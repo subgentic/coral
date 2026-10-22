@@ -141,7 +141,10 @@ export async function showFirewallWarning(message) {
 
 /** What Coral did to make an open data folder private: told once, as a fix, not as a warning (#295). */
 export function showSecurityNotice(message) {
+    if (!message || document.getElementById("security-notice-toast")) return;
     showWarningToast("security-notice-toast", "Data folder made private", message, "status");
+    // The status keeps the notice until the page that showed it says so: a CLI or another tab reading the status does not use it up.
+    fetch("/api/system/security-notice/ack", { method: "POST" }).catch(() => {});
 }
 
 /** The ids showed this database may be a copy of another Coral's (#12591): Coral runs as usual, and this warning offers "This is my data folder", which adopts the folder in place. adopt() resolves when it did. */
