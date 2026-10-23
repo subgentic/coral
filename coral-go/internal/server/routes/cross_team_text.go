@@ -51,7 +51,7 @@ func textFilesNotSet(teams []string) string {
 
 // textFilesOff is the refusal of a send with files from or to a team that does not share files.
 func textFilesOff(teams []string) string {
-	return fmt.Sprintf("Sharing files with other teams is off on %s. Ask the Operator to turn on Share files with teams on other computers in %s on each (the setting also covers files between teams on this computer). Nothing was sent.", teamList(teams), teamSettingsMessaging)
+	return fmt.Sprintf("Sharing files with other teams is off on %s. Ask the Operator to turn on Share files with teams on other computers in %s%s (the setting also covers files between teams on this computer). Nothing was sent.", teamList(teams), teamSettingsMessaging, eachIfMany(teams))
 }
 
 // textFilesTurnedOffMidSend is the refusal when the switch went off while files were on their way.
@@ -185,4 +185,12 @@ func joinRefusals(notSet func([]string) string, unset []string, off func([]strin
 		parts = append(parts, off(offTeams))
 	}
 	return strings.Join(parts, " ")
+}
+
+// eachIfMany is " on each" when more than one team is named: the setting is per team.
+func eachIfMany(teams []string) string {
+	if len(teams) > 1 {
+		return " on each"
+	}
+	return ""
 }
