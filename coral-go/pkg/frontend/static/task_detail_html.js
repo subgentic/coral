@@ -1,6 +1,7 @@
 /* The task detail dialog's markup (moved out of tasks.js, #4996; no behaviour change). */
 import { escapeHtml, escapeAttr } from './utils.js';
 import { _priorityLabel, formatTaskDate, _formatCost, _formatTokenCount } from './task_format.js';
+import { whenWords } from './job_words.js';
 import { serverUrl, artifactPath, contextServer, keyLabel, boardKeyName, splitKey, identityKey } from './server_base.js';
 import { _claimedFor } from './subagents.js';
 import { _verifyLine } from './task_verify_marks.js';
@@ -9,8 +10,8 @@ import { _getBoardProject } from './task_board_context.js';
 /** The top of the task detail: its title, lifecycle, priority, result and verification line. */
 function _taskDetailHeadHtml(task) {
     const statusLabel = task.workflow?.outcome === 'failed' ? 'Finished' : task.status === 'completed' ? 'Finished'
-        : task.status === 'review_pending' ? 'Open · Review pending (slot released)'
-        : task.workflow?.completion_review && task.status === 'in_progress' ? 'Open · Completion review requested (slot occupied)'
+        : task.status === 'review_pending' ? 'In review'
+        : task.workflow?.completion_review && task.status === 'in_progress' ? 'In progress · review requested'
         : task.status === 'in_progress' ? 'Open · In Progress'
         : task.status === 'skipped' ? 'Cancelled'
         : task.status === 'blocked' ? 'Blocked'
@@ -52,7 +53,7 @@ function _taskRevisionHtml(task) {
             const effective = amendment.effective_snapshot || {};
             const changes = amendment.changes || {};
             const fields = Object.keys(changes).map(field => `<div><strong>${escapeHtml(field === 'workflow_instructions' ? 'Instructions' : 'Description')}</strong>: ${escapeHtml(preview(previous[field]))} → ${escapeHtml(preview(effective[field] ?? changes[field]))}</div>`).join('');
-            return `<div class="task-amendment-entry"><strong>Revision ${Number(amendment.revision)}</strong> · ${escapeHtml(amendment.actor || 'Planner')} · ${escapeHtml(amendment.created_at || '')}<br><span>${escapeHtml(amendment.reason || '')}</span>${fields}</div>`;
+            return `<div class="task-amendment-entry"><strong>Revision ${Number(amendment.revision)}</strong> · ${escapeHtml(amendment.actor || 'Planner')} · ${escapeHtml(whenWords(amendment.created_at) || '')}<br><span>${escapeHtml(amendment.reason || '')}</span>${fields}</div>`;
         }).join('')}</details>` : ''}
     </div>`;
     return html;
@@ -67,10 +68,13 @@ function _taskWorkflowHtml(task) {
             const uri = String(a.uri || '');
             const coralMatch = /^coral:\/\/artifacts\/([a-f0-9]{64})$/i.exec(uri);
             const href = coralMatch ? serverUrl(artifactPath(coralMatch[1]), contextServer()) : uri;
-            const uriDisplay = (/^https?:\/\//i.test(uri) || coralMatch)
-                ? `<a href="${escapeAttr(coralMatch ? '#' : escapeAttr(href))}" data-artifact-uri="${escapeAttr(uri)}"${coralMatch ? ' data-on-click="task-artifact-open"' : ' target="_blank" rel="noopener noreferrer"'}>${escapeHtml(uri)}</a>`
-                : escapeHtml(uri);
-            return `<div class="task-detail-body"><strong>${escapeHtml(a.name)}</strong>${a.revision ? ` · ${escapeHtml(a.revision)}` : ''}${a.digest ? ` · ${escapeHtml(a.digest)}` : ''}${uri ? `<div>${uriDisplay}</div>` : ''}${a.content ? `<pre style="white-space:pre-wrap;overflow-wrap:anywhere">${escapeHtml(a.content)}</pre>` : ''}</div>`;
+            // A link is its name (the address is its title): a coral:// address is 64 characters and ran out of the dialog (#7182).
+            const linked = /^https?:\/\//i.test(uri) || coralMatch;
+            const nameHtml = linked
+                ? `<a href="${escapeAttr(coralMatch ? '#' : escapeAttr(href))}" data-artifact-uri="${escapeAttr(uri)}" title="${escapeAttr(uri)}"${coralMatch ? ' data-on-click="task-artifact-open"' : ' target="_blank" rel="noopener noreferrer"'}><strong>${escapeHtml(a.name || uri)}</strong></a>`
+                : `<strong>${escapeHtml(a.name)}</strong>`;
+            const uriDisplay = linked ? '' : escapeHtml(uri);
+            return `<div class="task-detail-body">${nameHtml}${a.revision ? ` · ${escapeHtml(a.revision)}` : ''}${a.digest ? ` · ${escapeHtml(a.digest)}` : ''}${uriDisplay ? `<div>${uriDisplay}</div>` : ''}${a.content ? `<pre style="white-space:pre-wrap;overflow-wrap:anywhere">${escapeHtml(a.content)}</pre>` : ''}</div>`;
         };
         html += `<details class="task-detail-section"><summary>Workflow${workflow.name ? `: ${escapeHtml(workflow.name)}` : ''}${workflow.stage ? ` · ${escapeHtml(workflow.stage)}` : ''}</summary>
             <div class="task-detail-body">${escapeHtml(workflow.instructions || '')}</div>
@@ -83,11 +87,12 @@ function _taskWorkflowHtml(task) {
         for (const input of workflow.inputs || []) html += `<details class="task-detail-section"><summary>Input from ${escapeHtml(input.board_id)} #${Number(input.task_id)} (${escapeHtml(input.outcome)})</summary>${(input.artifacts || []).map(artifactHtml).join('')}</details>`;
         if (workflow.completion_review) {
             const review = workflow.completion_review;
-            html += `<div class="task-detail-section"><div class="task-detail-label">Completion candidate · not an accepted result</div>
-                <div class="task-detail-body">Submitted by ${escapeHtml(review.submitted_by)} · ${escapeHtml(review.submitted_at)}<br>
-                Proposed outcome: ${escapeHtml(review.proposed_outcome)}<br>${escapeHtml(review.reason)}<br>${escapeHtml(review.message || '')}</div>
+            // In words a person reads (#7182): who, when (the app's times), what they propose, what it waits for; not "completion candidate", "slot" or an ISO time.
+            const note = [review.reason && review.reason !== 'review pending' ? escapeHtml(review.reason) : '', escapeHtml(review.message || '')].filter(Boolean).join('<br>');
+            html += `<div class="task-detail-section"><div class="task-detail-label">Submitted for review · not accepted yet</div>
+                <div class="task-detail-body">Submitted by ${escapeHtml(review.submitted_by)}, ${escapeHtml(whenWords(review.submitted_at))}<br>Proposed result: ${escapeHtml(review.proposed_outcome)}${note ? `<br>${note}` : ''}</div>
                 ${(review.artifacts || []).map(artifactHtml).join('')}
-                ${review.released_by ? `<div>Slot released by ${escapeHtml(review.released_by)} · ${escapeHtml(review.released_at)}: ${escapeHtml(review.release_reason)}</div>` : '<div>The worker slot is still occupied. An orchestrator can release it with coral-board task release-review.</div>'}</div>`;
+                ${review.released_by ? `<div class="task-detail-body">Waiting for the Orchestrator to pick reviewers.<br>Released by ${escapeHtml(review.released_by)}, ${escapeHtml(whenWords(review.released_at))}${review.release_reason ? `: ${escapeHtml(review.release_reason)}` : ''}</div>` : '<div class="task-detail-body">The agent still holds this task. An orchestrator can release it with coral-board task release-review.</div>'}</div>`;
         }
         if (workflow.artifacts?.length) html += `<div class="task-detail-section"><div class="task-detail-label">Completion artifacts</div>${workflow.artifacts.map(artifactHtml).join('')}</div>`;
     }

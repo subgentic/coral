@@ -965,9 +965,8 @@ body.panel-dragging .agentic-state {
     opacity: 0.65;
 }
 
-.board-task-item.in-progress .board-task-desc {
-    color: var(--accent);
-}
+.board-task-item:not(.board-task-header) .board-task-desc { color: var(--link-text); } /* every title is the link it is (#7182); the working one is told by its status icon, not by being the only blue title */
+.board-task-item.completed:not(.board-task-header) .board-task-desc { text-decoration: line-through; text-decoration-thickness: 1px; } /* a finished title keeps the full link colour (4.5:1 in both themes; a 60% mix measured 3.3 and 2.9): the line and the check icon say it is done */
 
 .board-task-status-icon {
     font-size: var(--icon-inline-size);
@@ -989,7 +988,6 @@ body.panel-dragging .agentic-state {
     font-weight: 600;
     padding: 2px 6px;
     border-radius: var(--radius-sm);
-    text-transform: uppercase;
     flex-shrink: 0;
     width: 58px;
     text-align: center;
@@ -2625,3 +2623,10 @@ button.team-artifact-name { cursor: pointer; }
 
 /* The list bar's search field, Filters, First, Latest, chips and selects draw in the app's font, not the browser's default for form controls (UI/UX's nit on #7315). */
 .list-bar-search, .list-bar-filter-btn, .list-bar-clear-all, .list-bar-select, .list-bar-by, .list-bar-chip, .list-bar-field input { font-family: inherit; }
+/* The task detail (#7182): the lifecycle chip wraps and Priority goes under it instead of the row running out of a phone's dialog; a long word never pushes the dialog wider. */
+.task-detail-meta { flex-wrap: wrap; }
+.task-detail-status { text-transform: none; white-space: normal; overflow-wrap: anywhere; }
+#task-detail-modal .task-detail-body, #task-detail-modal .task-detail-body a { overflow-wrap: anywhere; }
+@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
+    .task-detail-meta { flex-direction: column; align-items: flex-start; }
+}

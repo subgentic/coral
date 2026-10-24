@@ -561,13 +561,16 @@
 1	task_detail_html.js	depsHtml
 1	task_detail_html.js	fields
 1	task_detail_html.js	lc.request_count
+1	task_detail_html.js	nameHtml
+1	task_detail_html.js	note
+1	task_detail_html.js	note ? `<br>${note}` : ''
 1	task_detail_html.js	priorityClass
 1	task_detail_html.js	revision
 1	task_detail_html.js	statusClass
 1	task_detail_html.js	statusLabel
 1	task_detail_html.js	task.priority ? (_priorityLabel[task.priority] || escapeHtml(task.priority)) : '\u2014'
-1	task_detail_html.js	uri ? `<div>${uriDisplay}</div>` : ''
 1	task_detail_html.js	uriDisplay
+1	task_detail_html.js	uriDisplay ? `<div>${uriDisplay}</div>` : ''
 2	task_detail_html.js	warningClass
 1	task_detail_html.js	workflow.artifacts.map(artifactHtml).join('')
 1	task_list.js	_goalChip(t)
