@@ -318,6 +318,9 @@ type GoalPage struct {
 	// Seq is the board's goals change counter (the one the live feed's goals_brief carries), on a board's own list: it moves on every goal write and every task change that touches a goal, so a caller that
 	// remembers the last one knows whether anything changed (#7296). Absent on the all-boards read.
 	Seq int64 `json:"seq,omitempty"`
+	// NoGoalOpen is how many of the board's open tasks (pending, in progress, blocked, draft, in review) serve no goal: the same number on every page of a listing and under every state filter, 0 for a board
+	// with no tasks (#7292). It is a pointer so the machine-wide read (AllGoalsPage, GET /api/goals) leaves it out instead of answering 0 for every board together.
+	NoGoalOpen *int `json:"no_goal_open,omitempty"`
 }
 
 // goalStatesKey is the filter a goal cursor is bound to: the states asked for, each once, in a fixed order, so a cursor made for one filter is refused under another (#7239).
@@ -396,7 +399,23 @@ func (s *Store) GoalPage(ctx context.Context, board string, q GoalListQuery) (*G
 	if err := s.reader().GetContext(ctx, &seq, `SELECT seq FROM board_goal_meta WHERE board_id = ?`, board); err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
 	}
-	return &GoalPage{Goals: goals, NextCursor: next, Seq: seq}, nil
+	noGoal, err := s.noGoalOpenTasks(ctx, board)
+	if err != nil {
+		return nil, err
+	}
+	return &GoalPage{Goals: goals, NextCursor: next, Seq: seq, NoGoalOpen: &noGoal}, nil
+}
+
+// noGoalOpenTasks counts the board's open tasks that link to no goal: one count over idx_board_tasks_board_status.
+func (s *Store) noGoalOpenTasks(ctx context.Context, board string) (int, error) {
+	marks := strings.TrimSuffix(strings.Repeat("?,", len(openTaskStatuses)), ",")
+	args := []any{board}
+	for _, st := range openTaskStatuses {
+		args = append(args, st)
+	}
+	var n int
+	err := s.reader().GetContext(ctx, &n, `SELECT COUNT(*) FROM board_tasks WHERE board_id = ? AND status IN (`+marks+`) AND goal_id IS NULL`, args...)
+	return n, err
 }
 
 // AllGoalsQuery selects goals across boards (#7260): States as GoalListQuery's, Boards narrows to the boards named (none: every board), Limit and Cursor as the board's own.

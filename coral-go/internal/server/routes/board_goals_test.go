@@ -493,3 +493,50 @@ func TestTaskListRefusesFullWithGoal(t *testing.T) {
 	code, out = call("GET", "/api/board/team/tasks?full=1", nil)
 	assert.Equal(t, 200, code, "full alone is unchanged: %v", out)
 }
+
+// #7292: GET /api/board/{p}/goals carries no_goal_open, the count of the board's open tasks that serve no goal, beside goals and next_cursor, on every page.
+func TestGoalListCarriesNoGoalOpen(t *testing.T) {
+	server, h := setupBoardTestServer(t)
+	ctx := context.Background()
+	call := goalCall(t, server.URL)
+	registerTaskPlanner(t, h, "team", "Orchestrator")
+	var goalIDs []int64
+	for i := 0; i < 3; i++ {
+		code, g := call("POST", "/api/board/team/goals", map[string]any{"title": "goal " + itoa(int64(i)), "subscriber_id": "Orchestrator"})
+		require.Equal(t, http.StatusCreated, code, "%v", g)
+		goalIDs = append(goalIDs, int64(g["id"].(float64)))
+	}
+	code, out := call("GET", "/api/board/team/goals", nil)
+	require.Equal(t, 200, code)
+	assert.EqualValues(t, 0, out["no_goal_open"], "no tasks: 0, and the key is there")
+	for i := 0; i < 3; i++ {
+		_, err := h.bs.CreateTask(ctx, "team", "loose "+itoa(int64(i)), "", "medium", "Orchestrator")
+		require.NoError(t, err)
+	}
+	linked, err := h.bs.CreateTask(ctx, "team", "linked", "", "medium", "Orchestrator")
+	require.NoError(t, err)
+	require.NoError(t, h.bs.SetTaskGoal(ctx, "team", linked.ID, &goalIDs[0]))
+
+	code, out = call("GET", "/api/board/team/goals?limit=2", nil)
+	require.Equal(t, 200, code)
+	assert.EqualValues(t, 3, out["no_goal_open"])
+	cursor, _ := out["next_cursor"].(string)
+	require.NotEmpty(t, cursor)
+	code, out = call("GET", "/api/board/team/goals?limit=2&cursor="+cursor, nil)
+	require.Equal(t, 200, code)
+	assert.EqualValues(t, 3, out["no_goal_open"], "the last page carries it too")
+	assert.Equal(t, "", out["next_cursor"])
+	code, out = call("GET", "/api/board/team/goals?state=done,dropped", nil)
+	require.Equal(t, 200, code)
+	assert.Empty(t, goalsOf(t, out))
+	assert.EqualValues(t, 3, out["no_goal_open"], "a filter with no goals still carries it")
+
+	// the machine-wide list is not a board's: it has no such key, on any page
+	code, all := call("GET", "/api/goals", nil)
+	require.Equal(t, 200, code)
+	assert.NotContains(t, all, "no_goal_open", "GET /api/goals has no no_goal_open: a 0 there would be wrong for every board together")
+	assert.NotEmpty(t, goalsOf(t, all))
+	code, all = call("GET", "/api/goals?limit=1", nil)
+	require.Equal(t, 200, code)
+	assert.NotContains(t, all, "no_goal_open")
+}
