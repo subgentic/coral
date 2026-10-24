@@ -1,6 +1,6 @@
 // A waiting agent or task says which goal it serves (#7302, the Operator: "the task/agent that are waiting can let me know which goal it is a part of"): in the Inbox's Needs you a row shows a quiet link
 // "Goal: <title>" under it when the live row carries a goal (live rows: goal {id, title, board}, #7301), and nothing when it has none; the link opens the goal on its board's Goals face. In the Tasks panel
-// an opened task shows the same link when the row carries goal_id and goal_title (the route's answer is stubbed here: the field is added to its whitelist separately, #7345). Real board over the API for the goal.
+// an opened task shows the same link when the row carries goal_id and goal_title (goal_id and goal_title come from the route's own answer, #7345). Real board over the API for the goal.
 // Drives Chrome over CDP against the isolated dev server (its rows are removed again).
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -38,7 +38,6 @@ const BASE = require('./test_base').BASE;
         assert.equal(await ev(`document.activeElement.id`), 'goals-detail-title', 'the focus is on the goal\'s heading');
 
         console.log('3. an opened task in the Inbox shows the same link when its row carries a goal, and nothing when it has none');
-        await ev(`(() => { const real = window.fetch; window.fetch = async (u, o) => { const r = await real(u, o); if (!/\\/api\\/board\\/tasks\\?/.test(String(u))) return r; const j = await r.json(); j.tasks = (j.tasks || []).map(t => t.title === 'Sign the installer' ? { ...t, goal_id: ${g.json.id}, goal_title: 'Ship the new installer' } : t); return new Response(JSON.stringify(j), { status: 200, headers: { 'Content-Type': 'application/json' } }); }; return true; })()`);
         await ev(`document.getElementById('nav-tab-hub-inbox').click(); true`);
         await waitFor(`!!document.getElementById('inbox-tab-tasks') && document.getElementById('inbox-tab-tasks').getClientRects().length > 0`, 'the Inbox tabs', 8000);
         await ev(`document.getElementById('inbox-tab-tasks').click(); true`);
