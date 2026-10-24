@@ -965,9 +965,8 @@ body.panel-dragging .agentic-state {
     opacity: 0.65;
 }
 
-.board-task-item.in-progress .board-task-desc {
-    color: var(--accent);
-}
+.board-task-item:not(.board-task-header) .board-task-desc { color: var(--link-text); } /* every title is the link it is (#7182); the working one is told by its status icon, not by being the only blue title */
+.board-task-item.completed:not(.board-task-header) .board-task-desc { text-decoration: line-through; text-decoration-thickness: 1px; } /* a finished title keeps the full link colour (4.5:1 in both themes; a 60% mix measured 3.3 and 2.9): the line and the check icon say it is done */
 
 .board-task-status-icon {
     font-size: var(--icon-inline-size);
@@ -989,7 +988,6 @@ body.panel-dragging .agentic-state {
     font-weight: 600;
     padding: 2px 6px;
     border-radius: var(--radius-sm);
-    text-transform: uppercase;
     flex-shrink: 0;
     width: 58px;
     text-align: center;
@@ -2621,3 +2619,11 @@ button.team-artifact-name { cursor: pointer; }
 /* A task names its goal (#7253): a quiet chip on a Tasks row and the Goal line's button in a task's detail. */
 .board-task-goal { display: inline-block; margin-left: 6px; padding: 0 6px; border: 1px solid var(--border-light); border-radius: 999px; color: var(--text-secondary); font-size: var(--fs-base); max-width: 16em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
 .task-goal-link { background: none; border: 0; padding: 0; font: inherit; color: var(--accent); text-decoration: underline; cursor: pointer; text-align: left; overflow-wrap: anywhere; }
+
+/* The task detail (#7182): the lifecycle chip wraps and Priority goes under it instead of the row running out of a phone's dialog; a long word never pushes the dialog wider. */
+.task-detail-meta { flex-wrap: wrap; }
+.task-detail-status { text-transform: none; white-space: normal; overflow-wrap: anywhere; }
+#task-detail-modal .task-detail-body, #task-detail-modal .task-detail-body a { overflow-wrap: anywhere; }
+@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
+    .task-detail-meta { flex-direction: column; align-items: flex-start; }
+}

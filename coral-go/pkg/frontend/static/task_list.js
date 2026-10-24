@@ -645,6 +645,8 @@ function _updateTaskCount(boardTasks, otherTasks, completedCount) {
         const total = boardTotal + otherTasks.length;
         const countText = total > 0 ? `${completedCount}/${total}` : '';
         if (countEl.textContent !== countText) countEl.textContent = countText; // same text: no new text node, no layout
+        const tab = document.getElementById('agentic-tab-tasks'); // the badge in words (#7182): "1/4" says nothing to a screen reader or a first look
+        if (tab) { const name = total > 0 ? `Tasks, ${completedCount} of ${total} done` : 'Tasks'; if (tab.getAttribute('aria-label') !== name) tab.setAttribute('aria-label', name); const tip = total > 0 ? `${completedCount} of ${total} done` : ''; if (countEl.title !== tip) countEl.title = tip; }
     }
 }
 
