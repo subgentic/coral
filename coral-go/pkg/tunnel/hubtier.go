@@ -17,10 +17,17 @@ type hubTierKey struct{}
 
 // WithHubTier returns ctx carrying the viewer's effective tier, "view", "interact" or
 // "launch" (exactly, lower case). Session.RoundTrip and Session.DialWS send it with the
-// stream. Anything else is ignored, so the connector treats the stream as View.
+// stream. An empty tier is no tier: the stream carries none (an older hub) and only the
+// computer's mode holds it, as before. A tier that is there but is not exactly one of the three
+// is carried as "view", never dropped: a dropped one would arrive as no tier, which is the
+// highest ceiling, so a misspelling ("Launch") fails closed, for requests, terminal frames and
+// redaction alike (#7278).
 func WithHubTier(ctx context.Context, tier string) context.Context {
-	if _, ok := parseHubTier(tier); !ok {
+	if tier == "" {
 		return ctx
+	}
+	if _, ok := parseHubTier(tier); !ok {
+		tier = "view"
 	}
 	return context.WithValue(ctx, hubTierKey{}, tier)
 }

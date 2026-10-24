@@ -28,9 +28,13 @@ func TestParseHubTier(t *testing.T) {
 	} {
 		assert.Equal(t, want, viewerTier(Header{HubTier: in}), "%q", in)
 	}
-	ctx := WithHubTier(context.Background(), "Launch")
-	assert.Empty(t, hubTierFrom(ctx), "the hub side ignores an inexact value too")
+	// A tier that is there but is not exactly one of the three is carried as View, never dropped: a dropped one would arrive as "no tier", which only the computer's mode holds (#7278, QA's #7274 note 3).
+	for _, bad := range []string{"Launch", "LAUNCH", " launch", "launch ", "admin", "never", "view,launch", "owner"} {
+		assert.Equal(t, "view", hubTierFrom(WithHubTier(context.Background(), bad)), "%q is held as View", bad)
+	}
+	assert.Empty(t, hubTierFrom(WithHubTier(context.Background(), "")), "an absent tier stays absent: held by the computer's mode only")
 	assert.Equal(t, "interact", hubTierFrom(WithHubTier(context.Background(), "interact")))
+	assert.Equal(t, "launch", hubTierFrom(WithHubTier(context.Background(), "launch")))
 }
 
 // Redacted for a viewer who can only look: the lower of the viewer's tier and the computer's mode

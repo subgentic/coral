@@ -264,8 +264,10 @@ type Header struct {
 	// reaches the local API; an old hub doesn't send it.
 	HubUser string `json:"hub_user,omitempty"`
 	// HubTier is the viewer's effective tier ("view", "interact" or "launch"), set from the
-	// hub's context (WithHubTier); it decides only whether answers are redacted (hubtier.go).
-	// Missing or anything else is View.
+	// hub's context (WithHubTier): it decides whether answers are redacted and the highest
+	// request and terminal frame the viewer may make (hubtier.go, #7076). Missing is held only by
+	// the computer's mode for requests and frames, and is View for redaction; any other value is
+	// View for all three.
 	HubTier string `json:"hub_tier,omitempty"`
 	// HubRole is "owner" when the viewer is the hub account this machine is enrolled to, set by the hub on the two update routes only
 	// (hubrole.go, #5280). Missing or anything else is no role.

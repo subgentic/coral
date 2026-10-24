@@ -3,6 +3,7 @@ package tunnel
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"strings"
 	"sync/atomic"
@@ -172,5 +173,71 @@ func TestViewerTierLeavesTheLiveFeedSocketOpen(t *testing.T) {
 			t.Fatalf("%q: the frame did not reach the feed", tier)
 		}
 		w.CloseNow()
+	}
+}
+
+// viewerMayUse (#7278, QA's #7274 note 4): a route that is not in the table (Never) is refused for a viewer below Launch, whatever it asks; at Launch the computer's mode (AllowRequest) is what refuses it. The
+// Never clause matters because TierNever is the lowest value: without it, "no higher than the ceiling" would let every unlisted route through.
+func TestViewerMayUseRefusesANeverRouteBelowLaunch(t *testing.T) {
+	require.Equal(t, TierNever, Classify("POST", "/api/not-a-route", ""), "the probe route is not in the table")
+	require.Equal(t, TierNever, Classify("GET", "/api/settings", ""))
+	for _, c := range []struct{ method, path string }{{"POST", "/api/not-a-route"}, {"GET", "/api/settings"}, {"DELETE", "/api/anything-else"}} {
+		for _, tier := range []string{"view", "interact", "Interact", "bogus"} {
+			assert.False(t, viewerMayUse(Header{HubTier: tier}, c.method, c.path), "%s %s at %q", c.method, c.path, tier)
+		}
+	}
+	assert.True(t, viewerMayUse(Header{HubTier: "view"}, "GET", "/api/sessions/live"), "a read is open to View")
+	assert.False(t, viewerMayUse(Header{HubTier: "view"}, "POST", "/api/sessions/live/a/send"), "an input is not")
+	assert.True(t, viewerMayUse(Header{HubTier: "interact"}, "POST", "/api/sessions/live/a/send"))
+}
+
+// A hub that sends a tier spelled wrong (an embedder that passes the raw value) is held as View end to end: requests, the terminal's input frames and redaction, through a real session (#7278).
+func TestAWronglySpelledTierIsHeldAsViewEverywhere(t *testing.T) {
+	tok := fake("ghp_", 36, alnum)
+	hub := newHub(t, fastCfg())
+	fc := &fakeCoral{}
+	inner := fc.handler()
+	local := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/sessions/live/a/capture" {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"output":"token ` + tok + ` here"}`))
+			return
+		}
+		inner.ServeHTTP(w, r)
+	})
+	sess, _ := connect(t, hub, local, func(l *LocalHandler) {
+		l.AllowRequest = AllowRequest(func() Mode { return TierLaunch })
+		l.MaxMode = func() Mode { return TierLaunch }
+		l.RedactTokens = func() bool { return true }
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	in, _ := json.Marshal(map[string]string{"type": "terminal_input", "data": "rm -rf ~\n"})
+	for _, bad := range []string{"Launch", "LAUNCH", " launch", "admin"} {
+		c := WithHubTier(ctx, bad)
+		// the request gate
+		req, _ := http.NewRequestWithContext(c, "POST", "http://x/api/sessions/live/a/send", strings.NewReader("{}"))
+		_, err := sess.RoundTrip(req)
+		require.Error(t, err, "%q: an input request is refused", bad)
+		assert.Contains(t, err.Error(), "path_not_allowed", bad)
+		// redaction
+		req, _ = http.NewRequestWithContext(c, "GET", "http://x/api/sessions/live/a/capture", nil)
+		resp, err := sess.RoundTrip(req)
+		require.NoError(t, err, bad)
+		b, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		assert.NotContains(t, string(b), tok, "%q: redacted like a View viewer", bad)
+		// the frame gate
+		before := len(fc.seenInputs())
+		ws, err := sess.DialWS(c, "/ws/terminal/a", "", nil)
+		require.NoError(t, err, bad)
+		_, _, _ = ws.Read(ctx)
+		require.NoError(t, ws.Write(ctx, websocket.MessageText, in), bad)
+		_, _, err = ws.Read(ctx)
+		require.Error(t, err, bad)
+		assert.Equal(t, websocket.StatusPolicyViolation, websocket.CloseStatus(err), "%q: input closes the stream", bad)
+		ws.CloseNow()
+		time.Sleep(50 * time.Millisecond)
+		assert.Len(t, fc.seenInputs(), before, "%q: no input reached the terminal", bad)
 	}
 }
