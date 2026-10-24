@@ -338,8 +338,13 @@ function _initKeyboardDetection() {
     // a keyboard and leaves the page its whole screen: read plainly, the zoom made the page, and the viewer (position fixed, height from this) half as tall, a screen with its lower half empty (#5493).
     const visibleHeight = () => Math.round(window.visualViewport.height * (window.visualViewport.scale || 1));
 
+    // The page's height follows the visible screen on a phone's layout and on any touch screen (#7326): an iPad is wider than the phone layout, and its Safari answers a rotation, the keyboard going
+    // away or a toolbar changing size with a stale 100dvh (a band under the page, sidebar and composer). A mouse-and-window desktop keeps the CSS's own 100dvh.
+    const coarse = () => typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
+    const follows = () => isMobile() || coarse();
+
     const updateViewportHeight = () => {
-        if (!isMobile()) {
+        if (!follows()) {
             document.documentElement.style.removeProperty('--visual-viewport-height');
             return;
         }
@@ -351,8 +356,9 @@ function _initKeyboardDetection() {
     updateViewportHeight();
 
     window.visualViewport.addEventListener('resize', () => {
-        if (!isMobile()) return;
+        if (!follows()) return;
         updateViewportHeight();
+        if (!isMobile()) return;
 
         // Keyboard is open when viewport shrinks significantly (>100px)
         const heightDiff = initialHeight - visibleHeight();
@@ -382,6 +388,14 @@ function _initKeyboardDetection() {
         }
         updateViewportHeight();
     });
+
+    // Safari reports a height that is still the old one right after a rotation, after the keyboard is dismissed (no resize event comes), when a page comes back from the back-forward cache and when the
+    // tab is shown again: read it again at each, now and a little later, so a stale height does not stay (#7326).
+    const reread = () => { updateViewportHeight(); for (const ms of [150, 500, 1000]) setTimeout(updateViewportHeight, ms); };
+    window.addEventListener('orientationchange', reread);
+    window.addEventListener('pageshow', reread);
+    window.addEventListener('focusout', reread);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reread(); });
 }
 
 // ── Top Bar Height ────────────────────────────────────────────────────────
