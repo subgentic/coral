@@ -567,3 +567,35 @@ func TestTaskQueryTextOverHTTP(t *testing.T) {
 	n, _, _ = total("q=redacted&fields=id,title")
 	assert.Equal(t, 0, n, "the stored text has no marker")
 }
+
+// #7345: goal_id and goal_title are fields the Inbox can ask for; the title is the task's own board's goal, never another board's, and nothing else changes.
+func TestTaskQueryFieldsGoalIDAndGoalTitle(t *testing.T) {
+	e := newTQEnv(t)
+	e.seed()
+	ctx := context.Background()
+	g, err := e.bs.CreateGoal(ctx, "alpha", board.GoalInput{Title: "Ship the beta"})
+	require.NoError(t, err)
+	require.NoError(t, e.bs.SetTaskGoal(ctx, "alpha", e.ids["a"], &g.ID))
+
+	code, out, body := e.get("fields=id,title,goal_id,goal_title")
+	require.Equal(t, 200, code, body)
+	for _, r := range out["tasks"].([]any) {
+		m := r.(map[string]any)
+		if m["title"] == "a" {
+			assert.EqualValues(t, g.ID, m["goal_id"])
+			assert.Equal(t, "Ship the beta", m["goal_title"])
+			continue
+		}
+		assert.Contains(t, m, "goal_id", "a named field is always there, null like the other nullable ones")
+		assert.Nil(t, m["goal_id"])
+		assert.NotContains(t, m, "goal_title", "no goal, no title")
+	}
+	assert.NotContains(t, body, "_goal", "the hidden column is never in the answer")
+
+	_, _, body = e.get("fields=summary")
+	assert.NotContains(t, body, "goal_", "the summary set does not grow")
+
+	code, _, body = e.get("fields=id,goal_titel")
+	assert.Equal(t, 400, code)
+	assert.Contains(t, body, "goal_title", "the 400 lists the real names")
+}

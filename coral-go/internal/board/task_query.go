@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"sort"
 	"strconv"
@@ -29,19 +30,20 @@ var TaskQueryLargeFields = []string{"body", "completion_message"}
 // review rounds own that) nor last_activity_at (the stall timer's).
 const updatedAtSQL = `MAX(created_at, COALESCE(claimed_at, created_at), COALESCE(completed_at, created_at), COALESCE(last_activity_at, created_at), COALESCE(edited_at, created_at))`
 
-// taskQueryColumns maps each field the caller may name to its SQL. board_label is not a column: it is filled from the boards.
+// taskQueryColumns maps each field the caller may name to its SQL. board_label and goal_title are not columns: board_label is filled from the boards,
+// goal_title (#7345) from the task's own board's goals (FillGoalTitles), which the page reads through a hidden goal_id column.
 var taskQueryColumns = map[string]string{
 	"id": "id", "revision": "revision", "board_id": "board_id", "title": "title", "status": "status", "priority": "priority",
 	"created_by": "created_by", "assigned_to": "assigned_to", "completed_by": "completed_by",
 	"parked_reason": "parked_reason", "parked_until": "parked_until", "remind_at": "remind_at",
 	"created_at": "created_at", "claimed_at": "claimed_at", "completed_at": "completed_at", "updated_at": updatedAtSQL,
-	"body": "body", "completion_message": "completion_message",
+	"body": "body", "completion_message": "completion_message", "goal_id": "goal_id",
 }
 
 // TaskQueryFieldNames lists every field a caller may name (besides the word summary), sorted for the docs and the 400 message.
 func TaskQueryFieldNames() []string {
 	return []string{"assigned_to", "board_id", "board_label", "body", "claimed_at", "completed_at", "completed_by", "completion_message",
-		"created_at", "created_by", "id", "parked_reason", "parked_until", "priority", "remind_at", "revision", "status", "title", "updated_at", "verification"}
+		"created_at", "created_by", "goal_id", "goal_title", "id", "parked_reason", "parked_until", "priority", "remind_at", "revision", "status", "title", "updated_at", "verification"}
 }
 
 var (
@@ -294,7 +296,7 @@ func parseQueryFields(vals []string) ([]string, error) {
 			}
 			continue
 		}
-		if _, ok := taskQueryColumns[n]; !ok && n != "board_label" && n != "verification" {
+		if _, ok := taskQueryColumns[n]; !ok && n != "board_label" && n != "verification" && n != "goal_title" {
 			bad = append(bad, n)
 			continue
 		}
@@ -456,6 +458,7 @@ func (s *Store) QueryTasks(ctx context.Context, q *TaskQuery) (*TaskQueryResult,
 	if slices.Contains(q.Fields, "board_label") {
 		s.addBoardLabels(ctx, page.res.Tasks, page.boards)
 	}
+	s.addGoalTitles(ctx, page, q.Fields)
 	if wantVerification {
 		if err := s.addVerification(ctx, page.res.Tasks, page.vTasks); err != nil {
 			return nil, err
@@ -495,10 +498,10 @@ func taskQueryStatement(q *TaskQuery) (stmt string, args []any, wantVerification
 }
 
 // taskQueryColumnList is the columns asked for, each under its field's name, then the hidden ones every page needs
-// (_id, _board, _sort) and, for verification, _status and _completed. board_label and verification are not columns.
+// (_id, _board, _sort), for verification _status and _completed, and for goal_title _goal. board_label, goal_title and verification are not columns.
 func taskQueryColumnList(fields []string, sortExpr string) (cols []string, wantVerification bool) {
 	for _, f := range fields {
-		if f == "board_label" {
+		if f == "board_label" || f == "goal_title" {
 			continue
 		}
 		if f == "verification" {
@@ -509,6 +512,9 @@ func taskQueryColumnList(fields []string, sortExpr string) (cols []string, wantV
 	}
 	if wantVerification {
 		cols = append(cols, `status AS "_status"`, `completed_at AS "_completed"`)
+	}
+	if slices.Contains(fields, "goal_title") {
+		cols = append(cols, `goal_id AS "_goal"`)
 	}
 	cols = append(cols, `id AS "_id"`, `board_id AS "_board"`, sortExpr+` AS "_sort"`)
 	return cols, wantVerification
@@ -576,6 +582,7 @@ func taskQueryWhere(q *TaskQuery, sortExpr string) (join string, where []string,
 type taskQueryPage struct {
 	res    *TaskQueryResult
 	boards []string
+	goals  []*int64 // row i's goal id, kept only when goal_title was asked for
 	ids    []int64
 	vTasks []Task
 	last   queryTaskCursor
@@ -606,6 +613,7 @@ func scanTaskQueryPage(rows *sqlx.Rows, q *TaskQuery, wantVerification bool) (*t
 		board, _ := m["_board"].(string)
 		page.boards = append(page.boards, board)
 		page.ids = append(page.ids, id)
+		page.takeGoal(m)
 		if wantVerification {
 			t := Task{ID: id}
 			t.Status, _ = m["_status"].(string)
@@ -645,15 +653,25 @@ func (p *taskQueryPage) inRequestOrder(ids []int64) {
 	if len(p.vTasks) == len(order) {
 		vTasks = make([]Task, len(order))
 	}
+	var goals []*int64
+	if len(p.goals) == len(order) {
+		goals = make([]*int64, len(order))
+	}
 	found := map[int64]bool{}
 	for to, from := range order {
 		tasks[to], boards[to], sorted[to] = p.res.Tasks[from], p.boards[from], p.ids[from]
 		if vTasks != nil {
 			vTasks[to] = p.vTasks[from]
 		}
+		if goals != nil {
+			goals[to] = p.goals[from]
+		}
 		found[p.ids[from]] = true
 	}
 	p.res.Tasks, p.boards, p.ids, p.vTasks = tasks, boards, sorted, vTasks
+	if goals != nil {
+		p.goals = goals
+	}
 	p.res.Missing = []int64{}
 	for _, id := range ids {
 		if !found[id] {
@@ -668,6 +686,41 @@ func (s *Store) addBoardLabels(ctx context.Context, tasks []map[string]any, boar
 	for i, m := range tasks {
 		if l := labels[boards[i]]; l != "" {
 			m["board_label"] = l
+		}
+	}
+}
+
+// takeGoal moves a row's hidden goal column into the page's list (and out of the row, so it is never in an answer).
+func (p *taskQueryPage) takeGoal(m map[string]any) {
+	g, has := m["_goal"]
+	if !has {
+		return
+	}
+	var id *int64
+	if v, ok := g.(int64); ok {
+		id = &v
+	}
+	p.goals = append(p.goals, id)
+	delete(m, "_goal")
+}
+
+// addGoalTitles sets each row's goal_title when it was asked for: the title of the task's goal on its own board, read once for the page (FillGoalTitles).
+// A task with no goal, or whose goal id belongs to another board, has no title and the key is left out.
+func (s *Store) addGoalTitles(ctx context.Context, p *taskQueryPage, fields []string) {
+	if !slices.Contains(fields, "goal_title") || len(p.goals) != len(p.res.Tasks) {
+		return
+	}
+	tasks := make([]Task, len(p.goals))
+	for i := range tasks {
+		tasks[i].BoardID, tasks[i].GoalID = p.boards[i], p.goals[i]
+	}
+	if err := s.FillGoalTitles(ctx, tasks); err != nil {
+		slog.Warn("could not read the goal titles of the tasks", "error", err)
+		return
+	}
+	for i := range tasks {
+		if tasks[i].GoalTitle != "" {
+			p.res.Tasks[i]["goal_title"] = tasks[i].GoalTitle
 		}
 	}
 }

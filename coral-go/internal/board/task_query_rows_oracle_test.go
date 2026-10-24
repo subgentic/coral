@@ -98,7 +98,7 @@ func some(rng *rand.Rand, vals []string, n int) []string {
 
 func randomValidTaskQuery(rng *rand.Rand) TaskQueryParams {
 	var p TaskQueryParams
-	fieldNames := append(TaskQueryFieldNames(), "summary")
+	fieldNames := append(oracleFieldNames(), "summary")
 	switch rng.Intn(4) {
 	case 0: // none: the hidden columns only
 	case 1:

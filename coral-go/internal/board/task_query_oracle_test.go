@@ -73,10 +73,22 @@ func pickVals(rng *rand.Rand, good []string, hostile bool) []string {
 	return out
 }
 
+// oracleFieldNames are the field names the frozen old implementation knew: goal_title (#7345) is new and has its own test, so the old-vs-new oracles
+// do not draw it.
+func oracleFieldNames() []string {
+	var out []string
+	for _, n := range TaskQueryFieldNames() {
+		if n != "goal_title" {
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
 // randomTaskQueryParams makes one parameter hostile (or none, a request of right values only) and gives the others
 // right values or none, so every parameter, the late ones included, is reached.
 func randomTaskQueryParams(rng *rand.Rand) TaskQueryParams {
-	fields := append(append([]string{"summary", "board_label", "verification", "nope"}, TaskQueryFieldNames()...), "body", "completion_message")
+	fields := append(append([]string{"summary", "board_label", "verification", "nope"}, oracleFieldNames()...), "body", "completion_message")
 	people := []string{"Dev 1", "QA", "Orchestrator", "dev 1"}
 	since := []string{"2026-10-18T00:00:00Z", "2026-10-18T09:30:00+02:00", "2026-10-18", "yesterday", "2026-13-01T00:00:00Z"}
 	limits := []string{"1", "25", "100", "101", "500", "501", "0", "-1", "01", "1e3", " 5", "5 ", "abc", "99999999999999999999"}

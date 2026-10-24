@@ -127,6 +127,7 @@ func (s *Store) queryTasksText(ctx context.Context, q *TaskQuery) (*TaskQueryRes
 		page.last = queryTaskCursor{Sort: sortName, Desc: q.Desc, Val: sortVal, ID: id}
 		board, _ := m["_board"].(string)
 		page.boards = append(page.boards, board)
+		page.takeGoal(m)
 		if wantVerification {
 			t := Task{ID: id}
 			t.Status, _ = m["_status"].(string)
@@ -146,6 +147,7 @@ func (s *Store) queryTasksText(ctx context.Context, q *TaskQuery) (*TaskQueryRes
 	if slices.Contains(q.Fields, "board_label") {
 		s.addBoardLabels(ctx, page.res.Tasks, page.boards)
 	}
+	s.addGoalTitles(ctx, page, q.Fields)
 	if wantVerification {
 		if err := s.addVerification(ctx, page.res.Tasks, page.vTasks); err != nil {
 			return nil, err
