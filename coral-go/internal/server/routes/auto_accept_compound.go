@@ -49,9 +49,11 @@ func (r *riskRun) from(command, workDir, dir string) string {
 	why := r.plain(command, workDir, dir)
 	if why == "" {
 		// The command again with every spelled-out word written plainly (r''m, \rm, "rm", $'\x72m' are rm), and a command whose name is built at run time ($X, $(echo rm)) is a risk (#7106).
-		text, dynamic, ok := normalizedCommand(command)
+		text, dynamic, inline, ok := normalizedCommand(command)
 		if dynamic {
 			why = whyRunTimeCommand
+		} else if inline != "" {
+			why = inline
 		} else if ok && text != command {
 			why = r.plain(text, workDir, dir)
 		}

@@ -67,10 +67,10 @@ func TestLauncherHelpers(t *testing.T) {
 	assert.Equal(t, "rm", ansiC(`\x72m`))
 	assert.Equal(t, "rm\n", ansiC(`\162m\n`))
 	for in, want := range map[string]bool{`$X`: true, `$(echo rm)`: true, "`x`": true, `r$(echo m)`: true, `$HOME/bin/x`: false, `rm`: false, `"$D"/x`: false} {
-		text, dynamic, ok := normalizedCommand(in + " -rf /etc")
+		text, dynamic, _, ok := normalizedCommand(in + " -rf /etc")
 		assert.True(t, ok, in)
 		assert.Equal(t, want, dynamic, in+" -> "+text)
 	}
-	text, _, _ := normalizedCommand(`r''m -rf $'/etc' "a b"`)
+	text, _, _, _ := normalizedCommand(`r''m -rf $'/etc' "a b"`)
 	assert.Equal(t, `rm -rf /etc 'a b'`, text)
 }
