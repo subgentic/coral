@@ -2617,3 +2617,7 @@ button.team-artifact-name { cursor: pointer; }
 
 /* The remove-shared-copy button in an opened chat image's toolbar is a 44 px target on touch (#6137) */
 @media (pointer: coarse), (max-width: 767px) { .preview-unshare-btn { min-width: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); } }
+
+/* A task names its goal (#7253): a quiet chip on a Tasks row and the Goal line's button in a task's detail. */
+.board-task-goal { display: inline-block; margin-left: 6px; padding: 0 6px; border: 1px solid var(--border-light); border-radius: 999px; color: var(--text-secondary); font-size: var(--fs-base); max-width: 16em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+.task-goal-link { background: none; border: 0; padding: 0; font: inherit; color: var(--accent); text-decoration: underline; cursor: pointer; text-align: left; overflow-wrap: anywhere; }

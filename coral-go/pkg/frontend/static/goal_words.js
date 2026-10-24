@@ -131,3 +131,6 @@ export const waitingGoals = (goals) => (goals || []).filter(g => String(g && g.s
 
 /** The one polite line when a refresh brings goals that now wait on the person (#7250). */
 export const needsYouText = (titles) => titles.length === 1 ? `A goal needs you: ${titles[0]}` : `${titles.length} goals need you: ${titles.join(', ')}`;
+
+/** The line under the Goals page's heading when open tasks serve no goal (#7253). */
+export const noGoalTasksText = (n) => `${n} ${n === 1 ? 'task serves' : 'tasks serve'} no goal`;

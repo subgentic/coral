@@ -63,4 +63,5 @@ assert.deepEqual(W.waitingLine({ title: 'A', recommendation: 'Yes' }), { title: 
 assert.equal(W.goalsToggleText(0, 0), 'Goals'); assert.equal(W.goalsToggleText(3, 0), 'Goals 3'); assert.equal(W.goalsToggleText(3, 1), 'Goals 3 · 1 waiting'); assert.equal(W.goalsToggleText(0, 2), 'Goals · 2 waiting'); assert.equal(W.goalsToggleText('x', -1), 'Goals');
 assert.equal(W.goalsToggleTitle, 'What this board is working toward'); assert.equal(W.goalsSubtitle, 'What the team is working toward. Tasks serve a goal.'); assert.equal(W.driverHelp, 'Driver: the agent who looks after it');
 assert.equal(W.needsYouText(['A']), 'A goal needs you: A'); assert.equal(W.needsYouText(['A', 'B']), '2 goals need you: A, B');
+assert.equal(W.noGoalTasksText(1), '1 task serves no goal'); assert.equal(W.noGoalTasksText(4), '4 tasks serve no goal');
 console.log('goal_words: ok');

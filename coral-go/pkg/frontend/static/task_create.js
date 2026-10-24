@@ -8,6 +8,9 @@ import { _renderDepPicker, _getSelectedDeps } from './task_dep_picker.js';
 import { showToast } from './utils.js';
 import { addPendingMessage } from './live_chat.js';
 import { loadBoardTasks, loadAgentTasks } from './task_list.js';
+import { readOpenGoals, fillGoalSelect, chooseGoalLabel } from './task_goals.js';
+
+let _requireGoal = false; // the board asks for a goal on every task: the Goal select has no empty choice to stay on
 
 export async function showCreateTaskModal(preset = {}) {
     const modal = ensureBuilt('create-task-modal'); // built on first open (#4500)
@@ -65,6 +68,18 @@ export async function showCreateTaskModal(preset = {}) {
                 });
             }
         } catch { /* ignore */ }
+    }
+
+    // The Goal select lists the board's open goals; it stays hidden when the board has none (and does not require one), so a board without goals sees no new control (#7253).
+    const goalRow = document.getElementById('create-task-goal-row');
+    if (goalRow) {
+        goalRow.hidden = true; _requireGoal = false;
+        if (boardProject) {
+            const read = await readOpenGoals(boardProject);
+            _requireGoal = read.requireGoal;
+            fillGoalSelect(document.getElementById('create-task-goal'), { goals: read.goals, requireGoal: read.requireGoal, selectedId: preset.goal_id });
+            goalRow.hidden = !read.goals.length && !read.requireGoal;
+        }
     }
 
     // A template or duplicate can supply workflow/prerequisites. Reveal those values.
@@ -134,6 +149,12 @@ export async function submitCreateTask() {
         return;
     }
 
+    const goalId = document.getElementById('create-task-goal-row')?.hidden ? '' : document.getElementById('create-task-goal')?.value;
+    if (_requireGoal && !goalId) {
+        showCreateError(errEl, `${chooseGoalLabel}: this board needs a goal on every task.`);
+        document.getElementById('create-task-goal')?.focus();
+        return;
+    }
     const blockedBy = _getSelectedDeps('create-task-deps');
     const isDraft = document.getElementById('create-task-draft')?.checked || false;
 
@@ -157,6 +178,7 @@ export async function submitCreateTask() {
             instructions: document.getElementById('create-task-instructions')?.value.trim() || '',
         };
         if (isDraft) payload.draft = true;
+        if (goalId) payload.goal_id = Number(goalId);
         const resp = await boardFetch(boardProject, `/tasks`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

@@ -12,7 +12,7 @@ import { toGoalList, mergeGoalLists, toTaskPage, toDrivers, createBody, errorOf,
 const PAGE = 50; // a goal's tasks are drawn this many at a time
 import * as W from './goal_words.js';
 
-const model = { project: '', sig: '', goals: [], requireGoal: false, filter: 'all', openId: 0, tasks: new Map(), loading: false, failed: '', asOf: '', creating: false };
+const model = { project: '', sig: '', goals: [], requireGoal: false, noGoalOpen: null, filter: 'all', openId: 0, tasks: new Map(), loading: false, failed: '', asOf: '', creating: false };
 let root = null;
 
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
@@ -39,17 +39,20 @@ export async function loadGoals() {
     const project = model.project;
     model.loading = !model.goals.length;
     if (model.loading) draw(); // "Loading goals…" only while there is nothing yet: a refresh does not redraw before it has an answer
-    let same = false;
+    let same = false, focusHeading = false;
     try {
+        const settingsRead = readJson('/settings').then(s => Boolean(s && s.require_goal), () => false); // the list does not say whether the board requires a goal: its settings do (#7253)
         let list = toGoalList(await readJson(LIST_PATH));
         for (let n = 0; list.cursor && n < 40; n++) { // the route pages (200 at most): read on until there is no cursor (#7239)
             list = mergeGoalLists(list, toGoalList(await readJson(`${LIST_PATH}&cursor=${encodeURIComponent(list.cursor)}`)));
         }
+        list.requireGoal = list.requireGoal || await settingsRead;
         if (project !== model.project) return;
         const before = new Set(W.waitingGoals(model.goals).map(g => g.id)), refresh = !model.failed && model.goals.length > 0;
-        const sig = JSON.stringify([list.goals, list.requireGoal]);
+        const sig = JSON.stringify([list.goals, list.requireGoal, list.noGoalOpen]);
         same = !model.failed && !!model.goals.length && sig === model.sig; // nothing changed: the page is left as it is (a redraw would take the keyboard's place)
-        model.sig = sig; model.goals = list.goals; model.requireGoal = list.requireGoal; model.failed = ''; model.asOf = clock();
+        model.sig = sig; model.goals = list.goals; model.requireGoal = list.requireGoal; model.noGoalOpen = list.noGoalOpen; model.failed = ''; model.asOf = clock();
+        if (model.wantOpen) { const want = model.wantOpen; model.wantOpen = 0; if (model.goals.some(g => g.id === want)) { model.openId = want; same = false; focusHeading = true; } }
         if (model.openId && !model.goals.some(g => g.id === model.openId)) { model.openId = 0; same = false; }
         const fresh = W.waitingGoals(model.goals).filter(g => !before.has(g.id));
         if (refresh && fresh.length) say(W.needsYouText(fresh.map(g => g.title))); // a refresh that brings a goal waiting on the person says so once (#7250)
@@ -59,6 +62,7 @@ export async function loadGoals() {
     }
     model.loading = false;
     if (!same) draw();
+    if (focusHeading) root.querySelector('#goals-detail-title')?.focus();
     if (model.openId) loadTasks(model.openId);
 }
 
@@ -271,6 +275,7 @@ function drawHead() {
     left.append(h, el('p', 'goals-subtitle', W.goalsSubtitle), el('p', 'goals-sub-line', `This board only · ${W.goalCountLine(model.goals.length, W.waitingGoals(model.goals).length)}`));
     if (state.hubConnected || window.__goalsHub) left.append(el('p', 'goals-note', W.otherBoardsNote));
     head.append(left, btn('btn btn-primary goals-new', 'New goal', () => openCreate()));
+    if (model.noGoalOpen > 0) left.append(el('p', 'goals-note goals-no-goal', W.noGoalTasksText(model.noGoalOpen))); // hidden while the route does not give the number
     if (model.requireGoal) head.after(Object.assign(el('p', 'goals-note goals-require'), { textContent: W.requireGoalNote }));
     else root.querySelector('.goals-require')?.remove();
 }
@@ -296,6 +301,13 @@ function draw() {
 }
 
 /** Open a goal (focus moves to its heading when asked: a person chose it) and read its tasks. */
+/** Open a goal that may not be read yet (the Goal line of a task): now when the list has it, else when the next read does (#7253). */
+export function openGoalWhenKnown(id) {
+    if (model.goals.some(g => g.id === id)) { openGoal(id, true); return; }
+    model.wantOpen = id;
+    loadGoals();
+}
+
 export function openGoal(id, focus = false) {
     model.openId = id;
     draw();
@@ -358,7 +370,7 @@ function openCreate() {
 
 /** Show the board's goals in `host` (the page's #mb-goals) and read them. */
 export function showGoals(host, project) {
-    if (project !== model.project) { Object.assign(model, { project, sig: '', goals: [], requireGoal: false, filter: 'all', openId: 0, tasks: new Map(), failed: '', asOf: '', loading: false }); }
+    if (project !== model.project) { Object.assign(model, { project, sig: '', goals: [], requireGoal: false, noGoalOpen: null, filter: 'all', openId: 0, tasks: new Map(), failed: '', asOf: '', loading: false }); }
     if (!host.dataset.built) {
         host.dataset.built = '1';
         const page = el('div', 'goals-page');
