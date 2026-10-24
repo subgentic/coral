@@ -921,6 +921,12 @@ func autoAcceptRisk(agentType, workDir string, pending *pendingTool, d approvalD
 				return why
 			}
 		}
+		// A command of several lines (Codex shows each as it was written) is also judged line by line: joined with spaces, "echo ok" then "rm -rf /x" is one echo (#7208).
+		if why := shellRisk(strings.ReplaceAll(input, "\x00", "\n"), workDir); why != "" {
+			return why
+		}
+	case "ambiguous":
+		return "the prompt shows more than one approval header, so what it asks about is unclear"
 	case "edit", "write_to_file", "replace_file_content":
 		if why := fileRisk("write_to_file", strings.ReplaceAll(input, "\x00", ""), workDir); why != "" {
 			return why
@@ -947,19 +953,35 @@ func screenAction(agentType string, d approvalDecision, capture string) (string,
 	case at.Codex:
 		var parts []string
 		dest := false
+		headers := 0
+		inCommand := false // the "$ " line has started: from there every line is the command's own text, whatever it looks like
 		for _, l := range d.Context {
-			switch {
-			case codexApprovalHeaderRe.MatchString(l), strings.HasPrefix(l, "Environment:"), strings.HasPrefix(l, "Reason:"),
-				strings.HasPrefix(l, "Description:"):
-				continue
-			case strings.HasPrefix(l, "Destination:"):
-				dest = true
-				if rest := strings.TrimSpace(strings.TrimPrefix(l, "Destination:")); rest != "" {
-					parts = append(parts, rest)
-				}
+			if codexApprovalHeaderRe.MatchString(l) {
+				headers++
 				continue
 			}
+			if ruleLineRe.MatchString(l) { // box-drawing lines inside the span are not text
+				continue
+			}
+			if !inCommand {
+				switch {
+				case strings.HasPrefix(l, "Environment:"), strings.HasPrefix(l, "Reason:"), strings.HasPrefix(l, "Description:"):
+					continue
+				case strings.HasPrefix(l, "Destination:"):
+					dest = true
+					if rest := strings.TrimSpace(strings.TrimPrefix(l, "Destination:")); rest != "" {
+						parts = append(parts, rest)
+					}
+					continue
+				}
+				if strings.HasPrefix(l, "$ ") {
+					inCommand = true
+				}
+			}
 			parts = append(parts, strings.TrimPrefix(l, "$ "))
+		}
+		if headers > 1 {
+			return "ambiguous", "" // two approval headers in one prompt: what it asks about is unclear
 		}
 		if d.Kind == "edit" || dest {
 			return "edit", strings.Join(parts, "\x00")
@@ -969,9 +991,17 @@ func screenAction(agentType string, d approvalDecision, capture string) (string,
 	case at.Agy, at.Antigravity, at.Gemini:
 		var parts []string
 		inCmd := false
+		headers := 0
 		for _, l := range d.Context {
 			if agyApprovalHeaderRe.MatchString(l) {
+				headers++
+				if headers > 1 {
+					return "ambiguous", "" // two approval headers in one prompt: what it asks about is unclear
+				}
 				inCmd = true
+				continue
+			}
+			if ruleLineRe.MatchString(l) { // box-drawing lines inside the span are not text
 				continue
 			}
 			if agyApprovalQuestionRe.MatchString(l) {

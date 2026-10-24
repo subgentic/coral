@@ -169,6 +169,8 @@ func classifyApproval(agentType, capture string) approvalDecision {
 		}
 		pick(func(l string) bool { return l == "yes" })
 	case at.Codex:
+		// The FIRST (topmost) run-command header above the menu opens the prompt: a command that prints a header line of its own cannot hide the lines above it by starting a "nearer" one (#7208).
+		// Two headers in the span are read as they are (screenAction asks about it); the kind is the first one's.
 		header := -1
 		for i := firstOpt - 1; i >= 0 && i >= firstOpt-40; i-- {
 			if m := codexApprovalHeaderRe.FindStringSubmatch(lines[i]); m != nil {
@@ -177,21 +179,38 @@ func classifyApproval(agentType, capture string) approvalDecision {
 				if strings.HasPrefix(m[1], "make") {
 					d.Kind = "edit"
 				}
-				break
 			}
 		}
 		if header < 0 {
 			return d
 		}
+		var span []string
+		for _, l := range lines[header:firstOpt] {
+			if t := strings.TrimSpace(l); t != "" {
+				span = append(span, t)
+			}
+		}
+		d.Context = span
+		d.FP = fingerprint(agentType, span, opts)
 		pick(func(l string) bool { return l == "yes, proceed" || strings.HasPrefix(l, "yes, proceed (") })
 	case at.Agy, at.Antigravity, at.Gemini:
+		// The first header above the menu opens the span here too (#7208): a command that prints a header line of its own cannot hide the lines above it.
 		header := -1
 		for i := firstOpt - 1; i >= 0 && i >= firstOpt-40; i-- {
 			if agyApprovalHeaderRe.MatchString(lines[i]) {
 				header = i
 				d.Kind = "command"
-				break
 			}
+		}
+		if header >= 0 {
+			var span []string
+			for _, l := range lines[header:firstOpt] {
+				if t := strings.TrimSpace(l); t != "" {
+					span = append(span, t)
+				}
+			}
+			d.Context = span
+			d.FP = fingerprint(agentType, span, opts)
 		}
 		if header < 0 && !agyApprovalQuestionRe.MatchString(screen.Question) {
 			return d
