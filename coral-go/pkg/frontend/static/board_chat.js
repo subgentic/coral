@@ -1,7 +1,7 @@
 /* Moved out of render.js as it was (#3795): no behaviour change. */
 import { formatHourMinute } from './format.js';
 import { morphHtml } from './dom_morph.js';
-import { OPERATOR_ID, isOperatorId, escapeHtml, showToast, escapeAttr, getAgentColor, externalMessageBadge, hubUserBadge, renderBoardMessageBody, setBoardMentionNames, highlightMentionsIn, boardAvatar, boardMessageColorStyle } from './utils.js';
+import { OPERATOR_ID, isOperatorId, escapeHtml, showToast, escapeAttr, getAgentColor, externalMessageBadge, hubUserBadge, renderBoardMessageBody, setBoardMentionNames, highlightMentionsIn, boardMessageColorStyle } from './utils.js';
 import { splitKey, keyLabel, boardFetch } from './server_base.js';
 import { groupTaskQueueRuns, renderTaskQueueRun } from './board_system_lines.js';
 import { messageAttachmentAttrs, messageAttachmentsHtml } from './board_attachments.js';
@@ -296,7 +296,6 @@ function _renderBoardPanelMessages(msgsEl, scrollToBottom) {
         const selectedClass = _boardChatSelectMode && _boardChatSelectedIds.has(m.id) ? ' mb-message-selected' : '';
         const checkbox = _boardChatSelectMode ? `<input type="checkbox" class="mb-select-checkbox" data-msg-id="${Number(m.id)}" ${_boardChatSelectedIds.has(m.id) ? 'checked' : ''} data-on-click="board-chat-msg-select">` : '';
         return `<div class="mb-message ${spacing}${alignClass}${selectedClass}"${messageAttachmentAttrs(m)} style="${boardMessageColorStyle(color)}">
-            ${boardAvatar(m, agent)}
             <div class="mb-message-header">
                 ${checkbox}
                 <span class="mb-agent-name">${m.icon ? escapeHtml(m.icon) + ' ' : ''}${escapeHtml(agent)}</span>

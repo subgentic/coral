@@ -1,4 +1,4 @@
-/* How a board message is shown: its text, badges, body cache, avatar and colours (moved out of utils.js, #5065; no behaviour change). */
+/* How a board message is shown: its text, badges, body cache and colours (moved out of utils.js, #5065; no behaviour change). */
 import { escapeHtml, escapeAttr } from './html_escape.js';
 import { renderMarkdown, _renderMarkdownUncached, FENCED_WITH_LANG } from './markdown.js';
 
@@ -257,16 +257,6 @@ export function renderBoardMessageBody(m) {
 
 export function _boardBodyCacheStatsForTests() {
     return { entries: _boardBodyCache.size, bytes: _boardBodyBytes, maxBytes: BOARD_BODY_CACHE_BYTES, ids: [..._boardBodyCache.values()].map(e => e.id) };
-}
-
-/** A board sender's avatar (#3590): their icon (at most two characters), else up to two initials
- *  ("QA Engineer" is QE, "Orchestrator (coral-hub)" is OR), escaped as text. Coloured by the
- *  message's --mb-color. */
-export function boardAvatar(m, name) {
-    const icon = m && m.icon ? Array.from(String(m.icon)).slice(0, 2).join('') : '';
-    const words = String(name || '?').replace(/\(.*?\)/g, ' ').trim().split(/\s+/).filter(Boolean);
-    const initials = icon || (words.length > 1 ? words[0][0] + words[1][0] : (words[0] || '?').slice(0, 2)).toUpperCase();
-    return `<span class="mb-avatar" aria-hidden="true">${escapeHtml(initials)}</span>`;
 }
 
 export function labelCodeBlocks(root) {
