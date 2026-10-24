@@ -69,7 +69,8 @@ if [ "$print" = 1 ]; then
         # the model list is asked as an initialize control request on stream-json (agentmodels.fetchClaude): the real claude answers it at once and goes on reading, so the stub does too
         case " $* " in *" --input-format stream-json "*)
           IFS= read -r _req
-          echo '{"type":"control_response","response":{"subtype":"success","request_id":"coral-models","response":{"models":[{"value":"stub-model","displayName":"Stub model","description":"the stand-in model","supportedEffortLevels":["low","high"]}]}}}';;
+          echo '{"type":"control_response","response":{"subtype":"success","request_id":"coral-models","response":{"models":[{"value":"stub-model","displayName":"Stub model","description":"the stand-in model","supportedEffortLevels":["low","high"]}]}}}'
+          : > "$D/answered";; # a marker a test can time the caller against: how long after the reply it let go of the process (#5591, #7163)
         esac
         cat > /dev/null
       fi
@@ -136,6 +137,9 @@ func NoSlower(t testing.TB, what string, baseline, subject func(), slack time.Du
 		t.Errorf("%s: the fastest of %d runs took %v against %v for the control: held for %v more than a plain run takes", what, n, bestSubj, bestBase, bestSubj-bestBase)
 	}
 }
+
+// AnsweredMarker is the file the signed-in stand-in makes the moment it has written its answer to an initialize request (and before it goes on reading stdin).
+func (s *Stub) AnsweredMarker() string { return filepath.Join(s.dir, "answered") }
 
 // Path is the stub's program: what a test gives as the CLI path.
 func (s *Stub) Path() string { return filepath.Join(s.dir, "claude") }

@@ -1,6 +1,7 @@
 package agentmodels
 
 import (
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -76,13 +77,18 @@ func TestModelListStillAsksClaudeWhenSignedIn(t *testing.T) {
 	claudestub.Isolate(t)
 	patientCheck(t)
 	stub := claudestub.New(t, claudestub.SignedIn)
+	// The time that matters is from the stand-in's answer to the fetch ending, not from the test's start: a loaded machine starts the script slowly, which no fetch can help. The stand-in goes on reading
+	// stdin after it answers, so a fetch that waited for it to end on its own would end at its own deadline, with the list and no error (#5591); one that lets go at the reply ends within moments.
+	start := time.Now()
 	res, took := fetched(t, stub.Path())
+	endedAt := start.Add(took)
 	assert.False(t, strings.Contains(strings.ToLower(res.Error), "not signed in"), "signed in: %q", res.Error)
 	assert.Empty(t, res.Error, "signed in: the stub answers the initialize request, so the list is read")
 	assert.NotEmpty(t, res.Models, "the stub's one model is listed")
-	// Not a number of seconds (#7163: on a loaded machine the stand-in's own start can take longer than any fixed bound): the fetch ended by reading the reply when the result has the model and no error. A fetch that
-	// waited for the process to end on its own would end at its deadline with an error, never with the list (#5591).
 	assert.Less(t, took, grossly, "the fetch ended")
+	marker, err := os.Stat(stub.AnsweredMarker())
+	require.NoError(t, err, "the stand-in answered the initialize request")
+	assert.Less(t, endedAt.Sub(marker.ModTime()), 6*time.Second, "the fetch lets go of the process when the reply is read, not when it gives up (#5591: it used to wait out 12 s)")
 	runs := stub.PrintRuns()
 	require.Len(t, runs, 1, "one print-mode run")
 	assert.False(t, runs[0].TTY)
