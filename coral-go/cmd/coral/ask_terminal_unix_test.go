@@ -66,6 +66,10 @@ func TestFirstStartAsABackgroundJobDoesNotAsk(t *testing.T) {
 				t.Fatal(err)
 			}
 			tty.Close()
+			// The started process is waited for once, here: when it exits, every wait below ends at once with how it ended, instead of waiting out startupCeiling for a Coral that is gone (#7273).
+			exited := make(chan struct{})
+			var exitErr error
+			go func() { exitErr = cmd.Wait(); close(exited) }()
 			var mu sync.Mutex
 			var out bytes.Buffer
 			go func() { // drain the terminal, or Coral blocks writing its log to it
@@ -89,15 +93,30 @@ func TestFirstStartAsABackgroundJobDoesNotAsk(t *testing.T) {
 					}
 				}
 				cmd.Process.Kill()
-				cmd.Wait()
+				<-exited
 				ptmx.Close()
 			})
+			// what the failure messages say besides what the test was waiting for: the port, whether the process is still there and how it ended, and what the terminal shows.
+			diag := func() string {
+				state := "still running"
+				select {
+				case <-exited:
+					state = fmt.Sprintf("exited (%v)", exitErr)
+				default:
+				}
+				return fmt.Sprintf("port %d, started process %s; terminal:\n%s", port, state, output())
+			}
 
 			base := fmt.Sprintf("http://127.0.0.1:%d", port)
 			healthy := func(within time.Duration) bool {
 				deadline := time.Now().Add(within)
 				client := &http.Client{Timeout: 10 * time.Second} // a poll that hangs is a failed poll, tried again until the ceiling
 				for time.Now().Before(deadline) {
+					select {
+					case <-exited:
+						return false // the Coral this test started is gone: nothing will listen
+					default:
+					}
 					if resp, err := client.Get(base + "/api/health"); err == nil {
 						resp.Body.Close()
 						return true
@@ -108,10 +127,10 @@ func TestFirstStartAsABackgroundJobDoesNotAsk(t *testing.T) {
 			}
 			if background {
 				if !healthy(startupCeiling) {
-					t.Fatalf("a background Coral never listened; terminal:\n%s", output())
+					t.Fatalf("a background Coral never listened: %s", diag())
 				}
 				if bytes.Contains([]byte(output()), []byte("Enable remote access?")) {
-					t.Fatalf("a background Coral asked:\n%s", output())
+					t.Fatalf("a background Coral asked: %s", diag())
 				}
 				if enabled, saved := remoteSetting(t, base, dataDir); saved || enabled {
 					t.Fatalf("nothing was asked, so remote access is off and unsaved (enabled %v, saved %v)", enabled, saved)
@@ -120,8 +139,13 @@ func TestFirstStartAsABackgroundJobDoesNotAsk(t *testing.T) {
 			}
 			deadline := time.Now().Add(startupCeiling)
 			for !bytes.Contains([]byte(output()), []byte("Enable remote access? [y/N]")) {
+				select {
+				case <-exited:
+					t.Fatalf("a foreground Coral on a terminal exited before it asked: %s", diag())
+				default:
+				}
 				if time.Now().After(deadline) {
-					t.Fatalf("a foreground Coral on a terminal didn't ask; terminal:\n%s", output())
+					t.Fatalf("a foreground Coral on a terminal didn't ask: %s", diag())
 				}
 				time.Sleep(100 * time.Millisecond)
 			}
@@ -129,7 +153,7 @@ func TestFirstStartAsABackgroundJobDoesNotAsk(t *testing.T) {
 				t.Fatal(err)
 			}
 			if !healthy(startupCeiling) {
-				t.Fatalf("Coral never listened after the answer; terminal:\n%s", output())
+				t.Fatalf("Coral never listened after the answer: %s", diag())
 			}
 			if enabled, saved := remoteSetting(t, base, dataDir); !saved || enabled {
 				t.Fatalf("the answer no is saved (enabled %v, saved %v)", enabled, saved)
