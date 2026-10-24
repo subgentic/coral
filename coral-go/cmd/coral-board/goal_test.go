@@ -135,11 +135,11 @@ func TestGoalListAndShowRead(t *testing.T) {
 	delete(gs.reply, "GET /api/board/team/goals?cursor=c1")
 	gs.reply["GET /api/board/team/goals"] = `{"goals":[{"id":3,"title":"Ship teams","state":"active","driver":"Orchestrator","rollup":{"done":2,"active":1,"blocked":0,"queued":2,"total":5}},{"id":4,"title":"No tasks","state":"blocked","rollup":{"total":0}}]}`
 
-	gs.reply["GET /api/board/team/goals/3"] = `{"id":3,"title":"Ship teams","state":"blocked","driver":"Orchestrator","blocked_on":"the operator","decision":"pick a date","recommendation":"Friday","if_silent":"we ship Friday","rollup":{"done":1,"active":0,"blocked":1,"queued":0,"total":2}}`
+	gs.reply["GET /api/board/team/goals/3"] = `{"id":3,"title":"Ship teams","state":"blocked","driver":"Orchestrator","blocked_on":"the operator","rollup":{"done":1,"active":0,"blocked":1,"queued":0,"total":2}}`
 	gs.reply["GET /api/board/team/tasks"] = `{"tasks":[{"id":11,"title":"Build it","status":"completed","assigned_to":"Backend Dev"},{"id":12,"title":"Test it","status":"blocked"}],"next_cursor":""}`
 	res = goalRun(t, gs, "goal", "show", "3")
 	require.Equal(t, 0, res.code, res.stderr)
-	for _, want := range []string{"Goal #3: Ship teams", "State:", "blocked", "Blocked on:", "the operator", "Decision:", "pick a date", "Recommendation:", "Friday", "If silent:", "we ship Friday", "1 done, 0 active, 1 blocked, 0 queued (2)", "#11   completed    Backend Dev", "#12   blocked      —"} {
+	for _, want := range []string{"Goal #3: Ship teams", "State:", "blocked", "Blocked on:", "the operator", "1 done, 0 active, 1 blocked, 0 queued (2)", "#11   completed    Backend Dev", "#12   blocked      —"} {
 		assert.Contains(t, res.stdout, want)
 	}
 	assert.Contains(t, strings.Join(gs.requests(), "\n"), "goal=3", "the goal's own tasks")
@@ -153,12 +153,12 @@ func TestGoalListAndShowRead(t *testing.T) {
 
 func TestGoalUpdateSendsOnlyWhatWasGivenAndClears(t *testing.T) {
 	gs := newGoalServer(t)
-	res := goalRun(t, gs, "goal", "update", "3", "--state", "blocked", "--blocked-on", "the operator", "--decision", "pick a date", "--recommendation", "Friday", "--if-silent", "ship Friday")
+	res := goalRun(t, gs, "goal", "update", "3", "--state", "blocked", "--blocked-on", "the operator")
 	require.Equal(t, 0, res.code, res.stderr)
 	assert.Equal(t, "Updated Goal #3\n", res.stdout)
 	req := gs.requests()[0]
 	assert.True(t, strings.HasPrefix(req, "PATCH /api/board/team/goals/3? "), req)
-	assert.Equal(t, map[string]any{"state": "blocked", "blocked_on": "the operator", "decision": "pick a date", "recommendation": "Friday", "if_silent": "ship Friday", "subscriber_id": "Tester"}, bodyOf(t, req))
+	assert.Equal(t, map[string]any{"state": "blocked", "blocked_on": "the operator", "subscriber_id": "Tester"}, bodyOf(t, req))
 
 	res = goalRun(t, gs, "goal", "update", "3", "--driver", "")
 	require.Equal(t, 0, res.code, res.stderr)
@@ -308,4 +308,18 @@ func TestGoalShowFollowsTheTaskCursor(t *testing.T) {
 		}
 	}
 	assert.Equal(t, 2, paged, "each read asked for the second page with the cursor and the goal")
+}
+
+// #7300: a goal does not wait on a person, so the decision flags are not options of goal update any more: refused by name, and nothing is sent.
+func TestGoalUpdateRefusesTheRemovedDecisionFlags(t *testing.T) {
+	gs := newGoalServer(t)
+	for _, flag := range []string{"--decision", "--recommendation", "--if-silent", "--answer"} {
+		res := goalRun(t, gs, "goal", "update", "3", flag, "x")
+		assert.NotEqual(t, 0, res.code, flag)
+		assert.Contains(t, res.stdout+res.stderr, strings.TrimPrefix(flag, "--"), flag)
+	}
+	assert.Empty(t, gs.requests(), "nothing was sent")
+	res := goalRun(t, gs, "goal", "--help")
+	assert.NotContains(t, res.stdout, "--decision")
+	assert.NotContains(t, res.stdout, "--if-silent")
 }

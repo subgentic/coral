@@ -78,17 +78,16 @@ func TestGoalRoutesEndToEnd(t *testing.T) {
 	require.Equal(t, 200, code)
 	assert.Equal(t, "Ship the beta", g["title"])
 
-	// Keeping it true: blocked says on whom, and what is needed; leaving blocked clears them.
+	// Keeping it true: blocked says why, a plain reason; leaving blocked clears it.
 	code, out = call("PATCH", "/api/board/team/goals/"+itoa(id), map[string]any{"state": "blocked", "subscriber_id": "Orchestrator"})
 	assert.Equal(t, 400, code)
 	assert.Equal(t, "goal_blocked_on_required", out["code"])
-	code, g = call("PATCH", "/api/board/team/goals/"+itoa(id), map[string]any{"state": "blocked", "blocked_on": "the operator", "decision": "Ship Friday?", "recommendation": "yes", "if_silent": "ship Monday", "subscriber_id": "Orchestrator"})
+	code, g = call("PATCH", "/api/board/team/goals/"+itoa(id), map[string]any{"state": "blocked", "blocked_on": "the operator", "subscriber_id": "Orchestrator"})
 	require.Equal(t, 200, code, "%v", g)
-	assert.Equal(t, "Ship Friday?", g["decision"])
-	assert.Equal(t, "ship Monday", g["if_silent"])
+	assert.Equal(t, "the operator", g["blocked_on"])
 	code, g = call("PATCH", "/api/board/team/goals/"+itoa(id), map[string]any{"state": "active", "driver": "", "subscriber_id": "Orchestrator"})
 	require.Equal(t, 200, code)
-	assert.Nil(t, g["decision"], "leaving blocked clears the decision fields")
+	assert.Nil(t, g["blocked_on"], "leaving blocked clears the reason")
 	assert.Nil(t, g["driver"], "an empty driver clears it")
 
 	// Tasks under the goal: made with goal_id, moved and unlinked with the task route, listed by goal, and counted in the rollup.
@@ -274,7 +273,7 @@ func TestGoalRoutesStartNothing(t *testing.T) {
 		method, path string
 		body         map[string]any
 	}{
-		{"PATCH", "/api/board/team/goals/" + id, map[string]any{"state": "blocked", "blocked_on": "Sleeper", "decision": "wake up?"}},
+		{"PATCH", "/api/board/team/goals/" + id, map[string]any{"state": "blocked", "blocked_on": "Sleeper"}},
 		{"PUT", "/api/board/team/tasks/" + itoa(task.ID) + "/goal", map[string]any{"goal_id": int64(g["id"].(float64))}},
 		{"PATCH", "/api/board/team/goals/" + id, map[string]any{"state": "active", "driver": "Sleeper"}},
 		{"POST", "/api/board/team/goals/" + id + "/close", map[string]any{"reason": "done"}},

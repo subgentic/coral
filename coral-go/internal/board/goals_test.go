@@ -2,6 +2,7 @@ package board
 
 import (
 	"context"
+	"encoding/json"
 	"regexp"
 	"strconv"
 	"strings"
@@ -523,8 +524,8 @@ func TestGoalsSchemaIsIdempotentAndUpgradesAnOldDatabase(t *testing.T) {
 	require.NoError(t, s.SetTaskGoal(ctx, "oldboard", task.ID, &g.ID))
 }
 
-// A goal's driver is a subscriber of its board; a blocked goal can say what it needs, what is recommended and what happens if no one answers: one cleaned line each, cleared with blocked.
-func TestGoalDriverAndTheBlockedDecisionFields(t *testing.T) {
+// A goal's driver is a subscriber of its board; a blocked goal says why in blocked_on, a plain reason, cleared with blocked (a goal does not wait on a person, #7300).
+func TestGoalDriverAndTheBlockedReason(t *testing.T) {
 	s := testStore(t)
 	ctx := context.Background()
 	_, err := s.CreateGoal(ctx, "team", GoalInput{Title: "no such driver", Driver: "Nobody"})
@@ -547,44 +548,84 @@ func TestGoalDriverAndTheBlockedDecisionFields(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "Orchestrator", got.Driver)
 
-	got, err = s.UpdateGoal(ctx, "team", g.ID, GoalUpdate{State: gp(GoalBlocked), BlockedOn: gp("the operator"), Decision: gp("  Ship\u202e on Friday?\n"), Recommendation: gp("yes"), IfSilent: gp("we ship Monday")})
+	got, err = s.UpdateGoal(ctx, "team", g.ID, GoalUpdate{State: gp(GoalBlocked), BlockedOn: gp("  the\u202e operator\n")})
 	require.NoError(t, err)
-	assert.Equal(t, "Ship on Friday?", got.Decision)
-	assert.Equal(t, "yes", got.Recommendation)
-	assert.Equal(t, "we ship Monday", got.IfSilent)
+	assert.Equal(t, "the operator", got.BlockedOn, "a plain reason, cleaned")
 	assert.Equal(t, "Orchestrator", got.Driver, "the driver stays")
-	for _, f := range []struct {
-		name string
-		u    func(string) GoalUpdate
-	}{
-		{"decision", func(v string) GoalUpdate { return GoalUpdate{Decision: gp(v)} }},
-		{"recommendation", func(v string) GoalUpdate { return GoalUpdate{Recommendation: gp(v)} }},
-		{"if_silent", func(v string) GoalUpdate { return GoalUpdate{IfSilent: gp(v)} }},
-	} {
-		_, err = s.UpdateGoal(ctx, "team", g.ID, f.u(strings.Repeat("x", 301)))
-		require.ErrorIs(t, err, ErrGoalTextTooLong, f.name)
-		assert.Contains(t, err.Error(), f.name)
-		_, err = s.UpdateGoal(ctx, "team", g.ID, f.u(strings.Repeat("x", 300)))
-		assert.NoError(t, err, f.name)
-	}
+	_, err = s.UpdateGoal(ctx, "team", g.ID, GoalUpdate{State: gp(GoalBlocked), BlockedOn: gp("")})
+	assert.ErrorIs(t, err, ErrGoalBlockedOnRequired, "a blocked goal still says why")
 	got, err = s.UpdateGoal(ctx, "team", g.ID, GoalUpdate{State: gp(GoalActive)})
 	require.NoError(t, err)
-	assert.Empty(t, got.BlockedOn+got.Decision+got.Recommendation+got.IfSilent, "leaving blocked clears all four")
-	// Fields given while the goal is not blocked are dropped, not kept for later.
-	got, err = s.UpdateGoal(ctx, "team", g.ID, GoalUpdate{Decision: gp("stale")})
-	require.NoError(t, err)
-	assert.Empty(t, got.Decision)
-	// Closing a blocked goal clears them too.
-	_, err = s.UpdateGoal(ctx, "team", g.ID, GoalUpdate{State: gp(GoalBlocked), BlockedOn: gp("QA"), IfSilent: gp("we wait")})
+	assert.Empty(t, got.BlockedOn, "leaving blocked clears the reason")
+	// Closing a blocked goal clears it too.
+	_, err = s.UpdateGoal(ctx, "team", g.ID, GoalUpdate{State: gp(GoalBlocked), BlockedOn: gp("QA")})
 	require.NoError(t, err)
 	closed, _, err := s.CloseGoal(ctx, "team", g.ID, "dropped it", GoalDropped)
 	require.NoError(t, err)
-	assert.Empty(t, closed.BlockedOn+closed.IfSilent)
+	assert.Empty(t, closed.BlockedOn)
 	assert.Equal(t, "Orchestrator", closed.Driver)
 	listed, err := s.ListGoals(ctx, "team", GoalListQuery{States: []string{GoalDropped}})
 	require.NoError(t, err)
 	require.Len(t, listed, 1)
 	assert.Equal(t, "Orchestrator", listed[0].Driver, "the list read carries the driver")
+}
+
+// #7300 (the Operator's decision: a goal does not wait on a person, tasks and agents do): the goal has no decision, recommendation, if_silent or answer, in the table or in what a read carries; a database
+// that had the columns (rc1 made them) loses them at startup with its goals and its change counter intact.
+func TestTheGoalDecisionColumnsAreGoneAndAnOlderTableLosesThem(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	columns := func() []string {
+		rows, err := s.db.QueryxContext(ctx, `SELECT name FROM pragma_table_info('board_goals')`)
+		require.NoError(t, err)
+		defer rows.Close()
+		var out []string
+		for rows.Next() {
+			var n string
+			require.NoError(t, rows.Scan(&n))
+			out = append(out, n)
+		}
+		return out
+	}
+	for _, gone := range []string{"decision", "recommendation", "if_silent", "answer"} {
+		assert.NotContains(t, columns(), gone)
+	}
+	g := newGoal(t, s, "team", "kept through the migration")
+	_, err := s.UpdateGoal(ctx, "team", g.ID, GoalUpdate{State: gp(GoalBlocked), BlockedOn: gp("the build")})
+	require.NoError(t, err)
+	b, err := json.Marshal(g)
+	require.NoError(t, err)
+	for _, key := range []string{"decision", "recommendation", "if_silent", "answer"} {
+		assert.NotContains(t, string(b), `"`+key+`"`, "a goal read carries no %s", key)
+	}
+
+	// An rc1-shaped table: the four columns back, with the trigger that watches them.
+	for _, stmt := range []string{
+		`DROP TRIGGER board_goals_seq_update`,
+		`ALTER TABLE board_goals ADD COLUMN decision TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE board_goals ADD COLUMN recommendation TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE board_goals ADD COLUMN if_silent TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE board_goals ADD COLUMN answer TEXT NOT NULL DEFAULT ''`,
+		`UPDATE board_goals SET decision = 'Ship Friday?', recommendation = 'yes', if_silent = 'ship Monday', answer = 'ok'`,
+		`CREATE TRIGGER board_goals_seq_update AFTER UPDATE OF title, outcome, done_when, state, blocked_on, driver, decision, recommendation, if_silent, closed_at, closed_reason ON board_goals
+			WHEN OLD.title IS NOT NEW.title OR OLD.decision IS NOT NEW.decision BEGIN SELECT 1; END`,
+	} {
+		_, err := s.db.ExecContext(ctx, stmt)
+		require.NoError(t, err, stmt)
+	}
+	require.NoError(t, s.ensureGoalsSchema(ctx), "the older table is migrated")
+	for _, gone := range []string{"decision", "recommendation", "if_silent", "answer"} {
+		assert.NotContains(t, columns(), gone, "dropped from the older table")
+	}
+	kept, err := s.GetGoal(ctx, "team", g.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "kept through the migration", kept.Title)
+	assert.Equal(t, "the build", kept.BlockedOn)
+	before := goalSeq(t, s, "team")
+	_, err = s.UpdateGoal(ctx, "team", g.ID, GoalUpdate{Title: gp("renamed after the migration")})
+	require.NoError(t, err)
+	assert.Greater(t, goalSeq(t, s, "team"), before, "the change counter still moves on a goal write")
+	require.NoError(t, s.ensureGoalsSchema(ctx), "and a second run is a no-op")
 }
 
 func TestGoalSummaryCountsOpenGoalsAndCarriesTheCounter(t *testing.T) {

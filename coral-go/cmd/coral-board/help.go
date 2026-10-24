@@ -23,7 +23,7 @@ var textFlags = map[string]bool{
 	"message": true, "reason": true, "body": true, "instructions": true,
 	"custom-instructions": true, "workflow-instructions": true,
 	// Board goals (#7116): the free-text options of coral-board goal.
-	"title": true, "outcome": true, "done-when": true, "blocked-on": true, "decision": true, "recommendation": true, "if-silent": true,
+	"title": true, "outcome": true, "done-when": true, "blocked-on": true,
 }
 
 // handleHelp prints usage when args ask for it: "--help", "-h" or "help" as

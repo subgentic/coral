@@ -25,14 +25,14 @@ Subcommands:
   list [--state open|all|proposed,active,blocked,done,dropped] [--json]    Goals still open by default
   show <id> [--json]               A goal, its fields, how its tasks stand and the tasks
   update <id> [--title T] [--outcome T] [--done-when T] [--state proposed|active|blocked] [--driver NAME | --driver ""]
-              [--blocked-on "who or what it waits for"] [--decision "what is needed"] [--recommendation "what you suggest"] [--if-silent "what happens if nobody answers"]
-                                   A goal that is blocked needs --blocked-on; --decision, --recommendation and --if-silent say what the block needs
+              [--blocked-on "the reason"]
+                                   A goal that is blocked needs --blocked-on, a plain reason (a goal does not wait on a person: a task or an agent does)
   close <id> --reason "why" [--state done|dropped]   Close a goal (done by default); its open tasks are left as they are and counted
 
 A task joins a goal when it is added (task add --goal <id>) or later (task goal <task> <goal|none>); task list --goal <id> lists a goal's tasks.`
 
 // goalTextFlags are the goal options whose values are free text.
-var goalTextFlags = []string{"title", "outcome", "done-when", "blocked-on", "decision", "recommendation", "if-silent"}
+var goalTextFlags = []string{"title", "outcome", "done-when", "blocked-on"}
 
 func cmdGoal() {
 	if len(os.Args) < 3 {
@@ -119,7 +119,7 @@ func splitTitle(args []string, valueFlags map[string]bool) (title string, rest [
 	return title, rest
 }
 
-var goalValueFlags = map[string]bool{"outcome": true, "done-when": true, "state": true, "driver": true, "title": true, "blocked-on": true, "decision": true, "recommendation": true, "if-silent": true, "reason": true}
+var goalValueFlags = map[string]bool{"outcome": true, "done-when": true, "state": true, "driver": true, "title": true, "blocked-on": true, "reason": true}
 
 func cmdGoalAdd(st *boardState, args []string) {
 	title, rest := splitTitle(args, goalValueFlags)
@@ -261,9 +261,6 @@ func cmdGoalShow(st *boardState, args []string) {
 	line("Outcome", "outcome")
 	line("Done when", "done_when")
 	line("Blocked on", "blocked_on")
-	line("Decision", "decision")
-	line("Recommendation", "recommendation")
-	line("If silent", "if_silent")
 	line("Closed", "closed_reason")
 	if r, ok := g["rollup"].(map[string]any); ok {
 		fmt.Printf("  %-15s %.0f done, %.0f active, %.0f blocked, %.0f queued (%.0f)\n", "Tasks:", num(r["done"]), num(r["active"]), num(r["blocked"]), num(r["queued"]), num(r["total"]))
@@ -282,13 +279,13 @@ func num(v any) float64 { f, _ := v.(float64); return f }
 
 func cmdGoalUpdate(st *boardState, args []string) {
 	if len(args) < 1 {
-		fmt.Fprintln(os.Stderr, `Usage: coral-board goal update <id> [--title T] [--outcome T] [--done-when T] [--state S] [--driver NAME] [--blocked-on T] [--decision T] [--recommendation T] [--if-silent T]`)
+		fmt.Fprintln(os.Stderr, `Usage: coral-board goal update <id> [--title T] [--outcome T] [--done-when T] [--state S] [--driver NAME] [--blocked-on T]`)
 		clierr.Exit1()
 	}
 	id := goalID(args[0], "Usage: coral-board goal update <id> [options]")
 	fs := flag.NewFlagSet("goal-update", flag.ContinueOnError)
 	vals := map[string]*string{}
-	for _, name := range []string{"title", "outcome", "done-when", "state", "driver", "blocked-on", "decision", "recommendation", "if-silent"} {
+	for _, name := range []string{"title", "outcome", "done-when", "state", "driver", "blocked-on"} {
 		vals[name] = fs.String(name, "", "")
 	}
 	clihelp.ParseFlags(fs, args[1:], func() string { return goalUsageText })

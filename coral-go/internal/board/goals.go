@@ -38,10 +38,8 @@ const (
 	MaxGoalOutcome   = 2000
 	MaxGoalDoneWhen  = 300
 	MaxGoalBlockedOn = 200
-	// MaxGoalDecision is the longest each of decision, recommendation and if_silent of a blocked goal may be.
-	MaxGoalDecision = 300
-	MaxGoalDriver   = 200
-	MaxGoalReason   = 300
+	MaxGoalDriver    = 200
+	MaxGoalReason    = 300
 )
 
 // GoalError is a refusal with a fixed word: the handler maps Code to the status, the CLI shows Message. Compare with errors.Is against the values below.
@@ -65,9 +63,6 @@ var (
 	ErrGoalAlreadyClosed     = &GoalError{"goal_already_closed", "this goal is already closed"}
 	ErrGoalTaskNotFound      = &GoalError{"task_not_found", "no such task on this board"}
 	ErrGoalDriverUnknown     = &GoalError{"goal_driver_unknown", "the driver is not a subscriber of this board"}
-	// An answer goes with one move: a blocked goal back to active (#7271).
-	ErrGoalAnswerNotApplicable = &GoalError{"goal_answer_not_applicable", "an answer goes with moving a blocked goal to active (state: active), and only then"}
-	ErrGoalAnswerEmpty         = &GoalError{"goal_answer_empty", "an answer can't be empty"}
 )
 
 // textTooLong is ErrGoalTextTooLong naming the field and its limit.
@@ -99,14 +94,8 @@ type Goal struct {
 	DoneWhen  string `db:"done_when" json:"done_when"`
 	State     string `db:"state" json:"state"`
 	BlockedOn string `db:"blocked_on" json:"blocked_on,omitempty"`
-	// Driver is the board subscriber who drives the goal; "" for none. Decision, Recommendation and IfSilent say, for a blocked goal, what is needed from the person, what is recommended and what happens
-	// if they stay silent; each is one cleaned line, cleared when the goal leaves blocked.
-	Driver         string `db:"driver" json:"driver,omitempty"`
-	Decision       string `db:"decision" json:"decision,omitempty"`
-	Recommendation string `db:"recommendation" json:"recommendation,omitempty"`
-	IfSilent       string `db:"if_silent" json:"if_silent,omitempty"`
-	// Answer is what the person said when they moved the goal from blocked back to active (#7271): kept with the goal until it is blocked again.
-	Answer       string     `db:"answer" json:"answer,omitempty"`
+	// Driver is the board subscriber who drives the goal; "" for none. A blocked goal says why in blocked_on, a plain reason: a goal does not wait on a person (a task or an agent does).
+	Driver       string     `db:"driver" json:"driver,omitempty"`
 	CreatedBy    string     `db:"created_by" json:"created_by"`
 	CreatedAt    string     `db:"created_at" json:"created_at"`
 	UpdatedAt    string     `db:"updated_at" json:"updated_at"`
@@ -119,7 +108,7 @@ type Goal struct {
 func (g Goal) Closed() bool { return g.State == GoalDone || g.State == GoalDropped }
 
 // goalColumns are the columns of a Goal.
-const goalColumns = `id, goal_uid, board_id, title, outcome, done_when, state, blocked_on, driver, decision, recommendation, if_silent, answer, created_by, created_at, updated_at, closed_at, closed_reason`
+const goalColumns = `id, goal_uid, board_id, title, outcome, done_when, state, blocked_on, driver, created_by, created_at, updated_at, closed_at, closed_reason`
 
 func (s *Store) ensureGoalsSchema(ctx context.Context) error {
 	for _, stmt := range []string{
@@ -133,10 +122,6 @@ func (s *Store) ensureGoalsSchema(ctx context.Context) error {
 			state         TEXT NOT NULL DEFAULT 'active' CHECK (state IN ('proposed', 'active', 'blocked', 'done', 'dropped')),
 			blocked_on    TEXT NOT NULL DEFAULT '',
 			driver        TEXT NOT NULL DEFAULT '',
-			decision      TEXT NOT NULL DEFAULT '',
-			recommendation TEXT NOT NULL DEFAULT '',
-			if_silent     TEXT NOT NULL DEFAULT '',
-			answer        TEXT NOT NULL DEFAULT '',
 			created_by    TEXT NOT NULL DEFAULT '',
 			created_at    TEXT NOT NULL,
 			updated_at    TEXT NOT NULL,
@@ -160,8 +145,18 @@ func (s *Store) ensureGoalsSchema(ctx context.Context) error {
 			return err
 		}
 	}
-	for _, ddl := range []string{"ALTER TABLE board_tasks ADD COLUMN goal_id INTEGER", "ALTER TABLE boards ADD COLUMN board_uid TEXT", "ALTER TABLE board_goals ADD COLUMN answer TEXT NOT NULL DEFAULT ''"} {
+	for _, ddl := range []string{"ALTER TABLE board_tasks ADD COLUMN goal_id INTEGER", "ALTER TABLE boards ADD COLUMN board_uid TEXT"} {
 		if _, err := s.db.ExecContext(ctx, ddl); err != nil && !strings.Contains(err.Error(), "duplicate column") {
+			return err
+		}
+	}
+	// The goal decision fields (decision, recommendation, if_silent) and the answer are gone (#7300, the Operator's decision: a goal does not wait on a person): a database that has the columns drops them, after the
+	// trigger that watches them, which is made again below without them.
+	if _, err := s.db.ExecContext(ctx, `DROP TRIGGER IF EXISTS board_goals_seq_update`); err != nil {
+		return err
+	}
+	for _, col := range []string{"decision", "recommendation", "if_silent", "answer"} {
+		if _, err := s.db.ExecContext(ctx, "ALTER TABLE board_goals DROP COLUMN "+col); err != nil && !strings.Contains(err.Error(), "no such column") {
 			return err
 		}
 	}
@@ -177,9 +172,9 @@ func (s *Store) ensureGoalsSchema(ctx context.Context) error {
 		// The update triggers fire only when a column they watch really changes (#7239): an UPDATE that writes the same values is not a change, and an open Goals view refreshes on this counter. They are dropped
 		// and made again so a database that has the older, unguarded ones gets these.
 		`DROP TRIGGER IF EXISTS board_goals_seq_update`,
-		`CREATE TRIGGER board_goals_seq_update AFTER UPDATE OF title, outcome, done_when, state, blocked_on, driver, decision, recommendation, if_silent, closed_at, closed_reason ON board_goals
+		`CREATE TRIGGER board_goals_seq_update AFTER UPDATE OF title, outcome, done_when, state, blocked_on, driver, closed_at, closed_reason ON board_goals
 			WHEN OLD.title IS NOT NEW.title OR OLD.outcome IS NOT NEW.outcome OR OLD.done_when IS NOT NEW.done_when OR OLD.state IS NOT NEW.state OR OLD.blocked_on IS NOT NEW.blocked_on OR OLD.driver IS NOT NEW.driver
-			OR OLD.decision IS NOT NEW.decision OR OLD.recommendation IS NOT NEW.recommendation OR OLD.if_silent IS NOT NEW.if_silent OR OLD.closed_at IS NOT NEW.closed_at OR OLD.closed_reason IS NOT NEW.closed_reason
+			OR OLD.closed_at IS NOT NEW.closed_at OR OLD.closed_reason IS NOT NEW.closed_reason
 			BEGIN ` + fmt.Sprintf(bump, "NEW.board_id") + ` END`,
 		`CREATE TRIGGER IF NOT EXISTS board_goals_seq_delete AFTER DELETE ON board_goals BEGIN ` + fmt.Sprintf(bump, "OLD.board_id") + ` END`,
 		`CREATE TRIGGER IF NOT EXISTS board_tasks_goal_seq_insert AFTER INSERT ON board_tasks WHEN NEW.goal_id IS NOT NULL BEGIN ` + fmt.Sprintf(bump, "NEW.board_id") + ` END`,
@@ -599,35 +594,18 @@ func (s *Store) goalRollups(ctx context.Context, board string, ids []int64) (map
 // GoalUpdate changes the fields that are set. A state of done or dropped is not set here: CloseGoal records the reason.
 type GoalUpdate struct {
 	Title, Outcome, DoneWhen, State, BlockedOn *string
-	// Driver: a subscriber of the board, or "" for none. Decision, Recommendation and IfSilent are for a blocked goal and are cleared when it leaves blocked.
-	Driver, Decision, Recommendation, IfSilent *string
-	// Answer, with State active on a goal that is blocked, is stored with the goal in the same write (#7271); anywhere else it is refused.
-	Answer *string
+	// Driver: a subscriber of the board, or "" for none.
+	Driver *string
 }
 
 // UpdateGoal changes a goal's text or state: keeping it true (active, proposed, blocked on someone) and reopening a closed one. Moving a goal to blocked needs blocked_on; moving it
 // anywhere else clears it. The goal is read, changed and written in one transaction, so two writers changing different fields of one goal at the same moment (the orchestrator sets the state
 // while the Operator or the Hub edits the title) both keep their change (#7087, Backend's review: 188 of 200 concurrent pairs lost one before).
 func (s *Store) UpdateGoal(ctx context.Context, board string, id int64, u GoalUpdate) (*Goal, error) {
-	return s.updateGoal(ctx, board, id, u, nil)
-}
-
-// UpdateGoalWithBefore is UpdateGoal that also returns the goal as it was just before the write, read in the same transaction: what a caller needs to say what changed (the question a blocked goal
-// waited on, who drove it) without a second read that another writer could change in between.
-func (s *Store) UpdateGoalWithBefore(ctx context.Context, board string, id int64, u GoalUpdate) (after, before *Goal, err error) {
-	var was Goal
-	after, err = s.updateGoal(ctx, board, id, u, &was)
-	if err != nil {
-		return nil, nil, err
-	}
-	return after, &was, nil
-}
-
-func (s *Store) updateGoal(ctx context.Context, board string, id int64, u GoalUpdate, beforeOut *Goal) (*Goal, error) {
 	// What does not depend on the goal's own row is checked first, outside the transaction.
 	var (
-		title, outcome, doneWhen, blockedOn, decision, recommendation, ifSilent string
-		err                                                                     error
+		title, outcome, doneWhen, blockedOn string
+		err                                 error
 	)
 	if u.Title != nil {
 		if title, err = goalLine("title", *u.Title, MaxGoalTitle); err != nil {
@@ -652,17 +630,6 @@ func (s *Store) updateGoal(ctx context.Context, board string, id int64, u GoalUp
 			return nil, err
 		}
 	}
-	for _, f := range []struct {
-		field string
-		in    *string
-		to    *string
-	}{{"decision", u.Decision, &decision}, {"recommendation", u.Recommendation, &recommendation}, {"if_silent", u.IfSilent, &ifSilent}} {
-		if f.in != nil {
-			if *f.to, err = goalLine(f.field, *f.in, MaxGoalDecision); err != nil {
-				return nil, err
-			}
-		}
-	}
 	if u.State != nil {
 		switch *u.State {
 		case GoalProposed, GoalActive, GoalBlocked:
@@ -670,16 +637,6 @@ func (s *Store) updateGoal(ctx context.Context, board string, id int64, u GoalUp
 			return nil, ErrGoalReasonRequired // closing is CloseGoal, with its reason
 		default:
 			return nil, ErrGoalBadState
-		}
-	}
-
-	var answer string
-	if u.Answer != nil {
-		if answer, err = goalLine("answer", *u.Answer, MaxGoalReason); err != nil {
-			return nil, err
-		}
-		if answer == "" {
-			return nil, ErrGoalAnswerEmpty
 		}
 	}
 
@@ -695,13 +652,6 @@ func (s *Store) updateGoal(ctx context.Context, board string, id int64, u GoalUp
 		return nil, err
 	}
 	before := g
-	if beforeOut != nil {
-		*beforeOut = g
-	}
-	// An answer goes with exactly one move, a blocked goal to active, and is written in the same transaction as the move.
-	if u.Answer != nil && !(before.State == GoalBlocked && u.State != nil && *u.State == GoalActive) {
-		return nil, ErrGoalAnswerNotApplicable
-	}
 	if u.Title != nil {
 		g.Title = title
 	}
@@ -719,36 +669,21 @@ func (s *Store) updateGoal(ctx context.Context, board string, id int64, u GoalUp
 			return nil, err
 		}
 	}
-	if u.Decision != nil {
-		g.Decision = decision
-	}
-	if u.Recommendation != nil {
-		g.Recommendation = recommendation
-	}
-	if u.IfSilent != nil {
-		g.IfSilent = ifSilent
-	}
 	if u.State != nil {
 		if g.Closed() {
 			g.ClosedAt, g.ClosedReason = nil, ""
 		}
 		g.State = *u.State
 	}
-	if u.Answer != nil {
-		g.Answer = answer
-	}
 	if g.State != GoalBlocked {
-		g.BlockedOn, g.Decision, g.Recommendation, g.IfSilent = "", "", "", ""
+		g.BlockedOn = ""
 	} else if g.BlockedOn == "" {
 		return nil, ErrGoalBlockedOnRequired
 	}
-	if g.State == GoalBlocked {
-		g.Answer = "" // a goal that waits again has no answer yet
-	}
 	// A write that changes nothing (the same title, an empty body) is not a change: no new updated_at, and the board's change counter does not move (#7239).
 	if !sameGoalText(before, g) {
-		if _, err := tx.ExecContext(ctx, `UPDATE board_goals SET title = ?, outcome = ?, done_when = ?, state = ?, blocked_on = ?, driver = ?, decision = ?, recommendation = ?, if_silent = ?, answer = ?, closed_at = ?, closed_reason = ?, updated_at = ? WHERE id = ? AND board_id = ?`,
-			g.Title, g.Outcome, g.DoneWhen, g.State, g.BlockedOn, g.Driver, g.Decision, g.Recommendation, g.IfSilent, g.Answer, g.ClosedAt, g.ClosedReason, nowUTC(), id, board); err != nil {
+		if _, err := tx.ExecContext(ctx, `UPDATE board_goals SET title = ?, outcome = ?, done_when = ?, state = ?, blocked_on = ?, driver = ?, closed_at = ?, closed_reason = ?, updated_at = ? WHERE id = ? AND board_id = ?`,
+			g.Title, g.Outcome, g.DoneWhen, g.State, g.BlockedOn, g.Driver, g.ClosedAt, g.ClosedReason, nowUTC(), id, board); err != nil {
 			return nil, err
 		}
 	}
@@ -767,8 +702,7 @@ func sameGoalText(a, b Goal) bool {
 	if b.ClosedAt != nil {
 		closedB = *b.ClosedAt
 	}
-	return a.Title == b.Title && a.Outcome == b.Outcome && a.DoneWhen == b.DoneWhen && a.State == b.State && a.BlockedOn == b.BlockedOn && a.Driver == b.Driver && a.Decision == b.Decision &&
-		a.Recommendation == b.Recommendation && a.IfSilent == b.IfSilent && a.Answer == b.Answer && (a.ClosedAt == nil) == (b.ClosedAt == nil) && closedA == closedB && a.ClosedReason == b.ClosedReason
+	return a.Title == b.Title && a.Outcome == b.Outcome && a.DoneWhen == b.DoneWhen && a.State == b.State && a.BlockedOn == b.BlockedOn && a.Driver == b.Driver && (a.ClosedAt == nil) == (b.ClosedAt == nil) && closedA == closedB && a.ClosedReason == b.ClosedReason
 }
 
 // openTaskStatuses are the task states that count as open when a goal is closed.
@@ -797,7 +731,7 @@ func (s *Store) CloseGoal(ctx context.Context, board string, id int64, reason, s
 	}
 	defer tx.Rollback()
 	now := nowUTC()
-	res, err := tx.ExecContext(ctx, `UPDATE board_goals SET state = ?, blocked_on = '', decision = '', recommendation = '', if_silent = '', closed_at = ?, closed_reason = ?, updated_at = ?
+	res, err := tx.ExecContext(ctx, `UPDATE board_goals SET state = ?, blocked_on = '', closed_at = ?, closed_reason = ?, updated_at = ?
 		WHERE id = ? AND board_id = ? AND state NOT IN ('done', 'dropped')`, state, now, reason, now, id, board)
 	if err != nil {
 		return nil, 0, err

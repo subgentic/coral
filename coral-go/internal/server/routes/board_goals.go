@@ -1,7 +1,6 @@
 package routes
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -25,8 +24,8 @@ import (
 //	POST  /api/board/{project}/goals                 {title, outcome?, done_when?, state?, driver?, subscriber_id}          -> 201 the goal
 //	GET   /api/board/{project}/goals?state=a,b       default: proposed, active, blocked                                      -> {"goals": [...]}
 //	GET   /api/board/{project}/goals/{goalID}                                                                                -> the goal
-//	PATCH /api/board/{project}/goals/{goalID}        any of title, outcome, done_when, state, blocked_on, driver, decision,
-//	                                                 recommendation, if_silent, with subscriber_id                           -> the goal
+//	PATCH /api/board/{project}/goals/{goalID}        any of title, outcome, done_when, state, blocked_on, driver, with
+//	                                                 subscriber_id                                                           -> the goal
 //	POST  /api/board/{project}/goals/{goalID}/close  {reason, state? done|dropped, subscriber_id}                            -> {"goal": ..., "open_tasks": n}
 //	PUT   /api/board/{project}/tasks/{taskID}/goal   {goal_id: n | null, subscriber_id}                                      -> the task
 //	GET   /api/board/{project}/tasks?goal=<id>       the goal's tasks, as the usual task page
@@ -283,73 +282,34 @@ func (h *BoardHandler) UpdateGoal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		Title          *string `json:"title"`
-		Outcome        *string `json:"outcome"`
-		DoneWhen       *string `json:"done_when"`
-		State          *string `json:"state"`
-		BlockedOn      *string `json:"blocked_on"`
-		Driver         *string `json:"driver"`
-		Decision       *string `json:"decision"`
-		Recommendation *string `json:"recommendation"`
-		IfSilent       *string `json:"if_silent"`
-		Answer         *string `json:"answer"`
-		SubscriberID   string  `json:"subscriber_id"`
+		Title        *string `json:"title"`
+		Outcome      *string `json:"outcome"`
+		DoneWhen     *string `json:"done_when"`
+		State        *string `json:"state"`
+		BlockedOn    *string `json:"blocked_on"`
+		Driver       *string `json:"driver"`
+		SubscriberID string  `json:"subscriber_id"`
 	}
 	// a field that cannot be changed (id, goal_uid, board_id, closed_at) or is mistyped is refused by name, not dropped (#7239)
 	if err := decodeJSONStrict(r, &body); err != nil {
 		if name, ok := strings.CutPrefix(err.Error(), "json: unknown field "); ok {
-			errBadRequest(w, fmt.Sprintf("unknown field %s: a goal's title, outcome, done_when, state, blocked_on, driver, decision, recommendation, if_silent, answer and subscriber_id can be sent", shortKey(strings.Trim(name, `"`))))
+			errBadRequest(w, fmt.Sprintf("unknown field %s: a goal's title, outcome, done_when, state, blocked_on, driver and subscriber_id can be sent", shortKey(strings.Trim(name, `"`))))
 			return
 		}
 		errBadRequest(w, "invalid JSON")
 		return
 	}
-	actor, ok := h.goalActor(w, r, project, body.SubscriberID)
-	if !ok {
+	if _, ok := h.goalActor(w, r, project, body.SubscriberID); !ok {
 		return
 	}
-	g, was, err := h.bs.UpdateGoalWithBefore(r.Context(), project, id, board.GoalUpdate{Title: body.Title, Outcome: body.Outcome, DoneWhen: body.DoneWhen, State: body.State, BlockedOn: body.BlockedOn,
-		Driver: body.Driver, Decision: body.Decision, Recommendation: body.Recommendation, IfSilent: body.IfSilent, Answer: body.Answer})
+	g, err := h.bs.UpdateGoal(r.Context(), project, id, board.GoalUpdate{Title: body.Title, Outcome: body.Outcome, DoneWhen: body.DoneWhen, State: body.State, BlockedOn: body.BlockedOn, Driver: body.Driver})
 	if err != nil {
 		if !goalError(w, err) {
 			errInternalServer(w, err.Error())
 		}
 		return
 	}
-	if body.Answer != nil { // the store accepted it, so this write moved a blocked goal to active: one message tells the driver
-		h.postGoalLine(r, project, actor, goalAnswerLine(h.goalAnswerTo(r.Context(), project, was), was, g))
-	}
 	writeJSON(w, http.StatusOK, g)
-}
-
-// goalAnswerLine is the board message for an answered goal: who it is for (the driver, else what the goal waited on), the goal, the question it waited on and the answer.
-func goalAnswerLine(to string, was, now *board.Goal) string {
-	mention := ""
-	if to != "" {
-		mention = "@" + to + " "
-	}
-	question := was.Decision
-	if question == "" {
-		question = "(waiting on " + was.BlockedOn + ")"
-	}
-	return mention + "Goal #" + strconv.FormatInt(now.ID, 10) + " \"" + now.Title + "\" is active again. You were waiting on: " + question + " Answer: " + now.Answer
-}
-
-// goalAnswerTo is who the answer's message names: the goal's driver, else what it was blocked on when that is a subscriber of the board, else the one who made the goal when they are one, so the message
-// reaches someone; "" (no mention, a plain board line) when none of them is on the board. A mention of a name that is nobody's reaches no one.
-func (h *BoardHandler) goalAnswerTo(ctx context.Context, project string, was *board.Goal) string {
-	if was.Driver != "" {
-		return was.Driver
-	}
-	for _, name := range []string{strings.TrimSpace(was.BlockedOn), was.CreatedBy} {
-		if name == "" {
-			continue
-		}
-		if sub, _ := h.bs.GetProjectSubscription(ctx, project, name); sub != nil {
-			return sub.SubscriberID
-		}
-	}
-	return ""
 }
 
 // postGoalLine posts a board message for a goal change, as the person who made it: the Operator or an orchestrator by name, or through Coral Hub the Operator with the Hub user noted, as a chat post is.

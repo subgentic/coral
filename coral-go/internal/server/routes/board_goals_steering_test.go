@@ -1,26 +1,16 @@
 package routes
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"net/http"
-	"net/http/httptest"
-	"strings"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/board"
-	"github.com/subgentic/coral/internal/board/boardtest"
-	"github.com/subgentic/coral/internal/cloud"
-	"github.com/subgentic/coral/pkg/tunnel"
 )
 
-// #7271 (goals steering, backend): PATCH .../goals/{id} takes an optional answer when a blocked goal goes back to active. One write keeps the answer with the goal and posts ONE board message from the person
-// naming the driver, the question the goal waited on and the answer; closing a goal posts one board line with the state, the reason and the open-task count.
+// #7271: closing a goal posts one board line with the state, the reason and the open-task count. (The answer to a blocked goal, #7271's other half, went with the goal decision: #7300.)
 func steeringRig(t *testing.T) (call func(method, path string, body any) (int, map[string]any), h *BoardHandler, gid int64) {
 	server, h := setupBoardTestServer(t)
 	ctx := context.Background()
@@ -30,7 +20,7 @@ func steeringRig(t *testing.T) (call func(method, path string, body any) (int, m
 	call = goalCall(t, server.URL)
 	_, g := call("POST", "/api/board/team/goals", map[string]any{"title": "Ship it", "driver": "Lead", "subscriber_id": "Orchestrator"})
 	gid = int64(g["id"].(float64))
-	code, out := call("PATCH", "/api/board/team/goals/"+itoa(gid), map[string]any{"state": "blocked", "blocked_on": "the operator", "decision": "Ship Friday?", "recommendation": "yes", "if_silent": "ship Monday", "subscriber_id": "Orchestrator"})
+	code, out := call("PATCH", "/api/board/team/goals/"+itoa(gid), map[string]any{"state": "blocked", "blocked_on": "the operator", "subscriber_id": "Orchestrator"})
 	require.Equal(t, 200, code, "%v", out)
 	return call, h, gid
 }
@@ -40,73 +30,6 @@ func messagesOf(t *testing.T, h *BoardHandler) []board.Message {
 	msgs, err := h.bs.ListMessages(context.Background(), "team", 100, 0, 0)
 	require.NoError(t, err)
 	return msgs
-}
-
-func TestAnsweringABlockedGoalStoresTheAnswerAndPostsOneMessage(t *testing.T) {
-	call, h, gid := steeringRig(t)
-	before := len(messagesOf(t, h))
-	code, out := call("PATCH", "/api/board/team/goals/"+itoa(gid), map[string]any{"state": "active", "answer": "Yes, ship Friday\x1b[31m", "subscriber_id": "Operator"})
-	require.Equal(t, 200, code, "%v", out)
-	assert.Equal(t, "active", out["state"])
-	assert.Equal(t, "Yes, ship Friday", out["answer"], "cleaned like a reason: the escape sequence is gone")
-	assert.NotContains(t, out, "decision", "the question leaves the goal with the block")
-
-	msgs := messagesOf(t, h)
-	require.Len(t, msgs, before+1, "one board message for the write")
-	m := msgs[len(msgs)-1]
-	assert.Equal(t, "Operator", m.SubscriberID, "from the person who answered")
-	assert.Contains(t, m.Content, "@Lead", "naming the driver")
-	assert.Contains(t, m.Content, "Ship Friday?", "the question the goal waited on")
-	assert.Contains(t, m.Content, "Yes, ship Friday", "and the answer")
-	assert.Contains(t, m.Content, "Ship it", "and the goal")
-
-	// The same answer again is not a second message: the goal is no longer blocked.
-	code, out = call("PATCH", "/api/board/team/goals/"+itoa(gid), map[string]any{"state": "active", "answer": "again", "subscriber_id": "Operator"})
-	assert.Equal(t, 400, code, "%v", out)
-	assert.Equal(t, "goal_answer_not_applicable", out["code"])
-	assert.Len(t, messagesOf(t, h), before+1)
-}
-
-func TestAnswerRefusalsStoreAndPostNothing(t *testing.T) {
-	call, h, gid := steeringRig(t)
-	before := len(messagesOf(t, h))
-	for name, body := range map[string]map[string]any{
-		"an answer with no state change":    {"answer": "yes"},
-		"an answer moving to proposed":      {"state": "proposed", "answer": "yes"},
-		"an answer staying blocked":         {"state": "blocked", "blocked_on": "x", "answer": "yes"},
-		"an answer over 300 characters":     {"state": "active", "answer": strings.Repeat("a", 301)},
-		"an empty answer with a state move": {"state": "active", "answer": "  "},
-	} {
-		body["subscriber_id"] = "Operator"
-		code, out := call("PATCH", "/api/board/team/goals/"+itoa(gid), body)
-		assert.Equal(t, 400, code, "%s: %v", name, out)
-	}
-	g, err := h.bs.GetGoal(context.Background(), "team", gid)
-	require.NoError(t, err)
-	assert.Equal(t, "blocked", g.State, "still blocked: nothing was written")
-	assert.Empty(t, g.Answer)
-	assert.Len(t, messagesOf(t, h), before, "and nothing was posted")
-
-	// An unblock with no answer posts nothing either.
-	code, out := call("PATCH", "/api/board/team/goals/"+itoa(gid), map[string]any{"state": "active", "subscriber_id": "Operator"})
-	require.Equal(t, 200, code, "%v", out)
-	assert.Len(t, messagesOf(t, h), before)
-}
-
-func TestAnAnswerOnAGoalWithNoDriverNamesWhatItWaitedOn(t *testing.T) {
-	server, h := setupBoardTestServer(t)
-	registerTaskPlanner(t, h, "team", "Orchestrator")
-	call := goalCall(t, server.URL)
-	_, g := call("POST", "/api/board/team/goals", map[string]any{"title": "No driver", "subscriber_id": "Orchestrator"})
-	gid := int64(g["id"].(float64))
-	code, out := call("PATCH", "/api/board/team/goals/"+itoa(gid), map[string]any{"state": "blocked", "blocked_on": "Orchestrator", "subscriber_id": "Orchestrator"})
-	require.Equal(t, 200, code, "%v", out)
-	before := len(messagesOf(t, h))
-	code, out = call("PATCH", "/api/board/team/goals/"+itoa(gid), map[string]any{"state": "active", "answer": "go", "subscriber_id": "Operator"})
-	require.Equal(t, 200, code, "%v", out)
-	msgs := messagesOf(t, h)
-	require.Len(t, msgs, before+1)
-	assert.Contains(t, msgs[len(msgs)-1].Content, "@Orchestrator", "blocked_on is mentioned when there is no driver")
 }
 
 func TestClosingAGoalPostsOneBoardLine(t *testing.T) {
@@ -131,108 +54,20 @@ func TestClosingAGoalPostsOneBoardLine(t *testing.T) {
 	assert.Len(t, messagesOf(t, h), before+1)
 }
 
-// Through Coral Hub the answer's message is the Operator's, made by the Hub user and marked as a Hub-operator post, as a chat post is; the goal write is the same one write.
-func TestAnAnswerThroughCoralHubIsPostedAsTheOperatorWithTheHubUser(t *testing.T) {
-	bs, err := boardtest.Open(t.TempDir() + "/board.db")
-	require.NoError(t, err)
-	t.Cleanup(func() { bs.Close() })
-	h := NewBoardHandler(bs)
-	t.Cleanup(h.WaitBackground)
-	ctx := context.Background()
-	_, err = bs.Subscribe(ctx, "team", "Lead", "Developer", "s-lead", nil, "mentions")
-	require.NoError(t, err)
-	g, err := bs.CreateGoal(ctx, "team", board.GoalInput{Title: "Ship it", Driver: "Lead", CreatedBy: "Operator"})
-	require.NoError(t, err)
-	blocked, on, q := "blocked", "the operator", "Ship Friday?"
-	_, err = bs.UpdateGoal(ctx, "team", g.ID, board.GoalUpdate{State: &blocked, BlockedOn: &on, Decision: &q})
-	require.NoError(t, err)
-	r := chi.NewRouter()
-	r.Use(TunnelIdentityGuard(bs, func(*http.Request) bool { return true }))
-	r.Patch("/api/board/{project}/goals/{goalID}", h.UpdateGoal)
-	srv := httptest.NewServer(r)
-	t.Cleanup(srv.Close)
-	const alice = "hub-user-1111aaaa"
-	body, _ := json.Marshal(map[string]any{"state": "active", "answer": "Yes", "subscriber_id": "Operator"})
-	req, err := http.NewRequest("PATCH", srv.URL+"/api/board/team/goals/"+itoa(g.ID), bytes.NewReader(body))
-	require.NoError(t, err)
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set(tunnel.ViaHeader, cloud.ViaSecret())
-	req.Header.Set(tunnel.HubUserHeader, alice)
-	resp, err := http.DefaultClient.Do(req)
-	require.NoError(t, err)
-	resp.Body.Close()
-	require.Equal(t, 200, resp.StatusCode)
-	msgs, err := bs.ListMessages(ctx, "team", 10, 0, 0)
-	require.NoError(t, err)
-	var posted []board.Message
-	for _, m := range msgs {
-		if strings.Contains(m.Content, "Answer: Yes") {
-			posted = append(posted, m)
-		}
+// #7300 (the Operator's decision: a goal does not wait on a person; tasks and agents do): the goal decision, recommendation and if_silent and the answer are not fields any more. A write that names one is a
+// 400 that names it, and a goal read carries none of them; a blocked goal keeps blocked_on as its plain reason.
+func TestTheGoalDecisionFieldsAreRefusedAndNotRead(t *testing.T) {
+	call, _, gid := steeringRig(t)
+	for _, field := range []string{"decision", "recommendation", "if_silent", "answer"} {
+		code, out := call("PATCH", "/api/board/team/goals/"+itoa(gid), map[string]any{field: "x", "subscriber_id": "Orchestrator"})
+		assert.Equal(t, 400, code, "%s: %v", field, out)
+		assert.Contains(t, out["error"], "unknown field "+field)
 	}
-	require.Len(t, posted, 1, "one message")
-	assert.Equal(t, "Operator", posted[0].SubscriberID)
-	require.NotNil(t, posted[0].Origin)
-	assert.Equal(t, board.OriginHubOperator, *posted[0].Origin)
-	assert.True(t, strings.HasPrefix(posted[0].Content, HubOperatorPrefix(alice)), "the Hub user is named as for a chat post: %q", posted[0].Content)
-	assert.Contains(t, posted[0].Content, "@Lead")
-}
-
-// Security's #7280 LOW 3: the answer belongs to the block it answered. A goal blocked again has no answer (the clear is pinned here), and the new block can be answered in turn with one more message.
-func TestABlockedAgainGoalHasNoAnswerUntilItIsAnswered(t *testing.T) {
-	call, h, gid := steeringRig(t)
-	code, out := call("PATCH", "/api/board/team/goals/"+itoa(gid), map[string]any{"state": "active", "answer": "first answer", "subscriber_id": "Operator"})
-	require.Equal(t, 200, code, "%v", out)
-	assert.Equal(t, "first answer", out["answer"])
-	code, out = call("PATCH", "/api/board/team/goals/"+itoa(gid), map[string]any{"state": "blocked", "blocked_on": "the operator", "decision": "Second question?", "subscriber_id": "Orchestrator"})
-	require.Equal(t, 200, code, "%v", out)
-	assert.NotContains(t, out, "answer", "blocked again: the old answer is gone")
-	g, err := h.bs.GetGoal(context.Background(), "team", gid)
-	require.NoError(t, err)
-	assert.Empty(t, g.Answer)
-	before := len(messagesOf(t, h))
-	code, out = call("PATCH", "/api/board/team/goals/"+itoa(gid), map[string]any{"state": "active", "answer": "second answer", "subscriber_id": "Operator"})
-	require.Equal(t, 200, code, "%v", out)
-	assert.Equal(t, "second answer", out["answer"])
-	msgs := messagesOf(t, h)
-	require.Len(t, msgs, before+1)
-	assert.Contains(t, msgs[len(msgs)-1].Content, "Second question?")
-}
-
-// Security's #7280 LOW (the Orchestrator's #7291): with no driver the answer's message names a subscriber of the board, so it reaches someone: what the goal waited on when that is a subscriber, else the
-// goal's creator when they are one; with neither on the board it is a plain line with no mention (a mention of nobody reaches nobody).
-func TestAnAnswerWithNoDriverNamesASubscriberOrNobody(t *testing.T) {
-	for name, tc := range map[string]struct {
-		blockedOn, creator, wantStart string
-		subscribe                     []string
-	}{
-		"blocked on a subscriber":               {"Reviewer", "Orchestrator", "@Reviewer ", []string{"Reviewer", "Orchestrator"}},
-		"blocked on text, creator subscribed":   {"the operator", "Orchestrator", "@Orchestrator ", []string{"Orchestrator"}},
-		"blocked on text, creator not on board": {"the operator", "Ghost", "Goal #", nil},
-	} {
-		t.Run(name, func(t *testing.T) {
-			server, h := setupBoardTestServer(t)
-			ctx := context.Background()
-			registerTaskPlanner(t, h, "team", "Orchestrator")
-			for _, s := range tc.subscribe {
-				if s != "Orchestrator" {
-					_, err := h.bs.Subscribe(ctx, "team", s, "Developer", "s-"+s, nil, "")
-					require.NoError(t, err)
-				}
-			}
-			g, err := h.bs.CreateGoal(ctx, "team", board.GoalInput{Title: "No driver", CreatedBy: tc.creator})
-			require.NoError(t, err)
-			call := goalCall(t, server.URL)
-			code, out := call("PATCH", "/api/board/team/goals/"+itoa(g.ID), map[string]any{"state": "blocked", "blocked_on": tc.blockedOn, "subscriber_id": "Orchestrator"})
-			require.Equal(t, 200, code, "%v", out)
-			before := len(messagesOf(t, h))
-			code, out = call("PATCH", "/api/board/team/goals/"+itoa(g.ID), map[string]any{"state": "active", "answer": "go", "subscriber_id": "Operator"})
-			require.Equal(t, 200, code, "%v", out)
-			msgs := messagesOf(t, h)
-			require.Len(t, msgs, before+1)
-			last := msgs[len(msgs)-1].Content
-			assert.True(t, strings.HasPrefix(last, tc.wantStart), "%q", last)
-			assert.Contains(t, last, "Answer: go")
-		})
+	code, g := call("GET", "/api/board/team/goals/"+itoa(gid), nil)
+	require.Equal(t, 200, code)
+	for _, field := range []string{"decision", "recommendation", "if_silent", "answer"} {
+		assert.NotContains(t, g, field, "a goal read carries no %s", field)
 	}
+	assert.Equal(t, "the operator", g["blocked_on"], "blocked keeps its plain reason")
+	assert.Equal(t, "blocked", g["state"])
 }
