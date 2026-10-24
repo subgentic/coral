@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -618,9 +619,12 @@ func (s *Store) GoalTaskPage(ctx context.Context, board string, goalID int64, cu
 	}
 	where, args := `t.board_id = ? AND t.goal_id = ?`, []any{board, goalID}
 	if cursor != "" {
-		_, after, err := decodeTaskCursor(cursor, board, "g")
+		forGoal, after, err := decodeTaskCursor(cursor, board, "g")
 		if err != nil {
 			return nil, err
+		}
+		if forGoal != strconv.FormatInt(goalID, 10) { // the cursor holds the goal it was issued for: another goal's would skip this goal's rows
+			return nil, fmt.Errorf("%w: cursor is for another goal", ErrBadTaskListQuery)
 		}
 		where += ` AND t.id > ?`
 		args = append(args, after)
@@ -631,7 +635,7 @@ func (s *Store) GoalTaskPage(ctx context.Context, board string, goalID int64, cu
 	}
 	if len(page.Tasks) > limit {
 		page.Tasks = page.Tasks[:limit]
-		page.NextCursor = encodeTaskCursor(board, "g", "", page.Tasks[limit-1].ID)
+		page.NextCursor = encodeTaskCursor(board, "g", strconv.FormatInt(goalID, 10), page.Tasks[limit-1].ID)
 	}
 	if err := s.loadListBlockedBy(ctx, page.Tasks); err != nil {
 		return nil, err

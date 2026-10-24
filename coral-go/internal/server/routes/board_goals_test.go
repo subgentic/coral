@@ -458,4 +458,19 @@ func TestGoalTasksReadPagesWithACursor(t *testing.T) {
 
 	code, page := call("GET", "/api/board/team/tasks?goal="+itoa(gid)+"&cursor=bogus", nil)
 	assert.Equal(t, 400, code, "%v", page)
+
+	// A cursor is for the goal it came from (QA's #7196): goal A's cursor on goal B is refused, not answered with B's rows after A's last id, which skips some; nor does the plain list take it.
+	_, other := call("POST", "/api/board/team/goals", map[string]any{"title": "Another", "subscriber_id": "Orchestrator"})
+	oid := int64(other["id"].(float64))
+	for i := 0; i < 3; i++ {
+		_, err := h.bs.CreateTaskWithOpts(ctx, "team", "o", "", "medium", "Orchestrator", &board.CreateTaskOpts{GoalID: &oid})
+		require.NoError(t, err)
+	}
+	_, first := call("GET", "/api/board/team/tasks?goal="+itoa(gid)+"&limit=2", nil)
+	cur := first["next_cursor"].(string)
+	require.NotEmpty(t, cur)
+	code, page = call("GET", "/api/board/team/tasks?goal="+itoa(oid)+"&limit=2&cursor="+cur, nil)
+	assert.Equal(t, 400, code, "goal A's cursor on goal B: %v", page)
+	code, page = call("GET", "/api/board/team/tasks?cursor="+cur, nil)
+	assert.Equal(t, 400, code, "a goal's cursor on the plain list: %v", page)
 }

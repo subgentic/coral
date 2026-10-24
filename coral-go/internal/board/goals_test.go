@@ -3,6 +3,7 @@ package board
 import (
 	"context"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -687,8 +688,13 @@ func TestGoalTaskPagePagesWithACursor(t *testing.T) {
 
 	_, err = s.GoalTaskPage(ctx, "team", g.ID, encodeTaskCursor("team", "a", "", 5), 10)
 	assert.ErrorIs(t, err, ErrBadTaskListQuery, "another read's cursor")
-	_, err = s.GoalTaskPage(ctx, "team", g.ID, encodeTaskCursor("elsewhere", "g", "", 5), 10)
+	_, err = s.GoalTaskPage(ctx, "team", g.ID, encodeTaskCursor("elsewhere", "g", strconv.FormatInt(g.ID, 10), 5), 10)
 	assert.ErrorIs(t, err, ErrBadTaskListQuery, "another board's cursor")
+	first, err := s.GoalTaskPage(ctx, "team", g.ID, "", 10)
+	require.NoError(t, err)
+	require.NotEmpty(t, first.NextCursor)
+	_, err = s.GoalTaskPage(ctx, "team", other.ID, first.NextCursor, 10)
+	assert.ErrorIs(t, err, ErrBadTaskListQuery, "this goal's cursor on another goal would skip that goal's rows")
 	_, err = s.GoalTaskPage(ctx, "other-board", g.ID, "", 10)
 	assert.ErrorIs(t, err, ErrGoalNotFound)
 }
