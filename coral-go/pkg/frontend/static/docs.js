@@ -187,7 +187,7 @@ function wrapTables(content) {
 }
 
 /** The topics as a sheet, for a phone (the sidebar's list is not on screen there): a button per topic; the open one says so. */
-function openTopics() {
+export function openTopics() {
     if (!docsList.length) return;
     const dlg = document.createElement('dialog'); dlg.className = 'docs-topics-dialog'; dlg.setAttribute('aria-labelledby', 'docs-topics-title');
     const title = document.createElement('h3'); title.id = 'docs-topics-title'; title.textContent = 'Topics';
@@ -210,7 +210,6 @@ function openTopics() {
 
 // A doc in the Docs list (#3645).
 registerActions({
-    'docs-topics': () => openTopics(),
     'doc-open': el => { const d = textOf(el.dataset.doc, 200); if (d) window.selectDoc(d); },
     'doc-open-key': (el, event) => {
         if (event.target === el && ['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) { // between the topics: the one Tab stop goes with the focus
