@@ -108,7 +108,10 @@ function _taskFieldsHtml(task) {
         <div class="task-detail-field">
             <span class="task-detail-label">Assigned To</span>
             <span class="task-detail-value">${escapeHtml(assignee)}</span>
-        </div>
+        </div>${task.goal_id ? `<div class="task-detail-field">
+            <span class="task-detail-label">Goal</span>
+            <span class="task-detail-value"><button type="button" class="task-goal-link" id="task-detail-goal-open" data-on-click="task-goal-open" data-goal-id="${Number(task.goal_id)}">Goal #${Number(task.goal_id)}</button></span>
+        </div>` : ''}
         <div class="task-detail-field">
             <span class="task-detail-label">Created By</span>
             <span class="task-detail-value">${escapeHtml(createdBy)}</span>

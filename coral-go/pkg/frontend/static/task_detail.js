@@ -10,6 +10,7 @@ import { closeOnBackdropAndEscape, releaseEscape } from './dialog_close.js';
 import { boardFetch, pathId, serverFetch, currentServer } from './server_base.js';
 import { _renderDepPicker, _getSelectedDeps } from './task_dep_picker.js';
 import { _taskRequiredOutputs } from './task_reminders.js';
+import { readOpenGoals, readGoal, fillGoalSelect, fillGoalLine, chooseGoalLabel } from './task_goals.js';
 import { _boardTasksFetch, _liveCosts, _reviewRequested, loadBoardTasks, loadAgentTasks } from './task_list.js';
 
 // Full tasks fetched for the detail view, by id. A list item is light (#3269).
@@ -64,6 +65,7 @@ export function showTaskDetailModal(taskId) {
 
     titleEl.textContent = `Task #${task.id}`;
     content.innerHTML = _taskDetailHtml(task, task.status === 'in_progress' ? _liveCosts[task.id] : null);
+    if (task.goal_id) fillGoalLine(_getBoardProject(), task.goal_id); // the Goal line names the goal once it is read (#7253)
     modal.setAttribute('aria-labelledby', 'task-detail-modal-title task-detail-heading'); // named by its number and its task (the dialog is shared: the others keep the title alone)
 
     // Update footer with action buttons for editable tasks
@@ -141,6 +143,7 @@ let _editOriginalTask = null;
 let _editBoardProject = null;
 
 let _editGeneration = 0;
+let _editRequireGoal = false; // the board needs a goal on every task: Save refuses an empty Goal choice
 
 export async function enableTaskEditMode(taskId) {
     let task = _boardTaskById(taskId);
@@ -188,6 +191,11 @@ export async function enableTaskEditMode(taskId) {
         } catch { /* ignore */ }
     }
 
+    // The goals the Goal select offers; a closed goal the task already has stays in it (#7253).
+    const goalRead = boardProject ? await readOpenGoals(boardProject) : { goals: [], requireGoal: false };
+    const currentGoal = task.goal_id && !goalRead.goals.some(g => g.id === task.goal_id) && boardProject ? await readGoal(boardProject, task.goal_id) : null;
+    _editRequireGoal = goalRead.requireGoal;
+
     if (editGeneration !== _editGeneration || _editOriginalTask !== task ||
         _getBoardProject() !== boardProject || !content.isConnected || content.firstChild !== originalContent) return;
 
@@ -219,7 +227,12 @@ export async function enableTaskEditMode(taskId) {
         <label for="task-edit-assignee">Assigned To
             <select id="task-edit-assignee">${assigneeOptions}</select>
         </label>
+        <label for="task-edit-goal" id="task-edit-goal-row"${goalRead.goals.length || goalRead.requireGoal || task.goal_id ? '' : ' hidden'}>Goal
+            <select id="task-edit-goal"></select>
+        </label>
         ${showDepPicker ? '<label>Blocked By <span class="text-muted-sm">(optional)</span></label><div id="task-edit-deps" class="dep-picker"></div>' : ''}`;
+
+    fillGoalSelect(document.getElementById('task-edit-goal'), { goals: goalRead.goals, requireGoal: goalRead.requireGoal, selectedId: task.goal_id, current: currentGoal });
 
     if (showDepPicker) {
         const currentDepIds = (task.blocked_by || []).map(d => d.task_id);
@@ -272,7 +285,9 @@ export async function saveTaskEdit(taskId) {
         }
     }
 
-    if (Object.keys(updates).length === 0 && Object.keys(amendmentChanges).length === 0) {
+    const goalValue = document.getElementById('task-edit-goal')?.value ?? String(task.goal_id || '');
+    const goalChanged = goalValue !== String(task.goal_id || '');
+    if (Object.keys(updates).length === 0 && Object.keys(amendmentChanges).length === 0 && !goalChanged) {
         cancelTaskEdit();
         return;
     }
@@ -281,6 +296,7 @@ export async function saveTaskEdit(taskId) {
     if (!boardProject) return;
 
     try {
+        if (goalChanged && !goalValue && _editRequireGoal) { document.getElementById('task-edit-goal')?.focus(); throw new Error(`${chooseGoalLabel}: this board needs a goal on every task.`); }
         if (Object.keys(amendmentChanges).length) {
             const reason = document.getElementById('task-edit-reason')?.value.trim() || '';
             if (!reason) throw new Error('An amendment reason is required for description or instruction changes');
@@ -303,6 +319,17 @@ export async function saveTaskEdit(taskId) {
             if (!resp.ok) {
                 const data = await resp.json().catch(() => ({}));
                 throw new Error(data.error || `HTTP ${resp.status}`);
+            }
+        }
+        if (goalChanged) {
+            const gr = await boardFetch(boardProject, `/tasks/${pathId(taskId)}/goal`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ goal_id: goalValue ? Number(goalValue) : null, subscriber_id: 'Operator' }),
+            });
+            if (!gr.ok) {
+                const data = await gr.json().catch(() => ({}));
+                throw new Error(data.error || `HTTP ${gr.status}`);
             }
         }
         _editOriginalTask = null;

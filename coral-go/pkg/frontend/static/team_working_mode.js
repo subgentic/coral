@@ -6,6 +6,7 @@ import { splitKey, keyLabel, serverUrl, isCloud } from './server_base.js';
 const { boardRenameControl } = await importOnce('./board_rename.js'); // lazy modules load the others they need through importOnce, so a failed load is retried
 const { infoButton, infoBox, bindInfo } = await importOnce('./info_toggle.js');
 const { refusalOf, answeredLocally } = await importOnce('./owner_refusal.js');
+const { requireGoalSentence } = await importOnce('./task_goals.js');
 import { changedFields, rebaseChanges, NOTHING_TO_SAVE } from './settings_diff.js';
 
 const PRESET_NAMES = { none: 'None', shared_checkout: 'Shared checkout', worktrees: 'Worktrees', merge_queue: 'Merge queue' };
@@ -109,6 +110,8 @@ function _teamSettingsShell(workspaceMode) {
         <p class="settings-info-text" id="wm-info" hidden>Working mode instructions are saved with each task on its first claim. Existing claimed tasks keep their instructions. This setting provides guidance; it does not create worktrees automatically. <a href="#" class="working-mode-docs-link" data-doc="teams">Docs: Team working modes</a></p>
         <p class="working-mode-hint working-mode-desc" id="working-mode-desc"></p>
         ${switchRow({ label: 'Include dependent-queue guidance', name: 'dependency_guidance', labelClass: 'check-hit' })}
+        ${switchRow({ label: 'Require a goal', name: 'require_goal', labelClass: 'check-hit', describedBy: ['require-goal-hint'] })}
+        <p class="working-mode-hint" id="require-goal-hint">${escapeHtml(requireGoalSentence)}</p>
         <label>Additional instructions<textarea name="custom_instructions" rows="4" placeholder="Team-specific conventions"></textarea></label>
       </fieldset>
       <details class="disclosure team-settings-section workflow-presets-section preset-editor">
@@ -243,7 +246,7 @@ export async function showTeamWorkingMode(team, options = {}) {
     let workingMode = null;
     // What each part of the form showed when it loaded (#4423): Save sends only what the person changed since, so a
     // setting another client changed while the dialog was open is not put back.
-    let opened = null;
+    let opened = null, openedRequire = false;
     const modeValues = () => ({ mode: form.elements.mode.value, dependency_guidance: form.elements.dependency_guidance.checked, custom_instructions: form.elements.custom_instructions.value });
 
     const { tabs, panels, bindTab } = _wireSettingsTabs(dialog, form);
@@ -419,6 +422,8 @@ export async function showTeamWorkingMode(team, options = {}) {
             if (settingsResponse.ok) healthMonitorOn = String((await settingsResponse.json()).settings?.board_health_monitor ?? '').trim().toLowerCase() !== 'false'; // the dialog stores a boolean as "False"
             if (boardSettingsResponse?.ok) {
                 const boardSettings = await boardSettingsResponse.json();
+                form.elements.require_goal.checked = openedRequire = Boolean(boardSettings.require_goal); // only this computer changes it (the route refuses it through Coral Hub)
+                form.elements.require_goal.disabled = !answeredLocally(team);
                 if (boardSettings.health && typeof boardSettings.health === 'object') await addHealthTab(boardSettings.health).catch(() => {});
                 let crossTeam = null;
                 { // the machine's own answer; through Coral Hub the route may not be served (then null and the switches stay as they were)
@@ -448,7 +453,8 @@ export async function showTeamWorkingMode(team, options = {}) {
         const base = opened || { mode: {} };
         const mode = modeValues();
         const modeChanged = Object.keys(changedFields(base.mode, mode)).length > 0;
-        if (!modeChanged) {
+        const requireChanged = form.elements.require_goal.checked !== openedRequire;
+        if (!modeChanged && !requireChanged) {
             setStatus(NOTHING_TO_SAVE);
             save.disabled = false;
             return;
@@ -465,8 +471,16 @@ export async function showTeamWorkingMode(team, options = {}) {
                 else { workingMode = await response.json(); base.mode = mode; }
             } catch (error) { modeError = error.message; }
         }
+        if (requireChanged) {
+            try {
+                const want = form.elements.require_goal.checked;
+                const response = await fetch(boardSettingsURL, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Operator', require_goal: want }) });
+                if (!response.ok) modeError = await jsonError(response, 'Could not save require a goal.');
+                else openedRequire = want;
+            } catch (error) { modeError = error.message; }
+        }
         opened = base;
-        if (!modeError) setStatus('Saved. Working mode applies on first claim.');
+        if (!modeError) setStatus(modeChanged ? 'Saved. Working mode applies on first claim.' : 'Saved.');
         else setStatus(`Save failed: ${modeError}`, true);
         if (!modeError) form.dataset.initialState = settingsFormSnapshot(form);
         save.disabled = false;

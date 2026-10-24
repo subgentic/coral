@@ -27,7 +27,8 @@ export function toGoal(g) {
 export function toGoalList(json) {
     const rows = Array.isArray(json) ? json : (json && Array.isArray(json.goals) ? json.goals : []);
     const goals = rows.map(toGoal).sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || '') || b.id - a.id);
-    return { goals, requireGoal: !!(json && !Array.isArray(json) && (json.require_goal ?? json.requireGoal)) };
+    const none = json && !Array.isArray(json) ? json.no_goal_open ?? json.noGoalOpen : undefined; // open tasks that serve no goal; null while the route does not say
+    return { goals, requireGoal: !!(json && !Array.isArray(json) && (json.require_goal ?? json.requireGoal)), noGoalOpen: Number.isFinite(Number(none)) && none !== null && none !== '' ? count(none) : null };
 }
 
 /** One task of a goal (the tasks route filtered by goal). `session` is filled by the view from the live list, not by the route. */

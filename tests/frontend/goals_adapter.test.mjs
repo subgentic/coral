@@ -10,7 +10,8 @@ assert.equal(toGoal(null).id, 0); assert.deepEqual(toGoal({ rollup: { done: -1, 
 const list = toGoalList({ goals: [{ id: 1, updated_at: '2026-10-24T10:00:00Z' }, { id: 2, updated_at: '2026-10-24T12:00:00Z' }, { id: 3, updated_at: '2026-10-24T12:00:00Z' }], require_goal: true });
 assert.deepEqual(list.goals.map(x => x.id), [3, 2, 1], 'newest activity first, the later id first on a tie'); assert.equal(list.requireGoal, true);
 assert.deepEqual(toGoalList([{ id: 1 }]).goals.map(x => x.id), [1], 'a bare array is accepted'); assert.equal(toGoalList([{ id: 1 }]).requireGoal, false);
-assert.deepEqual(toGoalList(null), { goals: [], requireGoal: false }); assert.deepEqual(toGoalList({ goals: 'x' }), { goals: [], requireGoal: false });
+assert.deepEqual(toGoalList(null), { goals: [], requireGoal: false, noGoalOpen: null }); assert.deepEqual(toGoalList({ goals: 'x' }), { goals: [], requireGoal: false, noGoalOpen: null });
+assert.equal(toGoalList({ goals: [], no_goal_open: 3 }).noGoalOpen, 3, 'the open tasks that serve no goal'); assert.equal(toGoalList({ goals: [], no_goal_open: 0 }).noGoalOpen, 0); assert.equal(toGoalList({ goals: [] }).noGoalOpen, null, 'null while the route does not say');
 
 const t = toTask({ id: 7, title: 'Do it', assigned_to: 'goal-qa', status: 'in_progress', status_line: 'signing' });
 assert.deepEqual({ ...t, raw: undefined }, { id: 7, title: 'Do it', assignee: 'goal-qa', state: 'in_progress', statusLine: 'signing', sessionId: '', raw: undefined });
