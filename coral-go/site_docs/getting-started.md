@@ -69,11 +69,12 @@ Add that `PATH` line to your shell's startup file for later terminals. There is 
 
 ## Updates
 
-Coral on a Mac keeps itself up to date. In the background it looks for the newest promoted release on GitHub, downloads it and checks it (the Sigstore signature, the checksum and the Apple Developer ID team of the new app). It never installs on its own: when an update is ready the dashboard and the tray offer Install update, and only then does Coral swap in the new app and start it again. If the new app does not stay up, the old one is put back.
+Coral on a Mac or on Windows keeps itself up to date. In the background it looks for the newest promoted release on GitHub, downloads it and checks it (the Sigstore signature, the checksum and the Apple Developer ID team of the new app). It never installs on its own: when an update is ready the dashboard and the tray offer Install update, and only then does Coral install it and start again. On a Mac it swaps in the new app, and puts the old one back if the new one does not stay up. On Windows it runs the new MSI as an upgrade, and Windows asks you to allow it.
 
 - **Turn it off:** the automatic-updates switch in Settings, or start Coral with `CORAL_AUTO_UPDATE=off`.
 - **Homebrew installs** are never updated by Coral: run `brew upgrade --cask coral`.
-- **Windows and Linux** do not install updates by themselves yet; download the new release as for a first install. Development, beta and Coral For Dropbox builds do not check at all.
+- **Windows:** only a Coral installed from the MSI updates this way; a portable copy never does (download the new zip). The Windows package is not code-signed yet: Coral accepts it on its checksum and the Sigstore signature alone. A rollback package is kept only when the version you had was itself a promoted release.
+- **Linux** does not install updates by itself yet; download the new release as for a first install. Development, beta and Coral For Dropbox builds do not check at all.
 
 ## Start Coral
 

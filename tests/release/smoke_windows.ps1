@@ -200,11 +200,11 @@ try {
         Remove-Item "env:$v" -ErrorAction SilentlyContinue
     }
 
-    # The updater program ships and is inert: its status says the apply is off (applyEnabled is a compile-time false until a platform passes its upgrade tests).
+    # The updater program ships and its status says the apply is on (applyEnabledWindows is true since #7320).
     $upd = Join-Path $extract 'coral-update.exe'
     if (Test-Path -LiteralPath $upd) {
         $st = (& $upd status --json 2>&1 | Out-String)
-        if ($st -match '"apply_enabled":\s*false') { Pass "coral-update status says apply_enabled false (the updater ships inert)" }
+        if ($st -match '"apply_enabled":\s*true') { Pass "coral-update status says apply_enabled true" }
         else { Fail "coral-update status: $st" }
     } else { Fail "coral-update.exe not in the ZIP" }
     New-Item -ItemType Directory -Force -Path (Join-Path $root '.coral') | Out-Null

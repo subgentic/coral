@@ -76,12 +76,12 @@ func TestAssetNamesAreTheOnesReleaseYmlUploads(t *testing.T) {
 	assert.Equal(t, "coral-linux-arm64-1.4.126.tar.gz", assetName("linux", "arm64", true)("1.4.126"))
 }
 
-// #162: Windows has its own off switch, whatever macOS and Linux have: the MSI apply stays off until the coral-go-team has reviewed it.
+// #162: Windows has its own off switch, whatever macOS and Linux have: the MSI apply is on only by its own constant (#7320).
 func TestWindowsApplyHasItsOwnOffSwitch(t *testing.T) {
-	assert.False(t, applyOn("windows", true, true, applyEnabledWindows, windowsApplyBuilt), "Mac and Linux on do not turn Windows on")
+	assert.False(t, applyOn("windows", true, true, false, windowsApplyBuilt), "Mac and Linux on do not turn Windows on")
 	assert.True(t, applyOn("windows", false, false, true, windowsApplyBuilt), "its own switch does, now that its apply is built")
-	assert.False(t, applyEnabledWindows, "off in this build")
-	assert.False(t, applyOn("windows", applyEnabledDarwin, applyEnabledLinux, applyEnabledWindows, windowsApplyBuilt), "so the Windows apply is off")
+	assert.True(t, applyEnabledWindows, "on in this build (#7320)")
+	assert.True(t, applyOn("windows", applyEnabledDarwin, applyEnabledLinux, applyEnabledWindows, windowsApplyBuilt), "so the Windows apply is on")
 }
 
 // #81 N1: only a Windows MSI install keeps the rollback package.
