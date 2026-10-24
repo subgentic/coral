@@ -11,6 +11,7 @@ const BASE = require('./test_base').BASE;
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const B = 'inbox-goal-' + Date.now().toString(36);
     const api = (m, p, body) => ev(`fetch(${JSON.stringify(p)}, { method: ${JSON.stringify(m)}, headers: { 'Content-Type': 'application/json' }, body: ${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'} }).then(async r => ({ status: r.status, json: await r.json().catch(() => null) }))`);
+    const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
@@ -31,7 +32,10 @@ const BASE = require('./test_base').BASE;
         assert.deepEqual(rows.map(r => [r.name, r.goal]).sort(), [['fe', 'Goal: Ship the new installer'], ['qa', '']]);
         assert.equal(rows.some(r => r.inside), false, 'the link is not inside the row\'s button (a control in a control)');
         assert.equal(await ev(`document.querySelectorAll('#inbox-needs-list .inbox-needs-goal').length`), 1);
+        const tuck = await ev(`(() => { const g = document.querySelector('#inbox-needs-list .inbox-needs-goal'), c = g.parentElement.querySelector('.inbox-needs-item'), gr = g.getBoundingClientRect(), cr = c.getBoundingClientRect(); return { gap: Math.round(gr.top - cr.bottom), left: Math.round(gr.left - cr.left), width: Math.round(gr.width - cr.width), square: getComputedStyle(c).borderBottomLeftRadius, round: getComputedStyle(g).borderBottomLeftRadius }; })()`);
+        assert.ok(tuck.gap >= -1 && tuck.gap <= 0 && tuck.left === 0 && tuck.width === 0 && tuck.square === '0px' && tuck.round !== '0px', 'the Goal link is the card\'s own footer, attached under its row: ' + JSON.stringify(tuck));
 
+        await shot('inbox-needs-goal');
         console.log('2. the link opens the goal on its board\'s Goals face');
         await ev(`document.querySelector('#inbox-needs-list .inbox-needs-goal').click(); true`);
         await waitFor(`!!document.querySelector('#mb-goals .goals-detail-title') && document.querySelector('#mb-goals .goals-detail-title').textContent === 'Ship the new installer'`, 'the goal to open', 12000);
@@ -48,6 +52,9 @@ const BASE = require('./test_base').BASE;
         }
         const links = await ev(`[...document.querySelectorAll('#inbox-panel-tasks .ibx-task')].map(li => ({ t: li.querySelector('.ibx-task-title').textContent, g: (li.querySelector('.ibx-goal') || {}).textContent || '' }))`);
         assert.deepEqual(links.sort((a, b) => a.t.localeCompare(b.t)), [{ t: 'Pick the icon', g: '' }, { t: 'Sign the installer', g: 'Goal: Ship the new installer' }]);
+        const quiet = await ev(`(() => { const g = document.querySelector('#inbox-panel-tasks .ibx-goal'), o = g.parentElement.querySelector('.ibx-open:not(.ibx-goal)'), gs = getComputedStyle(g), gr = g.getBoundingClientRect(), or = o.getBoundingClientRect(); return { border: gs.borderTopWidth, underline: gs.textDecorationLine.includes('underline'), bg: gs.backgroundColor, gap: Math.round(gr.left - or.right), sameRow: Math.abs((gr.top + gr.bottom) / 2 - (or.top + or.bottom) / 2) < 14 }; })()`);
+        assert.ok(quiet.border === '0px' && quiet.underline && quiet.bg === 'rgba(0, 0, 0, 0)' && quiet.gap >= 0 && quiet.gap <= 24 && quiet.sameRow, 'the task\'s Goal is the same quiet underlined link, beside Open the task: ' + JSON.stringify(quiet));
+        await shot('inbox-task-goal');
         console.log('PASS the goal a waiting agent or task serves');
     } finally { await removeBoards(ev, [B]).catch(() => {}); await client.close(); }
 })().catch(err => { console.error(err); process.exit(1); });
