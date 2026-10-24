@@ -67,6 +67,14 @@ Add that `PATH` line to your shell's startup file for later terminals. There is 
 
 **If you once installed the old Python package** (`pip install agent-coral`), remove it. It installs commands with the same names and uses the same `~/.coral` directory and port, and can shadow this program. Check with `which -a coral` and remove it with `pip uninstall agent-coral`. Coral logs a warning at startup when it detects this.
 
+## Updates
+
+Coral on a Mac keeps itself up to date. In the background it looks for the newest promoted release on GitHub, downloads it and checks it (the Sigstore signature, the checksum and the Apple Developer ID team of the new app). It never installs on its own: when an update is ready the dashboard and the tray offer Install update, and only then does Coral swap in the new app and start it again. If the new app does not stay up, the old one is put back.
+
+- **Turn it off:** the automatic-updates switch in Settings, or start Coral with `CORAL_AUTO_UPDATE=off`.
+- **Homebrew installs** are never updated by Coral: run `brew upgrade --cask coral`.
+- **Windows and Linux** do not install updates by themselves yet; download the new release as for a first install. Development, beta and Coral For Dropbox builds do not check at all.
+
 ## Start Coral
 
 Open Coral from Applications on macOS or the Start menu on Windows. From a terminal with the tools on your `PATH`:
