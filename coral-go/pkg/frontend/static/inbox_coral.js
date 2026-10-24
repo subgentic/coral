@@ -41,8 +41,10 @@ export const coralInboxAdapter = {
         for (const s of OPEN_STATUSES) q.append('status', s);
         const d = await json(await fetch(`/api/board/tasks?${q}`));
         return (d.tasks || []).map(t => ({ id: t.id, project: t.board_id, board: t.board_label || keyLabel(t.board_id), title: t.title, priority: t.priority, status: t.status,
-            created_by: t.created_by, created_at: t.created_at, updated_at: t.updated_at, revision: t.revision }));
+            created_by: t.created_by, created_at: t.created_at, updated_at: t.updated_at, revision: t.revision,
+            goal: t.goal_id && t.goal_title ? { id: Number(t.goal_id), title: String(t.goal_title) } : null })); // the goal it serves, when the route sends one (#7302)
     },
+    openGoal(task) { return importOnce('./task_goals.js').then(m => m.openGoalOnBoard(task.project, task.goal.id)); },
     async getTask(project, id) {
         return json(await fetch(`/api/board/${encodeURIComponent(project)}/tasks/${pathId(id)}`));
     },

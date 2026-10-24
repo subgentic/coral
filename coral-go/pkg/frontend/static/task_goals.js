@@ -109,6 +109,7 @@ export async function fillGoalLine(project, id) {
 /** Show a goal on the Goals face of its board: the Messages | Goals choice is set to Goals, the board is selected, the goal opens. */
 export async function openGoalOnBoard(project, id) {
     if (!project || !id) return;
+    window.switchNavTab?.('board'); // from the Inbox or a task: the board's screen first
     browserLocal.set('coral.board.face', 'goals');
     const board = await importOnce('./message_board.js');
     board.selectBoardProject(project);
