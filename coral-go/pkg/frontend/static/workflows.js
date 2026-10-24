@@ -864,6 +864,17 @@ function showError(el, msg, field) {
 // The Workflows view's generated markup (#3645): data-on-* names, never code. The view's own
 // buttons (back, build, create and the create dialog) register in app.js, which loads this module.
 // Ids are checked (idOf) before use: a bad one does nothing.
+// The More menu on a workflow's page closes on Escape (the focus goes back to More) and when the focus leaves it (#7177, from #7156's review).
+function closeWorkflowMore(returnFocus) {
+    for (const menu of document.querySelectorAll('.wf-more-menu:not([hidden])')) {
+        const btn = document.querySelector(`.wf-more-btn[aria-controls="${menu.id}"]`);
+        menu.hidden = true;
+        if (btn) { btn.setAttribute('aria-expanded', 'false'); if (returnFocus) btn.focus(); }
+    }
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.querySelector('.wf-more-menu:not([hidden])')) { e.preventDefault(); closeWorkflowMore(true); } });
+document.addEventListener('focusin', e => { if (document.querySelector('.wf-more-menu:not([hidden])') && !(e.target instanceof Element && e.target.closest('.wf-more'))) closeWorkflowMore(false); });
+
 registerActions({
     'wf-select': el => withId(el.dataset.workflowId, selectWorkflow),
     'wf-run': el => withId(el.dataset.runId, selectWorkflowRun),

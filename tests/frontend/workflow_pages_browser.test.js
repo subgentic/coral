@@ -40,6 +40,17 @@ const BASE = require('./test_base').BASE;
                 assert.ok(order.stepsTop < order.metaTop, `${tag}: Steps come before the meta line: ` + JSON.stringify(order));
                 assert.ok(order.display === 'flex' && order.dir === 'row' && order.wrap === 'wrap', `${tag}: the meta is one wrapping line: ` + JSON.stringify(order));
             }
+            // the More menu closes on Escape (focus back to More) and when focus leaves it (UI Accessibility's note on #7156)
+            await ev(`document.querySelector('.wf-more-btn').click(); true`);
+            assert.equal(await ev(`document.querySelector('.wf-more-menu').hidden`), false, `${tag}: More opens its menu`);
+            await ev(`document.querySelector('.wf-more-menu button').focus(); true`);
+            await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+            const esc = await ev(`({ hidden: document.querySelector('.wf-more-menu').hidden, expanded: document.querySelector('.wf-more-btn').getAttribute('aria-expanded'), onMore: document.activeElement === document.querySelector('.wf-more-btn') })`);
+            assert.deepEqual(esc, { hidden: true, expanded: 'false', onMore: true }, `${tag}: Escape closes the menu with the focus back on More: ` + JSON.stringify(esc));
+            await ev(`document.querySelector('.wf-more-btn').click(); document.querySelector('.wf-more-menu button').focus(); true`);
+            await ev(`document.querySelector('.wf-detail-actions [data-on-click="wf-trigger"]').focus(); true`);
+            const left = await ev(`({ hidden: document.querySelector('.wf-more-menu').hidden, expanded: document.querySelector('.wf-more-btn').getAttribute('aria-expanded') })`);
+            assert.deepEqual(left, { hidden: true, expanded: 'false' }, `${tag}: moving the focus out of More closes its menu: ` + JSON.stringify(left));
             await ev(`document.querySelector('.wf-runs-table .row-open-btn').click(); true`);
             await waitFor(`!!document.querySelector('.wf-run-step')`, 'the run page', 8000); await sleep(400); // sleep-ok: the page draws after the click
             const run = await ev(`(() => { const steps = [...document.querySelectorAll('.wf-run-step')]; const pass = steps[0], fail = steps[1]; const vis = e => !!e && e.getClientRects().length > 0 && !e.closest('details:not([open]) > :not(summary)');
