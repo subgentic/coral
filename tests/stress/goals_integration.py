@@ -60,6 +60,7 @@ def api(method, path, body=None, expected=(200,)):
 def cli(role, *args, ok=True):
     agent = agents[role]
     env = dict(os.environ, HOME=home, USERPROFILE=home, CORAL_URL=url,
+               CORAL_TELEMETRY_DISABLED="1",
                CORAL_SESSION_NAME=agent["session_name"], CORAL_SUBSCRIBER_ID=role,
                CORAL_SESSION_TOKEN=agent["token"])
     for name in ("TMUX", "TMUX_PANE", "CORAL_PORT", "CORAL_SESSION_AUTH_FILE"):
