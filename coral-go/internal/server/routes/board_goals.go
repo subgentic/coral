@@ -168,7 +168,7 @@ func (h *BoardHandler) ListGoals(w http.ResponseWriter, r *http.Request) {
 }
 
 // ListAllGoals: GET /api/goals?state=a,b&board=x&board=y&limit=n&cursor=c (#7260). The goals of every board (or the boards named) in one call, oldest first by id, in the per-board read's page shape with each goal's
-// board_id and rollup and no tasks. The Operator's, like GET /api/board/tasks (an agent's token is refused by the identity layer: operatorOnlyRoutes); a View viewer through Coral Hub gets a goal's waiting-for fields nulled (viewDropRoutes). An unknown or mistyped parameter is a 400 that names it,
+// board_id and rollup and no tasks. The Operator's, like GET /api/board/tasks (an agent's token is refused by the identity layer: operatorOnlyRoutes); a View viewer through Coral Hub gets the same reply, redacted for secrets. An unknown or mistyped parameter is a 400 that names it,
 // never a silent fall-back to the unfiltered list; a board that has no goals, or does not exist, adds nothing.
 func (h *BoardHandler) ListAllGoals(w http.ResponseWriter, r *http.Request) {
 	query, err := url.ParseQuery(r.URL.RawQuery)

@@ -240,7 +240,7 @@ func (h *SessionsHandler) heldMessagesOf(sessionID, name string) any {
 	return nil
 }
 
-// heldMessages is the agent's held messages, oldest first, or nil when there are none (a viewer who can only look never receives them: the Coral Hub connector nulls the field, pkg/tunnel/viewdrop.go).
+// heldMessages is the agent's held messages, oldest first, or nil when there are none (a Coral Hub viewer receives them too, redacted for secrets: the operator's decision of 2026-10-24).
 func (h *SessionsHandler) heldMessages(sessionID, name string) []heldMessage {
 	p := &h.holds
 	p.mu.Lock()

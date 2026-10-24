@@ -207,7 +207,7 @@ var routeTable = cat(
 		"/api/token-usage", "/api/token-usage/summary", "/api/token-usage/timeseries",
 		"/api/token-usage/by-team", "/api/token-usage/by-branch", "/api/token-usage/session/{id}/turns",
 		"/api/goals/metrics", "/api/call-metrics/summary",
-		"/api/goals", // every board's goals in one call (#7260): the Operator's, redacted like the per-board read, a viewer's waiting-for fields nulled (viewDropRoutes)
+		"/api/goals", // every board's goals in one call (#7260): the Operator's, redacted like the per-board read
 		"/api/tags", "/api/folder-tags", "/api/folder-tags/{name}", "/api/pinned-folders",
 		// The Operator's saved messages (#4510): his own bookmarks, snippets redacted when saved.
 		"/api/scheduled/jobs", "/api/scheduled/jobs/{id}", "/api/scheduled/jobs/{id}/runs", "/api/scheduled/runs/recent",

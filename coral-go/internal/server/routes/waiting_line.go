@@ -15,7 +15,7 @@ import (
 // clean it: the WHOLE text is cleaned (no escape, control, bidi or zero-width characters), then redacted whole (a token is found by its whole length and a key by its header and
 // footer, so nothing is cut or split first), then the home folder is shown as "~", then it is one line of at most maxWaitingLine characters with an ellipsis, and a line of the text that is
 // one unbroken run of base64, hex or token characters is never shown. When the text cannot be checked for secrets nothing is shown, never the raw text. At View through Coral
-// Hub the connector drops the field altogether (pkg/tunnel/viewdrop.go); in a push, an email or a notification it is never used.
+// Hub a View viewer gets the field like any other viewer, redacted again by the connector (the operator's decision of 2026-10-24); in a push, an email or a notification it is never used.
 const maxWaitingLine = 200
 
 // homeFolder is the home folder text is masked against (a test sets it).

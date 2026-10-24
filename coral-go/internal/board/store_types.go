@@ -122,7 +122,7 @@ type ProjectInfo struct {
 	BoardLabel      string `db:"-" json:"board_label"`         // the board's display name (#3536)
 	SubscriberCount int    `db:"subscriber_count" json:"subscriber_count"`
 	MessageCount    int    `db:"message_count" json:"message_count"`
-	// GoalsBrief is what the feed carries of the board's goals, with no text (#7116): how many are open and the board's change counter. A Coral Hub viewer who can only look gets it as null (viewdrop.go).
+	// GoalsBrief is what the feed carries of the board's goals, with no text (#7116): how many are open and the board's change counter. A Coral Hub viewer gets it as every viewer does (the operator's decision of 2026-10-24: View sees everything but secrets).
 	Goals     *GoalsBrief `db:"-" json:"goals_brief"`
 	GoalsOpen int         `db:"goals_open" json:"-"`
 	GoalsSeq  int64       `db:"goals_seq" json:"-"`

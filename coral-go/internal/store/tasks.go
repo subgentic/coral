@@ -73,7 +73,7 @@ type AgentEvent struct {
 }
 
 // MarshalJSON is the event as every API sends it. What a permission_request wants to do (its detail's "wants", #6622) is display text for the live row alone, which the
-// Coral Hub connector drops for a viewer who can only look: no events list, search or feed carries it, so a view-only viewer cannot read a command there.
+// live row's waiting_summary carries, and a Coral Hub viewer gets that like any other viewer (the operator's decision of 2026-10-24): no events list, search or feed carries it.
 func (e AgentEvent) MarshalJSON() ([]byte, error) {
 	type plain AgentEvent
 	p := plain(e)
