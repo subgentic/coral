@@ -100,10 +100,19 @@ func TestAViewViewerSeesEverythingButSecretsAndWritesAreRefused(t *testing.T) {
 		assertNineKeys(t, string(data), tok, "the live feed frame "+strings.Repeat("+", i))
 	}
 
-	// Read-only is kept: with the computer's mode at View, a write never reaches the computer (the mode ceiling), and reads still come with all nine keys. A viewer's own tier is the hub's to enforce
-	// until the connector reads it for writes (the viewer-tier gate of #7076); this test pins the ceiling.
-	mode.Store(int32(TierView))
+	// Read-only is kept, by the connector itself (the viewer-tier gate, #7076) and by the computer's mode. First the viewer's own tier: the computer's mode is Launch, the viewer is View, the hub's
+	// check is not in this harness, and a write still never reaches the computer.
 	before := writes.Load()
+	for _, path := range []string{"/api/board/team/goals", "/api/sessions/live/a/send", "/api/board/team/tasks"} {
+		req, _ := http.NewRequestWithContext(viewCtx, http.MethodPost, "http://x"+path, strings.NewReader(`{"title":"x"}`))
+		_, err := sess.RoundTrip(req)
+		require.Error(t, err, path+": a View viewer's write is refused by the connector while the computer's mode is Launch")
+		assert.Contains(t, err.Error(), "path_not_allowed", path)
+	}
+	assert.Equal(t, before, writes.Load(), "no write reached the computer")
+	// Then the computer's mode: lowered to View, it holds a viewer of any tier.
+	mode.Store(int32(TierView))
+	before = writes.Load()
 	for _, path := range []string{"/api/board/team/goals", "/api/sessions/live/a/send", "/api/board/team/tasks"} {
 		req, _ := http.NewRequestWithContext(viewCtx, http.MethodPost, "http://x"+path, strings.NewReader(`{"title":"x"}`))
 		resp, err := sess.RoundTrip(req)

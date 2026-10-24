@@ -69,7 +69,7 @@ func (l *LocalHandler) serveWS(ctx context.Context, s *Stream) {
 	down.SetReadLimit(lim)
 	// Always gated: an unset MaxMode means view, so a LocalHandler built without one
 	// never forwards terminal input.
-	gate := func(data []byte) bool { return FrameTier(dec, data) <= currentMode(l.MaxMode) }
+	gate := func(data []byte) bool { return FrameTier(dec, data) <= Lower(viewerCeiling(h), currentMode(l.MaxMode)) } // the lower of the viewer's tier and the computer's mode (#7076)
 	var toHub *wsRedact
 	if redactsRoute(http.MethodGet, dec) {
 		// What a View stream sends to the hub is redacted (#3562); the setting is read per frame.

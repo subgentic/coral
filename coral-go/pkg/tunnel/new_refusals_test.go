@@ -215,12 +215,17 @@ func TestNewRefusalsAreNotProducedOnAViewComputer(t *testing.T) {
 	mu.Unlock()
 }
 
-// A viewer below a route's tier is NOT refused by the connector (only the computer's mode is): it gets what the server sends, redacted. The
-// hub decides each member's tier before it opens a stream; this records that the connector does not repeat the check.
-func TestNewRefusalsReachAViewerAsTheServerSentThem(t *testing.T) {
+// A viewer below a route's tier is refused by the connector too (#7076: the lower of the viewer's tier and the computer's mode), before the server is asked; a viewer at the route's tier gets what
+// the server sends, as before. (Until #7076 the connector checked only the computer's mode and this test recorded that the hub alone gated the route.)
+func TestNewRefusalsReachOnlyAViewerAtTheRoutesTier(t *testing.T) {
 	row := newRefusals()[2] // a board post over 256 KiB, an Interact route
 	require.Equal(t, TierInteract, row.tier)
+	var mu sync.Mutex
+	reached := 0
 	local := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		reached++
+		mu.Unlock()
 		b, _ := json.Marshal(row.body)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(row.status)
@@ -234,8 +239,15 @@ func TestNewRefusalsReachAViewerAsTheServerSentThem(t *testing.T) {
 		l.AllowRequest = AllowRequest(func() Mode { return TierLaunch })
 	})
 	req, _ := http.NewRequestWithContext(WithHubTier(context.Background(), "view"), row.method, "http://x"+row.path, strings.NewReader(`{}`))
+	_, err := sess.RoundTrip(req)
+	require.Error(t, err, "a View viewer is refused on an Interact route")
+	assert.Contains(t, err.Error(), "path_not_allowed")
+	mu.Lock()
+	assert.Zero(t, reached, "the server was never asked")
+	mu.Unlock()
+	req, _ = http.NewRequestWithContext(WithHubTier(context.Background(), "interact"), row.method, "http://x"+row.path, strings.NewReader(`{}`))
 	resp, err := sess.RoundTrip(req)
 	require.NoError(t, err)
 	defer resp.Body.Close()
-	assert.Equal(t, row.status, resp.StatusCode, "the viewer's tier gates redaction only; the hub gates the route")
+	assert.Equal(t, row.status, resp.StatusCode, "an Interact viewer gets the server's answer")
 }

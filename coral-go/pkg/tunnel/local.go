@@ -145,6 +145,9 @@ func (l *LocalHandler) checkRequest(h Header) (decoded string, ok bool) {
 	default:
 		return "", false // default deny
 	}
+	if !viewerMayUse(h, method, decoded) {
+		return "", false // the viewer's own tier is below the route's (#7076); the answer is the generic refusal, which says nothing about the computer's mode
+	}
 	return decoded, true
 }
 
