@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/store"
@@ -66,11 +67,19 @@ func TestPruneSessionCachesKeepsOnlyLiveSessions(t *testing.T) {
 // The sweep is throttled and never runs twice concurrently.
 func TestMaybePruneSessionCachesThrottled(t *testing.T) {
 	_, h, _, _ := setupSessionsTestServer(t)
+	// The server's own calls (a list, a status poll) may be starting a sweep of their own right now: between their time check and their store the state is "running, last not yet stored", and a call of ours
+	// then starts nothing (#7231: on a loaded Mac the first call here did not store). So wait until no sweep is running (a signal, not a pause), and start from a sweep that is due, which is what the test is about.
+	idle := func() bool { return !h.cachePrune.running.Load() }
+	require.Eventually(t, idle, time.Minute, time.Millisecond, "the server's own sweep ends")
+	before := time.Now().Add(-2 * sessionCachePruneEvery).UnixNano()
+	h.cachePrune.last.Store(before)
 	h.maybePruneSessionCaches()
 	first := h.cachePrune.last.Load()
-	require.NotZero(t, first)
+	require.Greater(t, first, before, "a sweep that is due starts")
+	require.Eventually(t, idle, time.Minute, time.Millisecond, "that sweep ends")
 	h.maybePruneSessionCaches()
 	require.Equal(t, first, h.cachePrune.last.Load(), "second call within the interval must not start a sweep")
+	assert.False(t, h.cachePrune.running.Load(), "and none is running")
 }
 
 func removeMockSession(m *mockSessionTerminal, name string) {
