@@ -1332,7 +1332,7 @@ func TestCreateTaskChecksThePriority(t *testing.T) {
 		assert.NotContains(t, err.Error(), "CHECK", bad)
 	}
 	// The caller's text is echoed quoted and cut (QA's #7213 2b): no raw ESC, NUL or bidi override, and a long value is not sent back whole.
-	_, err := s.CreateTask(ctx, "proj", "Task", "", "a\x1b[31m\x00\u202e"+strings.Repeat("x", 3000), "alice")
+	_, err := s.CreateTask(ctx, "proj", "Task", "", "a\x1b[31m\x00\u202e"+strings.Repeat("x", 3<<20), "alice")
 	require.Error(t, err)
 	assert.Less(t, len(err.Error()), 200)
 	assert.NotContains(t, err.Error(), "\x1b")
@@ -1344,4 +1344,15 @@ func TestCreateTaskChecksThePriority(t *testing.T) {
 	task, err := s.CreateTask(ctx, "proj", "Task", "", "", "alice")
 	require.NoError(t, err)
 	assert.Equal(t, "medium", task.Priority)
+	// The update path answers the same way.
+	hostile := "a\x1b[31m\x00\u202e" + strings.Repeat("x", 3<<20)
+	_, _, err = s.UpdateTask(ctx, "proj", task.ID, TaskUpdate{Priority: &hostile}, 3)
+	require.Error(t, err)
+	assert.Less(t, len(err.Error()), 200)
+	for _, raw := range []string{"\x1b", "\x00", "\u202e"} {
+		assert.NotContains(t, err.Error(), raw)
+	}
+	unchanged, err := s.getTaskByID(ctx, "proj", task.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "medium", unchanged.Priority)
 }
