@@ -61,6 +61,19 @@ var startAnchors = func() []startLit {
 	// Secret names (#3733), after the rules above so Authorization wins a start they share.
 	out = append(out, startLit{rule: secretRule, seek: seekSecretName})
 	add("://", 0, urlCredRule)
+	add("xapp-", 0, &tokenRules[4])
+	// The command-line rules (#7279): the commands that take a password as an argument, the long flags, the npm and Slack webhook shapes.
+	add("sshpass", 0, &tokenRules[9])
+	add("mysql", 0, &tokenRules[10])
+	add("mariadb", 0, &tokenRules[11])
+	add("redis-cli", 0, &tokenRules[12])
+	add("docker login", 0, &tokenRules[13])
+	add("podman login", 0, &tokenRules[13])
+	add("curl", 0, &tokenRules[14])
+	add("openssl", 0, &tokenRules[15])
+	add("--", 0, &tokenRules[16])
+	add("npm_", 0, &tokenRules[17])
+	add("hooks.slack.com/services/", 0, &tokenRules[18])
 	add("-----BEGIN ", 0, nil)
 	return out
 }()

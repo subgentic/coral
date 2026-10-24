@@ -61,19 +61,19 @@ func isCredValue(c byte) bool {
 	return isAlnum(c) || c == '.' || c == '_' || c == '~' || c == '+' || c == '/' || c == '=' || c == '-'
 }
 
-var tokenRules = []tokenRule{
+var tokenRules = append([]tokenRule{
 	{prefixes: []string{"ghp_", "gho_", "ghu_", "ghs_", "ghr_"}, class: isAlnum, min: 36, max: 255, notAfter: isWord},
 	{prefixes: []string{"github_pat_"}, class: isWord, min: 22, max: 255, notAfter: isWord},
 	{prefixes: []string{"sk-"}, class: isB64URL, min: 20, max: 255, notAfter: isB64URL},
 	{prefixes: []string{"AKIA", "ASIA"}, class: isUpperDigit, min: 16, max: 16, exact: true, notAfter: isAlnum},
-	{prefixes: []string{"xoxa-", "xoxb-", "xoxp-", "xoxr-", "xoxs-"}, class: isAlnumDash, min: 10, max: 255, notAfter: isWord},
+	{prefixes: []string{"xoxa-", "xoxb-", "xoxp-", "xoxr-", "xoxs-", "xoxe-", "xoxc-", "xoxd-", "xoxe.xoxp-", "xoxe.xoxb-", "xapp-"}, class: isAlnumDash, min: 10, max: 255, notAfter: isWord},
 	{prefixes: []string{"Bearer", "bearer", "BEARER"}, glue: bearerGlue, class: isCredValue, min: 20, max: 512, keep: true, notAfter: isWord},
 	{prefixes: []string{"Authorization", "authorization", "AUTHORIZATION"}, glue: authGlue, class: isCredValue, min: 8, max: 512, keep: true, notAfter: isWord, params: true},
 	{prefixes: secretNamePrefixes, glue: secretGlue, class: isSecretValue, min: 1, max: 512, keep: true, notAfter: isAlnum, bare: secretBare, toQuote: true},
 	// A URL with a password, scheme://user:password@host (#3756): postgres, mysql, redis, mongodb(+srv),
 	// amqp, https, git+https and the rest. The scheme, the user and the host stay; the password goes.
 	{prefixes: []string{"://"}, glue: urlUserGlue, class: urlRunByte, min: 1, max: maxURLRun, keep: true, notAfter: never, value: urlPassword},
-}
+}, cliRules...)
 
 // match reports the token at b, which starts with one of the rule's prefixes: its length so far,
 // where its value starts, whether it is a token, whether more bytes are needed to tell (never
