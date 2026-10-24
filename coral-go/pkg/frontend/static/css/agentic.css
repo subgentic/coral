@@ -2617,3 +2617,6 @@ button.team-artifact-name { cursor: pointer; }
 
 /* The remove-shared-copy button in an opened chat image's toolbar is a 44 px target on touch (#6137) */
 @media (pointer: coarse), (max-width: 767px) { .preview-unshare-btn { min-width: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); } }
+
+/* The list bar's search field, Filters, First, Latest, chips and selects draw in the app's font, not the browser's default for form controls (UI/UX's nit on #7315). */
+.list-bar-search, .list-bar-filter-btn, .list-bar-clear-all, .list-bar-select, .list-bar-by, .list-bar-chip, .list-bar-field input { font-family: inherit; }
