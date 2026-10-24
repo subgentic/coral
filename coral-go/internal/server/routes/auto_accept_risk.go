@@ -3,11 +3,13 @@ package routes
 import (
 	"errors"
 	"io/fs"
+	"log/slog"
 	"path"
 	"path/filepath"
 	"regexp"
 	"runtime"
 	"strings"
+	"time"
 
 	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/safefs"
@@ -76,6 +78,42 @@ var autoAcceptFileTools = map[string]string{
 // the relative "Windows": the command is judged a second time with every backslash turned into "/", and the first risk
 // found is the answer (a path with backslashes is then the path it names).
 func shellRisk(command, workDir string) string {
+	return shellRiskWithin(command, workDir)
+}
+
+// shellRiskDeadline bounds one judgement of a command (a variable for the tests). The step budget inside each scanner is the real fix for a loop; this is the belt: past it the answer is "ask" and a warning
+// is logged, so a leak shows. Go cannot stop a goroutine, so a spinning one would still burn a core until the process ends: the log line is how it would be seen (#7201).
+var shellRiskDeadline = 10 * time.Second
+
+// shellRiskImpl is the judgement the deadline wraps (a variable so a test can make it spin).
+var shellRiskImpl = shellRiskUnbounded
+
+const whyTookTooLong = "it took too long to check"
+
+func shellRiskWithin(command, workDir string) string {
+	done := make(chan string, 1)
+	impl := shellRiskImpl // read here, by the caller: the goroutine below may outlive a test that swaps the variable
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				slog.Warn("auto-accept: judging a command panicked; it was left to the person", "bytes", len(command), "panic", r)
+				done <- "it could not be checked"
+			}
+		}()
+		done <- impl(command, workDir)
+	}()
+	timer := time.NewTimer(shellRiskDeadline)
+	defer timer.Stop()
+	select {
+	case why := <-done:
+		return why
+	case <-timer.C:
+		slog.Warn("auto-accept: judging a command did not finish in time; it was left to the person, and its goroutine may still be running", "deadline", shellRiskDeadline.String(), "bytes", len(command))
+		return whyTookTooLong
+	}
+}
+
+func shellRiskUnbounded(command, workDir string) string {
 	why := shellRiskFrom(command, workDir, workDir)
 	if why != "" || runtime.GOOS != "windows" {
 		return why

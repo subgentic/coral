@@ -260,9 +260,11 @@ func sedRunsCommands(args []string) bool {
 }
 
 // sedScriptRuns reads a sed script command by command (addresses, s and y with their delimiters, a, i, c text to the end of the line, labels) and reports an e, w or W command, or an e or w flag of s.
+// Every pass of the loop consumes at least one character and the whole read has a step budget: a script it cannot read to the end (a trailing backslash, an unterminated address) is answered as
+// a command that runs something, never looped on (#7201 round 2: QA's fuzz found a script that never returned).
 func sedScriptRuns(sc string) bool {
 	i, n := 0, len(sc)
-	skipTo := func(delim byte) { // past the next unescaped delim
+	skipTo := func(delim byte) { // past the next unescaped delim, or to the end
 		for i < n {
 			if sc[i] == '\\' && i+1 < n {
 				i += 2
@@ -275,35 +277,54 @@ func sedScriptRuns(sc string) bool {
 			i++
 		}
 	}
+	parseAddr := func() bool {
+		switch {
+		case sc[i] >= '0' && sc[i] <= '9':
+			for i < n && sc[i] >= '0' && sc[i] <= '9' {
+				i++
+			}
+		case sc[i] == '$':
+			i++
+		case sc[i] == '/':
+			i++
+			skipTo('/')
+		case sc[i] == '\\' && i+1 < n:
+			d := sc[i+1]
+			i += 2
+			skipTo(d)
+		default:
+			return false
+		}
+		for i < n && (sc[i] == 'I' || sc[i] == 'M') {
+			i++
+		}
+		return true
+	}
+	budget := 8*n + 64
 	for i < n {
+		if budget--; budget < 0 {
+			return true // cannot be read to the end: ask
+		}
+		start := i
 		for i < n && strings.IndexByte(" \t\n;{}", sc[i]) >= 0 {
 			i++
 		}
-		// addresses
-		for i < n {
-			switch {
-			case sc[i] == '/':
-				i++
-				skipTo('/')
-			case sc[i] == '\\' && i+1 < n:
-				d := sc[i+1]
-				i += 2
-				skipTo(d)
-			case sc[i] >= '0' && sc[i] <= '9' || sc[i] == '$' || sc[i] == ',' || sc[i] == '~' || sc[i] == '+' || sc[i] == '!' || sc[i] == ' ':
-				i++
-				continue
-			default:
-			}
-			if i < n && (sc[i] == 'I' || sc[i] == 'M') {
-				i++
-			}
-			if i < n && (sc[i] == ',' || sc[i] == '~' || sc[i] == '+' || sc[i] == '!' || sc[i] == ' ' || sc[i] == '/' || sc[i] == '\\' || sc[i] >= '0' && sc[i] <= '9' || sc[i] == '$') {
-				continue
-			}
+		if i >= n {
 			break
 		}
+		if parseAddr() {
+			for i < n && (sc[i] == ',' || sc[i] == '~' || sc[i] == '+') {
+				i++
+				if i < n {
+					parseAddr()
+				}
+			}
+		}
+		for i < n && (sc[i] == '!' || sc[i] == ' ' || sc[i] == '\t') {
+			i++
+		}
 		if i >= n {
-			return false
+			break
 		}
 		c := sc[i]
 		i++
@@ -334,6 +355,9 @@ func sedScriptRuns(sc string) bool {
 			for i < n && sc[i] != ';' && sc[i] != '\n' {
 				i++
 			}
+		}
+		if i == start {
+			i++
 		}
 	}
 	return false
