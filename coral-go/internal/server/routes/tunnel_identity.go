@@ -65,7 +65,7 @@ func TunnelIdentityGuard(bs *board.Store, operatorAllowed func(*http.Request) bo
 			}
 			values, receiveAll, err := tunnelIdentityValues(r)
 			if err != nil {
-				errBadRequest(w, "could not read the request body")
+				refuseUnreadableBody(w)
 				return
 			}
 			if receiveAll {

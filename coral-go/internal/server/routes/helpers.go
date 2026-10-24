@@ -89,6 +89,12 @@ func decodeJSONMax(w http.ResponseWriter, r *http.Request, v any, n int64) error
 
 // writeError answers status with the error envelope every route uses: {"error": msg}, and "code" next to it when the client is meant to match on it (#5262). The err* helpers below are
 // this with the status in their name. Extra fields (a limit, the field at fault) are not part of the envelope: such a reply is written with writeJSON.
+// refuseUnreadableBody answers a request whose body could not be read to the end (the connection was cut, or the body ran over its limit mid-read): 400 body_unreadable. A cut body is never put back
+// and handed on: what is left of it would be read by a later layer or a handler as if it were the whole request (#7204).
+func refuseUnreadableBody(w http.ResponseWriter) {
+	writeError(w, http.StatusBadRequest, "body_unreadable", "could not read the request body")
+}
+
 func writeError(w http.ResponseWriter, status int, code, msg string) {
 	if code == "" {
 		writeJSON(w, status, map[string]string{"error": msg})

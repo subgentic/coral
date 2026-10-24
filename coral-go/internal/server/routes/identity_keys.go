@@ -63,7 +63,7 @@ func CanonicalIdentityKeys(next http.Handler) http.Handler {
 				writeError(w, http.StatusRequestEntityTooLarge, "body_too_large", "This board request's body is over the limit")
 				return
 			}
-			errBadRequest(w, "could not read the request body")
+			refuseUnreadableBody(w)
 			return
 		}
 		if out, changed := canonicalizeIdentityKeys(raw); changed {

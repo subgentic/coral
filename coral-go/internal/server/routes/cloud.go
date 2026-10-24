@@ -447,10 +447,14 @@ func (h *CloudHandler) refuseCloud(w http.ResponseWriter, r *http.Request, allow
 		return false // strict local auth checked the signature already (#3418)
 	}
 	if allow&allowCLI != 0 && r.Header.Get(cloud.CLIAuthHeader) != "" && localCLI(r) {
-		// The MAC covers the body, so read it here and give the handler a copy.
+		// The MAC covers the body, so read it here and give the handler a copy. A body that could not be read to the end is refused: what was read is not put back for any later check or handler.
 		body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 64<<10))
+		if err != nil {
+			refuseUnreadableBody(w)
+			return true
+		}
 		r.Body = io.NopCloser(bytes.NewReader(body))
-		if err == nil && h.cliAuth.Verify(r, body) {
+		if h.cliAuth.Verify(r, body) {
 			return false
 		}
 	}

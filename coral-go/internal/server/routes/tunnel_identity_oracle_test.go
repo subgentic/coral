@@ -290,7 +290,7 @@ func tunnelIdentityGuardBefore4756(bs *board.Store, operatorAllowed func(*http.R
 				raw, err := io.ReadAll(r.Body)
 				r.Body.Close()
 				if err != nil {
-					errBadRequest(w, "could not read the request body")
+					refuseUnreadableBody(w) // the real guard's own answer (#7204: it carries the code body_unreadable)
 					return
 				}
 				r.Body = io.NopCloser(bytes.NewReader(raw))

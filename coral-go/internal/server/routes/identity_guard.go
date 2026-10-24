@@ -56,7 +56,7 @@ func RejectBadIdentities(next http.Handler) http.Handler {
 			raw, err := io.ReadAll(r.Body)
 			r.Body.Close()
 			if err != nil {
-				errBadRequest(w, "could not read the request body")
+				refuseUnreadableBody(w)
 				return
 			}
 			r.Body = io.NopCloser(bytes.NewReader(raw))
@@ -112,7 +112,7 @@ func RejectOperatorImpersonation(next http.Handler) http.Handler {
 		raw, err := io.ReadAll(r.Body)
 		r.Body.Close()
 		if err != nil {
-			errBadRequest(w, "could not read the request body")
+			refuseUnreadableBody(w)
 			return
 		}
 		r.Body = io.NopCloser(bytes.NewReader(raw))
