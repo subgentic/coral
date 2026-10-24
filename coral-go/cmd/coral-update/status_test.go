@@ -100,6 +100,9 @@ func TestStatusSaysWhatTheUpdaterKnows(t *testing.T) {
 	})
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "updates", runrecord.File), []byte(`{"argv":["/opt/coral/coral","--port","8420"],"cwd":"/srv"}`), 0o600))
 
+	oldApply := applyEnabled // the status says what the switch of the platform is; this test is about the rest of it, with the switch off
+	t.Cleanup(func() { applyEnabled = oldApply })
+	applyEnabled = false
 	m := statusJSON(t, nil)
 	wantFeature := "on"
 	if !config.TierChecksForUpdates { // a dev, beta or dropboxers build says it is off, and still says everything else
@@ -289,4 +292,15 @@ func TestStatusJSONShowsOnlyVersionsInVersionFields(t *testing.T) {
 	_, plain := statusRun(t, nil, "status")
 	assert.NotContains(t, plain, "id_rsa", "the plain text shows the same fields")
 	assert.NotContains(t, plain, "evil")
+}
+
+// #7325: the status says the apply is on for a platform whose switch is on.
+func TestStatusSaysTheApplyIsOnWhenTheSwitchIs(t *testing.T) {
+	oldApply := applyEnabled
+	t.Cleanup(func() { applyEnabled = oldApply })
+	t.Setenv("CORAL_DATA_DIR", t.TempDir())
+	applyEnabled = true
+	assert.Equal(t, true, statusJSON(t, nil)["apply_enabled"])
+	applyEnabled = false
+	assert.Equal(t, false, statusJSON(t, nil)["apply_enabled"])
 }

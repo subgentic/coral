@@ -1,5 +1,11 @@
 # Release Notes
 
+## v1.4.167-rc2 — Coral on a Mac installs its own updates
+
+### Changes
+
+- **The auto-installer is on for macOS** (#7325): a Coral on a Mac that finds a newer promoted release stages it, checks it again (the Sigstore signature, the pinned Developer ID team, the new app's code signature) and installs it by swapping the app and starting it again; if the new app does not stay up, it swaps back. It was proved before it was switched on, by a real install of the promoted 1.4.162 over an isolated 1.4.161 app, with the real tools: the new server answered, the signature was valid afterwards, and it did not ask for the terms again (they are the same in both versions). Windows follows when its own live install has passed; Linux when its rehearsal is green again. `coral-update status` says whether the apply is on for the platform it runs on.
+
 ## v1.4.167-rc1 — Goals on a board, and computers that belong to a team
 
 ### Changes

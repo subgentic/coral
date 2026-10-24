@@ -58,6 +58,10 @@ func TestApplyIsNotBuiltYet(t *testing.T) {
 	if !config.TierChecksForUpdates {
 		t.Skip("a build of another tier answers off")
 	}
+	// The answer of a platform whose apply switch is off (Windows and Linux today; macOS is on since #7325): the test sets the switch it exercises, not the host's.
+	oldApply := applyEnabled
+	t.Cleanup(func() { applyEnabled = oldApply })
+	applyEnabled = false
 	code, out := runOut(t, nil, "apply")
 	assert.Equal(t, 0, code)
 	assert.Equal(t, "not_enabled", out["result"])
