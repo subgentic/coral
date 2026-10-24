@@ -172,7 +172,7 @@ function renderJobDetail(job, runs) {
            </div>`
         : fails >= 1
         ? `<div class="sched-fail-banner" role="status">
-             <strong>${fails === 1 ? 'The last run failed' : `The last ${fails} runs failed`}</strong>${escapeHtml(when)}${why ? `: ${escapeHtml(why)}` : ''}. It is still scheduled.
+             <strong>${fails === 1 ? 'The last run failed' : `The last ${fails} runs failed`}</strong>${escapeHtml(when)}${why ? `: ${escapeHtml(why)}` : ''}. ${!job.enabled ? (job.paused_reason ? 'It is paused. Fix the cause, then press Enable.' : 'It is paused. Press Enable to run it again.') : 'It is still scheduled.'}
            </div>`
         : '';
 
