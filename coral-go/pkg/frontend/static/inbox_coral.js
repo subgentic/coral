@@ -10,7 +10,7 @@ import { setInboxCount } from './inbox_tab.js'; // the count on the Tasks tab
 const { mountInbox, clearInboxDrafts, INBOX_CONTRACT } = await importOnce('./inbox_panel.js'); // the component (shared with the hub); this file is the one that is Coral's
 
 const OPEN_STATUSES = ['pending', 'in_progress', 'review_pending', 'blocked'];
-const FIELDS = 'id,board_id,board_label,title,priority,status,created_by,created_at,updated_at,revision'; // updated_at and revision are the change stamp the panel keeps a drawn task by (#5803)
+const FIELDS = 'id,board_id,board_label,title,priority,status,created_by,created_at,updated_at,revision,goal_id,goal_title'; // updated_at and revision are the change stamp the panel keeps a drawn task by (#5803)
 
 async function json(resp) {
     let data = {};
