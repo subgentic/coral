@@ -84,6 +84,12 @@ if ($LASTEXITCODE -ne 0) {
 } else {
     Write-Host "  Built coral-app.exe" -ForegroundColor Green
 }
+
+# The MSI's custom-action helper (#335, tools/coral.wxs): in the MSI's Binary table, never installed, so beside bin\ (not in it); a GUI program, or
+# each custom action flashes a console window
+$env:CGO_ENABLED = "0"
+go build -trimpath -overlay $overlay -ldflags "-s -w -H windowsgui" -o (Join-Path $BuildDir "coral-msi-helper.exe") ./cmd/coral-msi-helper/
+if ($LASTEXITCODE -ne 0) { Write-Host "  FAIL: coral-msi-helper" -ForegroundColor Red; exit 1 }
 } finally { go run ./tools/strip-static -clean $overlay }
 
 Pop-Location
