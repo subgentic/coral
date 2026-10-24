@@ -1,6 +1,6 @@
 /* Message Board: project list, messages, subscribers, posting */
 
-import { OPERATOR_ID, isOperatorId, escapeHtml, escapeAttr, showView, getAgentColor, showToast, externalMessageBadge, hubUserBadge, renderBoardMessageBody, setBoardMentionNames, highlightMentionsIn, boardAvatar, boardMessageColorStyle } from './utils.js';
+import { OPERATOR_ID, isOperatorId, escapeHtml, escapeAttr, showView, getAgentColor, showToast, externalMessageBadge, hubUserBadge, renderBoardMessageBody, setBoardMentionNames, highlightMentionsIn, boardMessageColorStyle } from './utils.js';
 import { registerActions, withId, textOf } from './actions.js';
 import { scrollBehavior } from './motion.js';
 import { boardPageChanged } from './dock_page.js';
@@ -387,7 +387,6 @@ function renderBoardItem(item, prev) {
     const checkbox = isSelectMode() ? `<input type="checkbox" class="mb-select-checkbox" data-msg-id="${Number(m.id)}" ${isSelected(m.id) ? 'checked' : ''} data-on-click="mb-msg-select">` : '';
     return `
         <div class="mb-message ${spacing}${alignClass}${selectedClass}" role="listitem" data-message-id="${escapeAttr(String(m.id))}"${messageAttachmentAttrs(m)} style="${boardMessageColorStyle(color)}">
-            ${boardAvatar(m, agent)}
             <div class="mb-message-header">
                 ${checkbox}
                 <span class="mb-agent-name">${m.icon ? escapeHtml(m.icon) + ' ' : ''}${escapeHtml(agent)}</span>

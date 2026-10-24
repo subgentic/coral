@@ -31,8 +31,8 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await Input.dispatchKeyEvent({ type: 'keyUp', key: k, code, windowsVirtualKeyCode: keyCode, nativeVirtualKeyCode: keyCode });
     };
     const LONG = 'a'.repeat(160);
-    // #3590: a board post is an avatar row (the sender's initials in their palette colour, no box or
-    // bar), a single newline in it is a line break, and a second post in a row shares the avatar.
+    // #3590, #7315: a board post is a row with no initials badge (the sender's name in their palette colour, no box or
+    // bar), a single newline in it is a line break, and a second post in a row shares the name.
     const rowCheck = async (feedId, where) => {
         const r = await ev(`(async () => {
             const { getAgentColor, hexToRgba, boardTextColor } = await import((window.__coralStatic||'/static/')+'utils.js');
@@ -43,18 +43,14 @@ const { removeBoards } = require('./helpers/board_cleanup');
             const msg = msgs[i], next = msgs[i + 1];
             const body = msg.querySelector('.mb-message-body');
             const p = body.querySelector('p');
-            const av = msg.querySelector('.mb-avatar');
+            const nameEl = msg.querySelector('.mb-agent-name');
             const probe = document.createElement('div'); const shade = boardTextColor(getAgentColor('QA Engineer'), document.documentElement.dataset.theme); probe.style.color = shade; probe.style.background = hexToRgba(shade, 0.18); document.body.appendChild(probe);
             const want = { color: getComputedStyle(probe).color, bg: getComputedStyle(probe).backgroundColor }; probe.remove();
-            const cs = getComputedStyle(msg), acs = av && getComputedStyle(av);
-            const ar = av && av.getBoundingClientRect(), br = body.getBoundingClientRect();
-            const nav = next && next.querySelector('.mb-avatar');
+            const cs = getComputedStyle(msg), br = body.getBoundingClientRect(), mr = msg.getBoundingClientRect(), nr = nameEl.getBoundingClientRect();
             return { br: !!p && !!p.querySelector('br'), lines: p ? p.innerText.split('\\n') : [], items: body.querySelectorAll('li').length,
                 borderLeft: cs.borderLeftWidth, borderBottom: cs.borderBottomWidth, bg: cs.backgroundColor,
-                initials: av && av.textContent, avChildren: av ? av.children.length : -1, avColor: acs && acs.color, avBg: acs && acs.backgroundColor, want,
-                bodyRightOfAvatar: !!ar && br.left >= ar.right,
+                avatars: msg.querySelectorAll('.mb-avatar').length, nameColor: getComputedStyle(nameEl).color, want, bodyLeft: Math.round(br.left - mr.left), nameLeft: Math.round(nr.left - mr.left),
                 nextGrouped: !!next && next.classList.contains('mb-message-grouped') && next.textContent.includes('a follow-up'),
-                nextAvatarHidden: !!nav && getComputedStyle(nav).visibility === 'hidden',
                 nextNameHidden: !!next && getComputedStyle(next.querySelector('.mb-agent-name')).display === 'none' };
         })()`);
         assert.ok(r, `${where}: the two-line post rendered`);
@@ -64,13 +60,11 @@ const { removeBoards } = require('./helpers/board_cleanup');
         assert.equal(r.borderLeft, '0px', `${where}: no colour bar`);
         assert.equal(r.borderBottom, '0px', `${where}: no underline`);
         assert.equal(r.bg, 'rgba(0, 0, 0, 0)', `${where}: no box (the page's background)`);
-        assert.equal(r.initials, 'QE', `${where}: the avatar shows the initials`);
-        assert.equal(r.avChildren, 0, `${where}: the avatar is text only`);
-        assert.equal(r.avColor, r.want.color, `${where}: the initials are in the theme's shade of the sender's palette colour`);
-        assert.equal(r.avBg, r.want.bg, `${where}: the avatar's tint is that colour`);
-        assert.ok(r.bodyRightOfAvatar, `${where}: the body sits right of the avatar`);
+        assert.equal(r.avatars, 0, `${where}: no initials badge (#7315)`);
+        assert.equal(r.nameColor, r.want.color, `${where}: the name is in the theme's shade of the sender's palette colour`);
+        assert.equal(r.nameLeft, r.bodyLeft, `${where}: the name and the text start at the same left edge`);
+        assert.ok(r.bodyLeft <= 12, `${where}: that edge is the row's padding, not a badge's width (${r.bodyLeft} px)`);
         assert.ok(r.nextGrouped, `${where}: the next post from the same sender is grouped`);
-        assert.ok(r.nextAvatarHidden, `${where}: a grouped post shares the avatar`);
         assert.ok(r.nextNameHidden, `${where}: a grouped post shares the name`);
     };
     // Security's NITs on #3590: a sender named 'constructor' gets a palette colour (an object
@@ -84,17 +78,14 @@ const { removeBoards } = require('./helpers/board_cleanup');
             const feed = document.getElementById(${JSON.stringify(feedId)});
             const find = t => [...feed.querySelectorAll('.mb-message')].find(m => m.textContent.includes(t));
             const ctor = find('from constructor'), icon = find('with an icon');
-            return { ctor: !!ctor, ctorColor: ctor && getComputedStyle(ctor.querySelector('.mb-avatar')).color, palette,
-                ctorInitials: ctor && ctor.querySelector('.mb-avatar').textContent,
-                iconText: icon && icon.querySelector('.mb-avatar').textContent };
+            return { ctor: !!ctor, ctorColor: ctor && getComputedStyle(ctor.querySelector('.mb-agent-name')).color, palette,
+                iconText: icon && icon.querySelector('.mb-agent-name').textContent };
         })()`);
         assert.ok(r.ctor, `${where}: a post from 'constructor' renders`);
         assert.ok(r.palette.includes(r.ctorColor), `${where}: 'constructor' gets a palette colour, not ${r.ctorColor}`);
-        assert.equal(r.ctorInitials, 'CO', `${where}: its initials`);
-        assert.equal(r.iconText, 'AB', `${where}: an icon avatar is at most two characters`);
+        assert.ok(r.iconText.includes('AB'), `${where}: a sender's icon is still in front of the name`);
     };
-    // #3590: every sender's name and initials meet WCAG AA (4.5:1) on the page and on the avatar's
-    // tint, in the dark and the light theme (the palette's own pastels don't on light).
+    // #3590: every sender's name meets WCAG AA (4.5:1) on the page, in the dark and the light theme (the palette's own pastels don't on light).
     const contrastCheck = async (feedId, where) => {
         const S = `(window.__coralStatic||'/static/')`;
         for (const theme of ['light', 'dark']) {
@@ -110,14 +101,13 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 let worst = { ratio: 99 };
                 for (const m of feed.querySelectorAll('.mb-message:not(.mb-message-grouped)')) {
                     const bg = pageBg(m.parentElement);
-                    const name = m.querySelector('.mb-agent-name'), av = m.querySelector('.mb-avatar');
+                    const name = m.querySelector('.mb-agent-name');
                     const nr = ratio(parse(getComputedStyle(name).color), bg);
-                    const ar = ratio(parse(getComputedStyle(av).color), over(parse(getComputedStyle(av).backgroundColor), bg));
-                    for (const [what, v] of [['name', nr], ['initials', ar]]) if (v < worst.ratio) worst = { ratio: Math.round(v * 100) / 100, what, who: name.textContent };
+                    if (nr < worst.ratio) worst = { ratio: Math.round(nr * 100) / 100, what: 'name', who: name.textContent };
                 }
                 return worst;
             })()`);
-            assert.ok(r.ratio >= 4.5, `${where}, ${theme} theme: every name and initials meet AA (worst ${JSON.stringify(r)})`);
+            assert.ok(r.ratio >= 4.5, `${where}, ${theme} theme: every name meets AA (worst ${JSON.stringify(r)})`);
         }
     };
     try {
@@ -228,7 +218,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await rowCheck('board-panel-msgs', 'team chat');
         await senderCheck('board-panel-msgs', 'team chat');
         await contrastCheck('board-panel-msgs', 'team chat');
-        console.log('   ✓ initials in the palette colour, no box, <br> between lines, a run shares the avatar');
+        console.log('   ✓ names in the palette colour, no badge, no box, <br> between lines, a run shares the name');
 
         console.log('#4 Closing the team view from its Tasks tab leaves only Tasks in the sidebar');
         await ev(`document.querySelector('.team-center-close').click(); true`);
@@ -337,7 +327,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await rowCheck('mb-messages', 'board view');
         await senderCheck('mb-messages', 'board view');
         await contrastCheck('mb-messages', 'board view');
-        console.log('   ✓ initials in the palette colour, no box, <br> between lines, a run shares the avatar');
+        console.log('   ✓ names in the palette colour, no badge, no box, <br> between lines, a run shares the name');
 
         console.log('PASS board_team_ux_browser');
     } finally {

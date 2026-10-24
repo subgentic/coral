@@ -159,13 +159,11 @@
     max-width: 100%;
 }
 
-/* Message board — avatar rows (#3590, the operator's choice): the sender's initials in their
-   palette colour at the left, the name and time on one line, the body beneath; no boxes or
-   dividers, a highlight on hover. Posts in a row from one sender share the avatar and name. */
+/* Message board rows (#3590, the operator's choice; no initials badge since #7315): the name and time on one line in the sender's
+   palette colour, the body beneath, both at the row's left edge; no boxes or dividers, a highlight on hover. Posts in a row from one sender share the name. */
 .mb-message {
     display: grid;
-    grid-template-columns: 34px minmax(0, 1fr);
-    column-gap: 12px;
+    grid-template-columns: minmax(0, 1fr);
     padding: 8px 10px;
     position: relative;
     border-radius: var(--radius-lg);
@@ -185,23 +183,9 @@
     --mb-tint: var(--mb-tint-light);
 }
 
-.mb-avatar {
-    display: flex;
-    grid-row: 1 / span 2;
-    align-items: center;
-    justify-content: center;
-    width: 34px;
-    height: 34px;
-    border-radius: var(--radius-lg);
-    background: var(--mb-tint);
-    color: var(--mb-color);
-    font-weight: 700;
-    font-size: 0.75rem;
-}
-
 .mb-message-header,
 .mb-message-body {
-    grid-column: 2;
+    grid-column: 1;
 }
 
 .mb-message-first {
@@ -210,11 +194,6 @@
 
 .mb-message-grouped {
     padding-top: 2px;
-}
-
-.mb-message-grouped .mb-avatar {
-    visibility: hidden;
-    height: 0;
 }
 
 .mb-message-grouped .mb-agent-name {
@@ -316,7 +295,7 @@
 
 /* Files that came with a cross-team message (#5503): under the text, in its column; an image is a thumbnail, any other file a chip with its name and size. */
 .mb-attachments {
-    grid-column: 2;
+    grid-column: 1;
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
