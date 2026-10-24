@@ -149,3 +149,6 @@ export const notYetHint = 'Not yet hides this until a task is added.';
 export const notYetSaid = 'Hidden until a task is added.';
 /** A closed-ready goal's card sentence: the rollup's, and a quiet "ready to close?". */
 export const readySentence = (sentence) => `${sentence} · ready to close?`;
+export const closeReasonHint = '300 characters at most.';
+/** Said once, politely, when the all-done strip first appears for a goal. */
+export const allDoneSaid = (n, title) => `All ${n} ${n === 1 ? 'task' : 'tasks'} of ${title} ${n === 1 ? 'is' : 'are'} done`;

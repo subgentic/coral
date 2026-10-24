@@ -225,15 +225,15 @@ function drawDetailRaw() {
     col.append(back);
     const h = el('h3', 'goals-detail-title', g.title); h.tabIndex = -1; h.id = 'goals-detail-title'; col.append(h);
     const line = el('div', 'goals-detail-line'); line.append(stateChip(g)); const meta = W.driverLine(g.driver, whenText(g.updatedAt)); if (meta) line.append(el('span', 'goal-card-meta', meta));
-    if (W.isOpenGoal(g)) line.append(btn('btn btn-small goals-close', 'Close goal', () => openClose(g)));
-    else if (W.isClosedGoal(g)) line.append(btn('btn btn-small goals-reopen', 'Reopen', () => reopenGoal(g)));
+    if (W.isOpenGoal(g)) { const cb = btn('btn btn-small goals-close', 'Close goal', () => openClose(g)); cb.setAttribute('aria-label', `Close goal: ${g.title}`); line.append(cb); } // the dialog's own button is plain "Close goal": the two have different names (the visible words start both)
+    else if (W.isClosedGoal(g)) { const rb = btn('btn btn-small goals-reopen', 'Reopen', () => reopenGoal(g)); rb.setAttribute('aria-label', `Reopen: ${g.title}`); line.append(rb); }
     col.append(line);
     if (g.outcome) { col.append(el('h4', 'goals-sub', 'Outcome'), el('p', 'goals-text', g.outcome)); }
     if (g.doneWhen) { col.append(el('h4', 'goals-sub', 'Done when'), el('p', 'goals-text', g.doneWhen)); }
     col.append(rollupBar(g.rollup), el('p', 'goal-card-sentence', W.rollupSentence(g.rollup)));
     const openLeft = g.rollup.active + g.rollup.blocked + g.rollup.queued;
     if ((g.state === 'done' || g.state === 'dropped') && openLeft) col.append(el('p', 'goals-note goals-closed-open', W.closedWithOpenText(openLeft)));
-    if (W.readyToClose(g) && !isNotYet(g)) col.append(allDoneStrip(g));
+    if (W.readyToClose(g) && !isNotYet(g)) { col.append(allDoneStrip(g)); announceAllDone(g); }
     const tasks = model.tasks.get(g.id);
     if (!(tasks && tasks.rows && !tasks.rows.length)) col.append(el('h4', 'goals-sub', 'Tasks')); // a goal with no tasks says "No tasks yet" once, under its title (#7224)
     if (!tasks) col.append(el('p', 'goals-note', 'Loading tasks…'));
@@ -356,6 +356,8 @@ const NOT_YET_KEY = 'coral.goals.notyet';
 const notYetKey = (g) => `${model.project}|${g.id}|${W.allTasksOf(g.rollup)}`; // per goal and task total: it comes back when a task is added or removed
 function notYetList() { try { const v = JSON.parse(browserLocal.get(NOT_YET_KEY) || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } }
 const isNotYet = (g) => notYetList().includes(notYetKey(g));
+const announcedDone = new Set(); // the all-done strips already said, by goal and task total: said once when it first appears, not on every redraw
+function announceAllDone(g) { const k = notYetKey(g); if (announcedDone.has(k)) return; announcedDone.add(k); say(W.allDoneSaid(W.allTasksOf(g.rollup), g.title)); }
 function setNotYet(g) { try { browserLocal.set(NOT_YET_KEY, JSON.stringify([...notYetList().filter(k => k !== notYetKey(g)), notYetKey(g)].slice(-100))); } catch { /* the strip comes back on the next read */ } }
 
 /** The prompt above Tasks when every task of an active goal is done: a labelled region (not an alert), Close as done and Not yet. */
@@ -396,8 +398,9 @@ function openClose(g, preset) {
     const fs = el('fieldset', 'goals-radios'); fs.append(el('legend', null, 'Close it as'));
     const radio = (value, label) => { const l = el('label', 'goals-radio'); const r = el('input'); r.type = 'radio'; r.name = 'goal-close-state'; r.value = value; r.checked = choose === value; l.append(r, el('span', null, label)); return l; };
     fs.append(radio('done', W.closeDoneLabel), radio('dropped', W.closeDroppedLabel));
-    const reason = el('input'); reason.type = 'text'; reason.maxLength = 300; reason.autocomplete = 'off'; reason.id = 'goal-close-reason';
-    const rl = el('label', 'goals-field'); rl.append(el('span', null, W.closeReasonLabel), reason);
+    const reason = el('input'); reason.type = 'text'; reason.maxLength = 300; reason.autocomplete = 'off'; reason.id = 'goal-close-reason'; reason.required = true; reason.setAttribute('aria-required', 'true');
+    const hint = el('span', 'goals-note', W.closeReasonHint); hint.id = 'goal-close-hint'; reason.setAttribute('aria-describedby', hint.id);
+    const rl = el('label', 'goals-field'); rl.append(el('span', null, W.closeReasonLabel), reason, hint);
     const err = el('p', 'goals-field-error'); err.setAttribute('role', 'alert'); err.id = 'goal-close-error';
     const go = btn('btn btn-primary', 'Close goal'); go.type = 'submit';
     const actions = el('div', 'goals-actions'); actions.append(btn('btn', 'Cancel', () => dlg.close()), go);
@@ -406,8 +409,8 @@ function openClose(g, preset) {
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         err.textContent = '';
-        if (!reason.value.trim()) { err.textContent = W.closeReasonNeeded; reason.setAttribute('aria-invalid', 'true'); reason.setAttribute('aria-describedby', err.id); reason.focus(); return; }
-        reason.removeAttribute('aria-invalid'); reason.removeAttribute('aria-describedby'); go.disabled = true;
+        if (!reason.value.trim()) { err.textContent = W.closeReasonNeeded; reason.setAttribute('aria-invalid', 'true'); reason.setAttribute('aria-describedby', `${hint.id} ${err.id}`); reason.focus(); return; }
+        reason.removeAttribute('aria-invalid'); reason.setAttribute('aria-describedby', hint.id); go.disabled = true;
         const as = form.querySelector('input[name="goal-close-state"]:checked')?.value === 'dropped' ? 'dropped' : 'done';
         try {
             const r = await boardFetch(model.project, `/goals/${g.id}/close`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: OPERATOR_ID, reason: reason.value.trim(), state: as }) });

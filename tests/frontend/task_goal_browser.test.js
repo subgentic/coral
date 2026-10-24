@@ -82,6 +82,15 @@ const BASE = require('./test_base').BASE;
             { required: true, ariaRequired: 'true', invalid: 'true', by: 'create-task-goal-error', role: 'alert', beside: true, focus: 'create-task-goal' }, 'the select is required, marked invalid and described by the refusal beside it (#7313)');
         await ev(`const sel = document.getElementById('create-task-goal'); sel.value = sel.options[1].value; sel.dispatchEvent(new Event('change', { bubbles: true })); true`);
         assert.equal(await ev(`document.getElementById('create-task-goal').getAttribute('aria-invalid') + ':' + document.getElementById('create-task-goal-error').hidden`), 'null:true', 'choosing a goal takes the refusal away');
+        // at 390 px and 200% text the refusal is scrolled into view, not left behind the dialog's footer (#7313)
+        await ev(`document.getElementById('create-task-goal').value = ''; true`);
+        await Emulation.setDeviceMetricsOverride({ width: 390, height: 700, deviceScaleFactor: 1, mobile: true });
+        await ev(`document.documentElement.style.fontSize = '32px'; document.querySelector('#create-task-modal [data-on-click="m-submit-create-task"]').click(); true`);
+        await waitFor(`!document.getElementById('create-task-goal-error').hidden`, 'the refusal at large text', 6000);
+        await ev(`new Promise(r => setTimeout(r, 400))`); // sleep-ok: the scroll settles
+        const seen = await ev(`(() => { const r = document.getElementById('create-task-goal-error').getBoundingClientRect(), f = document.querySelector('#create-task-modal .modal-footer, #create-task-modal .modal-actions, #create-task-modal [data-on-click="m-submit-create-task"]').getBoundingClientRect(); return { top: Math.round(r.top), bottom: Math.round(r.bottom), vh: innerHeight, footerTop: Math.round(f.top) }; })()`);
+        assert.ok(seen.top >= 0 && seen.bottom <= seen.vh, `the refusal is on the screen: ${JSON.stringify(seen)}`);
+        await ev(`document.documentElement.style.fontSize = ''; true`); await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         assert.equal(((await api('GET', `/api/board/${B}/tasks?limit=50`)).json.tasks || []).some(t => t.title === 'No goal here'), false, 'nothing was created');
         console.log('6. Team settings has the Require a goal switch with its one sentence; Save writes it');
         assert.equal((await api('PUT', `/api/board/${B}/settings`, { subscriber_id: 'Operator', require_goal: false })).status, 200);

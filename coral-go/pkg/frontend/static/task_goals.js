@@ -119,7 +119,7 @@ export async function openGoalOnBoard(project, id) {
 /** A refusal beside the Goal select: the message in its own alert line, the select marked invalid and described by it; clearGoalInvalid undoes it. */
 export function showGoalInvalid(select, line, message) {
     line.textContent = ''; line.hidden = false; line.textContent = message;
-    select.setAttribute('aria-invalid', 'true'); select.setAttribute('aria-describedby', line.id); select.focus();
+    select.setAttribute('aria-invalid', 'true'); select.setAttribute('aria-describedby', line.id); select.focus(); line.scrollIntoView({ block: 'nearest' }); // at large text the refusal under the select would sit behind the dialog's footer (#7313)
 }
 export function clearGoalInvalid(select) {
     select.removeAttribute('aria-invalid'); select.removeAttribute('aria-describedby');
