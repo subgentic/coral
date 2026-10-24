@@ -64,6 +64,7 @@ export function normalizeStatus(raw) {
         auto: typeof raw.auto === 'boolean' ? raw.auto : null,
         source: raw.staged && SOURCE_RE.test(str(raw.staged.source)) ? raw.staged.source : '', // staged.source: the repository the staged update came from, sent by the server only for a verified update (#6292); anything but owner/name is ignored
         // Release channels (#5558; the server's #5557): the fields are optional, an older server sends none and the pane then draws no channel group.
+        hubRelaunch: raw.relaunch_available === true, // #7343: Coral Hub's relaunch exists in this build; without it Settings draws no Hub row
         localInstall: raw.local_install === true, // #7338: this computer's own dashboard may install (the server says so only to a request from here, on Windows); through Coral Hub it is never true
         hasChannel: raw.channel === 'approved' || raw.channel === 'agentic',
         channel: raw.channel === 'agentic' ? 'agentic' : 'approved', // anything else is read as approved: the safe side wins

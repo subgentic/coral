@@ -110,7 +110,7 @@ func TestALocalTokenIsNoGoodOnTheHubsRouteAndAHubTokenIsNoGoodHere(t *testing.T)
 	assert.Empty(t, e.up.applies)
 }
 
-func TestTheLocalRelaunchIsLocalOnlyAndOffWhileTheFeatureIsOff(t *testing.T) {
+func TestTheLocalRelaunchIsLocalOnlyAndNotTiedToTheHubFeature(t *testing.T) {
 	e := newRelaunchEnv(t)
 	tok := e.localToken()
 	code, out := e.postLocal(ack(tok), hubHdr(ownerA))
@@ -118,10 +118,12 @@ func TestTheLocalRelaunchIsLocalOnlyAndOffWhileTheFeatureIsOff(t *testing.T) {
 	assert.Equal(t, "local_only", out["code"])
 	assert.Empty(t, e.up.applies)
 
+	// #7343: the Hub's feature being off does not turn off the person at this computer: their own relaunch is on in every build
 	e.on = false
+	tok = e.localToken()
 	code, _ = e.postLocal(ack(tok), nil)
-	assert.Equal(t, 404, code)
-	assert.Empty(t, e.up.applies)
+	assert.Less(t, code, 300, "the local relaunch does not follow the Hub's feature")
+	assert.Len(t, e.up.applies, 1)
 }
 
 func TestTheLocalRelaunchKeepsEveryRuleOfTheRelaunchThatIsNotAboutTheHub(t *testing.T) {

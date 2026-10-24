@@ -11,7 +11,7 @@ const BASE = require('./test_base').BASE;
 
 const APPROVE_URL = 'https://github.com/subgentic/coral/actions/workflows/approve-release.yml';
 const NOW = Date.now(), day = n => new Date(NOW - n * 86400000).toISOString();
-const base = { enabled: true, installed: '1.4.141', state: 'none', staged: null, relaunch: { available: false, reason: 'nothing_staged', restarts: [], ack: '' }, last_result: null, checked_at: new Date().toISOString(), auto: true, not_ready_reason: 'up_to_date' };
+const base = { enabled: true, relaunch_available: true, installed: '1.4.141', state: 'none', staged: null, relaunch: { available: false, reason: 'nothing_staged', restarts: [], ack: '' }, last_result: null, checked_at: new Date().toISOString(), auto: true, not_ready_reason: 'up_to_date' };
 const approvedSt = { ...base, channel: 'approved', approved: { version: '1.4.142', approved_at: day(2) } };
 const NOTES = 'Changes\n- Messaging tab drawn with the strip\n<img src=x onerror="window.__pwn=1"> <b>bold</b>';
 const agenticSt = { ...base, channel: 'agentic', approved: { version: '1.4.142', approved_at: day(2) }, waiting: [{ version: '1.4.144', published_at: day(8), notes: NOTES }, { version: '1.4.143', published_at: day(3), notes: '' }] };
@@ -28,7 +28,7 @@ const agenticSt = { ...base, channel: 'agentic', approved: { version: '1.4.142',
     const STUB = `(() => { const real = window.fetch; window.__ch = window.__ch || { status: null, puts: [], putStatus: 200, check: null, track: [] };
         const json = (o, status) => Promise.resolve(new Response(JSON.stringify(o), { status: status || 200, headers: { 'Content-Type': 'application/json' } }));
         window.fetch = (u, o) => { const url = String(u), method = (o && o.method) || 'GET';
-            if (url.includes('/api/cloud/status')) return json({ connected: false, hub_relaunch_updates: false });
+            if (url.includes('/api/cloud/status')) return json({ connected: false, hub_relaunch_updates: false, hub_relaunch_available: true });
             if (url.endsWith('/api/system/update')) return window.__ch.status ? json(window.__ch.status) : json({ error: 'none' }, 404);
             if (url.includes('/api/system/update-check')) return json(window.__ch.check || { available: false });
             if (method === 'POST' && url.endsWith('/api/tracking/event')) { window.__ch.track.push(JSON.parse(o.body)); return json({ ok: true }); }

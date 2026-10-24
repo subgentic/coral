@@ -8,7 +8,7 @@ const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 
 const agents = [{ session_id: 'sid-0', name: 'api-worker', state: 'working' }, { session_id: 'sid-1', name: 'review-1', state: 'waiting' }];
-const win = (version, over = {}, relaunch = {}) => ({ enabled: true, installed: '1.4.125', state: 'staged', staged: { version, staged_at: '2026-10-17T03:00:00Z', days_ready: 1, verified: true }, local_install: true,
+const win = (version, over = {}, relaunch = {}) => ({ enabled: true, relaunch_available: true, installed: '1.4.125', state: 'staged', staged: { version, staged_at: '2026-10-17T03:00:00Z', days_ready: 1, verified: true }, local_install: true,
     relaunch: { available: false, reason: 'local_approval_needed', restarts: agents, ack: '', ...relaunch }, last_result: null, checked_at: new Date().toISOString(), auto: true, install_kind: 'msi', ...over });
 
 (async () => {
@@ -25,7 +25,7 @@ const win = (version, over = {}, relaunch = {}) => ({ enabled: true, installed: 
         const json = (o, status) => Promise.resolve(new Response(JSON.stringify(o), { status: status || 200, headers: { 'Content-Type': 'application/json' } }));
         window.fetch = (u, o) => {
             const url = String(u), method = (o && o.method) || 'GET';
-            if (url.includes('/api/cloud/status')) return json({ connected: false, hub_relaunch_updates: window.__upd.hubOn, hub_relaunch_needs_here: !!(window.__upd.status && window.__upd.status.local_install) });
+            if (url.includes('/api/cloud/status')) return json({ state: 'connected', configured: true, url: 'https://hub.example.invalid', max_mode: 'launch', mode: 'launch', hub_relaunch_updates: window.__upd.hubOn, hub_relaunch_available: window.__upd.hubAvail !== false, hub_relaunch_needs_here: !!(window.__upd.status && window.__upd.status.local_install) });
             if (url.includes('/api/system/update')) {
                 const path = url.replace(/^.*\\/api\\/system\\/update/, '') || '/status';
                 window.__upd.calls.push({ method, path, body: o && o.body ? JSON.parse(o.body) : null });
@@ -107,6 +107,20 @@ const win = (version, over = {}, relaunch = {}) => ({ enabled: true, installed: 
             await load(view, win('1.4.126', { local_install: undefined }, { reason: 'a_reason_nobody_knows', restarts: [] }));
             p = await pill(); pn = await pane();
             check(`${tag}: an unknown reason says Coral did not say why, never just "Unavailable" (${p && p.name})`, p && /Coral did not say why\. Nothing was changed\./.test(p.name) && !/Unavailable/.test(p.name) && /Coral did not say why/.test(pn.text) && !/Unavailable/.test(pn.text));
+            await ev(`window.hideSettingsModal(); true`);
+
+            // ═══ #7343: a build without the Hub's relaunch feature (every shipping build): the status says relaunch_available is false, so Settings draws no Hub row (the automatic switch stays: Coral checks by itself in every build),
+            // the Network and Hub pane draws no switch or sentence for it, and Install update is still there
+            await load(view, win('1.4.126', { relaunch_available: false }));
+            await ev(`window.__upd.hubAvail = false; true`);
+            pn = await ev(`(async () => { window.showSettingsModal('updates'); const m = await import(${S} + 'update_settings.js'); await m.showUpdatesPane(); const b = document.getElementById('update-pane-body'); const act = b.querySelector('.update-act'); return { text: b.textContent.replace(/\\s+/g, ' ').trim(), auto: !!document.getElementById('settings-update-auto'), act: act ? act.textContent.trim() : null }; })()`);
+            check(`${tag}: without the Hub's feature Settings > Updates has no Coral Hub row, keeps the automatic switch, and still has Install update (${JSON.stringify({ auto: pn.auto, act: pn.act, hub: /Relaunch from Coral Hub/.test(pn.text) })})`, pn.auto === true && !/Relaunch from Coral Hub|Coral Hub can|Not on Windows/.test(pn.text) && pn.act === 'Install update');
+            await ev(`window.hideSettingsModal(); true`);
+            for (const [avail, want] of [[false, false], [true, true]]) {
+                await ev(`window.__upd.hubAvail = ${avail}; window.showSettingsModal('network'); true`); await settle(500);
+                const net = await ev(`(async () => { const m = await import(${S} + 'cloud_connect.js'); await m.loadCloudStatus(); await new Promise(r => setTimeout(r, 600)); const row = document.getElementById('settings-cloud-hub-relaunch-row'), st = document.getElementById('settings-cloud-hub-relaunch-state'); const vis = e => !!e && !e.hidden && e.getClientRects().length > 0; return { row: vis(row), state: vis(st), exists: !!row }; })()`);
+                check(`${tag}: Network and Hub with the Hub's feature ${avail ? 'on' : 'off'}: the relaunch switch and its sentence are ${want ? 'drawn' : 'not drawn'} (${JSON.stringify(net)})`, net.exists && net.row === want && (want ? true : net.state === false));
+            }
             await ev(`window.hideSettingsModal(); true`);
 
             // ═══ elsewhere nothing changed: a relaunch the server offers is still Relaunch to update

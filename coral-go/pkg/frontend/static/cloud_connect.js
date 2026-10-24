@@ -305,6 +305,8 @@ class CloudPanel {
         const hubRelaunch = this.part('hub-relaunch');
         if (hubRelaunch) hubRelaunch.checked = st.hub_relaunch_updates === true; // an explicit true only: the server's default is off
         this.hubRelaunchNeedsHere = st.hub_relaunch_needs_here === true;
+        // Coral Hub's relaunch exists only in a build that has the feature (#7343): without it the switch does nothing, so neither the switch nor its sentence is drawn
+        for (const id of ['settings-cloud-hub-relaunch-row', 'settings-cloud-hub-relaunch-state']) { const el = this.root.querySelector('#' + id); if (el) el.hidden = st.hub_relaunch_available !== true; }
         this.hubRelaunchWords(hubRelaunch);
         // Cross-team switches from the hub (#5572): the owner may turn a team's messaging and file sharing on or off unless this lock is off (the server reads an unset or unreadable lock as off).
         const hubCrossTeam = this.part('hub-cross-team');

@@ -4,7 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 
-const STATUS = { enabled: true, installed: '1.4.155', state: 'none', not_ready_reason: 'up_to_date', relaunch: { available: false, reason: 'nothing_staged', restarts: [], ack: '' } };
+const STATUS = { enabled: true, relaunch_available: true, installed: '1.4.155', state: 'none', not_ready_reason: 'up_to_date', relaunch: { available: false, reason: 'nothing_staged', restarts: [], ack: '' } };
 const stub = (status, body) => `(() => { const R = window.fetch;
     window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin);
         if (url.pathname === '/api/system/update') return Promise.resolve(new Response(JSON.stringify(${JSON.stringify(body)}), { status: ${status}, headers: { 'content-type': 'application/json' } }));

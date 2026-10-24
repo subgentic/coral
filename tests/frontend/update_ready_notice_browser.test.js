@@ -7,7 +7,7 @@ const { setTheme, auditRegion } = require('./helpers/contrast');
 const { guardSettings } = require('./helpers/settings_guard');
 const BASE = require('./test_base').BASE;
 
-const staged = (version = '1.4.160', over = {}, relaunch = {}) => ({ enabled: true, installed: '1.4.159', state: 'staged', staged: { version, staged_at: '2026-10-23T03:00:00Z', days_ready: 0, verified: true },
+const staged = (version = '1.4.160', over = {}, relaunch = {}) => ({ enabled: true, relaunch_available: true, installed: '1.4.159', state: 'staged', staged: { version, staged_at: '2026-10-23T03:00:00Z', days_ready: 0, verified: true },
     relaunch: { available: true, reason: '', hub_allowed: false, restarts: [], tmux_agents_restart: false, ack: 'ack-1', ...relaunch }, last_result: null, checked_at: new Date().toISOString(), auto: true, ...over });
 
 // the server's status carries the repository inside `staged`, only for a verified update (#6290)
@@ -25,7 +25,7 @@ const stagedFrom = (source, relaunch = {}) => { const st = staged('1.4.160', {},
         const json = (o, status) => Promise.resolve(new Response(JSON.stringify(o), { status: status || 200, headers: { 'Content-Type': 'application/json' } }));
         window.fetch = (u, o) => {
             const url = String(u), method = (o && o.method) || 'GET';
-            if (url.includes('/api/cloud/status')) return json({ connected: false, hub_relaunch_updates: false });
+            if (url.includes('/api/cloud/status')) return json({ connected: false, hub_relaunch_updates: false, hub_relaunch_available: true });
             if (url.includes('/api/system/update')) {
                 window.__upd.calls.push({ method, url: url.replace(/^.*\\/api\\/system\\/update/, '') || '/status' });
                 if (url.endsWith('/api/system/update')) { const answer = () => (window.__upd.status ? json(window.__upd.status) : json({ error: 'none' }, 404)); return window.__upd.delay ? new Promise(r => setTimeout(() => r(answer()), window.__upd.delay)) : answer(); }
@@ -175,7 +175,7 @@ const stagedFrom = (source, relaunch = {}) => { const st = staged('1.4.160', {},
             ['Coral Hub relaunching off for this machine', staged('1.4.162', {}, { available: false, reason: 'hub_off' })],
             ['a relaunch already running', staged('1.4.162', {}, { available: false, reason: 'busy' })],
             ['an update not verified', staged('1.4.162', unverified)],
-            ['nothing staged', { enabled: true, installed: '1.4.159', state: 'none', staged: null, relaunch: { available: false, reason: 'nothing_staged', restarts: [], ack: '' }, last_result: null }],
+            ['nothing staged', { enabled: true, relaunch_available: true, installed: '1.4.159', state: 'none', staged: null, relaunch: { available: false, reason: 'nothing_staged', restarts: [], ack: '' }, last_result: null }],
             ['the updater switched off', staged('1.4.162', { enabled: false })],
         ];
         for (const [what, st] of CASES) {

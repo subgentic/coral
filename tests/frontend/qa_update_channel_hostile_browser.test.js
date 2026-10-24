@@ -8,7 +8,7 @@ const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 
 const NOW = Date.now(), day = n => new Date(NOW - n * 86400000).toISOString();
-const base = { enabled: true, installed: '1.4.141', state: 'none', staged: null, relaunch: { available: false, reason: 'nothing_staged', restarts: [], ack: '' }, last_result: null, checked_at: new Date().toISOString(), auto: true, not_ready_reason: 'up_to_date' };
+const base = { enabled: true, relaunch_available: true, installed: '1.4.141', state: 'none', staged: null, relaunch: { available: false, reason: 'nothing_staged', restarts: [], ack: '' }, last_result: null, checked_at: new Date().toISOString(), auto: true, not_ready_reason: 'up_to_date' };
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -19,7 +19,7 @@ const base = { enabled: true, installed: '1.4.141', state: 'none', staged: null,
     const STUB = `(() => { const real = window.fetch; window.__ch = window.__ch || { status: null, puts: [], putStatus: 200, later: null, check: null };
         const json = (o, status) => Promise.resolve(new Response(JSON.stringify(o), { status: status || 200, headers: { 'Content-Type': 'application/json' } }));
         window.fetch = (u, o) => { const url = String(u), method = (o && o.method) || 'GET';
-            if (url.includes('/api/cloud/status')) return json({ connected: false, hub_relaunch_updates: false });
+            if (url.includes('/api/cloud/status')) return json({ connected: false, hub_relaunch_updates: false, hub_relaunch_available: true });
             if (url.endsWith('/api/system/update')) return window.__ch.status ? json(window.__ch.status) : json({ error: 'none' }, 404);
             if (url.includes('/api/system/update-check')) return json(window.__ch.check || { available: false });
             if (method === 'PUT' && url.endsWith('/api/settings')) { const b = JSON.parse(o.body); window.__ch.puts.push(b);

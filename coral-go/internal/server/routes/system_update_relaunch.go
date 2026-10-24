@@ -245,6 +245,11 @@ func (h *UpdateRelaunchHandler) on() bool {
 	return h.Enabled != nil && h.Enabled() && h.Updater != nil
 }
 
+// localOn is whether this computer's own update routes are on: the status the dashboard reads, Check now, the automatic switch, the person's own relaunch and (in system_update_install.go)
+// Install update. They are on in every build once the updater is there (#7343): the person at this computer is never behind the Hub's feature. on() above is the Hub's relaunch feature
+// alone (updateRelaunchFeature): POST /api/system/update/relaunch and what a request through Coral Hub is told. The job that checks by itself is local too (#7343).
+func (h *UpdateRelaunchHandler) localOn() bool { return h.Updater != nil }
+
 // identify runs the stamp and owner checks (identifyOwner with this handler's own label source).
 func (h *UpdateRelaunchHandler) identify(r *http.Request) callerIdentity {
 	return ownerIdentityWith(r, h.OwnerUser, h.OwnerRecord, &h.noLabelLogged)
@@ -603,7 +608,8 @@ func (h *UpdateRelaunchHandler) addUpdateFacts(out map[string]any, rec UpdaterRe
 
 // Status: GET /api/system/update.
 func (h *UpdateRelaunchHandler) Status(w http.ResponseWriter, r *http.Request) {
-	if !h.on() {
+	// This computer's own dashboard is answered in every build; a request through Coral Hub only while the Hub's relaunch feature is on (#7343)
+	if (viaTunnel(r) && !h.on()) || !h.localOn() {
 		errNotFound(w, "not found")
 		return
 	}
@@ -631,6 +637,8 @@ func (h *UpdateRelaunchHandler) Status(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.addChannelFacts(r, out)
+	// What the page may promise (#7343): the Hub's relaunch exists only while the Hub's feature is on
+	out["relaunch_available"] = h.on()
 	if relaunchNeedsLocalApproval && !viaTunnel(r) {
 		out["local_install"] = true // #7338: this computer's own dashboard may install (POST /api/system/update/install); a request through Coral Hub is never told so
 	}
@@ -724,7 +732,7 @@ var localIdentity = callerIdentity{owner: true, pseudo: "local", local: true}
 // /api/system/update, bound to "local" so it is no good on the Hub's route and a Hub token is no good here). Local only: through Coral Hub it is refused, and an agent's token is
 // refused before it gets here.
 func (h *UpdateRelaunchHandler) RelaunchLocal(w http.ResponseWriter, r *http.Request) {
-	if !h.on() {
+	if !h.localOn() { // the person at this computer is not behind the Hub's feature (#7343)
 		errNotFound(w, "not found")
 		return
 	}

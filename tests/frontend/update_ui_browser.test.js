@@ -11,8 +11,8 @@ const { guardSettings } = require('./helpers/settings_guard');
 const BASE = require('./test_base').BASE;
 
 const agents = (n, extra = {}) => Array.from({ length: n }, (_, i) => ({ session_id: `sid-${i}`, name: ['api-worker', 'review-1', 'docs-2'][i] || `agent-${i}`, state: ['working', 'waiting', 'idle'][i % 3], ...(i === 0 ? { resumes: true } : i === 2 ? { resumes: false } : {}), ...extra }));
-const staged = (days, restarts = agents(3), over = {}) => ({ enabled: true, installed: '1.4.125', state: 'staged', staged: { version: '1.4.126', staged_at: '2026-10-17T03:00:00Z', days_ready: days, verified: true }, relaunch: { available: true, reason: '', hub_allowed: true, restarts, tmux_agents_restart: false, ack: 'ack-1' }, last_result: null, checked_at: new Date().toISOString(), auto: true, ...over });
-const idle = { enabled: true, installed: '1.4.125', state: 'none', staged: null, relaunch: { available: false, reason: 'nothing_staged', restarts: [], ack: '' }, last_result: null, checked_at: new Date().toISOString(), auto: true };
+const staged = (days, restarts = agents(3), over = {}) => ({ enabled: true, relaunch_available: true, installed: '1.4.125', state: 'staged', staged: { version: '1.4.126', staged_at: '2026-10-17T03:00:00Z', days_ready: days, verified: true }, relaunch: { available: true, reason: '', hub_allowed: true, restarts, tmux_agents_restart: false, ack: 'ack-1' }, last_result: null, checked_at: new Date().toISOString(), auto: true, ...over });
+const idle = { enabled: true, relaunch_available: true, installed: '1.4.125', state: 'none', staged: null, relaunch: { available: false, reason: 'nothing_staged', restarts: [], ack: '' }, last_result: null, checked_at: new Date().toISOString(), auto: true };
 const upToDate = { ...idle, not_ready_reason: 'up_to_date' }; // what the server says when it knows (#5388); `idle` says nothing, and the pane must not claim more than that
 
 (async () => {
@@ -33,7 +33,7 @@ const upToDate = { ...idle, not_ready_reason: 'up_to_date' }; // what the server
         const json = (o, status) => Promise.resolve(new Response(JSON.stringify(o), { status: status || 200, headers: { 'Content-Type': 'application/json' } }));
         window.fetch = (u, o) => {
             const url = String(u), method = (o && o.method) || 'GET';
-            if (url.includes('/api/cloud/status')) return json({ connected: false, hub_relaunch_updates: window.__upd.hub }); // the connector's status: the saved switch is here, not in the update status
+            if (url.includes('/api/cloud/status')) return json({ connected: false, hub_relaunch_updates: window.__upd.hub, hub_relaunch_available: true }); // the connector's status: the saved switch is here, not in the update status
             if (url.includes('/api/cloud/hub-relaunch')) { window.__upd.calls.push({ method, url: '/hub-relaunch', body: o && o.body ? JSON.parse(o.body) : null }); return json({ ok: true }); }
             if (url.includes('/api/system/update')) {
                 const u2 = window.__upd; u2.calls.push({ method, url: url.replace(/^.*\\/api\\/system\\/update/, '') || '/status', body: o && o.body ? JSON.parse(o.body) : null });

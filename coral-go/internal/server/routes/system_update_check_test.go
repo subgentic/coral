@@ -27,29 +27,60 @@ func (e *relaunchEnv) setAuto(body string, hdr map[string]string) (int, map[stri
 	return e.do(e.h.SetAuto, "PUT", "/api/system/update/settings", body, hdr)
 }
 
-func TestTheCheckRoutesAre404WhileTheFeatureIsOffAndTheJobDoesNothing(t *testing.T) {
+// #7343: this computer's own check, automatic switch and background job are on in every build; the Hub's relaunch feature being off changes none of them.
+func TestTheLocalCheckRoutesAndTheJobAreOnWhileTheHubFeatureIsOff(t *testing.T) {
 	e := newRelaunchEnv(t)
 	e.on = false
-	code, _ := e.checkNow(nil)
-	assert.Equal(t, 404, code)
+	e.h.SetSetting = func(context.Context, string, string) error { return nil }
+	code, out := e.checkNow(nil)
+	assert.Equal(t, 202, code, "%v", out)
+	require.Eventually(t, func() bool { return e.up.checkCount() == 1 }, 5*time.Second, 5*time.Millisecond)
+	code, out = e.checkNow(hubHdr(ownerA))
+	assert.Equal(t, 403, code, "through Coral Hub it is refused, as with the feature on: %v", out)
 	code, _ = e.setAuto(`{"auto": false}`, map[string]string{"Content-Type": "application/json"})
-	assert.Equal(t, 404, code)
+	assert.Equal(t, 200, code)
+	e.h.Updater = nil
+	code, _ = e.checkNow(nil)
+	assert.Equal(t, 404, code, "no updater: no routes")
+	e.h.Updater = e.up
+	e.up.mu.Lock()
+	e.up.checks = 0
+	e.up.mu.Unlock()
 
 	ran := make(chan struct{})
 	e.h.checkTimes = checkTimes{after: func(time.Duration) <-chan time.Time { close(ran); return nil }}
 	done := make(chan struct{})
-	go func() { e.h.RunBackgroundChecks(t.Context()); close(done) }()
+	ctx, stop := context.WithCancel(t.Context())
+	defer stop()
+	go func() { e.h.RunBackgroundChecks(ctx); close(done) }()
+	select {
+	case <-ran:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the job did not schedule a check while the Hub's feature is off")
+	}
+	stop()
 	select {
 	case <-done:
 	case <-time.After(5 * time.Second):
-		t.Fatal("the job waits while the feature is off")
+		t.Fatal("the job did not end with its context")
+	}
+
+	// no updater: nothing runs
+	e.h.Updater = nil
+	ranNone := make(chan struct{})
+	e.h.checkTimes = checkTimes{after: func(time.Duration) <-chan time.Time { close(ranNone); return nil }}
+	finished := make(chan struct{})
+	go func() { e.h.RunBackgroundChecks(t.Context()); close(finished) }()
+	select {
+	case <-finished:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the job waits without an updater")
 	}
 	select {
-	case <-ran:
-		t.Fatal("the job scheduled a check while the feature is off")
+	case <-ranNone:
+		t.Fatal("the job scheduled a check without an updater")
 	default:
 	}
-	assert.Zero(t, e.up.checkCount())
 }
 
 func TestCheckNowIsLocalOnlyAndStartsOneCheck(t *testing.T) {

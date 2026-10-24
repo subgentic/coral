@@ -95,7 +95,7 @@ func (h *UpdateRelaunchHandler) localOnly(w http.ResponseWriter, r *http.Request
 
 // CheckNow: POST /api/system/update/check. Starts one check in the background (202), at most one at a time and one a minute.
 func (h *UpdateRelaunchHandler) CheckNow(w http.ResponseWriter, r *http.Request) {
-	if !h.on() {
+	if !h.localOn() {
 		errNotFound(w, "not found")
 		return
 	}
@@ -148,7 +148,7 @@ func (h *UpdateRelaunchHandler) CheckNow(w http.ResponseWriter, r *http.Request)
 
 // SetAuto: PUT /api/system/update/settings {"auto": bool}: whether Coral checks for updates (and keeps one staged) by itself. The one object, one field, at most 1 KB.
 func (h *UpdateRelaunchHandler) SetAuto(w http.ResponseWriter, r *http.Request) {
-	if !h.on() {
+	if !h.localOn() {
 		errNotFound(w, "not found")
 		return
 	}
@@ -180,10 +180,10 @@ func (h *UpdateRelaunchHandler) SetAuto(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusOK, map[string]any{"auto": *body.Auto})
 }
 
-// RunBackgroundChecks is the job: it returns at once while the feature is off (nothing runs), else waits for ctx and checks on the schedule, only when the owner has not turned automatic
+// RunBackgroundChecks is the job: it returns at once without an updater (nothing runs), else waits for ctx and checks on the schedule, only when the owner has not turned automatic
 // checks off, the updater is on and this install is one it updates. A failure doubles the wait (up to a day); a check that is already running (a person's) is not doubled.
-func (h *UpdateRelaunchHandler) RunBackgroundChecks(ctx context.Context) {
-	if !h.on() {
+func (h *UpdateRelaunchHandler) RunBackgroundChecks(ctx context.Context) { // on in every build with an updater (#7343, the Operator's decision for the auto-updater): the Hub's feature is not needed
+	if !h.localOn() {
 		return
 	}
 	t := h.checkTimes.get()

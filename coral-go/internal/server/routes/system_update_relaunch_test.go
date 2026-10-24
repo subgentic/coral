@@ -172,6 +172,29 @@ func TestRelaunchRoutesAre404WhileTheFlagIsOff(t *testing.T) {
 	e.h.Updater = nil
 	c, _ = e.status(hubHdr(ownerA))
 	assert.Equal(t, 404, c, "no updater: no routes")
+	c, _ = e.status(nil)
+	assert.Equal(t, 404, c, "no updater: not even this computer's own status")
+}
+
+// #7343: with the Hub's feature off (every shipping build) this computer's own dashboard still gets the update status, and is told the Hub's relaunch is not available; a request
+// through Coral Hub gets nothing (404), as before.
+func TestTheLocalStatusIsOnWhileTheHubFeatureIsOff(t *testing.T) {
+	e := newRelaunchEnv(t)
+	e.on = false
+	c, st := e.status(nil)
+	require.Equal(t, 200, c)
+	assert.Equal(t, true, st["enabled"])
+	assert.Equal(t, false, st["relaunch_available"], "the page hides what the Hub could do")
+	assert.Equal(t, "1.4.131", st["staged"].(map[string]any)["version"])
+	c, _ = e.status(hubHdr(ownerA))
+	assert.Equal(t, 404, c, "the Hub is told nothing")
+	c, _ = e.post(`{"ack":"x"}`, hubHdr(ownerA))
+	assert.Equal(t, 404, c, "the Hub's relaunch is off")
+
+	e.on = true
+	c, st = e.status(nil)
+	require.Equal(t, 200, c)
+	assert.Equal(t, true, st["relaunch_available"])
 }
 
 func TestRelaunchHappyPathAndStatusShape(t *testing.T) {

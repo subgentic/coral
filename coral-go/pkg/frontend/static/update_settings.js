@@ -172,7 +172,7 @@ export async function showUpdatesPane() {
     const reason = unmanaged ? (s.installKind === 'homebrew' ? 'Homebrew manages updates.' : 'This install cannot update itself.') : '';
     if (serverHas.autoPref) grid.append(row('settings-update-auto', 'Check for updates automatically', unmanaged ? reason : `Downloads in the background and checks the release is genuine. ${windowsInstall(s) ? 'Windows asks for your permission, and you choose when to install it.' : 'The update installs when you relaunch Coral, never while you work.'} Only the latest releases of Coral\'s own GitHub repository are used.`, unmanaged ? false : s.auto !== false, unmanaged));
     // The Coral Hub relaunch switch lives in Settings > Network and Hub (with the rest of what the hub may do here); this pane only says where it is
-    if (hubOn !== null && !unmanaged) {
+    if (hubOn !== null && !unmanaged && s.hubRelaunch) { // Coral Hub's relaunch exists in this build (#7343)
         const r = mk('div', 'settings-row'); const dt = mk('dt', null, 'Relaunch from Coral Hub'); const dd = mk('dd');
         // On Windows Coral Hub cannot install at all (the install asks the person here): the sentence says so and there is no switch to change (#7338)
         dd.append(mk('span', 'toggle-desc', `${windowsInstall(s) ? HUB_RELAUNCH_WINDOWS : hubOn ? HUB_RELAUNCH_ON : HUB_RELAUNCH_OFF} `));

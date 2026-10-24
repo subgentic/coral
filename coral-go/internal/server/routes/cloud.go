@@ -288,6 +288,8 @@ type cloudStatus struct {
 	HubRelaunchUpdates bool `json:"hub_relaunch_updates"`
 	// HubRelaunchNeedsHere: on Windows an update installs only when a person at this computer approves it, so the switch above cannot let Coral Hub install; the page says so (#7338).
 	HubRelaunchNeedsHere bool `json:"hub_relaunch_needs_here,omitempty"`
+	// HubRelaunchAvailable: Coral Hub's relaunch exists in this build (updateRelaunchFeature, false in every shipping build). While it is false the switch above does nothing, and the page draws neither the switch nor its sentence (#7343).
+	HubRelaunchAvailable bool `json:"hub_relaunch_available"`
 	// HubCrossTeamSettings is the local lock "Let Coral Hub change cross-team settings" (#5572); on, the Coral Hub owner may turn a team's cross-team messaging and file sharing on or off.
 	HubCrossTeamSettings bool `json:"hub_cross_team_settings"`
 	// AllowHubAutoAcceptChanged is who last changed the auto-accept switch and when ({by: "hub"|"local", user, at}), shown beside it in Settings > Network and Hub (#5840); absent until it was changed.
@@ -328,7 +330,7 @@ func (h *CloudHandler) status() cloudStatus {
 			boot = json.RawMessage(v)
 		}
 	}
-	out := cloudStatus{Status: st, AllowHubAutoAccept: allow, MaxModeSaved: modeSaved, RedactTokens: redact, HubRelaunchUpdates: relaunch, HubRelaunchNeedsHere: relaunchNeedsLocalApproval, HubCrossTeamSettings: crossTeam, AllowHubAutoAcceptChanged: changed, Bootstrap: boot, OfferAtLaunch: h.OfferAtLaunch}
+	out := cloudStatus{Status: st, AllowHubAutoAccept: allow, MaxModeSaved: modeSaved, RedactTokens: redact, HubRelaunchUpdates: relaunch, HubRelaunchNeedsHere: relaunchNeedsLocalApproval, HubRelaunchAvailable: updateRelaunchFeature, HubCrossTeamSettings: crossTeam, AllowHubAutoAcceptChanged: changed, Bootstrap: boot, OfferAtLaunch: h.OfferAtLaunch}
 	if missing, known := h.ownerLabelState(context.Background()); known && missing {
 		out.OwnerLabelMissing = true
 	}
