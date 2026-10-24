@@ -231,6 +231,10 @@ func (o *IdentityObserver) Middleware(next http.Handler) http.Handler {
 				o.refuse(w, http.StatusRequestEntityTooLarge, "body_too_large", "This board request's body is over the limit")
 				return
 			}
+			if errors.Is(err, errBoardBodyUnreadable) {
+				o.refuse(w, http.StatusBadRequest, "body_unreadable", "the request body could not be read")
+				return
+			}
 			if err != nil {
 				// The board's subscribers couldn't be read, so a name the request claims can't be
 				// told apart from one another session holds: refused, not let through (#3512).
@@ -254,6 +258,10 @@ func (o *IdentityObserver) Middleware(next http.Handler) http.Handler {
 			isBoard := strings.HasPrefix(r.URL.Path, "/api/board/")
 			if isBoard {
 				given, readErr = attributionClaims(r)
+				if errors.Is(readErr, errBoardBodyUnreadable) {
+					o.refuse(w, http.StatusBadRequest, "body_unreadable", "the request body could not be read")
+					return
+				}
 			}
 			next.ServeHTTP(w, r)
 			if isBoard {

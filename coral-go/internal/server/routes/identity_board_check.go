@@ -143,9 +143,15 @@ func boardClaims(r *http.Request) (map[string][]string, error) {
 			return nil, errBoardBodyTooLarge
 		}
 		r.Body.Close()
+		if err != nil {
+			// A body that could not be read to its end (a stream cut short, #7187): what was read is handed on with the error after it, so whatever reads next sees the cut, never a clean EOF, and the
+			// request is refused here (the observer answers 400).
+			r.Body = io.NopCloser(io.MultiReader(bytes.NewReader(raw), &errBody{err: err}))
+			return nil, errBoardBodyUnreadable
+		}
 		r.Body = io.NopCloser(bytes.NewReader(raw))
 		var body map[string]json.RawMessage
-		if err == nil && json.Unmarshal(raw, &body) == nil {
+		if json.Unmarshal(raw, &body) == nil {
 			// Every spelling of a claim field counts, as encoding/json would match it (#4233): the
 			// canonicalising middleware has already put them in one spelling, and this holds
 			// when a request reaches here by another path.
@@ -178,3 +184,11 @@ const maxBoardBody = 4 << 20
 
 // errBoardBodyTooLarge is a board request whose body is over maxBoardBody: 413.
 var errBoardBodyTooLarge = errors.New("board request body too large")
+
+// errBoardBodyUnreadable is a board request whose body could not be read to its end (not for size): 400, never handed on as if it were whole (#7187).
+var errBoardBodyUnreadable = errors.New("board request body could not be read")
+
+// errBody is a reader that fails with err on every read: what a handler sees after the part of a cut body that did arrive.
+type errBody struct{ err error }
+
+func (e *errBody) Read([]byte) (int, error) { return 0, e.err }

@@ -2,6 +2,7 @@ package routes
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -230,6 +231,10 @@ func (o *IdentityObserver) serveAs(w http.ResponseWriter, r *http.Request, next 
 	var readErr error
 	if isBoard {
 		given, readErr = attributionClaims(r)
+		if errors.Is(readErr, errBoardBodyUnreadable) { // a body cut short is never handed to a handler (#7187)
+			o.refuse(w, http.StatusBadRequest, "body_unreadable", "the request body could not be read")
+			return
+		}
 	}
 	next.ServeHTTP(w, r)
 	if isBoard {
