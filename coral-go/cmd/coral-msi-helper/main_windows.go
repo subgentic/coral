@@ -3,7 +3,7 @@
 // coral-msi-helper is the MSI's custom-action program (#335). It is carried in the MSI's Binary table and run by Windows Installer from a temporary
 // copy, as the person installing (immediate actions: impersonated, never SYSTEM); it is never installed. Its argv is fixed by tools/coral.wxs.
 //
-//	coral-msi-helper stop  --folder DIR [--folder DIR] [--wait SECONDS]
+//	coral-msi-helper stop  --folder DIR [--folder DIR] [--wait SECONDS] [--uninstall]
 //	coral-msi-helper start
 //	coral-msi-helper eula
 //
@@ -15,6 +15,7 @@
 // server child stops the normal way, its standard input closed. A Coral window (coral-app) still open then gets WM_CLOSE. Then it waits for
 // every such process to end. It never ends a server child, an agent, or another account's or session's process. When it found a tray it
 // marks Coral to be started again (internal/installrestart). It never removes a mark: a second stop in the same install finds nothing.
+// With --uninstall (the uninstall's close) it never marks, and removes any mark: nothing is started after an uninstall.
 //
 // start, after InstallFinalize: when stop marked Coral, and this user's shell is running in this session, it starts coral-tray.exe from the
 // folder of the product Windows Installer registered per machine (never a folder from its command line or a property)
@@ -69,8 +70,9 @@ func main() {
 	var folders multiFlag
 	fs.Var(&folders, "folder", "a Coral install folder")
 	wait := fs.Int("wait", 60, "seconds to wait for Coral to end")
+	uninstall := fs.Bool("uninstall", false, "stop: Coral is being uninstalled, so it is not started again")
 	// stop takes the folders to look in; start takes none: it starts Coral from the registered product, never from a folder on its command line.
-	if err := fs.Parse(os.Args[2:]); err != nil || (len(folders) == 0) != (os.Args[1] == "start") || fs.NArg() != 0 {
+	if err := fs.Parse(os.Args[2:]); err != nil || (len(folders) == 0) != (os.Args[1] == "start") || (*uninstall && os.Args[1] != "stop") || fs.NArg() != 0 {
 		log.Printf("%s: bad arguments", os.Args[1])
 		return
 	}
@@ -81,7 +83,7 @@ func main() {
 	}
 	switch os.Args[1] {
 	case "stop":
-		stop(me, folders, time.Duration(*wait)*time.Second)
+		stop(me, folders, time.Duration(*wait)*time.Second, *uninstall)
 	case "start":
 		start(me)
 	default:
@@ -285,7 +287,17 @@ func coralOf(me identity, folders []string) func(proc) bool {
 	return func(p proc) bool { return p.who.is(me) && under(p.image, folders) }
 }
 
-func stop(me identity, folders []string, wait time.Duration) {
+func stop(me identity, folders []string, wait time.Duration, uninstall bool) {
+	if uninstall {
+		// Nothing is started after an uninstall: a mark is never added, and one already there is removed. Restart Manager may have closed the
+		// tray before this ran (an uninstall's close comes after its files-in-use check), and the tray marks when Restart Manager closes it
+		// (#345, step b). This runs only after consent, so a declined uninstall leaves the mark as it was.
+		defer func() {
+			if err := installrestart.Discard(); err != nil {
+				log.Printf("stop: the restart mark: %v", err)
+			}
+		}()
+	}
 	procs, err := list(windows.PROCESS_TERMINATE|windows.SYNCHRONIZE, coralOf(me, folders))
 	if err != nil {
 		log.Printf("stop: the processes: %v", err)
@@ -298,13 +310,15 @@ func stop(me identity, folders []string, wait time.Duration) {
 			trays = append(trays, p)
 		}
 	}
-	// A mark is only ever added here, never removed: a run that finds no tray may be a second one inside the same install, after the first
+	// For an install a mark is only ever added here, never removed: a run that finds no tray may be a second one inside the same install, after the first
 	// closed Coral (the old package's uninstall in an upgrade, #335 rehearsal step c). start takes the mark, and an old one starts nothing.
 	if len(trays) == 0 {
 		if len(procs) == 0 {
 			log.Printf("stop: no Coral of this user is running")
 			return
 		}
+	} else if uninstall {
+		log.Printf("stop: Coral is being uninstalled: it won't be started again")
 	} else if err := installrestart.Mark(time.Now()); err != nil {
 		log.Printf("stop: Coral won't be started again after the install: %v", err)
 	}

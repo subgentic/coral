@@ -182,7 +182,8 @@
              shows it Restart Manager's "close these applications" box can come first, and Coral closes there only if the person chooses to.
          CORALCLOSED (Secure) skips the helper, to rehearse Restart Manager alone. Neither runs in the old package's uninstall inside an
          upgrade (UPGRADINGPRODUCTCODE): that one comes after the new package closed Coral and finds nothing running (#335 rehearsal, step c);
-         the helper never removes the mark that starts Coral again.
+         the helper never removes the mark that starts Coral again. A plain uninstall's close (the helper's uninstall flag) never marks, and removes
+         a mark the tray wrote when Restart Manager closed it for that uninstall (#345): nothing is started after an uninstall.
          After the install, when the helper closed a running Coral, it starts Coral again through explorer.exe, which hands it to Windows'
          unelevated Explorer factory: Coral then runs as the signed-in person with their own environment, not the installer's (#336). With the
          full UI the Finish page's "Launch Coral" does it instead (UILevel 5), so it is never started twice; never after an uninstall. It
@@ -193,7 +194,7 @@
       ExeCommand="stop --folder &quot;[ProgramFiles64Folder]$(var.InstallFolderName)&quot; --folder &quot;[ProgramFilesFolder]$(var.InstallFolderName)&quot; --wait 60"
       Execute="immediate" Return="ignore" />
     <CustomAction Id="CloseCoralForUninstall" BinaryRef="CoralMsiHelper"
-      ExeCommand="stop --folder &quot;[ProgramFiles64Folder]$(var.InstallFolderName)&quot; --folder &quot;[ProgramFilesFolder]$(var.InstallFolderName)&quot; --wait 60"
+      ExeCommand="stop --uninstall --folder &quot;[ProgramFiles64Folder]$(var.InstallFolderName)&quot; --folder &quot;[ProgramFilesFolder]$(var.InstallFolderName)&quot; --wait 60"
       Execute="deferred" Impersonate="yes" Return="ignore" />
     <CustomAction Id="StartCoralAfterInstall" BinaryRef="CoralMsiHelper"
       ExeCommand="start"

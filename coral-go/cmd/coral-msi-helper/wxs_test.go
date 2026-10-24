@@ -73,3 +73,16 @@ func TestNoCustomActionRunsAConsoleProgram(t *testing.T) {
 		assert.NotRegexp(t, `(?i)ExeCommand="[^"]*\b(cmd|powershell|pwsh|conhost)(\.exe)?\b`, a)
 	}
 }
+
+// Only the uninstall's close says --uninstall (it never marks, and removes the mark the tray wrote when Restart Manager closed it for the
+// uninstall, #345): the install's close marks Coral to be started again.
+func TestOnlyTheUninstallsCloseForgetsTheRestart(t *testing.T) {
+	wxs := readWxs(t)
+	exe := func(id string) string {
+		m := regexp.MustCompile(`<CustomAction Id="` + id + `"[^>]*ExeCommand="([^"]*)"`).FindStringSubmatch(wxs)
+		require.NotNil(t, m, id)
+		return m[1]
+	}
+	assert.Regexp(t, `^stop --uninstall `, exe("CloseCoralForUninstall"))
+	assert.NotContains(t, exe("CloseCoralForInstall"), "--uninstall")
+}

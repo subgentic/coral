@@ -44,6 +44,18 @@ func TestARecentMarkStartsCoralOnceAndNothingElseDoes(t *testing.T) {
 	assert.False(t, Take(now), "a mark that is not a time")
 }
 
+// An uninstall discards the mark (#345: Restart Manager closed the tray for an uninstall, and the tray marked): nothing is started after
+// it, and with no mark Discard is no error.
+func TestAnUninstallDiscardsTheMark(t *testing.T) {
+	inTemp(t)
+	now := time.Date(2026, 10, 24, 20, 16, 29, 0, time.UTC)
+	require.NoError(t, Discard(), "no mark, no folder")
+	require.NoError(t, Mark(now))
+	require.NoError(t, Discard())
+	assert.False(t, Take(now), "discarded")
+	require.NoError(t, Discard(), "twice")
+}
+
 // The real folder is this user's Local AppData known folder, then Coral (a scratch USERPROFILE moves the known folder with it, QA on #335).
 func TestTheMarkLivesInThisUsersLocalAppData(t *testing.T) {
 	dir, err := folder()

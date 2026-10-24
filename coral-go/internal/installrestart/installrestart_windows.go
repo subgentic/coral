@@ -61,6 +61,19 @@ func Mark(now time.Time) error {
 	return err
 }
 
+// Discard removes the mark, if there is one, without reading it: Coral is being uninstalled, so there is nothing to start again (#345: Restart
+// Manager closing the tray for an uninstall made it mark). A link that has the mark's name is removed as itself.
+func Discard() error {
+	dir, err := folder()
+	if err != nil {
+		return err
+	}
+	if err := os.Remove(filepath.Join(dir, fileName)); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	return nil
+}
+
 // Take removes the mark and reports whether it was there and recent (written within MaxAge before now, never after it). A missing,
 // unreadable or stale mark is false; the file goes in every case, so it starts Coral once at most.
 func Take(now time.Time) bool {
