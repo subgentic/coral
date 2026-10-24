@@ -11,18 +11,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// #5879, #7325: the apply is switched per platform. macOS and Windows are on, after their live installs passed (an isolated 1.4.161 updated to the promoted 1.4.162 by the product's own apply; #7320's Windows run); Linux is off
-// until its rehearsal is green again (#7327).
-func TestOnlyMacAndWindowsApplyAreOn(t *testing.T) {
+// #5879, #7325: the apply is switched per platform. macOS, Windows and Linux are on, after their proofs passed (an isolated 1.4.161 updated to the promoted 1.4.162 by the product's own apply; #7320's Windows run; #7327's Linux rehearsal).
+func TestEveryPlatformWithAnApplyHasItOn(t *testing.T) {
 	assert.True(t, applyEnabledDarwin, "macOS: its live install passed (#7325)")
-	assert.False(t, applyEnabledLinux, "Linux stays off until the rehearsal is green again (#7327)")
+	assert.True(t, applyEnabledLinux, "Linux: its rehearsal is green (#7327)")
 	assert.True(t, applyEnabledWindows, "Windows: its live install passed (#7320)")
 	assert.True(t, windowsApplyBuilt, "the Windows apply exists (#162), and is on by applyEnabledWindows")
-	want := map[string]bool{"darwin": true, "linux": false, "windows": true, "freebsd": false}
+	want := map[string]bool{"darwin": true, "linux": true, "windows": true, "freebsd": false}
 	for goos, on := range want {
 		assert.Equal(t, on, applyOn(goos, applyEnabledDarwin, applyEnabledLinux, applyEnabledWindows, windowsApplyBuilt), goos)
 	}
-	assert.Equal(t, runtime.GOOS == "darwin" || runtime.GOOS == "windows", applyEnabled, "the switch this build reads is the one of the platform it runs on")
+	assert.Equal(t, runtime.GOOS == "darwin" || runtime.GOOS == "windows" || runtime.GOOS == "linux", applyEnabled, "the switch this build reads is the one of the platform it runs on")
 }
 
 func TestEachPlatformReadsItsOwnSwitch(t *testing.T) {

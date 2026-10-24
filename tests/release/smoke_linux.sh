@@ -92,10 +92,10 @@ hh="$work/h"; dd="$work/d"; mkdir -p "$hh/.coral" "$dd" "$hh/.claude/projects" "
 # an array, not a function: a backgrounded function is a subshell, and $! would be the subshell, not coral (a SIGTERM to it left the server running)
 CENV=(env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin HOME="$hh" CORAL_DATA_DIR="$dd" CORAL_CLOUD_URL=off CORAL_TELEMETRY_DISABLED=1 CORAL_NO_DEMO_SEED=1)
 
-# ---- 7 updater: coral-update ships in the package and is inert: its status says the apply is off (applyEnabled is a compile-time false until a platform passes its upgrade tests) ----
+# ---- 7 updater: coral-update ships in the package and its status says the apply is on (applyEnabledLinux is true since #7325) ----
 if [ "$run_ok" = 1 ]; then
   st=$("${CENV[@]}" "$pkg/coral-update" status --json 2>&1)
-  if grep -Eq '"apply_enabled": *false' <<<"$st"; then result "7 updater" PASS "coral-update ships, status says apply_enabled false"
+  if grep -Eq '"apply_enabled": *true' <<<"$st"; then result "7 updater" PASS "coral-update ships, status says apply_enabled true"
   else result "7 updater" FAIL "coral-update status: $(head -c 200 <<<"$st" | tr '\n' ' ')"; fi
 fi
 
