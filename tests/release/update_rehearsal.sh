@@ -104,17 +104,13 @@ setup() { # NAME
   KEY=$(tr -d '[:space:]' < "$dd/api_key" 2>/dev/null)
   "${CENV[@]}" "$inst/coral-board" join rhsproj --as Tester > "$s/board.out" 2>&1
   "${CENV[@]}" "$inst/coral-board" post "a message before the update" >> "$s/board.out" 2>&1
-  # The run record: how the server was started, which Linux apply reads to start Coral again after the swap. The server is documented to write it at
-  # startup (internal/updater/runrecord) and NOTHING does yet (#5401 finding), so this script writes it, in the documented form: argv, cwd, 0600 in a 0700 folder.
-  # RHS_NO_RUN_RECORD=1 leaves it out: the diagnostic that shows what an apply does today without it (it rolls back)
-  [ -n "${RHS_NO_RUN_RECORD:-}" ] && return 0
-  mkdir -p "$dd/updates" && chmod 700 "$dd/updates" &&
-  ( umask 077; python3 - "$inst" "$dd" "$PORT" "$s" > "$dd/updates/run.json" <<'PY'
-import json, sys
-inst, dd, port, cwd = sys.argv[1:5]
-print(json.dumps({"argv": [inst + "/coral", "--home", dd, "--host", "127.0.0.1", "--port", port, "--backend", "pty", "--no-browser", "--cloud-url", "off"], "cwd": cwd}))
-PY
-  ) && chmod 600 "$dd/updates/run.json"
+  # The run record: how the server was started, which Linux apply reads to start Coral again after the swap. The server writes it itself at startup
+  # (cmd/coral/run_record.go: argv, cwd and the allowlisted environment, 0600 in a 0700 folder), so this script no longer writes a stand-in: the old stand-in had no
+  # environment, which runrecord.Validate now refuses ("no_run_record", every apply refused as unsupported_install). It waits for the server's own record.
+  # RHS_NO_RUN_RECORD=1 removes it: the diagnostic that shows what an apply does without it (it is refused).
+  for _ in $(seq 1 50); do [ -s "$dd/updates/run.json" ] && break; sleep 0.1; done
+  if [ -n "${RHS_NO_RUN_RECORD:-}" ]; then rm -f "$dd/updates/run.json"; return 0; fi
+  [ -s "$dd/updates/run.json" ] || { echo "update_rehearsal: the server wrote no run record at $dd/updates/run.json" >&2; return 1; }
 }
 health_version() { curl -s -m 3 "http://127.0.0.1:$PORT/api/health" | jget version; }
 waitfor_health() { for _ in $(seq 1 150); do [ -n "$(health_version)" ] && return 0; sleep 0.2; done; return 1; }
