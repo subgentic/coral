@@ -60,7 +60,16 @@ type wsTick struct {
 	goalsJSON string
 	goalsOpen int
 	goalsSeq  int64
+	// The newest goalEventsWindow goal events of each board that has goals (#7355): ids, a kind and the counter value, no text. Each connection takes the ones above the counter it last saw.
+	goalEvents map[string][]board.GoalEvent
 }
+
+// goalEventsWindow is how many goal events of a board a tick carries: one more than a frame may send (goalEventsPerFrame), so a window that is full says there were more than a frame can hold.
+// goalEventsPerFrame is the most goal events one frame carries; past that, or when events are missing, the frame says goal_events_gap and the page refetches.
+const (
+	goalEventsWindow   = 51
+	goalEventsPerFrame = 50
+)
 
 // wsLocalPart is this server's sessions and job runs, serialized.
 type wsLocalPart struct {
@@ -75,7 +84,8 @@ type wsLocalPart struct {
 	runsJSON   string
 	goals      map[string]board.GoalsBrief
 	goalsJSON  string
-	reused     int // rows whose serialized form came from the previous tick (#4308)
+	goalEvents map[string][]board.GoalEvent // the window of the boards with goals (#7355)
+	reused     int                          // rows whose serialized form came from the previous tick (#4308)
 }
 
 // wsRemotePart is the hub's remote view, serialized.
@@ -243,10 +253,37 @@ func (h *SessionsHandler) buildWSLocalPart(r *http.Request, hasRemotes bool, pre
 			p.goals = briefs
 			b, _ := json.Marshal(briefs)
 			p.goalsJSON = string(b)
+			p.goalEvents = h.goalEventsFor(ctx, briefs, prev)
 		}
 	}
 	p.builtAt = time.Now()
 	return p
+}
+
+// goalEventsFor is the window of goal events of the boards in briefs (#7355): a board whose counter is the one the previous build saw keeps that build's window (no read), the others are read in one query.
+// A read that fails leaves the window empty: the frame then says goal_events_gap, never a wrong event.
+func (h *SessionsHandler) goalEventsFor(ctx context.Context, briefs map[string]board.GoalsBrief, prev *wsLocalPart) map[string][]board.GoalEvent {
+	out := make(map[string][]board.GoalEvent, len(briefs))
+	var stale []string
+	for id, b := range briefs {
+		if prev != nil && prev.goals != nil {
+			if was, ok := prev.goals[id]; ok && was.Seq == b.Seq {
+				if ev, kept := prev.goalEvents[id]; kept {
+					out[id] = ev
+				}
+				continue
+			}
+		}
+		stale = append(stale, id)
+	}
+	if len(stale) > 0 {
+		if win, err := h.bs.GoalEventsWindow(ctx, stale, goalEventsWindow); err == nil {
+			for id, ev := range win {
+				out[id] = ev
+			}
+		}
+	}
+	return out
 }
 
 func (h *SessionsHandler) buildWSRemotePart(gen uint64, genOK bool) *wsRemotePart {
@@ -283,6 +320,7 @@ func assembleWSTick(local *wsLocalPart, remote *wsRemotePart) *wsTick {
 		serversJSON: remote.serversJSON,
 		goals:       local.goals,
 		goalsJSON:   local.goalsJSON,
+		goalEvents:  local.goalEvents,
 	}
 	for _, g := range local.goals {
 		t.goalsOpen += g.Open

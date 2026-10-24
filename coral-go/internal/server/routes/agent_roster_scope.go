@@ -91,7 +91,8 @@ func scopeTickForAgent(tick *wsTick, ownerSessionID string) *wsTick {
 		copies[reflect.ValueOf(row).Pointer()] = cp
 		t.sessions = append(t.sessions, cp)
 	}
-	t.servers, t.hasRemotes, t.serversJSON = nil, false, "" // nor the list of the remote servers
+	t.servers, t.hasRemotes, t.serversJSON = nil, false, ""   // nor the list of the remote servers
+	t.goalEvents = ownBoardGoalEvents(tick.goalEvents, board) // the goal events of its own board only (#7355); the brief it gets is the ids-and-counts one every connection has
 	t.current = make(map[string]string, len(tick.current))
 	t.byKey = make(map[string]map[string]any, len(tick.byKey))
 	for key, s := range tick.byKey {
