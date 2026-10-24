@@ -2,7 +2,6 @@ package executil
 
 import (
 	"context"
-	"os/exec"
 	"time"
 )
 
@@ -13,12 +12,12 @@ import (
 func Output(d time.Duration, name string, args ...string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), d)
 	defer cancel()
-	return exec.CommandContext(ctx, name, args...).Output()
+	return Command(ctx, name, args...).Output() // Windows: no console window, and the whole tree ends at the deadline (#349)
 }
 
 // Run runs name with args and waits for it, killing it after d.
 func Run(d time.Duration, name string, args ...string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), d)
 	defer cancel()
-	return exec.CommandContext(ctx, name, args...).Run()
+	return Command(ctx, name, args...).Run()
 }
