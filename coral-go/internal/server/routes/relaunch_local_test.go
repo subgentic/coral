@@ -124,6 +124,11 @@ func TestTheLocalRelaunchIsLocalOnlyAndNotTiedToTheHubFeature(t *testing.T) {
 	code, _ = e.postLocal(ack(tok), nil)
 	assert.Less(t, code, 300, "the local relaunch does not follow the Hub's feature")
 	assert.Len(t, e.up.applies, 1)
+
+	// but it needs an updater: none, no route (Security's LOW on #7343)
+	e.h.Updater = nil
+	code, _ = e.postLocal(ack(tok), nil)
+	assert.Equal(t, 404, code, "no updater: no local relaunch")
 }
 
 func TestTheLocalRelaunchKeepsEveryRuleOfTheRelaunchThatIsNotAboutTheHub(t *testing.T) {
