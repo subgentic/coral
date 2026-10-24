@@ -1,5 +1,30 @@
 # Release Notes
 
+## v1.4.167-rc1 — Goals on a board, and computers that belong to a team
+
+### Changes
+
+- **Goals on a board** (#7087, #7116, #7113, #7135, #7142, #7184, #7223, #7239, #7217): a goal says what the team is working toward and when it is done; the board's tasks serve it. Open a board and press **Goals** next to Messages, then **New goal**: a title, an optional "Done when" (a check a person can make) and an optional driver (the agent who looks after it). Each goal shows a progress bar and a sentence such as "4 tasks: 2 done, 2 queued", and opening one lists its tasks, each with Open task, a page at a time. The page keeps itself current when tasks move, and again when you come back to the window. Goals belong to one board on this computer; the Goals view is not shown when you open the board through Coral Hub.
+- **Waiting on you:** a goal an agent has blocked on a decision shows a card at the top of the list: the question, the agent's recommendation and what happens if you say nothing. The card and the goal's chip say who it waits on ("Blocked on Operator"). It shows under All and Blocked.
+- **What agents do with goals:** agents read and keep goals with `coral-board goal add`, `goal list`, `goal show`, `goal update` and `goal close`, and join a task to a goal with `task add --goal` or `task goal`. Only the Operator and a registered Orchestrator write goals; a worker agent cannot change a goal's state. Writing a goal never starts or wakes an agent. A closed goal leaves its open tasks open and counts them: the page says "Closed with 2 tasks still open". An edit that changes nothing does not refresh open pages, goal and task numbers must be plain digits (01 or +1 is refused), and asking for a goal's tasks in full is refused with a 400 that says so.
+- **Require a goal** (#7116) is a board setting, off by default: when on, a task without a goal is refused with a sentence saying how to pick or create one. Only the Operator on this computer turns it on, through `PUT /api/board/<board>/settings` (there is no switch in the page yet).
+- **A computer can belong to a team** (#7061): when a computer is linked to a Coral Hub organisation, the organisation's owners and admins are its owner (each known by a stable Hub id), instead of one person's sign-in. A personal computer works exactly as before. The Hub decides: its answer to the link says "team" and names the organisation, and Coral records that with the link. There is no switch in Coral's settings; linking again replaces it, and a link answer Coral cannot read is refused, never treated as personal.
+- **What a person sees on a team's computer:** the computer's status says it is a team's (never the organisation's id); Settings does not show it yet. Signing in with a Hub account on it is refused: Hub account sign-in is for personal computers. "Confirm the owner" says it is a team's computer and adopts nothing. A comment an admin writes through the Hub shows their name to others and "You" to themselves.
+- **What the Hub's owners and admins can do:** on a team's computer they can do the owner-only things the Hub is allowed to (the owner's reads and writes); a member of the organisation cannot. Each action is recorded with the person's Hub id beside their name (delete, auto-accept, the cross-team switches). A request that is not clearly from the recorded organisation is refused.
+
+### Known issues
+
+- **The page cannot close a goal, answer a "Waiting on you" card, or link a task to a goal.** Create a goal in the page; close it with `coral-board goal close`, answer a decision in a board message or the CLI, and link a task with `task goal`. The Create Task dialog has no Goal field yet, and a task's detail does not name its goal (fixed in a later release).
+- **A goal whose tasks are all done stays Active** until it is closed; the page does not yet suggest closing it.
+- **Tasks with no goal are not listed under Goals,** and the page does not yet say how many there are.
+- **No per-board visibility on a team's computer:** everyone the organisation allows sees every board on that computer; there is no way to hide one board from the team yet.
+- **One organisation per computer.** A member of the organisation is refused on the owner-only routes.
+- **An unreadable team record means no one is the owner** until the computer is linked again.
+
+### Internal
+
+- **Tests:** `tests/stress/run_goals.sh` runs a goals integration check against a private server with mock agents, on tmux or PTY, with concurrent field updates, competing closes, paging and wake checks (#7203, #7212); the goals, routes, tunnel and logsafe tests and the telemetry and log-path censuses cover the new code (#7243).
+
 ## v1.4.166 — Runs that end when their agent's turn ends, a never-started run says so, kept worktrees you can list and remove, a Settings page sorted by task, and a safer reading of shell commands in auto-accept
 
 ### Changes
