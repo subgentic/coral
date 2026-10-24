@@ -265,6 +265,11 @@ func cmdTaskAdd(st *boardState, args []string) {
 	json.Unmarshal(data, &task)
 	id := task["id"]
 	fmt.Printf("Created Task #%.0f: %s\n", id, title)
+	if _, linked := task["goal_id"]; !goalGiven && !(linked && task["goal_id"] != nil) {
+		if line := goalHintLine(st.Project, id); line != "" {
+			fmt.Println(line)
+		}
+	}
 }
 
 func cmdTaskList(st *boardState, asJSON bool) { cmdTaskListGoal(st, asJSON, 0) }

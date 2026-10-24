@@ -9,6 +9,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/subgentic/coral/internal/clierr"
 	"github.com/subgentic/coral/internal/clihelp"
@@ -372,4 +373,72 @@ func cmdTaskGoal(st *boardState, args []string) {
 		return
 	}
 	fmt.Printf("Task #%d is now on Goal #%d\n", taskID, target)
+}
+
+// openGoalsOf is the board's open goals (proposed, active, blocked: the goals list's default), at most limit of them, for the lines that tell an agent what the team is working toward. A board that cannot be
+// asked (an older Coral with no goals, a slow answer, a refusal) has none: these lines are a courtesy and never make the command fail.
+func openGoalsOf(project string, limit int) []map[string]any {
+	data, status, err := apiCallRawTimeout("GET", "/"+url.PathEscape(project)+"/goals?limit="+strconv.Itoa(limit), nil, 3*time.Second)
+	if err != nil || status != http.StatusOK {
+		return nil
+	}
+	var page struct {
+		Goals []map[string]any `json:"goals"`
+	}
+	if json.Unmarshal(data, &page) != nil {
+		return nil
+	}
+	return page.Goals
+}
+
+// shortTitle cuts a goal's title for a one-line hint.
+func shortTitle(s string, n int) string {
+	if r := []rune(s); len(r) > n {
+		return string(r[:n]) + "…"
+	}
+	return s
+}
+
+// goalHintLine is the one line task add prints when the new task has no goal and the board has open goals: which goals, and how to link the task. "" when there is nothing to say.
+func goalHintLine(project string, taskID any) string {
+	goals := openGoalsOf(project, 6)
+	if len(goals) == 0 {
+		return ""
+	}
+	var names []string
+	for i, g := range goals {
+		if i == 5 {
+			names = append(names, "and more (coral-board goal list)")
+			break
+		}
+		names = append(names, fmt.Sprintf("#%.0f %q", num(g["id"]), shortTitle(str(g["title"]), 40)))
+	}
+	return fmt.Sprintf("Open goals on this board: %s. To link this task to one: coral-board task goal %.0f <goal>", strings.Join(names, ", "), num(taskID))
+}
+
+// printGoalBriefing is what join adds after "Joined": the board's open goals with what makes each done (or what a blocked one waits on), and how a task joins one.
+func printGoalBriefing(project string) {
+	goals := openGoalsOf(project, 9)
+	if len(goals) == 0 {
+		return
+	}
+	fmt.Println("This board's open goals (what the team is working toward):")
+	for i, g := range goals {
+		if i == 8 {
+			fmt.Println("  ... and more: coral-board goal list")
+			break
+		}
+		line := fmt.Sprintf("  #%.0f %s", num(g["id"]), shortTitle(str(g["title"]), 80))
+		switch {
+		case str(g["state"]) == "blocked" && str(g["blocked_on"]) != "":
+			line += fmt.Sprintf(" (blocked on %s)", shortTitle(str(g["blocked_on"]), 60))
+		case str(g["state"]) != "" && str(g["state"]) != "active":
+			line += " (" + str(g["state"]) + ")"
+		}
+		if d := str(g["done_when"]); d != "" {
+			line += " — done when: " + shortTitle(d, 100)
+		}
+		fmt.Println(line)
+	}
+	fmt.Println("A task that serves one joins it: coral-board task add \"title\" --goal <id> (or coral-board task goal <task> <goal>).")
 }

@@ -59,9 +59,10 @@ func cmdJoin() {
 	saveState(&boardState{Project: boardID, JobTitle: jobTitle, ServerURL: serverURL})
 	if boardID != project {
 		fmt.Printf("Joined '%s' (board %s) as '%s' (subscriber: %s)\n", project, boardID, jobTitle, subscriberID)
-		return
+	} else {
+		fmt.Printf("Joined '%s' as '%s' (subscriber: %s)\n", project, jobTitle, subscriberID)
 	}
-	fmt.Printf("Joined '%s' as '%s' (subscriber: %s)\n", project, jobTitle, subscriberID)
+	printGoalBriefing(boardID)
 }
 
 // joinProblem is what join prints when the server refused it ("" when it didn't): a name

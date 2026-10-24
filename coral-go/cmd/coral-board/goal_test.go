@@ -215,19 +215,29 @@ func TestTaskAddAndListTakeTheGoal(t *testing.T) {
 	gs.reply["POST /api/board/team/tasks"] = `{"id":21}`
 	res := goalRun(t, gs, "task", "add", "Do it", "--goal", "3")
 	require.Equal(t, 0, res.code, res.stderr)
-	b := bodyOf(t, gs.requests()[0])
+	// task add with no goal also reads the board's open goals for its hint (#7296); the requests that matter here are the others
+	requests := func() []string {
+		var out []string
+		for _, r := range gs.requests() {
+			if !strings.HasPrefix(r, "GET /api/board/team/goals") {
+				out = append(out, r)
+			}
+		}
+		return out
+	}
+	b := bodyOf(t, requests()[0])
 	assert.Equal(t, float64(3), b["goal_id"])
 	res = goalRun(t, gs, "task", "add", "No goal")
 	require.Equal(t, 0, res.code, res.stderr)
-	assert.NotContains(t, bodyOf(t, gs.requests()[1]), "goal_id", "no goal given: none sent")
+	assert.NotContains(t, bodyOf(t, requests()[1]), "goal_id", "no goal given: none sent")
 
 	gs.reply["GET /api/board/team/tasks"] = `{"tasks":[{"id":11,"title":"Build it","status":"pending","priority":"high"}],"next_cursor":""}`
 	res = goalRun(t, gs, "task", "list", "--goal", "3")
 	require.Equal(t, 0, res.code, res.stderr)
 	assert.Contains(t, res.stdout, "Build it")
-	assert.Contains(t, gs.requests()[2], "goal=3")
+	assert.Contains(t, requests()[2], "goal=3")
 	res = goalRun(t, gs, "task", "list")
-	assert.NotContains(t, gs.requests()[3], "goal=")
+	assert.NotContains(t, requests()[3], "goal=")
 
 	for _, args := range [][]string{{"task", "list", "--goal", "abc"}, {"task", "list", "--goal", "0"}, {"task", "add", "x", "--goal", "-1"}, {"task", "add", "x", "--goal", "0"}} {
 		res = goalRun(t, gs, args...)

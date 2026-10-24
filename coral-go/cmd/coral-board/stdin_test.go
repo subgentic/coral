@@ -85,6 +85,14 @@ func TestTaskTextFlagsReadStdin(t *testing.T) {
 		srv := newRecordingServer(t)
 		res := runBoardInput(t, srv.URL, subscribedDataDir(t, srv.URL), strings.NewReader("line one\n`two` $(three)\n"), args...)
 		reqs := srv.requests()
+		// task add also asks the board for its open goals, to name them in a hint (#7296): that read is not what this test is about
+		var posted []string
+		for _, r := range reqs {
+			if !strings.HasPrefix(r, "GET /api/board/team/goals") {
+				posted = append(posted, r)
+			}
+		}
+		reqs = posted
 		if len(reqs) != 1 || !strings.Contains(reqs[0], `line one\n`+"`two`"+` $(three)"`) {
 			t.Errorf("%v: exit %d, stderr %q, requests %v; want the stdin text as sent", args, res.code, res.stderr, reqs)
 		}

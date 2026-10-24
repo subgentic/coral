@@ -1,0 +1,60 @@
+package main
+
+import (
+	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// #7296 (UI/UX #7249 finding 6): an agent learns the board's goals without being told. task add with no --goal, on a board with open goals, says so in one line (the goals, and how to link the task);
+// join, the agent's first look at a board, lists the open goals with what makes each done.
+const twoGoals = `{"goals":[{"id":3,"title":"Ship the goals page","state":"active","done_when":"The page is in a release"},{"id":5,"title":"Cut the build time","state":"blocked","blocked_on":"the operator"}],"next_cursor":""}`
+
+func TestTaskAddWithNoGoalNamesTheBoardsOpenGoals(t *testing.T) {
+	gs := newGoalServer(t)
+	gs.reply["POST /api/board/team/tasks"] = `{"id":9,"title":"Fix it"}`
+	gs.reply["GET /api/board/team/goals"] = twoGoals
+	res := goalRun(t, gs, "task", "add", "Fix it")
+	require.Equal(t, 0, res.code, res.stderr)
+	assert.Contains(t, res.stdout, "Created Task #9: Fix it")
+	var hint []string
+	for _, l := range strings.Split(res.stdout, "\n") {
+		if strings.Contains(l, "goal") && !strings.HasPrefix(l, "Created") {
+			hint = append(hint, l)
+		}
+	}
+	require.Len(t, hint, 1, "one line: %q", res.stdout)
+	assert.Contains(t, hint[0], `#3 "Ship the goals page"`)
+	assert.Contains(t, hint[0], `#5 "Cut the build time"`)
+	assert.Contains(t, hint[0], "coral-board task goal 9 <goal>", "and how to link this task")
+
+	// With --goal given there is nothing to say; with no open goal there is nothing to name; a goals read that fails says nothing and does not fail the add.
+	res = goalRun(t, gs, "task", "add", "Fix it", "--goal", "3")
+	assert.NotContains(t, res.stdout, "open goals")
+	gs.reply["GET /api/board/team/goals"] = `{"goals":[],"next_cursor":""}`
+	res = goalRun(t, gs, "task", "add", "Fix it")
+	assert.Equal(t, "Created Task #9: Fix it\n", res.stdout)
+	delete(gs.reply, "GET /api/board/team/goals")
+	res = goalRun(t, gs, "task", "add", "Fix it")
+	assert.Equal(t, 0, res.code)
+}
+
+func TestJoinListsTheOpenGoalsWithWhatMakesThemDone(t *testing.T) {
+	gs := newGoalServer(t)
+	gs.reply["POST /api/board/team/subscribe"] = `{"project":"team","subscriber_id":"Tester"}`
+	gs.reply["GET /api/board/team/goals"] = twoGoals
+	res := goalRun(t, gs, "join", "team", "--as", "Developer")
+	require.Equal(t, 0, res.code, res.stderr)
+	assert.Contains(t, res.stdout, "Joined 'team' as 'Developer'")
+	assert.Contains(t, res.stdout, `#3 Ship the goals page`)
+	assert.Contains(t, res.stdout, "done when: The page is in a release")
+	assert.Contains(t, res.stdout, `#5 Cut the build time`)
+	assert.Contains(t, res.stdout, "blocked", "a blocked goal says so")
+	assert.Contains(t, res.stdout, "--goal <id>", "and how a task joins one")
+
+	gs.reply["GET /api/board/team/goals"] = `{"goals":[],"next_cursor":""}`
+	res = goalRun(t, gs, "join", "team", "--as", "Developer")
+	assert.Equal(t, "Joined 'team' as 'Developer' (subscriber: Tester)\n", res.stdout, "a board with no goals says nothing more")
+}
