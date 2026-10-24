@@ -7,7 +7,7 @@
  *   replyToTask({ project, taskId, content })-> { ok, notified: [names], warnings: [codes] }                                             POST /api/board/{project}/tasks/{id}/reply, {content} only
  *   canReply()                               -> { ok: true } | { ok: false, reason }                                                     (e.g. a Coral Hub viewer at the View tier)
  *   readSavedMessage(item)                   -> { text, partial, reason }   reason: '' | 'gone' | 'not_reachable' | 'too_long'          GET /api/saved/{id}/message
- *   optional: contract (the INBOX_CONTRACT it was written for: a different one is refused), linkPolicy(url), prepareLinks(text) (async: the lookup for that text, returns the linkPolicy to use for it), openTask(task), taskHref(task) (a same-origin path), now()
+ *   optional: contract (the INBOX_CONTRACT it was written for: a different one is refused), linkPolicy(url), prepareLinks(text) (async: the lookup for that text, returns the linkPolicy to use for it), openTask(task), openGoal(task) (the task's goal {id, title} opens: a task row with a goal shows 'Goal: <title>' only where this is given, #7302), taskHref(task) (a same-origin path), now()
  * Rules it keeps (Security's conditions on #5750): nothing here builds HTML from machine text: every title, name, count, error and reason is set with textContent, and the task and message text goes
  * through safe_markdown.js (the shared DOM-built renderer); it imports only same-origin modules and uses no eval or dynamic import; a path an adapter returns is used only if it is a same-origin path;
  * a reply draft is kept in memory only (never localStorage or sessionStorage) and dropped by clearInboxDrafts() (sign-out). inbox_no_html_census.test.js holds the first two to account. */
@@ -167,6 +167,11 @@ export function mountInbox(host, adapter, options) {
             const b = el('button', 'btn btn-small ibx-open', 'Open the task'); b.type = 'button';
             b.addEventListener('click', () => adapter.openTask(task));
             metaRow.append(b);
+        }
+        if (task.goal && task.goal.title && typeof adapter.openGoal === 'function') { // the goal the task serves, a quiet link beside Open the task; nothing without one or where the adapter cannot open a goal (#7302)
+            const g = el('button', 'btn btn-small ibx-open ibx-goal', `Goal: ${task.goal.title}`); g.type = 'button';
+            g.addEventListener('click', () => adapter.openGoal(task));
+            metaRow.append(g);
         }
         if (metaRow.childNodes.length) out.push(metaRow);
         const text = full.body == null ? '' : String(full.body);

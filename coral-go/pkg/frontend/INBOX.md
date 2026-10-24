@@ -43,6 +43,7 @@ A plain object of functions, never evaluated text. `mountInbox` refuses one that
 | `linkPolicy(url)` (optional) | the host's link callback (see below) |
 | `prepareLinks(text)` (optional, async) | the lookup for ONE render of that text: returns the `linkPolicy` to use for it (Coral: `artifactLinkPolicy`, one `GET /api/artifacts/<hex>/meta` per distinct id, at most 20, only a 200 makes a link; 403, 404, any other status and a network error leave text). If it throws, the adapter's `linkPolicy` is used. Additive: `INBOX_CONTRACT` stays 1 |
 | `openTask(task)`, `taskHref(task)` (optional) | "Open the task": a button that calls `openTask`, or a link when `taskHref` returns a same-origin path (`safePath`: "/x", never "//host", a backslash, a blank or a control character; anything else makes no link) |
+| `openGoal(task)` (optional) | A task row that carries `goal` ({ id, title }) shows a quiet "Goal: <title>" button beside "Open the task" that calls `openGoal(task)`; without this hook, or without a goal on the row, nothing is drawn (#7302). The title is drawn as text. Coral Hub's adapter need not give it. |
 | `now()` (optional) | the clock, for ages |
 
 `INBOX_CONTRACT` is 1. A breaking change to the adapter or to `mountInbox` bumps it and is a line in the release notes; the hub adapts when it takes the pin.

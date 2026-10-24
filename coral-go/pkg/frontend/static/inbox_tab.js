@@ -88,13 +88,13 @@ function renderNeedsYou(force = false) {
     const list = document.getElementById('inbox-needs-list');
     if (!local || local.hidden || !list) return;
     const rows = (state.liveSessions || []).filter(s => s && s.waiting_for_input);
-    const key = JSON.stringify(rows.map(s => [sessionServer(s), s.session_id, s.name, s.display_name, s.waiting_kind, s.board_project, s.board_project ? keyLabel(identityKey(sessionServer(s), s.board_project)) : '', askOf(s), waitingText(s.waiting_since)])); // the waiting words change by the minute, so a re-draw follows them; // the team's name is in the key: a label that arrives later redraws the row (#6961)
+    const key = JSON.stringify(rows.map(s => [sessionServer(s), s.session_id, s.name, s.display_name, s.waiting_kind, s.board_project, s.board_project ? keyLabel(identityKey(sessionServer(s), s.board_project)) : '', askOf(s), s.goal && s.goal.id ? [s.goal.id, s.goal.title, s.goal.board] : 0, waitingText(s.waiting_since)])); // the waiting words change by the minute, so a re-draw follows them; // the team's name is in the key: a label that arrives later redraws the row (#6961)
     if (!force && key === _needsKey) return;
     _needsKey = key;
     if (rows.some(s => s.waiting_since) && !_needsTimer) _needsTimer = pollEvery(() => renderNeedsYou(), 30000); // "waiting 4 min" moves on while the list is open
     const empty = document.getElementById('inbox-needs-empty');
     if (empty) empty.hidden = rows.length > 0;
-    const heldId = list.contains(document.activeElement) ? document.activeElement.dataset.sessionId : ''; // the row the keyboard is on: the minute's redraw must not take it away (#7004)
+    const held = list.contains(document.activeElement) ? { id: document.activeElement.dataset.sessionId, goal: document.activeElement.classList.contains('inbox-needs-goal') } : null; // the row the keyboard is on (its goal link too): the minute's redraw must not take it away (#7004)
     // Built with the DOM: no text from an agent is ever read as markup.
     list.replaceChildren(...rows.map(s => {
         const li = document.createElement('li');
@@ -121,9 +121,16 @@ function renderNeedsYou(force = false) {
             window.selectLiveSession?.(s.name, s.agent_type, s.session_id, sessionServer(s));
         });
         li.append(b);
+        if (s.goal && s.goal.id && s.goal.title) { // the goal this agent's task serves, as a quiet link under the row (a link inside the row's button would be a control in a control); nothing without one (#7302)
+            const g = document.createElement('button'); g.type = 'button'; g.className = 'inbox-needs-goal'; g.dataset.sessionId = String(s.session_id || '');
+            g.textContent = `Goal: ${s.goal.title}`;
+            g.title = String(s.goal.title);
+            g.addEventListener('click', () => importOnce('./task_goals.js').then(m => m.openGoalOnBoard(s.goal.board || s.board_project, Number(s.goal.id))).catch(() => {}));
+            li.append(g);
+        }
         return li;
     }));
-    if (heldId) [...list.querySelectorAll('.inbox-needs-item')].find(b => b.dataset.sessionId === heldId)?.focus({ preventScroll: true });
+    if (held) [...list.querySelectorAll(held.goal ? '.inbox-needs-goal' : '.inbox-needs-item')].find(b => b.dataset.sessionId === held.id)?.focus({ preventScroll: true });
 }
 
 // The two tabs of the dashboard's own Inbox (as the hub's): one panel shows at a time. The chosen tab is kept for this browser (and across a reload) (browserLocal).
