@@ -115,3 +115,7 @@ The example shows structure only; production URLs, data, local time and accessib
 - [ ] Reduced motion, long names, empty/busy/error states, and locale-dependent date lengths were checked.
 - [ ] Files has four text tabs and retained inline preview; artifact tables keep six labeled columns and explicit actions.
 - [ ] Code, terminal, rich preview and agent-published iframe behavior remain isolated from workspace styling.
+
+## Reading a stack trace
+
+The dashboard's JS is served with local variable and function names shortened (#7185), so the browser console's stack frames name short letters. Start Coral with `CORAL_NO_MINIFY=1` to serve the readable source in devtools, and say so in a bug report that carries a stack: name `CORAL_NO_MINIFY=1` as the way to read it.

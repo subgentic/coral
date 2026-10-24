@@ -16,8 +16,9 @@ import (
 // CSS files from 707 KB to 475 KB (-33%).
 //
 // What it does and does not do, so a stack trace and the page's own code keep working:
-//   - whitespace and syntax only: identifiers are NOT renamed, so function and variable names are the source's (no code here reads a
-//     name, and an error in the console names what the source names); module boundaries and import paths are untouched (no bundling);
+//   - whitespace and syntax, and the names of local variables and functions (#7185: 360 KB of the shipped tree): exported names, property names, string keys and
+//     import paths are never renamed, so no behaviour changes (no code here reads a function's name or a stack trace); the console's stack frames name short
+//     letters, and CORAL_NO_MINIFY=1 serves the source to read in the browser's devtools; module boundaries and import paths are untouched (no bundling);
 //   - comments are dropped, "legal" ones (@license, @preserve) kept; Unicode is left as UTF-8, not escaped;
 //   - vendor/, *.min.js and agent_docs are served as they are (already minified or not code).
 //
@@ -63,7 +64,7 @@ func minifyOptions(ext string) api.TransformOptions {
 		Charset:           api.CharsetUTF8,
 		LegalComments:     api.LegalCommentsInline,
 		LogLevel:          api.LogLevelSilent,
-		MinifyIdentifiers: false,
+		MinifyIdentifiers: ext != ".css",
 	}
 	if ext == ".css" {
 		opts.Loader = api.LoaderCSS
