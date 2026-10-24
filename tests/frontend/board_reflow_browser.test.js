@@ -2,10 +2,10 @@
 // coarse pointer; and as the #4502 suite does it, at device scale 2 with a 32 px root), no message row, sender name or
 // message text ends past the right edge of the screen, and nothing in the board view scrolls sideways. The board has more
 // than a page of messages, so "Load earlier" is shown: at 200% that nowrap button was wider than the screen, and the feed
-// (centred with auto margins, so not stretched) took its width; every row was laid out in that box and clipped. Also long
+// (with a maximum width, so not stretched) took its width; every row was laid out in that box and clipped. Also long
 // sender names with spaces, ordinary messages, a long unbroken token, a link and a fenced block (which scrolls on its own).
 // A long unbroken sender name is #4502's case (board_followups_browser). On a desktop the feed is as before: the column's
-// width at 1400 px, and at most 840 px and centred at 1920. On a failure it prints the right edge of each box from the
+// width at 1400 px, and at most 840 px, from the column's left edge, at 1920 (#7315). On a failure it prints the right edge of each box from the
 // last row up to the body.
 'use strict';
 
@@ -104,7 +104,7 @@ const LONG = 'Senior Platform Reliability Developer With A Long Title';
             if (v.width === 1400) assert.equal(m.feedWidth, m.colWidth, `${v.name}: the feed fills its column as before`);
             if (v.width === 1920) {
                 assert.equal(m.feedWidth, 840, `${v.name}: the feed stays at its 840 px maximum`);
-                assert.ok(Math.abs(m.feedMargins[0] - m.feedMargins[1]) <= 1, `${v.name}: and centred (${m.feedMargins})`);
+                assert.ok(m.feedMargins[0] <= 1, `${v.name}: and starts at its column's left edge, as the search field does, not centred (#7315) (${m.feedMargins})`);
             }
             console.log(`${v.name}: ${m.rows} rows fit (feed right ${m.feedRight} of ${m.vw}, ${m.feedWidth} wide)`);
         }

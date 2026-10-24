@@ -63,7 +63,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         assert.equal(r.avatars, 0, `${where}: no initials badge (#7315)`);
         assert.equal(r.nameColor, r.want.color, `${where}: the name is in the theme's shade of the sender's palette colour`);
         assert.equal(r.nameLeft, r.bodyLeft, `${where}: the name and the text start at the same left edge`);
-        assert.ok(r.bodyLeft <= 12, `${where}: that edge is the row's padding, not a badge's width (${r.bodyLeft} px)`);
+        assert.ok(r.bodyLeft <= 12, `${where}: that edge is the row's own, not a badge's width (${r.bodyLeft} px)`);
         assert.ok(r.nextGrouped, `${where}: the next post from the same sender is grouped`);
         assert.ok(r.nextNameHidden, `${where}: a grouped post shares the name`);
     };
