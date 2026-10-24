@@ -177,3 +177,24 @@ func TestAnAnswerThroughCoralHubIsPostedAsTheOperatorWithTheHubUser(t *testing.T
 	assert.True(t, strings.HasPrefix(posted[0].Content, HubOperatorPrefix(alice)), "the Hub user is named as for a chat post: %q", posted[0].Content)
 	assert.Contains(t, posted[0].Content, "@Lead")
 }
+
+// Security's #7280 LOW 3: the answer belongs to the block it answered. A goal blocked again has no answer (the clear is pinned here), and the new block can be answered in turn with one more message.
+func TestABlockedAgainGoalHasNoAnswerUntilItIsAnswered(t *testing.T) {
+	call, h, gid := steeringRig(t)
+	code, out := call("PATCH", "/api/board/team/goals/"+itoa(gid), map[string]any{"state": "active", "answer": "first answer", "subscriber_id": "Operator"})
+	require.Equal(t, 200, code, "%v", out)
+	assert.Equal(t, "first answer", out["answer"])
+	code, out = call("PATCH", "/api/board/team/goals/"+itoa(gid), map[string]any{"state": "blocked", "blocked_on": "the operator", "decision": "Second question?", "subscriber_id": "Orchestrator"})
+	require.Equal(t, 200, code, "%v", out)
+	assert.NotContains(t, out, "answer", "blocked again: the old answer is gone")
+	g, err := h.bs.GetGoal(context.Background(), "team", gid)
+	require.NoError(t, err)
+	assert.Empty(t, g.Answer)
+	before := len(messagesOf(t, h))
+	code, out = call("PATCH", "/api/board/team/goals/"+itoa(gid), map[string]any{"state": "active", "answer": "second answer", "subscriber_id": "Operator"})
+	require.Equal(t, 200, code, "%v", out)
+	assert.Equal(t, "second answer", out["answer"])
+	msgs := messagesOf(t, h)
+	require.Len(t, msgs, before+1)
+	assert.Contains(t, msgs[len(msgs)-1].Content, "Second question?")
+}

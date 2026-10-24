@@ -338,10 +338,9 @@ func goalAnswerLine(was, now *board.Goal) string {
 // The goal write is done and answered either way: a message that cannot be posted is logged, not made the write's failure.
 func (h *BoardHandler) postGoalLine(r *http.Request, project, actor, content string) {
 	var err error
-	if cloud.Tunneled(r) {
-		user := hubOperatorUser(r)
+	if user := hubOperatorUser(r); cloud.Tunneled(r) && user != "" {
 		_, err = h.bs.PostHubMessage(r.Context(), project, user, HubOperatorPrefix(user)+content, nil, true)
-	} else {
+	} else { // not through the Hub, or a Hub write with no Hub user to name (the guard has one for every write that reaches here): the actor's own post
 		_, err = h.bs.PostMessage(r.Context(), project, actor, content, nil)
 	}
 	if err != nil {
