@@ -205,7 +205,8 @@ func parsePromptScreenRaw(capture string) (promptScreen, bool) {
 	}
 	for i := end; i >= 0; i-- {
 		line := lines[i]
-		if m := promptOptionRe.FindStringSubmatch(line); m != nil && indentOf(line) < 5 {
+		// Option 1 is the menu's first: a numbered line above it ("1. first" in a Codex command's own text, #7194) is what the dialog shows, not another option.
+		if m := promptOptionRe.FindStringSubmatch(line); m != nil && indentOf(line) < 5 && (len(opts) == 0 || opts[0].N > 1) {
 			n, _ := strconv.Atoi(m[2])
 			label, checked, boxed := m[3], false, false
 			if b := optionBoxRe.FindStringSubmatch(label); b != nil {
