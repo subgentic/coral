@@ -182,6 +182,11 @@ func shellRiskCoreMode(command, workDir, dir string, inner func(command, workDir
 			if why := check(cmd, args, at, workDir); why != "" {
 				return why
 			}
+			if launch { // inline code (perl -e) after the command's own rule found nothing
+				if why := inlineCodeRisk(cmd, args); why != "" {
+					return why
+				}
+			}
 			continue
 		}
 		if check, ok := launchCommandRisks[cmd]; ok && launch {

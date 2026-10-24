@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -34,6 +35,11 @@ func launchedRisk(cmd string, args []string, seg, workDir, cwd string, inner fun
 	run := func(words ...string) string { return inner(strings.Join(words, " "), workDir, cwd) }
 	for len(args) > 0 && args[0] == "--" && cmd != "xargs" { // eval -- rm -rf /etc: the shell takes -- as the end of options, the command follows
 		args = args[1:]
+	}
+	if _, hasRule := shellCommandRisks[cmd]; !hasRule { // a command with a rule of its own (perl -i) gets that rule's answer first, and inline code is judged after it
+		if why := inlineCodeRisk(cmd, args); why != "" {
+			return why
+		}
 	}
 	switch cmd {
 	case "eval":
@@ -399,18 +405,33 @@ func operandRisk(takes map[string]bool) commandRisk {
 
 // normalizedCommand is the command with every word that is spelled out (quotes, backslashes, $'...') written plainly, so r""m, "rm", \rm and $'\x72m' read as rm; dynamic is true when a command
 // has a name built at run time (a word that is only an expansion, as $(echo rm) or $X, not a path that starts with one). ok is false when the command cannot be parsed.
-func normalizedCommand(command string) (text string, dynamic, ok bool) {
+func normalizedCommand(command string) (text string, dynamic bool, inline string, ok bool) {
 	if len(command) > maxParsedCommand {
-		return "", false, false
+		return "", false, "", false
 	}
 	f, err := syntax.NewParser(syntax.Variant(syntax.LangBash)).Parse(strings.NewReader(command), "")
 	if err != nil {
-		return "", false, false
+		return "", false, "", false
 	}
 	syntax.Walk(f, func(n syntax.Node) bool {
 		call, isCall := n.(*syntax.CallExpr)
 		if !isCall {
 			return true
+		}
+		// The command read whole, its words as the parser knows them (a quoted | or ; inside an argument is not a cut): an interpreter given inline code, an awk program that starts a command, ssh,
+		// parallel (#7201).
+		if inline == "" && len(call.Args) > 0 {
+			vals := make([]string, len(call.Args))
+			for i, w := range call.Args {
+				if v, ok := staticValue(w); ok {
+					vals[i] = v
+				} else {
+					vals[i] = "$DYN"
+				}
+			}
+			if vals[0] != "$DYN" {
+				inline = inlineCodeRisk(filepath.Base(vals[0]), vals[1:])
+			}
 		}
 		for i, w := range call.Args {
 			if i == 0 && dynamicName(w) {
@@ -424,9 +445,37 @@ func normalizedCommand(command string) (text string, dynamic, ok bool) {
 	})
 	var b strings.Builder
 	if syntax.NewPrinter().Print(&b, f) != nil {
-		return "", dynamic, false
+		return "", dynamic, inline, false
 	}
-	return strings.TrimSpace(b.String()), dynamic, true
+	return strings.TrimSpace(b.String()), dynamic, inline, true
+}
+
+// staticValue is the text a word spells, and whether all of it is literal (no expansion).
+func staticValue(w *syntax.Word) (string, bool) {
+	var b strings.Builder
+	for _, p := range w.Parts {
+		switch p := p.(type) {
+		case *syntax.Lit:
+			b.WriteString(unbackslash(p.Value))
+		case *syntax.SglQuoted:
+			if p.Dollar {
+				b.WriteString(ansiC(p.Value))
+			} else {
+				b.WriteString(p.Value)
+			}
+		case *syntax.DblQuoted:
+			for _, q := range p.Parts {
+				lit, ok := q.(*syntax.Lit)
+				if !ok {
+					return "", false
+				}
+				b.WriteString(undouble(lit.Value))
+			}
+		default:
+			return "", false
+		}
+	}
+	return b.String(), true
 }
 
 // dynamicName reports whether a command name is built at run time: it holds an expansion anywhere (a variable, a command substitution, backticks), unless it is a path that BEGINS with the one expansion
