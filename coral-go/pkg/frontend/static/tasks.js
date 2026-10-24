@@ -8,6 +8,8 @@ import './dialog_close.js';
 import { registerTaskView } from './task_hooks.js';
 import './utils.js';
 import { registerActions, idOf, withId, tokenOf, textOf } from './actions.js';
+import { importOnce } from './import_once.js';
+import { _getBoardProject } from './task_board_context.js';
 import './live_chat.js';
 // Load order only (#4996): the imports below with no names are loaded for what the module registers at load, in the order this module imported them before the split (the startup-sequence golden records it).
 import './task_verification.js';
@@ -161,6 +163,7 @@ registerActions({
     'task-remind': el => withId(el.dataset.taskId, id => window.remindBoardTask(id)),
     'task-remind-stop': el => withId(el.dataset.taskId, id => window.stopBoardTaskReminder(id)),
     'task-edit': el => withId(el.dataset.taskId, id => window.enableTaskEditMode(id)),
+    'task-goal-open': el => { const id = idOf(el.dataset.goalId), project = _getBoardProject(); if (!id || !project) return; window.hideTaskDetailModal?.(); importOnce('./task_goals.js').then(m => m.openGoalOnBoard(project, id)); }, // the task's Goal line opens the goal on the Goals face (#7253)
     'task-edit-cancel': () => window.cancelTaskEdit(),
     'task-edit-save': el => withId(el.dataset.taskId, id => window.saveTaskEdit(id)),
     'task-publish': el => withId(el.dataset.taskId, id => window.publishBoardTask(id)),

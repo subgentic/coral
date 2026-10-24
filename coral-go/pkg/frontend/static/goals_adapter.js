@@ -29,12 +29,13 @@ const newestFirst = (a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || '
 export function toGoalList(json) {
     const rows = Array.isArray(json) ? json : (json && Array.isArray(json.goals) ? json.goals : []);
     const goals = rows.map(toGoal).sort(newestFirst);
-    return { goals, requireGoal: !!(json && !Array.isArray(json) && (json.require_goal ?? json.requireGoal)), cursor: text(json && !Array.isArray(json) ? json.next_cursor : '') };
+    const none = json && !Array.isArray(json) ? json.no_goal_open ?? json.noGoalOpen : undefined; // open tasks that serve no goal; null while the route does not say
+    return { goals, requireGoal: !!(json && !Array.isArray(json) && (json.require_goal ?? json.requireGoal)), cursor: text(json && !Array.isArray(json) ? json.next_cursor : ''), noGoalOpen: Number.isFinite(Number(none)) && none !== null && none !== '' ? count(none) : null };
 }
 
 /** Two pages of the list as one: the goals of both, newest activity first, and the second's cursor. */
 export function mergeGoalLists(a, b) {
-    return { goals: a.goals.concat(b.goals).sort(newestFirst), requireGoal: a.requireGoal || b.requireGoal, cursor: b.cursor };
+    return { goals: a.goals.concat(b.goals).sort(newestFirst), requireGoal: a.requireGoal || b.requireGoal, cursor: b.cursor, noGoalOpen: a.noGoalOpen ?? b.noGoalOpen };
 }
 
 /** One task of a goal (the tasks route filtered by goal). `session` is filled by the view from the live list, not by the route. */

@@ -14,6 +14,16 @@ import { loadPanelOpen, savePanelOpen } from './list_bar.js';
 import { _priorityOrder, _formatCost, _formatTaskTime, _priorityLabel, formatTaskDate, _agentTaskStatus } from './task_format.js';
 import { morphHtml } from './dom_morph.js';
 import { _verifyMark } from './task_verify_marks.js';
+import { goalTitle, refreshGoalTitles } from './task_goals.js';
+
+let _goalBoard = ''; // the board whose goal titles the chips read (the one the list was last loaded for)
+
+/** A quiet chip naming the task's goal on its row (#7253): nothing for a task with no goal or a goal whose title is not read yet. */
+function _goalChip(t) {
+    if (!t || !t.goal_id || t._source === 'agent' || t._source === 'subagent') return '';
+    const title = goalTitle(_goalBoard, t.goal_id);
+    return title ? ` <span class="board-task-goal" title="Goal">${escapeHtml(title)}</span>` : '';
+}
 
 // ── Board task polling ───────────────────────────────────────────────
 export let _boardTaskPollTimer = null;
@@ -169,6 +179,8 @@ function _setBoardTasks() {
 
 export async function loadBoardTasks(boardName) {
     _syncTaskFiltersBoard(boardName);
+    _goalBoard = boardName || '';
+    if (boardName) refreshGoalTitles(boardName).then(changed => { if (changed) renderBoardTaskList(); }, () => {}); // the goal chips name their goals once the titles are read (#7253)
     await _loadBoardTasksDefault(boardName);
     if (_queryActive()) await _loadFilteredTasks(boardName, { refresh: true });
 }
@@ -599,7 +611,7 @@ function _taskRowsHtml(tasks) {
             <span class="board-task-priority ${priorityClass}" title="Claim priority: ${escapeAttr(t.priority || 'none')}">${t.priority ? (_priorityLabel[t.priority] || escapeHtml(t.priority)) : '\u2014'}</span>
             ${typeCell}
             <span class="board-task-assignee">${escapeHtml(assignee)}</span>
-            <span class="board-task-desc"${tooltip}>${subagentBadge}${claimedBadge}${blockedBadge}${title}${isSubagent || isAgent ? '' : _verifyMark(t)}</span>
+            <span class="board-task-desc"${tooltip}>${subagentBadge}${claimedBadge}${blockedBadge}${title}${isSubagent || isAgent ? '' : _verifyMark(t)}${_goalChip(t)}</span>
             <span class="${costClass}">${costText}</span>
             <span class="board-task-time">${timeStr}</span>
         </div>`;
