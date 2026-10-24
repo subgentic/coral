@@ -12,12 +12,13 @@ import (
 )
 
 var taskQueryParamNames = map[string]bool{"fields": true, "status": true, "assigned_to": true, "board": true, "priority": true,
-	"created_by": true, "verification": true, "parked": true, "created_since": true, "updated_since": true, "sort": true, "order": true, "limit": true, "cursor": true, "q": true}
+	"created_by": true, "verification": true, "parked": true, "created_since": true, "updated_since": true, "sort": true, "order": true, "limit": true, "cursor": true, "q": true, "id": true}
 
 // queryAllTasks is GET /api/board/tasks with a query (#4540), for clients such as Coral Hub that show their own filtered view:
 //
 //	?fields=a,b|summary&status=a&status=b&assigned_to=X&board=P&priority=high&created_by=X&verification=verified&parked=true
 //	&created_since=<RFC 3339>&updated_since=<RFC 3339>&q=<text>&sort=created_at|updated_at&order=asc|desc&limit=N&cursor=C
+//	&id=N&id=M (or id=N,M), at most 100 (#7247)
 //
 // q (#4745) is a plain case-insensitive substring of a task's title, body or completion message (% and _ are ordinary characters, no
 // pattern, at most 200 characters). The reply always has "total", the tasks the filters (and q) match; with q it also has "truncated"
@@ -56,7 +57,7 @@ func (h *BoardHandler) queryAllTasks(w http.ResponseWriter, r *http.Request) boo
 	query, err := board.ParseTaskQuery(board.TaskQueryParams{
 		Fields: q["fields"], Status: q["status"], AssignedTo: q["assigned_to"], Board: q["board"], Priority: q["priority"],
 		CreatedBy: q["created_by"], Verification: q["verification"], Parked: q["parked"], CreatedSince: q["created_since"], UpdatedSince: q["updated_since"],
-		Sort: q["sort"], Order: q["order"], Limit: q["limit"], Cursor: q["cursor"], Q: q["q"],
+		Sort: q["sort"], Order: q["order"], Limit: q["limit"], Cursor: q["cursor"], Q: q["q"], ID: q["id"],
 	})
 	if err != nil {
 		if errors.Is(err, board.ErrTaskQuery) {
@@ -121,6 +122,9 @@ func (h *BoardHandler) queryAllTasks(w http.ResponseWriter, r *http.Request) boo
 		if res.NextCursor != "" {
 			out["next_cursor"] = res.NextCursor
 		}
+	}
+	if query.IDs != nil {
+		out["missing"] = res.Missing // the ids the filters did not match: not there, another board's, filtered out, all alike
 	}
 	if query.Text != "" {
 		out["total"] = res.Total

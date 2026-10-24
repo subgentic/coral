@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -53,6 +55,8 @@ const (
 	// With a large field named each row can carry a long text: fewer rows per page.
 	TaskQueryMaxLimitLarge = 100
 	taskQueryMaxValues     = 50
+	// TaskQueryMaxIDs is the most ids one query by id names (#7247): the answer is one page, so the cap is the page.
+	TaskQueryMaxIDs = 100
 )
 
 // ErrTaskQuery is an invalid query: the message names what was wrong and is safe to show the caller.
@@ -65,10 +69,12 @@ func taskQueryErr(format string, a ...any) error {
 // TaskQuery is a validated query. Build it with ParseTaskQuery.
 type TaskQuery struct {
 	// Fields is nil when the caller named none: the reply is then the whole task row, as the list has always been.
-	Fields        []string
-	Statuses      []string
-	AssignedTo    []string
-	Boards        []string
+	Fields     []string
+	Statuses   []string
+	AssignedTo []string
+	Boards     []string
+	// IDs is the id filter, in the order the caller gave them, each once (nil: no id filter): the answer is these tasks in this order, and Missing lists the ids it does not hold.
+	IDs           []int64
 	Priorities    []string
 	CreatedBy     []string
 	Verifications []string
@@ -98,6 +104,7 @@ type TaskQueryParams struct {
 	Fields, Status, AssignedTo, Board, Priority, CreatedBy, Verification []string
 	Parked, CreatedSince, UpdatedSince, Sort, Order, Limit, Cursor       []string
 	Q                                                                    []string
+	ID                                                                   []string
 }
 
 // splitMulti reads a multi-value parameter: repeated (status=a&status=b) or comma separated (status=a,b), or both.
@@ -217,7 +224,53 @@ func ParseTaskQuery(p TaskQueryParams) (*TaskQuery, error) {
 	if q.cursor, err = parseQueryCursor(p.Cursor, q.SortUpdated, q.Desc); err != nil {
 		return nil, err
 	}
+	if q.IDs, err = parseQueryIDs(p.ID); err != nil {
+		return nil, err
+	}
+	if q.IDs != nil {
+		// The answer is these tasks in this order: a page of its own, so nothing that pages or reorders or searches is allowed beside it.
+		for name, given := range map[string]bool{"cursor": q.cursor != nil, "limit": len(p.Limit) > 0, "sort": len(p.Sort) > 0, "order": len(p.Order) > 0, "q": q.Text != ""} {
+			if given {
+				return nil, taskQueryErr("id can't be combined with %s: the answer is exactly the tasks asked for, in the order asked", name)
+			}
+		}
+		q.Limit = len(q.IDs)
+	}
 	return q, nil
+}
+
+// parseQueryIDs reads id: repeated or comma separated, each a whole positive number, at most TaskQueryMaxIDs distinct; nil when none is given. The order given is kept and a repeat is dropped.
+func parseQueryIDs(vals []string) ([]int64, error) {
+	if len(vals) == 0 {
+		return nil, nil
+	}
+	var ids []int64
+	seen := map[int64]bool{}
+	for _, v := range vals {
+		for _, part := range strings.Split(v, ",") {
+			part = strings.TrimSpace(part)
+			n, err := strconv.ParseInt(part, 10, 64)
+			if part == "" || err != nil || n < 1 || strconv.FormatInt(n, 10) != part {
+				return nil, taskQueryErr("id must be a whole positive number, got %q", truncateEcho(part))
+			}
+			if !seen[n] {
+				seen[n] = true
+				ids = append(ids, n)
+			}
+			if len(ids) > TaskQueryMaxIDs {
+				return nil, taskQueryErr("id names more than %d tasks", TaskQueryMaxIDs)
+			}
+		}
+	}
+	return ids, nil
+}
+
+// truncateEcho is a caller's text for an error message: cut at 40 characters, so a long value is not sent back whole (quote it with %q).
+func truncateEcho(s string) string {
+	if r := []rune(s); len(r) > 40 {
+		return string(r[:40]) + "…"
+	}
+	return s
 }
 
 // parseQueryFields reads the fields asked for: nil when none (the whole row), "summary" standing for
@@ -377,6 +430,8 @@ type TaskQueryResult struct {
 	NextCursor string
 	Total      int
 	Truncated  bool
+	// Missing, for a query by id, is the ids asked for that the filters did not match: not there, another board's (with a board filter), another status. Never nil with ids (an empty list), nil otherwise.
+	Missing []int64
 }
 
 func placeholders(n int) string { return strings.TrimSuffix(strings.Repeat("?,", n), ",") }
@@ -395,6 +450,9 @@ func (s *Store) QueryTasks(ctx context.Context, q *TaskQuery) (*TaskQueryResult,
 	page, err := scanTaskQueryPage(rows, q, wantVerification)
 	if err != nil {
 		return nil, err
+	}
+	if q.IDs != nil {
+		page.inRequestOrder(q.IDs)
 	}
 	if slices.Contains(q.Fields, "board_label") {
 		s.addBoardLabels(ctx, page.res.Tasks, page.boards)
@@ -474,6 +532,12 @@ func taskQueryWhere(q *TaskQuery, sortExpr string) (join string, where []string,
 	in("assigned_to", q.AssignedTo)
 	in("board_id", q.Boards)
 	in("created_by", q.CreatedBy)
+	if len(q.IDs) > 0 {
+		where = append(where, "id IN ("+placeholders(len(q.IDs))+")")
+		for _, id := range q.IDs {
+			args = append(args, id)
+		}
+	}
 	if len(q.Verifications) > 0 {
 		join = " LEFT JOIN task_workflows w ON w.task_id = board_tasks.id"
 		var alts []string
@@ -513,6 +577,7 @@ func taskQueryWhere(q *TaskQuery, sortExpr string) (join string, where []string,
 type taskQueryPage struct {
 	res    *TaskQueryResult
 	boards []string
+	ids    []int64
 	vTasks []Task
 	last   queryTaskCursor
 	more   bool
@@ -541,6 +606,7 @@ func scanTaskQueryPage(rows *sqlx.Rows, q *TaskQuery, wantVerification bool) (*t
 		page.last = queryTaskCursor{Sort: sortName, Desc: q.Desc, Val: sortVal, ID: id}
 		board, _ := m["_board"].(string)
 		page.boards = append(page.boards, board)
+		page.ids = append(page.ids, id)
 		if wantVerification {
 			t := Task{ID: id}
 			t.Status, _ = m["_status"].(string)
@@ -560,6 +626,41 @@ func scanTaskQueryPage(rows *sqlx.Rows, q *TaskQuery, wantVerification bool) (*t
 		return nil, err
 	}
 	return page, nil
+}
+
+// inRequestOrder puts the page's rows (and the lists kept beside them) in the order ids were asked and sets Missing to the ids no row came for.
+func (p *taskQueryPage) inRequestOrder(ids []int64) {
+	pos := make(map[int64]int, len(ids))
+	for i, id := range ids {
+		pos[id] = i
+	}
+	order := make([]int, len(p.ids))
+	for i := range order {
+		order[i] = i
+	}
+	sort.SliceStable(order, func(a, b int) bool { return pos[p.ids[order[a]]] < pos[p.ids[order[b]]] })
+	tasks := make([]map[string]any, len(order))
+	boards := make([]string, len(order))
+	sorted := make([]int64, len(order))
+	var vTasks []Task
+	if len(p.vTasks) == len(order) {
+		vTasks = make([]Task, len(order))
+	}
+	found := map[int64]bool{}
+	for to, from := range order {
+		tasks[to], boards[to], sorted[to] = p.res.Tasks[from], p.boards[from], p.ids[from]
+		if vTasks != nil {
+			vTasks[to] = p.vTasks[from]
+		}
+		found[p.ids[from]] = true
+	}
+	p.res.Tasks, p.boards, p.ids, p.vTasks = tasks, boards, sorted, vTasks
+	p.res.Missing = []int64{}
+	for _, id := range ids {
+		if !found[id] {
+			p.res.Missing = append(p.res.Missing, id)
+		}
+	}
 }
 
 // addBoardLabels sets each row's board_label from its board (boards[i] is row i's); a board without a label is left out.

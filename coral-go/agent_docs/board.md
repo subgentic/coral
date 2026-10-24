@@ -928,6 +928,7 @@ and the connector accepts only the parameters below.
 | `order` | `desc` (default, newest first) or `asc` |
 | `limit` | 1 to 500, default 100; 1 to 100 when the reply carries `body` or `completion_message` (named, or whole rows) |
 | `cursor` | The `next_cursor` of the previous page, with the same filters, sort and order |
+| `id` | Multi (#7247): task ids, repeated or comma separated, whole positive numbers, at most **100**. The reply is exactly those tasks **in the order asked**, each once, and adds `"missing": [ids]` with every id the other filters did not match: an id that is not there, one on another board than a `board` filter names, one a `status` filters out, all alike (so a caller learns nothing about what it could not read). `missing` is `[]` when nothing is missing. It is one page: with `cursor`, `limit`, `sort`, `order` or `q` it is a 400. |
 
 Through Coral Hub the reply is redacted after the filters have matched, so a filter value that the redaction would change (one holding a token, key or password) is refused with a 400 for `assigned_to`, `created_by` and `board`: an exact match on such a name would confirm a guess of the secret, and a value without a secret can only match names without one. A computer's own dashboard is not restricted.
 
