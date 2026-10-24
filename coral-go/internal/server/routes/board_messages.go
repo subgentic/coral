@@ -7,7 +7,6 @@ import (
 	"github.com/subgentic/coral/internal/claudeartifact"
 	"net/http"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -360,7 +359,7 @@ func (h *BoardHandler) ListAllMessages(w http.ResponseWriter, r *http.Request) {
 	h.setBoardIdentity(w, r, urlParam(r, "project"))
 	// Single message lookup by ID
 	if idStr := r.URL.Query().Get("id"); idStr != "" {
-		msgID, err := strconv.ParseInt(idStr, 10, 64)
+		msgID, err := parseID(idStr) // canonical decimal only (#7261); 0 is a canonical id that is not there: 404 below, as before
 		if err != nil {
 			errBadRequest(w, "invalid message id")
 			return
@@ -380,7 +379,7 @@ func (h *BoardHandler) ListAllMessages(w http.ResponseWriter, r *http.Request) {
 	// ?task_id=N: the replies to that task (#5463), oldest first, always inside the board of the URL.
 	// A task_id the query parser dropped (a semicolon) is refused too, never read as "no filter".
 	if r.URL.Query().Has("task_id") || strings.Contains(r.URL.RawQuery, "task_id") {
-		taskID, err := strconv.ParseInt(r.URL.Query().Get("task_id"), 10, 64)
+		taskID, err := parseID(r.URL.Query().Get("task_id"))
 		if err != nil || taskID <= 0 {
 			errBadRequest(w, "invalid task_id")
 			return
@@ -476,7 +475,11 @@ func (h *BoardHandler) CheckUnread(w http.ResponseWriter, r *http.Request) {
 // DeleteMessage deletes a single message.
 // DELETE /api/board/{project}/messages/{messageID}
 func (h *BoardHandler) DeleteMessage(w http.ResponseWriter, r *http.Request) {
-	msgID, _ := strconv.ParseInt(chi.URLParam(r, "messageID"), 10, 64)
+	msgID, perr := parseID(chi.URLParam(r, "messageID"))
+	if perr != nil {
+		errBadRequest(w, "invalid message id")
+		return
+	}
 	found, err := h.bs.DeleteMessage(r.Context(), urlParam(r, "project"), msgID)
 	if err != nil {
 		errInternalServer(w, err.Error())
