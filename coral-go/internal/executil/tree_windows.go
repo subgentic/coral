@@ -17,8 +17,14 @@ import (
 
 type procEntry struct{ pid, ppid uint32 }
 
+// member is a process found below the command, with the creation time it was found with: the kill checks it again on the handle it ends, so a process id that was reused in between is never ended.
+type member struct {
+	pid  uint32
+	born time.Time
+}
+
 // collect is the descendants of root among procs. created gives a process's creation time, false when it cannot be read (such a process is left alone). Pure, so a test can drive it.
-func collect(procs []procEntry, root uint32, created func(pid uint32) (time.Time, bool)) []uint32 {
+func collect(procs []procEntry, root uint32, created func(pid uint32) (time.Time, bool)) []member {
 	born, ok := created(root)
 	if !ok {
 		return nil
@@ -27,7 +33,7 @@ func collect(procs []procEntry, root uint32, created func(pid uint32) (time.Time
 		pid  uint32
 		born time.Time
 	}
-	var out []uint32
+	var out []member
 	seen := map[uint32]bool{root: true}
 	queue := []node{{root, born}}
 	for len(queue) > 0 {
@@ -42,7 +48,7 @@ func collect(procs []procEntry, root uint32, created func(pid uint32) (time.Time
 				continue
 			}
 			seen[p.pid] = true
-			out = append(out, p.pid)
+			out = append(out, member{p.pid, b})
 			queue = append(queue, node{p.pid, b})
 		}
 	}
@@ -83,7 +89,7 @@ func createdAt(pid uint32) (time.Time, bool) {
 }
 
 // descendants is every process now running below pid.
-func descendants(pid uint32) []uint32 {
+func descendants(pid uint32) []member {
 	return collect(snapshotProcesses(), pid, createdAt)
 }
 
@@ -94,10 +100,10 @@ func killTree(pid uint32) {
 	for pass := 0; pass < 3; pass++ {
 		fresh := false
 		for _, d := range descendants(pid) {
-			if known[d] {
+			if known[d.pid] {
 				continue
 			}
-			known[d] = true
+			known[d.pid] = true
 			fresh = true
 			terminate(d)
 		}
@@ -107,13 +113,18 @@ func killTree(pid uint32) {
 	}
 }
 
-func terminate(pid uint32) {
-	h, err := windows.OpenProcess(windows.PROCESS_TERMINATE, false, pid)
+// terminate ends m through one handle that is also asked its creation time: if the process there is not the one that was found (its id was reused), nothing is ended.
+func terminate(m member) {
+	h, err := windows.OpenProcess(windows.PROCESS_TERMINATE|windows.PROCESS_QUERY_LIMITED_INFORMATION, false, m.pid)
 	if err != nil {
 		return
 	}
+	defer windows.CloseHandle(h)
+	var creation, exit, kernel, user windows.Filetime
+	if windows.GetProcessTimes(h, &creation, &exit, &kernel, &user) != nil || !time.Unix(0, creation.Nanoseconds()).Equal(m.born) {
+		return
+	}
 	_ = windows.TerminateProcess(h, 1)
-	windows.CloseHandle(h)
 }
 
 // exited says whether the process is gone (or ending: Windows refuses to terminate one that is).
