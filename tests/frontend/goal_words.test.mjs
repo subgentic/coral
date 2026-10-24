@@ -8,7 +8,7 @@ assert.equal(W.filterLabel('blocked'), 'Blocked'); assert.equal(W.filterLabel('a
 assert.equal(W.stateWord({ state: 'active' }), 'Active');
 assert.equal(W.stateWord({ state: 'proposed' }), 'Proposed');
 assert.equal(W.stateWord({ state: 'done' }), 'Done'); assert.equal(W.stateWord({ state: 'dropped' }), 'Dropped');
-assert.equal(W.stateWord({ state: 'blocked', blockedOn: 'the Operator' }), 'Blocked on the Operator', 'named: on whom');
+assert.equal(W.stateWord({ state: 'blocked', blockedOn: 'the Operator' }), 'Blocked: the Operator', 'named: on whom');
 assert.equal(W.stateWord({ state: 'blocked', blockedOn: '  ' }), 'Blocked', 'nothing named: Blocked alone');
 assert.equal(W.stateWord({ state: 'blocked' }), 'Blocked');
 assert.equal(W.stateWord({ state: 'ODD_state' }), 'Odd_state', 'an unknown state is shown, not hidden');
@@ -30,7 +30,7 @@ assert.equal(W.rollupSentence({ done: '3', active: -2, blocked: 'x', queued: 1 }
 assert.deepEqual(W.rollupShares({ done: 5, active: 2, blocked: 1, queued: 2 }), { done: 0.5, active: 0.2, blocked: 0.1 });
 assert.deepEqual(W.rollupShares({}), { done: 0, active: 0, blocked: 0 });
 
-assert.equal(W.goalCountLine(5, 1), '5 goals, 1 waiting on you'); assert.equal(W.goalCountLine(1, 0), '1 goal');
+assert.equal(W.goalCountLine(5), '5 goals'); assert.equal(W.goalCountLine(1), '1 goal'); assert.equal(W.goalCountLine(0), 'No goals yet');
 assert.equal(W.goalCountLine(3, 0), '3 goals'); assert.equal(W.goalCountLine(0, 0), 'No goals yet');
 
 assert.equal(W.filterAnnouncement('blocked', 1), 'Showing 1 blocked goal'); assert.equal(W.filterAnnouncement('active', 2), 'Showing 2 active goals');
@@ -46,22 +46,22 @@ assert.equal(W.asOfText('14:32'), 'as of 14:32'); assert.equal(W.asOfText(''), '
 assert.equal(W.driverLine('Orchestrator', 'today 14:32'), 'Driver: Orchestrator · today 14:32');
 assert.equal(W.driverLine('', 'Oct 17'), 'Oct 17'); assert.equal(W.driverLine('Dev', ''), 'Driver: Dev'); assert.equal(W.driverLine('', ''), '');
 
-const goals = [{ state: 'active' }, { state: 'active' }, { state: 'blocked', blockedOn: 'the Operator', decision: 'Ship?' }, { state: 'done' }, { state: 'blocked' }, { state: 'weird' }];
+const goals = [{ state: 'active' }, { state: 'active' }, { state: 'blocked', blockedOn: 'the Operator' }, { state: 'done' }, { state: 'blocked' }, { state: 'weird' }];
 assert.deepEqual(W.filterCounts(goals), { all: 6, active: 2, blocked: 2, proposed: 0, done: 1, dropped: 0 }, 'an unknown state counts in All only');
 assert.equal(W.keepsGoal('all', goals[5]), true); assert.equal(W.keepsGoal('blocked', goals[2]), true); assert.equal(W.keepsGoal('done', goals[2]), false);
-assert.deepEqual(W.waitingGoals(goals), [goals[2]], 'only a goal blocked on someone, with a decision to make, waits on the person');
-assert.deepEqual(W.waitingGoals(null), []);
 assert.equal(W.errorWords('goal_title_required', 'x'), 'A goal needs a title.'); assert.equal(W.errorWords('goal_driver_unknown', ''), 'That driver is not on this board.');
 assert.equal(W.errorWords('some_new_code', 'The server says this'), 'The server says this', 'an unknown code shows the server\'s sentence'); assert.equal(W.errorWords('', ''), 'try again');
 assert.equal(W.showMoreText(120), 'Show 50 more'); assert.equal(W.showMoreText(20), 'Show 20 more'); assert.equal(W.showMoreText(0), 'Show 0 more');
 assert.equal(W.tasksShownText(100, 120), 'Showing 100 of 120 tasks');
 assert.equal(W.tasksCappedText(120, 130), 'Showing 120 of 130 tasks. The rest are on the Tasks panel.');
 assert.equal(W.closedWithOpenText(2), 'Closed with 2 tasks still open. They stay open until someone finishes or moves them.'); assert.equal(W.closedWithOpenText(1), 'Closed with 1 task still open. They stay open until someone finishes or moves them.');
-assert.deepEqual(W.waitingLine({ title: 'Cut the release', decision: 'Cut the release on Friday, or wait?' }), { title: 'Cut the release', text: 'Cut the release on Friday, or wait?' }, 'the title is its own line, always (#7252)');
-assert.deepEqual(W.waitingLine({ title: 'Fix the flaky suites', decision: 'Spend a day on the slowest suite?' }), { title: 'Fix the flaky suites', text: 'Spend a day on the slowest suite?' });
-assert.deepEqual(W.waitingLine({ title: 'A', recommendation: 'Yes' }), { title: 'A', text: 'Yes' }, 'the recommendation when there is no decision'); assert.deepEqual(W.waitingLine(null), { title: '', text: '' });
-assert.equal(W.goalsToggleText(0, 0), 'Goals'); assert.equal(W.goalsToggleText(3, 0), 'Goals 3'); assert.equal(W.goalsToggleText(3, 1), 'Goals 3 · 1 waiting'); assert.equal(W.goalsToggleText(0, 2), 'Goals · 2 waiting'); assert.equal(W.goalsToggleText('x', -1), 'Goals');
+assert.equal(W.goalsToggleText(0), 'Goals'); assert.equal(W.goalsToggleText(3), 'Goals 3'); assert.equal(W.goalsToggleText(-2), 'Goals');
 assert.equal(W.goalsToggleTitle, 'What this board is working toward'); assert.equal(W.goalsSubtitle, 'What the team is working toward. Tasks serve a goal.'); assert.equal(W.driverHelp, 'Driver: the agent who looks after it');
-assert.equal(W.needsYouText(['A']), 'A goal needs you: A'); assert.equal(W.needsYouText(['A', 'B']), '2 goals need you: A, B');
 assert.equal(W.noGoalTasksText(1), '1 task serves no goal'); assert.equal(W.noGoalTasksText(4), '4 tasks serve no goal');
+assert.equal(W.stateWord({ state: 'blocked', blockedOn: 'the Operator' }), 'Blocked: the Operator'); assert.equal(W.stateWord({ state: 'blocked' }), 'Blocked');
+assert.equal(W.readyToClose({ state: 'active', rollup: { done: 3 } }), true); assert.equal(W.readyToClose({ state: 'active', rollup: {} }), false, 'no tasks'); assert.equal(W.readyToClose({ state: 'active', rollup: { done: 3, queued: 1 } }), false); assert.equal(W.readyToClose({ state: 'blocked', rollup: { done: 3 } }), false);
+assert.deepEqual(W.closeWarning({ done: 2, active: 1, queued: 2 }), { head: '3 of its 5 tasks are still open (1 active, 2 queued).', text: ' They stay open and stay linked to this goal; nothing is stopped. A closed goal takes no new tasks.' }); assert.equal(W.closeWarning({ done: 2, queued: 1 }).head, '1 of its 3 tasks is still open (1 queued).');
+assert.equal(W.closedAsText('done', 0), 'Closed as done.'); assert.equal(W.closedAsText('dropped', 2), 'Closed as dropped. 2 tasks are still open.'); assert.equal(W.closedAsText('dropped', 1), 'Closed as dropped. 1 task is still open.');
+assert.equal(W.allDoneLine(3), 'All 3 tasks are done.'); assert.equal(W.allDoneLine(1), 'All 1 task is done.'); assert.equal(W.allDoneAsk('X works'), 'Done when: X works. Is that true?'); assert.equal(W.allDoneAsk(''), 'Is that true?');
+assert.equal(W.isOpenGoal({ state: 'blocked' }), true); assert.equal(W.isClosedGoal({ state: 'dropped' }), true); assert.equal(W.isOpenGoal({ state: 'done' }), false);
 console.log('goal_words: ok');

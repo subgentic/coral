@@ -1,6 +1,6 @@
 /* The one place the goals routes' JSON becomes the Goals view's model (#7113): when #7087's shape is fixed or changes, this file is the only change. The view reads only what these functions return.
  * Field names follow the #7078 design note and the Orchestrator's list: id, title, outcome, done_when, state, blocked_on, driver, updated_at, rollup {done, active, blocked, queued}, and for a goal
- * blocked on someone decision, recommendation and if_silent. Nothing here throws on a missing field: a goal with fewer fields shows less, never nothing. No imports. */
+ * Nothing here throws on a missing field: a goal with fewer fields shows less, never nothing. No imports. */
 const text = (v) => (typeof v === 'string' ? v : '');
 const count = (v) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0; };
 
@@ -17,9 +17,6 @@ export function toGoal(g) {
         driver: text(g && g.driver),
         updatedAt: text(g && (g.updated_at ?? g.updatedAt)),
         rollup: { done: count(r.done), active: count(r.active), blocked: count(r.blocked), queued: count(r.queued) },
-        decision: text(g && g.decision),
-        recommendation: text(g && g.recommendation),
-        ifSilent: text(g && (g.if_silent ?? g.ifSilent)),
     };
 }
 

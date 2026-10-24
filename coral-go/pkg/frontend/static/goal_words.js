@@ -16,7 +16,7 @@ export function stateWord(goal) {
     const s = word(goal && goal.state);
     if (s === 'Blocked') {
         const on = String((goal && goal.blockedOn) || '').trim();
-        return on ? `Blocked on ${on}` : 'Blocked';
+        return on ? `Blocked: ${on}` : 'Blocked';
     }
     return s;
 }
@@ -41,11 +41,8 @@ export function rollupSentence(rollup) {
     return `${plural(total, 'task', 'tasks')}: ${parts.filter(([, n]) => n).map(([w, n]) => `${n} ${w}`).join(', ')}`;
 }
 
-/** The header's count line: "5 goals, 1 waiting on you"; "1 goal"; "No goals yet". */
-export function goalCountLine(total, waiting = 0) {
-    if (!total) return 'No goals yet';
-    return waiting ? `${plural(total, 'goal', 'goals')}, ${waiting} waiting on you` : plural(total, 'goal', 'goals');
-}
+/** The header's count line: "5 goals"; "1 goal"; "No goals yet". */
+export const goalCountLine = (total) => total ? plural(total, 'goal', 'goals') : 'No goals yet';
 
 /** What the page's status region says once after a chip is pressed: "Showing all 5 goals", "Showing 1 blocked goal", "No dropped goals". */
 export function filterAnnouncement(which, count) {
@@ -85,11 +82,8 @@ export function driverLine(driver, when) {
 const ERRORS = { goal_title_required: 'A goal needs a title.', goal_text_too_long: 'That is too long: shorten it and try again.', goal_driver_unknown: 'That driver is not on this board.', goal_bad_state: 'That state is not one a goal can have.', goal_not_found: 'That goal is no longer on this board.', goal_closed: 'That goal is closed.', goal_already_closed: 'That goal is already closed.', goal_blocked_on_required: 'A blocked goal says who it waits for.', goal_required: 'This board needs a goal on every task.', local_only: 'This can only be done on this computer.' };
 export const errorWords = (code, sentence) => ERRORS[code] || String(sentence || '').trim() || 'try again';
 
-/** The Goals switch's label on the board's header: "Goals", "Goals 3" (open goals), "Goals 3 · 1 waiting" when a goal waits on the person. */
-export function goalsToggleText(open, waiting) {
-    const o = Math.max(0, Number(open) || 0), w = Math.max(0, Number(waiting) || 0);
-    return `Goals${o ? ` ${o}` : ''}${w ? ` · ${w} waiting` : ''}`;
-}
+/** The Goals switch's label on the board's header: "Goals", "Goals 3" (open goals). */
+export const goalsToggleText = (open) => { const o = Math.max(0, Number(open) || 0); return `Goals${o ? ` ${o}` : ''}`; };
 /** What the Goals switch is for, as its title. */
 export const goalsToggleTitle = 'What this board is working toward';
 /** The one line under the Goals heading, and the help under the New goal dialog's Driver. */
@@ -98,11 +92,6 @@ export const driverHelp = 'Driver: the agent who looks after it';
 
 /** A goal that is Closed with tasks still open, said on its page (the close answers with the count, and does not touch them). */
 export const closedWithOpenText = (n) => `Closed with ${plural(n, 'task', 'tasks')} still open. They stay open until someone finishes or moves them.`;
-
-/** One "Waiting on you" row's words: the goal's title (its own line) and the decision, or the recommendation, under it (#7252). */
-export function waitingLine(goal) {
-    return { title: String((goal && goal.title) || '').trim(), text: String((goal && (goal.decision || goal.recommendation)) || '').trim() };
-}
 
 /** The note under the header when the board refuses tasks without a goal. */
 export const requireGoalNote = 'Tasks without a goal are refused on this board (require a goal is on).';
@@ -126,11 +115,39 @@ export function filterCounts(goals) {
     return out;
 }
 
-/** Goals blocked on someone: the ones "Waiting on you" shows. A goal blocked on nothing named is blocked, not waiting on the person. */
-export const waitingGoals = (goals) => (goals || []).filter(g => String(g && g.state || '').toLowerCase() === 'blocked' && String(g.blockedOn || '').trim() && (g.decision || g.recommendation || g.ifSilent));
-
-/** The one polite line when a refresh brings goals that now wait on the person (#7250). */
-export const needsYouText = (titles) => titles.length === 1 ? `A goal needs you: ${titles[0]}` : `${titles.length} goals need you: ${titles.join(', ')}`;
 
 /** The line under the Goals page's heading when open tasks serve no goal (#7253). */
 export const noGoalTasksText = (n) => `${n} ${n === 1 ? 'task serves' : 'tasks serve'} no goal`;
+
+// Closing a goal, reopening it, and the prompt when every task is done (#7272, UI/UX's #7270).
+const openOf = (r) => { const x = r || {}; return ['active', 'blocked', 'queued'].reduce((n, k) => n + Math.max(0, Number(x[k]) || 0), 0); };
+const totalOf = (r) => openOf(r) + Math.max(0, Number((r || {}).done) || 0);
+/** Open tasks of a rollup (active, blocked, queued) and all its tasks. */
+export const openTasksOf = openOf;
+export const allTasksOf = totalOf;
+/** A goal that can be closed (its state is open) and one that is closed. */
+export const isOpenGoal = (goal) => ['proposed', 'active', 'blocked'].includes(String(goal && goal.state || '').toLowerCase());
+export const isClosedGoal = (goal) => ['done', 'dropped'].includes(String(goal && goal.state || '').toLowerCase());
+/** An active goal with tasks, none of them open: the page asks whether to close it. */
+export const readyToClose = (goal) => String(goal && goal.state || '').toLowerCase() === 'active' && totalOf(goal && goal.rollup) > 0 && openOf(goal && goal.rollup) === 0;
+export const closeTitle = 'Close this goal?';
+export const closeDoneLabel = 'Done: what we wanted is true';
+export const closeDroppedLabel = 'Dropped: we are no longer doing it';
+export const closeReasonLabel = 'Why (required): a line the agents will see';
+export const closeReasonNeeded = 'A reason is needed: the agents read it.';
+export const alreadyClosedText = 'It was already closed.';
+/** The warning in the Close dialog when tasks are open: "2 of its 5 tasks are still open (2 queued)." and what closing does about them. */
+export function closeWarning(rollup) {
+    const r = rollup || {}, open = openOf(r), total = totalOf(r);
+    const parts = ['active', 'blocked', 'queued'].filter(k => Number(r[k]) > 0).map(k => `${Number(r[k])} ${k}`).join(', ');
+    return { head: `${open} of its ${plural(total, 'task', 'tasks')} ${open === 1 ? 'is' : 'are'} still open${parts ? ` (${parts})` : ''}.`, text: ' They stay open and stay linked to this goal; nothing is stopped. A closed goal takes no new tasks.' };
+}
+export const closedAsText = (state, open) => `Closed as ${state === 'dropped' ? 'dropped' : 'done'}.${open ? ` ${plural(open, 'task', 'tasks')} ${open === 1 ? 'is' : 'are'} still open.` : ''}`;
+export const reopenedText = 'Reopened.';
+/** The all-done strip: its line, the goal's done-when, the question, and what Not yet does. */
+export const allDoneLine = (n) => `All ${plural(n, 'task', 'tasks').replace(/^\d+ /, n === 1 ? '1 ' : `${n} `)} ${n === 1 ? 'is' : 'are'} done.`;
+export const allDoneAsk = (doneWhen) => `${doneWhen ? `Done when: ${doneWhen}. ` : ''}Is that true?`;
+export const notYetHint = 'Not yet hides this until a task is added.';
+export const notYetSaid = 'Hidden until a task is added.';
+/** A closed-ready goal's card sentence: the rollup's, and a quiet "ready to close?". */
+export const readySentence = (sentence) => `${sentence} · ready to close?`;

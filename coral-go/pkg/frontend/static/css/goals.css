@@ -42,11 +42,6 @@
 .goal-rollup-active { background: var(--accent); }
 .goal-rollup-blocked { background: var(--warning); }
 
-.goals-waiting { border: 1px solid var(--warning); border-radius: var(--radius-lg); padding: 10px 12px; background: rgba(var(--warning-rgb), 0.1); display: flex; flex-direction: column; gap: 6px; }
-.goals-waiting-head { margin: 0; font-size: 0.875rem; }
-.goals-waiting-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
-.goals-waiting-text { min-width: 0; overflow-wrap: anywhere; }
-.goals-label { color: var(--text-secondary); font-size: 0.75rem; }
 .goals-text { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
 .goals-sub { margin: 8px 0 0; font-size: 0.8125rem; color: var(--text-secondary); }
 .goals-detail-title { margin: 0; font-size: 1.0625rem; overflow-wrap: anywhere; }
@@ -82,14 +77,24 @@
     .goals-page.goals-open .goals-list-col { display: none; }
     .goals-detail-col { border: none; padding: 0; background: none; }
     .goals-back { display: inline-flex; align-items: center; }
-    .goals-chip, .goals-dialog .btn, .goals-new, .goal-task-actions .btn, .goals-waiting .btn, .goals-failed .btn, .goals-empty .btn { min-height: var(--control-touch-height, 44px); }
+    .goals-chip, .goals-dialog .btn, .goals-new, .goal-task-actions .btn, .goals-failed .btn, .goals-empty .btn { min-height: var(--control-touch-height, 44px); }
     .goals-dialog { width: 100vw; height: 100dvh; max-width: none; max-height: none; border-radius: 0; margin: 0; }
     .goals-field input, .goals-field select { min-height: var(--control-touch-height, 44px); }
     .goals-page.goals-open .goals-head, .goals-page.goals-open .goals-require { display: none; } /* an open goal is a screen of its own, the back row first (UI/UX #7113) */
     .goal-item { min-height: var(--control-touch-height, 44px); }
 }
 
-.goals-waiting-title { display: block; }
-.goals-waiting-question { display: block; }
 .goals-subtitle { margin: 2px 0 0; color: var(--text-secondary); font-size: 0.8125rem; }
 .goals-new { min-height: var(--control-touch-height, 44px); } /* the desktop chips and New goal are 44 px high too (#7250) */
+
+/* Close, Reopen and the all-done prompt (#7272). */
+.goals-close-dialog { max-height: calc(100dvh - 24px); overflow-y: auto; }
+.goals-close-goal { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.goals-warning { border: 1px solid var(--warning); border-radius: var(--radius-lg); padding: 8px 10px; background: rgba(var(--warning-rgb), 0.1); font-size: 0.8125rem; overflow-wrap: anywhere; }
+.goals-radios { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.goals-radios legend { font-size: 0.8125rem; padding: 0; margin-bottom: 2px; }
+.goals-radio { display: flex; align-items: center; gap: 8px; min-height: var(--control-touch-height, 44px); font-size: 0.875rem; cursor: pointer; }
+.goals-alldone { border: 1px solid var(--success); border-radius: var(--radius-lg); padding: 10px 12px; background: rgba(var(--success-rgb), 0.1); display: flex; flex-direction: column; gap: 6px; }
+.goals-alldone-text { margin: 0; overflow-wrap: anywhere; }
+.goals-alldone-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.goals-close, .goals-reopen, .goals-alldone-actions .btn { min-height: var(--control-touch-height, 44px); }
