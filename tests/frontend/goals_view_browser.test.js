@@ -86,7 +86,7 @@ const { GOALS, GOALS_STUB } = require('./helpers/goals_stub');
             console.log(`${at}: a goal with many tasks pages them`);
             await ev(`(() => { const rows = (from, n, st) => Array.from({ length: n }, (_, i) => ({ id: from + i, title: 'Task ' + (from + i), status: st }));
                 window.__goals = [...window.__goals, { id: 6, title: 'Many done', state: 'active', rollup: { done: 120, active: 0, blocked: 0, queued: 0 }, updated_at: new Date().toISOString() }, { id: 7, title: 'Capped', state: 'active', rollup: { done: 130, active: 0, blocked: 0, queued: 0 }, updated_at: new Date().toISOString() }, { id: 8, title: 'Cursor', state: 'active', rollup: { done: 80, active: 0, blocked: 0, queued: 0 }, updated_at: new Date().toISOString() }];
-                window.__tasks[6] = rows(1000, 120, 'completed'); window.__tasks[7] = rows(2000, 120, 'completed'); window.__tasks[8] = rows(3000, 50, 'completed'); window.__cursors = { 8: 'c1' }; window.__page2 = { 8: rows(3050, 30, 'completed') }; return true; })()`);
+                window.__tasks[6] = rows(1000, 120, 'completed'); window.__tasks[7] = rows(2000, 120, 'completed'); window.__tasks[8] = rows(3000, 50, 'completed'); window.__cursors = { 8: 'c1' }; window.__pagedGoals = { 6: 50 }; /* goal 6 is answered like the real route: 50 rows and a cursor */ window.__page2 = { 8: rows(3050, 30, 'completed') }; return true; })()`);
             await ev(`(async () => { (await import(${S} + 'goals_view.js')).loadGoals(); return true; })()`);
             await waitFor(`document.querySelectorAll('.goal-card').length === 8`, 'the extra goals', 6000);
             if (mobile) await ev(`document.querySelector('.goals-back') && document.querySelector('.goals-back').click(); true`);

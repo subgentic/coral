@@ -54,9 +54,15 @@ export async function loadGoals() {
 
 async function loadTasks(id) {
     try {
-        const page = toTaskPage(await readJson(`/tasks?goal=${encodeURIComponent(id)}`));
         const before = model.tasks.get(id);
-        model.tasks.set(id, { rows: page.rows, cursor: page.cursor, shown: before && before.rows ? Math.max(before.shown, PAGE) : PAGE, moreFailed: '' }); // a refresh keeps how many were shown (#7142)
+        const want = before && before.rows ? before.shown : PAGE; // a refresh covers as many rows as were shown: the route answers a page of 50 and a cursor, so it reads pages until it has them (QA's #7196)
+        let page = toTaskPage(await readJson(`/tasks?goal=${encodeURIComponent(id)}`));
+        let rows = page.rows, cursor = page.cursor;
+        for (let n = 0; cursor && rows.length < want && n < 40; n++) {
+            page = toTaskPage(await readJson(`/tasks?goal=${encodeURIComponent(id)}&cursor=${encodeURIComponent(cursor)}`));
+            rows = rows.concat(page.rows); cursor = page.cursor;
+        }
+        model.tasks.set(id, { rows, cursor, shown: before && before.rows ? Math.max(before.shown, PAGE) : PAGE, moreFailed: '' }); // a refresh keeps how many were shown (#7142)
     } catch (e) {
         model.tasks.set(id, { failed: String((e && e.message) || '') });
     }
