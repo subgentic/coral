@@ -5,6 +5,7 @@
 import { state } from './state.js';
 import { boardFetch, keyLabel, splitKey, LOCAL_SERVER } from './server_base.js';
 import { setRowCurrent, OPERATOR_ID } from './utils.js';
+import { browserLocal } from './safe_storage.js';
 import { onGoalsSeq } from './goals_feed.js';
 import { whenText } from './when_text.js';
 import { toGoalList, mergeGoalLists, toTaskPage, toDrivers, createBody, errorOf, LIST_PATH } from './goals_adapter.js';
@@ -48,14 +49,11 @@ export async function loadGoals() {
         }
         list.requireGoal = list.requireGoal || await settingsRead;
         if (project !== model.project) return;
-        const before = new Set(W.waitingGoals(model.goals).map(g => g.id)), refresh = !model.failed && model.goals.length > 0;
         const sig = JSON.stringify([list.goals, list.requireGoal, list.noGoalOpen]);
         same = !model.failed && !!model.goals.length && sig === model.sig; // nothing changed: the page is left as it is (a redraw would take the keyboard's place)
         model.sig = sig; model.goals = list.goals; model.requireGoal = list.requireGoal; model.noGoalOpen = list.noGoalOpen; model.failed = ''; model.asOf = clock();
         if (model.wantOpen) { const want = model.wantOpen; model.wantOpen = 0; if (model.goals.some(g => g.id === want)) { model.openId = want; same = false; focusHeading = true; } }
         if (model.openId && !model.goals.some(g => g.id === model.openId)) { model.openId = 0; same = false; }
-        const fresh = W.waitingGoals(model.goals).filter(g => !before.has(g.id));
-        if (refresh && fresh.length) say(W.needsYouText(fresh.map(g => g.title))); // a refresh that brings a goal waiting on the person says so once (#7250)
     } catch (e) {
         if (project !== model.project) return;
         model.failed = W.failedText(e && e.message); model.sig = '';
@@ -151,7 +149,7 @@ function goalCard(goal) {
     b.append(top);
     const meta = W.driverLine(goal.driver, whenText(goal.updatedAt));
     if (meta) b.append(el('span', 'goal-card-meta', meta));
-    b.append(rollupBar(goal.rollup), el('span', 'goal-card-sentence', W.rollupSentence(goal.rollup)));
+    b.append(rollupBar(goal.rollup), el('span', 'goal-card-sentence', W.readyToClose(goal) ? W.readySentence(W.rollupSentence(goal.rollup)) : W.rollupSentence(goal.rollup)));
     b.addEventListener('click', () => openGoal(goal.id, true));
     li.append(b);
     setRowCurrent(li, goal.id === model.openId);
@@ -169,20 +167,6 @@ function drawListRaw() {
         chips.append(c);
     }
     col.append(chips);
-    const waiting = W.waitingGoals(model.goals);
-    if (waiting.length && (model.filter === 'all' || model.filter === 'blocked')) { // the card follows the filter: a Done filter is not topped by a goal that is blocked (#7223)
-        const strip = el('div', 'goals-waiting');
-        strip.append(el('h3', 'goals-waiting-head', 'Waiting on you'));
-        for (const g of waiting) {
-            const row = el('div', 'goals-waiting-row');
-            const line = W.waitingLine(g), words = el('span', 'goals-waiting-text');
-            if (line.title) words.append(el('strong', 'goals-waiting-title', line.title)); // the goal's name on its own line, the question under it (#7252)
-            words.append(el('span', 'goals-waiting-question', line.text));
-            row.append(words, (() => { const open = btn('btn btn-small goals-waiting-open', 'Open the goal', () => openGoal(g.id, true)); if (g.title) open.setAttribute('aria-label', `Open the goal: ${g.title}`); return open; })());
-            strip.append(row);
-        }
-        col.append(strip);
-    }
     if (model.failed) {
         const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert');
         f.append(el('span', null, `${model.failed}${model.goals.length ? ` (${W.asOfText(model.asOf)})` : ''}`), btn('btn btn-small', 'Try again', loadGoals));
@@ -239,19 +223,16 @@ function drawDetailRaw() {
     const back = btn('goals-back', '‹ Goals', () => closeGoal());
     col.append(back);
     const h = el('h3', 'goals-detail-title', g.title); h.tabIndex = -1; h.id = 'goals-detail-title'; col.append(h);
-    const line = el('div', 'goals-detail-line'); line.append(stateChip(g)); const meta = W.driverLine(g.driver, whenText(g.updatedAt)); if (meta) line.append(el('span', 'goal-card-meta', meta)); col.append(line);
+    const line = el('div', 'goals-detail-line'); line.append(stateChip(g)); const meta = W.driverLine(g.driver, whenText(g.updatedAt)); if (meta) line.append(el('span', 'goal-card-meta', meta));
+    if (W.isOpenGoal(g)) line.append(btn('btn btn-small goals-close', 'Close goal', () => openClose(g)));
+    else if (W.isClosedGoal(g)) line.append(btn('btn btn-small goals-reopen', 'Reopen', () => reopenGoal(g)));
+    col.append(line);
     if (g.outcome) { col.append(el('h4', 'goals-sub', 'Outcome'), el('p', 'goals-text', g.outcome)); }
     if (g.doneWhen) { col.append(el('h4', 'goals-sub', 'Done when'), el('p', 'goals-text', g.doneWhen)); }
     col.append(rollupBar(g.rollup), el('p', 'goal-card-sentence', W.rollupSentence(g.rollup)));
     const openLeft = g.rollup.active + g.rollup.blocked + g.rollup.queued;
     if ((g.state === 'done' || g.state === 'dropped') && openLeft) col.append(el('p', 'goals-note goals-closed-open', W.closedWithOpenText(openLeft)));
-    if (W.waitingGoals([g]).length) {
-        const w = el('div', 'goals-waiting goals-waiting-full'); w.append(el('h4', 'goals-sub', 'Waiting on you'));
-        if (g.decision) w.append(el('p', 'goals-text', g.decision));
-        if (g.recommendation) { w.append(el('span', 'goals-label', 'Recommendation'), el('p', 'goals-text', g.recommendation)); }
-        if (g.ifSilent) { w.append(el('span', 'goals-label', 'If you say nothing'), el('p', 'goals-text', g.ifSilent)); }
-        col.append(w);
-    }
+    if (W.readyToClose(g) && !isNotYet(g)) col.append(allDoneStrip(g));
     col.append(el('h4', 'goals-sub', 'Tasks'));
     const tasks = model.tasks.get(g.id);
     if (!tasks) col.append(el('p', 'goals-note', 'Loading tasks…'));
@@ -272,7 +253,7 @@ function drawHead() {
     head.replaceChildren();
     const left = el('div', 'goals-head-text');
     const h = el('h2', 'goals-title', 'Goals'); h.tabIndex = -1;
-    left.append(h, el('p', 'goals-subtitle', W.goalsSubtitle), el('p', 'goals-sub-line', `This board only · ${W.goalCountLine(model.goals.length, W.waitingGoals(model.goals).length)}`));
+    left.append(h, el('p', 'goals-subtitle', W.goalsSubtitle), el('p', 'goals-sub-line', `This board only · ${W.goalCountLine(model.goals.length)}`));
     if (state.hubConnected || window.__goalsHub) left.append(el('p', 'goals-note', W.otherBoardsNote));
     head.append(left, btn('btn btn-primary goals-new', 'New goal', () => openCreate()));
     if (model.noGoalOpen > 0) left.append(el('p', 'goals-note goals-no-goal', W.noGoalTasksText(model.noGoalOpen))); // hidden while the route does not give the number
@@ -364,6 +345,81 @@ function openCreate() {
     });
     dlg.addEventListener('close', () => { model.creating = false; dlg.remove(); root.querySelector('.goals-new')?.focus(); });
     dlg.showModal(); t.focus();
+}
+
+// ── closing, reopening, and the all-done prompt (#7272, UI/UX's #7270) ─────
+
+const NOT_YET_KEY = 'coral.goals.notyet';
+const notYetKey = (g) => `${model.project}|${g.id}|${W.allTasksOf(g.rollup)}`; // per goal and task total: it comes back when a task is added or removed
+function notYetList() { try { const v = JSON.parse(browserLocal.get(NOT_YET_KEY) || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } }
+const isNotYet = (g) => notYetList().includes(notYetKey(g));
+function setNotYet(g) { try { browserLocal.set(NOT_YET_KEY, JSON.stringify([...notYetList().filter(k => k !== notYetKey(g)), notYetKey(g)].slice(-100))); } catch { /* the strip comes back on the next read */ } }
+
+/** The prompt above Tasks when every task of an active goal is done: a labelled region (not an alert), Close as done and Not yet. */
+function allDoneStrip(g) {
+    const s = el('section', 'goals-alldone'); s.setAttribute('aria-label', 'All tasks done');
+    const words = el('p', 'goals-alldone-text'); words.append(el('strong', null, W.allDoneLine(W.allTasksOf(g.rollup))), document.createTextNode(` ${W.allDoneAsk(g.doneWhen)}`));
+    const acts = el('div', 'goals-alldone-actions');
+    acts.append(btn('btn btn-primary btn-small goals-alldone-close', 'Close as done', () => openClose(g, 'done')), btn('btn btn-small goals-alldone-not-yet', 'Not yet', () => { setNotYet(g); drawDetail(); say(W.notYetSaid); root.querySelector('#goals-detail-title')?.focus(); }));
+    s.append(words, acts, el('p', 'goals-note', W.notYetHint));
+    return s;
+}
+
+async function reopenGoal(g) {
+    try {
+        const r = await boardFetch(model.project, `/goals/${g.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: OPERATOR_ID, state: 'active' }) });
+        if (!r.ok) throw await failure(r);
+        say(W.reopenedText);
+        await loadGoals();
+    } catch (ex) { say(`Not reopened: ${W.errorWords(ex && ex.code, ex && ex.message)}`); }
+    root.querySelector('#goals-detail-title')?.focus();
+}
+
+/** The Close dialog: a real dialog (focus trapped, Escape closes), described by the open-tasks warning when there is one. `preset` chooses Done (the all-done strip). */
+function openClose(g, preset) {
+    if (model.creating) return;
+    model.creating = true;
+    const open = W.openTasksOf(g.rollup), total = W.allTasksOf(g.rollup);
+    const dlg = document.createElement('dialog'); dlg.className = 'goals-dialog goals-close-dialog'; dlg.setAttribute('aria-labelledby', 'goals-close-title');
+    const form = el('form', 'goals-form'); form.noValidate = true;
+    const title = el('h3', null, W.closeTitle); title.id = 'goals-close-title';
+    const parts = [title, el('p', 'goals-close-goal', g.title)];
+    if (open) {
+        const warn = el('div', 'goals-warning'); warn.id = 'goals-close-warning';
+        const w = W.closeWarning(g.rollup); warn.append(el('strong', null, w.head), document.createTextNode(w.text));
+        dlg.setAttribute('aria-describedby', warn.id); parts.push(warn);
+    }
+    const choose = preset || (open === 0 && total > 0 ? 'done' : 'dropped');
+    const fs = el('fieldset', 'goals-radios'); fs.append(el('legend', null, 'Close it as'));
+    const radio = (value, label) => { const l = el('label', 'goals-radio'); const r = el('input'); r.type = 'radio'; r.name = 'goal-close-state'; r.value = value; r.checked = choose === value; l.append(r, el('span', null, label)); return l; };
+    fs.append(radio('done', W.closeDoneLabel), radio('dropped', W.closeDroppedLabel));
+    const reason = el('input'); reason.type = 'text'; reason.maxLength = 300; reason.autocomplete = 'off'; reason.id = 'goal-close-reason';
+    const rl = el('label', 'goals-field'); rl.append(el('span', null, W.closeReasonLabel), reason);
+    const err = el('p', 'goals-field-error'); err.setAttribute('role', 'alert'); err.id = 'goal-close-error';
+    const go = btn('btn btn-primary', 'Close goal'); go.type = 'submit';
+    const actions = el('div', 'goals-actions'); actions.append(btn('btn', 'Cancel', () => dlg.close()), go);
+    form.append(...parts, fs, rl, err, actions);
+    dlg.append(form); document.body.append(dlg);
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        err.textContent = '';
+        if (!reason.value.trim()) { err.textContent = W.closeReasonNeeded; reason.setAttribute('aria-invalid', 'true'); reason.setAttribute('aria-describedby', err.id); reason.focus(); return; }
+        reason.removeAttribute('aria-invalid'); reason.removeAttribute('aria-describedby'); go.disabled = true;
+        const as = form.querySelector('input[name="goal-close-state"]:checked')?.value === 'dropped' ? 'dropped' : 'done';
+        try {
+            const r = await boardFetch(model.project, `/goals/${g.id}/close`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: OPERATOR_ID, reason: reason.value.trim(), state: as }) });
+            if (!r.ok) throw await failure(r);
+            dlg.close();
+            say(W.closedAsText(as, open));
+            await loadGoals();
+            root.querySelector('#goals-detail-title')?.focus();
+        } catch (ex) {
+            if (ex && ex.code === 'goal_already_closed') { dlg.close(); say(W.alreadyClosedText); await loadGoals(); return; }
+            err.textContent = `The goal was not closed: ${W.errorWords(ex && ex.code, ex && ex.message)}`; go.disabled = false;
+        }
+    });
+    dlg.addEventListener('close', () => { model.creating = false; dlg.remove(); (root.querySelector('.goals-close') || root.querySelector('#goals-detail-title'))?.focus(); });
+    dlg.showModal(); (form.querySelector('input[name="goal-close-state"]:checked') || reason).focus();
 }
 
 // ── showing and hiding ───────────────────────────────────────────────────
