@@ -172,7 +172,7 @@ func classifyApproval(agentType, capture string) approvalDecision {
 		// The FIRST (topmost) run-command header above the menu opens the prompt: a command that prints a header line of its own cannot hide the lines above it by starting a "nearer" one (#7208).
 		// Two headers in the span are read as they are (screenAction asks about it); the kind is the first one's.
 		header := -1
-		for i := firstOpt - 1; i >= 0 && i >= firstOpt-40; i-- {
+		for i := firstOpt - 1; i >= 0; i-- { // the whole capture above the menu, not a window: a long command cannot push its own first lines out of the span (#7222)
 			if m := codexApprovalHeaderRe.FindStringSubmatch(lines[i]); m != nil {
 				header = i
 				d.Kind = "command"
@@ -196,7 +196,7 @@ func classifyApproval(agentType, capture string) approvalDecision {
 	case at.Agy, at.Antigravity, at.Gemini:
 		// The first header above the menu opens the span here too (#7208): a command that prints a header line of its own cannot hide the lines above it.
 		header := -1
-		for i := firstOpt - 1; i >= 0 && i >= firstOpt-40; i-- {
+		for i := firstOpt - 1; i >= 0; i-- { // the whole capture above the menu, not a window: a long command cannot push its own first lines out of the span (#7222)
 			if agyApprovalHeaderRe.MatchString(lines[i]) {
 				header = i
 				d.Kind = "command"

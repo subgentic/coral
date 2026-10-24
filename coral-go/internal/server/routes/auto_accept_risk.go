@@ -991,7 +991,7 @@ func screenAction(agentType string, d approvalDecision, capture string) (string,
 	case at.Agy, at.Antigravity, at.Gemini:
 		var parts []string
 		inCmd := false
-		headers := 0
+		headers, questions := 0, 0
 		for _, l := range d.Context {
 			if agyApprovalHeaderRe.MatchString(l) {
 				headers++
@@ -1005,9 +1005,13 @@ func screenAction(agentType string, d approvalDecision, capture string) (string,
 				continue
 			}
 			if agyApprovalQuestionRe.MatchString(l) {
-				break
+				questions++
+				if questions > 1 {
+					return "ambiguous", "" // two question lines: the command's own text printed one, and what it asks about is unclear (#7222)
+				}
+				continue
 			}
-			if inCmd {
+			if inCmd && questions == 0 {
 				parts = append(parts, strings.TrimSpace(l))
 			}
 		}
