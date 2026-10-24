@@ -23,7 +23,7 @@ var routeQueries = map[string]string{
 	"GET /api/board/{}/messages/all":              "after_id,before_id,format,id,limit,offset,task_id",
 	"GET /api/board/{}/messages/search":           "cursor,from,limit,mentions,q,since,sort,until",
 	"GET /api/board/{}/status":                    "activity,name,subscriber_id",
-	"GET /api/board/{}/tasks":                     "cursor,full,goal,limit,session_id,status",
+	"GET /api/board/{}/tasks":                     "cursor,full,goal,limit,status",
 	"GET /api/board/{}/tasks/{}/artifact-content": "index,source",
 	"GET /api/call-metrics/summary":               "hours",
 	"GET /api/filesystem/is-git":                  "path*",

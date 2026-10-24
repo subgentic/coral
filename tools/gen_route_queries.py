@@ -29,9 +29,6 @@ FILE_PARAMS = {'filepath', 'dir', 'path', 'working_directory', 'file', 'ref', 'c
 # against this table (coral-hub internal/e2e TestChromeUIPass records them). Add here, with the reason, never
 # loosen the table any other way.
 EXTRA = {
-    # The recorded hub UI sends session_id with the board task list (pkg/tunnel TestRealUIQueriesAreNotRefused); the list
-    # is per board, so BoardHandler.ListTasks ignores it. It was allowed before only because a same-named handler read it.
-    'GET /api/board/{}/tasks': {'session_id'},
     # The Team Artifacts list's query (#4572): parseTeamArtifactQuery reads these from a url.Values it is handed, not from the request,
     # which the scan above does not follow. Search, filters, sort and cursor paging on the existing route.
     'GET /api/board/{}/artifacts': {'q', 'kind', 'origin', 'by', 'board', 'kept', 'since', 'until', 'sort', 'cursor'},

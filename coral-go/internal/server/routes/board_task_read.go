@@ -26,6 +26,10 @@ func (h *BoardHandler) ListTasks(w http.ResponseWriter, r *http.Request) {
 	project := urlParam(r, "project")
 	h.setBoardIdentity(w, r, project)
 	q := r.URL.Query()
+	if q.Get("full") == "1" && q.Get("goal") != "" {
+		errBadRequest(w, "full=1 and goal cannot be combined: a goal's tasks are paged (limit, cursor)")
+		return
+	}
 	if q.Get("full") == "1" {
 		// Every task in full, but not without end: a viewer or an agent can ask for it (#4602). Past maxFullTaskRows the reply
 		// is cut and says so; the paged list (no full=1) reaches the rest.

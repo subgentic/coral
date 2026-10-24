@@ -474,3 +474,23 @@ func TestGoalTasksReadPagesWithACursor(t *testing.T) {
 	code, page = call("GET", "/api/board/team/tasks?cursor="+cur, nil)
 	assert.Equal(t, 400, code, "a goal's cursor on the plain list: %v", page)
 }
+
+// #7217 (Security's read): full=1 and goal= together are a 400 that says so, not the full list with the goal silently ignored (the answer would be every task of the board, under a goal's name).
+func TestTaskListRefusesFullWithGoal(t *testing.T) {
+	server, h := setupBoardTestServer(t)
+	registerTaskPlanner(t, h, "team", "Orchestrator")
+	call := goalCall(t, server.URL)
+	_, g := call("POST", "/api/board/team/goals", map[string]any{"title": "G", "subscriber_id": "Orchestrator"})
+	gid := int64(g["id"].(float64))
+	_, err := h.bs.CreateTaskWithOpts(context.Background(), "team", "elsewhere", "", "medium", "Orchestrator", nil)
+	require.NoError(t, err)
+	code, out := call("GET", "/api/board/team/tasks?full=1&goal="+itoa(gid), nil)
+	assert.Equal(t, 400, code, "%v", out)
+	assert.Contains(t, out["error"], "full")
+	assert.Contains(t, out["error"], "goal")
+	assert.NotContains(t, out, "tasks", "not the board's tasks under a goal's name")
+	code, out = call("GET", "/api/board/team/tasks?goal="+itoa(gid), nil)
+	assert.Equal(t, 200, code, "the goal read alone is unchanged: %v", out)
+	code, out = call("GET", "/api/board/team/tasks?full=1", nil)
+	assert.Equal(t, 200, code, "full alone is unchanged: %v", out)
+}
