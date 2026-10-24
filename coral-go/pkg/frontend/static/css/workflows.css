@@ -788,3 +788,20 @@
 .wf-hints[open] { display: flex; flex-direction: column; gap: 2px; }
 .wf-hints p { margin: 0; font-size: var(--fs-md); line-height: 1.45; color: var(--text-secondary); }
 .wf-hints strong { color: var(--text-primary); font-weight: 600; }
+/* The workflow pages (#7156): a closed step shows the first line of its output, the file chips are behind Files, Delete is behind More, and on a phone the steps come before the meta line. */
+.wf-run-step-peek { color: var(--text-secondary); font-family: var(--font-mono); font-size: var(--fs-base); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1 1 auto; margin-left: 6px; }
+.wf-run-step-output-toggle[aria-expanded="true"] .wf-run-step-peek { display: none; }
+.wf-step-files-more { margin-top: 6px; }
+.wf-step-files-more > summary { cursor: pointer; color: var(--text-muted); font-size: var(--fs-base); width: fit-content; }
+.wf-step-files-more[open] > summary { margin-bottom: 4px; }
+.wf-step-files-more .wf-step-files { margin-top: 0; }
+.wf-more { position: relative; }
+.wf-more-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 5; min-width: 120px; padding: 6px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-lg); }
+.wf-more-menu[hidden] { display: none; }
+.wf-more-menu .btn { width: 100%; margin: 0; }
+@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
+    #wf-detail { display: flex; flex-direction: column; }
+    #wf-detail .wf-detail-meta { order: 3; }
+    #wf-detail .wf-runs-section { order: 4; }
+    .wf-more-menu .btn, .wf-more-btn, .wf-step-files-more > summary { min-height: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); display: flex; align-items: center; }
+}

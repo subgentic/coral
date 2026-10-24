@@ -9,7 +9,7 @@ import { note, currentRoute } from './nav.js';
 import { KILL_LOG_NOTE } from './render.js';
 import { formatDuration as fmtDuration } from './format.js';
 import { runFailureHtml, runFailureTag } from './run_failure.js';
-import { whenWords, resultWords, limitWords } from './job_words.js'; // the Jobs pages' words: one set for both
+import { whenWords, resultWords, limitWords, stepWords } from './job_words.js'; // the Jobs pages' words: one set for both
 import { limitSeconds, limitParts } from './time_limit.js';
 
 let workflows = [];
@@ -330,11 +330,16 @@ function renderWorkflowDetail(wf, runs) {
                 <button class="btn btn-sm" data-on-click="wf-edit-agent" data-workflow-id="${Number(wf.id)}">
                     <span class="material-icons" style="font-size:0.875rem" aria-hidden="true">smart_toy</span> Edit with Agent
                 </button>
-                <button class="btn btn-sm" style="color:var(--error-text)" data-on-click="wf-delete" data-workflow-id="${Number(wf.id)}" data-name="${escAttr(wf.name)}">Delete</button>
+                <div class="wf-more">
+                    <button class="btn btn-sm wf-more-btn" type="button" data-on-click="wf-more" aria-expanded="false" aria-controls="wf-more-menu-${Number(wf.id)}" aria-label="More for ${escAttr(wf.name)}">More</button>
+                    <div class="wf-more-menu" id="wf-more-menu-${Number(wf.id)}" hidden>
+                        <button class="btn btn-sm" style="color:var(--error-text)" data-on-click="wf-delete" data-workflow-id="${Number(wf.id)}" data-name="${escAttr(wf.name)}">Delete</button>
+                    </div>
+                </div>
             </div>
         </div>
         <div class="wf-detail-meta">
-            <span><span class="material-icons" aria-hidden="true">folder</span> ${esc(wf.repo_path || 'Not set')}</span>
+            <span><span class="material-icons" aria-hidden="true">folder</span> Folder: ${esc(wf.repo_path || 'not set')}</span>
             <span><span class="material-icons" aria-hidden="true">timer</span> Time limit ${limitWords(wf.max_duration_s || 3600)}</span>
             <span><span class="material-icons" aria-hidden="true">schedule</span> Created ${formatTime(wf.created_at)}</span>
             ${wf.enabled ? '' : '<span style="color:var(--warning)"><span class="material-icons" aria-hidden="true">pause_circle</span> Disabled</span>'}
@@ -453,9 +458,11 @@ function renderRunDetail(run) {
         if (s.output_tail) {
             const outputId = `wf-step-output-${run.id}-${i}`;
             const autoExpand = isFailed ? ' wf-expanded' : '';
+            const first = String(s.output_tail).split('\n').map(l => l.trim()).find(Boolean) || ''; // a closed step says what its output began with (#7156)
+            const peek = first ? `<span class="wf-run-step-peek">${esc(first.length > 120 ? first.slice(0, 119) + '…' : first)}</span>` : '';
             outputHtml = `
                 <button type="button" class="wf-run-step-output-toggle" aria-expanded="${escAttr(isFailed)}" aria-controls="${escAttr(outputId)}" aria-label="${escAttr('Output of ' + (s.name || 'step ' + (i + 1)))}" data-on-click="wf-output-toggle">
-                    <span class="material-icons" style="font-size:0.875rem" aria-hidden="true">terminal</span> Output
+                    <span class="material-icons" style="font-size:0.875rem" aria-hidden="true">terminal</span> Output${peek}
                     <span class="material-icons wf-toggle-arrow" style="font-size:0.875rem" aria-hidden="true">expand_more</span>
                 </button>
                 <div id="${escAttr(outputId)}" class="wf-run-step-output${autoExpand}">${esc(s.output_tail)}</div>`;
@@ -472,10 +479,7 @@ function renderRunDetail(run) {
         const files = s.files || [];
         if (files.length > 0) {
             const fileItems = files.map(f => `<span class="wf-step-file">${esc(f)}</span>`).join('');
-            filesHtml = `<div class="wf-step-files">
-                <span class="material-icons" style="font-size:0.8125rem;color:var(--text-muted)" aria-hidden="true">folder_open</span>
-                ${fileItems}
-            </div>`;
+            filesHtml = `<details class="wf-step-files-more"><summary aria-label="${escAttr('Files of ' + (s.name || 'step ' + (i + 1)))}">Files</summary><div class="wf-step-files">${fileItems}</div></details>`; // exit_code, stderr.txt, stdout.txt: the way to the files, not the face of the step (#7156)
         }
 
         // Session link for agent steps
@@ -520,7 +524,7 @@ function renderRunDetail(run) {
     const focusKey = document.activeElement && container.contains(document.activeElement) ? (document.activeElement.getAttribute('aria-controls') ? `c:${document.activeElement.getAttribute('aria-controls')}` : `a:${document.activeElement.dataset.onClick || ''}:${document.activeElement.dataset.session || document.activeElement.dataset.runId || ''}`) : '';
     container.innerHTML = `
         <div class="wf-run-header">
-            <h3 class="wf-run-title">Run #${run.id} <span style="color:var(--text-secondary);font-weight:400">— ${esc(run.workflow_name || '')}</span></h3>
+            <h3 class="wf-run-title">Run #${run.id}</h3>
             <div style="display:flex;gap:6px">${retriggerBtn}${killBtn}</div>
         </div>
         <div class="wf-run-meta">
@@ -529,7 +533,7 @@ function renderRunDetail(run) {
             ${run.started_at ? `<span><span class="material-icons" aria-hidden="true">schedule</span> ${formatTime(run.started_at)}</span>` : ''}
             ${durationHtml}
             ${run.finished_at ? `<span><span class="material-icons" aria-hidden="true">check_circle</span> ${formatTime(run.finished_at)}</span>` : ''}
-            ${signInFailure ? `<span class="wf-run-error" style="color:var(--error-text)"><span class="material-icons" aria-hidden="true">error</span> ${signInFailure}</span>` : run.error_msg ? `<span class="wf-run-error" style="color:var(--error-text)"><span class="material-icons" aria-hidden="true">error</span> ${esc(run.error_msg)}${errorExcerpt ? `<span class="wf-run-error-excerpt">: ${esc(errorExcerpt)}</span>` : ''}</span>` : ''}
+            ${signInFailure ? `<span class="wf-run-error" style="color:var(--error-text)"><span class="material-icons" aria-hidden="true">error</span> ${signInFailure}</span>` : run.error_msg ? `<span class="wf-run-error" style="color:var(--error-text)"><span class="material-icons" aria-hidden="true">error</span> <span class="wf-run-error-text">${esc(stepWords(String(run.error_msg).trim()))}${errorExcerpt ? `<span class="wf-run-error-excerpt">: ${esc(errorExcerpt)}</span>` : ''}</span></span>` : ''}
         </div>
         ${progressBarHtml}
         <div class="wf-run-steps wf-timeline">${stepsHtml}</div>
@@ -869,6 +873,7 @@ registerActions({
     // Deleting still asks first (deleteWorkflow's confirmation dialog); the name is only shown in it.
     'wf-delete': el => withId(el.dataset.workflowId, id => deleteWorkflow(id, String(el.dataset.name || ''))),
     'wf-kill-run': el => withId(el.dataset.runId, confirmKillWorkflowRun),
+    'wf-more': el => { const menu = document.getElementById(el.getAttribute('aria-controls')); if (!menu) return; menu.hidden = !menu.hidden; el.setAttribute('aria-expanded', String(!menu.hidden)); }, // Delete sits behind More, as on a job's page (#7156)
     'wf-output-toggle': el => {
         const out = document.getElementById(el.getAttribute('aria-controls'));
         if (out) el.setAttribute('aria-expanded', String(out.classList.toggle('wf-expanded')));

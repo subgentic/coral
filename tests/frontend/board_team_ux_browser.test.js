@@ -311,7 +311,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 toggleTag: toggle?.tagName, toggleExpanded: toggle?.getAttribute('aria-expanded') };
         })()`);
         assert.equal(run.error, 'warming up\nboom: config missing', 'the failed step shows its stderr');
-        assert.match(run.header, /step 1 \(two\) failed: exit code 3: boom: config missing$/, 'the run header quotes the last stderr line');
+        assert.match(run.header, /step 2 \(two\) failed: exit code 3: boom: config missing$/, 'the run header quotes the last stderr line');
         assert.equal(run.collapsedHeight, 0, 'a collapsed output box shows nothing');
         assert.equal(run.toggleTag, 'BUTTON', 'the Output toggle is a button');
         assert.equal(run.toggleExpanded, 'false');

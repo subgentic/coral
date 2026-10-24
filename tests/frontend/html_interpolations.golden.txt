@@ -693,6 +693,7 @@
 1	workflows.js	durationHtml
 1	workflows.js	ecClass
 1	workflows.js	enabledBadge
+1	workflows.js	escAttr('Files of ' + (s.name || 'step ' + (i + 1)))
 1	workflows.js	escAttr('Output of ' + (s.name || 'step ' + (i + 1)))
 1	workflows.js	escAttr('View agent of ' + (s.name || 'step ' + (i + 1)))
 1	workflows.js	escAttr(STEP_WORDS[s.status] || 'Waiting')
@@ -701,7 +702,7 @@
 2	workflows.js	escAttr(outputId)
 1	workflows.js	escAttr(runLabel)
 1	workflows.js	escAttr(s.session_name || s.session_id)
-1	workflows.js	escAttr(wf.name)
+2	workflows.js	escAttr(wf.name)
 1	workflows.js	exitCodeHtml
 1	workflows.js	fileItems
 1	workflows.js	filesHtml
@@ -720,6 +721,7 @@
 1	workflows.js	limitWords(wf.max_duration_s || 3600)
 1	workflows.js	lr.started_at ? '&middot; ' + formatTime(lr.started_at) : ''
 1	workflows.js	outputHtml
+1	workflows.js	peek
 1	workflows.js	progressBarHtml
 1	workflows.js	progressPct
 1	workflows.js	retriggerBtn
