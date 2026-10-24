@@ -39,6 +39,36 @@ func run(t *testing.T, s *Stub, limit time.Duration, stdin string, args ...strin
 	return o.String(), e.String(), code, took, killed
 }
 
+// runUntil starts the stub and ends it (the way a caller's own limit would) once ready says what the test waited for has happened, e.g. that the stand-in logged its start: the limit is a signal, not a
+// number of milliseconds a busy machine can start a script slower than (#7163). The ceiling only ends a stand-in that never starts. It reports whether the stub was still running when it was ended.
+func runUntil(t *testing.T, s *Stub, ready func() bool, args ...string) (killed bool) {
+	t.Helper()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	cmd := exec.CommandContext(ctx, s.Path(), args...)
+	require.NoError(t, cmd.Start())
+	done := make(chan struct{})
+	go func() { _ = cmd.Wait(); close(done) }()
+	deadline := time.After(2 * time.Minute)
+	for !ready() {
+		select {
+		case <-done:
+			return false // it ended on its own before the signal
+		case <-deadline:
+			t.Fatal("the stand-in never showed the signal")
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+	select {
+	case <-done:
+		return false
+	default:
+	}
+	cancel() // the caller's limit
+	<-done
+	return true
+}
+
 // killLimit is when a test ends a child that is stuck: generous, because it is not what tells a hold from a plain run (NoSlower does, against a signed-in control), and a busy machine
 // starts a script slowly.
 const killLimit = 30 * time.Second
@@ -87,9 +117,9 @@ func TestAuthStatusInEachState(t *testing.T) {
 	}
 
 	s.Set(HangingAuth)
-	_, _, _, took, killed := run(t, s, 700*time.Millisecond, "", "auth", "status")
+	// The caller's own limit ends it once the stand-in has logged its start (a signal: a loaded machine starts the script later than any fixed 700 ms).
+	killed := runUntil(t, s, func() bool { return len(s.AuthChecks()) >= 4 }, "auth", "status")
 	assert.True(t, killed, "a hanging `auth status` is ended by the caller's own limit")
-	assert.Less(t, took, 2*killLimit)
 	assert.Len(t, s.AuthChecks(), 4, "every check is logged, including the hanging one")
 	assert.Zero(t, s.Grabs(), "asking for the status never starts a login")
 }
