@@ -180,8 +180,9 @@ function _setBoardTasks() {
 export async function loadBoardTasks(boardName) {
     _syncTaskFiltersBoard(boardName);
     _goalBoard = boardName || '';
-    if (boardName) refreshGoalTitles(boardName).then(changed => { if (changed) renderBoardTaskList(); }, () => {}); // the goal chips name their goals once the titles are read (#7253)
     await _loadBoardTasksDefault(boardName);
+    // The goal chips name their goals once the titles are read (#7253): a board whose tasks serve no goal reads none (select_session_trace pins a board's requests; #7346).
+    if (boardName && (state.currentBoardTasks || []).some(t => t && t.goal_id)) refreshGoalTitles(boardName).then(changed => { if (changed) renderBoardTaskList(); }, () => {});
     if (_queryActive()) await _loadFilteredTasks(boardName, { refresh: true });
 }
 
