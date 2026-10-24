@@ -104,7 +104,7 @@ export function healthCard(h, { title = 'Machine health', online = false, waitin
     card.className = 'machine-health-card';
     const head = document.createElement('div');
     head.className = 'machine-health-head';
-    const t = document.createElement('h5');
+    const t = document.createElement('h6');
     t.className = 'machine-health-title';
     t.textContent = title;
     const status = document.createElement('span');

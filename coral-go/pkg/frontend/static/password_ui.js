@@ -21,8 +21,9 @@ const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls)
 
 /** A labelled password input with a Show/Hide button. `autocomplete` is what tells a password manager to save or fill. */
 export function passwordField({ id, label, autocomplete, name }) {
-    const wrap = el('label', 'pw-field');
-    wrap.append(el('span', 'pw-label', label));
+    const wrap = el('div', 'pw-field'); // a div: the Show button sits beside the label, not inside it, so the field's name is its label's words (#7282)
+    const lab = el('label', 'pw-label', label); lab.htmlFor = id;
+    wrap.append(lab);
     const row = el('span', 'pw-input-row');
     const input = el('input', 'pw-input');
     input.type = 'password'; input.id = id; input.name = name || id; input.autocomplete = autocomplete;

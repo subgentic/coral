@@ -4643,6 +4643,7 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .settings-cli-details > summary { cursor: pointer; font-weight: 600; font-size: var(--fs-md); min-height: 32px; display: flex; align-items: center; }
 .settings-cli-details[open] > summary { margin-bottom: 8px; }
 .settings-cli-details > summary { gap: 6px; }
+.settings-cli-details > summary { list-style: none; }
 .settings-cli-details > summary::-webkit-details-marker { display: none; }
 .settings-cli-details > summary::before { content: '▸'; font-size: 0.75rem; flex: none; } /* a flex summary draws no marker of its own, and the line read as a caption (#7041) */
 .settings-cli-details[open] > summary::before { transform: rotate(90deg); }

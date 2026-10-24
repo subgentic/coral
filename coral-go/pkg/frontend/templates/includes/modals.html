@@ -711,7 +711,7 @@
                 <dd class="settings-cli-paths">
                     <label class="settings-cli-row">
                         <span class="settings-cli-label">Claude</span>
-                        <select id="settings-default-thinking-claude" class="settings-input">
+                        <select id="settings-default-thinking-claude" class="settings-input" aria-label="Claude default thinking">
                             <option value="">The CLI's own default</option>
                             <option value="low">Low</option>
                             <option value="medium">Medium</option>
@@ -846,11 +846,11 @@
                 </div>
                 {{ template "includes/toggle_row" (toggle "settings-fit-pane-width" "Fit pane width" "With the tmux backend, the terminal takes the size of this browser window.") }}
             <!-- Settings > Terminal backend (#3634): filled by terminal_backend.js; never shown through Coral Hub. -->
-            <div class="tb-row" id="settings-terminal-backend" role="group" aria-labelledby="tb-label" hidden>
+            <div class="tb-row" id="settings-terminal-backend" role="radiogroup" aria-labelledby="tb-label" hidden>
                 <div class="tb-head"><span class="tb-label" id="tb-label">Terminal backend</span><span class="tb-now" id="tb-now"></span></div>
                 <div id="tb-choice">
-                    <label class="tb-opt"><input type="radio" name="terminal-backend" value="tmux" id="tb-opt-tmux"><span><span class="tb-t">tmux: agents keep running when you quit Coral, and can reach each other's terminals</span><button type="button" class="tb-learn" aria-expanded="false" aria-controls="tb-d-tmux" data-about="tmux">Learn more</button><span class="tb-d" id="tb-d-tmux" hidden>Agents keep running when Coral restarts, upgrades or crashes, and Coral picks them up again afterwards. Coral keeps its terminals in a tmux server whose socket sits in your Coral data folder. Any agent, and any other program running as you, can find that socket and read or type into other agents' terminals. Choose this if you restart or upgrade Coral often.</span></span></label>
-                    <label class="tb-opt"><input type="radio" name="terminal-backend" value="pty" id="tb-opt-pty"><span><span class="tb-t">pty: agents stop when you quit Coral<span id="tb-pty-wakes"> and wake next time</span> <span class="tb-default">(default)</span></span><button type="button" class="tb-learn" aria-expanded="false" aria-controls="tb-d-pty" data-about="pty">Learn more</button><span class="tb-d" id="tb-d-pty" hidden>Coral holds each terminal itself, so there is no shared socket for an agent to use against another agent. The price: agents end whenever Coral restarts, upgrades or crashes (Coral puts them to sleep first when it stops cleanly, and marks them asleep at the next start after a crash). When Coral starts again it wakes them one at a time (not if Coral has restarted several times in a row; up to the number set below; more after you confirm; you can turn this off), and they resume their conversation, but a tool that was running is not continued.</span></span></label>
+                    <label class="tb-opt"><input type="radio" name="terminal-backend" value="tmux" id="tb-opt-tmux" aria-label="tmux" aria-describedby="tb-t-tmux"><span><span class="tb-t" id="tb-t-tmux">tmux: agents keep running when you quit Coral, and can reach each other's terminals</span><button type="button" class="tb-learn" aria-expanded="false" aria-controls="tb-d-tmux" data-about="tmux">Learn more</button><span class="tb-d" id="tb-d-tmux" hidden>Agents keep running when Coral restarts, upgrades or crashes, and Coral picks them up again afterwards. Coral keeps its terminals in a tmux server whose socket sits in your Coral data folder. Any agent, and any other program running as you, can find that socket and read or type into other agents' terminals. Choose this if you restart or upgrade Coral often.</span></span></label>
+                    <label class="tb-opt"><input type="radio" name="terminal-backend" value="pty" id="tb-opt-pty" aria-label="pty" aria-describedby="tb-t-pty"><span><span class="tb-t" id="tb-t-pty">pty: agents stop when you quit Coral<span id="tb-pty-wakes"> and wake next time</span> <span class="tb-default">(default)</span></span><button type="button" class="tb-learn" aria-expanded="false" aria-controls="tb-d-pty" data-about="pty">Learn more</button><span class="tb-d" id="tb-d-pty" hidden>Coral holds each terminal itself, so there is no shared socket for an agent to use against another agent. The price: agents end whenever Coral restarts, upgrades or crashes (Coral puts them to sleep first when it stops cleanly, and marks them asleep at the next start after a crash). When Coral starts again it wakes them one at a time (not if Coral has restarted several times in a row; up to the number set below; more after you confirm; you can turn this off), and they resume their conversation, but a tool that was running is not continued.</span></span></label>
                     <p class="tb-pending" id="tb-pending" role="status"></p>
                 </div>
                 <!-- #3636: on pty, wake the agents that were running when Coral stopped -->
@@ -992,9 +992,9 @@
                 </dt>
                 <dd>
                     <div class="settings-controls-row">
-                    <label class="settings-inline">Older than <input type="number" id="settings-prune-days" min="1" max="3650" step="1" value="14" inputmode="numeric"> days</label>
+                    <label class="settings-inline">Older than <input type="number" id="settings-prune-days" aria-label="Older than, in days, free space" min="1" max="3650" step="1" value="14" inputmode="numeric"> days</label>
                     <label class="settings-inline">What to prune
-                    <select id="settings-prune-kind">
+                    <select id="settings-prune-kind" aria-label="What to prune, free space">
                         <option value="diffs">Saved diffs</option>
                         <option value="objects">Unlinked artifacts</option>
                         <option value="all">Both</option>
@@ -1013,9 +1013,9 @@
                 <dd>
                     <div class="settings-controls-row">
                     <label class="settings-inline" for="settings-retention-days">Older than</label>
-                    <span class="settings-unit-field"><input type="number" id="settings-retention-days" min="0" max="3650" step="1" inputmode="numeric" aria-describedby="settings-retention-status settings-retention-days-unit"><span class="settings-field-unit" id="settings-retention-days-unit">days</span></span>
+                    <span class="settings-unit-field"><input type="number" id="settings-retention-days" aria-label="Older than, in days, automatic cleanup" min="0" max="3650" step="1" inputmode="numeric" aria-describedby="settings-retention-status settings-retention-days-unit"><span class="settings-field-unit" id="settings-retention-days-unit">days</span></span>
                     <label class="settings-inline">What to prune
-                    <select id="settings-retention-kind">
+                    <select id="settings-retention-kind" aria-label="What to prune, automatic cleanup">
                         <option value="diffs">Saved diffs</option>
                         <option value="objects">Unlinked artifacts</option>
                         <option value="all">Both</option>
@@ -1053,7 +1053,7 @@
                         <h4 class="settings-pane-title">Network and Hub</h4>
                         <div class="info-grid settings-grid net-groups">
                 <section class="settings-row net-group" id="net-group-access" aria-labelledby="net-access-title">
-                <div class="net-group-head"><h3 id="net-access-title" class="net-group-title">Remote access</h3><label class="check-hit"><input type="checkbox" id="settings-remote-access-enabled" aria-labelledby="net-access-title" aria-describedby="settings-remote-access-status net-remote-note settings-remote-access-enabled-desc"></label></div>
+                <div class="net-group-head"><h5 id="net-access-title" class="net-group-title">Remote access</h5><label class="check-hit"><input type="checkbox" id="settings-remote-access-enabled" aria-labelledby="net-access-title" aria-describedby="settings-remote-access-status net-remote-note settings-remote-access-enabled-desc"></label></div>
                 <div class="net-body">
                     <div id="settings-remote-access-status" class="settings-hint" role="status">Loading effective access status…</div>
                     <div id="net-remote-note" class="settings-hint" role="status"></div>
@@ -1062,7 +1062,7 @@
                 
                         <!-- About: the version (Coral has no paid licence, #3221) -->
                         <div class="settings-section settings-about-section" id="about-section">
-                            <h4 class="settings-about-title">About</h4>
+                            <h6 class="settings-about-title">About</h6>
                             <div id="app-version-label" class="settings-version-label"></div>
                             <!-- This machine's health from the feed (#3446); a hub-served page has no machine of its own: it is part of About (UI audit #5589, finding 19) -->
                             <div class="settings-machine-health" data-local-only>
@@ -1072,7 +1072,7 @@
                         </div>
                     </section>
                 <section class="settings-row settings-row-wide net-group" id="net-group-setup" aria-labelledby="net-setup-title" hidden>
-                <div class="net-group-head"><h3 id="net-setup-title" class="net-group-title">Setup code</h3></div>
+                <div class="net-group-head"><h5 id="net-setup-title" class="net-group-title">Setup code</h5></div>
                 <div class="net-body">
                     <button type="button" class="btn btn-small" id="settings-setup-code-reveal" aria-expanded="false" aria-controls="settings-setup-code-box">Show setup code</button>
                     <div id="settings-setup-code-box" class="settings-cloud-usercode-row" hidden>
@@ -1083,7 +1083,7 @@
                 </div>
                 </section>
                 <section class="settings-row settings-row-wide net-group" id="net-group-hub" aria-labelledby="net-hub-title">
-                <div class="net-group-head"><h3 id="net-hub-title" class="net-group-title">Coral Hub</h3></div>
+                <div class="net-group-head"><h5 id="net-hub-title" class="net-group-title">Coral Hub</h5></div>
                 <div class="net-body" id="settings-cloud">
                     <div class="settings-cloud-head">
                         <div id="settings-cloud-status" data-cloud="status" class="settings-hint" role="status" aria-live="polite">Loading…</div>
@@ -1156,7 +1156,7 @@
                 </section>
                 <section class="settings-row settings-row-hub net-group" id="net-group-manage" aria-labelledby="settings-hub-mode-label">
                 <!-- Manage other computers from this one (#3460, hub_mode_setting.js): saved at once, applied at the next start -->
-                <div class="net-group-head"><h3 id="settings-hub-mode-label" class="net-group-title">Manage other computers from this one</h3><label class="settings-hub-mode-toggle"><input type="checkbox" id="settings-hub-mode-enabled" aria-labelledby="settings-hub-mode-label" aria-describedby="settings-hub-mode-line settings-hub-mode-desc settings-hub-mode-status"></label></div>
+                <div class="net-group-head"><h5 id="settings-hub-mode-label" class="net-group-title">Manage other computers from this one</h5><label class="settings-hub-mode-toggle"><input type="checkbox" id="settings-hub-mode-enabled" aria-labelledby="settings-hub-mode-label" aria-describedby="settings-hub-mode-line settings-hub-mode-desc settings-hub-mode-status"></label></div>
                 <div class="net-body" id="settings-hub-mode">
                     <div id="settings-hub-mode-line" class="settings-hint">Adds a Servers tab, with full control of those computers.</div>
                     <div id="settings-hub-mode-desc" class="settings-hint" data-info>It uses this Coral's own address, port and sign-in: the API key from other computers, and Remote access above for who can reach it. Nothing new listens. Turning it off keeps the servers you added.</div>
