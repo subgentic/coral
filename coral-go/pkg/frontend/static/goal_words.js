@@ -128,3 +128,6 @@ export function filterCounts(goals) {
 
 /** Goals blocked on someone: the ones "Waiting on you" shows. A goal blocked on nothing named is blocked, not waiting on the person. */
 export const waitingGoals = (goals) => (goals || []).filter(g => String(g && g.state || '').toLowerCase() === 'blocked' && String(g.blockedOn || '').trim() && (g.decision || g.recommendation || g.ifSilent));
+
+/** The one polite line when a refresh brings goals that now wait on the person (#7250). */
+export const needsYouText = (titles) => titles.length === 1 ? `A goal needs you: ${titles[0]}` : `${titles.length} goals need you: ${titles.join(', ')}`;

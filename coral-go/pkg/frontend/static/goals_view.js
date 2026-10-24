@@ -46,10 +46,13 @@ export async function loadGoals() {
             list = mergeGoalLists(list, toGoalList(await readJson(`${LIST_PATH}&cursor=${encodeURIComponent(list.cursor)}`)));
         }
         if (project !== model.project) return;
+        const before = new Set(W.waitingGoals(model.goals).map(g => g.id)), refresh = !model.failed && model.goals.length > 0;
         const sig = JSON.stringify([list.goals, list.requireGoal]);
         same = !model.failed && !!model.goals.length && sig === model.sig; // nothing changed: the page is left as it is (a redraw would take the keyboard's place)
         model.sig = sig; model.goals = list.goals; model.requireGoal = list.requireGoal; model.failed = ''; model.asOf = clock();
         if (model.openId && !model.goals.some(g => g.id === model.openId)) { model.openId = 0; same = false; }
+        const fresh = W.waitingGoals(model.goals).filter(g => !before.has(g.id));
+        if (refresh && fresh.length) say(W.needsYouText(fresh.map(g => g.title))); // a refresh that brings a goal waiting on the person says so once (#7250)
     } catch (e) {
         if (project !== model.project) return;
         model.failed = W.failedText(e && e.message); model.sig = '';
@@ -130,7 +133,7 @@ function stateChip(goal) {
 }
 
 function rollupBar(rollup) {
-    const bar = el('span', 'goal-rollup'); bar.setAttribute('role', 'img'); bar.setAttribute('aria-label', W.rollupSentence(rollup));
+    const bar = el('span', 'goal-rollup'); bar.setAttribute('aria-hidden', 'true'); // the sentence beside the bar says the same: a reader hears it once (#7250)
     const sh = W.rollupShares(rollup);
     for (const k of ['done', 'active', 'blocked']) { if (!sh[k]) continue; const seg = el('span', `goal-rollup-${k}`); seg.style.width = `${(sh[k] * 100).toFixed(1)}%`; bar.append(seg); }
     return bar;
@@ -171,7 +174,7 @@ function drawListRaw() {
             const line = W.waitingLine(g), words = el('span', 'goals-waiting-text');
             if (line.title) words.append(el('strong', 'goals-waiting-title', line.title)); // the goal's name on its own line, the question under it (#7252)
             words.append(el('span', 'goals-waiting-question', line.text));
-            row.append(words, btn('btn btn-small goals-waiting-open', 'Open the goal', () => openGoal(g.id, true)));
+            row.append(words, (() => { const open = btn('btn btn-small goals-waiting-open', 'Open the goal', () => openGoal(g.id, true)); if (g.title) open.setAttribute('aria-label', `Open the goal: ${g.title}`); return open; })());
             strip.append(row);
         }
         col.append(strip);
@@ -251,7 +254,7 @@ function drawDetailRaw() {
     else if (tasks.failed !== undefined) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, W.failedText(tasks.failed).replace('Goals', 'Tasks')), btn('btn btn-small', 'Try again', () => loadTasks(g.id))); col.append(f); }
     else if (!tasks.rows.length) col.append(el('p', 'goals-note', W.noTasksText(g.id)));
     else {
-        const ul = el('ul', 'goal-tasks'); for (const t of tasks.rows.slice(0, tasks.shown)) ul.append(taskRow(t)); col.append(ul);
+        const ul = el('ul', 'goal-tasks'); ul.setAttribute('aria-label', `Tasks of ${g.title}`); for (const t of tasks.rows.slice(0, tasks.shown)) ul.append(taskRow(t)); col.append(ul);
         const total = taskTotal(g, tasks), left = Math.max(tasks.rows.length - tasks.shown, 0) || (tasks.cursor ? Math.max(total - tasks.shown, 1) : 0);
         if (left) col.append(btn('btn goals-more', W.showMoreText(left, PAGE), () => showMoreTasks(g.id)));
         if (tasks.moreFailed) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, tasks.moreFailed)); col.append(f); }
@@ -361,7 +364,9 @@ export function showGoals(host, project) {
         const page = el('div', 'goals-page');
         const status = el('div', 'goals-status sr-only'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
         const cols = el('div', 'goals-cols');
-        cols.append(el('section', 'goals-list-col'), el('section', 'goals-detail-col'));
+        const listCol = el('section', 'goals-list-col'), detailCol = el('section', 'goals-detail-col');
+        listCol.setAttribute('aria-label', 'Goals'); detailCol.setAttribute('aria-label', 'Goal detail');
+        cols.append(listCol, detailCol);
         page.append(el('div', 'goals-head'), status, cols);
         host.replaceChildren(page);
     }

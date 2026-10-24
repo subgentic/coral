@@ -19,7 +19,7 @@
 .goals-back { display: none; align-self: flex-start; background: none; border: none; color: var(--accent); font: inherit; padding: 8px 0; min-height: var(--control-touch-height, 44px); cursor: pointer; }
 
 .goals-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.goals-chip { min-height: 32px; padding: 4px 10px; border: 1px solid var(--control-border); border-radius: 999px; background: var(--bg-secondary); color: var(--text-secondary); font: inherit; font-size: 0.8125rem; cursor: pointer; }
+.goals-chip { min-height: var(--control-touch-height, 44px); padding: 4px 10px; border: 1px solid var(--control-border); border-radius: 999px; background: var(--bg-secondary); color: var(--text-secondary); font: inherit; font-size: 0.8125rem; cursor: pointer; }
 .goals-chip[aria-pressed="true"] { background: var(--accent-dim); color: var(--text-on-accent); border-color: var(--accent); }
 
 .goals-ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
@@ -92,3 +92,4 @@
 .goals-waiting-title { display: block; }
 .goals-waiting-question { display: block; }
 .goals-subtitle { margin: 2px 0 0; color: var(--text-secondary); font-size: 0.8125rem; }
+.goals-new { min-height: var(--control-touch-height, 44px); } /* the desktop chips and New goal are 44 px high too (#7250) */
