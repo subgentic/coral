@@ -10,7 +10,7 @@ import { closeOnBackdropAndEscape, releaseEscape } from './dialog_close.js';
 import { boardFetch, pathId, serverFetch, currentServer } from './server_base.js';
 import { _renderDepPicker, _getSelectedDeps } from './task_dep_picker.js';
 import { _taskRequiredOutputs } from './task_reminders.js';
-import { readOpenGoals, readGoal, fillGoalSelect, fillGoalLine, chooseGoalLabel } from './task_goals.js';
+import { readOpenGoals, readGoal, fillGoalSelect, fillGoalLine, showGoalInvalid, chooseGoalLabel } from './task_goals.js';
 import { _boardTasksFetch, _liveCosts, _reviewRequested, loadBoardTasks, loadAgentTasks } from './task_list.js';
 
 // Full tasks fetched for the detail view, by id. A list item is light (#3269).
@@ -230,6 +230,7 @@ export async function enableTaskEditMode(taskId) {
         <label for="task-edit-goal" id="task-edit-goal-row"${goalRead.goals.length || goalRead.requireGoal || task.goal_id ? '' : ' hidden'}>Goal
             <select id="task-edit-goal"></select>
         </label>
+        <p id="task-edit-goal-error" class="task-goal-error modal-error" role="alert" hidden></p>
         ${showDepPicker ? '<label>Blocked By <span class="text-muted-sm">(optional)</span></label><div id="task-edit-deps" class="dep-picker"></div>' : ''}`;
 
     fillGoalSelect(document.getElementById('task-edit-goal'), { goals: goalRead.goals, requireGoal: goalRead.requireGoal, selectedId: task.goal_id, current: currentGoal });
@@ -296,7 +297,7 @@ export async function saveTaskEdit(taskId) {
     if (!boardProject) return;
 
     try {
-        if (goalChanged && !goalValue && _editRequireGoal) { document.getElementById('task-edit-goal')?.focus(); throw new Error(`${chooseGoalLabel}: this board needs a goal on every task.`); }
+        if (goalChanged && !goalValue && _editRequireGoal) { showGoalInvalid(document.getElementById('task-edit-goal'), document.getElementById('task-edit-goal-error'), `${chooseGoalLabel}: this board needs a goal on every task.`); return; }
         if (Object.keys(amendmentChanges).length) {
             const reason = document.getElementById('task-edit-reason')?.value.trim() || '';
             if (!reason) throw new Error('An amendment reason is required for description or instruction changes');

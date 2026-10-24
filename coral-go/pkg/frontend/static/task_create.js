@@ -8,7 +8,7 @@ import { _renderDepPicker, _getSelectedDeps } from './task_dep_picker.js';
 import { showToast } from './utils.js';
 import { addPendingMessage } from './live_chat.js';
 import { loadBoardTasks, loadAgentTasks } from './task_list.js';
-import { readOpenGoals, fillGoalSelect, chooseGoalLabel } from './task_goals.js';
+import { readOpenGoals, fillGoalSelect, showGoalInvalid, clearGoalInvalid, chooseGoalLabel } from './task_goals.js';
 
 let _requireGoal = false; // the board asks for a goal on every task: the Goal select has no empty choice to stay on
 
@@ -74,6 +74,8 @@ export async function showCreateTaskModal(preset = {}) {
     const goalRow = document.getElementById('create-task-goal-row');
     if (goalRow) {
         goalRow.hidden = true; _requireGoal = false;
+        const goalSelect = document.getElementById('create-task-goal');
+        if (!goalSelect.dataset.bound) { goalSelect.dataset.bound = 'true'; goalSelect.addEventListener('change', () => clearGoalInvalid(goalSelect)); } // choosing a goal takes the refusal away
         if (boardProject) {
             const read = await readOpenGoals(boardProject);
             _requireGoal = read.requireGoal;
@@ -151,8 +153,7 @@ export async function submitCreateTask() {
 
     const goalId = document.getElementById('create-task-goal-row')?.hidden ? '' : document.getElementById('create-task-goal')?.value;
     if (_requireGoal && !goalId) {
-        showCreateError(errEl, `${chooseGoalLabel}: this board needs a goal on every task.`);
-        document.getElementById('create-task-goal')?.focus();
+        showGoalInvalid(document.getElementById('create-task-goal'), document.getElementById('create-task-goal-error'), `${chooseGoalLabel}: this board needs a goal on every task.`);
         return;
     }
     const blockedBy = _getSelectedDeps('create-task-deps');
