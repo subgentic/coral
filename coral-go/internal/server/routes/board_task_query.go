@@ -2,6 +2,7 @@ package routes
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"sort"
@@ -106,6 +107,9 @@ func (h *BoardHandler) queryAllTasks(w http.ResponseWriter, r *http.Request) boo
 		labels := h.bs.BoardLabels(r.Context(), ids)
 		for i := range tasks {
 			tasks[i].BoardLabel = labels[tasks[i].BoardID]
+		}
+		if err := h.bs.FillGoalTitles(r.Context(), tasks); err != nil {
+			slog.Warn("could not read the goal titles of the tasks", "error", err)
 		}
 		out["tasks"] = tasks
 		if next != "" {

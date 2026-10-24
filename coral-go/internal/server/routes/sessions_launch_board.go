@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -276,6 +277,33 @@ func (h *SessionsHandler) addBoardLabels(ctx context.Context, rows []map[string]
 	for _, row := range rows {
 		if id := boardKeyOf(row["board_project"]); id != "" {
 			row["board_label"] = labels[id]
+		}
+	}
+}
+
+// addSessionGoals gives every session row a "goal" ({id, title, board}) from the in-progress task of its session when that task has a goal, and null when there is none (#7301), with one read for the
+// whole list. A row that is not in the roster fields of rosterFields stays out of other boards' agents' sight (an allow-list: the goal is private to the Operator and the agent's own board).
+func (h *SessionsHandler) addSessionGoals(ctx context.Context, rows []map[string]any) {
+	if h.bs == nil || len(rows) == 0 {
+		return
+	}
+	var ids []string
+	for _, row := range rows {
+		if id, _ := row["session_id"].(string); id != "" {
+			ids = append(ids, id)
+		}
+	}
+	goals, err := h.bs.GoalsOfSessions(ctx, ids)
+	if err != nil {
+		slog.Warn("could not read the goals of the live sessions", "error", err)
+		goals = nil
+	}
+	for _, row := range rows {
+		id, _ := row["session_id"].(string)
+		if ref, ok := goals[id]; ok && id != "" {
+			row["goal"] = ref
+		} else {
+			row["goal"] = nil
 		}
 	}
 }

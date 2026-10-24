@@ -906,3 +906,89 @@ func (s *Store) GoalSummary(ctx context.Context, board string) (open int, seq in
 		COALESCE((SELECT seq FROM board_goal_meta WHERE board_id = ?1), 0)`, board).Scan(&open, &seq)
 	return open, seq, err
 }
+
+// GoalRef is the goal a task or an agent serves, as a row shows it (#7301).
+type GoalRef struct {
+	ID    int64  `json:"id"`
+	Title string `json:"title"`
+	Board string `json:"board"`
+}
+
+// GoalsOfSessions gives, for each of the sessions, the goal of its in-progress task when that task has a goal (the newest claim wins when it has several); a session with no such task is not in the map.
+// One read for the whole list, in chunks.
+func (s *Store) GoalsOfSessions(ctx context.Context, sessionIDs []string) (map[string]GoalRef, error) {
+	out := map[string]GoalRef{}
+	for start := 0; start < len(sessionIDs); start += 400 {
+		end := min(start+400, len(sessionIDs))
+		chunk := sessionIDs[start:end]
+		marks := strings.TrimSuffix(strings.Repeat("?,", len(chunk)), ",")
+		args := make([]any, len(chunk))
+		for i, id := range chunk {
+			args[i] = id
+		}
+		var rows []struct {
+			SessionID string `db:"session_id"`
+			GoalID    int64  `db:"goal_id"`
+			Title     string `db:"title"`
+			Board     string `db:"board_id"`
+		}
+		if err := s.reader().SelectContext(ctx, &rows, `SELECT t.session_id AS session_id, g.id AS goal_id, g.title AS title, g.board_id AS board_id
+			FROM board_tasks t JOIN board_goals g ON g.id = t.goal_id AND g.board_id = t.board_id
+			WHERE t.status = 'in_progress' AND t.session_id IN (`+marks+`)
+			ORDER BY t.claimed_at ASC, t.id ASC`, args...); err != nil {
+			return nil, err
+		}
+		for _, r := range rows { // oldest first: the newest claim overwrites
+			out[r.SessionID] = GoalRef{ID: r.GoalID, Title: r.Title, Board: r.Board}
+		}
+	}
+	return out, nil
+}
+
+// FillGoalTitles sets GoalTitle on every task that has a goal, from one read of the goals' titles (a goal of the task's own board only).
+func (s *Store) FillGoalTitles(ctx context.Context, tasks []Task) error {
+	ids := map[int64]bool{}
+	for i := range tasks {
+		if tasks[i].GoalID != nil {
+			ids[*tasks[i].GoalID] = true
+		}
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	list := make([]int64, 0, len(ids))
+	for id := range ids {
+		list = append(list, id)
+	}
+	type key struct {
+		board string
+		id    int64
+	}
+	titles := map[key]string{}
+	for start := 0; start < len(list); start += 400 {
+		end := min(start+400, len(list))
+		chunk := list[start:end]
+		marks := strings.TrimSuffix(strings.Repeat("?,", len(chunk)), ",")
+		args := make([]any, len(chunk))
+		for i, id := range chunk {
+			args[i] = id
+		}
+		var rows []struct {
+			ID    int64  `db:"id"`
+			Board string `db:"board_id"`
+			Title string `db:"title"`
+		}
+		if err := s.reader().SelectContext(ctx, &rows, `SELECT id, board_id, title FROM board_goals WHERE id IN (`+marks+`)`, args...); err != nil {
+			return err
+		}
+		for _, r := range rows {
+			titles[key{r.Board, r.ID}] = r.Title
+		}
+	}
+	for i := range tasks {
+		if tasks[i].GoalID != nil {
+			tasks[i].GoalTitle = titles[key{tasks[i].BoardID, *tasks[i].GoalID}]
+		}
+	}
+	return nil
+}

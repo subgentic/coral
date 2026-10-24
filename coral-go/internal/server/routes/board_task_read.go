@@ -4,6 +4,7 @@ package routes
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -94,6 +95,9 @@ func (h *BoardHandler) ListAllTasks(w http.ResponseWriter, r *http.Request) {
 	labels := h.bs.BoardLabels(r.Context(), ids)
 	for i := range tasks {
 		tasks[i].BoardLabel = labels[tasks[i].BoardID]
+	}
+	if err := h.bs.FillGoalTitles(r.Context(), tasks); err != nil {
+		slog.Warn("could not read the goal titles of the tasks", "error", err)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"tasks": emptyIfNil(tasks)})
 }

@@ -641,5 +641,6 @@ func (h *SessionsHandler) liveSessionRowsBefore4713(r *http.Request, trace *phas
 	}
 
 	h.addBoardLabels(r.Context(), sessions)
+	h.addSessionGoals(r.Context(), sessions) // the goal of each row (#7301): not what #4713 changed, kept the same on both sides
 	return archivedLast(sessions), nil
 }

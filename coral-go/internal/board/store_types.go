@@ -62,7 +62,9 @@ type Task struct {
 	// RemindAt: a one-time reminder of the task at that time (task add --remind-at, remind.go).
 	RemindAt *string `db:"remind_at" json:"remind_at,omitempty"`
 	// GoalID is the goal of this board the task works toward (#7087), or nil.
-	GoalID    *int64       `db:"goal_id" json:"goal_id,omitempty"`
+	GoalID *int64 `db:"goal_id" json:"goal_id,omitempty"`
+	// GoalTitle is the title of that goal, filled where a list is read for the Inbox (FillGoalTitles, #7301); absent when the task has no goal or the list did not ask.
+	GoalTitle string       `db:"-" json:"goal_title,omitempty"`
 	BlockedBy []TaskDep    `db:"-" json:"blocked_by,omitempty"`
 	Workflow  TaskWorkflow `db:"-" json:"workflow"`
 	// Verification: whether a completed task's "done" is backed by an independent check (#4563); set when the workflow is
