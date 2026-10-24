@@ -194,6 +194,7 @@ registerActions({
 // the empty state and the mobile tabs. A literal argument comes from data-arg and must be one
 // the markup uses.
 registerActions({
+    'docs-topics': () => { importOnce('./docs.js').then(m => m.openTopics()).catch(() => {}); }, // the Topics button is in the Docs page from the start (a census sees it before docs.js loads): registered here, the sheet is in docs.js (#7162)
     'docs-copy-agent-line': () => { importOnce('./docs.js').then(m => m.copyDocsLine()).catch(() => {}); }, // the Docs page's button, in the page from the start; docs.js loads with the Docs tab
     'm-close-top-bar-settings-then-check-for-updates': () => { window.__coral.closeTopBarSettings(); window.checkForUpdates(true); },
     'm-close-top-bar-settings-then-show-saved': () => { window.__coral.closeTopBarSettings(); importOnce('./saved.js').then(m => m.openSavedAll()).catch(() => {}); },
