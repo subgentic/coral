@@ -129,7 +129,7 @@ func (i *Idempotency) Wrap(next http.HandlerFunc) http.HandlerFunc {
 		}
 		raw, err := io.ReadAll(io.LimitReader(r.Body, idempotencyMaxBody+1))
 		if err != nil {
-			errBadRequest(w, "the request body could not be read")
+			refuseUnreadableBody(w)
 			return
 		}
 		if len(raw) > idempotencyMaxBody {

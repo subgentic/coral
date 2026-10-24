@@ -450,6 +450,11 @@ func (h *CloudHandler) refuseCloud(w http.ResponseWriter, r *http.Request, allow
 		// The MAC covers the body, so read it here and give the handler a copy. A body that could not be read to the end is refused: what was read is not put back for any later check or handler.
 		body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 64<<10))
 		if err != nil {
+			var tooLarge *http.MaxBytesError
+			if errors.As(err, &tooLarge) { // over the limit is the size's answer, as in identity_keys.go; only a read that failed is unreadable
+				writeError(w, http.StatusRequestEntityTooLarge, "body_too_large", "This request's body is over the limit")
+				return true
+			}
 			refuseUnreadableBody(w)
 			return true
 		}

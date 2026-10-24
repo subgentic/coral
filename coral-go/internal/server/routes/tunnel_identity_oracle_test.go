@@ -208,7 +208,7 @@ func TestTunnelIdentityGuardAgreesWithBefore4756(t *testing.T) {
 			switch {
 			case o.seen.passed && o.record == nil:
 				counts["skipped (not a tunneled board write, a chat post)"]++
-			case strings.Contains(o.body, "could not read the request body"):
+			case strings.Contains(o.body, "the request body could not be read"):
 				counts["body unreadable"]++
 			case strings.Contains(msg, "receive every message"):
 				counts["receive_mode all"]++

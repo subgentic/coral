@@ -30,7 +30,7 @@ func assertUnreadable(t *testing.T, rec *httptest.ResponseRecorder, what string)
 	t.Helper()
 	assert.Equal(t, http.StatusBadRequest, rec.Code, what+": "+rec.Body.String())
 	assert.Equal(t, "body_unreadable", codeOf(t, rec), what)
-	assert.Contains(t, rec.Body.String(), "could not read the request body", what)
+	assert.Contains(t, rec.Body.String(), "the request body could not be read", what, "one wording for the code, the observer's (#7261)")
 }
 
 // #7204 (QA's #7199 sweep): a request whose body is cut while a layer reads it is a 400 body_unreadable and goes no further: what was read is not put back for a later layer or a handler to take
@@ -113,4 +113,32 @@ func TestACountedClaimThatCouldNotBeReadIsUnreadable(t *testing.T) {
 	}
 	assert.EqualValues(t, 1, unreadable, "a read error is the unreadable outcome, whatever the claims it gave: %v", o.actorClaims)
 	assert.EqualValues(t, 1, match)
+}
+
+// #7261 (Security's #7259 LOW points): refuseCloud answers a body over its 64 KiB limit as 413 body_too_large, as identity_keys.go does for size, and only a read error as 400 body_unreadable; and the
+// idempotency layer's read of a cut body carries the same code.
+func TestRefuseCloudSeparatesATooLargeBodyFromAnUnreadableOne(t *testing.T) {
+	db, err := storetest.Open(t, filepath.Join(t.TempDir(), "c.db"))
+	require.NoError(t, err)
+	defer db.Close()
+	h := NewCloudHandler(store.NewSessionStore(db), t.TempDir())
+	h.SetPeerCheck(func(*http.Request) (bool, bool) { return true, true })
+	sig := base64.RawURLEncoding.EncodeToString([]byte("not a signature"))
+	r := httptest.NewRequest("POST", "/api/cloud/connect", strings.NewReader(strings.Repeat("x", 64<<10+1)))
+	r.RemoteAddr, r.Host = "127.0.0.1:50000", "127.0.0.1:8420"
+	r.Header.Set(cliauth.CLIAuthHeader, sig)
+	rec := httptest.NewRecorder()
+	assert.True(t, h.refuseCloud(rec, r, allowCLI))
+	assert.Equal(t, http.StatusRequestEntityTooLarge, rec.Code, rec.Body.String())
+	assert.Equal(t, "body_too_large", codeOf(t, rec))
+}
+
+func TestIdempotencyRefusesACutBodyWithTheUnreadableCode(t *testing.T) {
+	c, i := newCounting(200), NewIdempotency()
+	req := idemReq("/api/sessions/launch", "", "hub-user-1234abcd", idemKey)
+	req.Body = cutBody(`{"name":"half`)
+	req.ContentLength = -1
+	rec := idemDo(i.Wrap(c.handler()), req)
+	assertUnreadable(t, rec, "idempotency")
+	assert.Zero(t, c.runs.Load(), "the handler never runs for a cut body")
 }
