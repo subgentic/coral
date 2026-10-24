@@ -738,3 +738,40 @@ func TestGoalTaskPagePagesWithACursor(t *testing.T) {
 	_, err = s.GoalTaskPage(ctx, "other-board", g.ID, "", "", 10)
 	assert.ErrorIs(t, err, ErrGoalNotFound)
 }
+
+// #7260 (Security's #7246 point 4): the all-boards rollup read names the page's boards and goal ids, so the (board_id, goal_id) index serves it; a goal_id list alone would scan every task. The plan is
+// pinned; and the limits are the all-boards read's own (default 50, at most 100).
+func TestAllGoalsRollupsUseTheBoardGoalIndexAndPageLimits(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	for i := 0; i < 130; i++ {
+		b := "alpha"
+		if i%2 == 0 {
+			b = "beta"
+		}
+		_, err := s.CreateGoal(ctx, b, GoalInput{Title: "g", CreatedBy: "Lead"})
+		require.NoError(t, err)
+	}
+	page, err := s.AllGoalsPage(ctx, AllGoalsQuery{})
+	require.NoError(t, err)
+	assert.Len(t, page.Goals, AllGoalsDefaultLimit, "the default page")
+	page, err = s.AllGoalsPage(ctx, AllGoalsQuery{Limit: 5000})
+	require.NoError(t, err)
+	assert.Len(t, page.Goals, AllGoalsMaxLimit, "clamped to the all-boards maximum, not the task list's 200")
+	assert.NotEmpty(t, page.NextCursor)
+
+	query, args := goalRollupsStatement(page.Goals)
+	rows, err := s.reader().QueryxContext(ctx, "EXPLAIN QUERY PLAN "+query, args...)
+	require.NoError(t, err)
+	defer rows.Close()
+	var plan []string
+	for rows.Next() {
+		var id, parent, notused int
+		var detail string
+		require.NoError(t, rows.Scan(&id, &parent, &notused, &detail))
+		plan = append(plan, detail)
+	}
+	joined := strings.Join(plan, " | ")
+	assert.Contains(t, joined, "idx_board_tasks_goal", "the rollup read is served by the (board_id, goal_id) index: %s", joined)
+	assert.NotContains(t, joined, "SCAN board_tasks", "and does not scan every task: %s", joined)
+}

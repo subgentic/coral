@@ -779,6 +779,7 @@ func (s *Server) registerBoard(r *chi.Mux, h *routeHandlers) {
 		r.Get("/api/board/{project}/tasks", boardHandler.ListTasks)
 		// Goals (#7087): board text, written by the Operator or an orchestrator, readable like tasks.
 		r.Post("/api/board/{project}/goals", boardHandler.CreateGoal)
+		r.Get("/api/goals", boardHandler.ListAllGoals) // every board's goals (#7260), the Operator's; /api/goals/metrics is the Jobs metrics
 		r.Get("/api/board/{project}/goals", boardHandler.ListGoals)
 		r.Get("/api/board/{project}/goals/{goalID}", boardHandler.GetGoal)
 		r.Patch("/api/board/{project}/goals/{goalID}", boardHandler.UpdateGoal)

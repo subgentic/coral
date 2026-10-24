@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -12,6 +13,8 @@ import (
 
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/clitext"
+	"github.com/subgentic/coral/internal/cloud"
+	"github.com/subgentic/coral/internal/safefs"
 )
 
 // Goals on the board (#7087, from #7078's note). A goal is an outcome a board's tasks work toward; the store is internal/board/goals.go. These routes write board text and nothing else: they never
@@ -151,6 +154,95 @@ func (h *BoardHandler) ListGoals(w http.ResponseWriter, r *http.Request) {
 		q.Limit = n
 	}
 	page, err := h.bs.GoalPage(r.Context(), project, q)
+	if errors.Is(err, board.ErrBadTaskListQuery) {
+		errBadRequest(w, err.Error())
+		return
+	}
+	if err != nil {
+		if !goalError(w, err) {
+			errInternalServer(w, err.Error())
+		}
+		return
+	}
+	writeJSON(w, http.StatusOK, page)
+}
+
+// ListAllGoals: GET /api/goals?state=a,b&board=x&board=y&limit=n&cursor=c (#7260). The goals of every board (or the boards named) in one call, oldest first by id, in the per-board read's page shape with each goal's
+// board_id and rollup and no tasks. The Operator's, like GET /api/board/tasks (an agent's token is refused by the identity layer: operatorOnlyRoutes); a View viewer through Coral Hub gets a goal's waiting-for fields nulled (viewDropRoutes). An unknown or mistyped parameter is a 400 that names it,
+// never a silent fall-back to the unfiltered list; a board that has no goals, or does not exist, adds nothing.
+func (h *BoardHandler) ListAllGoals(w http.ResponseWriter, r *http.Request) {
+	query, err := url.ParseQuery(r.URL.RawQuery)
+	if err != nil {
+		errBadRequest(w, "the query string is not valid (no ';', and %-escapes must be two hex digits)")
+		return
+	}
+	for k := range query {
+		switch k {
+		case "state", "board", "limit", "cursor":
+		default:
+			errBadRequest(w, "unknown parameter "+k)
+			return
+		}
+	}
+	for _, k := range []string{"state", "limit", "cursor"} {
+		if len(query[k]) > 1 {
+			errBadRequest(w, k+" is given more than once")
+			return
+		}
+	}
+	q := board.AllGoalsQuery{Cursor: query.Get("cursor")}
+	split := func(name string, vals []string) ([]string, bool) {
+		var out []string
+		seen := map[string]bool{}
+		for _, v := range vals {
+			for _, p := range strings.Split(v, ",") {
+				p = strings.TrimSpace(p)
+				if p == "" || len(p) > 200 {
+					errBadRequest(w, name+" has an empty value or one over 200 characters")
+					return nil, false
+				}
+				if !seen[p] {
+					seen[p] = true
+					out = append(out, p)
+				}
+			}
+		}
+		return out, true
+	}
+	var ok bool
+	if q.States, ok = split("state", query["state"]); !ok {
+		return
+	}
+	if q.Boards, ok = split("board", query["board"]); !ok {
+		return
+	}
+	if len(q.Boards) > board.AllGoalsMaxBoards {
+		errBadRequest(w, "board names more than "+strconv.Itoa(board.AllGoalsMaxBoards)+" boards")
+		return
+	}
+	for _, b := range q.Boards {
+		if !safefs.IsSafeID(b) { // a board id the way every board route takes one; a name nobody has simply adds nothing
+			errBadRequest(w, "board must be a board id: letters, digits, '-' and '_'")
+			return
+		}
+	}
+	if cloud.Tunneled(r) { // redacted after the filter matched: a board value the redactor would change can match nothing the viewer sees (as the machine-wide task query)
+		for _, v := range q.Boards {
+			if shownText(v) != v {
+				errBadRequest(w, "board can't contain a secret (a token, a key or a password): it would match what the redaction hides")
+				return
+			}
+		}
+	}
+	if l := query.Get("limit"); l != "" {
+		n, err := strconv.Atoi(l)
+		if err != nil || n <= 0 {
+			errBadRequest(w, "limit must be a positive number")
+			return
+		}
+		q.Limit = n
+	}
+	page, err := h.bs.AllGoalsPage(r.Context(), q)
 	if errors.Is(err, board.ErrBadTaskListQuery) {
 		errBadRequest(w, err.Error())
 		return

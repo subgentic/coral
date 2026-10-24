@@ -444,7 +444,8 @@ func TestRealUIQueriesAreNotRefused(t *testing.T) {
 		{"GET", "/api/sessions/live/001/history/search", "q=x&limit=10&offset=0&session_id=abc"},
 		{"GET", "/api/board/proj/messages", "limit=50&subscriber_id=ops"}, // no session_id since #3743
 		{"GET", "/api/board/proj/messages/all", "limit=100&offset=0&before_id=5"},
-		{"GET", "/api/board/proj/tasks", "limit=50&status=open&goal=3&cursor=abc"}, // no session_id: the list is per board and the handler never read it (#7217)
+		{"GET", "/api/goals", "state=active,blocked&board=team-a&limit=50&cursor=abc"}, // every board's goals (#7260)
+		{"GET", "/api/board/proj/tasks", "limit=50&status=open&goal=3&cursor=abc"},     // no session_id: the list is per board and the handler never read it (#7217)
 		{"GET", "/api/sessions/history/search", "q=x&page=1&page_size=50"},
 		{"GET", "/api/scheduled/runs/recent", "limit=20"},
 		{"GET", "/api/workflows/runs/recent", "limit=20&offset=0&status=failed"},

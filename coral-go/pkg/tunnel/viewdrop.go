@@ -31,6 +31,7 @@ var viewDropRoutes = map[string]bool{
 	"GET /api/board/{project}/goals":      true,
 	"GET /api/board/{project}/goals/{id}": true,
 	"GET /api/board/projects":             true, // each board's goals brief (#7116)
+	"GET /api/goals":                      true, // every board's goals (#7260)
 }
 
 // viewDropMax is the largest reply read whole to drop a field (a live list is a few hundred KiB at most).

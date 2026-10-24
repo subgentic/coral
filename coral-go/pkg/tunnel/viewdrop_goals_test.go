@@ -25,7 +25,7 @@ func TestViewOnlyViewerGetsNoGoalDecisionFields(t *testing.T) {
 	local := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body := ""
 		switch r.URL.Path {
-		case "/api/board/team/goals":
+		case "/api/board/team/goals", "/api/goals": // /api/goals is every board's goals (#7260)
 			body = list
 		case "/api/board/team/goals/3":
 			body = goalOne
@@ -73,7 +73,7 @@ func TestViewOnlyViewerGetsNoGoalDecisionFields(t *testing.T) {
 		return res
 	}
 	dropped := []string{"blocked_on", "decision", "recommendation", "if_silent"}
-	for _, path := range []string{"/api/board/team/goals", "/api/board/team/goals/3"} {
+	for _, path := range []string{"/api/board/team/goals", "/api/board/team/goals/3", "/api/goals"} {
 		for _, g := range goalsIn(path, get(path, WithHubTier(ctx, "view"))) {
 			for _, k := range dropped {
 				v, present := g[k]

@@ -24,6 +24,7 @@ import (
 // auto-accept off, the dashboard's upload and its removal, and opening a file in the Operator's editor (#4512).
 var formerlyOpenOperatorRoutes = []string{
 	"GET /ws/terminal/{name}",
+	"GET /api/goals", // every board's goals (#7260)
 	"POST /api/auto-accept/disable-all",
 	"POST /api/upload",
 	"DELETE /api/upload/{name}",

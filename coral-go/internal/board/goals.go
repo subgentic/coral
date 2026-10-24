@@ -2,7 +2,9 @@ package board
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"sort"
@@ -389,6 +391,98 @@ func (s *Store) GoalPage(ctx context.Context, board string, q GoalListQuery) (*G
 	return &GoalPage{Goals: goals, NextCursor: next}, nil
 }
 
+// AllGoalsQuery selects goals across boards (#7260): States as GoalListQuery's, Boards narrows to the boards named (none: every board), Limit and Cursor as the board's own.
+type AllGoalsQuery struct {
+	States []string
+	Boards []string
+	Limit  int
+	Cursor string
+}
+
+// AllGoalsMaxBoards is the most boards one all-boards goal read may name.
+const AllGoalsMaxBoards = 20
+
+// AllGoalsDefaultLimit and AllGoalsMaxLimit bound a page of the all-boards read: a goal row can hold about 4 KB of text, so 100 goals stay under half a megabyte (Security's #7246 point 6).
+const (
+	AllGoalsDefaultLimit = 50
+	AllGoalsMaxLimit     = 100
+)
+
+// allGoalsKey is the filter an all-boards goal cursor is bound to: the states and the boards asked for, as a short hash (a board name may hold any character, so it is not spelled in the cursor).
+func allGoalsKey(states, boards []string) string {
+	b := append([]string(nil), boards...)
+	sort.Strings(b)
+	sum := sha256.Sum256([]byte(goalStatesKey(states) + "\x00" + strings.Join(b, "\x00")))
+	return hex.EncodeToString(sum[:8])
+}
+
+// AllGoalsPage is a page of the goals of every board (or the boards named), oldest first by id, each with its board and its rollup: the rollups of the whole page come from one grouped read. A cursor
+// of a board's own read, of another filter or of nothing this server gave is ErrBadTaskListQuery.
+func (s *Store) AllGoalsPage(ctx context.Context, q AllGoalsQuery) (*GoalPage, error) {
+	states := q.States
+	if len(states) == 0 {
+		states = []string{GoalProposed, GoalActive, GoalBlocked}
+	}
+	for _, st := range states {
+		if !validGoalState(st) {
+			return nil, ErrGoalBadState
+		}
+	}
+	key := allGoalsKey(states, q.Boards)
+	limit := q.Limit
+	if limit <= 0 {
+		limit = AllGoalsDefaultLimit
+	}
+	if limit > AllGoalsMaxLimit {
+		limit = AllGoalsMaxLimit
+	}
+	var args []any
+	marks := make([]string, len(states))
+	for i, st := range states {
+		marks[i] = "?"
+		args = append(args, st)
+	}
+	where := `state IN (` + strings.Join(marks, ",") + `)`
+	if len(q.Boards) > 0 {
+		where += ` AND board_id IN (` + placeholders(len(q.Boards)) + `)`
+		for _, b := range q.Boards {
+			args = append(args, b)
+		}
+	}
+	if q.Cursor != "" {
+		at, after, err := decodeTaskCursor(q.Cursor, allBoardsTag, "A")
+		if err != nil {
+			return nil, err
+		}
+		if at != key {
+			return nil, fmt.Errorf("%w: cursor is for another filter", ErrBadTaskListQuery)
+		}
+		where += ` AND id > ?`
+		args = append(args, after)
+	}
+	args = append(args, limit+1)
+	goals := []Goal{}
+	if err := s.reader().SelectContext(ctx, &goals, `SELECT `+goalColumns+` FROM board_goals WHERE `+where+` ORDER BY id ASC LIMIT ?`, args...); err != nil {
+		return nil, err
+	}
+	next := ""
+	if len(goals) > limit {
+		goals = goals[:limit]
+		next = encodeTaskCursor(allBoardsTag, "A", key, goals[limit-1].ID)
+	}
+	rollups, err := s.goalRollupsByID(ctx, goals)
+	if err != nil {
+		return nil, err
+	}
+	for i := range goals {
+		goals[i].Rollup = rollups[goals[i].ID]
+	}
+	return &GoalPage{Goals: goals, NextCursor: next}, nil
+}
+
+// allBoardsTag stands for "every board" where a cursor names its board.
+const allBoardsTag = "*"
+
 // ListGoals is the first page of a board's goals (GoalPage without a cursor), for a caller that wants the goals and not the paging.
 func (s *Store) ListGoals(ctx context.Context, board string, q GoalListQuery) ([]Goal, error) {
 	page, err := s.GoalPage(ctx, board, q)
@@ -404,6 +498,57 @@ func validGoalState(st string) bool {
 		return true
 	}
 	return false
+}
+
+// goalRollupsByID is goalRollups for goals of different boards: one grouped read over the tasks linked to the page's goals, on the (board_id, goal_id) index (idx_board_tasks_goal leads with the board:
+// a goal_id list alone would scan every task, Security's #7246 point 4).
+func (s *Store) goalRollupsByID(ctx context.Context, goals []Goal) (map[int64]GoalRollup, error) {
+	out := make(map[int64]GoalRollup, len(goals))
+	if len(goals) == 0 {
+		return out, nil
+	}
+	query, args := goalRollupsStatement(goals)
+	var rows []struct {
+		GoalID int64  `db:"goal_id"`
+		Status string `db:"status"`
+		N      int    `db:"n"`
+	}
+	if err := s.reader().SelectContext(ctx, &rows, query, args...); err != nil {
+		return nil, err
+	}
+	for _, r := range rows {
+		ru := out[r.GoalID]
+		switch r.Status {
+		case "completed", "skipped":
+			ru.Done += r.N
+		case "in_progress", "review_pending":
+			ru.Active += r.N
+		case "blocked":
+			ru.Blocked += r.N
+		default: // pending, draft
+			ru.Queued += r.N
+		}
+		ru.Total += r.N
+		out[r.GoalID] = ru
+	}
+	return out, nil
+}
+
+// goalRollupsStatement is the grouped read of the tasks linked to goals: the page's boards and goal ids, both in the WHERE so the index on (board_id, goal_id) serves it.
+func goalRollupsStatement(goals []Goal) (string, []any) {
+	var boards []any
+	seen := map[string]bool{}
+	for _, g := range goals {
+		if !seen[g.BoardID] {
+			seen[g.BoardID] = true
+			boards = append(boards, g.BoardID)
+		}
+	}
+	args := append([]any(nil), boards...)
+	for _, g := range goals {
+		args = append(args, g.ID)
+	}
+	return `SELECT goal_id, status, COUNT(*) AS n FROM board_tasks WHERE board_id IN (` + placeholders(len(boards)) + `) AND goal_id IN (` + placeholders(len(goals)) + `) GROUP BY goal_id, status`, args
 }
 
 // goalRollups counts the tasks of each of the goals, in one query over the board's linked tasks.

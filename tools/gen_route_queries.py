@@ -29,6 +29,8 @@ FILE_PARAMS = {'filepath', 'dir', 'path', 'working_directory', 'file', 'ref', 'c
 # against this table (coral-hub internal/e2e TestChromeUIPass records them). Add here, with the reason, never
 # loosen the table any other way.
 EXTRA = {
+    # The all-boards goals read (#7260): ListAllGoals reads state and board from a url.Values it parsed itself (a mistyped query string is refused, not dropped), which the scan above does not follow.
+    'GET /api/goals': {'state', 'board'},
     # The Team Artifacts list's query (#4572): parseTeamArtifactQuery reads these from a url.Values it is handed, not from the request,
     # which the scan above does not follow. Search, filters, sort and cursor paging on the existing route.
     'GET /api/board/{}/artifacts': {'q', 'kind', 'origin', 'by', 'board', 'kept', 'since', 'until', 'sort', 'cursor'},

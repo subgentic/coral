@@ -109,6 +109,7 @@ c GET /api/filesystem/is-git
 c GET /api/filesystem/list
 c GET /api/folder-tags
 c GET /api/folder-tags/{folderName}
+b GET /api/goals
 b GET /api/goals/metrics
 c GET /api/health
 c GET /api/pinned-folders
