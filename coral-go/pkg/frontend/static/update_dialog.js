@@ -5,7 +5,7 @@ import { attachDialogFocus } from './dialog_focus.js';
 import { browserSession } from './safe_storage.js';
 import { importOnce } from './import_once.js';
 
-const { RESUME_KEY, RELEASES_REPO, RELEASES_URL, reasonText, requestRelaunch } = await importOnce('./update_api.js');
+const { RESUME_KEY, RELEASES_REPO, RELEASES_URL, installsLocally, reasonText, requestInstall, requestRelaunch } = await importOnce('./update_api.js');
 
 // What happens after Relaunch, by how this Coral was installed (the docs' per-platform table): none of it promises that this page comes back by itself
 const AFTER = {
@@ -44,7 +44,8 @@ function draw(note) {
     const s = current, r = s.relaunch, n = r.restarts.length;
     dialog.replaceChildren();
     const content = mk('div', 'modal-content modal-md update-confirm');
-    const head = mk('div', 'modal-header'); const h = mk('h3', null, `Install Coral ${s.staged.version} and relaunch?`); h.id = 'update-confirm-title'; head.append(h);
+    const win = installsLocally(s); // Windows installs from here with Windows's own permission prompt, not a relaunch (#7338)
+    const head = mk('div', 'modal-header'); const h = mk('h3', null, win ? `Install Coral ${s.staged.version}?` : `Install Coral ${s.staged.version} and relaunch?`); h.id = 'update-confirm-title'; head.append(h);
     const body = mk('div', 'modal-body'); body.id = 'update-confirm-body';
     const days = s.staged.days;
     // Where it comes from: Coral's releases on the one pinned repository. The status says the repository only after verification; the words and the link are this page's (RELEASES_URL), never built from the status's text.
@@ -63,7 +64,7 @@ function draw(note) {
         const icon = mk('span', 'material-icons', 'warning'); icon.setAttribute('aria-hidden', 'true');
         const inner = mk('div', 'update-warn-body');
         const back = r.restarts.filter(a => a.resumes === true).length, fresh = r.restarts.filter(a => a.resumes === false).length;
-        const lead = mk('p'); lead.append(mk('b', null, `Relaunching restarts ${plural(n, 'agent')}`), document.createTextNode(` that run in Coral's own terminal (pty). Their work in progress stops.${comeBack(back, fresh, n)}`));
+        const lead = mk('p'); lead.append(mk('b', null, `${win ? 'Installing' : 'Relaunching'} restarts ${plural(n, 'agent')}`), document.createTextNode(` that run in Coral's own terminal (pty). Their work in progress stops.${comeBack(back, fresh, n)}`));
         const list = mk('ul', 'update-agents'); list.tabIndex = 0; list.setAttribute('aria-label', 'Agents that restart');
         for (const a of r.restarts) {
             const li = mk('li'); li.append(mk('span', 'update-agent-name', a.name || a.sessionId), ' ', mk('span', 'update-agent-state', STATE_WORDS[a.state] || a.state)); // spaces between the parts: the row's text reads as words wherever it is read from (#6315)
@@ -74,11 +75,12 @@ function draw(note) {
         inner.append(lead, list, mk('p', 'update-keep', r.tmuxRestart ? 'Agents in tmux restart too: the bundled tmux changed.' : 'Agents in tmux keep running and reattach.'));
         warn.append(icon, inner); body.append(warn);
     }
+    if (win) body.append(mk('p', 'update-uac', 'Coral quits to hand over to the installer, and Windows asks for your permission (the usual admin prompt). Coral starts again when the installer is done.'));
     body.append(mk('p', 'update-later-note', 'Nothing is installed until you choose Install. Later changes nothing: the update stays ready and the button stays in the top bar.'));
     const acts = mk('div', 'modal-actions modal-footer');
     const later = mk('button', 'btn update-later', 'Later'); later.type = 'button';
     later.addEventListener('click', close);
-    const go = mk('button', 'btn btn-primary update-go', n > 0 ? `Install and restart ${plural(n, 'agent')}` : 'Install and relaunch'); go.type = 'button';
+    const go = mk('button', 'btn btn-primary update-go', n > 0 ? `Install and restart ${plural(n, 'agent')}` : win ? 'Install update' : 'Install and relaunch'); go.type = 'button';
     go.addEventListener('click', () => sendRelaunch(go, later));
     // the safe answer starts with focus when something would restart; with nothing to lose the action itself does
     (n > 0 ? later : go).setAttribute('data-initial-focus', '');
@@ -87,12 +89,13 @@ function draw(note) {
 }
 
 async function sendRelaunch(go, later) {
-    const ack = current.relaunch.ack;
+    const win = installsLocally(current);
     go.disabled = true; later.disabled = true;
-    const res = await requestRelaunch(ack);
+    // Windows: the version this dialog showed is sent with the click, so the server installs that one or none (409 stale_version); a relaunch sends the acknowledgement of what it showed
+    const res = win ? await requestInstall(current.staged.version) : await requestRelaunch(current.relaunch.ack);
     if (res.ok) {
         const body = dialog.querySelector('.modal-body');
-        const p = mk('p', 'update-note', AFTER[current.installKind] || AFTER_DEFAULT); p.setAttribute('role', 'status');
+        const p = mk('p', 'update-note', win ? AFTER.msi : AFTER[current.installKind] || AFTER_DEFAULT); p.setAttribute('role', 'status');
         body.querySelector('.update-later-note')?.remove(); // sent: "Not now?" no longer applies
         body.append(p); later.textContent = 'Close'; later.disabled = false; go.hidden = true;
         return;
@@ -104,6 +107,12 @@ async function sendRelaunch(go, later) {
         return;
     }
     go.disabled = false; later.disabled = false;
+    // 409 stale_version: the staged update is not the one this dialog showed; the status is read again and the dialog is drawn for what is ready now, nothing was installed (#7338)
+    if (res.status === 409 && res.code === 'stale_version') {
+        const fresh = await (await importOnce('./update_ui.js')).refreshUpdateStatus();
+        if (fresh && installsLocally(fresh)) { current = fresh; draw(reasonText('stale_version')); dialog.querySelector('[data-initial-focus]')?.focus(); return; }
+        close(); return;
+    }
     // 404: Coral Hub has relaunching switched off for this machine: nothing to offer, so nothing is shown
     if (res.status === 404) { close(); (await importOnce('./update_ui.js')).refreshUpdateStatus(); return; }
     const body = dialog.querySelector('.modal-body');
@@ -116,7 +125,7 @@ async function sendRelaunch(go, later) {
         dialog.querySelector('.modal-actions').insertBefore(a, go); go.hidden = true; a.focus();
         return;
     }
-    say(reasonText(res.code)); // 'Unavailable' for a reason this build does not know; never the server's own words
+    say(reasonText(res.code)); // a sentence that Coral did not say why for a reason this build does not know; never the server's own words
 }
 
 function close() { if (dialog) dialog.style.display = 'none'; } // display-ok: modal_chrome (Escape, the Tab trap) and dialog_focus read a .modal's display, as for every dialog

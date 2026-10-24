@@ -11,6 +11,7 @@ package routes
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
@@ -44,6 +45,31 @@ const UpdateQuitExitCode = 5
 // without asking anyone). A variable so a test can stand for Windows.
 var updateInstallPlatform = runtime.GOOS == "windows"
 
+// readInstallBody reads the install request: nothing, {}, or an object with only a string "version" (the version the page showed; nil when it says none). bad is true for
+// anything else: another field, another type, a body that is not one JSON value, or one longer than 64 bytes.
+func readInstallBody(r *http.Request) (shown *string, bad bool) {
+	raw, err := io.ReadAll(io.LimitReader(r.Body, 65))
+	if err != nil || len(raw) > 64 {
+		return nil, true
+	}
+	raw = bytes.TrimSpace(raw)
+	if len(raw) == 0 {
+		return nil, false
+	}
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.DisallowUnknownFields()
+	var body struct {
+		Version *string `json:"version"`
+	}
+	if dec.Decode(&body) != nil || dec.More() {
+		return nil, true
+	}
+	if bytes.Contains(raw, []byte("null")) && body.Version == nil && len(raw) > 2 {
+		return nil, true // {"version":null} says nothing it can be held to
+	}
+	return body.Version, false
+}
+
 // InstallUpdate: POST /api/system/update/install, on this computer only (the dashboard or the signed command line, as Coral's own user), no body.
 // 202 once the updater is running and the server has been asked to quit; 409 when there is nothing to install, it is not Windows, the updater says it
 // would not install (apply_not_enabled, updates_off, install_not_supported, updater_unavailable), or one is already under way.
@@ -56,10 +82,11 @@ func (h *CloudHandler) InstallUpdate(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusForbidden, "operator_only", "only the Operator can install an update") // a person only: never an agent with forged browser headers
 		return
 	}
-	// Nothing in the request chooses anything: an empty body, or {}.
-	raw, err := io.ReadAll(io.LimitReader(r.Body, 33))
-	if err != nil || len(raw) > 32 || (len(bytes.TrimSpace(raw)) != 0 && string(bytes.TrimSpace(raw)) != "{}") {
-		errBadRequest(w, "the request has no body: the update to install is the one Coral has staged and verified")
+	// Nothing in the request chooses what is installed: an empty body, {}, or {"version": "x.y.z"}, the version the page showed. The version is a check, never a choice
+	// (#7338): the updater installs what it staged, and a page that showed another version than the staged one is refused below, so a click installs what the person read.
+	shown, bad := readInstallBody(r)
+	if bad {
+		errBadRequest(w, "the request names no update: the one to install is the one Coral has staged and verified; it may say which version the page showed")
 		return
 	}
 	if !updateInstallPlatform {
@@ -77,6 +104,10 @@ func (h *CloudHandler) InstallUpdate(w http.ResponseWriter, r *http.Request) {
 	version, err := staged(r.Context())
 	if err != nil {
 		writeError(w, http.StatusConflict, "nothing_staged", "There is no verified update staged to install")
+		return
+	}
+	if shown != nil && *shown != version {
+		writeError(w, http.StatusConflict, "stale_version", "The update that is ready changed since this page showed it: look at it again")
 		return
 	}
 	// The server quits once the updater is running, so the updater is asked first whether it will install anything: an updater that would answer "not

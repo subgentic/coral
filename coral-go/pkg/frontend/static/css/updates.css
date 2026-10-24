@@ -9,7 +9,8 @@
 .update-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--update-c); flex: none; }
 .update-age { font-weight: 500; } /* the dashboard's text colour like the label: the secondary colour on the red tint was 4.36:1 (light theme) */
 .update-pill[hidden] { display: none; }
-.update-pill[aria-disabled="true"] { border-style: dashed; cursor: default; }
+.update-pill[aria-disabled="true"] { border-style: dashed; cursor: default; color: var(--text-secondary); } /* not available now (#7338): drawn as unavailable, no hover lift; it stays focusable so its label says why */
+.update-pill[aria-disabled="true"]:hover { background: color-mix(in srgb, var(--update-c) 12%, var(--bg-secondary)); }
 /* a phone: the control is a full-width row under the bar (update_ui.js moves it), 44 px, with the label and the age written out */
 .update-strip { padding: var(--space-xs) var(--space-md); background: var(--bg-secondary); border-bottom: 1px solid var(--border); }
 .update-strip[hidden] { display: none; }
@@ -37,6 +38,7 @@
 .update-state-dot[data-k="fresh"], .update-state-dot[data-k="ok"] { background: var(--success); } .update-state-dot[data-k="warm"] { background: var(--warning); } .update-state-dot[data-k="bad"] { background: var(--error); } .update-state-dot[data-k="info"] { background: var(--accent); }
 .update-status-text { flex: 1 1 auto; min-width: 0; } .update-status-text b { display: block; } .update-status-text p { margin: 2px 0 0; color: var(--text-secondary); font-size: var(--fs-sm, 0.8125rem); overflow-wrap: anywhere; }
 .update-act { flex: none; }
+.update-act:disabled { opacity: .55; cursor: not-allowed; } /* a disabled Settings button no longer looks live (#7338, UI Accessibility) */
 .update-bar { margin-top: 8px; height: 6px; border-radius: var(--radius-xs); background: var(--bg-tertiary); overflow: hidden; } .update-bar span { display: block; height: 100%; background: var(--accent); }
 .update-managed { display: flex; gap: var(--space-lg, 12px); padding: var(--space-lg, 12px); margin: 0 0 var(--space-lg, 12px); border-radius: var(--radius-lg, 8px); border: 1px solid var(--border); background: var(--bg-secondary); }
 .update-managed .material-icons { color: var(--text-secondary); flex: none; } .update-managed p { margin: 4px 0; color: var(--text-secondary); }

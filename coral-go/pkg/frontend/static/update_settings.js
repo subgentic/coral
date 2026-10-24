@@ -4,8 +4,8 @@
 import { importOnce } from './import_once.js';
 import { copyText, showToast } from './utils.js';
 import { isCloud } from './server_base.js';
-const { ageTier, notAvailable, notReadyText, fetchHubRelaunch, requestCheckNow, savePrefs, saveChannel, serverHas } = await importOnce('./update_api.js');
-const { HUB_RELAUNCH_ON, HUB_RELAUNCH_OFF } = await importOnce('./update_words.js');
+const { ageTier, canStart, installsLocally, notAvailable, reasonText, notReadyText, fetchHubRelaunch, requestCheckNow, savePrefs, saveChannel, serverHas } = await importOnce('./update_api.js');
+const { HUB_RELAUNCH_ON, HUB_RELAUNCH_OFF, HUB_RELAUNCH_WINDOWS } = await importOnce('./update_words.js');
 const { failureNotice, getUpdateStatus, refreshUpdateStatus, relaunchOffered } = await importOnce('./update_ui.js');
 
 const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
@@ -41,10 +41,11 @@ function card(s) {
         title.textContent = `Coral ${s.staged.version} is ready`;
         sub.textContent = `Downloaded and its signature was checked ${days < 1 ? 'earlier today' : plural(days, 'day') + ' ago'}. Nothing is installed until you say yes.`;
         dot.dataset.k = tier; c.dataset.k = tier;
-        act = mk('button', 'btn btn-primary update-act', 'Relaunch to update'); act.type = 'button';
+        act = mk('button', 'btn btn-primary update-act', installsLocally(s) ? 'Install update' : 'Relaunch to update'); act.type = 'button'; // Windows installs from this page (#7338)
         act.setAttribute('aria-haspopup', 'dialog');
-        if (!s.relaunch.available) { act.setAttribute('aria-disabled', 'true'); sub.textContent += ` ${notAvailable(s.relaunch.reason)}`; }
-        act.addEventListener('click', async () => { if (act.getAttribute('aria-disabled') === 'true') return; (await importOnce('./update_dialog.js')).openUpdateDialog(getUpdateStatus()); });
+        if (windowsInstall(s) && !s.localInstall) { act = null; sub.textContent += ` ${reasonText(s.relaunch.reason)}`; } // a request through Coral Hub: nobody there can install, so no button (#7338)
+        else if (!canStart(s)) { act.disabled = true; sub.textContent += ` ${notAvailable(s.relaunch.reason)}`; } // a real disabled button, not a primary one that only says so to a screen reader (#7338)
+        if (act) act.addEventListener('click', async () => { if (act.disabled) return; (await importOnce('./update_dialog.js')).openUpdateDialog(getUpdateStatus()); });
     } else if (s.progress !== null) {
         title.textContent = `Downloading Coral${s.staged && s.staged.version ? ' ' + s.staged.version : ''}`; sub.textContent = `${s.progress} percent`; dot.dataset.k = 'ok'; c.dataset.k = 'ok';
         const bar = mk('div', 'update-bar'); bar.setAttribute('role', 'progressbar'); bar.setAttribute('aria-valuemin', '0'); bar.setAttribute('aria-valuemax', '100'); bar.setAttribute('aria-valuenow', String(s.progress)); bar.setAttribute('aria-label', 'Download');
@@ -61,6 +62,9 @@ function card(s) {
     c.append(dot, text); if (act) c.append(act);
     return c;
 }
+
+/** Windows: an update installs from this computer's dashboard, after Windows asks the person (#166, #7338). The server says so with relaunch.reason, to everyone who asks. */
+const windowsInstall = (s) => s.relaunch.reason === 'local_approval_needed';
 
 /** Whether this install is one Coral does not update by itself: Homebrew, a folder it cannot write to, or whatever the server says is unsupported (its relaunch reason, since an older server sends no install kind). */
 const isManaged = (s) => s.installKind === 'homebrew' || s.installKind === 'unwritable' || s.relaunch.reason === 'unsupported_install' || s.notReady === 'unsupported_install';
@@ -166,14 +170,18 @@ export async function showUpdatesPane() {
     // Through Coral Hub the switch is not the hub's to change (the machine's owner sets it on that computer), so it is not drawn there
     const grid = mk('dl', 'info-grid settings-grid');
     const reason = unmanaged ? (s.installKind === 'homebrew' ? 'Homebrew manages updates.' : 'This install cannot update itself.') : '';
-    if (serverHas.autoPref) grid.append(row('settings-update-auto', 'Check for updates automatically', unmanaged ? reason : 'Downloads in the background and checks the release is genuine. The update installs when you relaunch Coral, never while you work. Only the latest releases of Coral\'s own GitHub repository are used.', unmanaged ? false : s.auto !== false, unmanaged));
+    if (serverHas.autoPref) grid.append(row('settings-update-auto', 'Check for updates automatically', unmanaged ? reason : `Downloads in the background and checks the release is genuine. ${windowsInstall(s) ? 'Windows asks for your permission, and you choose when to install it.' : 'The update installs when you relaunch Coral, never while you work.'} Only the latest releases of Coral\'s own GitHub repository are used.`, unmanaged ? false : s.auto !== false, unmanaged));
     // The Coral Hub relaunch switch lives in Settings > Network and Hub (with the rest of what the hub may do here); this pane only says where it is
     if (hubOn !== null && !unmanaged) {
         const r = mk('div', 'settings-row'); const dt = mk('dt', null, 'Relaunch from Coral Hub'); const dd = mk('dd');
-        dd.append(mk('span', 'toggle-desc', `${hubOn ? HUB_RELAUNCH_ON : HUB_RELAUNCH_OFF} `));
-        const go = mk('button', 'btn btn-small', 'Change in Network and Hub'); go.type = 'button';
-        go.addEventListener('click', () => window.showSettingsModal && window.showSettingsModal('network'));
-        dd.append(go); r.append(dt, dd); grid.append(r);
+        // On Windows Coral Hub cannot install at all (the install asks the person here): the sentence says so and there is no switch to change (#7338)
+        dd.append(mk('span', 'toggle-desc', `${windowsInstall(s) ? HUB_RELAUNCH_WINDOWS : hubOn ? HUB_RELAUNCH_ON : HUB_RELAUNCH_OFF} `));
+        if (!windowsInstall(s)) {
+            const go = mk('button', 'btn btn-small', 'Change in Network and Hub'); go.type = 'button';
+            go.addEventListener('click', () => window.showSettingsModal && window.showSettingsModal('network'));
+            dd.append(go);
+        }
+        r.append(dt, dd); grid.append(r);
     }
     if (!isCloud() && grid.children.length) host.append(grid);
     const facts = mk('dl', 'info-grid settings-grid update-facts');

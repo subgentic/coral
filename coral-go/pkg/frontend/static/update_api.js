@@ -21,6 +21,7 @@ const ROUTES = {
     cloudStatus: '/api/cloud/status', // GET: hub_relaunch_updates is where the saved switch is read
     hubRelaunch: '/api/cloud/hub-relaunch', // PUT {allow}: the switch Coral Hub may relaunch this Coral (#5280)
     check: '/api/system/update/check', // POST: one background check, local only
+    install: '/api/system/update/install', // POST {version}: Windows installs from this computer's own dashboard only (#166, #7338); Windows Installer then asks the person (UAC)
     prefs: '/api/system/update/settings', // PUT {auto}: check for updates automatically, local only
 };
 
@@ -63,6 +64,7 @@ export function normalizeStatus(raw) {
         auto: typeof raw.auto === 'boolean' ? raw.auto : null,
         source: raw.staged && SOURCE_RE.test(str(raw.staged.source)) ? raw.staged.source : '', // staged.source: the repository the staged update came from, sent by the server only for a verified update (#6292); anything but owner/name is ignored
         // Release channels (#5558; the server's #5557): the fields are optional, an older server sends none and the pane then draws no channel group.
+        localInstall: raw.local_install === true, // #7338: this computer's own dashboard may install (the server says so only to a request from here, on Windows); through Coral Hub it is never true
         hasChannel: raw.channel === 'approved' || raw.channel === 'agentic',
         channel: raw.channel === 'agentic' ? 'agentic' : 'approved', // anything else is read as approved: the safe side wins
         approved: raw.approved && typeof raw.approved === 'object' && VERSION_RE.test(str(raw.approved.version)) ? { version: raw.approved.version, approvedAt: Date.parse(str(raw.approved.approved_at)) ? str(raw.approved.approved_at) : '' } : null,
@@ -82,7 +84,7 @@ export function normalizeRelaunch(r) {
     };
 }
 
-/** What a reason says to the person, for the status's `relaunch.reason` and the refusals of a relaunch (the machine's own and Coral Hub's). A reason this build does not know is "Unavailable": never the server's word, which may be anything. */
+/** What a reason says to the person, for the status's `relaunch.reason` and the refusals of a relaunch (the machine's own and Coral Hub's). A reason this build does not know says that Coral did not say why (UNKNOWN_REASON_TEXT): never the server's word, which may be anything. */
 const REASON_TEXT = {
     max_mode: 'This Coral is not allowed to restart agents from here.',
     owner_only: 'Only the owner can relaunch this Coral.',
@@ -102,10 +104,28 @@ const REASON_TEXT = {
     label_missing: 'This machine is not set up for relaunching from Coral Hub.',
     reauth_required: 'Sign in again to relaunch this Coral.',
     no_run_record: 'Coral could not be restarted automatically on this computer, so it cannot relaunch itself here.', // #5419
+    local_approval_needed: 'Installing an update on Windows needs someone at this computer to approve it: use Install update in Settings there.', // #166: Coral Hub cannot do it
+    // the refusals of POST /api/system/update/install (#7338)
+    network: 'Coral could not be reached. Nothing was changed.',
+    stale_version: 'The update that is ready changed since this page showed it. Look at it again before you install.',
+    apply_not_enabled: 'Installing updates from here is not turned on yet. Coral keeps running as it is.',
+    updates_off: 'Updates are turned off for this Coral. It keeps running as it is.',
+    install_not_supported: 'This Coral was not installed with the installer, so it cannot update itself. Update it from its installer.',
+    updater_unavailable: 'The updater could not be reached. Coral keeps running as it is.',
+    updater_not_started: 'The updater could not be started. Coral is still running and nothing was changed.',
+    install_unavailable: 'This Coral cannot hand itself to the updater. Update it from its installer.',
+    unsupported_platform: 'This computer installs updates another way.',
+    operator_only: 'Only the person at this computer can install an update.',
 };
 /** Set while the person is away signing in again (the hub's 401 reauth_required): on return the dashboard reads the status afresh and shows the dialog again. */
 export const RESUME_KEY = 'coral-update-resume';
-export const reasonText = (reason) => (Object.hasOwn(REASON_TEXT, reason) ? REASON_TEXT[reason] : 'Unavailable');
+/** A reason this build does not know still gets a sentence (#7338): that Coral did not say why, and that nothing was changed. */
+export const UNKNOWN_REASON_TEXT = 'Coral did not say why. Nothing was changed.';
+export const reasonText = (reason) => (Object.hasOwn(REASON_TEXT, reason) ? REASON_TEXT[reason] : UNKNOWN_REASON_TEXT);
+/** Windows installs from this computer's own dashboard (#7338): the status says local_approval_needed and, only to a request from here, local_install. A relaunch is never offered there. */
+export const installsLocally = (s) => !!s && s.localInstall === true && s.relaunch.reason === 'local_approval_needed';
+/** Whether the person can start the update from this page now: a relaunch the server offers, or Windows's local install. */
+export const canStart = (s) => !!s && (s.relaunch.available || installsLocally(s));
 /** One wording for a relaunch that is offered but cannot be used now (the top-bar control, the Settings card): "Not available right now: <why>". */
 export const notAvailable = (reason) => `Not available right now: ${reasonText(reason)}`;
 
@@ -152,9 +172,19 @@ export async function requestRelaunch(ack, { server = '' } = {}) {
         if (resp.status === 202 && !isLocalServer(server)) noteRelaunchSent(server); // a machine behind the hub was told to relaunch: its Servers row says Updating (#5355)
         let body = {};
         try { body = await resp.json(); } catch { /* an empty body */ }
-        // the hub says why in `reason` (reauth_required, mode_too_low), the machine in `code`; error text is never shown (a reason this build does not know is "Unavailable")
+        // the hub says why in `reason` (reauth_required, mode_too_low), the machine in `code`; error text is never shown (a reason this build does not know says that Coral did not say why)
         return { ok: resp.ok, status: resp.status, code: str(body.code) || str(body.reason), signInUrl: safePath(body.sign_in_url), relaunch: body.relaunch && typeof body.relaunch === 'object' ? normalizeRelaunch(body.relaunch) : null };
     } catch (e) { return { ok: false, status: 0, code: 'network', signInUrl: '', relaunch: null }; }
+}
+
+/** Install the staged update on this computer (Windows, #7338): POST {version}, the version the page showed, so the server installs it only when it is still the staged one (409 stale_version otherwise). Local only: never sent for a machine behind Coral Hub. Resolves { ok, status, code }. */
+export async function requestInstall(version) {
+    try {
+        const resp = await fetch(ROUTES.install, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ version: str(version) }) });
+        let body = {};
+        try { body = await resp.json(); } catch { /* an empty body */ }
+        return { ok: resp.ok, status: resp.status, code: str(body.code) };
+    } catch (e) { return { ok: false, status: 0, code: 'network' }; }
 }
 
 /** The saved "Coral Hub may relaunch this Coral" switch, or null when it can't be read (the status of the update has no such field; the connector's does). */

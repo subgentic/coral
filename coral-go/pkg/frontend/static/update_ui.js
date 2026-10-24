@@ -5,7 +5,7 @@ import { PHONE_QUERY } from './phone_layout.js';
 import { importOnce } from './import_once.js';
 import { browserLocal, browserSession } from './safe_storage.js';
 import { pollEvery } from './overload.js';
-const { RESUME_KEY, ageTier, fetchUpdateStatus, notAvailable, requestCheckNow, rollbackText, serverHas } = await importOnce('./update_api.js'); // lazy modules load the others they need through importOnce, so a failed load is retried
+const { RESUME_KEY, ageTier, canStart, fetchUpdateStatus, installsLocally, notAvailable, requestCheckNow, rollbackText, serverHas } = await importOnce('./update_api.js'); // lazy modules load the others they need through importOnce, so a failed load is retried
 import { updatesUiOn } from './update_flag.js';
 
 const POLL_MS = 10 * 60 * 1000;
@@ -31,7 +31,8 @@ export function pillWords(s) {
     const ago = days < 1 ? 'earlier today' : `${plural(days, 'day')} ago`;
     return {
         tier, age,
-        name: `Relaunch to update to version ${s.staged.version}. Downloaded ${ago}.${s.relaunch.available ? '' : ` ${notAvailable(s.relaunch.reason)}`}`,
+        verb: installsLocally(s) ? 'Install update' : 'Relaunch to update', // Windows installs from this page (#7338): no relaunch is offered there
+        name: `${installsLocally(s) ? 'Install update' : 'Relaunch to update'} to version ${s.staged.version}. Downloaded ${ago}.${canStart(s) ? '' : ` ${notAvailable(s.relaunch.reason)}`}`,
     };
 }
 
@@ -48,7 +49,8 @@ function placePill() {
 function renderPill() {
     const pill = $('update-pill');
     if (!pill) return;
-    const on = relaunchOffered(status) && status.relaunch.reason !== 'no_run_record'; // no_run_record: Settings carries the sentence, the top bar has nothing to offer (like unsupported_install)
+    // no_run_record: Settings carries the sentence, the top bar has nothing to offer (like unsupported_install); local_approval_needed without local_install is a request through Coral Hub: nobody there can install, so no button (#7338)
+    const on = relaunchOffered(status) && status.relaunch.reason !== 'no_run_record' && !(status.relaunch.reason === 'local_approval_needed' && !status.localInstall);
     pill.hidden = !on;
     placePill();
     if (!on) return;
@@ -56,8 +58,9 @@ function renderPill() {
     pill.dataset.age = w.tier;
     pill.setAttribute('aria-label', w.name);
     pill.title = w.name;
+    pill.querySelector('.update-long').textContent = w.verb;
     pill.querySelector('.update-age').textContent = w.age ? ` · ${w.age}` : '';
-    const busy = !status.relaunch.available;
+    const busy = !canStart(status);
     pill.setAttribute('aria-disabled', String(busy));
 }
 
@@ -87,7 +90,7 @@ function renderBanner() {
     banner.querySelector('.update-fail-rest').textContent = n.rest;
     // Try again is drawn only when it can do something: a check route to ask, or a rolled-back update that can be relaunched again
     const again = banner.querySelector('.update-fail-again');
-    if (again) again.hidden = !(serverHas.check || (n.kind === 'rolled' && relaunchOffered(status) && status.relaunch.available));
+    if (again) again.hidden = !(serverHas.check || (n.kind === 'rolled' && relaunchOffered(status) && canStart(status)));
     // role=alert announces a banner when it appears; the same notice redrawn by the next poll is not announced again (the text is only written when it changed)
     if (!wasShown) banner.setAttribute('role', 'alert');
 }
@@ -95,7 +98,7 @@ function renderBanner() {
 /** The one-time notice (#6292): a verified update that this install can apply now, said once per version in this browser. Review opens the confirmation; Later closes the notice and changes nothing (the control stays). Never drawn where the control is not (Homebrew, unsupported, no run record, Coral Hub off), and never in a hidden tab (it would be marked seen unread). */
 const READY_SEEN_KEY = 'coral-update-ready-seen';
 export function readyNotice(s) {
-    if (!relaunchOffered(s) || s.relaunch.reason === 'no_run_record' || !s.relaunch.available) return null;
+    if (!relaunchOffered(s) || s.relaunch.reason === 'no_run_record' || !canStart(s)) return null;
     return { key: s.staged.version, lead: `Coral ${s.staged.version} is ready.`, rest: ' It is downloaded and checked. Nothing is installed until you say yes.' };
 }
 function renderReadyNotice() {
@@ -127,14 +130,14 @@ export async function refreshUpdateStatus() {
 }
 
 async function openDialog() {
-    if (!relaunchOffered(status) || !status.relaunch.available) return;
+    if (!relaunchOffered(status) || !canStart(status)) return;
     const m = await importOnce('./update_dialog.js');
     m.openUpdateDialog(status);
 }
 
 async function tryAgain() {
     const banner = $('update-fail-banner');
-    if (banner && banner.dataset.kind === 'rolled' && relaunchOffered(status) && status.relaunch.available) { openDialog(); return; }
+    if (banner && banner.dataset.kind === 'rolled' && relaunchOffered(status) && canStart(status)) { openDialog(); return; }
     await requestCheckNow();
     await refreshUpdateStatus();
 }
@@ -145,7 +148,7 @@ export async function resumeAfterSignIn() {
     browserSession.remove(RESUME_KEY);
     if (!flag) return false;
     await refreshUpdateStatus();
-    if (relaunchOffered(status) && status.relaunch.available) { await openDialog(); return true; }
+    if (relaunchOffered(status) && canStart(status)) { await openDialog(); return true; }
     return false;
 }
 

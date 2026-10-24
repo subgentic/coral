@@ -13,7 +13,7 @@
 import { copyText } from './utils.js';
 import { importOnce } from './import_once.js';
 const { morePermsWords, operatorLine, spellCode } = await importOnce('./cloud_words.js');
-const { HUB_RELAUNCH_ON, HUB_RELAUNCH_OFF } = await importOnce('./update_words.js'); // a lazy module loads the others through importOnce, so a failed load is retried
+const { HUB_RELAUNCH_ON, HUB_RELAUNCH_OFF, HUB_RELAUNCH_WINDOWS } = await importOnce('./update_words.js'); // a lazy module loads the others through importOnce, so a failed load is retried
 
 const STATUS_URL = '/api/cloud/status';
 // 'Let Coral Hub act as the Operator' (#3377): a local-only owner setting. The route answers only
@@ -155,7 +155,7 @@ class CloudPanel {
     hubRelaunchWords(box) {
         const t = this.part('hub-relaunch-state');
         if (!t || !box) return;
-        t.textContent = box.checked ? HUB_RELAUNCH_ON : HUB_RELAUNCH_OFF;
+        t.textContent = this.hubRelaunchNeedsHere ? HUB_RELAUNCH_WINDOWS : box.checked ? HUB_RELAUNCH_ON : HUB_RELAUNCH_OFF; // Windows: Coral Hub cannot install, whatever the switch says (#7338)
         box.setAttribute('aria-describedby', 'settings-cloud-hub-relaunch-desc settings-cloud-hub-relaunch-state');
     }
 
@@ -304,6 +304,7 @@ class CloudPanel {
         // Relaunching for an update from the hub (#5280, #5383): on unless the owner turned it off here.
         const hubRelaunch = this.part('hub-relaunch');
         if (hubRelaunch) hubRelaunch.checked = st.hub_relaunch_updates === true; // an explicit true only: the server's default is off
+        this.hubRelaunchNeedsHere = st.hub_relaunch_needs_here === true;
         this.hubRelaunchWords(hubRelaunch);
         // Cross-team switches from the hub (#5572): the owner may turn a team's messaging and file sharing on or off unless this lock is off (the server reads an unset or unreadable lock as off).
         const hubCrossTeam = this.part('hub-cross-team');

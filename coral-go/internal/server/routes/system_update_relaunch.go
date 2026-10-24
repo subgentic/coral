@@ -631,6 +631,9 @@ func (h *UpdateRelaunchHandler) Status(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.addChannelFacts(r, out)
+	if relaunchNeedsLocalApproval && !viaTunnel(r) {
+		out["local_install"] = true // #7338: this computer's own dashboard may install (POST /api/system/update/install); a request through Coral Hub is never told so
+	}
 	if !viaTunnel(r) { // the local dashboard's "check automatically" switch; the Hub's shape is unchanged
 		if settings, err := h.Settings(r.Context()); err == nil {
 			out["auto"] = UpdateAutoOn(settings)

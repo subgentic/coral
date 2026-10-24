@@ -65,11 +65,28 @@ func TestInstallUpdateIsLocalPersonOnly(t *testing.T) {
 		reset()
 		require.Equal(t, http.StatusAccepted, req("{}", nil).Code)
 	})
-	t.Run("the request names nothing: a body that chooses a version or a path is refused", func(t *testing.T) {
-		for _, body := range []string{`{"version":"9.9.9"}`, `{"path":"C:\\x.msi"}`, `{"url":"http://x"}`, strings.Repeat(" ", 40)} {
+	t.Run("the request names nothing to install: a body that chooses a path or an address is refused", func(t *testing.T) {
+		for _, body := range []string{`{"path":"C:\\x.msi"}`, `{"url":"http://x"}`, `{"version":"1.5.0","path":"C:\\x.msi"}`, `{"version":9}`, `{"version":null}`, `{"version":"1.5.0"} {}`, strings.Repeat(" ", 70)} {
 			reset()
 			rec := req(body, nil)
 			assert.Equal(t, http.StatusBadRequest, rec.Code, body)
+			assert.Equal(t, [2]int{0, 0}, [2]int{launched, quit}, body)
+		}
+	})
+	// #7338: the page says which version it showed; the server installs only that one. The version is a check, never a choice.
+	t.Run("the version the page showed is installed when it is the one staged", func(t *testing.T) {
+		reset()
+		rec := req(`{"version":"1.5.0"}`, nil)
+		require.Equal(t, http.StatusAccepted, rec.Code, rec.Body.String())
+		assert.JSONEq(t, `{"ok":true,"version":"1.5.0","quitting":true}`, rec.Body.String())
+		assert.Equal(t, [2]int{1, 1}, [2]int{launched, quit})
+	})
+	t.Run("a version that is not the staged one installs nothing and says the update changed", func(t *testing.T) {
+		for _, body := range []string{`{"version":"9.9.9"}`, `{"version":"1.4.9"}`, `{"version":""}`, `{"version":"1.5.0-rc1"}`, `{"version":" 1.5.0"}`} {
+			reset()
+			rec := req(body, nil)
+			assert.Equal(t, http.StatusConflict, rec.Code, body)
+			assert.Contains(t, rec.Body.String(), "stale_version", body)
 			assert.Equal(t, [2]int{0, 0}, [2]int{launched, quit}, body)
 		}
 	})
@@ -206,4 +223,23 @@ func TestRelaunchIsRefusedOnWindows(t *testing.T) {
 		assert.Equal(t, "local_approval_needed", out["code"], "%v", out)
 	}
 	assert.Zero(t, e.up.applyCount(), "nothing was started")
+}
+
+// #7338: the status tells the page whether the person here may install: only a request from this computer's own dashboard, only where the install is a local one (Windows).
+// A machine behind Coral Hub (a viewer, the owner) is told nothing it could draw an Install update button from.
+func TestStatusSaysWhetherThePersonHereMayInstall(t *testing.T) {
+	e := newRelaunchEnv(t) // a non-Windows OS
+	code, st := e.status(nil)
+	require.Equal(t, 200, code)
+	assert.NotContains(t, st, "local_install", "elsewhere an update installs by relaunch")
+
+	relaunchNeedsLocalApproval = true // Windows
+	code, st = e.status(nil)
+	require.Equal(t, 200, code)
+	assert.Equal(t, true, st["local_install"], "the dashboard on this computer may install")
+	assert.Equal(t, "local_approval_needed", st["relaunch"].(map[string]any)["reason"])
+
+	code, st = e.status(hubHdr(ownerA))
+	require.Equal(t, 200, code)
+	assert.NotContains(t, st, "local_install", "through Coral Hub nobody installs")
 }

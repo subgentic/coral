@@ -38,7 +38,7 @@ const idle = (over = {}) => ({ enabled: true, installed: '1.4.125', state: 'none
         check(`the ten reasons are not "Unavailable" (${JSON.stringify(words.r.map(w => w.slice(0, 28)))})`, words.r.every(w => w && w !== 'Unavailable'));
         check('switch_off says where the switch is', /Settings > Network and Hub/.test(words.r[2]));
         check(`no_run_record says it cannot relaunch itself here (${words.r[9]})`, words.r[9] === 'Coral could not be restarted automatically on this computer, so it cannot relaunch itself here.');
-        check(`an unknown reason, and "constructor", are Unavailable (${words.unknown}, ${words.proto})`, words.unknown === 'Unavailable' && words.proto === 'Unavailable');
+        check(`an unknown reason, and "constructor", say that Coral did not say why, not "Unavailable" (${words.unknown}, ${words.proto})`, words.unknown === 'Coral did not say why. Nothing was changed.' && words.proto === words.unknown);
         check(`one wording: "${words.na}"`, words.na === 'Not available right now: Another relaunch is already running.');
         await setStatus(staged({}, { available: false, reason: 'no_run_record' }));
         const nrPill = await ev(`(() => { const p = document.getElementById('update-pill'); return !p || p.hidden || getComputedStyle(p).display === 'none'; })()`);
