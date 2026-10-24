@@ -123,16 +123,17 @@ func finalPath(dir string) string {
 	return strings.TrimPrefix(s, `\\?\`)
 }
 
-// openLog sends the log to a new coral-msi-helper-<random>.log in this user's temporary folder, and standard error. A fixed name in a folder
-// the user can write is a link an elevated run could be made to write through: a new file with a random name is created, never opened
-// (Security on #335). The first line says whether this run's token is elevated.
+// openLog sends the log to a new coral-msi-helper-<random>.log in this user's temporary folder, and only there: a GUI program that Windows
+// Installer starts has no standard error, and a MultiWriter with it stopped at its failed write, so the file stayed empty (Security on
+// #155, tested live). A fixed name in a folder the user can write is a link an elevated run could be made to write through: a new file with
+// a random name is created, never opened (Security on #335). The first line says whether this run's token is elevated.
 func openLog() func() {
 	log.SetFlags(log.LstdFlags)
 	f, err := os.CreateTemp(os.TempDir(), "coral-msi-helper-*.log")
 	if err != nil {
 		return func() {}
 	}
-	log.SetOutput(io.MultiWriter(os.Stderr, f))
+	log.SetOutput(f)
 	log.Printf("coral-msi-helper %s (elevated: %v)", strings.Join(os.Args[1:], " "), windows.GetCurrentProcessToken().IsElevated())
 	return func() { f.Close() }
 }
@@ -414,10 +415,10 @@ func eula(elevated bool) {
 		return
 	}
 	if err := license.WriteInstallerEULAMarker(); err != nil {
-		log.Printf("eula: %v", err)
+		log.Printf("eula: %s: %v", license.EULAMarkerPath(), err)
 		return
 	}
-	log.Printf("eula: the terms accepted in the installer are recorded")
+	log.Printf("eula: the terms accepted in the installer are recorded (%s)", license.EULAMarkerPath())
 }
 
 func start(me identity) {

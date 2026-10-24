@@ -3,6 +3,7 @@
 package main
 
 import (
+	"log"
 	"os"
 	"path/filepath"
 	"testing"
@@ -73,4 +74,30 @@ func TestAProcessIsReadFromItsHandle(t *testing.T) {
 	assert.Contains(t, p.cmdline, "-test.", "the command line the test binary was given")
 	other := identity{user: me.user, session: me.session + 1}
 	assert.False(t, p.who.is(other), "another session of the same user is not this one")
+}
+
+// The log reaches its file with no standard error: Windows Installer starts the GUI helper without one, and a write to it fails (Security
+// on #155: a MultiWriter with stderr stopped there, and every helper log stayed empty).
+func TestTheLogReachesItsFileWithNoStandardError(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("TMP", dir)
+	t.Setenv("TEMP", dir)
+	stderr := os.Stderr
+	closed, err := os.CreateTemp(t.TempDir(), "stderr")
+	require.NoError(t, err)
+	require.NoError(t, closed.Close())
+	os.Stderr = closed
+	t.Cleanup(func() { os.Stderr = stderr; log.SetOutput(stderr) })
+
+	closeLog := openLog()
+	log.Printf("a later line")
+	closeLog()
+
+	logs, err := filepath.Glob(filepath.Join(dir, "coral-msi-helper-*.log"))
+	require.NoError(t, err)
+	require.Len(t, logs, 1)
+	b, err := os.ReadFile(logs[0])
+	require.NoError(t, err)
+	assert.Contains(t, string(b), "(elevated: ")
+	assert.Contains(t, string(b), "a later line")
 }
