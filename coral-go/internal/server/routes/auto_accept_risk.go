@@ -13,6 +13,7 @@ import (
 
 	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/safefs"
+	"github.com/subgentic/coral/internal/safego"
 )
 
 // A best-effort safety net, not a guarantee (#3182; operator, 2026-10-13): the
@@ -94,6 +95,9 @@ func shellRiskWithin(command, workDir string) string {
 	done := make(chan string, 1)
 	impl := shellRiskImpl // read here, by the caller: the goroutine below may outlive a test that swaps the variable
 	go func() {
+		// safego.Recover is the census's first statement (a bare go statement fails TestEveryGoroutineRecovers); the recover below runs first and answers
+		// the caller, so this one only catches what that one could not.
+		defer safego.Recover("auto-accept shell risk")
 		defer func() {
 			if r := recover(); r != nil {
 				slog.Warn("auto-accept: judging a command panicked; it was left to the person", "bytes", len(command), "panic", r)
