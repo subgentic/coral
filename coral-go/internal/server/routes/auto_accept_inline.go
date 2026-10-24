@@ -5,30 +5,54 @@ import (
 	"strings"
 )
 
-// The last open forms of auto-accept (#7201, left open on purpose in #7106): a command that runs code it is given inline (python -c, node -e, perl -e, ruby -e, php -r, awk with system()), a
-// command run on another computer (ssh host command) and one that runs commands for a list (parallel). Same policy as the rare launchers: what the code does is not modelled and a person decides.
-// Running a script FILE (python3 x.py, node x.js, perl x.pl) is left as it is, and so are the interpreters' version and help flags and a module run (python3 -m pytest).
+// The last open forms of auto-accept (#7201): a command that runs code it is given inline (python -c, node -e, perl -e, ruby -e, php -r, awk with a command, osascript -e, ...), a command run on
+// another computer (ssh, mosh, autossh, sshpass) and one that runs commands for a list (parallel). The rule for the whole family is the Orchestrator's: if a word could put inline code or a remote
+// command in front of an interpreter, ask. No option arity is modelled (a value in the next word is read as any other word), so a script's own -c or -e after its name asks too: over-asking is the
+// accepted cost. Running a script FILE (python3 x.py, node x.js, perl x.pl) stays as it is, and so do the version and help flags and a module run (python3 -m pytest).
 
 // inlineCodeRisk is why a command that runs inline code, a remote command or a command list is high-risk ("" when it is none of them).
 func inlineCodeRisk(cmd string, args []string) string {
 	name := interpreterName(cmd)
+	if name == "" {
+		return ""
+	}
+	// everything before a lone -- is read; after it the words belong to the program that was named
+	if i := indexOf(args, "--"); i >= 0 {
+		args = args[:i]
+	}
 	switch name {
-	case "python", "node", "deno", "bun", "perl", "ruby", "php":
+	case "python", "node", "deno", "bun", "perl", "ruby", "php", "osascript", "lua", "Rscript", "julia", "emacs", "vim", "npx", "groovy", "tsnode", "powershell", "expect":
 		if inlineCodeFlag(name, args) {
-			// perl -pi -e 's/a/b/' file and perl -ne 'print' file are the common text edits, and the tests since #3207 hold them to perlRisk's reading of the files they touch: a one-liner whose program
-			// calls nothing that runs a command or changes the file system stays with that rule. Every other inline program, and every perl that reads its program from its input, asks.
-			if name == "perl" && perlExplicitProgram(args) && !perlProgramRuns(args) {
-				return ""
-			}
 			return "it runs inline code (" + cmd + ")"
 		}
+	case "npm":
+		if indexOf(args, "exec") >= 0 || indexOf(args, "x") >= 0 || indexOf(args, "dlx") >= 0 { // npm exec -c 'command', pnpm dlx, yarn dlx: the runner of npx
+			if inlineCodeFlag("npx", args) {
+				return "it runs inline code (" + cmd + " exec)"
+			}
+		}
+	case "repl":
+		if !onlyInfoFlags(args) {
+			return "it reads a program from its input (" + cmd + ")"
+		}
+	case "sed":
+		if sedRunsCommands(args) {
+			return "it runs a command or writes a file from a sed script (sed)"
+		}
+	case "tclsh":
+		return "it runs Tcl code (tclsh)"
+
+	case "rsync":
+		if rsyncRemoteShell(args) {
+			return "it runs a remote shell command (rsync -e)"
+		}
 	case "awk":
-		if awkRunsCommands(args) {
+		if awkStartsCommand(args) {
 			return "it runs commands from an awk program (" + cmd + ")"
 		}
 	case "ssh":
 		if sshRunsRemotely(args) {
-			return "it runs a command on another computer (ssh)"
+			return "it runs a command on another computer (" + cmd + ")"
 		}
 	case "parallel":
 		if !onlyInfoFlags(args) {
@@ -38,88 +62,350 @@ func inlineCodeRisk(cmd string, args []string) string {
 	return ""
 }
 
+func indexOf(args []string, w string) int {
+	for i, a := range args {
+		if a == w {
+			return i
+		}
+	}
+	return -1
+}
+
 var (
 	pythonNameRe = regexp.MustCompile(`^(python|pypy)[0-9.]*$`)
 	awkNameRe    = regexp.MustCompile(`^(awk|gawk|mawk|nawk|busybox-awk)$`)
+	vimNameRe    = regexp.MustCompile(`^(vim|nvim|vi|view|ex|gvim)$`)
 )
 
-// interpreterName is the family of a command name: python3.11 and pypy3 are python, nodejs is node, gawk is awk.
+// interpreterName is the family of a command name (a .exe is dropped): python3.11 and pypy3 are python, nodejs is node, gawk is awk, nvim is vim, mosh and autossh and sshpass are ssh.
 func interpreterName(cmd string) string {
+	cmd = strings.TrimSuffix(cmd, ".exe")
 	switch {
-	case pythonNameRe.MatchString(cmd):
+	case pythonNameRe.MatchString(cmd), cmd == "py":
 		return "python"
 	case cmd == "node" || cmd == "nodejs":
 		return "node"
 	case awkNameRe.MatchString(cmd):
 		return "awk"
+	case vimNameRe.MatchString(cmd):
+		return "vim"
 	}
 	switch cmd {
-	case "deno", "bun", "perl", "ruby", "php", "ssh", "parallel":
+	case "deno", "bun", "perl", "ruby", "php", "ssh", "parallel", "osascript", "lua", "Rscript", "julia", "emacs", "npx", "tclsh", "rsync", "groovy", "expect", "sed", "npm", "pnpm", "yarn":
+		if cmd == "pnpm" || cmd == "yarn" {
+			return "npm"
+		}
 		return cmd
+	case "ts-node", "tsx":
+		return "tsnode"
+	case "pwsh", "powershell":
+		return "powershell"
+	case "irb", "jshell":
+		return "repl"
+	case "mosh", "autossh", "sshpass", "mosh-client":
+		return "ssh"
 	}
 	return ""
 }
 
-// inlineCodeFlag reports whether the options before the script (or module) of an interpreter give it code to run: python -c, node -e/-p (--eval, --print), deno eval, bun -e/--eval, perl -e/-E (also in a
-// group: -pe, -lane), ruby -e (also -ne, -pe), php -r/-R/-B/-E (--run). Options after the script belong to the script. A bare interpreter, or "-", reads its program from its input.
+// inlineCodeFlag reports whether the words of an interpreter's command line could give it code to run: a flag anywhere before a lone -- (python: -c or an option group with c, -m timeit; node and bun:
+// -e, -p, -pe, --eval, --print; deno: eval, -e, --eval; perl: -e, -E; ruby: -e; php: -r, -R, -B, -E, --run; osascript, lua, Rscript, julia: -e; emacs: --eval, --execute; vim: -c, --cmd, +command; npx: -c).
+// A bare interpreter, or "-", reads its program from its input and asks too, unless it only answers a question (--version, -V, -h).
 func inlineCodeFlag(name string, args []string) bool {
-	if name == "deno" {
-		return len(args) > 0 && args[0] == "eval"
+	hasOperand := false
+	for i, a := range args {
+		if !strings.HasPrefix(a, "-") && !(name == "vim" && strings.HasPrefix(a, "+")) {
+			hasOperand = true
+			if name == "deno" && a == "eval" {
+				return true
+			}
+			if name == "python" && i > 0 && args[i-1] == "-m" && (a == "timeit" || a == "code" || a == "pdb" || a == "runpy") {
+				return true // a module run that runs the code it is given
+			}
+			continue
+		}
+		if name == "vim" && strings.HasPrefix(a, "+") && len(a) > 1 && !isDigits(a[1:]) {
+			return true // +command
+		}
+		if name == "powershell" {
+			if powershellGivesCode(a) {
+				return true
+			}
+			continue
+		}
+		if strings.HasPrefix(a, "--") {
+			long := strings.SplitN(a, "=", 2)[0]
+			switch name {
+			case "node", "bun", "deno", "tsnode":
+				if long == "--eval" || long == "--print" {
+					return true
+				}
+			case "php":
+				if long == "--run" {
+					return true
+				}
+			case "julia":
+				if long == "--eval" || long == "--print" {
+					return true
+				}
+			case "emacs":
+				if long == "--eval" || long == "--execute" || long == "--funcall" || long == "--load" {
+					return true
+				}
+			case "vim":
+				if long == "--cmd" {
+					return true
+				}
+			case "npx":
+				if long == "--call" || long == "--eval" || long == "--print" {
+					return true
+				}
+			case "osascript", "Rscript", "groovy":
+				if long == "--eval" || long == "--expression" || long == "--exec" {
+					return true
+				}
+			}
+			continue
+		}
+		// a short option word: its leading run of letters is the option group
+		letters := a[1:]
+		for k := 0; k < len(letters); k++ {
+			if !isLetter(letters[k]) {
+				letters = letters[:k]
+				break
+			}
+		}
+		if letters == "" {
+			continue
+		}
+		if shortGroupGivesCode(name, letters) {
+			return true
+		}
 	}
-	// short options that take the rest of their word (or the next word) as a value: the letters after them in a group are not options
-	valued := map[string]string{"python": "WXQ", "node": "r", "bun": "r", "perl": "IMmFiCdDV", "ruby": "IrCFKEeTxW", "php": "dzcnfhtqS"}[name]
-	sawScript := false
+	if name == "osascript" || name == "lua" || name == "Rscript" || name == "julia" || name == "emacs" || name == "vim" || name == "npx" || name == "groovy" || name == "tsnode" {
+		return false // an editor, a runner or a script file named alone is not a program read from its input here
+	}
+	return !hasOperand && !onlyInfoFlags(args)
+}
+
+// powershellGivesCode reports whether a PowerShell parameter word gives it code: -Command and its abbreviations (-c, -co, ...), -EncodedCommand (-e, -ec, -en, ...), also with / or a value after a colon. -File and the other
+// parameters do not (-ExecutionPolicy is not read as -e).
+func powershellGivesCode(a string) bool {
+	if !strings.HasPrefix(a, "-") && !strings.HasPrefix(a, "/") {
+		return false
+	}
+	w := strings.ToLower(strings.TrimLeft(a, "-/"))
+	w = strings.SplitN(w, ":", 2)[0]
+	if w == "" {
+		return false
+	}
+	if strings.HasPrefix("command", w) || strings.HasPrefix("encodedcommand", w) {
+		return true
+	}
+	return w == "ec" || w == "e"
+}
+
+// sedRunsCommands reports whether a sed script (-e, --expression=, or the first word that is not an option) holds a command that runs another or writes a file: e, w, W, or the e and w flags of s. -f names a
+// script file, left as it is.
+func sedRunsCommands(args []string) bool {
+	var scripts []string
+	gotScript := false
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		switch {
-		case a == "--":
-			sawScript = i+1 < len(args)
-			i = len(args)
-		case !strings.HasPrefix(a, "-"):
-			sawScript = true
-			i = len(args)
-		case strings.HasPrefix(a, "--"):
-			long := strings.SplitN(a, "=", 2)[0]
-			switch {
-			case name == "node" && (long == "--eval" || long == "--print"), name == "bun" && (long == "--eval" || long == "--print"), name == "php" && long == "--run":
-				return true
-			case name == "node" && (long == "--require" || long == "--import" || long == "--loader" || long == "--experimental-loader") && !strings.Contains(a, "="):
+		case a == "-f" || a == "--file" || strings.HasPrefix(a, "--file="):
+			return false
+		case a == "-e" || a == "--expression":
+			if i+1 < len(args) {
+				scripts = append(scripts, args[i+1])
+				gotScript = true
 				i++
 			}
-		default:
-			for k := 1; k < len(a); k++ {
-				c := a[k]
-				if inlineLetter(name, c) {
-					return true
+		case strings.HasPrefix(a, "--expression="):
+			scripts = append(scripts, strings.TrimPrefix(a, "--expression="))
+			gotScript = true
+		case a == "-l" || a == "--line-length":
+			i++
+		case strings.HasPrefix(a, "-") && len(a) > 1 && !strings.HasPrefix(a, "--"):
+			// a group such as -ne, -ni, -i.bak: an e in it is -e whose script is the next word
+			letters := a[1:]
+			for k := 0; k < len(letters); k++ {
+				if !isLetter(letters[k]) {
+					break
 				}
-				if strings.IndexByte(valued, c) >= 0 {
-					if k+1 == len(a) && ((name != "perl" && (c == 'r' || c == 'W' || c == 'X' || c == 'I' || c == 'M' || c == 'm')) || (name == "perl" && c == 'I')) {
-						i++ // the value is the next word
-					}
+				if letters[k] == 'e' && i+1 < len(args) {
+					scripts = append(scripts, args[i+1])
+					gotScript = true
+					i++
+					break
+				}
+				if letters[k] == 'i' {
 					break
 				}
 			}
+		case strings.HasPrefix(a, "-"):
+		default:
+			if !gotScript {
+				scripts = append(scripts, a)
+				gotScript = true
+			}
 		}
 	}
-	// An interpreter given no script at all reads its program from its input (python3 < x.py, echo ... | node), except when it only answers a question (--version, -V, -h).
-	return !sawScript && !onlyInfoFlags(args)
-}
-
-// inlineLetter says whether the short option letter c of an interpreter gives it code.
-func inlineLetter(name string, c byte) bool {
-	switch name {
-	case "python":
-		return c == 'c'
-	case "node", "bun":
-		return c == 'e' || c == 'p'
-	case "perl":
-		return c == 'e' || c == 'E'
-	case "ruby":
-		return c == 'e'
-	case "php":
-		return c == 'r' || c == 'R' || c == 'B' || c == 'E'
+	for _, sc := range scripts {
+		if sedScriptRuns(sc) {
+			return true
+		}
 	}
 	return false
+}
+
+// sedScriptRuns reads a sed script command by command (addresses, s and y with their delimiters, a, i, c text to the end of the line, labels) and reports an e, w or W command, or an e or w flag of s.
+func sedScriptRuns(sc string) bool {
+	i, n := 0, len(sc)
+	skipTo := func(delim byte) { // past the next unescaped delim
+		for i < n {
+			if sc[i] == '\\' && i+1 < n {
+				i += 2
+				continue
+			}
+			if sc[i] == delim {
+				i++
+				return
+			}
+			i++
+		}
+	}
+	for i < n {
+		for i < n && strings.IndexByte(" \t\n;{}", sc[i]) >= 0 {
+			i++
+		}
+		// addresses
+		for i < n {
+			switch {
+			case sc[i] == '/':
+				i++
+				skipTo('/')
+			case sc[i] == '\\' && i+1 < n:
+				d := sc[i+1]
+				i += 2
+				skipTo(d)
+			case sc[i] >= '0' && sc[i] <= '9' || sc[i] == '$' || sc[i] == ',' || sc[i] == '~' || sc[i] == '+' || sc[i] == '!' || sc[i] == ' ':
+				i++
+				continue
+			default:
+			}
+			if i < n && (sc[i] == 'I' || sc[i] == 'M') {
+				i++
+			}
+			if i < n && (sc[i] == ',' || sc[i] == '~' || sc[i] == '+' || sc[i] == '!' || sc[i] == ' ' || sc[i] == '/' || sc[i] == '\\' || sc[i] >= '0' && sc[i] <= '9' || sc[i] == '$') {
+				continue
+			}
+			break
+		}
+		if i >= n {
+			return false
+		}
+		c := sc[i]
+		i++
+		switch c {
+		case 'e', 'w', 'W':
+			return true
+		case 's', 'y':
+			if i >= n {
+				return false
+			}
+			d := sc[i]
+			i++
+			skipTo(d)
+			skipTo(d)
+			if c == 's' {
+				for i < n && strings.IndexByte(";\n} \t", sc[i]) < 0 {
+					if sc[i] == 'e' || sc[i] == 'w' {
+						return true
+					}
+					i++
+				}
+			}
+		case 'a', 'i', 'c':
+			for i < n && sc[i] != '\n' {
+				i++
+			}
+		case ':', 'b', 't', 'T', 'r', 'R', 'l', 'L', 'q', 'Q':
+			for i < n && sc[i] != ';' && sc[i] != '\n' {
+				i++
+			}
+		}
+	}
+	return false
+}
+
+// shortGroupGivesCode reports whether a group of short option letters holds one that gives the interpreter code. For perl the letters after a letter that takes the rest of its word as a value are
+// not options (-MFile::Path, -I/lib), so the group is read up to it.
+func shortGroupGivesCode(name, letters string) bool {
+	valued := ""
+	if name == "perl" {
+		valued = "IMmFiCdDV"
+	}
+	for k := 0; k < len(letters); k++ {
+		c := letters[k]
+		switch name {
+		case "python":
+			if c == 'c' {
+				return true
+			}
+		case "node", "bun", "deno", "tsnode":
+			if c == 'e' || c == 'p' {
+				return true
+			}
+		case "groovy":
+			if c == 'e' {
+				return true
+			}
+		case "expect":
+			if c == 'c' {
+				return true
+			}
+		case "perl":
+			if c == 'e' || c == 'E' {
+				return true
+			}
+		case "ruby", "osascript", "lua", "Rscript", "julia":
+			if c == 'e' || (name == "julia" && (c == 'E' || c == 'p')) {
+				return true
+			}
+		case "php":
+			if c == 'r' || c == 'R' || c == 'B' || c == 'E' {
+				return true
+			}
+		case "vim":
+			if c == 'c' || c == 'S' {
+				return true
+			}
+		case "npx":
+			if c == 'c' || c == 'e' || c == 'p' {
+				return true
+			}
+		case "emacs":
+			if c == 'f' {
+				return true
+			}
+		}
+		if strings.IndexByte(valued, c) >= 0 {
+			break
+		}
+	}
+	return false
+}
+
+func isLetter(c byte) bool { return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' }
+
+func isDigits(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] < '0' || s[i] > '9' {
+			return false
+		}
+	}
+	return s != ""
 }
 
 // onlyInfoFlags reports whether every argument is a version or help request (or there is none to a command that needs some): --version, -V, -v, -h, --help, -?.
@@ -137,55 +423,67 @@ func onlyInfoFlags(args []string) bool {
 	return true
 }
 
-var awkSystemRe = regexp.MustCompile(`\bsystem\s*\(|\|&`)
+var awkSystemRe = regexp.MustCompile(`\bsystem\s*\(`)
 
-// awkPipeRe reports whether an awk program starts a command: system(), a coprocess (|&), or a single | with a string on either side (print | "sort", "date" | getline); || is the or operator.
-func awkStartsCommand(prog string) bool {
+// awkStartsCommand reports whether an awk command line could start a command: system(), or any | that is not the or operator || (print | "sort", c | getline, |&). The field separator (-F|, -F '|')
+// and -v assignments are not read, so awk -F'|' '{print $1}' f is left alone; -f names a program file, left as it is.
+func awkStartsCommand(args []string) bool {
+	var text []string
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		switch {
+		case a == "-f" || a == "--file" || strings.HasPrefix(a, "-f") && !strings.HasPrefix(a, "-field"):
+			return false
+		case a == "-F" || a == "-v" || a == "--assign" || a == "--field-separator":
+			i++
+		case strings.HasPrefix(a, "-F") || strings.HasPrefix(a, "-v") || strings.HasPrefix(a, "--field-separator=") || strings.HasPrefix(a, "--assign="):
+		case strings.HasPrefix(a, "--source="):
+			text = append(text, strings.TrimPrefix(a, "--source="))
+		case strings.HasPrefix(a, "-e") && len(a) > 2:
+			text = append(text, a[2:])
+		case strings.HasPrefix(a, "-"):
+		default:
+			text = append(text, a)
+		}
+	}
+	prog := strings.Join(text, " ")
 	if awkSystemRe.MatchString(prog) {
 		return true
 	}
 	for i := 0; i < len(prog); i++ {
-		if prog[i] != '|' || (i > 0 && prog[i-1] == '|') || (i+1 < len(prog) && prog[i+1] == '|') {
-			continue
-		}
-		j := i + 1
-		for j < len(prog) && (prog[j] == ' ' || prog[j] == '\t') {
-			j++
-		}
-		k := i - 1
-		for k >= 0 && (prog[k] == ' ' || prog[k] == '\t') {
-			k--
-		}
-		if (j < len(prog) && prog[j] == '"') || (k >= 0 && prog[k] == '"') {
+		if prog[i] == '|' {
+			if i+1 < len(prog) && prog[i+1] == '|' {
+				i++ // the or operator
+				continue
+			}
 			return true
 		}
 	}
 	return false
 }
 
-// awkRunsCommands reports whether an awk program (the first word that is not an option, unless -f names a file) starts a command: system(), or a pipe to or from one.
-func awkRunsCommands(args []string) bool {
-	for i := 0; i < len(args); i++ {
-		a := args[i]
-		switch {
-		case a == "-f" || a == "--file" || strings.HasPrefix(a, "-f"):
-			return false // a program file: left as it is
-		case a == "-v" || a == "-F" || a == "--assign" || a == "--field-separator" || a == "-e" || a == "--source":
-			if a == "-e" || a == "--source" {
-				if i+1 < len(args) && awkStartsCommand(args[i+1]) {
+// rsyncRemoteShell reports whether rsync is given a remote shell command: -e or --rsh, alone, attached or in a group (-avze ssh).
+func rsyncRemoteShell(args []string) bool {
+	for _, a := range args {
+		if strings.HasPrefix(a, "--rsh") {
+			return true
+		}
+		if strings.HasPrefix(a, "-") && !strings.HasPrefix(a, "--") {
+			letters := a[1:]
+			for k := 0; k < len(letters); k++ {
+				if !isLetter(letters[k]) {
+					break
+				}
+				if letters[k] == 'e' {
 					return true
 				}
 			}
-			i++
-		case strings.HasPrefix(a, "-"):
-		default:
-			return awkStartsCommand(strings.Join(args[i:], " "))
 		}
 	}
 	return false
 }
 
-// sshRunsRemotely reports whether an ssh command opens a session or runs a command on another computer: anything but its version and its configuration queries (-V, -G, -Q).
+// sshRunsRemotely reports whether an ssh-like command opens a session or runs a command on another computer: anything but its version and its configuration queries (-V, -G, -Q).
 func sshRunsRemotely(args []string) bool {
 	for _, a := range args {
 		if a == "-V" || a == "-G" || strings.HasPrefix(a, "-Q") {
@@ -195,43 +493,40 @@ func sshRunsRemotely(args []string) bool {
 	return true
 }
 
-// perlExplicitProgram reports whether perl is given its program with -e or -E (not from its input).
-func perlExplicitProgram(args []string) bool {
+// awkInplaceRisk judges gawk -i inplace: the files after the program are rewritten where they are, so one outside the working folder is a write there.
+func awkInplaceRisk(_ string, args []string, at func([]string) []string, workDir string) string {
+	inplace, gotProg := false, false
+	var files []string
 	for i := 0; i < len(args); i++ {
 		a := args[i]
-		if a == "--" || !strings.HasPrefix(a, "-") {
-			break
-		}
-		if a == "-I" { // its value is the next word
+		switch {
+		case (a == "-i" || a == "--include") && i+1 < len(args):
+			if args[i+1] == "inplace" {
+				inplace = true
+			}
 			i++
-			continue
-		}
-		if strings.HasPrefix(a, "--") {
-			continue
-		}
-		for k := 1; k < len(a); k++ {
-			if a[k] == 'e' || a[k] == 'E' {
-				return true
-			}
-			if strings.IndexByte("IMmFiCdDV", a[k]) >= 0 {
-				break
-			}
-		}
-	}
-	return false
-}
-
-var perlRunsRe = regexp.MustCompile(`\b(system|exec|fork|unlink|rmdir|rename|mkdir|chmod|chown|chdir|kill|qx|open|opendir|sysopen|syscall|require|eval|do|glob|truncate|symlink|link|utime|socket|connect|exit)\b|\b(File|IO|Cwd|POSIX|Socket|Net|LWP|HTTP|IPC|Fcntl|Proc|Win32)::|\b(use|no)\s+(lib|POSIX|Socket)\b|` + "`" + `|%ENV|\$ENV\b|\bpipe\b|\|\s*["']|["']\s*\|[^|]|<\(|\bsh\b`)
-
-// perlProgramRuns reports whether the text of a perl command line (its -e programs, and -M modules) uses something that runs a command, reaches the file system or the network, or loads code: those ask.
-func perlProgramRuns(args []string) bool {
-	text := strings.Join(args, " ")
-	for _, a := range args {
-		if strings.HasPrefix(a, "-M") || strings.HasPrefix(a, "-m") {
-			if strings.Contains(a, "::") || !strings.EqualFold(a[2:], "strict") && !strings.EqualFold(a[2:], "warnings") && !strings.EqualFold(a[2:], "utf8") {
-				return true
+		case a == "-iinplace" || a == "--include=inplace":
+			inplace = true
+		case a == "-f" || a == "--file" || a == "-e" || a == "--source":
+			gotProg = true
+			i++
+		case a == "-F" || a == "-v" || a == "--assign" || a == "--field-separator":
+			i++
+		case strings.HasPrefix(a, "-f") || strings.HasPrefix(a, "--source=") || strings.HasPrefix(a, "--file=") || strings.HasPrefix(a, "-e"):
+			gotProg = true
+		case strings.HasPrefix(a, "-"):
+		default:
+			if !gotProg {
+				gotProg = true
+			} else {
+				files = append(files, a)
 			}
 		}
 	}
-	return perlRunsRe.MatchString(text)
+	if inplace {
+		if t := outsideTarget(at(files), workDir); t != "" {
+			return "it rewrites a file outside the working directory (" + t + ")"
+		}
+	}
+	return ""
 }

@@ -259,6 +259,10 @@ var shellCommandRisks = map[string]commandRisk{
 
 // launchCommandRisks: the commands whose writes #7106 reads (not part of the floor shellRiskSimple keeps).
 var launchCommandRisks = map[string]commandRisk{
+	"awk":      awkInplaceRisk,
+	"gawk":     awkInplaceRisk,
+	"mawk":     awkInplaceRisk,
+	"nawk":     awkInplaceRisk,
 	"curl":     curlRisk,
 	"wget":     wgetRisk,
 	"mkfifo":   operandRisk(map[string]bool{"-m": true, "--mode": true}),

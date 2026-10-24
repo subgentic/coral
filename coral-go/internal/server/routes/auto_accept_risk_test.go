@@ -399,9 +399,16 @@ func TestShellRisk3207(t *testing.T) {
 		"perl -pi -E's/a/b/' /etc/hosts":        "edits a file outside",
 		"perl -0777 -pi -e 's/a/b/' /etc/hosts": "edits a file outside",
 		"perl -0777pi -e 's/a/b/' /etc/hosts":   "edits a file outside",
-		"s\\udo ls":                             "sudo",
-		"r\\m -rf /etc":                         "deletes recursively",
-		"git pu\\sh --force":                    "force-pushes",
+		// perl -e and -E always ask, whatever the program (#7201 round 2: agents can use sed): these four were once held as not risky
+		"perl -pi -e 's/a/b/' src/a.go":     "inline code",
+		"perl -ne 'print' /etc/hosts":       "inline code",
+		"perl -Ilib -ne 'print' /etc/hosts": "inline code",
+		"perl -Mstrict -e 1 /etc/hosts":     "inline code",
+		"perl -pi -e's/a/b/' src/a.go":      "inline code",
+		"perl -0x1F -ne 'print' /etc/hosts": "inline code",
+		"s\\udo ls":                         "sudo",
+		"r\\m -rf /etc":                     "deletes recursively",
+		"git pu\\sh --force":                "force-pushes",
 	}
 	for cmd, want := range risky {
 		assert.Contains(t, shellRisk(cmd, wd), want, cmd)
@@ -410,12 +417,6 @@ func TestShellRisk3207(t *testing.T) {
 		"git push origin main",
 		"git push -u origin feature",
 		"git push origin main:main",
-		"perl -pi -e 's/a/b/' src/a.go",
-		"perl -ne 'print' /etc/hosts",       // not in place
-		"perl -Ilib -ne 'print' /etc/hosts", // -I's value, not -i
-		"perl -Mstrict -e 1 /etc/hosts",     // -M's value
-		"perl -pi -e's/a/b/' src/a.go",      // attached program, file in the repo
-		"perl -0x1F -ne 'print' /etc/hosts", // a record separator
 		"perl script.pl",
 		"find . -name x -exec rm {} \\;",
 		"echo summary",

@@ -31,7 +31,7 @@ func TestShellRiskArchiveRulesLeaveOrdinaryCommandsAlone(t *testing.T) {
 		`tar -xf a.tar`, `tar -xzf a.tgz -C out`, `tar xzf a.tgz -C out`, `tar -tf a.tar`, `tar -tzf /tmp/a.tgz`, `tar -cf out.tar src`, `tar czf out.tgz src`, `tar -xf /tmp/a.tar -C sub`, `tar -cf - src | gzip`, `tar -xf /tmp/a.tar`,
 		`unzip a.zip`, `unzip a.zip -d out`, `unzip -l /tmp/a.zip`, `unzip -t a.zip`, `unzip -p a.zip x`, `zip out.zip x`, `zip -r out.zip dir`, `7z x a.7z`, `7z x a.7z -oout`, `7z a out.7z dir`, `7z l /tmp/a.7z`,
 		`gzip out.log`, `gzip -c out.log`, `gzip -l /tmp/a.gz`, `gunzip -c /tmp/a.gz`, `xz -t /tmp/a.xz`, `xz out.log`,
-		`rsync -a src/ dst/`, `rsync -a src/ host:/srv/dst`, `rsync -a host:/srv/src dst/`, `rsync -a --delete src/ dst/`, `rsync -a -e ssh src/ user@host:dst`, `rsync -a src/ rsync://host/module`,
+		`rsync -a src/ dst/`, `rsync -a src/ host:/srv/dst`, `rsync -a host:/srv/src dst/`, `rsync -a --delete src/ dst/`, `rsync -a src/ rsync://host/module`,
 	} {
 		assert.Empty(t, shellRisk(c, dir), "must pass: %s", c)
 	}
