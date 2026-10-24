@@ -151,6 +151,28 @@ Run this command?
 	assert.Equal(t, a.FP, classifyApproval(at.Claude, bash).FP, "stable for the same screen")
 }
 
+// #7194 (Codex Test's #7191): a Codex command whose own text has numbered lines ("1. first") sits between the question and the menu. The menu is the numbered list at the bottom, option 1 being its
+// first; a "1." in the command above it is the command's text, not a second option 1 (which made the list "not clean" and left the dialog to the person). The capture is the codex_exec one with
+// the command made a multi-line one with a numbered list in it.
+func TestClassifyApprovalReadsTheMenuNotTheCommandsNumberedLines(t *testing.T) {
+	exec := autoAcceptScreen(t, "codex_exec")
+	at1 := "  $ touch\n  /private/tmp/claude-501/-Users-user-Software-coral-coral-go/524ee9ff-38dc-866f-4c51-0644d1c95849/scratchpad/pr\n  obe/outside2.txt\n"
+	require.Contains(t, exec, at1, "the fixture's command block")
+	for name, command := range map[string]string{
+		"a list":    "  $ printf 'steps:\n  1. first\n  2. second\n  3. third'\n",
+		"ends in 1": "  $ echo done\n  1. last line of the command\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			d := classifyApproval(at.Codex, strings.Replace(exec, at1, command, 1))
+			assert.True(t, d.Prompt, "the menu is recognised")
+			assert.True(t, d.Approve)
+			assert.Equal(t, 1, d.N)
+			assert.Equal(t, "Yes, proceed (y)", d.Label)
+			assert.Len(t, d.Screen.Options, 3, "the menu's three options, none of the command's")
+		})
+	}
+}
+
 func TestAutoAcceptSupported(t *testing.T) {
 	for _, typ := range []string{at.Claude, at.Codex, at.Agy, at.Antigravity, at.Gemini} {
 		assert.True(t, AutoAcceptSupported(typ), typ)
