@@ -284,34 +284,31 @@ func (h *BoardHandler) SetTaskGoal(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, task)
 }
 
-// goalTaskPage is the task page of one goal: the usual page, and truncated when the goal has more tasks than one answer holds (board.MaxGoalTasks).
-type goalTaskPage struct {
-	board.TaskListPage
-	Truncated bool `json:"truncated,omitempty"`
-}
-
-// listGoalTasks answers GET .../tasks?goal=<id> with a goal's tasks in the shape of the task page, whole in one answer (a goal's tasks are bounded).
+// listGoalTasks answers GET .../tasks?goal=<id>[&limit=n][&cursor=c] with a page of a goal's tasks, oldest first, in the shape of the task page: next_cursor continues it, empty on the last page.
 func (h *BoardHandler) listGoalTasks(w http.ResponseWriter, r *http.Request, project, raw string) {
 	id, err := strconv.ParseInt(raw, 10, 64)
 	if err != nil || id <= 0 {
 		errBadRequest(w, "goal must be a goal's number")
 		return
 	}
-	rows, truncated, err := h.bs.GoalTasks(r.Context(), project, id)
+	q := r.URL.Query()
+	limit := 0
+	if l := q.Get("limit"); l != "" {
+		if limit, err = strconv.Atoi(l); err != nil || limit <= 0 {
+			errBadRequest(w, "limit must be a positive number")
+			return
+		}
+	}
+	page, err := h.bs.GoalTaskPage(r.Context(), project, id, q.Get("cursor"), limit)
+	if errors.Is(err, board.ErrBadTaskListQuery) {
+		errBadRequest(w, err.Error())
+		return
+	}
 	if err != nil {
 		if !goalError(w, err) {
 			errInternalServer(w, err.Error())
 		}
 		return
-	}
-	page := goalTaskPage{TaskListPage: board.TaskListPage{Tasks: rows}, Truncated: truncated}
-	for _, t := range rows {
-		switch t.Status {
-		case "completed", "skipped":
-			page.TotalCompleted++
-		case "pending", "in_progress", "blocked", "draft", "review_pending":
-			page.TotalOpen++
-		}
 	}
 	writeJSON(w, http.StatusOK, page)
 }

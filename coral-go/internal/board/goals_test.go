@@ -93,7 +93,7 @@ func TestGoalsAreBoardScoped(t *testing.T) {
 	assert.ErrorIs(t, err, ErrGoalNotFound)
 	_, _, err = s.CloseGoal(ctx, "beta", g.ID, "because", "")
 	assert.ErrorIs(t, err, ErrGoalNotFound)
-	_, _, err = s.GoalTasks(ctx, "beta", g.ID)
+	_, err = s.GoalTaskPage(ctx, "beta", g.ID, "", 0)
 	assert.ErrorIs(t, err, ErrGoalNotFound)
 	got, err := s.GetGoal(ctx, "alpha", g.ID)
 	require.NoError(t, err)
@@ -171,10 +171,10 @@ func TestGoalRollupCountsTheGoalsTasksByState(t *testing.T) {
 
 func mustTaskIDs(t *testing.T, s *Store, goalID int64) []int64 {
 	t.Helper()
-	rows, _, err := s.GoalTasks(context.Background(), "team", goalID)
+	page, err := s.GoalTaskPage(context.Background(), "team", goalID, "", TaskListMaxLimit)
 	require.NoError(t, err)
-	ids := make([]int64, len(rows))
-	for i, r := range rows {
+	ids := make([]int64, len(page.Tasks))
+	for i, r := range page.Tasks {
 		ids[i] = r.ID
 		require.NotNil(t, r.GoalID)
 		assert.Equal(t, goalID, *r.GoalID)
@@ -640,23 +640,55 @@ func TestGoalStateAndTextWritesRaceWithoutLoss(t *testing.T) {
 	}
 }
 
-// A goal's task read says when it is cut: past MaxGoalTasks the rest is not sent and truncated is true; at the cap it is not.
-func TestGoalTasksSaysWhenItIsTruncated(t *testing.T) {
+// A goal's task read pages like the task list's (#7184): 1200 tasks in pages of 200 come oldest first, each once, with the goal's totals on every page; a closed task counts as done; another goal's or
+// another board's cursor is refused, and a goal of another board is not found.
+func TestGoalTaskPagePagesWithACursor(t *testing.T) {
 	s := testStore(t)
 	ctx := context.Background()
 	g := newGoal(t, s, "team", "many")
-	for i := 0; i < MaxGoalTasks+1; i++ {
-		_, err := s.CreateTaskWithOpts(ctx, "team", "t", "", "medium", "Lead", &CreateTaskOpts{GoalID: &g.ID})
+	other := newGoal(t, s, "team", "other")
+	var want []int64
+	for i := 0; i < 1200; i++ {
+		task, err := s.CreateTaskWithOpts(ctx, "team", "t", "", "medium", "Lead", &CreateTaskOpts{GoalID: &g.ID})
 		require.NoError(t, err)
+		want = append(want, task.ID)
 	}
-	rows, truncated, err := s.GoalTasks(ctx, "team", g.ID)
+	_, err := s.CreateTaskWithOpts(ctx, "team", "elsewhere", "", "medium", "Lead", &CreateTaskOpts{GoalID: &other.ID})
 	require.NoError(t, err)
-	assert.Len(t, rows, MaxGoalTasks)
-	assert.True(t, truncated, "one more than the cap is a truncation")
-	_, err = s.db.Exec(`DELETE FROM board_tasks WHERE id = (SELECT MAX(id) FROM board_tasks WHERE goal_id = ?)`, g.ID)
+	_, err = s.db.Exec(`UPDATE board_tasks SET status = 'completed' WHERE id IN (?, ?)`, want[0], want[1])
 	require.NoError(t, err)
-	rows, truncated, err = s.GoalTasks(ctx, "team", g.ID)
+
+	var got []int64
+	cursor, sizes := "", []int{}
+	for {
+		page, err := s.GoalTaskPage(ctx, "team", g.ID, cursor, 200)
+		require.NoError(t, err)
+		sizes = append(sizes, len(page.Tasks))
+		assert.Equal(t, 1198, page.TotalOpen)
+		assert.Equal(t, 2, page.TotalCompleted)
+		for _, row := range page.Tasks {
+			got = append(got, row.ID)
+		}
+		if page.NextCursor == "" {
+			break
+		}
+		cursor = page.NextCursor
+		require.Less(t, len(sizes), 10)
+	}
+	assert.Equal(t, []int{200, 200, 200, 200, 200, 200}, sizes)
+	assert.Equal(t, want, got, "every task once, oldest first")
+
+	page, err := s.GoalTaskPage(ctx, "team", g.ID, "", 0)
 	require.NoError(t, err)
-	assert.Len(t, rows, MaxGoalTasks)
-	assert.False(t, truncated, "exactly the cap is not")
+	assert.Len(t, page.Tasks, TaskListDefaultLimit, "no limit is the task list's default")
+	page, err = s.GoalTaskPage(ctx, "team", g.ID, "", 5000)
+	require.NoError(t, err)
+	assert.Len(t, page.Tasks, TaskListMaxLimit, "a limit past the maximum is clamped")
+
+	_, err = s.GoalTaskPage(ctx, "team", g.ID, encodeTaskCursor("team", "a", "", 5), 10)
+	assert.ErrorIs(t, err, ErrBadTaskListQuery, "another read's cursor")
+	_, err = s.GoalTaskPage(ctx, "team", g.ID, encodeTaskCursor("elsewhere", "g", "", 5), 10)
+	assert.ErrorIs(t, err, ErrBadTaskListQuery, "another board's cursor")
+	_, err = s.GoalTaskPage(ctx, "other-board", g.ID, "", 10)
+	assert.ErrorIs(t, err, ErrGoalNotFound)
 }

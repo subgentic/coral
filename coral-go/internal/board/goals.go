@@ -40,8 +40,6 @@ const (
 	MaxGoalReason   = 300
 	// MaxGoalList is the most goals one read returns.
 	MaxGoalList = 500
-	// MaxGoalTasks is the most tasks one goal's task read returns.
-	MaxGoalTasks = 500
 )
 
 // GoalError is a refusal with a fixed word: the handler maps Code to the status, the CLI shows Message. Compare with errors.Is against the values below.
@@ -606,23 +604,45 @@ func (s *Store) checkGoalForTask(ctx context.Context, q goalQuerier, board strin
 	return nil
 }
 
-// GoalTasks is a goal's tasks as list rows (every state, oldest first, at most MaxGoalTasks), for the board of the goal; truncated says there were more than that. A goal of another board is
-// not found.
-func (s *Store) GoalTasks(ctx context.Context, board string, goalID int64) (rows []TaskListItem, truncated bool, err error) {
+// GoalTaskPage is a page of a goal's tasks as list rows (every state, oldest first), for the board of the goal: limit as the task list's (0 is its default, clamped to its maximum), cursor from the
+// NextCursor of the page before. The totals are the goal's, not the page's. A goal of another board is not found; a cursor of another board or of another read is ErrBadTaskListQuery.
+func (s *Store) GoalTaskPage(ctx context.Context, board string, goalID int64, cursor string, limit int) (*TaskListPage, error) {
 	if _, err := s.GetGoal(ctx, board, goalID); err != nil {
-		return nil, false, err
+		return nil, err
 	}
-	rows = []TaskListItem{}
-	if err := s.reader().SelectContext(ctx, &rows, `SELECT `+taskListColumns+` WHERE t.board_id = ? AND t.goal_id = ? ORDER BY t.id ASC LIMIT ?`, board, goalID, MaxGoalTasks+1); err != nil {
-		return nil, false, err
+	if limit <= 0 {
+		limit = TaskListDefaultLimit
 	}
-	if len(rows) > MaxGoalTasks {
-		rows, truncated = rows[:MaxGoalTasks], true
+	if limit > TaskListMaxLimit {
+		limit = TaskListMaxLimit
 	}
-	if err := s.loadListBlockedBy(ctx, rows); err != nil {
-		return nil, false, err
+	where, args := `t.board_id = ? AND t.goal_id = ?`, []any{board, goalID}
+	if cursor != "" {
+		_, after, err := decodeTaskCursor(cursor, board, "g")
+		if err != nil {
+			return nil, err
+		}
+		where += ` AND t.id > ?`
+		args = append(args, after)
 	}
-	return rows, truncated, nil
+	page := &TaskListPage{Tasks: []TaskListItem{}}
+	if err := s.reader().SelectContext(ctx, &page.Tasks, `SELECT `+taskListColumns+` WHERE `+where+` ORDER BY t.id ASC LIMIT ?`, append(args, limit+1)...); err != nil {
+		return nil, err
+	}
+	if len(page.Tasks) > limit {
+		page.Tasks = page.Tasks[:limit]
+		page.NextCursor = encodeTaskCursor(board, "g", "", page.Tasks[limit-1].ID)
+	}
+	if err := s.loadListBlockedBy(ctx, page.Tasks); err != nil {
+		return nil, err
+	}
+	if err := s.reader().QueryRowxContext(ctx, `SELECT
+		 COALESCE(SUM(CASE WHEN `+openTaskStatusSQL+` THEN 1 ELSE 0 END), 0),
+		 COALESCE(SUM(CASE WHEN `+doneTaskStatusSQL+` THEN 1 ELSE 0 END), 0)
+		 FROM board_tasks WHERE board_id = ? AND goal_id = ?`, board, goalID).Scan(&page.TotalOpen, &page.TotalCompleted); err != nil {
+		return nil, err
+	}
+	return page, nil
 }
 
 // inheritedGoal is the goal a retry of task retryOf continues under: the retried task's own, when it has one and that goal is still open.

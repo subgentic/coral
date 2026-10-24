@@ -32,6 +32,9 @@ func newGoalServer(t *testing.T) *goalServer {
 		gs.reqs = append(gs.reqs, key+"?"+r.URL.RawQuery+" "+string(body))
 		status := gs.status
 		canned, ok := gs.reply[key]
+		if c := r.URL.Query().Get("cursor"); c != "" {
+			canned, ok = gs.reply[key+"?cursor="+c] // a page of a paged read: its own canned answer
+		}
 		gs.mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
 		if status != 0 {
@@ -251,21 +254,29 @@ func TestGoalHelp(t *testing.T) {
 	assert.Contains(t, res.stdout, "task goal <task> <goal|none>")
 }
 
-// #7087 round 2: a goal's task answer that is cut says so, and goal show says so too (the first 500 tasks are all the route sends).
-func TestGoalShowSaysWhenItsTasksAreCut(t *testing.T) {
+// #7184: a goal's tasks come a page at a time, by next_cursor, and goal show lists every one of them (there is no cut to report).
+func TestGoalShowFollowsTheTaskCursor(t *testing.T) {
 	gs := newGoalServer(t)
-	gs.reply["GET /api/board/team/goals/3"] = `{"id":3,"title":"Big","state":"active","rollup":{"done":0,"active":0,"blocked":0,"queued":2,"total":600}}`
-	gs.reply["GET /api/board/team/tasks"] = `{"tasks":[{"id":11,"title":"A","status":"pending"},{"id":12,"title":"B","status":"pending"}],"next_cursor":"","truncated":true}`
+	gs.reply["GET /api/board/team/goals/3"] = `{"id":3,"title":"Big","state":"active","rollup":{"done":0,"active":0,"blocked":0,"queued":3,"total":3}}`
+	gs.reply["GET /api/board/team/tasks"] = `{"tasks":[{"id":11,"title":"A","status":"pending"},{"id":12,"title":"B","status":"pending"}],"next_cursor":"c1"}`
+	gs.reply["GET /api/board/team/tasks?cursor=c1"] = `{"tasks":[{"id":13,"title":"C","status":"pending"}],"next_cursor":""}`
 	res := goalRun(t, gs, "goal", "show", "3")
 	require.Equal(t, 0, res.code, res.stderr)
-	assert.Contains(t, res.stdout, "only the first 2 tasks are listed")
+	for _, title := range []string{" A", " B", " C"} {
+		assert.Contains(t, res.stdout, title)
+	}
+	assert.NotContains(t, res.stdout, "only the first")
 	res = goalRun(t, gs, "goal", "show", "3", "--json")
 	require.Equal(t, 0, res.code, res.stderr)
 	var one map[string]any
 	require.NoError(t, json.Unmarshal([]byte(res.stdout), &one))
-	assert.Equal(t, true, one["tasks_truncated"])
-
-	gs.reply["GET /api/board/team/tasks"] = `{"tasks":[{"id":11,"title":"A","status":"pending"}],"next_cursor":""}`
-	res = goalRun(t, gs, "goal", "show", "3")
-	assert.NotContains(t, res.stdout, "only the first")
+	assert.Len(t, one["tasks"], 3)
+	assert.NotContains(t, one, "tasks_truncated")
+	var paged int
+	for _, r := range gs.requests() {
+		if strings.Contains(r, "goal=3") && strings.Contains(r, "cursor=c1") {
+			paged++
+		}
+	}
+	assert.Equal(t, 2, paged, "each read asked for the second page with the cursor and the goal")
 }

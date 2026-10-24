@@ -405,9 +405,9 @@ func TestGoalRoutesThroughCoralHub(t *testing.T) {
 	_, t2, hdr := viaHub(alice, "task-key-0123456789ab", "POST", "/api/board/team/tasks", task)
 	assert.Equal(t, t1["id"], t2["id"])
 	assert.Equal(t, "true", hdr.Get("Idempotent-Replay"))
-	tasks, _, err := bs.GoalTasks(ctx, "team", gid)
+	page, err := bs.GoalTaskPage(ctx, "team", gid, "", 0)
 	require.NoError(t, err)
-	assert.Len(t, tasks, 1, "one task for two sends")
+	assert.Len(t, page.Tasks, 1, "one task for two sends")
 
 	// The other goal writes are the Hub's Operator too, through the same guard.
 	code, out, _ = viaHub(alice, "", "PATCH", "/api/board/team/goals/"+itoa(gid), map[string]any{"title": "Renamed", "subscriber_id": "Operator"})
@@ -416,28 +416,46 @@ func TestGoalRoutesThroughCoralHub(t *testing.T) {
 	assert.Equal(t, 200, code, "%v", out)
 }
 
-// A goal's task read says when it is cut (Frontend's #7135 finding): past board.MaxGoalTasks the page says truncated; under it, no flag.
-func TestGoalTasksReadSaysWhenItIsTruncated(t *testing.T) {
+// A goal's task read pages with a real next_cursor like the plain task list (#7184): 1200 tasks come in pages of the asked size, oldest first, each once, the last page has an empty cursor, and the totals count
+// the whole goal, not the page. A cursor of another goal's read or another board is refused.
+func TestGoalTasksReadPagesWithACursor(t *testing.T) {
 	server, h := setupBoardTestServer(t)
 	ctx := context.Background()
 	registerTaskPlanner(t, h, "team", "Orchestrator")
 	call := goalCall(t, server.URL)
 	_, g := call("POST", "/api/board/team/goals", map[string]any{"title": "Many tasks", "subscriber_id": "Orchestrator"})
 	gid := int64(g["id"].(float64))
-	for i := 0; i < board.MaxGoalTasks; i++ {
-		_, err := h.bs.CreateTaskWithOpts(ctx, "team", "t", "", "medium", "Orchestrator", &board.CreateTaskOpts{GoalID: &gid})
+	var want []int64
+	for i := 0; i < 1200; i++ {
+		task, err := h.bs.CreateTaskWithOpts(ctx, "team", "t", "", "medium", "Orchestrator", &board.CreateTaskOpts{GoalID: &gid})
 		require.NoError(t, err)
+		want = append(want, task.ID)
 	}
-	code, page := call("GET", "/api/board/team/tasks?goal="+itoa(gid), nil)
-	require.Equal(t, 200, code)
-	assert.Len(t, page["tasks"], board.MaxGoalTasks)
-	_, has := page["truncated"]
-	assert.False(t, has, "exactly the cap is not a truncation")
-	_, err := h.bs.CreateTaskWithOpts(ctx, "team", "one too many", "", "medium", "Orchestrator", &board.CreateTaskOpts{GoalID: &gid})
-	require.NoError(t, err)
-	code, page = call("GET", "/api/board/team/tasks?goal="+itoa(gid), nil)
-	require.Equal(t, 200, code)
-	assert.Len(t, page["tasks"], board.MaxGoalTasks)
-	assert.Equal(t, true, page["truncated"])
-	assert.EqualValues(t, board.MaxGoalTasks, page["total_open"])
+	var got []int64
+	cursor, pages := "", 0
+	for {
+		path := "/api/board/team/tasks?goal=" + itoa(gid) + "&limit=200"
+		if cursor != "" {
+			path += "&cursor=" + cursor
+		}
+		code, page := call("GET", path, nil)
+		require.Equal(t, 200, code, "%v", page)
+		pages++
+		_, truncated := page["truncated"]
+		assert.False(t, truncated, "a paged read is never cut")
+		assert.EqualValues(t, 1200, page["total_open"], "the totals are the goal's, not the page's")
+		for _, row := range page["tasks"].([]any) {
+			got = append(got, int64(row.(map[string]any)["id"].(float64)))
+		}
+		cursor, _ = page["next_cursor"].(string)
+		if cursor == "" {
+			break
+		}
+		require.Less(t, pages, 10)
+	}
+	assert.Equal(t, want, got, "every task once, oldest first")
+	assert.Equal(t, 6, pages)
+
+	code, page := call("GET", "/api/board/team/tasks?goal="+itoa(gid)+"&cursor=bogus", nil)
+	assert.Equal(t, 400, code, "%v", page)
 }
