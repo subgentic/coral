@@ -75,18 +75,29 @@ func TestFirstStartWithOpenNonTTYStdinDoesNotBlock(t *testing.T) {
 	}
 }
 
+// startupCeiling is how long a test waits for the server to listen or to ask: only a ceiling for a server that never does, not a measure of how fast it starts. The waits poll for the signal (the
+// health answer, the prompt text) and end the moment it comes; 20 s was too little on a loaded Mac, where a server's start (a fresh binary, a new data folder) takes longer (#7241).
+const startupCeiling = 3 * time.Minute
+
 // remoteSetting reads the saved remote access answer from /api/system/privacy, with the
 // server's API key (strict local auth is the default since #3936: without a credential the
 // read is refused and proves nothing). saved is false when nothing was saved.
 func remoteSetting(t *testing.T, base, dataDir string) (enabled, saved bool) {
 	t.Helper()
-	key, err := os.ReadFile(filepath.Join(dataDir, "api_key"))
-	if err != nil {
-		t.Fatal(err)
+	// The key file and the answer are waited for (a signal, not a pause): on a loaded machine the server that has just listened may not have its key written, or a poll may time out, yet (#7241).
+	var key []byte
+	for deadline := time.Now().Add(startupCeiling); ; {
+		var err error
+		if key, err = os.ReadFile(filepath.Join(dataDir, "api_key")); err == nil && strings.TrimSpace(string(key)) != "" {
+			break
+		} else if time.Now().After(deadline) {
+			t.Fatalf("no api_key written: %v", err)
+		}
+		time.Sleep(50 * time.Millisecond)
 	}
 	req, _ := http.NewRequest("GET", base+"/api/system/privacy", nil)
 	req.Header.Set("X-API-Key", strings.TrimSpace(string(key)))
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := (&http.Client{Timeout: time.Minute}).Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}

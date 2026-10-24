@@ -96,8 +96,9 @@ func TestFirstStartAsABackgroundJobDoesNotAsk(t *testing.T) {
 			base := fmt.Sprintf("http://127.0.0.1:%d", port)
 			healthy := func(within time.Duration) bool {
 				deadline := time.Now().Add(within)
+				client := &http.Client{Timeout: 10 * time.Second} // a poll that hangs is a failed poll, tried again until the ceiling
 				for time.Now().Before(deadline) {
-					if resp, err := http.Get(base + "/api/health"); err == nil {
+					if resp, err := client.Get(base + "/api/health"); err == nil {
 						resp.Body.Close()
 						return true
 					}
@@ -106,7 +107,7 @@ func TestFirstStartAsABackgroundJobDoesNotAsk(t *testing.T) {
 				return false
 			}
 			if background {
-				if !healthy(20 * time.Second) {
+				if !healthy(startupCeiling) {
 					t.Fatalf("a background Coral never listened; terminal:\n%s", output())
 				}
 				if bytes.Contains([]byte(output()), []byte("Enable remote access?")) {
@@ -117,7 +118,7 @@ func TestFirstStartAsABackgroundJobDoesNotAsk(t *testing.T) {
 				}
 				return
 			}
-			deadline := time.Now().Add(20 * time.Second)
+			deadline := time.Now().Add(startupCeiling)
 			for !bytes.Contains([]byte(output()), []byte("Enable remote access? [y/N]")) {
 				if time.Now().After(deadline) {
 					t.Fatalf("a foreground Coral on a terminal didn't ask; terminal:\n%s", output())
@@ -127,7 +128,7 @@ func TestFirstStartAsABackgroundJobDoesNotAsk(t *testing.T) {
 			if _, err := ptmx.Write([]byte("n\r")); err != nil {
 				t.Fatal(err)
 			}
-			if !healthy(20 * time.Second) {
+			if !healthy(startupCeiling) {
 				t.Fatalf("Coral never listened after the answer; terminal:\n%s", output())
 			}
 			if enabled, saved := remoteSetting(t, base, dataDir); !saved || enabled {
