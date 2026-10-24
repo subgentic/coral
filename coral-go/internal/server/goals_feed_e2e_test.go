@@ -42,7 +42,7 @@ func TestTheLiveFeedCarriesTheGoalsBriefThroughTheRealRouter(t *testing.T) {
 	tok, err := srv.keyStore.NewSession(r, auth.SessionByPassword, false)
 	require.NoError(t, err)
 	cookie := &http.Cookie{Name: srv.keyStore.SessionCookieName(r), Value: tok}
-	dctx, cancel := context.WithTimeout(ctx, time.Minute)
+	dctx, cancel := context.WithTimeout(ctx, 10*time.Second) // a red run ends in 10 s, not a minute (Security's #7266 LOW 1); each frame arrives within a tick or two
 	defer cancel()
 	conn, _, err := websocket.Dial(dctx, "ws"+strings.TrimPrefix(local.URL, "http")+"/ws/coral", &websocket.DialOptions{HTTPHeader: http.Header{"Origin": {local.URL}, "Cookie": {cookie.String()}}})
 	require.NoError(t, err)
