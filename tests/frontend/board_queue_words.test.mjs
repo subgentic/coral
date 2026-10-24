@@ -1,5 +1,6 @@
 // What a run of the task queue's lines says (#7183): counts in words, never the lines' command text.
 import assert from 'node:assert/strict';
+process.env.CORAL_TELEMETRY_DISABLED = '1'; // a unit test starts no Coral; the opt-out stays on in case a line of it ever does (the CI runners census, #7183)
 import { queueEvent, queueRunWords } from '../../coral-go/pkg/frontend/static/board_queue_words.js';
 
 const L = {
