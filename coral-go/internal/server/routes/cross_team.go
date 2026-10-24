@@ -780,6 +780,9 @@ func (h *BoardHandler) recordHubSettings(w http.ResponseWriter, r *http.Request,
 		if u.RequireGoal != nil {
 			undo.RequireGoal = &before.RequireGoal
 		}
+		if u.Health != nil { // the health setup sent in the same body was applied with the rest: it is undone with it (QA's #7329 finding)
+			undo.Health = &before.Health
+		}
 		if _, uerr := h.bs.UpdateBoardSettings(ctx, project, undo); uerr != nil {
 			slog.Error("[cloud] could not undo a Coral Hub settings change that was not recorded", "board", project, "error", uerr)
 		}
