@@ -143,9 +143,9 @@
 
 /* Message board — container spacing and max-width */
 #mb-messages {
-    padding-left: 20px !important;
+    padding-left: 8px !important; /* the same left edge as the search field and the filters above (#7315): a name and its text start there */
     max-width: 840px;
-    margin: 0 auto;
+    margin: 0;
     /* The auto margins centre it on a wide screen, but they also stop it stretching: it took the width of its widest
        unbreakable content, which at 200% text on a phone (the nowrap "Load earlier" button) was wider than the screen,
        and every row was laid out in that box and clipped (#4505, WCAG 1.4.10). Never wider than its column. */
@@ -164,7 +164,7 @@
 .mb-message {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    padding: 8px 10px;
+    padding: 8px 10px 8px 0;
     position: relative;
     border-radius: var(--radius-lg);
 }
@@ -194,6 +194,14 @@
 
 .mb-message-grouped {
     padding-top: 2px;
+}
+
+/* A follow-up from the same sender has no name, so its header is only the time and the Save button: they stay (on hover and focus) at the row's right edge and take no line of their own. */
+.mb-message-grouped .mb-message-header {
+    position: absolute;
+    top: 2px;
+    right: 6px;
+    margin-bottom: 0;
 }
 
 .mb-message-grouped .mb-agent-name {
