@@ -219,7 +219,9 @@ function renderWorkflowList() {
             lastRunHtml = '<span style="color:var(--text-muted)">Never run</span>';
         }
 
-        return `<div class="wf-card" data-on-click="wf-select" role="button" tabindex="0" data-key-click data-workflow-id="${Number(wf.id)}">
+        const runLabel = 'Run ' + wf.name; // names the card's button
+        // The card is the button that opens the workflow; Run is its sibling, not inside it (a button in a button is not one control), one click, named for its card (#7219)
+        return `<div class="wf-card-wrap"><div class="wf-card" data-on-click="wf-select" role="button" tabindex="0" data-key-click data-workflow-id="${Number(wf.id)}">
             <div class="wf-card-top">
                 <span class="wf-card-name">${esc(wf.name)}</span>
                 <span class="wf-card-badges">
@@ -229,7 +231,8 @@ function renderWorkflowList() {
             </div>
             ${wf.description ? `<div class="wf-card-desc">${esc(wf.description)}</div>` : ''}
             <div class="wf-card-footer">${lastRunHtml}</div>
-        </div>`;
+        </div>
+        <button type="button" class="btn btn-sm btn-primary wf-card-run" data-on-click="wf-trigger" data-workflow-id="${Number(wf.id)}" aria-label="${escAttr(runLabel)}"><span class="material-icons" aria-hidden="true">play_arrow</span> Run</button></div>`;
     }).join('');
 }
 

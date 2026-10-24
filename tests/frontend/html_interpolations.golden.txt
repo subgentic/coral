@@ -701,6 +701,7 @@
 1	workflows.js	escAttr(isFailed)
 1	workflows.js	escAttr(name)
 2	workflows.js	escAttr(outputId)
+1	workflows.js	escAttr(runLabel)
 1	workflows.js	escAttr(s.session_name || s.session_id)
 1	workflows.js	escAttr(wf.name)
 1	workflows.js	exitCodeHtml

@@ -77,6 +77,14 @@
     gap: 8px;
 }
 
+/* Run on a card (#7219): beside the card, not inside it; the card keeps room for it */
+.wf-card-wrap { position: relative; }
+.wf-card-wrap > .wf-card { padding-right: calc(4.5rem + 20px); } /* rem: the room grows with the text size, as the button does */
+.wf-card-wrap .wf-card-top { flex-wrap: wrap; gap: 4px 8px; } /* the name and the badges wrap in the room Run leaves (large text) instead of running under it */
+.wf-card-wrap .wf-card-badges { flex-wrap: wrap; }
+.wf-card-run { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); margin: 0; display: inline-flex; align-items: center; gap: 4px; min-height: var(--control-touch-height, 44px); }
+.wf-card-run .material-icons { font-size: 0.875rem; }
+
 .wf-card {
     background: var(--bg-secondary);
     border: 1px solid var(--border);
