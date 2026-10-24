@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -179,7 +178,7 @@ func (h *BoardHandler) sendTaskNudge(ctx context.Context, project, subscriberID,
 // POST /api/board/{project}/tasks/{taskID}/nudge
 func (h *BoardHandler) NudgeTask(w http.ResponseWriter, r *http.Request) {
 	project := urlParam(r, "project")
-	taskID, err := strconv.ParseInt(chi.URLParam(r, "taskID"), 10, 64)
+	taskID, err := parseID(chi.URLParam(r, "taskID"))
 	if err != nil {
 		errBadRequest(w, "invalid task ID")
 		return
@@ -235,7 +234,7 @@ func (h *BoardHandler) NudgeTask(w http.ResponseWriter, r *http.Request) {
 // POST body: {"seconds": 1800}
 func (h *BoardHandler) SnoozeTaskReminder(w http.ResponseWriter, r *http.Request) {
 	project := urlParam(r, "project")
-	taskID, err := strconv.ParseInt(chi.URLParam(r, "taskID"), 10, 64)
+	taskID, err := parseID(chi.URLParam(r, "taskID"))
 	if err != nil {
 		errBadRequest(w, "invalid task ID")
 		return
@@ -273,7 +272,7 @@ func (h *BoardHandler) SnoozeTaskReminder(w http.ResponseWriter, r *http.Request
 // POST body: {"interval_seconds": 300}; DELETE stops the reminder.
 func (h *BoardHandler) RemindTask(w http.ResponseWriter, r *http.Request) {
 	project := urlParam(r, "project")
-	taskID, err := strconv.ParseInt(chi.URLParam(r, "taskID"), 10, 64)
+	taskID, err := parseID(chi.URLParam(r, "taskID"))
 	if err != nil {
 		errBadRequest(w, "invalid task ID")
 		return

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -39,8 +40,6 @@ const (
 	MaxGoalDecision = 300
 	MaxGoalDriver   = 200
 	MaxGoalReason   = 300
-	// MaxGoalList is the most goals one read returns.
-	MaxGoalList = 500
 )
 
 // GoalError is a refusal with a fixed word: the handler maps Code to the status, the CLI shows Message. Compare with errors.Is against the values below.
@@ -167,10 +166,17 @@ func (s *Store) ensureGoalsSchema(ctx context.Context) error {
 		`CREATE TRIGGER IF NOT EXISTS boards_board_uid_immutable BEFORE UPDATE OF board_uid ON boards WHEN OLD.board_uid IS NOT NULL AND NEW.board_uid IS NOT OLD.board_uid
 			BEGIN SELECT RAISE(ABORT, 'a board uid is never changed'); END`,
 		`CREATE TRIGGER IF NOT EXISTS board_goals_seq_insert AFTER INSERT ON board_goals BEGIN ` + fmt.Sprintf(bump, "NEW.board_id") + ` END`,
-		`CREATE TRIGGER IF NOT EXISTS board_goals_seq_update AFTER UPDATE OF title, outcome, done_when, state, blocked_on, driver, decision, recommendation, if_silent, closed_at, closed_reason ON board_goals BEGIN ` + fmt.Sprintf(bump, "NEW.board_id") + ` END`,
+		// The update triggers fire only when a column they watch really changes (#7239): an UPDATE that writes the same values is not a change, and an open Goals view refreshes on this counter. They are dropped
+		// and made again so a database that has the older, unguarded ones gets these.
+		`DROP TRIGGER IF EXISTS board_goals_seq_update`,
+		`CREATE TRIGGER board_goals_seq_update AFTER UPDATE OF title, outcome, done_when, state, blocked_on, driver, decision, recommendation, if_silent, closed_at, closed_reason ON board_goals
+			WHEN OLD.title IS NOT NEW.title OR OLD.outcome IS NOT NEW.outcome OR OLD.done_when IS NOT NEW.done_when OR OLD.state IS NOT NEW.state OR OLD.blocked_on IS NOT NEW.blocked_on OR OLD.driver IS NOT NEW.driver
+			OR OLD.decision IS NOT NEW.decision OR OLD.recommendation IS NOT NEW.recommendation OR OLD.if_silent IS NOT NEW.if_silent OR OLD.closed_at IS NOT NEW.closed_at OR OLD.closed_reason IS NOT NEW.closed_reason
+			BEGIN ` + fmt.Sprintf(bump, "NEW.board_id") + ` END`,
 		`CREATE TRIGGER IF NOT EXISTS board_goals_seq_delete AFTER DELETE ON board_goals BEGIN ` + fmt.Sprintf(bump, "OLD.board_id") + ` END`,
 		`CREATE TRIGGER IF NOT EXISTS board_tasks_goal_seq_insert AFTER INSERT ON board_tasks WHEN NEW.goal_id IS NOT NULL BEGIN ` + fmt.Sprintf(bump, "NEW.board_id") + ` END`,
-		`CREATE TRIGGER IF NOT EXISTS board_tasks_goal_seq_update AFTER UPDATE OF status, goal_id ON board_tasks WHEN OLD.goal_id IS NOT NULL OR NEW.goal_id IS NOT NULL BEGIN ` + fmt.Sprintf(bump, "NEW.board_id") + ` END`,
+		`DROP TRIGGER IF EXISTS board_tasks_goal_seq_update`,
+		`CREATE TRIGGER board_tasks_goal_seq_update AFTER UPDATE OF status, goal_id ON board_tasks WHEN (OLD.goal_id IS NOT NULL OR NEW.goal_id IS NOT NULL) AND (OLD.status IS NOT NEW.status OR OLD.goal_id IS NOT NEW.goal_id) BEGIN ` + fmt.Sprintf(bump, "NEW.board_id") + ` END`,
 		`CREATE TRIGGER IF NOT EXISTS board_tasks_goal_seq_delete AFTER DELETE ON board_tasks WHEN OLD.goal_id IS NOT NULL BEGIN ` + fmt.Sprintf(bump, "OLD.board_id") + ` END`,
 	} {
 		if _, err := s.db.ExecContext(ctx, stmt); err != nil {
@@ -294,35 +300,80 @@ func (s *Store) GetGoal(ctx context.Context, board string, id int64) (*Goal, err
 	return &g, nil
 }
 
-// GoalListQuery selects goals. States empty means every goal that is not closed (proposed, active, blocked); a state name selects exactly those named.
+// GoalListQuery selects goals. States empty means every goal that is not closed (proposed, active, blocked); a state name selects exactly those named. Limit is the task list's: 0 is its default (50),
+// above its maximum (200) is clamped. Cursor is the NextCursor of the page before.
 type GoalListQuery struct {
 	States []string
 	Limit  int
+	Cursor string
 }
 
-// ListGoals is a board's goals, oldest first, each with its rollup.
-func (s *Store) ListGoals(ctx context.Context, board string, q GoalListQuery) ([]Goal, error) {
+// GoalPage is one page of a board's goals, oldest first (by id): NextCursor continues it, "" on the last page.
+type GoalPage struct {
+	Goals      []Goal `json:"goals"`
+	NextCursor string `json:"next_cursor"`
+}
+
+// goalStatesKey is the filter a goal cursor is bound to: the states asked for, each once, in a fixed order, so a cursor made for one filter is refused under another (#7239).
+func goalStatesKey(states []string) string {
+	seen := map[string]bool{}
+	var out []string
+	for _, st := range states {
+		if !seen[st] {
+			seen[st] = true
+			out = append(out, st)
+		}
+	}
+	sort.Strings(out)
+	return strings.Join(out, ",")
+}
+
+// GoalPage is a page of a board's goals, each with its rollup. A cursor of another board, another filter or another read is ErrBadTaskListQuery.
+func (s *Store) GoalPage(ctx context.Context, board string, q GoalListQuery) (*GoalPage, error) {
 	states := q.States
 	if len(states) == 0 {
 		states = []string{GoalProposed, GoalActive, GoalBlocked}
 	}
-	args := []any{board}
-	marks := make([]string, 0, len(states))
 	for _, st := range states {
 		if !validGoalState(st) {
 			return nil, ErrGoalBadState
 		}
+	}
+	key := goalStatesKey(states)
+	limit := q.Limit
+	if limit <= 0 {
+		limit = TaskListDefaultLimit
+	}
+	if limit > TaskListMaxLimit {
+		limit = TaskListMaxLimit
+	}
+	args := []any{board}
+	marks := make([]string, 0, len(states))
+	for _, st := range states {
 		marks = append(marks, "?")
 		args = append(args, st)
 	}
-	limit := q.Limit
-	if limit <= 0 || limit > MaxGoalList {
-		limit = MaxGoalList
+	where := `board_id = ? AND state IN (` + strings.Join(marks, ",") + `)`
+	if q.Cursor != "" {
+		at, after, err := decodeTaskCursor(q.Cursor, board, "G")
+		if err != nil {
+			return nil, err
+		}
+		if at != key {
+			return nil, fmt.Errorf("%w: cursor is for another state filter", ErrBadTaskListQuery)
+		}
+		where += ` AND id > ?`
+		args = append(args, after)
 	}
-	args = append(args, limit)
+	args = append(args, limit+1)
 	goals := []Goal{}
-	if err := s.reader().SelectContext(ctx, &goals, `SELECT `+goalColumns+` FROM board_goals WHERE board_id = ? AND state IN (`+strings.Join(marks, ",")+`) ORDER BY id ASC LIMIT ?`, args...); err != nil {
+	if err := s.reader().SelectContext(ctx, &goals, `SELECT `+goalColumns+` FROM board_goals WHERE `+where+` ORDER BY id ASC LIMIT ?`, args...); err != nil {
 		return nil, err
+	}
+	next := ""
+	if len(goals) > limit {
+		goals = goals[:limit]
+		next = encodeTaskCursor(board, "G", key, goals[limit-1].ID)
 	}
 	ids := make([]int64, len(goals))
 	for i := range goals {
@@ -335,7 +386,16 @@ func (s *Store) ListGoals(ctx context.Context, board string, q GoalListQuery) ([
 	for i := range goals {
 		goals[i].Rollup = rollups[goals[i].ID]
 	}
-	return goals, nil
+	return &GoalPage{Goals: goals, NextCursor: next}, nil
+}
+
+// ListGoals is the first page of a board's goals (GoalPage without a cursor), for a caller that wants the goals and not the paging.
+func (s *Store) ListGoals(ctx context.Context, board string, q GoalListQuery) ([]Goal, error) {
+	page, err := s.GoalPage(ctx, board, q)
+	if err != nil {
+		return nil, err
+	}
+	return page.Goals, nil
 }
 
 func validGoalState(st string) bool {
@@ -456,6 +516,7 @@ func (s *Store) UpdateGoal(ctx context.Context, board string, id int64, u GoalUp
 	} else if err != nil {
 		return nil, err
 	}
+	before := g
 	if u.Title != nil {
 		g.Title = title
 	}
@@ -493,14 +554,30 @@ func (s *Store) UpdateGoal(ctx context.Context, board string, id int64, u GoalUp
 	} else if g.BlockedOn == "" {
 		return nil, ErrGoalBlockedOnRequired
 	}
-	if _, err := tx.ExecContext(ctx, `UPDATE board_goals SET title = ?, outcome = ?, done_when = ?, state = ?, blocked_on = ?, driver = ?, decision = ?, recommendation = ?, if_silent = ?, closed_at = ?, closed_reason = ?, updated_at = ? WHERE id = ? AND board_id = ?`,
-		g.Title, g.Outcome, g.DoneWhen, g.State, g.BlockedOn, g.Driver, g.Decision, g.Recommendation, g.IfSilent, g.ClosedAt, g.ClosedReason, nowUTC(), id, board); err != nil {
-		return nil, err
+	// A write that changes nothing (the same title, an empty body) is not a change: no new updated_at, and the board's change counter does not move (#7239).
+	if !sameGoalText(before, g) {
+		if _, err := tx.ExecContext(ctx, `UPDATE board_goals SET title = ?, outcome = ?, done_when = ?, state = ?, blocked_on = ?, driver = ?, decision = ?, recommendation = ?, if_silent = ?, closed_at = ?, closed_reason = ?, updated_at = ? WHERE id = ? AND board_id = ?`,
+			g.Title, g.Outcome, g.DoneWhen, g.State, g.BlockedOn, g.Driver, g.Decision, g.Recommendation, g.IfSilent, g.ClosedAt, g.ClosedReason, nowUTC(), id, board); err != nil {
+			return nil, err
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 	return s.GetGoal(ctx, board, id)
+}
+
+// sameGoalText reports whether two reads of a goal hold the same text and state: every column UpdateGoal writes except updated_at.
+func sameGoalText(a, b Goal) bool {
+	closedA, closedB := "", ""
+	if a.ClosedAt != nil {
+		closedA = *a.ClosedAt
+	}
+	if b.ClosedAt != nil {
+		closedB = *b.ClosedAt
+	}
+	return a.Title == b.Title && a.Outcome == b.Outcome && a.DoneWhen == b.DoneWhen && a.State == b.State && a.BlockedOn == b.BlockedOn && a.Driver == b.Driver && a.Decision == b.Decision &&
+		a.Recommendation == b.Recommendation && a.IfSilent == b.IfSilent && (a.ClosedAt == nil) == (b.ClosedAt == nil) && closedA == closedB && a.ClosedReason == b.ClosedReason
 }
 
 // openTaskStatuses are the task states that count as open when a goal is closed.
@@ -605,9 +682,10 @@ func (s *Store) checkGoalForTask(ctx context.Context, q goalQuerier, board strin
 	return nil
 }
 
-// GoalTaskPage is a page of a goal's tasks as list rows (every state, oldest first), for the board of the goal: limit as the task list's (0 is its default, clamped to its maximum), cursor from the
-// NextCursor of the page before. The totals are the goal's, not the page's. A goal of another board is not found; a cursor of another board or of another read is ErrBadTaskListQuery.
-func (s *Store) GoalTaskPage(ctx context.Context, board string, goalID int64, cursor string, limit int) (*TaskListPage, error) {
+// GoalTaskPage is a page of a goal's tasks as list rows (oldest first), for the board of the goal: status is the task list's (open, completed or all; "" is all), limit as the task list's (0 is its
+// default, clamped to its maximum), cursor from the NextCursor of the page before. The totals are the goal's, whatever the status. A goal of another board is not found; a cursor of another board,
+// goal, status or read, and an unknown status, are ErrBadTaskListQuery.
+func (s *Store) GoalTaskPage(ctx context.Context, board string, goalID int64, status, cursor string, limit int) (*TaskListPage, error) {
 	if _, err := s.GetGoal(ctx, board, goalID); err != nil {
 		return nil, err
 	}
@@ -618,13 +696,24 @@ func (s *Store) GoalTaskPage(ctx context.Context, board string, goalID int64, cu
 		limit = TaskListMaxLimit
 	}
 	where, args := `t.board_id = ? AND t.goal_id = ?`, []any{board, goalID}
+	switch status {
+	case "", TaskListAll:
+		status = TaskListAll
+	case TaskListOpen:
+		where += ` AND t.` + openTaskStatusSQL
+	case TaskListCompleted:
+		where += ` AND t.` + doneTaskStatusSQL
+	default:
+		return nil, fmt.Errorf("%w: unknown status %q (use open, completed or all)", ErrBadTaskListQuery, status)
+	}
+	key := strconv.FormatInt(goalID, 10) + ":" + status // what a cursor is bound to
 	if cursor != "" {
-		forGoal, after, err := decodeTaskCursor(cursor, board, "g")
+		forKey, after, err := decodeTaskCursor(cursor, board, "g")
 		if err != nil {
 			return nil, err
 		}
-		if forGoal != strconv.FormatInt(goalID, 10) { // the cursor holds the goal it was issued for: another goal's would skip this goal's rows
-			return nil, fmt.Errorf("%w: cursor is for another goal", ErrBadTaskListQuery)
+		if forKey != key { // the cursor holds the goal and the status it was issued for: another's would skip this read's rows
+			return nil, fmt.Errorf("%w: cursor is for another goal or status", ErrBadTaskListQuery)
 		}
 		where += ` AND t.id > ?`
 		args = append(args, after)
@@ -635,7 +724,7 @@ func (s *Store) GoalTaskPage(ctx context.Context, board string, goalID int64, cu
 	}
 	if len(page.Tasks) > limit {
 		page.Tasks = page.Tasks[:limit]
-		page.NextCursor = encodeTaskCursor(board, "g", strconv.FormatInt(goalID, 10), page.Tasks[limit-1].ID)
+		page.NextCursor = encodeTaskCursor(board, "g", key, page.Tasks[limit-1].ID)
 	}
 	if err := s.loadListBlockedBy(ctx, page.Tasks); err != nil {
 		return nil, err

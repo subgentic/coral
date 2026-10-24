@@ -80,6 +80,7 @@ func bodyOf(t *testing.T, req string) map[string]any {
 
 func TestGoalAddSendsTheFieldsAndPrintsTheId(t *testing.T) {
 	gs := newGoalServer(t)
+	gs.reply["POST /api/board/team/goals"] = `{"id":7,"title":"Ship teams","state":"proposed"}`
 	res := goalRun(t, gs, "goal", "add", "Ship teams", "--outcome", "Orgs own machines", "--done-when", "an admin approves one", "--state", "proposed", "--driver", "Orchestrator")
 	require.Equal(t, 0, res.code, res.stderr)
 	assert.Equal(t, "Created Goal #7: Ship teams\n", res.stdout)
@@ -88,6 +89,14 @@ func TestGoalAddSendsTheFieldsAndPrintsTheId(t *testing.T) {
 	assert.True(t, strings.HasPrefix(reqs[0], "POST /api/board/team/goals? "), reqs[0])
 	b := bodyOf(t, reqs[0])
 	assert.Equal(t, map[string]any{"title": "Ship teams", "outcome": "Orgs own machines", "done_when": "an admin approves one", "state": "proposed", "driver": "Orchestrator", "subscriber_id": "Tester"}, b)
+
+	// The title is printed as the server stored it, cleaned, not as typed (#7239).
+	gs.reply["POST /api/board/team/goals"] = `{"id":8,"title":"Tred X","state":"active"}`
+	res = goalRun(t, gs, "goal", "add", "Tred\x1b[31m\u202eX")
+	require.Equal(t, 0, res.code, res.stderr)
+	assert.Equal(t, "Created Goal #8: Tred X\n", res.stdout)
+	delete(gs.reply, "POST /api/board/team/goals")
+	gs.reqs = gs.reqs[:1]
 
 	// Options may stand before the title, and only the title is required.
 	res = goalRun(t, gs, "goal", "add", "--driver", "QA", "Plain")
@@ -107,7 +116,7 @@ func TestGoalListAndShowRead(t *testing.T) {
 	require.Equal(t, 0, res.code, res.stderr)
 	assert.Contains(t, res.stdout, "#3   active    Orchestrator    2/5       Ship teams")
 	assert.Contains(t, res.stdout, "#4   blocked   —               —         No tasks")
-	assert.Equal(t, "GET /api/board/team/goals? ", gs.requests()[0][:len("GET /api/board/team/goals? ")], "open goals: no state given")
+	assert.True(t, strings.HasPrefix(gs.requests()[0], "GET /api/board/team/goals?limit=200 "), "open goals: no state given, the biggest page asked for: "+gs.requests()[0])
 
 	res = goalRun(t, gs, "goal", "list", "--state", "all", "--json")
 	require.Equal(t, 0, res.code, res.stderr)
@@ -115,6 +124,16 @@ func TestGoalListAndShowRead(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(res.stdout), &arr), res.stdout)
 	assert.Len(t, arr, 2)
 	assert.Contains(t, gs.requests()[1], "state=proposed,active,blocked,done,dropped")
+
+	// The goals come in pages: the list follows next_cursor to the end (#7239).
+	gs.reply["GET /api/board/team/goals"] = `{"goals":[{"id":3,"title":"First page","state":"active"}],"next_cursor":"c1"}`
+	gs.reply["GET /api/board/team/goals?cursor=c1"] = `{"goals":[{"id":9,"title":"Second page","state":"active"}],"next_cursor":""}`
+	res = goalRun(t, gs, "goal", "list")
+	require.Equal(t, 0, res.code, res.stderr)
+	assert.Contains(t, res.stdout, "First page")
+	assert.Contains(t, res.stdout, "Second page")
+	delete(gs.reply, "GET /api/board/team/goals?cursor=c1")
+	gs.reply["GET /api/board/team/goals"] = `{"goals":[{"id":3,"title":"Ship teams","state":"active","driver":"Orchestrator","rollup":{"done":2,"active":1,"blocked":0,"queued":2,"total":5}},{"id":4,"title":"No tasks","state":"blocked","rollup":{"total":0}}]}`
 
 	gs.reply["GET /api/board/team/goals/3"] = `{"id":3,"title":"Ship teams","state":"blocked","driver":"Orchestrator","blocked_on":"the operator","decision":"pick a date","recommendation":"Friday","if_silent":"we ship Friday","rollup":{"done":1,"active":0,"blocked":1,"queued":0,"total":2}}`
 	gs.reply["GET /api/board/team/tasks"] = `{"tasks":[{"id":11,"title":"Build it","status":"completed","assigned_to":"Backend Dev"},{"id":12,"title":"Test it","status":"blocked"}],"next_cursor":""}`
@@ -210,7 +229,7 @@ func TestTaskAddAndListTakeTheGoal(t *testing.T) {
 	res = goalRun(t, gs, "task", "list")
 	assert.NotContains(t, gs.requests()[3], "goal=")
 
-	for _, args := range [][]string{{"task", "list", "--goal", "abc"}, {"task", "list", "--goal", "0"}, {"task", "add", "x", "--goal", "-1"}} {
+	for _, args := range [][]string{{"task", "list", "--goal", "abc"}, {"task", "list", "--goal", "0"}, {"task", "add", "x", "--goal", "-1"}, {"task", "add", "x", "--goal", "0"}} {
 		res = goalRun(t, gs, args...)
 		assert.NotEqual(t, 0, res.code, args)
 	}

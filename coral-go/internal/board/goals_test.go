@@ -94,7 +94,7 @@ func TestGoalsAreBoardScoped(t *testing.T) {
 	assert.ErrorIs(t, err, ErrGoalNotFound)
 	_, _, err = s.CloseGoal(ctx, "beta", g.ID, "because", "")
 	assert.ErrorIs(t, err, ErrGoalNotFound)
-	_, err = s.GoalTaskPage(ctx, "beta", g.ID, "", 0)
+	_, err = s.GoalTaskPage(ctx, "beta", g.ID, "", "", 0)
 	assert.ErrorIs(t, err, ErrGoalNotFound)
 	got, err := s.GetGoal(ctx, "alpha", g.ID)
 	require.NoError(t, err)
@@ -172,7 +172,7 @@ func TestGoalRollupCountsTheGoalsTasksByState(t *testing.T) {
 
 func mustTaskIDs(t *testing.T, s *Store, goalID int64) []int64 {
 	t.Helper()
-	page, err := s.GoalTaskPage(context.Background(), "team", goalID, "", TaskListMaxLimit)
+	page, err := s.GoalTaskPage(context.Background(), "team", goalID, "", "", TaskListMaxLimit)
 	require.NoError(t, err)
 	ids := make([]int64, len(page.Tasks))
 	for i, r := range page.Tasks {
@@ -387,6 +387,46 @@ func TestAGoalUIDIsNeverChanged(t *testing.T) {
 }
 
 // The board's change counter is moved by the database on every goal write and every task change that touches a goal, and by nothing else.
+// #7239 (QA's #7236): a write that changes nothing is not a change. The Goals view refreshes when the counter moves, so a PATCH with the same title or an empty body must leave it, and the goal's
+// updated_at, alone; at the database too, an UPDATE that writes the values already there does not fire the triggers. A task sent to review, which moves a goal's rollup, does move it.
+func TestGoalSeqStaysPutOnAWriteThatChangesNothing(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	g := newGoal(t, s, "team", "Same")
+	linked, err := s.CreateTaskWithOpts(ctx, "team", "linked", "", "medium", "Lead", &CreateTaskOpts{GoalID: &g.ID})
+	require.NoError(t, err)
+	seq := goalSeq(t, s, "team")
+	_, err = s.db.Exec(`UPDATE board_goals SET updated_at = '2020-01-01T00:00:00Z' WHERE id = ?`, g.ID) // an old stamp, so a rewrite shows (the clock has seconds)
+	require.NoError(t, err)
+	before, err := s.GetGoal(ctx, "team", g.ID)
+	require.NoError(t, err)
+	require.Equal(t, seq, goalSeq(t, s, "team"), "backdating moved nothing")
+
+	got, err := s.UpdateGoal(ctx, "team", g.ID, GoalUpdate{Title: gp("Same")})
+	require.NoError(t, err)
+	assert.Equal(t, before.UpdatedAt, got.UpdatedAt, "the same title is not an edit")
+	_, err = s.UpdateGoal(ctx, "team", g.ID, GoalUpdate{})
+	require.NoError(t, err)
+	assert.Equal(t, seq, goalSeq(t, s, "team"), "an empty update leaves the counter")
+
+	for _, stmt := range []string{
+		`UPDATE board_goals SET title = title, state = state, driver = driver, closed_at = closed_at WHERE id = ` + strconv.FormatInt(g.ID, 10),
+		`UPDATE board_tasks SET status = status, goal_id = goal_id WHERE id = ` + strconv.FormatInt(linked.ID, 10),
+	} {
+		_, err := s.db.Exec(stmt)
+		require.NoError(t, err, stmt)
+		assert.Equal(t, seq, goalSeq(t, s, "team"), stmt)
+	}
+
+	_, err = s.db.Exec(`UPDATE board_tasks SET status = 'review_pending' WHERE id = ?`, linked.ID)
+	require.NoError(t, err)
+	assert.Greater(t, goalSeq(t, s, "team"), seq, "a linked task sent to review moves a rollup, so it moves the counter")
+	seq = goalSeq(t, s, "team")
+	_, err = s.UpdateGoal(ctx, "team", g.ID, GoalUpdate{Title: gp("Different")})
+	require.NoError(t, err)
+	assert.Greater(t, goalSeq(t, s, "team"), seq, "a real edit still moves it")
+}
+
 func TestGoalSeqMovesOnGoalAndLinkedTaskChangesOnly(t *testing.T) {
 	s := testStore(t)
 	ctx := context.Background()
@@ -662,7 +702,7 @@ func TestGoalTaskPagePagesWithACursor(t *testing.T) {
 	var got []int64
 	cursor, sizes := "", []int{}
 	for {
-		page, err := s.GoalTaskPage(ctx, "team", g.ID, cursor, 200)
+		page, err := s.GoalTaskPage(ctx, "team", g.ID, "", cursor, 200)
 		require.NoError(t, err)
 		sizes = append(sizes, len(page.Tasks))
 		assert.Equal(t, 1198, page.TotalOpen)
@@ -679,22 +719,22 @@ func TestGoalTaskPagePagesWithACursor(t *testing.T) {
 	assert.Equal(t, []int{200, 200, 200, 200, 200, 200}, sizes)
 	assert.Equal(t, want, got, "every task once, oldest first")
 
-	page, err := s.GoalTaskPage(ctx, "team", g.ID, "", 0)
+	page, err := s.GoalTaskPage(ctx, "team", g.ID, "", "", 0)
 	require.NoError(t, err)
 	assert.Len(t, page.Tasks, TaskListDefaultLimit, "no limit is the task list's default")
-	page, err = s.GoalTaskPage(ctx, "team", g.ID, "", 5000)
+	page, err = s.GoalTaskPage(ctx, "team", g.ID, "", "", 5000)
 	require.NoError(t, err)
 	assert.Len(t, page.Tasks, TaskListMaxLimit, "a limit past the maximum is clamped")
 
-	_, err = s.GoalTaskPage(ctx, "team", g.ID, encodeTaskCursor("team", "a", "", 5), 10)
+	_, err = s.GoalTaskPage(ctx, "team", g.ID, "", encodeTaskCursor("team", "a", "", 5), 10)
 	assert.ErrorIs(t, err, ErrBadTaskListQuery, "another read's cursor")
-	_, err = s.GoalTaskPage(ctx, "team", g.ID, encodeTaskCursor("elsewhere", "g", strconv.FormatInt(g.ID, 10), 5), 10)
+	_, err = s.GoalTaskPage(ctx, "team", g.ID, "", encodeTaskCursor("elsewhere", "g", strconv.FormatInt(g.ID, 10), 5), 10)
 	assert.ErrorIs(t, err, ErrBadTaskListQuery, "another board's cursor")
-	first, err := s.GoalTaskPage(ctx, "team", g.ID, "", 10)
+	first, err := s.GoalTaskPage(ctx, "team", g.ID, "", "", 10)
 	require.NoError(t, err)
 	require.NotEmpty(t, first.NextCursor)
-	_, err = s.GoalTaskPage(ctx, "team", other.ID, first.NextCursor, 10)
+	_, err = s.GoalTaskPage(ctx, "team", other.ID, "", first.NextCursor, 10)
 	assert.ErrorIs(t, err, ErrBadTaskListQuery, "this goal's cursor on another goal would skip that goal's rows")
-	_, err = s.GoalTaskPage(ctx, "other-board", g.ID, "", 10)
+	_, err = s.GoalTaskPage(ctx, "other-board", g.ID, "", "", 10)
 	assert.ErrorIs(t, err, ErrGoalNotFound)
 }

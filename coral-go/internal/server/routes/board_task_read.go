@@ -100,7 +100,7 @@ func (h *BoardHandler) ListAllTasks(w http.ResponseWriter, r *http.Request) {
 
 // ActiveTask returns the subscriber's current in-progress task.
 func (h *BoardHandler) GetTask(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.ParseInt(chi.URLParam(r, "taskID"), 10, 64)
+	id, err := parseID(chi.URLParam(r, "taskID"))
 	if err != nil || id <= 0 {
 		errBadRequest(w, "invalid task ID")
 		return
@@ -144,7 +144,7 @@ func (h *BoardHandler) ActiveTask(w http.ResponseWriter, r *http.Request) {
 // GET /api/board/{project}/tasks/{taskID}/changes.diff
 func (h *BoardHandler) TaskChangesDiff(w http.ResponseWriter, r *http.Request) {
 	project := urlParam(r, "project")
-	taskID, err := strconv.ParseInt(chi.URLParam(r, "taskID"), 10, 64)
+	taskID, err := parseID(chi.URLParam(r, "taskID"))
 	if err != nil {
 		errBadRequest(w, "invalid task ID")
 		return
@@ -211,7 +211,7 @@ func (h *BoardHandler) TaskChangesDiff(w http.ResponseWriter, r *http.Request) {
 // GET /api/board/{project}/tasks/{taskID}/cost
 func (h *BoardHandler) TaskLiveCost(w http.ResponseWriter, r *http.Request) {
 	project := urlParam(r, "project")
-	taskID, err := strconv.ParseInt(chi.URLParam(r, "taskID"), 10, 64)
+	taskID, err := parseID(chi.URLParam(r, "taskID"))
 	if err != nil {
 		errBadRequest(w, "invalid task ID")
 		return

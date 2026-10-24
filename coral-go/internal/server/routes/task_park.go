@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -83,7 +82,7 @@ func (h *BoardHandler) healthAdminLegacy(r *http.Request, project string) (who s
 // (until: RFC 3339, optional). DELETE unparks it. The orchestrator or the Operator only.
 func (h *BoardHandler) ParkTask(w http.ResponseWriter, r *http.Request) {
 	project := urlParam(r, "project")
-	taskID, err := strconv.ParseInt(chi.URLParam(r, "taskID"), 10, 64)
+	taskID, err := parseID(chi.URLParam(r, "taskID"))
 	if err != nil || taskID <= 0 {
 		errBadRequest(w, "invalid task ID")
 		return

@@ -181,6 +181,8 @@ func cmdTaskAdd(st *boardState, args []string) {
 	retryOf := fs.Int64("retry-of", 0, "Finished task ID this new task retries")
 	goal := fs.Int64("goal", 0, "The goal of this board the task serves")
 	clihelp.ParseFlags(fs, reordered, func() string { return commandUsage(os.Args[1], os.Args[2:]) })
+	goalGiven := false
+	fs.Visit(func(f *flag.Flag) { goalGiven = goalGiven || f.Name == "goal" })
 	*taskBody = flagText(*taskBody, "task body")
 
 	if title == "" {
@@ -200,8 +202,8 @@ func cmdTaskAdd(st *boardState, args []string) {
 	if *assignee != "" {
 		reqBody["assigned_to"] = *assignee
 	}
-	if *goal < 0 {
-		fmt.Fprintln(os.Stderr, "--goal needs a goal ID, a whole number")
+	if goalGiven && *goal <= 0 { // --goal 0 is a goal that does not exist, as the API says (#7239), not "no goal"
+		fmt.Fprintf(os.Stderr, "--goal needs a goal ID, a whole number of 1 or more (got %d)\n", *goal)
 		clierr.Exit1()
 	}
 	if *goal > 0 {

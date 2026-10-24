@@ -23,11 +23,18 @@ export function toGoal(g) {
     };
 }
 
-/** The list route's answer: an array of goals, or {goals: [...], require_goal}. Newest activity first. */
+const newestFirst = (a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || '') || b.id - a.id;
+
+/** The list route's answer: an array of goals, or {goals: [...], next_cursor, require_goal}. Newest activity first. `cursor` is what continues the list ('' on the last page, #7239). */
 export function toGoalList(json) {
     const rows = Array.isArray(json) ? json : (json && Array.isArray(json.goals) ? json.goals : []);
-    const goals = rows.map(toGoal).sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || '') || b.id - a.id);
-    return { goals, requireGoal: !!(json && !Array.isArray(json) && (json.require_goal ?? json.requireGoal)) };
+    const goals = rows.map(toGoal).sort(newestFirst);
+    return { goals, requireGoal: !!(json && !Array.isArray(json) && (json.require_goal ?? json.requireGoal)), cursor: text(json && !Array.isArray(json) ? json.next_cursor : '') };
+}
+
+/** Two pages of the list as one: the goals of both, newest activity first, and the second's cursor. */
+export function mergeGoalLists(a, b) {
+    return { goals: a.goals.concat(b.goals).sort(newestFirst), requireGoal: a.requireGoal || b.requireGoal, cursor: b.cursor };
 }
 
 /** One task of a goal (the tasks route filtered by goal). `session` is filled by the view from the live list, not by the route. */
@@ -55,7 +62,7 @@ export function toTaskPage(json) {
 }
 
 /** The states the list route is asked for: it answers only the open ones (proposed, active, blocked) by default, and the view's chips include Done and Dropped. */
-export const LIST_PATH = '/goals?state=proposed,active,blocked,done,dropped';
+export const LIST_PATH = '/goals?state=proposed,active,blocked,done,dropped&limit=200';
 
 /** A refused or failed answer: the route's {error: sentence, code: word}. */
 export function errorOf(json) {

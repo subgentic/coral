@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -14,7 +13,7 @@ import (
 // SubmitCompletionReview preserves a candidate; it does not complete the task.
 func (h *BoardHandler) SubmitCompletionReview(w http.ResponseWriter, r *http.Request) {
 	project := urlParam(r, "project")
-	id, err := strconv.ParseInt(chi.URLParam(r, "taskID"), 10, 64)
+	id, err := parseID(chi.URLParam(r, "taskID"))
 	if err != nil {
 		errBadRequest(w, "invalid task ID")
 		return
@@ -104,7 +103,7 @@ func (h *BoardHandler) SubmitCompletionReview(w http.ResponseWriter, r *http.Req
 // POST /api/board/{project}/tasks/{taskID}/review {subscriber_id, reviewers: ["Security Reviewer", ...]}
 func (h *BoardHandler) DelegateReview(w http.ResponseWriter, r *http.Request) {
 	project := urlParam(r, "project")
-	id, err := strconv.ParseInt(chi.URLParam(r, "taskID"), 10, 64)
+	id, err := parseID(chi.URLParam(r, "taskID"))
 	if err != nil {
 		errBadRequest(w, "invalid task ID")
 		return
@@ -163,7 +162,7 @@ func (h *BoardHandler) RejectReview(w http.ResponseWriter, r *http.Request) {
 
 func (h *BoardHandler) reviewVerdict(w http.ResponseWriter, r *http.Request, approve bool) {
 	project := urlParam(r, "project")
-	id, err := strconv.ParseInt(chi.URLParam(r, "taskID"), 10, 64)
+	id, err := parseID(chi.URLParam(r, "taskID"))
 	if err != nil {
 		errBadRequest(w, "invalid task ID")
 		return
@@ -247,7 +246,7 @@ func (h *BoardHandler) reviewVerdict(w http.ResponseWriter, r *http.Request, app
 
 func (h *BoardHandler) ReleaseCompletionReview(w http.ResponseWriter, r *http.Request) {
 	project := urlParam(r, "project")
-	id, err := strconv.ParseInt(chi.URLParam(r, "taskID"), 10, 64)
+	id, err := parseID(chi.URLParam(r, "taskID"))
 	if err != nil {
 		errBadRequest(w, "invalid task ID")
 		return

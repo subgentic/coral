@@ -219,7 +219,7 @@ func (h *SessionsHandler) ownNote(w http.ResponseWriter, r *http.Request, scope 
 }
 
 func (h *SessionsHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
-	taskID, _ := strconv.ParseInt(chi.URLParam(r, "taskID"), 10, 64)
+	taskID, _ := parseID(chi.URLParam(r, "taskID"))
 	scope, ok := h.itemScope(w, r, queryClaim(r))
 	if !ok {
 		return
@@ -245,7 +245,7 @@ func (h *SessionsHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *SessionsHandler) DeleteTask(w http.ResponseWriter, r *http.Request) {
-	taskID, _ := strconv.ParseInt(chi.URLParam(r, "taskID"), 10, 64)
+	taskID, _ := parseID(chi.URLParam(r, "taskID"))
 	scope, ok := h.itemScope(w, r, queryClaim(r))
 	if !ok {
 		return

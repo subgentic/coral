@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -72,7 +71,7 @@ func (h *BoardHandler) ClaimTask(w http.ResponseWriter, r *http.Request) {
 // POST /api/board/{project}/tasks/{taskID}/complete
 func (h *BoardHandler) CompleteTaskByID(w http.ResponseWriter, r *http.Request) {
 	project := urlParam(r, "project")
-	taskID, err := strconv.ParseInt(chi.URLParam(r, "taskID"), 10, 64)
+	taskID, err := parseID(chi.URLParam(r, "taskID"))
 	if err != nil {
 		errBadRequest(w, "invalid task ID")
 		return
@@ -182,7 +181,7 @@ func (h *BoardHandler) afterTaskCompleted(project, subscriberID string, complete
 // POST /api/board/{project}/tasks/{taskID}/cancel
 func (h *BoardHandler) CancelTaskByID(w http.ResponseWriter, r *http.Request) {
 	project := urlParam(r, "project")
-	taskID, err := strconv.ParseInt(chi.URLParam(r, "taskID"), 10, 64)
+	taskID, err := parseID(chi.URLParam(r, "taskID"))
 	if err != nil {
 		errBadRequest(w, "invalid task ID")
 		return

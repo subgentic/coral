@@ -38,7 +38,7 @@ const { GOALS, GOALS_STUB } = require('./helpers/goals_stub');
             assert.equal(await shown('#mb-board'), false, `${at}: Messages are out of the way`);
             assert.deepEqual(await ev(`['mb-face-messages', 'mb-face-goals'].map(id => document.getElementById(id).getAttribute('aria-pressed'))`), ['false', 'true']);
             assert.equal(await ev(`localStorage.getItem('coral.board.face')`), 'goals', `${at}: the choice is kept`);
-            assert.equal(await ev(`window.__goalsListQuery`), '?state=proposed,active,blocked,done,dropped', `${at}: the list asks for every state (the route answers only the open ones by default)`);
+            assert.equal(await ev(`window.__goalsListQuery`), '?state=proposed,active,blocked,done,dropped&limit=200', `${at}: the list asks for every state (the route answers only the open ones by default)`);
             assert.equal((await texts('.goals-sub-line'))[0], 'This board only · 5 goals, 1 waiting on you');
             assert.deepEqual(await texts('.goals-chip'), ['All 5', 'Active 1', 'Blocked 1', 'Proposed 1', 'Done 1', 'Dropped 1']);
             assert.deepEqual(await texts('.goal-card-title'), ['Ship the new installer', 'Fix the flaky suites', 'Docs pass', 'Old cleanup', 'A retired idea'], `${at}: newest activity first`);

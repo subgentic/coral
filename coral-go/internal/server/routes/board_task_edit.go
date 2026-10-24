@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -21,7 +20,7 @@ import (
 // PATCH /api/board/{project}/tasks/{taskID}
 func (h *BoardHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 	project := urlParam(r, "project")
-	taskID, err := strconv.ParseInt(chi.URLParam(r, "taskID"), 10, 64)
+	taskID, err := parseID(chi.URLParam(r, "taskID"))
 	if err != nil {
 		errBadRequest(w, "invalid task ID")
 		return
@@ -172,7 +171,7 @@ func taskAssignee(t *board.Task) string {
 // PATCH /api/board/{project}/tasks/{taskID}/amend
 func (h *BoardHandler) AmendTask(w http.ResponseWriter, r *http.Request) {
 	project := urlParam(r, "project")
-	taskID, err := strconv.ParseInt(chi.URLParam(r, "taskID"), 10, 64)
+	taskID, err := parseID(chi.URLParam(r, "taskID"))
 	if err != nil {
 		errBadRequest(w, "invalid task ID")
 		return
@@ -224,7 +223,7 @@ func (h *BoardHandler) AmendTask(w http.ResponseWriter, r *http.Request) {
 // POST /api/board/{project}/tasks/{taskID}/reassign
 func (h *BoardHandler) ReassignTask(w http.ResponseWriter, r *http.Request) {
 	project := urlParam(r, "project")
-	taskID, err := strconv.ParseInt(chi.URLParam(r, "taskID"), 10, 64)
+	taskID, err := parseID(chi.URLParam(r, "taskID"))
 	if err != nil {
 		errBadRequest(w, "invalid task ID")
 		return
@@ -288,7 +287,7 @@ func (h *BoardHandler) ReassignTask(w http.ResponseWriter, r *http.Request) {
 // POST /api/board/{project}/tasks/{taskID}/publish
 func (h *BoardHandler) PublishTask(w http.ResponseWriter, r *http.Request) {
 	project := urlParam(r, "project")
-	taskID, err := strconv.ParseInt(chi.URLParam(r, "taskID"), 10, 64)
+	taskID, err := parseID(chi.URLParam(r, "taskID"))
 	if err != nil {
 		errBadRequest(w, "invalid task ID")
 		return

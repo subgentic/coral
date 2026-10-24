@@ -3,7 +3,6 @@ package routes
 import (
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -29,7 +28,7 @@ func withVerifiedCaller(r *http.Request, attributed string) string {
 // POST /api/board/{project}/tasks/{taskID}/attach {subscriber_id, artifacts}
 func (h *BoardHandler) AttachPatches(w http.ResponseWriter, r *http.Request) {
 	project := urlParam(r, "project")
-	id, err := strconv.ParseInt(chi.URLParam(r, "taskID"), 10, 64)
+	id, err := parseID(chi.URLParam(r, "taskID"))
 	if err != nil {
 		errBadRequest(w, "invalid task ID")
 		return
@@ -82,7 +81,7 @@ func (h *BoardHandler) AttachPatches(w http.ResponseWriter, r *http.Request) {
 // POST /api/board/{project}/tasks/{taskID}/send-back {subscriber_id, note}
 func (h *BoardHandler) SendBack(w http.ResponseWriter, r *http.Request) {
 	project := urlParam(r, "project")
-	id, err := strconv.ParseInt(chi.URLParam(r, "taskID"), 10, 64)
+	id, err := parseID(chi.URLParam(r, "taskID"))
 	if err != nil {
 		errBadRequest(w, "invalid task ID")
 		return
@@ -153,7 +152,7 @@ func (h *BoardHandler) MergeQueue(w http.ResponseWriter, r *http.Request) {
 // POST /api/board/{project}/tasks/{taskID}/mark-landed {subscriber_id, digests, commits: [{sha, subject}]}
 func (h *BoardHandler) MarkLanded(w http.ResponseWriter, r *http.Request) {
 	project := urlParam(r, "project")
-	id, err := strconv.ParseInt(chi.URLParam(r, "taskID"), 10, 64)
+	id, err := parseID(chi.URLParam(r, "taskID"))
 	if err != nil {
 		errBadRequest(w, "invalid task ID")
 		return

@@ -70,6 +70,13 @@ func decodeJSON(r *http.Request, v any) error {
 	return json.NewDecoder(r.Body).Decode(v)
 }
 
+// decodeJSONStrict is decodeJSON that refuses a field the target does not have: its error reads `json: unknown field "name"` (#7239).
+func decodeJSONStrict(r *http.Request, v any) error {
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	return dec.Decode(v)
+}
+
 // decodeJSONLimit is decodeJSON on the first n bytes of the body.
 func decodeJSONLimit(r *http.Request, v any, n int64) error {
 	return json.NewDecoder(io.LimitReader(r.Body, n)).Decode(v)

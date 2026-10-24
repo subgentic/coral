@@ -7,7 +7,7 @@ import { boardFetch, keyLabel, splitKey, LOCAL_SERVER } from './server_base.js';
 import { setRowCurrent, OPERATOR_ID } from './utils.js';
 import { onGoalsSeq } from './goals_feed.js';
 import { whenText } from './when_text.js';
-import { toGoalList, toTaskPage, toDrivers, createBody, errorOf, LIST_PATH } from './goals_adapter.js';
+import { toGoalList, mergeGoalLists, toTaskPage, toDrivers, createBody, errorOf, LIST_PATH } from './goals_adapter.js';
 
 const PAGE = 50; // a goal's tasks are drawn this many at a time
 import * as W from './goal_words.js';
@@ -41,7 +41,10 @@ export async function loadGoals() {
     if (model.loading) draw(); // "Loading goals…" only while there is nothing yet: a refresh does not redraw before it has an answer
     let same = false;
     try {
-        const list = toGoalList(await readJson(LIST_PATH));
+        let list = toGoalList(await readJson(LIST_PATH));
+        for (let n = 0; list.cursor && n < 40; n++) { // the route pages (200 at most): read on until there is no cursor (#7239)
+            list = mergeGoalLists(list, toGoalList(await readJson(`${LIST_PATH}&cursor=${encodeURIComponent(list.cursor)}`)));
+        }
         if (project !== model.project) return;
         const sig = JSON.stringify([list.goals, list.requireGoal]);
         same = !model.failed && !!model.goals.length && sig === model.sig; // nothing changed: the page is left as it is (a redraw would take the keyboard's place)

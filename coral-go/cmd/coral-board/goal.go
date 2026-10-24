@@ -146,6 +146,9 @@ func cmdGoalAdd(st *boardState, args []string) {
 	var g map[string]any
 	_ = json.Unmarshal(data, &g)
 	id, _ := g["id"].(float64)
+	if stored, _ := g["title"].(string); stored != "" {
+		title = stored // the title as stored, cleaned of control and bidi characters, not as typed (#7239)
+	}
 	fmt.Printf("Created Goal #%.0f: %s\n", id, title)
 }
 
@@ -163,11 +166,32 @@ func cmdGoalList(st *boardState, args []string) {
 	default:
 		path += "?state=" + url.QueryEscape(s)
 	}
-	data := goalCall("GET", path, nil, "listing goals", http.StatusOK)
+	// The route pages (50 by default, 200 at most): read pages until there is no next_cursor (#7239).
+	sep := "?"
+	if strings.Contains(path, "?") {
+		sep = "&"
+	}
 	var out struct {
 		Goals []map[string]any `json:"goals"`
 	}
-	_ = json.Unmarshal(data, &out)
+	cursor := ""
+	for pages := 0; pages < 1000; pages++ {
+		page := path + sep + "limit=200"
+		if cursor != "" {
+			page += "&cursor=" + url.QueryEscape(cursor)
+		}
+		data := goalCall("GET", page, nil, "listing goals", http.StatusOK)
+		var got struct {
+			Goals      []map[string]any `json:"goals"`
+			NextCursor string           `json:"next_cursor"`
+		}
+		_ = json.Unmarshal(data, &got)
+		out.Goals = append(out.Goals, got.Goals...)
+		if got.NextCursor == "" || got.NextCursor == cursor {
+			break
+		}
+		cursor = got.NextCursor
+	}
 	if asJSON {
 		if out.Goals == nil {
 			out.Goals = []map[string]any{}

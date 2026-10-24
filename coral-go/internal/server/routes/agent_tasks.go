@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -289,7 +288,7 @@ func (h *SessionsHandler) CancelAgentTaskForAgent(w http.ResponseWriter, r *http
 }
 
 func (h *SessionsHandler) finishAgentTask(w http.ResponseWriter, r *http.Request, state int) {
-	taskID, err := strconv.ParseInt(chi.URLParam(r, "taskID"), 10, 64)
+	taskID, err := parseID(chi.URLParam(r, "taskID"))
 	if err != nil {
 		errBadRequest(w, "invalid task id")
 		return
@@ -344,7 +343,7 @@ func (h *SessionsHandler) personalTaskForRequest(w http.ResponseWriter, r *http.
 	if !ok {
 		return nil, false
 	}
-	id, err := strconv.ParseInt(chi.URLParam(r, "taskID"), 10, 64)
+	id, err := parseID(chi.URLParam(r, "taskID"))
 	if err != nil || id <= 0 {
 		errBadRequest(w, "invalid task id")
 		return nil, false

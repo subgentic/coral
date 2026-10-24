@@ -3,6 +3,7 @@ package routes
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/clitext"
 )
 
 // Goals on the board (#7087, from #7078's note). A goal is an outcome a board's tasks work toward; the store is internal/board/goals.go. These routes write board text and nothing else: they never
@@ -83,7 +85,7 @@ func (h *BoardHandler) goalActor(w http.ResponseWriter, r *http.Request, project
 }
 
 func goalID(w http.ResponseWriter, r *http.Request) (int64, bool) {
-	id, err := strconv.ParseInt(chi.URLParam(r, "goalID"), 10, 64)
+	id, err := parseID(chi.URLParam(r, "goalID"))
 	if err != nil || id <= 0 {
 		errBadRequest(w, "invalid goal ID")
 		return 0, false
@@ -128,17 +130,19 @@ func (h *BoardHandler) CreateGoal(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, g)
 }
 
-// ListGoals: GET /api/board/{project}/goals?state=a,b&limit=n
+// ListGoals: GET /api/board/{project}/goals?state=a,b&limit=n&cursor=c. A page of the board's goals, oldest first, in the task list's shape: limit defaults to 50 and is at most 200, next_cursor
+// continues it and is "" on the last page; a cursor holds the board and the state filter it was made for (#7239).
 func (h *BoardHandler) ListGoals(w http.ResponseWriter, r *http.Request) {
 	project := urlParam(r, "project")
-	q := board.GoalListQuery{}
-	if s := strings.TrimSpace(r.URL.Query().Get("state")); s != "" {
+	query := r.URL.Query()
+	q := board.GoalListQuery{Cursor: query.Get("cursor")}
+	if s := strings.TrimSpace(query.Get("state")); s != "" {
 		q.States = strings.Split(s, ",")
 		for i := range q.States {
 			q.States[i] = strings.TrimSpace(q.States[i])
 		}
 	}
-	if l := r.URL.Query().Get("limit"); l != "" {
+	if l := query.Get("limit"); l != "" {
 		n, err := strconv.Atoi(l)
 		if err != nil || n <= 0 {
 			errBadRequest(w, "limit must be a positive number")
@@ -146,14 +150,18 @@ func (h *BoardHandler) ListGoals(w http.ResponseWriter, r *http.Request) {
 		}
 		q.Limit = n
 	}
-	goals, err := h.bs.ListGoals(r.Context(), project, q)
+	page, err := h.bs.GoalPage(r.Context(), project, q)
+	if errors.Is(err, board.ErrBadTaskListQuery) {
+		errBadRequest(w, err.Error())
+		return
+	}
 	if err != nil {
 		if !goalError(w, err) {
 			errInternalServer(w, err.Error())
 		}
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"goals": goals})
+	writeJSON(w, http.StatusOK, page)
 }
 
 // GetGoal: GET /api/board/{project}/goals/{goalID}
@@ -191,7 +199,12 @@ func (h *BoardHandler) UpdateGoal(w http.ResponseWriter, r *http.Request) {
 		IfSilent       *string `json:"if_silent"`
 		SubscriberID   string  `json:"subscriber_id"`
 	}
-	if err := decodeJSON(r, &body); err != nil {
+	// a field that cannot be changed (id, goal_uid, board_id, closed_at) or is mistyped is refused by name, not dropped (#7239)
+	if err := decodeJSONStrict(r, &body); err != nil {
+		if name, ok := strings.CutPrefix(err.Error(), "json: unknown field "); ok {
+			errBadRequest(w, fmt.Sprintf("unknown field %s: a goal's title, outcome, done_when, state, blocked_on, driver, decision, recommendation, if_silent and subscriber_id can be sent", shortKey(strings.Trim(name, `"`))))
+			return
+		}
 		errBadRequest(w, "invalid JSON")
 		return
 	}
@@ -241,7 +254,7 @@ func (h *BoardHandler) CloseGoal(w http.ResponseWriter, r *http.Request) {
 // SetTaskGoal: PUT /api/board/{project}/tasks/{taskID}/goal {"goal_id": n | null}. null unlinks; a goal that is not on this board, or is closed, is refused.
 func (h *BoardHandler) SetTaskGoal(w http.ResponseWriter, r *http.Request) {
 	project := urlParam(r, "project")
-	taskID, err := strconv.ParseInt(chi.URLParam(r, "taskID"), 10, 64)
+	taskID, err := parseID(chi.URLParam(r, "taskID"))
 	if err != nil || taskID <= 0 {
 		errBadRequest(w, "invalid task ID")
 		return
@@ -284,14 +297,31 @@ func (h *BoardHandler) SetTaskGoal(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, task)
 }
 
-// listGoalTasks answers GET .../tasks?goal=<id>[&limit=n][&cursor=c] with a page of a goal's tasks, oldest first, in the shape of the task page: next_cursor continues it, empty on the last page.
+// shortKey is a query key as the 400 echoes it: cleaned of control and bidi characters and cut at 40 characters.
+func shortKey(k string) string {
+	k = clitext.CleanName(k)
+	if r := []rune(k); len(r) > 40 {
+		k = string(r[:40]) + "..."
+	}
+	return k
+}
+
+// listGoalTasks answers GET .../tasks?goal=<id>[&status=open|completed|all][&limit=n][&cursor=c] with a page of a goal's tasks, oldest first, in the shape of the task page: next_cursor continues it, empty on the last page.
 func (h *BoardHandler) listGoalTasks(w http.ResponseWriter, r *http.Request, project, raw string) {
-	id, err := strconv.ParseInt(raw, 10, 64)
+	id, err := parseID(raw)
 	if err != nil || id <= 0 {
 		errBadRequest(w, "goal must be a goal's number")
 		return
 	}
 	q := r.URL.Query()
+	for k := range q { // a filter this read does not have is refused by name, not left out: a mistyped one would read the goal's whole list (#7239)
+		switch k {
+		case "goal", "status", "limit", "cursor":
+		default:
+			errBadRequest(w, fmt.Sprintf("a goal's task read takes goal, status, limit and cursor, not %q", shortKey(k)))
+			return
+		}
+	}
 	limit := 0
 	if l := q.Get("limit"); l != "" {
 		if limit, err = strconv.Atoi(l); err != nil || limit <= 0 {
@@ -299,7 +329,7 @@ func (h *BoardHandler) listGoalTasks(w http.ResponseWriter, r *http.Request, pro
 			return
 		}
 	}
-	page, err := h.bs.GoalTaskPage(r.Context(), project, id, q.Get("cursor"), limit)
+	page, err := h.bs.GoalTaskPage(r.Context(), project, id, q.Get("status"), q.Get("cursor"), limit)
 	if errors.Is(err, board.ErrBadTaskListQuery) {
 		errBadRequest(w, err.Error())
 		return

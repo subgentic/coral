@@ -405,7 +405,7 @@ func TestGoalRoutesThroughCoralHub(t *testing.T) {
 	_, t2, hdr := viaHub(alice, "task-key-0123456789ab", "POST", "/api/board/team/tasks", task)
 	assert.Equal(t, t1["id"], t2["id"])
 	assert.Equal(t, "true", hdr.Get("Idempotent-Replay"))
-	page, err := bs.GoalTaskPage(ctx, "team", gid, "", 0)
+	page, err := bs.GoalTaskPage(ctx, "team", gid, "", "", 0)
 	require.NoError(t, err)
 	assert.Len(t, page.Tasks, 1, "one task for two sends")
 
