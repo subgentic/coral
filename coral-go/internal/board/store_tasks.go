@@ -49,6 +49,15 @@ type CreateTaskOpts struct {
 	reviewTask bool
 }
 
+// checkPriority is the answer for a priority that is not one of the four the board keeps (the table's CHECK is the backstop; its text is not an answer a caller should read).
+func checkPriority(priority string) error {
+	switch priority {
+	case "critical", "high", "medium", "low":
+		return nil
+	}
+	return fmt.Errorf("invalid priority: %s (use critical, high, medium or low)", priority)
+}
+
 // CreateTask inserts a task and returns it.
 func (s *Store) CreateTask(ctx context.Context, project, title, body, priority, createdBy string, assignedTo ...string) (*Task, error) {
 	return s.CreateTaskWithOpts(ctx, project, title, body, priority, createdBy, nil, assignedTo...)
@@ -56,6 +65,12 @@ func (s *Store) CreateTask(ctx context.Context, project, title, body, priority, 
 
 // CreateTaskWithOpts inserts a task with optional dependency configuration.
 func (s *Store) CreateTaskWithOpts(ctx context.Context, project, title, body, priority, createdBy string, opts *CreateTaskOpts, assignedTo ...string) (*Task, error) {
+	if priority == "" {
+		priority = "medium"
+	}
+	if err := checkPriority(priority); err != nil {
+		return nil, err
+	}
 	w := TaskWorkflow{}
 	if opts != nil {
 		w = opts.Workflow
@@ -63,9 +78,6 @@ func (s *Store) CreateTaskWithOpts(ctx context.Context, project, title, body, pr
 	w, err := s.prepareWorkflow(ctx, project, w)
 	if err != nil {
 		return nil, err
-	}
-	if priority == "" {
-		priority = "medium"
 	}
 	now := nowUTC()
 
@@ -665,10 +677,8 @@ func (s *Store) UpdateTask(ctx context.Context, project string, taskID int64, up
 		args = append(args, *updates.Body)
 	}
 	if updates.Priority != nil {
-		switch *updates.Priority {
-		case "critical", "high", "medium", "low":
-		default:
-			return nil, "", fmt.Errorf("invalid priority: %s", *updates.Priority)
+		if err := checkPriority(*updates.Priority); err != nil {
+			return nil, "", err
 		}
 		setClauses = append(setClauses, "priority = ?")
 		args = append(args, *updates.Priority)

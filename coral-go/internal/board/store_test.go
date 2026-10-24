@@ -1319,3 +1319,21 @@ func TestClaimTaskDirectIDClaimsRequestedReadyTask(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "pending", pending.Status)
 }
+
+// #7211: the store itself refuses a priority that is not critical, high, medium or low, whoever the caller (the database's CHECK is the backstop, not the answer): the error names it and nothing is stored.
+func TestCreateTaskChecksThePriority(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	for _, bad := range []string{"banana", "High", "urgent", " low"} {
+		_, err := s.CreateTask(ctx, "proj", "Task", "", bad, "alice")
+		require.Error(t, err, bad)
+		assert.Contains(t, err.Error(), "invalid priority", bad)
+		assert.NotContains(t, err.Error(), "CHECK", bad)
+	}
+	var n int
+	require.NoError(t, s.db.QueryRow(`SELECT COUNT(*) FROM board_tasks WHERE board_id = 'proj'`).Scan(&n))
+	assert.Zero(t, n)
+	task, err := s.CreateTask(ctx, "proj", "Task", "", "", "alice")
+	require.NoError(t, err)
+	assert.Equal(t, "medium", task.Priority)
+}
