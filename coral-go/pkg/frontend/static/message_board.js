@@ -16,6 +16,7 @@ import { paintPauseButton } from './board_pause_button.js';
 import { pathId, keyLabel, noteBoardLabel, hasBoardLabel, onBoardLabelsChanged, splitKey, boardFetch, teamFetch, isCloud, inTeam } from './server_base.js';
 import { importOnce } from './import_once.js';
 import { browserLocal } from './safe_storage.js';
+import { trackBoardGoals } from './goals_badge.js'; // the Goals switch's count and "waiting" (#7252)
 import './goals_adapter.js'; // the Goals view (goals_view.js) is lazy and imports only what loads at startup (import_hygiene): its two small helpers load here (#7113)
 import './goal_words.js';
 import { OUTCOME_UNKNOWN_LINE, isOutcomeUnknown } from './outcome_unknown.js';
@@ -154,11 +155,13 @@ export function selectBoardProject(project, messageId = null) {
 
 // Messages | Goals (#7113): the board's two faces. The Goals face is this computer's own (the Hub has its own goals page), so the switch is not drawn through the Hub; the choice is kept for this browser.
 const FACE_KEY = 'coral.board.face';
+let _tracked = ''; // the board whose goals the switch counts
 function applyBoardFace(project) {
     const sw = document.getElementById('mb-face-switch'), goals = document.getElementById('mb-goals'), board = document.getElementById('mb-board');
     if (!sw || !goals || !board) return;
     const has = !!project && !isCloud();
     sw.hidden = !has;
+    if (_tracked !== (has ? project : '')) { _tracked = has ? project : ''; trackBoardGoals(has ? project : null); }
     const face = has && browserLocal.get(FACE_KEY) === 'goals' ? 'goals' : 'messages';
     document.getElementById('mb-face-messages')?.setAttribute('aria-pressed', String(face === 'messages'));
     document.getElementById('mb-face-goals')?.setAttribute('aria-pressed', String(face === 'goals'));

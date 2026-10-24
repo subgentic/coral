@@ -1,5 +1,7 @@
 /* The local Goals view (#7113, layout A of UI/UX's #7091): the board's second face. Two columns wide (list 300 to 380 px, the open goal beside it); on a phone two screens with a back row. */
-.mb-face-switch { display: inline-flex; gap: 0; margin-right: 8px; }
+.mb-face-switch { display: inline-flex; gap: 0; margin-right: 8px; max-width: 100%; } /* at 200% text a long label wraps inside its button instead of pushing Messages off the left edge (#7252) */
+.mb-face-switch .mb-face-btn { min-width: 0; white-space: normal; }
+.mb-face-switch #mb-face-messages { flex-shrink: 0; } /* Goals gives way: a one-word Messages is never narrower than its word (360 px at 200% text) */
 .mb-face-switch[hidden] { display: none; }
 .mb-face-btn[aria-pressed="true"] { background: var(--accent-dim); color: var(--text-on-accent); border-color: var(--accent); }
 
@@ -86,3 +88,7 @@
     .goals-page.goals-open .goals-head, .goals-page.goals-open .goals-require { display: none; } /* an open goal is a screen of its own, the back row first (UI/UX #7113) */
     .goal-item { min-height: var(--control-touch-height, 44px); }
 }
+
+.goals-waiting-title { display: block; }
+.goals-waiting-question { display: block; }
+.goals-subtitle { margin: 2px 0 0; color: var(--text-secondary); font-size: 0.8125rem; }
