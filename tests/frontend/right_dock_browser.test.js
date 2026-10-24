@@ -115,6 +115,9 @@ const BASE = require('./test_base').BASE;
         console.log('7. Each kind of page keeps its own state: closing it on the board leaves Chats and the agent page as they were; coming back finds the board as left');
         await ev(`window.selectBoardProject(${JSON.stringify(BOARD)}); true`);
         await waitFor(`document.querySelectorAll('#mb-messages .mb-message').length === 1`, 'the board', 8000);
+        // Coming back to the board draws it again (its messages, subscribers and tabs read the board again, boardPageChanged), so the sidebar's state is read once that has settled, not at the instant the first message is
+        // back: a condition wait, not a sample (#7190: the one flake of this line read the state between the page's own steps; 80 stressed runs at CPU x4 and x10 did not reproduce it).
+        await waitFor(`(() => { const a = document.getElementById('agentic-state'); const t = document.querySelector('#agentic-block-top .agentic-tab.active'); return !!a && !a.classList.contains('collapsed') && !!t && t.dataset.tab === 'saved'; })()`, 'the board\'s sidebar open on its last tab, Saved', 6000).catch(() => {});
         d = await dock();
         assert.ok(d.open && d.active === 'saved', 'the board kept its last tab, Saved: ' + JSON.stringify(d));
         await toggle();
