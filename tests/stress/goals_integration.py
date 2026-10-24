@@ -161,10 +161,9 @@ try:
     check("goal add stores driver and done-when", show(g1)["driver"] == "Driver"
           and show(g1)["done_when"] == "all checks pass")
     check("goal list includes the new goal", g1 in [g["id"] for g in json.loads(cli("Orchestrator", "goal", "list", "--json"))])
-    cli("Orchestrator", "goal", "update", g1, "--state", "blocked", "--blocked-on", "Operator",
-        "--decision", "choose a release", "--recommendation", "ship", "--if-silent", "wait")
-    check("goal update retains decision fields", show(g1)["state"] == "blocked"
-          and show(g1)["recommendation"] == "ship")
+    cli("Orchestrator", "goal", "update", g1, "--state", "blocked", "--blocked-on", "Operator")
+    check("a blocked goal keeps the reason it waits for", show(g1)["state"] == "blocked"
+          and show(g1)["blocked_on"] == "Operator")
     cli("Orchestrator", "goal", "update", g1, "--state", "active", "--title", "Deliver goals updated")
     check("active clears stale blocker fields", show(g1)["title"] == "Deliver goals updated"
           and not show(g1).get("blocked_on"))
@@ -282,6 +281,123 @@ try:
     check("CLI task list returns each of the 120 tasks exactly once",
           sorted(map(int, re.findall(r"^#(\d+)\s", listing, re.MULTILINE))) == expected_ids)
     rollup(paged_goal, queued=120)
+
+    # --- Goals steering (#7271, as #7300 left it): the one board line a close posts, the fields that were removed, and the all-boards read (#7260).
+    def messages(b=None):
+        return api("GET", (b or base) + "/messages/all?limit=500")  # the whole list, no read cursor moved
+
+    def lines_with(text, b=None):
+        return sorted((m for m in messages(b) if text in m["content"]), key=lambda m: m["id"])
+
+    def refused(value, code=None):
+        return isinstance(value, dict) and (code is None or value.get("code") == code)
+
+    # The goal fields that were removed (#7300) are refused by name, not dropped: a goal does not wait on a person.
+    pin = goal("Fields that are gone")
+    for field in ("answer", "decision", "recommendation", "if_silent"):
+        value = api("PATCH", base + f"/goals/{pin}", {field: "x", "subscriber_id": "Operator"}, expected=(400,))
+        check(f"PATCH {field} is refused as an unknown field", refused(value) and "unknown field" in value.get("error", "") and field in value.get("error", ""))
+    check("the refused fields left the goal as it was", show(pin)["state"] == "active" and not show(pin).get("answer"))
+
+    # A close posts one line that counts what is left open.
+    def closing(title, open_tasks, state=None):
+        gid = goal(title)
+        for i in range(open_tasks):
+            task(f"{title} task {i}", "--goal", gid)
+        body = {"reason": "wrapped up", "subscriber_id": "Operator"}
+        if state:
+            body["state"] = state
+        api("POST", base + f"/goals/{gid}/close", body)
+        return gid
+
+    for title, count, state, noun in (("Close with two", 2, None, "2 open tasks"), ("Close with one", 1, None, "1 open task"),
+                                      ("Close with none", 0, None, "0 open tasks"), ("Drop with one", 1, "dropped", "1 open task")):
+        gid = closing(title, count, state)
+        kind = state or "done"
+        text = f'Goal #{gid} "{title}" is closed as {kind}: wrapped up ({noun} left)'
+        found = lines_with(f'Goal #{gid} "{title}" is closed')
+        check(f"closing '{title}' posts exactly one line saying {noun} are left",
+              len(found) == 1 and found[0]["content"] == text and found[0]["subscriber_id"] == "Operator")
+    closed_by_agent = goal("Closed by the orchestrator")
+    cli("Orchestrator", "goal", "close", closed_by_agent, "--reason", "agent close")
+    found = lines_with(f'Goal #{closed_by_agent} "Closed by the orchestrator" is closed')
+    check("an orchestrator's close posts its line as the orchestrator",
+          len(found) == 1 and found[0]["subscriber_id"] == "Orchestrator")
+    api("POST", base + f"/goals/{closed_by_agent}/close", {"reason": "again", "subscriber_id": "Operator"}, expected=(409,))
+    api("PATCH", base + f"/goals/{closed_by_agent}", {"state": "active", "subscriber_id": "Operator"})
+    check("a refused second close and a reopen post no line",
+          len(lines_with(f'Goal #{closed_by_agent} "Closed by the orchestrator" is closed')) == 1)
+
+    # GET /api/goals reads every board's goals in one call, paged by a cursor bound to its filters (#7260).
+    second = api("POST", "/api/sessions/launch-team", {
+        "board_name": "goals-integration-b", "working_dir": str(root / "work"),
+        "agent_type": "claude", "backend": backend,
+        "agents": [{"name": "Orchestrator", "prompt": "Mock goals integration fixture, second board"}]})
+    board_b = second["board"]
+    base_b = "/api/board/" + board_b
+    for agent in second["agents"]:
+        assert "error" not in agent, "mock launch of the second board failed"
+        live = next(s for s in api("GET", "/api/sessions/live") if s["session_id"] == agent["session_id"])
+        agent["live_name"] = live["name"]
+        dump = root / "env-dump" / (agent["session_id"] + ".env")
+        ready(dump)
+        values = dict(line.split("=", 1) for line in dump.read_text().splitlines() if "=" in line)
+        agents["Orchestrator on the second board"] = dict(agent, token=values["CORAL_SESSION_TOKEN"])
+    for i in range(5):
+        api("POST", base_b + "/goals", {"title": f"Other board {i}", "subscriber_id": "Operator"}, expected=(201,))
+    closed_b = api("POST", base_b + "/goals", {"title": "Other board done", "subscriber_id": "Operator"}, expected=(201,))["id"]
+    api("POST", base_b + f"/goals/{closed_b}/close", {"reason": "done there", "subscriber_id": "Operator"})
+    ALL_STATES = "proposed,active,blocked,done,dropped"
+
+    def walk(path, query, limit):
+        ids_, rows, cursor_, pages_ = [], [], "", 0
+        while True:
+            q = f"{query}&limit={limit}" + (("&cursor=" + urllib.parse.quote(cursor_, safe="")) if cursor_ else "")
+            page_ = api("GET", path + "?" + q)
+            rows += page_["goals"]
+            ids_ += [g["id"] for g in page_["goals"]]
+            pages_ += 1
+            cursor_ = page_.get("next_cursor", "")
+            if not cursor_:
+                return ids_, rows, pages_
+            assert pages_ < 400, "paging did not end"
+
+    a_ids, _, _ = walk(base + "/goals", "state=" + ALL_STATES, 50)
+    b_ids, _, _ = walk(base_b + "/goals", "state=" + ALL_STATES, 50)
+    union = sorted(a_ids + b_ids)
+    check("the two boards' goal ids do not collide", len(set(a_ids) & set(b_ids)) == 0 and len(a_ids) > 10 and len(b_ids) == 6)
+    got, rows, pages = walk("/api/goals", "state=" + ALL_STATES, 7)
+    check("GET /api/goals at 7 a page gives every goal of both boards once, oldest first",
+          got == union and len(set(got)) == len(got) and pages == -(-len(union) // 7))
+    check("each goal carries its board and a rollup", {r["board_id"] for r in rows} == {board, board_b} and all("rollup" in r for r in rows))
+    got1, _, pages1 = walk("/api/goals", "state=" + ALL_STATES, 1)
+    check("one goal a page reaches every goal", got1 == union and pages1 == len(union))
+    gotA, rowsA, _ = walk("/api/goals", "state=" + ALL_STATES + "&board=" + urllib.parse.quote(board), 9)
+    check("board= names one board", gotA == sorted(a_ids) and {r["board_id"] for r in rowsA} == {board})
+    gotAB, _, _ = walk("/api/goals", "state=" + ALL_STATES + "&board=" + urllib.parse.quote(board) + "&board=" + urllib.parse.quote(board_b), 9)
+    check("two board= values give both boards", gotAB == union)
+    gotNone, _, _ = walk("/api/goals", "state=" + ALL_STATES + "&board=no-such-board", 9)
+    check("a board that does not exist adds nothing", gotNone == [])
+    done_rows = [g for g in api("GET", "/api/goals?state=done&limit=200")["goals"]]
+    check("state=done gives the closed goals of both boards",
+          closed_b in [g["id"] for g in done_rows] and closed_by_agent not in [g["id"] for g in done_rows]
+          and {g["board_id"] for g in done_rows} == {board, board_b})
+    first_page = api("GET", "/api/goals?state=" + ALL_STATES + "&limit=3")
+    cur = urllib.parse.quote(first_page["next_cursor"], safe="")
+    for label, query in (("another state filter", f"state=done&limit=3&cursor={cur}"),
+                         ("another board filter", f"state={ALL_STATES}&board={urllib.parse.quote(board)}&limit=3&cursor={cur}")):
+        answer = api("GET", "/api/goals?" + query, expected=(400,))
+        check(f"a cursor made for one filter is refused under {label}", "cursor" in json.dumps(answer))
+    for label, query in (("an unknown parameter", "bogus=1"), ("a repeated limit", "limit=2&limit=3"), ("a zero limit", "limit=0")):
+        answer = api("GET", "/api/goals?" + query, expected=(400,))
+        check(f"{label} is refused by name", isinstance(answer, dict) and bool(answer.get("error")))
+    req = urllib.request.Request(url + "/api/goals?limit=1", headers={"X-Coral-Session-Token": agents["Orchestrator"]["token"]})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as response:
+            agent_code = response.status
+    except urllib.error.HTTPError as error:
+        agent_code = error.code
+    check("an agent's token is refused the all-boards read", agent_code in (401, 403))
 
     driver = agents["Driver"]
     check("driver put to sleep", api("POST", "/api/sessions/live/" + driver["session_id"] + "/sleep", {})["sleeping"])
