@@ -1015,6 +1015,20 @@ func screenAction(agentType string, d approvalDecision, capture string) (string,
 				parts = append(parts, strings.TrimSpace(l))
 			}
 		}
+		// The real question is the line just above the menu: with a header and no question there, or a question line that is not the last (the command's own text printed it), what the prompt asks about is
+		// unclear (#7234).
+		if headers == 1 {
+			last := ""
+			for k := len(d.Context) - 1; k >= 0; k-- {
+				if !ruleLineRe.MatchString(d.Context[k]) {
+					last = d.Context[k]
+					break
+				}
+			}
+			if !agyApprovalQuestionRe.MatchString(last) {
+				return "ambiguous", ""
+			}
+		}
 		return "command", strings.Join(parts, "\x00")
 	}
 	// Claude: the newest tool line above the prompt. A long call wraps over several screen
