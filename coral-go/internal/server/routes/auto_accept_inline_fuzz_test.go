@@ -106,3 +106,46 @@ func TestShellRiskDeadlineAnswersAskAndALogLine(t *testing.T) {
 		t.Fatal("the normal judgement still works")
 	}
 }
+
+// A grammar-based generator of valid sed scripts (#7201 round 4): every address form (numbers, $, regexes, bracket expressions with a slash or a custom delimiter inside, GNU first~step, addr,+N, addr,~N,
+// 0,/re/, \cREc, I and M flags, !), harmless commands and runner commands (e, w, W, the e and w flags of s), joined in both orders by ; and by a newline. A script with a runner must be read as one that runs
+// something; the same script with the runner replaced by a harmless command must not. The count is logged.
+func TestSedScriptGrammarWithBracketAddresses(t *testing.T) {
+	addrs := []string{"", "1", "$", "2,4", "/x/", "/x/,/y/", "/x/I", "/x/M", "$!", "1~2", "2,+3", "2,~4", "0,/x/", `\%x%`, `\,x,`,
+		`/[/]/`, `/a[/]b/`, `/[^/]/`, `/[a/b]/`, `/[[:alpha:]/]/`, `/[]/]/`, `/[^]/]/`, `/[[.slash.]/]/`, `/[[=a=]/]/`, `/[\n]/`, `\,[,],`, `\%[%]%`, `/[/]/,/[/]/`, `/[/]/!`, `/[0-9/]/I`}
+	harmless := []string{"p", "d", "n", "N", "g", "G", "h", "H", "x", "=", "l", "q", "s/a/b/", "s/a/b/g", "s/[/]/b/", "s,[,],b,", "y/abc/xyz/", "a text", "i text", "c text", "r file", ":lbl", "b lbl", "t lbl", "{p}", "!d", "s/e/w/"}
+	runners := []string{"e id", "e", "w /tmp/o", "W /tmp/o", "s/a/b/e", "s/a/b/w /tmp/o", "s/[/]/b/e", "s,[,],b,w /tmp/o"}
+	seps := []string{";", "\n"}
+	runsCount, safeCount := 0, 0
+	for _, a := range addrs {
+		for _, r := range runners {
+			for _, h := range harmless {
+				for _, sep := range seps {
+					if sep == ";" && (h == "a text" || h == "i text" || h == "c text") {
+						continue // the text of a, i and c runs to the end of the line, a runner after a ; is part of it
+					}
+					for pos := 0; pos < 3; pos++ {
+						var with, without string
+						switch pos {
+						case 0:
+							with, without = a+r, a+h
+						case 1:
+							with, without = h+sep+a+r, h+sep+a+h
+						case 2:
+							with, without = a+h+sep+a+r, a+h+sep+a+h
+						}
+						if !sedScriptRuns(with) {
+							t.Errorf("a script with a runner reads as safe: %q", with)
+						}
+						runsCount++
+						if sedScriptRuns(without) {
+							t.Errorf("a harmless script is asked about: %q", without)
+						}
+						safeCount++
+					}
+				}
+			}
+		}
+	}
+	t.Logf("%d scripts with a runner read as running, %d harmless ones checked", runsCount, safeCount)
+}

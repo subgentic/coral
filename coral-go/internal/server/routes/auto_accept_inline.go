@@ -277,6 +277,51 @@ func sedScriptRuns(sc string) bool {
 			i++
 		}
 	}
+	// skipRegex is skipTo for a regular expression: a [ opens a bracket expression, inside which the delimiter and the backslash are ordinary characters (/[/]/p matches the lines that hold a slash), a ] first
+	// in it (or after ^) is a member, and [:class:], [.x.] and [=x=] are read whole. A bracket that is not closed before the end of the script makes the script unreadable (ok false).
+	skipRegex := func(delim byte) (ok bool) {
+		for i < n {
+			switch c := sc[i]; {
+			case c == '\\' && i+1 < n:
+				i += 2
+			case c == delim:
+				i++
+				return true
+			case c == '[':
+				i++
+				if i < n && sc[i] == '^' {
+					i++
+				}
+				if i < n && sc[i] == ']' {
+					i++
+				}
+				closed := false
+				for i < n {
+					if sc[i] == '[' && i+1 < n && strings.IndexByte(":.=", sc[i+1]) >= 0 {
+						end := strings.Index(sc[i+2:], string(sc[i+1])+"]")
+						if end < 0 {
+							return false
+						}
+						i += 2 + end + 2
+						continue
+					}
+					if sc[i] == ']' {
+						i++
+						closed = true
+						break
+					}
+					i++
+				}
+				if !closed {
+					return false
+				}
+			default:
+				i++
+			}
+		}
+		return true // the end of the script before the delimiter: nothing more to read
+	}
+	unreadable := false
 	parseAddr := func() bool {
 		switch {
 		case sc[i] >= '0' && sc[i] <= '9':
@@ -287,11 +332,15 @@ func sedScriptRuns(sc string) bool {
 			i++
 		case sc[i] == '/':
 			i++
-			skipTo('/')
+			if !skipRegex('/') {
+				unreadable = true
+			}
 		case sc[i] == '\\' && i+1 < n:
 			d := sc[i+1]
 			i += 2
-			skipTo(d)
+			if !skipRegex(d) {
+				unreadable = true
+			}
 		default:
 			return false
 		}
@@ -320,6 +369,9 @@ func sedScriptRuns(sc string) bool {
 				}
 			}
 		}
+		if unreadable {
+			return true // a bracket expression that does not close: cannot be read, ask
+		}
 		for i < n && (sc[i] == '!' || sc[i] == ' ' || sc[i] == '\t') {
 			i++
 		}
@@ -337,7 +389,13 @@ func sedScriptRuns(sc string) bool {
 			}
 			d := sc[i]
 			i++
-			skipTo(d)
+			if c == 's' {
+				if !skipRegex(d) {
+					return true
+				}
+			} else {
+				skipTo(d)
+			}
 			skipTo(d)
 			if c == 's' {
 				for i < n && strings.IndexByte(";\n} \t", sc[i]) < 0 {
