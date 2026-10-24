@@ -43,7 +43,16 @@ func TestTheOwnerRoutesThroughTheHubOnTheRealRouter(t *testing.T) {
 
 	assert.Equal(t, 403, call(h, "PUT", "/api/board/team/settings", health, grantee).Code)
 	assert.Equal(t, 403, call(h, "PUT", "/api/board/team/settings", health, otherOwner).Code)
-	assert.Equal(t, 403, call(h, "PUT", "/api/board/team/settings", `{"subscriber_id":"Operator","cross_team_messaging":true}`, owner).Code, "cross-team stays local")
+	// Coral Hub is the authority for cross-team settings (#7329): the owner sets them here, nobody else does, and the guard's Operator-actions row is the only one.
+	const crossTeam = `{"subscriber_id":"Operator","cross_team_messaging":true}`
+	assert.Equal(t, 403, call(h, "PUT", "/api/board/team/settings", crossTeam, grantee).Code, "a grantee")
+	assert.Equal(t, 403, call(h, "PUT", "/api/board/team/settings", crossTeam, otherOwner).Code, "another label")
+	before, _ := r.srv.boardStore.RecentHubOperatorActions(ctx, 50)
+	assert.Equal(t, 200, call(h, "PUT", "/api/board/team/settings", crossTeam, owner).Code, "the owner sets cross-team settings")
+	after, _ := r.srv.boardStore.RecentHubOperatorActions(ctx, 50)
+	assert.Equal(t, len(before)+1, len(after), "one use of the Operator identity is one row")
+	set, _ := r.srv.boardStore.GetBoardSettings(ctx, "team")
+	assert.True(t, set.CrossTeamMessaging)
 	rec := call(h, "PUT", "/api/board/team/settings", health, owner)
 	assert.Equal(t, 200, rec.Code, "the owner saves the health setup: %s", rec.Body.String())
 	// And an agent's own routes are untouched: the hub still has no PUT /api/settings.

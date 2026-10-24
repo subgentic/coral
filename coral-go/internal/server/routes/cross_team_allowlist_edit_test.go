@@ -96,27 +96,6 @@ func TestOnlyTheOperatorEditsTheListAndAMixedBodyIsRefusedWhole(t *testing.T) {
 	assert.Equal(t, []board.AllowedSender{alpha}, set.CrossTeamAllowed)
 }
 
-// Through Coral Hub the list is never editable, the owner's session included.
-func TestTheListCannotBeEditedThroughCoralHub(t *testing.T) {
-	_, h := setupBoardTestServer(t)
-	withLabel(t, ownerLabel, nil)
-	ctx := context.Background()
-	_, err := h.bs.Subscribe(ctx, "team", "Dev", "Developer", "dev-session", nil, "all")
-	require.NoError(t, err)
-	id, ok, _ := h.bs.CrossTeamID(ctx, "team")
-	require.True(t, ok)
-	other := "x-" + strings.Repeat("q", 16)
-	body := `{"subscriber_id":"Operator","cross_team_allowed":[{"server":"local","cross_team_id":"` + other + `"}]}`
-	for name, hdr := range map[string]map[string]string{"the hub owner": ownerHeaders(ownerLabel), "a hub user": granteeHeaders()} {
-		code, out := boardCall(t, h, http.MethodPut, body, hdr)
-		assert.Equal(t, http.StatusForbidden, code, name)
-		assert.NotEmpty(t, out["code"], name)
-	}
-	set, _ := h.bs.GetBoardSettings(ctx, "team")
-	assert.Empty(t, set.CrossTeamAllowed)
-	_ = id
-}
-
 func TestTheListIsCheckedAsAWholeAndNothingChangesOnAnError(t *testing.T) {
 	e := newAttachEnv(t, false)
 	alpha := board.AllowedSender{Server: board.LocalServer, CrossTeamID: e.idOf("alpha")}

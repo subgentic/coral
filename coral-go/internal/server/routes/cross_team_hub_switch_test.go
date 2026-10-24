@@ -359,15 +359,19 @@ func TestTheStateEndpointServesTheOwnerPathAndTheLastChange(t *testing.T) {
 	assert.Equal(t, false, msg["on"])
 }
 
-// The settings route stays local-only for the two switches, for the owner too.
-func TestTheSettingsRouteStaysLocalOnlyForTheTwoSwitches(t *testing.T) {
+// The settings route changes the two switches for the OWNER through the Hub (#7329, reversing the local-only rule of #3377 and #4379), and for nobody else.
+func TestTheSettingsRouteChangesTheTwoSwitchesForTheOwnerAlone(t *testing.T) {
 	e := newHubSwitchEnv(t)
 	for _, body := range []string{`{"subscriber_id":"Operator","cross_team_messaging":true}`, `{"subscriber_id":"Operator","cross_team_artifacts":true}`} {
-		code, _ := boardCall(t, e.h, http.MethodPut, body, ownerHeaders(ownerLabel))
+		code, _ := boardCall(t, e.h, http.MethodPut, body, granteeHeaders())
 		assert.Equal(t, http.StatusForbidden, code, body)
 	}
 	s := e.settings("team")
-	assert.False(t, s.CrossTeamMessaging || s.CrossTeamArtifacts)
+	assert.False(t, s.CrossTeamMessaging || s.CrossTeamArtifacts, "a grantee changes nothing")
+	code, out := boardCall(t, e.h, http.MethodPut, `{"subscriber_id":"Operator","cross_team_messaging":true,"cross_team_artifacts":true}`, ownerHeaders(ownerLabel))
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	s = e.settings("team")
+	assert.True(t, s.CrossTeamMessaging && s.CrossTeamArtifacts, "the owner does")
 }
 
 func TestTheNoticeIsAFixedTemplateOfTheValidatedHubUserAlone(t *testing.T) {

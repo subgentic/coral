@@ -146,26 +146,6 @@ func TestOwnerSavesTheHealthSetupThroughTheHubOnly(t *testing.T) {
 	assert.Equal(t, 400, code)
 }
 
-func TestTheOwnerThroughTheHubCannotChangeTheCrossTeamFields(t *testing.T) {
-	_, h := setupBoardTestServer(t)
-	withLabel(t, ownerLabel, nil)
-	ctx := context.Background()
-	before, err := h.bs.GetBoardSettings(ctx, "team")
-	require.NoError(t, err)
-	for _, field := range []string{`"cross_team_messaging": true`, `"cross_team_servers": ["srv_abc"]`, `"cross_team_artifacts": true`,
-		`"cross_team_messaging": true, "health": {"on": false}`} {
-		code, out := boardCall(t, h, http.MethodPut, `{"subscriber_id":"Operator",`+field+`}`, ownerHeaders(ownerLabel))
-		assert.Equal(t, 403, code, field)
-		assert.Equal(t, "local_only", out["code"], field)
-	}
-	after, err := h.bs.GetBoardSettings(ctx, "team")
-	require.NoError(t, err)
-	assert.Equal(t, before, after, "nothing of a refused request is saved, the health part included")
-	// This computer is as before.
-	code, _ := boardCall(t, h, http.MethodPut, `{"subscriber_id":"Operator","cross_team_messaging":true}`, nil)
-	assert.Equal(t, 200, code)
-}
-
 func TestPromptInspectionThroughTheHubIsTheOwnersRead(t *testing.T) {
 	db, err := storetest.Open(t, t.TempDir()+"/c.db")
 	require.NoError(t, err)

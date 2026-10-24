@@ -157,3 +157,9 @@ func textHubSwitchNotice(hubUser string, files, on, changed bool) string {
 	}
 	return "Coral Hub's owner (" + hubUser + ") turned " + what + " " + state + " for this team. See " + teamSettingsMessaging + "."
 }
+
+// textHubSettingsNotice is the board's notice of a change Coral Hub's owner made through the settings route to something that is not a switch (the list of who may message the team, the servers it accepts): fixed words,
+// the validated hub user and never any value (#7329).
+func textHubSettingsNotice(hubUser string, what string) string {
+	return "Coral Hub's owner (" + hubUser + ") changed " + what + " for this team. See " + teamSettingsMessaging + "."
+}

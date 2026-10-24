@@ -141,3 +141,42 @@ func (s *Store) LastSwitchChanges(ctx context.Context, project string) (map[stri
 	}
 	return out, rows.Err()
 }
+
+// HubSettingsEdit is one edit of a board setting that is not a switch (the list of who may message the board, the servers it accepts), as the settings log shows it.
+type HubSettingsEdit struct{ Field, Old, New string }
+
+// RecordHubSettingsChange records a change of cross-team settings that Coral Hub's owner made through the settings route (#7329), in ONE transaction: the Operator-actions row when recordAction (hub user, method, path,
+// board), a switch log row for each switch that moved, and an edit log row for each edit, the hub user named in them all. If any of it cannot be written nothing is, and the caller undoes the change.
+// The caller has checked who is asking.
+func (s *Store) RecordHubSettingsChange(ctx context.Context, project, hubUser, hubUserID, method, path string, recordAction bool, switches []SwitchChange, edits []HubSettingsEdit) error {
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	at := time.Now().UTC().Format(time.RFC3339)
+	if recordAction { // not when the identity guard admitted the request as the Hub's Operator: it records that row itself, and one use of the Operator identity is one row
+		if _, err := tx.ExecContext(ctx, `INSERT INTO hub_operator_actions (at, hub_user, hub_user_id, method, path, project, status) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			at, hubUser, hubUserID, method, path, project, 200); err != nil {
+			return err
+		}
+	}
+	for _, c := range switches {
+		c.Project, c.Via, c.Who, c.WhoID, c.At = project, SwitchViaHub, hubUser, hubUserID, at
+		if err := insertSwitchLog(ctx, tx, c); err != nil {
+			return err
+		}
+	}
+	for _, e := range edits {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO board_settings_log (board_id, at, kind, actor, field, old_value, new_value) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			project, nowUTC(), LogEdit, hubUser, e.Field, e.Old, e.New); err != nil {
+			return err
+		}
+	}
+	if len(edits) > 0 {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM board_settings_log WHERE board_id = ? AND id <= (SELECT id FROM board_settings_log WHERE board_id = ? ORDER BY id DESC LIMIT 1 OFFSET ?)`, project, project, maxLogRows); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
