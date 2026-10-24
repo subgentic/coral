@@ -56,13 +56,14 @@ func cmdJoin() {
 	if id, _ := result["project"].(string); id != "" {
 		boardID = id
 	}
-	saveState(&boardState{Project: boardID, JobTitle: jobTitle, ServerURL: serverURL})
+	goals, goalsSeq := openGoalsAndSeq(boardID, 9)
+	saveState(&boardState{Project: boardID, JobTitle: jobTitle, ServerURL: serverURL, GoalsSeq: goalsSeq})
 	if boardID != project {
 		fmt.Printf("Joined '%s' (board %s) as '%s' (subscriber: %s)\n", project, boardID, jobTitle, subscriberID)
 	} else {
 		fmt.Printf("Joined '%s' as '%s' (subscriber: %s)\n", project, jobTitle, subscriberID)
 	}
-	printGoalBriefing(boardID)
+	printGoalBriefing(goals)
 }
 
 // joinProblem is what join prints when the server refused it ("" when it didn't): a name
@@ -283,6 +284,9 @@ func cmdRead() {
 			clierr.Exit1()
 		}
 		fmt.Println("No new messages.")
+		if !r.asJSON {
+			goalsNoticeOnRead(st)
+		}
 		return
 	}
 	// --json: one message object per line, exactly as the server returned it (scripts read
@@ -298,6 +302,21 @@ func cmdRead() {
 	if r.useLast && r.messageID == 0 {
 		markSkippedRead(st.Project, subscriberID, messages)
 	}
+	if r.messageID == 0 {
+		goalsNoticeOnRead(st)
+	}
+}
+
+// goalsNoticeOnRead tells an agent about the board's goals when they changed since it last heard: an agent that is already subscribed never runs join, so read is where it hears (#7296). One short block (the
+// same lines join prints), once per change of the board's goals counter; nothing when the board has no goals. It is saved in the agent's state so the next read is quiet.
+func goalsNoticeOnRead(st *boardState) {
+	goals, seq := openGoalsAndSeq(st.Project, 9)
+	if seq == st.GoalsSeq || (seq == 0 && len(goals) == 0) {
+		return
+	}
+	printGoalBriefing(goals)
+	st.GoalsSeq = seq
+	saveState(st)
 }
 
 // printMessages prints each message as "[YYYY-MM-DDTHH:MM] role: content" (the poster's title, else its id).

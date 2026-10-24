@@ -315,6 +315,9 @@ type GoalListQuery struct {
 type GoalPage struct {
 	Goals      []Goal `json:"goals"`
 	NextCursor string `json:"next_cursor"`
+	// Seq is the board's goals change counter (the one the live feed's goals_brief carries), on a board's own list: it moves on every goal write and every task change that touches a goal, so a caller that
+	// remembers the last one knows whether anything changed (#7296). Absent on the all-boards read.
+	Seq int64 `json:"seq,omitempty"`
 }
 
 // goalStatesKey is the filter a goal cursor is bound to: the states asked for, each once, in a fixed order, so a cursor made for one filter is refused under another (#7239).
@@ -389,7 +392,11 @@ func (s *Store) GoalPage(ctx context.Context, board string, q GoalListQuery) (*G
 	for i := range goals {
 		goals[i].Rollup = rollups[goals[i].ID]
 	}
-	return &GoalPage{Goals: goals, NextCursor: next}, nil
+	var seq int64
+	if err := s.reader().GetContext(ctx, &seq, `SELECT seq FROM board_goal_meta WHERE board_id = ?`, board); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, err
+	}
+	return &GoalPage{Goals: goals, NextCursor: next, Seq: seq}, nil
 }
 
 // AllGoalsQuery selects goals across boards (#7260): States as GoalListQuery's, Boards narrows to the boards named (none: every board), Limit and Cursor as the board's own.

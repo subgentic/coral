@@ -22,6 +22,8 @@ type boardState struct {
 	Project   string `json:"project"`
 	JobTitle  string `json:"job_title"`
 	ServerURL string `json:"server_url,omitempty"`
+	// GoalsSeq is the board's goals change counter as this agent last saw it (at join, or when read last told it about the goals): read says the goals again only when it has moved (#7296).
+	GoalsSeq int64 `json:"goals_seq,omitempty"`
 }
 
 // coralDir returns the data directory this agent's Coral server uses, falling

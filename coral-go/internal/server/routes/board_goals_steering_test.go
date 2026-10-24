@@ -71,3 +71,29 @@ func TestTheGoalDecisionFieldsAreRefusedAndNotRead(t *testing.T) {
 	assert.Equal(t, "the operator", g["blocked_on"], "blocked keeps its plain reason")
 	assert.Equal(t, "blocked", g["state"])
 }
+
+// #7296 round 2: a board's own goals list carries the board's goals change counter as seq (the one the live feed's goals_brief has), so a caller that remembers it knows whether anything changed; the all-boards
+// read does not carry one.
+func TestTheBoardsGoalListCarriesTheGoalsSeq(t *testing.T) {
+	server, h := setupBoardTestServer(t)
+	registerTaskPlanner(t, h, "team", "Orchestrator")
+	call := goalCall(t, server.URL)
+	seq := func() float64 {
+		code, out := call("GET", "/api/board/team/goals", nil)
+		require.Equal(t, 200, code, "%v", out)
+		s, _ := out["seq"].(float64)
+		return s
+	}
+	assert.Zero(t, seq(), "a board that never had a goal")
+	_, g := call("POST", "/api/board/team/goals", map[string]any{"title": "One", "subscriber_id": "Orchestrator"})
+	first := seq()
+	assert.Positive(t, first)
+	assert.Equal(t, first, seq(), "unchanged goals, the same seq")
+	gid := int64(g["id"].(float64))
+	_, err := h.bs.CreateTaskWithOpts(context.Background(), "team", "t", "", "medium", "Orchestrator", &board.CreateTaskOpts{GoalID: &gid})
+	require.NoError(t, err)
+	assert.Greater(t, seq(), first, "a task linked to a goal moves it")
+	code, all := call("GET", "/api/goals", nil)
+	require.Equal(t, 200, code)
+	assert.NotContains(t, all, "seq", "the all-boards read has no counter")
+}

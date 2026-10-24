@@ -375,17 +375,24 @@ func cmdTaskGoal(st *boardState, args []string) {
 // openGoalsOf is the board's open goals (proposed, active, blocked: the goals list's default), at most limit of them, for the lines that tell an agent what the team is working toward. A board that cannot be
 // asked (an older Coral with no goals, a slow answer, a refusal) has none: these lines are a courtesy and never make the command fail.
 func openGoalsOf(project string, limit int) []map[string]any {
+	goals, _ := openGoalsAndSeq(project, limit)
+	return goals
+}
+
+// openGoalsAndSeq is openGoalsOf with the board's goals change counter (the list's "seq": it moves on every goal write and on every task change that touches a goal).
+func openGoalsAndSeq(project string, limit int) ([]map[string]any, int64) {
 	data, status, err := apiCallRawTimeout("GET", "/"+url.PathEscape(project)+"/goals?limit="+strconv.Itoa(limit), nil, 3*time.Second)
 	if err != nil || status != http.StatusOK {
-		return nil
+		return nil, 0
 	}
 	var page struct {
 		Goals []map[string]any `json:"goals"`
+		Seq   int64            `json:"seq"`
 	}
 	if json.Unmarshal(data, &page) != nil {
-		return nil
+		return nil, 0
 	}
-	return page.Goals
+	return page.Goals, page.Seq
 }
 
 // shortTitle cuts a goal's title for a one-line hint.
@@ -414,8 +421,7 @@ func goalHintLine(project string, taskID any) string {
 }
 
 // printGoalBriefing is what join adds after "Joined": the board's open goals with what makes each done (or what a blocked one waits on), and how a task joins one.
-func printGoalBriefing(project string) {
-	goals := openGoalsOf(project, 9)
+func printGoalBriefing(goals []map[string]any) {
 	if len(goals) == 0 {
 		return
 	}

@@ -24,6 +24,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"github.com/subgentic/coral/internal/agent"
 	"github.com/subgentic/coral/internal/auth"
 	"github.com/subgentic/coral/internal/background"
 	"github.com/subgentic/coral/internal/board"
@@ -110,6 +111,9 @@ func NewWithKey(cfg *config.Config, db *store.DB, backend ptymanager.TerminalBac
 	}
 	if boardStore != nil && db != nil {
 		boardStore.SetSessionsDB(db.Reader())
+	}
+	if boardStore != nil {
+		agent.SetBoardGoalsBrief(boardGoalsPromptBlock(boardStore)) // an agent's board system prompt lists the board's open goals (#7296)
 	}
 	if db != nil {
 		routes.SetUploaderLookup(routes.NewUploaderLookup(store.NewSessionStore(db), boardStore)) // each upload records its board, agent and role (#5575)

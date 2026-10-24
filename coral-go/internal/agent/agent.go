@@ -870,6 +870,13 @@ func isOrchestratorRole(role string) bool {
 	return role != "" && strings.Contains(strings.ToLower(role), "orchestrator")
 }
 
+// boardGoalsBrief, when set (the server sets it at startup), is asked for a board's open goals as a short text block the board system prompt carries (#7296): an agent is subscribed when it starts and never runs
+// join, so this is where it learns what the team is working toward.
+var boardGoalsBrief func(boardName string) string
+
+// SetBoardGoalsBrief sets (or, with nil, clears) the goals block source of the board system prompt.
+func SetBoardGoalsBrief(f func(boardName string) string) { boardGoalsBrief = f }
+
 // BuildBoardSystemPrompt builds the board system prompt fragment shared by all agents.
 // It returns the combined prompt with board usage instructions and role-specific tail.
 // If boardName is empty, it returns just the base prompt (if any).
@@ -894,6 +901,12 @@ func BuildBoardSystemPrompt(boardName, role, prompt string, promptOverrides map[
 				"  %s subscribers   — see who is on the board\n"+
 				"When you have a new message, Coral will notify you.\n\n",
 			boardName, roleLabel, cli, cli, cli, cli, cli, cli)
+
+		if boardGoalsBrief != nil {
+			if goals := boardGoalsBrief(boardName); goals != "" {
+				boardIntro += goals + "\n\n"
+			}
+		}
 
 		var tail string
 		if isOrchestratorRole(role) {

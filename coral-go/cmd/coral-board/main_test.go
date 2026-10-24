@@ -568,9 +568,13 @@ func TestCmdRead_URLRouting(t *testing.T) {
 
 			var recordedPath, recordedRawQuery string
 			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				if strings.HasSuffix(r.URL.Path, "/goals") { // the read's goals notice (#7296) is not the request this test routes
+					w.Write([]byte(`{"goals":[],"next_cursor":""}`))
+					return
+				}
 				recordedPath = r.URL.Path
 				recordedRawQuery = r.URL.RawQuery
-				w.Header().Set("Content-Type", "application/json")
 				if r.URL.Query().Get("id") != "" {
 					w.Write([]byte(`[{"id":42,"content":"hello"}]`))
 				} else {
