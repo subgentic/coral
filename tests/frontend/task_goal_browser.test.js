@@ -29,8 +29,9 @@ const BASE = require('./test_base').BASE;
         console.log('1. a Tasks row names its goal in a quiet chip; a task with no goal has none');
         await waitFor(`document.querySelectorAll('#agentic-panel-tasks .board-task-goal').length === 1`, 'the goal chip', 8000);
         assert.deepEqual(await ev(`[...document.querySelectorAll('#agentic-panel-tasks .board-task-item')].map(r => [r.querySelector('.board-task-desc').textContent.trim(), (r.querySelector('.board-task-goal') || {}).textContent || ''])`),
-            await ev(`[...document.querySelectorAll('#agentic-panel-tasks .board-task-item')].map(r => [r.querySelector('.board-task-desc').textContent.trim(), /installer/.test(r.querySelector('.board-task-desc').textContent) ? 'Ship the new installer' : ''])`));
-        assert.equal(await ev(`document.querySelector('#agentic-panel-tasks .board-task-goal').textContent`), 'Ship the new installer');
+            await ev(`[...document.querySelectorAll('#agentic-panel-tasks .board-task-item')].map(r => [r.querySelector('.board-task-desc').textContent.trim(), /installer/.test(r.querySelector('.board-task-desc').textContent) ? 'Goal: Ship the new installer' : ''])`));
+        assert.equal(await ev(`document.querySelector('#agentic-panel-tasks .board-task-goal').textContent`), 'Goal: Ship the new installer', 'the chip says Goal: to a screen reader (hidden words), then the title (#7313)');
+        assert.equal(await ev(`document.querySelector('#agentic-panel-tasks .board-task-goal .sr-only').textContent`), 'Goal: ');
 
         console.log('2. Create Task: the Goal select lists the open goals; the task is made under the chosen one');
         await ev(`document.querySelector('.btn-create-task').click(); true`);
@@ -50,6 +51,12 @@ const BASE = require('./test_base').BASE;
         await ev(`document.getElementById('task-detail-goal-open').click(); true`);
         await waitFor(`!!document.querySelector('#mb-goals .goals-detail-title') && document.querySelector('#mb-goals .goals-detail-title').textContent === 'Ship the new installer'`, 'the goal to open on the Goals face', 10000);
         assert.equal(await shown('task-detail-modal'), false, 'the task dialog closed');
+        await ev(`window.showTaskDetailModal(${t1.json.id}); true`);
+        await waitFor(`!!document.getElementById('task-detail-goal-open')`, 'the Goal line again', 8000);
+        await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+        assert.ok(await ev(`document.getElementById('task-detail-goal-open').getBoundingClientRect().height >= 44`), 'the Goal line button is a 44 px target on a phone (#7313)');
+        await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+        await ev(`window.hideTaskDetailModal(); true`);
         assert.equal(await ev(`document.activeElement.id`), 'goals-detail-title', 'focus is on the goal\'s heading');
 
         console.log('4. Edit: the Goal select moves the task to another goal and back to none');
@@ -70,8 +77,11 @@ const BASE = require('./test_base').BASE;
         await ev(`document.querySelector('.btn-create-task').click(); true`);
         await waitFor(`getComputedStyle(document.getElementById('create-task-modal')).display !== 'none' && !document.getElementById('create-task-goal-row').hidden && document.getElementById('create-task-goal').options[0].textContent === 'Choose a goal'`, 'the required Goal select', 8000);
         await ev(`document.getElementById('create-task-title').value = 'No goal here'; document.querySelector('#create-task-modal [data-on-click="m-submit-create-task"]').click(); true`);
-        await waitFor(`/Choose a goal/.test(document.getElementById('create-task-error').textContent) && getComputedStyle(document.getElementById('create-task-error')).display !== 'none'`, 'the refusal', 6000);
-        assert.equal(await ev(`document.activeElement.id`), 'create-task-goal', 'focus goes to the Goal select');
+        await waitFor(`/Choose a goal/.test(document.getElementById('create-task-goal-error').textContent) && !document.getElementById('create-task-goal-error').hidden`, 'the refusal beside the select', 6000);
+        assert.deepEqual(await ev(`(() => { const sel = document.getElementById('create-task-goal'), line = document.getElementById('create-task-goal-error'); return { required: sel.required, ariaRequired: sel.getAttribute('aria-required'), invalid: sel.getAttribute('aria-invalid'), by: sel.getAttribute('aria-describedby'), role: line.getAttribute('role'), beside: sel.closest('label').nextElementSibling === line, focus: document.activeElement.id }; })()`),
+            { required: true, ariaRequired: 'true', invalid: 'true', by: 'create-task-goal-error', role: 'alert', beside: true, focus: 'create-task-goal' }, 'the select is required, marked invalid and described by the refusal beside it (#7313)');
+        await ev(`const sel = document.getElementById('create-task-goal'); sel.value = sel.options[1].value; sel.dispatchEvent(new Event('change', { bubbles: true })); true`);
+        assert.equal(await ev(`document.getElementById('create-task-goal').getAttribute('aria-invalid') + ':' + document.getElementById('create-task-goal-error').hidden`), 'null:true', 'choosing a goal takes the refusal away');
         assert.equal(((await api('GET', `/api/board/${B}/tasks?limit=50`)).json.tasks || []).some(t => t.title === 'No goal here'), false, 'nothing was created');
         console.log('6. Team settings has the Require a goal switch with its one sentence; Save writes it');
         assert.equal((await api('PUT', `/api/board/${B}/settings`, { subscriber_id: 'Operator', require_goal: false })).status, 200);

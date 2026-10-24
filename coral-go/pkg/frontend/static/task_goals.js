@@ -73,6 +73,8 @@ export function fillGoalSelect(select, { goals, requireGoal, selectedId, current
     for (const g of goals) add(g);
     if (current && current.id && !seen.has(current.id)) add(current, current.state ? ` (${current.state})` : '');
     select.value = selectedId && seen.has(Number(selectedId)) ? String(selectedId) : '';
+    if (requireGoal) { select.required = true; select.setAttribute('aria-required', 'true'); } else { select.required = false; select.removeAttribute('aria-required'); } // a board that needs a goal says so to a screen reader (#7313)
+    clearGoalInvalid(select);
     return select;
 }
 
@@ -112,4 +114,15 @@ export async function openGoalOnBoard(project, id) {
     board.selectBoardProject(project);
     const view = await importOnce('./goals_view.js');
     view.openGoalWhenKnown(id);
+}
+
+/** A refusal beside the Goal select: the message in its own alert line, the select marked invalid and described by it; clearGoalInvalid undoes it. */
+export function showGoalInvalid(select, line, message) {
+    line.textContent = ''; line.hidden = false; line.textContent = message;
+    select.setAttribute('aria-invalid', 'true'); select.setAttribute('aria-describedby', line.id); select.focus();
+}
+export function clearGoalInvalid(select) {
+    select.removeAttribute('aria-invalid'); select.removeAttribute('aria-describedby');
+    const line = select.closest('label')?.nextElementSibling;
+    if (line && line.classList.contains('task-goal-error')) { line.hidden = true; line.textContent = ''; }
 }

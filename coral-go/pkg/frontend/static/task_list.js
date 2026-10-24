@@ -22,7 +22,7 @@ let _goalBoard = ''; // the board whose goal titles the chips read (the one the 
 function _goalChip(t) {
     if (!t || !t.goal_id || t._source === 'agent' || t._source === 'subagent') return '';
     const title = goalTitle(_goalBoard, t.goal_id);
-    return title ? ` <span class="board-task-goal" title="Goal">${escapeHtml(title)}</span>` : '';
+    return title ? ` <span class="board-task-goal" title="Goal"><span class="sr-only">Goal: </span>${escapeHtml(title)}</span>` : '';
 }
 
 // ── Board task polling ───────────────────────────────────────────────
