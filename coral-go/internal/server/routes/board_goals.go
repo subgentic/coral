@@ -14,7 +14,6 @@ import (
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/clitext"
 	"github.com/subgentic/coral/internal/cloud"
-	"github.com/subgentic/coral/internal/safefs"
 )
 
 // Goals on the board (#7087, from #7078's note). A goal is an outcome a board's tasks work toward; the store is internal/board/goals.go. These routes write board text and nothing else: they never
@@ -221,9 +220,11 @@ func (h *BoardHandler) ListAllGoals(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for _, b := range q.Boards {
-		if !safefs.IsSafeID(b) { // a board id the way every board route takes one; a name nobody has simply adds nothing
-			errBadRequest(w, "board must be a board id: letters, digits, '-' and '_'")
-			return
+		for _, c := range b { // a board that already exists keeps any name (names.go): spaces and dots are fine, control characters are not; a name nobody has simply adds nothing
+			if c < 0x20 || c == 0x7f {
+				errBadRequest(w, "board can't contain a control character")
+				return
+			}
 		}
 	}
 	if cloud.Tunneled(r) { // redacted after the filter matched: a board value the redactor would change can match nothing the viewer sees (as the machine-wide task query)

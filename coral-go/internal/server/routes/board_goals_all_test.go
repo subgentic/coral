@@ -118,20 +118,22 @@ func TestAllGoalsReadRefusals(t *testing.T) {
 		return strings.Join(parts, "&")
 	}
 	for name, q := range map[string]string{
-		"a cursor for other states":  "state=done&limit=2&cursor=" + cur,
-		"a cursor for another board": "board=alpha&limit=2&cursor=" + cur,
-		"a per-board goal cursor":    "limit=2&cursor=" + perBoardCursor,
-		"a made-up cursor":           "cursor=bogus",
-		"limit zero":                 "limit=0",
-		"limit negative":             "limit=-1",
-		"limit text":                 "limit=abc",
-		"a mistyped parameter":       "GOAL=1",
-		"an unknown parameter":       "goal=1",
-		"a list that is not a query": "limit=1;board=x",
-		"a bad state":                "state=paused",
-		"too many boards":            many(51),
-		"an empty board":             "board=",
-		"an empty state member":      "state=active,,blocked",
+		"a cursor for other states":   "state=done&limit=2&cursor=" + cur,
+		"a cursor for another board":  "board=alpha&limit=2&cursor=" + cur,
+		"a per-board goal cursor":     "limit=2&cursor=" + perBoardCursor,
+		"a made-up cursor":            "cursor=bogus",
+		"limit zero":                  "limit=0",
+		"limit negative":              "limit=-1",
+		"limit text":                  "limit=abc",
+		"a mistyped parameter":        "GOAL=1",
+		"an unknown parameter":        "goal=1",
+		"a list that is not a query":  "limit=1;board=x",
+		"a bad state":                 "state=paused",
+		"too many boards":             many(21),
+		"a board with a control char": "board=a%00b",
+		"a board over 200 characters": "board=" + strings.Repeat("b", 201),
+		"an empty board":              "board=",
+		"an empty state member":       "state=active,,blocked",
 	} {
 		code, out := call("GET", "/api/goals?"+q, nil)
 		assert.Equal(t, http.StatusBadRequest, code, "%s: %v", name, out)
@@ -143,4 +145,23 @@ func TestAllGoalsReadRefusals(t *testing.T) {
 	assert.Equal(t, 200, code, "twenty boards is the cap: %v", out)
 	code, out = call("GET", "/api/goals?limit=2&cursor="+cur, nil)
 	assert.Equal(t, 200, code, "its own cursor still works: %v", out)
+}
+
+// #7260 (the Orchestrator's call): a board name is a length-capped value, not an IsSafeID id: boards that already exist keep any name (names.go), so one with a space or a dot can be named, and a name
+// nobody has adds nothing.
+func TestAllGoalsReadNamesOlderBoardsWithAnyName(t *testing.T) {
+	server, h := setupBoardTestServer(t)
+	ctx := context.Background()
+	_, err := h.bs.CreateGoal(ctx, "Old Team v1.2", board.GoalInput{Title: "legacy", CreatedBy: "Orchestrator"})
+	require.NoError(t, err)
+	_, err = h.bs.CreateGoal(ctx, "other", board.GoalInput{Title: "elsewhere", CreatedBy: "Orchestrator"})
+	require.NoError(t, err)
+	call := goalCall(t, server.URL)
+	code, page := call("GET", "/api/goals?board="+url.QueryEscape("Old Team v1.2"), nil)
+	require.Equal(t, 200, code, "%v", page)
+	require.Len(t, page["goals"], 1)
+	assert.Equal(t, "Old Team v1.2", page["goals"].([]any)[0].(map[string]any)["board_id"])
+	code, page = call("GET", "/api/goals?board="+url.QueryEscape("../secrets"), nil)
+	assert.Equal(t, 200, code, "a name nobody has is not a refusal: %v", page)
+	assert.Empty(t, page["goals"])
 }
