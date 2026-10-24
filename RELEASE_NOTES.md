@@ -1,5 +1,41 @@
 # Release Notes
 
+## v1.4.166 — Runs that end when their agent's turn ends, a never-started run says so, kept worktrees you can list and remove, a Settings page sorted by task, and a safer reading of shell commands in auto-accept
+
+### Changes
+
+- **A scheduled prompt run finishes on its agent's own accepted turn end** (#7090, #7088): once, live or adopted after a restart; a failed turn is a failed run (a code for it, `agent_turn_failed`), and the settle ends the agent once. A run no longer waits for the CLI to exit or for the job's timeout.
+- **A run that never started says so** (#6978, #7016, #7025): when Coral cannot hand the agent its start command, the launch fails at once with a plain reason and a code, leaves no idle session, and falls back to the data folder when the temp folder is unusable; a run whose terminal sits at an idle shell with no event from the agent for 3 minutes, or a run settled at startup whose agent reported nothing at all, is failed as "never started" (Pi and Gemini, which install no hooks, never are). The Jobs row reads "Failed (never started)", "Failed (couldn't start the agent)" or "Failed (agent exited at once)", with the server's sentence under it.
+- **Kept worktrees** (#7055, #7026, #7035, #7056, #6977): Settings' list reads again when a stop keeps a worktree, so it stops saying "In use"; a kept job-run worktree is still listed, and removable, after its job's repository changed or went (the list reads under a time budget and shows an entry unchecked when git does not answer); a remove runs git only in a repository that lists the folder; a Remove and a resurrect of the same team no longer interleave.
+- **Waits and notices** (#7105, #7146): an expired wait wakes its agent and a freed task's assignee; the timeout notice for an agent whose CLI has exited is retired instead of retried every second, and a notice older than 15 minutes is retired with a receipt.
+- **Settings is sorted by task** (#7040, #7041): Agents has headed parts; About, Hub connect, Render engine, Customize Theme and Log terminal input are where the audit put them. Settings > Agents > CLI paths shows its marker and opens itself when Coral cannot find the default CLI; Automatic cleanup at 0 days reads Off and the prune selects have visible labels; Security and privacy at 390 px and 200% text does not scroll sideways and the Install ID is no longer one letter per line; the Save toast names what changed ("Saved: Show scrollbars off, Git diff mode").
+- **The Inbox** (#7122, #7004, #6981): the folder is beside a waiting agent, tasks sort by priority with a High chip, a reply box says the task stays open, the "Gone" sentence shows once and the Saved count is not repeated; a Needs you row says how long an agent has waited ("waiting 4 min", from the live row's new `waiting_since`, the start of the agent's own request, null when it waits for nothing and not set for a sign-in or launch-prompt wait).
+- **Jobs and Workflows** (#7121, #6988, #7001): the flag chips wrap, there is no one-tap permission-bypass chip, a phone has a back row, a run's When is a link, the path shows its end, the checkbox sits beside its label; the Workflows list says how Build with Agent and New Workflow differ and what starts a workflow, behind a "How workflows start" disclosure once the list has items.
+- **The phone and large text** (#7063, #7065, #7066, #7064, #6971): one side-panel toggle on a phone agent view, the team reminder behind Send options, chips that say what a default is, the open panel tab named; the agent view at 200% text has whole sidebar rows, a header that writes the state and no Stop for an idle agent; New Agent's second step on a phone has a whole-row summary and a closed More options; one verb and noun for starting things (New agent, New team); the message box's placeholder wraps only at spaces.
+- **Analytics** (#6975, #6997): phone tables show there is more to the right (one "more columns" line), the numbers' explanation is behind a disclosure, Total Cost is not drawn as selected, and empty tables say how to get data; the page's heading reads "Analytics".
+- **One "when" format** (#6986): "just now" and "N min ago" for the first hour, then a time of day in the viewer's own clock.
+- **Auto-accept reads shell commands with a real parser** (#7086, #7069, #7106, #7208): compound commands, wrappers and nesting are judged by a parser (`mvdan.cc/sh/v3`, BSD-3, syntax only), a command nested too deeply to read is answered as risky in one pass, and a shell wrapper's inner command is judged once per run; a `~` inside a path is not shell text and brace expansion reaching the home folder is still shell text; on Windows a board name with < > " | ? * is refused with a plain sentence instead of failing inside git. A command run through eval, trap, xargs, find -exec, watch, timeout, nice, env, sudo, command, exec, time, nohup, setsid, stdbuf, ionice or flock is judged as the command it runs; a command name built at run time (an expansion inside the name, as in rm${IFS}-rf) asks; writes outside the working folder by tar, cpio, zip, unzip, 7z, the compressors, rsync, curl, wget, mkfifo, shred and truncate ask; and a command run through unshare, chroot, nsenter, strace, ltrace, valgrind, systemd-run, pkexec, setpriv, firejail, runuser or script always asks. A command over several lines is judged line by line, and a prompt that shows two approval headers is left to you.
+- **Artifact comments through Coral Hub** (#7052, #7120): a comment, a reply, a resolve and a reopen on an artifact are open through the Hub as the owner's alone (with an Idempotency-Key, the sixth route that takes one); the owner's Hub read of the comments may comment, reply and resolve, and edit, delete and lock stay off.
+- **Browse through the Hub on a Windows machine** (#7070): the home path is shown as `~/folder`, so Browse no longer stops at the first folder.
+
+### Fixes
+
+- **The remote board poll goes to the address that was checked** (#7053, #7046, #7109): a redirect is not followed, only a success is read, and the address is checked again where it connects; the board proxy does not follow a redirect from a registered remote, and a session's change file is written only for a valid session id.
+- **A workflow's step-file route is bounded** (#7155, CodeQL #753): by the resolved step folder, and the folder must be inside the resolved runs folder.
+- **CodeQL fixes** (#7045, #7073): a Content-Disposition filename is read in linear time (ReDoS), and the knowledge fallback escapes its text first and bounds its link rules (XSS).
+- **The board store never writes to the artifact rows a caller passes in** (#7169): submit, complete and attach clear their stamps on a copy, so a concurrent reader no longer races the write.
+
+### Known issues
+
+- **A paused job's red banner ends "It is still scheduled."** while the job is marked paused (found in the release-candidate check; fixed in the next release).
+- **When a command's own text has a line that begins with 1.,** auto-accept does not recognize Codex's permission menu and leaves the question to you (it never approves wrongly; fixed in the next release).
+
+### Internal
+
+- **Tests and tooling:** the routes tests no longer set package variables (#6991, #7010, #7029); flaky tests made deterministic (#7117, #7125, #7144, the settings toast leak); the Windows CI routes step also runs the worktree, job-run, resurrect, team-launch, kept-job, remove and stall tests (#7103: 152 to 202 tests, about 15 s more); the terminal-input census follows the rename (#7105); the Windows survey nudge test on a ConPTY (#7007); both settings goldens and the startup golden regenerated; CodeQL runs as an advanced setup with `tests/` left out (#7034, outside the release).
+- **Tunnel:** pkg/tunnel: SessionConfig.CheckHello lets Coral Hub vet an authenticated Hello (its minimum-version check); an error answers unsupported_version, retry_later (with its wait) or unauthorized (#7095).
+- **Windows tests:** #7048: the worktree tests pass on Windows (git's forward slashes; a name Windows cannot make).
+
 ## v1.4.165 — A scheduled run survives a restart, kept worktrees you can remove, rows you can reach with the keyboard, and a board message that gets through Claude's survey
 
 ### Changes
