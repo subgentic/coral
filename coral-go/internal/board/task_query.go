@@ -248,8 +248,7 @@ func parseQueryIDs(vals []string) ([]int64, error) {
 	seen := map[int64]bool{}
 	for _, v := range vals {
 		for _, part := range strings.Split(v, ",") {
-			part = strings.TrimSpace(part)
-			n, err := strconv.ParseInt(part, 10, 64)
+			n, err := strconv.ParseInt(part, 10, 64) // digits only as written: a space around an id is another spelling of it (#7239, Security's #7255 LOW)
 			if part == "" || err != nil || n < 1 || strconv.FormatInt(n, 10) != part {
 				return nil, taskQueryErr("id must be a whole positive number, got %q", truncateEcho(part))
 			}
