@@ -27,12 +27,16 @@ for line in (root / "cookies.txt").read_text().splitlines():
 cookie = "; ".join(cookies)
 assert cookie, "private login did not create a cookie"
 passed = 0
+failed = 0
 agents = {}
 
 
 def check(label, condition):
-    global passed
-    assert condition, label
+    global passed, failed
+    if not condition:
+        failed += 1
+        print("[goals] FAIL: " + label, flush=True)
+        raise AssertionError(label)
     passed += 1
     print("[goals] PASS: " + label, flush=True)
 
@@ -135,7 +139,7 @@ try:
         "board_name": "goals-integration", "working_dir": str(root / "work"),
         "agent_type": "claude", "backend": backend,
         "agents": [{"name": role, "prompt": "Mock goals integration fixture"}
-                   for role in ("Orchestrator", "Worker", "Driver")]})
+                   for role in ("Orchestrator", "Worker", "Tester", "Driver")]})
     board = launch["board"]
     base = "/api/board/" + board
     for agent in launch["agents"]:
@@ -148,7 +152,7 @@ try:
         values = dict(line.split("=", 1) for line in dump.read_text().splitlines() if "=" in line)
         assert values.get("CORAL_SESSION_TOKEN"), "mock agent received no token"
         agents[agent["name"]] = dict(agent, token=values["CORAL_SESSION_TOKEN"])
-    check("three real mock identities launched", len(agents) == 3)
+    check("four real mock identities launched (two workers)", len(agents) == 4)
 
     # All shared planning uses the real CLI with the mock Orchestrator's token.
     g1 = goal("Deliver goals", "--driver", "Driver", "--outcome", "integration works",
@@ -166,15 +170,15 @@ try:
     rollup(g1)
 
     t1 = task("Build goal", "--goal", g1, "--assignee", "Worker")
-    t2 = task("Consume build", "--goal", g1, "--blocked-by", json.dumps([t1]))
+    t2 = task("Consume build", "--goal", g1, "--assignee", "Tester", "--blocked-by", json.dumps([t1]))
     rollup(g1, queued=1, blocked=1)
     cli("Worker", "task", "claim", t1)
     rollup(g1, active=1, blocked=1)
     cli("Worker", "task", "complete", t1, "--message", "built")
     rollup(g1, done=1, queued=1)
-    cli("Worker", "task", "claim", t2)
+    cli("Tester", "task", "claim", t2)
     rollup(g1, done=1, active=1)
-    cli("Worker", "task", "complete", t2, "--message", "tested")
+    cli("Tester", "task", "complete", t2, "--message", "tested")
     rollup(g1, done=2)
     g2 = goal("Other goal")
     cli("Orchestrator", "task", "goal", t2, g2)
@@ -201,18 +205,27 @@ try:
     check("closing preserves the open task", api("GET", base + f"/tasks/{linked}")["status"] == "pending")
     check("default list excludes closed goal", g1 not in [g["id"] for g in json.loads(cli("Orchestrator", "goal", "list", "--json"))])
     check("all-state list includes closed goal", g1 in [g["id"] for g in json.loads(cli("Orchestrator", "goal", "list", "--state", "all", "--json"))])
+    refused_close = cli("Orchestrator", "goal", "close", g1, "--reason", "second close", ok=False)
+    check("separate second close is refused", refused_close.returncode != 0
+          and "goal_already_closed" in refused_close.stderr
+          and show(g1)["closed_reason"] == "delivered with follow-up")
     cli("Orchestrator", "goal", "update", g1, "--state", "active")
     check("reopen clears closed metadata", show(g1)["state"] == "active" and not show(g1).get("closed_at"))
 
     concurrent_goal = goal("Concurrent changes")
     updates = [("title", "Concurrent title"), ("outcome", "Concurrent outcome"),
                ("done-when", "Concurrent check"), ("driver", "Driver")]
-    race([lambda k=k, v=v: cli("Orchestrator", "goal", "update", concurrent_goal, "--" + k, v)
-          for k, v in updates])
-    changed = show(concurrent_goal)
-    check("concurrent disjoint updates preserve every field", all(changed[k.replace("-", "_")] == v for k, v in updates))
+    # Five goals, four independent fields each: all twenty writes have an
+    # unambiguous final value, so none can disappear behind another writer.
+    update_goals = [concurrent_goal] + [goal(f"Concurrent fields {i}") for i in range(4)]
+    race([lambda gid=gid, k=k, v=v: cli("Orchestrator", "goal", "update", gid, "--" + k, v)
+          for gid in update_goals for k, v in updates])
+    for gid in update_goals:
+        changed = show(gid)
+        check(f"20 concurrent updates preserve every field of goal {gid}",
+              all(changed[k.replace("-", "_")] == v for k, v in updates))
     closes = race([lambda i=i: cli("Orchestrator", "goal", "close", concurrent_goal, "--reason", f"winner-{i}", ok=False)
-                   for i in range(8)])
+                   for i in range(10)])
     winners = [i for i, result in enumerate(closes) if result.returncode == 0]
     check("exactly one concurrent close wins", len(winners) == 1)
     check("other closes report already closed", all(result.returncode == 0 or "goal_already_closed" in result.stderr for result in closes))
@@ -240,6 +253,35 @@ try:
     cli("Orchestrator", "goal", "close", fresh, "--reason", "brief closed")
     check("closing moves goals_brief count and seq", brief()["open"] == new["open"] - 1 and brief()["seq"] > seq)
 
+    paged_goal = goal("120 paged tasks")
+    # Seed bulk data as the private dashboard Operator, without exhausting the
+    # agent write burst budget. Worker/task flow above uses the real board CLI.
+    expected_ids = [api("POST", base + "/tasks", {
+        "title": f"Paging task {i:03d}", "goal_id": paged_goal,
+        "subscriber_id": "Operator"}, expected=(201,))["id"] for i in range(120)]
+    ids, cursors, sizes = [], set(), []
+    cursor = ""
+    # Bounded data traversal, not readiness polling: the real route pages 50 at a time.
+    for _ in range(4):
+        page = api("GET", base + f"/tasks?status=all&goal={paged_goal}&limit=50&cursor="
+                   + urllib.parse.quote(cursor, safe=""))
+        check("paged route never reports truncation", not page.get("truncated", False))
+        ids.extend(t["id"] for t in page["tasks"])
+        sizes.append(len(page["tasks"]))
+        cursor = page.get("next_cursor", "")
+        if not cursor:
+            break
+        assert cursor not in cursors, "route repeated a cursor"
+        cursors.add(cursor)
+    check("route pages exactly 50/50/20 without loss or duplication",
+          sizes == [50, 50, 20] and ids == expected_ids and not cursor)
+    check("CLI goal show returns all 120 tasks",
+          sorted(t["id"] for t in show(paged_goal)["tasks"]) == expected_ids)
+    listing = cli("Orchestrator", "task", "list", "--goal", paged_goal)
+    check("CLI task list returns each of the 120 tasks exactly once",
+          sorted(map(int, re.findall(r"^#(\d+)\s", listing, re.MULTILINE))) == expected_ids)
+    rollup(paged_goal, queued=120)
+
     driver = agents["Driver"]
     check("driver put to sleep", api("POST", "/api/sessions/live/" + driver["session_id"] + "/sleep", {})["sleeping"])
 
@@ -252,13 +294,22 @@ try:
 
     check("sleep removes the driver's live terminal", asleep())
     sleeping_goal = goal("Sleeping driver", "--driver", "Driver")
+    check("goal create leaves driver asleep", asleep())
     cli("Orchestrator", "goal", "update", sleeping_goal, "--outcome", "no wake", "--done-when", "still sleeping")
+    check("goal update leaves driver asleep", asleep())
     cli("Orchestrator", "goal", "close", sleeping_goal, "--reason", "no wake on close")
+    check("goal close leaves driver asleep", asleep())
     cli("Orchestrator", "goal", "list", "--state", "all", "--json")
     check("goal create/update/close never wake sleeping driver", asleep())
     check("sleeping driver remains valid goal metadata", show(sleeping_goal)["driver"] == "Driver")
-    print(f"[goals] {passed} checks passed", flush=True)
+except Exception as error:
+    if failed == 0:
+        failed += 1
+        print("[goals] FAIL: " + str(error), flush=True)
+    raise
 finally:
+    (root / "goals-counts").write_text(f"{passed} {failed}\n")
+    print(f"[goals] totals: PASS={passed} FAIL={failed}", flush=True)
     if agents:
         # Exact session IDs, on this authenticated private server, including failures.
         for agent in agents.values():

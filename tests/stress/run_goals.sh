@@ -30,6 +30,12 @@ cleanup() {
     fi
     if ! coral_test_sandbox_check; then result=1; fi
     coral_test_sandbox_cleanup
+    local passed=0 failed=0
+    if [[ -f "$TMPDIR_GOALS/goals-counts" ]]; then
+        read -r passed failed < "$TMPDIR_GOALS/goals-counts"
+    fi
+    if (( result != 0 && failed == 0 )); then failed=1; fi
+    log "Runner totals: PASS=$passed FAIL=$failed"
     if [[ $result -ne 0 || ${KEEP_TEST_DATA:-0} == 1 ]]; then
         log "Retained private test data: $TMPDIR_GOALS"
     else
