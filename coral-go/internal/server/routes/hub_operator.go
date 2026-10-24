@@ -43,10 +43,11 @@ func recordHubOwnerAction(ctx context.Context, bs *board.Store, id callerIdentit
 }
 
 func recordHubOperatorActionAs(ctx context.Context, bs *board.Store, hubUser, hubUserID, method, path, project string, status int) {
-	// logsafe-ok: a request's URL path, not a place on this computer
 	if hubUserID != "" {
+		// logsafe-ok: a request's URL path, not a place on this computer
 		slog.Info("[cloud] Coral Hub acted as the Operator", "hub_user", hubUser, "hub_user_id", hubUserID, "method", method, "path", path, "status", status)
 	} else {
+		// logsafe-ok: a request's URL path, not a place on this computer
 		slog.Info("[cloud] Coral Hub acted as the Operator", "hub_user", hubUser, "method", method, "path", path, "status", status)
 	}
 	if bs == nil {
