@@ -452,7 +452,7 @@ func fetchClaude(ctx context.Context, path, dir string) ([]Model, error) {
 	}
 	defer func() {
 		in.Close()
-		_ = cmd.Process.Kill() // it has answered: nothing else is wanted from it
+		_ = executil.Kill(cmd) // it has answered: nothing else is wanted from it, nor from what it started (a claude.cmd shim's node, #349)
 		_ = cmd.Wait()
 	}()
 	if _, err := io.WriteString(in, `{"type":"control_request","request_id":"coral-models","request":{"subtype":"initialize"}}`+"\n"); err != nil {
