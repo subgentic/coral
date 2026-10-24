@@ -445,7 +445,10 @@ func (h *ThemesHandler) DeleteTheme(w http.ResponseWriter, r *http.Request) {
 // POST /api/themes/import
 func (h *ThemesHandler) ImportTheme(w http.ResponseWriter, r *http.Request) {
 	h.ensureDir()
-	r.ParseMultipartForm(10 << 20) // 10 MB
+	if err := r.ParseMultipartForm(10 << 20); err != nil { // 10 MB in memory, the rest on disk; a cut or malformed body stores nothing
+		errBadRequest(w, "The upload could not be read: it was cut off or is not a form upload")
+		return
+	}
 	file, header, err := r.FormFile("file")
 	if err != nil {
 		errBadRequest(w, "file required")
@@ -453,7 +456,11 @@ func (h *ThemesHandler) ImportTheme(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	data, _ := io.ReadAll(file)
+	data, err := io.ReadAll(file)
+	if err != nil {
+		errBadRequest(w, "The upload could not be read: it was cut off or is not a form upload")
+		return
+	}
 	var parsed map[string]any
 	if json.Unmarshal(data, &parsed) != nil {
 		errBadRequest(w, "Invalid JSON file")
