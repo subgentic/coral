@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/subgentic/coral/internal/config"
 	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/internal/store"
@@ -96,16 +96,13 @@ func (h *BoardRemotesHandler) ListSubscriptions(w http.ResponseWriter, r *http.R
 
 // ProxyProjects handles GET /api/board/remotes/proxy/{remote_server}/projects
 func (h *BoardRemotesHandler) ProxyProjects(w http.ResponseWriter, r *http.Request) {
-	remoteServer := chi.URLParam(r, "*")
-	// Extract the remote_server and path parts
-	// URL pattern: /api/board/remotes/proxy/{remote_server}/projects
-	// The wildcard captures everything after /proxy/
-	parts := strings.SplitN(remoteServer, "/projects", 2)
-	if len(parts) == 0 {
+	// URL pattern: /api/board/remotes/proxy/{remoteServer}/projects. The route's own parameter, percent-decoded: the registered server's URL has slashes, so a client sends it escaped; it only selects
+	// which registered subscription is meant (proxyGet uses the registered string, never this one).
+	server := urlParam(r, "remoteServer")
+	if server == "" {
 		errBadRequest(w, "missing remote server")
 		return
 	}
-	server := parts[0]
 	result, code, err := h.proxyGet(r.Context(), server, "/projects")
 	if err != nil {
 		writeJSON(w, code, map[string]string{"error": err.Error()})
@@ -118,11 +115,14 @@ func (h *BoardRemotesHandler) ProxyProjects(w http.ResponseWriter, r *http.Reque
 
 // ProxyMessages handles GET /api/board/remotes/proxy/{remote_server}/{project}/messages/all
 func (h *BoardRemotesHandler) ProxyMessages(w http.ResponseWriter, r *http.Request) {
-	remoteServer := chi.URLParam(r, "remoteServer")
+	remoteServer := urlParam(r, "remoteServer") // decoded, to find the registered server; it is never the URL used (#7290)
 	project := urlParam(r, "project")
 	// A number from 1 to 500, formatted here: the caller's text never reaches the remote's query string (#4602).
 	limit := clampLimit(queryInt(r, "limit", 200), 200, 500)
-	path := fmt.Sprintf("/%s/messages/all?limit=%d", project, limit)
+	if !remoteProjectOK(w, project) {
+		return
+	}
+	path := fmt.Sprintf("/%s/messages/all?limit=%d", url.PathEscape(project), limit)
 	result, code, err := h.proxyGet(r.Context(), remoteServer, path)
 	if err != nil {
 		writeJSON(w, code, map[string]string{"error": err.Error()})
@@ -135,9 +135,12 @@ func (h *BoardRemotesHandler) ProxyMessages(w http.ResponseWriter, r *http.Reque
 
 // ProxySubscribers handles GET /api/board/remotes/proxy/{remote_server}/{project}/subscribers
 func (h *BoardRemotesHandler) ProxySubscribers(w http.ResponseWriter, r *http.Request) {
-	remoteServer := chi.URLParam(r, "remoteServer")
+	remoteServer := urlParam(r, "remoteServer") // decoded, to find the registered server; it is never the URL used (#7290)
 	project := urlParam(r, "project")
-	path := fmt.Sprintf("/%s/subscribers", project)
+	if !remoteProjectOK(w, project) {
+		return
+	}
+	path := fmt.Sprintf("/%s/subscribers", url.PathEscape(project))
 	result, code, err := h.proxyGet(r.Context(), remoteServer, path)
 	if err != nil {
 		writeJSON(w, code, map[string]string{"error": err.Error()})
@@ -150,10 +153,13 @@ func (h *BoardRemotesHandler) ProxySubscribers(w http.ResponseWriter, r *http.Re
 
 // ProxyCheckUnread handles GET /api/board/remotes/proxy/{remote_server}/{project}/messages/check
 func (h *BoardRemotesHandler) ProxyCheckUnread(w http.ResponseWriter, r *http.Request) {
-	remoteServer := chi.URLParam(r, "remoteServer")
+	remoteServer := urlParam(r, "remoteServer") // decoded, to find the registered server; it is never the URL used (#7290)
 	project := urlParam(r, "project")
 	// subscriber_id, escaped: it was sent on as typed (#3743), so an '&' in it added parameters.
-	path := fmt.Sprintf("/%s/messages/check?subscriber_id=%s", project, url.QueryEscape(r.URL.Query().Get("subscriber_id")))
+	if !remoteProjectOK(w, project) {
+		return
+	}
+	path := fmt.Sprintf("/%s/messages/check?subscriber_id=%s", url.PathEscape(project), url.QueryEscape(r.URL.Query().Get("subscriber_id")))
 	result, code, err := h.proxyGet(r.Context(), remoteServer, path)
 	if err != nil {
 		writeJSON(w, code, map[string]string{"error": err.Error()})
@@ -164,6 +170,35 @@ func (h *BoardRemotesHandler) ProxyCheckUnread(w http.ResponseWriter, r *http.Re
 	w.Write(result)
 }
 
+// remoteProjectOK refuses a project that is not one path segment of the remote's /api/board/: the name urlParam hands over is percent-DECODED, so "..%2F..%2Fsessions%3Fx=" would walk the pinned URL off /api/board/
+// and rewrite its query (CodeQL #490, #7290). Empty, ".", "..", a name with a slash, a backslash, "?", "#" or a control character is a 400; what passes is also url.PathEscape'd where it is used.
+func remoteProjectOK(w http.ResponseWriter, project string) bool {
+	bad := project == "" || project == "." || project == ".." || len(project) > 200
+	for _, c := range project {
+		if c == '/' || c == '\\' || c == '?' || c == '#' || c < 0x20 || c == 0x7f {
+			bad = true
+		}
+	}
+	if bad {
+		errBadRequest(w, "project must be a board name: one path segment with no '/', '\\', '?', '#' or control character")
+		return false
+	}
+	return true
+}
+
+// pinnedRemoteURL is the URL the proxy asks: the registered scheme, the resolved address and port (an IPv6 address is bracketed by net.JoinHostPort) and /api/board plus the path built here.
+func pinnedRemoteURL(scheme, ip, port, path string) string {
+	return scheme + "://" + net.JoinHostPort(ip, port) + "/api/board" + path
+}
+
+// hostHeader is a registered hostname as a Host header: an IPv6 literal is bracketed.
+func hostHeader(host string) string {
+	if strings.Contains(host, ":") {
+		return "[" + host + "]"
+	}
+	return host
+}
+
 // proxyGet forwards a GET request to a remote Coral server's board API with SSRF protection.
 func (h *BoardRemotesHandler) proxyGet(ctx context.Context, remoteServer, path string) ([]byte, int, error) {
 	// Validate remote server is a registered subscription
@@ -172,16 +207,18 @@ func (h *BoardRemotesHandler) proxyGet(ctx context.Context, remoteServer, path s
 		return nil, http.StatusInternalServerError, fmt.Errorf("failed to list subscriptions: %w", err)
 	}
 
-	registered := false
+	// From here on the registered subscription's own server string is the remote: parsed, resolved and used as the Host, never the caller's spelling of it (#7290).
+	registeredServer := ""
 	for _, sub := range subs {
 		if strings.TrimRight(sub.RemoteServer, "/") == strings.TrimRight(remoteServer, "/") {
-			registered = true
+			registeredServer = sub.RemoteServer
 			break
 		}
 	}
-	if !registered {
+	if registeredServer == "" {
 		return nil, http.StatusForbidden, fmt.Errorf("remote server is not registered. Add a subscription first")
 	}
+	remoteServer = registeredServer
 
 	// Resolve and validate IP to prevent SSRF + DNS rebinding
 	resolveURL := h.resolve
@@ -208,7 +245,7 @@ func (h *BoardRemotesHandler) proxyGet(ctx context.Context, remoteServer, path s
 		}
 	}
 
-	pinnedURL := fmt.Sprintf("%s://%s:%s/api/board%s", parsed.Scheme, resolvedIP, port, path)
+	pinnedURL := pinnedRemoteURL(parsed.Scheme, resolvedIP, port, path)
 
 	// A redirect is not followed (as remote_servers.go): the check above is of the registered address only, and a Location could send this request to any host and bring its body back (CodeQL #490, #7046).
 	client := &http.Client{Timeout: 5 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
@@ -217,7 +254,7 @@ func (h *BoardRemotesHandler) proxyGet(ctx context.Context, remoteServer, path s
 		return nil, http.StatusBadGateway, fmt.Errorf("failed to create request: %w", err)
 	}
 	// Set Host header to original hostname for correct routing
-	req.Host = parsed.Hostname()
+	req.Host = hostHeader(parsed.Hostname())
 
 	resp, err := client.Do(req)
 	if err != nil {
