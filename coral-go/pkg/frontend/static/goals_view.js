@@ -3,15 +3,16 @@
  * The routes' JSON becomes the model in goals_adapter.js, the words come from goal_words.js; everything drawn here is built with the DOM and textContent (no text from a goal or a task is read as markup).
  * Lazy: message_board.js imports it when the Goals face is chosen. */
 import { state } from './state.js';
-import { boardFetch, keyLabel } from './server_base.js';
+import { boardFetch, keyLabel, splitKey, LOCAL_SERVER } from './server_base.js';
 import { setRowCurrent, OPERATOR_ID } from './utils.js';
+import { onGoalsSeq } from './goals_feed.js';
 import { whenText } from './when_text.js';
 import { toGoalList, toTaskPage, toDrivers, createBody, errorOf, LIST_PATH } from './goals_adapter.js';
 
 const PAGE = 50; // a goal's tasks are drawn this many at a time
 import * as W from './goal_words.js';
 
-const model = { project: '', goals: [], requireGoal: false, filter: 'all', openId: 0, tasks: new Map(), loading: false, failed: '', asOf: '', creating: false };
+const model = { project: '', sig: '', goals: [], requireGoal: false, filter: 'all', openId: 0, tasks: new Map(), loading: false, failed: '', asOf: '', creating: false };
 let root = null;
 
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
@@ -37,18 +38,21 @@ export async function loadGoals() {
     if (!model.project) return;
     const project = model.project;
     model.loading = !model.goals.length;
-    draw();
+    if (model.loading) draw(); // "Loading goals…" only while there is nothing yet: a refresh does not redraw before it has an answer
+    let same = false;
     try {
         const list = toGoalList(await readJson(LIST_PATH));
         if (project !== model.project) return;
-        model.goals = list.goals; model.requireGoal = list.requireGoal; model.failed = ''; model.asOf = clock();
-        if (model.openId && !model.goals.some(g => g.id === model.openId)) model.openId = 0;
+        const sig = JSON.stringify([list.goals, list.requireGoal]);
+        same = !model.failed && !!model.goals.length && sig === model.sig; // nothing changed: the page is left as it is (a redraw would take the keyboard's place)
+        model.sig = sig; model.goals = list.goals; model.requireGoal = list.requireGoal; model.failed = ''; model.asOf = clock();
+        if (model.openId && !model.goals.some(g => g.id === model.openId)) { model.openId = 0; same = false; }
     } catch (e) {
         if (project !== model.project) return;
-        model.failed = W.failedText(e && e.message);
+        model.failed = W.failedText(e && e.message); model.sig = '';
     }
     model.loading = false;
-    draw();
+    if (!same) draw();
     if (model.openId) loadTasks(model.openId);
 }
 
@@ -62,7 +66,9 @@ async function loadTasks(id) {
             page = toTaskPage(await readJson(`/tasks?goal=${encodeURIComponent(id)}&cursor=${encodeURIComponent(cursor)}`));
             rows = rows.concat(page.rows); cursor = page.cursor;
         }
-        model.tasks.set(id, { rows, cursor, shown: before && before.rows ? Math.max(before.shown, PAGE) : PAGE, moreFailed: '' }); // a refresh keeps how many were shown (#7142)
+        const sig = JSON.stringify([rows.map(r => [r.id, r.title, r.assignee, r.state, r.statusLine, r.sessionId]), cursor]);
+        if (before && before.rows && before.sig === sig && !before.moreFailed) return; // the same tasks: nothing to draw again
+        model.tasks.set(id, { rows, cursor, sig, shown: before && before.rows ? Math.max(before.shown, PAGE) : PAGE, moreFailed: '' }); // a refresh keeps how many were shown (#7142)
     } catch (e) {
         model.tasks.set(id, { failed: String((e && e.message) || '') });
     }
@@ -154,12 +160,15 @@ function drawListRaw() {
     }
     col.append(chips);
     const waiting = W.waitingGoals(model.goals);
-    if (waiting.length) {
+    if (waiting.length && (model.filter === 'all' || model.filter === 'blocked')) { // the card follows the filter: a Done filter is not topped by a goal that is blocked (#7223)
         const strip = el('div', 'goals-waiting');
         strip.append(el('h3', 'goals-waiting-head', 'Waiting on you'));
         for (const g of waiting) {
             const row = el('div', 'goals-waiting-row');
-            row.append(el('span', 'goals-waiting-text', `${g.title}: ${g.decision || g.recommendation}`), btn('btn btn-small goals-waiting-open', 'Open the goal', () => openGoal(g.id, true)));
+            const line = W.waitingLine(g), words = el('span', 'goals-waiting-text');
+            if (line.title) words.append(el('strong', 'goals-waiting-title', line.title), document.createTextNode(' '));
+            words.append(document.createTextNode(line.text));
+            row.append(words, btn('btn btn-small goals-waiting-open', 'Open the goal', () => openGoal(g.id, true)));
             strip.append(row);
         }
         col.append(strip);
@@ -224,6 +233,8 @@ function drawDetailRaw() {
     if (g.outcome) { col.append(el('h4', 'goals-sub', 'Outcome'), el('p', 'goals-text', g.outcome)); }
     if (g.doneWhen) { col.append(el('h4', 'goals-sub', 'Done when'), el('p', 'goals-text', g.doneWhen)); }
     col.append(rollupBar(g.rollup), el('p', 'goal-card-sentence', W.rollupSentence(g.rollup)));
+    const openLeft = g.rollup.active + g.rollup.blocked + g.rollup.queued;
+    if ((g.state === 'done' || g.state === 'dropped') && openLeft) col.append(el('p', 'goals-note goals-closed-open', W.closedWithOpenText(openLeft)));
     if (W.waitingGoals([g]).length) {
         const w = el('div', 'goals-waiting goals-waiting-full'); w.append(el('h4', 'goals-sub', 'Waiting on you'));
         if (g.decision) w.append(el('p', 'goals-text', g.decision));
@@ -340,7 +351,7 @@ function openCreate() {
 
 /** Show the board's goals in `host` (the page's #mb-goals) and read them. */
 export function showGoals(host, project) {
-    if (project !== model.project) { Object.assign(model, { project, goals: [], requireGoal: false, filter: 'all', openId: 0, tasks: new Map(), failed: '', asOf: '', loading: false }); }
+    if (project !== model.project) { Object.assign(model, { project, sig: '', goals: [], requireGoal: false, filter: 'all', openId: 0, tasks: new Map(), failed: '', asOf: '', loading: false }); }
     if (!host.dataset.built) {
         host.dataset.built = '1';
         const page = el('div', 'goals-page');
@@ -354,4 +365,23 @@ export function showGoals(host, project) {
     host.hidden = false;
     draw();
     loadGoals();
+    watchGoals(host);
+}
+
+// The view keeps itself current (#7223): when this board's change counter moves in the /ws/coral frames, and when the window comes back to the front; the open goal and how many of its tasks were shown stay.
+let _stop = null, _bound = false, _reading = false, _again = false;
+const bareBoard = () => { const k = splitKey(model.project); return k.server === LOCAL_SERVER ? k.name : ''; };
+function refresh() {
+    if (!root || !root.isConnected || root.closest('[hidden]') || !model.project) return;
+    if (_reading) { _again = true; return; } // one read at a time; a change that came meanwhile is read next
+    _reading = true;
+    loadGoals().finally(() => { _reading = false; if (_again) { _again = false; refresh(); } });
+}
+function watchGoals() {
+    if (_stop) _stop();
+    _stop = onGoalsSeq((board) => { if (board === bareBoard()) refresh(); });
+    if (_bound) return;
+    _bound = true;
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
 }

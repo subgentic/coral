@@ -56,4 +56,8 @@ assert.equal(W.errorWords('some_new_code', 'The server says this'), 'The server 
 assert.equal(W.showMoreText(120), 'Show 50 more'); assert.equal(W.showMoreText(20), 'Show 20 more'); assert.equal(W.showMoreText(0), 'Show 0 more');
 assert.equal(W.tasksShownText(100, 120), 'Showing 100 of 120 tasks');
 assert.equal(W.tasksCappedText(120, 130), 'Showing 120 of 130 tasks. The rest are on the Tasks panel.');
+assert.equal(W.closedWithOpenText(2), 'Closed with 2 tasks still open. They stay open until someone finishes or moves them.'); assert.equal(W.closedWithOpenText(1), 'Closed with 1 task still open. They stay open until someone finishes or moves them.');
+assert.deepEqual(W.waitingLine({ title: 'Cut the release', decision: 'Cut the release on Friday, or wait?' }), { title: '', text: 'Cut the release on Friday, or wait?' }, 'a decision that begins with the title says it once');
+assert.deepEqual(W.waitingLine({ title: 'Fix the flaky suites', decision: 'Spend a day on the slowest suite?' }), { title: 'Fix the flaky suites', text: 'Spend a day on the slowest suite?' });
+assert.deepEqual(W.waitingLine({ title: 'A', recommendation: 'Yes' }), { title: 'A', text: 'Yes' }, 'the recommendation when there is no decision'); assert.deepEqual(W.waitingLine(null), { title: '', text: '' });
 console.log('goal_words: ok');

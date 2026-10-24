@@ -24,6 +24,7 @@ import { isSignedOut } from './overload.js';
 import { recheckSignedOut } from './signed_out.js';
 import { syncUnreachableBanner } from './hub_access.js';
 import { applyMachineHealth } from './machine_health.js';
+import { publishGoalsBrief } from './goals_feed.js';
 import { syncAutoAcceptHeader, noteAutoAcceptPauses } from './auto_accept.js';
 import { pruneTerminalGone, syncTerminalGoneHeader } from './terminal_gone.js';
 import { setText } from './dom_write.js';
@@ -373,6 +374,7 @@ function _syncViewedSession(data) {
 export function handleCoralMessage(data) {
     // This machine's health (#3444, #3446): before a diff is merged into a full update below.
     applyMachineHealth(data);
+    if (data.goals_brief) publishGoalsBrief(data.goals_brief); // a board's goals changed: the Goals view reads them again (#7223)
     {
         // Handle diff updates: merge changed/removed into existing session list
         if (data.type === "coral_diff") {
