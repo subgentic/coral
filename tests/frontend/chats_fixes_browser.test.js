@@ -1,0 +1,57 @@
+// Chats (#7157, UI/UX's #7148 findings 7 to 9): Resume is a quiet button, primary only on the person's last (newest) chat; the copy-branch icon is a 44 px target on a phone; the empty pane's hint is a small
+// grey line, not the page's biggest heading; and at 390 px a long chat title wraps to two lines with the provider badge under it instead of being cut with an ellipsis. Drives Chrome over CDP through
+// agent_view_harness.js with the history list and two chats answered at the page's fetch.
+const assert = require('node:assert/strict');
+const { connect } = require('./agent_view_harness');
+const BASE = require('./test_base').BASE;
+const S = `(window.__coralStatic || '/static/')`;
+
+(async () => {
+    const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const sleep = ms => new Promise(r => setTimeout(r, ms)); // sleep-ok: a chat draws after the click
+    try {
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        for (const [w, h, mobile, font] of [[1280, 900, false, ''], [390, 844, true, ''], [390, 844, true, '32px']]) {
+            const tag = `${w} px${font ? ', 200% text' : ''}`;
+            await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
+            await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            if (font) await ev(`document.documentElement.style.fontSize = '${font}'; true`);
+            await ev(`(() => { const real = window.fetch; const json = o => Promise.resolve(new Response(JSON.stringify(o), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+                const at = (dd, hh) => { const d = new Date(); d.setDate(d.getDate() - dd); d.setHours(hh, 0, 0, 0); return d.toISOString(); };
+                const rows = [ { session_id: 'aaaaaa1', summary_title: 'The newest chat', source_type: 'claude', display_name: 'Ada', last_timestamp: at(0, 14), branch: 'feat/flaky' },
+                    { session_id: 'aaaaaa2', summary_title: 'An older chat', source_type: 'claude', display_name: 'Ada', last_timestamp: at(1, 9), branch: 'feat/flaky' },
+                    { session_id: 'eeeeee1', summary_title: 'An extremely long chat title that goes on and on and on, well past what one row of the sidebar can hold at any size at all', source_type: 'codex', display_name: 'A-long-agent-name', last_timestamp: at(6, 11) } ];
+                const chat = sid => json({ session_id: sid, agent_type: 'claude', messages: [{ type: 'user', content: 'Hello' }, { type: 'assistant', text: 'Hi' }], total: 2, start: 0 });
+                window.fetch = (u, o) => { const p = new URL(String(u), location.href).pathname;
+                    if (p === '/api/sessions/history') return json({ sessions: rows, total: rows.length, page: 1, page_size: 50 });
+                    if (p === '/api/sessions/history/aaaaaa1') return chat('aaaaaa1'); if (p === '/api/sessions/history/aaaaaa2') return chat('aaaaaa2');
+                    if (p.startsWith('/api/sessions/history/aaaaaa1/') || p.startsWith('/api/sessions/history/aaaaaa2/')) return json([]);
+                    return real(u, o); };
+                return true; })()`);
+            await ev(`window.switchNavTab('history'); true`); await sleep(800); // sleep-ok: the list draws after the tab opens
+            await ev(`(async () => { const m = await import(${S} + 'history_list.js'); if (m.loadHistorySessions) await m.loadHistorySessions(); return true; })().catch(() => true)`);
+            await waitFor(`document.querySelectorAll('#history-sessions-list li[data-session-id]').length === 3`, 'three chats', 10000);
+            // the empty pane
+            const empty = await ev(`(() => { const v = document.getElementById('chats-empty-view'); const h = v && v.querySelector('h1'); if (!h || !h.getClientRects().length) return null; const root = parseFloat(getComputedStyle(document.documentElement).fontSize); return { ratio: parseFloat(getComputedStyle(h).fontSize) / root, color: getComputedStyle(h).color, primary: getComputedStyle(document.body).color }; })()`);
+            if (!mobile) { assert.ok(empty && empty.ratio <= 1.25 && empty.color !== empty.primary, `${tag}: the empty pane's hint is a small grey line: ` + JSON.stringify(empty)); }
+            // the long title wraps with the badge below it (a phone)
+            if (mobile) {
+                const row = await ev(`(() => { const li = document.querySelector('#history-sessions-list li[data-session-id="eeeeee1"]'); const l = li.querySelector('.session-label'), b = li.querySelector('.badge'); const lr = l.getBoundingClientRect(), br = b.getBoundingClientRect(); const lh = parseFloat(getComputedStyle(l).lineHeight) || parseFloat(getComputedStyle(l).fontSize) * 1.3; return { lines: Math.round(lr.height / lh), cut: getComputedStyle(l).textOverflow === 'ellipsis' && l.scrollWidth > l.clientWidth + 1, badgeBelow: br.top >= lr.bottom - 2 }; })()`);
+                assert.ok(row.lines === 2 && !row.cut && row.badgeBelow, `${tag}: a long title wraps to two lines with the badge under it: ` + JSON.stringify(row));
+            }
+            // Resume: primary only on the newest chat; the copy-branch icon is a 44 px target on a phone
+            await ev(`window.selectHistorySession('aaaaaa1'); true`);
+            await waitFor(`document.getElementById('btn-resume-session') && document.getElementById('btn-resume-session').getClientRects().length > 0`, 'Resume on the newest chat', 8000); await sleep(300); // sleep-ok: the header settles
+            assert.equal(await ev(`document.getElementById('btn-resume-session').classList.contains('btn-primary')`), true, `${tag}: Resume is the primary button on the newest chat`);
+            if (mobile) {
+                const cb = await ev(`(() => { const b = document.querySelector('#history-session-branch .copy-branch-btn'); const r = b.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height) }; })()`);
+                assert.ok(cb.w >= 44 && cb.h >= 44, `${tag}: the copy-branch icon is a 44 px target: ` + JSON.stringify(cb));
+            }
+            await ev(`window.selectHistorySession('aaaaaa2'); true`);
+            await waitFor(`document.getElementById('history-session-title') && /older/i.test(document.getElementById('history-session-title').textContent)`, 'the older chat', 8000); await sleep(300); // sleep-ok: the header settles
+            assert.equal(await ev(`document.getElementById('btn-resume-session').classList.contains('btn-primary')`), false, `${tag}: Resume is a quiet button on an older chat`);
+        }
+        console.log('PASS chats fixes');
+    } finally { await client.close(); }
+})().catch(e => { console.error(e); process.exit(1); });

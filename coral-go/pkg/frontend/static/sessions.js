@@ -454,6 +454,9 @@ export async function selectHistorySession(sessionId, locator = null) {
     if (resumeBtn) {
         const resumable = historyEntry && (historyEntry.source_type === "claude" || historyEntry.source_type === "codex");
         resumeBtn.style.display = resumable ? "" : "none";
+        // Resume is the page's one primary button only on the person's newest chat (the first of the list); on any other it is a quiet button beside Details (#7157)
+        const newest = (state.historySessionsList || []).find(s => s && s.type !== 'group' && !String(s.session_id || '').startsWith('board:'));
+        resumeBtn.classList.toggle('btn-primary', !!newest && newest.session_id === sessionId);
     }
 
     // Show board link if session was part of a message board

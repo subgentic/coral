@@ -2232,3 +2232,11 @@
 .worktree-dock-body[hidden] { display: none; }
 .worktree-dock-item { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
 .worktree-dock-text { min-width: 0; flex: 1 1 12rem; overflow-wrap: anywhere; }
+
+/* Chats (#7157): the empty pane's hint is a small grey line, not the page's biggest heading; the copy-branch icon is a 44 px target on a phone; and a long chat title wraps to two lines with the badge under it. */
+#chats-empty-view .welcome-header h1 { font-size: 1.125rem; font-weight: 400; color: var(--text-secondary); letter-spacing: normal; }
+@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
+    .copy-branch-btn { min-width: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); }
+    #history-sessions-list .chat-row-title { flex-wrap: wrap; row-gap: 2px; }
+    #history-sessions-list .chat-row-title .session-label { flex: 1 1 100%; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+}
