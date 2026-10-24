@@ -36,13 +36,21 @@ func shim(t *testing.T) string {
 	return p
 }
 
+func pids(ms []member) []uint32 {
+	var out []uint32
+	for _, m := range ms {
+		out = append(out, m.pid)
+	}
+	return out
+}
+
 // waitForDescendants waits until pid has at least n descendants and returns them.
 func waitForDescendants(t *testing.T, pid int, n int) []uint32 {
 	t.Helper()
 	deadline := time.Now().Add(15 * time.Second)
 	for time.Now().Before(deadline) {
 		if d := descendants(uint32(pid)); len(d) >= n {
-			return d
+			return pids(d)
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
@@ -99,7 +107,7 @@ func waitForDescendantsQuiet(cmd *exec.Cmd, n int) []uint32 {
 	for time.Now().Before(deadline) {
 		if cmd.Process != nil {
 			if d := descendants(uint32(cmd.Process.Pid)); len(d) >= n {
-				return d
+				return pids(d)
 			}
 		}
 		time.Sleep(25 * time.Millisecond)
@@ -141,7 +149,7 @@ func TestCollectIgnoresARecycledParentId(t *testing.T) {
 	born := map[uint32]time.Time{10: t0, 11: t0.Add(time.Second), 12: t0.Add(-5 * time.Second), 13: t0.Add(2 * time.Second), 14: t0.Add(time.Second)}
 	procs := []procEntry{{pid: 10, ppid: 1}, {pid: 11, ppid: 10}, {pid: 12, ppid: 10}, {pid: 13, ppid: 11}, {pid: 14, ppid: 99}}
 	got := collect(procs, 10, func(pid uint32) (time.Time, bool) { v, ok := born[pid]; return v, ok })
-	assert.ElementsMatch(t, []uint32{11, 13}, got, "12 is older than its parent (a recycled id) and 14 is nobody's child")
+	assert.ElementsMatch(t, []uint32{11, 13}, pids(got), "12 is older than its parent (a recycled id) and 14 is nobody's child")
 	// A process whose age cannot be read is left alone.
 	got = collect(procs, 10, func(pid uint32) (time.Time, bool) {
 		if pid == 11 {
@@ -150,7 +158,7 @@ func TestCollectIgnoresARecycledParentId(t *testing.T) {
 		v, ok := born[pid]
 		return v, ok
 	})
-	assert.NotContains(t, got, uint32(11))
+	assert.NotContains(t, pids(got), uint32(11))
 }
 
 // Kill is for a command Coral stops itself: the shim and its child both end.
@@ -167,4 +175,24 @@ func TestKillEndsTheShimAndItsChild(t *testing.T) {
 		}
 		assert.False(t, processAlive(k), "the shim's child %d is still running after Kill", k)
 	}
+}
+
+// A process id reused between the finding and the kill is not ended: the creation time is read again on the handle that terminates.
+func TestTerminateSkipsAProcessThatIsNotTheOneFound(t *testing.T) {
+	cmd := exec.Command("ping", "-n", "30", "127.0.0.1")
+	HideWindow(cmd)
+	require.NoError(t, cmd.Start())
+	defer func() { _ = cmd.Process.Kill(); _ = cmd.Wait() }()
+	pid := uint32(cmd.Process.Pid)
+	born, ok := createdAt(pid)
+	require.True(t, ok)
+	terminate(member{pid: pid, born: born.Add(-time.Hour)}) // the id of another, older process
+	time.Sleep(200 * time.Millisecond)
+	assert.True(t, processAlive(pid), "a process whose creation time differs from the one found is left running")
+	terminate(member{pid: pid, born: born})
+	deadline := time.Now().Add(5 * time.Second)
+	for processAlive(pid) && time.Now().Before(deadline) {
+		time.Sleep(50 * time.Millisecond)
+	}
+	assert.False(t, processAlive(pid), "the one that was found is ended")
 }
