@@ -85,15 +85,23 @@ export function driverLine(driver, when) {
 const ERRORS = { goal_title_required: 'A goal needs a title.', goal_text_too_long: 'That is too long: shorten it and try again.', goal_driver_unknown: 'That driver is not on this board.', goal_bad_state: 'That state is not one a goal can have.', goal_not_found: 'That goal is no longer on this board.', goal_closed: 'That goal is closed.', goal_already_closed: 'That goal is already closed.', goal_blocked_on_required: 'A blocked goal says who it waits for.', goal_required: 'This board needs a goal on every task.', local_only: 'This can only be done on this computer.' };
 export const errorWords = (code, sentence) => ERRORS[code] || String(sentence || '').trim() || 'try again';
 
+/** The Goals switch's label on the board's header: "Goals", "Goals 3" (open goals), "Goals 3 · 1 waiting" when a goal waits on the person. */
+export function goalsToggleText(open, waiting) {
+    const o = Math.max(0, Number(open) || 0), w = Math.max(0, Number(waiting) || 0);
+    return `Goals${o ? ` ${o}` : ''}${w ? ` · ${w} waiting` : ''}`;
+}
+/** What the Goals switch is for, as its title. */
+export const goalsToggleTitle = 'What this board is working toward';
+/** The one line under the Goals heading, and the help under the New goal dialog's Driver. */
+export const goalsSubtitle = 'What the team is working toward. Tasks serve a goal.';
+export const driverHelp = 'Driver: the agent who looks after it';
+
 /** A goal that is Closed with tasks still open, said on its page (the close answers with the count, and does not touch them). */
 export const closedWithOpenText = (n) => `Closed with ${plural(n, 'task', 'tasks')} still open. They stay open until someone finishes or moves them.`;
 
-/** One "Waiting on you" row's words: the decision (or the recommendation) once; the goal's title only when the decision does not already begin with it ("Cut the release: Cut the release on Friday..." said it twice). */
+/** One "Waiting on you" row's words: the goal's title (its own line) and the decision, or the recommendation, under it (#7252). */
 export function waitingLine(goal) {
-    const text = String((goal && (goal.decision || goal.recommendation)) || '').trim();
-    const title = String((goal && goal.title) || '').trim();
-    const same = !!title && text.toLowerCase().replace(/\s+/g, ' ').startsWith(title.toLowerCase().replace(/\s+/g, ' '));
-    return { title: same ? '' : title, text };
+    return { title: String((goal && goal.title) || '').trim(), text: String((goal && (goal.decision || goal.recommendation)) || '').trim() };
 }
 
 /** The note under the header when the board refuses tasks without a goal. */
