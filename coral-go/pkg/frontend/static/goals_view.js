@@ -7,6 +7,7 @@ import { boardFetch, keyLabel, splitKey, LOCAL_SERVER } from './server_base.js';
 import { setRowCurrent, OPERATOR_ID } from './utils.js';
 import { browserLocal } from './safe_storage.js';
 import { onGoalsSeq } from './goals_feed.js';
+import { pollEvery } from './overload.js';
 import { whenText } from './when_text.js';
 import { toGoalList, mergeGoalLists, toTaskPage, toDrivers, createBody, errorOf, LIST_PATH } from './goals_adapter.js';
 
@@ -164,6 +165,7 @@ function drawListRaw() {
     for (const f of W.FILTERS) {
         const c = btn('goals-chip', `${W.filterLabel(f)} ${counts[f]}`, () => { model.filter = f; say(W.filterAnnouncement(f, counts[f])); drawList(); });
         c.setAttribute('aria-pressed', String(model.filter === f)); c.dataset.filter = f;
+        if (!counts[f] && f !== 'all') c.classList.add('goals-chip-zero'); // still pressable, quieter than the chips that have goals
         chips.append(c);
     }
     col.append(chips);
@@ -176,7 +178,7 @@ function drawListRaw() {
     if (!model.goals.length) {
         if (!model.failed) {
             const e = el('div', 'goals-empty');
-            e.append(el('p', null, W.noGoalsText), btn('btn btn-primary', 'New goal', () => openCreate()), el('code', 'goals-cmd', W.noGoalsCommand));
+            e.append(el('p', null, W.noGoalsText)); // the header's New goal is the one button; no command line for a person (#7224)
             col.append(e);
         }
         return;
@@ -207,8 +209,7 @@ function taskRow(t) {
     acts.append(openT);
     if (W.taskStateWord(t.state) === 'Done') { li.append(acts); return li; } // a finished task has no agent to open: a long done list is not 120 repeats of "Not running here" (#7142)
     const session = agentFor(t);
-    const ob = btn('btn btn-small goal-open-agent', 'Open the agent', session ? () => openAgent(session) : null); ob.setAttribute('aria-label', `Open the agent for task #${t.id}`);
-    if (!session) { ob.setAttribute('aria-disabled', 'true'); ob.classList.add('is-off'); const why = el('span', 'goal-task-why', 'Not running here'); ob.setAttribute('aria-describedby', (why.id = `goal-why-${t.id}`)); acts.append(ob, why); } else acts.append(ob);
+    if (session) { const ob = btn('btn btn-small goal-open-agent', 'Open the agent', () => openAgent(session)); ob.setAttribute('aria-label', `Open the agent for task #${t.id}`); acts.append(ob); } // no agent here: no disabled button and no line on the row; the list says it once (#7224)
     li.append(acts);
     return li;
 }
@@ -233,12 +234,14 @@ function drawDetailRaw() {
     const openLeft = g.rollup.active + g.rollup.blocked + g.rollup.queued;
     if ((g.state === 'done' || g.state === 'dropped') && openLeft) col.append(el('p', 'goals-note goals-closed-open', W.closedWithOpenText(openLeft)));
     if (W.readyToClose(g) && !isNotYet(g)) col.append(allDoneStrip(g));
-    col.append(el('h4', 'goals-sub', 'Tasks'));
     const tasks = model.tasks.get(g.id);
+    if (!(tasks && tasks.rows && !tasks.rows.length)) col.append(el('h4', 'goals-sub', 'Tasks')); // a goal with no tasks says "No tasks yet" once, under its title (#7224)
     if (!tasks) col.append(el('p', 'goals-note', 'Loading tasks…'));
     else if (tasks.failed !== undefined) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, W.failedText(tasks.failed).replace('Goals', 'Tasks')), btn('btn btn-small', 'Try again', () => loadTasks(g.id))); col.append(f); }
-    else if (!tasks.rows.length) col.append(el('p', 'goals-note', W.noTasksText(g.id)));
+    else if (!tasks.rows.length) { /* said by the rollup sentence above */ }
     else {
+        const live = tasks.rows.filter(t => W.taskStateWord(t.state) !== 'Done'), idle = live.filter(t => !agentFor(t));
+        if (idle.length) col.append(el('p', 'goals-note goals-nobody', W.nobodyWorkingText(idle.length, live.length)));
         const ul = el('ul', 'goal-tasks'); ul.setAttribute('aria-label', `Tasks of ${g.title}`); for (const t of tasks.rows.slice(0, tasks.shown)) ul.append(taskRow(t)); col.append(ul);
         const total = taskTotal(g, tasks), left = Math.max(tasks.rows.length - tasks.shown, 0) || (tasks.cursor ? Math.max(total - tasks.shown, 1) : 0);
         if (left) col.append(btn('btn goals-more', W.showMoreText(left, PAGE), () => showMoreTasks(g.id)));
@@ -459,6 +462,8 @@ function watchGoals() {
     _stop = onGoalsSeq((board) => { if (board === bareBoard()) refresh(); });
     if (_bound) return;
     _bound = true;
+    pollEvery(() => { if (root && root.isConnected && !root.closest('[hidden]')) draw(); }, 60000); // "just now" and the times on the cards move on by the minute, without a read
+    pollEvery(refresh, 30000); // a slow safety read: a claim or a review of a linked task does not move the board's seq (QA's #7236), and a read that finds the same draws nothing
     window.addEventListener('focus', refresh);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
 }

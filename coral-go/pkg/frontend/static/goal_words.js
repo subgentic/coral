@@ -55,8 +55,6 @@ export const filteredEmpty = (which, total) => ({ text: `No ${which} goals`, act
 
 /** The list's line when the board has no goals at all. */
 export const noGoalsText = 'No goals yet. A goal says what the team is for and when it is done; tasks belong to it.';
-/** The terminal line shown under it (the same fields as New goal). */
-export const noGoalsCommand = 'coral-board goal add "title" --done-when "..."';
 
 /** The button under a long task list: "Show 50 more" (never more than the page, never more than is left). */
 export const showMoreText = (left, page = 50) => `Show ${Math.min(page, Math.max(0, left))} more`;
@@ -65,8 +63,8 @@ export const tasksShownText = (shown, total) => `Showing ${shown} of ${total} ta
 /** Under the list when the route sent fewer tasks than the goal's rollup counts (its cap): honest about it, and where the rest are. */
 export const tasksCappedText = (shown, total) => `Showing ${shown} of ${total} tasks. The rest are on the Tasks panel.`;
 
-/** A goal's task list when it has none. */
-export const noTasksText = (id) => `No tasks in this goal yet. Add one with coral-board task add "title" --goal ${Number(id) || 0}.`;
+/** One line over a goal's open tasks when no agent on this computer works on some of them (said once, not on every row): "Nobody is working on these yet", or "Nobody is working on 2 of these yet". */
+export const nobodyWorkingText = (idle, open) => (idle >= open ? 'Nobody is working on these yet' : `Nobody is working on ${idle} of these yet`);
 
 /** The failed read: "Goals could not be read: <reason>", and the line that marks a list kept on screen from before: "as of 14:32". */
 export const failedText = (reason) => { const r = String(reason || '').trim(); return r ? `Goals could not be read: ${r}` : 'Goals could not be read'; };

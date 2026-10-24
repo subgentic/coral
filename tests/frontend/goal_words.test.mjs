@@ -39,8 +39,7 @@ assert.equal(W.filterAnnouncement('dropped', 0), 'No dropped goals'); assert.equ
 assert.deepEqual(W.filteredEmpty('dropped', 4), { text: 'No dropped goals', action: 'Show all 4' });
 
 assert.match(W.noGoalsText, /^No goals yet\. A goal says what the team is for and when it is done; tasks belong to it\.$/);
-assert.equal(W.noGoalsCommand, 'coral-board goal add "title" --done-when "..."');
-assert.equal(W.noTasksText(4), 'No tasks in this goal yet. Add one with coral-board task add "title" --goal 4.');
+assert.equal(W.nobodyWorkingText(3, 3), 'Nobody is working on these yet'); assert.equal(W.nobodyWorkingText(2, 5), 'Nobody is working on 2 of these yet');
 assert.equal(W.failedText('timed out'), 'Goals could not be read: timed out'); assert.equal(W.failedText(''), 'Goals could not be read');
 assert.equal(W.asOfText('14:32'), 'as of 14:32'); assert.equal(W.asOfText(''), '');
 assert.equal(W.driverLine('Orchestrator', 'today 14:32'), 'Driver: Orchestrator · today 14:32');
