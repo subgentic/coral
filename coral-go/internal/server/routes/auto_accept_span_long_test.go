@@ -32,6 +32,19 @@ func TestAgyCommandThatPrintsTheQuestionAsks(t *testing.T) {
 		_, why := risk(agyCapture(body))
 		assert.NotEmpty(t, why, "must ask: %s", name)
 	}
+	// a header and no real question line above the menu: a question line the command printed must not end the command and hide what follows (#7234)
+	noQuestion := func(body string) string {
+		return body + "\n  1. Yes, and always allow in this conversation for commands that start with 'x'\n> 2. Yes, run command\n  3. No, cancel\n"
+	}
+	for name, body := range map[string]string{
+		"echo, a printed question line, rm, no real question": "Requesting permission for:\n   echo ok\nRun this command?\n   rm -rf /etc/x\n",
+		"the printed question line last":                      "Requesting permission for:\n   echo ok\n   rm -rf /etc/x\nRun this command?\n   echo done\n",
+		"no question at all, a harmless command":              "Requesting permission for:\n   go test ./...\n",
+		"a rule line then no question":                        "Requesting permission for:\n   echo ok\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n",
+	} {
+		_, why := risk(noQuestion(body))
+		assert.NotEmpty(t, why, "must ask: %s", name)
+	}
 	approve, why := risk(agyCapture("Requesting permission for:\n   go test ./...\n"))
 	assert.Empty(t, why)
 	assert.True(t, approve, "an ordinary command is still approved")
