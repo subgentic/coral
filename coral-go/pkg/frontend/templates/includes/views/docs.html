@@ -2,6 +2,8 @@
 <!-- Documentation View -->
 <div id="docs-view" class="docs-view" style="display:none">
     <div class="docs-toolbar">
+        <!-- On a phone the sidebar (and its list of topics) is not on screen: this opens the same topics as a sheet (#7162) -->
+        <button type="button" class="btn btn-small docs-topics-btn" id="docs-topics-btn" data-on-click="docs-topics" aria-haspopup="dialog">Topics</button>
         <button type="button" class="btn btn-small" id="docs-copy-agent-line" data-on-click="docs-copy-agent-line" title="Copies one line you can paste to an agent so it can read these docs">
             <span class="material-icons" aria-hidden="true">content_copy</span> Copy docs line for agents
         </button>

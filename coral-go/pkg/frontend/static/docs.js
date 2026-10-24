@@ -121,7 +121,8 @@ export function openDoc(name) {
     if (doc && doc.name !== selectedDoc) selectDoc(doc.name, { noteRoute: false });
 }
 
-export async function selectDoc(name, { noteRoute = true } = {}) {
+export async function selectDoc(name, { noteRoute = true, focusHeading = false } = {}) {
+    const acted = focusHeading || !!document.activeElement?.closest?.('#docs-content, .docs-topics-dialog'); // a person chose this page from a link or the topics sheet: they are told where they landed (#7162); the sidebar's list keeps the focus on the topic (docs_a11y)
     selectedDoc = name;
     const hadFocus = !!document.activeElement?.closest?.('#docs-nav-list'); // the list is drawn again: focus goes back to the topic that was opened
     renderDocNav();
@@ -146,10 +147,14 @@ export async function selectDoc(name, { noteRoute = true } = {}) {
     const html = renderDocsMarkdown(doc.content);
     if (html !== null) {
         content.innerHTML = html;
+        wrapTables(content);
     } else {
         // Fallback: pre-formatted text
         content.innerHTML = '<pre style="white-space:pre-wrap">' + esc(doc.content) + '</pre>';
     }
+
+    const h1 = content.querySelector('h1');
+    if (acted && h1) { h1.tabIndex = -1; h1.focus(); } // the new page's heading takes the focus (the link they pressed is gone with the old page)
 
     // Highlight code blocks once highlight.js has loaded (they show plain until
     // then, and stay plain if it cannot load).
@@ -164,10 +169,48 @@ export async function copyDocsLine() {
     else showToast('Could not copy: select the text in the hint and copy it', true);
 }
 
+// ── Tables and topics on a phone (#7162) ───────────────────────────────
+
+/** Each table sits in a labelled, focusable scroll region (a keyboard reaches what overflows) with a visible line that says it scrolls sideways, drawn only while it does. */
+function wrapTables(content) {
+    content.querySelectorAll('table').forEach((table, i) => {
+        const wrap = document.createElement('div'); wrap.className = 'docs-table-wrap';
+        wrap.tabIndex = 0; wrap.setAttribute('role', 'region');
+        const first = (table.querySelector('th') || {}).textContent;
+        wrap.setAttribute('aria-label', `Table ${i + 1}${first ? `: ${first.trim()}` : ''}, scrolls sideways`);
+        const hint = document.createElement('p'); hint.className = 'docs-table-hint'; hint.hidden = true; hint.textContent = 'Scroll sideways to see every column';
+        table.replaceWith(wrap); wrap.append(table);
+        wrap.before(hint);
+        const sync = () => { hint.hidden = !(wrap.scrollWidth > wrap.clientWidth + 1); };
+        sync(); requestAnimationFrame(sync); window.addEventListener('resize', () => { if (wrap.isConnected) sync(); });
+    });
+}
+
+/** The topics as a sheet, for a phone (the sidebar's list is not on screen there): a button per topic; the open one says so. */
+function openTopics() {
+    if (!docsList.length) return;
+    const dlg = document.createElement('dialog'); dlg.className = 'docs-topics-dialog'; dlg.setAttribute('aria-labelledby', 'docs-topics-title');
+    const title = document.createElement('h3'); title.id = 'docs-topics-title'; title.textContent = 'Topics';
+    const ul = document.createElement('ul'); ul.className = 'docs-topics-list';
+    for (const d of docsList) {
+        const li = document.createElement('li');
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'btn docs-topic'; b.textContent = d.title || d.name;
+        if (d.name === selectedDoc) b.setAttribute('aria-current', 'true');
+        b.addEventListener('click', () => { dlg.dataset.picked = '1'; dlg.close(); selectDoc(d.name, { focusHeading: true }); });
+        li.append(b); ul.append(li);
+    }
+    const close = document.createElement('button'); close.type = 'button'; close.className = 'btn'; close.textContent = 'Close'; close.addEventListener('click', () => dlg.close());
+    dlg.append(title, ul, close); document.body.append(dlg);
+    dlg.addEventListener('close', () => { const picked = dlg.dataset.picked === '1'; dlg.remove(); if (!picked) document.getElementById('docs-topics-btn')?.focus(); }); // a topic chosen: the new page's heading has the focus, not this button
+    dlg.showModal();
+    (ul.querySelector('[aria-current]') || ul.querySelector('button'))?.focus();
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────
 
 // A doc in the Docs list (#3645).
 registerActions({
+    'docs-topics': () => openTopics(),
     'doc-open': el => { const d = textOf(el.dataset.doc, 200); if (d) window.selectDoc(d); },
     'doc-open-key': (el, event) => {
         if (event.target === el && ['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) { // between the topics: the one Tab stop goes with the focus
