@@ -15,3 +15,5 @@ func guardTrayWindow() {}
 func takeInstallMark() {}
 
 func takeLaunchPending() bool { return false }
+
+func allowTrayWindowClose() {}

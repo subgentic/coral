@@ -302,6 +302,7 @@ var quitAsked atomic.Bool
 
 func quit() {
 	quitAsked.Store(true)
+	allowTrayWindowClose() // the library's Quit posts WM_CLOSE to the tray window; a WM_CLOSE posted by anything else is dropped (#346)
 	systray.Quit()
 }
 
@@ -565,7 +566,7 @@ func runForeground(host string, port int, noBrowser, debugMode bool, backendType
 		exitOnce.Do(func() {
 			closedBySystem := !quitAsked.Load()
 			if closedBySystem {
-				log.Printf("[TRAY] Windows asked Coral to close (an installer's Restart Manager, or the end of the session)")
+				log.Printf("[TRAY] Windows ended the session or an installer's Restart Manager closed Coral (WM_ENDSESSION)")
 				onSystemClose()
 			}
 			killCoralApp()
@@ -573,6 +574,7 @@ func runForeground(host string, port int, noBrowser, debugMode bool, backendType
 			log.Println("coral-tray exited")
 			if closedBySystem && runtime.GOOS == "windows" {
 				// The library ran this from WM_ENDSESSION and keeps its message loop going: end it, so this process exits and frees its files (#335).
+				allowTrayWindowClose()
 				safego.Go("coral-tray/systray-quit", systray.Quit)
 			}
 		})
