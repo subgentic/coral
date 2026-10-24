@@ -85,6 +85,17 @@ export function driverLine(driver, when) {
 const ERRORS = { goal_title_required: 'A goal needs a title.', goal_text_too_long: 'That is too long: shorten it and try again.', goal_driver_unknown: 'That driver is not on this board.', goal_bad_state: 'That state is not one a goal can have.', goal_not_found: 'That goal is no longer on this board.', goal_closed: 'That goal is closed.', goal_already_closed: 'That goal is already closed.', goal_blocked_on_required: 'A blocked goal says who it waits for.', goal_required: 'This board needs a goal on every task.', local_only: 'This can only be done on this computer.' };
 export const errorWords = (code, sentence) => ERRORS[code] || String(sentence || '').trim() || 'try again';
 
+/** A goal that is Closed with tasks still open, said on its page (the close answers with the count, and does not touch them). */
+export const closedWithOpenText = (n) => `Closed with ${plural(n, 'task', 'tasks')} still open. They stay open until someone finishes or moves them.`;
+
+/** One "Waiting on you" row's words: the decision (or the recommendation) once; the goal's title only when the decision does not already begin with it ("Cut the release: Cut the release on Friday..." said it twice). */
+export function waitingLine(goal) {
+    const text = String((goal && (goal.decision || goal.recommendation)) || '').trim();
+    const title = String((goal && goal.title) || '').trim();
+    const same = !!title && text.toLowerCase().replace(/\s+/g, ' ').startsWith(title.toLowerCase().replace(/\s+/g, ' '));
+    return { title: same ? '' : title, text };
+}
+
 /** The note under the header when the board refuses tasks without a goal. */
 export const requireGoalNote = 'Tasks without a goal are refused on this board (require a goal is on).';
 /** The line that says the other boards are elsewhere, drawn only while the Hub is connected. */
