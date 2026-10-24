@@ -227,13 +227,9 @@ func (h *BoardHandler) UpdateBoardSettings(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	viaHub := cloud.Tunneled(r)
-	touchesCrossTeam := body.CrossTeamMessaging != nil || body.CrossTeamServers != nil || body.CrossTeamArtifacts != nil || body.CrossTeamAllowed != nil
+	touchesCrossTeam := body.CrossTeamMessaging != nil || body.CrossTeamServers != nil || body.CrossTeamArtifacts != nil || body.CrossTeamAllowed != nil || body.RequireGoal != nil // whether a board requires a goal is the owner's through Coral Hub too (the operator, 2026-10-24, #7329)
 	var hubID callerIdentity
 	if viaHub {
-		if body.RequireGoal != nil { // whether a board requires a goal for every task is decided on this computer, on or off (#7116)
-			writeJSON(w, http.StatusForbidden, map[string]string{"code": "local_only", "error": "require_goal can be changed only on this computer, not through Coral Hub"})
-			return
-		}
 		if touchesCrossTeam {
 			// Coral Hub is the authority for cross-team settings (the operator's decision of 2026-10-24, #7329, reversing #3377 and #4379): the owner of this computer (on a team's machine, the owner or an admin of
 			// the organisation: hubOwnerRequest) may set them through the settings route, as through the four switch routes, under the same local lock, the same rate limit, a record naming the hub user and a
@@ -325,7 +321,7 @@ func (h *BoardHandler) UpdateBoardSettings(w http.ResponseWriter, r *http.Reques
 			return
 		}
 	}
-	if body.RequireGoal != nil && *body.RequireGoal != beforeRequire.RequireGoal {
+	if body.RequireGoal != nil && *body.RequireGoal != beforeRequire.RequireGoal && !viaHub { // through Coral Hub the record names the hub user (recordHubSettings)
 		// Who changed it and when, in the board's settings log like the other owner changes (#7116).
 		actor := callerActor(r).Name
 		if actor == "" {
@@ -756,6 +752,9 @@ func (h *BoardHandler) recordHubSettings(w http.ResponseWriter, r *http.Request,
 	if u.CrossTeamArtifacts != nil && before.CrossTeamArtifacts != *u.CrossTeamArtifacts {
 		switches = append(switches, board.SwitchChange{Key: board.SwitchFiles, Old: before.CrossTeamArtifacts, New: *u.CrossTeamArtifacts})
 	}
+	if u.RequireGoal != nil && before.RequireGoal != *u.RequireGoal {
+		edits = append(edits, board.HubSettingsEdit{Field: "require_goal", Old: fmt.Sprint(before.RequireGoal), New: fmt.Sprint(*u.RequireGoal)})
+	}
 	if u.CrossTeamAllowed != nil && allowedForLog(before.CrossTeamAllowed) != allowedForLog(after.CrossTeamAllowed) {
 		edits = append(edits, board.HubSettingsEdit{Field: "cross_team_allowed", Old: allowedForLog(before.CrossTeamAllowed), New: allowedForLog(after.CrossTeamAllowed)})
 	}
@@ -778,6 +777,9 @@ func (h *BoardHandler) recordHubSettings(w http.ResponseWriter, r *http.Request,
 		if u.CrossTeamAllowed != nil {
 			undo.CrossTeamAllowed = &before.CrossTeamAllowed
 		}
+		if u.RequireGoal != nil {
+			undo.RequireGoal = &before.RequireGoal
+		}
 		if _, uerr := h.bs.UpdateBoardSettings(ctx, project, undo); uerr != nil {
 			slog.Error("[cloud] could not undo a Coral Hub settings change that was not recorded", "board", project, "error", uerr)
 		}
@@ -790,8 +792,11 @@ func (h *BoardHandler) recordHubSettings(w http.ResponseWriter, r *http.Request,
 	}
 	for _, e := range edits {
 		what := "the servers it accepts messages from"
-		if e.Field == "cross_team_allowed" {
+		switch e.Field {
+		case "cross_team_allowed":
 			what = "who may message it (the allow-list)"
+		case "require_goal":
+			what = "whether it requires a goal for every task"
 		}
 		notices = append(notices, textHubSettingsNotice(id.pseudo, what))
 	}

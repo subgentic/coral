@@ -121,10 +121,21 @@ func TestNobodyButTheOwnerChangesCrossTeamSettingsThroughTheHub(t *testing.T) {
 	actions, _ := h.bs.RecentHubOperatorActions(ctx, 5)
 	assert.Empty(t, actions, "a refusal records no change")
 
-	// require_goal stays on this computer, the owner's request included.
+	// require_goal is the owner's through the Hub too, and nobody else's (#7329).
+	for name, hdr := range map[string]map[string]string{"a grantee": granteeHeaders(), "another label": ownerHeaders("hub-user-9999ffff"), "no marker": noMarker} {
+		code, out := boardCall(t, h, http.MethodPut, `{"subscriber_id":"Operator","require_goal":true}`, hdr)
+		assert.Equal(t, 403, code, name)
+		assert.Equal(t, "owner_only", out["code"], name)
+	}
+	rg, _ := h.bs.GetBoardSettings(ctx, "team")
+	assert.False(t, rg.RequireGoal)
 	code, out := boardCall(t, h, http.MethodPut, `{"subscriber_id":"Operator","require_goal":true}`, ownerHeaders(ownerLabel))
-	assert.Equal(t, 403, code)
-	assert.Equal(t, "local_only", out["code"])
+	assert.Equal(t, 200, code, "%v", out)
+	rg, _ = h.bs.GetBoardSettings(ctx, "team")
+	assert.True(t, rg.RequireGoal)
+	actions, _ = h.bs.RecentHubOperatorActions(ctx, 5)
+	require.NotEmpty(t, actions)
+	assert.Equal(t, ownerLabel, actions[0].HubUser)
 	// This computer is as before.
 	code, _ = boardCall(t, h, http.MethodPut, `{"subscriber_id":"Operator","cross_team_messaging":true}`, nil)
 	assert.Equal(t, 200, code)
@@ -184,7 +195,7 @@ func TestAHubSettingsChangeThatCannotBeRecordedIsUndone(t *testing.T) {
 	_, err = raw.Exec(`CREATE TRIGGER no_hub_actions BEFORE INSERT ON hub_operator_actions BEGIN SELECT RAISE(ABORT, 'cannot record'); END`)
 	require.NoError(t, err)
 
-	code, out := boardCall(t, h, http.MethodPut, `{"subscriber_id":"Operator","cross_team_messaging":true,"cross_team_artifacts":true,"cross_team_servers":["srv_abc"]}`, ownerHeaders(ownerLabel))
+	code, out := boardCall(t, h, http.MethodPut, `{"subscriber_id":"Operator","cross_team_messaging":true,"cross_team_artifacts":true,"cross_team_servers":["srv_abc"],"require_goal":true}`, ownerHeaders(ownerLabel))
 	assert.Equal(t, 500, code)
 	assert.Equal(t, "record_failed", out["code"])
 	set, err := bs.GetBoardSettings(ctx, "team")
@@ -192,6 +203,7 @@ func TestAHubSettingsChangeThatCannotBeRecordedIsUndone(t *testing.T) {
 	assert.False(t, set.CrossTeamMessaging, "the change is undone")
 	assert.False(t, set.CrossTeamArtifacts)
 	assert.Empty(t, set.CrossTeamServers)
+	assert.False(t, set.RequireGoal, "require_goal is undone with the rest")
 	msgs, _ := bs.ListMessages(ctx, "team", 50, 0, 0)
 	for _, m := range msgs {
 		assert.False(t, m.Origin != nil && *m.Origin == board.OriginHubNotice, "no notice for a change that was not made")

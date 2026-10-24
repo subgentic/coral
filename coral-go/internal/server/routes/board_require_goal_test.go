@@ -13,9 +13,9 @@ import (
 	"github.com/subgentic/coral/internal/board"
 )
 
-// #7116: the per-board require-a-goal setting. Only this computer changes it, on or off (a tunnelled PUT, the owner's included, is 403 local_only and changes nothing); the change is logged; and a task with no
+// #7116: the per-board require-a-goal setting. This computer changes it, and through Coral Hub the OWNER does (#7329, the operator's decision of 2026-10-24: Coral Hub is the main authority), under the cross-team settings' guards; nobody else; the change is logged; and a task with no
 // goal on a board that requires one is a 400 goal_required with nothing stored.
-func TestRequireGoalIsChangedOnlyOnThisComputer(t *testing.T) {
+func TestRequireGoalIsChangedOnTheComputerAndByTheHubOwnerAlone(t *testing.T) {
 	_, h := setupBoardTestServer(t)
 	withLabel(t, ownerLabel, nil)
 	ctx := context.Background()
@@ -24,36 +24,64 @@ func TestRequireGoalIsChangedOnlyOnThisComputer(t *testing.T) {
 	require.Equal(t, 200, code)
 	assert.Equal(t, false, out["require_goal"], "off by default")
 
+	h.hubCrossTeamLock = func(context.Context) (bool, error) { return true, nil }
+	// Through Coral Hub the OWNER sets it (the operator, 2026-10-24, #7329), under the same guards as the cross-team settings; nobody else does.
 	for _, field := range []string{`"require_goal": true`, `"require_goal": false`, `"require_goal": true, "health": {"on": false}`} {
-		for name, hdr := range map[string]map[string]string{"the owner through the hub": ownerHeaders(ownerLabel), "a grantee": granteeHeaders()} {
+		for name, hdr := range map[string]map[string]string{"a grantee": granteeHeaders(), "another label": ownerHeaders("hub-user-9999ffff")} {
 			code, out = boardCall(t, h, http.MethodPut, `{"subscriber_id":"Operator",`+field+`}`, hdr)
 			assert.Equal(t, 403, code, name+" "+field)
-			assert.Contains(t, []any{"local_only", "owner_only"}, out["code"], name+" "+field)
+			assert.Equal(t, "owner_only", out["code"], name+" "+field)
 		}
 	}
 	got, err := h.bs.GetBoardSettings(ctx, "team")
 	require.NoError(t, err)
 	assert.False(t, got.RequireGoal, "nothing of a refused request is saved")
 
-	// Hub owner, with the owner marker: local_only by name for this setting.
+	// The owner through the hub, with the local lock off: refused by name.
+	h.hubCrossTeamLock = func(context.Context) (bool, error) { return false, nil }
 	code, out = boardCall(t, h, http.MethodPut, `{"subscriber_id":"Operator","require_goal":true}`, ownerHeaders(ownerLabel))
 	assert.Equal(t, 403, code)
-	assert.Equal(t, "local_only", out["code"])
-
-	// This computer: on, then logged, then off.
-	code, out = boardCall(t, h, http.MethodPut, `{"subscriber_id":"Operator","require_goal":true}`, nil)
+	assert.Equal(t, "hub_changes_off", out["code"])
+	h.hubCrossTeamLock = func(context.Context) (bool, error) { return true, nil }
+	// With it on: set, and the log names the hub user, not "Operator".
+	code, out = boardCall(t, h, http.MethodPut, `{"subscriber_id":"Operator","require_goal":true}`, ownerHeaders(ownerLabel))
 	require.Equal(t, 200, code, "%v", out)
 	assert.Equal(t, true, out["require_goal"])
 	log, err := h.bs.ListLog(ctx, "team")
 	require.NoError(t, err)
 	require.Len(t, log, 1)
 	assert.Equal(t, "require_goal", log[0].Field)
+	assert.Equal(t, ownerLabel, log[0].Actor, "the hub user is the actor")
 	assert.Equal(t, "false", log[0].Old)
 	assert.Equal(t, "true", log[0].New)
+	code, _ = boardCall(t, h, http.MethodPut, `{"subscriber_id":"Operator","require_goal":false}`, ownerHeaders(ownerLabel))
+	require.Equal(t, 200, code)
+	got, _ = h.bs.GetBoardSettings(ctx, "team")
+	assert.False(t, got.RequireGoal)
+	log, _ = h.bs.ListLog(ctx, "team")
+	assert.Len(t, log, 2)
+
+	// This computer: on, then logged, then off.
+	code, out = boardCall(t, h, http.MethodPut, `{"subscriber_id":"Operator","require_goal":true}`, nil)
+	require.Equal(t, 200, code, "%v", out)
+	assert.Equal(t, true, out["require_goal"])
+	log, err = h.bs.ListLog(ctx, "team")
+	require.NoError(t, err)
+	require.Len(t, log, 3, "the local change is a row of its own, by the local Operator")
+	local := 0
+	for _, e := range log {
+		if e.Actor != ownerLabel {
+			local++
+			assert.Equal(t, "require_goal", e.Field)
+			assert.Equal(t, "false", e.Old)
+			assert.Equal(t, "true", e.New)
+		}
+	}
+	assert.Equal(t, 1, local)
 	code, _ = boardCall(t, h, http.MethodPut, `{"subscriber_id":"Operator","require_goal":true}`, nil)
 	require.Equal(t, 200, code)
 	log, _ = h.bs.ListLog(ctx, "team")
-	assert.Len(t, log, 1, "a save that changes nothing is not a log row")
+	assert.Len(t, log, 3, "a save that changes nothing is not a log row")
 	code, out = boardCall(t, h, http.MethodPut, `{"subscriber_id":"Operator","require_goal":false}`, nil)
 	require.Equal(t, 200, code)
 	assert.Equal(t, false, out["require_goal"])
