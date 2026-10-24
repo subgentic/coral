@@ -1,5 +1,5 @@
 // Settings > Network and Hub, the groups (#6579 part 2; Security's #6559, UI Accessibility's #6558, the Orchestrator's fold of #6629 LOW 4):
-//   the groups are sections with an h3 (the headings list reads Remote access, [Setup code], Coral Hub, Manage other computers), Coral Hub first on a phone;
+//   the groups are sections with an h5 under the pane's h4 (#7282) (the headings list reads Remote access, [Setup code], Coral Hub, Manage other computers), Coral Hub first on a phone;
 //   Remote access turning on is an explicit act (it waits for Save and says what it then lets in); the setup code is there only while Remote access is on or a Coral Hub link is being made, is not on the screen
 //   until "Show setup code" (a button that says whether it is open), is spelled for a screen reader, is copied with "Copy setup code", and hides itself after a minute; "Manage other computers from this one" says
 //   a hub has full control of those computers; an Operator opt-out is still said on the card when the computer is not linked. 1280 and 390 px; both themes for contrast. Routes are stood in at the page's fetch.
@@ -15,7 +15,7 @@ const BASE = require('./test_base').BASE;
     const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); true`); fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const text = sel => ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); return e ? e.textContent.replace(/\\s+/g, ' ').trim() : null; })()`);
     const vis = sel => `(() => { const e = document.querySelector(${JSON.stringify(sel)}); return !!e && e.checkVisibility(); })()`;
-    const headings = () => ev(`[...document.querySelectorAll('#settings-pane-network h3')].filter(h => h.checkVisibility()).map(h => h.textContent.replace(/\\s+/g, ' ').trim())`);
+    const headings = () => ev(`[...document.querySelectorAll('#settings-pane-network h5.net-group-title')].filter(h => h.checkVisibility()).map(h => h.textContent.replace(/\\s+/g, ' ').trim())`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) {
