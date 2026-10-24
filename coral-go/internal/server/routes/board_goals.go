@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -290,29 +291,66 @@ func (h *BoardHandler) UpdateGoal(w http.ResponseWriter, r *http.Request) {
 		Decision       *string `json:"decision"`
 		Recommendation *string `json:"recommendation"`
 		IfSilent       *string `json:"if_silent"`
+		Answer         *string `json:"answer"`
 		SubscriberID   string  `json:"subscriber_id"`
 	}
 	// a field that cannot be changed (id, goal_uid, board_id, closed_at) or is mistyped is refused by name, not dropped (#7239)
 	if err := decodeJSONStrict(r, &body); err != nil {
 		if name, ok := strings.CutPrefix(err.Error(), "json: unknown field "); ok {
-			errBadRequest(w, fmt.Sprintf("unknown field %s: a goal's title, outcome, done_when, state, blocked_on, driver, decision, recommendation, if_silent and subscriber_id can be sent", shortKey(strings.Trim(name, `"`))))
+			errBadRequest(w, fmt.Sprintf("unknown field %s: a goal's title, outcome, done_when, state, blocked_on, driver, decision, recommendation, if_silent, answer and subscriber_id can be sent", shortKey(strings.Trim(name, `"`))))
 			return
 		}
 		errBadRequest(w, "invalid JSON")
 		return
 	}
-	if _, ok := h.goalActor(w, r, project, body.SubscriberID); !ok {
+	actor, ok := h.goalActor(w, r, project, body.SubscriberID)
+	if !ok {
 		return
 	}
-	g, err := h.bs.UpdateGoal(r.Context(), project, id, board.GoalUpdate{Title: body.Title, Outcome: body.Outcome, DoneWhen: body.DoneWhen, State: body.State, BlockedOn: body.BlockedOn,
-		Driver: body.Driver, Decision: body.Decision, Recommendation: body.Recommendation, IfSilent: body.IfSilent})
+	g, was, err := h.bs.UpdateGoalWithBefore(r.Context(), project, id, board.GoalUpdate{Title: body.Title, Outcome: body.Outcome, DoneWhen: body.DoneWhen, State: body.State, BlockedOn: body.BlockedOn,
+		Driver: body.Driver, Decision: body.Decision, Recommendation: body.Recommendation, IfSilent: body.IfSilent, Answer: body.Answer})
 	if err != nil {
 		if !goalError(w, err) {
 			errInternalServer(w, err.Error())
 		}
 		return
 	}
+	if body.Answer != nil { // the store accepted it, so this write moved a blocked goal to active: one message tells the driver
+		h.postGoalLine(r, project, actor, goalAnswerLine(was, g))
+	}
 	writeJSON(w, http.StatusOK, g)
+}
+
+// goalAnswerLine is the board message for an answered goal: who it is for (the driver, else what the goal waited on), the goal, the question it waited on and the answer.
+func goalAnswerLine(was, now *board.Goal) string {
+	to := was.Driver
+	if to == "" {
+		to = was.BlockedOn
+	}
+	question := was.Decision
+	if question == "" {
+		question = "(waiting on " + was.BlockedOn + ")"
+	}
+	return "@" + to + " Goal #" + strconv.FormatInt(now.ID, 10) + " \"" + now.Title + "\" is active again. You were waiting on: " + question + " Answer: " + now.Answer
+}
+
+// postGoalLine posts a board message for a goal change, as the person who made it: the Operator or an orchestrator by name, or through Coral Hub the Operator with the Hub user noted, as a chat post is.
+// The goal write is done and answered either way: a message that cannot be posted is logged, not made the write's failure.
+func (h *BoardHandler) postGoalLine(r *http.Request, project, actor, content string) {
+	var err error
+	if cloud.Tunneled(r) {
+		user := hubOperatorUser(r)
+		_, err = h.bs.PostHubMessage(r.Context(), project, user, HubOperatorPrefix(user)+content, nil, true)
+	} else {
+		_, err = h.bs.PostMessage(r.Context(), project, actor, content, nil)
+	}
+	if err != nil {
+		slog.Warn("goal board message not posted", "project", project, "error", err)
+		return
+	}
+	if h.notifyFn != nil {
+		h.notifyFn(project)
+	}
 }
 
 // CloseGoal: POST /api/board/{project}/goals/{goalID}/close. A goal with open tasks is closed all the same: the answer says how many were open, so the caller can warn.
@@ -331,7 +369,8 @@ func (h *BoardHandler) CloseGoal(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, "invalid JSON")
 		return
 	}
-	if _, ok := h.goalActor(w, r, project, body.SubscriberID); !ok {
+	actor, ok := h.goalActor(w, r, project, body.SubscriberID)
+	if !ok {
 		return
 	}
 	g, open, err := h.bs.CloseGoal(r.Context(), project, id, body.Reason, body.State)
@@ -341,6 +380,11 @@ func (h *BoardHandler) CloseGoal(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	noun := "open tasks"
+	if open == 1 {
+		noun = "open task"
+	}
+	h.postGoalLine(r, project, actor, "Goal #"+strconv.FormatInt(g.ID, 10)+" \""+g.Title+"\" is closed as "+g.State+": "+g.ClosedReason+" ("+strconv.Itoa(open)+" "+noun+" left)")
 	writeJSON(w, http.StatusOK, map[string]any{"goal": g, "open_tasks": open})
 }
 
