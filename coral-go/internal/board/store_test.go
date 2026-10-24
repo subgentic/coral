@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -1330,6 +1331,13 @@ func TestCreateTaskChecksThePriority(t *testing.T) {
 		assert.Contains(t, err.Error(), "invalid priority", bad)
 		assert.NotContains(t, err.Error(), "CHECK", bad)
 	}
+	// The caller's text is echoed quoted and cut (QA's #7213 2b): no raw ESC, NUL or bidi override, and a long value is not sent back whole.
+	_, err := s.CreateTask(ctx, "proj", "Task", "", "a\x1b[31m\x00\u202e"+strings.Repeat("x", 3000), "alice")
+	require.Error(t, err)
+	assert.Less(t, len(err.Error()), 200)
+	assert.NotContains(t, err.Error(), "\x1b")
+	assert.NotContains(t, err.Error(), "\x00")
+	assert.NotContains(t, err.Error(), "\u202e")
 	var n int
 	require.NoError(t, s.db.QueryRow(`SELECT COUNT(*) FROM board_tasks WHERE board_id = 'proj'`).Scan(&n))
 	assert.Zero(t, n)

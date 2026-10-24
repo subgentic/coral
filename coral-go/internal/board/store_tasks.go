@@ -55,7 +55,11 @@ func checkPriority(priority string) error {
 	case "critical", "high", "medium", "low":
 		return nil
 	}
-	return fmt.Errorf("invalid priority: %s (use critical, high, medium or low)", priority)
+	shown := priority
+	if r := []rune(shown); len(r) > 40 {
+		shown = string(r[:40]) + "…" // the caller's text is echoed quoted and cut: control characters and a very long value do not come back raw
+	}
+	return fmt.Errorf("invalid priority: %q (use critical, high, medium or low)", shown)
 }
 
 // CreateTask inserts a task and returns it.
