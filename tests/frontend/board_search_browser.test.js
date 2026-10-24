@@ -72,7 +72,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await settle(`document.querySelectorAll('#mb-messages > .mb-message').length >= 50`, 'the latest page');
 
         let s = await snap();
-        check('the tools row has Filters, First and Latest; no results line yet', s.controls.join() === 'Filters,First,Latest' && s.results === null, JSON.stringify([s.controls, s.results]));
+        check('the tools row has Filters, Jump to first and Jump to latest; no results line yet (#7183)', s.controls.join() === 'Filters,Jump to first,Jump to latest' && s.results === null, JSON.stringify([s.controls, s.results]));
         // The retry total: messages with the word retry in any form (the code messages hold it too).
         await type('#bm-search', 'retry');
         await settle(`document.querySelector('#mb-tools .mb-search-results')?.textContent.startsWith('1 of ')`, 'the first result');
@@ -123,7 +123,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         s = await snap();
         const ids = await ev(`[...document.querySelectorAll('#mb-messages > .mb-message')].map(r => Number(r.dataset.messageId))`);
         check('First loads every earlier page and lands on the first message of the board, each once', s.atTop && s.unique && ids[0] === Math.min(...ids) && s.rows >= N, JSON.stringify([s.rows, ids[0], s.atTop]));
-        await ev(`[...document.querySelectorAll('#mb-tools .mb-tool-btn')].find(b => b.textContent === 'Latest').click(); true`);
+        await ev(`[...document.querySelectorAll('#mb-tools .mb-tool-btn')].find(b => b.textContent === 'Jump to latest').click(); true`);
         await settle(`(() => { const c = document.getElementById('mb-messages'); return c.scrollHeight - c.scrollTop - c.clientHeight < 6; })()`, 'Latest: the bottom');
         check('Latest is the bottom of the board', (await snap()).atBottom);
 

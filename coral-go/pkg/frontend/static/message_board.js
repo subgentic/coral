@@ -381,6 +381,8 @@ function renderBoardItem(item, prev) {
     const isLeader = /orchestrator/i.test(agent) || isOperatorId(m.subscriber_id);
     const alignClass = isLeader ? ' board-msg-left' : ' board-msg-right';
     const selectedClass = isSelectMode() && isSelected(m.id) ? ' mb-message-selected' : '';
+    const snippet = String(m.content || '').replace(/\s+/g, ' ').trim().slice(0, 40);
+    const moreLabel = `Actions for the message from ${agent}, ${formatTime(m.created_at)}${snippet ? `: ${snippet}` : ''}`; // each one names its own message (three at one minute are three names)
     const deleteLabel = `Delete the message from ${agent}, ${formatTime(m.created_at)}`; // names the message: the × alone is read as "times"
     const checkbox = isSelectMode() ? `<input type="checkbox" class="mb-select-checkbox" data-msg-id="${Number(m.id)}" ${isSelected(m.id) ? 'checked' : ''} data-on-click="mb-msg-select">` : '';
     return `
@@ -393,10 +395,29 @@ function renderBoardItem(item, prev) {
                 ${messageTimeHtml(m.created_at)}
                 ${BOARD_SAVE_BUTTON(currentProject || '', keyLabel(currentProject || ''), String(m.created_at || ''), String(m.job_title || m.subscriber_id || ''))}
                 <button class="mb-delete-msg-btn" data-on-click="mb-msg-delete" data-msg-id="${Number(m.id)}" title="Delete message" aria-label="${escapeAttr(deleteLabel)}">&times;</button>
+                <button type="button" class="mb-msg-more" data-on-click="mb-msg-more" aria-haspopup="dialog" title="Message actions" aria-label="${escapeAttr(moreLabel)}">&hellip;</button>
             </div>
             <div class="mb-message-body">${renderBoardMessageBody(m)}</div>
             ${messageAttachmentsHtml(m)}
         </div>`;
+}
+
+/** On a phone a message's actions are behind one "..." (#7183): a sheet with Save for later (or Remove from saved) and, set apart below it, Delete. The buttons are the message's own (hidden on a phone): the sheet presses them. */
+function openMessageActions(opener) {
+    const row = opener.closest('.mb-message'); if (!row) return;
+    const messageId = row.dataset.messageId;
+    const save = row.querySelector('.mb-save-btn'), del = row.querySelector('.mb-delete-msg-btn');
+    const dlg = document.createElement('dialog'); dlg.className = 'mb-actions-sheet'; dlg.setAttribute('aria-labelledby', 'mb-actions-title');
+    const title = document.createElement('h3'); title.id = 'mb-actions-title'; title.textContent = (opener.getAttribute('aria-label') || 'Message actions').replace(/^Actions for the m/, 'M').replace(/:.*$/, '');
+    dlg.append(title);
+    const item = (cls, text, target) => { const b = document.createElement('button'); b.type = 'button'; b.className = cls; b.textContent = text; b.addEventListener('click', () => { dlg.close(); target.click(); }); return b; };
+    if (save) dlg.append(item('btn mb-actions-item', save.getAttribute('aria-pressed') === 'true' ? 'Remove from saved' : 'Save for later', save));
+    if (del) { const apart = document.createElement('div'); apart.className = 'mb-actions-apart'; apart.append(item('btn mb-actions-item mb-actions-danger', 'Delete message', del)); dlg.append(apart); }
+    const close = document.createElement('button'); close.type = 'button'; close.className = 'btn mb-actions-item'; close.textContent = 'Close'; close.addEventListener('click', () => dlg.close());
+    dlg.append(close); document.body.append(dlg);
+    dlg.addEventListener('close', () => { dlg.remove(); const back = opener.isConnected ? opener : document.querySelector(`.mb-message[data-message-id="${CSS.escape(String(messageId))}"] .mb-msg-more`); if (back) back.focus(); }); // the list may have been drawn again (a save marks the row): the same message's button gets the focus
+    dlg.showModal();
+    dlg.querySelector('.mb-actions-item')?.focus();
 }
 
 // Where messages[i] is in the list, searching from the end (new rows are at the end).
@@ -1081,6 +1102,7 @@ registerActions({
     'mb-jump-latest': () => jumpToLatest(),
     'mb-msg-select': el => withId(el.dataset.msgId, id => toggleMessageSelect(id, el.checked)),
     'mb-msg-delete': el => withId(el.dataset.msgId, confirmDeleteBoardMessage),
+    'mb-msg-more': el => openMessageActions(el),
     'mb-subscriber-history': el => {
         const s = textOf(el.dataset.session);
         if (s) navigateToAgentSession(s, textOf(el.dataset.name) || '');

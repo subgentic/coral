@@ -25,6 +25,7 @@ const SPEC = {
 const PAGE = 50;
 let _bar = null, _results = null, _status = null, _hooks = null;
 let _project = null, _filters = { ...EMPTY };
+let _toggle = null; // the phone's one "Search" row (#7183): the bar opens under it
 let _list = { ids: [], total: 0, cursor: '', busy: false, error: '', truncated: false }; // the matches, newest first
 let _index = -1; // the match on screen
 let _seq = 0;
@@ -94,6 +95,7 @@ async function run(next) {
     _index = -1;
     _list = { ids: [], total: 0, cursor: '', busy: isFiltered(_filters), error: '' };
     _bar.set(_filters, null);
+    if (isFiltered(_filters)) openTools(true); // a search in use keeps its bar open on a phone
     _hooks.redraw();
     status();
     if (!isFiltered(_filters)) return;
@@ -142,11 +144,13 @@ export function mountBoardSearch(host, project, hooks) {
         _filters = { ...EMPTY }; _list = { ids: [], total: 0, cursor: '', busy: false, error: '' }; _index = -1;
         if (_bar) { _bar.dispose(); _bar = null; }
         _status = null;
+        if (_toggle) { _toggle.remove(); _toggle = null; }
+        host.classList.remove('mb-tools-open');
     }
     if (!_bar) {
         _bar = buildListBar(SPEC, run);
-        const first = make('button', 'list-bar-filter-btn mb-tool-btn', 'First'); first.type = 'button'; first.title = 'The first message of the board';
-        const latest = make('button', 'list-bar-filter-btn mb-tool-btn', 'Latest'); latest.type = 'button'; latest.title = 'The latest message';
+        const first = make('button', 'list-bar-filter-btn mb-tool-btn', 'Jump to first'); first.type = 'button'; first.title = 'Jump to the first message of the board';
+        const latest = make('button', 'list-bar-filter-btn mb-tool-btn', 'Jump to latest'); latest.type = 'button'; latest.title = 'Jump to the latest message';
         first.addEventListener('click', () => _hooks.first());
         latest.addEventListener('click', () => _hooks.latest());
         _bar.controls.append(first, latest);
@@ -162,7 +166,20 @@ export function mountBoardSearch(host, project, hooks) {
         _bar.node.append(_status);
         _bar.set(_filters, null);
     }
+    if (!_toggle) {
+        _toggle = make('button', 'btn mb-search-toggle', 'Search'); _toggle.type = 'button';
+        _toggle.setAttribute('aria-expanded', String(host.classList.contains('mb-tools-open')));
+        _toggle.addEventListener('click', () => { openTools(!host.classList.contains('mb-tools-open')); if (host.classList.contains('mb-tools-open')) _bar.focusSearch(); });
+    }
     if (_bar.node.parentElement !== host) host.append(_bar.node);
+    if (_toggle.parentElement !== host) host.prepend(_toggle);
+}
+
+/** Show or fold the search and its buttons under the phone's Search row (a wider screen always shows them). */
+function openTools(open) {
+    const host = _bar && _bar.node.parentElement; if (!host || !_toggle) return;
+    host.classList.toggle('mb-tools-open', !!open);
+    _toggle.setAttribute('aria-expanded', String(!!open));
 }
 
 /** The board's members, offered in the From field (typed text still works). */
@@ -173,6 +190,7 @@ export function resetBoardSearch() {
     _seq++; _project = null; _filters = { ...EMPTY }; _list = { ids: [], total: 0, cursor: '', busy: false, error: '' }; _index = -1;
     if (_bar) { _bar.dispose(); _bar = null; }
     _status = null;
+    if (_toggle) { _toggle.remove(); _toggle = null; }
 }
 
 export const boardSearchState = () => ({ filters: _filters, ids: _list.ids, total: _list.total, index: _index });

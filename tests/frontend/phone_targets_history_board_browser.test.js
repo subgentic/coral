@@ -13,10 +13,13 @@ const BASE = require('./test_base').BASE;
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
             const r = await ev(`(() => { const host = document.createElement('div'); host.style.cssText = 'position:fixed;left:0;top:60px;width:100%;z-index:99999;background:var(--bg-primary)'; host.innerHTML =
                 '<div class="history-tabs"><button class="history-tab-btn">Summary</button><button class="history-tab-btn">Chat</button></div>' +
-                '<div class="mb-message"><div class="mb-message-header"><span class="mb-agent-name">Operator</span><button class="mb-save-btn" aria-label="Save"><svg viewBox="0 0 16 16"><path d="M3 2h10v12l-5-3-5 3z"/></svg></button><button class="mb-delete-msg-btn" aria-label="Delete">&times;</button></div></div>';
+                '<div class="mb-message"><div class="mb-message-header"><span class="mb-agent-name">Operator</span><button class="mb-save-btn" aria-label="Save"><svg viewBox="0 0 16 16"><path d="M3 2h10v12l-5-3-5 3z"/></svg></button><button class="mb-delete-msg-btn" aria-label="Delete">&times;</button><button class="mb-msg-more" aria-label="Actions">&hellip;</button></div></div>';
                 document.body.append(host); const m = s => { const b = host.querySelector(s).getBoundingClientRect(); return { w: Math.round(b.width), h: Math.round(b.height) }; };
-                const out = { tab: m('.history-tab-btn'), save: m('.mb-save-btn'), del: m('.mb-delete-msg-btn') }; host.remove(); return out; })()`);
-            for (const k of ['tab', 'save', 'del']) {
+                const out = { tab: m('.history-tab-btn'), save: m('.mb-save-btn'), del: m('.mb-delete-msg-btn'), more: m('.mb-msg-more') }; host.remove(); return out; })()`);
+            // on a phone (#7183) a message's Save and Delete are behind one "..." (a 44 px target), not drawn beside each other
+            if (touch) { assert.ok(r.tab.w >= 44 && r.tab.h >= 44 && r.more.w >= 44 && r.more.h >= 44, `${name}: the tab and the "..." are 44 px targets ${JSON.stringify(r)}`); assert.ok(r.save.w === 0 && r.del.w === 0, `${name}: Save and Delete are in the sheet, not drawn ${JSON.stringify(r)}`); }
+            else assert.equal(r.more.w, 0, `${name}: no "..." with a mouse ${JSON.stringify(r.more)}`);
+            for (const k of touch ? [] : ['tab', 'save', 'del']) {
                 if (touch) assert.ok(r[k].w >= 44 && r[k].h >= 44, `${name}: ${k} is a 44 px target ${JSON.stringify(r[k])}`);
                 else assert.ok(r[k].h < 44 || k === 'tab' && r[k].h < 44, `${name}: ${k} is unchanged with a mouse ${JSON.stringify(r[k])}`);
             }

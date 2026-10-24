@@ -7,6 +7,7 @@
    each line can still be selected. */
 
 import { escapeHtml, escapeAttr } from './utils.js';
+import { queueRunWords } from './board_queue_words.js';
 
  const TASK_QUEUE_SENDER = 'Coral Task Queue';
 
@@ -56,14 +57,11 @@ document.addEventListener('toggle', (e) => {
 
 /** One collapsed row for a run of task-queue lines. formatTime formats created_at. */
 export function renderTaskQueueRun(item, formatTime) {
-    const n = item.msgs.length;
-    const summaries = item.msgs.slice(-3).reverse().map(m => summaryOf(m.content));
-    const more = n > 3 ? ` · +${n - 3} more` : '';
-    const label = n === 1 ? summaries[0] : `${n} task updates · ${summaries.join(' · ')}${more}`;
+    const label = queueRunWords(item.msgs.map(m => m.content)) || summaryOf(item.msgs[0] && item.msgs[0].content); // what happened, in words (#7183): never the lines' command text
     const lines = item.msgs.map(m => `
             <div class="mb-queue-line" data-message-id="${escapeAttr(String(m.id))}">
                 <span class="mb-queue-time">${escapeHtml(formatTime(m.created_at))}</span>
-                <span class="mb-queue-text">${escapeHtml(String(m.content || ''))}</span>
+                <span class="mb-queue-text" title="${escapeAttr(String(m.content || ''))}">${escapeHtml(String(m.content || ''))}</span>
             </div>`).join('');
     const open = item.msgs.some(m => openIds.has(String(m.id)));
     return `<details class="mb-queue-run" role="listitem" data-queue-run="${escapeAttr(item.key)}"${open ? ' open' : ''}>

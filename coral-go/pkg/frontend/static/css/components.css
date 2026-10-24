@@ -253,7 +253,7 @@
     overflow-wrap: anywhere;
 }
 .mb-queue-time { flex: none; opacity: 0.8; }
-.mb-queue-text { min-width: 0; white-space: pre-wrap; }
+.mb-queue-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); } /* the queue's own lines are instructions to the agents: one quiet line each, the whole text as its title (#7183) */
 
 .mb-message-header {
     min-width: 0;
@@ -394,6 +394,20 @@
     .mb-message-header { align-items: center; }
     .mb-save-btn, .mb-delete-msg-btn { display: inline-flex; align-items: center; justify-content: center; min-width: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); }
 }
+/* On a phone the message's actions are one "..." (#7183): Delete is never drawn beside Save, and a saved message keeps its filled bookmark as its mark. */
+.mb-msg-more { display: none; }
+@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
+    .mb-message-header .mb-delete-msg-btn, .mb-message-header .mb-save-btn:not([aria-pressed="true"]) { display: none; }
+    .mb-msg-more { display: inline-flex; align-items: center; justify-content: center; min-width: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); margin-left: auto; background: none; border: none; color: var(--text-secondary); font-size: 1.25rem; line-height: 1; cursor: pointer; }
+    .mb-message-header .mb-save-btn[aria-pressed="true"] { margin-left: auto; }
+    .mb-message-header .mb-save-btn[aria-pressed="true"] + .mb-delete-msg-btn + .mb-msg-more { margin-left: 0; }
+}
+.mb-actions-sheet { margin: auto; border: 1px solid var(--border-light); border-radius: var(--radius-lg); background: var(--bg-secondary); color: var(--text-primary); padding: 16px; width: min(380px, calc(100vw - 32px)); }
+.mb-actions-sheet::backdrop { background: rgba(var(--black-rgb), 0.5); }
+.mb-actions-sheet h3 { margin: 0 0 8px; font-size: 1rem; overflow-wrap: anywhere; }
+.mb-actions-item { display: flex; width: 100%; justify-content: flex-start; min-height: var(--control-touch-height, 44px); margin: 0 0 6px; }
+.mb-actions-apart { margin: 14px 0 14px; padding-top: 14px; border-top: 1px solid var(--border); } /* set apart from Save: a destructive action is not one tap beside it */
+.mb-actions-danger { color: var(--error-text); border-color: var(--error); }
 .mb-save-btn svg { width: var(--icon-inline-size, 1rem); height: var(--icon-inline-size, 1rem); }
 .mb-message:hover .mb-save-btn,
 .mb-message:focus-within .mb-save-btn,
@@ -4542,6 +4556,12 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .mb-tools { flex: none; padding: 0 var(--space-md, 12px); }
 .mb-tools:empty { display: none; }
 .mb-tools .list-bar-bar { padding-left: 0; padding-right: 0; }
+/* On a phone the search and its buttons are one "Search" row that opens on a tap (#7183): the messages get the room. A wider screen shows the bar as before. */
+.mb-search-toggle { display: none; }
+@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
+    .mb-search-toggle { display: flex; align-items: center; width: 100%; min-height: var(--control-touch-height, 44px); margin: 4px 0; justify-content: flex-start; }
+    .mb-tools:not(.mb-tools-open) > .list-bar-bar, .mb-tools:not(.mb-tools-open) > .mb-search-status { display: none; }
+}
 .mb-search-status { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .mb-search-status[hidden] { display: none; }
 .mb-search-results { margin-right: auto; font-size: 0.8125rem; font-weight: 600; color: var(--text-primary); }
