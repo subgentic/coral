@@ -198,3 +198,41 @@ func TestABlockedAgainGoalHasNoAnswerUntilItIsAnswered(t *testing.T) {
 	require.Len(t, msgs, before+1)
 	assert.Contains(t, msgs[len(msgs)-1].Content, "Second question?")
 }
+
+// Security's #7280 LOW (the Orchestrator's #7291): with no driver the answer's message names a subscriber of the board, so it reaches someone: what the goal waited on when that is a subscriber, else the
+// goal's creator when they are one; with neither on the board it is a plain line with no mention (a mention of nobody reaches nobody).
+func TestAnAnswerWithNoDriverNamesASubscriberOrNobody(t *testing.T) {
+	for name, tc := range map[string]struct {
+		blockedOn, creator, wantStart string
+		subscribe                     []string
+	}{
+		"blocked on a subscriber":               {"Reviewer", "Orchestrator", "@Reviewer ", []string{"Reviewer", "Orchestrator"}},
+		"blocked on text, creator subscribed":   {"the operator", "Orchestrator", "@Orchestrator ", []string{"Orchestrator"}},
+		"blocked on text, creator not on board": {"the operator", "Ghost", "Goal #", nil},
+	} {
+		t.Run(name, func(t *testing.T) {
+			server, h := setupBoardTestServer(t)
+			ctx := context.Background()
+			registerTaskPlanner(t, h, "team", "Orchestrator")
+			for _, s := range tc.subscribe {
+				if s != "Orchestrator" {
+					_, err := h.bs.Subscribe(ctx, "team", s, "Developer", "s-"+s, nil, "")
+					require.NoError(t, err)
+				}
+			}
+			g, err := h.bs.CreateGoal(ctx, "team", board.GoalInput{Title: "No driver", CreatedBy: tc.creator})
+			require.NoError(t, err)
+			call := goalCall(t, server.URL)
+			code, out := call("PATCH", "/api/board/team/goals/"+itoa(g.ID), map[string]any{"state": "blocked", "blocked_on": tc.blockedOn, "subscriber_id": "Orchestrator"})
+			require.Equal(t, 200, code, "%v", out)
+			before := len(messagesOf(t, h))
+			code, out = call("PATCH", "/api/board/team/goals/"+itoa(g.ID), map[string]any{"state": "active", "answer": "go", "subscriber_id": "Operator"})
+			require.Equal(t, 200, code, "%v", out)
+			msgs := messagesOf(t, h)
+			require.Len(t, msgs, before+1)
+			last := msgs[len(msgs)-1].Content
+			assert.True(t, strings.HasPrefix(last, tc.wantStart), "%q", last)
+			assert.Contains(t, last, "Answer: go")
+		})
+	}
+}

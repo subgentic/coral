@@ -742,10 +742,10 @@ func (s *Store) updateGoal(ctx context.Context, board string, id int64, u GoalUp
 	} else if g.BlockedOn == "" {
 		return nil, ErrGoalBlockedOnRequired
 	}
-	// A write that changes nothing (the same title, an empty body) is not a change: no new updated_at, and the board's change counter does not move (#7239).
 	if g.State == GoalBlocked {
 		g.Answer = "" // a goal that waits again has no answer yet
 	}
+	// A write that changes nothing (the same title, an empty body) is not a change: no new updated_at, and the board's change counter does not move (#7239).
 	if !sameGoalText(before, g) {
 		if _, err := tx.ExecContext(ctx, `UPDATE board_goals SET title = ?, outcome = ?, done_when = ?, state = ?, blocked_on = ?, driver = ?, decision = ?, recommendation = ?, if_silent = ?, answer = ?, closed_at = ?, closed_reason = ?, updated_at = ? WHERE id = ? AND board_id = ?`,
 			g.Title, g.Outcome, g.DoneWhen, g.State, g.BlockedOn, g.Driver, g.Decision, g.Recommendation, g.IfSilent, g.Answer, g.ClosedAt, g.ClosedReason, nowUTC(), id, board); err != nil {

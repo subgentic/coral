@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -316,22 +317,39 @@ func (h *BoardHandler) UpdateGoal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if body.Answer != nil { // the store accepted it, so this write moved a blocked goal to active: one message tells the driver
-		h.postGoalLine(r, project, actor, goalAnswerLine(was, g))
+		h.postGoalLine(r, project, actor, goalAnswerLine(h.goalAnswerTo(r.Context(), project, was), was, g))
 	}
 	writeJSON(w, http.StatusOK, g)
 }
 
 // goalAnswerLine is the board message for an answered goal: who it is for (the driver, else what the goal waited on), the goal, the question it waited on and the answer.
-func goalAnswerLine(was, now *board.Goal) string {
-	to := was.Driver
-	if to == "" {
-		to = was.BlockedOn
+func goalAnswerLine(to string, was, now *board.Goal) string {
+	mention := ""
+	if to != "" {
+		mention = "@" + to + " "
 	}
 	question := was.Decision
 	if question == "" {
 		question = "(waiting on " + was.BlockedOn + ")"
 	}
-	return "@" + to + " Goal #" + strconv.FormatInt(now.ID, 10) + " \"" + now.Title + "\" is active again. You were waiting on: " + question + " Answer: " + now.Answer
+	return mention + "Goal #" + strconv.FormatInt(now.ID, 10) + " \"" + now.Title + "\" is active again. You were waiting on: " + question + " Answer: " + now.Answer
+}
+
+// goalAnswerTo is who the answer's message names: the goal's driver, else what it was blocked on when that is a subscriber of the board, else the one who made the goal when they are one, so the message
+// reaches someone; "" (no mention, a plain board line) when none of them is on the board. A mention of a name that is nobody's reaches no one.
+func (h *BoardHandler) goalAnswerTo(ctx context.Context, project string, was *board.Goal) string {
+	if was.Driver != "" {
+		return was.Driver
+	}
+	for _, name := range []string{strings.TrimSpace(was.BlockedOn), was.CreatedBy} {
+		if name == "" {
+			continue
+		}
+		if sub, _ := h.bs.GetProjectSubscription(ctx, project, name); sub != nil {
+			return sub.SubscriberID
+		}
+	}
+	return ""
 }
 
 // postGoalLine posts a board message for a goal change, as the person who made it: the Operator or an orchestrator by name, or through Coral Hub the Operator with the Hub user noted, as a chat post is.
