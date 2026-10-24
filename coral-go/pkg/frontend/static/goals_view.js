@@ -169,8 +169,8 @@ function drawListRaw() {
         for (const g of waiting) {
             const row = el('div', 'goals-waiting-row');
             const line = W.waitingLine(g), words = el('span', 'goals-waiting-text');
-            if (line.title) words.append(el('strong', 'goals-waiting-title', line.title), document.createTextNode(' '));
-            words.append(document.createTextNode(line.text));
+            if (line.title) words.append(el('strong', 'goals-waiting-title', line.title)); // the goal's name on its own line, the question under it (#7252)
+            words.append(el('span', 'goals-waiting-question', line.text));
             row.append(words, btn('btn btn-small goals-waiting-open', 'Open the goal', () => openGoal(g.id, true)));
             strip.append(row);
         }
@@ -265,7 +265,7 @@ function drawHead() {
     head.replaceChildren();
     const left = el('div', 'goals-head-text');
     const h = el('h2', 'goals-title', 'Goals'); h.tabIndex = -1;
-    left.append(h, el('p', 'goals-sub-line', `This board only · ${W.goalCountLine(model.goals.length, W.waitingGoals(model.goals).length)}`));
+    left.append(h, el('p', 'goals-subtitle', W.goalsSubtitle), el('p', 'goals-sub-line', `This board only · ${W.goalCountLine(model.goals.length, W.waitingGoals(model.goals).length)}`));
     if (state.hubConnected || window.__goalsHub) left.append(el('p', 'goals-note', W.otherBoardsNote));
     head.append(left, btn('btn btn-primary goals-new', 'New goal', () => openCreate()));
     if (model.requireGoal) head.after(Object.assign(el('p', 'goals-note goals-require'), { textContent: W.requireGoalNote }));
@@ -320,10 +320,11 @@ function openCreate() {
     const d = el('input'); d.type = 'text'; d.maxLength = 300; d.autocomplete = 'off';
     const dr = el('select'); dr.disabled = true; dr.append(new Option('Loading this board\'s agents…', '')); // the board's own agents: the route refuses a name that is not a subscriber
     const err = el('p', 'goals-field-error'); err.setAttribute('role', 'alert');
+    const driverNote = el('p', 'goals-note', W.driverHelp); driverNote.id = 'goal-new-driver-help'; dr.setAttribute('aria-describedby', driverNote.id); // what a driver is
     const where = el('p', 'goals-note', `Created on this board: ${keyLabel(model.project)}`);
     const go = btn('btn btn-primary', 'Create goal'); go.type = 'submit';
     const cancel = btn('btn', 'Cancel', () => dlg.close());
-    form.append(title, field('Title (required)', t, 'goal-new-title'), field('Done when (optional): what a person can check', d, 'goal-new-done'), field('Driver (optional)', dr, 'goal-new-driver'), where, err, el('div', 'goals-actions'));
+    form.append(title, field('Title (required)', t, 'goal-new-title'), field('Done when (optional): what a person can check', d, 'goal-new-done'), field('Driver (optional)', dr, 'goal-new-driver'), driverNote, where, err, el('div', 'goals-actions'));
     form.querySelector('.goals-actions').append(cancel, go);
     dlg.append(form); document.body.append(dlg);
     readJson('/subscribers').then(json => {
