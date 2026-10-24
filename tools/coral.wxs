@@ -158,13 +158,12 @@
     <WixVariable Id="WixUIBannerBmp" Value="$(sys.SOURCEFILEDIR)..\assets\installer\WixUIBannerBmp.bmp" />
     <WixVariable Id="WixUIDialogBmp" Value="$(sys.SOURCEFILEDIR)..\assets\installer\WixUIDialogBmp.bmp" />
 
-    <!-- Write EULA acceptance marker after install so coral-app skips its own prompt -->
-    <StandardDirectory Id="SystemFolder" />
-    <CustomAction Id="WriteEULAMarker"
-      Directory="SystemFolder"
-      ExeCommand="cmd.exe /c &quot;if not exist &quot;%USERPROFILE%\.coral&quot; mkdir &quot;%USERPROFILE%\.coral&quot; &amp; echo accepted>&quot;%USERPROFILE%\.coral\.eula-accepted&quot;&quot;"
-      Impersonate="yes"
-      Return="ignore" />
+    <!-- Record the terms accepted on the license page, so coral-app skips its own prompt: coral-msi-helper eula (below), as the person
+         installing; never with an elevated token (msiexec run as administrator), when the Coral window asks instead. It was a cmd.exe line,
+         which opened a console window at every first install (#345). -->
+    <CustomAction Id="WriteEULAMarker" BinaryRef="CoralMsiHelper"
+      ExeCommand="eula"
+      Execute="immediate" Return="ignore" />
     <!-- Closing Coral for the install, and starting it again after (#335). Coral's processes keep its programs open (the tray and its server
          child, the Coral window, an agent's coral-board or hook), and the tray and its server have no window of their own, so Restart Manager
          can't ask them to close and Windows Installer said "unable to automatically close all requested applications" and went on with the

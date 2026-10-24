@@ -5,6 +5,7 @@
 //
 //	coral-msi-helper stop  --folder DIR [--folder DIR] [--wait SECONDS]
 //	coral-msi-helper start
+//	coral-msi-helper eula
 //
 // stop, once the person has allowed the install (for an install before its files-in-use check, for an uninstall after it): closes this
 // user's Coral the normal way. The processes it considers are this user's, in this session, whose program is in one of the Coral folders, each checked on its own handle. Each tray among them (a coral-tray that is not
@@ -20,7 +21,10 @@
 // through explorer.exe (by its full path), which hands it to Windows' unelevated Explorer factory: Coral runs with the signed-in person's own
 // token and environment, as the Start Menu would start it, never the installer's.
 //
-// It always exits 0: the custom actions ignore its exit code. What it did goes to a new coral-msi-helper-<random>.log in this user's
+// eula, after InstallFiles on a first install: records that the person accepted the terms on the license page (see eula below); it
+// replaced a cmd.exe line, which opened a console window and quoted the profile path by hand.
+//
+// It is a GUI program (-H windowsgui), so no custom action opens a console window (#345). It always exits 0: the custom actions ignore its exit code. What it did goes to a new coral-msi-helper-<random>.log in this user's
 // temporary folder.
 package main
 
@@ -40,6 +44,7 @@ import (
 	"golang.org/x/sys/windows"
 
 	"github.com/subgentic/coral/internal/installrestart"
+	"github.com/subgentic/coral/internal/license"
 	"github.com/subgentic/coral/internal/msiproduct"
 	"github.com/subgentic/coral/internal/trayevent"
 )
@@ -48,7 +53,15 @@ func main() {
 	closeLog := openLog()
 	defer closeLog()
 	if len(os.Args) < 2 {
-		log.Printf("usage: coral-msi-helper stop --folder DIR... | start")
+		log.Printf("usage: coral-msi-helper stop --folder DIR... | start | eula")
+		return
+	}
+	if os.Args[1] == "eula" {
+		if len(os.Args) != 2 {
+			log.Printf("eula: bad arguments")
+			return
+		}
+		eula(windows.GetCurrentProcessToken().IsElevated())
 		return
 	}
 	fs := flag.NewFlagSet(os.Args[1], flag.ContinueOnError)
@@ -389,6 +402,22 @@ var installedFolder = func() (string, error) {
 		return "", errors.New(why)
 	}
 	return dir, nil
+}
+
+// eula records that the person accepted the terms on the installer's license page, so the Coral window doesn't ask again
+// (internal/license). With an elevated token (msiexec run as administrator) it writes nothing: the marker's folder is one the person's
+// unelevated programs can write, so an elevated write there could be sent through a link they put in its place, and the folder would be
+// made with the administrators' owner. The Coral window then shows its own terms dialog, as a portable Coral does.
+func eula(elevated bool) {
+	if elevated {
+		log.Printf("eula: elevated: the terms are not recorded (the Coral window asks for them)")
+		return
+	}
+	if err := license.WriteInstallerEULAMarker(); err != nil {
+		log.Printf("eula: %v", err)
+		return
+	}
+	log.Printf("eula: the terms accepted in the installer are recorded")
 }
 
 func start(me identity) {

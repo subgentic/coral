@@ -35,6 +35,15 @@ func onSystemClose() {
 	}
 }
 
+// takeInstallMark removes the installer helper's mark when the installer's own "Launch Coral" starts this tray (the full UI's Finish page,
+// where the helper's start doesn't run): that start is the one the install makes, so a mark left behind would start Coral again at the
+// next quiet install within installrestart.MaxAge, though the person may have quit it meanwhile (#345, step 2).
+func takeInstallMark() {
+	if installrestart.Take(time.Now()) {
+		log.Printf("[TRAY] started by the installer's Launch Coral: the install's restart mark is taken")
+	}
+}
+
 // guardTrayWindow keeps a posted WM_ENDSESSION from the tray icon's window, whose library would end the tray on any (internal/endsession).
 func guardTrayWindow() {
 	if err := endsession.Guard("SystrayClass"); err != nil {

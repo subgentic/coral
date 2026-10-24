@@ -59,3 +59,17 @@ func TestCoralClosesOnlyAfterConsent(t *testing.T) {
 	assert.Contains(t, def, `Impersonate="yes"`)
 	assert.NotRegexp(t, `CustomAction Id="CloseCoralForInstall"[^>]*Impersonate="no"`, wxs)
 }
+
+// No custom action opens a console window (#345: QA's tripwire saw MSI4E1B.tmp's conhost at every install): the EULA marker is written by
+// the helper (a GUI program, tests/release/windows_build_census_test.py and verify_gui_subsystem.ps1), never by cmd.exe or a shell.
+func TestNoCustomActionRunsAConsoleProgram(t *testing.T) {
+	wxs := readWxs(t)
+	def := regexp.MustCompile(`<CustomAction Id="WriteEULAMarker"[^>]*/>`).FindString(wxs)
+	require.NotEmpty(t, def)
+	assert.Contains(t, def, `BinaryRef="CoralMsiHelper"`)
+	assert.Contains(t, def, `ExeCommand="eula"`)
+	assert.Contains(t, def, `Execute="immediate"`)
+	for _, a := range regexp.MustCompile(`<CustomAction [^>]*/>`).FindAllString(wxs, -1) {
+		assert.NotRegexp(t, `(?i)ExeCommand="[^"]*\b(cmd|powershell|pwsh|conhost)(\.exe)?\b`, a)
+	}
+}
