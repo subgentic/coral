@@ -70,6 +70,23 @@ const A = 'a'.repeat(64), B = 'b'.repeat(64), C = 'c'.repeat(64);
             assert.ok(await click('#team-panel-artifacts button', /^Refresh$/), 'a Refresh button'); await settle(500);
             assert.ok((await ev(`window.__req`)).length > before, 'a new request');
         });
+        await S.run("a linked computer's team: Keep and Delete are not offered (they would act on THIS computer's store), Open and Copy link are; a deletion message about another server leaves the list alone", async () => {
+            await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'team_artifacts_page.js'); const host = document.createElement('div'); host.id = 'qa-remote-host'; document.body.append(host);
+                const R = window.fetch.bind(window);
+                window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin);
+                    if (/\\/artifacts$/.test(url.pathname) && !/^\\/api\\/board\\/${TEAM}/.test(url.pathname)) return Promise.resolve(new Response(JSON.stringify({ project: 'ci', artifacts: [{ id: '${A}', name: 'remote-report.md', media_type: 'text/markdown', size: 10, uri: 'coral://artifacts/${A}', available: true, source: 'uploaded' }], has_more: false, total: 1, all: 1 }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+                    return R(u, o); };
+                m.showArtifacts(host, '@m2/ci', {}); return true; })()`);
+            await waitFor(`!!document.querySelector('#qa-remote-host tbody tr')`, 'the remote team row', 6000);
+            await ev(`document.querySelector('#qa-remote-host .team-row-btn').click(); true`); await settle(500);
+            const names = await ev(`[...window.__tp.pane().querySelectorAll('button, a')].map(x => x.textContent.trim())`);
+            assert.ok(names.includes('Open') && names.includes('Copy link'), `Open and Copy link: ${JSON.stringify(names)}`);
+            assert.ok(!names.includes('Keep') && !names.includes('Kept') && !names.includes('Delete'), `no Keep and no Delete: ${JSON.stringify(names)}`);
+            await ev(`new BroadcastChannel('coral-artifact-deletions').postMessage({ hex: '${A}', server: 'local' }); true`); await settle(300);
+            assert.equal(await ev(`document.querySelectorAll('#qa-remote-host tbody tr').length`), 1, 'a deletion on this computer leaves the other computer\'s row');
+            await ev(`new BroadcastChannel('coral-artifact-deletions').postMessage({ hex: '${A}', server: 'm2' }); true`); await settle(300);
+            assert.equal(await ev(`document.querySelectorAll('#qa-remote-host tbody tr').length`), 0, 'a deletion on that computer drops it');
+        });
         await removeBoards(ev, [TEAM]); S.finish();
     } finally { await removeBoards(ev, [TEAM]); await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

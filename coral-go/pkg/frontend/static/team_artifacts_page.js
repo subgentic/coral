@@ -1,7 +1,7 @@
 /* The team page's Artifacts tab (#7453): the team's artifacts as a table (Name, Type, Size, Task, Created) under the search, Filters and Sort bar the old tab had, and the document in the detail pane. The name opens the pane: the preview, every detail the old
  * row's (i) showed, and the actions pinned under it (Open, Download, Copy link, Keep, Delete). The server does the matching: a search covers every artifact, not the loaded page (team_artifact_filters.js is the query). Everything drawn is built with the DOM and
  * textContent: names, task titles and the words about where a file came from are written by agents and other computers. Lazy: team_page.js imports it. */
-import { boardFetch, serverUrl, artifactPath, isCloud, splitKey, keyLabel } from './server_base.js';
+import { boardFetch, serverUrl, artifactPath, isCloud, splitKey, keyLabel, LOCAL_SERVER } from './server_base.js';
 import { whenText } from './when_text.js';
 import { importOnce } from './import_once.js';
 import { browserLocal } from './safe_storage.js';
@@ -77,13 +77,17 @@ const taskText = (item) => (item.task_id ? `#${item.task_id}${item.task_title ? 
 
 // ── what is kept and what is deleted ─────────────────────────────────────
 
-const local = () => !isCloud() && !document.body.classList.contains('popout-mode');
+// Keep and Delete act on this computer's store: only for a team of this computer (a linked computer's artifact is its own, and the same route here would reach our copy of the same bytes, or none), and not through the Hub or in the pop-out (Security, #7520).
+const local = () => !isCloud() && !document.body.classList.contains('popout-mode') && splitKey(model.project).server === LOCAL_SERVER;
 async function loadKept() {
     if (!local()) return new Set();
     try { const r = await fetch('/api/system/artifact-store/kept'); return new Set(r.ok ? (await r.json()).kept || [] : []); } catch { return new Set(); }
 }
 const deletions = typeof BroadcastChannel === 'function' ? new BroadcastChannel('coral-artifact-deletions') : null; // other tabs of this dashboard drop a row deleted here
-deletions?.addEventListener('message', (e) => { if (HEX_RE.test(String(e.data))) forget(e.data); });
+deletions?.addEventListener('message', (e) => { // the message names the server it was about (the old tab's names none: this computer)
+    const d = e.data, hex = typeof d === 'string' ? d : d && d.hex, server = typeof d === 'string' ? LOCAL_SERVER : d && d.server;
+    if (HEX_RE.test(String(hex)) && server === splitKey(model.project).server) forget(hex);
+});
 function forget(hex) {
     model.items = model.items.filter(it => managedHex(it) !== hex);
     if (detailKey() === hex) closeDetailPane();
@@ -109,7 +113,7 @@ function deleteArtifact(hex, name, size) {
                 const r = await fetch(`/api/artifacts/${hex}`, { method: 'DELETE' });
                 if (r.ok || r.status === 404) {
                     const at = [...(root?.querySelectorAll('tbody tr') || [])].findIndex(tr => tr.dataset.key === hex);
-                    forget(hex); deletions?.postMessage(hex);
+                    forget(hex); deletions?.postMessage({ hex, server: splitKey(model.project).server });
                     say(r.ok ? `Deleted ${name}.` : `${name} was already gone.`);
                     // the row the focus was on is gone: the same place in the list (the next row, else the one before), never the page (#4469)
                     const after = [...(root?.querySelectorAll('tbody tr') || [])]; (after[at] || after[at - 1])?.querySelector('.team-row-btn')?.focus();
