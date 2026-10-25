@@ -785,6 +785,11 @@ func (s *Server) registerBoard(r *chi.Mux, h *routeHandlers) {
 		r.Patch("/api/board/{project}/goals/{goalID}", boardHandler.UpdateGoal)
 		r.Post("/api/board/{project}/goals/{goalID}/close", boardHandler.CloseGoal)
 		r.Put("/api/board/{project}/tasks/{taskID}/goal", boardHandler.SetTaskGoal)
+		// Goal requests between two boards of this computer (#7361): not carried through Coral Hub yet.
+		r.Post("/api/board/{project}/goal-requests", boardHandler.PostGoalRequest)
+		r.Get("/api/board/{project}/goal-requests", boardHandler.ListGoalRequests)
+		r.Post("/api/board/{project}/goal-requests/{requestID}/accept", boardHandler.AcceptGoalRequest)
+		r.Post("/api/board/{project}/goal-requests/{requestID}/decline", boardHandler.DeclineGoalRequest)
 		r.Post("/api/board/{project}/tasks/claim", boardHandler.ClaimTask)
 		r.Post("/api/board/{project}/tasks/current", boardHandler.ActiveTask)
 		r.Get("/api/board/{project}/tasks/{taskID}", boardHandler.GetTask)

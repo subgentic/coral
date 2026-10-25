@@ -201,8 +201,8 @@ type sqlExecer interface {
 }
 
 // SendGoalRequest makes a request from goal goalID of board `from` to board `to` on this computer: the asker's row and the receiver's, in one transaction. title and ask are what the receiver
-// will read (the caller has redacted them). The goal must be open (proposed, active or blocked); the receiver's caps hold (20 waiting from this board, 100 in all).
-func (s *Store) SendGoalRequest(ctx context.Context, from string, goalID int64, to, ask, createdBy string) (*GoalRequestOut, *GoalRequestIn, error) {
+// will read (the caller has redacted the ask; redactTitle, when given, is applied to the goal's title). The goal must be open (proposed, active or blocked); the receiver's caps hold (20 waiting from this board, 100 in all).
+func (s *Store) SendGoalRequest(ctx context.Context, from string, goalID int64, to, ask, createdBy string, redactTitle func(string) string) (*GoalRequestOut, *GoalRequestIn, error) {
 	ask, err := requestText("ask", ask, GoalRequestAskMax, true)
 	if err != nil {
 		return nil, nil, err
@@ -217,7 +217,11 @@ func (s *Store) SendGoalRequest(ctx context.Context, from string, goalID int64, 
 	if g.Closed() {
 		return nil, nil, ErrGoalClosed
 	}
-	title := []rune(g.Title)
+	goalTitle := g.Title
+	if redactTitle != nil {
+		goalTitle = redactTitle(goalTitle) // secrets never leave the asker's board in the title either
+	}
+	title := []rune(goalTitle)
 	if len(title) > GoalRequestTitleMax {
 		title = title[:GoalRequestTitleMax]
 	}

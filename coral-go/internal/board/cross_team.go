@@ -618,6 +618,15 @@ func (s *Store) RelayedOrigin(ctx context.Context, project string, id int64) (Me
 // zeroWidthSpace is invisible when rendered but breaks every mention pattern.
 const zeroWidthSpace = "\u200b"
 
+// BoardMentionNames are the names (subscriber ids and job titles) DefuseMentions guards on board: what a server post that quotes another team's text defuses against.
+func (s *Store) BoardMentionNames(ctx context.Context, project string) []string {
+	names, err := s.boardMentionNames(ctx, project)
+	if err != nil {
+		return nil // the "@" forms are defused all the same; only the "Name:" forms need names
+	}
+	return names
+}
+
 // DefuseMentions makes text unable to mention anyone on a board while it
 // reads the same: a cross-team message may only wake the recipients the
 // server addresses, never the board's workers or "@all". names are the

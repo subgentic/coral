@@ -264,14 +264,25 @@ func (h *BoardHandler) GetGoal(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	g, err := h.bs.GetGoal(r.Context(), urlParam(r, "project"), id)
+	project := urlParam(r, "project")
+	g, err := h.bs.GetGoal(r.Context(), project, id)
 	if err != nil {
 		if !goalError(w, err) {
 			errInternalServer(w, err.Error())
 		}
 		return
 	}
-	writeJSON(w, http.StatusOK, g)
+	// The requests this goal sent that were accepted (#7361): where it asked, never what the other team made of it (no task, count or title). The cap is 20; the total says how many more.
+	refs, total, err := h.bs.AcceptedGoalRequests(r.Context(), project, id)
+	if err != nil {
+		errInternalServer(w, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, struct {
+		*board.Goal
+		AcceptedRequests      []board.AcceptedRequestRef `json:"accepted_requests"`
+		AcceptedRequestsTotal int                        `json:"accepted_requests_total"`
+	}{g, refs, total})
 }
 
 // UpdateGoal: PATCH /api/board/{project}/goals/{goalID}. Only the fields the body names change; "driver": "" clears the driver.

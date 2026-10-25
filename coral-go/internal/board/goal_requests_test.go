@@ -20,7 +20,7 @@ func requestEnv(t *testing.T) (*Store, context.Context, *Goal) {
 // A request makes both rows in one step; the asker's row holds no text, the receiver's holds the typed request.
 func TestSendGoalRequestMakesBothRows(t *testing.T) {
 	s, ctx, g := requestEnv(t)
-	out, in, err := s.SendGoalRequest(ctx, "alpha", g.ID, "beta", "  Please build the importer\x00  ", "Lead")
+	out, in, err := s.SendGoalRequest(ctx, "alpha", g.ID, "beta", "  Please build the importer\x00  ", "Lead", nil)
 	require.NoError(t, err)
 	assert.Equal(t, GoalRequestRequested, out.Status)
 	assert.Equal(t, "beta", out.ToBoard)
@@ -46,18 +46,18 @@ func TestSendGoalRequestMakesBothRows(t *testing.T) {
 
 func TestSendGoalRequestRefusals(t *testing.T) {
 	s, ctx, g := requestEnv(t)
-	_, _, err := s.SendGoalRequest(ctx, "alpha", g.ID, "beta", "   ", "Lead")
+	_, _, err := s.SendGoalRequest(ctx, "alpha", g.ID, "beta", "   ", "Lead", nil)
 	assert.ErrorIs(t, err, ErrGoalRequestAskRequired)
-	_, _, err = s.SendGoalRequest(ctx, "alpha", g.ID, "beta", strings.Repeat("x", GoalRequestAskMax+1), "Lead")
+	_, _, err = s.SendGoalRequest(ctx, "alpha", g.ID, "beta", strings.Repeat("x", GoalRequestAskMax+1), "Lead", nil)
 	assert.Equal(t, "text_too_long", err.(*GoalRequestError).Code)
-	_, _, err = s.SendGoalRequest(ctx, "alpha", 99999, "beta", "x", "Lead")
+	_, _, err = s.SendGoalRequest(ctx, "alpha", 99999, "beta", "x", "Lead", nil)
 	assert.Error(t, err, "a goal that is not there")
 	other := newGoal(t, s, "gamma", "Another board's")
-	_, _, err = s.SendGoalRequest(ctx, "alpha", other.ID, "beta", "x", "Lead")
+	_, _, err = s.SendGoalRequest(ctx, "alpha", other.ID, "beta", "x", "Lead", nil)
 	assert.Error(t, err, "another board's goal cannot be asked about")
 	_, _, err = s.CloseGoal(ctx, "alpha", g.ID, "all done", GoalDone)
 	require.NoError(t, err)
-	_, _, err = s.SendGoalRequest(ctx, "alpha", g.ID, "beta", "x", "Lead")
+	_, _, err = s.SendGoalRequest(ctx, "alpha", g.ID, "beta", "x", "Lead", nil)
 	assert.ErrorIs(t, err, ErrGoalClosed, "a closed goal asks for nothing")
 }
 
@@ -65,37 +65,37 @@ func TestGoalRequestCaps(t *testing.T) {
 	s, ctx, _ := requestEnv(t)
 	for i := 0; i < GoalRequestPendingPerPair; i++ {
 		g := newGoal(t, s, "alpha", fmt.Sprintf("goal %d", i))
-		_, _, err := s.SendGoalRequest(ctx, "alpha", g.ID, "beta", "x", "Lead")
+		_, _, err := s.SendGoalRequest(ctx, "alpha", g.ID, "beta", "x", "Lead", nil)
 		require.NoError(t, err, i)
 	}
 	g := newGoal(t, s, "alpha", "one too many")
-	_, _, err := s.SendGoalRequest(ctx, "alpha", g.ID, "beta", "x", "Lead")
+	_, _, err := s.SendGoalRequest(ctx, "alpha", g.ID, "beta", "x", "Lead", nil)
 	assert.ErrorIs(t, err, ErrGoalRequestTooManyTotal, "20 waiting from one board")
 	// another sender board still gets in, up to the target's total of 100
 	for b := 0; b < 4; b++ {
 		from := fmt.Sprintf("from%d", b)
 		for i := 0; i < GoalRequestPendingPerPair; i++ {
 			g := newGoal(t, s, from, fmt.Sprintf("g%d", i))
-			_, _, err := s.SendGoalRequest(ctx, from, g.ID, "beta", "x", "Lead")
+			_, _, err := s.SendGoalRequest(ctx, from, g.ID, "beta", "x", "Lead", nil)
 			require.NoError(t, err, "%s %d", from, i)
 		}
 	}
 	g = newGoal(t, s, "late", "late")
-	_, _, err = s.SendGoalRequest(ctx, "late", g.ID, "beta", "x", "Lead")
+	_, _, err = s.SendGoalRequest(ctx, "late", g.ID, "beta", "x", "Lead", nil)
 	assert.ErrorIs(t, err, ErrGoalRequestTooManyTotal, "100 waiting on the target in all")
 	// an answered request frees its place
 	list, err := s.ListGoalRequestsIn(ctx, "beta", GoalRequestPending, 200)
 	require.NoError(t, err)
 	_, err = s.DeclineGoalRequest(ctx, "beta", list[0].ID, "no", "Lead")
 	require.NoError(t, err)
-	_, _, err = s.SendGoalRequest(ctx, "late", g.ID, "beta", "x", "Lead")
+	_, _, err = s.SendGoalRequest(ctx, "late", g.ID, "beta", "x", "Lead", nil)
 	assert.NoError(t, err)
 }
 
 // Accept: one transaction's worth, one task per request, linked to the asker's goal, never copying the ask.
 func TestAcceptGoalRequestCreatesALinkedTaskOnce(t *testing.T) {
 	s, ctx, g := requestEnv(t)
-	_, in, err := s.SendGoalRequest(ctx, "alpha", g.ID, "beta", "SECRET-ASK-TEXT build it", "Lead")
+	_, in, err := s.SendGoalRequest(ctx, "alpha", g.ID, "beta", "SECRET-ASK-TEXT build it", "Lead", nil)
 	require.NoError(t, err)
 
 	task, after, err := s.AcceptGoalRequest(ctx, "beta", in.ID, "Build the importer", "my own body", "high", "Orch B", "Dev B")
@@ -140,7 +140,7 @@ func TestAcceptOnABoardThatRequiresAGoal(t *testing.T) {
 	require.NoError(t, err)
 	_, err = s.CreateTask(ctx, "beta", "plain", "", "medium", "Lead")
 	require.ErrorIs(t, err, ErrGoalRequired, "a task with no goal is refused there")
-	_, in, err := s.SendGoalRequest(ctx, "alpha", g.ID, "beta", "x", "Lead")
+	_, in, err := s.SendGoalRequest(ctx, "alpha", g.ID, "beta", "x", "Lead", nil)
 	require.NoError(t, err)
 	_, _, err = s.AcceptGoalRequest(ctx, "beta", in.ID, "For their goal", "", "medium", "Orch B", "")
 	assert.NoError(t, err)
@@ -148,7 +148,7 @@ func TestAcceptOnABoardThatRequiresAGoal(t *testing.T) {
 
 func TestAcceptRefusedForDeclinedExpiredAndOtherBoards(t *testing.T) {
 	s, ctx, g := requestEnv(t)
-	_, in, err := s.SendGoalRequest(ctx, "alpha", g.ID, "beta", "x", "Lead")
+	_, in, err := s.SendGoalRequest(ctx, "alpha", g.ID, "beta", "x", "Lead", nil)
 	require.NoError(t, err)
 	_, _, err = s.AcceptGoalRequest(ctx, "gamma", in.ID, "t", "", "medium", "Orch", "")
 	assert.ErrorIs(t, err, ErrGoalRequestNotFound, "another board's request is not there")
@@ -158,7 +158,7 @@ func TestAcceptRefusedForDeclinedExpiredAndOtherBoards(t *testing.T) {
 	assert.ErrorIs(t, err, ErrGoalRequestAnswered, "declined stays declined")
 
 	g2 := newGoal(t, s, "alpha", "second")
-	_, in2, err := s.SendGoalRequest(ctx, "alpha", g2.ID, "beta", "x", "Lead")
+	_, in2, err := s.SendGoalRequest(ctx, "alpha", g2.ID, "beta", "x", "Lead", nil)
 	require.NoError(t, err)
 	old := time.Now().UTC().Add(-GoalRequestTTL - time.Hour).Format(time.RFC3339)
 	_, err = s.db.ExecContext(ctx, `UPDATE board_goal_requests_in SET created_at = ? WHERE id = ?`, old, in2.ID)
@@ -172,7 +172,7 @@ func TestAcceptRefusedForDeclinedExpiredAndOtherBoards(t *testing.T) {
 // The reply: only for a request this board made, from the target it addressed, once; an accept carries no text.
 func TestApplyGoalRequestReply(t *testing.T) {
 	s, ctx, g := requestEnv(t)
-	out, _, err := s.SendGoalRequest(ctx, "alpha", g.ID, "beta", "x", "Lead")
+	out, _, err := s.SendGoalRequest(ctx, "alpha", g.ID, "beta", "x", "Lead", nil)
 	require.NoError(t, err)
 
 	_, err = s.ApplyGoalRequestReply(ctx, "alpha", out.RequestID, "", "gamma", GoalRequestAccepted, "")
@@ -197,13 +197,13 @@ func TestApplyGoalRequestReply(t *testing.T) {
 	assert.Equal(t, GoalRequestAccepted, again[0].Status)
 
 	g2 := newGoal(t, s, "alpha", "two")
-	out2, _, err := s.SendGoalRequest(ctx, "alpha", g2.ID, "beta", "x", "Lead")
+	out2, _, err := s.SendGoalRequest(ctx, "alpha", g2.ID, "beta", "x", "Lead", nil)
 	require.NoError(t, err)
 	d, err := s.ApplyGoalRequestReply(ctx, "alpha", out2.RequestID, "", "beta", GoalRequestDeclined, strings.Repeat("r", GoalRequestReasonMax))
 	require.NoError(t, err)
 	assert.Len(t, d.Reason, GoalRequestReasonMax)
 	g3 := newGoal(t, s, "alpha", "three")
-	out3, _, _ := s.SendGoalRequest(ctx, "alpha", g3.ID, "beta", "x", "Lead")
+	out3, _, _ := s.SendGoalRequest(ctx, "alpha", g3.ID, "beta", "x", "Lead", nil)
 	_, err = s.ApplyGoalRequestReply(ctx, "alpha", out3.RequestID, "", "beta", GoalRequestDeclined, strings.Repeat("r", GoalRequestReasonMax+1))
 	assert.Error(t, err, "a reason over 500 is refused")
 }
@@ -220,7 +220,7 @@ func TestAcceptedGoalRequestsAndTheGoalCounter(t *testing.T) {
 	var first string
 	for i := 0; i < GoalRequestAcceptedListMax+3; i++ {
 		to := fmt.Sprintf("team%d", i)
-		out, _, err := s.SendGoalRequest(ctx, "alpha", g.ID, to, "x", "Lead")
+		out, _, err := s.SendGoalRequest(ctx, "alpha", g.ID, to, "x", "Lead", nil)
 		if err != nil { // 20 waiting from one board: answer as we go
 			t.Fatal(err)
 		}
