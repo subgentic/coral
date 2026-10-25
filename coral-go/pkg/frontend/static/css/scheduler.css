@@ -296,8 +296,10 @@ div.job-field#sched-label { margin-bottom: 6px; }
 .sidebar-jobs-group { margin-bottom: 8px; }
 .sidebar-jobs-group[hidden] { display: none; }
 .sched-row { display: flex; flex-direction: column; align-items: stretch; gap: 2px; }
-.sched-row-head { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 6px; min-width: 0; } /* the badges wrap under the name at a large text size: the name keeps the row's width, no word is broken */
-.sched-row-name { font-weight: 600; min-width: 0; flex: 1 1 8rem; overflow-wrap: break-word; }
+.sched-row-head { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto auto; align-items: baseline; min-width: 0; } /* the dot has its own slot, so every name starts at one left edge; the paused pill and the failed count are on the name's line (UI/UX #7588 item 2) */
+.sched-row-head > .sched-dot { align-self: center; } /* 8 px of a 14 px slot: the meta line's 14 px indent is under the name */
+.sched-row-head > .sched-chip, .sched-row-head > .sched-fail-badge { margin-left: 6px; align-self: center; }
+.sched-row-name { font-weight: 600; min-width: 0; overflow-wrap: break-word; }
 .sched-row-meta { color: var(--text-secondary); font-size: var(--fs-md); padding-left: 14px; }
 .sched-row-problem { display: block; color: var(--error); font-size: var(--fs-md); padding-left: 14px; overflow-wrap: anywhere; } /* a run that failed for its folder or branch, in words (#6707) */
 .sched-row-note { display: block; color: var(--text-secondary); font-size: var(--fs-md); padding-left: 14px; overflow-wrap: anywhere; } /* what a run's exit_reason adds to its status: Coral was stopped when its agent ended, or restarted before it launched (#6907) */

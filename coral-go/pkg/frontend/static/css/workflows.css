@@ -24,6 +24,7 @@
 .wf-phone-back { display: none; }
 /* The sidebar's rows: the workflow's name, and its steps and last run under it */
 .wf-nav-row .row-btn { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.wf-nav-row .row-btn > .sched-row-head { align-self: stretch; } /* the dot's slot and the name, as a job's row (scheduler.css) */
 .wf-nav-name { display: block; font-size: var(--fs-md); font-weight: 600; overflow-wrap: anywhere; }
 .wf-nav-meta { display: block; font-size: var(--fs-base); font-weight: 400; color: var(--text-secondary); overflow-wrap: anywhere; }
 .group-table-cell-btn { margin: 0; }

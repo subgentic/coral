@@ -9,7 +9,7 @@ import { note, currentRoute } from './nav.js';
 import { KILL_LOG_NOTE } from './render.js';
 import { formatDuration as fmtDuration } from './format.js';
 import { runFailureHtml, runFailureTag } from './run_failure.js';
-import { whenWords, resultWords, limitWords, stepWords } from './job_words.js'; // the Jobs pages' words: one set for both
+import { whenWords, resultWords, limitWords, stepWords, runDot } from './job_words.js'; // the Jobs pages' words: one set for both
 import { limitSeconds, limitParts } from './time_limit.js';
 import { registerGroupSource, groupHeaderHtml, isGroupFolded, syncPaneGroupToggle, refreshGroupTable, openFirstGroupTable, backLinkHtml } from './sidebar_groups.js';
 import { onViewShown } from './view_switch.js';
@@ -262,8 +262,9 @@ function renderWorkflowList() {
     const row = w => {
         const last = w.last_run ? [lastResult(w.last_run), w.last_run.started_at ? whenWords(w.last_run.started_at) : ''].filter(Boolean).join(' ') : 'never run';
         const n = stepsOf(w);
+        const rd = runDot(w.last_run); // the dot a job's row has: one state, one look
         const open = Number(selectedWorkflowId) === Number(w.id);
-        return `<li class="session-list-item wf-nav-row${escAttr(open ? ' active' : '')}"><button type="button" class="row-btn"${open ? ' aria-current="true"' : ''} data-on-click="wf-select" data-workflow-id="${Number(w.id)}"><span class="wf-nav-name">${esc(w.name)}</span><span class="wf-nav-meta">${esc(`${n} step${n !== 1 ? 's' : ''} \u00b7 ${last}`)}</span></button></li>`;
+        return `<li class="session-list-item wf-nav-row${escAttr(open ? ' active' : '')}"><button type="button" class="row-btn"${open ? ' aria-current="true"' : ''} data-on-click="wf-select" data-workflow-id="${Number(w.id)}"><span class="sched-row-head"><span class="sched-dot sched-dot-${escAttr(rd.dot)}" role="img" aria-label="${escAttr(rd.words)}" title="${escAttr(rd.words)}"></span><span class="sched-row-name wf-nav-name">${esc(w.name)}</span></span><span class="sched-row-meta wf-nav-meta">${esc(`${n} step${n !== 1 ? 's' : ''} \u00b7 ${last}`)}</span></button></li>`;
     };
     list.innerHTML = groups.map(g => groupHeaderHtml('workflows', g.key, g.label, g.items.length) + (isGroupFolded('workflows', g.key) ? '' : g.items.map(row).join(''))).join('')
         || (workflows.length ? '<li class="empty-state">No workflow matches the search.</li>' : '<li class="empty-state">No workflows yet.</li>');

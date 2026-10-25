@@ -9,7 +9,7 @@ import { changedFields, NOTHING_TO_SAVE } from './settings_diff.js';
 import { ensureBuilt } from './lazy_dom.js';
 import { formatDuration as fmtDuration } from './format.js';
 import { runFailure, runFailureTag } from './run_failure.js';
-import { cronWords, atWords, awayWords, whenWords, resultWords, reasonWords, lastWords, limitWords, exitNote, resultLine } from './job_words.js';
+import { cronWords, atWords, awayWords, whenWords, resultWords, reasonWords, lastWords, limitWords, exitNote, resultLine, runDot } from './job_words.js';
 import { updateJobsSectionCount } from './live_jobs.js';
 import { limitSeconds, limitParts } from './time_limit.js';
 import { registerGroupSource, groupHeaderHtml, isGroupFolded, syncPaneGroupToggle, refreshGroupTable, backLinkHtml } from './sidebar_groups.js';
@@ -91,11 +91,9 @@ function jobRowHtml(job) {
     const active = selectedJobId === job.id ? 'active' : '';
     const lastStatus = job.last_run ? job.last_run.status : '';
     const unseenRun = lastStatus === 'completed' && job.last_run.exit_reason === 'ended_while_coral_was_down'; // done, but Coral did not see the result: not the green of a pass (#6907)
-    const dot = unseenRun ? 'none' : lastStatus === 'completed' ? 'ok'
-        : lastStatus === 'running' ? 'run'
-        : lastStatus === 'failed' || lastStatus === 'killed' ? 'bad'
-        : 'none';
-    const dotWords = unseenRun ? 'Last run completed, result not seen' : lastStatus ? `Last run ${{ completed: 'passed', killed: 'stopped' }[lastStatus] || lastStatus}` : 'Not run yet'; // the words the row's text uses (passed, not completed) // the dot is a coloured circle: its words say what it means
+    const rd = runDot(job.last_run); // the same dot and words a workflow's row has
+    const dot = unseenRun ? 'none' : rd.dot;
+    const dotWords = unseenRun ? 'Last run completed, result not seen' : rd.words; // the dot is a coloured circle: its words say what it means
     const paused = job.enabled ? '' : `<span class="sched-chip">${job.paused_reason ? 'paused: failing' : 'paused'}</span>`;
     // A job whose scheduling works but whose every run fails otherwise looks identical to a healthy one here.
     const fails = job.consecutive_failures || 0;
