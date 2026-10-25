@@ -561,6 +561,9 @@ func (s *Session) RoundTrip(req *http.Request) (*http.Response, error) {
 	if t := hubTeamFrom(ctx); t != (HubTeam{}) {
 		hdr.HubOrg, hdr.HubTeamRole, hdr.HubUserID = t.Org, t.Role, t.UserID
 	}
+	if a, ok := hubServiceFrom(ctx); ok {
+		hdr.HubService, hdr.AskServer, hdr.AskBoard = true, a.Server, a.Board
+	}
 	hs, err := s.OpenStream(ctx, hdr)
 	if err != nil {
 		return nil, err

@@ -170,6 +170,12 @@ func TestHubSweepNoHomeInAnyViewRoute(t *testing.T) {
 		}
 		q := hubSweepQuery(f[1], sid)
 		rec := call(h, "GET", path+q, "", hub)
+		if f[1] == "/api/goal-links" { // the Hub's service-only read (#7364): refused without the service stamp (an owner and a viewer included), and answered with it for one request id
+			require.Equal(t, 403, rec.Code, "%s through the hub without the service stamp: %s", f[1], rec.Body.String())
+			require.Contains(t, rec.Body.String(), "service_only", f[1])
+			require.Equal(t, 403, call(h, "GET", path+"?request_id=x", "", owner).Code, "the owner is not the service")
+			rec = call(h, "GET", path+"?request_id=sweep", "", map[string]string{tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubServiceHeader: "1", tunnel.HubAskBoardHeader: "team"})
+		}
 		if ownerOnly[f[1]] {
 			plain := rec
 			require.Equal(t, 403, plain.Code, "%s through the hub without the owner marker: %s", f[1], plain.Body.String())
