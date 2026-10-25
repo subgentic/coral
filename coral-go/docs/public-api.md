@@ -78,6 +78,8 @@ Content-Type: application/json
 }
 ```
 
+**Codex and the permission mode.** A launch of `codex` that names no permission mode (no permission flags, no saved default mode) starts in Auto for the Operator (the dashboard, the command line, an API key): `--sandbox workspace-write -a never` with tool networking on, so the agent can reach Coral. A saved default mode of `default`, or a mode named in `flags`, is used as it says; `default` is bare Codex, which asks first and has no network. A launch made with an agent's token never gets Auto (an agent does not start a less-restricted agent), so a Codex it starts on a board with no mode is refused with `403` and the code `agent_launch_needs_mode`: it would ask first and could not reach Coral from its sandbox. Ask the Operator to start it, or to set a default permission mode in Settings.
+
 #### Launch a team of agents
 ```
 POST /api/sessions/launch-team
