@@ -8,6 +8,7 @@ import { boardFetch, keyLabel } from './server_base.js';
 import { browserLocal } from './safe_storage.js';
 
 const TEAM_KEY = 'coral-spend-team';
+const HOURLY_WHY = 'Hourly is for the last 24 hours.';
 const DRIFT = 1.3; // the bar of a day is amber when it is 30% above usual (colour only: nothing is sent to anyone)
 const model = { team: '', range: '24h', data: null, loading: false, error: '', seq: 0, metric: 'tokens', grain: 'day', doneGrain: 'day' };
 let root = null, timeRoot = null;
@@ -127,7 +128,8 @@ function chart(data, f) {
     wrap.append(head);
     wrap.append(bars(rows, { usual, name: `${noun} each ${hourly ? 'hour' : 'day'}, ${rows.length} ${hourly ? 'hours' : 'days'}`, amberAbove: usual ? usual * DRIFT : null, unit }));
     const axis = el('div', 'spend-axis'); axis.setAttribute('aria-hidden', 'true'); axis.append(el('span', null, hourly ? '24 hours ago' : `${rows.length} days ago`), el('span', null, hourly ? 'now' : 'to' + 'day')); // the word is spelled in two parts: the icon-name lint reads a quoted word as an icon
-    wrap.append(axis, el('p', 'spend-note', usual ? `Dashed line: usual, ${unit(usual)}. The last bar is amber when it is 30% above.` : `No usual yet: there is no commit in the 7 days before${tools ? ' or no tool call recorded' : ''}.`));
+    const why = [!toolsOn ? 'Tool calls are not measured.' : '', model.range !== '24h' ? HOURLY_WHY : ''].filter(Boolean).join(' '); // a disabled button gives no tooltip to a keyboard or a touch: the reason is in the text
+    wrap.append(axis, el('p', 'spend-note', [usual ? `Dashed line: usual, ${unit(usual)}. The last bar is amber when it is 30% above.` : `No usual yet: there is no commit in the 7 days before${tools ? ' or no tool call recorded' : ''}.`, why].filter(Boolean).join(' ')));
     return wrap;
 }
 
@@ -204,7 +206,7 @@ function drawTime() {
     if (num(w.median_s) != null) cards.append(card(fmtDur(w.median_s), 'median, claimed to done', num(u.median_s) != null ? `usual ${fmtDur(u.median_s)}` : ''));
     if (num(w.p90_s) != null) cards.append(card(fmtDur(w.p90_s), 'slowest 1 in 10', num(u.p90_s) != null ? `usual ${fmtDur(u.p90_s)}` : ''));
     if (num(w.wait_median_s) != null) cards.append(card(fmtDur(w.wait_median_s), 'median wait before claimed', ''));
-    if (num(w.review_median_s) != null) cards.append(card(fmtDur(w.review_median_s), 'Median review time (assignment to approval)', ''));
+    if (num(w.review_median_s) != null) cards.append(card(fmtDur(w.review_median_s), 'median in review, assignment to approval', ''));
     if (num(w.sent_back) != null) cards.append(card(`${w.sent_back} of ${w.done || 0}`, 'sent back 2 or more times', num(w.rounds_mean) != null ? `${w.rounds_mean.toFixed(1)} rounds on average` : ''));
     body.append(cards);
     const hourly = model.doneGrain === 'hour' && Array.isArray(tt.per_hour) && tt.per_hour.length && model.range === '24h';
@@ -216,9 +218,9 @@ function drawTime() {
         box.append(head);
         const rows = list.map(d => ({ label: hourly ? hourLabel(d) : dayLabel(d), value: d.done ? d.done : null }));
         const usual = usualDay != null && !hourly ? usualDay : null;
-        box.append(bars(rows, { usual, name: `Tasks done each ${hourly ? 'hour' : 'day'}`, amberAbove: usual ? usual * DRIFT : null, unit: v => String(Math.round(v)) }));
+        box.append(bars(rows, { usual, name: `Tasks done each ${hourly ? 'hour' : 'day'}`, unit: v => String(Math.round(v)) })); // more tasks done than usual is good news: this chart is never amber
         const axis = el('div', 'spend-axis'); axis.setAttribute('aria-hidden', 'true'); axis.append(el('span', null, hourly ? '24 hours ago' : `${rows.length} days ago`), el('span', null, hourly ? 'now' : 'to' + 'day'));
-        box.append(axis, el('p', 'spend-note', usual ? `Dashed line: usual, ${usual} a day. The last bar is amber when it is 30% above. A day with no task done has no bar.` : 'A time with no task done has no bar.'));
+        box.append(axis, el('p', 'spend-note', [usual ? `Dashed line: usual, ${usual} a day. A day with no task done has no bar.` : 'A time with no task done has no bar.', model.range !== '24h' ? HOURLY_WHY : ''].filter(Boolean).join(' ')));
         body.append(box);
     }
     const agents = Array.isArray(tt.agents) ? tt.agents : [];
