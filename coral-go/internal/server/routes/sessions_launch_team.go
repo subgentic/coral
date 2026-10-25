@@ -206,6 +206,14 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 		if fromAgent && !savedMember {
 			agentDef.Flags, agentDef.Capabilities, agentDef.Tools, agentDef.Hooks = limitAgentLaunch("launch-team", agentDef.Flags, agentDef.Capabilities, agentDef.Tools, agentDef.Hooks)
 		}
+		if fromAgent && !savedMember {
+			// The Operator's saved default is not an agent's to use when it skips the prompts (Security's #7576 finding): not started, a setup problem (the category "" makes an all-refused team a 422).
+			if mode, inherits := agentLaunchInheritsSkippingDefault(memberType, agentDef.Flags, userSettings); inherits {
+				launched = append(launched, map[string]any{"name": agentDef.Name, "error": agentLaunchInheritsSkippingDefaultMessage(memberType, mode), "code": agentLaunchNeedsModeCode})
+				categories = append(categories, "")
+				continue
+			}
+		}
 		if code, msg, stopped := h.hubMemberStopped(ctx, r, body, agentDef); stopped {
 			// Not started, and a setup problem (the category "" makes an all-refused team a 422), never a server fault (#5839).
 			launched = append(launched, map[string]any{"name": agentDef.Name, "error": msg, "code": code})
