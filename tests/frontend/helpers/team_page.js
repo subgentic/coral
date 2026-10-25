@@ -15,7 +15,16 @@ const SOURCE = `(() => {
     const sidebar = () => [...document.querySelectorAll('aside')].filter(A.vis).find(a => /^Agents$/i.test(A.name(a))) || [...document.querySelectorAll('#mobile-agent-list')].filter(A.vis)[0] || null;
     const pane = () => [...document.querySelectorAll('aside')].filter(A.vis).find(a => /^Details$/i.test(A.name(a))) || null;
     const box = e => e ? A.box(e) : null;
-    window.__tp = { page, h1, tablist, tabs, tabLabel, find, sidebar, pane, box };
+    // The visible table of the page body (a table, or a role=table/grid), its column headers and its body rows as screen-reader text.
+    const table = () => { const m = main(); return m ? [...m.querySelectorAll('table, [role=table], [role=grid]')].find(A.vis) || null : null; };
+    const headers = () => { const t = table(); return t ? [...t.querySelectorAll('th, [role=columnheader]')].filter(A.vis).map(h => A.text(h).replace(/\\s+/g, ' ').trim()) : null; };
+    const rows = () => { const t = table(); return t ? [...t.querySelectorAll('tbody tr, [role=row]')].filter(r => A.vis(r) && !r.querySelector('th, [role=columnheader]')).map(r => A.text(r).replace(/\\s+/g, ' ').trim()) : null; };
+    // A named group of filter chips (a role=group, toolbar or fieldset named for what it filters) and its buttons with their pressed state.
+    const group = rx => { const m = main(); return m ? [...m.querySelectorAll('[role=group], [role=toolbar], fieldset')].filter(A.vis).find(g => rx.test(A.name(g))) || null : null; };
+    const chips = rx => { const g = group(rx); return g ? [...g.querySelectorAll('button, [role=button]')].filter(A.vis).map(b => ({ name: A.name(b).replace(/\\s+/g, ' ').trim(), pressed: b.getAttribute('aria-pressed') })) : null; };
+    // Every write the page makes after record(): method, path and body, so a suite can say "this click sent something".
+    const record = () => { if (window.__writes) return true; window.__writes = []; const R = window.fetch.bind(window); window.fetch = (u, o = {}) => { const m = String((o && o.method) || 'GET').toUpperCase(); if (m !== 'GET') window.__writes.push({ m, p: new URL(String(u), location.origin).pathname, b: String((o && o.body) || '') }); return R(u, o); }; return true; };
+    window.__tp = { page, h1, tablist, tabs, tabLabel, find, sidebar, pane, box, table, headers, rows, group, chips, record };
     return true;
 })()`;
 const install = async ev => { await na.install(ev); return ev(SOURCE); };
