@@ -1337,8 +1337,8 @@
 .sched-preset,
 .team-settings-tabs [role="tab"],
 .team-availability-dialog button,
-.working-mode-form select,
-.working-mode-form input[name="preset_name"],
+:is(.working-mode-form, .team-launch-health) select,
+:is(.working-mode-form, .team-launch-health) input[name="preset_name"],
 .modal-content select,
 .modal-content input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="range"]) {
         min-height: var(--control-touch-height);

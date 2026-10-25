@@ -231,6 +231,7 @@ function _refreshAfterLaunch(server, target) {
 
 export function hideLaunchModal() {
     document.getElementById("launch-modal").style.display = "none";
+    document.dispatchEvent(new CustomEvent('launch-modal-hidden')); // the team form's step 3 panes are drawn when it opens and gone when it closes (team_launch_settings.js)
     for (const id of ['launch-dir', 'launch-terminal-dir', 'launch-team-base-branch']) clearFieldInvalid(document.getElementById(id));
 }
 

@@ -221,7 +221,7 @@ export function renderAgentConfigForm(containerId, opts = {}) {
     let nameHTML = '';
     if (showName) {
         nameHTML = `
-            <label>${escapeHtml(opts.nameLabel || 'Name / Role')}:
+            <label>${escapeHtml(opts.nameLabel || 'Name / Role')}${opts.nameLabel ? '' : ':'}
                 <input type="text" class="acf-name" placeholder="e.g. QA Engineer, Frontend Dev" value="${escapeAttr(nameVal)}">
             </label>`;
     }
@@ -294,7 +294,7 @@ export function renderAgentConfigForm(containerId, opts = {}) {
             // New Agent's three steps (#7391): step 2 is the persona page (the prompt here, the persona and name adopted above it), step 3 is these three panes: the provider group adopted into Agent, the Mode as cards, the tool chips in a closed disclosure.
             const toolsHTML = `<details class="acf-tools-details"><summary>Tool permissions <span class="acf-perms-summary settings-hint"></span></summary>${permEditorHTML(true)}</details>`;
             container.innerHTML = [
-                `<div class="acf-persona-page" data-adopt="persona"><label class="launch-prompt-field"><span class="launch-field-head">Behavior prompt</span><textarea class="acf-prompt" rows="8" placeholder="Describe the agent's role and behavior...">${escapeHtml(promptVal)}</textarea></label></div>`,
+                `<div class="acf-persona-page" data-adopt="persona"><div class="launch-prompt-field"><span class="launch-field-head" id="${escapeAttr(uid)}-prompt-label">Behavior prompt</span><textarea class="acf-prompt" aria-labelledby="${escapeAttr(uid)}-prompt-label" rows="8" placeholder="Describe the agent's role and behavior...">${escapeHtml(promptVal)}</textarea></div></div>`,
                 pane('agent', 'Agent', 'smart_toy', '', topHTML),
                 pane('permissions', 'Permissions', 'lock', '', `${autoPermissionsHTML}${toolsHTML}`),
                 pane('advanced', 'Advanced', 'tune', '', `<label>Flags <span style="color:var(--text-muted);font-weight:normal">(optional)</span>:${flagsInput}</label>`),
@@ -305,14 +305,14 @@ export function renderAgentConfigForm(containerId, opts = {}) {
             const agentHTML = topHTML.replace('<label>Agent Type:', '<label class="acf-provider-label"><span class="acf-provider-head">Provider</span>');
             container.innerHTML = [
                 pane('agent', 'Agent', 'smart_toy', '', `${agentHTML}<p class="settings-hint acf-provider-change" role="status" hidden></p>`),
-                pane('persona', 'Persona', 'badge', '', `<p class="launch-field-head"><span>Name</span></p><p class="acf-restart-name"></p><label class="launch-prompt-field"><span class="launch-field-head">Behavior prompt</span><textarea class="acf-prompt" rows="8" placeholder="Describe the agent's role and behavior...">${escapeHtml(promptVal)}</textarea></label>`),
+                pane('persona', 'Persona', 'badge', '', `<p class="launch-field-head"><span>Name</span></p><p class="acf-restart-name"></p><div class="launch-prompt-field"><span class="launch-field-head" id="${escapeAttr(uid)}-prompt-label">Behavior prompt</span><textarea class="acf-prompt" aria-labelledby="${escapeAttr(uid)}-prompt-label" rows="8" placeholder="Describe the agent's role and behavior...">${escapeHtml(promptVal)}</textarea></div>`),
                 pane('permissions', 'Permissions', 'lock', '', `${autoPermissionsHTML}${toolsHTML}`),
                 pane('advanced', 'Advanced', 'tune', '', `<label>Flags <span style="color:var(--text-muted);font-weight:normal">(optional)</span>:${flagsInput}</label>`),
             ].join('');
         } else {
             // The team member and Add-agent-to-board dialogs (#7391): the same panes as New Agent's step 3, and one Persona pane (the persona, the name, the prompt) where New Agent has a page.
             const toolsHTML = `<details class="acf-tools-details"><summary>Tool permissions <span class="acf-perms-summary settings-hint"></span></summary>${permEditorHTML(true)}</details>`;
-            const promptHTML = `<label class="launch-prompt-field"><span class="launch-field-head">Behavior prompt</span><textarea class="acf-prompt" rows="10" placeholder="Describe the agent's role and behavior...">${escapeHtml(promptVal)}</textarea></label>`;
+            const promptHTML = `<div class="launch-prompt-field"><span class="launch-field-head" id="${escapeAttr(uid)}-prompt-label">Behavior prompt</span><textarea class="acf-prompt" aria-labelledby="${escapeAttr(uid)}-prompt-label" rows="10" placeholder="Describe the agent's role and behavior...">${escapeHtml(promptVal)}</textarea></div>`;
             container.innerHTML = [
                 pane('persona', 'Persona', 'badge', '', `${(showPreset || showName) ? `${presetHTML}${nameHTML}` : ''}${promptHTML}`),
                 pane('agent', 'Agent', 'smart_toy', '', topHTML.replace('<label>Agent Type:', '<label class="acf-provider-label"><span class="acf-provider-head">Provider</span>')),
