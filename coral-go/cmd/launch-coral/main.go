@@ -219,7 +219,15 @@ func launchAgentSessions(ctx context.Context, tc *tmux.Client, cfg *config.Confi
 
 		// Build the launch command first: its prompt and settings files must be written
 		// before a session is made for it (#3601 W12).
-		cmd, err := ag.LaunchCommand(launchParamsFor(cfg, sessionID, sessionName, protocolPath, dir))
+		// The agent's CLI is resolved here, not left to the shell: a launch line that types a bare name the shell does not know ends in "codex is not recognized" in the pane (#353).
+		cliPath, err := agent.LaunchCLI(nil, agentType)
+		if err != nil {
+			log.Printf("Warning: not launching %s: %v", sessionName, err)
+			continue
+		}
+		params := launchParamsFor(cfg, sessionID, sessionName, protocolPath, dir)
+		params.CLIPath = cliPath
+		cmd, err := ag.LaunchCommand(params)
 		if err != nil {
 			log.Printf("Warning: not launching %s: %v", sessionName, err)
 			continue
