@@ -139,8 +139,9 @@ func TestARefThatIsNotABranchNameIsRefusedAndTheCacheKeepsAnswersForAMinute(t *t
 func TestAHostileBranchNameIsRefusedAndWritesNothing(t *testing.T) {
 	root := newRepo(t, "main")
 	commit(t, root, "Backend Dev", "2026-10-20T10:00:00Z", "a.txt")
+	commit(t, root, "Backend Dev", "2026-10-21T10:00:00Z", "b.txt") // two commits: main~1 and main^ name a real commit, so only the name rule refuses them
 	out := filepath.Join(t.TempDir(), "x")
-	for _, bad := range []string{"--output=" + out, "-n", "a b", "main~1", "main..main", "main^", "a@{1}", "a:b", "x.lock", "main.", "/main", "main/", "a//b", ".hidden", "@", "a*", "a?", "a[1]"} {
+	for _, bad := range []string{"--output=" + out, "-n", "a b", "main~1", "main..main", "main^", "main@{0}", "a@{1}", "a:b", "x.lock", "main.", "/main", "main/", "a//b", ".hidden", "@", "a*", "a?", "a[1]"} {
 		_, _, err := Read(context.Background(), root, bad, time.Unix(0, 0), time.Now())
 		assert.Error(t, err, "branch %q", bad)
 		assert.False(t, validBranch(bad), "branch %q", bad)
@@ -196,4 +197,25 @@ func TestABurstOfReadsMakesOneGitReadPerRepository(t *testing.T) {
 	}
 	wg.Wait()
 	assert.EqualValues(t, 1, calls.Load(), "eight requests, one git read")
+}
+
+func TestAFailedReadIsRememberedForAFewSecondsSoABurstDoesNotWaitOnGitEachTime(t *testing.T) {
+	var calls atomic.Int64
+	old := readFn
+	t.Cleanup(func() { readFn = old })
+	readFn = func(context.Context, string, string, time.Time, time.Time) ([]Commit, bool, error) {
+		calls.Add(1)
+		return nil, false, assert.AnError
+	}
+	now := time.Date(2026, 10, 25, 12, 0, 0, 0, time.UTC)
+	c := &Cache{now: func() time.Time { return now }}
+	since, until := time.Date(2026, 10, 20, 0, 0, 0, 0, time.UTC), time.Date(2026, 10, 21, 0, 0, 0, 0, time.UTC)
+	for i := 0; i < 5; i++ {
+		_, _, err := c.Read(context.Background(), "/repo", "main", since, until)
+		assert.ErrorIs(t, err, assert.AnError)
+	}
+	assert.EqualValues(t, 1, calls.Load(), "five requests inside the error window, one read")
+	now = now.Add(ErrorTTL + time.Second)
+	_, _, _ = c.Read(context.Background(), "/repo", "main", since, until)
+	assert.EqualValues(t, 2, calls.Load(), "after it git is asked again")
 }
