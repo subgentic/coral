@@ -136,23 +136,6 @@
     .goals-facts dd, .detail-facts dd { margin-bottom: 8px; }
 }
 
-/* the team's goals under its agents in the sidebar */
-.sidebar-goals-head { list-style: none; margin: 8px 0 2px; padding: 0 8px; }
-.sidebar-goals-title { margin: 0; font-size: 0.8125rem; font-weight: 600; color: var(--text-secondary); }
-.sidebar-goal { list-style: none; margin: 0; padding: 0; }
-.sidebar-goal-row { display: flex; align-items: stretch; gap: 2px; }
-.sidebar-goal-chev { flex: none; width: 28px; display: inline-grid; place-items: center; background: none; border: 0; color: var(--text-secondary); cursor: pointer; border-radius: var(--radius-md); }
-.sidebar-goal-chev svg { transition: transform 0.12s; transform: rotate(-90deg); }
-.sidebar-goal-chev.open svg { transform: none; }
-.sidebar-goal-chev:hover, .sidebar-goal-open:hover, .sidebar-goal-task:hover { background: var(--bg-hover); }
-.sidebar-goal-open { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 4px 8px; background: none; border: 0; border-radius: var(--radius-md); color: var(--text-primary); font: inherit; text-align: left; cursor: pointer; }
-.sidebar-goal-title { font-size: 0.8125rem; font-weight: 500; overflow-wrap: anywhere; }
-.sidebar-goal-count { font-size: 0.75rem; color: var(--text-secondary); }
-.sidebar-goal-tasks { list-style: none; margin: 0 0 4px 30px; padding: 0; }
-.sidebar-goal-task { display: block; width: 100%; padding: 4px 8px; background: none; border: 0; border-radius: var(--radius-md); color: var(--text-secondary); font: inherit; font-size: 0.75rem; text-align: left; cursor: pointer; overflow-wrap: anywhere; }
-.sidebar-goal-none { margin: 0 0 4px 38px; font-size: 0.75rem; color: var(--text-secondary); }
-.sidebar-goal-chev:focus-visible, .sidebar-goal-open:focus-visible, .sidebar-goal-task:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-
 /* The Agents tab (stage 3): a quiet line and Refresh, status chips with counts on one line (they scroll sideways when too many), Remind as a quiet button in its row */
 .team-state-bad { --goal-hue: var(--error); }
 .team-agents-top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; }

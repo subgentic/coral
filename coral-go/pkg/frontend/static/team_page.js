@@ -16,7 +16,6 @@ import { renderLiveSessions } from './render.js';
 const { closeDetailPane } = await importOnce('./detail_pane.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried
 const { el } = await importOnce('./team_table.js');
 const { quietFocus } = await importOnce('./quiet_focus.js');
-import { refreshGoalsTree } from './sidebar_goals.js';
 
 const LABEL = { goals: 'Goals', messages: 'Messages', tasks: 'Tasks', agents: 'Agents', artifacts: 'Artifacts', knowledge: 'Knowledge', settings: 'Settings' };
 const S = { team: '', tab: 'goals', item: null, counts: {}, built: false, countSeq: 0 };
@@ -149,7 +148,6 @@ async function readCounts() {
         knowledge,
     ]);
     if (seq !== S.countSeq || team !== S.team) return;
-    refreshGoalsTree(team);
     const g = goals.value;
     if (g) S.counts.goals = (Array.isArray(g) ? g : g.goals || []).length;
     const t = tasks.value;

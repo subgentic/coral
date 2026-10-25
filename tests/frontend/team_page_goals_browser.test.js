@@ -1,6 +1,6 @@
 // The team page's Goals face, a goal's page and a task's page (#7453, stage 1; UI/UX's team page doc 7aa984fe): Goals is a table (Goal, State, Tasks, Updated, and New goal); choosing a goal swaps the body for the goal's own
 // page (a back link "Goals", an h2 with the name, Outcome and Done when, a table of its tasks, a pinned bar with Add task and Close goal) and Back returns to the list with the focus on the row; a task opens its own
-// page the same way (back link "Tasks", h2 "#<id> <title>", its goal as a link); the sidebar shows the goals under the team, each with a chevron that shows its tasks. 1280 and 390 px. Written failing-first by QA
+// page the same way (back link "Tasks", h2 "#<id> <title>", its goal as a link); the Agents sidebar has no goals (#7659). 1280 and 390 px. Written failing-first by QA
 // (#7466): controls by role and accessible name (helpers/team_page.js). Isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -73,15 +73,14 @@ const GOAL = 'Explore goals with two teams';
                 await click('button, a', /^(\u2190\s*)?Tasks$/, 'back link');
                 const f = await activeName(); assert.ok(f.includes('Add the goal filter'), `the focus is on the task's row (got ${JSON.stringify(f.slice(0, 60))})`);
             });
-            await S.run(`${label}: the sidebar lists the goals under the team, and a chevron named "Show the tasks of <goal>" opens the goal's tasks`, async () => {
+            await S.run(`${label}: the Agents sidebar has no goals (the operator, #7659): no Goals heading, no goal rows, no chevrons; the goals are on the team page`, async () => {
                 if (mobile) { await ev(`(() => { const b = [...document.querySelectorAll('.mobile-tab-bar [role=tab], .mobile-tab-bar button')].find(x => /^Agents$/i.test(window.__na.name(x))); if (b) b.click(); return true; })()`); await settle(400); }
                 const side = () => ev(`(() => { const s = window.__tp.sidebar(); return s ? [...s.querySelectorAll('button, a, [role=button], [role=treeitem]')].filter(window.__na.vis).map(e => window.__na.name(e)) : null; })()`);
+                await settle(1200); // the card has been drawn and the goals read, if anything read them
                 const names = await side(); assert.ok(names, 'a sidebar named Agents');
-                assert.ok(names.some(n => n.includes(GOAL)), `the goal ${GOAL} is under the team (got ${names.length} controls)`);
-                assert.ok(names.includes(`Show the tasks of ${GOAL}`), 'a chevron named Show the tasks of <goal>');
-                await ev(`(() => { const s = window.__tp.sidebar(); const b = [...s.querySelectorAll('button')].find(x => window.__na.name(x) === ${JSON.stringify('Show the tasks of ' + GOAL)}); b.click(); return true; })()`); await settle(300);
-                const after = await side(); assert.ok(after.some(n => n.includes('Add the goal filter')), 'the goal\'s tasks are listed after the chevron');
-                assert.ok(after.includes(`Hide the tasks of ${GOAL}`), 'the chevron now says Hide the tasks of <goal>');
+                assert.ok(!names.some(n => n.includes(GOAL)), `the goal ${GOAL} is not in the sidebar (got ${names.length} controls)`);
+                assert.ok(!names.some(n => /^(Show|Hide) the tasks of /.test(n)), 'no chevron for a goal\'s tasks');
+                assert.equal(await ev(`document.querySelectorAll('.sidebar-goal, .sidebar-goals-head').length`), 0, 'no goal rows or heading in the page');
             });
         }
         await removeBoards(ev, [TEAM]); S.finish(); // finish() exits the process, so the board goes first

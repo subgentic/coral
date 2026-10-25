@@ -503,8 +503,6 @@
 1	sessions.js	filtered.map(e => `<button class="emoji-picker-btn" data-emoji="${escapeAttr(e)}">${e}</button>`).join("")
 1	settings_dialog.js	label
 1	settings_nav.js	p.dataset.icon
-1	sidebar_goals.js	CHEV
-1	sidebar_goals.js	items
 1	sidebar_groups.js	CELL_ACTION_ATTR[c.action]
 1	sidebar_groups.js	CHEVRON
 1	sidebar_groups.js	CHIP_ACTION_ATTR[c.action]

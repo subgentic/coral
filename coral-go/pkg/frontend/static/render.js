@@ -25,7 +25,7 @@ import { LOCAL_SERVER } from './server_base.js';
 import { machineState } from './launch_server.js';
 import { syncHubFirstRun, hubEmptyListHtml } from './hub_first_run.js';
 import './format.js';
-import { registerLiveListRenderer, registerLastRedraw, redrawLiveList, liveListEl } from './list_hooks.js';
+import { registerLiveListRenderer, redrawLiveList, liveListEl } from './list_hooks.js';
 import { _boardChatSelectAll, _boardChatSelectNone, _boardMentionInput, _boardMentionKey, _cancelBoardChatSelect, _exportBoardChatSelected, _insertBoardMention, _toggleBoardChatMsgSelect, _toggleBoardChatPause } from './board_chat.js';
 import { buildSessionTooltip } from './session_state.js';
 import './board_accents.js';
@@ -41,7 +41,6 @@ import { browserLocal } from './safe_storage.js';
 import { getTeamTokenUsage } from './token_usage_ui.js';
 import { _renderSidebarRail } from './sidebar_rail.js';
 import { _passesFilters, _pinMatchesFilter } from './list_filter_match.js';
-import { toggleGoalTasks } from './sidebar_goals.js';
 import { _renderGroups } from './group_cards.js';
 import { UPDOWN, W, agentArgs, dirOf, menu, withAgent, withBoard } from './action_helpers.js';
 export { KILL_LOG_NOTE, KILL_LOG_NOTE_MANY, attachDirect, killSessionDirect, restartDirect, showInfoDirect, toggleAgentArchive, toggleAgentSleep } from './agent_actions.js';
@@ -142,9 +141,7 @@ export function agentSearchKey(e) {
 
 /** Render the agent list now (user actions, which may read the DOM right after).
  *  A pending scheduled render is dropped: this one shows the latest list. */
-let _lastSessions = [];
 export function renderLiveSessions(sessions) {
-    _lastSessions = sessions;
     if (_scheduledRender) { cancelAnimationFrame(_scheduledRender); _scheduledRender = 0; }
     followServerOrder(sessions); // a replaced agent's place was moved to its new id on the server (#4943)
     noteBoardLabels(sessions); // board_label beside board_project (#3536): what keyLabel shows
@@ -175,7 +172,6 @@ export function flushLiveSessionsRender() {
 }
 
 registerLiveListRenderer(renderLiveSessions); // the hook other modules redraw through (list_hooks.js)
-registerLastRedraw(() => renderLiveSessions(_lastSessions));
 
 /** The session a list row shows (by id and server, by name when the row has no id). */
 function _rowSession(item) {
@@ -404,9 +400,6 @@ registerActions({
     'group-collapse': el => { const g = textOf(el.dataset.group); if (g) window.toggleGroupCollapse(g); },
     'group-header-key': (el, event) => window.groupHeaderKey(event, el),
     'team-header-key': (el, event) => window.teamHeaderKey(event, el),
-    'goal-tree-toggle': el => { const b = textOf(el.dataset.board), id = idOf(el.dataset.goalId); if (b && id) toggleGoalTasks(b, id); },
-    'goal-tree-open': el => { const b = textOf(el.dataset.board), id = idOf(el.dataset.goalId); if (b && id) window.openTeamPage(b, { tab: 'goals', item: id }); },
-    'goal-tree-task': el => { const b = textOf(el.dataset.board), id = idOf(el.dataset.taskId); if (b && id) window.openTeamPage(b, { tab: 'tasks', item: id }); },
     'team-name-open': el => { const b = textOf(el.dataset.board); if (b) window.openTeamPage(b); },
     'group-chevron': (el, event) => { event.stopPropagation(); const g = textOf(el.dataset.group); if (g) window.toggleGroupCollapse(g); },
     'group-sleeping-expand': el => { const g = textOf(el.dataset.group); if (g) window.expandSleepingGroup(g); },

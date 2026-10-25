@@ -11,7 +11,6 @@ import { pinPathForKey, emptyPins, notePinKeys } from './pinned_folders.js';
 import { localFirst } from './server_status.js';
 import { killAllItem, teamHealthBtn, _rowNameWithServer, _boardAccentStyle, _pinMenuItem, FOLDER_GROUP_ICON } from './list_card_parts.js';
 import { _pinMatchesFilter } from './list_filter_match.js';
-import { goalsTreeHtml } from './sidebar_goals.js';
 
 // Team-first mode: one team as a card: its header, its menu and its agents.
 function _renderTeamCard(boardName, boardSessions) {
@@ -96,7 +95,6 @@ function _renderTeamCard(boardName, boardSessions) {
             return 0;
         });
         html += _renderAgentListWithSubgroups(orderedBoard, boardWorkDir, true, boardName);
-        html += goalsTreeHtml(boardName); // the team's open goals under its agents (#7453)
         html += `</ul></li>`;
     return html;
 }
