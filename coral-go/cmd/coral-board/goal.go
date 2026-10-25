@@ -30,7 +30,7 @@ Subcommands:
   close <id> --reason "why" [--state done|dropped]   Close a goal (done by default); its open tasks are left as they are and counted
   request <goal> --to <team> --ask "what is asked"   Ask another team on this computer to create a task for this goal (the team must take goal requests)
   requests [--status pending|accepted|declined|expired] [--json]   The goal requests other teams sent this board (default: all)
-  request-decline <id> --reason "why"   Decline a request another team sent (accept one with: task add --goal-from <id> --title "...")
+  request-decline <id> --reason "why"   Decline a request another team sent (accept one with: task add "title" --goal-from <id>)
 
 A task joins a goal when it is added (task add --goal <id>) or later (task goal <task> <goal|none>); task list --goal <id> lists a goal's tasks.`
 

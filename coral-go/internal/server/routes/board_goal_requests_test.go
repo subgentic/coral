@@ -74,7 +74,8 @@ func TestGoalRequestFlowAcceptAndDecline(t *testing.T) {
 	assert.Contains(t, wake, "@Orchestrator B")
 	assert.Contains(t, wake, "Please build the importer", "the request is quoted in the labelled block")
 	assert.NotContains(t, howTo, "Please build", "Coral's own how-to line quotes nothing")
-	assert.Contains(t, howTo, "task add --goal-from "+id)
+	assert.Contains(t, howTo, `task add "your title" --goal-from `+id, "the hint is the command the CLI takes: the title is positional")
+	assert.NotContains(t, howTo, "--title", "task add has no --title option")
 
 	// the list
 	code, out = call("GET", "/api/board/beta/goal-requests?status=pending", nil)

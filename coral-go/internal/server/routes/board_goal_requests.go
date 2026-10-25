@@ -174,7 +174,7 @@ func (h *BoardHandler) wakeForGoalRequest(ctx context.Context, target string, re
 		return
 	}
 	// The how-to is Coral's own sentence, a second line after the quoted block would be read as part of it, so it is its own post.
-	howTo := fmt.Sprintf("Accept #%d with: coral-board task add --goal-from %d --title \"...\" (you write the task; the ask is not copied). Decline with: coral-board goal request-decline %d --reason \"...\". List them: coral-board goal requests.", in.ID, in.ID, in.ID)
+	howTo := fmt.Sprintf("Accept #%d with: coral-board task add \"your title\" --goal-from %d [--body \"...\"] (you write the task; the ask is not copied). Decline with: coral-board goal request-decline %d --reason \"...\". List them: coral-board goal requests.", in.ID, in.ID, in.ID)
 	if _, err := h.bs.PostSystemMessage(ctx, target, goalRequestSystemSender, howTo, nil); err != nil {
 		slog.Warn("goal request: could not post how to answer", "board", target, "error", err)
 	}

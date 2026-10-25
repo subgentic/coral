@@ -99,3 +99,17 @@ func TestGoalRequestsListCannotBeClosedByTheAsk(t *testing.T) {
 	assert.Equal(t, 1, strings.Count(res.stdout, "[end of untrusted text"), res.stdout)
 	assert.Equal(t, 1, strings.Count(res.stdout, "[untrusted text from team"), res.stdout)
 }
+
+// Codex Test's #7372 finding: the hint a request's wake post gives is a command the CLI takes. The hint form is run as written (the title positional, --goal-from after it) and the usage text agrees.
+func TestTheAcceptHintIsACommandTheCLITakes(t *testing.T) {
+	gs := newGoalServer(t)
+	gs.reply["POST /api/board/team/goal-requests/1/accept"] = `{"task":{"id":5,"title":"your title"},"request":{"id":1}}`
+	res := goalRun(t, gs, "task", "add", "your title", "--goal-from", "1", "--body", "...")
+	require.Equal(t, 0, res.code, res.stderr)
+	assert.Contains(t, res.stdout, "Created Task #5")
+	help := goalRun(t, gs, "goal", "--help")
+	assert.NotContains(t, help.stdout, `--goal-from <id> --title`, "the goal usage does not name an option task add lacks")
+	assert.Contains(t, help.stdout, `task add "title" --goal-from <id>`)
+	res = goalRun(t, gs, "task", "add", "--goal-from", "1", "--title", "x")
+	assert.NotEqual(t, 0, res.code, "task add still has no --title")
+}
