@@ -24,6 +24,9 @@ const (
 	// GoalLinksTitleMax and GoalLinksAssigneeMax bound the two free-text fields of a row, in characters.
 	GoalLinksTitleMax    = 200
 	GoalLinksAssigneeMax = 128
+	// The same two fields are also cut to a byte bound (four bytes a character is the worst), so a full page of the largest rows stays under GoalLinksReplyMaxBytes whatever the text.
+	GoalLinksTitleBytes    = 512
+	GoalLinksAssigneeBytes = 256
 	// GoalLinksReplyMaxBytes is the one byte cap of a whole reply (the routes test holds a full page of the largest rows under it).
 	GoalLinksReplyMaxBytes = 128 << 10
 )
@@ -72,12 +75,16 @@ func rfc3339UTC(s string) string {
 	return s
 }
 
-// boundText cuts s to at most n characters, on a character boundary.
-func boundText(s string, n int) string {
-	if utf8.RuneCountInString(s) <= n {
-		return s
+// boundText cuts s to at most n characters and at most nBytes bytes, on a character boundary.
+func boundText(s string, n, nBytes int) string {
+	if utf8.RuneCountInString(s) > n {
+		s = string([]rune(s)[:n])
 	}
-	return string([]rune(s)[:n])
+	for len(s) > nBytes {
+		_, size := utf8.DecodeLastRuneInString(s)
+		s = s[:len(s)-size]
+	}
+	return s
 }
 
 // GoalLinks is the page of the requests this asker (server, boardID) sent as requestID that this computer accepted, with the task made for each. limit is 1..GoalLinksMaxLimit (the caller checks it); redact,
@@ -143,13 +150,13 @@ func (s *Store) GoalLinks(ctx context.Context, requestID, server, boardID, curso
 		reply.NextCursor = &c
 	}
 	for _, r := range rows {
-		title := boundText(r.Title, GoalLinksTitleMax)
+		title := boundText(r.Title, GoalLinksTitleMax, GoalLinksTitleBytes)
 		if redact != nil {
-			title = boundText(redact(title), GoalLinksTitleMax)
+			title = boundText(redact(title), GoalLinksTitleMax, GoalLinksTitleBytes)
 		}
 		reply.Accepted = append(reply.Accepted, GoalLinkRow{
 			RequestID: requestID, Board: r.Board, GoalUID: r.GoalUID, TaskID: r.TaskID, TaskStatus: r.TaskStatus, RequestState: GoalRequestAccepted,
-			AcceptedAt: rfc3339UTC(r.AcceptedAt), Title: title, Assignee: boundText(r.Assignee, GoalLinksAssigneeMax), UpdatedAt: rfc3339UTC(r.UpdatedAt),
+			AcceptedAt: rfc3339UTC(r.AcceptedAt), Title: title, Assignee: boundText(r.Assignee, GoalLinksAssigneeMax, GoalLinksAssigneeBytes), UpdatedAt: rfc3339UTC(r.UpdatedAt),
 		})
 	}
 	return reply, nil
