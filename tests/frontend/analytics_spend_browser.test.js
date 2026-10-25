@@ -74,6 +74,23 @@ const FIX = { board: TEAM, range_hours: 24, generated_at: '2026-10-25T10:00:00Z'
             await pick('Trend shows', 'tokens'); await pick('Trend by', 'day');
             assert.match(await text('#cost-spend .spend-chart-head h4'), /Tokens per commit, each day/);
         });
+        await run('shots of the two views (CORAL_SCREENSHOT_DIR)', async () => {
+            const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return;
+            const fs = require('node:fs'); fs.mkdirSync(d, { recursive: true });
+            for (const [key, name] of [['per-commit', 'tokens-per-commit'], ['task-time', 'task-time']]) {
+                await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'analytics_views.js'); m.selectView(${JSON.stringify(key)}); return true; })()`);
+                await new Promise(r => setTimeout(r, 600)); // sleep-ok: the view draws after the choice
+                fs.writeFileSync(`${d}/analytics-${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));
+            }
+        });
+        await run('the two views are one page shape (#7688): a summary sentence, the tiles, the chart beside "How it is counted", the table under its title with the same gap', async () => {
+            assert.equal(await text('#cost-task-time .spend-headline'), '14 tasks done, median 38 min, usual 31 min.', 'Task time has its summary sentence');
+            const shape = await ev(`(() => { const out = {}; for (const id of ['cost-spend', 'cost-task-time']) { const r = document.getElementById(id), grid = r.querySelector('.spend-grid'), title = r.querySelector('.spend-who .spend-box-title'), how = r.querySelector('.spend-grid .spend-how > summary');
+                out[id] = { how: how && how.textContent, kids: [...r.querySelectorAll(':scope .spend-body > *, :scope .time-body > *')].map(e => e.className.split(' ')[0]).join(','), gap: grid && title ? [getComputedStyle(grid).marginBottom, getComputedStyle(title.closest('.spend-who')).marginTop, title.closest('.spend-who').previousElementSibling === grid].join('/') : null, card: !!r.querySelector('.spend-grid .spend-box') }; } return out; })()`);
+            assert.equal(shape['cost-spend'].how, 'How it is counted'); assert.equal(shape['cost-task-time'].how, 'How it is counted', 'Task time has the disclosure too');
+            assert.equal(shape['cost-spend'].kids, shape['cost-task-time'].kids, 'the same skeleton: ' + JSON.stringify(shape));
+            assert.ok(shape['cost-spend'].gap && shape['cost-spend'].gap.endsWith('/true') && shape['cost-spend'].gap === shape['cost-task-time'].gap, 'the table follows the chart row with the same spacing: ' + JSON.stringify([shape['cost-spend'].gap, shape['cost-task-time'].gap]));
+        });
         await run('Task time: six tiles, tasks done with Daily and Hourly, by agent; a measure the endpoint does not return is left out', async () => {
             const cards = await ev(`[...document.querySelectorAll('#cost-task-time .spend-card')].map(c => c.textContent.replace(/\\s+/g, ' ').trim())`);
             assert.equal(cards.length, 6, JSON.stringify(cards));
