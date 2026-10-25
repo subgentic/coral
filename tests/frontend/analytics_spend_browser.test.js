@@ -77,8 +77,13 @@ const FIX = { board: TEAM, range_hours: 24, generated_at: '2026-10-25T10:00:00Z'
             assert.equal(cards.length, 6, JSON.stringify(cards));
             assert.ok(/^14\s*tasks done, last 24 h\s*usual 11 a day/.test(cards[0]), cards[0]); assert.ok(/^38 min\s*median, claimed to done\s*usual 31 min/.test(cards[1]), cards[1]);
             assert.ok(/^2 h 05 min\s*slowest 1 in 10\s*usual 1 h 40 min/.test(cards[2]), cards[2]); assert.ok(/^12 min\s*median wait before claimed/.test(cards[3]), cards[3]);
-            assert.ok(/^47 min\s*Median review time \(assignment to approval\)/.test(cards[4]), cards[4]); assert.ok(/^3 of 14\s*sent back 2 or more times\s*1\.6 rounds on average/.test(cards[5]), cards[5]);
+            assert.ok(/^47 min\s*median in review, assignment to approval/.test(cards[4]), cards[4]); assert.ok(/^3 of 14\s*sent back 2 or more times\s*1\.6 rounds on average/.test(cards[5]), cards[5]);
             assert.equal(await ev(`document.querySelectorAll('#cost-task-time .spend-bar').length`), 6, 'the day with no task done has no bar');
+            await ev(`window.__spend.task_time.per_day[window.__spend.task_time.per_day.length - 1].done = 99; true`);
+            await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard(); return true; })()`);
+            await waitFor(`document.querySelectorAll('#cost-task-time .spend-bar').length > 0`, 'the chart again', 6000);
+            assert.equal(await ev(`document.querySelectorAll('#cost-task-time .spend-bar-high').length`), 0, 'more tasks done than usual is not drawn in the warning colour');
+            assert.ok(!/amber/.test(await text('#cost-task-time .spend-box .spend-note')), 'and its caption does not promise amber');
             await ev(`document.querySelector('#cost-task-time .spend-toggle [data-key="hour"]').click(); true`);
             assert.equal(await ev(`document.querySelectorAll('#cost-task-time .spend-bar-col').length`), 24);
             await ev(`document.querySelector('#cost-task-time .spend-toggle [data-key="day"]').click(); true`);
@@ -101,6 +106,8 @@ const FIX = { board: TEAM, range_hours: 24, generated_at: '2026-10-25T10:00:00Z'
         await run('the 7 day range asks range=7d; a 404 says there is no data', async () => {
             await ev(`document.getElementById('cost-time-range').value = 'week'; document.getElementById('cost-time-range').dispatchEvent(new Event('change', { bubbles: true })); true`);
             await waitFor(`window.__spendReq.some(s => /range=7d/.test(s))`, 'a request with range=7d', 6000);
+            await waitFor(`/Hourly is for the last 24 hours\\./.test((document.querySelector('#cost-spend .spend-chart .spend-note') || {}).textContent || '')`, 'the reason in the chart note, not only in a tooltip', 6000);
+            assert.match(await text('#cost-task-time .spend-box .spend-note'), /Hourly is for the last 24 hours\./, 'Tasks done says it too');
             await ev(`window.__spendStatus = 404; true`); await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard(); return true; })()`);
             await waitFor(`/No spend data for this team yet/.test(document.getElementById('cost-spend').textContent)`, 'the no-data line', 6000);
         });
