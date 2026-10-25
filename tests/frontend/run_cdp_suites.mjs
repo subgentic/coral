@@ -15,11 +15,14 @@
 // key event sent through Input.dispatchKeyEvent, and a hidden page runs no animation frames (#3707). The preload
 // switches on focus emulation for each CDP connection a suite makes; CDP_KEEP_VISIBLE=0 turns it off.
 //
-// --shards N (default 1) starts N such server+Chrome pairs, each with its own data dir, ports and profile,
+// --shards N starts N such server+Chrome pairs, each with its own data dir, ports and profile,
 // and runs N suites at once: each shard takes the next suite from one shared queue, so within a shard
-// suites still run one at a time. Output is printed per suite as it finishes.
+// suites still run one at a time. Output is printed per suite as it finishes. The default is 1 in CI (CI set),
+// with --only, --sequences or --part, and 3 with --stress; a full local run gets one shard per 6 CPUs, 1 to 6
+// (#351: a full run on Windows took 78 min on 1 shard, 27.5 on 3 and 15.5 on 6; each shard is a Coral and a
+// Chrome, about 250 MB).
 //
-// --timeout S (default 120) is a hard wall-clock limit per suite attempt. When it fires (typically a hung
+// --timeout S (default 180, as CI passes) is a hard wall-clock limit per suite attempt. When it fires (typically a hung
 // CDP socket), the suite's whole process group is killed, which closes its CDP client, and that shard's
 // Chrome and Coral server are replaced with fresh ones before its next suite, so a wedged browser can't
 // fail the suites after it. The attempt is reported as TIMEOUT. A shard whose Chrome or server died
@@ -139,8 +142,9 @@ const intArg = (name, def, min) => {
 };
 const stress = flag('--stress');
 const only = arg('--only', '');
-const timeoutS = intArg('--timeout', 120, 1);
-const shards = intArg('--shards', stress ? 3 : 1, 1);
+const timeoutS = intArg('--timeout', 180, 1);
+const localShards = process.env.CI || only || flag('--sequences') || arg('--part', '') ? 1 : Math.min(6, Math.max(1, Math.floor(os.availableParallelism() / 6)));
+const shards = intArg('--shards', stress ? 3 : localShards, 1);
 const retries = stress ? 0 : intArg('--retries', 1, 0);
 const runs = stress ? intArg('--runs', 3, 1) : 1;
 const throttle = stress ? Number(arg('--cpu-throttle', '4')) : 1;
