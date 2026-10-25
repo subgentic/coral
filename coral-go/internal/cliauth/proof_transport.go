@@ -5,6 +5,7 @@ import (
 	"runtime"
 	"sync"
 
+	"github.com/subgentic/coral/internal/coralproxy"
 	"github.com/subgentic/coral/internal/serverproof"
 )
 
@@ -60,5 +61,5 @@ func baseHTTP() http.RoundTripper {
 	if t, ok := http.DefaultTransport.(*http.Transport); ok {
 		return t
 	}
-	return &http.Transport{Proxy: http.ProxyFromEnvironment}
+	return &http.Transport{Proxy: coralproxy.Func}
 }

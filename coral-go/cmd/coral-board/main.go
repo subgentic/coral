@@ -7,6 +7,7 @@ import (
 	"github.com/subgentic/coral/internal/clierr"
 	"github.com/subgentic/coral/internal/clitext"
 	"github.com/subgentic/coral/internal/config"
+	"github.com/subgentic/coral/internal/coralproxy"
 	"github.com/subgentic/coral/internal/hooks"
 	"os"
 	"strconv"
@@ -29,6 +30,7 @@ func init() {
 }
 
 func main() {
+	coralproxy.Install()                 // inside Codex's loopback-only network profile, reach Coral through its command proxy (#7489); otherwise unchanged. First: the identity wrappers below take the default transport as their base
 	hooks.InstallIdentity("coral-board") // the agent session's token, sent with every request (#3387)
 	// A person running it in their own terminal (no agent session) signs with the
 	// command-line token instead, as the local Operator (strict local auth, #3418).

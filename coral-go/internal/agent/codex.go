@@ -331,7 +331,7 @@ func (a *CodexAgent) LaunchCommand(params LaunchParams) (string, error) {
 		parts, _, _ = appendCodexPermissionMode(parts, bypassSandbox, params.PermissionMode)
 	}
 	parts = collapseCodexSandboxFlags(parts, presetApplied)
-	parts = codexCoralSandboxNetwork(parts, params)
+	parts = codexCoralSandboxNetwork(parts, params, version)
 	if arg := codexActionPrompt(files, params); arg != "" {
 		raw = append(raw, arg)
 		// "--": a prompt that is only a flag ("--dangerously-skip-permissions") is the
@@ -712,7 +712,7 @@ func appendCodexPermissionMode(parts []string, bypassSandbox bool, mode string) 
 // could not reach Coral and it could neither read nor post on its board. It gets the same switch, whatever
 // the mode. Chips that keep approvals (on-request) and the modes that ask do not: the person who chose to be
 // asked is asked.
-func codexCoralSandboxNetwork(parts []string, params LaunchParams) []string {
+func codexCoralSandboxNetwork(parts []string, params LaunchParams, version string) []string {
 	// The pair is what decides, not how it was asked for: Auto sent as the mode and Auto sent as the flags the dashboard turns it into (--sandbox workspace-write -a never, no mode) are the same launch, and
 	// the second one used to start a Codex that could not reach Coral (#7483, Codex Test's #7485). Chips are left alone unless the agent is on a board (see above).
 	if !params.Capabilities.IsEmpty() && params.BoardName == "" {
@@ -758,7 +758,71 @@ func codexCoralSandboxNetwork(parts []string, params LaunchParams) []string {
 	if insert < 0 {
 		insert = len(parts)
 	}
+	if codexLoopbackProfileOn(parts, version) {
+		return codexWithLoopbackProfile(parts, insert)
+	}
 	out := append([]string(nil), parts[:insert]...)
 	out = append(out, "-c", "sandbox_workspace_write.network_access=true")
 	return append(out, parts[insert:]...)
+}
+
+// CodexLoopbackProfile turns on the narrow network profile below in place of the broad switch (#7489). It is off by default until real Codex has proven it end to end (coral-board wait, uploads, a long
+// session); CORAL_CODEX_LOOPBACK_PROFILE=1 turns it on for those checks.
+var CodexLoopbackProfile = os.Getenv("CORAL_CODEX_LOOPBACK_PROFILE") == "1"
+
+// codexLoopbackProfileMin is the first Codex measured to enforce the profile (0.163.0: Codex Test's real checks, #7488 and #7498); an older or unknown one keeps the broad switch.
+const codexLoopbackProfileMin = "0.163.0"
+
+// codexLoopbackProfileName names the permission profile Coral defines.
+const codexLoopbackProfileName = "coralonly"
+
+// codexLoopbackProfileOn reports whether a launch with these parts uses the profile: it is switched on, the Codex is known to support it, and the person set no network or permission setting of their own (their
+// own -c network_access=false must keep meaning "no network", and the profile would silently replace it).
+func codexLoopbackProfileOn(parts []string, version string) bool {
+	if !CodexLoopbackProfile || !codexVersionAtLeast(version, codexLoopbackProfileMin) {
+		return false
+	}
+	for i := 0; i < len(parts); i++ {
+		v := ""
+		switch {
+		case parts[i] == "-c" || parts[i] == "--config":
+			if i+1 < len(parts) {
+				v = parts[i+1]
+			}
+		case strings.HasPrefix(parts[i], "--config="):
+			v = strings.TrimPrefix(parts[i], "--config=")
+		case strings.HasPrefix(parts[i], "-c="):
+			v = strings.TrimPrefix(parts[i], "-c=")
+		}
+		if strings.Contains(v, "network_access") || strings.HasPrefix(v, "permissions") || strings.HasPrefix(v, "default_permissions") || strings.HasPrefix(v, "sandbox_mode") {
+			return false
+		}
+	}
+	return true
+}
+
+// codexWithLoopbackProfile replaces --sandbox X (the legacy setting, which makes Codex drop the profile) by a permission profile that extends the workspace sandbox and allows the network only through
+// Codex's command proxy and only to 127.0.0.1, and selects it. The approval flag stays as it is. coral-board and coral-agent send loopback requests through that proxy when Codex says it is active
+// (internal/coralproxy). insert is where Coral's own -c settings go (before the person's).
+func codexWithLoopbackProfile(parts []string, insert int) []string {
+	var out []string
+	profile := []string{
+		"-c", "features.network_proxy=true",
+		"-c", `permissions.` + codexLoopbackProfileName + `={extends=":workspace", network={enabled=true, mode="limited", allow_local_binding=false, domains={"127.0.0.1"="allow"}}}`,
+		"-c", `default_permissions="` + codexLoopbackProfileName + `"`,
+	}
+	for i := 0; i < len(parts); i++ {
+		if i == insert {
+			out = append(out, profile...)
+		}
+		if kind, n := codexPermissionFlag(parts, i); n > 0 && kind == 's' {
+			i += n - 1 // the legacy sandbox flag is dropped
+			continue
+		}
+		out = append(out, parts[i])
+	}
+	if insert >= len(parts) {
+		out = append(out, profile...)
+	}
+	return out
 }

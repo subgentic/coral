@@ -137,3 +137,70 @@ func TestCodexAutoSentAsFlagsReachesCoralLikeTheMode(t *testing.T) {
 	// chips on no board keep their own policy
 	assert.NotContains(t, launch(LaunchParams{Capabilities: &Capabilities{Allow: []string{CapShell}}, Flags: []string{"--sandbox", "workspace-write", "-a", "never"}}), net)
 }
+
+// #7489: with the loopback profile on, a launch that would get the broad network switch gets a permission profile instead: it extends the workspace sandbox, allows the network only through Codex's command proxy and
+// only to 127.0.0.1, is selected with default_permissions, and the legacy --sandbox flag (which makes Codex drop a profile) is gone; the approval flag stays.
+func TestCodexLoopbackProfileReplacesTheBroadSwitch(t *testing.T) {
+	old, oldProbe := CodexLoopbackProfile, CodexVersionProbe
+	t.Cleanup(func() { CodexLoopbackProfile, CodexVersionProbe = old, oldProbe })
+	CodexLoopbackProfile = true
+	CodexVersionProbe = func(string) string { return "0.163.0" }
+	launch := func(p LaunchParams) string {
+		t.Helper()
+		p.CLIPath = "codex"
+		cmd, err := (&CodexAgent{}).LaunchCommand(p)
+		require.NoError(t, err)
+		return cmd
+	}
+	const broad = "sandbox_workspace_write.network_access=true"
+	shell := &Capabilities{Allow: []string{CapShell}}
+	for name, p := range map[string]LaunchParams{
+		"Auto as the mode":      {PermissionMode: "auto"},
+		"Auto as flags":         {Flags: []string{"--sandbox", "workspace-write", "-a", "never"}},
+		"chips on a board":      {Capabilities: shell, BoardName: "coral-go-team"},
+		"Don't ask on a board":  {PermissionMode: "dontAsk", BoardName: "coral-go-team"},
+		"the equals-form flags": {Flags: []string{"--sandbox=workspace-write", "--ask-for-approval=never"}},
+	} {
+		cmd := launch(p)
+		assert.Contains(t, cmd, "features.network_proxy=true", name)
+		assert.Contains(t, cmd, `permissions.coralonly={extends=":workspace", network={enabled=true, mode="limited", allow_local_binding=false, domains={"127.0.0.1"="allow"}}}`, name)
+		assert.Contains(t, cmd, `default_permissions="coralonly"`, name)
+		assert.Regexp(t, `-a never|--ask-for-approval=never`, cmd, name)
+		assert.NotContains(t, cmd, "--sandbox", name+": the legacy flag makes Codex drop the profile")
+		assert.NotContains(t, cmd, "--sandbox=", name)
+		assert.NotContains(t, cmd, broad, name+": the broad switch is replaced")
+	}
+	// the profile's settings come before the person's own -c settings, so theirs still win
+	cmd := launch(PermissionMode_("auto", []string{"-c", "model=\"x\""}))
+	assert.Less(t, strings.Index(cmd, "default_permissions"), strings.Index(cmd, "model="), cmd)
+
+	// not used: another approval pair, plan, bypass, a person's own network or permission setting, an older or unknown Codex, off
+	for name, p := range map[string]LaunchParams{
+		"on-request":      {Flags: []string{"--sandbox", "workspace-write", "-a", "on-request"}},
+		"plan":            {PermissionMode: "plan"},
+		"bypass":          {PermissionMode: "bypassPermissions"},
+		"network off":     {PermissionMode: "auto", Flags: []string{"-c", "sandbox_workspace_write.network_access=false"}},
+		"own profile":     {PermissionMode: "auto", Flags: []string{"-c", `default_permissions="mine"`}},
+		"own permissions": {PermissionMode: "auto", Flags: []string{"-c", "permissions.mine.network.enabled=false"}},
+		"chips no board":  {PermissionMode: "auto", Capabilities: shell},
+		"nothing at all":  {},
+	} {
+		assert.NotContains(t, launch(p), "default_permissions=\"coralonly\"", name)
+	}
+	CodexVersionProbe = func(string) string { return "0.162.0" }
+	cmd = launch(LaunchParams{PermissionMode: "auto"})
+	assert.NotContains(t, cmd, "coralonly", "an older Codex")
+	assert.Contains(t, cmd, broad, "keeps the broad switch")
+	CodexVersionProbe = func(string) string { return "" }
+	assert.NotContains(t, launch(LaunchParams{PermissionMode: "auto"}), "coralonly", "unknown version")
+	CodexVersionProbe = func(string) string { return "0.163.0" }
+	CodexLoopbackProfile = false
+	cmd = launch(LaunchParams{PermissionMode: "auto"})
+	assert.NotContains(t, cmd, "coralonly", "off")
+	assert.Contains(t, cmd, broad)
+}
+
+// PermissionMode_ builds launch params for a mode with extra flags.
+func PermissionMode_(mode string, flags []string) LaunchParams {
+	return LaunchParams{PermissionMode: mode, Flags: flags}
+}
