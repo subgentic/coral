@@ -1,5 +1,6 @@
 /* Live updates to the open agent's header: its folder, branch, waiting state, goal and status (moved out of render.js, #4996; no behaviour change). */
 import { syncHeldNotice } from './held_inputs.js';
+import './held_send_now.js'; // Send now on the held notice (#7554)
 import { syncQueuedFromRow, paint as paintQueued } from './held_sends.js';
 import { _shortPath, _gitStateSummary, _repoBranch, deriveSessionState } from './session_state.js';
 import { startupSignedOut } from './signin_line.js';

@@ -138,6 +138,7 @@ GET /api/sessions/live/{name}/file-content view
 GET /api/sessions/live/{name}/file-original view
 GET /api/sessions/live/{name}/files view
 GET /api/sessions/live/{name}/git view
+GET /api/sessions/live/{name}/held never
 GET /api/sessions/live/{name}/history/context view
 GET /api/sessions/live/{name}/history/search view
 GET /api/sessions/live/{name}/info view
@@ -330,6 +331,7 @@ POST /api/sessions/live/{name}/context-window never
 POST /api/sessions/live/{name}/events never
 POST /api/sessions/live/{name}/files/refresh interact
 POST /api/sessions/live/{name}/goal interact
+POST /api/sessions/live/{name}/held/send never
 POST /api/sessions/live/{name}/keys interact
 POST /api/sessions/live/{name}/kill launch
 POST /api/sessions/live/{name}/model launch

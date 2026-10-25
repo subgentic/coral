@@ -1,6 +1,6 @@
 // Automated messages held for over a minute (#6473, the dashboard side of #6466): Coral holds an agent's board nudges and reminders while a prompt is open or its input box is not on screen (held_inputs on the live row). A few seconds
 // is the gate working; once an agent has held for more than a minute (counted from when the page first saw it holding, or the row's held_since) its row says "N messages waiting: Coral can't see the input box" and the agent view says it
-// with a Show terminal button; both go when the count is 0, and the clock starts over. Nothing is delivered from the page: there is no deliver-now button. A sleeping agent and a row that never held say nothing. At 1280 and 390 px.
+// with a Show terminal button; both go when the count is 0, and the clock starts over. Send now (#7554) delivers them from the page, at the Operator's word. A sleeping agent and a row that never held say nothing. At 1280 and 390 px.
 // The minute is shortened by window.__coralHeldAfterMs here. Drives Chrome over CDP through agent_view_harness.js against the isolated dev server.
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
@@ -53,6 +53,24 @@ const BASE = require('./test_base').BASE;
             await ev(`document.querySelector('#composer-held-notice button').click(); true`);
             check(`${tag}: Show terminal opens the terminal view`, await ev('window.__shown'));
             await ev(`document.querySelector('#composer-held-notice button').dispatchEvent(new Event('x')); true`);
+
+            // 7554: Send now. With one held it says "Send now", with several "Send all now", and the line says the agent may be mid-turn; a click posts to the held/send route for this exact session, once.
+            const sendView = () => ev(`(() => { const b = document.getElementById('composer-held-send'), h = document.getElementById('composer-held-hint'); return { label: b && b.textContent, shown: !!b && !b.hidden && b.getBoundingClientRect().height > 0, hint: h && !h.hidden ? h.textContent : '', describedby: b && b.getAttribute('aria-describedby') }; })()`);
+            let sv = await sendView();
+            check(`${tag}: one held: the button says "Send now", with the line that the agent may be in the middle of a turn`, sv.shown && sv.label === 'Send now' && /middle of a turn/.test(sv.hint) && sv.describedby === 'composer-held-hint', JSON.stringify(sv));
+            await ev(`window.__sent = []; window.__realFetch = window.fetch; window.fetch = (u, o) => { if (String(u).includes('/held/send')) { window.__sent.push({ u: String(u), body: o && o.body }); return Promise.resolve(new Response(JSON.stringify({ ok: true, sent: 1, left: 0 }), { status: 200, headers: { 'Content-Type': 'application/json' } })); } return window.__realFetch(u, o); }; true`);
+            await ev(`document.getElementById('composer-held-send').click(); true`);
+            await waitFor(`window.__sent.length >= 1`, 'the send', 4000);
+            const sent = await ev('window.__sent');
+            check(`${tag}: Send now posts to this agent's held/send route with its type and session id, for all`, sent.length === 1 && /\/api\/sessions\/live\/held-agent\/held\/send/.test(sent[0].u) && JSON.parse(sent[0].body).session_id === 'held-agent-id' && JSON.parse(sent[0].body).agent_type === 'claude' && JSON.parse(sent[0].body).id === '', JSON.stringify(sent));
+            await ev(`window.fetch = window.__realFetch; true`);
+            await feed(2);
+            sv = await sendView();
+            check(`${tag}: several held: "Send all now"`, sv.shown && sv.label === 'Send all now', JSON.stringify(sv));
+            await feed(0);
+            sv = await sendView();
+            check(`${tag}: nothing held: the button and its line are gone`, !sv.shown && sv.hint === '', JSON.stringify(sv));
+            await feed(1);
 
             // 7433: each reason has its own true words; only "box" says Coral cannot see the input box
             const words = await ev(`import(${S} + 'held_inputs.js').then(m => Object.fromEntries(['turn', 'prompt', 'dialog', 'draft', 'box', 'other', undefined, 'unknown-word', '__proto__'].map(r => [String(r), (m.heldNotice({ session_id: 'w-' + r, held_inputs: 2, held_since: '2020-01-01T00:00:00Z', held_reason: r }) || {}).text])))`);
