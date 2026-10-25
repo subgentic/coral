@@ -12,6 +12,7 @@
 // test server. Drives Chrome over CDP; run_cdp_suites.mjs finds CDP suites by the harness's name.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 // The send and first-chat answers, held until the test lets them go: window.__hold.send / .chat are arrays of
 // { resolve(status, body) }, and window.__hold.chatMode = 'hold' | 'fail' | 'pass'.
@@ -46,7 +47,7 @@ const HOLD = `(() => {
         await Page.addScriptToEvaluateOnNewDocument({ source: HOLD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`localStorage.setItem('coral-live-view-mode', 'chat'); window.__m.add('cs-a', 'A', 4, { sleeping: false }); window.__m.add('cs-b', 'B', 4, { sleeping: false }); true`);
 
         console.log('Chat view: the conversation\'s own states, none of the terminal\'s');
@@ -131,7 +132,7 @@ const HOLD = `(() => {
         await ev(`window.sendCommand(); true`);
         await waitFor(`window.__hold.send.length === 1`, 'the fourth send');
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`window.__m.add('cs-a', 'A', 4, { sleeping: false }); true`);
         await select('cs-a');
         await waitFor(`window.__rendered().length > 0`, 'the conversation after the reload');

@@ -7,6 +7,7 @@ const { launchStandIn } = require('./helpers/stand_in_agent');
 const { guardSettings } = require('./helpers/settings_guard');
 const { themeJs } = require('./helpers/theme');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 async function httpJson(method, p, body) {
     const r = await fetch(BASE + p, { method, headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
@@ -37,7 +38,7 @@ const chips = n => Array.from({ length: n }, (_, i) => `<div class="image-attach
             await Emulation.setDeviceMetricsOverride({ width: w, height: 844, deviceScaleFactor: 1, mobile: true });
             await Emulation.setTouchEmulationEnabled({ enabled: true });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             await ev(`window.selectLiveSession(${JSON.stringify(name)}, 'claude', ${JSON.stringify(sid)}, 'local'); true`);
             await waitFor(`!!window.T && T.state.currentSession && T.state.currentSession.session_id === ${JSON.stringify(sid)}`, 'the agent is open', { timeout: 15000 });
             // the "Sent" toast of a message that carried two images, a long question and the hint for the agent is one short line (#6137)

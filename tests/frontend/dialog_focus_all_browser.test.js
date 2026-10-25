@@ -4,6 +4,7 @@
 // (filled in by code when it opens) is listed, not failed. Run against an isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, ev, waitFor, PRELOAD } = await connect();
@@ -18,7 +19,7 @@ const { connect } = require('./agent_view_harness');
         await Page.enable();
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`window.__coral.buildAllLazy(); true`); // the dialogs built on first open (#4500), each with the same focus handling
         const ids = await ev(`[...document.querySelectorAll('.modal[role=dialog]')].map(d => d.id)`);
         assert.ok(ids.length >= 18, `the page has its dialogs (${ids.length})`);

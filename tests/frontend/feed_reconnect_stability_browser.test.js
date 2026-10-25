@@ -5,6 +5,7 @@
 // agent's state, and the gateway back-off for its server is cleared when the server is back; and, after a forced GC, listeners, nodes, documents, live timers and the heap do not grow.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 const settle = ms => new Promise(r => setTimeout(r, ms)); // sleep-ok: the page's own timers (notice delays, debounces) have no event to wait for; it is polled until the page stops changing
 // FEED_STACK_SELFTEST=1 makes every retry run twice (a reconnect that stacks): the suite must then fail.
 const QUIET_MS = 2000; // longer than the page's longest timer of its own, the 1.5 s notice delay
@@ -43,7 +44,7 @@ const DROP_BOUNDS = { listeners: 5, nodes: 10, documents: 0, intervals: 0, heapM
         })();` });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         // When the page last changed its DOM at all. The list re-renders on every feed update and a render replaces nodes (the same count before and after), so a steady node count does not mean the
         // page has stopped building: counting nodes in the middle of a render read +37 (two runs in 20 of the old quiet-count wait, one in 45 before it). A node count is taken only after the DOM has been still.
         await ev(`(() => { window.__lastMut = Date.now(); new MutationObserver(() => { window.__lastMut = Date.now(); }).observe(document.documentElement, { childList: true, subtree: true }); return true; })()`);

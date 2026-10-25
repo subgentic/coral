@@ -4,7 +4,7 @@
 // cost, thirty times over them, does. The highlights and the cards still agree: 400 threads, 320 open, the clicked one current in both.
 const { connect } = require('./agent_view_harness');
 const { fixture, STUB } = require('./helpers/comments_scale');
-const { framesJs } = require('./helpers/wait');
+const { framesJs, coralReady } = require('./helpers/wait');
 const BASE = require('./test_base').BASE;
 
 const OPEN_MS = 2500, CLICK_MS = 1000, POST_MS = 1500, SELECT_MS = 1500;
@@ -19,7 +19,7 @@ const OPEN_MS = 2500, CLICK_MS = 1000, POST_MS = 1500, SELECT_MS = 1500;
         for (const kind of ['markdown', 'code']) {
             const fx = fixture(kind);
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             await ev(STUB(fx));
             const t0 = Date.now();
             await ev(`import(${S} + 'artifact_viewer.js').then(v => v.openArtifactViewer(window.__HEX, { filename: ${JSON.stringify(fx.filename)} })); true`);

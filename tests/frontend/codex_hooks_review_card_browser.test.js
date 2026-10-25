@@ -9,6 +9,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const DIALOG = ['  Hooks need review', '  2 hooks are new or changed.', '  Hooks can run outside the sandbox after you trust them.', '',
     '> 1. Review hooks', '  2. Trust all and continue', "  3. Continue without trusting (hooks won't run)", '', '  Press enter to confirm or esc to go back'];
@@ -41,7 +42,7 @@ function writeCodex(dir) {
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`localStorage.setItem('coral-live-view-mode', 'chat'); true`);
         const put = await api('PUT', '/api/settings', { cli_path_codex: writeCodex(dir) });
         assert.equal(put.status, 200, 'cli_path_codex set: ' + JSON.stringify(put.data));

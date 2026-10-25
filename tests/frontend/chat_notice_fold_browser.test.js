@@ -5,6 +5,7 @@
 // user messages never fold. Set FOLD_SHOT_DIR to save a screenshot. Run against an isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 const call = (id, name, label) => [{ type: 'assistant', text: '', tool_uses: [{ name, tool_use_id: id, input_summary: label, description: label }] }, { type: 'tool_result', tool_use_id: id, tool_name: name, content: 'ok' }];
 const NOTICE = "You have 2 unread messages on the message board. Run 'coral-board read' to see them.";
@@ -42,7 +43,7 @@ const fixture = [
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 900, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`import((window.__coralStatic || '/static/') + 'live_chat.js').then(m => {
             const box = document.createElement('div'); box.id = 'fold-box'; box.className = 'chat-messages chat-prose';
             box.style.cssText = 'position:fixed;left:0;top:0;width:860px;height:880px;overflow:auto;background:var(--bg-primary);z-index:99999;padding:12px';

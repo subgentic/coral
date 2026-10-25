@@ -6,6 +6,7 @@
 // Run against an isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -16,7 +17,7 @@ const { connect } = require('./agent_view_harness');
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`(() => { const orig = window.fetch; window.fetch = (url, opts = {}) => { const u = String(url);
             if (/\\/search-files\\?/.test(u) && /view=explorer/.test(u)) { const dir = new URL(u, location.href).searchParams.get('dir');
                 const entries = dir === '.' ? [{ name: 'src', type: 'dir', path: 'src' }, { name: 'README.md', type: 'file', path: 'README.md' }, { name: 'notes.txt', type: 'file', path: 'notes.txt' }]

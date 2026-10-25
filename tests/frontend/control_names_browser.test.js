@@ -3,6 +3,7 @@
 // had none (#3981 audit, point 8). Run against an isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, PRELOAD, install } = await connect();
@@ -11,7 +12,7 @@ const { connect } = require('./agent_view_harness');
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`window.__coral.buildAllLazy(); true`); // the dialogs are built on first open (#4500): check every control in them
         const unnamed = await ev(`(() => { const t = s => (s || '').replace(/\\s+/g, ' ').trim(); const out = [];
             for (const root of ['settings-modal', 'default-prompts-modal', 'prompt-modal']) {

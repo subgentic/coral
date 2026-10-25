@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { setTheme, auditRegion } = require('./helpers/contrast');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const CODE = 'J3CD-G5X3';
 const VERIFY = 'https://app.coralhub.dev/enroll?code=J3CD-G5X3';
@@ -52,7 +53,7 @@ const STUB = `
             await Emulation.setDeviceMetricsOverride({ width: view.w, height: view.h, deviceScaleFactor: 2, mobile: view.phone });
             await Emulation.setTouchEmulationEnabled({ enabled: view.phone });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             await setTheme(ev, view.theme);
             await ev(STUB);
             await ev(`import(${S} + 'editions.js').then(m => m.showHubSetup('connect')).then(() => true)`);

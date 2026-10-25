@@ -11,6 +11,7 @@ const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const GOLDEN = path.join(__dirname, 'fixtures', 'feed_message_golden.json');
 const sha = t => require('node:crypto').createHash('sha256').update(t).digest('hex');
+const { coralReady } = require('./helpers/wait');
 
 const S = (name, o = {}) => ({ name, session_id: name + '-id', agent_type: 'claude', status: 'Working', summary: 'sum ' + name, display_name: null, working_directory: '/work/' + name, branch: 'main', repo_name: 'repo', model: 'opus',
     waiting_for_input: false, sleeping: false, staleness_seconds: 5, commands: ['/x'], changed_file_count: 2, ...o });
@@ -49,7 +50,7 @@ const STEPS = [
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'settings');
         await ev(`(async () => {
             const st = window.__coralStatic || '/static/';
             const T = window.T = { state: (await import(st + 'state.js')).state, ws: await import(st + 'websocket.js') };

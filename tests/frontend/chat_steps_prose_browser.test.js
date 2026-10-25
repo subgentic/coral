@@ -6,6 +6,7 @@
 // Run against an isolated dev server; set STEPS_SHOT_DIR to save screenshots.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 const tool = (id, name, summary, label) => ({ name, tool_use_id: id, input_summary: summary, description: label });
 const preCall = (id, name, label, pre) => [{ type: 'assistant', text: pre, tool_uses: [tool(id, name, label, label)] }, { type: 'tool_result', tool_use_id: id, tool_name: name, content: 'ok' }];
@@ -32,7 +33,7 @@ const fixture = withHook => [
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 900, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         const render = (msgs, id) => ev(`import((window.__coralStatic || '/static/') + 'live_chat.js').then(m => {
             document.getElementById(${JSON.stringify(id)})?.remove();
             const box = document.createElement('div'); box.id = ${JSON.stringify(id)}; box.className = 'chat-messages chat-prose';
