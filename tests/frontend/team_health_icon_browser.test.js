@@ -131,22 +131,27 @@ const { setTheme } = require('./helpers/contrast');
         assert.ok(/whether or not the health check/.test(await ev(`document.getElementById('hr-auto_delegate-w').textContent`)), 'and says (behind its (i)) that it works with the check off');
         await shot('settings-health');
 
-        // The Agent Team dialog has no health option (UI audit #5589: the check has one home, Team settings > Health check):
-        // a launch sends no health_monitor, so the team gets the default (off).
+        // The Agent Team dialog's step 3 has the Health check tab (#7407, the design): the switch is off, and a launch sends health_monitor only when it is on.
         await ev(`(async () => { window.__launches = []; const real = window.fetch; const json = (b) => Promise.resolve(new Response(JSON.stringify(b), { status: 200, headers: { 'content-type': 'application/json' } }));
             window.fetch = (u, o = {}) => { const p = new URL(String(u), location.href); if (p.pathname === '/api/sessions/launch-team' && (o.method || 'GET') === 'POST') { window.__launches.push(JSON.parse(o.body)); return json({ agents: [{ name: 'A', session_id: 's' }] }); } return real(u, o); };
             await window.showLaunchModal(); window.hideLaunchModal(); // the dialog's markup loads on first use
             return true; })()`);
-        await ev(`window.showLaunchModal(); window._selectLaunchType('team'); true`);
-        await waitFor(`getComputedStyle(document.getElementById('launch-step-team')).display !== 'none'`, 'the team step');
-        await waitFor(`!document.querySelector('#launch-step-team .btn-primary').disabled`, 'the Launch button to be enabled');
-        assert.equal(await ev(`!!document.getElementById('launch-team-health') || !!document.getElementById('team-health-option') || /health monitor/i.test(document.getElementById('launch-step-team').textContent)`), false, 'the Agent Team dialog has no health check option');
-        await shot('dialog');
-        await ev(`document.getElementById('team-board-name').value = 'hl-launch'; document.getElementById('launch-team-dir').value = '/work/project'; window._validateTeamName(); true`);
-        await waitFor(`!document.getElementById('team-board-name-hint').classList.contains('error')`, 'the team name to be accepted');
-        await ev(`window._addTeamAgent('Amy', 'First.'); window.launchTeam(); true`); // the dialog starts with no members (#5989)
-        await waitFor(`window.__launches.length === 1`, 'the launch request');
-        assert.equal('health_monitor' in await ev(`window.__launches[0]`), false, 'not sent: the team gets the default (off) and is set in Team settings > Health check');
-        console.log('PASS team health monitor: off by default, the icon (dimmed off, accent on, 44 px on a phone, none through the Hub), it opens the setting, none in the launch dialog');
+        const launchTeam = async (name, ticked) => {
+            await ev(`window.showLaunchModal(); window._selectLaunchType('team'); true`);
+            await waitFor(`getComputedStyle(document.getElementById('launch-step-team')).display !== 'none'`, 'the team step');
+            await ev(`{ const n = document.getElementById('team-board-name'); n.value = ${JSON.stringify(name)}; n.dispatchEvent(new Event('input', { bubbles: true })); const d = document.getElementById('launch-team-dir'); d.value = '/work/project'; d.dispatchEvent(new Event('input', { bubbles: true })); window._validateTeamName(); } window._addTeamAgent('Orchestrator', 'First.'); document.getElementById('launch-team-next').click(); true`); // the members are step 2
+            await waitFor(`document.querySelectorAll('#team-agents-list .team-agent-row').length === 1`, 'the member');
+            await ev(`document.getElementById('launch-team-next').click(); true`); // step 3
+            await waitFor(`!!document.querySelector('#launch-step-team [name=on]')`, 'the Health check tab');
+            assert.equal(await ev(`document.querySelector('#launch-step-team [name=on]').checked`), false, 'the health check switch is off by default');
+            if (ticked) await ev(`document.querySelector('#launch-step-team [name=on]').click(); true`);
+            const before = await ev(`window.__launches.length`);
+            await ev(`document.getElementById('launch-team-go').click(); true`);
+            await waitFor(`window.__launches.length === ${before} + 1`, 'the launch request');
+            return await ev(`window.__launches[window.__launches.length - 1]`);
+        };
+        assert.equal('health_monitor' in await launchTeam('hl-launch', false), false, 'not sent while the switch is off: the team gets the default (off)');
+        assert.equal((await launchTeam('hl-launch-2', true)).health_monitor, true, 'sent as true when the switch is on');
+        console.log('PASS team health monitor: off by default, the icon (dimmed off, accent on, 44 px on a phone, none through the Hub), it opens the setting, a switch in the launch dialog sent only when on');
     } finally { await ev(`fetch('/api/board/${TEAM}', { method: 'DELETE' }).then(r => r.status)`).catch(() => {}); await client.close(); } // the suite's board goes (the runner's end-check names one left)
 })().catch(e => { console.error(e); process.exitCode = 1; });

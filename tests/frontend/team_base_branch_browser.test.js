@@ -28,7 +28,7 @@ const MISSING = 'The base branch main does not exist in /work/repo. Its branches
             const click = sel => ev(`document.querySelector(${JSON.stringify(sel)}).click(); true`);
             const type = (id, v) => ev(`{ const i = document.getElementById(${JSON.stringify(id)}); i.value = ${JSON.stringify(v)}; i.dispatchEvent(new Event('input', { bubbles: true })); i.dispatchEvent(new Event('change', { bubbles: true })); } true`);
             await ev(`window.showLaunchModal(); window._selectLaunchType('team'); true`);
-            await waitFor(`getComputedStyle(document.getElementById('launch-step-team')).display !== 'none' && document.querySelectorAll('#team-template-list [role=option]').length > 0`, 'the team step');
+            await waitFor(`getComputedStyle(document.getElementById('launch-step-team')).display !== 'none' && document.querySelectorAll('#team-template-select option').length > 1`, 'the team step');
             await type('team-board-name', 'crew-1'); await type('launch-team-dir', '/work/repo');
             await waitFor(`document.getElementById('launch-team-base-branch').value === 'master'`, 'Base Branch to take the repo\'s branch', 6000);
             check(`${tag}: Base Branch starts as the repo's current branch (master), not "main"`, (await ev(`document.getElementById('launch-team-base-branch').value`)) === 'master' && (await ev(`document.getElementById('launch-team-base-branch').placeholder`)) !== 'main');
@@ -43,16 +43,17 @@ const MISSING = 'The base branch main does not exist in /work/repo. Its branches
             await ev(`{ const c = document.getElementById('launch-team-worktree'); if (!c.checked) { c.checked = true; c.dispatchEvent(new Event('change', { bubbles: true })); } } true`);
             await ev(`{ const i = document.getElementById('launch-team-base-branch'); i.value = 'main'; i.dispatchEvent(new Event('input', { bubbles: true })); } true`);
             await ev(`window.__launchAnswer = { status: 400, body: { error: ${JSON.stringify(MISSING)}, code: 'base_branch_missing', field: 'base_branch', branches: ['master'], default_branch: 'master' } }; document.querySelectorAll('.toast').forEach(t => t.remove()); true`);
-            await ev(`document.querySelector('#team-template-list [role=option]').click(); true`); // a template: the members the launch needs
+            await click('#launch-team-next'); // step 2: a template, the members the launch needs
+            await ev(`{ const sel = document.getElementById('team-template-select'); sel.value = [...sel.options].find(o => o.value).value; sel.dispatchEvent(new Event('change', { bubbles: true })); } true`);
             await waitFor(`document.querySelectorAll('#team-agents-list .team-agent-row').length > 0`, 'the template members');
-            await ev(`document.querySelector('#launch-step-team .team-step-tab[data-step="start"]').click(); true`);
+            await click('#launch-team-next'); // step 3
             await click('#launch-team-go');
             await waitFor(`!!document.getElementById('launch-team-base-branch-error')`, 'the inline error', 6000);
             await sleep(300); // sleep-ok: the absence of a toast
             const e = await ev(`(() => { const i = document.getElementById('launch-team-base-branch'), l = document.getElementById('launch-team-base-branch-error');
                 return { invalid: i.getAttribute('aria-invalid'), described: (i.getAttribute('aria-describedby') || '').split(' ').includes('launch-team-base-branch-error'), role: l.getAttribute('role'), text: l.textContent,
-                    open: !!i.closest('details') && i.closest('details').open, focus: document.activeElement === i, toasts: [...document.querySelectorAll('.toast')].map(t => t.textContent.trim()), visible: l.getBoundingClientRect().height > 0 }; })()`);
-            check(`${tag}: the refusal is said under Base Branch, as an alert, with the field marked and described, More options open and the focus on it`, e.invalid === 'true' && e.described && e.role === 'alert' && e.text === MISSING && e.open && e.focus && e.visible, JSON.stringify(e));
+                    step: document.getElementById('launch-step-team').dataset.stage, focus: document.activeElement === i, toasts: [...document.querySelectorAll('.toast')].map(t => t.textContent.trim()), visible: l.getBoundingClientRect().height > 0 }; })()`);
+            check(`${tag}: the refusal is said under Base Branch, as an alert, with the field marked and described, the dialog back on step 1 and the focus on it`, e.invalid === 'true' && e.described && e.role === 'alert' && e.text === MISSING && e.step === 'team' && e.focus && e.visible, JSON.stringify(e));
             check(`${tag}: and not as a toast (a toast is gone in five seconds and cut to two lines on a phone)`, e.toasts.length === 0, JSON.stringify(e.toasts));
             check(`${tag}: the dialog stays open to fix it`, await ev(`getComputedStyle(document.getElementById('launch-modal')).display !== 'none'`));
             await ev(`{ const i = document.getElementById('launch-team-base-branch'); i.value = 'master'; i.dispatchEvent(new Event('input', { bubbles: true })); } true`);

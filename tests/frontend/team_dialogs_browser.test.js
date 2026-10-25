@@ -39,19 +39,19 @@ const BASE = require('./test_base').BASE;
 
         console.log('The team form starts with no members (#5989), a hint for the name, and moves its agents');
         await openTeam();
-        await waitFor(`document.querySelectorAll('#team-template-list [role=option]').length > 0`, 'the template choice');
+        await waitFor(`document.querySelectorAll('#team-template-select option').length > 1`, 'the template choice');
         assert.deepEqual(await teamRows(), [], 'no members nobody picked');
-        await ev(`document.querySelector('#launch-step-team .team-step-tab[data-step="members"]').click(); true`);
+        await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'team_steps.js'); m.showTeamStep('members'); return true; })()`);
         assert.equal(await ev(`getComputedStyle(document.querySelector('#launch-step-team .team-agents-empty')).display !== 'none'`), true, 'the line that says what to do');
-        await ev(`document.querySelector('#launch-step-team .team-step-tab[data-step="team"]').click(); true`);
+        await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'team_steps.js'); m.showTeamStep('team'); return true; })()`);
         assert.equal(await ev(`document.getElementById('launch-team-dir').value === '' && document.getElementById('launch-team-dir').required && document.getElementById('launch-team-dir').getBoundingClientRect().height > 0`), true, 'the folder is on the first screen, empty and required');
-        assert.equal(await ev(`!!document.getElementById('team-goal') && !!document.getElementById('team-goal').closest('#team-panel-start')`), true, 'the optional first task is on the Start step');
-        await ev(`window._addTeamAgent('Amy', 'First.'); true`);
+        assert.equal(await ev(`!!document.getElementById('team-goal') && !!document.getElementById('team-goal').closest('#team-panel-start')`), true, 'the optional first task is on step 3, the Start tab');
+        await ev(`window._addTeamAgent('Orchestrator', 'First.'); true`);
         // #4950: the team form is a sectioned dialog that opens on Members; the name is above the sections (#5589 finding 6), so every section has it and Launch Team without it stays where it is.
-        assert.equal(await ev(`document.querySelector('#launch-step-team .team-step-tab[aria-selected=true]').dataset.step`), 'team'); // the three steps (#6397): the dialog opens on Team; the name and the folder are there
+        assert.equal(await ev(`document.getElementById('launch-step-team').dataset.stage`), 'team'); // the three steps (#6397, #7407): the dialog opens on step 1; the name and the folder are there
         await ev(`document.getElementById('team-board-name').value = ''; document.querySelector('#launch-step-team [data-on-click="m-launch-team"]').click(); true`);
         await waitFor(`document.activeElement && document.activeElement.id === 'team-board-name'`, 'Launch Team without a name puts the focus on the name');
-        assert.equal(await ev(`document.querySelector('#launch-step-team .team-step-tab[aria-selected=true]').dataset.step`), 'team', 'and stays on Team');
+        assert.equal(await ev(`document.getElementById('launch-step-team').dataset.stage`), 'team', 'and stays on step 1');
         assert.deepEqual(await hint(), ['', false]);
         await ev(`{ const i = document.getElementById('team-board-name'); i.value = 'taken'; i.dispatchEvent(new Event('input', { bubbles: true })); } true`);
         await waitFor(`window._validateTeamName() && /exists/.test(document.getElementById('team-board-name-hint').textContent)`, 'the existing-board hint');
@@ -74,30 +74,30 @@ const BASE = require('./test_base').BASE;
         await ev(`{ const d = document.getElementById('launch-team-dir'); d.value = '/work/repo'; d.dispatchEvent(new Event('change', { bubbles: true })); window._checkTeamGitDir && window._checkTeamGitDir(); } true`);
 
         console.log('Templates: the list has the built-ins, loading one fills the agents, saving adds it to the list');
-        const opts = await ev(`[...document.querySelectorAll('#team-template-list [role=option]')].map(o => o.textContent)`);
-        assert.ok(opts.some(o => /^Coding Team5 members$/.test(o)), JSON.stringify(opts));
-        await ev(`window._loadTeamTemplateFromSelect('Dungeon Master'); true`);
+        const opts = await ev(`[...document.querySelectorAll('#team-template-select option')].map(o => o.textContent)`);
+        assert.ok(opts.some(o => /^Coding Team \(5 members\)$/.test(o)), JSON.stringify(opts));
+        await ev(`import((window.__coralStatic || '/static/') + 'team_dialogs.js').then(m => m._pickTeamTemplate('Dungeon Master')); true`);
         assert.deepEqual((await teamRows()).slice(0, 2), ['Dungeon Master', 'Warrior']); assert.equal((await teamRows()).length, 7);
-        assert.equal(await ev(`document.querySelector('#team-template-list [aria-selected=true]').dataset.name`), 'Dungeon Master', 'the chosen template is marked');
+        assert.equal(await ev(`document.getElementById('team-template-select').value`), 'Dungeon Master', 'the chosen template is shown in the select');
         await ev(`window._saveTeamTemplate(); true`);
         await waitFor(`getComputedStyle(document.getElementById('save-template-modal')).display !== 'none'`, 'the save dialog');
         assert.equal(await ev(`document.getElementById('save-template-name').value`), 'fresh', 'named after the board');
         await ev(`document.getElementById('save-template-name').value = ''; window._confirmSaveTemplate(); true`);
         assert.ok((await toasts()).some(t => /Template name is required/.test(t)));
         await ev(`document.getElementById('save-template-name').value = 'My Crew'; window._confirmSaveTemplate(); true`);
-        await waitFor(`[...document.querySelectorAll('#team-template-list [role=option]')].some(o => o.textContent === 'My Crew7 members, saved')`, 'the saved template in the list');
+        await waitFor(`[...document.querySelectorAll('#team-template-select option')].some(o => o.textContent === 'My Crew (7 members, saved)')`, 'the saved template in the list');
         assert.equal(await ev(`getComputedStyle(document.getElementById('save-template-modal')).display`), 'none');
 
         console.log('The team-agent dialog: a name is required, Save adds the agent, Edit changes it');
         await ev(`window.showTeamAgentModal(); true`);
-        assert.deepEqual(await ev(`[document.getElementById('team-agent-modal-title').textContent, getComputedStyle(document.getElementById('team-agent-modal')).display]`), ['Add Team Agent', 'flex']);
+        assert.deepEqual(await ev(`[document.getElementById('team-agent-modal-title').textContent, getComputedStyle(document.getElementById('team-agent-modal')).display]`), ['Add member', 'flex']);
         await ev(`window.saveTeamAgentFromModal(); true`);
-        assert.ok((await toasts()).some(t => /Agent name is required/.test(t)));
+        assert.ok((await toasts()).some(t => /A member needs a role/.test(t)));
         await ev(`{ const n = document.querySelector('#team-agent-modal-acf .acf-name'); n.value = 'Scribe'; n.dispatchEvent(new Event('input', { bubbles: true })); } true`);
         await ev(`window.saveTeamAgentFromModal(); true`);
         assert.equal((await teamRows()).includes('Scribe'), true, 'added'); assert.equal(await ev(`getComputedStyle(document.getElementById('team-agent-modal')).display`), 'none');
         await ev(`window.showTeamAgentModal([...document.querySelectorAll('#team-agents-list .team-agent-row')].find(r => r.querySelector('.team-agent-role-name').textContent === 'Scribe')); true`);
-        assert.equal(await ev(`document.getElementById('team-agent-modal-title').textContent`), 'Edit Team Agent');
+        assert.equal(await ev(`document.getElementById('team-agent-modal-title').textContent`), 'Edit member');
         await ev(`{ const n = document.querySelector('#team-agent-modal-acf .acf-name'); n.value = 'Editor'; n.dispatchEvent(new Event('input', { bubbles: true })); window.saveTeamAgentFromModal(); } true`);
         rows = await teamRows(); assert.equal(rows.includes('Editor') && !rows.includes('Scribe'), true, 'edited: ' + JSON.stringify(rows));
 
@@ -106,7 +106,7 @@ const BASE = require('./test_base').BASE;
         assert.ok((await toasts()).some(t => /Team name is required/.test(t)));
         await ev(`document.getElementById('team-board-name').value = 'crew-1'; document.getElementById('launch-team-dir').value = ''; window._validateTeamName(); window.launchTeam(); true`);
         assert.ok(!(await toasts()).some(t => /Choose a folder for the team/.test(t)), 'said once, under the field (#6029)'); assert.match(await ev(`document.getElementById('launch-team-dir-error').textContent`), /Choose a folder/);
-        await ev(`document.getElementById('launch-team-dir').value = '/work/project'; document.getElementById('team-goal').value = 'Build the login page.'; window.launchTeam(); true`);
+        await ev(`window._addTeamAgent('Orchestrator', 'Lead the team.'); document.getElementById('launch-team-dir').value = '/work/project'; document.getElementById('team-goal').value = 'Build the login page.'; window.launchTeam(); true`); // a team needs an Orchestrator (#7407)
         await waitFor(`window.__teamLaunches.length === 1`, 'the request');
         const sent = await ev(`window.__teamLaunches[0]`);
         assert.equal(sent.board_name, 'crew-1'); assert.equal(sent.working_dir, '/work/project'); assert.ok(Array.isArray(sent.flags)); assert.ok(sent.agents.length >= 8 && sent.agents.every(a => a.name));
@@ -121,16 +121,16 @@ const BASE = require('./test_base').BASE;
         assert.equal(await ev(`document.getElementById('team-goal').value`), 'Build the login page.', 'the field keeps what was typed until the dialog is opened again');
         // The first task that could not be sent (the board answers 500) is not lost: it waits in the board's message box, with a toast, to send again.
         await openTeam();
-        await ev(`window._addTeamAgent('Amy', 'First.'); window.__postStatus = 500; window.__posts.length = 0; window.__launchAnswer = { status: 200, body: { board_id: 'crew-1-2', agents: [{ name: 'A', session_id: 's' }] } }; document.querySelectorAll('.toast').forEach(t => t.remove()); true`);
+        await ev(`window._addTeamAgent('Orchestrator', 'First.'); window.__postStatus = 500; window.__posts.length = 0; window.__launchAnswer = { status: 200, body: { board_id: 'crew-1-2', agents: [{ name: 'A', session_id: 's' }] } }; document.querySelectorAll('.toast').forEach(t => t.remove()); true`);
         await ev(`document.getElementById('team-board-name').value = 'crew-1'; document.getElementById('launch-team-dir').value = '/work/project'; document.getElementById('team-goal').value = 'Try again.'; window._validateTeamName(); window.launchTeam(); true`);
         await waitFor(`window.__posts.length === 1`, 'the post that fails');
         assert.equal(await ev(`window.__posts[0].path`), '/api/board/crew-1-2/messages', 'the first task goes to the id the server made ("Create another" on a name in use), not the label typed');
         await waitFor(`[...document.querySelectorAll('.toast')].some(t => /first task was not sent/.test(t.textContent))`, 'the toast that says so');
-        await waitFor(`document.getElementById('board-panel-input')?.value === '@Amy Try again.'`, 'the draft in the message box');
+        await waitFor(`document.getElementById('board-panel-input')?.value === '@Orchestrator Try again.'`, 'the draft in the message box');
         assert.equal(await ev(`T.state.selectedTeam`), 'crew-1-2', 'and the team that opens is that board');
         await ev(`window.__postStatus = 200; window.__launchAnswer = { status: 200, body: { agents: [{ name: 'A', session_id: 's' }] } }; true`);
         await openTeam();
-        await ev(`window._addTeamAgent('Amy', 'First.'); true`); // a new dialog starts with no members (#5989)
+        await ev(`window._addTeamAgent('Orchestrator', 'First.'); true`); // a new dialog starts with no members (#5989)
         await ev(`window.__launchAnswer = { status: 200, body: { agents: [{ name: 'A' }, { name: 'B', error: 'no cli' }] } }; document.getElementById('team-board-name').value = 'crew-2'; document.getElementById('launch-team-dir').value = '/work/project'; window._validateTeamName(); window.launchTeam(); true`);
         await waitFor(`!!document.querySelector('body > .modal:not([id]) ul li')`, 'the failed-agents dialog');
         assert.deepEqual(await ev(`[document.querySelector('body > .modal:not([id]) h3').textContent, document.querySelector('body > .modal:not([id]) ul li').textContent]`), ['Team Launch — 1 agent failed', 'B: no cli']);
@@ -139,7 +139,7 @@ const BASE = require('./test_base').BASE;
         // A team in which nobody started (#122): the server answers an error with each member's error; the same per-member dialog (with its Settings
         // button) shows, and the launch dialog stays open to try again.
         await openTeam();
-        await ev(`window._addTeamAgent('Amy', 'First.'); true`); // a new dialog starts with no members (#5989)
+        await ev(`window._addTeamAgent('Orchestrator', 'First.'); true`); // a new dialog starts with no members (#5989)
         await ev(`window.__launchAnswer = { status: 422, body: { ok: false, code: 'team_launch_failed', error: 'no agent in the team started (A: no cli; B: no cli)', agents: [{ name: 'A', error: 'no cli' }, { name: 'B', error: 'no cli' }] } }; document.getElementById('team-board-name').value = 'crew-3'; document.getElementById('launch-team-dir').value = '/work/project'; window._validateTeamName(); window.launchTeam(); true`);
         await waitFor(`!!document.querySelector('body > .modal:not([id]) ul li')`, 'the all-failed dialog');
         assert.deepEqual(await ev(`[document.querySelector('body > .modal:not([id]) h3').textContent, document.querySelectorAll('body > .modal:not([id]) ul li').length, !!document.querySelector('body > .modal:not([id]) [data-action=settings]')]`), ['Team Launch — 2 agents failed', 2, true]);
