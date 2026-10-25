@@ -40,7 +40,7 @@ export function pickerVisible(hub, servers) {
 /** Dropdown entries: Local first, then each remote, unusable ones disabled with a reason. */
 export function pickerOptions(servers) {
     // The Cloud Hub runs no agents of its own: only the user's servers are targets.
-    const opts = state.cloud === true ? [] : [{ id: LOCAL_SERVER, label: 'Local (this machine)', disabled: false, reason: '' }];
+    const opts = state.cloud === true ? [] : [{ id: LOCAL_SERVER, label: 'This computer', disabled: false, reason: '' }];
     for (const s of remoteServers(servers)) {
         const reason = UNUSABLE_STATUS_REASON[s.status] || '';
         const name = s.label || s.id;

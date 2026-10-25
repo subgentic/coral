@@ -239,7 +239,7 @@ export function renderAgentConfigForm(containerId, opts = {}) {
 
     let presetHTML = '';
     if (showPreset) {
-        presetHTML = `<div id="${escapeAttr(uid)}-presets" class="agent-preset-selector" style="margin-bottom:8px"></div>`;
+        presetHTML = `${opts.sections ? `<div class="launch-field-head"><label for="${escapeAttr(uid)}-preset">Start from a persona</label> <span class="launch-optional">optional</span></div>` : ''}<div id="${escapeAttr(uid)}-presets" class="agent-preset-selector" style="margin-bottom:8px"></div>`;
     }
 
     let nameHTML = '';
@@ -382,7 +382,7 @@ export function renderAgentConfigForm(containerId, opts = {}) {
 
     // Render presets if enabled — pass containerId so the preset handler knows which ACF to update
     if (showPreset) {
-        _renderPresetButtons(`${uid}-presets`, 'acf', { target: containerId });
+        _renderPresetButtons(`${uid}-presets`, 'acf', { target: containerId, selectId: opts.sections ? `${uid}-preset` : undefined });
     }
 
     // Loaded values are classified against the provider's known defaults and
