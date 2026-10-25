@@ -312,3 +312,67 @@ func TestGoalLinksRedactBeforeTheyCut(t *testing.T) {
 		assert.LessOrEqual(t, len([]rune(got)), GoalLinksTitleMax, "pad %d", pad)
 	}
 }
+
+// #7464 pins (Security Reviewer Windows). Each fails on its mutant.
+
+// The reconcile (a crash between the task and the mark leaves a task whose request is still pending) is keyed with the sender's server: two senders with the same sender board and the same id on one receiving
+// board are not mixed up, and the other asker is shown nothing.
+func TestReconcileMarksOnlyTheRequestOfTheSenderServerThatTheTaskIsFor(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	on := true
+	_, err := s.UpdateBoardSettings(ctx, "beta", BoardSettingsUpdate{GoalRequests: &on})
+	require.NoError(t, err)
+	rid := strings.Repeat("cd", 16)
+	for _, srv := range []string{"srv-1", "srv-2"} {
+		_, err := s.db.ExecContext(ctx, `INSERT INTO board_goal_requests_in (board_id, request_id, from_server, from_board, goal_uid, status, created_at) VALUES ('beta', ?, ?, 'alpha', 'g', 'pending', '2030-01-01T00:00:00Z')`, rid, srv)
+		require.NoError(t, err)
+	}
+	// srv-1's task exists (made, then the crash: its row is still pending)
+	task, err := s.CreateTaskWithOpts(ctx, "beta", "srv-1's job", "", "medium", "Lead", &CreateTaskOpts{remote: &remoteGoalLink{BoardUID: "b", GoalUID: "g", RequestID: rid, Server: "srv-1", Board: "alpha"}})
+	require.NoError(t, err)
+	rows, err := s.ListGoalRequestsIn(ctx, "beta", "", 50)
+	require.NoError(t, err)
+	got := map[string]string{}
+	for _, r := range rows {
+		got[r.FromServer] = r.Status
+	}
+	assert.Equal(t, map[string]string{"srv-1": "accepted", "srv-2": "pending"}, got, "only the sender the task was made for is marked")
+	reply, err := s.GoalLinks(ctx, rid, "srv-2", "alpha", "", 50, nil)
+	require.NoError(t, err)
+	assert.Empty(t, reply.Accepted, "the other asker is shown nothing")
+	reply, err = s.GoalLinks(ctx, rid, "srv-1", "alpha", "", 50, nil)
+	require.NoError(t, err)
+	require.Len(t, reply.Accepted, 1)
+	assert.Equal(t, task.ID, reply.Accepted[0].TaskID)
+}
+
+// A reply is applied only for a request id of the one form (32 lower-case hex), even when a row with another id exists.
+func TestAReplyWithAMalformedRequestIDIsNotApplied(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	for _, id := range []string{strings.Repeat("AB", 16), strings.Repeat("ab", 15) + "a", strings.Repeat("ab", 16) + "a", strings.Repeat("ab", 15) + "a\x00", strings.Repeat("ab", 15) + "a\n", ""} {
+		_, err := s.db.ExecContext(ctx, `INSERT INTO board_goal_requests_out (board_id, goal_id, request_id, to_server, to_board, status, created_at) VALUES ('alpha', 1, ?, '', 'beta', 'requested', '2030-01-01T00:00:00Z')`, id)
+		require.NoError(t, err)
+		_, err = s.ApplyGoalRequestReply(ctx, "alpha", id, "", "beta", "accepted", "")
+		assert.ErrorIs(t, err, ErrGoalRequestReplyUnknown, "id %q", id)
+		var status string
+		require.NoError(t, s.db.GetContext(ctx, &status, `SELECT status FROM board_goal_requests_out WHERE request_id = ?`, id))
+		assert.Equal(t, "requested", status, "the row is untouched: %q", id)
+	}
+}
+
+// A received row is listed by the read only when it is accepted, even when it has a task id.
+func TestGoalLinksListOnlyAcceptedRows(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	rid, task := acceptedRequest(t, s, ctx, "alpha", "beta", "job", "")
+	for _, st := range []string{"pending", "declined", "expired"} {
+		_, err := s.db.ExecContext(ctx, `UPDATE board_goal_requests_in SET status = ? WHERE request_id = ?`, st, rid)
+		require.NoError(t, err)
+		reply, err := s.GoalLinks(ctx, rid, "", "alpha", "", 50, nil)
+		require.NoError(t, err)
+		assert.Empty(t, reply.Accepted, "a %s row that still has task %d is not listed", st, task.ID)
+		assert.Zero(t, reply.AcceptedTotal, st)
+	}
+}
