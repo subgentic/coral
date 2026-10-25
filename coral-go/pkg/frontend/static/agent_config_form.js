@@ -253,8 +253,8 @@ export function renderAgentConfigForm(containerId, opts = {}) {
             <label>Agent Type:
                 <select class="acf-agent-type">
                     <option value="claude"${agentTypeVal === 'claude' || !agentTypeVal ? ' selected' : ''}>Claude</option>
-                    <option value="agy"${agentTypeVal === 'agy' || agentTypeVal === 'antigravity' || agentTypeVal === 'gemini' ? ' selected' : ''}>Antigravity</option>
                     <option value="codex"${agentTypeVal === 'codex' ? ' selected' : ''}>Codex</option>
+                    <option value="agy"${agentTypeVal === 'agy' || agentTypeVal === 'antigravity' || agentTypeVal === 'gemini' ? ' selected' : ''}>Antigravity</option>
                     <option value="pi"${agentTypeVal === 'pi' ? ' selected' : ''}>Pi</option>
                     <option value="terminal"${agentTypeVal === 'terminal' ? ' selected' : ''}>Terminal</option>
                 </select>

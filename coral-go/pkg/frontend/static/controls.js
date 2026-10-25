@@ -584,6 +584,7 @@ async function showRestartModal() {
     }
 
     document.getElementById("restart-modal").style.display = "flex";
+    importOnce('./quiet_focus.js').then(m => m.quietFocus(document.getElementById('restart-modal')), () => {}); // the selected tab takes the focus: no ring until a key is pressed (#7391)
 }
 
 export function hideRestartModal() {

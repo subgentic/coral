@@ -62,7 +62,7 @@ export function modelLabel(agentType, modelId, server) {
 /** The provider's name for an agent type ("Claude"), '' for a terminal (it has none). */
 export function providerName(agentType) { return agentType === 'terminal' ? '' : typeName(agentType); }
 
-export const LEVEL_NAMES = { low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Extra high', max: 'Max' };
+export const LEVEL_NAMES = { minimal: 'Minimal', low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Extra high', max: 'Max' };
 export const levelName = l => LEVEL_NAMES[l] || l;
 
 /** The thinking (effort) level a row has on record: { name, requested } or null. The level the newest turn ran at (thinking_actual, from the transcript) when there is one, else the level the
