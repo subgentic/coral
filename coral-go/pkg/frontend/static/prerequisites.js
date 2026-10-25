@@ -123,7 +123,7 @@ export async function checkTmuxForLaunch(element, {force = false, isLocal = () =
         if (!current(element,controller)) return;
         if (data.tmux_available || data.tmux_required === false || data.effective_backend === 'pty') { element.replaceChildren(); setHidden(element, true); blocksLaunch(element, false); return; }
         blocksLaunch(element, true); setHidden(element, false);
-        renderCLI(element, 'tmux is not installed. Coral needs it to run agents.', recheck, {command:data.tmux_install_command || ''});
+        renderCLI(element, 'tmux is not installed. Coral needs tmux to run agents.', recheck, {command:data.tmux_install_command || ''});
     } catch (error) {
         if (!current(element,controller) || error.name === 'AbortError') return;
         // A check that failed says nothing about tmux: it does not hold the launch.
