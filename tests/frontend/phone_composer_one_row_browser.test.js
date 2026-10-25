@@ -41,7 +41,7 @@ const S = `(window.__coralStatic || '/static/')`;
 
         console.log('Options opens a sheet with what each holds; a choice opens that menu; Escape goes back to Options');
         const o = await ev(`(() => { const b = document.getElementById('options-chip'); return { name: b.textContent.trim(), popup: b.getAttribute('aria-haspopup'), expanded: b.getAttribute('aria-expanded') }; })()`);
-        assert.deepEqual(o, { name: 'Options', popup: 'menu', expanded: 'false' });
+        assert.deepEqual(o, { name: 'Model and thinking', popup: 'menu', expanded: 'false' });
         await ev(`document.getElementById('options-chip').click(); true`);
         await waitFor(`!document.getElementById('options-chip-menu').hidden`, 'the Options sheet', 3000);
         assert.equal(await ev(`document.getElementById('options-chip').getAttribute('aria-expanded')`), 'true');
