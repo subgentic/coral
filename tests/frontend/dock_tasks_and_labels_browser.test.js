@@ -1,0 +1,50 @@
+// UI/UX's 170 list, items 9 and 12 (task 7639). Item 9: the labels of the Restart dialog's permission mode and of the Add Macro dialog (Label, Command) have no colon, as nowhere else. Item 12: the agent dock's
+// Tasks table has a sentence-case head (12/500, not capitals made by CSS), a board task's name is the row's one real button (its id is text), and a mouse click on a row leaves no focus ring behind. The task
+// list is an agent's Tasks tab on a real board of the isolated dev server (helpers/board_tasks_tab.js). Drives Chrome over CDP through agent_view_harness.js.
+const assert = require('node:assert/strict');
+const { connect } = require('./agent_view_harness');
+const BASE = require('./test_base').BASE;
+const { openBoardTasksTab } = require('./helpers/board_tasks_tab');
+const { removeBoards } = require('./helpers/board_cleanup');
+
+const B = 'dock-tasks-' + Date.now().toString(36);
+
+(async () => {
+    const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    try {
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        await Emulation.setDeviceMetricsOverride({ width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+        await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install();
+        await ev(`window.__coralReady.then(() => true)`);
+        const api = (m, p, body) => ev(`fetch(${JSON.stringify(p)}, { method: ${JSON.stringify(m)}, headers: { 'Content-Type': 'application/json' }, body: ${JSON.stringify(JSON.stringify(body))} }).then(r => r.status)`);
+        for (const [id, t] of [['Boss', 'Orchestrator'], ['dev-1', 'Developer']]) assert.equal(await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: id, job_title: t, session_name: id + '-s' }), 200);
+        for (const [title, priority] of [['Ship the queue', 'high'], ['Write the docs', 'low'], ['Fix the focus ring', 'medium']]) assert.equal(await api('POST', `/api/board/${B}/tasks`, { subscriber_id: 'Boss', title, priority }), 201);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await openBoardTasksTab({ ev, waitFor }, B);
+        await waitFor(`document.querySelectorAll('#board-task-list .board-task-item:not(.board-task-header)').length === 3 && document.getElementById('agentic-panel-tasks').getBoundingClientRect().width > 50`, 'three task rows', 15000);
+
+        console.log('12. a sentence-case head, the name is the one button, no ring after a click');
+        if (process.env.CORAL_SCREENSHOT_DIR) require('node:fs').writeFileSync(require('node:path').join(process.env.CORAL_SCREENSHOT_DIR, 'dock-tasks.png'), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));
+        const head = await ev(`(() => { const h = document.querySelector('#board-task-list .board-task-header'); const cs = getComputedStyle(h); return { texts: [...h.children].map(c => c.textContent.trim()), transform: cs.textTransform, weight: cs.fontWeight, size: cs.fontSize }; })()`);
+        assert.equal(head.transform, 'none', 'the head is not capitals made by CSS: ' + JSON.stringify(head));
+        assert.deepEqual([head.weight, head.size], ['500', '12px'], '12/500');
+        assert.deepEqual(head.texts.slice(0, 3), ['Status', 'ID', 'Priority'], 'the words as written');
+        const row = await ev(`(() => { const r = document.querySelector('#board-task-list .board-task-item:not(.board-task-header)'); const b = [...r.querySelectorAll('button')]; return { buttons: b.length, name: b[0] && b[0].getAttribute('aria-label'), inDesc: !!(b[0] && b[0].closest('.board-task-desc')), idIsButton: !!r.querySelector('button.board-task-id') }; })()`);
+        assert.equal(row.buttons, 1, 'one real button on the row: ' + JSON.stringify(row)); assert.ok(row.inDesc && !row.idIsButton, 'it is the name, and the id is text');
+        assert.ok(/^Open task #\d+: [A-Z]/.test(row.name), 'its name says what it opens: ' + row.name);
+        await ev(`document.querySelector('#board-task-list .board-task-item:not(.board-task-header) .board-task-desc').click(); true`);
+        await waitFor(`!!document.getElementById('task-detail-modal') && getComputedStyle(document.getElementById('task-detail-modal')).display !== 'none'`, 'the task opens', 8000);
+        await ev(`window.hideTaskDetailModal(); true`);
+        const ring = await ev(`[...document.querySelectorAll('#board-task-list *')].filter(e => { const c = getComputedStyle(e); return c.outlineStyle !== 'none' && parseFloat(c.outlineWidth) > 0; }).map(e => e.className)`);
+        assert.deepEqual(ring, [], 'no element of the list wears a ring after a mouse click and the dialog closing');
+
+        console.log('9. no colons on the Restart and Add Macro labels');
+        const macro = await ev(`['macro-label-input', 'macro-command-input'].map(id => document.getElementById(id).closest('label').firstChild.textContent.trim())`);
+        assert.deepEqual(macro, ['Label', 'Command'], 'the Add Macro labels');
+        await ev(`window.selectLiveSession && true; window.restartSession(); true`);
+        await waitFor(`!!document.querySelector('#restart-acf .acf-permission-mode')`, 'the Restart form', 10000);
+        const restart = await ev(`document.querySelector('#restart-acf .acf-permission-mode').closest('label').firstChild.textContent.trim()`);
+        assert.equal(restart, 'Permission mode', 'the Restart label');
+        console.log('PASS dock tasks and labels');
+    } finally { await removeBoards(ev, [B]); await client.close(); }
+})().catch(e => { console.error(e); process.exit(1); });

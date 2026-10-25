@@ -258,7 +258,7 @@ export function renderAgentConfigForm(containerId, opts = {}) {
             : 'default';
         const permModeDesc = v.agentType === 'codex' && CODEX_NETWORK_MODES.includes(permModeVal) ? CODEX_AUTO_DESCRIPTION : PERMISSION_MODE_DESCRIPTIONS[permModeVal] || '';
         autoPermissionsHTML = `
-            <label>Permission Mode:
+            <label>Permission mode
                 <select class="acf-permission-mode" data-on-change="perm-mode-describe">
                     <option value="default"${permModeVal === 'default' ? ' selected' : ''}>Default</option>
                     <option value="plan"${permModeVal === 'plan' ? ' selected' : ''}>Plan</option>

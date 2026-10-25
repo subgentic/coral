@@ -583,6 +583,8 @@ function _taskRowsHtml(tasks) {
         const clickHandler = isSubagent ? ` data-on-click="task-subagent-open" style="cursor:pointer"`
             : isAgent ? ` data-on-click="task-open" data-kind="agent" data-task-id="${Number(t.id)}" style="cursor:pointer"`
             : ` data-on-click="task-open" data-kind="board" data-task-id="${Number(t.id)}" style="cursor:pointer"`;
+        // A board task's name is the row's one real button, as on the team page's Tasks tab (#7639); its id is text. An agent's task and a subagent keep the id as the button.
+        const toPage = !isAgent && !isSubagent;
         const openLabel = `${isSubagent ? 'Open subagent' : `Open task ${taskIdLabel}`}: ${t.title || t.description || ''}, ${_taskStatus(t).detail}`;
         const typeCell = isSubagent
             ? `<span class="board-task-type board-task-type-subagent" title="Subagent launched by ${escapeAttr(assignee)}"><span class="material-icons" aria-hidden="true">account_tree</span>sub</span>`
@@ -598,11 +600,11 @@ function _taskRowsHtml(tasks) {
         return `
         <div class="board-task-item ${statusClass}${isSubagent ? ' board-task-subagent' : ''}"${clickHandler}${isSubagent ? ` data-subagent-id="${escapeAttr(t.subagent_id || '')}"` : ''}>
             ${statusIcon}
-            <button type="button" class="board-task-id board-task-open" title="${isSubagent ? 'Open the subagent' : 'Task ID'}" aria-label="${escapeAttr(openLabel)}">${escapeHtml(taskIdLabel)}</button>
+            ${toPage ? `<span class="board-task-id" title="Task ID">${escapeHtml(taskIdLabel)}</span>` : `<button type="button" class="board-task-id board-task-open" title="${isSubagent ? 'Open the subagent' : 'Task ID'}" aria-label="${escapeAttr(openLabel)}">${escapeHtml(taskIdLabel)}</button>`}
             <span class="board-task-priority ${priorityClass}" title="Claim priority: ${escapeAttr(t.priority || 'none')}">${t.priority ? (_priorityLabel[t.priority] || escapeHtml(t.priority)) : '\u2014'}</span>
             ${typeCell}
             <span class="board-task-assignee">${escapeHtml(assignee)}</span>
-            <span class="board-task-desc"${tooltip}>${subagentBadge}${claimedBadge}${blockedBadge}${title}${isSubagent || isAgent ? '' : _verifyMark(t)}${_goalChip(t)}</span>
+            <span class="board-task-desc"${tooltip}>${subagentBadge}${claimedBadge}${blockedBadge}${toPage ? `<button type="button" class="board-task-open board-task-name" aria-label="${escapeAttr(openLabel)}">${title}</button>` : title}${isSubagent || isAgent ? '' : _verifyMark(t)}${_goalChip(t)}</span>
             <span class="${costClass}">${costText}</span>
             <span class="board-task-time">${timeStr}</span>
         </div>`;

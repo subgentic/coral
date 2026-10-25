@@ -855,11 +855,9 @@ body.panel-dragging .agentic-state {
 }
 
 .board-task-header {
-    font-weight: 600;
     color: var(--text-secondary);
-    font-size: var(--fs-base);
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
+    font-size: 0.75rem;
+    font-weight: 500; /* sentence case, 12/500, as the team page's Tasks table (#7639) */
     cursor: default;
     border-bottom: 1px solid var(--border);
     padding: 6px 12px;

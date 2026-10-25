@@ -632,6 +632,7 @@
 1	task_list.js	t.priority ? (_priorityLabel[t.priority] || escapeHtml(t.priority)) : '\u2014'
 1	task_list.js	timeStr
 1	task_list.js	title
+1	task_list.js	toPage ? `<button type="button" class="board-task-open board-task-name" aria-label="${escapeAttr(openLabel)}">
 1	task_list.js	tooltip
 1	task_list.js	typeCell
 1	task_verify_marks.js	v.icon
