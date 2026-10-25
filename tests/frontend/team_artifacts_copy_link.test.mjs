@@ -50,9 +50,13 @@ await until(() => copied.length === 2);
 assert.equal(copied[1], 'https://docs.example/d/1', 'external links copy their own URL');
 assert.equal(await openRow(2), undefined, 'a missing artifact has nothing to copy');
 
-// The header copy button pastes instructions with no task or manifest step.
+// The toolbar's More menu has Copy publishing instructions: it pastes instructions with no task or manifest step.
 copied.length = 0;
-view.querySelector('.team-artifacts-help').click();
+view.querySelector('.list-bar-more-btn').click();
+await until(() => !view.querySelector('.list-bar-more-menu').hidden);
+const item = [...view.querySelectorAll('.list-bar-more-menu [role="menuitem"]')].find(b => b.textContent === 'Copy publishing instructions');
+assert.ok(item, 'the menu has Copy publishing instructions');
+item.click();
 await until(() => copied.length === 1);
 assert.equal(copied.length, 1);
 assert.match(copied[0], /coral-agent artifact upload <file>/);

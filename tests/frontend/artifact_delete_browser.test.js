@@ -80,7 +80,7 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         // Not offered in the pop-out (its page is the agent, not the Operator's console).
         await ev(`document.body.classList.add('popout-mode'); true`);
         const kept = `[...document.querySelectorAll('#agentic-panel-artifacts tbody tr')].find(r => r.textContent.includes('kept.txt'))`;
-        await ev(`document.querySelector('#agentic-panel-artifacts .team-artifacts-refresh').click(); true`);
+        await ev(`import((window.__coralStatic || '/static/') + 'team_artifacts_page.js').then(m => m.loadArtifacts({ keep: true })); true`);
         await until(`!!(${kept})`, 'the list re-rendered in pop-out mode');
         await openRow(kept);
         const pop = await ev(`({ up: ${up2}, rows: [...document.querySelectorAll('#agentic-panel-artifacts tbody tr')].map(r => r.textContent.slice(0, 40)), del: !!(${del}), foot: [...document.querySelectorAll('#agentic-detail-pane .detail-foot .btn')].map(b => b.textContent) })`);

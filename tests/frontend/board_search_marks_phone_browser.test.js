@@ -60,11 +60,11 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await ev(`new Promise(r => setTimeout(r, 500))`); // sleep-ok: the layout settles after the resize
         await ev(`(() => { const t = document.querySelector('#mb-tools .mb-search-toggle'); if (t.getAttribute('aria-expanded') !== 'true') t.click(); })(); true`); // on a phone the bar is under one Search row (#7183)
         const g = await ev(`(() => { const t = document.getElementById('mb-tools'); const h = sel => { const x = t.querySelector(sel); return x ? Math.round(x.getBoundingClientRect().height) : null; };
-            const btns = [...t.querySelectorAll('.list-bar-controls button')].map(b => [b.textContent.trim().replace(/\\s*\\(\\d+\\)$/, ''), Math.round(b.getBoundingClientRect().height)]);
+            const btns = [...t.querySelectorAll('.list-bar-search-row > .list-bar-toggle, .list-bar-search-row .list-bar-more-btn')].map(b => [b.getAttribute('aria-label'), Math.round(b.getBoundingClientRect().height)]);
             const st = t.querySelector('.mb-search-status'); const steps = [...t.querySelectorAll('button[data-step], .mb-search-clear')].map(b => Math.round(b.getBoundingClientRect().height));
             return { shown: t.getClientRects().length > 0, search: h('.list-bar-search'), btns, status: !!st && !st.hidden, steps, tools: t.scrollWidth - t.clientWidth, page: document.documentElement.scrollWidth - document.documentElement.clientWidth }; })()`);
-        check('the tools row shows with the search, Filters, First and Latest', g.shown && g.btns.map(b => b[0]).join() === 'Filters,Jump to first,Jump to latest', JSON.stringify(g.btns));
-        check('they are 44px targets, and so are the search box and the result buttons', g.search >= 44 && g.btns.every(b => b[1] >= 44) && g.steps.every(h => h >= 44), JSON.stringify([g.search, g.btns, g.steps]));
+        check('the tools row shows with the search, the Filters icon and the More icon (#7686)', g.shown && g.btns.map(b => b[0]).join() === 'Filters and sort,More', JSON.stringify(g.btns));
+        check('the icons are 44px targets, and so are the search box and the result buttons', g.search >= 44 && g.btns.every(b => b[1] >= 44) && g.steps.every(h => h >= 44), JSON.stringify([g.search, g.btns, g.steps]));
         check('the results line shows, and nothing scrolls sideways', g.status && g.tools <= 1 && g.page <= 0, JSON.stringify([g.status, g.tools, g.page]));
     } finally { await removeBoards(ev, [BOARD]); await client.close(); }
     const failed = results.filter(r => r === 'FAIL').length;

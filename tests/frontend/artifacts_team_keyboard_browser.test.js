@@ -1,6 +1,6 @@
 // The side panel's Artifacts tab and the Team view by keyboard (#4026 follow-up; the tab is the team page's table since #7622), against stubbed APIs:
-//   Artifacts: every control is a real, named, focusable control in a sensible order (Refresh, the help button, then each row's name); Enter on a row opens its sheet (the title focused) and Escape closes it with the focus back on the row; in the
-//   sheet Keep toggles by Space and the focus stays on it; Refresh by Enter keeps the focus on Refresh; Delete asks first, with the focus on Cancel, and Escape returns to the Delete button.
+//   Artifacts: every control is a real, named, focusable control in a sensible order (the search box, the Filters icon, the More icon, then each row's name); Enter on a row opens its sheet (the title focused) and Escape closes it with the focus back on the row; in the
+//   sheet Keep toggles by Space and the focus stays on it; the More menu opens by Enter and Escape returns to its button, a quiet reload keeps the focus; Delete asks first, with the focus on Cancel, and Escape returns to the Delete button.
 //   Team view: Refresh and each agent's Remind button are reachable and work by Enter (the prompt is stubbed); the modal Team view traps
 //   Tab, closes on Escape and gives the focus back.
 // Run against an isolated dev server.
@@ -45,10 +45,10 @@ const HEX = n => String(n).repeat(64).slice(0, 64);
         await ev(`window.switchAgenticTab('artifacts', 'top'); true`);
         const ROW = '#agentic-panel-artifacts-view tbody tr';
         await waitFor(`document.querySelectorAll('${ROW}').length === 3`, 'the artifact rows', 8000);
-        const controls = await ev(`[...document.querySelectorAll('#agentic-panel-artifacts-view button, #agentic-panel-artifacts-view a[href]')].filter(e => !e.closest('.list-bar-menu')).map(e => ({ name: (e.getAttribute('aria-label') || e.textContent || '').trim(), tab: e.tabIndex, shown: e.getClientRects().length > 0 }))`);
+        const controls = await ev(`[...document.querySelectorAll('#agentic-panel-artifacts-view button, #agentic-panel-artifacts-view a[href]')].filter(e => !e.closest('.list-bar-menu, .list-bar-more-menu')).map(e => ({ name: (e.getAttribute('aria-label') || e.textContent || '').trim(), tab: e.tabIndex, shown: e.getClientRects().length > 0 }))`);
         assert.ok(controls.every(c => c.shown && c.tab >= 0 && c.name), 'every control is shown, focusable and named: ' + JSON.stringify(controls.filter(c => !(c.shown && c.tab >= 0 && c.name))));
-        const bar = await ev(`[...document.querySelectorAll('#agentic-panel-artifacts-view .team-artifacts-refresh, #agentic-panel-artifacts-view .team-artifacts-help')].map(e => e.getAttribute('aria-label'))`);
-        assert.deepEqual(bar, ['Refresh', 'Copy publishing instructions'], 'Refresh and the help button are in the header');
+        const bar = await ev(`[...document.querySelectorAll('#agentic-panel-artifacts-view .list-bar-search, #agentic-panel-artifacts-view .list-bar-toggle, #agentic-panel-artifacts-view .list-bar-more-btn')].map(e => e.getAttribute('aria-label') || e.placeholder)`);
+        assert.deepEqual(bar, ['More'], 'an agent with no team has the More icon in its header and no Refresh (its list has no search or filters)');
         assert.deepEqual(await ev(`[...document.querySelectorAll('${ROW}')].map(r => r.querySelectorAll('button').length)`), [1, 1, 1], 'a row is one button: its name');
 
         console.log('2. A row opens by Enter; Escape closes it with the focus back on the row');
@@ -70,12 +70,18 @@ const HEX = n => String(n).repeat(64).slice(0, 64);
         await waitFor(`(${FOOT('Keep|Kept')}).getAttribute('aria-pressed') === 'true'`, 'Keep to toggle', 4000);
         a = await active(); assert.equal(a.label, 'Kept', 'the focus stays on the Keep button: ' + JSON.stringify(a));
 
-        console.log('4. Refresh by Enter keeps the focus on Refresh');
-        await ev(`document.querySelector('#agentic-panel-artifacts-view .team-artifacts-refresh').focus(); true`);
+        console.log('4. The More menu opens by key and Escape returns to its button; a quiet reload keeps the focus');
+        await ev(`document.querySelector('#agentic-panel-artifacts-view .list-bar-more-btn').focus(); true`);
         await press('Enter', 'Enter', 13);
+        await waitFor(`!document.querySelector('#agentic-panel-artifacts-view .list-bar-more-menu').hidden`, 'the More menu', 4000);
+        a = await active(); assert.equal(a.label, 'Copy publishing instructions', 'the first item has the focus: ' + JSON.stringify(a));
+        await press('Escape', 'Escape', 27);
+        await waitFor(`document.querySelector('#agentic-panel-artifacts-view .list-bar-more-menu').hidden`, 'the menu closed', 4000);
+        a = await active(); assert.equal(a.label, 'More', 'Escape returns the focus to the More button: ' + JSON.stringify(a));
+        await ev(`document.querySelector('#agentic-panel-artifacts-view .list-bar-more-btn').focus(); import((window.__coralStatic || '/static/') + 'team_artifacts_page.js').then(m => m.loadArtifacts({ keep: true })); true`);
         await waitFor(`document.querySelectorAll('${ROW}').length === 3 && window.__calls.filter(c => c === 'GET artifacts').length >= 2`, 'the reload', 6000);
         await sleep(300); // sleep-ok: a redraw and a layout settle over frames; no completion event
-        a = await active(); assert.equal(a.label, 'Refresh', 'after a refresh the focus is still on Refresh: ' + JSON.stringify(a));
+        assert.equal(await ev(`document.activeElement === document.querySelector('#agentic-panel-artifacts-view .list-bar-more-btn')`), true, 'a quiet reload leaves the focus on the More button');
 
         console.log('5. Delete asks first; Escape returns to the Delete button');
         await ev(`document.querySelectorAll('${ROW} .team-row-btn')[2].focus(); true`);

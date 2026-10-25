@@ -109,7 +109,7 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
 
         // Not offered in the pop-out.
         await ev(`document.body.classList.add('popout-mode'); true`);
-        await ev(`document.querySelector('#agentic-panel-artifacts-view .team-artifacts-refresh').click(); true`);
+        await ev(`import((window.__coralStatic || '/static/') + 'team_artifacts_page.js').then(m => m.loadArtifacts({ keep: true })); true`);
         await openRow();
         await until(`document.querySelectorAll('#agentic-detail-pane .detail-foot .btn').length > 0`, 'the pop-out sheet');
         check('no Keep in the pop-out', !(await ev(`!!(${keep})`)));

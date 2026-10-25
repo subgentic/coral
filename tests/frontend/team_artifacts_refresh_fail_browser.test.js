@@ -33,7 +33,7 @@ const items = Array.from({ length: N }, (_, i) => ({ name: `report-${String(i).p
         const names = () => ev(`[...document.querySelectorAll('${ROWS} .team-row-btn')].map(e => e.textContent.trim())`);
 
         console.log('1. a Refresh that fails keeps the rows and says so');
-        await ev(`window.__fail = true; window.__delay = 150; document.querySelector('.team-artifacts-refresh').click(); true`);
+        await ev(`window.__fail = true; window.__delay = 150; import((window.__coralStatic || '/static/') + 'team_artifacts_page.js').then(m => m.loadArtifacts({ keep: true })); true`);
         await waitFor(`!!document.querySelector('#agentic-panel-artifacts-view .team-artifacts-error')`, 'the error', 6000);
         await ev(`${framesJs(3)}`);
         await waitFor(`document.querySelectorAll('${ROWS}').length === ${N}`, 'the rows drawn again', 6000).catch(() => {});

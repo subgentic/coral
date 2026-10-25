@@ -3,6 +3,7 @@
  * textContent: names, task titles and the words about where a file came from are written by agents and other computers. Lazy: team_page.js imports it. */
 import { boardFetch, serverUrl, artifactPath, isCloud, splitKey, keyLabel, LOCAL_SERVER } from './server_base.js';
 import { whenText } from './when_text.js';
+import { pollEvery } from './overload.js';
 import { importOnce } from './import_once.js';
 import { browserLocal } from './safe_storage.js';
 import { renderArtifact } from './artifact_preview.js';
@@ -11,7 +12,7 @@ const { teamTable, rowButton, el } = await importOnce('./team_table.js'); // laz
 const { openDetailPane, closeDetailPane, detailKey } = await importOnce('./detail_pane.js');
 const { buildBar } = await importOnce('./team_artifact_bar.js');
 const { loadFilters, saveFilters, toParams, isFiltered, EMPTY } = await importOnce('./team_artifact_filters.js');
-const { loadPanelOpen, savePanelOpen } = await importOnce('./list_bar.js');
+const { loadPanelOpen, savePanelOpen, buildMoreMenu } = await importOnce('./list_bar.js');
 const { isOwnerLabelRefusal, OWNER_LABEL_TEXT } = await importOnce('./owner_label.js');
 const { inlineArtifactPath } = await importOnce('./artifact_paths.js');
 const { readersAllowed, readersDisclosure } = await importOnce('./artifact_readers.js');
@@ -122,7 +123,7 @@ function deleteArtifact(hex, name, size) {
                     forget(hex); deletions?.postMessage({ hex, server: server() });
                     say(r.ok ? `Deleted ${name}.` : `${name} was already gone.`);
                     // the row the focus was on is gone: the same place in the list (the next row, else the one before), never the page (#4469)
-                    const after = [...(root?.querySelectorAll('tbody tr') || [])]; ((after[at] || after[at - 1])?.querySelector('.team-row-btn') || root?.querySelector('.team-artifacts-refresh'))?.focus(); // and Refresh when none is left
+                    const after = [...(root?.querySelectorAll('tbody tr') || [])]; ((after[at] || after[at - 1])?.querySelector('.team-row-btn') || root?.querySelector('.list-bar-search') || root?.querySelector('.list-bar-more-btn'))?.focus(); // and the search box when none is left
                 } else { const d = await r.json().catch(() => ({})); showToast(`Couldn't delete ${name}: ${d.error || `HTTP ${r.status}`}`, true); }
             } catch { showToast(`Couldn't delete ${name}: Coral didn't answer.`, true); }
         }, null, { label: 'Delete' });
@@ -179,21 +180,28 @@ function ensureBar() {
     if (bar && barKey === model.key) return;
     barKey = model.key;
     const panel = model.scope ? 'artifacts' : 'team-artifacts';
-    const plain = !!(model.scope && model.scope.standalone); // an agent with no team: its list has no search or filters, only the title, Refresh and the copy icon
-    if (!plain) { bar = buildBar(setFilters, { page: true, personal: !!model.scope, hooks: { onPanel: open => savePanelOpen(panel, filterKey(), open) } }); bar.setOpen(loadPanelOpen(panel, filterKey())); }
-    const refresh = btn('team-artifacts-action team-artifact-icon-btn team-artifacts-refresh', null, () => loadArtifacts({ keep: true }));
-    const ri = el('span', 'material-icons', 'refresh'); ri.setAttribute('aria-hidden', 'true'); refresh.append(ri);
-    refresh.title = 'Refresh'; refresh.setAttribute('aria-label', 'Refresh');
-    const help = btn('team-artifacts-action team-artifacts-help', null);
-    const icon = el('span', 'material-icons', 'content_copy'); icon.setAttribute('aria-hidden', 'true'); help.append(icon);
-    help.title = 'Copy publishing instructions'; help.setAttribute('aria-label', help.title); // what an agent is told to do to publish an artifact
-    help.addEventListener('click', async () => {
-        try { await navigator.clipboard.writeText(AGENT_ARTIFACT_PROMPT); icon.textContent = 'check'; } catch { icon.textContent = 'error_outline'; }
-        setTimeout(() => { icon.textContent = 'content_copy'; }, 1500);
-    });
+    const plain = !!(model.scope && model.scope.standalone); // an agent with no team: its list has no search or filters, only the More icon
+    // The list's other action behind the More icon (#7686); Refresh is gone: the tab reads itself again (watch below).
+    const more = [{ label: 'Copy publishing instructions', run: async () => { try { await navigator.clipboard.writeText(AGENT_ARTIFACT_PROMPT); showToast('Publishing instructions copied'); } catch { showToast('The instructions could not be copied', true); } } }];
+    if (!plain) { bar = buildBar(setFilters, { page: true, personal: !!model.scope, more, hooks: { onPanel: open => savePanelOpen(panel, filterKey(), open) } }); bar.setOpen(loadPanelOpen(panel, filterKey())); }
     const title = el('span', 'sr-only', model.scope ? `Artifacts of ${model.scope.name}` : `Artifacts of ${keyLabel(model.project)}`); // the tab names the list: no label beside the search (UI/UX, #7622);
-    if (plain) { const node = el('div', 'team-artifacts-plain-head'); node.append(title, refresh, help); bar = { node, names() {}, set() {}, setOpen() {} }; }
-    else bar.setHeader(title, [refresh, help]);
+    if (plain) { const node = el('div', 'team-artifacts-plain-head'); node.append(title, buildMoreMenu('ta-plain', more)); bar = { node, names() {}, set() {}, setOpen() {} }; }
+    else bar.setHeader(title, []);
+}
+
+// The tab keeps itself current (it had a Refresh icon, #7686): when the window comes back to the front and on a slow read while it is on screen; a list the person paged further is left as it is.
+let watching = false, reading = false;
+function refreshQuiet() {
+    if (!root || !root.isConnected || !root.getClientRects().length || document.hidden || reading || !model.key || model.loading || model.loadingMore || model.items.length > PAGE) return;
+    reading = true;
+    loadArtifacts({ keep: true }).finally(() => { reading = false; });
+}
+function watch() {
+    if (watching) return;
+    watching = true;
+    pollEvery(refreshQuiet, 15000);
+    window.addEventListener('focus', refreshQuiet);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshQuiet(); });
 }
 
 function statusLine() {
@@ -249,7 +257,7 @@ function draw() {
     if (box && box.scrollTop !== at) box.scrollTop = at; // the same place in the list, as the redraw left the box shorter for a moment
     // Load more: the button again, or, when the last page came and the button is gone, the first new row (the keyboard stays in the list, not on the page)
     if (held === '#load-more') (body.querySelector('.goals-more') || body.querySelectorAll('[data-artifact-id]')[Math.min(rowsBefore, model.items.length - 1)])?.focus({ preventScroll: true });
-    else if (held === '#retry') (body.querySelector('.team-artifacts-retry') || body.querySelector('[data-artifact-id]') || bar.node.querySelector('.team-artifacts-refresh'))?.focus({ preventScroll: true }); // Retry is drawn away by the answer: the list's first row, never the page
+    else if (held === '#retry') (body.querySelector('.team-artifacts-retry') || body.querySelector('[data-artifact-id]') || bar.node.querySelector('.list-bar-search'))?.focus({ preventScroll: true }); // Retry is drawn away by the answer: the list's first row, never the page
     else if (held) body.querySelector(`[data-artifact-id="${CSS.escape(held)}"]`)?.focus({ preventScroll: true });
 }
 
@@ -319,6 +327,7 @@ export function showArtifacts(host, project, h = {}, scope = null) {
         bar = null;
     }
     root = host.firstChild;
+    watch();
     draw();
     if (scope && sameKey && model.loaded) return Promise.resolve(); // an agent's tab drawn again (another tab and back) keeps its list until Refresh or another agent
     return loadArtifacts();
