@@ -593,3 +593,28 @@ func ptrString(p *string) string {
 	}
 	return *p
 }
+
+// #7377 (Security's LOW): the tools list belongs to the provider it was made for, as the flags and the capabilities do. The restart route empties it itself on a provider change, so this pins the store's own
+// guard: a replacement that names another provider and no tools does not inherit the old ones; the same provider does, and tools it is given win.
+func TestReplaceLiveSessionCarriesTheToolsOnlyToTheSameProvider(t *testing.T) {
+	ctx := context.Background()
+	ss := NewSessionStore(openTestDB(t))
+	tools := `["OnlyClaudeTool"]`
+	require.NoError(t, ss.RegisterLiveSession(ctx, &LiveSession{SessionID: "a", AgentType: "claude", AgentName: "a", WorkingDir: "/tmp", Tools: &tools}))
+
+	require.NoError(t, ss.ReplaceLiveSession(ctx, "a", &LiveSession{SessionID: "b", AgentType: "claude", AgentName: "a", WorkingDir: "/tmp"}))
+	b, err := ss.GetLiveSession(ctx, "b")
+	require.NoError(t, err)
+	assert.Equal(t, tools, ptrString(b.Tools), "the same provider: carried")
+
+	given := `["NewTool"]`
+	require.NoError(t, ss.ReplaceLiveSession(ctx, "b", &LiveSession{SessionID: "c", AgentType: "claude", AgentName: "a", WorkingDir: "/tmp", Tools: &given}))
+	c, err := ss.GetLiveSession(ctx, "c")
+	require.NoError(t, err)
+	assert.Equal(t, given, ptrString(c.Tools), "tools the replacement is given win")
+
+	require.NoError(t, ss.ReplaceLiveSession(ctx, "c", &LiveSession{SessionID: "d", AgentType: "codex", AgentName: "a", WorkingDir: "/tmp"}))
+	d, err := ss.GetLiveSession(ctx, "d")
+	require.NoError(t, err)
+	assert.Equal(t, "", ptrString(d.Tools), "another provider: the old provider's tools do not carry over")
+}
