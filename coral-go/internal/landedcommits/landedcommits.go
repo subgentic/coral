@@ -7,6 +7,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"sort"
 	"strconv"
 	"strings"
@@ -18,6 +19,19 @@ import (
 
 // MaxCommits is the most commits one read returns (a window of a very busy repository is cut there and says so).
 const MaxCommits = 2000
+
+// readFn is Read; a test replaces it to count the reads a burst makes.
+var readFn = Read
+
+var errBadBranch = errors.New("landedcommits: not a branch name")
+
+// readTimeout bounds one git log.
+const readTimeout = 20 * time.Second
+
+// logArgs are the arguments of the one git log this package runs: fixed options, the dates formatted here, the ref (always refs/..., never an option) and "--" last.
+func logArgs(ref string, since, until time.Time) []string {
+	return []string{"log", ref, "--no-merges", "--max-count=" + strconv.Itoa(MaxCommits+1), "--format=%H%x00%an%x00%cI", "--since=" + since.UTC().Format(time.RFC3339), "--until=" + until.UTC().Format(time.RFC3339), "--"}
+}
 
 // Commit is one non-merge commit on the branch: its hash, its author's name and when it was committed (RFC 3339, UTC).
 type Commit struct {
@@ -54,6 +68,16 @@ func CommonRoot(ctx context.Context, dirs []string) string {
 	return best
 }
 
+// validBranch is git's own idea of a branch name where it matters here: ValidRef (no option, no whitespace or control) and none of what git forbids in a ref name or reads as a revision expression (.., @{, ^, ~,
+// :, ?, *, [, a trailing dot or .lock, a leading or trailing slash, a double slash). A name like main~1 would otherwise name a commit, and shift the counts.
+func validBranch(name string) bool {
+	if gitutil.ValidRef(name) != nil || strings.ContainsAny(name, "^~:?*[") || strings.Contains(name, "..") || strings.Contains(name, "@{") || strings.Contains(name, "//") ||
+		strings.HasPrefix(name, "/") || strings.HasSuffix(name, "/") || strings.HasSuffix(name, ".") || strings.HasSuffix(name, ".lock") || strings.HasPrefix(name, ".") || name == "@" {
+		return false
+	}
+	return true
+}
+
 func refExists(ctx context.Context, root, ref string) bool {
 	return gitutil.Command(ctx, root, "rev-parse", "--verify", "--quiet", ref+"^{commit}").Run() == nil
 }
@@ -62,7 +86,7 @@ func refExists(ctx context.Context, root, ref string) bool {
 func DefaultBranch(ctx context.Context, root string) string {
 	if out, err := gitutil.Command(ctx, root, "symbolic-ref", "--short", "refs/remotes/origin/HEAD").Output(); err == nil {
 		name := strings.TrimPrefix(strings.TrimSpace(string(out)), "origin/")
-		if name != "" && gitutil.ValidRef(name) == nil && (refExists(ctx, root, "refs/heads/"+name) || refExists(ctx, root, "refs/remotes/origin/"+name)) {
+		if name != "" && validBranch(name) && (refExists(ctx, root, "refs/heads/"+name) || refExists(ctx, root, "refs/remotes/origin/"+name)) {
 			return name
 		}
 	}
@@ -77,15 +101,16 @@ func DefaultBranch(ctx context.Context, root string) string {
 // Read is the non-merge commits of branch committed in [since, until) (git's own --until includes its end, so the end is dropped here), newest first, at most MaxCommits; capped says there were more. The
 // local branch is read, else origin's.
 func Read(ctx context.Context, root, branch string, since, until time.Time) (commits []Commit, capped bool, err error) {
-	if err := gitutil.ValidRef(branch); err != nil {
-		return nil, false, err
+	if !validBranch(branch) {
+		return nil, false, errBadBranch
 	}
 	ref := "refs/heads/" + branch
 	if !refExists(ctx, root, ref) {
 		ref = "refs/remotes/origin/" + branch
 	}
-	args := []string{"log", ref, "--no-merges", "--max-count=" + strconv.Itoa(MaxCommits+1), "--format=%H%x00%an%x00%cI", "--since=" + since.UTC().Format(time.RFC3339), "--until=" + until.UTC().Format(time.RFC3339), "--"}
-	out, err := gitutil.Command(ctx, root, args...).Output()
+	ctx, cancel := context.WithTimeout(ctx, readTimeout)
+	defer cancel()
+	out, err := gitutil.Command(ctx, root, logArgs(ref, since, until)...).Output()
 	if err != nil {
 		return nil, false, err
 	}
@@ -113,10 +138,11 @@ func Read(ctx context.Context, root, branch string, since, until time.Time) (com
 
 // Cache keeps the answers of Read for ttl (60 s), by repository, branch and window, so a page that reloads does not run git each time. The zero value is ready; now is the clock (nil: time.Now).
 type Cache struct {
-	mu  sync.Mutex
-	m   map[string]cached
-	ttl time.Duration
-	now func() time.Time
+	mu    sync.Mutex
+	m     map[string]cached
+	ttl   time.Duration
+	now   func() time.Time
+	repos map[string]*sync.Mutex // one read at a time per repository: a burst waits for the first and then finds its answer cached
 }
 
 type cached struct {
@@ -135,13 +161,33 @@ func (c *Cache) Read(ctx context.Context, root, branch string, since, until time
 		now = c.now
 	}
 	key := root + "\x00" + branch + "\x00" + since.UTC().Truncate(time.Minute).Format(time.RFC3339) + "\x00" + until.UTC().Truncate(time.Minute).Format(time.RFC3339)
+	lookup := func() ([]Commit, bool, bool) {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		if e, ok := c.m[key]; ok && now().Sub(e.at) < CacheTTL {
+			return e.commits, e.capped, true
+		}
+		return nil, false, false
+	}
+	if commits, capped, ok := lookup(); ok {
+		return commits, capped, nil
+	}
 	c.mu.Lock()
-	if e, ok := c.m[key]; ok && now().Sub(e.at) < CacheTTL {
-		c.mu.Unlock()
-		return e.commits, e.capped, nil
+	if c.repos == nil {
+		c.repos = map[string]*sync.Mutex{}
+	}
+	rm := c.repos[root]
+	if rm == nil {
+		rm = &sync.Mutex{}
+		c.repos[root] = rm
 	}
 	c.mu.Unlock()
-	commits, capped, err := Read(ctx, root, branch, since, until)
+	rm.Lock()
+	defer rm.Unlock()
+	if commits, capped, ok := lookup(); ok { // an earlier request of the burst has read it
+		return commits, capped, nil
+	}
+	commits, capped, err := readFn(ctx, root, branch, since, until)
 	if err != nil {
 		return nil, false, err
 	}
