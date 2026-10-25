@@ -40,6 +40,18 @@ function rememberLoads(client) {
     let mark = null;  // loads when the last navigate was made; null once its load was handed out or a newer load cycle started
     let waiting = 0;  // loadEventFired() waits asked and not yet answered: a load that comes while one is waiting was heard (a wait made before its navigate: `const loaded = Page.loadEventFired(); await Page.navigate(...); await loaded;`)
     let page = 'the page'; // what the last navigate or reload asked for, for the timeout's message
+    // The browser going away is not a pass (#352, QA on #168): a load wait is an event wait, which the client does not end when its connection closes (it ends the commands in flight, not the
+    // events awaited), and with the timer unref'd the suite's process then exits 0 with the wait never answered. A connection that closes under a wait rejects it; one the suite closed itself
+    // (client.close(): it is done with its waits, a raced one included) does not count at exit.
+    const pending = new Set(); // { what, reject }
+    const state = { closed: false, pending };
+    clients.push(state);
+    client.on('disconnect', () => {
+        for (const w of pending) { const msg = `[cdp] the browser connection closed while waiting for a load of ${w.what}`; console.error(msg); w.reject(new Error(msg)); }
+        pending.clear();
+    });
+    const close = client.close;
+    client.close = function (...args) { state.closed = true; return close.apply(this, args); };
     client.on('Page.loadEventFired', () => { loads++; loadAt = Date.now(); if (waiting > 0) mark = null; }); // so it is not kept for the next wait: servers_table's about:blank load answered the wait for the page after it (#6195 follow-up)
     client.on('Page.frameStartedLoading', () => { if (mark !== null && loads > mark) mark = null; }); // the navigate's load came and nobody asked: this is another load, and that is the one to wait for
     const navigate = Page.navigate, load = Page.loadEventFired;
@@ -56,16 +68,28 @@ function rememberLoads(client) {
         if (args.length > 0) return p; // the callback form is the caller's own
         const ms = loadLimitMs, what = page, since = new Date().toISOString();
         return new Promise((resolve, reject) => {
+            const w = { what, reject: e => { clearTimeout(timer); pending.delete(w); reject(e); } };
             const timer = setTimeout(() => {
                 const msg = `[cdp] load timeout: no load event for ${what} within ${ms} ms (waiting since ${since})`;
                 console.error(msg);
-                reject(new Error(msg));
+                w.reject(new Error(msg));
             }, ms);
             timer.unref(); // a wait the suite gave up on (a race it already settled) does not keep its process alive
-            p.then(v => { clearTimeout(timer); resolve(v); }, e => { clearTimeout(timer); reject(e); });
+            pending.add(w);
+            p.then(v => { clearTimeout(timer); pending.delete(w); resolve(v); }, e => w.reject(e));
         });
     };
 }
+
+// The second line (#352, Security on #168): a process that exits with a load wait still open on a connection the suite did not close itself (it called process.exit mid-wait, or a disconnect
+// went unseen) exits non-zero, saying which. Waits on a client the suite closed are ones it was done with (the losing side of a race), so they do not count.
+const clients = [];
+process.on('exit', () => {
+    const open = clients.filter(c => !c.closed).flatMap(c => [...c.pending]);
+    if (!open.length) return;
+    for (const w of open) console.error(`[cdp] the suite exited with a load of ${w.what} still awaited`);
+    if (!process.exitCode) process.exitCode = 1;
+});
 
 // A fake clock for the page (opt-in, a test of the tests): CORAL_TEST_FAKE_NOW="2026-10-24T00:30" (local time, any form Date reads) makes every page the suite drives believe it is then, and the time goes on from there
 // (Date, new Date() and Date.now(); not performance.now, timers or the server's clock). A suite whose expectation depends on the hour or the day (today, yesterday, in N h, the next cron fire) fails at 00:30 or
