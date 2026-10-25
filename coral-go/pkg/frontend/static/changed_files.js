@@ -11,6 +11,9 @@ import { storeKey, readStars, writeStars } from './local_store.js';
 import { serverFetch, serverForSession, sessionServer, currentServer, isCloud, dropBody } from './server_base.js';
 
 let _currentFiles = [];
+let _actionsOpenFor = ''; // the path whose row has its Copy, Preview and Edit open on a phone (#7652): kept across the list's redraws
+// A phone's row has one "More" button in place of the three icon buttons, so the name keeps the row (#7652); it opens them on a line under the row.
+const moreButton = (path, name) => { const label = `More for ${name}`; return `<button type="button" class="file-more-btn" data-on-click="file-more" data-path="${escapeAttr(path)}" aria-expanded="${escapeAttr(String(_actionsOpenFor === path))}" aria-label="${escapeAttr(label)}" title="More"><span aria-hidden="true">&#x22EF;</span></button>`; }; // the midline ellipsis as text: no icon font name to subset
 let _searchTimeout = null;
 let _renderTimer = null;
 
@@ -79,12 +82,13 @@ export function renderStarredFiles() {
             const copyBtn = `<button class="file-action-btn" data-on-click="file-copy" data-path="${escapeAttr(filepath)}" title="Copy path" aria-label="${escapeAttr(copyLabel)}"><span class="material-icons" aria-hidden="true">content_copy</span></button>`;
             const previewBtn = `<button class="file-action-btn" data-on-click="file-preview" data-path="${escapeAttr(filepath)}" title="Preview" aria-label="${escapeAttr(previewLabel)}"><span class="material-icons" aria-hidden="true">visibility</span></button>`;
             const editBtn = `<button class="file-action-btn" data-on-click="file-edit" data-path="${escapeAttr(filepath)}" title="Edit" aria-label="${escapeAttr(editLabel)}"><span class="material-icons" aria-hidden="true">edit</span></button>`;
-            return `<div class="file-item file-starred" data-on-click="file-open" role="button" tabindex="0" data-key-click data-path="${escapeAttr(filepath)}">
+            return `<div class="file-item file-starred${escapeAttr(_actionsOpenFor === filepath ? ' actions-open' : '')}" data-on-click="file-open" role="button" tabindex="0" data-key-click data-path="${escapeAttr(filepath)}">
                 ${starBtn}
                 <div class="file-path-wrap">
                     <span class="file-name">${escapeHtml(name)}</span>
                     ${dir ? `<span class="file-dir">${escapeHtml(dir)}</span>` : ''}
                 </div>
+                ${moreButton(filepath, name)}
                 <div class="file-action-btns">${copyBtn}${previewBtn}${editBtn}</div>
             </div>`;
         }).join('');
@@ -523,7 +527,7 @@ export async function refreshChangedFiles() {
 
         // Clicking the row opens its diff in the preview pane; the buttons
         // copy the path, preview the file, and open it in the editor.
-        return `<div class="file-item ${statusCls}${agentOnlyCls}" title="${escapeHtml(f.filepath)} (${escapeAttr(statusLabel)})"
+        return `<div class="file-item ${statusCls}${agentOnlyCls}${escapeAttr(_actionsOpenFor === f.filepath ? ' actions-open' : '')}" title="${escapeHtml(f.filepath)} (${escapeAttr(statusLabel)})"
                      data-filepath="${escapeAttr(f.filepath)}"
                      data-on-click="file-open" data-path="${escapeAttr(f.filepath)}" data-diff="1">
             ${starBtn}
@@ -534,6 +538,7 @@ export async function refreshChangedFiles() {
                 ${agentsHtml}
             </div>
             ${stats}
+            ${moreButton(f.filepath, rowName)}
             <div class="file-action-btns">${copyBtn}${previewBtn}${editBtn}</div>
         </div>`;
     }).join('');
@@ -546,6 +551,7 @@ const diffOpts = el => (el.dataset.diff === '1' ? [0, { diff: true }] : []);
 registerActions({
     'file-open': el => { const p = pathOf(el); if (p) openFilePreview(p, ...diffOpts(el)); },
     'file-star': (el, event) => { event.stopPropagation(); const p = pathOf(el); if (p) toggleStarFile(p); },
+    'file-more': (el, event) => { event.stopPropagation(); const p = pathOf(el); if (!p) return; _actionsOpenFor = _actionsOpenFor === p ? '' : p; const row = el.closest('.file-item'); if (row) row.classList.toggle('actions-open', _actionsOpenFor === p); el.setAttribute('aria-expanded', String(_actionsOpenFor === p)); },
     'file-copy': (el, event) => { event.stopPropagation(); const p = pathOf(el); if (p) copyFilePath(p); },
     'file-preview': (el, event) => { event.stopPropagation(); const p = pathOf(el); if (p) openFilePreview(p, ...diffOpts(el)); },
     'file-edit': (el, event) => { event.stopPropagation(); const p = pathOf(el); if (p) openFileEdit(p, ...diffOpts(el)); },

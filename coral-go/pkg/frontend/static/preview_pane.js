@@ -450,6 +450,7 @@ function _activate(tab) {
     _activeId = tab.id;
     _renderTabs();
     _showPane();
+    if (_isMobile()) _setPhoneFull(true); // a phone's viewer is a screen of its own with Back, not a third of the list's screen (#7652)
     _render(tab);
 }
 
