@@ -48,7 +48,7 @@ const HEX = n => String(n).repeat(64).slice(0, 64);
         const controls = await ev(`[...document.querySelectorAll('#agentic-panel-artifacts-view button, #agentic-panel-artifacts-view a[href]')].filter(e => !e.closest('.list-bar-menu')).map(e => ({ name: (e.getAttribute('aria-label') || e.textContent || '').trim(), tab: e.tabIndex, shown: e.getClientRects().length > 0 }))`);
         assert.ok(controls.every(c => c.shown && c.tab >= 0 && c.name), 'every control is shown, focusable and named: ' + JSON.stringify(controls.filter(c => !(c.shown && c.tab >= 0 && c.name))));
         const bar = await ev(`[...document.querySelectorAll('#agentic-panel-artifacts-view .team-artifacts-refresh, #agentic-panel-artifacts-view .team-artifacts-help')].map(e => e.getAttribute('aria-label'))`);
-        assert.deepEqual(bar, ['Refresh', 'Copy instructions for agents on how to publish an artifact'], 'Refresh and the help button are in the header');
+        assert.deepEqual(bar, ['Refresh', 'Copy publishing instructions'], 'Refresh and the help button are in the header');
         assert.deepEqual(await ev(`[...document.querySelectorAll('${ROW}')].map(r => r.querySelectorAll('button').length)`), [1, 1, 1], 'a row is one button: its name');
 
         console.log('2. A row opens by Enter; Escape closes it with the focus back on the row');
