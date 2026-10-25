@@ -21,7 +21,8 @@ import { flashCopied, makeBubble } from './chat_bubbles.js';
 import './saved_marks.js';
 import './pasted_content.js';
 import { CHAT_TRIM, FIRST_PAGE, takeChatPrefetch } from './chat_page.js';
-import { loginBySession, ownPromptCard, pendingToolBySession, promptOptionsBySession, syncNeedsInputCard } from './needs_input_card.js';
+import { loginBySession, ownPromptCard, pendingToolBySession, promptOptionsBySession, syncNeedsInputCard, keepCardInView, cardKeptAt } from './needs_input_card.js';
+export { cardKeptAt };
 import { INTERRUPT_RE, noteAgentActivity, noteInterrupt, rememberUserMessage, syncPendingBubbles, syncWorkingIndicator } from './pending_messages.js';
 import { browserLocal } from './safe_storage.js';
 import './chat_thumbs.js';
@@ -239,7 +240,7 @@ async function _showKeptPage(session, container, kept) {
         historyMessageCount = kept.total;
         _updateLoadMoreButton(container);
         initialLoadDone = true;
-        if (state.autoScroll) container.scrollTop = container.scrollHeight;
+        if (state.autoScroll) { container.scrollTop = container.scrollHeight; keepCardInView(); } // an open card's question and first answer stay in view (#352)
     }
     return false;
 }
@@ -343,6 +344,7 @@ function _syncAfterHistory(container, session, data) {
     syncEmptyState(container);
     if (state.autoScroll) {
         container.scrollTop = container.scrollHeight;
+        keepCardInView(); // an open card's question and first answer stay in view (#352)
     }
     syncJumpToLatest();
 }
@@ -838,7 +840,7 @@ export function setLiveViewMode(mode) {
     applyLiveViewMode();
     if (mode === "chat") {
         const container = document.getElementById("live-history-messages");
-        if (container) container.scrollTop = container.scrollHeight;
+        if (container) { container.scrollTop = container.scrollHeight; keepCardInView(); }
         state.autoScroll = true;
         syncJumpToLatest();
     }

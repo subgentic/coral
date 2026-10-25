@@ -66,6 +66,16 @@ const { connect } = require('./agent_view_harness');
             await sleep(900); // sleep-ok: the card scrolls its answers into view after the resize (120 ms debounce)
             a = await answers();
             assert.ok(a.bs.every(b => b.inside), `${tag}: with the keyboard open every answer is still inside the chat pane (${JSON.stringify(a)})`);
+            // more answers than the pane can hold (#352): the first stays in view, the rest are below and the pane scrolls to them
+            await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 2, mobile: true });
+            await ev(`(() => { const as = document.querySelectorAll('.chat-needs-input .cni-answer'); const l = as[as.length - 1]; for (let i = 0; i < 6; i++) { const c = l.cloneNode(true); c.classList.add('census-extra'); l.after(c); } return true; })()`);
+            await sleep(900); // sleep-ok: the card's answers come into view after the resize (120 ms debounce), as above
+            await Emulation.setDeviceMetricsOverride({ width: w, height: Math.round(h * 0.55), deviceScaleFactor: 2, mobile: true });
+            await sleep(900); // sleep-ok: as above
+            a = await answers();
+            const more = await ev(`(() => { const p = document.getElementById('live-history-messages'); return { scrolls: p.scrollHeight > p.clientHeight }; })()`);
+            assert.ok(a.bs.length === 9 && a.bs[0].inside && !a.bs[a.bs.length - 1].inside && more.scrolls, `${tag}: with more answers than fit, the first stays inside the chat pane and the rest scroll (${JSON.stringify({ a, more })})`);
+            await ev(`document.querySelectorAll('.census-extra').forEach(e => e.remove()); true`);
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 2, mobile: true });
             console.log(`   ✓ ${tag}`);
         }

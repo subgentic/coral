@@ -2,7 +2,7 @@
 import { state, loadSessionDrafts, sessionKey, saveSessionDraft } from './state.js';
 import { accountTag, setStoreOwner, ageOutStored, DAY_MS } from './local_store.js';
 import { applyTabPrefs } from './tab_customize.js';
-import { loadPendingFromStorage, initCommandInputAutosize, refreshLiveHistory } from './live_chat.js';
+import { loadPendingFromStorage, initCommandInputAutosize, refreshLiveHistory, cardKeptAt } from './live_chat.js';
 import { platform } from './platform/detect.js';
 import { initNative } from './platform/native.js';
 import { initMacOS } from './platform/macos.js';
@@ -117,7 +117,8 @@ export function wirePaneScroll() {
     if (liveHistory) {
         liveHistory.addEventListener("scroll", () => {
             const { scrollTop, scrollHeight, clientHeight } = liveHistory;
-            state.autoScroll = (scrollHeight - scrollTop - clientHeight) < 50;
+            // where an open card put it (#352: its question and answers kept in view a little above the bottom) the chat still follows, so it comes back down when the card is answered
+            state.autoScroll = (scrollHeight - scrollTop - clientHeight) < 50 || cardKeptAt(scrollTop);
         });
     }
 

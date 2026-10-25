@@ -307,11 +307,27 @@ function keepAnswersOnScreen() {
     const el = _cardWatch && _cardWatch.el;
     if (!el || !el.isConnected) return;
     const answers = el.querySelectorAll(".cni-answer");
-    const last = answers[answers.length - 1], pane = el.parentElement;
+    const first = answers[0], last = answers[answers.length - 1], pane = el.parentElement;
     if (!last || !pane) return;
-    const pr = pane.getBoundingClientRect(), lr = last.getBoundingClientRect();
-    if (lr.bottom > pr.bottom - 4) pane.scrollTop += lr.bottom - pr.bottom + 8;
+    const pr = pane.getBoundingClientRect(), lr = last.getBoundingClientRect(), fr = first.getBoundingClientRect();
+    const q = el.querySelector(".cni-question"), qTop = q ? q.getBoundingClientRect().top : fr.top;
+    // What stays in view (#352): the question and every answer when they fit; else every answer, the last at the pane's bottom; else (more answers than the pane holds) the question's first
+    // line and the first answer at the top, and the rest scroll. The chat's own pin to its bottom (a refresh while it follows the chat) put the card's top above the pane on a short phone pane
+    // with the keyboard open, and the first answer stayed hidden.
+    const room = pr.height - 12;
+    const down = lr.bottom - pr.bottom + 8; // brings the last answer up to the pane's bottom
+    const top = y => y - pr.top - 4;         // the scroll that brings y to the pane's top
+    let delta;
+    if (lr.bottom - qTop <= room) delta = down > 0 ? Math.min(down, top(qTop)) : Math.min(0, top(qTop));
+    else if (lr.bottom - fr.top <= room) delta = down > 0 ? Math.min(down, top(fr.top)) : Math.min(0, top(fr.top));
+    else delta = fr.bottom - qTop <= room ? top(qTop) : top(fr.top);
+    if (Math.abs(delta) >= 1) { pane.scrollTop += delta; _keptAt = pane.scrollTop; }
 }
+let _keptAt = -1; // the pane's scrollTop where the card last put it
+/** After the chat pinned itself to its bottom (it follows the chat): the open card's question and first answer back in view (#352). */
+export function keepCardInView() { keepAnswersOnScreen(); }
+/** Whether the chat sits where the open card put it: it still counts as following the chat (auto-scroll stays on), since the card, not the person, moved it off the bottom. A person's own scroll moves it elsewhere. */
+export function cardKeptAt(scrollTop) { return !!_cardWatch && _keptAt >= 0 && Math.abs(scrollTop - _keptAt) < 2; }
 function keepAnswersOnScreenSoon() { clearTimeout(_answersTimer); _answersTimer = setTimeout(keepAnswersOnScreen, 120); } // timeout-ok: the layout settles after the keyboard or the card appears
 const _onViewResize = () => { const w = document.getElementById("capture-wrapper"); if (w && w.classList.contains("card-in-view")) keepAnswersOnScreenSoon(); };
 window.addEventListener("resize", _onViewResize);
