@@ -14,7 +14,7 @@ import { effectiveLiveViewMode, setLiveViewMode, jumpToLiveMessage } from './liv
 import { buildListBar } from './list_bar.js';
 import { importOnce } from './import_once.js';
 const { savedExpandFor } = await importOnce('./inbox_coral.js'); // "Read the whole message" on a saved item: the shared Inbox component
-import { selectInboxTab } from './inbox_tab.js';
+import { selectInboxTab, rememberInboxGroup } from './inbox_tab.js';
 // This module is loaded lazily, so its own parts are loaded the same way (a static import of a module not loaded at startup could not be retried: import_hygiene).
 const { KINDS, KIND_LABEL, SORTS, SORT_LABEL, EMPTY: SAVED_EMPTY, makeModel: savedModel, clean: cleanSaved, isFiltered: savedFiltered, toQuery: savedQuery } = await importOnce('./saved_filters.js');
 
@@ -337,13 +337,14 @@ async function probe(it) {
 }
 
 let _drawn = false; // the list has been drawn once: a later read keeps what is on screen until the answer comes
+let _readError = ''; // why the last read failed, for the Inbox's Saved table (the dock says it in #saved-status)
 async function refresh() {
     if (!_drawn) { // the first read: the bar is already there and one line says it is loading, so nothing moves when the list arrives (#7431)
         syncBar(0);
         const li = document.createElement('li'); li.className = 'saved-empty saved-loading'; li.setAttribute('role', 'status'); li.textContent = 'Loading saved items';
         $('saved-list').replaceChildren(li);
     }
-    try { await load(); render(); _drawn = true; } catch (e) { $('saved-list').querySelector('.saved-loading')?.remove(); $('saved-status').textContent = `Could not read the saved messages (${e.message}).`; } // the loading line goes: the screen must not say it is loading and that it failed
+    try { await load(); _readError = ''; render(); _drawn = true; } catch (e) { _readError = `Could not read the saved messages (${e.message}).`; $('saved-list').querySelector('.saved-loading')?.remove(); $('saved-status').textContent = _readError; for (const fn of renderListeners) fn(); } // the loading line goes: the screen must not say it is loading and that it failed
 }
 
 /** On a phone the side panel is an overlay over the chat: it gives way so the jump is seen (the tab is where it was when it is opened again). */
@@ -442,8 +443,9 @@ async function openSavedView({ toggle = false } = {}) {
     dropJumpBar();
     _prevTab = activeNavTab() === 'hub-inbox' ? _prevTab : activeNavTab();
     wantAllScope(true); // the Inbox is everything's, whatever agent or team is behind it
+    await rememberInboxGroup('saved'); // before the tab shows: the Inbox opens on Saved, not on the group it was last left on
     window.switchNavTab?.('hub-inbox');
-    try { await showSavedView(); await selectInboxTab('saved'); } finally { wantAllScope(false); } // the Inbox at its Saved group
+    try { const read = showSavedView(); await selectInboxTab('saved'); await read; } finally { wantAllScope(false); } // the Inbox at its Saved group: the table is up at once and says it is loading (a phone waited for the read first and showed the list meanwhile)
     $('group-table-view')?.querySelector('.group-table-link, .group-chip')?.focus();
 }
 
@@ -500,7 +502,7 @@ let inboxBar = null; // the Filters and Sort bar in the Inbox's Display options:
 export function onSavedRender(fn) { renderListeners.add(fn); }
 /** What the Inbox shows: the tab's items (Open or Done), both totals, the servers that did not answer, and whether a search or filter is on. */
 export function savedView() {
-    return { tab, totals: { ...totals }, shown: items.filter(i => (tab === 'done') === !!i.done_at), down: [...down], filtered: savedFiltered(filters), query: filters.q || '' };
+    return { loading: !_drawn && !_readError, error: _readError, tab, totals: { ...totals }, shown: items.filter(i => (tab === 'done') === !!i.done_at), down: [...down], filtered: savedFiltered(filters), query: filters.q || '' };
 }
 /** One item's facts for a row or a page: its words, and what it can do. */
 export function savedItemFacts(it) {

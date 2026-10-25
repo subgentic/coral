@@ -115,10 +115,10 @@ registerGroupSource('hub-inbox', {
         if (key === 'saved') {
             const v = saved.savedView();
             const rows = v.shown.map(saved.savedItemFacts);
-            const empty = v.filtered ? 'No saved messages match this search.' : v.tab === 'done' ? 'Nothing is marked done.' : 'Nothing is saved for later.';
+            const empty = v.loading ? 'Loading saved items' : v.error ? v.error : v.filtered ? 'No saved messages match this search.' : v.tab === 'done' ? 'Nothing is marked done.' : 'Nothing is saved for later.'; // the first read says it is loading, not that nothing is saved; a failed one says so
             return { title: 'Saved', stack: true, columns: ['Message', 'Saved', 'State', 'Action'], chipsLabel: 'Show',
                 chips: [{ action: 'inbox-saved-chip', data: { tab: 'open' }, label: 'Open', count: v.totals.open, pressed: v.tab === 'open' }, { action: 'inbox-saved-chip', data: { tab: 'done' }, label: 'Done', count: v.totals.done, pressed: v.tab === 'done' }],
-                empty: { line: empty, hint: v.filtered || v.tab === 'done' ? '' : 'Save a message from a chat or a board with its bookmark.' },
+                empty: { line: empty, hint: v.loading || v.error || v.filtered || v.tab === 'done' ? '' : 'Save a message from a chat or a board with its bookmark.' },
                 note: [v.query ? 'The search covers every saved message, not only these.' : '', ...v.down.map(d => `${d.label || d.id} did not answer, so its saved messages are not shown.`)].filter(Boolean).join(' '),
                 rows: rows.map(f => ({ title: f.which, action: 'inbox-saved-open', data: { id: f.id },
                     cells: [f.saved, f.state, f.gone ? '' : { action: 'inbox-saved-done', data: { id: f.id }, label: f.done ? 'Reopen' : 'Done', aria: `${f.done ? 'Reopen, move back to Open' : 'Mark done'}: ${f.which}` }] })) };
@@ -289,6 +289,9 @@ export async function showInbox() {
     $('inbox-view')?.removeAttribute('data-phone-item');
     if (!isPhoneLayout()) openGroupTable('hub-inbox', group);
 }
+
+/** The group the Inbox opens on the next time it is shown, with nothing drawn (the Saved button names it before it switches to the tab, so the last group is not on screen first). */
+export function rememberGroup(name) { if (GROUPS.some(g => g.key === name)) { group = name; browserLocal.set(GROUP_KEY, name); } }
 
 /** A group wanted on screen from elsewhere (the Saved button of the top bar): its table opens. */
 export async function openInboxGroup(name) {
