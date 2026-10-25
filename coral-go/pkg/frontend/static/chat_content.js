@@ -18,7 +18,8 @@ export function htmlToElement(html) {
 
 // A run of tool calls (with their results) is folded into one collapsed "work group", with the one-line
 // preamble of a message that makes them (live_chat.js) and the Coral notices that start or interrupt the work (#4171). Prose in a message with no tool calls, a reply, is
-// never put in a group (#4105). A reply, a message from the user or a
+// never put in a group (#4105), whoever started the turn and however short it is (#7419: a Codex agent's short replies to board notices sat behind "9 steps" under the rule that folded them,
+// and the operator wants every reply on the page). A reply, a message from the user or a
 // notice from Coral ends the run, so a turn that goes on after an answer reads as steps, the answer,
 // more steps. (Before, more work after an answer folded the answer back into the next group, and a
 // reply the operator wanted to read sat behind "5 steps".)
@@ -29,51 +30,19 @@ function createWorkGroup() {
     </details>`);
 }
 
-// A reply to a turn that Coral's own notice started (the unread-messages notice, the health check, task-queue notices, stop-hook
-// feedback; #4171) folds into the steps group when it is short: under FOLD_REPLY_MAX characters and one paragraph. A longer reply, and
-// every reply to a message from the user, stays on the page.
-const FOLD_REPLY_MAX = 280;
-
-export function isShortReply(text) {
-    const t = String(text || "").trim();
-    return t.length > 0 && t.length < FOLD_REPLY_MAX && !/\n\s*\n/.test(t);
-}
-
-/** The first sentence of a reply, for the group's label. */
-function firstSentence(text) {
-    const t = String(text || "").replace(/\s+/g, " ").trim();
-    const m = /^.*?[.!?](?=\s|$)/.exec(t);
-    return (m ? m[0] : t).trim();
-}
-
-/** True when the turn now being drawn was started by a Coral notice, not by the user: the earliest group of the run of groups at the
- *  end of the transcript (since the last reply or user message) opens with a notice. A notice that arrives in the middle of the
- *  user's own turn joins a group that already has steps before it, so that turn stays the user's. */
-export function noticeStartedTurn(container) {
-    let el = lastContent(container);
-    let earliest = null;
-    while (el && el.classList.contains("work-group")) { earliest = el; el = el.previousElementSibling; }
-    const first = earliest && earliest.querySelector(":scope > .work-group-body")?.firstElementChild;
-    return !!(first && first.classList.contains("chat-system"));
-}
-
 function stepCount(group) {
-    return Array.from(group.querySelector(":scope > .work-group-body").children).filter(c => !c.classList.contains("folded-reply")).length;
+    return group.querySelector(":scope > .work-group-body").children.length;
 }
 
 export function updateWorkGroupSummary(group) {
     const body = group.querySelector(":scope > .work-group-body");
-    // The folded reply is the label, not a step.
     const steps = stepCount(group);
     group.querySelector(".work-group-count").textContent = `${steps} step${steps === 1 ? "" : "s"}`;
     const last = body.lastElementChild;
     let latest = "";
-    if (last && last.classList.contains("folded-reply")) latest = firstSentence(last.querySelector(".message-text")?.textContent);
-    else {
-        const lastTool = Array.from(body.querySelectorAll(":scope > .tool-call")).pop();
-        if (lastTool) latest = lastTool.querySelector(".tool-call-label").textContent;
-        else if (last && last.classList.contains("chat-system")) latest = last.querySelector(".chat-system-text")?.textContent || "";
-    }
+    const lastTool = Array.from(body.querySelectorAll(":scope > .tool-call")).pop();
+    if (lastTool) latest = lastTool.querySelector(".tool-call-label").textContent;
+    else if (last && last.classList.contains("chat-system")) latest = last.querySelector(".chat-system-text")?.textContent || "";
     group.querySelector(".work-group-latest").textContent = latest;
 }
 
@@ -94,6 +63,7 @@ export function appendContent(container, el) {
     container.insertBefore(el, firstChrome || null);
 }
 
+// newGroup starts a group of its own even when the last element is one (a caller that wants its step apart from the run before it).
 export function appendWork(container, el, { newGroup = false } = {}) {
     let group = lastContent(container);
     if (!group || !group.classList.contains("work-group") || newGroup) {
@@ -107,7 +77,7 @@ export function appendWork(container, el, { newGroup = false } = {}) {
 
 // Consecutive collapsed groups with nothing visible between them (no reply that stays on the page, no user message) read as ONE bar
 // (#4264, the operator: "multiple collapsed bars should be rolled up into a single one"). The groups stay siblings of each other in the
-// transcript, so everything that walks the page (noticeStartedTurn, the notice roll-up, stitching pages) is unchanged; a run of two or
+// transcript, so everything that walks the page (the notice roll-up, stitching pages) is unchanged; a run of two or
 // more gets a .work-rollup bar in front of it, labelled with the count and the newest group's label, and its groups are hidden until the
 // bar is open. A group the page adds while the bar is open shows at once; one added while it is closed folds in under the bar.
 function createRollup() {

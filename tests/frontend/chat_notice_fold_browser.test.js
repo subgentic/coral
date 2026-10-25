@@ -1,4 +1,4 @@
-// Coral's own notices fold into the steps group, and a short reply to a turn a notice started folds with them (#4171, operator). Fixture in
+// Coral's own notices fold into the steps group, and EVERY reply stays on the page, short or not, whoever started the turn (#4171 folded the short replies to notice turns; #7419, the operator: a Codex agent's replies sat behind "9 steps"). Fixture in
 // the shape of the operator's screenshot: a reply to the user, then (unread-messages notice, a board read, a short reply), (health check, a
 // read, a short reply), (a notice and a LONG reply), (stop-hook feedback, a read, a short reply), a notice inside the user's own turn, and a
 // user message with a short reply. Checks what is folded, what shows, the group labels, the order inside an expanded group, and that
@@ -51,35 +51,32 @@ const fixture = [
             const vis = el => el.checkVisibility({ checkVisibilityCSS: true });
             return [...box.children].map(el => el.classList.contains('work-rollup') ? { kind: 'rollup', count: el.querySelector('.work-group-count').textContent } : el.classList.contains('work-group')
                 ? { kind: 'group', open: el.open, count: el.querySelector('.work-group-count').textContent, label: el.querySelector('.work-group-latest').textContent,
-                    inside: [...el.querySelectorAll(':scope > .work-group-body > *')].map(c => c.classList.contains('chat-system') ? 'notice' : c.classList.contains('tool-call') ? 'tool' : c.classList.contains('folded-reply') ? 'reply' : c.className) }
+                    inside: [...el.querySelectorAll(':scope > .work-group-body > *')].map(c => c.classList.contains('chat-system') ? 'notice' : c.classList.contains('tool-call') ? 'tool' : c.classList.contains('chat-bubble') ? 'bubble' : c.className) }
                 : { kind: el.classList.contains('human') ? 'user' : 'reply', text: (el.querySelector('.message-text') || el).innerText.trim().slice(0, 40), visible: vis(el) }); })()`);
         if (process.env.FOLD_SHOT_DIR) require('node:fs').writeFileSync(`${process.env.FOLD_SHOT_DIR}/chat.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));
         const kinds = top.map(x => x.kind).join(',');
-        // user, group(t1), reply(DevOps), rollup(3 updates) over group[notice,t2,reply], group[health,t3,reply], group[notice], reply(LONG), group[hook,t4,reply], user, group[t5,notice,t6], reply(Build), user, reply
-        assert.equal(kinds, 'user,group,reply,rollup,group,group,group,reply,group,user,group,reply,user,reply', kinds + '\n' + JSON.stringify(top, null, 1));
+        // user, group(t1), reply(DevOps), group[notice,t2], reply, group[health,t3], reply, group[notice], reply(LONG), group[hook,t4], reply, user, group[t5,notice,t6], reply(Build), user, reply
+        assert.equal(kinds, 'user,group,reply,group,reply,group,reply,group,reply,group,reply,user,group,reply,user,reply', kinds + '\n' + JSON.stringify(top, null, 1));
         const g = top.filter(x => x.kind === 'group');
-        assert.equal(top.find(x => x.kind === 'rollup').count, '3 updates \u00b7 5 steps', 'three folded turns in a row are one bar (#4264)');
-        assert.deepEqual(g[1].inside, ['notice', 'tool', 'reply'], 'unread notice, read, reply folded in order');
-        assert.equal(g[1].count, '2 steps'); assert.equal(g[1].label, 'Both were routine task-queue notices.');
-        assert.deepEqual(g[2].inside, ['notice', 'tool', 'reply']); assert.equal(g[2].count, '2 steps'); assert.equal(g[2].label, 'All six agents are working, and each has its next task queued.');
+        assert.equal(top.filter(x => x.kind === 'rollup').length, 0, 'every reply ends a run, so no two groups are neighbours and nothing is rolled up');
+        assert.deepEqual(g[1].inside, ['notice', 'tool'], 'unread notice, read: the steps of the turn');
+        assert.equal(g[1].count, '2 steps'); assert.equal(g[1].label, 'Read new board messages');
+        assert.deepEqual(g[2].inside, ['notice', 'tool']); assert.equal(g[2].count, '2 steps'); assert.equal(g[2].label, 'Read health check and list open tasks');
         assert.deepEqual(g[3].inside, ['notice']); assert.equal(g[3].count, '1 step'); assert.ok(/^You have 2 unread messages/.test(g[3].label), 'a notice alone labels its group with its text');
-        assert.deepEqual(g[4].inside, ['notice', 'tool', 'reply']); assert.equal(g[4].label, 'Nothing new for me.'); // stop-hook feedback folds as a notice
+        assert.deepEqual(g[4].inside, ['notice', 'tool']); assert.equal(g[4].label, 'Read the board'); // stop-hook feedback folds as a notice
         assert.deepEqual(g[5].inside, ['tool', 'notice', 'tool']); assert.equal(g[5].count, '3 steps'); // a notice inside the user's own turn is one of its steps
         assert.ok(g.every(x => !x.open), 'groups are collapsed');
         const replies = top.filter(x => x.kind === 'reply');
         assert.ok(replies.every(r => r.visible), 'every reply on the page is visible: ' + JSON.stringify(replies));
-        assert.deepEqual(replies.map(r => r.text.slice(0, 12)), ['DevOps confi', 'The health c', 'Build is gre', 'No, that is '], 'reply to the user, the LONG reply after a notice, the reply inside the user turn, the reply to the next user message');
+        assert.deepEqual(replies.map(r => r.text.slice(0, 12)), ['DevOps confi', 'Both were ro', 'All six agen', 'The health c', 'Nothing new ', 'Build is gre', 'No, that is '], 'the short replies to notice turns are on the page, in order, with the long one and the replies to the user');
         assert.equal(top.filter(x => x.kind === 'user').length, 3, 'user messages (not notices) stay');
         // no notice or hook text stands on its own
         assert.equal(await ev(`[...document.getElementById('fold-box').children].some(el => el.classList.contains('chat-system'))`), false, 'no notice pill outside a group');
         assert.equal(await ev(`/Stop hook feedback/.test([...document.querySelectorAll('#fold-box > .chat-bubble.human')].map(e => e.innerText).join('|'))`), false, 'stop-hook feedback is not shown as a user message');
-        // Open the roll-up bar (its groups hide while it is closed)
-        await ev(`document.querySelector('#fold-box > .work-rollup').open = true`);
-        await waitFor(`document.querySelector('#fold-box > .work-rollup + .work-group').checkVisibility({ checkVisibilityCSS: true })`, 'the roll-up bar to open');
-        // Expanded: the notice, the step and the reply, in order
+        // Expanded: the notice and the step, in order
         const opened = await ev(`(() => { const gs = document.querySelectorAll('#fold-box > .work-group'); gs[1].open = true; return gs[1].innerText; })()`);
-        const i1 = opened.indexOf('unread messages'), i2 = opened.indexOf('Read new board messages'), i3 = opened.lastIndexOf('Both were routine');
-        assert.ok(i1 >= 0 && i2 > i1 && i3 > i2, 'expanding shows the notice, the step, the reply in order: ' + JSON.stringify(opened));
+        const i1 = opened.indexOf('unread messages'), i2 = opened.lastIndexOf('Read new board messages');
+        assert.ok(i1 >= 0 && i2 > i1, 'expanding shows the notice, then the step, in order: ' + JSON.stringify(opened));
         // Expanded, each notice keeps its pill: the bell 'Coral' pill, the shield 'Coral · Health check' pill, in its place among the steps (operator).
         const pills = await ev(`(() => { document.querySelectorAll('#fold-box > .work-group').forEach(g => { g.open = true; });
             return [...document.querySelectorAll('#fold-box .work-group-body > .chat-system')].map(p => { const cs = getComputedStyle(p); const r = p.getBoundingClientRect();
@@ -89,8 +86,40 @@ const fixture = [
         assert.equal(pills.length, 5, 'five notices in groups: ' + JSON.stringify(pills));
         assert.ok(pills.every(p => p.radius && p.border && p.visible), 'each is a visible bordered pill: ' + JSON.stringify(pills));
         assert.deepEqual(pills.map(p => [p.icon, p.label]), [['notifications', 'Coral'], ['health_and_safety', 'Coral · Health check'], ['notifications', 'Coral'], ['notifications', 'Coral'], ['notifications', 'Coral']], 'the bell pill and the shield health-check pill');
+        // #7419: a Codex agent's chat (the operator's screenshot): the replies the agent gives to board notices are on the page; its commentary (progress) and its tool steps are what fold.
+        const codex = [
+            { type: 'user', content: 'Introduce yourself to the team' },
+            { type: 'assistant', text: 'Posted my introduction. Awaiting Orchestrator instructions.', phase: 'final_answer' },
+            { type: 'user', content: NOTICE },
+            ...call('c1', 'exec_command', 'Read the board'),
+            { type: 'assistant', text: 'Reading the design guidelines now.', phase: 'commentary' },
+            ...call('c2', 'exec_command', 'Read the guidelines'),
+            { type: 'assistant', text: 'Recorded the Coral design guidelines.', phase: 'final_answer' },
+            { type: 'user', content: HOOK },
+            ...call('c3', 'exec_command', 'Post the findings'),
+            { type: 'assistant', text: 'Posted 11 UX/accessibility findings to the Orchestrator.', phase: 'final_answer' },
+            { type: 'user', content: NOTICE },
+            { type: 'assistant', text: "I've reviewed the Artifacts screenshot.", phase: 'final_answer' },
+        ];
+        await ev(`import((window.__coralStatic || '/static/') + 'live_chat.js').then(m => {
+            const box = document.createElement('div'); box.id = 'codex-box'; box.className = 'chat-messages chat-prose';
+            box.style.cssText = 'position:fixed;left:0;top:0;width:860px;height:880px;overflow:auto;background:var(--bg-primary);z-index:100000;padding:12px';
+            document.body.appendChild(box); m.renderTranscript(${JSON.stringify(codex)}, box, 'codex'); return true; })`);
+        const ctop = await ev(`(() => { const box = document.getElementById('codex-box'); const vis = el => el.checkVisibility({ checkVisibilityCSS: true });
+            return [...box.children].map(el => el.classList.contains('work-group')
+                ? { kind: 'group', count: el.querySelector('.work-group-count').textContent, inside: [...el.querySelectorAll(':scope > .work-group-body > *')].map(c => c.classList.contains('chat-system') ? 'notice' : c.classList.contains('tool-call') ? 'tool' : c.classList.contains('chat-bubble') ? 'commentary' : c.className) }
+                : { kind: el.classList.contains('human') ? 'user' : 'reply', text: (el.querySelector('.message-text') || el).innerText.trim(), visible: vis(el) }); })()`);
+        assert.equal(ctop.map(x => x.kind).join(','), 'user,reply,group,reply,group,reply,group,reply', JSON.stringify(ctop, null, 1));
+        const creplies = ctop.filter(x => x.kind === 'reply');
+        assert.ok(creplies.every(r => r.visible), 'every Codex reply is visible');
+        assert.deepEqual(creplies.map(r => r.text), ['Posted my introduction. Awaiting Orchestrator instructions.', 'Recorded the Coral design guidelines.', 'Posted 11 UX/accessibility findings to the Orchestrator.', "I've reviewed the Artifacts screenshot."]);
+        const cg = ctop.filter(x => x.kind === 'group');
+        assert.deepEqual(cg[0].inside, ['notice', 'tool', 'commentary', 'tool'], 'the commentary and the steps are folded, in order'); assert.equal(cg[0].count, '4 steps');
+        assert.deepEqual(cg[1].inside, ['notice', 'tool']);
+        assert.deepEqual(cg[2].inside, ['notice'], 'a notice with only a reply after it is a group of one step');
+        console.log('   ✓ a Codex agent: every reply on the page, commentary and steps folded');
         console.log('   ✓ expanded groups keep the Coral pill styling');
         console.log('   ✓ ' + kinds);
-        console.log('\nPASS notices and short notice-turn replies fold into steps');
+        console.log('\nPASS notices fold into steps and every reply stays on the page');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

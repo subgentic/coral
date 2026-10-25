@@ -1,5 +1,5 @@
 /* Drawing a chat's messages (moved out of live_chat.js, #5065; no behaviour change; the copy button's click listener stays in live_chat.js, which registers it after its own earlier ones). */
-import { appendContent, appendTurnFinal, appendWork, htmlToElement, isShortReply, noticeStartedTurn } from './chat_content.js';
+import { appendContent, appendTurnFinal, appendWork, htmlToElement } from './chat_content.js';
 import { makeBubble } from './chat_bubbles.js';
 import { unwrapPastedContent } from './pasted_content.js';
 import { isCoralNudge, INTERRUPT_RE, appendCoralNotice, isCoralHealthNudge, normalizeNudgeText } from './pending_messages.js';
@@ -75,10 +75,8 @@ function renderOneMessage(msg, container, agentType) {
             // in the steps group with the calls. Prose in a message with no tool calls (a question card is not a step)
             // is a reply: it always shows and it ends the group (#4105).
             const preamble = (msg.tool_uses || []).some(t => !adapter.toolView(t).isQuestion);
-            // A short reply to a turn a Coral notice started folds into the group too, and labels it (#4171).
-            const folded = !preamble && (msg.tool_uses || []).length === 0 && isShortReply(msg.text) && noticeStartedTurn(container);
-            if (folded) bubble.classList.add("folded-reply");
-            if (preamble || folded || adapter.assistantPlacement(msg) === "work") appendWork(container, bubble);
+            // A reply always shows, whoever started the turn and however short it is (#7419; until then a short reply to a turn a Coral notice started folded into the group, #4171).
+            if (preamble || adapter.assistantPlacement(msg) === "work") appendWork(container, bubble);
             else appendTurnFinal(container, bubble);
         }
         for (const tool of msg.tool_uses || []) {
