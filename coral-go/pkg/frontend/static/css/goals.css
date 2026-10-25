@@ -112,3 +112,43 @@
     /* the board's name is one line on a phone, so the first goal is on the first screen at large text (#7224) */
     #messageboard-view.mb-has-board #messageboard-project-badge { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
+
+/* Goals uses the width (#7404, UI/UX's #7401): the list 280 to 360 px beside a wide detail, the detail under the list when the Goals area is under 880 px (never a strip), the chips on one line,
+   no ring round the detail (it takes focus when a goal opens, as a region named by the goal's title; real controls inside it keep their rings), Outcome and Done when side by side, one-line task rows.
+   A phone keeps its own rules above: one column, the list then the detail. */
+.mb-goals { container-type: inline-size; }
+.goals-page { max-width: 1440px; width: 100%; margin-inline: auto; }
+.goals-chips { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; } /* it scrolls sideways when the six do not fit (a phone); no bar is drawn under the chips */
+.goals-chip { flex: none; white-space: nowrap; }
+.goals-detail-col { container-type: inline-size; }
+.goals-detail-col:focus { outline: none; }
+.goals-detail-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.goals-detail-head > .btn { margin: 0; }
+.goals-detail-head-text { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.goals-two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+@container (max-width: 419px) { .goals-two { grid-template-columns: minmax(0, 1fr); } }
+.goals-detail-col .goals-sub { margin: 0 0 4px; }
+.goals-detail-col .goals-text { font-size: 0.875rem; line-height: 1.55; max-width: 70ch; }
+@media (min-width: 768px) {
+    .goals-cols { grid-template-columns: minmax(280px, 360px) minmax(0, 1fr); gap: 20px; }
+    .goals-detail-col { padding: 18px 22px 22px; gap: 16px; }
+    .goal-task { display: grid; align-items: center; column-gap: 12px; row-gap: 2px; }
+    .goal-task-head { display: contents; }
+    .goal-task-title { flex: none; min-width: 0; }
+    .goal-task-id, .goal-task-title, .goal-task .goal-chip, .goal-task-sub, .goal-task-actions { grid-row: 1; }
+    .goal-task-id { grid-column: 1; }
+    .goal-task-title { grid-column: 2; }
+    .goal-task-sub { grid-column: 3; max-width: 24ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .goal-task .goal-chip { grid-column: 4; }
+    .goal-task-actions { grid-column: 5; justify-content: flex-end; }
+    .goal-task { grid-template-columns: auto minmax(0, 1fr) auto auto auto; }
+}
+@container (max-width: 559px) { .goal-task-sub { grid-column: 2 / -1; grid-row: 2; max-width: none; white-space: normal; } }
+@container (max-width: 879px) { .goals-cols { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 767px) { .goals-page.goals-open .goals-chips-host { display: none; } } /* an open goal is a screen of its own: the filter row belongs to the list */
+
+/* Goals face, wide screens (#7404): the right panel is out of the way until Members brings it back (goals_layout.js); Members is drawn on this face only */
+.mb-members-btn { display: none; }
+body[data-goals-layout] .mb-members-btn { display: inline-flex; }
+body[data-goals-layout]:not([data-goals-members]) #agentic-state,
+body[data-goals-layout]:not([data-goals-members]) #task-bar-resize-handle { display: none; }

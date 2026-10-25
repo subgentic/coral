@@ -39,7 +39,7 @@ const BASE = require('./test_base').BASE;
         console.log('2. the link opens the goal on its board\'s Goals face');
         await ev(`document.querySelector('#inbox-needs-list .inbox-needs-goal').click(); true`);
         await waitFor(`!!document.querySelector('#mb-goals .goals-detail-title') && document.querySelector('#mb-goals .goals-detail-title').textContent === 'Ship the new installer'`, 'the goal to open', 12000);
-        assert.equal(await ev(`document.activeElement.id`), 'goals-detail-title', 'the focus is on the goal\'s heading');
+        assert.equal(await ev(`document.activeElement.id`), 'goals-detail', 'the focus is on the goal\'s detail');
 
         console.log('3. an opened task in the Inbox shows the same link when its row carries a goal, and nothing when it has none');
         await ev(`document.getElementById('nav-tab-hub-inbox').click(); true`);

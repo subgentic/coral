@@ -61,7 +61,7 @@ const BASE = require('./test_base').BASE;
         assert.ok(await ev(`document.getElementById('task-detail-goal-open').getBoundingClientRect().height >= 44`), 'the Goal line button is a 44 px target on a phone (#7313)');
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await ev(`window.hideTaskDetailModal(); true`);
-        assert.equal(await ev(`document.activeElement.id`), 'goals-detail-title', 'focus is on the goal\'s heading');
+        assert.equal(await ev(`document.activeElement.id`), 'goals-detail', 'focus is on the goal\'s detail');
 
         console.log('4. Edit: the Goal select moves the task to another goal and back to none');
         await ev(`localStorage.setItem('coral.board.face', 'messages'); true`);

@@ -16,6 +16,7 @@ import { paintPauseButton } from './board_pause_button.js';
 import { pathId, keyLabel, noteBoardLabel, hasBoardLabel, onBoardLabelsChanged, splitKey, boardFetch, teamFetch, isCloud, inTeam } from './server_base.js';
 import { importOnce } from './import_once.js';
 import { browserLocal } from './safe_storage.js';
+import { setGoalsLayout, toggleGoalsMembers } from './goals_layout.js'; // Goals uses the width (#7404)
 import { trackBoardGoals } from './goals_badge.js'; // the Goals switch's count and "waiting" (#7252)
 import './goals_adapter.js'; // the Goals view (goals_view.js) is lazy and imports only what loads at startup (import_hygiene): its two small helpers load here (#7113)
 import './goal_words.js';
@@ -165,6 +166,7 @@ function applyBoardFace(project) {
     const face = has && browserLocal.get(FACE_KEY) === 'goals' ? 'goals' : 'messages';
     document.getElementById('mb-face-messages')?.setAttribute('aria-pressed', String(face === 'messages'));
     document.getElementById('mb-face-goals')?.setAttribute('aria-pressed', String(face === 'goals'));
+    setGoalsLayout(face === 'goals');
     if (face === 'goals') {
         board.style.display = 'none'; // display-ok: #mb-board is shown and hidden this way everywhere else in this file
         importOnce('./goals_view.js').then(m => m.showGoals(goals, project)).catch(() => {});
@@ -1096,6 +1098,7 @@ document.addEventListener('click', (e) => {
 registerActions({
     'mb-project': el => { const p = textOf(el.dataset.project); if (p) selectBoardProject(p); },
     'mb-earlier': () => loadEarlierMessages(),
+    'mb-members': () => toggleGoalsMembers(),
     'mb-face': el => { browserLocal.set(FACE_KEY, el.dataset.face === 'goals' ? 'goals' : 'messages'); applyBoardFace(currentProject); },
     'mb-more': (el, event) => toggleMoreMenu(event),
     'mb-jump-latest': () => jumpToLatest(),
