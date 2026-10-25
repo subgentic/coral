@@ -12,7 +12,7 @@ const { launchStandIn } = require('./stand_in_agent');
 const { guardSettings } = require('./settings_guard');
 const { STUB, HEX } = require('./comments_scale');
 const { GOALS_STUB } = require('./goals_stub');
-const { scene, tap: tapSel, problems, required, useScaleShot, openBoardComposer, BOARD_COMPOSER_UP, showUpdateReady, UPDATE_NOTICE_UP, UPDATE_DIALOG_UP } = require('./phone_targets');
+const { closeToast, scene, tap: tapSel, problems, required, useScaleShot, openBoardComposer, BOARD_COMPOSER_UP, showUpdateReady, UPDATE_NOTICE_UP, UPDATE_DIALOG_UP } = require('./phone_targets');
 const { requiredScenes } = require('./census_required'); // the scenes the suite must visit: one file each, so commits that add scenes do not conflict
 const BASE = require('../test_base').BASE;
 const TEAM = 'census-' + Date.now().toString(36);
@@ -54,7 +54,7 @@ module.exports = part => (async () => {
                 await waitFor(`!!document.querySelector('#command-input') && document.querySelector('.mobile-send-btn[data-on-click="cmd-send"]').getClientRects().length > 0`, 'composer', 20000);
                 await ev(`(() => { const i = document.getElementById('command-input'); i.focus(); i.value = 'Is the build green?'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
                 await tap('.mobile-send-btn[data-on-click="cmd-send"]');
-                await waitFor(`[...document.querySelectorAll('#live-history-messages .chat-bubble.human')].some(b => /build green/.test(b.textContent))`, 'my message', 15000);
+                await waitFor(`[...document.querySelectorAll('#live-history-messages .chat-bubble.human')].some(b => /build green/.test(b.textContent))`, 'my message', 15000); await closeToast(ev, waitFor, '/Sent: Is the build green/'); // the send's own toast covers the chat, terminal view and find buttons on a phone: closed once the send is checked, so they are measured
             }, { min: 10, expect: `!!document.getElementById('command-input') && document.querySelectorAll('#live-history-messages .chat-bubble').length >= 1` });
             // The chip is drawn from the agent's row in the page's live list, and this harness serves that list from its mocked agents (agent_view_harness PRELOAD), of which there are none here (the agent is a real
             // stand-in): the page's list is empty, so the chip only drew by chance. The row is handed to the chip directly, so the chip and its menu are the real ones.

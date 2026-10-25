@@ -11,7 +11,7 @@ const { connect } = require('../agent_view_harness');
 const { launchStandIn } = require('./stand_in_agent');
 const { guardSettings } = require('./settings_guard');
 const { GOALS_STUB } = require('./goals_stub');
-const { scene, tap: tapSel, problems, required, useScaleShot, openBoardComposer, BOARD_COMPOSER_UP, showUpdateReady, UPDATE_NOTICE_UP, UPDATE_DIALOG_UP } = require('./phone_targets');
+const { closeToast, scene, tap: tapSel, problems, required, useScaleShot, openBoardComposer, BOARD_COMPOSER_UP, showUpdateReady, UPDATE_NOTICE_UP, UPDATE_DIALOG_UP } = require('./phone_targets');
 const { requiredScenes } = require('./census_required'); // the scenes the suite must visit: one file each, so commits that add scenes do not conflict
 const { INBOX_WORLD } = require('./inbox_world');
 const { STUB, HEX } = require('./comments_scale');
@@ -50,7 +50,7 @@ module.exports = part => (async () => {
                 await waitFor(`!!document.querySelector('#command-input') && document.querySelector('#command-input').getClientRects().length > 0`, 'composer', 20000);
                 await ev(`(() => { const i = document.getElementById('command-input'); i.focus(); i.value = 'Is the build green?'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
                 await ev(`document.querySelector('[data-on-click="cmd-send"]').click(); true`);
-                await waitFor(`[...document.querySelectorAll('#live-history-messages .chat-bubble.human')].some(b => /build green/.test(b.textContent))`, 'my message', 15000);
+                await waitFor(`[...document.querySelectorAll('#live-history-messages .chat-bubble.human')].some(b => /build green/.test(b.textContent))`, 'my message', 15000); await closeToast(ev, waitFor, '/Sent: Is the build green/'); // the send's own toast covers the chat, terminal view and find buttons on a phone: closed once the send is checked, so they are measured
             }, { min: 10, expect: `document.querySelectorAll('#live-history-messages .chat-bubble').length >= 1` });
             await sc('composer: messages queued behind a question', async () => { await ev(`import(${S} + 'held_sends.js').then(m => { m.rememberSend(${JSON.stringify(standIn.sid)}, 1, 'Run the tests please'); m.noteHeld(${JSON.stringify(standIn.sid)}, 1); m.noteHeld(${JSON.stringify(standIn.sid)}, 2, 'Then push the branch and open the pull request'); return true; })`); await waitFor(`document.querySelectorAll('#composer-queued .composer-queued-item').length === 2`, 'the queued lines', 8000); }, { min: 3, expect: `document.querySelectorAll('#composer-queued .composer-queued-item').length === 2` });
             await ev(`import(${S} + 'held_sends.js').then(m => { m.noteDone(${JSON.stringify(standIn.sid)}, 1); m.noteDone(${JSON.stringify(standIn.sid)}, 2); return true; })`);

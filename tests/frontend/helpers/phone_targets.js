@@ -221,6 +221,15 @@ const NET_WATCH = `(() => { if (!window.__censusNet) { let n = 0; const f = wind
 // contrast_census.js, part b; keyboard_census_desktop) and "hub: toasts" (phone_targets_census_hub) show them in their own setup, which runs after this. The warnings and the update notice are
 // not toasts and stay.
 const CLEAR_TOASTS = `(() => { for (const b of document.querySelectorAll('.toast > .toast-close, .notification-toast-close')) b.click(); return document.querySelectorAll('.toast').length; })()`;
+/** A scene's own toast that would cover what the scene measures (the composer's "Sent" toast over the chat and terminal view buttons and the find button on a phone, #352): it must show, it is
+ * closed by its close button once the scene has checked what made it, and it must leave. `text` is a regular expression literal for its words. `waitFor` is the suite's (expression, what, ms). */
+async function closeToast(ev, waitFor, text) {
+    const find = `[...document.querySelectorAll('.toast')].find(t => ${text}.test(t.textContent))`;
+    await waitFor(`!!${find}`, `the toast ${text}`, 10000);
+    await ev(`(${find}).querySelector('.toast-close').click(); true`);
+    await waitFor(`!${find}`, `the toast ${text} to close`, 5000);
+}
+
 /** Before a scene's setup: clear earlier scenes' toasts, and start counting its requests. */
 async function sceneStart(ev) {
     const left = await ev(CLEAR_TOASTS);
@@ -310,4 +319,4 @@ async function openBoardComposer(ev, waitFor, team, select = true) {
 }
 const BOARD_COMPOSER_UP = `!!document.getElementById('board-panel-input') && !!document.getElementById('board-panel-input').offsetParent && document.querySelector('#board-chat-input-pane .board-mention-chip').getClientRects().length > 0`;
 
-module.exports = { sceneStart, sceneReady, showUpdateReady, UPDATE_NOTICE_UP, UPDATE_DIALOG_UP, openBoardComposer, BOARD_COMPOSER_UP, useScaleShot, scaleOf, SCALE, MEASURE, ALLOW, ALLOW_DUPS, ALLOW_UNNAMED, ALLOW_CONTRAST, useThemeSetter, scene, tap, problems, required };
+module.exports = { closeToast, sceneStart, sceneReady, showUpdateReady, UPDATE_NOTICE_UP, UPDATE_DIALOG_UP, openBoardComposer, BOARD_COMPOSER_UP, useScaleShot, scaleOf, SCALE, MEASURE, ALLOW, ALLOW_DUPS, ALLOW_UNNAMED, ALLOW_CONTRAST, useThemeSetter, scene, tap, problems, required };
