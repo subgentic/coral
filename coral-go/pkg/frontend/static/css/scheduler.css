@@ -167,6 +167,7 @@ div.job-field#sched-label { margin-bottom: 6px; }
     bottom: 0;
     z-index: 2;
     display: flex;
+    flex-wrap: wrap; /* at a large text size the buttons wrap onto a second row: none is pushed off the left edge */
     justify-content: flex-end;
     gap: 8px;
     margin-top: var(--space-2xl);
@@ -295,8 +296,8 @@ div.job-field#sched-label { margin-bottom: 6px; }
 .sidebar-jobs-group { margin-bottom: 8px; }
 .sidebar-jobs-group[hidden] { display: none; }
 .sched-row { display: flex; flex-direction: column; align-items: stretch; gap: 2px; }
-.sched-row-head { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.sched-row-name { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.sched-row-head { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 6px; min-width: 0; } /* the badges wrap under the name at a large text size: the name keeps the row's width, no word is broken */
+.sched-row-name { font-weight: 600; min-width: 0; flex: 1 1 8rem; overflow-wrap: break-word; }
 .sched-row-meta { color: var(--text-secondary); font-size: var(--fs-md); padding-left: 14px; }
 .sched-row-problem { display: block; color: var(--error); font-size: var(--fs-md); padding-left: 14px; overflow-wrap: anywhere; } /* a run that failed for its folder or branch, in words (#6707) */
 .sched-row-note { display: block; color: var(--text-secondary); font-size: var(--fs-md); padding-left: 14px; overflow-wrap: anywhere; } /* what a run's exit_reason adds to its status: Coral was stopped when its agent ended, or restarted before it launched (#6907) */
