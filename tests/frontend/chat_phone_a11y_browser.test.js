@@ -66,6 +66,8 @@ const { connect } = require('./agent_view_harness');
             await sleep(900); // sleep-ok: the card scrolls its answers into view after the resize (120 ms debounce)
             a = await answers();
             assert.ok(a.bs.every(b => b.inside), `${tag}: with the keyboard open every answer is still inside the chat pane (${JSON.stringify(a)})`);
+            const q = await ev(`(() => { const p = document.getElementById('live-history-messages').getBoundingClientRect(); const r = document.querySelector('.chat-needs-input .cni-question').getBoundingClientRect(); return { top: Math.round(r.top), bottom: Math.round(r.bottom), pane: [Math.round(p.top), Math.round(p.bottom)], inside: r.top >= p.top - 1 && r.bottom <= p.bottom + 1 }; })()`);
+            assert.ok(q.inside, `${tag}: with the keyboard open the question (the command) is in view with the answers (#352: Yes and No without what they allow) (${JSON.stringify(q)})`);
             // more answers than the pane can hold (#352): the first stays in view, the rest are below and the pane scrolls to them
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 2, mobile: true });
             await ev(`(() => { const as = document.querySelectorAll('.chat-needs-input .cni-answer'); const l = as[as.length - 1]; for (let i = 0; i < 6; i++) { const c = l.cloneNode(true); c.classList.add('census-extra'); l.after(c); } return true; })()`);

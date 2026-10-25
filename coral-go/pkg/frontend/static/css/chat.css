@@ -1140,6 +1140,10 @@ h3.cni-question { margin-bottom: 4px; } /* a heading with its text under it (#30
     overflow-x: auto;
     font-size: var(--fs-base);
 }
+/* With a phone's keyboard open (keyboard_open.js) the card is tighter above its answers (#352), so the question line, the command and every answer fit on a short pane together: at 360 px the
+   three were 3 px too tall and the question went above. The answers keep their size (44 px targets). */
+html.kb-open .cni-question { margin-bottom: 6px; }
+html.kb-open .cni-target { margin-bottom: 6px; padding-top: 6px; padding-bottom: 6px; }
 .cni-plan {
     max-height: 300px;
     overflow-y: auto;
