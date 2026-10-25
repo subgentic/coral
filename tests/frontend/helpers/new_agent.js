@@ -2,7 +2,9 @@
 // accessible name or visible text, never an id or a class, so the build can name its elements as it likes while the person-visible and screen-reader-visible shape is what is tested.
 // install(ev) puts window.__na in the page: dialog() is the visible role=dialog whose name starts with "New agent" or "Restart" (the exact names are asserted by their own scenarios); find(selector, regexp) the visible control in it whose accessible name matches.
 const SOURCE = `(() => {
-    const vis = e => !!e && e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden';
+    // Shown to a person: has a box, is not visibility:hidden, and is not the content of a closed <details> (its summary stays shown).
+    const inClosedDetails = e => { for (let d = e.closest('details'); d; d = d.parentElement && d.parentElement.closest('details')) { if (!d.open) { const sm = e.closest('summary'); if (!(sm && sm.parentElement === d)) return true; } } return false; };
+    const vis = e => !!e && e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden' && !inClosedDetails(e);
     // Text as a screen reader gets it: a part that is aria-hidden (an icon's ligature name, an initial in a dot) is left out, and blocks and buttons are separated.
     const text = e => { let out = ''; const walk = n => { if (n.nodeType === 3) { out += n.textContent; return; } if (n.nodeType !== 1 || n.getAttribute('aria-hidden') === 'true' || n.hidden) return; const block = /^(DIV|P|LI|LABEL|BUTTON|H[1-6]|SECTION|OPTION|SUMMARY|TD|TH|TR)$/.test(n.tagName); if (block) out += ' '; for (const c of n.childNodes) walk(c); if (block) out += ' '; }; walk(e); return out.replace(/\\s+/g, ' ').trim(); };
     const name = e => {
