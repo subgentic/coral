@@ -6,7 +6,9 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -72,84 +74,158 @@ func TestClaudeTranscriptTailFirstReadMatchesTheWholeFile(t *testing.T) {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	var cases, tailAnswered, wholeRead, neededGrowth, afterAppend, withAPIError, withEvent int
-	for seed := int64(0); seed < 400; seed++ {
-		rng := rand.New(rand.NewSource(seed))
-		rare := []string{"", "version", "event", "model"}[seed%4]
+	// The tail windows are one package-wide setting, so the seeds go through the same steps in the same order, together: every seed's step under
+	// one setting runs in parallel, then the setting changes. A seed's own steps stay in order, and its random numbers are drawn in the same order
+	// as when each seed ran start to finish.
+	type seedRun struct {
+		seed     int64
+		rng      *rand.Rand
+		rare     string
+		sid      string
+		path     string
+		windows  []int64
+		ts       time.Time
+		body     string
+		r        *SessionReader
+		want     claudeTurnCache
+		got      claudeTurnCache
+		appended bool
+	}
+	runs := make([]*seedRun, 400)
+	for i := range runs {
+		seed := int64(i)
 		sid := fmt.Sprintf("00000000-0000-4000-8000-%012d", seed)
-		path := filepath.Join(dir, sid+".jsonl")
-		n := rng.Intn(120)
-		ts := time.Date(2026, 10, 18, 10, 0, 0, 0, time.UTC)
-		var sb strings.Builder
-		write := func(count int) {
-			for i := 0; i < count; i++ {
-				ts = ts.Add(time.Second)
-				sb.WriteString(tailRecord(rng, i, ts, rare))
-				sb.WriteString("\n")
-			}
+		w := []int64{200, 800, 3200}
+		if (seed/4)%2 == 1 {
+			w = []int64{4000, 16000} // most of these transcripts end inside the first tail
 		}
-		write(n)
+		runs[i] = &seedRun{seed: seed, rng: rand.New(rand.NewSource(seed)), rare: []string{"", "version", "event", "model"}[seed%4], sid: sid,
+			path: filepath.Join(dir, sid+".jsonl"), windows: w, ts: time.Date(2026, 10, 18, 10, 0, 0, 0, time.UTC)}
+	}
+	// step runs fn for the seeds that pick selects, all together, with the tail windows set to w.
+	step := func(w []int64, pick func(*seedRun) bool, fn func(*seedRun) error) {
+		claudeTailWindows = w
+		var wg sync.WaitGroup
+		sem := make(chan struct{}, 2*runtime.GOMAXPROCS(0))
+		for _, sr := range runs {
+			if !pick(sr) {
+				continue
+			}
+			wg.Add(1)
+			sem <- struct{}{}
+			go func() {
+				defer wg.Done()
+				defer func() { <-sem }()
+				if err := fn(sr); err != nil {
+					t.Error(err)
+				}
+			}()
+		}
+		wg.Wait()
+	}
+	all := func(*seedRun) bool { return true }
+	scan := func(sr *seedRun) (claudeTurnCache, *SessionReader) {
+		r := NewSessionReader()
+		return r.scanClaudeTranscript(sr.sid, "/work"), r
+	}
+	same := func(a, b claudeTurnCache) bool {
+		return a.event == b.event && a.at.Equal(b.at) && a.version == b.version && a.model == b.model && reflect.DeepEqual(a.apiErr, b.apiErr)
+	}
+	// 1. the transcript is written, and read whole
+	step(nil, all, func(sr *seedRun) error {
+		n := sr.rng.Intn(120)
+		var sb strings.Builder
+		for i := 0; i < n; i++ {
+			sr.ts = sr.ts.Add(time.Second)
+			sb.WriteString(tailRecord(sr.rng, i, sr.ts, sr.rare))
+			sb.WriteString("\n")
+		}
 		body := sb.String()
-		if rng.Intn(5) == 0 && len(body) > 0 {
+		if sr.rng.Intn(5) == 0 && len(body) > 0 {
 			body = body[:len(body)-1] // the last record has no newline yet
 		}
-		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
-			t.Fatal(err)
+		sr.body = body
+		if err := os.WriteFile(sr.path, []byte(body), 0o600); err != nil {
+			return err
 		}
-		windows := []int64{200, 800, 3200}
-		if (seed/4)%2 == 1 {
-			windows = []int64{4000, 16000} // most of these transcripts end inside the first tail
-		}
-		scan := func(w []int64) (claudeTurnCache, *SessionReader) {
-			claudeTailWindows = w
-			r := NewSessionReader()
-			return r.scanClaudeTranscript(sid, "/work"), r
-		}
-		want, _ := scan(nil)
-		got, r := scan(windows)
-		same := func(a, b claudeTurnCache) bool {
-			return a.event == b.event && a.at.Equal(b.at) && a.version == b.version && a.model == b.model && reflect.DeepEqual(a.apiErr, b.apiErr)
-		}
-		if !same(want, got) {
-			t.Fatalf("seed %d: first read: whole file %+v, tail first %+v", seed, want, got)
-		}
+		sr.want, _ = scan(sr)
+		return nil
+	})
+	// 2. the first read, tail first, under each seed's windows
+	var cases, tailAnswered, wholeRead, neededGrowth, afterAppend, withAPIError, withEvent int
+	for _, group := range []int64{0, 1} {
+		inGroup := func(sr *seedRun) bool { return (sr.seed/4)%2 == group }
+		step(runs[int(group)*4].windows, inGroup, func(sr *seedRun) error {
+			sr.got, sr.r = scan(sr)
+			if !same(sr.want, sr.got) {
+				return fmt.Errorf("seed %d: first read: whole file %+v, tail first %+v", sr.seed, sr.want, sr.got)
+			}
+			return nil
+		})
+	}
+	for _, sr := range runs {
 		cases++
-		if got.from > 0 {
+		if sr.got.from > 0 {
 			tailAnswered++
-			if int64(len(body))-got.from > windows[0] { // a window longer than the first one answered
+			if int64(len(sr.body))-sr.got.from > sr.windows[0] { // a window longer than the first one answered
 				neededGrowth++
 			}
-		} else if want.size > windows[0] {
+		} else if sr.want.size > sr.windows[0] {
 			wholeRead++
 		}
-		if got.apiErr.Kind != "" {
+		if sr.got.apiErr.Kind != "" {
 			withAPIError++
 		}
-		if got.event != "" {
+		if sr.got.event != "" {
 			withEvent++
 		}
-		// what is appended after the first read is followed, and gives the whole file's state
+	}
+	// 3. what is appended after the first read is followed, and gives the whole file's state
+	step(nil, all, func(sr *seedRun) error {
 		more := &strings.Builder{}
-		for i := 0; i < rng.Intn(15); i++ {
-			ts = ts.Add(time.Second)
-			more.WriteString(tailRecord(rng, 1000+i, ts, rare) + "\n")
+		for i := 0; i < sr.rng.Intn(15); i++ {
+			sr.ts = sr.ts.Add(time.Second)
+			more.WriteString(tailRecord(sr.rng, 1000+i, sr.ts, sr.rare) + "\n")
 		}
-		if more.Len() > 0 {
-			f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o600)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if len(body) > 0 && body[len(body)-1] != '\n' {
-				f.WriteString("\n")
-			}
-			f.WriteString(more.String())
-			f.Close()
-			claudeTailWindows = windows
-			got2 := r.scanClaudeTranscript(sid, "/work")
-			want2, _ := scan(nil)
-			if !same(want2, got2) {
-				t.Fatalf("seed %d: after an append: whole file %+v, tail first then followed %+v", seed, want2, got2)
-			}
+		if more.Len() == 0 {
+			return nil
+		}
+		f, err := os.OpenFile(sr.path, os.O_APPEND|os.O_WRONLY, 0o600)
+		if err != nil {
+			return err
+		}
+		if len(sr.body) > 0 && sr.body[len(sr.body)-1] != '\n' {
+			f.WriteString("\n")
+		}
+		f.WriteString(more.String())
+		f.Close()
+		sr.appended = true
+		return nil
+	})
+	got2 := map[int64]claudeTurnCache{}
+	var mu sync.Mutex
+	for _, group := range []int64{0, 1} {
+		pick := func(sr *seedRun) bool { return sr.appended && (sr.seed/4)%2 == group }
+		step(runs[int(group)*4].windows, pick, func(sr *seedRun) error {
+			g := sr.r.scanClaudeTranscript(sr.sid, "/work")
+			mu.Lock()
+			got2[sr.seed] = g
+			mu.Unlock()
+			return nil
+		})
+	}
+	step(nil, func(sr *seedRun) bool { return sr.appended }, func(sr *seedRun) error {
+		want2, _ := scan(sr)
+		mu.Lock()
+		g := got2[sr.seed]
+		mu.Unlock()
+		if !same(want2, g) {
+			return fmt.Errorf("seed %d: after an append: whole file %+v, tail first then followed %+v", sr.seed, want2, g)
+		}
+		return nil
+	})
+	for _, sr := range runs {
+		if sr.appended {
 			afterAppend++
 		}
 	}
