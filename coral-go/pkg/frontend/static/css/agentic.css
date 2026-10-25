@@ -500,6 +500,18 @@ body.panel-dragging .agentic-state {
     background: var(--bg-tertiary);
     color: var(--text-primary);
 }
+@media (max-width: 767px), (pointer: coarse) {
+    .activity-chart { max-height: none; }
+    .activity-chart-mode { height: auto; }
+    .activity-chart-mode button { min-height: 44px; min-width: 44px; font-size: 0.75rem; padding: 0 12px; } /* the Time and Count switch at a touch size, as the other switches (#7652) */
+}
+#agentic-panel-activity { container: activity / inline-size; }
+@container activity (max-width: 20rem) { /* 200% text on a phone: the time goes under the summary, which keeps its words (#7652) */
+    .event-item { flex-wrap: wrap; row-gap: 0; }
+    .event-item .event-body { flex: 1 1 0; min-width: 6em; }
+    .event-item .event-summary { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow-wrap: anywhere; } /* at this size a summary wraps to three lines, not to a dozen letters */
+    .event-item .event-time, .event-item .event-duration { flex: 0 0 100%; padding-left: 2.25em; text-align: left; }
+}
 .activity-timing-note { padding: var(--space-md) var(--space-lg); font-size: var(--fs-base); color: var(--text-secondary); }
 
 .activity-chart:empty {
@@ -1929,6 +1941,9 @@ body.panel-dragging .agentic-state {
     opacity: 1;
 }
 
+.file-more-btn { display: none; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; background: none; border: 0; border-radius: var(--radius-md); color: var(--text-muted); font: inherit; font-size: 1.25rem; line-height: 1; cursor: pointer; flex: none; } /* a phone's one button for the row's Copy, Preview and Edit (mobile.css) */
+.file-more-btn:hover, .file-more-btn[aria-expanded="true"] { color: var(--text-primary); background: var(--bg-hover); }
+.file-more-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .file-action-btn {
     background: none;
     border: none;
@@ -2355,7 +2370,8 @@ body.panel-dragging .agentic-state {
 /* Four lazy viewer sources and the selected agent's directory tree. */
 .file-explorer-view { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; }
 .file-explorer-view[hidden] { display: none; }
-.explorer-root { min-width: 0; overflow-wrap: anywhere; font-size: var(--fs-md); font-weight: 600; color: var(--text-primary); }
+.explorer-heading { flex-wrap: wrap; } /* the folder's name on its own line when the two buttons do not fit beside it (#7652) */
+.explorer-root { flex: 1 1 8em; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-md); font-weight: 600; color: var(--text-primary); }
 .explorer-item { display: flex; align-items: center; gap: 5px; width: 100%; min-width: 0; padding: 5px 10px; color: var(--text-primary); background: transparent; border: 0; text-align: left; font: inherit; font-size: var(--fs-md); cursor: pointer; }
 .explorer-item:hover, .explorer-item:focus { background: var(--bg-tertiary); }
 .explorer-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }

@@ -38,7 +38,7 @@ const BASE = require('./test_base').BASE;
                 window.__m.add('pv-a', 'P', 4, { sleeping: false, session_id: 'pv-a-id' });
                 state.currentSession = { type: 'live', name: 'pv-a', session_id: 'pv-a-id', agent_type: 'claude' }; showView('live-session-view');
                 window.PP.setPreviewSession('pv-a-id'); // the agent's own tabs, as selecting it does
-                window.PP.openArtifactTab('coral://artifacts/' + 'a'.repeat(64), { name: 'a.md', mediaType: 'text/markdown' }); return true; })()`);
+                window.PP.openArtifactTab('coral://artifacts/' + 'a'.repeat(64), { name: 'a.md', mediaType: 'text/markdown' }); if (document.getElementById('preview-pane').classList.contains('preview-phone-full')) document.getElementById('preview-full-back').click(); return true; })()`); // a phone opens it full screen (#7652): these checks start from the docked sheet and test the full-screen toggle from there
             await waitFor(w < 700 ? `getComputedStyle(document.getElementById('preview-pane')).display !== 'none'` : `getComputedStyle(document.getElementById('preview-column')).display !== 'none'`, w < 700 ? 'the preview pane' : 'the preview column', 8000);
         };
         const mouse = async (type, x, y) => Input.dispatchMouseEvent({ type, x, y, button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, clickCount: 1 });

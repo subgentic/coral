@@ -1312,10 +1312,13 @@
         min-height: 40px;
     }
 
-    /* File action buttons: always visible on touch (no hover) */
-    .file-action-btns {
-        opacity: 1 !important;
-    }
+    /* A row's Copy, Preview and Edit are behind one More button (#7652): the name keeps the row, they open on a line under it */
+    .file-item { flex-wrap: wrap; }
+    .file-item .file-path-wrap { flex: 1 1 0; min-width: 4em; }
+    .file-item .file-more-btn { display: inline-flex; }
+    .file-item .file-name, .file-item .file-dir { white-space: normal; overflow-wrap: anywhere; } /* a name wraps rather than being cut to a few letters (#7652) */
+    .file-item .file-action-btns { display: none; }
+    .file-item.actions-open .file-action-btns { display: flex; flex: 0 0 100%; justify-content: flex-end; opacity: 1 !important; }
 
     .file-action-btn {
         min-width: 32px;

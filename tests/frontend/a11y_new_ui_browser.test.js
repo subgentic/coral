@@ -223,7 +223,7 @@ const LABELS = ['Feels like a slideshow', "Doesn't show the game", 'Tone/story i
                 await ev(`(async () => { const st = ${S}; const { state } = await import(st + 'state.js'); window.PP = await import(st + 'preview_pane.js'); const { showView } = await import(st + 'utils.js');
                     { const real = window.fetch; window.fetch = (u, o) => /\\/api\\/artifacts\\/a{64}/.test(String(u)) ? Promise.resolve(new Response('# Release notes\\n\\n' + 'A line of the notes.\\n\\n'.repeat(20), { status: 200, headers: { 'Content-Type': 'text/markdown' } })) : real(u, o); }
                     state.currentSession = { type: 'live', name: 'qa-multi', session_id: 'qa-multi-id', agent_type: 'claude' }; showView('live-session-view'); window.PP.setPreviewSession('qa-multi-id');
-                    window.PP.openArtifactTab('coral://artifacts/' + 'a'.repeat(64), { name: 'a.md', mediaType: 'text/markdown' }); return true; })()`);
+                    window.PP.openArtifactTab('coral://artifacts/' + 'a'.repeat(64), { name: 'a.md', mediaType: 'text/markdown' }); if (document.getElementById('preview-pane').classList.contains('preview-phone-full')) document.getElementById('preview-full-back').click(); return true; })()`); // a phone opens it full screen (#7652): these checks start from the docked sheet and test the full-screen toggle from there
                 await waitFor(`getComputedStyle(document.getElementById('preview-pane')).display !== 'none'`, 'the preview pane', 8000); await settle(500);
                 axc = await axUnder('#preview-pane');
                 check(`${tag}: every control in the preview has a name (${JSON.stringify(unnamed(axc))})`, unnamed(axc).length === 0);

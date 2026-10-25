@@ -93,7 +93,7 @@ export function switchAgenticTab(tabName, blockId) {
     }
 
     const activeBtn = document.getElementById(`agentic-tab-${tabName}`);
-    if (activeBtn) activeBtn.classList.add('active');
+    if (activeBtn) { activeBtn.classList.add('active'); activeBtn.scrollIntoView?.({ inline: 'nearest', block: 'nearest' }); } // the strip scrolls (a phone's): the open tab is never left cut at its edge (#7652)
 
     const activePanel = document.getElementById(`agentic-panel-${tabName}`);
     if (activePanel) activePanel.classList.add('active');
