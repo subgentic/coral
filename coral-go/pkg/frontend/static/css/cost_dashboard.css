@@ -578,7 +578,9 @@
 .spend-not-measured, .spend-muted { color: var(--text-secondary); }
 .spend-who { margin-bottom: 16px; }
 @media (max-width: 760px) { .spend-grid { grid-template-columns: minmax(0, 1fr); } .spend-bars { height: 120px; gap: 6px; } }
-.spend-table th[scope=row] { text-align: left; font-weight: 600; }
+.spend-table tbody th[scope=row] { text-align: left; font-weight: 600; padding: 6px 12px; border-bottom: 1px solid var(--border-subtle); color: var(--text-primary); white-space: nowrap; } /* the agent's name sits in the cell like the other cells, as far in as the AGENT header */
+.spend-table tbody tr:last-child th[scope=row] { border-bottom: 0; }
+@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .spend-table tbody th[scope=row] { padding-left: 4px; padding-right: 4px; } }
 
 .spend-chart-head { display: flex; align-items: center; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; margin-bottom: 8px; }
 .spend-chart-head .spend-box-title { margin: 0; }
