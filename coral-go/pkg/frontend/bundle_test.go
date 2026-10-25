@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/fstest"
 )
 
 var (
@@ -265,5 +266,32 @@ func TestBundleMangledNamesKeepExports(t *testing.T) {
 	}
 	if !strings.Contains(app, "$morphHtml") {
 		t.Error("the bundle does not export morphHtml under its alias")
+	}
+}
+
+// A tree whose local names were shortened (MinifyAsset, #7185: the release's static tree) still has its importOnce('./x.js') call sites found: the call reads e("./x.js") there, and a module not found is not
+// registered with importOnce, so a later importOnce goes to the network for its stub, which waits on app.js's own top-level awaits: the stripped dashboard hung at start (the CDP gate's stripped job).
+func TestImportOnceSpecsAreFoundInAMinifiedTree(t *testing.T) {
+	_, static := realBundle(t)
+	min := fstest.MapFS{}
+	_ = fs.WalkDir(static, ".", func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return nil
+		}
+		data, _ := fs.ReadFile(static, p)
+		if strings.HasSuffix(p, ".js") && !strings.HasPrefix(p, "vendor/") {
+			data = MinifyAsset(p, data)
+		}
+		min[p] = &fstest.MapFile{Data: data}
+		return nil
+	})
+	want, got := importOnceSpecs(static), importOnceSpecs(min)
+	if len(want) < 20 {
+		t.Fatalf("the source tree has only %d importOnce specifiers: the scan is not reading it", len(want))
+	}
+	for m := range want {
+		if !got[m] {
+			t.Errorf("%s is imported with importOnce in the source but not found in the minified tree", m)
+		}
 	}
 }
