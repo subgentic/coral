@@ -69,7 +69,8 @@ const AGENTS = (waiting) => waiting ? [
 
             assert.deepEqual(await ev(`[...document.querySelectorAll('${pane} .sgroup-header .group-name-text')].map(e => e.textContent)`), ['Needs you', 'Tasks', 'Saved'], at + 'the three groups');
             assert.deepEqual(await ev(`[...document.querySelectorAll('${pane} .sgroup-header .session-group-count')].map(e => e.textContent)`), ['2', '3', '2'], at + 'with their counts');
-            assert.equal(await ev(`document.querySelectorAll('${pane} li.sb-row').length`), 5, at + 'Needs you and Tasks list their rows (2 and 3); Saved is its header');
+            assert.deepEqual(await ev(`[...document.querySelectorAll('${pane} .sgroup-header')].map(h => !!h.querySelector('button.group-chevron'))`), [true, true, true], at + 'every group has a chevron, and Saved lists its messages under it like the others');
+            assert.equal(await ev(`document.querySelectorAll('${pane} li.sb-row').length`), 7, at + 'the three groups list their rows (2, 3 and the 2 saved messages)');
             // the button is the row: the li around it has no padding and the button is 36 px high (44 on a phone), UI/UX's rule for every sidebar list (#7473)
             assert.deepEqual(await ev(`(() => { const b = document.querySelector('${pane} li:not(.session-group-header) > .row-btn'), li = b.parentElement, cs = getComputedStyle(li); return { pad: [cs.paddingTop, cs.paddingBottom], h: Math.round(b.getBoundingClientRect().height) >= ${mobile ? 44 : 36}, same: Math.abs(li.getBoundingClientRect().height - b.getBoundingClientRect().height) <= 1 }; })()`), { pad: ['0px', '0px'], h: true, same: true }, at + 'a row is its button, no padding on the li, at least ${mobile ? 44 : 36} px high');
 

@@ -68,10 +68,11 @@ let _navKey = null, _poll = 0;
 export function renderInboxNav(force = false) {
     const list = $('inbox-nav-list');
     if (!list) return;
-    const needs = needsRows(), tk = taskRows();
+    const needs = needsRows(), tk = taskRows(), sv = saved.savedView().shown.map(saved.savedItemFacts);
+    const openSaved = page && page.kind === 'saved' ? page.id : '';
     const open = page && page.kind === 'task' ? `${page.project}#${page.id}` : '';
     const key = JSON.stringify([group, queries.needs, queries.tasks, open, GROUPS.map(g => isGroupFolded('hub-inbox', g.key)), savedCounts().open,
-        needs.map(s => [sessionServer(s), s.session_id, s.display_name, s.waiting_kind, s.waiting_since, teamOf(s), askOf(s)]), tk.map(t => [t.project, t.id, t.title, t.priority, t.status, t.board])]);
+        needs.map(s => [sessionServer(s), s.session_id, s.display_name, s.waiting_kind, s.waiting_since, teamOf(s), askOf(s)]), tk.map(t => [t.project, t.id, t.title, t.priority, t.status, t.board]), openSaved, sv.map(f => [f.id, f.which, f.saved, f.state])]);
     if (!force && key === _navKey) return;
     _navKey = key;
     if (needs.some(s => s.waiting_since) && !_poll) _poll = pollEvery(() => renderInboxNav(true), 30000); // "waiting 4 min" moves on while the list is open
@@ -84,8 +85,9 @@ export function renderInboxNav(force = false) {
         const here = open === `${t.project}#${t.id}`;
         return `<li class="session-list-item sb-row${escAttr(here ? ' active' : '')}"><button type="button" class="row-btn"${here ? ' aria-current="true"' : ''} data-on-click="inbox-task-open" data-row-key="${escAttr('t:' + t.project + '#' + t.id)}" data-project="${escAttr(t.project)}" data-task-id="${escAttr(t.id)}"><span class="sb-row-name">${esc(t.title || '(no title)')}</span><span class="sb-row-meta">${esc([PRIORITY_WORDS[t.priority] || t.priority, t.board, stateOf(t)].filter(Boolean).join(' · '))}</span></button></li>`;
     };
+    const savedRow = f => `<li class="session-list-item sb-row${escAttr(openSaved === f.id ? ' active' : '')}"><button type="button" class="row-btn"${openSaved === f.id ? ' aria-current="true"' : ''} data-on-click="inbox-saved-open" data-row-key="${escAttr('s:' + f.id)}" data-id="${escAttr(f.id)}"><span class="sb-row-name">${esc(f.which)}</span><span class="sb-row-meta">${esc([`Saved ${f.saved}`, f.state].filter(Boolean).join(' · '))}</span></button></li>`;
     list.innerHTML = GROUPS.map(g => groupHeaderHtml('hub-inbox', g.key, g.label, countOf(g.key))
-        + (isGroupFolded('hub-inbox', g.key) ? '' : g.key === 'needs' ? needs.map(needsRow).join('') : g.key === 'tasks' ? tk.map(taskRow).join('') : '')).join('');
+        + (isGroupFolded('hub-inbox', g.key) ? '' : g.key === 'needs' ? needs.map(needsRow).join('') : g.key === 'tasks' ? tk.map(taskRow).join('') : sv.map(savedRow).join(''))).join('');
     if (held) [...list.querySelectorAll('.row-btn')].find(b => b.dataset.rowKey === held)?.focus({ preventScroll: true });
     syncPaneGroupToggle('hub-inbox');
     refreshGroupTable('hub-inbox');
@@ -104,7 +106,7 @@ registerGroupSource('hub-inbox', {
             const goal = rows.some(goalOf);
             return { title: 'Needs you', columns: ['Item', 'Team', ...opt.filter(o => o[1]).map(o => o[0]), 'When', ...(goal ? ['Goal'] : [])], empty: { line: 'Nothing needs your input.' },
                 rows: rows.map(s => ({ title: resolveSessionIdentity(s), action: 'inbox-agent-open', data: { name: s.name, 'agent-type': s.agent_type, 'session-id': s.session_id, server: sessionServer(s) },
-                    cells: [teamOf(s), ...opt.filter(o => o[1]).map(o => o[2](s)), waitingText(s.waiting_since) || '', ...(goal ? [goalOf(s) ? { action: 'inbox-goal-open', data: { board: s.goal.board || s.board_project || '', 'goal-id': s.goal.id }, label: s.goal.title, aria: `Goal: ${s.goal.title}` } : ''] : [])] })) };
+                    cells: [teamOf(s), ...opt.filter(o => o[1]).map(o => o[2](s)), waitingText(s.waiting_since) || '', ...(goal ? [goalOf(s) ? { link: true, action: 'inbox-goal-open', data: { board: s.goal.board || s.board_project || '', 'goal-id': s.goal.id }, label: s.goal.title, aria: `Goal: ${s.goal.title}` } : ''] : [])] })) };
         }
         if (key === 'tasks') {
             return { title: 'Tasks', columns: ['Task', 'Priority', 'State', 'Team'], empty: { line: queries.tasks ? 'No task matches the search.' : 'No assigned tasks.' },

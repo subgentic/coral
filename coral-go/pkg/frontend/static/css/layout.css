@@ -978,3 +978,6 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
     .inbox-saved-actions .wf-more { flex: 1 1 100%; }
     .inbox-saved-actions .wf-more-menu { position: static; margin-top: 4px; }
 }
+
+.group-table-cell-btn.group-table-cell-link { min-height: 0; padding: 0; border: 0; background: none; color: var(--accent); text-decoration: underline; font: inherit; text-align: left; cursor: pointer; } /* a cell's action that reads as text, like its neighbours (the Needs you table's Goal) */
+@media (pointer: coarse) { .group-table-cell-btn.group-table-cell-link { min-height: 44px; display: inline-flex; align-items: center; } }

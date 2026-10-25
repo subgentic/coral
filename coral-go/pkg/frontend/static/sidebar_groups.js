@@ -96,7 +96,7 @@ function dataAttrs(data) { return Object.entries(data || {}).map(([k, v]) => `da
 function cellHtml(c) {
     if (c && typeof c === 'object') {
         if (!CELL_ACTION_ATTR[c.action]) return `<td>${dash}</td>`;
-        return `<td><button type="button" class="btn btn-small group-table-cell-btn" ${CELL_ACTION_ATTR[c.action]} ${dataAttrs(c.data)} aria-label="${escapeAttr(c.aria || c.label)}">${escapeHtml(c.label)}</button></td>`;
+        return `<td><button type="button" class="${c.link ? 'group-table-cell-btn group-table-cell-link' : 'btn btn-small group-table-cell-btn'}" ${CELL_ACTION_ATTR[c.action]} ${dataAttrs(c.data)} aria-label="${escapeAttr(c.aria || c.label)}">${escapeHtml(c.label)}</button></td>`;
     }
     return `<td>${c ? escapeHtml(c) : dash}</td>`;
 }
