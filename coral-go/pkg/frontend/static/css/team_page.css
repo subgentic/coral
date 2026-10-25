@@ -247,9 +247,13 @@
 .team-task-extra .task-dep-status { text-transform: capitalize; } /* the pill reads Unmet, not UNMET (UI/UX, #7644) */
 
 /* a goal's page (#7665): its details beside its tasks. The main pane is the goal or the picked task's page; the column is the shared sidebar's look */
-.goal-split { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 24px; align-items: stretch; flex: 1 1 auto; min-height: 0; } /* the main pane runs the page's height, so its bar is pinned at the foot */
-.goal-main { min-width: 0; display: flex; flex-direction: column; gap: 10px; } /* the title has its gap under the back link, the state line under the title */
-.goal-side { align-self: start; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-secondary); position: sticky; top: 8px; max-height: calc(100vh - 140px); overflow-y: auto; }
+.goal-split { --goal-side-w: 340px; position: relative; display: grid; grid-template-columns: minmax(0, 1fr) var(--goal-side-w); align-items: stretch; flex: 1 1 auto; min-height: 0; } /* the right sidebar of a goal's page: the main pane and the column each scroll, as the agent dock does */
+.goal-main { min-width: 0; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; padding: 16px 24px 0; } /* the title has its gap under the back link, the state line under the title */
+.goal-side { border-left: 1px solid var(--border); background: var(--bg-secondary); overflow-y: auto; min-height: 0; }
+.goal-side-grip { position: absolute; top: 0; bottom: 0; right: var(--goal-side-w); width: 8px; margin-right: -4px; z-index: 2; cursor: col-resize; touch-action: none; }
+.goal-side-grip:hover, .goal-side-grip.dragging, .goal-side-grip:focus-visible { background: var(--accent); opacity: 0.5; outline: none; }
+.goals-page.goals-open.goals-table-page { max-width: none; padding: 0; gap: 0; min-height: 0; overflow: hidden; } /* an open goal fills the page area to the window's right edge: the padding belongs to the main pane */
+.goals-page.goals-open .goals-body { gap: 0; }
 .goal-side-head { display: flex; align-items: baseline; gap: 8px; padding: 12px 12px 8px; font-size: 0.875rem; }
 .goal-side-counts { color: var(--text-secondary); font-size: 0.75rem; font-weight: 500; }
 .goal-side-search { display: block; width: calc(100% - 24px); box-sizing: border-box; margin: 0 12px 10px; padding: 6px 10px; font: inherit; font-size: 0.8125rem; color: var(--text-primary); background: var(--bg-primary); border: 1px solid var(--control-border, var(--border)); border-radius: var(--radius-md); }
@@ -269,7 +273,10 @@
 .goals-progress { margin: 14px 0 6px; font-weight: 600; font-size: 0.875rem; }
 @media (max-width: 760px) {
     .goal-split { display: flex; flex-direction: column; }
-    .goal-main { flex: 1; }
+    .goal-main { flex: 1; padding: 0; overflow: visible; }
+    .goals-page.goals-open.goals-table-page { padding: 12px 16px 0; gap: 12px; min-height: 100%; overflow: visible; } /* a phone's goal is a page with its own margins, as before */
+    .goals-page.goals-open .goals-body { gap: 12px; }
+    .goal-side-grip { display: none; }
     .goal-split-column .goal-main, .goal-split:not(.goal-split-column) .goal-side { display: none; } /* the list is a screen of its own: the goal or a task is the other */
     .goal-side { position: static; max-height: none; border: 0; background: none; align-self: stretch; } /* the list screen is the page's whole width */
     .goals-table-page .goal-side-back { display: inline-flex; margin: 0 0 8px; }

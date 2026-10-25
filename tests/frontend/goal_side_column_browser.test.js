@@ -39,6 +39,32 @@ const BASE = require('./test_base').BASE;
         check('the title has a gap under its back link', await ev(`(() => { const b = document.querySelector('.goal-main .goals-back').getBoundingClientRect(), t = document.getElementById('goals-detail-title').getBoundingClientRect(); return t.top - b.bottom >= 8; })()`));
         await shot('goal-column-desktop');
 
+        console.log('1b. The column is a right sidebar: flush right, the page height, resized like the dock');
+        const flush = await ev(`(() => { const s = document.querySelector('.goal-side').getBoundingClientRect(), p = document.getElementById('team-page-scroll') || document.querySelector('.team-page-scroll'), pr = p.getBoundingClientRect(), g = document.querySelector('.goal-side-grip'); return { right: Math.round(pr.right - s.right), top: Math.round(s.top - pr.top), bottom: Math.round(pr.bottom - s.bottom), margin: getComputedStyle(document.querySelector('.goal-side')).margin, radius: getComputedStyle(document.querySelector('.goal-side')).borderRadius, grip: !!g && g.getAttribute('role') === 'separator', pageScrolls: p.scrollHeight > p.clientHeight + 1 }; })()`);
+        check('the column touches the page area on the right, top and bottom, with no card margin or rounding', Math.abs(flush.right) <= 1 && Math.abs(flush.top) <= 1 && Math.abs(flush.bottom) <= 1 && flush.margin === '0px' && flush.radius === '0px' && flush.grip && !flush.pageScrolls, JSON.stringify(flush));
+        const width = () => ev(`Math.round(document.querySelector('.goal-side').getBoundingClientRect().width)`);
+        const drag = async (dx) => { const r = await ev(`(() => { const b = document.querySelector('.goal-side-grip').getBoundingClientRect(); return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + 200) }; })()`); const Input = client.Input; await Input.dispatchMouseEvent({ type: 'mouseMoved', x: r.x, y: r.y }); await Input.dispatchMouseEvent({ type: 'mousePressed', x: r.x, y: r.y, button: 'left', clickCount: 1 }); await Input.dispatchMouseEvent({ type: 'mouseMoved', x: r.x + dx, y: r.y, button: 'left' }); await Input.dispatchMouseEvent({ type: 'mouseReleased', x: r.x + dx, y: r.y, button: 'left', clickCount: 1 }); };
+        await drag(-100);
+        await waitFor(`Math.round(document.querySelector('.goal-side').getBoundingClientRect().width) === 440`, 'the column dragged 100 px wider', 5000);
+        check('dragging the handle on its left edge widens it by the distance dragged, and the width is remembered', (await width()) === 440 && (await ev(`localStorage.getItem('coral-goal-side-width')`)) === '440');
+        await drag(2000);
+        check('it stops at the dock\'s minimum, 280 px', (await width()) === 280, String(await width()));
+        await drag(-3000);
+        const maxW = await width();
+        check('and at the dock\'s maximum: the page beside it keeps 240 px', Math.abs(maxW - (await ev(`Math.round(document.querySelector('.goal-split').getBoundingClientRect().width) - 240`))) <= 1, String(maxW));
+        await ev(`document.querySelector('.goal-side-grip').focus(); true`);
+        await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'Home', code: 'Home', windowsVirtualKeyCode: 36 }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Home', code: 'Home', windowsVirtualKeyCode: 36 });
+        await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'ArrowLeft', code: 'ArrowLeft', windowsVirtualKeyCode: 37 }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'ArrowLeft', code: 'ArrowLeft', windowsVirtualKeyCode: 37 });
+        check('the handle is a keyboard separator: Home goes to 280, Left widens by 24', (await width()) === 304, String(await width()));
+        await ev(`document.querySelector('.goal-side-grip').dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); true`);
+        check('a double click resets it to 340 and forgets the saved width', (await width()) === 340 && (await ev(`localStorage.getItem('coral-goal-side-width')`)) === null);
+        await drag(-60);
+        await openGoal(goal, 'goals'); // drawn again: the remembered width is applied again
+        check('the width is remembered when the goal page is drawn again', (await width()) === 400, String(await width()));
+        await ev(`localStorage.removeItem('coral-goal-side-width'); true`);
+        await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'goals' }); true`); await openGoal(goal);
+        await shot('goal-column-flush-desktop');
+
         console.log('2. Search');
         await ev(`(() => { const s = document.querySelector('.goal-side-search'); s.value = 'third'; s.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
         check('the search narrows the column', JSON.stringify((await rows()).map(r => r.title)) === JSON.stringify(['#' + third + ' Third open task']));
