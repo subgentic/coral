@@ -3,12 +3,14 @@
 // Called when the open confirm modal is dismissed without confirming.
 let _confirmCancel = null;
 
-export function showConfirmModal(title, message, onConfirm, onCancel) {
+/** opts.label: the confirming button's word when "Yes" would not name the action ("Delete"); every other call keeps Yes. */
+export function showConfirmModal(title, message, onConfirm, onCancel, opts = {}) {
     _dismissConfirm(); // a modal replaced before an answer counts as cancelled
     document.getElementById("confirm-modal-title").textContent = title;
     document.getElementById("confirm-modal-message").textContent = message;
     const yesBtn = document.getElementById("confirm-modal-yes");
     const newBtn = yesBtn.cloneNode(true);
+    newBtn.textContent = opts.label || 'Yes';
     yesBtn.parentNode.replaceChild(newBtn, yesBtn);
     newBtn.addEventListener("click", () => {
         _confirmCancel = null;
