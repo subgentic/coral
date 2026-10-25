@@ -179,7 +179,7 @@ function drawSpend() {
     body.append(cards);
     const grid = el('div', 'spend-grid');
     const chartBox = el('section', 'spend-box'); chartBox.append(chart(data, f));
-    const how = el('details', 'disclosure spend-how'); how.append(el('summary', null, 'How it is counted'), el('p', 'spend-note', 'Tokens are input plus output. Cache writes and cache reads are shown beside, never hidden in the total. A commit counts once when it reaches main; its author is the agent, and one that matches no agent is Unattributed. Review and orchestration tokens belong to the team, not to one commit. An agent with no token record is Not measured, not zero.'));
+    const how = el('details', 'disclosure spend-how'); how.append(el('summary', null, 'How it is counted'), el('p', 'spend-note', 'Tokens are input plus output. Cache writes and cache reads are shown beside, never hidden in the total. A commit counts once when it reaches main; its author is the agent, and one that matches no agent is Unattributed. A commit is credited to the author name its committer typed, so these are counts, not proof of who did the work. In a repository shared by several teams, Unattributed can include other teams\' commits. Review and orchestration tokens belong to the team, not to one commit. An agent with no token record is Not measured, not zero.'));
     grid.append(chartBox, how);
     body.append(grid);
     const who = el('section', 'spend-who'); who.append(el('h4', 'spend-box-title', 'Who spends'));

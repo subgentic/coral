@@ -50,6 +50,8 @@ const FIX = { board: TEAM, range_hours: 24, generated_at: '2026-10-25T10:00:00Z'
             assert.deepEqual(t[0], ['Frontend Dev', '800 K', '26%', '2', '14 M', '120']); assert.deepEqual(t[1], ['Orchestrator', '600 K', '19%', 'team', '12 M', '90']);
             assert.deepEqual(t[2], ['Gemini Dev', 'Not measured[x5]']); assert.deepEqual(t[3], ['Unattributed', 'Commits whose author matches no agent[x5]']);
             assert.ok(await ev(`!!document.querySelector('#cost-spend .spend-how')`), 'How it is counted');
+            const how = await text('#cost-spend .spend-how');
+            assert.match(how, /counts, not proof of who did the work/); assert.match(how, /shared by several teams, Unattributed can include other teams/);
         });
         await run('commits that could not be read are said with their reason, not as zero', async () => {
             await ev(`window.__spend = { ...window.__spend, commits: { available: false, reason: 'no repository found for this team', window: null, usual: null, unattributed: 0 } }; true`);
