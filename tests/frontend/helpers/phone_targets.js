@@ -215,8 +215,18 @@ async function tap(ev, selector) {
 const QUIET_MS = 150;
 // Counts the page's fetches in flight (window.__censusNet()). Installed before a scene's setup, so the requests the setup starts are counted; once per document.
 const NET_WATCH = `(() => { if (!window.__censusNet) { let n = 0; const f = window.fetch; window.fetch = function (...a) { n++; let p; try { p = f.apply(this, a); } catch (e) { n--; throw e; } return p.finally(() => { n--; }); }; window.__censusNet = () => n; } return true; })()`;
-/** Before a scene's setup: start counting its requests. */
-const sceneStart = ev => ev(NET_WATCH);
+// Takes away the toasts an earlier scene left (Security on #352): a toast that outlives its scene now that scenes come sooner shows up in later scenes as extra stops and findings, run to run, and in
+// the 200% pass a control under it is not on top, so it is left out of the overlap check (the composer's "Sent" toast hid #live-view-btn-chat, #live-view-btn-terminal, #chat-find-btn and
+// #terminal-fit-width-btn in two scenes on main already). Each is closed by its own close button. The scenes whose subject is toasts keep theirs: "toasts" (phone_census.js, part b;
+// contrast_census.js, part b; keyboard_census_desktop) and "hub: toasts" (phone_targets_census_hub) show them in their own setup, which runs after this. The warnings and the update notice are
+// not toasts and stay.
+const CLEAR_TOASTS = `(() => { for (const b of document.querySelectorAll('.toast > .toast-close, .notification-toast-close')) b.click(); return document.querySelectorAll('.toast').length; })()`;
+/** Before a scene's setup: clear earlier scenes' toasts, and start counting its requests. */
+async function sceneStart(ev) {
+    const left = await ev(CLEAR_TOASTS);
+    if (left) throw new Error(`${left} toast(s) from an earlier scene would not close`);
+    await ev(NET_WATCH);
+}
 /** A scene is ready when `expect` (if given) is true, polled for up to 5 s, and then the quiet tail has held, or `ms` at most. In place of fixed sleeps of 400 ms before `expect` and `ms` after it
  * (about 1 s a scene, 670 s across the census suites, #348): a scene that is ready sooner is measured sooner, and one still loading is waited for up to the old total. Throws "the scene is not
  * showing" as before. */
