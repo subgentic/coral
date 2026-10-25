@@ -38,7 +38,7 @@ const BASE = require('./test_base').BASE;
         await open('ec-idle', {});
         let w = await words();
         assert.equal(w.role, 'status');
-        assert.equal(w.title, 'No messages yet');
+        assert.equal(w.title, 'Say hello to your agent');
         assert.equal(w.hint, 'Type below to start.'); // #5991: the keys and what appears are said by the box itself
         assert.equal(w.size, '14px', 'sized in rem: 0.875rem is 14px at the default size');
         await shot('idle');
@@ -53,7 +53,7 @@ const BASE = require('./test_base').BASE;
         console.log('1c. An agent started hours ago with no output on record is not "starting": the 25 s counts from its own start (created_at), not from this page opening it');
         await open('ec-old', { old: true, age: 7200 });
         w = await words();
-        assert.equal(w.title, 'No messages yet', 'an old live agent with no output age: ' + JSON.stringify(w));
+        assert.equal(w.title, 'Say hello to your agent', 'an old live agent with no output age: ' + JSON.stringify(w));
         assert.equal(w.hint, 'Type below to start.');
 
         console.log('2. The words are written once, not at every refresh');

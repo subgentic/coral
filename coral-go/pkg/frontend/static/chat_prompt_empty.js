@@ -27,7 +27,7 @@ function emptyStateWords(session) {
     if (isStarting(row) && deriveSessionState(row) === "idle") return [`Waiting for ${CLI_NAMES[row.agent_type] || "the agent"} to start`, "Its first screen is not up yet. You can type below once it is."];
     switch (deriveSessionState(row)) {
         case 'sleeping': return row.sleep_reason === 'agent_exited' ? ["This agent has ended", "Its CLI exited. Use Restart below to start it again."] : ["This agent is asleep", "Use Wake below to chat with it."];
-        default: return ["No messages yet", "Type below to start."];
+        default: return ["Say hello to your agent", "Type below to start."];
     }
 }
 
