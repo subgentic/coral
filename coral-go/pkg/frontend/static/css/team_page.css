@@ -101,7 +101,8 @@
     .detail-pane { position: fixed; inset: 0; z-index: 30; width: auto; border-left: 0; }
     .detail-close { width: 44px; height: 44px; }
     .detail-foot .btn { flex: 1; min-height: 44px; }
-    .goals-facts, .detail-facts { grid-template-columns: 96px minmax(0, 1fr); }
+    .goals-facts, .detail-facts { grid-template-columns: minmax(0, 1fr); gap: 0; } /* a label above its value: it holds at 200% text */
+    .goals-facts dd, .detail-facts dd { margin-bottom: 8px; }
 }
 
 /* the team's goals under its agents in the sidebar */

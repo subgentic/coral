@@ -263,6 +263,11 @@ async function openGoalPage(id) {
 /** Open a team's page. opts: { tab, item, silent (the router is showing it: write no address), replace }. */
 export async function openTeamPage(team, opts = {}) {
     if (!team) return false;
+    // Another team while this one's settings hold edits: ask first, and stay where we are when the person declines.
+    if (S.team && S.team !== team && currentTeamPage()) {
+        const { hasUnsavedTeamSettings, confirmTeamWorkspaceChange } = await importOnce('./team_working_mode.js');
+        if (hasUnsavedTeamSettings() && !(await confirmTeamWorkspaceChange())) return false;
+    }
     const tab = TEAM_TABS.includes(opts.tab) ? opts.tab : 'goals';
     const changed = S.team !== team;
     if (changed) { S.team = team; S.counts = {}; S.item = null; }
