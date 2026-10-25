@@ -2369,43 +2369,11 @@ button.subscriber-history-link {
     line-height: 1.4;
 }
 
-.agent-persona-actions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-    margin-bottom: 0;
-}
 
-.agent-persona-actions .btn-small {
-    margin: 0;
-}
 
-.agent-persona-actions .btn-subtle {
-    padding: 4px 10px;
-    border-radius: var(--radius-md); /* the shape of every other button (#6042); these were pills */
-    background: transparent;
-    border-color: var(--control-border);
-    color: var(--text-muted);
-}
 
-.agent-persona-actions .btn-subtle:hover {
-    color: var(--text-primary);
-    background: var(--bg-hover);
-    border-color: var(--accent);
-}
 
-.agent-persona-actions .btn:first-child {
-    color: var(--accent);
-}
-/* Save Persona on hover: the accent text on the hover fill was 4.31:1 in the light theme; the other subtle buttons turn to the primary text colour (#4673). */
-.agent-persona-actions .btn:first-child:hover {
-    color: var(--text-primary);
-}
 
-.agent-persona-actions .btn:first-child:hover {
-    background: rgba(var(--accent-rgb), 0.08);
-}
 
 .acf-name,
 .acf-model,
@@ -2432,13 +2400,8 @@ button.subscriber-history-link {
 .persona-files { flex-basis: 100%; }
 .persona-files > summary { cursor: pointer; width: fit-content; padding: 4px 0; font-size: var(--fs-sm); color: var(--text-secondary); }
 .persona-files-row { display: flex; gap: 8px; flex-wrap: wrap; padding: 4px 0; }
-.agent-persona-actions .persona-files-row .btn:first-child { color: var(--text-muted); } /* the first-child accent is Save Persona's alone */
 #launch-agent-acf.has-agent-pick .acf-top-row > label:has(> .acf-agent-type) { display: none; }
 
-.agent-persona-actions .btn {
-    width: auto;
-    justify-content: center;
-}
 
 .acf-top-row {
     display: grid;
@@ -2809,12 +2772,6 @@ button.subscriber-history-link {
     margin-bottom: 12px;
 }
 
-.import-export-row {
-    display: flex;
-    gap: 6px;
-    margin-bottom: 10px;
-    flex-wrap: wrap;
-}
 
 .btn-subtle {
     background: var(--bg-tertiary);
@@ -4467,19 +4424,11 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .team-availability-dialog#team-working-mode-dialog { height: auto; max-height: 90dvh; }
 .modal-content:has(.settings-shell) { min-height: min(30rem, 90dvh); }
 #launch-modal .modal-content:not(.sd-modal-content) { min-height: 0; } /* the chooser and the terminal form hold the hidden New Agent step's .settings-shell, which gave them the tabbed dialogs' 30rem floor: half the chooser was empty (#6316) */
-#launch-agent-more .settings-pane-title { display: none; } /* the section's name is on the tab (or the phone's select) beside it: said twice (#6316); the pane keeps its name from it */
-/* New Agent is two steps (#6333; the stage is data-stage on the step, set by launch_core.js setLaunchMore): the folder with Next, then everything else with Back and Launch; the folder shows as one line with Change in the second. */
-#launch-step-agent[data-stage="folder"] :is(#launch-agent-summary, .launch-agent-name, #launch-agent-more, #launch-agent-back, #launch-agent-go, #launch-dir-summary) { display: none; }
-#launch-step-agent[data-stage="details"] :is(.launch-dir-field, #launch-dir-note, #dir-browser, #launch-agent-cancel, #launch-agent-next, #launch-dir-recents, #launch-dir-hint) { display: none; }
 .launch-dir-recents { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; }
 .launch-dir-recents:empty { display: none; }
 .launch-dir-recent { margin: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .launch-dir-hint { margin: 0 0 8px; }
 @media (pointer: coarse), (max-width: 767px) { .launch-dir-recent { min-height: var(--control-touch-height, 44px); } }
-.launch-dir-summary { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.launch-dir-summary-label { color: var(--text-secondary); flex: none; }
-.launch-dir-summary code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-@media (pointer: coarse), (max-width: 767px) { .launch-dir-summary .btn { min-height: var(--control-touch-height, 44px); } }
 
 .modal-header .sd-sub { margin: .15rem 0 0; color: var(--text-secondary); font-size: .8125rem; font-weight: 400; }
 .sd-modal-content .modal-footer { flex: none; }
@@ -4496,7 +4445,6 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 /* The back arrow in a sectioned launch step's header: room between it and the title, so its focus ring does not touch the words (#4976). */
 .sd-step-header .launch-back-btn { margin-right: .5rem; border-radius: var(--radius-md); }
 .sd-step-header .launch-back-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 0; }
-.sd-modal-content .agent-persona-actions .btn-subtle { color: var(--text-primary); } /* 4.5:1 on the light panel (the accent blue was 4.44) */
 .sd-extra:empty { display: none; }
 .settings-tab .sd-dot { margin-left: auto; width: .5rem; height: .5rem; flex: none; border-radius: 50%; background: var(--danger, #f85149); }
 .settings-tab .sd-dot[hidden] { display: none; }
@@ -4599,15 +4547,10 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
     .cm-row .btn, .cm-actions .btn, .cm-add { min-height: 44px; min-width: 44px; }
 }
-/* New Agent opens on the folder and Launch; the name, persona, agent, prompt, permissions and board sit behind "More options" (#5595). Closed, the dialog is only as tall as the folder row. */
-.sd-modal-content.launch-simple { width: min(42rem, 94vw); height: auto; min-height: 0; max-height: 90dvh; } /* closed, only the folder row: no floor, and the one size rule's 90dvh */
 .modal-content:has(.settings-shell) #launch-step-agent .settings-modal-body { flex-direction: column; overflow: auto; }
-.launch-simple #launch-step-agent .settings-modal-body { flex: none; }
 .sd-essentials { flex: none; padding: 1.1rem 1.6rem .4rem; }
 .sd-essentials label { display: block; margin-bottom: .6rem; }
 .sd-essentials input[type="text"] { box-sizing: border-box; }
-.sd-more { flex: 1; min-height: 0; display: flex; border-top: 1px solid var(--border); }
-.sd-more[hidden] { display: none; }
 @container sd (max-width: 40rem) {
     .sd-essentials { padding: .8rem 1rem .3rem; }
     .sd-essentials :is(input[type="text"], .btn) { min-height: 44px; }
@@ -4783,16 +4726,6 @@ dialog.reminder-dialog::backdrop { background: rgba(var(--black-rgb), 0.5); }
 @media (pointer: coarse), (max-width: 767px) { .team-agent-summary-actions .team-agent-reorder-btn { width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); } }
 .team-mode-warn { color: var(--warning); font-weight: 600; }
 /* New Agent's second step as compact rows, like the members table (#6457): the value that will be used, a Change that opens its section. */
-.launch-agent-summary { width: 100%; border-collapse: collapse; margin: 8px 0 4px; font-size: .8125rem; }
-.launch-agent-summary th { text-align: left; font-weight: 600; color: var(--text-secondary); padding: 6px 12px 6px 0; width: 1%; white-space: nowrap; vertical-align: middle; }
-.launch-agent-summary td { padding: 6px 0; vertical-align: middle; border-top: 1px solid var(--border); }
-.launch-agent-summary th { border-top: 1px solid var(--border); }
-.launch-agent-summary .las-act { width: 1%; text-align: right; }
-.launch-agent-summary .launch-agent-pick { margin: 0; }
-.launch-agent-summary .las-change { margin: 0; }
-.launch-agent-summary tr[hidden] { display: none; }
-@media (pointer: coarse), (max-width: 767px) { .launch-agent-summary .las-change { min-height: var(--control-touch-height, 44px); } }
-.launch-dir-summary .btn { margin: 0; } /* the folder's Change is flush right, in the column of the rows' Change buttons (#6460) */
 
 /* A list row or card that opens something is a button for the keyboard and a screen reader (#6976): one Tab stop, Enter or Space opens it (data-key-click), and its focus is drawn inside it. In a table the first cell holds a real button that looks like its text (a row with a button role would lose its table semantics). */
 [data-key-click]:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
@@ -4821,21 +4754,9 @@ body:has(#nav-tab-hub-inbox.active) #saved-btn .saved-count { display: none; }
 .launch-more-options { display: flex; flex: 1; min-height: 0; flex-direction: column; width: 100%; }
 .launch-more-options > .settings-shell { flex: 1; min-height: 0; }
 .launch-more-options > summary { display: none; }
-.launch-agent-name { padding-bottom: .6rem; }
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
     .launch-more-options > summary { display: list-item; cursor: pointer; font-weight: 600; font-size: var(--fs-md); line-height: var(--control-touch-height, 44px); padding: 0 1rem; border-top: 1px solid var(--border); }
     .launch-more-options:not([open]) { flex: none; }
-    #launch-agent-more:has(> .launch-more-options:not([open])) { flex: none; }
-    .launch-agent-summary, .launch-agent-summary tbody { display: block; }
-    .launch-agent-summary tr { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 0 .75rem; border-top: 1px solid var(--border); padding: 4px 0; }
-    .launch-agent-summary th, .launch-agent-summary td { border-top: 0; display: block; padding: 6px 0; width: auto; }
-    .launch-agent-summary th { flex: 0 0 5rem; white-space: normal; }
-    .launch-agent-summary .las-value { flex: 1 1 6rem; min-width: 0; overflow-wrap: anywhere; }
-    .launch-agent-summary [data-row="provider"] .las-value { flex-basis: 100%; }
-    .launch-agent-summary .las-act { flex: 0 0 auto; width: auto; margin-left: auto; text-align: right; }
-    .launch-agent-summary .las-change::after { content: ''; position: absolute; inset: 0; } /* the whole row is the button (#7066) */
-    .launch-agent-summary tr:has(.las-change:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
-    .launch-agent-summary .las-change:focus-visible { outline: none; }
 }
 
 /* The goal an agent or task serves (#7302): under a Needs you row it is the card's own footer, attached to it (no gap, the card's border, its bottom corners square); in a task's meta row it is the same quiet underlined link, beside Open the task. */
