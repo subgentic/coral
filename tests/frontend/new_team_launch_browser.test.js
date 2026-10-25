@@ -7,6 +7,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { install: installNT, N, T, openNewTeam, scenarios, stubModels } = require('./helpers/new_team');
 const BASE = require('./test_base').BASE;
+const { removeBoards } = require('./helpers/board_cleanup');
 
 const REQUEST_KEYS = ['board_name', 'working_dir', 'agent_type', 'flags', 'agents', 'board_server', 'worktree', 'base_branch', 'working_mode', 'health_monitor'];
 const AGENT_KEYS = ['name', 'prompt', 'icon', 'capabilities', 'agent_type', 'model', 'thinking', 'flags'];
@@ -85,6 +86,6 @@ const AGENT_KEYS = ['name', 'prompt', 'icon', 'capabilities', 'agent_type', 'mod
             assert.match(await ev(`[...document.querySelectorAll('.toast, [role=status], [role=alert]')].map(e => e.textContent).join(' | ')`), /goal/i, 'the toast names Require a goal');
             assert.equal((await sent()).launch.length, 1, 'the team was launched once');
         });
-        S.finish();
+        await removeBoards(ev, ['qa-board-7']); S.finish(); // finish() exits the process, so the board the launch made goes first
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

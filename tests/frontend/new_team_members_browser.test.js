@@ -48,8 +48,11 @@ const BASE = require('./test_base').BASE;
             assert.ok(!(await t.has('select', N.bulk)), 'still no "Set all workers to": the Orchestrator is the only member');
         });
         await S.run('Add Orchestrator again after a worker is there still adds it at the top (a team that has workers but no Orchestrator)', async () => {
-            await t.click('button', N.addMember); await settle(300);
-            assert.equal((await roles()).length, 2, 'Add member adds a member');
+            await t.click('button', N.addMember); await waitFor(`!!window.__nt.dlg(${N.member})`, 'the Add member dialog', 5000);
+            assert.match(await ev(`window.__na.name(window.__nt.dlg(${N.member}))`), /^Add member/, 'the dialog is named Add member');
+            assert.equal((await roles()).length, 1, 'nothing is added until Save member');
+            await setRole('Backend Dev'); await save(); await settle(300);
+            assert.equal((await roles()).length, 2, 'Save member adds the member at the end'); assert.equal((await roles())[1], 'Backend Dev', 'with the role typed');
             const worker = (await roles())[1];
             // rename the first away so the team has workers only
             await openRow('Orchestrator'); await setRole('Lead'); await save();
@@ -108,7 +111,7 @@ const BASE = require('./test_base').BASE;
         await S.run('Edit member: changes are held until Save member (the row does not change while the dialog is open), a provider change resets that member\'s Model and Thinking only, and a thinking level leaves the model alone', async () => {
             const r = await roles(); const w = r[2]; const before = await rowText(w);
             await openRow(w); await mtab('Agent');
-            await setModel(/claude-small/); await setThinking('Medium');
+            await setModel(/-small/); await setThinking('Medium');
             const same = await rowText(w); assert.equal(same, before, 'the row is unchanged while the dialog is open');
             const modelNow = await ev(`window.__nt.find(window.__nt.dlg(${N.member}), 'select', /^Model$/i).value`); await setThinking('High');
             assert.equal(await ev(`window.__nt.find(window.__nt.dlg(${N.member}), 'select', /^Model$/i).value`), modelNow, 'a thinking level leaves the model alone');
