@@ -8,6 +8,7 @@ import { importOnce } from './import_once.js';
 import { state } from './state.js';
 import { resolveSessionIdentity } from './session_state.js';
 import { askedBefore, dismissAsked, askedWords } from './asked_before_restart.js';
+import { isStartFailed, startFailedText } from './start_failed.js';
 
 const lastState = new Map(); // session_id -> the words its state last had, to say a change once (#6213)
 let stateFlip = false;
@@ -53,12 +54,14 @@ export function applySleepingView(sleeping, { manageInput = true, archived } = {
     const ended = sleeping && !archived && !gone && !!row && row.sleep_reason === 'agent_exited';
     // The agent by the name its row shows (its role or name), not its folder (#10439: "home stopped before answering"); a message it never answered stays in the chat, marked, and its Working clock stops.
     const who = (row && resolveSessionIdentity(row)) || (cur && (cur.display_name || cur.name)) || 'This agent';
+    // Its start was refused for its CLI (#353): said with fixed words and the fix, as text.
+    const failedStart = isStartFailed({ sleeping, archived, sleep_reason: row && row.sleep_reason });
     const endedText = `${who} has ended`;
     if (ended && cur && state.lastSendAt && state.lastSendAt.has(cur.session_id)) importOnce('./pending_messages.js').then(m => m.markUnanswered(cur.session_id)).catch(() => {});
     const hint = document.getElementById('sleeping-composer-hint');
     if (hint) { const words = ended ? 'Wake continues this conversation; Restart starts a fresh session with new settings.' : ''; if (hint.textContent !== words) hint.textContent = words; hint.hidden = !ended; }
     if (text) {
-        const next = archived ? 'This agent is archived' : gone ? "This agent's terminal is gone" : ended ? endedText : 'This agent is sleeping';
+        const next = archived ? 'This agent is archived' : gone ? "This agent's terminal is gone" : failedStart ? startFailedText(who, row.agent_type) : ended ? endedText : 'This agent is sleeping';
         if (text.textContent !== next) text.textContent = next; // a status line: written only when it changes, so it is announced once
     }
     // What it asked before Coral restarted (#10368): its CLI is gone, so the words, with Restart (below) and Dismiss; written only when they change, so a status is announced once.
@@ -79,8 +82,8 @@ export function applySleepingView(sleeping, { manageInput = true, archived } = {
         if (live && before !== undefined && before !== words) { stateFlip = !stateFlip; live.textContent = words + (stateFlip ? '' : '\u00a0'); }
     }
     const icon = document.getElementById('sleeping-composer-icon');
-    if (icon) icon.textContent = archived ? '🗄️' : gone || ended ? '⚠️' : '🌙';
-    if (bar) bar.classList.toggle('is-terminal-gone', gone || ended);
+    if (icon) icon.textContent = archived ? '🗄️' : gone || ended || failedStart ? '⚠️' : '🌙';
+    if (bar) bar.classList.toggle('is-terminal-gone', gone || ended || failedStart);
     // Its terminal session is gone, so there is nothing to wake (Wake answers ok and the agent
     // falls asleep again): Restart is the way back (#3344).
     const wakeBtn = document.getElementById('sleeping-wake-btn');

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/subgentic/coral/internal/agent"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/store"
 )
@@ -208,6 +209,9 @@ func (r *SessionReconciler) checkExited(ctx context.Context, ls store.LiveSessio
 		delete(r.exited, ls.SessionID)
 		return
 	}
+	if r.cliMissing(ctx, ls, name) {
+		return
+	}
 	if created, err := time.Parse(store.ISOFormat, ls.CreatedAt); err == nil && r.now().Sub(created) < exitedLaunchGrace {
 		return
 	}
@@ -223,4 +227,36 @@ func (r *SessionReconciler) checkExited(ctx context.Context, ls store.LiveSessio
 	r.slept = append(r.slept, ls.SessionID)
 	r.logger.Warn("agent CLI has exited, marking as sleeping (Wake resumes it)",
 		"session_id", ls.SessionID, "agent_name", ls.AgentName, "foreground", fg)
+}
+
+// missingCLIWindow is how long after Coral typed an agent's launch line a shell's "no such command" error for the agent's CLI counts as the launch's own: the reconciler's pass is
+// every 30 seconds, so this is the first pass or two. Later the same words on a screen are an agent's own output (a transcript of a failed command) and are left alone.
+const missingCLIWindow = 45 * time.Second
+
+// cliMissing is the safety net under the CLI checks (#353): the agent's pane is at its shell, it was launched moments ago, and the shell's own "no such command" error for the agent's
+// CLI is on the screen (a launch line typed although the CLI was nowhere, or not on the agent's shell's PATH). Conclusive at once, so the agent is marked with the reason cli_missing
+// ("Failed to start", with the words the dashboard has for it) without the launch grace or the consecutive passes. It only marks: nothing is killed, relaunched or typed, and no setting
+// changes. It reports whether it marked the agent.
+func (r *SessionReconciler) cliMissing(ctx context.Context, ls store.LiveSession, name string) bool {
+	info := agent.GetCLIInfo(ls.AgentType)
+	sr, ok := r.runtime.(ptymanager.ScreenReader)
+	if info == nil || info.Binary == "" || !ok {
+		return false
+	}
+	created, err := time.Parse(store.ISOFormat, ls.CreatedAt)
+	if err != nil || r.now().Sub(created) > missingCLIWindow {
+		return false
+	}
+	screen, err := sr.AgentScreen(ctx, name, ls.AgentType, ls.SessionID)
+	if err != nil || !agent.MissingCommandIn(screen, info.Binary) {
+		return false
+	}
+	if err := r.sessionStore.SetSessionSleepingFor(ctx, ls.SessionID, store.SleepReasonCLIMissing); err != nil {
+		r.logger.Error("failed to mark an agent whose CLI is missing", "session_id", ls.SessionID, "error", err)
+		return false
+	}
+	delete(r.exited, ls.SessionID)
+	r.slept = append(r.slept, ls.SessionID)
+	r.logger.Warn("the agent's shell could not find its CLI; marking it failed to start", "session_id", ls.SessionID, "agent_name", ls.AgentName, "agent_type", ls.AgentType)
+	return true
 }

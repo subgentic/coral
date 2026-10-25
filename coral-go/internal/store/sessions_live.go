@@ -599,6 +599,10 @@ const SleepReasonTerminalGone = "terminal_gone"
 // (#6058). The dashboard says "Ended" and offers Restart, not a plain "Sleeping". Waking clears it.
 const SleepReasonAgentExited = "agent_exited"
 
+// SleepReasonCLIMissing: a start of the agent (a wake, a restart, a resume, or the launch line a shell could not run) was refused because its CLI is missing or cannot be run (#353).
+// The dashboard says "Failed to start" and why, in the row, the header and the composer. Waking it successfully, or starting it again, clears it like any sleep reason.
+const SleepReasonCLIMissing = "cli_missing"
+
 // SleepReasonCoralStopped: the agent was running when a pty Coral stopped (cleanly, or a crash
 // found at the next start), so Coral may wake it again at its next start (#3636). Only Coral's
 // own shutdown and startup code writes it; no request can (an Operator's Sleep is reason "").

@@ -403,6 +403,7 @@ func (h *SessionsHandler) restartCommand(ctx context.Context, p *restartPlan) (s
 	}
 	cliPath, cerr := agent.LaunchCLIScreened(userSettings, p.agentType, h.commonPlaceScreen(ctx)) // a broken cli_path_<agent> refuses the restart (#115)
 	if cerr != nil {
+		h.markStartRefused(ctx, p.sleeping, cerr) // only a sleeping agent is marked (#353)
 		refuse, _ := cliPathRefusal(ctx, cerr)
 		return "", refuse
 	}

@@ -101,6 +101,7 @@ func (h *SessionsHandler) prepareWake(ctx context.Context, ls *store.LiveSession
 	}
 	cliPath, err := agent.LaunchCLIScreened(userSettings, ls.AgentType, h.commonPlaceScreen(ctx)) // a broken cli_path_<agent> refuses the wake (#115)
 	if err != nil {
+		h.markStartRefused(ctx, ls, err) // a wake nobody watches shows on the card and the board (#353)
 		return nil, err
 	}
 
