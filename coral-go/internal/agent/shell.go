@@ -135,7 +135,12 @@ func appBundleBinDirFor(r *exeResolver) string {
 		// macOS .app bundle: .../Coral.app/Contents/MacOS/coral
 		if strings.Contains(dir, ".app"+string(os.PathSeparator)+"Contents"+string(os.PathSeparator)+"MacOS") ||
 			strings.HasSuffix(dir, ".app/Contents/MacOS") {
-			return dir
+			// A bundle moved or replaced while Coral runs: the remembered folder is checked (one stat), and forgotten if it is gone.
+			if _, err := os.Stat(dir); err == nil || !remembered {
+				return dir
+			}
+			r.drop()
+			continue
 		}
 
 		// Windows/Linux installed: check if hook binaries exist alongside the executable
