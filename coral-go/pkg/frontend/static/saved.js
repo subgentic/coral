@@ -336,7 +336,7 @@ async function refresh() {
         const li = document.createElement('li'); li.className = 'saved-empty saved-loading'; li.setAttribute('role', 'status'); li.textContent = 'Loading saved items';
         $('saved-list').replaceChildren(li);
     }
-    try { await load(); render(); _drawn = true; } catch (e) { $('saved-status').textContent = `Could not read the saved messages (${e.message}).`; }
+    try { await load(); render(); _drawn = true; } catch (e) { $('saved-list').querySelector('.saved-loading')?.remove(); $('saved-status').textContent = `Could not read the saved messages (${e.message}).`; } // the loading line goes: the screen must not say it is loading and that it failed
 }
 
 /** On a phone the side panel is an overlay over the chat: it gives way so the jump is seen (the tab is where it was when it is opened again). */
