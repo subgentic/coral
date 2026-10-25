@@ -2,10 +2,8 @@ package routes
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -47,13 +45,6 @@ func (h *BoardHandler) postGoalRequestMessage(ctx context.Context, project strin
 	return err
 }
 
-// decodeStrictBody reads a JSON body (at most 1 MiB) and refuses a field the route does not know, as the goal routes do.
-func decodeStrictBody(r *http.Request, v any) error {
-	dec := json.NewDecoder(io.LimitReader(r.Body, 1<<20))
-	dec.DisallowUnknownFields()
-	return dec.Decode(v)
-}
-
 // goalRequestError answers a GoalRequestError with its status and code, and reports whether err was one.
 func goalRequestError(w http.ResponseWriter, err error) bool {
 	var ge *board.GoalRequestError
@@ -85,7 +76,7 @@ func (h *BoardHandler) PostGoalRequest(w http.ResponseWriter, r *http.Request) {
 		GoalID       int64  `json:"goal_id"`
 		Ask          string `json:"ask"`
 	}
-	if err := decodeStrictBody(r, &body); err != nil {
+	if err := decodeJSONStrict(r, &body); err != nil {
 		errBadRequest(w, "invalid JSON")
 		return
 	}
@@ -152,7 +143,7 @@ func (h *BoardHandler) PostGoalRequest(w http.ResponseWriter, r *http.Request) {
 }
 
 // wakeForGoalRequest tells the target's Orchestrators a request is waiting: the first one in a few minutes says what it is, inside an untrusted block; the ones after it are counted in the next
-// wake-up (they sit in the pending list, which `coral-board goal requests` and the board's read notice show). A loop on the asker's side makes no more turns than that.
+// wake-up (they sit in the pending list that `coral-board goal requests` shows). A loop on the asker's side makes no more turns than that.
 func (h *BoardHandler) wakeForGoalRequest(ctx context.Context, target string, recipients []string, in *board.GoalRequestIn) {
 	now := time.Now()
 	if last, ok := h.goalReqWake.Load(target); ok && now.Sub(last.(time.Time)) < goalRequestWakeEvery {
@@ -219,7 +210,7 @@ func (h *BoardHandler) AcceptGoalRequest(w http.ResponseWriter, r *http.Request)
 		Priority     string `json:"priority"`
 		AssignedTo   string `json:"assigned_to"`
 	}
-	if err := decodeStrictBody(r, &body); err != nil {
+	if err := decodeJSONStrict(r, &body); err != nil {
 		errBadRequest(w, "invalid JSON")
 		return
 	}
@@ -265,7 +256,7 @@ func (h *BoardHandler) DeclineGoalRequest(w http.ResponseWriter, r *http.Request
 		SubscriberID string `json:"subscriber_id"`
 		Reason       string `json:"reason"`
 	}
-	if err := decodeStrictBody(r, &body); err != nil {
+	if err := decodeJSONStrict(r, &body); err != nil {
 		errBadRequest(w, "invalid JSON")
 		return
 	}

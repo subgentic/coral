@@ -68,6 +68,7 @@ GET /api/board/{project}/artifacts view
 GET /api/board/{project}/cross-team-candidates never
 GET /api/board/{project}/cross-team-state never
 GET /api/board/{project}/cross-team/settings view
+GET /api/board/{project}/goal-requests never
 GET /api/board/{project}/goals view
 GET /api/board/{project}/goals/{goalID} view
 GET /api/board/{project}/groups never
@@ -259,6 +260,9 @@ POST /api/board/{project}/cross-team/files/disable launch
 POST /api/board/{project}/cross-team/files/enable launch
 POST /api/board/{project}/external-artifacts interact
 POST /api/board/{project}/external-messages interact
+POST /api/board/{project}/goal-requests never
+POST /api/board/{project}/goal-requests/{requestID}/accept never
+POST /api/board/{project}/goal-requests/{requestID}/decline never
 POST /api/board/{project}/goals interact
 POST /api/board/{project}/goals/{goalID}/close interact
 POST /api/board/{project}/groups/{groupID}/members never
