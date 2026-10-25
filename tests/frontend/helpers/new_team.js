@@ -10,7 +10,8 @@ const SOURCE = `(() => {
     const roles = d => rows(d).map(b => A.name(b).replace(/^Edit /, '').replace(/: .*$/, ''));
     const panel = d => { if (!d) return null; const r = d.getBoundingClientRect(); const full = r.width >= innerWidth - 1 && r.height >= innerHeight - 1; const c = full ? [...d.children].find(e => A.vis(e) && e.getBoundingClientRect().width > 100) : null; return c || d; };
     const buttons = d => d ? [...d.querySelectorAll('button')].filter(A.vis).map(b => ({ name: A.name(b), ...A.box(b), disabled: b.disabled, ariaDisabled: b.getAttribute('aria-disabled') })) : [];
-    window.__nt = { dlg, find, rows, roles, panel, buttons };
+    const tablist = d => d ? [...d.querySelectorAll('[role=tablist]')].filter(A.vis)[0] || null : null; // the visible one: the Launch dialog holds New agent's step 3 tablist too, hidden
+    window.__nt = { dlg, find, rows, roles, panel, buttons, tablist };
     return true;
 })()`;
 const install = async ev => { await na.install(ev); return ev(SOURCE); };
@@ -21,7 +22,7 @@ const N = {
     cancel: /^Cancel$/i, back: /^Back$/i, next: /^Next$/i, launch: /^Launch team$/i, save: /^Save member$/i, addMember: /^\+?\s*Add member$/i, addOrch: /^Add Orchestrator$/i,
     tabs: ['Start', 'Workflow', 'Health check', 'Messaging'], memberTabs: ['Persona', 'Agent', 'Permissions', 'Advanced'],
 };
-const stepLine = ev => ev(`(() => { const d = window.__nt.dlg(${N.team}); if (!d) return ''; const hits = [...d.querySelectorAll('*')].map(e => window.__na.text(e)).filter(t => /^Step \\d of 3: /.test(t)); hits.sort((a, b) => a.length - b.length); return hits[0] || ''; })()`);
+const stepLine = ev => ev(`(() => { const d = window.__nt.dlg(${N.team}); if (!d) return ''; const hits = [...d.querySelectorAll('*')].filter(window.__na.vis).map(e => window.__na.text(e)).filter(t => /^Step \\d of 3: /.test(t)); hits.sort((a, b) => a.length - b.length); return hits[0] || ''; })()`);
 // Open New team as a person does: the Launch dialog, then the Team choice.
 async function openNewTeam(ev, waitFor) {
     await ev(`(async () => { await window.showLaunchModal(); const c = document.querySelector('#launch-step-chooser [data-arg="team"]'); if (c && c.getClientRects().length) c.click(); return true; })()`);
@@ -34,8 +35,8 @@ const T = (ev, waitFor) => {
         type: (sel, rx, v, within = N.team) => ev(`(() => { const e = window.__nt.find(window.__nt.dlg(${within}), ${JSON.stringify(sel)}, ${rx}); if (!e) return false; e.value = ${JSON.stringify(v)}; e.dispatchEvent(new Event('input', { bubbles: true })); e.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`),
         has: (sel, rx, within = N.team) => ev(`!!window.__nt.find(window.__nt.dlg(${within}), ${JSON.stringify(sel)}, ${rx})`),
         pick: (rx, text, within = N.team) => ev(`(() => { const s = window.__nt.find(window.__nt.dlg(${within}), 'select', ${rx}); if (!s) return false; const o = [...s.options].find(o => ${text}.test(o.textContent)); if (!o) return false; s.value = o.value; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`),
-        step: n => waitFor(`/^Step ${n} of 3/.test((() => { const d = window.__nt.dlg(${N.team}); return d ? [...d.querySelectorAll('*')].map(e => window.__na.text(e)).filter(x => /^Step \\d of 3: /.test(x)).sort((a, b) => a.length - b.length)[0] || '' : ''; })())`, `step ${n} of 3`, 5000),
-        to: async (n, { name = 'alpha', folder = '/work/payments-app', template = /Coding|Blank/ } = {}) => {
+        step: n => waitFor(`/^Step ${n} of 3/.test((() => { const d = window.__nt.dlg(${N.team}); return d ? [...d.querySelectorAll('*')].filter(window.__na.vis).map(e => window.__na.text(e)).filter(x => /^Step \\d of 3: /.test(x)).sort((a, b) => a.length - b.length)[0] || '' : ''; })())`, `step ${n} of 3`, 5000),
+        to: async (n, { name = 'alpha', folder = '/work/payments-app', template = /Coding/ } = {}) => {
             await t.type('input', N.teamName, name); await t.type('input', N.folder, folder);
             if (n >= 2) { await t.click('button', N.next); await t.step(2); }
             if (n >= 3) { if (template) await t.pick(N.template, template); await t.click('button', N.next); await t.step(3); }

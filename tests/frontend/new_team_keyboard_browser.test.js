@@ -41,13 +41,13 @@ const BASE = require('./test_base').BASE;
             await t.pick(N.template, /Coding|\(\d+ members\)/); await settle(400); await t.click('button', N.next); await t.step(3); await settle(200); assert.match(await say(), /Step 3 of 3/);
         });
         await S.run('step 3 tabs are real tabs: a tablist, one selected, one tab stop, each tab controls a tabpanel named by it', async () => {
-            const tabs = await ev(`(() => { const tl = window.__nt.dlg(${N.team}).querySelector('[role=tablist]'); if (!tl) return null; return { o: tl.getAttribute('aria-orientation'), t: [...tl.querySelectorAll('[role=tab]')].map(x => ({ n: window.__na.name(x), s: x.getAttribute('aria-selected'), tab: x.tabIndex, c: (() => { const p = document.getElementById(x.getAttribute('aria-controls') || ''); return p ? { role: p.getAttribute('role'), by: p.getAttribute('aria-labelledby') === x.id } : null; })() })) }; })()`);
+            const tabs = await ev(`(() => { const tl = window.__nt.tablist(window.__nt.dlg(${N.team})); if (!tl) return null; return { o: tl.getAttribute('aria-orientation'), t: [...tl.querySelectorAll('[role=tab]')].map(x => ({ n: window.__na.name(x), s: x.getAttribute('aria-selected'), tab: x.tabIndex, c: (() => { const p = document.getElementById(x.getAttribute('aria-controls') || ''); return p ? { role: p.getAttribute('role'), by: p.getAttribute('aria-labelledby') === x.id } : null; })() })) }; })()`);
             assert.ok(tabs, 'a role=tablist'); assert.equal(tabs.t.length, 4); assert.equal(tabs.t.filter(x => x.s === 'true').length, 1);
             assert.deepEqual(tabs.t.map(x => x.tab).sort(), [-1, -1, -1, 0], 'one tab stop');
             for (const x of tabs.t) { assert.ok(x.c, `${x.n}: aria-controls points to a panel`); assert.equal(x.c.role, 'tabpanel'); assert.ok(x.c.by, `${x.n}: the panel is labelled by its tab`); }
         });
         await S.run('tablist keys on step 3: arrows along the axis move and select (wrapping), Home and End go to the ends', async () => {
-            const vertical = await ev(`window.__nt.dlg(${N.team}).querySelector('[role=tablist]').getAttribute('aria-orientation') === 'vertical'`);
+            const vertical = await ev(`window.__nt.tablist(window.__nt.dlg(${N.team})).getAttribute('aria-orientation') === 'vertical'`);
             const [next, prev] = vertical ? ['ArrowDown', 'ArrowUp'] : ['ArrowRight', 'ArrowLeft'];
             const cur = () => ev(`(() => { const x = [...window.__nt.dlg(${N.team}).querySelectorAll('[role=tab]')].find(e => e.getAttribute('aria-selected') === 'true'); return { n: window.__na.name(x), f: document.activeElement === x }; })()`);
             await ev(`[...window.__nt.dlg(${N.team}).querySelectorAll('[role=tab]')].find(e => e.getAttribute('aria-selected') === 'true').focus(); true`);
@@ -61,7 +61,7 @@ const BASE = require('./test_base').BASE;
         });
         await S.run('a member row is one button named "Edit <role>: <provider>, <model>"; its Actions button has aria-haspopup and toggles aria-expanded; the menu is a menu', async () => {
             const role = (await ev(`window.__nt.roles(window.__nt.dlg(${N.team}))`))[1];
-            const st = () => ev(`(() => { const b = [...window.__nt.dlg(${N.team}).querySelectorAll('button')].find(x => window.__na.name(x) === 'Actions for ' + ${JSON.stringify(role)}); return b ? { popup: b.getAttribute('aria-haspopup'), exp: b.getAttribute('aria-expanded'), menu: !!window.__nt.dlg(${N.team}).querySelector('[role=menu]') } : null; })()`);
+            const st = () => ev(`(() => { const b = [...window.__nt.dlg(${N.team}).querySelectorAll('button')].find(x => window.__na.name(x) === 'Actions for ' + ${JSON.stringify(role)}); return b ? { popup: b.getAttribute('aria-haspopup'), exp: b.getAttribute('aria-expanded'), menu: [...window.__nt.dlg(${N.team}).querySelectorAll('[role=menu]')].some(window.__na.vis) } : null; })()`);
             let s = await st(); assert.ok(s, 'an Actions for <role> button'); assert.ok(s.popup); assert.equal(s.exp, 'false');
             await ev(`[...window.__nt.dlg(${N.team}).querySelectorAll('button')].find(x => window.__na.name(x) === 'Actions for ' + ${JSON.stringify(role)}).focus(); true`); await key('Enter'); await settle(200);
             s = await st(); assert.equal(s.exp, 'true'); assert.ok(s.menu, 'a role=menu'); assert.ok((await insideTop()).inside);
@@ -83,12 +83,13 @@ const BASE = require('./test_base').BASE;
         await S.run('Edit member: tabs Persona, Agent, Permissions, Advanced are real tabs with the arrow keys; every control of each tab is named; Mode is a radiogroup with arrow keys; Tab stays inside it', async () => {
             const role = (await ev(`window.__nt.roles(window.__nt.dlg(${N.team}))`))[1];
             await focusRow(role); await key('Enter'); await waitFor(`!!window.__nt.dlg(${N.member})`, 'Edit member', 4000);
-            const tl = await ev(`(() => { const tl = window.__nt.dlg(${N.member}).querySelector('[role=tablist]'); return tl ? [...tl.querySelectorAll('[role=tab]')].filter(window.__na.vis).map(x => window.__na.name(x)) : null; })()`);
+            const tl = await ev(`(() => { const tl = window.__nt.tablist(window.__nt.dlg(${N.member})); return tl ? [...tl.querySelectorAll('[role=tab]')].filter(window.__na.vis).map(x => window.__na.name(x)) : null; })()`);
             assert.deepEqual(tl, N.memberTabs, 'a tablist with the four tabs');
-            const vertical = await ev(`window.__nt.dlg(${N.member}).querySelector('[role=tablist]').getAttribute('aria-orientation') === 'vertical'`); const next = vertical ? 'ArrowDown' : 'ArrowRight';
+            const vertical = await ev(`window.__nt.tablist(window.__nt.dlg(${N.member})).getAttribute('aria-orientation') === 'vertical'`); const next = vertical ? 'ArrowDown' : 'ArrowRight';
             await ev(`[...window.__nt.dlg(${N.member}).querySelectorAll('[role=tab]')].find(x => x.getAttribute('aria-selected') === 'true').focus(); true`); await key(next);
             assert.equal(await ev(`window.__na.name([...window.__nt.dlg(${N.member}).querySelectorAll('[role=tab]')].find(x => x.getAttribute('aria-selected') === 'true'))`), 'Agent', 'the arrow selects the next tab');
             for (const n of N.memberTabs) { await ev(`[...window.__nt.dlg(${N.member}).querySelectorAll('[role=tab]')].find(x => window.__na.name(x) === ${JSON.stringify(n)}).click(); true`); await settle(250); assert.deepEqual(await unnamed(N.member), [], `Edit member, ${n}: unnamed controls`); }
+            await ev(`[...window.__nt.dlg(${N.member}).querySelectorAll('[role=tab]')].find(x => window.__na.name(x) === 'Permissions').click(); true`); await settle(250); // Permissions open: the loop above ended on Advanced
             const mode = () => ev(`(() => { const g = [...window.__nt.dlg(${N.member}).querySelectorAll('[role=radiogroup]')].find(e => /mode$/i.test(window.__na.name(e))); if (!g) return null; const r = window.__na.radios(g); const i = r.findIndex(x => window.__na.isChecked(x)); return { i, n: r.length, f: document.activeElement === r[i] }; })()`);
             await ev(`(() => { const g = [...window.__nt.dlg(${N.member}).querySelectorAll('[role=radiogroup]')].find(e => /mode$/i.test(window.__na.name(e))); window.__na.radios(g).find(x => window.__na.isChecked(x)).focus(); return true; })()`);
             const a = await mode(); assert.ok(a, 'a Mode radiogroup on Permissions'); await key('ArrowRight'); const b = await mode(); assert.equal(b.i, (a.i + 1) % a.n, 'ArrowRight moves the mode'); assert.ok(b.f, 'and the focus with it');
