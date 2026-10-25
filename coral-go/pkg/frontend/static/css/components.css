@@ -4426,7 +4426,7 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 }
 .modal-content:has(.settings-shell) #launch-step-agent .settings-modal-body { flex-direction: column; overflow: auto; }
 /* Agent Team (UI audit #5589, findings 5 and 6): the team name, which every launch needs, is above the sections; the template tools are one disclosure after the picker, so the members come first. */
-.modal-content:has(.settings-shell) #launch-step-team .settings-modal-body { flex-direction: column; }
+.modal-content:has(.settings-shell) #launch-step-team .settings-modal-body { flex-direction: column; overflow: auto; } /* the steps scroll inside the fixed dialog (#7407) */
 /* Folded section: one summary style. A user sets only the --dz-* variables that differ. */
 .disclosure > summary { cursor: pointer; width: var(--dz-width, fit-content); padding: var(--dz-pad, .25rem .5rem .25rem 0); color: var(--dz-color, inherit); font-size: var(--dz-size, var(--fs-md)); font-weight: 600; }
 .disclosure[open] > summary { margin-bottom: var(--dz-gap, .4rem); }
@@ -4745,7 +4745,7 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .team-agents-list { display: flex; flex-direction: column; }
 .team-agent-row { display: flex; align-items: center; gap: 6px; border-bottom: 1px solid var(--border-light); }
 .team-agent-row.drag-over { background: var(--bg-hover); }
-.team-agent-open { flex: 1; min-width: 0; display: grid; grid-template-columns: minmax(8rem, 16rem) 1fr auto; align-items: center; gap: 12px; min-height: 44px; padding: 8px 6px; background: none; border: 0; border-radius: var(--radius-md); color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.team-agent-open { flex: 1; min-width: 0; display: grid; grid-template-columns: minmax(0, 16rem) minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 44px; padding: 8px 6px; background: none; border: 0; border-radius: var(--radius-md); color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .team-agent-open:hover { background: var(--bg-hover); }
 .team-agent-open:focus-visible, .team-agent-menu-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .team-agent-role-name { font-size: var(--fs-md); font-weight: 500; color: var(--text-primary); overflow-wrap: anywhere; }
@@ -4790,3 +4790,11 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 }
 
 .team-launch-health { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; } /* the health panel's layout in the launch dialog (the Team settings form's class is not used here) */
+
+/* New team on a phone and at large text: nothing wider than the screen (the census), and the health panel's (i) on its label's first line. */
+.team-allworkers select { min-width: 0; max-width: 100%; width: min(12em, 100%); }
+.team-menu { min-width: min(12rem, calc(100vw - 32px)); max-width: calc(100vw - 32px); }
+.team-menu-item { white-space: normal; }
+#launch-step-team .settings-pane .health-line > label.health-rule-head:has(> input[type="checkbox"]) { margin: 0; }
+#launch-step-team .settings-pane .health-line > .settings-info-btn { align-self: flex-start; margin-top: calc((1.4rem - 1.5rem) / 2); } /* the (i) sits on the switch's line: the switch is 1.4rem, the (i) 1.5rem */
+.team-agent-role-name, .team-agent-summary { min-width: 0; }

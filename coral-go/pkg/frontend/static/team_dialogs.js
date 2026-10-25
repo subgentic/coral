@@ -138,6 +138,7 @@ function _syncTeamGate() {
     if (dir) { recap.append(', '); const d = document.createElement('b'); d.textContent = dir; recap.append(d); }
 }
 document.addEventListener('team-step-shown', _syncTeamGate);
+document.addEventListener('team-page-open', e => { const page = e.target.closest && e.target.closest('.team-page'); if (page && page.dataset.page) showTeamStep(page.dataset.page); });
 document.addEventListener('input', e => { if (e.target && (e.target.id === 'team-board-name' || e.target.id === 'launch-team-dir')) _syncTeamGate(); });
 
 // Remove keeps the row aside for Undo (one removal back); a new removal, a template or a closed dialog makes the last one final.
