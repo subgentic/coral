@@ -32,7 +32,7 @@ func goalLinksEnv(t *testing.T) (*BoardHandler, string, *board.Task) {
 	require.NoError(t, err)
 	_, in, err := h.bs.SendGoalRequest(ctx, "alpha", g.ID, "beta", "do it", "Lead", nil)
 	require.NoError(t, err)
-	task, _, err := h.bs.AcceptGoalRequest(ctx, "beta", in.ID, "Build the importer ghp" + "_abcdefghijklmnopqrstuvwxyz0123456789", "body", "high", "Orch", "Dev B")
+	task, _, err := h.bs.AcceptGoalRequest(ctx, "beta", in.ID, "Build the importer ghp"+"_abcdefghijklmnopqrstuvwxyz0123456789", "body", "high", "Orch", "Dev B")
 	require.NoError(t, err)
 	return h, in.RequestID, task
 }
@@ -165,7 +165,7 @@ func TestGoalLinksAnswersTheAcceptedRequestsOfThatAskerAndNothingElse(t *testing
 	l := got.Rows[0]
 	assert.EqualValues(t, task.ID, l["task_id"])
 	assert.Equal(t, "Build the importer "+redact.Marker, l["title"], "the title's token is redacted")
-	assert.NotContains(t, rec.Body.String(), "ghp" + "_abcdefghijklmnopqrstuvwxyz0123456789")
+	assert.NotContains(t, rec.Body.String(), "ghp"+"_abcdefghijklmnopqrstuvwxyz0123456789")
 	assert.Equal(t, "pending", l["task_status"])
 	assert.Equal(t, "accepted", l["request_state"])
 	assert.Equal(t, "Dev B", l["assignee"])
