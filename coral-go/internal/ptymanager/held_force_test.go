@@ -2,6 +2,7 @@ package ptymanager
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -107,4 +108,42 @@ func TestSendNowRefusesARealPromptOnTheScreen(t *testing.T) {
 	assert.Empty(t, pasted)
 	assert.Zero(t, enters)
 	assert.Equal(t, 1, HeldCount(name))
+}
+
+// A prompt that opens after the press's own screen check, between the paste and its Enter: the Enter is withheld and the send stays held (the check inside the forced paste, which the press check cannot cover).
+func TestSendNowWithholdsTheEnterWhenAPromptOpensAfterThePressCheck(t *testing.T) {
+	stuckGate(t, time.Hour, time.Hour)
+	name := "claude-sendnow-lateprompt"
+	term := &stuckTerm{screen: noBox}
+	SetNeedsInputFunc(func(context.Context, string, string, string) bool { return true })
+	t.Cleanup(func() { DropHeld(name, "test done"); waitGateIdle(t) })
+
+	d, err := DeliverAutomated(context.Background(), pasteSend(term, name, "[board] QA: please look at #16", "board message", false))
+	require.NoError(t, err)
+	require.Equal(t, Held, d)
+	time.Sleep(60 * time.Millisecond)
+
+	var mu sync.Mutex
+	reads := 0
+	term.mu.Lock()
+	term.onScreen = func() {
+		mu.Lock()
+		reads++
+		n := reads
+		mu.Unlock()
+		if n == 2 { // read 1 is the press's check, 2 the forced paste's own look; the next one, before the Enter, finds the menu
+			term.set(permissionMenu, false)
+		}
+	}
+	term.mu.Unlock()
+	res, err := SendHeldNow(context.Background(), name, "")
+	require.NoError(t, err)
+	assert.Zero(t, res.Sent)
+	assert.Equal(t, 1, res.Again, "its Enter was withheld")
+	pasted, enters := term.got()
+	assert.Len(t, pasted, 1)
+	assert.Zero(t, enters, "no Enter into a prompt")
+	term.mu.Lock()
+	term.onScreen = nil
+	term.mu.Unlock()
 }
