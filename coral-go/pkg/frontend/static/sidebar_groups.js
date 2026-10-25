@@ -107,13 +107,15 @@ function chipsHtml(t) {
 }
 
 function tableHtml(t, kind, key) {
-    const head = t.columns.map(c => `<th scope="col">${escapeHtml(c)}</th>`).join('');
-    const rows = t.rows.map(r => `<tr><td><button type="button" class="group-table-link" ${ROW_ACTION_ATTR[r.action] || ''} ${dataAttrs(r.data)}>${escapeHtml(r.title)}</button></td>`
-        + r.cells.map(cellHtml).join('') + '</tr>').join('');
+    // A table that stacks its rows on a phone (the Inbox's Saved: the message over its state and action) says it is a table in its roles, since a display other than table-* loses the native ones.
+    const st = !!t.stack;
+    const head = t.columns.map(c => `<th scope="col"${st ? ' role="columnheader"' : ''}>${escapeHtml(c)}</th>`).join('');
+    const rows = t.rows.map(r => `<tr${st ? ' role="row"' : ''}><td${st ? ' role="cell"' : ''}><button type="button" class="group-table-link" ${ROW_ACTION_ATTR[r.action] || ''} ${dataAttrs(r.data)}>${escapeHtml(r.title)}</button></td>`
+        + r.cells.map(c => (st ? cellHtml(c).replace('<td>', '<td role="cell">') : cellHtml(c))).join('') + '</tr>').join('');
     const top = `<div class="group-table-head"><h2 id="group-table-title" tabindex="-1">${escapeHtml(t.title)}</h2><span class="session-group-count">${t.rows.length}</span>${extraHtml(t.extra)}</div>${chipsHtml(t)}`;
     // A group with nothing in it says so in one line (its chips, if it has them, stay: they are how the list is widened)
     if (!t.rows.length && t.empty) return top + `<div class="empty-pane"><p class="empty-line">${escapeHtml(t.empty.line)}</p>${t.empty.hint ? `<p class="empty-hint">${escapeHtml(t.empty.hint)}</p>` : ''}</div>`;
-    return top + `<div class="group-table-scroll"><table class="group-table" aria-labelledby="group-table-title"><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>`
+    return top + `<div class="group-table-scroll"><table class="group-table${st ? ' group-table-stack' : ''}"${st ? ' role="table"' : ''} aria-labelledby="group-table-title"><thead${st ? ' role="rowgroup"' : ''}><tr${st ? ' role="row"' : ''}>${head}</tr></thead><tbody${st ? ' role="rowgroup"' : ''}>${rows}</tbody></table></div>`
         + (t.note ? `<p class="empty-hint group-table-note">${escapeHtml(t.note)}</p>` : '');
 }
 
@@ -129,10 +131,11 @@ function drawTable() {
 }
 
 /** Opens a group as a table in the centre. */
-export function openGroupTable(kind, key) {
+export function openGroupTable(kind, key, { focus = false } = {}) {
     open = { kind, key };
     if (!drawTable()) { open = null; return false; }
     showView('group-table-view');
+    if (focus) document.getElementById('group-table-title')?.focus({ preventScroll: true }); // a group opened by the person: the keyboard starts at its heading
     document.querySelectorAll('.sidebar-pane .session-list > li.active').forEach(li => { li.classList.remove('active'); li.querySelector('[aria-current]')?.removeAttribute('aria-current'); });
     return true;
 }
@@ -178,13 +181,13 @@ export function setBackLink(id, kind, group) {
 }
 
 registerActions({
-    'sgroup-open': el => { const kind = textOf(el.dataset.kind), key = textOf(el.dataset.group); if (kind && key && !openGroupTable(kind, key)) sources.get(kind)?.showList?.(); }, // a group that has gone (a filter, a fold of the list) leaves for the tab's own page
+    'sgroup-open': el => { const kind = textOf(el.dataset.kind), key = textOf(el.dataset.group); if (kind && key && !openGroupTable(kind, key, { focus: true })) sources.get(kind)?.showList?.(); }, // a group that has gone (a filter, a fold of the list) leaves for the tab's own page
     'sgroup-chevron': (el, event) => { event.stopPropagation(); const kind = textOf(el.dataset.kind), key = textOf(el.dataset.group); if (kind && key) toggleGroupFold(kind, key); },
     'sgroup-key': (el, event) => {
         if (event.target !== el || (event.key !== 'Enter' && event.key !== ' ')) return;
         event.preventDefault();
         const kind = textOf(el.dataset.kind), key = textOf(el.dataset.group);
-        if (kind && key) openGroupTable(kind, key);
+        if (kind && key) openGroupTable(kind, key, { focus: true });
     },
     'sgroup-list': el => { const kind = textOf(el.dataset.kind); open = null; sources.get(kind)?.showList?.(); },
 });

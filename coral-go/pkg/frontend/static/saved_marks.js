@@ -173,6 +173,8 @@ document.addEventListener('keydown', (e) => {
     if (t.closest('input, textarea, select, [contenteditable="true"], [role="dialog"], [role="menu"], .modal')) return;
     if (!(t === document.body || t.closest('#agentic-state, #inbox-view, #group-table-view') || t.id === 'saved-btn')) return;
     e.preventDefault();
+    const back = savedViewShowing() ? document.querySelector('#inbox-page:not([hidden]) > .group-back') : null; // on a message's (or a task's) page inside the Inbox Escape is one level back, to its table with the focus on its row; the next Escape leaves
+    if (back) { back.click(); return; }
     importOnce('./saved.js').then(m => m.closeSaved()).catch(() => {});
 });
 

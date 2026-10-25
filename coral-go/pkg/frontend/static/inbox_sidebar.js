@@ -27,9 +27,9 @@ const { waitingText } = await importOnce('./waiting_text.js'); // a lazy module 
 
 const $ = id => document.getElementById(id);
 const GROUPS = [
-    { key: 'needs', label: 'Needs you', search: 'Search needs you' },
-    { key: 'tasks', label: 'Tasks', search: 'Search tasks' },
-    { key: 'saved', label: 'Saved', search: 'Search saved messages', short: 'Search saved' }, // the box beside Display options and Expand is narrow: its placeholder is the short words, its name the whole ones
+    { key: 'needs', label: 'Needs you', search: 'Search needs you', short: 'Search' },
+    { key: 'tasks', label: 'Tasks', search: 'Search tasks', short: 'Search' },
+    { key: 'saved', label: 'Saved', search: 'Search saved messages', short: 'Search' }, // the box beside Display options and Expand is narrow: its placeholder is the short words, its name the whole ones
 ];
 const GROUP_KEY = 'coral.inbox.tab'; // the group last on screen, kept in this browser
 let tasks = [];
@@ -116,7 +116,7 @@ registerGroupSource('hub-inbox', {
             const v = saved.savedView();
             const rows = v.shown.map(saved.savedItemFacts);
             const empty = v.filtered ? 'No saved messages match this search.' : v.tab === 'done' ? 'Nothing is marked done.' : 'Nothing is saved for later.';
-            return { title: 'Saved', columns: ['Message', 'Saved', 'State', 'Action'], chipsLabel: 'Show',
+            return { title: 'Saved', stack: true, columns: ['Message', 'Saved', 'State', 'Action'], chipsLabel: 'Show',
                 chips: [{ action: 'inbox-saved-chip', data: { tab: 'open' }, label: 'Open', count: v.totals.open, pressed: v.tab === 'open' }, { action: 'inbox-saved-chip', data: { tab: 'done' }, label: 'Done', count: v.totals.done, pressed: v.tab === 'done' }],
                 empty: { line: empty, hint: v.filtered || v.tab === 'done' ? '' : 'Save a message from a chat or a board with its bookmark.' },
                 note: [v.query ? 'The search covers every saved message, not only these.' : '', ...v.down.map(d => `${d.label || d.id} did not answer, so its saved messages are not shown.`)].filter(Boolean).join(' '),
@@ -139,7 +139,8 @@ function setGroup(key) {
     const input = $('inbox-search'), g = GROUPS.find(x => x.key === key);
     if (input) {
         const text = key === 'saved' ? (saved.savedView().query || queries.saved) : queries[key];
-        if (input.placeholder !== (g.short || g.search)) { input.placeholder = g.short || g.search; input.setAttribute('aria-label', g.search); }
+        if (input.placeholder !== (g.short || g.search)) input.placeholder = g.short || g.search;
+        if (input.getAttribute('aria-label') !== g.search) input.setAttribute('aria-label', g.search); // the name stays whole whatever the placeholder says (a placeholder as short as the box's default no longer skips it)
         if (input.value !== text) input.value = text;
     }
     const btn = document.querySelector('.sidebar-pane[data-pane="hub-inbox"] [data-display-button]');
@@ -178,7 +179,7 @@ function openPageShell(kindLabel, groupKey) {
     if (isPhoneLayout()) $('inbox-view')?.setAttribute('data-phone-item', '');
     host.replaceChildren();
     const back = el('button', 'group-back', `\u2190 ${kindLabel}`); // the link back to the group's table (the shared one, sidebar_groups.js)
-    back.type = 'button'; back.setAttribute('data-on-click', 'sgroup-open'); back.dataset.kind = 'hub-inbox'; back.dataset.group = groupKey;
+    back.type = 'button'; back.setAttribute('data-on-click', 'inbox-back'); back.dataset.kind = 'hub-inbox'; back.dataset.group = groupKey; // the way back puts the focus on the row it came from
     const phoneBack = el('button', 'group-back inbox-phone-back', '← Back to the list');
     phoneBack.type = 'button'; phoneBack.setAttribute('data-on-click', 'inbox-phone-back');
     host.append(back, phoneBack);
@@ -198,6 +199,7 @@ function openTaskPage(project, id) {
     mountInbox(mount, coralInboxAdapter, { region: false, only: { project: t.project, id: t.id } }); // the component's own text and reply box, for this one task
     setGroup('tasks');
     renderInboxNav(true);
+    focusTitle(host);
 }
 
 let openMore = null;
@@ -238,19 +240,34 @@ function openSavedPage(id) {
     bar.append(open);
     host.append(bar);
     setGroup('saved');
+    focusTitle(host);
+}
+
+/** A page was opened: the keyboard and a screen reader start at its heading, not on the body. */
+function focusTitle(host) { const h = host.querySelector('.wf-item-title'); if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); } }
+
+/** Back from a page: the focus goes to the row it came from (in the table, or in the list on a phone), else to the table's title. */
+function focusCameFrom(was, inList) {
+    if (!was) return;
+    const root = inList ? document.querySelector('.sidebar-pane[data-pane="hub-inbox"]') : $('group-table-view');
+    const id = CSS.escape(String(was.id));
+    const sel = inList ? (was.kind === 'task' ? `.row-btn[data-row-key="${CSS.escape('t:' + was.project + '#' + was.id)}"]` : `.row-btn[data-id="${id}"]`) : (was.kind === 'task' ? `.group-table-link[data-task-id="${id}"]` : `.group-table-link[data-id="${id}"]`);
+    const row = root && root.querySelector(sel);
+    if (row) row.focus({ preventScroll: true }); else if (!inList) $('group-table-title')?.focus({ preventScroll: true });
 }
 
 function sayLive(text) { const live = $('inbox-live'); if (live) { const s = document.createElement('span'); s.textContent = text; live.replaceChildren(s); } }
 
 /** Leave a page for its group's table (a phone: for the list). */
-function closePage(openTable = true) {
-    const g = page ? (page.kind === 'task' ? 'tasks' : 'saved') : group;
+function closePage(openTable = true, focusBack = false) {
+    const was = page, g = page ? (page.kind === 'task' ? 'tasks' : 'saved') : group;
     page = null;
     const host = $('inbox-page');
     if (host) { host.hidden = true; host.replaceChildren(); host.dataset.saved = ''; }
     $('inbox-view')?.removeAttribute('data-phone-item');
     renderInboxNav(true);
     if (openTable && !isPhoneLayout()) openGroupTable('hub-inbox', g);
+    if (focusBack) focusCameFrom(was, isPhoneLayout() || !openTable);
 }
 
 // ── The tab ──────────────────────────────────────────────────────────────
@@ -300,5 +317,6 @@ registerActions({
         if (await saved.savedSetDone(it, done)) sayLive(done ? 'Marked done' : 'Moved back to Open');
     },
     'inbox-goal-open': el => { const board = textOf(el.dataset.board), id = Number(el.dataset.goalId); if (board && id) importOnce('./task_goals.js').then(m => m.openGoalOnBoard(board, id)).catch(() => {}); },
-    'inbox-phone-back': () => closePage(false),
+    'inbox-phone-back': () => closePage(false, true),
+    'inbox-back': () => { const was = page, g = was ? (was.kind === 'task' ? 'tasks' : 'saved') : group; closePage(false); openGroupTable('hub-inbox', g); focusCameFrom(was, false); }, // the link back to the group's table (on a phone too, as the shared back link did), with the focus on the row it came from
 });

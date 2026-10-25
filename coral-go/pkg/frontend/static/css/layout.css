@@ -950,6 +950,14 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .group-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .group-chip-count { font-size: var(--fs-sm); font-weight: 600; color: var(--text-secondary); }
 .group-table-note { margin-top: var(--space-md); }
+/* A table that stacks its rows on a phone (the Inbox's Saved): the message over its date, state and action, so none is behind the table's sideways scroll; the header row stays for a screen reader. */
+@media (max-width: 760px) {
+    .group-table-stack thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+    .group-table-stack, .group-table-stack tbody { display: block; }
+    .group-table-stack tr { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; padding: var(--space-lg) 0; border-bottom: 1px solid var(--border); }
+    .group-table-stack td { display: block; padding: 0; border: 0; }
+    .group-table-stack td:first-child { flex: 1 1 100%; }
+}
 @media (pointer: coarse) { .group-chip { min-height: 44px; } .group-table-cell-btn { min-height: 44px; min-width: 44px; } }
 /* An item's page in the Inbox (a task, a saved message): it fills the view, so its pinned bar is at the foot of the screen; the view's padding is taken back so nothing shows under the bar */
 .inbox-page { display: flex; flex-direction: column; flex: 1; box-sizing: border-box; padding: 20px 24px; }
