@@ -29,6 +29,8 @@ const TABS = ['hub-inbox', 'history', 'servers', 'workflows', 'jobs'];
     };
     const arrived = async (name, what) => {
         await waitFor(`window.__qaState.currentSession && window.__qaState.currentSession.name === ${JSON.stringify(name)}`, `${what}: the agent to be selected`);
+        // The state is set first; the view and the tab follow after the selection's own awaits (a read at once fell between them on a slow moment, #7704): wait for the same three things the assertions below read, and let them say which one is wrong if it never settles
+        await waitFor(`(() => { const view = document.getElementById('live-session-view'); const active = [...document.querySelectorAll('.top-nav-tab.active')].map(b => b.id); return active.length === 1 && active[0] === 'nav-tab-agents' && !!view && view.offsetParent !== null && !document.getElementById('inbox-view')?.offsetParent; })()`, `${what}: the agent's view and the Agents tab to be shown`, { soft: true });
         const r = await ev(`(() => {
             const active = [...document.querySelectorAll('.top-nav-tab.active')].map(b => b.id);
             const live = document.querySelector('[data-section="live-sessions"]');
