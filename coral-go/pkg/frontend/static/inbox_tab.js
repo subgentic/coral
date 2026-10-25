@@ -1,15 +1,12 @@
-/* Inbox tab (#4718, #4811): on every Coral. Where the hub serves the dashboard it is the Coral Hub's /inbox page (what needs the Operator, what was saved) inside the dashboard, in a
- * frame whose address is the constant below: never built from a URL, a hash or a message, and nothing is posted to or read from the frame. On every other Coral the dashboard builds its own Inbox,
- * in the hub's /inbox order: Needs you (the agents waiting for input, from the live list the dashboard already holds, each opening that agent) and Saved for later (saved.js moves the one
- * Saved list in; two tabs, one panel at a time; the top bar's bookmark opens the Inbox at it where the scope is all). The tab carries a badge with the number of agents waiting for input, counted from that list (no
- * request of its own). */
+/* Inbox tab (#4718, #4811, #7472): on every Coral. Where the hub serves the dashboard it is the Coral Hub's /inbox page (what needs the Operator, what was saved) inside the dashboard, in a
+ * frame whose address is the constant below: never built from a URL, a hash or a message, and nothing is posted to or read from the frame. On every other Coral the dashboard builds its own
+ * Inbox on the shared sidebar: three groups, Needs you (the agents waiting for input, from the live list the dashboard already holds, each opening that agent), Tasks and Saved for later, whose names
+ * open a table in the centre (inbox_sidebar.js, loaded the first time the tab is shown). This file is the part that is always loaded: the tab's badge with the number of agents waiting for input,
+ * the three counts, and the announcement of an agent that has just started waiting. */
 
 import { state } from './state.js';
-import { isCloud, sessionServer, keyLabel, identityKey } from './server_base.js';
+import { isCloud, sessionServer } from './server_base.js';
 import { importOnce } from './import_once.js';
-import { browserLocal } from './safe_storage.js';
-import { waitingText } from './waiting_text.js';
-import { pollEvery } from './overload.js';
 import { resolveSessionIdentity, sessionStateInfo } from './session_state.js';
 import './safe_markdown.js'; // the shared Inbox renderer's wrapper: the lazy Inbox modules import it, and a lazy module imports only what loads at startup (import_hygiene)
 
@@ -36,25 +33,24 @@ export function updateInboxTab() {
     const label = n > 0 ? `Inbox, ${n} waiting for input` : null;
     if (tab.getAttribute('aria-label') !== label) { if (label) tab.setAttribute('aria-label', label); else tab.removeAttribute('aria-label'); }
     setInboxCount('needs', n);
-    renderNeedsYou();
+    _hooks.needs?.(); // the Needs you rows, once the sidebar is loaded and while the Inbox is on screen
     announceNewlyWaiting(tab);
 }
 
-// The count on each of the Inbox's three tabs (Needs you, Tasks, Saved), in the tab's name as well as drawn beside it: a screen reader hears "Needs you, 2 waiting" with the tab, not a grey number after it.
-// Only what changed is written (this runs for every message of the feed). A count that is not known yet (the tasks before the first read) or is 0 shows nothing.
-const COUNT_NAMES = { needs: n => `Needs you, ${n} waiting`, tasks: (n, high) => `Tasks, ${n}${high ? `, ${high} high` : ''}`, saved: n => `Saved, ${n}` };
-const _counts = {};
+// The count of each of the Inbox's three groups (Needs you, Tasks, Saved) and how many tasks are high priority. A count that is not known yet (the tasks before the first read) is 0. The sidebar (once
+// it is loaded) draws them in its group headers and tables: it is told through the hooks below.
+const _counts = { needs: 0, tasks: 0, saved: 0 }, _high = { tasks: 0 };
+const _hooks = {};
+/** The Inbox's sidebar (inbox_sidebar.js) tells this file what to call when the list of agents waiting changes (needs) and when a count does (counts). */
+export function onInboxHooks(h) { Object.assign(_hooks, h); }
 export function setInboxCount(kind, n, high = 0) {
-    const tab = document.getElementById(`inbox-tab-${kind}`), box = document.getElementById(`inbox-tab-${kind}-count`);
-    if (!tab || !box || !COUNT_NAMES[kind]) return;
+    if (!(kind in _counts)) return;
     n = Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
-    _counts[kind] = n;
     high = Number.isFinite(high) && high > 0 ? Math.min(Math.floor(high), n) : 0;
-    const text = (n > 99 ? '99+' : n > 0 ? String(n) : '') + (high ? ` · ${high} high` : '');
-    if (box.textContent !== text) box.textContent = text;
-    if (box.hidden !== (n === 0)) box.hidden = n === 0;
-    const name = n > 0 ? COUNT_NAMES[kind](n, high) : null;
-    if (tab.getAttribute('aria-label') !== name) { if (name) tab.setAttribute('aria-label', name); else tab.removeAttribute('aria-label'); }
+    if (_counts[kind] === n && (kind !== 'tasks' || _high.tasks === high)) return;
+    _counts[kind] = n;
+    if (kind === 'tasks') _high.tasks = high;
+    _hooks.counts?.();
 }
 
 let _announced = null; // the agents that were waiting at the last look (null before the first)
@@ -81,98 +77,10 @@ function announceNewlyWaiting(tab) {
 const askOf = s => String(s.waiting_summary || '').replace(/\s+/g, ' ').trim();
 const needsWords = s => { const why = sessionStateInfo(s).label, ask = askOf(s); return ask && ask !== why ? `${why}. ${ask}` : why; };
 
-let _needsKey = null, _needsTimer = 0;
-/** The Needs you list of the dashboard's own Inbox: the agents waiting for input, each a button that opens that agent. Drawn only while that Inbox is on screen, and only when the list changed. */
-function renderNeedsYou(force = false) {
-    const local = document.getElementById('inbox-local');
-    const list = document.getElementById('inbox-needs-list');
-    if (!local || local.hidden || !list) return;
-    const rows = (state.liveSessions || []).filter(s => s && s.waiting_for_input);
-    const key = JSON.stringify(rows.map(s => [sessionServer(s), s.session_id, s.name, s.display_name, s.waiting_kind, s.board_project, s.board_project ? keyLabel(identityKey(sessionServer(s), s.board_project)) : '', askOf(s), s.goal && s.goal.id ? [s.goal.id, s.goal.title, s.goal.board] : 0, waitingText(s.waiting_since)])); // the waiting words change by the minute, so a re-draw follows them; // the team's name is in the key: a label that arrives later redraws the row (#6961)
-    if (!force && key === _needsKey) return;
-    _needsKey = key;
-    if (rows.some(s => s.waiting_since) && !_needsTimer) _needsTimer = pollEvery(() => renderNeedsYou(), 30000); // "waiting 4 min" moves on while the list is open
-    const empty = document.getElementById('inbox-needs-empty');
-    if (empty) empty.hidden = rows.length > 0;
-    const held = list.contains(document.activeElement) ? { id: document.activeElement.dataset.sessionId, goal: document.activeElement.classList.contains('inbox-needs-goal') } : null; // the row the keyboard is on (its goal link too): the minute's redraw must not take it away (#7004)
-    // Built with the DOM: no text from an agent is ever read as markup.
-    list.replaceChildren(...rows.map(s => {
-        const li = document.createElement('li');
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'inbox-needs-item';
-        b.dataset.sessionId = String(s.session_id || '');
-        // One control per row, named "Open <agent> ...": the visible Open is its last word, not a second button inside it.
-        const lead = document.createElement('span'); lead.className = 'sr-only'; lead.textContent = 'Open ';
-        const name = document.createElement('span'); name.className = 'inbox-needs-name'; name.textContent = resolveSessionIdentity(s);
-        const why = document.createElement('span'); why.className = 'inbox-needs-why'; why.textContent = sessionStateInfo(s).label;
-        const head = document.createElement('span'); head.className = 'inbox-needs-head'; head.append(lead, name, why);
-        const wt = waitingText(s.waiting_since); // nothing when the start is unknown
-        if (wt) { const w = document.createElement('span'); w.className = 'inbox-needs-waited'; w.textContent = wt; head.append(w); }
-        if (s.board_project) { const t = document.createElement('span'); t.className = 'inbox-needs-team'; t.textContent = keyLabel(identityKey(sessionServer(s), s.board_project)); head.append(t); }
-        const dir = String(s.working_directory || '').replace(/[\\/]+$/, '').split(/[\\/]/).pop(); // the folder's own name: two agents of one role in two folders are told apart (#7122)
-        if (dir) { const f = document.createElement('span'); f.className = 'inbox-needs-folder'; f.textContent = dir; f.title = String(s.working_directory); head.append(f); }
-        b.append(head);
-        const ask = askOf(s); // the agent's own request, as text (never markup): one line, cut by the CSS to the row's width
-        if (ask && ask !== why.textContent) { const a = document.createElement('span'); a.className = 'inbox-needs-ask'; a.textContent = ask; a.title = ask; b.append(a); }
-        const go = document.createElement('span'); go.className = 'inbox-needs-open'; go.setAttribute('aria-hidden', 'true'); go.textContent = 'Open'; b.append(go);
-        b.addEventListener('click', () => {
-            window.switchNavTab?.('agents');
-            window.selectLiveSession?.(s.name, s.agent_type, s.session_id, sessionServer(s));
-        });
-        li.append(b);
-        if (s.goal && s.goal.id && s.goal.title) { // the goal this agent's task serves, as a quiet link under the row (a link inside the row's button would be a control in a control); nothing without one (#7302)
-            const g = document.createElement('button'); g.type = 'button'; g.className = 'inbox-needs-goal'; g.dataset.sessionId = String(s.session_id || '');
-            g.textContent = `Goal: ${s.goal.title}`;
-            g.title = String(s.goal.title);
-            g.addEventListener('click', () => importOnce('./task_goals.js').then(m => m.openGoalOnBoard(s.goal.board || s.board_project, Number(s.goal.id))).catch(() => {}));
-            li.append(g);
-        }
-        return li;
-    }));
-    if (held) [...list.querySelectorAll(held.goal ? '.inbox-needs-goal' : '.inbox-needs-item')].find(b => b.dataset.sessionId === held.id)?.focus({ preventScroll: true });
-}
+export { askOf, needsWords };
 
-// The two tabs of the dashboard's own Inbox (as the hub's): one panel shows at a time. The chosen tab is kept for this browser (and across a reload) (browserLocal).
-const TAB_KEY = 'coral.inbox.tab';
-const TABS = ['needs', 'tasks', 'saved'];
-let _tab = null;
-const storedTab = () => { const v = browserLocal.get(TAB_KEY); return TABS.includes(v) ? v : 'needs'; };
-/** Which tab the dashboard's own Inbox is on. */
-export const inboxTab = () => _tab || storedTab();
-
-/** Show one tab's panel (and only that one), remember the choice, and load what the panel holds. */
-export function selectInboxTab(name, { focus = false } = {}) {
-    if (!TABS.includes(name)) name = 'needs';
-    _tab = name;
-    browserLocal.set(TAB_KEY, name);
-    for (const t of TABS) {
-        const b = document.getElementById(`inbox-tab-${t}`);
-        const panel = document.getElementById(`inbox-panel-${t}`);
-        if (b) { b.setAttribute('aria-selected', String(t === name)); b.tabIndex = t === name ? 0 : -1; }
-        if (panel && panel.hidden !== (t !== name)) panel.hidden = t !== name;
-    }
-    if (focus) document.getElementById(`inbox-tab-${name}`)?.focus();
-    if (name === 'needs') renderNeedsYou(true);
-    else if (name === 'tasks') importOnce('./inbox_coral.js').then(m => m.refreshTasks()).catch(() => {});
-    else if (!document.getElementById('inbox-local')?.hidden) importOnce('./saved.js').then(m => m.showSavedView()).catch(() => {});
-}
-
-let _tabsWired = false;
-function wireTabs() {
-    if (_tabsWired) return;
-    const list = document.getElementById('inbox-tablist');
-    if (!list) return;
-    _tabsWired = true;
-    for (const t of TABS) document.getElementById(`inbox-tab-${t}`)?.addEventListener('click', () => selectInboxTab(t));
-    list.addEventListener('keydown', e => {
-        const i = TABS.indexOf(inboxTab());
-        const to = e.key === 'ArrowRight' ? (i + 1) % TABS.length : e.key === 'ArrowLeft' ? (i + TABS.length - 1) % TABS.length : e.key === 'Home' ? 0 : e.key === 'End' ? TABS.length - 1 : -1;
-        if (to < 0) return;
-        e.preventDefault();
-        selectInboxTab(TABS[to], { focus: true });
-    });
-}
+/** Which group of the dashboard's own Inbox a caller wants on screen (the Saved button of the top bar brings the Saved group's table up): the Inbox's sidebar opens it. */
+export function selectInboxTab(name) { return importOnce('./inbox_sidebar.js').then(m => m.openInboxGroup(name)); }
 
 /** Called by switchNavTab('hub-inbox'): where the hub serves the dashboard the page is loaded the first time the tab is shown, and kept after; elsewhere the dashboard's own Inbox is drawn. */
 export function showInboxTabContent() {
@@ -181,9 +89,7 @@ export function showInboxTabContent() {
     if (!isCloud()) {
         const local = document.getElementById('inbox-local');
         if (local) local.hidden = false;
-        wireTabs();
-        if (inboxTab() !== 'tasks') importOnce('./inbox_coral.js').then(m => m.refreshTasks()).catch(() => {}); // the Tasks tab's count is known without opening it
-        selectInboxTab(inboxTab()); // the tab it was on (this browser's last choice at first): that panel only is loaded and shown
+        importOnce('./inbox_sidebar.js').then(m => m.showInbox()).catch(() => {}); // the groups, their tables and a task's or a message's page
         return;
     }
     if (document.getElementById('inbox-frame')) return;

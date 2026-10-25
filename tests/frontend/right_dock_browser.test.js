@@ -96,7 +96,7 @@ const BASE = require('./test_base').BASE;
         assert.equal(await ev(`getComputedStyle(document.getElementById('agentic-state')).display`), 'none', 'the sidebar is not shown on Chats');
         assert.equal(await ev(`getComputedStyle(document.getElementById('panel-toggle-btn')).display`), 'none', 'and its button is not either');
         await ev(`document.getElementById('saved-btn').click(); true`);
-        await waitFor(`document.getElementById('saved-view').getClientRects().length > 0 && document.getElementById('saved-view').contains(document.getElementById('saved-ui')) && document.querySelectorAll('#saved-list .saved-item').length === 1`, 'the Saved page', 8000);
+        await waitFor(`(() => { const t = document.getElementById('group-table-view'); return t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved'; })() && true && document.querySelectorAll('#saved-list .saved-item').length === 1`, 'the Saved page', 8000);
         assert.equal(await ev(`getComputedStyle(document.getElementById('agentic-state')).display`), 'none', 'the page has no sidebar beside it');
         await shot('saved-page-from-chats');
         await ev(`switchNavTab('history'); true`);
@@ -146,14 +146,14 @@ const BASE = require('./test_base').BASE;
         await ev(`switchNavTab('history'); true`);
         await waitFor(`document.getElementById('agentic-state').dataset.page === 'chats'`, 'Chats');
         await ev(`document.getElementById('saved-btn').click(); true`); // from Chats: the Saved page
-        await waitFor(`document.getElementById('saved-view').getClientRects().length > 0 && document.querySelectorAll('#saved-list .saved-item').length === 1`, 'the item', 8000);
+        await waitFor(`(() => { const t = document.getElementById('group-table-view'); return t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved'; })() && document.querySelectorAll('#saved-list .saved-item').length === 1`, 'the item', 8000);
         await ev(`document.querySelector('#saved-list .saved-item .btn-primary, #saved-list .saved-item .saved-open').click(); true`);
         await waitFor(`document.getElementById('agentic-state').dataset.page === 'board' && !!document.querySelector('#mb-messages .chat-search-target')`, 'the jump to the board message', 10000);
         d = await dock();
         assert.deepEqual({ open: d.open, active: d.active }, { open: true, active: 'subscribers' }, 'the board\'s sidebar is as the person left it: ' + JSON.stringify(d));
         await waitFor(`!!document.getElementById('saved-jumpbar')`, 'the jump bar', 4000);
         await ev(`document.querySelector('#saved-jumpbar .btn').click(); true`);
-        await waitFor(`document.getElementById('saved-view').getClientRects().length > 0 && document.getElementById('saved-view').contains(document.getElementById('saved-ui'))`, 'Back to Saved: the page it started from', 6000);
+        await waitFor(`(() => { const t = document.getElementById('group-table-view'); return t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved'; })() && true`, 'Back to Saved: the page it started from', 6000);
 
         console.log('10. A phone: the top bar button opens the side panel overlay on the board and in Chats, with that page\'s tabs, and X closes it; Chats has none');
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 2, mobile: true });

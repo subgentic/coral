@@ -313,6 +313,15 @@
 1	history_list.js	typeTag
 1	history_tabs.js	icon
 1	history_tabs.js	statusClass
+1	inbox_sidebar.js	escAttr('n:' + s.session_id)
+1	inbox_sidebar.js	escAttr('t:' + t.project + '#' + t.id)
+1	inbox_sidebar.js	escAttr(here ? ' active' : '')
+1	inbox_sidebar.js	escAttr(s.agent_type)
+1	inbox_sidebar.js	escAttr(s.name)
+1	inbox_sidebar.js	escAttr(s.session_id)
+1	inbox_sidebar.js	escAttr(sessionServer(s))
+1	inbox_sidebar.js	escAttr(t.id)
+1	inbox_sidebar.js	escAttr(t.project)
 2	knowledge_fallback.js	label
 1	launch_core.js	failList
 1	launch_core.js	started
@@ -489,16 +498,19 @@
 1	sidebar_goals.js	items
 1	sidebar_groups.js	CELL_ACTION_ATTR[c.action]
 1	sidebar_groups.js	CHEVRON
+1	sidebar_groups.js	CHIP_ACTION_ATTR[c.action]
 1	sidebar_groups.js	EXTRA_ACTION_ATTR[x.action]
 1	sidebar_groups.js	ROW_ACTION_ATTR[r.action] || ''
 2	sidebar_groups.js	attrs
 1	sidebar_groups.js	c ? escapeHtml(c) : dash
+1	sidebar_groups.js	chipsHtml(t)
 1	sidebar_groups.js	dash
-1	sidebar_groups.js	dataAttrs(c.data)
+2	sidebar_groups.js	dataAttrs(c.data)
 1	sidebar_groups.js	dataAttrs(r.data)
 1	sidebar_groups.js	extraHtml(t.extra)
 1	sidebar_groups.js	head
 1	sidebar_groups.js	rows
+1	sidebar_groups.js	t.chips.filter(c => CHIP_ACTION_ATTR[c.action]).map(c => `<button type="button" class="group-chip" ${CHIP_ACTI
 1	sidebar_rail.js	_RAIL_ICONS[g.kind]
 1	sidebar_rail.js	_railRoleIcon(s)
 1	sidebar_rail.js	badge

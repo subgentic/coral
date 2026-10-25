@@ -52,6 +52,8 @@ A refresh (the tab shown again) keeps the drawn body of an open task, and does n
 
 `mountInbox(host, adapter, { load: false })` does not read the tasks at once (the host calls `refresh()` when the list is shown). `savedExpand(item)` returns `{ root, button, region }`: the "Read the whole message" control for one saved item; the host puts `root` in its item. `destroy()` removes the panel and drops the drafts.
 
+**`only` (optional, #7472).** `mountInbox(host, adapter, { only: { project, id } })` shows one task as a page of its own: the list holds that task alone, open, without its own heading button (the host's page has the title and the link back), and `onCount` is not called. Without `only` everything is as before, so a host that never passes it (Coral Hub's pinned version) is unchanged and the contract number stays 1.
+
 ## Rules the component keeps (Security's conditions on #5750)
 
 - Nothing builds HTML from machine text. Titles, names, counts, errors and reasons are set with `textContent`; the task and message text go through `renderSafe` (the DOM-built renderer: a closed list of tags, no image, links `http`, `https` and `mailto` with the host shown, hidden characters removed, bounded work). `inbox_no_html_census.test.js` is an AST scan of `inbox_panel.js` and `safe_markdown.js` for `innerHTML`, `outerHTML`, `insertAdjacentHTML`, `document.write`, `DOMParser`, `createContextualFragment`, `on*`, `style` and `srcdoc` attributes, `href`/`src` set from anything but `safePath(...)`, `eval`, `Function`, dynamic `import()` and any import from outside `./name.js`.

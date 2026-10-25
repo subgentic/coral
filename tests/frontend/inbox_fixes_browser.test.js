@@ -24,37 +24,40 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await ev(`(() => { const waiting = ['rev-id', 'qa-id']; const entry = window.__m.entry.bind(window.__m);
             window.__m.entry = a => ({ ...entry(a), board_project: a.session_id === 'qa-id' ? ${JSON.stringify(B)} : null, board_job_title: { 'rev-id': 'Reviewer', 'qa-id': 'QA Engineer' }[a.session_id] || '', waiting_for_input: waiting.includes(a.session_id), waiting_kind: waiting.includes(a.session_id) ? 'permission' : null, waiting_summary: a.session_id === 'qa-id' ? 'Run npm test in the frontend folder' : '', working_directory: a.session_id === 'qa-id' ? '/work/coral/tests/frontend' : '/work/coral/coral-go' });
             window.__m.add('rev', 'R', 4, { sleeping: false, session_id: 'rev-id' }); window.__m.add('qa', 'Q', 4, { sleeping: false, session_id: 'qa-id' }); window._coralSetLiveSessions(Object.values(window.__m.agents).map(a => window.__m.entry(a))); return true; })()`);
-        await ev(`document.getElementById('nav-tab-hub-inbox').click(); true`);
-        await waitFor(`document.querySelectorAll('#inbox-needs-list .inbox-needs-item').length === 2`, 'two agents waiting', 10000);
+        await ev(`window.switchNavTab('hub-inbox'); true`);
+        await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2`, 'two agents waiting', 10000);
         // Needs you: the folder beside the agent, the team where there is one, the question when there is one
-        const needs = await ev(`[...document.querySelectorAll('#inbox-needs-list .inbox-needs-item')].map(b => ({ name: b.querySelector('.inbox-needs-name').textContent, folder: (b.querySelector('.inbox-needs-folder') || {}).textContent || '', team: (b.querySelector('.inbox-needs-team') || {}).textContent || '', ask: (b.querySelector('.inbox-needs-ask') || {}).textContent || '' }))`);
+        const needs = await ev(`(() => { const th = [...document.querySelectorAll('#group-table-view thead th')].map(h => h.textContent.trim()); const c = (tr, h) => th.includes(h) ? tr.cells[th.indexOf(h)].textContent.trim() : ''; return [...document.querySelectorAll('#group-table-view tbody tr')].map(tr => ({ name: tr.querySelector('.group-table-link').textContent, folder: c(tr, 'Folder'), team: c(tr, 'Team').replace(/^\u2014none$/, ''), ask: c(tr, 'Asks') })); })()`);
         const qa = needs.find(n => n.name === 'qa'), rev = needs.find(n => n.name === 'rev');
         assert.ok(qa && qa.folder === 'frontend' && qa.team && qa.ask === 'Run npm test in the frontend folder', 'the qa row says its folder, team and question: ' + JSON.stringify(needs));
         assert.ok(rev && rev.folder === 'coral-go' && rev.team === '', 'the rev row says its folder (no team, no question): ' + JSON.stringify(needs));
         // Tasks: priority first, a High chip, the count of high ones on the tab
-        await ev(`document.getElementById('inbox-tab-tasks').click(); true`);
-        await waitFor(`document.querySelectorAll('#inbox-panel-tasks .ibx-task').length === 3`, 'three tasks', 10000);
-        const tasks = await ev(`({ titles: [...document.querySelectorAll('#inbox-panel-tasks .ibx-task-title')].map(t => t.textContent), chips: [...document.querySelectorAll('#inbox-panel-tasks .ibx-task')].map(li => !!li.querySelector('.ibx-chip-high')), tab: document.getElementById('inbox-tab-tasks').getAttribute('aria-label'), box: document.getElementById('inbox-tab-tasks-count').textContent })`);
+        await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('tasks')); true`);
+        await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 3`, 'three tasks', 10000);
+        const tasks = await ev(`({ titles: [...document.querySelectorAll('#group-table-view .group-table-link')].map(t => t.textContent), prio: [...document.querySelectorAll('#group-table-view tbody tr')].map(tr => tr.cells[1].textContent.trim()), count: document.querySelector('#group-table-view .session-group-count').textContent })`);
         assert.deepEqual(tasks.titles, ['Decide: ship 166 with the Windows trace pending?', 'Approve the design', 'Pick the name for the Goals tab'], 'the tasks are ordered by priority: ' + JSON.stringify(tasks));
-        assert.deepEqual(tasks.chips, [true, false, false], 'only the high one has a High chip: ' + JSON.stringify(tasks));
-        assert.ok(/3/.test(tasks.tab) && /1 high/.test(tasks.tab) && /1 high/.test(tasks.box), 'the tab says 3 tasks and 1 high: ' + JSON.stringify(tasks));
+        assert.deepEqual(tasks.prio, ['High', 'Medium', 'Low'], 'the priority column says each one: ' + JSON.stringify(tasks));
+        assert.equal(tasks.count, '3', 'the table says 3 tasks: ' + JSON.stringify(tasks));
         // a task opens: the reply box says the task stays open, and Open the task is a button
-        await ev(`document.querySelector('#inbox-panel-tasks .ibx-task-head').click(); true`);
-        await waitFor(`!!document.querySelector('#inbox-panel-tasks .ibx-reply-label')`, 'the reply box', 8000);
-        const reply = await ev(`(() => { const o = document.querySelector('#inbox-panel-tasks .ibx-open'); return { label: document.querySelector('#inbox-panel-tasks .ibx-reply-label').textContent, oldNote: !!document.querySelector('#inbox-panel-tasks .ibx-note'), openTag: o && o.tagName, openBtn: o && o.classList.contains('btn'), openH: o && Math.round(o.getBoundingClientRect().height) }; })()`);
+        await ev(`document.querySelector('#group-table-view .group-table-link').click(); true`);
+        await waitFor(`!!document.querySelector('#inbox-page .ibx-reply-label')`, 'the reply box', 8000);
+        const reply = await ev(`(() => { const o = document.querySelector('#inbox-page .ibx-open'); return { label: document.querySelector('#inbox-page .ibx-reply-label').textContent, oldNote: !!document.querySelector('#inbox-page .ibx-note'), openTag: o && o.tagName, openBtn: o && o.classList.contains('btn'), openH: o && Math.round(o.getBoundingClientRect().height) }; })()`);
         assert.ok(/task stays open/.test(reply.label) && !reply.oldNote, 'the reply box says the task stays open (once): ' + JSON.stringify(reply));
         assert.ok(reply.openBtn && reply.openH >= 30, 'Open the task is drawn as a button: ' + JSON.stringify(reply));
-        // Saved: the gone sentence once
-        await ev(`document.getElementById('inbox-tab-saved').click(); true`);
-        await waitFor(`document.querySelectorAll('#saved-list .saved-item').length === 3`, 'three saved', 10000);
-        await sleep(400); // sleep-ok: the rows are marked gone from the list's own answer
-        const saved = await ev(`(() => { const rows = [...document.querySelectorAll('#saved-list .saved-item.gone')]; return { gone: rows.length, said: rows.filter(r => { const w = r.querySelector('.why'); return w && !w.hidden && w.textContent.trim(); }).length, tips: rows.map(r => ((r.querySelector('.kind.gone') || {}).title || '').length > 10) }; })()`);
+        // Saved: a message whose transcript is gone says Gone in the table (one word, not a sentence on every row) and says why once, on its own page
+        await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('saved')); true`);
+        await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 3`, 'three saved', 10000);
+        await waitFor(`[...document.querySelectorAll('#group-table-view tbody tr')].every(tr => tr.cells[2].textContent.trim() === 'Gone')`, 'the rows are marked gone from the list\'s own answer', 10000);
+        const saved = await ev(`({ gone: [...document.querySelectorAll('#group-table-view tbody tr')].filter(tr => tr.cells[2].textContent.trim() === 'Gone').length, sentences: document.querySelectorAll('#group-table-view .inbox-saved-why, #group-table-view .why').length, buttons: document.querySelectorAll('#group-table-view .group-table-cell-btn').length })`);
         assert.equal(saved.gone, 3, 'three gone rows: ' + JSON.stringify(saved));
-        assert.equal(saved.said, 1, 'the sentence is said once for the list: ' + JSON.stringify(saved));
-        assert.ok(saved.tips.every(Boolean), 'every Gone chip carries the reason as its tip: ' + JSON.stringify(saved));
-        // the top bar's count is not drawn on the Inbox page, where the tabs have theirs
-        const bar = await ev(`(() => { const c = document.querySelector('#saved-btn .saved-count'); return { exists: !!c, shown: !!c && c.getClientRects().length > 0, tab: document.getElementById('inbox-tab-saved-count').textContent }; })()`);
-        assert.ok(bar.tab === '3' && !bar.shown, 'the top bar does not repeat the Saved count on the Inbox page: ' + JSON.stringify(bar));
+        assert.equal(saved.sentences, 0, 'the sentence is not repeated on the rows: ' + JSON.stringify(saved));
+        await ev(`document.querySelector('#group-table-view .group-table-link').click(); true`);
+        await waitFor(`!!document.querySelector('#inbox-page .inbox-saved-why')`, 'the reason on the page', 8000);
+        assert.equal(await ev(`document.querySelectorAll('#inbox-page .inbox-saved-why').length`), 1, 'the reason is said once on the page');
+        assert.ok((await ev(`document.querySelector('#inbox-page .inbox-saved-why').textContent.trim().length`)) > 10, 'and it is a sentence');
+        // the top bar's count is not drawn on the Inbox page, where the group has its own
+        const bar = await ev(`(() => { const c = document.querySelector('#saved-btn .saved-count'); return { exists: !!c, shown: !!c && c.getClientRects().length > 0, chip: (document.querySelector('.group-chip .group-chip-count') || {}).textContent || '' }; })()`);
+        assert.ok(bar.chip.includes('3') && !bar.shown, 'the top bar does not repeat the Saved count on the Inbox page: ' + JSON.stringify(bar));
         console.log('PASS inbox fixes');
     } finally {
         for (const id of savedIds) await api('DELETE', `/api/saved/${id}`).catch(() => {});

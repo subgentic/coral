@@ -936,3 +936,45 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .session-list .sgroup-header { align-items: center; } /* the list's own rule starts the items at the top: a header's chevron sits level with its name */
 .sgroup-header .group-chevron { margin-left: -6px; }
 @media (pointer: coarse) { .group-table-link, .group-back { min-height: 44px; } }
+
+/* ── The Inbox on the shared sidebar (inbox_sidebar.js, #7472) ── */
+/* A row of the sidebar: a name and one muted line under it (Needs you, Tasks) */
+.sb-row .row-btn { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.sb-row-name { display: block; font-size: var(--fs-md); font-weight: 600; overflow-wrap: anywhere; }
+.sb-row-meta { display: block; font-size: var(--fs-base); font-weight: 400; color: var(--text-secondary); overflow-wrap: anywhere; }
+/* The chips above a table that show one part of a list (Saved: Open and Done, with their counts) */
+.group-table-chips { display: flex; flex-wrap: wrap; gap: var(--space-md); margin: 0 0 var(--space-lg); }
+.group-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 4px 12px; border: 1px solid var(--control-border); border-radius: 999px; background: none; color: var(--text-secondary); font: 500 var(--fs-md)/1.4 var(--font-sans); cursor: pointer; }
+.group-chip:hover { color: var(--text-primary); background: var(--bg-hover); }
+.group-chip[aria-pressed="true"] { color: var(--text-primary); border-color: var(--accent); background: var(--bg-tertiary); }
+.group-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.group-chip-count { font-size: var(--fs-sm); font-weight: 600; color: var(--text-secondary); }
+.group-table-note { margin-top: var(--space-md); }
+@media (pointer: coarse) { .group-chip { min-height: 44px; } .group-table-cell-btn { min-height: 44px; min-width: 44px; } }
+/* An item's page in the Inbox (a task, a saved message): it fills the view, so its pinned bar is at the foot of the screen; the view's padding is taken back so nothing shows under the bar */
+.inbox-page { display: flex; flex-direction: column; flex: 1; box-sizing: border-box; padding: 20px 24px; }
+.inbox-page[hidden] { display: none; }
+.inbox-page > * { flex-shrink: 0; }
+.inbox-page .item-bar { margin-top: auto; bottom: -20px; margin-bottom: -20px; padding-bottom: calc(var(--space-lg) + 20px); }
+.inbox-task-mount { margin-top: var(--space-lg); }
+.item-bar .ibx-saved-toggle { font-size: var(--fs-md); } /* Read the whole message sits in the bar at the size of its neighbours */
+.inbox-saved-snippet { margin: 0 0 var(--space-lg); font-size: var(--fs-lg); line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.inbox-saved-why { margin: 0 0 var(--space-lg); font-size: var(--fs-base); color: var(--text-secondary); }
+.inbox-phone-back { display: none; }
+/* The Inbox on a phone: the pane is the page's list; a task or a message is the screen after it, with a way back */
+#mobile-inbox-list { display: none; }
+@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
+    #mobile-inbox-list { display: block; width: 100%; min-width: 0; } /* a flex item of the view: its own width was its widest row (271 of 390 px) */
+    #inbox-view:not([data-phone-item]) .inbox-local { display: none; }
+    #inbox-view[data-phone-item] #mobile-inbox-list { display: none; }
+    #inbox-view .inbox-phone-back { display: inline-flex; align-items: center; min-height: var(--control-touch-height, 44px); }
+    #inbox-page > .group-back:not(.inbox-phone-back) { display: none; } /* a phone has its own back, to the list */
+    #mobile-inbox-list .sidebar-hide-btn { display: none; } /* the page is the whole screen: there is no column to hide */
+    #mobile-inbox-list .sidebar-header { padding: 12px; }
+    .inbox-page { padding: 12px; }
+    .inbox-page .item-bar { position: static; margin-bottom: 0; padding-bottom: var(--space-lg); }
+    .inbox-saved-actions { flex-wrap: wrap; } /* at 200% text the three buttons do not fit one row: they wrap, none leaves the screen */
+    .inbox-saved-actions .btn { max-width: 100%; white-space: normal; }
+    .inbox-saved-actions .wf-more { flex: 1 1 100%; }
+    .inbox-saved-actions .wf-more-menu { position: static; margin-top: 4px; }
+}

@@ -320,6 +320,7 @@ export const SIDEBAR_PANES = {
     agents: { search: 'Search agents', action: { name: 'launch-show', label: 'New agent' } },
     history: { search: 'Search chats', action: null },
     jobs: { search: 'Search jobs', action: { name: 'job-new', label: 'New job' } },
+    'hub-inbox': { search: 'Search the Inbox', action: null },
     workflows: { search: 'Search workflows', action: { name: 'wf-create', label: 'New workflow' } },
     tokens: { search: 'Search views', action: null }, // Analytics: the tab's name is tokens
     docs: { search: 'Search docs', action: null },

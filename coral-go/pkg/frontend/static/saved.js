@@ -247,8 +247,14 @@ const savedSpec = () => ({
 /** The bar above the list, told the filters, the conversations there are and how many of the tab's messages match (the tab's own total, which a search does not change). */
 function syncBar(shownCount) {
     const host = $('saved-bar');
-    if (!host) return;
-    if (!bar) { bar = buildListBar(savedSpec(), next => { filters = cleanSaved(next); refresh(); }); host.append(bar.node); }
+    if (host) {
+        if (!bar) { bar = buildListBar(savedSpec(), next => { filters = cleanSaved(next); refresh(); }); host.append(bar.node); }
+        syncOneBar(bar, shownCount);
+    }
+    if (inboxBar) syncOneBar(inboxBar, shownCount);
+}
+
+function syncOneBar(bar, shownCount) {
     const refs = [...convTitles.keys()].sort((a, b) => convLabel(a).localeCompare(convLabel(b)));
     if (filters.conv && !refs.includes(filters.conv)) refs.push(filters.conv);
     bar.setOptions('conv', refs, Object.fromEntries(refs.map(r => [r, convLabel(r)])));
@@ -280,6 +286,7 @@ function render() {
         b.tabIndex = t === tab ? 0 : -1;
     }
     $('saved-panel').setAttribute('aria-labelledby', `saved-tab-${tab}`);
+    for (const fn of renderListeners) fn(); // the Inbox's Saved table (inbox_sidebar.js) follows the same list
 }
 
 // What each shown item points at, read from the list's own answer (#5802): the server marks a bookmark whose message is deleted or whose transcript is not on its computer, so the
@@ -390,7 +397,7 @@ function wire() {
 let showing = null;
 export function showSaved() {
     if (showing) return showing; // the tab's switch and the top bar's button can both ask at once
-    placeUi('sidebar'); // the right sidebar's Saved tab: the one list is there (it may have been the full-screen page's)
+    placeUi(); // the right sidebar's Saved tab: the one list is there
     wire();
     checks.clear();
     status('');
@@ -398,13 +405,15 @@ export function showSaved() {
     return showing;
 }
 
-// ── Where the one list is shown (#4811) ──────────────────────────────
-// The list (#saved-ui) is a single component: it lives in the right sidebar's Saved tab (an agent's or a team's page keeps that, scoped), and is moved into the full-screen
-// Saved page (#saved-view) while that is shown, for the scope "all". It is never shown in both.
-function placeUi(where) {
-    const ui = $('saved-ui'), host = $(where === 'view' ? 'saved-view' : 'agentic-panel-saved');
+// ── Where the one list is shown (#4811, #7472) ───────────────────────
+// The list (#saved-ui) is a single component and lives in the right sidebar's Saved tab (an agent's or a team's page keeps that, scoped). The dashboard's own Inbox no longer moves it: it draws the same
+// list as a table of its own on the shared sidebar (inbox_sidebar.js), through the functions above, for the scope "all".
+function placeUi() {
+    const ui = $('saved-ui'), host = $('agentic-panel-saved');
     if (ui && host && ui.parentElement !== host) host.append(ui);
 }
+/** Whether the Inbox's Saved group (its table or a saved message's page) is what the centre shows. */
+const inboxSavedShowing = () => { const t = $('group-table-view'); return !!t && t.style.display !== 'none' && t.dataset.group === 'hub-inbox:saved' || !!$('inbox-page')?.dataset.saved && !$('inbox-page').hidden; };
 
 let _prevTab = 'agents'; // the nav tab the full-screen page was opened from: Escape and the top bar's button return there
 const activeNavTab = () => document.querySelector('.top-nav-tab.active')?.dataset.arg || 'agents';
@@ -413,33 +422,29 @@ const activeNavTab = () => document.querySelector('.top-nav-tab.active')?.datase
 let viewLoad = null;
 export function showSavedView() {
     if (viewLoad) return viewLoad; // the nav tab's switch and the top bar's button can both ask at once
-    placeUi('view');
+    placeUi();
     wire();
     checks.clear();
     status('');
     viewLoad = refresh().finally(() => { viewLoad = null; });
     return viewLoad;
 }
-/** Left the full-screen page: the list goes back to the right sidebar. */
-export function leaveSavedView() { placeUi('sidebar'); }
 
 /** The Inbox at its Saved part: from the top bar's button on any page where the scope is all. A press while it shows goes back to where it was opened from. */
 async function openSavedView({ toggle = false } = {}) {
     if (savedViewShowing()) {
-        const onSaved = !$('inbox-panel-saved')?.hidden;
+        const onSaved = inboxSavedShowing();
         if (toggle && onSaved) { closeSaved(); return; }
-        if (!onSaved) selectInboxTab('saved'); // the Inbox is open on Needs you: the button brings its Saved tab up
-        $('inbox-tab-saved')?.focus({ preventScroll: true }); // the selected tab, no jump; the ring is the browser's: after a key, not after a click
+        if (!onSaved) await selectInboxTab('saved'); // the Inbox is open on another group: the button brings its Saved table up
+        $('group-table-view')?.querySelector('.group-table-link, .group-chip')?.focus();
         return;
     }
     dropJumpBar();
     _prevTab = activeNavTab() === 'hub-inbox' ? _prevTab : activeNavTab();
     wantAllScope(true); // the Inbox is everything's, whatever agent or team is behind it
-    selectInboxTab('saved'); // before the switch: the Inbox opens on its Saved tab
     window.switchNavTab?.('hub-inbox');
-    try { await showSavedView(); } finally { wantAllScope(false); }
-    // The Inbox page as the Inbox tab shows it: no scroll to the list (the same screen either way), and the focus on the Saved sub-tab, not on a button of the list (#7431).
-    $('inbox-tab-saved')?.focus({ preventScroll: true });
+    try { await showSavedView(); await selectInboxTab('saved'); } finally { wantAllScope(false); } // the Inbox at its Saved group
+    $('group-table-view')?.querySelector('.group-table-link, .group-chip')?.focus();
 }
 
 let _before = null; // {open, tab}: the dock as it was when the Saved button opened it
@@ -484,6 +489,59 @@ export async function openSaved({ toggle = false } = {}) {
     wire();
     await showSaved();
     ($('saved-list').querySelector('.btn') || $('saved-tab-open')).focus();
+}
+
+// ── The Inbox's Saved group (#7472) ──────────────────────────────────
+// The dashboard's own Inbox draws this same list as a table on the shared sidebar (inbox_sidebar.js). It reads it through this small surface and changes it through the same functions the list's
+// buttons use, so the Done a table row makes and the Done the right sidebar's list makes are one action, and the two lists never disagree.
+const renderListeners = new Set();
+let inboxBar = null; // the Filters and Sort bar in the Inbox's Display options: the search is the sidebar's own box, so this one has none (spec.noSearch)
+/** fn() is called after every draw of the list. */
+export function onSavedRender(fn) { renderListeners.add(fn); }
+/** What the Inbox shows: the tab's items (Open or Done), both totals, the servers that did not answer, and whether a search or filter is on. */
+export function savedView() {
+    return { tab, totals: { ...totals }, shown: items.filter(i => (tab === 'done') === !!i.done_at), down: [...down], filtered: savedFiltered(filters), query: filters.q || '' };
+}
+/** One item's facts for a row or a page: its words, and what it can do. */
+export function savedItemFacts(it) {
+    const c = chipFor(it), chk = checks.get(uid(it));
+    return { id: uid(it), server: it.server, title: srcLabel(it), snippet: it.snippet || '', saved: ago(it.saved_at), said: it.said_at ? when(it.said_at) : '', done: !!it.done_at,
+        state: chk && chk.state === 'gone' ? 'Gone' : it.done_at ? 'Done' : 'Open', gone: !!(chk && chk.state === 'gone'), noopen: !!(chk && chk.state === 'noopen'), why: chk ? chk.why || '' : '',
+        serverName: multi ? serverName(it.server) : '', which: whichOne(it), open: openLabel(it), chip: c.text, kind: it.kind };
+}
+export const findSavedItem = id => items.find(i => uid(i) === id) || null;
+export function setSavedTab(t) { tab = t === 'done' ? 'done' : 'open'; render(); }
+/** The sidebar's search: the server matches, so it covers every saved message, not only the ones shown. */
+export function setSavedQuery(q) {
+    const next = cleanSaved({ ...filters, q });
+    if (JSON.stringify(next) === JSON.stringify(filters)) return Promise.resolve();
+    filters = next;
+    return refresh();
+}
+/** Read the list now (the Inbox's Saved group was opened), for the scope the Inbox is (everything). */
+export function loadSaved() { checks.clear(); wire(); return refresh(); }
+/** Done or Reopen, Remove, Open: the same actions as the list's buttons (their focus and announcements are the list's own, which the Inbox does not show). */
+export async function savedSetDone(it, done) {
+    const r = await serverFetch(it.server, `/api/saved/${it.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ done }) });
+    if (!r.ok) { showToast('Could not change the saved message', true); return false; }
+    await refresh();
+    savedChanged();
+    return true;
+}
+export async function savedRemove(it) {
+    const r = await serverFetch(it.server, `/api/saved/${it.id}`, { method: 'DELETE' });
+    if (!r.ok && r.status !== 404) { showToast('Could not remove the saved message', true); return false; }
+    await refresh();
+    savedChanged();
+    return true;
+}
+export function savedOpen(it) { return openSavedLink(it); }
+/** The bar for the Inbox's Display options (Filters and Sort; no search), built once into `host`. */
+export function mountInboxSavedBar(host) {
+    if (inboxBar || !host) return;
+    inboxBar = buildListBar({ ...savedSpec(), idp: 'svi', noSearch: true }, next => { filters = cleanSaved({ ...next, q: filters.q }); refresh(); });
+    host.append(inboxBar.node);
+    syncOneBar(inboxBar, savedView().shown.length);
 }
 
 // ── The jump ──────────────────────────────────────────────────────────

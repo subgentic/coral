@@ -283,6 +283,7 @@ registerActions({
     'analytics-view': el => { const key = el.dataset.view; importOnce('./analytics_views.js').then(m => m.selectView(key, { focus: true })).catch(() => {}); },
     'analytics-phone-back': () => { importOnce('./analytics_views.js').then(m => m.phoneBack()).catch(() => {}); },
     'workflows-search-filter': el => { const v = el.value; importOnce('./workflows.js').then(m => m.filterWorkflows(v)).catch(() => {}); }, // the Workflows sidebar's search box is in the page from the start; workflows.js loads with the tab
+    'inbox-search-filter': el => { const v = el.value; importOnce('./inbox_sidebar.js').then(m => m.filterInbox(v)).catch(() => {}); }, // the Inbox sidebar's search box is in the page from the start; inbox_sidebar.js loads with the tab
     'wf-phone-back': () => { importOnce('./workflows.js').then(m => m.workflowsPhoneBack()).catch(() => {}); },
     'wf-build-agent': () => launchWorkflowAgent(),
     'wf-create': () => showWorkflowCreateModal(),
@@ -455,8 +456,6 @@ function switchNavTab(tab, opts = {}) {
     // Clean up any active cost dashboard timer when leaving tokens tab
     stopCostDashboard();
     if (tab !== 'servers') importOnce('./servers_tab.js').then(m => m.leaveServersTab());
-    // Leaving the Inbox: the one Saved list goes back to the right sidebar (#4811). Loaded only if the list is in the page, not on every tab switch.
-    if (tab !== 'hub-inbox' && document.getElementById('saved-view')?.contains(document.getElementById('saved-ui'))) importOnce('./saved.js').then(m => m.leaveSavedView());
     // The URL follows the tab (#3532): a tab the user chose is a history entry. Servers writes its
     // own (it can carry a server); the board tab names no board, so it keeps the URL.
     const TAB_ROUTE = { agents: 'agents', history: 'chats', workflows: 'workflows', jobs: 'jobs', tokens: 'analytics', docs: 'docs' };
@@ -467,7 +466,7 @@ function switchNavTab(tab, opts = {}) {
     }
 
     // Toggle sidebar visibility — full-width views hide the sidebar
-    const fullWidthTabs = new Set(['servers', 'hub-inbox', 'artifacts']); // Workflows and Analytics have their sidebars (#7471, #7473)
+    const fullWidthTabs = new Set(['servers', 'artifacts', ...(isCloud() ? ['hub-inbox'] : [])]); // Workflows, Analytics and the Inbox have their sidebars (#7471, #7473, #7472), except where the hub serves the Inbox as a frame
     const layout = document.querySelector('.layout');
     if (layout) layout.classList.toggle('sidebar-hidden', fullWidthTabs.has(tab));
 

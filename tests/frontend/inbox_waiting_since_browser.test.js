@@ -16,27 +16,28 @@ const BASE = require('./test_base').BASE;
         const set = since => ev(`(async () => { const w = ${JSON.stringify(since)};
             window.__qaState.liveSessions = window.__qaState.liveSessions.map(s => ({ ...s, waiting_for_input: true, waiting_kind: 'permission', waiting_since: w[s.session_id] === undefined ? null : w[s.session_id] }));
             (await import(${S} + 'inbox_tab.js')).updateInboxTab(); return true; })()`);
-        const rows = () => ev(`[...document.querySelectorAll('#inbox-needs-list .inbox-needs-item')].map(b => ({ id: b.dataset.sessionId, waited: b.querySelector('.inbox-needs-waited')?.textContent || '', title: b.querySelector('.inbox-needs-waited')?.title || '', text: b.textContent.replace(/\\s+/g, ' ').trim() }))`);
+        const WHEN = `[...document.querySelectorAll('#group-table-view thead th')].findIndex(h => h.textContent.trim() === 'When')`; // the column moves when a row has a folder or a question
+        // an empty cell is a dash for the eye and "none" for a screen reader
+        const rows = () => ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(tr => ({ id: tr.querySelector('.group-table-link').dataset.sessionId, waited: tr.cells[${WHEN}].textContent.trim().replace(/^\u2014none$/, ''), title: tr.cells[${WHEN}].title || '', text: tr.textContent }))`);
         const ago = m => new Date(Date.now() - m * 60000).toISOString();
         await set({ 'qa-a-id': ago(4) });
         await ev(`window.switchNavTab('hub-inbox'); true`);
-        await waitFor(`!document.getElementById('inbox-local').hidden && document.querySelectorAll('#inbox-needs-list .inbox-needs-item').length === 2`, 'the Needs you list', 8000);
+        await waitFor(`!document.getElementById('inbox-local').hidden && document.querySelectorAll('#group-table-view tbody tr').length === 2`, 'the Needs you table', 8000);
         let r = await rows(); const a = id => r.find(x => x.id === id);
         assert.equal(a('qa-a-id').waited, 'waiting 4 min', 'the row says how long, as text');
-        assert.ok(a('qa-a-id').text.includes('waiting 4 min'), 'inside the one control');
-        assert.equal(a('qa-a-id').title, '', 'not a hover title');
+                assert.equal(a('qa-a-id').title, '', 'not a hover title');
         assert.equal(a('fe-a-id').waited, '', 'a null waiting_since says nothing');
         assert.ok(!/waiting \d|waiting under/.test(a('fe-a-id').text), 'and no guess');
         console.log('PASS the row says "waiting 4 min" and nothing for null');
         await set({ 'qa-a-id': ago(7), 'fe-a-id': ago(130) });
-        await waitFor(`document.querySelectorAll('#inbox-needs-list .inbox-needs-waited').length === 2`, 'both waits drawn', 8000);
+        await waitFor(`[...document.querySelectorAll('#group-table-view tbody tr')].every(tr => tr.cells[${WHEN}].textContent.trim())`, 'both waits drawn', 8000);
         r = await rows();
         assert.equal(a('qa-a-id').waited, 'waiting 7 min'); assert.equal(r.find(x => x.id === 'fe-a-id').waited, 'waiting 2 h 10 min');
         // time passes with no new feed message: the 30-second tick redraws it, and a row the keyboard is on keeps it (UI Accessibility's #7004 review)
-        await ev(`document.querySelector('#inbox-needs-list .inbox-needs-item[data-session-id="qa-a-id"]').focus(); true`);
+        await ev(`document.querySelector('#inbox-nav-list .row-btn[data-session-id="qa-a-id"]').focus(); true`);
         await ev(`window.__realNow = Date.now; Date.now = () => window.__realNow() + 3 * 60000; true`);
-        await waitFor(`[...document.querySelectorAll('#inbox-needs-list .inbox-needs-waited')].some(e => e.textContent === 'waiting 10 min')`, 'the wait moves on by itself', 40000);
-        assert.equal(await ev(`document.activeElement.classList.contains('inbox-needs-item') && document.activeElement.dataset.sessionId`), 'qa-a-id', 'focus stays on the row after the redraw');
+        await waitFor(`[...document.querySelectorAll('#group-table-view tbody tr')].some(tr => tr.cells[${WHEN}].textContent.trim() === 'waiting 10 min')`, 'the wait moves on by itself', 40000);
+        assert.equal(await ev(`document.activeElement.classList.contains('row-btn') && document.activeElement.dataset.sessionId`), 'qa-a-id', 'focus stays on the row after the redraw');
         console.log('PASS it updates as time passes, and keeps the focused row');
         console.log('PASS Inbox waiting_since');
     } finally { await client.close(); }

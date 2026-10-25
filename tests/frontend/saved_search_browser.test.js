@@ -28,14 +28,17 @@ async function run() {
     const { waitFor } = require('./helpers/wait').bind(ev);
     const settle = (cond, label) => waitFor(cond, label, { timeout: 8000 });
     const api = (method, path, body) => ev(`fetch(${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, headers: { 'Content-Type': 'application/json' }, body: ${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'} }).then(async r => ({ status: r.status, body: await r.json().catch(() => null) }))`);
-    const snap = () => ev(`(() => { const bar = document.getElementById('saved-bar'); const rows = [...document.querySelectorAll('#saved-list > li:not(.saved-empty)')];
-        return { shown: !!bar.firstChild && bar.getClientRects().length > 0, count: (bar.querySelector('.list-bar-count') || {}).textContent || '', chips: [...bar.querySelectorAll('.list-bar-chip-text')].map(e => e.textContent), titles: rows.map(r => r.textContent.replace(/\\s+/g, ' ').slice(0, 80)),
-            empty: (document.querySelector('#saved-list > .saved-empty') || {}).textContent || null, tabs: [document.getElementById('saved-count-open').textContent, document.getElementById('saved-count-done').textContent], over: document.documentElement.scrollWidth - document.documentElement.clientWidth }; })()`);
-    const type = async (text) => { await ev(`document.getElementById('sv-search').focus(); true`); await Input.insertText({ text }); };
+    const snap = () => ev(`(() => { const bar = document.getElementById('inbox-saved-bar'), t = document.getElementById('group-table-view'), rows = [...t.querySelectorAll('tbody tr')], n = c => c && c.textContent !== '0' ? '(' + c.textContent + ')' : '';
+        return { shown: !!bar.firstChild, count: (bar.querySelector('.list-bar-count') || {}).textContent || '', chips: [...bar.querySelectorAll('.list-bar-chip-text')].map(e => e.textContent), titles: rows.map(r => r.textContent.replace(/\\s+/g, ' ').slice(0, 80)),
+            empty: (t.querySelector('.empty-line') || {}).textContent || null, note: (t.querySelector('.group-table-note') || {}).textContent || '', tabs: [...t.querySelectorAll('.group-chip .group-chip-count')].map(c => n(c)), over: document.documentElement.scrollWidth - document.documentElement.clientWidth }; })()`);
+    const chip = i => ev(`document.querySelectorAll('#group-table-view .group-chip')[${i}].click(); true`); // Open (0) and Done (1)
+    const setQuery = text => ev(`(() => { const e = document.getElementById('inbox-search'); e.value = ${JSON.stringify(text)}; e.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+    let phone = false; // a phone's table fills the screen and its search box is on the list screen behind it, so the text is set in the box without typing
+    const type = async (text) => { if (phone) return setQuery(text); await ev(`document.getElementById('inbox-search').focus(); true`); await Input.insertText({ text }); }; // the sidebar's one search box, the server matches
     // A filter select's options arrive with the saved list (setOptions), a moment after the rows. Picking a value it does not hold yet sets nothing, so the
     // pick waits for the option itself, not for a chip or a count (#5216: the phone run once picked before sv-a-1 existed). A failure says which it was.
     const pickOption = async (id, value) => {
-        const state = () => ev(`(() => { const s = document.getElementById(${JSON.stringify(id)}); return { options: s ? [...s.options].map(o => o.value) : null, value: s && s.value, chip: document.querySelector('#saved-bar .list-bar-chip-text')?.textContent || null }; })()`);
+        const state = () => ev(`(() => { const s = document.getElementById(${JSON.stringify(id)}); return { options: s ? [...s.options].map(o => o.value) : null, value: s && s.value, chip: document.querySelector('#inbox-saved-bar .list-bar-chip-text')?.textContent || null }; })()`);
         await settle(`(() => { const s = document.getElementById(${JSON.stringify(id)}); return !!s && [...s.options].some(o => o.value === ${JSON.stringify(value)}); })()`, `the option ${value} in ${id}`)
             .catch(async e => { throw new Error(`${e.message} | case: the option was not built | ${JSON.stringify(await state())}`); });
         await pick(id, value);
@@ -62,50 +65,51 @@ async function run() {
 
         for (const [dev, w, h, mobile] of [['desktop', 1280, 800, false], ['phone', 390, 844, true]]) {
             console.log(dev);
+            phone = mobile;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
             await waitFor(`typeof window._coralSetLiveSessions === 'function'`, 'the app hooks', { timeout: 10000 });
-            await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'saved.js'); await m.openSaved(); return true; })()`);
-            await settle(`document.querySelectorAll('#saved-list > li:not(.saved-empty)').length === 4`, 'the four open messages').catch(async e => { throw new Error(e.message + ' | ' + JSON.stringify(await ev(`({ rows: document.querySelectorAll('#saved-list > li').length, text: document.getElementById('saved-list').textContent.slice(0, 200), status: document.getElementById('saved-status').textContent, bar: !!document.getElementById('saved-bar').firstChild })`)) + ' | ' + exceptions.join(' ; ')); });
+            await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'saved.js'); await m.openSaved(); return true; })()`); // the Inbox at Saved: the table, its Open and Done chips, the sidebar's search and Display options (Filters and Sort)
+            await settle(`document.querySelectorAll('#group-table-view tbody tr').length === 4`, 'the four open messages').catch(async e => { throw new Error(e.message + ' | ' + JSON.stringify(await ev(`({ rows: document.querySelectorAll('#saved-list > li').length, text: document.getElementById('saved-list').textContent.slice(0, 200), status: document.getElementById('saved-status').textContent, bar: !!document.getElementById('saved-bar').firstChild })`)) + ' | ' + exceptions.join(' ; ')); });
             let s = await snap();
             check(`${dev}: the bar is between the tabs and the list; the plain list is the 4 open ones (6 saved: 4 open, 2 done)`, s.shown && s.titles.length === 4 && s.count === '4 messages' && s.chips.length === 0 && s.tabs.join() === '(4),(2)', JSON.stringify([s.shown, s.titles.length, s.count, s.tabs]));
 
             await type('retry');
-            await settle(`document.querySelector('#saved-bar .list-bar-count').textContent === '2 of 4'`, 'the search');
+            await settle(`document.querySelector('#inbox-saved-bar .list-bar-count').textContent === '2 of 4'`, 'the search');
             s = await snap();
             check(`${dev}: "retry" matches two of the open ones (titles and snippets), with a chip; the tabs' totals stay`, s.titles.length === 2 && s.chips.join() === 'Search: retry' && s.tabs.join() === '(4),(2)', JSON.stringify([s.titles.length, s.count, s.chips, s.tabs]));
-            await ev(`document.getElementById('saved-tab-done').click(); true`);
-            await settle(`document.querySelector('#saved-bar .list-bar-count').textContent === '1 of 2'`, 'the Done tab');
+            await ev(`document.querySelectorAll('#group-table-view .group-chip')[1].click(); true`);
+            await settle(`document.querySelector('#inbox-saved-bar .list-bar-count').textContent === '1 of 2'`, 'the Done tab');
             s = await snap();
             check(`${dev}: the Done tab has its own match (1 of 2: the Backend Dev note)`, s.titles.length === 1 && /Backend Dev/.test(s.titles[0]), JSON.stringify(s.titles));
-            await ev(`document.getElementById('saved-tab-open').click(); true`);
+            await ev(`document.querySelectorAll('#group-table-view .group-chip')[0].click(); true`);
             await type('zzz-nothing');
-            await settle(`!!document.querySelector('#saved-list > .saved-empty')`, 'the empty line');
+            await settle(`!!document.querySelector('#group-table-view .empty-line')`, 'the empty line');
             s = await snap();
             check(`${dev}: nothing matching says so`, s.empty === 'No saved messages match this search.' && s.shown, JSON.stringify([s.empty, s.count]));
-            await ev(`document.querySelector('#saved-bar .list-bar-clear-q').click(); true`);
-            await settle(`document.querySelectorAll('#saved-list > li:not(.saved-empty)').length === 4`, 'the plain list again');
+            await ev(`document.getElementById('inbox-search').value = ''; document.getElementById('inbox-search').dispatchEvent(new Event('input', { bubbles: true })); true`);
+            await settle(`document.querySelectorAll('#group-table-view tbody tr').length === 4`, 'the plain list again');
 
             await pick('sv-kind', 'board');
-            await settle(`document.querySelector('#saved-bar .list-bar-chip-text')?.textContent === 'Type: Board message' && document.querySelector('#saved-bar .list-bar-count').textContent === '2 of 4'`, 'the board filter');
+            await settle(`document.querySelector('#inbox-saved-bar .list-bar-chip-text')?.textContent === 'Type: Board message' && document.querySelector('#inbox-saved-bar .list-bar-count').textContent === '2 of 4'`, 'the board filter');
             s = await snap();
             check(`${dev}: Type: board message leaves the two open board messages`, s.titles.length === 2 && s.titles.every(t => /team-x/.test(t)) && s.chips.join() === 'Type: Board message', JSON.stringify([s.titles, s.chips]));
             await pick('sv-kind', '');
             const convState = await pickOption('sv-conv', 'sv-a-1');
-            await settle(`document.querySelector('#saved-bar .list-bar-chip-text')?.textContent === 'From: Frontend Dev' && document.querySelector('#saved-bar .list-bar-count').textContent === '2 of 4'`, 'From a conversation')
+            await settle(`document.querySelector('#inbox-saved-bar .list-bar-chip-text')?.textContent === 'From: Frontend Dev' && document.querySelector('#inbox-saved-bar .list-bar-count').textContent === '2 of 4'`, 'From a conversation')
                 .catch(async e => { throw new Error(`${e.message} | case: the option existed but the pick had no effect | ${JSON.stringify(await convState())}`); });
             s = await snap();
             check(`${dev}: From a conversation (by its title) leaves that chat's two, and the chip reads the title`, s.titles.length === 2 && s.titles.every(t => /Frontend Dev/.test(t)) && s.chips.join() === 'From: Frontend Dev', JSON.stringify([s.titles, s.chips]));
-            await ev(`document.querySelector('#saved-bar .list-bar-filter-btn').click(); document.querySelector('#saved-bar .list-bar-clear-all').click(); true`);
-            await settle(`document.querySelector('#saved-bar .list-bar-count').textContent === '4 messages'`, 'Clear all');
+            await ev(`document.querySelector('#inbox-saved-bar .list-bar-filter-btn').click(); document.querySelector('#inbox-saved-bar .list-bar-clear-all').click(); true`);
+            await settle(`document.querySelector('#inbox-saved-bar .list-bar-count').textContent === '4 messages'`, 'Clear all');
 
-            const order = () => ev(`[...document.querySelectorAll('#saved-list > li:not(.saved-empty)')].map(r => r.querySelector('.snip').textContent.replace(/\\s+/g, ' ').slice(0, 40))`); // the snippets: a row's Gone sentence is said once for the list (#7122), so the whole text differs by row
+            const order = () => ev(`[...document.querySelectorAll('#group-table-view tbody .group-table-link')].map(r => r.textContent.replace(/\\s+/g, ' ').slice(0, 40))`); // the snippets: a row's Gone sentence is said once for the list (#7122), so the whole text differs by row
             const newest = await order();
-            await pick('sv-sort', 'oldest');
-            await settle(`(() => { const r = document.querySelector('#saved-list > li:not(.saved-empty)'); return !!r && !/rollout checklist|unrelated/.test(r.textContent); })()`, 'oldest first');
+            await pick('svi-sort', 'oldest');
+            await settle(`(() => { const r = document.querySelector('#group-table-view tbody tr'); return !!r && !/rollout checklist|unrelated/.test(r.textContent); })()`, 'oldest first');
             const oldest = await order();
             check(`${dev}: Oldest saved reverses the order`, JSON.stringify(oldest) === JSON.stringify([...newest].reverse()), JSON.stringify([newest[0], oldest[0]]));
-            await pick('sv-sort', 'newest');
+            await pick('svi-sort', 'newest');
             s = await snap();
             check(`${dev}: nothing scrolls sideways`, s.over <= 0, String(s.over));
         }

@@ -186,6 +186,22 @@ function syncMobileJobsList() {
     }
 }
 
+// The Inbox's lists: the same move (#7472).
+let _inboxHome = null;
+function syncMobileInboxList() {
+    const section = document.querySelector('[data-pane="hub-inbox"]');
+    const host = document.getElementById('mobile-inbox-list');
+    if (!section || !host) return;
+    if (isMobile()) {
+        if (!_inboxHome) _inboxHome = { parent: section.parentElement, next: section.nextSibling };
+        if (section.parentElement !== host) host.appendChild(section);
+    } else if (_inboxHome) {
+        const { parent, next } = _inboxHome;
+        parent.insertBefore(section, next?.parentNode === parent ? next : null);
+        _inboxHome = null;
+    }
+}
+
 // The Workflows list: the same move (#7471).
 let _workflowsHome = null;
 function syncMobileWorkflowsList() {
@@ -488,6 +504,7 @@ export function initMobile() {
     syncMobileDocsList();
     syncMobileWorkflowsList();
     syncMobileAnalyticsList();
+    syncMobileInboxList();
     // Set default tab
     if (isMobile()) {
         switchMobileTab('agents');
@@ -513,6 +530,7 @@ export function initMobile() {
             syncMobileDocsList();
             syncMobileWorkflowsList();
             syncMobileAnalyticsList();
+            syncMobileInboxList();
             const list = document.getElementById('mobile-agent-list');
             const welcome = document.getElementById('welcome-screen');
             if (mobile) {

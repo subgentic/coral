@@ -1,4 +1,4 @@
-// The saved messages' buttons for a person using a screen reader (#6541): every saved item has "Read the whole message", "Done" and "Remove", and four items read as the same three names four times,
+// The saved messages' buttons for a person using a screen reader (#6541, #7472): every saved item has a row link, a "Done" button (the table) and, on its page, "Read the whole message" and "Remove", and four items read as the same names four times,
 // so a person moving through them by button cannot tell which message a press would act on. Each button now says which message it is for (the source and the start of its text), and the name still
 // contains the words on the button (a person speaking "Done" to a voice control is understood). Desktop and a 390 px phone. Drives Chrome over CDP through agent_view_harness.js with the Inbox's
 // stand-in routes (helpers/inbox_world.js).
@@ -17,27 +17,35 @@ const BASE = require('./test_base').BASE;
             await ev(`window.__coralReady.then(() => true)`);
             await ev(INBOX_WORLD);
             await ev(`localStorage.setItem('coral.inbox.tab', 'saved'); window.switchNavTab('hub-inbox'); true`);
-            await waitFor(`document.querySelectorAll('#saved-list .saved-item').length === 4`, `${tag}: four saved items`, 10000);
-            const names = () => ev(`[...document.querySelectorAll('#saved-list .saved-item')].map(li => [...li.querySelectorAll('button')].map(b => ({ name: (b.getAttribute('aria-label') || b.textContent).replace(/\\s+/g, ' ').trim(), visible: [...b.childNodes].filter(n => !(n.classList && n.classList.contains('material-icons'))).map(n => n.textContent).join('').replace(/\\s+/g, ' ').trim() })))`);
+            await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('saved')).then(() => true)`); // a phone opens on the list: the group's name opens its table
+            await waitFor(`document.getElementById('group-table-view').getClientRects().length > 0 && document.querySelectorAll('#group-table-view tbody tr').length === 4`, `${tag}: four saved items`, 10000);
+            const btnNames = sel => ev(`[...document.querySelectorAll(${JSON.stringify(sel)})].map(b => ({ name: (b.getAttribute('aria-label') || b.textContent).replace(/\\s+/g, ' ').trim(), visible: [...b.childNodes].filter(n => !(n.classList && n.classList.contains('material-icons'))).map(n => n.textContent).join('').replace(/\\s+/g, ' ').trim() }))`);
+            const names = async () => [await btnNames('#group-table-view tbody button')]; // the rows' links and their Done buttons
             const check = (rows, when) => {
                 const all = rows.flat().map(b => b.name);
                 assert.deepEqual([...new Set(all.filter((n, i) => all.indexOf(n) !== i))], [], `${tag}, ${when}: no two buttons in the list share a name`);
                 for (const b of rows.flat()) assert.ok(b.name.toLowerCase().includes(b.visible.toLowerCase()), `${tag}, ${when}: "${b.name}" contains its visible words "${b.visible}"`);
             };
             check(await names(), 'closed');
-            // a message opened: the toggle's words change ("Show less") and its name follows
-            await ev(`document.querySelector('#saved-list .ibx-saved-toggle').click(); true`);
-            await waitFor(`document.querySelector('#saved-list .ibx-saved-toggle').getAttribute('aria-expanded') === 'true'`, `${tag}: the message opens`, 5000);
-            check(await names(), 'one message open');
+            // a message's page: Read the whole message and Remove name the message too, and the toggle's words change ("Show less") with its name
+            await ev(`document.querySelector('#group-table-view .group-table-link').click(); true`);
+            await waitFor(`!!document.querySelector('#inbox-page .ibx-saved-toggle')`, `${tag}: the message page`, 8000);
+            const page = async () => [await btnNames('#inbox-page .item-bar button, #inbox-page .item-bar .btn')];
+            check(await page(), 'a message page, closed');
+            await ev(`document.querySelector('#inbox-page .ibx-saved-toggle').click(); true`);
+            await waitFor(`document.querySelector('#inbox-page .ibx-saved-toggle').getAttribute('aria-expanded') === 'true'`, `${tag}: the message opens`, 5000);
+            check(await page(), 'a message page, open');
+            await ev(`document.querySelector('#inbox-page .group-back:not(.inbox-phone-back)').click(); true`);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 4`, `${tag}: back at the table`, 8000);
             // two items from one source that start alike are named apart, and a cut at 40 characters never leaves half an emoji
             // fixed times, so the list's own order (newest saved first) does not depend on the clock
             await ev(`(() => { const real = window.fetch; const mk = (id, snippet) => ({ id, kind: 'agent', ref: 'sess-same', key: String(id).padStart(20, '0'), title: 'Same Agent', snippet, agent_type: 'claude', saved_at: '2026-10-23T10:0' + (9 - (id - 20)) + ':00Z', said_at: '2026-10-23T09:00:00Z' });
                 const items = [mk(21, 'The same first words'), mk(22, 'The same first words'), mk(23, 'x'.repeat(39) + '\u{1F600} and then more words after it')];
                 window.fetch = (u, o = {}) => new URL(String(u), location.origin).pathname === '/api/saved' && (o.method || 'GET').toUpperCase() === 'GET' ? Promise.resolve(new Response(JSON.stringify({ items, open: 3, done: 0 }), { status: 200, headers: { 'content-type': 'application/json' } })) : real(u, o); return true; })()`);
-            await ev(`document.getElementById('inbox-tab-needs').click(); true`); await ev(`document.getElementById('inbox-tab-saved').click(); true`); // the list is read again when the tab is shown
-            await waitFor(`document.querySelectorAll('#saved-list .saved-item').length === 3`, `${tag}: the three items`, 10000);
+            await ev(`import((window.__coralStatic || '/static/') + 'saved.js').then(m => m.loadSaved()).then(() => true)`); // the list is read again
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 3`, `${tag}: the three items`, 10000);
             check(await names(), 'two that start alike');
-            const lone = await ev(`[...document.querySelectorAll('#saved-list .saved-remove')].map(b => b.getAttribute('aria-label'))`);
+            const lone = await ev(`[...document.querySelectorAll('#group-table-view .group-table-cell-btn')].map(b => b.getAttribute('aria-label'))`);
             // told apart by what the names say, not by where the list put them
             const pair = lone.filter(n => /The same first words/.test(n)), single = lone.filter(n => !/The same first words/.test(n));
             assert.deepEqual(pair.map(n => n.slice(-8)).sort(), ['(1 of 2)', '(2 of 2)'], `${tag}: the pair is told apart (${JSON.stringify(lone)})`);

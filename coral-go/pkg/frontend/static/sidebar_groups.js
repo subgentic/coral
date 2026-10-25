@@ -5,7 +5,7 @@
  * this (a team's name opens the team, its chevron folds: group_cards.js); this is the same header for the tabs that have groups of their own (Chats by day, Jobs by state).
  *
  * A tab registers a source: { keys(): the group keys as drawn, redraw(): draws the list again, table(key): { title, columns, rows }, isEmpty(): whether the tab's centre is
- * its empty page, showList() and empty(): back to the tab's own page }. A table may also carry { extra: { action, label, icon, title } }, one action button in its head. A row is { title, action: the delegated action the first cell's button names, data: the data-* values it carries (name: value),
+ * its empty page, showList() and empty(): back to the tab's own page }. A table may also carry { extra: { action, label, icon, title } }, one action button in its head; { chips: [{ action, data, label, count, pressed }], chipsLabel } filter chips above it; { empty: { line, hint } } for the line it is replaced by when it has no row; and { note } a line under it. A row is { title, action: the delegated action the first cell's button names, data: the data-* values it carries (name: value),
  * cells: the other cells as text, or a button { action, data, label, aria } }. */
 import { browserLocal } from './safe_storage.js';
 import { escapeHtml, escapeAttr, showView } from './utils.js';
@@ -75,9 +75,12 @@ let open = null;     // { kind, key }: the table on screen
 const dash = '<span aria-hidden="true">&mdash;</span><span class="sr-only">none</span>'; // an empty cell: the mark is drawn, a reader hears "none" (a span with only an aria-label is not announced)
 
 /** The actions a row's button may name, each as the literal attribute: a source names one of these, never its own text. */
-const ROW_ACTION_ATTR = { 'history-open': 'data-on-click="history-open"', 'board-open': 'data-on-click="board-open"', 'job-select': 'data-on-click="job-select"', 'doc-open': 'data-on-click="doc-open"', 'wf-select': 'data-on-click="wf-select"' };
+const ROW_ACTION_ATTR = { 'history-open': 'data-on-click="history-open"', 'board-open': 'data-on-click="board-open"', 'job-select': 'data-on-click="job-select"', 'doc-open': 'data-on-click="doc-open"', 'wf-select': 'data-on-click="wf-select"',
+    'inbox-agent-open': 'data-on-click="inbox-agent-open"', 'inbox-task-open': 'data-on-click="inbox-task-open"', 'inbox-saved-open': 'data-on-click="inbox-saved-open"' };
 /** The actions a table's own button cell may name (Workflows: Run), the same way. */
-const CELL_ACTION_ATTR = { 'wf-trigger': 'data-on-click="wf-trigger"' };
+const CELL_ACTION_ATTR = { 'wf-trigger': 'data-on-click="wf-trigger"', 'inbox-saved-done': 'data-on-click="inbox-saved-done"', 'inbox-goal-open': 'data-on-click="inbox-goal-open"' };
+/** The filter chips above a table (the Inbox's Saved: Open and Done, with counts), the same way. */
+const CHIP_ACTION_ATTR = { 'inbox-saved-chip': 'data-on-click="inbox-saved-chip"' };
 
 /** The one action a table may carry in its head (Docs: "Copy docs line for agents"), as the literal attribute: a source names one of these. */
 const EXTRA_ACTION_ATTR = { 'docs-copy-agent-line': 'data-on-click="docs-copy-agent-line"', 'wf-build-agent': 'data-on-click="wf-build-agent"' };
@@ -98,12 +101,20 @@ function cellHtml(c) {
     return `<td>${c ? escapeHtml(c) : dash}</td>`;
 }
 
+function chipsHtml(t) {
+    if (!t.chips || !t.chips.length) return '';
+    return `<div class="group-table-chips" role="group" aria-label="${escapeAttr(t.chipsLabel || 'Show')}">${t.chips.filter(c => CHIP_ACTION_ATTR[c.action]).map(c => `<button type="button" class="group-chip" ${CHIP_ACTION_ATTR[c.action]} ${dataAttrs(c.data)} aria-pressed="${escapeAttr(c.pressed ? 'true' : 'false')}">${escapeHtml(c.label)} <span class="group-chip-count">${Number(c.count)}</span></button>`).join('')}</div>`;
+}
+
 function tableHtml(t, kind, key) {
     const head = t.columns.map(c => `<th scope="col">${escapeHtml(c)}</th>`).join('');
     const rows = t.rows.map(r => `<tr><td><button type="button" class="group-table-link" ${ROW_ACTION_ATTR[r.action] || ''} ${dataAttrs(r.data)}>${escapeHtml(r.title)}</button></td>`
         + r.cells.map(cellHtml).join('') + '</tr>').join('');
-    return `<div class="group-table-head"><h2 id="group-table-title" tabindex="-1">${escapeHtml(t.title)}</h2><span class="session-group-count">${t.rows.length}</span>${extraHtml(t.extra)}</div>`
-        + `<div class="group-table-scroll"><table class="group-table" aria-labelledby="group-table-title"><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>`;
+    const top = `<div class="group-table-head"><h2 id="group-table-title" tabindex="-1">${escapeHtml(t.title)}</h2><span class="session-group-count">${t.rows.length}</span>${extraHtml(t.extra)}</div>${chipsHtml(t)}`;
+    // A group with nothing in it says so in one line (its chips, if it has them, stay: they are how the list is widened)
+    if (!t.rows.length && t.empty) return top + `<div class="empty-pane"><p class="empty-line">${escapeHtml(t.empty.line)}</p>${t.empty.hint ? `<p class="empty-hint">${escapeHtml(t.empty.hint)}</p>` : ''}</div>`;
+    return top + `<div class="group-table-scroll"><table class="group-table" aria-labelledby="group-table-title"><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>`
+        + (t.note ? `<p class="empty-hint group-table-note">${escapeHtml(t.note)}</p>` : '');
 }
 
 function drawTable() {
@@ -112,6 +123,7 @@ function drawTable() {
     const t = src && src.table(open.key);
     if (!host || !t) return false;
     const html = (isPhoneLayout() ? `<button type="button" class="btn btn-small group-table-back" data-on-click="sgroup-list" data-kind="${escapeAttr(open.kind)}">Back to the list</button>` : '') + tableHtml(t, open.kind, open.key);
+    host.dataset.group = open.kind + ':' + open.key; // which table is on screen (saved.js asks for the Inbox's Saved)
     if (host.dataset.drawn !== html) { host.innerHTML = html; host.dataset.drawn = html; } // a redraw of what is there would drop the focus from a row the keyboard is on
     return true;
 }

@@ -80,7 +80,7 @@ export function showView(activeId) {
         if (el) el.style.display = id === activeId ? VIEW_DISPLAY[id] : "none";
     }
     const layout = document.querySelector('.layout');
-    if (layout) layout.classList.toggle('sidebar-hidden', FULL_WIDTH_VIEWS.has(activeId));
+    if (layout) layout.classList.toggle('sidebar-hidden', FULL_WIDTH_VIEWS.has(activeId) && !(activeId === 'inbox-view' && !isCloud())); // the Inbox has its pane except as the hub's frame (#7472)
     document.body.classList.toggle('live-session-active', activeId === 'live-session-view');
     // Which CLI the agent page on screen is, for the lines that are about one CLI only (the "Claude is not signed in" line, #6070): its type, or "remote" for an agent on another computer or seen through
     // Coral Hub (this computer's CLI says nothing about it); empty off an agent's page. Plain CSS reads it, so no listener is needed at startup.

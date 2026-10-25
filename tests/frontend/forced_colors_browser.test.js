@@ -88,14 +88,14 @@ const MD = '# Migration plan\n\n## Steps\n\n1. Add the new columns behind a flag
             assert.ok(parseFloat(chips.on) >= 2 && chips.on !== chips.off, 'a pressed toggle is marked by its border colour: ' + JSON.stringify(chips));
             assert.equal(chips.on.split(' ')[0], chips.off.split(' ')[0], 'a toggle keeps its size when pressed: the border is as wide unpressed as pressed: ' + JSON.stringify(chips));
 
-            console.log(`9. ${mode}: the selected Inbox tab is marked and none moves (#5770)`);
-            await ev(`localStorage.removeItem('coral.inbox.tab'); document.getElementById('nav-tab-hub-inbox').click(); true`);
-            await waitFor(`!!document.getElementById('inbox-local') && !document.getElementById('inbox-local').hidden`, 'the Inbox', 8000);
-            const itabs = await ev(`(() => [...document.querySelectorAll('.inbox-tab')].map(b => { const c = getComputedStyle(b); return { sel: b.getAttribute('aria-selected') === 'true', w: c.borderBottomWidth, col: c.borderBottomColor }; }))()`);
+            console.log(`9. ${mode}: the pressed Open or Done chip of the Inbox's Saved table is marked and none moves (#5770, #7472)`);
+            await ev(`localStorage.setItem('coral.inbox.tab', 'saved'); document.getElementById('nav-tab-hub-inbox').click(); true`);
+            await waitFor(`document.querySelectorAll('#group-table-view .group-chip').length === 2 && document.getElementById('group-table-view').getClientRects().length > 0`, 'the Saved chips', 8000);
+            const itabs = await ev(`(() => [...document.querySelectorAll('#group-table-view .group-chip')].map(b => { const c = getComputedStyle(b); return { sel: b.getAttribute('aria-pressed') === 'true', w: c.borderTopWidth, col: c.borderTopColor }; }))()`);
             const isel = itabs.find(x => x.sel), iothers = itabs.filter(x => !x.sel);
-            assert.ok(isel && iothers.length === 2, 'three Inbox tabs: ' + JSON.stringify(itabs));
-            assert.ok(iothers.every(o => o.col !== isel.col), "the selected tab's underline is a colour of its own: " + JSON.stringify(itabs));
-            assert.ok(iothers.every(o => o.w === isel.w) && parseFloat(isel.w) >= 3, 'all the underlines are as wide, so none moves: ' + JSON.stringify(itabs));
+            assert.ok(isel && iothers.length === 1, 'two chips, one pressed: ' + JSON.stringify(itabs));
+            assert.ok(iothers.every(o => o.col !== isel.col), "the pressed chip's border is a colour of its own: " + JSON.stringify(itabs));
+            assert.ok(iothers.every(o => o.w === isel.w) && parseFloat(isel.w) >= 2, 'both borders are as wide, so none moves: ' + JSON.stringify(itabs));
         }
         console.log('7. a comment card that is current or hovered, and an avatar, are marked in forced colors (#5732)');
         for (const dark of [true, false]) {

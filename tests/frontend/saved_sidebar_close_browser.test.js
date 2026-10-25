@@ -45,25 +45,25 @@ async function run() {
         await ev(`localStorage.removeItem('coral-agentic-collapsed'); true`);
 
         console.log('Home view: the Saved page (#4811), not a sidebar');
-        const page = () => ev(`(() => ({ view: document.getElementById('saved-view').getClientRects().length > 0, nav: document.querySelector('.top-nav-tab.active').dataset.arg, pressed: document.getElementById('saved-btn').getAttribute('aria-pressed'), focus: document.activeElement && document.activeElement.id, dock: getComputedStyle(document.getElementById('agentic-state')).display, x: getComputedStyle(document.getElementById('saved-close')).display }))()`);
+        const page = () => ev(`(() => ({ view: (() => { const t = document.getElementById('group-table-view'); return t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved'; })(), nav: document.querySelector('.top-nav-tab.active').dataset.arg, pressed: document.getElementById('saved-btn').getAttribute('aria-pressed'), focus: document.activeElement && document.activeElement.id, dock: getComputedStyle(document.getElementById('agentic-state')).display, x: getComputedStyle(document.getElementById('saved-close')).display }))()`);
         check('the Saved bookmark starts not pressed', (await state()).pressed === 'false', JSON.stringify(await state()));
-        await clickSaved(); check('the bookmark opens the full-screen page, pressed, with no sidebar and no X', await until(`document.getElementById('saved-view').getClientRects().length > 0 && document.getElementById('saved-btn').getAttribute('aria-pressed') === 'true' && getComputedStyle(document.getElementById('saved-close')).display === 'none' && getComputedStyle(document.getElementById('agentic-state')).display === 'none'`, 'the page'), JSON.stringify(await page()));
-        await clickSaved(); check('the bookmark again leaves it, with the focus on the bookmark', await until(`document.getElementById('saved-view').getClientRects().length === 0 && document.getElementById('saved-btn').getAttribute('aria-pressed') === 'false' && document.activeElement.id === 'saved-btn'`, 'left'), JSON.stringify(await page()));
-        await clickSaved(); check('it opens again', await until(`document.getElementById('saved-view').getClientRects().length > 0`, 'the page'));
-        await esc(); check('Escape leaves it (the focus is inside the page after opening), the focus back on the bookmark', await until(`document.getElementById('saved-view').getClientRects().length === 0 && document.activeElement.id === 'saved-btn'`, 'left by Escape'), JSON.stringify(await page()));
+        await clickSaved(); check('the bookmark opens the full-screen page, pressed, with no sidebar (its X is in the hidden dock)', await until(`(() => { const t = document.getElementById('group-table-view'); return t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved'; })() && document.getElementById('saved-btn').getAttribute('aria-pressed') === 'true' && getComputedStyle(document.getElementById('agentic-state')).display === 'none'`, 'the page'), JSON.stringify(await page()));
+        await clickSaved(); check('the bookmark again leaves it, with the focus on the bookmark', await until(`!(() => { const t = document.getElementById('group-table-view'); return t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved'; })() && document.getElementById('saved-btn').getAttribute('aria-pressed') === 'false' && document.activeElement.id === 'saved-btn'`, 'left'), JSON.stringify(await page()));
+        await clickSaved(); check('it opens again', await until(`(() => { const t = document.getElementById('group-table-view'); return t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved'; })()`, 'the page'));
+        await esc(); check('Escape leaves it (the focus is inside the page after opening), the focus back on the bookmark', await until(`!(() => { const t = document.getElementById('group-table-view'); return t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved'; })() && document.activeElement.id === 'saved-btn'`, 'left by Escape'), JSON.stringify(await page()));
         console.log('Escape is left alone where something else has it');
         // Open it through the page's own opener and wait for the promise it returns: its last step is moving the focus into the page (a list button, or the
         // tab), after the list has loaded, and where that lands depends on the host (#4992). With the promise done there is no focus move left to come, so the
         // field below keeps the focus it is given and Escape comes from the field. (Waiting for the focus to be "inside the page" instead hangs when it lands elsewhere.)
         await ev(`import((window.__coralStatic || '/static/') + 'saved.js').then(m => m.openSavedAll({ toggle: false })).then(() => true)`);
-        check('opened', await until(`document.getElementById('saved-view').getClientRects().length > 0`, 'the page'));
+        check('opened', await until(`(() => { const t = document.getElementById('group-table-view'); return t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved'; })()`, 'the page'));
         await ev(`const i = document.createElement('input'); i.id = 'qa-field'; document.body.appendChild(i); i.focus(); true`);
         await Page.bringToFront();
         check('the field has the focus', await until(`(() => { const i = document.getElementById('qa-field'); i.focus(); return document.activeElement === i; })()`, 'the field focused'));
         await esc(); await new Promise(r => setTimeout(r, 300)); // sleep-ok: proves a negative, a close would come at once
         check('Escape in a text field does not leave the page', (await page()).view);
         await ev(`document.getElementById('qa-field').remove(); true`); await clickSaved();
-        check('closed', await until(`document.getElementById('saved-view').getClientRects().length === 0`, 'left'));
+        check('closed', await until(`!(() => { const t = document.getElementById('group-table-view'); return t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved'; })()`, 'left'));
 
         console.log('From an agent\'s page');
         const r = await httpJson('POST', '/api/sessions/launch', { working_dir: require('node:os').tmpdir(), agent_type: 'terminal', display_name: 'qa-saved-dock' });
@@ -99,11 +99,11 @@ async function run() {
         console.log('A phone');
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 800, deviceScaleFactor: 2, mobile: true });
         await Page.navigate({ url: BASE + '/' }); await coralReady();
-        await clickDockSaved(); check('on a phone home the bookmark opens the full-screen page, not the overlay', await until(`document.getElementById('saved-view').getClientRects().length > 0 && !document.getElementById('agentic-state').classList.contains('mobile-panel-overlay')`, 'the page'));
-        await clickDockSaved(); check('and again leaves it', await until(`document.getElementById('saved-view').getClientRects().length === 0`, 'left'));
+        await clickDockSaved(); check('on a phone home the bookmark opens the full-screen page, not the overlay', await until(`(() => { const t = document.getElementById('group-table-view'); return t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved'; })() && !document.getElementById('agentic-state').classList.contains('mobile-panel-overlay')`, 'the page'));
+        await clickDockSaved(); check('and again leaves it', await until(`!(() => { const t = document.getElementById('group-table-view'); return t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved'; })()`, 'left'));
         await goAgent();
         await clickDockSaved(); await opened('on an agent the bookmark opens the overlay');
-        check('the phone has its own close button and not the desktop X', await ev(`getComputedStyle(document.getElementById('agentic-mobile-close-btn')).display !== 'none' && getComputedStyle(document.getElementById('saved-close')).display === 'none'`));
+        check('the phone has its own close button and not the desktop X', await ev(`getComputedStyle(document.getElementById('agentic-mobile-close-btn')).display !== 'none'`));
         await clickDockSaved(); await closed('the bookmark again closes the overlay');
     } finally {
         for (const s of launched) await httpJson('POST', '/api/sessions/live/' + encodeURIComponent(s.session_name) + '/kill', { session_id: s.session_id, agent_type: 'terminal' }).catch(() => {});

@@ -171,7 +171,7 @@ document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape' || e.defaultPrevented || !savedShowing()) return;
     const t = e.target instanceof Element ? e.target : document.body;
     if (t.closest('input, textarea, select, [contenteditable="true"], [role="dialog"], [role="menu"], .modal')) return;
-    if (!(t === document.body || t.closest('#agentic-state, #inbox-view') || t.id === 'saved-btn')) return;
+    if (!(t === document.body || t.closest('#agentic-state, #inbox-view, #group-table-view') || t.id === 'saved-btn')) return;
     e.preventDefault();
     importOnce('./saved.js').then(m => m.closeSaved()).catch(() => {});
 });

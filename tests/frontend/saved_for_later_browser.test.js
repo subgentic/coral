@@ -200,9 +200,9 @@ const hex = i => i.toString(16).padStart(20, '0');
         // The top bar's bookmark is the Inbox's, from an agent's page too (#4905): Enter on it opens the page with the focus on its Saved sub-tab, and pressing it again goes back to the agent.
         await ev(`document.getElementById('saved-btn').focus(); true`);
         await key('Enter', 'Enter', 13);
-        await waitFor(`document.getElementById('saved-view').getClientRects().length > 0 && (document.getElementById('saved-view').contains(document.activeElement) || document.activeElement.id === 'inbox-tab-saved')`, 'the Inbox at Saved with the focus on its Saved sub-tab or inside the list (#7431)', 6000);
+        await waitFor(`(() => { const t = document.getElementById('group-table-view'); return t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved'; })() && document.getElementById('group-table-view').contains(document.activeElement)`, 'the Inbox at Saved with the focus inside it', 6000);
         await ev(`document.getElementById('saved-btn').click(); true`); // pressed again: back to the agent
-        await waitFor(`document.getElementById('saved-view').getClientRects().length === 0`, 'the Inbox left', 6000);
+        await waitFor(`!(() => { const t = document.getElementById('group-table-view'); return t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved'; })()`, 'the Inbox left', 6000);
         await ev(`document.getElementById('agentic-state').classList.add('collapsed'); true`); // the sidebar closed
         await ev(`document.getElementById('agentic-tab-saved').classList.add('tab-hidden'); true`); // and the user hid the Saved tab: the toast's link and Back to Saved still open it
         await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'saved.js'); await m.openSaved(); return true; })()`);
@@ -336,7 +336,7 @@ const hex = i => i.toString(16).padStart(20, '0');
         const mi = await ev(`(() => { const e = document.querySelector('.saved-menu-item'); const r = e.getBoundingClientRect(); return { shown: getComputedStyle(e).display !== 'none' && r.width > 0, h: Math.round(r.height), count: e.querySelector('.saved-count').textContent, text: e.textContent.trim().replace(/\\s+/g, ' ') }; })()`);
         assert.ok(mi.shown && mi.h >= 43 && mi.count === '2' && /^Saved for later/.test(mi.text), 'the menu entry has the count and is a 44 px target: ' + JSON.stringify(mi));
         await ev(`document.querySelector('.saved-menu-item').click(); true`);
-        await waitFor(`document.getElementById('saved-view').getClientRects().length > 0 && document.getElementById('saved-view').contains(document.getElementById('saved-ui'))`, 'the menu entry to open the Inbox at Saved (everything\'s, as the top bar button does)', 8000);
+        await waitFor(`(() => { const t = document.getElementById('group-table-view'); return t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved'; })() && true`, 'the menu entry to open the Inbox at Saved (everything\'s, as the top bar button does)', 8000);
         await shot('saved-menu-phone-200');
         await ev(`document.documentElement.style.fontSize = ''; true`);
         await waitFor(`!document.body.classList.contains('saved-in-menu')`, 'the top bar button to come back at normal text', 6000);

@@ -80,7 +80,9 @@ const SAVED_WORDS = {
  * options.load === false: do not read the tasks at once (the host calls refresh() when the list is shown).
  * options.onCount(n): told how many tasks the list holds after each read (the host shows it on its tab).
  * options.region === false: the root is a plain div, not a region named "Tasks for you" (the host's own panel is named already).
- * @param {HTMLElement} host @param {object} adapter @param {{ load?: boolean, region?: boolean, onCount?: (n: number) => void }} [options]
+ * options.only ({ project, id }, optional, #7472): the host shows ONE task as a page of its own. The list holds that task alone, open, without its own heading button (the host's page has the title and
+ *   the link back), and onCount is not called (the host's count is of the whole list). Without it everything is as it always was; a host that never passes it (Coral Hub's pinned version) is unchanged.
+ * @param {HTMLElement} host @param {object} adapter @param {{ load?: boolean, region?: boolean, onCount?: (n: number) => void, only?: { project: string, id: (string|number) } }} [options]
  */
 export function mountInbox(host, adapter, options) {
     checkAdapter(adapter);
@@ -102,8 +104,9 @@ export function mountInbox(host, adapter, options) {
     const drawn = new Map();
     // The change stamp: updated_at AND revision (an amendment moves the revision, an edit or a claim moves updated_at). A task the list gives either of no value for has no stamp, so it is read again every time.
     const stampOf = t => (t && t.updated_at != null && t.updated_at !== '' && t.revision != null && t.revision !== '' ? `${t.updated_at}#${t.revision}` : '');
+    const only = options && options.only && typeof options.only === 'object' ? options.only : null;
     function taskRow(task) {
-        const li = el('li', 'ibx-task');
+        const li = el('li', only ? 'ibx-task ibx-task-single' : 'ibx-task');
         li.dataset.key = draftKey(task.project, task.id);
         const bodyId = uid('ibx-task-body');
         const head = el('button', 'ibx-task-head');
@@ -144,6 +147,7 @@ export function mountInbox(host, adapter, options) {
             } finally { loading = false; region.removeAttribute('aria-busy'); }
         }
         head.addEventListener('click', () => setOpen(head.getAttribute('aria-expanded') !== 'true', true));
+        if (only) openIds.add(li.dataset.key); // the one task is open from the start
         if (openIds.has(li.dataset.key)) {
             const hit = drawn.get(li.dataset.key);
             if (hit && hit.stamp === stampOf(task)) { region.replaceChildren(...hit.nodes); loaded = true; } // unchanged since it was drawn: the same body, the draft in it as it was
@@ -239,15 +243,16 @@ export function mountInbox(host, adapter, options) {
             const tasks = await adapter.listTasks();
             if (gone) return;
             const RANK = { high: 0, medium: 1, low: 2 }; // priority first, then the newest update (the list's own order, kept by a stable sort) (#7122)
-            const rows = (Array.isArray(tasks) ? [...tasks] : []).sort((a, b) => (RANK[a.priority] ?? 3) - (RANK[b.priority] ?? 3));
+            let rows = (Array.isArray(tasks) ? [...tasks] : []).sort((a, b) => (RANK[a.priority] ?? 3) - (RANK[b.priority] ?? 3));
+            if (only) rows = rows.filter(t => String(t.project) === String(only.project) && String(t.id) === String(only.id));
             const kept = document.activeElement && list.contains(document.activeElement) ? document.activeElement.closest('.ibx-task')?.dataset.key : '';
             const stillListed = new Set(rows.map(t => draftKey(t.project, t.id)));
             for (const k of [...drawn.keys()]) if (!stillListed.has(k)) drawn.delete(k);
             list.replaceChildren(...rows.map(taskRow));
             if (kept) list.querySelector(`.ibx-task[data-key="${CSS.escape(kept)}"] .ibx-task-head`)?.focus(); // a refresh does not take the focus from the task being read
             empty.hidden = rows.length > 0;
-            empty.textContent = rows.length ? '' : 'No assigned tasks.';
-            if (options && typeof options.onCount === 'function') options.onCount(rows.length, rows.filter(t => t.priority === 'high').length);
+            empty.textContent = rows.length ? '' : only ? 'This task is no longer assigned to you.' : 'No assigned tasks.';
+            if (!only && options && typeof options.onCount === 'function') options.onCount(rows.length, rows.filter(t => t.priority === 'high').length);
         } catch (e) {
             if (gone) return;
             list.replaceChildren();

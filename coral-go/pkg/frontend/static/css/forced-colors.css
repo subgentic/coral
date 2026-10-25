@@ -63,16 +63,13 @@
        so one does not change size (and move what is beside it) when it is pressed; only the colour changes. */
     button[aria-pressed] { border-width: 2px; border-style: solid; border-color: ButtonBorder; }
     button[aria-pressed="true"] { border-color: Highlight; }
+    .group-chip[aria-pressed="true"] { border-color: Highlight; } /* the Inbox's Open and Done chips: their own pressed border is a theme colour, forced colours would turn it into text */
     /* Comments (#5711): the current card is raised by a shadow and the hovered one is tinted, both gone here, and each avatar is a coloured circle whose initials are all that is left.
        The current card gets a Highlight border and an inner outline, the hovered one a Highlight border, and the avatar a ring. */
     .ac-card { transition: none; } /* the state is a system colour: it changes at once, not over 120 ms */
     .ac-card.ac-active { border-color: Highlight; outline: 2px solid Highlight; outline-offset: -2px; }
     .ac-card.ac-hover { border-color: Highlight; }
     .ac-avatar { box-sizing: border-box; border: 1px solid CanvasText; }
-    /* The Inbox tabs (#5770): the selected one is an accent underline, a colour. Every tab has the same 4 px underline, in the page colour unless selected, so the selected one is
-       Highlight and none moves. */
-    .inbox-tab { border-bottom-width: 4px; border-bottom-color: Canvas; }
-    .inbox-tab[aria-selected="true"] { border-bottom-color: Highlight; }
     /* @mentions of a board member (#5964): the tint is dropped, the weight stays; a thin border says "mention" and an underline says "you" (the viewer's own name). */
     .mb-mention { border: 1px solid CanvasText; }
     .mb-mention-self { text-decoration: underline; }

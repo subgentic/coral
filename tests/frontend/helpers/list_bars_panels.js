@@ -28,7 +28,7 @@ const mockAgents = (ctx, list) => ctx.ev(`(() => { const jobs = ${JSON.stringify
 
 const PANELS = [];
 
-// ── Inbox, Saved for later tab (the Saved bar's menu open, a filter chip showing; the tabs are one panel at a time, #5126) ──
+// ── Inbox, Saved group (its table and chips; the Saved bar in Display options, its menu open and a filter chip showing, #5126, #7472) ──
 PANELS.push({
     key: 'inbox',
     async prepare(ctx) {
@@ -47,16 +47,17 @@ PANELS.push({
         await ctx.settle(`['qa-a-id', 'fe-a-id'].every(id => (window.__qaState.liveSessions || []).some(s => s.session_id === id))`, 'agents');
         await ctx.ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.updateInboxTab()); true`);
         if (phone) { await ctx.ev(`window.switchNavTab('hub-inbox'); true`); } else await ctx.ev(`document.getElementById('nav-tab-hub-inbox').click(); true`);
-        await ctx.ev(`document.getElementById('inbox-tab-saved').click(); true`);
-        await ctx.settle(`document.querySelectorAll('#saved-list > li:not(.saved-empty)').length >= 4 && document.querySelectorAll('#inbox-needs-list .inbox-needs-item').length === 1`, 'the Inbox');
+        await ctx.ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('saved')).then(() => true)`);
+        await ctx.settle(`document.querySelectorAll('#group-table-view tbody tr').length >= 4 && document.getElementById('group-table-view').getClientRects().length > 0`, 'the Inbox');
         await pick(ctx, '#sv-kind', 'board'); // a Type chip
-        await ctx.settle(`!!document.querySelector('#saved-bar .list-bar-chip')`, 'a chip');
-        await openMenu(ctx, '#saved-bar');
-        return { roots: ['#inbox-view'], focus: ['#sv-search', '#inbox-tab-needs', '#saved-bar .list-bar-filter-btn'] };
+        await ctx.settle(`!!document.querySelector('#inbox-saved-bar .list-bar-chip')`, 'a chip');
+        await ctx.ev(`(() => { const b = document.querySelector('.sidebar-pane[data-pane="hub-inbox"] [data-display-button]'); if (b && b.getClientRects().length) b.click(); return true; })()`); // a phone's table hides the list and its Display options
+        await openMenu(ctx, '#inbox-saved-bar');
+        return { roots: ['#group-table-view', '.sidebar-pane[data-pane="hub-inbox"]'], focus: phone ? ['.group-chip'] : ['#inbox-search', '.group-chip', '#inbox-saved-bar .list-bar-filter-btn'] }; // a phone's table hides the list, its search and Display options
     },
 });
 
-// ── Inbox, Needs you tab (the hub's tabs and the waiting agent's row) ──
+// ── Inbox, Needs you group (its table and the waiting agent's row) ──
 PANELS.push({
     key: 'inbox-needs',
     async show(ctx, { phone }) {
@@ -66,8 +67,9 @@ PANELS.push({
         await ctx.settle(`['qa-a-id', 'fe-a-id'].every(id => (window.__qaState.liveSessions || []).some(s => s.session_id === id))`, 'agents');
         await ctx.ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.updateInboxTab()); true`);
         if (phone) { await ctx.ev(`window.switchNavTab('hub-inbox'); true`); } else await ctx.ev(`document.getElementById('nav-tab-hub-inbox').click(); true`);
-        await ctx.settle(`document.querySelectorAll('#inbox-needs-list .inbox-needs-item').length === 1 && document.getElementById('inbox-needs-list').getClientRects().length > 0`, 'Needs you');
-        return { roots: ['#inbox-view'], focus: ['.inbox-needs-item', '#inbox-tab-saved'] };
+        await ctx.ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
+        await ctx.settle(`document.querySelectorAll('#group-table-view tbody tr').length === 1 && document.getElementById('group-table-view').getClientRects().length > 0`, 'Needs you');
+        return { roots: ['#group-table-view'], focus: ['#group-table-view .group-table-link'] };
     },
 });
 

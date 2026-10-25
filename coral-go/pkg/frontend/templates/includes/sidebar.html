@@ -82,6 +82,14 @@
                     </div>
                 </section>
             </div>
+            <div class="sidebar-pane" data-pane="hub-inbox" hidden>
+                {{ template "includes/sidebar_header" "hub-inbox" }}
+                <section class="sidebar-section" data-section="hub-inbox">
+                    <div class="sidebar-section-body">
+                        <ul id="inbox-nav-list" class="session-list"></ul>
+                    </div>
+                </section>
+            </div>
             <div class="sidebar-pane" data-pane="docs" hidden>
                 {{ template "includes/sidebar_header" "docs" }}
                 <section class="sidebar-section" data-section="docs">
@@ -105,6 +113,7 @@
                         {{ else if eq . "history" }}<input type="search" id="history-search" class="sidebar-search-input" placeholder="Search" autocomplete="off" aria-label="Search chats">
                         {{ else if eq . "jobs" }}<input type="search" id="jobs-search" class="sidebar-search-input" placeholder="Search" autocomplete="off" aria-label="Search jobs" data-on-input="jobs-search-filter">
                         {{ else if eq . "tokens" }}<input type="search" id="analytics-search" class="sidebar-search-input" placeholder="Search" autocomplete="off" aria-label="Search views" data-on-input="analytics-search-filter">
+                        {{ else if eq . "hub-inbox" }}<input type="search" id="inbox-search" class="sidebar-search-input" placeholder="Search" autocomplete="off" aria-label="Search the Inbox" data-on-input="inbox-search-filter">
                         {{ else if eq . "workflows" }}<input type="search" id="workflows-search" class="sidebar-search-input" placeholder="Search" autocomplete="off" aria-label="Search workflows" data-on-input="workflows-search-filter">
                         {{ else }}<input type="search" id="docs-search" class="sidebar-search-input" placeholder="Search" autocomplete="off" aria-label="Search docs" data-on-input="docs-search-filter">{{ end }}
                     </div>
@@ -142,6 +151,7 @@
                         <label class="list-display-option" data-display-row="thinking"><input type="checkbox" id="display-show-thinking" data-display-input="thinking" data-on-change="toggle-show-thinking"> Show thinking level</label>
                     </div>
                     <p class="list-display-hint" data-display-hint role="status" hidden></p>
+                        {{ else if eq . "hub-inbox" }}<div id="inbox-saved-bar" class="inbox-saved-bar"></div><!-- the Saved list's Filters and Sort (saved.js builds the bar here; the search is the box above) -->
                         {{ else }}<div class="hf-row">
                             <label class="hf-label">Group by</label>
                             <div class="hf-toggle-group" role="group" aria-label="Group chats by">

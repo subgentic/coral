@@ -119,10 +119,13 @@ const STUB = `(() => {
         await ev(`window.__coralReady.then(() => true)`);
         await installAudit(ev); await setTheme(ev, theme);
         await ev(STUB);
-        await ev(`localStorage.removeItem('coral.inbox.tab'); document.getElementById('nav-tab-hub-inbox') && (document.getElementById('nav-tab-hub-inbox').click(), true)`);
-        await waitFor(`!!document.getElementById('inbox-local') && !document.getElementById('inbox-local').hidden`, 'the Inbox', 8000);
+        // The component is mounted the way Coral Hub mounts it (the list, no option; #7472 keeps that unchanged): the mounted instance of inbox_coral.js in its host, which this suite shows in the page
+        // (the Inbox's own tab is the sidebar now), and the one Saved list of the right sidebar, shown the same way.
     };
-    const tab = n => ev(`document.getElementById('inbox-tab-${n}').click(); true`);
+    const tab = async n => {
+        if (n === 'tasks') await ev(`(async () => { const m = await import(${S} + 'inbox_coral.js'); const h = document.getElementById('inbox-tasks-host'); h.hidden = false; if (h.parentElement !== document.body) document.body.append(h); m.refreshTasks(); return true; })()`);
+        else if (n === 'saved') await ev(`(async () => { const m = await import(${S} + 'saved.js'); await m.showSaved(); const ui = document.getElementById('saved-ui'); ui.hidden = false; if (ui.parentElement !== document.body) document.body.append(ui); return true; })()`);
+    };
     const rows = () => ev(`[...document.querySelectorAll('#inbox-tasks-host .ibx-task')].map(li => { const h = li.querySelector('.ibx-task-head'); const r = li.querySelector('.ibx-task-body'); return { title: li.querySelector('.ibx-task-title').textContent, meta: li.querySelector('.ibx-task-meta').textContent, expanded: h.getAttribute('aria-expanded'), controls: h.getAttribute('aria-controls'), regionOk: !!r && r.id === h.getAttribute('aria-controls') && !r.hasAttribute('role') && !r.hasAttribute('aria-label'), hidden: r.hidden }; })`);
     const head = i => ev(`document.querySelectorAll('#inbox-tasks-host .ibx-task-head')[${i}].click(); true`);
     const type = (i, text) => ev(`(() => { const t = document.querySelectorAll('#inbox-tasks-host .ibx-reply-input')[${i}]; t.value = ${JSON.stringify(text)}; t.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
@@ -190,7 +193,6 @@ const STUB = `(() => {
             await tab('needs'); await tab('tasks');
             await waitFor(`document.querySelectorAll('#inbox-tasks-host .ibx-task').length === 3 && !!document.querySelector('#inbox-tasks-host .ibx-task-body:not([hidden]) .ibx-reply-input')`, 'the open task is open again', 6000);
             check(`${dev}: leaving the tab and coming back keeps the open task open`, (await ev(`[...document.querySelectorAll('#inbox-tasks-host .ibx-task-head')].map(h => h.getAttribute('aria-expanded')).join()`)) === 'true,false,false');
-            check(`${dev}: the Inbox heading stays while its tabs name the panels`, (await ev(`document.getElementById('inbox-title').textContent`)) === 'Inbox');
             const lv = () => ev(`document.querySelector('#inbox-tasks-host .ibx-live').textContent.trim()`);
             await head(1);
             await waitFor(`!!document.querySelectorAll('#inbox-tasks-host .ibx-task-body')[1].querySelector('.ibx-reply-input')`, 'the second task', 4000);
