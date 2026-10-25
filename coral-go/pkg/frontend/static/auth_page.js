@@ -3,9 +3,8 @@
  * state (data-password-set, data-local on <body>), so this script asks no status question. It talks to #3949's routes:
  * POST /auth/password, POST /auth/password/create, POST /auth/key. A password is any non-empty text and is sent exactly as typed. */
 
-// A static import, not `await importOnce(...)` at the top level: that await held the whole module, and so the form's submit handlers, until a second request for password_rules.js was answered, while the page's load
-// event (readyState complete) came without waiting for it; a Create or Sign in click in that gap was a native GET that put the password in the address bar (#7367).
-import { passwordProblem, strengthOf, retryAfterSeconds, formatCountdown } from './password_rules.js';
+import { importOnce } from './import_once.js';
+const { passwordProblem, strengthOf, retryAfterSeconds, formatCountdown } = await importOnce('./password_rules.js');
 
 const $ = id => document.getElementById(id);
 const passwordSet = document.body.dataset.passwordSet === 'true';

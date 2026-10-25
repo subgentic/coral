@@ -105,7 +105,7 @@ async function freshServer() {
 
         // 1. the first page
         await Page.navigate({ url: s.base + '/' }); await Page.loadEventFired();
-        await waitFor(`!!document.getElementById('create-form') && document.readyState === 'complete'`, `${tag}: the "Create a password" page with its script run`, { timeout: 15000, diag: `document.body.innerText.slice(0, 300)` }); // the form is in the HTML before /static/auth_page.js has run and attached its submit handler: a click before that is a native GET that puts the password in the address (#7367); readyState complete is after every module of the page ran
+        await waitFor(`!!document.getElementById('create-form') && document.documentElement.dataset.authReady === 'true'`, `${tag}: the "Create a password" page with its script run`, { timeout: 15000, diag: `document.body.innerText.slice(0, 300)` }); // the form is in the HTML before auth_page.js (a module that first awaits password_rules.js) has attached its submit handler: a click before that is a native GET that puts the password in the address and reloads the page (#7367); authReady is set when the script has run (auth_page_browser waits on it the same way)
         const anon = await ev(`fetch('/api/sessions/live').then(r => r.status)`);
         assert.ok(anon === 401 || anon === 403, `${tag}: signed out, the agent list is refused (got ${anon})`);
         await ev(`(() => { for (const id of ['password', 'confirm']) { const i = document.getElementById(id); i.value = ${JSON.stringify(PASSWORD)}; i.dispatchEvent(new Event('input', { bubbles: true })); } document.getElementById('submit').click(); return true; })()`);
@@ -198,7 +198,7 @@ async function freshServer() {
         const s = await freshServer(); servers.push(s);
         await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
         await Page.navigate({ url: s.base + '/' }); await Page.loadEventFired();
-        await waitFor(`!!document.getElementById('create-form') && document.readyState === 'complete'`, `${tag}: the "Create a password" page with its script run`, { timeout: 15000, diag: `document.body.innerText.slice(0, 300)` }); // the form is in the HTML before /static/auth_page.js has run and attached its submit handler: a click before that is a native GET that puts the password in the address (#7367); readyState complete is after every module of the page ran
+        await waitFor(`!!document.getElementById('create-form') && document.documentElement.dataset.authReady === 'true'`, `${tag}: the "Create a password" page with its script run`, { timeout: 15000, diag: `document.body.innerText.slice(0, 300)` }); // the form is in the HTML before auth_page.js (a module that first awaits password_rules.js) has attached its submit handler: a click before that is a native GET that puts the password in the address and reloads the page (#7367); authReady is set when the script has run (auth_page_browser waits on it the same way)
         await ev(`(() => { for (const id of ['password', 'confirm']) { const i = document.getElementById(id); i.value = ${JSON.stringify(PASSWORD)}; i.dispatchEvent(new Event('input', { bubbles: true })); } document.getElementById('submit').click(); return true; })()`);
         await waitFor(`!document.getElementById('create-form')`, `${tag}: leaving the password page`, { timeout: 15000, diag: `document.body.innerText.slice(0, 300)` });
         await ready(s);
