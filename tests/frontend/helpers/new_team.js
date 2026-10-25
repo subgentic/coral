@@ -36,10 +36,13 @@ const T = (ev, waitFor) => {
         has: (sel, rx, within = N.team) => ev(`!!window.__nt.find(window.__nt.dlg(${within}), ${JSON.stringify(sel)}, ${rx})`),
         pick: (rx, text, within = N.team) => ev(`(() => { const s = window.__nt.find(window.__nt.dlg(${within}), 'select', ${rx}); if (!s) return false; const o = [...s.options].find(o => ${text}.test(o.textContent)); if (!o) return false; s.value = o.value; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`),
         step: n => waitFor(`/^Step ${n} of 3/.test((() => { const d = window.__nt.dlg(${N.team}); return d ? [...d.querySelectorAll('*')].filter(window.__na.vis).map(e => window.__na.text(e)).filter(x => /^Step \\d of 3: /.test(x)).sort((a, b) => a.length - b.length)[0] || '' : ''; })())`, `step ${n} of 3`, 5000),
+        // to(n): fills what each step needs and presses Next; a step that does not come up says which one, so a setup that fails is not swallowed (#7511: new_team_members had 4 of 9 scenarios red on Windows with an empty log).
         to: async (n, { name = 'alpha', folder = '/work/payments-app', template } = {}) => {
-            await t.type('input', N.teamName, name); await t.type('input', N.folder, folder);
-            if (n >= 2) { await t.click('button', N.next); await t.step(2); if (n === 2 && template) await t.pick(N.template, template); }
-            if (n >= 3) { const tpl = template === undefined ? /Coding/ : template; if (tpl) await t.pick(N.template, tpl); await t.click('button', N.next); await t.step(3); }
+            const need = async (ok, what) => assert_(await ok, `the setup to step ${n} did not come up: ${what}`);
+            const pickTemplate = async tpl => { const names = await ev(`(() => { const s = window.__nt.find(window.__nt.dlg(${N.team}), 'select', ${N.template}); return s ? [...s.options].map(o => o.textContent.trim()) : null; })()`); await need(t.pick(N.template, tpl), `no template named ${tpl} among ${JSON.stringify(names)}`); };
+            await need(t.type('input', N.teamName, name), 'no Team name field'); await need(t.type('input', N.folder, folder), 'no Folder field');
+            if (n >= 2) { await t.click('button', N.next); await t.step(2); if (n === 2 && template) await pickTemplate(template); }
+            if (n >= 3) { const tpl = template === undefined ? /Coding/ : template; if (tpl) await pickTemplate(tpl); await t.click('button', N.next); await t.step(3); }
         },
         rect: () => ev(`(() => { const p = window.__nt.panel(window.__nt.dlg(${N.team})); return p ? window.__na.box(p) : null; })()`),
     };

@@ -30,8 +30,8 @@ const BASE = require('./test_base').BASE;
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installNT(ev); await stubModels(ev);
         await ev(`localStorage.setItem('coral-recent-dirs', JSON.stringify(['/work/payments-app'])); true`);
-        await openNewTeam(ev, waitFor).catch(() => {});
-        await t.to(2, { template: /^Blank/ }).catch(() => {});
+        await openNewTeam(ev, waitFor);
+        await t.to(2, { template: /^Blank/ });
 
         await S.run('a blank team cannot go on: Next is off, a line says "Add an Orchestrator..." with an Add Orchestrator button, and the footer reason "Add an Orchestrator to continue" is said', async () => {
             assert.deepEqual(await roles(), [], 'a blank team has no members');

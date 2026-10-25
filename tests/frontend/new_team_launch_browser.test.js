@@ -31,7 +31,7 @@ const AGENT_KEYS = ['name', 'prompt', 'icon', 'capabilities', 'agent_type', 'mod
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installNT(ev); await stubModels(ev);
         await ev(`localStorage.setItem('coral-recent-dirs', JSON.stringify(['/work/payments-app'])); true`);
         await install_stub(200);
-        await openNewTeam(ev, waitFor).catch(() => {});
+        await openNewTeam(ev, waitFor);
 
         await S.run('a minimal launch (team name, folder, an Orchestrator, Launch team): the request has today\'s keys, working_mode and health_monitor only added, the dialog closes, and the team opens', async () => {
             await t.to(2, { template: /^Blank/ }); await t.click('button', N.addOrch); await settle(250);

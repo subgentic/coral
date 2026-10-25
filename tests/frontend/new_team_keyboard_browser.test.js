@@ -22,7 +22,7 @@ const BASE = require('./test_base').BASE;
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installNT(ev); await stubModels(ev);
         await ev(`localStorage.setItem('coral-recent-dirs', JSON.stringify(['/work/payments-app'])); true`);
-        await openNewTeam(ev, waitFor).catch(() => {});
+        await openNewTeam(ev, waitFor);
 
         await S.run('New team is modal and named: role=dialog, aria-modal=true, name "New team", and the keyboard starts inside it', async () => {
             const d = await ev(`(() => { const d = window.__nt.dlg(${N.team}); return d ? { modal: d.getAttribute('aria-modal'), name: window.__na.name(d) } : null; })()`);

@@ -31,7 +31,7 @@ const BASE = require('./test_base').BASE;
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installNT(ev); await stubModels(ev);
         await ev(`localStorage.setItem('coral-recent-dirs', JSON.stringify(['/work/payments-app', '/work/website', '/work/docs'])); true`);
-        await openNewTeam(ev, waitFor).catch(() => {});
+        await openNewTeam(ev, waitFor);
 
         await S.run('the dialog is a role=dialog named exactly "New team" and opens on "Step 1 of 3: Name and where it launches"', async () => {
             assert.ok(await ev(`!!window.__nt.dlg(${N.team})`), 'no role=dialog named "New team"');
