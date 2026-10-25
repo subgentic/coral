@@ -1,0 +1,320 @@
+goal write | enforced=false | Coral Hub as the operator | claim="   " | allowed=false actor="" status=400
+goal write | enforced=false | Coral Hub as the operator | claim="  Orchestrator A  " | allowed=true actor="Orchestrator A" status=0
+goal write | enforced=false | Coral Hub as the operator | claim="" | allowed=false actor="" status=400
+goal write | enforced=false | Coral Hub as the operator | claim="Dev A" | allowed=true actor="Dev A" status=0
+goal write | enforced=false | Coral Hub as the operator | claim="Nobody" | allowed=true actor="Nobody" status=0
+goal write | enforced=false | Coral Hub as the operator | claim="Operator" | allowed=true actor="Operator" status=0
+goal write | enforced=false | Coral Hub as the operator | claim="Orchestrator A" | allowed=true actor="Orchestrator A" status=0
+goal write | enforced=false | Coral Hub as the operator | claim="Orchestrator B" | allowed=true actor="Orchestrator B" status=0
+goal write | enforced=false | Coral Hub as the operator | claim="operator" | allowed=true actor="operator" status=0
+goal write | enforced=false | Coral Hub as the operator | claim="orchestrator a" | allowed=true actor="orchestrator a" status=0
+goal write | enforced=false | a Hub user | claim="   " | allowed=false actor="" status=400
+goal write | enforced=false | a Hub user | claim="  Orchestrator A  " | allowed=true actor="Orchestrator A" status=0
+goal write | enforced=false | a Hub user | claim="" | allowed=false actor="" status=400
+goal write | enforced=false | a Hub user | claim="Dev A" | allowed=false actor="" status=403
+goal write | enforced=false | a Hub user | claim="Nobody" | allowed=false actor="" status=403
+goal write | enforced=false | a Hub user | claim="Operator" | allowed=true actor="Operator" status=0
+goal write | enforced=false | a Hub user | claim="Orchestrator A" | allowed=true actor="Orchestrator A" status=0
+goal write | enforced=false | a Hub user | claim="Orchestrator B" | allowed=false actor="" status=403
+goal write | enforced=false | a Hub user | claim="operator" | allowed=false actor="" status=403
+goal write | enforced=false | a Hub user | claim="orchestrator a" | allowed=false actor="" status=403
+goal write | enforced=false | a joining token (no name) | claim="   " | allowed=false actor="" status=400
+goal write | enforced=false | a joining token (no name) | claim="  Orchestrator A  " | allowed=true actor="Orchestrator A" status=0
+goal write | enforced=false | a joining token (no name) | claim="" | allowed=false actor="" status=400
+goal write | enforced=false | a joining token (no name) | claim="Dev A" | allowed=false actor="" status=403
+goal write | enforced=false | a joining token (no name) | claim="Nobody" | allowed=false actor="" status=403
+goal write | enforced=false | a joining token (no name) | claim="Operator" | allowed=true actor="Operator" status=0
+goal write | enforced=false | a joining token (no name) | claim="Orchestrator A" | allowed=true actor="Orchestrator A" status=0
+goal write | enforced=false | a joining token (no name) | claim="Orchestrator B" | allowed=false actor="" status=403
+goal write | enforced=false | a joining token (no name) | claim="operator" | allowed=false actor="" status=403
+goal write | enforced=false | a joining token (no name) | claim="orchestrator a" | allowed=false actor="" status=403
+goal write | enforced=false | a worker's token | claim="   " | allowed=false actor="" status=400
+goal write | enforced=false | a worker's token | claim="  Orchestrator A  " | allowed=true actor="Orchestrator A" status=0
+goal write | enforced=false | a worker's token | claim="" | allowed=false actor="" status=400
+goal write | enforced=false | a worker's token | claim="Dev A" | allowed=false actor="" status=403
+goal write | enforced=false | a worker's token | claim="Nobody" | allowed=false actor="" status=403
+goal write | enforced=false | a worker's token | claim="Operator" | allowed=true actor="Operator" status=0
+goal write | enforced=false | a worker's token | claim="Orchestrator A" | allowed=true actor="Orchestrator A" status=0
+goal write | enforced=false | a worker's token | claim="Orchestrator B" | allowed=false actor="" status=403
+goal write | enforced=false | a worker's token | claim="operator" | allowed=false actor="" status=403
+goal write | enforced=false | a worker's token | claim="orchestrator a" | allowed=false actor="" status=403
+goal write | enforced=false | another team's orchestrator | claim="   " | allowed=false actor="" status=400
+goal write | enforced=false | another team's orchestrator | claim="  Orchestrator A  " | allowed=true actor="Orchestrator A" status=0
+goal write | enforced=false | another team's orchestrator | claim="" | allowed=false actor="" status=400
+goal write | enforced=false | another team's orchestrator | claim="Dev A" | allowed=false actor="" status=403
+goal write | enforced=false | another team's orchestrator | claim="Nobody" | allowed=false actor="" status=403
+goal write | enforced=false | another team's orchestrator | claim="Operator" | allowed=true actor="Operator" status=0
+goal write | enforced=false | another team's orchestrator | claim="Orchestrator A" | allowed=true actor="Orchestrator A" status=0
+goal write | enforced=false | another team's orchestrator | claim="Orchestrator B" | allowed=false actor="" status=403
+goal write | enforced=false | another team's orchestrator | claim="operator" | allowed=false actor="" status=403
+goal write | enforced=false | another team's orchestrator | claim="orchestrator a" | allowed=false actor="" status=403
+goal write | enforced=false | no identity layer (a claim) | claim="   " | allowed=false actor="" status=400
+goal write | enforced=false | no identity layer (a claim) | claim="  Orchestrator A  " | allowed=true actor="Orchestrator A" status=0
+goal write | enforced=false | no identity layer (a claim) | claim="" | allowed=false actor="" status=400
+goal write | enforced=false | no identity layer (a claim) | claim="Dev A" | allowed=false actor="" status=403
+goal write | enforced=false | no identity layer (a claim) | claim="Nobody" | allowed=false actor="" status=403
+goal write | enforced=false | no identity layer (a claim) | claim="Operator" | allowed=true actor="Operator" status=0
+goal write | enforced=false | no identity layer (a claim) | claim="Orchestrator A" | allowed=true actor="Orchestrator A" status=0
+goal write | enforced=false | no identity layer (a claim) | claim="Orchestrator B" | allowed=false actor="" status=403
+goal write | enforced=false | no identity layer (a claim) | claim="operator" | allowed=false actor="" status=403
+goal write | enforced=false | no identity layer (a claim) | claim="orchestrator a" | allowed=false actor="" status=403
+goal write | enforced=false | orchestrator's token | claim="   " | allowed=false actor="" status=400
+goal write | enforced=false | orchestrator's token | claim="  Orchestrator A  " | allowed=true actor="Orchestrator A" status=0
+goal write | enforced=false | orchestrator's token | claim="" | allowed=false actor="" status=400
+goal write | enforced=false | orchestrator's token | claim="Dev A" | allowed=false actor="" status=403
+goal write | enforced=false | orchestrator's token | claim="Nobody" | allowed=false actor="" status=403
+goal write | enforced=false | orchestrator's token | claim="Operator" | allowed=true actor="Operator" status=0
+goal write | enforced=false | orchestrator's token | claim="Orchestrator A" | allowed=true actor="Orchestrator A" status=0
+goal write | enforced=false | orchestrator's token | claim="Orchestrator B" | allowed=false actor="" status=403
+goal write | enforced=false | orchestrator's token | claim="operator" | allowed=false actor="" status=403
+goal write | enforced=false | orchestrator's token | claim="orchestrator a" | allowed=false actor="" status=403
+goal write | enforced=false | the Operator (cookie, key) | claim="   " | allowed=false actor="" status=400
+goal write | enforced=false | the Operator (cookie, key) | claim="  Orchestrator A  " | allowed=true actor="Orchestrator A" status=0
+goal write | enforced=false | the Operator (cookie, key) | claim="" | allowed=false actor="" status=400
+goal write | enforced=false | the Operator (cookie, key) | claim="Dev A" | allowed=true actor="Dev A" status=0
+goal write | enforced=false | the Operator (cookie, key) | claim="Nobody" | allowed=true actor="Nobody" status=0
+goal write | enforced=false | the Operator (cookie, key) | claim="Operator" | allowed=true actor="Operator" status=0
+goal write | enforced=false | the Operator (cookie, key) | claim="Orchestrator A" | allowed=true actor="Orchestrator A" status=0
+goal write | enforced=false | the Operator (cookie, key) | claim="Orchestrator B" | allowed=true actor="Orchestrator B" status=0
+goal write | enforced=false | the Operator (cookie, key) | claim="operator" | allowed=true actor="operator" status=0
+goal write | enforced=false | the Operator (cookie, key) | claim="orchestrator a" | allowed=true actor="orchestrator a" status=0
+goal write | enforced=true | Coral Hub as the operator | claim="   " | allowed=true actor="   " status=0
+goal write | enforced=true | Coral Hub as the operator | claim="  Orchestrator A  " | allowed=true actor="  Orchestrator A  " status=0
+goal write | enforced=true | Coral Hub as the operator | claim="" | allowed=false actor="" status=400
+goal write | enforced=true | Coral Hub as the operator | claim="Dev A" | allowed=true actor="Dev A" status=0
+goal write | enforced=true | Coral Hub as the operator | claim="Nobody" | allowed=true actor="Nobody" status=0
+goal write | enforced=true | Coral Hub as the operator | claim="Operator" | allowed=true actor="Operator" status=0
+goal write | enforced=true | Coral Hub as the operator | claim="Orchestrator A" | allowed=true actor="Orchestrator A" status=0
+goal write | enforced=true | Coral Hub as the operator | claim="Orchestrator B" | allowed=true actor="Orchestrator B" status=0
+goal write | enforced=true | Coral Hub as the operator | claim="operator" | allowed=true actor="operator" status=0
+goal write | enforced=true | Coral Hub as the operator | claim="orchestrator a" | allowed=true actor="orchestrator a" status=0
+goal write | enforced=true | a Hub user | claim="   " | allowed=false actor="" status=403
+goal write | enforced=true | a Hub user | claim="  Orchestrator A  " | allowed=false actor="" status=403
+goal write | enforced=true | a Hub user | claim="" | allowed=false actor="" status=400
+goal write | enforced=true | a Hub user | claim="Dev A" | allowed=false actor="" status=403
+goal write | enforced=true | a Hub user | claim="Nobody" | allowed=false actor="" status=403
+goal write | enforced=true | a Hub user | claim="Operator" | allowed=false actor="" status=403
+goal write | enforced=true | a Hub user | claim="Orchestrator A" | allowed=true actor="Orchestrator A" status=0
+goal write | enforced=true | a Hub user | claim="Orchestrator B" | allowed=false actor="" status=403
+goal write | enforced=true | a Hub user | claim="operator" | allowed=false actor="" status=403
+goal write | enforced=true | a Hub user | claim="orchestrator a" | allowed=false actor="" status=403
+goal write | enforced=true | a joining token (no name) | claim="   " | allowed=false actor="" status=403
+goal write | enforced=true | a joining token (no name) | claim="  Orchestrator A  " | allowed=false actor="" status=403
+goal write | enforced=true | a joining token (no name) | claim="" | allowed=false actor="" status=403
+goal write | enforced=true | a joining token (no name) | claim="Dev A" | allowed=false actor="" status=403
+goal write | enforced=true | a joining token (no name) | claim="Nobody" | allowed=false actor="" status=403
+goal write | enforced=true | a joining token (no name) | claim="Operator" | allowed=false actor="" status=403
+goal write | enforced=true | a joining token (no name) | claim="Orchestrator A" | allowed=false actor="" status=403
+goal write | enforced=true | a joining token (no name) | claim="Orchestrator B" | allowed=false actor="" status=403
+goal write | enforced=true | a joining token (no name) | claim="operator" | allowed=false actor="" status=403
+goal write | enforced=true | a joining token (no name) | claim="orchestrator a" | allowed=false actor="" status=403
+goal write | enforced=true | a worker's token | claim="   " | allowed=false actor="" status=403
+goal write | enforced=true | a worker's token | claim="  Orchestrator A  " | allowed=false actor="" status=403
+goal write | enforced=true | a worker's token | claim="" | allowed=false actor="" status=403
+goal write | enforced=true | a worker's token | claim="Dev A" | allowed=false actor="" status=403
+goal write | enforced=true | a worker's token | claim="Nobody" | allowed=false actor="" status=403
+goal write | enforced=true | a worker's token | claim="Operator" | allowed=false actor="" status=403
+goal write | enforced=true | a worker's token | claim="Orchestrator A" | allowed=false actor="" status=403
+goal write | enforced=true | a worker's token | claim="Orchestrator B" | allowed=false actor="" status=403
+goal write | enforced=true | a worker's token | claim="operator" | allowed=false actor="" status=403
+goal write | enforced=true | a worker's token | claim="orchestrator a" | allowed=false actor="" status=403
+goal write | enforced=true | another team's orchestrator | claim="   " | allowed=false actor="" status=403
+goal write | enforced=true | another team's orchestrator | claim="  Orchestrator A  " | allowed=false actor="" status=403
+goal write | enforced=true | another team's orchestrator | claim="" | allowed=false actor="" status=403
+goal write | enforced=true | another team's orchestrator | claim="Dev A" | allowed=false actor="" status=403
+goal write | enforced=true | another team's orchestrator | claim="Nobody" | allowed=false actor="" status=403
+goal write | enforced=true | another team's orchestrator | claim="Operator" | allowed=false actor="" status=403
+goal write | enforced=true | another team's orchestrator | claim="Orchestrator A" | allowed=false actor="" status=403
+goal write | enforced=true | another team's orchestrator | claim="Orchestrator B" | allowed=false actor="" status=403
+goal write | enforced=true | another team's orchestrator | claim="operator" | allowed=false actor="" status=403
+goal write | enforced=true | another team's orchestrator | claim="orchestrator a" | allowed=false actor="" status=403
+goal write | enforced=true | no identity layer (a claim) | claim="   " | allowed=false actor="" status=403
+goal write | enforced=true | no identity layer (a claim) | claim="  Orchestrator A  " | allowed=false actor="" status=403
+goal write | enforced=true | no identity layer (a claim) | claim="" | allowed=false actor="" status=403
+goal write | enforced=true | no identity layer (a claim) | claim="Dev A" | allowed=false actor="" status=403
+goal write | enforced=true | no identity layer (a claim) | claim="Nobody" | allowed=false actor="" status=403
+goal write | enforced=true | no identity layer (a claim) | claim="Operator" | allowed=false actor="" status=403
+goal write | enforced=true | no identity layer (a claim) | claim="Orchestrator A" | allowed=false actor="" status=403
+goal write | enforced=true | no identity layer (a claim) | claim="Orchestrator B" | allowed=false actor="" status=403
+goal write | enforced=true | no identity layer (a claim) | claim="operator" | allowed=false actor="" status=403
+goal write | enforced=true | no identity layer (a claim) | claim="orchestrator a" | allowed=false actor="" status=403
+goal write | enforced=true | orchestrator's token | claim="   " | allowed=true actor="Orchestrator A" status=0
+goal write | enforced=true | orchestrator's token | claim="  Orchestrator A  " | allowed=true actor="Orchestrator A" status=0
+goal write | enforced=true | orchestrator's token | claim="" | allowed=true actor="Orchestrator A" status=0
+goal write | enforced=true | orchestrator's token | claim="Dev A" | allowed=true actor="Orchestrator A" status=0
+goal write | enforced=true | orchestrator's token | claim="Nobody" | allowed=true actor="Orchestrator A" status=0
+goal write | enforced=true | orchestrator's token | claim="Operator" | allowed=true actor="Orchestrator A" status=0
+goal write | enforced=true | orchestrator's token | claim="Orchestrator A" | allowed=true actor="Orchestrator A" status=0
+goal write | enforced=true | orchestrator's token | claim="Orchestrator B" | allowed=true actor="Orchestrator A" status=0
+goal write | enforced=true | orchestrator's token | claim="operator" | allowed=true actor="Orchestrator A" status=0
+goal write | enforced=true | orchestrator's token | claim="orchestrator a" | allowed=true actor="Orchestrator A" status=0
+goal write | enforced=true | the Operator (cookie, key) | claim="   " | allowed=true actor="Operator" status=0
+goal write | enforced=true | the Operator (cookie, key) | claim="  Orchestrator A  " | allowed=true actor="Operator" status=0
+goal write | enforced=true | the Operator (cookie, key) | claim="" | allowed=true actor="Operator" status=0
+goal write | enforced=true | the Operator (cookie, key) | claim="Dev A" | allowed=true actor="Operator" status=0
+goal write | enforced=true | the Operator (cookie, key) | claim="Nobody" | allowed=true actor="Operator" status=0
+goal write | enforced=true | the Operator (cookie, key) | claim="Operator" | allowed=true actor="Operator" status=0
+goal write | enforced=true | the Operator (cookie, key) | claim="Orchestrator A" | allowed=true actor="Operator" status=0
+goal write | enforced=true | the Operator (cookie, key) | claim="Orchestrator B" | allowed=true actor="Operator" status=0
+goal write | enforced=true | the Operator (cookie, key) | claim="operator" | allowed=true actor="Operator" status=0
+goal write | enforced=true | the Operator (cookie, key) | claim="orchestrator a" | allowed=true actor="Operator" status=0
+request send | enforced=false | Coral Hub as the operator | claim="   " | allowed=false actor="" status=400
+request send | enforced=false | Coral Hub as the operator | claim="  Orchestrator A  " | allowed=true actor="Orchestrator A" status=0
+request send | enforced=false | Coral Hub as the operator | claim="" | allowed=false actor="" status=400
+request send | enforced=false | Coral Hub as the operator | claim="Dev A" | allowed=true actor="Dev A" status=0
+request send | enforced=false | Coral Hub as the operator | claim="Nobody" | allowed=true actor="Nobody" status=0
+request send | enforced=false | Coral Hub as the operator | claim="Operator" | allowed=true actor="Operator" status=0
+request send | enforced=false | Coral Hub as the operator | claim="Orchestrator A" | allowed=true actor="Orchestrator A" status=0
+request send | enforced=false | Coral Hub as the operator | claim="Orchestrator B" | allowed=true actor="Orchestrator B" status=0
+request send | enforced=false | Coral Hub as the operator | claim="operator" | allowed=true actor="operator" status=0
+request send | enforced=false | Coral Hub as the operator | claim="orchestrator a" | allowed=true actor="orchestrator a" status=0
+request send | enforced=false | a Hub user | claim="   " | allowed=false actor="" status=400
+request send | enforced=false | a Hub user | claim="  Orchestrator A  " | allowed=true actor="Orchestrator A" status=0
+request send | enforced=false | a Hub user | claim="" | allowed=false actor="" status=400
+request send | enforced=false | a Hub user | claim="Dev A" | allowed=false actor="" status=403
+request send | enforced=false | a Hub user | claim="Nobody" | allowed=false actor="" status=403
+request send | enforced=false | a Hub user | claim="Operator" | allowed=true actor="Operator" status=0
+request send | enforced=false | a Hub user | claim="Orchestrator A" | allowed=true actor="Orchestrator A" status=0
+request send | enforced=false | a Hub user | claim="Orchestrator B" | allowed=false actor="" status=403
+request send | enforced=false | a Hub user | claim="operator" | allowed=false actor="" status=403
+request send | enforced=false | a Hub user | claim="orchestrator a" | allowed=false actor="" status=403
+request send | enforced=false | a joining token (no name) | claim="   " | allowed=false actor="" status=400
+request send | enforced=false | a joining token (no name) | claim="  Orchestrator A  " | allowed=true actor="Orchestrator A" status=0
+request send | enforced=false | a joining token (no name) | claim="" | allowed=false actor="" status=400
+request send | enforced=false | a joining token (no name) | claim="Dev A" | allowed=false actor="" status=403
+request send | enforced=false | a joining token (no name) | claim="Nobody" | allowed=false actor="" status=403
+request send | enforced=false | a joining token (no name) | claim="Operator" | allowed=true actor="Operator" status=0
+request send | enforced=false | a joining token (no name) | claim="Orchestrator A" | allowed=true actor="Orchestrator A" status=0
+request send | enforced=false | a joining token (no name) | claim="Orchestrator B" | allowed=false actor="" status=403
+request send | enforced=false | a joining token (no name) | claim="operator" | allowed=false actor="" status=403
+request send | enforced=false | a joining token (no name) | claim="orchestrator a" | allowed=false actor="" status=403
+request send | enforced=false | a worker's token | claim="   " | allowed=false actor="" status=400
+request send | enforced=false | a worker's token | claim="  Orchestrator A  " | allowed=true actor="Orchestrator A" status=0
+request send | enforced=false | a worker's token | claim="" | allowed=false actor="" status=400
+request send | enforced=false | a worker's token | claim="Dev A" | allowed=false actor="" status=403
+request send | enforced=false | a worker's token | claim="Nobody" | allowed=false actor="" status=403
+request send | enforced=false | a worker's token | claim="Operator" | allowed=true actor="Operator" status=0
+request send | enforced=false | a worker's token | claim="Orchestrator A" | allowed=true actor="Orchestrator A" status=0
+request send | enforced=false | a worker's token | claim="Orchestrator B" | allowed=false actor="" status=403
+request send | enforced=false | a worker's token | claim="operator" | allowed=false actor="" status=403
+request send | enforced=false | a worker's token | claim="orchestrator a" | allowed=false actor="" status=403
+request send | enforced=false | another team's orchestrator | claim="   " | allowed=false actor="" status=400
+request send | enforced=false | another team's orchestrator | claim="  Orchestrator A  " | allowed=true actor="Orchestrator A" status=0
+request send | enforced=false | another team's orchestrator | claim="" | allowed=false actor="" status=400
+request send | enforced=false | another team's orchestrator | claim="Dev A" | allowed=false actor="" status=403
+request send | enforced=false | another team's orchestrator | claim="Nobody" | allowed=false actor="" status=403
+request send | enforced=false | another team's orchestrator | claim="Operator" | allowed=true actor="Operator" status=0
+request send | enforced=false | another team's orchestrator | claim="Orchestrator A" | allowed=true actor="Orchestrator A" status=0
+request send | enforced=false | another team's orchestrator | claim="Orchestrator B" | allowed=false actor="" status=403
+request send | enforced=false | another team's orchestrator | claim="operator" | allowed=false actor="" status=403
+request send | enforced=false | another team's orchestrator | claim="orchestrator a" | allowed=false actor="" status=403
+request send | enforced=false | no identity layer (a claim) | claim="   " | allowed=false actor="" status=400
+request send | enforced=false | no identity layer (a claim) | claim="  Orchestrator A  " | allowed=true actor="Orchestrator A" status=0
+request send | enforced=false | no identity layer (a claim) | claim="" | allowed=false actor="" status=400
+request send | enforced=false | no identity layer (a claim) | claim="Dev A" | allowed=false actor="" status=403
+request send | enforced=false | no identity layer (a claim) | claim="Nobody" | allowed=false actor="" status=403
+request send | enforced=false | no identity layer (a claim) | claim="Operator" | allowed=true actor="Operator" status=0
+request send | enforced=false | no identity layer (a claim) | claim="Orchestrator A" | allowed=true actor="Orchestrator A" status=0
+request send | enforced=false | no identity layer (a claim) | claim="Orchestrator B" | allowed=false actor="" status=403
+request send | enforced=false | no identity layer (a claim) | claim="operator" | allowed=false actor="" status=403
+request send | enforced=false | no identity layer (a claim) | claim="orchestrator a" | allowed=false actor="" status=403
+request send | enforced=false | orchestrator's token | claim="   " | allowed=false actor="" status=400
+request send | enforced=false | orchestrator's token | claim="  Orchestrator A  " | allowed=true actor="Orchestrator A" status=0
+request send | enforced=false | orchestrator's token | claim="" | allowed=false actor="" status=400
+request send | enforced=false | orchestrator's token | claim="Dev A" | allowed=false actor="" status=403
+request send | enforced=false | orchestrator's token | claim="Nobody" | allowed=false actor="" status=403
+request send | enforced=false | orchestrator's token | claim="Operator" | allowed=true actor="Operator" status=0
+request send | enforced=false | orchestrator's token | claim="Orchestrator A" | allowed=true actor="Orchestrator A" status=0
+request send | enforced=false | orchestrator's token | claim="Orchestrator B" | allowed=false actor="" status=403
+request send | enforced=false | orchestrator's token | claim="operator" | allowed=false actor="" status=403
+request send | enforced=false | orchestrator's token | claim="orchestrator a" | allowed=false actor="" status=403
+request send | enforced=false | the Operator (cookie, key) | claim="   " | allowed=false actor="" status=400
+request send | enforced=false | the Operator (cookie, key) | claim="  Orchestrator A  " | allowed=true actor="Orchestrator A" status=0
+request send | enforced=false | the Operator (cookie, key) | claim="" | allowed=false actor="" status=400
+request send | enforced=false | the Operator (cookie, key) | claim="Dev A" | allowed=true actor="Dev A" status=0
+request send | enforced=false | the Operator (cookie, key) | claim="Nobody" | allowed=true actor="Nobody" status=0
+request send | enforced=false | the Operator (cookie, key) | claim="Operator" | allowed=true actor="Operator" status=0
+request send | enforced=false | the Operator (cookie, key) | claim="Orchestrator A" | allowed=true actor="Orchestrator A" status=0
+request send | enforced=false | the Operator (cookie, key) | claim="Orchestrator B" | allowed=true actor="Orchestrator B" status=0
+request send | enforced=false | the Operator (cookie, key) | claim="operator" | allowed=true actor="operator" status=0
+request send | enforced=false | the Operator (cookie, key) | claim="orchestrator a" | allowed=true actor="orchestrator a" status=0
+request send | enforced=true | Coral Hub as the operator | claim="   " | allowed=true actor="   " status=0
+request send | enforced=true | Coral Hub as the operator | claim="  Orchestrator A  " | allowed=true actor="  Orchestrator A  " status=0
+request send | enforced=true | Coral Hub as the operator | claim="" | allowed=false actor="" status=400
+request send | enforced=true | Coral Hub as the operator | claim="Dev A" | allowed=true actor="Dev A" status=0
+request send | enforced=true | Coral Hub as the operator | claim="Nobody" | allowed=true actor="Nobody" status=0
+request send | enforced=true | Coral Hub as the operator | claim="Operator" | allowed=true actor="Operator" status=0
+request send | enforced=true | Coral Hub as the operator | claim="Orchestrator A" | allowed=true actor="Orchestrator A" status=0
+request send | enforced=true | Coral Hub as the operator | claim="Orchestrator B" | allowed=true actor="Orchestrator B" status=0
+request send | enforced=true | Coral Hub as the operator | claim="operator" | allowed=true actor="operator" status=0
+request send | enforced=true | Coral Hub as the operator | claim="orchestrator a" | allowed=true actor="orchestrator a" status=0
+request send | enforced=true | a Hub user | claim="   " | allowed=false actor="" status=403
+request send | enforced=true | a Hub user | claim="  Orchestrator A  " | allowed=false actor="" status=403
+request send | enforced=true | a Hub user | claim="" | allowed=false actor="" status=400
+request send | enforced=true | a Hub user | claim="Dev A" | allowed=false actor="" status=403
+request send | enforced=true | a Hub user | claim="Nobody" | allowed=false actor="" status=403
+request send | enforced=true | a Hub user | claim="Operator" | allowed=false actor="" status=403
+request send | enforced=true | a Hub user | claim="Orchestrator A" | allowed=true actor="Orchestrator A" status=0
+request send | enforced=true | a Hub user | claim="Orchestrator B" | allowed=false actor="" status=403
+request send | enforced=true | a Hub user | claim="operator" | allowed=false actor="" status=403
+request send | enforced=true | a Hub user | claim="orchestrator a" | allowed=false actor="" status=403
+request send | enforced=true | a joining token (no name) | claim="   " | allowed=false actor="" status=403
+request send | enforced=true | a joining token (no name) | claim="  Orchestrator A  " | allowed=false actor="" status=403
+request send | enforced=true | a joining token (no name) | claim="" | allowed=false actor="" status=403
+request send | enforced=true | a joining token (no name) | claim="Dev A" | allowed=false actor="" status=403
+request send | enforced=true | a joining token (no name) | claim="Nobody" | allowed=false actor="" status=403
+request send | enforced=true | a joining token (no name) | claim="Operator" | allowed=false actor="" status=403
+request send | enforced=true | a joining token (no name) | claim="Orchestrator A" | allowed=false actor="" status=403
+request send | enforced=true | a joining token (no name) | claim="Orchestrator B" | allowed=false actor="" status=403
+request send | enforced=true | a joining token (no name) | claim="operator" | allowed=false actor="" status=403
+request send | enforced=true | a joining token (no name) | claim="orchestrator a" | allowed=false actor="" status=403
+request send | enforced=true | a worker's token | claim="   " | allowed=false actor="" status=403
+request send | enforced=true | a worker's token | claim="  Orchestrator A  " | allowed=false actor="" status=403
+request send | enforced=true | a worker's token | claim="" | allowed=false actor="" status=403
+request send | enforced=true | a worker's token | claim="Dev A" | allowed=false actor="" status=403
+request send | enforced=true | a worker's token | claim="Nobody" | allowed=false actor="" status=403
+request send | enforced=true | a worker's token | claim="Operator" | allowed=false actor="" status=403
+request send | enforced=true | a worker's token | claim="Orchestrator A" | allowed=false actor="" status=403
+request send | enforced=true | a worker's token | claim="Orchestrator B" | allowed=false actor="" status=403
+request send | enforced=true | a worker's token | claim="operator" | allowed=false actor="" status=403
+request send | enforced=true | a worker's token | claim="orchestrator a" | allowed=false actor="" status=403
+request send | enforced=true | another team's orchestrator | claim="   " | allowed=false actor="" status=403
+request send | enforced=true | another team's orchestrator | claim="  Orchestrator A  " | allowed=false actor="" status=403
+request send | enforced=true | another team's orchestrator | claim="" | allowed=false actor="" status=403
+request send | enforced=true | another team's orchestrator | claim="Dev A" | allowed=false actor="" status=403
+request send | enforced=true | another team's orchestrator | claim="Nobody" | allowed=false actor="" status=403
+request send | enforced=true | another team's orchestrator | claim="Operator" | allowed=false actor="" status=403
+request send | enforced=true | another team's orchestrator | claim="Orchestrator A" | allowed=false actor="" status=403
+request send | enforced=true | another team's orchestrator | claim="Orchestrator B" | allowed=false actor="" status=403
+request send | enforced=true | another team's orchestrator | claim="operator" | allowed=false actor="" status=403
+request send | enforced=true | another team's orchestrator | claim="orchestrator a" | allowed=false actor="" status=403
+request send | enforced=true | no identity layer (a claim) | claim="   " | allowed=false actor="" status=403
+request send | enforced=true | no identity layer (a claim) | claim="  Orchestrator A  " | allowed=false actor="" status=403
+request send | enforced=true | no identity layer (a claim) | claim="" | allowed=false actor="" status=403
+request send | enforced=true | no identity layer (a claim) | claim="Dev A" | allowed=false actor="" status=403
+request send | enforced=true | no identity layer (a claim) | claim="Nobody" | allowed=false actor="" status=403
+request send | enforced=true | no identity layer (a claim) | claim="Operator" | allowed=false actor="" status=403
+request send | enforced=true | no identity layer (a claim) | claim="Orchestrator A" | allowed=false actor="" status=403
+request send | enforced=true | no identity layer (a claim) | claim="Orchestrator B" | allowed=false actor="" status=403
+request send | enforced=true | no identity layer (a claim) | claim="operator" | allowed=false actor="" status=403
+request send | enforced=true | no identity layer (a claim) | claim="orchestrator a" | allowed=false actor="" status=403
+request send | enforced=true | orchestrator's token | claim="   " | allowed=true actor="Orchestrator A" status=0
+request send | enforced=true | orchestrator's token | claim="  Orchestrator A  " | allowed=true actor="Orchestrator A" status=0
+request send | enforced=true | orchestrator's token | claim="" | allowed=true actor="Orchestrator A" status=0
+request send | enforced=true | orchestrator's token | claim="Dev A" | allowed=true actor="Orchestrator A" status=0
+request send | enforced=true | orchestrator's token | claim="Nobody" | allowed=true actor="Orchestrator A" status=0
+request send | enforced=true | orchestrator's token | claim="Operator" | allowed=true actor="Orchestrator A" status=0
+request send | enforced=true | orchestrator's token | claim="Orchestrator A" | allowed=true actor="Orchestrator A" status=0
+request send | enforced=true | orchestrator's token | claim="Orchestrator B" | allowed=true actor="Orchestrator A" status=0
+request send | enforced=true | orchestrator's token | claim="operator" | allowed=true actor="Orchestrator A" status=0
+request send | enforced=true | orchestrator's token | claim="orchestrator a" | allowed=true actor="Orchestrator A" status=0
+request send | enforced=true | the Operator (cookie, key) | claim="   " | allowed=true actor="Operator" status=0
+request send | enforced=true | the Operator (cookie, key) | claim="  Orchestrator A  " | allowed=true actor="Operator" status=0
+request send | enforced=true | the Operator (cookie, key) | claim="" | allowed=true actor="Operator" status=0
+request send | enforced=true | the Operator (cookie, key) | claim="Dev A" | allowed=true actor="Operator" status=0
+request send | enforced=true | the Operator (cookie, key) | claim="Nobody" | allowed=true actor="Operator" status=0
+request send | enforced=true | the Operator (cookie, key) | claim="Operator" | allowed=true actor="Operator" status=0
+request send | enforced=true | the Operator (cookie, key) | claim="Orchestrator A" | allowed=true actor="Operator" status=0
+request send | enforced=true | the Operator (cookie, key) | claim="Orchestrator B" | allowed=true actor="Operator" status=0
+request send | enforced=true | the Operator (cookie, key) | claim="operator" | allowed=true actor="Operator" status=0
+request send | enforced=true | the Operator (cookie, key) | claim="orchestrator a" | allowed=true actor="Operator" status=0

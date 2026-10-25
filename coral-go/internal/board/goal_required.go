@@ -10,6 +10,9 @@ import (
 // is set (CreateTaskWithOpts, SetTaskGoal), so every writer is covered, not only the HTTP handler. It governs new tasks and moves only: tasks that already have no goal stay as they are.
 const settingRequireGoal = "require_goal"
 
+// settingGoalRequests is the board setting that lets other teams ask this one to create a task for their goal (#7361).
+const settingGoalRequests = "goal_requests"
+
 // ErrGoalRequired is the refusal of a task with no goal on a board that requires one (HTTP 400, code goal_required).
 var ErrGoalRequired = &GoalError{"goal_required", "this board requires a goal for every task: create or pick one with coral-board goal"}
 

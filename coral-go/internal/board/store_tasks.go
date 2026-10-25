@@ -47,6 +47,8 @@ type CreateTaskOpts struct {
 	// reviewTask is set only by Coral's own review flow (review_flow.go) for a review task it makes: such a task is exempt from a board's require-a-goal rule (#7116). It is unexported on purpose: no
 	// caller outside this package, and nothing a request carries (the workflow's review_of is a field the caller sets), can claim the exemption.
 	reviewTask bool
+	// remote links the new task to a goal of another team, for the request it was made for (#7361): set only by AcceptGoalRequest, so nothing a request carries sets it.
+	remote *remoteGoalLink
 }
 
 // checkPriority is the answer for a priority that is not one of the four the board keeps (the table's CHECK is the backstop; its text is not an answer a caller should read).
@@ -108,7 +110,7 @@ func (s *Store) CreateTaskWithOpts(ctx context.Context, project, title, body, pr
 	}
 	// A board that requires a goal refuses a task with none, before anything is stored (#7116). A review task Coral makes for a task in review is not the person's to give a goal: it is exempt, or
 	// a board that requires goals could not review its own work.
-	if goalID == nil && (opts == nil || !opts.reviewTask) {
+	if goalID == nil && (opts == nil || (!opts.reviewTask && opts.remote == nil)) { // a task made for another team's request has that team's goal
 		if on, err := s.requiresGoal(ctx, s.db, project); err != nil {
 			return nil, err
 		} else if on {
@@ -116,10 +118,22 @@ func (s *Store) CreateTaskWithOpts(ctx context.Context, project, title, body, pr
 		}
 	}
 
+	var remoteBoard, remoteGoal, requestID *string
+	if opts != nil && opts.remote != nil {
+		// A task made for another team's request has no goal of its own board's: a task has a local goal or a remote one, never both.
+		if goalID != nil {
+			return nil, ErrGoalRequestAnswered
+		}
+		r := opts.remote
+		remoteGoal, requestID = &r.GoalUID, &r.RequestID
+		if r.BoardUID != "" {
+			remoteBoard = &r.BoardUID
+		}
+	}
 	result, err := s.db.ExecContext(ctx,
-		`INSERT INTO board_tasks (board_id, title, body, status, priority, created_by, assigned_to, created_at, goal_id)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		project, title, bodyPtr, initialStatus, priority, createdBy, assignPtr, now, goalID)
+		`INSERT INTO board_tasks (board_id, title, body, status, priority, created_by, assigned_to, created_at, goal_id, remote_board_uid, remote_goal_uid, request_id)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		project, title, bodyPtr, initialStatus, priority, createdBy, assignPtr, now, goalID, remoteBoard, remoteGoal, requestID)
 	if err != nil {
 		return nil, err
 	}
