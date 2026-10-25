@@ -23,6 +23,8 @@ import { syncServersBar, serverVisible, serversFiltered, resetServersBar } from 
 let _servers = [];
 let _editing = null;      // id being edited, '' for "add", null when the form is closed
 let _confirmDelete = null;
+let _open = null;         // the id whose page is open (a server's page: facts, and Test, Edit and Remove in its pinned bar), null for the table
+let _focusNext = null;    // 'back' | 'row': where the focus goes after the next draw (opening a page, coming back)
 let _busy = new Set();    // ids (or '*') with a request in flight
 let _loadError = '';
 let _formError = '';
@@ -56,7 +58,7 @@ export async function renderServersInto(el) {
         el.addEventListener('submit', onSubmit);
     }
     _host = el;
-    _editing = null; _draft = null; _confirmDelete = null; _formError = ''; _loadError = '';
+    _editing = null; _draft = null; _confirmDelete = null; _formError = ''; _loadError = ''; _open = null;
     render();
     await load();
     clearInterval(_timer);
@@ -67,7 +69,7 @@ export async function renderServersInto(el) {
 /** Leaving the Servers tab: stop refreshing and drop an open form. */
 export function hideServersModal() {
     clearInterval(_timer); _timer = null;
-    _editing = null;
+    _editing = null; _open = null;
     resetServersBar();
 }
 
@@ -107,18 +109,45 @@ function warningHtml(text, cls = '') {
     return `<div class="servers-row-warn ${cls}"><span class="material-icons" aria-hidden="true">warning</span><span><b>Warning:</b> ${escHtml(t.charAt(0).toUpperCase() + t.slice(1))}${/[.!?]$/.test(t) ? '' : '.'}</span></div>`;
 }
 
+/** What the registry and the live list know about a remote server, as one object. */
+function liveOf(s) {
+    return { ...s, ...((state.servers || []).find(x => x && x.id === s.id) || {}) };
+}
+
+function agentsText(n) { return `${n} agent${n === 1 ? '' : 's'}`; }
+
+/** One row of the table: the server's name (it opens the server's page), its status and its agents (#7638). */
 function rowHtml(s) {
     if (s.local || s.id === 'local') {
-        // This hub: its version and agent count, like the remote rows (#3152).
+        // This hub: its version and agent count, like the remote rows (#3152). It has no page of its own: nothing here is edited or removed.
         const n = serverAgentCount({ id: 'local' });
-        const localMeta = ['This hub', state.localVersion ? `Coral ${state.localVersion}` : '', `${n} agent${n === 1 ? '' : 's'}`].filter(Boolean);
-        return `<li class="servers-row servers-row-local" id="server-row-local" tabindex="-1">
-            <div class="servers-row-main"><div class="servers-row-title">${escHtml(s.label || 'Local')} <span class="servers-id">local</span></div>
-            <div class="servers-row-meta">${localMeta.map(escHtml).join(' &middot; ')}</div></div>
-            <div class="servers-row-status">${statusPill('online')}</div></li>`;
+        const localMeta = ['This hub', state.localVersion ? `Coral ${state.localVersion}` : ''].filter(Boolean);
+        return `<tr class="servers-row servers-row-local" id="server-row-local" tabindex="-1">
+            <td><span class="servers-row-title">${escHtml(s.label || 'Local')} <span class="servers-id">local</span></span><div class="servers-row-meta">${localMeta.map(escHtml).join(' &middot; ')}</div></td>
+            <td>${statusPill('online')}</td><td>${agentsText(n)}</td></tr>`;
     }
+    const live = liveOf(s);
+    const agents = serverAgentCount(live);
+    return `<tr class="servers-row" id="server-row-${escHtml(s.id)}" tabindex="-1" data-id="${escHtml(s.id)}">
+        <td><button type="button" class="group-table-link" data-action="open" data-id="${escHtml(s.id)}">${escHtml(s.label || s.id)}</button> <span class="servers-id">${escHtml(s.id)}</span>${s.allow_private ? ' <span class="servers-tag" title="Private network addresses are allowed for this server">private network</span>' : ''}${warningHtml(s.warning)}</td>
+        <td>${statusPill(live.status || s.status)}</td><td>${agentsText(agents)}</td></tr>`;
+}
+
+/** A fact of the server's page: a label (13/500) and its value (13/400). */
+function factHtml(label, value) {
+    return value ? `<div class="servers-fact"><dt>${escHtml(label)}</dt><dd>${value}</dd></div>` : '';
+}
+
+/** A server's page: its facts, what to do about a problem, and Test, Edit and Remove in a bar pinned at its foot (Remove the danger button, the primary last). */
+function pageHtml(s) {
+    const live = liveOf(s);
     const busy = _busy.has(s.id);
     const confirming = _confirmDelete === s.id;
+    const status = live.status || s.status;
+    const version = serverVersion(live);
+    const agents = serverAgentCount(live);
+    const badge = updateBadgeHtml(live);
+    const below = belowMinimumText(live); // the Hub's "Update Coral to <min>" hint (#3915), plain text
     // One line says what to do; the raw error is behind Details, for support (#3981).
     const act = (s.status === 'key_unreadable' || s.status === 'unauthorized')
         ? statusMeta(s.status).hint
@@ -127,34 +156,29 @@ function rowHtml(s) {
     const attention = act
         ? `<div class="servers-row-error" role="status"><span class="servers-row-hint">${escHtml(act)}</span>${raw ? ` <details class="servers-row-detail"><summary>Details</summary>${escHtml(raw)}</details>` : ''}</div>`
         : raw ? `<div class="servers-row-error" role="status">${escHtml(raw)}</div>` : '';
-    // Version, agent count and update come with the live list's servers entry (#3099).
-    const live = { ...s, ...((state.servers || []).find(x => x && x.id === s.id) || {}) };
-    const version = serverVersion(live);
-    const agents = serverAgentCount(live);
-    const badge = updateBadgeHtml(live);
-    const below = belowMinimumText(live); // the Hub's "Update Coral to <min>" hint (#3915), plain text
-    // An online server's status is live from the feed; 'last contact' (refreshed
-    // about once a minute) is shown only once it is not online (#3152).
-    const contact = (live.status || s.status) !== 'online' ? `last contact ${formatLastSeen(s.last_seen)}` : '';
-    const meta = [s.url, version ? `Coral ${version}` : '', `${agents} agent${agents === 1 ? '' : 's'}`, contact].filter(Boolean);
-    return `<li class="servers-row" id="server-row-${escHtml(s.id)}" tabindex="-1" data-id="${escHtml(s.id)}">
-        <div class="servers-row-main">
-            <div class="servers-row-title">${escHtml(s.label || s.id)} <span class="servers-id">${escHtml(s.id)}</span>${s.allow_private ? ' <span class="servers-tag" title="Private network addresses are allowed for this server">private network</span>' : ''}${badge ? ' ' + badge : ''}</div>
-            <div class="servers-row-meta">${meta.map(escHtml).join(' &middot; ')}</div>
-            ${warningHtml(s.warning)}
-            ${below ? `<div class="servers-row-hint server-below-minimum">${escHtml(below)}</div>` : ''}
-            ${attention}
-        </div>
-        <div class="servers-row-status">${statusPill(s.status)}</div>
-        <div class="servers-row-actions">
-            <button type="button" class="btn btn-small" data-action="test" data-id="${escHtml(s.id)}"${busy ? ' disabled aria-busy="true"' : ''}>${busy ? 'Testing...' : 'Test'}</button>
-            <button type="button" class="btn btn-small" data-action="edit" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>Edit</button>
-            ${confirming
-                ? `<button type="button" class="btn btn-small btn-danger" data-action="delete-confirm" data-id="${escHtml(s.id)}">Confirm remove</button>
-                   <button type="button" class="btn btn-small" data-action="delete-cancel">Cancel</button>`
-                : `<button type="button" class="btn btn-small btn-danger-text servers-remove" data-action="delete" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>Remove</button>`}
-        </div>
-    </li>`;
+    // An online server's status is live from the feed; 'last contact' (refreshed about once a minute) is shown only once it is not online (#3152).
+    const contact = status !== 'online' ? formatLastSeen(s.last_seen) : '';
+    const bar = confirming
+        ? `<button type="button" class="btn" data-action="delete-cancel">Cancel</button>
+           <button type="button" class="btn btn-danger" data-action="delete-confirm" data-id="${escHtml(s.id)}">Confirm remove</button>`
+        : `<button type="button" class="btn" data-action="test" data-id="${escHtml(s.id)}"${busy ? ' disabled aria-busy="true"' : ''}>${busy ? 'Testing...' : 'Test'}</button>
+           <button type="button" class="btn" data-action="edit" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>Edit</button>
+           <button type="button" class="btn btn-danger servers-remove" data-action="delete" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>Remove</button>`;
+    return `<section class="servers-page" id="server-row-${escHtml(s.id)}" tabindex="-1" data-id="${escHtml(s.id)}" aria-labelledby="servers-page-name">
+        <button type="button" class="group-back" id="servers-back" data-action="back">&larr; Servers</button>
+        <h3 class="servers-page-name" id="servers-page-name">${escHtml(s.label || s.id)} <span class="servers-id">${escHtml(s.id)}</span>${s.allow_private ? ' <span class="servers-tag" title="Private network addresses are allowed for this server">private network</span>' : ''}</h3>
+        <p class="item-meta">${statusPill(status)}</p>
+        <dl class="servers-facts">
+            ${factHtml('URL', escHtml(s.url || ''))}
+            ${factHtml('Coral', `${escHtml(version ? `Coral ${version}` : 'Not known yet')}${badge ? ' ' + badge : ''}`)}
+            ${factHtml('Agents', escHtml(agentsText(agents)))}
+            ${factHtml('Last contact', escHtml(contact))}
+        </dl>
+        ${warningHtml(s.warning)}
+        ${below ? `<div class="servers-row-hint server-below-minimum">${escHtml(below)}</div>` : ''}
+        ${attention}
+        <div class="item-bar servers-page-bar">${bar}</div>
+    </section>`;
 }
 
 function formHtml() {
@@ -194,24 +218,38 @@ function render() {
     const remotes = allRemotes.filter(serverVisible);
     const local = _servers.find(s => s.local || s.id === 'local') || { local: true, id: 'local', label: 'Local' };
     // The periodic refresh must not pull focus out of a row the user is on.
-    const activeRow = document.activeElement && m.contains(document.activeElement) ? document.activeElement.closest('.servers-row') : null;
+    const activeRow = document.activeElement && m.contains(document.activeElement) ? document.activeElement.closest('.servers-row, .servers-page') : null;
     const keep = activeRow && _editing === null ? { row: activeRow.id, action: document.activeElement.dataset.action } : null;
+    const page = _open ? _servers.find(x => x.id === _open && !(x.local || x.id === 'local')) : null;
+    if (_open && !page && _servers.length) _open = null; // the server is gone (removed here or elsewhere): back to the table
     // A long list pushes "Add server" screens below the fold: with many machines it sits above the list, beside how many answer.
     const many = allRemotes.length > 5;
     const online = allRemotes.filter(s => s.status === 'online').length;
     const topBar = `<div class="servers-top"><span class="servers-summary">${allRemotes.length} servers, ${online} online${online < allRemotes.length ? `, ${allRemotes.length - online} not` : ''}</span><button type="button" class="btn btn-primary" data-action="add">Add server</button></div>`;
     const restoreFocus = rememberFocus(m); // a control the redraw replaced (Add server, Test, Edit) gets focus back (#4882)
-    m.innerHTML = `<p class="servers-intro">Servers whose agents and teams appear in this hub. The hub stores each server's API key (encrypted); a key grants full control of that server.</p>
-            ${_loadError ? `<div class="servers-form-error" role="alert">${escHtml(_loadError)}</div>` : ''}
-            ${many && _editing === null ? topBar : ''}
-            <ul class="servers-list" aria-label="Registered servers">${rowHtml(local)}${remotes.map(rowHtml).join('')}</ul>
+    const table = `<div class="group-table-scroll"><table class="group-table group-table-stack servers-table" aria-label="Registered servers">
+                <thead><tr><th scope="col">Server</th><th scope="col">Status</th><th scope="col">Agents</th></tr></thead>
+                <tbody>${rowHtml(local)}${remotes.map(rowHtml).join('')}</tbody></table></div>`;
+    const back = '<button type="button" class="group-back" id="servers-back" data-action="back">&larr; Servers</button>';
+    const body = _open && page
+        ? (_editing === _open ? `<section class="servers-page" id="server-row-${escHtml(_open)}" tabindex="-1" data-id="${escHtml(_open)}">${back}${formHtml()}</section>` : pageHtml(page))
+        : `${many && _editing === null ? topBar : ''}
+            ${table}
             ${!remotes.length && !_loadError ? `<p class="servers-empty">${serversFiltered() ? 'No servers match this search.' : 'No remote servers yet.'}</p>` : ''}
             ${_editing !== null ? formHtml() : many ? '' : '<div class="servers-form-actions"><button type="button" class="btn btn-primary" data-action="add">Add server</button></div>'}`;
+    m.innerHTML = `${_open && page ? '' : '<p class="servers-intro">Servers whose agents and teams appear in this hub. The hub stores each server\'s API key (encrypted); a key grants full control of that server.</p>'}
+            ${_loadError ? `<div class="servers-form-error" role="alert">${escHtml(_loadError)}</div>` : ''}
+            ${body}`;
     restoreFocus();
     if (keep) {
         const r = document.getElementById(keep.row);
         const again = r && (keep.action ? r.querySelector(`[data-action="${keep.action}"]`) : null);
         if (again) again.focus(); else if (r) r.focus();
+    }
+    if (_focusNext) {
+        const where = _focusNext; _focusNext = null;
+        const el = where === 'back' ? document.getElementById('servers-back') : (m.querySelector(`.servers-row[data-id="${CSS.escape(where)}"] [data-action="open"]`) || m.querySelector('.servers-table'));
+        if (el) el.focus();
     }
     if (_editing !== null) {
         const f = m.querySelector('#servers-form');
@@ -227,6 +265,8 @@ async function onClick(e) {
     if (!btn) return;
     const action = btn.dataset.action;
     const id = btn.dataset.id;
+    if (action === 'open') { _open = id; _confirmDelete = null; _focusNext = 'back'; return render(); }
+    if (action === 'back') { const was = _open; _open = null; _editing = null; _confirmDelete = null; _formError = ''; _urlError = ''; _draft = null; _focusNext = was || 'row'; return render(); }
     if (action === 'add') { _editing = ''; _formError = ''; _urlError = ''; _draft = null; return render(); }
     if (action === 'edit') { _editing = id; _formError = ''; _urlError = ''; _draft = null; _confirmDelete = null; return render(); }
     if (action === 'cancel-form') { _editing = null; _formError = ''; _urlError = ''; _draft = null; return render(); }
@@ -260,7 +300,7 @@ async function doDelete(id) {
     try {
         const resp = await fetch(`/api/servers/${encodeURIComponent(id)}`, { method: 'DELETE' });
         if (!resp.ok) _loadError = describeServerError(resp.status, await readBody(resp));
-        else { _loadError = ''; showToast('Server removed'); }
+        else { _loadError = ''; _open = null; _focusNext = 'row'; showToast('Server removed'); }
     } catch {
         _loadError = 'Remove failed: could not reach the hub.';
     }

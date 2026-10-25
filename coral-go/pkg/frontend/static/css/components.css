@@ -3469,16 +3469,6 @@ button.subscriber-history-link {
 /* ── Servers settings dialog (multi-server hub) ───────────────────── */
 
 .servers-empty { color: var(--text-secondary); font-size: var(--fs-base); margin: 0 0 var(--space-lg); }
-.servers-list { list-style: none; margin: 0 0 var(--space-xl); padding: 0; border: 1px solid var(--border); border-radius: var(--radius-lg); }
-.servers-row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-md) var(--space-lg);
-    padding: var(--space-lg);
-}
-.servers-row + .servers-row { border-top: 1px solid var(--border); }
-.servers-row-main { flex: 1 1 14em; min-width: 0; }
 .servers-row-title { font-size: var(--fs-md); font-weight: 600; color: var(--text-primary); overflow-wrap: anywhere; }
 .servers-id, .servers-tag {
     font-family: var(--font-mono);
@@ -3494,8 +3484,6 @@ button.subscriber-history-link {
 .servers-url-error { display: flex; align-items: flex-start; gap: var(--space-sm); margin-top: calc(-1 * var(--space-sm)); margin-bottom: var(--space-lg); font-size: var(--fs-base); font-weight: 400; color: var(--text-primary); overflow-wrap: anywhere; }
 .servers-url-error .material-icons { flex: none; font-size: 1.15em; color: var(--error); }
 .servers-form input[aria-invalid="true"] { border-color: var(--error); }
-.servers-row-status { flex: 0 0 auto; }
-.servers-row-actions { display: flex; flex-wrap: wrap; gap: var(--space-md); }
 .servers-row-detail { display: inline; color: var(--text-secondary); }
 .servers-row-detail summary { display: inline; cursor: pointer; color: var(--text-secondary); text-decoration: underline; }
 .servers-row-detail[open] summary { display: block; margin: var(--space-xs) 0; }
@@ -3541,7 +3529,7 @@ button.subscriber-history-link {
     .servers-form input:not([type="checkbox"]):not([type="radio"]), .servers-form-actions .btn, .servers-top .btn { min-height: var(--control-touch-height, 44px); }
     .servers-form label.servers-check { min-height: var(--control-touch-height, 44px); } /* the whole row is the tap target; the box stays by the first line */
 }
-@media (pointer: coarse) { .servers-row-actions .btn { min-height: 44px; } }
+@media (pointer: coarse), (max-width: 767px) { .servers-page-bar .btn { min-height: var(--control-touch-height, 44px); } }
 
 /* Settings > Coral Hub (cloud connector) */
 .settings-cloud-code { margin: 6px 0; font-size: var(--fs-base); }
@@ -4717,3 +4705,19 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .settings-retention-switch { width: 100%; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--border); }
 .settings-retention-switch > label:first-child { font: var(--dlg-label); color: var(--text-primary); margin: 0; }
 #settings-modal .settings-controls-row > label.settings-inline { margin-bottom: 0; padding-bottom: 0; } /* the dialog's generic label leaves 12 px under itself: the buttons beside Older than and What to prune sit level with their fields (#7627) */
+
+/* The Servers tab of a self-hosted hub (#7638): a table (Server, Status, Agents), and a server's page with its facts and Test, Edit and Remove in a bar pinned at its foot */
+.servers-table td:first-child { overflow-wrap: anywhere; }
+.servers-table .servers-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.servers-page { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; }
+.servers-page > * { flex-shrink: 0; }
+.servers-page-name { margin: 0; font-size: 1.0625rem; font-weight: 700; line-height: 1.3; color: var(--text-primary); overflow-wrap: anywhere; }
+.servers-page .item-meta { display: flex; align-items: center; gap: var(--space-md); }
+.servers-facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px var(--space-xl); margin: var(--space-lg) 0; }
+.servers-fact { display: contents; }
+.servers-fact dt { font-size: var(--fs-md); font-weight: 500; color: var(--text-secondary); }
+.servers-fact dd { margin: 0; font-size: var(--fs-md); font-weight: 400; color: var(--text-primary); overflow-wrap: anywhere; }
+.servers-page .item-bar { margin-top: auto; bottom: calc(-1 * var(--space-lg, 16px)); margin-bottom: calc(-1 * var(--space-lg, 16px)); padding-bottom: calc(var(--space-lg) + var(--space-lg, 16px)); } /* the view's padding is taken back so nothing shows under the bar */
+.servers-view:has(.servers-page) .servers-tab { min-height: 100%; display: flex; flex-direction: column; }
+.servers-view:has(.servers-page) .servers-tab-body { flex: 1 1 auto; display: flex; flex-direction: column; }
+@media (pointer: coarse), (max-width: 767px) { .servers-table .group-table-link { min-width: var(--control-touch-height, 44px); } } /* a short name is still a 44 px target */

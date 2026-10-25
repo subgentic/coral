@@ -113,7 +113,11 @@ const CLOUD_PRELOAD = `(() => {
         await ev(`(() => { window.__arrayShape = true; T.state.hub = true; T.state.servers = ${JSON.stringify(LIVE)}; return true; })()`);
         await ev(`window.switchNavTab('servers'); true`);
         await waitFor(`document.querySelectorAll('#servers-view .servers-row').length >= ${SERVERS.length}`, 'the self-hosted hub server rows', 8000);
-        const own = await ev(`Object.fromEntries([...document.querySelectorAll('#servers-view .servers-row')].map(r => [r.dataset.id, [...r.querySelectorAll('.server-below-minimum')].map(n => ({ text: n.textContent, kids: n.children.length }))]))`);
+        // the hint is on a server's page (#7638): open each in turn
+        const own = await ev(`(async () => { const until = async f => { for (let i = 0; i < 100 && !f(); i++) await new Promise(r => setTimeout(r, 20)); }; const out = {};
+            for (const id of [...document.querySelectorAll('#servers-view .servers-row[data-id]')].map(r => r.dataset.id)) { document.querySelector('#server-row-' + id + ' [data-action=open]').click(); await until(() => document.querySelector('.servers-page'));
+                out[id] = [...document.querySelectorAll('.servers-page .server-below-minimum')].map(n => ({ text: n.textContent, kids: n.children.length })); document.getElementById('servers-back').click(); await until(() => document.querySelector('table.servers-table')); }
+            return out; })()`);
         assert.deepEqual(own.m1, [{ text: 'Update Coral to 1.4.61', kids: 0 }], 'm1 in the self-hosted list');
         assert.ok(own.m2.length === 1 && own.m2[0].text.startsWith('Update Coral to <img src=x') && own.m2[0].kids === 0, 'm2: hostile text stays text');
         assert.deepEqual(own.m3, []); assert.deepEqual(own.m4, []);

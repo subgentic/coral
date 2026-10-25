@@ -46,7 +46,9 @@ const SERVERS = [
         await shot('rows-desktop');
 
         // 2. the edit form repeats it; an https row's does not
-        await ev(`document.querySelector('#server-row-lan [data-action=edit]').click(); true`);
+        await ev(`document.querySelector('#server-row-lan [data-action=open]').click(); true`); // Edit is on the server's page (#7638)
+        await waitFor(`!!document.querySelector('.servers-page [data-action=edit]')`, 'the lan page');
+        await ev(`document.querySelector('.servers-page [data-action=edit]').click(); true`);
         await waitFor(`!!document.getElementById('servers-form')`, 'the edit form');
         assert.equal(await ev(`!!document.querySelector('#servers-form .servers-row-warn')`), true, 'the edit form shows the warning');
         assert.equal(await ev(`document.querySelector('#servers-form input[name=url]').closest('label').textContent.includes('unencrypted')`), false, 'it is not part of the URL field\'s name');
@@ -58,10 +60,17 @@ const SERVERS = [
         assert.deepEqual(acc.api_key, { name: 'API key', desc: 'Write-only. The key is stored encrypted and is never shown again.' });
         assert.equal(acc.allow_private.name, 'Allow private network address'); assert.match(acc.allow_private.desc, /^Only tick this for a server on your LAN/);
         ok('each server form field is named by its label and described by its help');
-        await ev(`document.querySelector('#servers-form [data-action=cancel-form]').click(); document.querySelector('#server-row-tls [data-action=edit]').click(); true`);
+        await ev(`document.querySelector('#servers-form [data-action=cancel-form]').click(); true`);
+        await ev(`document.getElementById('servers-back').click(); true`);
+        await waitFor(`!!document.querySelector('#server-row-tls [data-action=open]')`, 'the table');
+        await ev(`document.querySelector('#server-row-tls [data-action=open]').click(); true`);
+        await waitFor(`!!document.querySelector('.servers-page [data-action=edit]')`, 'the tls page');
+        await ev(`document.querySelector('.servers-page [data-action=edit]').click(); true`);
         await waitFor(`!!document.getElementById('servers-form')`, 'the second edit form');
         assert.equal(await ev(`!!document.querySelector('#servers-form .servers-row-warn')`), false, 'an https server\'s edit form has none');
         await ev(`document.querySelector('#servers-form [data-action=cancel-form]').click(); true`);
+        await ev(`document.getElementById('servers-back').click(); true`);
+        await waitFor(`!!document.querySelector('[data-action=add]')`, 'the table again');
         ok('the edit form shows the warning for the http server and none for the https one');
 
         // 3. a refused add shows its message next to the URL field, and that field is flagged and focused
