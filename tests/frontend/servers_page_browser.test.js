@@ -41,6 +41,7 @@ const SERVERS = [
             const t = await ev(`(() => { const tb = document.querySelector('table.servers-table'); return { heads: [...tb.querySelectorAll('thead th')].map(h => h.textContent.trim()), scopes: [...tb.querySelectorAll('thead th')].map(h => h.getAttribute('scope')), rows: tb.querySelectorAll('tbody tr').length,
                 links: [...tb.querySelectorAll('tbody [data-action=open]')].map(b => b.textContent.trim()), rowButtons: [...tb.querySelectorAll('tbody button')].filter(b => b.dataset.action !== 'open').length, overflow: document.documentElement.scrollWidth - innerWidth }; })()`);
             assert.deepEqual(t.heads, ['Server', 'Status', 'Agents'], at + 'the columns');
+            assert.equal(await ev(`document.getElementById('servers-tab-title').checkVisibility()`), true, at + 'the table keeps the Servers title');
             assert.deepEqual(t.scopes, ['col', 'col', 'col']);
             assert.equal(t.rows, 3, at + 'this hub and two servers');
             assert.deepEqual(t.links, ['epoch', 'LAN box'], at + 'each remote server\'s name opens its page; this hub has none');
@@ -65,6 +66,7 @@ const SERVERS = [
             assert.equal(p.facts.URL, 'http://192.168.1.50:8420'); assert.match(p.facts['Last contact'] || '', /\S/, at + 'last contact, as it is not online'); assert.equal(p.facts.Agents, '0 agents');
             assert.match(p.error || '', /Is Coral running on that machine/, at + 'what to do about it');
             assert.equal(p.table, false, at + 'the table is not on the page');
+            assert.equal(await ev(`document.getElementById('servers-tab-title').checkVisibility()`), false, at + 'the page has no "Servers" title: its back link says it');
             assert.ok(p.overflow <= 0, at + 'no sideways scroll');
             await shot(`servers-page-${w}`);
             ok(at + 'the page: facts, a way back, Test, Edit and Remove pinned at the foot, Remove the danger button');

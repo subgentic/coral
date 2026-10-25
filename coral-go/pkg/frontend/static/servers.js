@@ -70,6 +70,7 @@ export async function renderServersInto(el) {
 export function hideServersModal() {
     clearInterval(_timer); _timer = null;
     _editing = null; _open = null;
+    const title = document.getElementById('servers-tab-title'); if (title) title.hidden = false;
     resetServersBar();
 }
 
@@ -240,6 +241,8 @@ function render() {
     m.innerHTML = `${_open && page ? '' : '<p class="servers-intro">Servers whose agents and teams appear in this hub. The hub stores each server\'s API key (encrypted); a key grants full control of that server.</p>'}
             ${_loadError ? `<div class="servers-form-error" role="alert">${escHtml(_loadError)}</div>` : ''}
             ${body}`;
+    const title = document.getElementById('servers-tab-title');
+    if (title) title.hidden = !!(_open && page); // a server's page has its back link, "← Servers", for the title
     restoreFocus();
     if (keep) {
         const r = document.getElementById(keep.row);
