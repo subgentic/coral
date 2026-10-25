@@ -394,11 +394,12 @@ function _initKeyboardDetection() {
     // tab is shown again: read it again at each, now and a little later, so a stale height does not stay (#7326).
     // Read at once and then on each frame for a second: Safari's first answer is the old one, and the right one comes a few frames later. Frames, not timers: a timer set by a focusout during start-up (the page moves
     // the focus as it builds) landed in the start-up handler on a machine whose window has focus and not on one without, so the start-up golden differed by machine (Windows CI, #7326).
+    const nextFrame = requestAnimationFrame.bind(window); // the browser's own, taken here: a page that counts its sidebar's frame requests (feed_message_golden) does not count this loop's
     const reread = () => {
         updateViewportHeight();
         const until = performance.now() + 1000;
-        const tick = () => { updateViewportHeight(); if (performance.now() < until) requestAnimationFrame(tick); };
-        requestAnimationFrame(tick);
+        const tick = () => { updateViewportHeight(); if (performance.now() < until) nextFrame(tick); };
+        nextFrame(tick);
     };
     window.addEventListener('orientationchange', reread);
     window.addEventListener('pageshow', reread);
