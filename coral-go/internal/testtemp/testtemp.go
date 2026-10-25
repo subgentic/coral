@@ -39,7 +39,8 @@ const Marker = "TESTTEMP_ACTIVE"
 // startedByGoTest reports whether args are those `go test` gives a test binary (it always adds -test.paniconexit0).
 func startedByGoTest(args []string) bool {
 	for _, a := range args {
-		if a == "-test.paniconexit0" {
+		switch a {
+		case "-test.paniconexit0", "-test.paniconexit0=true", "-test.paniconexit0=1", "--test.paniconexit0":
 			return true
 		}
 	}

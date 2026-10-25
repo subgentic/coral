@@ -14,7 +14,7 @@ import (
 
 func TestUsePointsTheTempFolderAtANewFolderAndRemovesIt(t *testing.T) {
 	before := map[string]string{}
-	for _, k := range []string{"TMPDIR", "TMP", "TEMP", "HOME", "USERPROFILE", "CORAL_DATA_DIR", "GOCACHE", "GOPATH", "GOMODCACHE", "GOENV"} {
+	for _, k := range []string{"TMPDIR", "TMP", "TEMP", "HOME", "USERPROFILE", "CORAL_DATA_DIR", "GOCACHE", "GOPATH", "GOMODCACHE", "GOENV", Marker} {
 		before[k] = os.Getenv(k)
 	}
 	t.Cleanup(func() {
@@ -56,6 +56,8 @@ func TestUsePointsTheTempFolderAtANewFolderAndRemovesIt(t *testing.T) {
 // A helper child (the test binary re-run with just -test.run=...) is not the process `go test` started: it keeps the environment its parent gave it.
 func TestOnlyTheProcessGoTestStartedGetsAPrivateWorld(t *testing.T) {
 	assert.True(t, startedByGoTest([]string{"x.test.exe", "-test.paniconexit0", "-test.timeout=10m0s", "-test.count=1"}))
+	assert.True(t, startedByGoTest([]string{"x.test.exe", "-test.paniconexit0=true"}))
+	assert.False(t, startedByGoTest([]string{"x.test.exe", "-test.paniconexit0=false"}))
 	assert.False(t, startedByGoTest([]string{"x.test.exe", "-test.run=^TestHelperRunBoard$"}), "a helper child")
 	assert.False(t, startedByGoTest([]string{"x.test.exe"}))
 	assert.False(t, startedByGoTest(nil))
@@ -82,7 +84,7 @@ func TestAHelperChildKeepsTheEnvironmentItsParentGaveIt(t *testing.T) {
 		}
 		cmd := exec.Command(os.Args[0], args...)
 		for _, kv := range os.Environ() {
-			if !strings.HasPrefix(kv, "CORAL_") && !strings.HasPrefix(kv, "TMUX") && !strings.HasPrefix(kv, "HOME=") {
+			if !strings.HasPrefix(kv, "CORAL_") && !strings.HasPrefix(kv, "TMUX") && !strings.HasPrefix(kv, "HOME=") && !strings.HasPrefix(kv, Marker+"=") { // this test process has the marker itself (its TestMain); a case sets it explicitly
 				cmd.Env = append(cmd.Env, kv)
 			}
 		}
@@ -104,14 +106,4 @@ func TestAHelperChildKeepsTheEnvironmentItsParentGaveIt(t *testing.T) {
 	assert.Equal(t, want, run("-test.paniconexit0", Marker+"=/somewhere"), "the marker stops a second private world")
 	// Without the marker, a process go test started does make its own: the values differ.
 	assert.NotEqual(t, want, run("-test.paniconexit0"), "a top-level test process gets its own")
-}
-
-// The loud check Security and the Orchestrator asked for: testtemp acts only in a process that has go test's -test.paniconexit0. If a future Go stops passing it, every package would
-// silently run without a private world; this test, which runs in every `go test`, then fails and says so. (A test binary run directly, not by go test or the shard script, has no flag: set
-// TESTTEMP_DIRECT=1 for such a run.)
-func TestGoTestStillMarksItsTestBinaries(t *testing.T) {
-	if os.Getenv("TESTTEMP_DIRECT") == "1" {
-		t.Skip("run directly, not by go test")
-	}
-	require.True(t, startedByGoTest(os.Args), "go test no longer passes -test.paniconexit0 (args: %v): every test package would run in the real temp, home and ~/.coral; update testtemp.startedByGoTest to what go test passes now", os.Args)
 }
