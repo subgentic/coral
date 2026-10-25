@@ -130,6 +130,14 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 	// An agent never starts a less-restricted agent (#4032).
 	if agentCaller(r) {
 		body.Flags, body.Capabilities, body.Tools, body.Hooks = limitAgentLaunch("launch", body.Flags, body.Capabilities, body.Tools, body.Hooks)
+		// ... and a Codex it starts on a board needs a mode: with none it would ask first and could not reach Coral (#7552); refused before anything is made.
+		if body.BoardName != "" || body.BoardID != "" {
+			if userSettings, err := h.launchSettings(r.Context()); err == nil && agentLaunchNeedsMode(body.AgentType, body.Flags, true, userSettings) {
+				attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
+				writeError(w, http.StatusForbidden, agentLaunchNeedsModeCode, agentLaunchNeedsModeMessage)
+				return
+			}
+		}
 	}
 
 	// Resolve model: request wins, else per-type default from settings.
