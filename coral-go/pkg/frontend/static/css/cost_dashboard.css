@@ -615,3 +615,7 @@
     #mobile-analytics-list .sidebar-header { padding: 12px; }
     .cost-page { padding: 12px; }
 }
+
+/* The views list: one line per view, a 44 px row on a phone with its text in the middle of it (#7473) */
+#cost-nav-list > li { min-height: var(--control-touch-height, 44px); }
+#cost-nav-list > li > .row-btn { align-items: center; justify-content: flex-start; }
