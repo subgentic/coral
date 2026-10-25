@@ -4,6 +4,7 @@
  * own *_filters.js, which is pure). The classes are list-bar-* (agentic.css, touch.css); the ids come from the spec so two bars never share one. */
 
 import { browserLocal } from './safe_storage.js';
+import { importOnce } from './import_once.js';
 
 const DEBOUNCE_MS = 300;
 const LIVE_SETTLE_MS = 500; // how long the count must stay as it is before it is announced
@@ -20,6 +21,26 @@ function make(tag, className, text) {
     if (className) n.className = className;
     if (text != null) n.textContent = text;
     return n;
+}
+
+/** The More icon of a toolbar (#7686): three dots after the filter icon, and a menu of the list's other actions (Copy publishing instructions, Jump to first message): one control in one place on every tab. items: [{ label, run() }]. */
+export function buildMoreMenu(id, items) {
+    const wrap = make('span', 'list-bar-more');
+    const btn = make('button', 'sidebar-collapse-btn list-bar-more-btn'); btn.type = 'button'; btn.id = `${id}-more`;
+    btn.title = 'More'; btn.setAttribute('aria-label', 'More'); btn.setAttribute('aria-haspopup', 'menu'); btn.setAttribute('aria-expanded', 'false'); btn.setAttribute('aria-controls', `${id}-more-menu`);
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    for (const [k, v] of [['width', '18'], ['height', '18'], ['viewBox', '0 0 24 24'], ['fill', 'currentColor'], ['aria-hidden', 'true']]) svg.setAttribute(k, v);
+    for (const x of [5, 12, 19]) { const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle'); c.setAttribute('cx', String(x)); c.setAttribute('cy', '12'); c.setAttribute('r', '1.8'); svg.append(c); }
+    btn.append(svg);
+    const menu = make('div', 'team-more-menu list-bar-more-menu'); menu.id = `${id}-more-menu`; menu.hidden = true; menu.setAttribute('role', 'menu'); menu.setAttribute('aria-label', 'More');
+    for (const it of items) {
+        const b = make('button', null, it.label); b.type = 'button'; b.setAttribute('role', 'menuitem');
+        b.addEventListener('click', async () => { (await importOnce('./menu_button.js')).closeMenus(); it.run(); });
+        menu.append(b);
+    }
+    btn.addEventListener('click', async () => (await importOnce('./menu_button.js')).toggleMenu(btn)); // the menu's keyboard and outside-click handling load with the first use
+    wrap.append(btn, menu);
+    return wrap;
 }
 
 function selectField(id, label, values, labels, anyLabel) {
@@ -99,7 +120,9 @@ export function buildListBar(spec, onChange, hooks = {}) {
     }
     // spec.headerSlots (#5315): the owner's title goes before the search box and its action icons after the filter icon, on this one row (setHeader). The slots are display: contents, so their children are the row's own.
     const lead = spec.headerSlots ? make('span', 'list-bar-lead') : null, tail = spec.headerSlots ? make('span', 'list-bar-tail') : null;
-    if (noSearch) searchRow.hidden = true; else searchRow.append(...(lead ? [lead] : []), wrap, count, ...(tog ? [tog] : []), ...(chev ? [chev] : []), ...(tail ? [tail] : []));
+    // spec.more (#7686): the list's other actions behind one More icon after the filter icon and the owner's own icons.
+    const more = spec.more && spec.more.length && !noSearch ? buildMoreMenu(p, spec.more) : null;
+    if (noSearch) searchRow.hidden = true; else searchRow.append(...(lead ? [lead] : []), wrap, count, ...(tog ? [tog] : []), ...(chev ? [chev] : []), ...(tail ? [tail] : []), ...(more ? [more] : []));
 
     const controls = make('div', 'list-bar-controls');
     const filterBtn = make('button', 'list-bar-filter-btn', 'Filters'); filterBtn.type = 'button';

@@ -33,10 +33,11 @@ const B = 'dock-tasks-' + Date.now().toString(36);
         assert.equal(row.buttons, 1, 'one real button on the row: ' + JSON.stringify(row)); assert.ok(row.inDesc && !row.idIsButton, 'it is the name, and the id is text');
         assert.ok(/^Open task #\d+: [A-Z]/.test(row.name), 'its name says what it opens: ' + row.name);
         await ev(`document.querySelector('#board-task-list .board-task-item:not(.board-task-header) .board-task-desc').click(); true`);
-        await waitFor(`!!document.getElementById('task-detail-modal') && getComputedStyle(document.getElementById('task-detail-modal')).display !== 'none'`, 'the task opens', 8000);
-        await ev(`window.hideTaskDetailModal(); true`);
+        await waitFor(`!!document.querySelector('#team-panel-item #team-task-title') && document.getElementById('task-detail-modal') && getComputedStyle(document.getElementById('task-detail-modal')).display === 'none'`, 'the task opens as the team page\'s task page, not a dialog (#7644)', 12000);
+        await ev(`window.exitTeamPage && window.exitTeamPage({ force: true }); window.selectLiveSession('bt-agent', 'claude', 'bt-agent-id', 'local'); true`);
+        await waitFor(`document.querySelectorAll('#board-task-list .board-task-item').length > 0 && document.getElementById('board-task-list').getClientRects().length > 0`, 'the dock\'s list again', 8000);
         const ring = await ev(`[...document.querySelectorAll('#board-task-list *')].filter(e => { const c = getComputedStyle(e); return c.outlineStyle !== 'none' && parseFloat(c.outlineWidth) > 0; }).map(e => e.className)`);
-        assert.deepEqual(ring, [], 'no element of the list wears a ring after a mouse click and the dialog closing');
+        assert.deepEqual(ring, [], 'no element of the list wears a ring after a mouse click and the page being left');
 
         console.log('9. no colons on the Restart and Add Macro labels');
         const macro = await ev(`['macro-label-input', 'macro-command-input'].map(id => document.getElementById(id).closest('label').firstChild.textContent.trim())`);

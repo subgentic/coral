@@ -2,7 +2,7 @@
 //  - a row is one control, its name, and holds no icons over the Created time or the name; on a touch phone every control is a 44 px target and nothing is wider than the screen at 200% text
 //  - an error is red and an empty list shows its line without a table; "1 artifact"
 //  - Delete by keyboard (in the row's sheet): the confirmation, then Yes, and the focus lands on the next row's name (the previous row's when the last one went, Refresh when none is left), never the page
-//  - the outcome of a delete is in a live region that is always in the page; Retry leaves the focus on the panel, not the page; Refresh keeps the focus while it loads
+//  - the outcome of a delete is in a live region that is always in the page; Retry leaves the focus on the panel, not the page; a reload keeps the focus while it loads
 // Run against an isolated dev server. CORAL_SCREENSHOT_DIR=<dir> saves screenshots.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -54,12 +54,12 @@ const HEX = c => c.repeat(64);
 
         console.log('2. A singular count');
         await ev(`window.__items = [window.__items[0]]; true`);
-        await ev(`document.querySelector('#agentic-panel-artifacts-view .team-artifacts-refresh').click(); true`);
+        await ev(`import((window.__coralStatic || '/static/') + 'team_artifacts_page.js').then(m => m.loadArtifacts({ keep: true })); true`);
         await waitFor(`/^1 artifact$/.test((document.querySelector('#agentic-panel-artifacts-view .team-count-line') || {}).textContent || '')`, '"1 artifact"', 8000);
-        await ev(`window.__items = ${JSON.stringify(ITEMS)}; document.querySelector('#agentic-panel-artifacts-view .team-artifacts-refresh').click(); true`);
+        await ev(`window.__items = ${JSON.stringify(ITEMS)}; import((window.__coralStatic || '/static/') + 'team_artifacts_page.js').then(m => m.loadArtifacts({ keep: true })); true`);
         await waitFor(`document.querySelectorAll('${ROWS}').length === 3`, 'three rows again', 8000);
 
-        console.log('3. Delete by keyboard: the focus goes to the next row, the previous one, then Refresh');
+        console.log('3. Delete by keyboard: the focus goes to the next row, the previous one, then the search box');
         const deleteRow = async i => {
             await ev(`document.querySelectorAll('${ROWS} .team-row-btn')[${i}].focus(); true`);
             await press('Enter', 'Enter', 13);
@@ -84,12 +84,12 @@ const HEX = c => c.repeat(64);
         await waitFor(`window.__deletes.length === 3 && document.querySelectorAll('${ROWS}').length === 0`, 'the only row to go', 8000);
         await sleep(200); // sleep-ok: the focus is placed after the redraw
         a = await active();
-        assert.equal(a.body, undefined, JSON.stringify(a)); assert.equal(a.label, 'Refresh', 'Refresh when nothing is left');
+        assert.equal(a.body, undefined, JSON.stringify(a)); assert.match(a.label, /^Search this agent/, 'the search box when nothing is left (the tab has no Refresh)');
         assert.equal(await ev(`!!document.querySelector('#agentic-panel-artifacts-view .team-table')`), false, 'an empty list is its line, with no table header over nothing');
         assert.equal(await ev(`document.querySelector('#agentic-panel-artifacts-view .team-count-line').textContent`), 'No artifacts yet.');
 
-        console.log('4. An error is red, has no table, and Retry keeps the focus on the panel; Refresh keeps it while loading');
-        await ev(`window.__mode = 'error'; document.querySelector('#agentic-panel-artifacts-view .team-artifacts-refresh').click(); true`);
+        console.log('4. An error is red, has no table, and Retry keeps the focus on the panel; a reload keeps it while loading');
+        await ev(`window.__mode = 'error'; import((window.__coralStatic || '/static/') + 'team_artifacts_page.js').then(m => m.loadArtifacts({ keep: true })); true`);
         await waitFor(`!!document.querySelector('#agentic-panel-artifacts-view .team-artifacts-retry')`, 'the error with Retry', 8000);
         const err = await ev(`(() => { const s = document.querySelector('#agentic-panel-artifacts-view .team-artifacts-error'); const calm = document.createElement('p'); calm.className = 'goals-note team-count-line'; document.querySelector('#agentic-panel-artifacts-view').append(calm); const c = getComputedStyle(calm).color; calm.remove();
             return { color: getComputedStyle(s).color, calm: c, role: s.getAttribute('role'), table: !!document.querySelector('#agentic-panel-artifacts-view .team-table') }; })()`);
@@ -101,12 +101,10 @@ const HEX = c => c.repeat(64);
         await sleep(200); // sleep-ok: the focus is placed after the redraw
         a = await active();
         assert.equal(a.body, undefined, 'after Retry the focus is on the panel: ' + JSON.stringify(a));
-        // Refresh while the list loads: the focus stays on it.
-        await ev(`window.__mode = 'deferred'; window.__lists = 0; document.querySelector('#agentic-panel-artifacts-view .team-artifacts-refresh').focus(); true`);
-        await press('Enter', 'Enter', 13);
+        // A reload while the list loads (the tab reads itself, #7686): the focus stays where it was and the rows stay.
+        await ev(`window.__mode = 'deferred'; window.__lists = 0; document.querySelector('#agentic-panel-artifacts-view .list-bar-search').focus(); import((window.__coralStatic || '/static/') + 'team_artifacts_page.js').then(m => m.loadArtifacts({ keep: true })); true`);
         await waitFor(`window.__lists === 1 && !!window.__release`, 'the load to start', 8000);
-        a = await active();
-        assert.equal(a.label, 'Refresh', 'the focus stays on Refresh while it loads: ' + JSON.stringify(a));
+        assert.equal(await ev(`document.activeElement === document.querySelector('#agentic-panel-artifacts-view .list-bar-search')`), true, 'the focus stays in the search box while it loads');
         assert.equal(await ev(`document.querySelectorAll('${ROWS}').length`), 3, 'the rows stay on screen while it loads');
         await ev(`window.__release(); true`);
         await waitFor(`document.querySelectorAll('${ROWS}').length === 3 && !document.querySelector('#agentic-panel-artifacts-view .team-count-line').textContent.startsWith('Loading')`, 'the load to end', 8000);
@@ -119,11 +117,11 @@ const HEX = c => c.repeat(64);
         await ev(`window.switchAgenticTab('artifacts', 'top'); true`); await sleep(300); // sleep-ok: the tab shows over frames
         for (const size of ['', '32px']) {
             await ev(`document.documentElement.style.fontSize = '${size}'; document.getElementById('agentic-state').style.width = ''; true`);
-            await ev(`document.querySelector('#agentic-panel-artifacts-view .team-artifacts-refresh').click(); true`);
+            await ev(`import((window.__coralStatic || '/static/') + 'team_artifacts_page.js').then(m => m.loadArtifacts({ keep: true })); true`);
             await waitFor(`document.querySelectorAll('${ROWS}').length === 3`, 'the rows on the phone', 8000);
             await sleep(400); // sleep-ok: layout settles
             const m = await ev(`(() => { const small = [];
-                for (const b of document.querySelectorAll('${ROWS} .team-row-btn, #agentic-panel-artifacts-view .team-artifacts-refresh, #agentic-panel-artifacts-view .team-artifacts-help')) { const r = b.getBoundingClientRect(); if (r.height < 43.5 || (!b.classList.contains('team-row-btn') && r.width < 43.5)) small.push((b.getAttribute('aria-label') || b.textContent).slice(0, 20) + ' ' + Math.round(r.width) + 'x' + Math.round(r.height)); }
+                for (const b of document.querySelectorAll('${ROWS} .team-row-btn, #agentic-panel-artifacts-view .list-bar-more-btn')) { const r = b.getBoundingClientRect(); if (r.height < 43.5 || (!b.classList.contains('team-row-btn') && r.width < 43.5)) small.push((b.getAttribute('aria-label') || b.textContent).slice(0, 20) + ' ' + Math.round(r.width) + 'x' + Math.round(r.height)); }
                 return { small, docOver: document.documentElement.scrollWidth - innerWidth }; })()`);
             assert.deepEqual(m.small, [], `${size || '100%'}: every control is a 44 px target`);
             assert.ok(m.docOver <= 0, `${size || '100%'}: no sideways scroll`);

@@ -103,8 +103,9 @@ const { removeBoards } = require('./helpers/board_cleanup');
             const taskId = await ev(`(async () => { const r = await fetch('/api/board/${board}/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: 'A task with a rather long title that has to wrap in the dialog at large text sizes', body: 'Line one of the body.\\n\\n- a bullet with a long run of words that wraps\\n- another bullet\\n\\n~~~\\nsome_long_command --with-many --flags and-a-very-long-argument-that-does-not-wrap\\n~~~', created_by: 'Operator' }) }).catch(() => null); const d = r && r.ok ? await r.json().catch(() => null) : null; return d && (d.id || (d.task && d.task.id)) || null; })()`);
             if (taskId) {
                 await ev(`window.selectLiveSession('phone-bot-with-a-long-name', 'claude', 'phone-bot-with-a-long-name-id', 'local'); (document.getElementById('popout-panel-toggle-btn') || document.getElementById('panel-toggle-btn')).click(); window.switchAgenticTab('tasks', 'top'); true`); await settle(1500);
-                await probe('task details with content', () => ev(`window.showTaskDetailModal(${JSON.stringify(taskId)}); true`), '#task-detail-modal');
-                await ev(`window.hideTaskDetailModal && window.hideTaskDetailModal(); (document.getElementById('agentic-mobile-close-btn') || document.createElement('i')).click(); true`);
+                // a board's task is the team page's task page (#7644)
+                await probe('task page with content', () => ev(`window.openTeamPage(${JSON.stringify(board)}, { tab: 'tasks', item: ${JSON.stringify(taskId)} }); true`).then(() => ev(`new Promise(r => { const t0 = Date.now(); const go = () => (document.querySelector('#team-panel-item #team-task-title') && document.querySelector('#team-panel-item .goals-pinbar .btn')) || Date.now() - t0 > 8000 ? r(true) : setTimeout(go, 50); go(); })`)), '#team-panel-item');
+                await ev(`window.exitTeamPage && window.exitTeamPage({ force: true }); true`);
             } else report.push('task details: the board refused the task here, not probed');
         }
         const subset = async (tag) => {

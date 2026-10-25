@@ -40,8 +40,8 @@ const items = Array.from({ length: N }, (_, i) => ({ name: `report-${String(i).p
         check('all 300 are there, once each, in the list\'s order, and Load more is gone', names.length === N && new Set(names).size === N && names.every((n, i) => n === `report-${String(i).padStart(3, '0')}.md`) && (await more()) === null, `${names.slice(0, 2)} ... ${names.slice(-1)}`);
 
         console.log('2. refreshed twice quickly: no stale or doubled rows');
-        await ev(`window.__delay = 150; document.querySelector('.team-artifacts-refresh').click(); true`);
-        await ev(`document.querySelector('.team-artifacts-refresh').click(); true`); // again, while the first is still on its way
+        await ev(`window.__delay = 150; import((window.__coralStatic || '/static/') + 'team_artifacts_page.js').then(m => m.loadArtifacts({ keep: true })); true`);
+        await ev(`import((window.__coralStatic || '/static/') + 'team_artifacts_page.js').then(m => m.loadArtifacts({ keep: true })); true`); // again, while the first is still on its way
         await waitFor(`document.querySelectorAll('${ROWS}').length === 100`, 'the first page again', 15000);
         await ev(`${framesJs(6)}`);
         const again = await rowsNow();
@@ -54,7 +54,7 @@ const items = Array.from({ length: N }, (_, i) => ({ name: `report-${String(i).p
         await ev(`(() => { const v = window.__scroller(); const row = document.querySelectorAll('${ROWS}')[60]; v.scrollTop += row.getBoundingClientRect().top - v.getBoundingClientRect().top; return v.scrollTop; })()`);
         await ev(`${framesJs(3)}`); // the scroll event of a scroll the person made has long been delivered when they press Refresh
         const before = await topRow(), st0 = await ev(`window.__scroller().scrollTop`);
-        await ev(`window.__delay = 300; window.__until = performance.now() + 700; document.querySelector('.team-artifacts-refresh').click(); true`); // the answer takes 300 ms, so frames pass while the list loads (#6509: the refresh emptied the list, the box shrank and the browser clamped the scroll to 0)
+        await ev(`window.__delay = 300; window.__until = performance.now() + 700; import((window.__coralStatic || '/static/') + 'team_artifacts_page.js').then(m => m.loadArtifacts({ keep: true })); true`); // the answer takes 300 ms, so frames pass while the list loads (#6509: the refresh emptied the list, the box shrank and the browser clamped the scroll to 0)
         await waitFor(`performance.now() > window.__until && document.querySelectorAll('${ROWS}').length === 100`, 'the redraw (the slow answer has come)', 15000); // the 300 ms answer, and the frames after it
         await ev(`${framesJs(4)}`);
         const after = await topRow(), st1 = await ev(`window.__scroller().scrollTop`);
@@ -63,7 +63,7 @@ const items = Array.from({ length: N }, (_, i) => ({ name: `report-${String(i).p
 
         console.log('3. a small list is drawn whole at once');
         await ev(`window.__items = window.__items.slice(0, 12); true`); await ev(`${framesJs(2)}`);
-        await ev(`window.__counts = []; window.__mo && window.__mo.disconnect(); window.__mo = new MutationObserver(() => { const n = document.querySelectorAll('${ROWS}').length; if (!window.__counts.length || window.__counts[window.__counts.length - 1] !== n) window.__counts.push(n); }); window.__mo.observe(document.getElementById('agentic-panel-artifacts'), { childList: true, subtree: true }); true`); await ev(`document.querySelector('.team-artifacts-refresh').click(); true`);
+        await ev(`window.__counts = []; window.__mo && window.__mo.disconnect(); window.__mo = new MutationObserver(() => { const n = document.querySelectorAll('${ROWS}').length; if (!window.__counts.length || window.__counts[window.__counts.length - 1] !== n) window.__counts.push(n); }); window.__mo.observe(document.getElementById('agentic-panel-artifacts'), { childList: true, subtree: true }); true`); await ev(`import((window.__coralStatic || '/static/') + 'team_artifacts_page.js').then(m => m.loadArtifacts({ keep: true })); true`);
         await waitFor(`document.querySelectorAll('${ROWS}').length === 12`, 'a short list', 6000);
         await ev(`${framesJs(3)}`);
         const small = (await ev(`window.__counts`)).filter(n => n > 0 && n !== 100); // (the page still on screen when the refresh was pressed is not part of it)

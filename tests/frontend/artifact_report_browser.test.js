@@ -63,7 +63,7 @@ const sample = fs.readFileSync(path.join(__dirname,'fixtures/verification_report
         await ev(`document.querySelector('.artifact-report-controls button').click()`);
         assert.equal(await ev('window.__reads'),readsAfterOpen,'toggle never refetches');
         // Managed application/json uses the same report renderer.
-        await ev(`window.closeAllPreviewTabs();window.__inline=false;document.querySelector('#agentic-panel-artifacts .team-artifacts-refresh').click()`);await settle();
+        await ev(`window.closeAllPreviewTabs();window.__inline=false;import((window.__coralStatic || '/static/') + 'team_artifacts_page.js').then(m => m.loadArtifacts({ keep: true }))`);await settle();
         await openReport();
         assert.equal(await ev(`document.querySelector('.artifact-report-title').textContent`),'Task #2254');
         // Module-level adversarial and fallback checks run in the real browser.

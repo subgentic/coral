@@ -13,6 +13,7 @@ const SPEC = {
     searchLabel: 'Search messages',
     placeholder: 'Search messages',
     sorts: null,
+    collapsible: true, // the same Filters icon as Artifacts and Tasks (#7686); the jumps are behind the More icon
     fields: [
         { type: 'text', key: 'from', id: 'bm-from', className: 'list-bar-by', label: 'From', max: 80, placeholder: 'Agent or person', datalist: 'bm-from-list' },
         { type: 'check', key: 'mentions', id: 'bm-mentions', label: 'Mentions me', wrapClass: 'list-bar-field list-bar-kept' },
@@ -148,12 +149,7 @@ export function mountBoardSearch(host, project, hooks) {
         host.classList.remove('mb-tools-open');
     }
     if (!_bar) {
-        _bar = buildListBar(SPEC, run);
-        const first = make('button', 'list-bar-filter-btn mb-tool-btn', 'Jump to first'); first.type = 'button'; first.title = 'Jump to the first message of the board';
-        const latest = make('button', 'list-bar-filter-btn mb-tool-btn', 'Jump to latest'); latest.type = 'button'; latest.title = 'Jump to the latest message';
-        first.addEventListener('click', () => _hooks.first());
-        latest.addEventListener('click', () => _hooks.latest());
-        _bar.controls.append(first, latest);
+        _bar = buildListBar({ ...SPEC, more: [{ label: 'Jump to first message', run: () => _hooks.first() }, { label: 'Jump to latest message', run: () => _hooks.latest() }] }, run);
         _status = make('div', 'mb-search-status'); _status.hidden = true;
         _results = make('span', 'mb-search-results'); _results.setAttribute('role', 'status'); _results.setAttribute('aria-live', 'polite');
         const icon = (name, label, stepName) => { const b = make('button', 'list-bar-filter-btn mb-search-step'); b.type = 'button'; b.dataset.step = stepName; b.setAttribute('aria-label', label); b.title = label;

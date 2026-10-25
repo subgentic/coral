@@ -30,6 +30,6 @@ const specFor = (personal, page = false) => {
 };
 
 /** onChange(filters) is called with the new, clean filters when the person changes anything (typing after a short pause). personal: the bar of one agent's Artifacts tab. */
-export function buildBar(onChange, { personal = false, page = false, hooks = {} } = {}) {
-    return buildListBar(specFor(personal, page), onChange, hooks);
+export function buildBar(onChange, { personal = false, page = false, more = null, hooks = {} } = {}) {
+    return buildListBar({ ...specFor(personal, page), ...(more ? { more } : {}) }, onChange, hooks); // more: the list's other actions behind the More icon (#7686)
 }

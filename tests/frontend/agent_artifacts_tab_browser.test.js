@@ -87,8 +87,8 @@ const STUB = `(() => {
             await showAgent({ board_project: TEAM }, 'artifacts'); await settled();
             let r = await last();
             check(`${tag}: the agent's list is asked for with its session, the newest first, and the board's route (${JSON.stringify(r.query)})`, r.kind === 'board' && r.query.session_id === 'aa-1' && r.query.sort === 'newest' && r.project === TEAM);
-            const head = await ev(`(() => { const p = document.querySelector('${panel}'); const q = s => p.querySelector(s); const vis = e => !!e && e.getClientRects().length > 0; return { search: vis(q('.list-bar-search')), filters: vis(q('.list-bar-toggle')), refresh: vis(q('.team-artifacts-refresh')), copy: vis(q('.team-artifacts-help')), rows: p.querySelectorAll('tbody tr').length, heads: [...p.querySelectorAll('thead th')].map(h => h.textContent), count: (q('.list-bar-count') || {}).textContent }; })()`);
-            check(`${tag}: the tab is a table with the search, the filter icon, Refresh and Copy, (${JSON.stringify(head)})`, head.search && head.filters && head.refresh && head.copy && head.rows === 7 && head.heads[0] === 'Name' && /^7 artifact/.test(head.count || ''));
+            const head = await ev(`(() => { const p = document.querySelector('${panel}'); const q = s => p.querySelector(s); const vis = e => !!e && e.getClientRects().length > 0; return { search: vis(q('.list-bar-search')), filters: vis(q('.list-bar-toggle')), more: vis(q('.list-bar-more-btn')), refresh: !!q('.team-artifacts-refresh'), rows: p.querySelectorAll('tbody tr').length, heads: [...p.querySelectorAll('thead th')].map(h => h.textContent), count: (q('.list-bar-count') || {}).textContent }; })()`);
+            check(`${tag}: the tab is a table with the search, the filter icon and the More icon, no Refresh (${JSON.stringify(head)})`, head.search && head.filters && head.more && !head.refresh && head.rows === 7 && head.heads[0] === 'Name' && /^7 artifact/.test(head.count || ''));
             await ev(`document.querySelector('${panel} .list-bar-search').focus(); true`); await type('zebra'); await settle(900, 450);
             r = await last();
             check(`${tag}: a search is the server's, scoped to the agent (${JSON.stringify(r.query)}), and the count says N of M`, r.query.q === 'zebra' && r.query.session_id === 'aa-1' && (await ev(`document.querySelector('${panel} .list-bar-count').textContent`)).includes('1 of 7'));
@@ -102,10 +102,10 @@ const STUB = `(() => {
             await ev(`(() => { const q = document.querySelector('${panel} .list-bar-search'); q.value = ''; q.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
             await settle(900); await settled();
 
-            // ═══ Refresh asks again
+            // ═══ the tab reads itself again (no Refresh icon, #7686): the module's reload asks again
             const before = await ev('window.__req.length');
-            await ev(`document.querySelector('${panel} .team-artifacts-refresh').click(); true`); await settle(600);
-            check(`${tag}: Refresh asks again (${before} -> ${await ev('window.__req.length')} requests)`, (await ev('window.__req.length')) > before);
+            await ev(`import((window.__coralStatic || '/static/') + 'team_artifacts_page.js').then(m => m.loadArtifacts({ keep: true })); true`); await settle(600);
+            check(`${tag}: a reload asks again (${before} -> ${await ev('window.__req.length')} requests)`, (await ev('window.__req.length')) > before);
 
             // ═══ a row opens its document as a sheet over the panel; the chat is still there
             await ev(`document.querySelector('${panel} tbody tr .team-row-btn').focus(); document.querySelector('${panel} tbody tr .team-row-btn').click(); true`);
@@ -132,8 +132,8 @@ const STUB = `(() => {
             // ═══ an agent with no team: the table of the files it uploaded, no search (the standalone route has no query)
             await showAgent({ board_project: null, session_id: 'solo-1', name: 'solo' }, 'artifacts'); await settled();
             r = await last();
-            const solo = await ev(`(() => { const p = document.querySelector('${panel}'); const vis = e => !!e && e.getClientRects().length > 0; return { bar: vis(p.querySelector('.list-bar-search')), rows: p.querySelectorAll('tbody tr').length, refresh: vis(p.querySelector('.team-artifacts-refresh')) }; })()`);
-            check(`${tag}: an agent with no team: the standalone route, the table and Refresh, no search bar (${JSON.stringify(solo)})`, r.kind === 'standalone' && r.query.session_id === 'solo-1' && !solo.bar && solo.rows === 3 && solo.refresh);
+            const solo = await ev(`(() => { const p = document.querySelector('${panel}'); const vis = e => !!e && e.getClientRects().length > 0; return { bar: vis(p.querySelector('.list-bar-search')), rows: p.querySelectorAll('tbody tr').length, more: vis(p.querySelector('.list-bar-more-btn')) }; })()`);
+            check(`${tag}: an agent with no team: the standalone route, the table and the More icon, no search bar (${JSON.stringify(solo)})`, r.kind === 'standalone' && r.query.session_id === 'solo-1' && !solo.bar && solo.rows === 3 && solo.more);
         }
         const failed = results.filter(x => !x).length;
         console.log(`${results.length - failed} of ${results.length} checks passed`);

@@ -48,8 +48,10 @@ const TEAM = `qa-design-${Date.now() % 100000}`;
                 assert.equal(m.ph, 'Search messages', 'the placeholder');
                 assert.ok(Math.abs(m.left - tasks.left) <= 1, `the search box's left edge ${m.left} is the Tasks tab's ${tasks.left}`);
                 assert.ok(Math.abs(m.top - tasks.top) <= 6, `its top ${m.top} is the Tasks tab's ${tasks.top} (not 4 px under the tab strip)`);
-                const btns = await ev(`['Filters', 'Jump to first', 'Jump to latest'].map(n => { const b = [...${panel()}.querySelectorAll('button')].find(x => x.textContent.trim() === n && window.__na.vis(x)); if (!b) return [n, null]; const c = getComputedStyle(b); return [n, [c.fontWeight, Math.round(b.getBoundingClientRect().height), c.backgroundColor === getComputedStyle(document.body).backgroundColor]]; })`);
-                for (const [n, v] of btns) { assert.ok(v, `${n} is there`); assert.deepEqual([v[0], v[1] >= 32, v[2]], ['500', true, false], `${n} is in the page's button style (13/500, 32 px, a fill): ${JSON.stringify(v)}`); }
+                // the toolbar is the Artifacts and Tasks tabs' (#7686): the Filters icon and the More icon (the jumps are its menu items), no text buttons
+                const btns = await ev(`[['.list-bar-toggle', 'Filters and sort'], ['.list-bar-more-btn', 'More']].map(([sel, n]) => { const b = ${panel()}.querySelector(sel); if (!b || !window.__na.vis(b)) return [n, null]; return [n, [b.getAttribute('aria-label'), Math.round(b.getBoundingClientRect().height)]]; })`);
+                for (const [n, v] of btns) { assert.ok(v, `${n} is there`); assert.deepEqual([v[0], v[1] >= 32], [n, true], `${n} is an icon button of 32 px or more: ${JSON.stringify(v)}`); }
+                assert.equal(await ev(`[...${panel()}.querySelectorAll('button')].filter(x => ['Filters', 'Jump to first', 'Jump to latest'].includes(x.textContent.trim()) && window.__na.vis(x)).length`), 0, 'no text button Filters or Jump on the toolbar');
             });
 
             await S.run(`${label}: item 5, New task is on the search row on a phone (beside the chips on a desktop), and no chip clips its text`, async () => {

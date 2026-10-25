@@ -91,7 +91,7 @@ const base=require('./test_base').BASE;
  await tab('artifacts');await waitFor(`/Personal a/.test(document.querySelector('#agentic-panel-artifacts-view').textContent)`,'the list');
  await click('#agentic-panel-artifacts tbody tr .team-row-btn');await waitFor(`!!document.querySelector('#agentic-detail-pane .detail-foot .btn')`,'the sheet');await ev(`[...document.querySelectorAll('#agentic-detail-pane .detail-foot .btn')].find(b=>b.textContent==='Open').click()`);await ev(`document.querySelector('#agentic-detail-pane .detail-close').click()`);assert.match(await ev(`document.getElementById('preview-body').textContent`),/Artifact body/);await ev('window.closeAllPreviewTabs()');await settle();assert.equal(await ev(`document.getElementById('agentic-tab-artifacts').classList.contains('active')`),true);
  await tab('artifacts');assert.equal(await ev(`calls.filter(x=>x.includes('/artifacts?')).length`),1);
- await ev(`window.defer=true;document.querySelector('#agentic-panel-artifacts-view .team-artifacts-refresh').click()`);await settle();
+ await ev(`window.defer=true;import((window.__coralStatic || '/static/') + 'team_artifacts_page.js').then(m => m.loadArtifacts({ keep: true })); true`);await settle();
  await ev(`window.defer=false;s.currentSession={...s.currentSession,session_id:'b',working_directory:'/repo-b/subdir'};f.syncFilesViewerSession();pending.splice(0).forEach(r=>r())`);await settle();
  await waitFor(`/Personal b/.test(document.querySelector('#agentic-panel-artifacts-view').textContent)`,'the second agent\'s list');assert.doesNotMatch(await ev(`document.querySelector('#agentic-panel-artifacts-view').textContent`),/Personal a/);
  await tab('browse');assert.doesNotMatch(await tree(),/main.go/);assert.match(await tree(),/repo-b/);

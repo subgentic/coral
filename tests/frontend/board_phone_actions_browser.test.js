@@ -1,5 +1,5 @@
 // The Message Board on a phone (#7183, UI/UX's #7180 findings 4 and 6): the search and its buttons are one "Search" row that opens on a tap (a wider window shows the bar as before); each message's actions are one
-// "..." that opens a sheet with Save for later and, set apart from it, Delete (Delete is never beside Save); the two jump buttons say "Jump to first" and "Jump to latest". 390 px with touch, and 1280 px.
+// "..." that opens a sheet with Save for later and, set apart from it, Delete (Delete is never beside Save); the two jumps are items of the search bar's More menu: "Jump to first message" and "Jump to latest message". 390 px with touch, and 1280 px.
 // Real isolated server, a board made through the API (and removed again). Drives Chrome over CDP through agent_view_harness.js.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -29,12 +29,12 @@ const S = `(window.__coralStatic || '/static/')`;
         assert.equal(await shown('#mb-tools .mb-search-toggle'), true, 'a Search row');
         assert.equal((await ev(`document.querySelector('#mb-tools .mb-search-toggle').textContent`)), 'Search');
         assert.ok(await ev(`document.querySelector('#mb-tools .mb-search-toggle').getBoundingClientRect().height >= 43.5`), 'it is 44 px');
-        assert.equal(await shown('#mb-tools .list-bar-bar'), false, 'the search box and its three buttons are folded away');
+        assert.equal(await shown('#mb-tools .list-bar-bar'), false, 'the search box and its icons are folded away');
         assert.equal(await ev(`document.querySelector('#mb-tools .mb-search-toggle').getAttribute('aria-expanded')`), 'false');
         await ev(`document.querySelector('#mb-tools .mb-search-toggle').click(); true`);
         assert.equal(await shown('#mb-tools .list-bar-bar'), true, 'a tap opens the bar');
         assert.equal(await ev(`document.querySelector('#mb-tools .mb-search-toggle').getAttribute('aria-expanded')`), 'true');
-        assert.deepEqual(await ev(`[...document.querySelectorAll('#mb-tools .mb-tool-btn')].map(b => b.textContent)`), ['Jump to first', 'Jump to latest'], 'the jump buttons say what they do');
+        assert.deepEqual(await ev(`[...document.querySelectorAll('#mb-tools .list-bar-more-menu [role=menuitem]')].map(b => b.textContent)`), ['Jump to first message', 'Jump to latest message'], 'the jumps are menu items of the More icon and say what they do (#7686)');
         await ev(`document.querySelector('#mb-tools .mb-search-toggle').click(); true`);
         assert.equal(await shown('#mb-tools .list-bar-bar'), false, 'and folds again');
         assert.equal(await ev(`[...document.querySelectorAll('.mb-message-header .mb-delete-msg-btn')].filter(b => b.getClientRects().length).length`), 0, 'no Delete cross beside the time');
@@ -68,7 +68,7 @@ const S = `(window.__coralStatic || '/static/')`;
         assert.equal(await shown('#mb-tools .mb-search-toggle'), false, 'no Search row on a wide screen');
         assert.equal(await shown('#mb-tools .list-bar-bar'), true, 'the bar is shown as before');
         assert.equal(await ev(`[...document.querySelectorAll('.mb-msg-more')].filter(b => b.getClientRects().length).length`), 0, 'no "..." on a wide screen');
-        assert.deepEqual(await ev(`[...document.querySelectorAll('#mb-tools .mb-tool-btn')].map(b => b.textContent)`), ['Jump to first', 'Jump to latest']);
+        assert.deepEqual(await ev(`[...document.querySelectorAll('#mb-tools .list-bar-more-menu [role=menuitem]')].map(b => b.textContent)`), ['Jump to first message', 'Jump to latest message']);
         console.log('PASS the board on a phone');
     } finally { await clearSaved(api).catch(() => {}); await removeBoards(ev, [board]).catch(() => {}); await client.close(); }
 })().catch(err => { console.error(err); process.exit(1); });

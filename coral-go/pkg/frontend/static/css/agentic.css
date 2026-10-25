@@ -2342,7 +2342,7 @@ body.panel-dragging .agentic-state {
 /* On a touch screen every control of the table is a 44 px target, and the five icons wrap into two rows of three and two inside their column (#4469). */
 @media (pointer: coarse) {
     .team-artifact-icon-btn { min-width: 44px; min-height: 44px; }
-    .team-artifacts-help { min-width: 44px; min-height: 44px; }
+    .list-bar-more-btn { min-width: 44px; min-height: 44px; }
 }
 
 /* Human-readable JSON artifacts, without changing their source/download. */
@@ -2411,7 +2411,7 @@ body.panel-dragging .agentic-state {
 .team-health-btn.is-on { color: var(--accent); }
 .team-health-btn.is-on svg { stroke-width: 2.2; }
 .team-health-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; color: var(--text-primary); }
-.team-artifacts-help .material-icons { font-size: 1.125rem; }
+.list-bar-more { position: relative; display: inline-flex; align-items: center; } /* the toolbar's More icon and its menu (#7686) */
 
 /* A custom view written by an automated caller waits for the user's click (custom_views.js). */
 .custom-view-gate { padding: 16px; display: flex; flex-direction: column; gap: 10px; }
@@ -2519,3 +2519,4 @@ body.panel-dragging .agentic-state {
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
     .task-detail-meta { flex-direction: column; align-items: flex-start; }
 }
+.list-bar-more-menu { min-width: 240px; white-space: nowrap; } /* "Copy publishing instructions" on one line */

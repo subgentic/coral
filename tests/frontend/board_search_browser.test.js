@@ -45,13 +45,14 @@ const { removeBoards } = require('./helpers/board_cleanup');
     const snap = async () => { await waitFor(IN_VIEW, 'the current match in view', { timeout: 3000 }).catch(() => {}); return snap0(); };
     const snap0 = () => ev(`(() => { const c = document.getElementById('mb-messages'); const cur = c.querySelector(':scope > .mb-message-current'); const bar = document.getElementById('mb-tools'); const st = bar.querySelector('.mb-search-status');
         const rows = [...c.querySelectorAll(':scope > .mb-message')]; const ids = rows.map(r => r.dataset.messageId);
-        return { controls: [...bar.querySelectorAll('.list-bar-controls button')].map(b => b.textContent.trim().replace(/\\s*\\(\\d+\\)$/, '')), results: st && !st.hidden ? bar.querySelector('.mb-search-results').textContent : null, chips: [...bar.querySelectorAll('.list-bar-chip-text')].map(e => e.textContent),
+        return { controls: [...bar.querySelectorAll('.list-bar-search-row > .list-bar-toggle, .list-bar-search-row .list-bar-more-btn')].map(b => b.getAttribute('aria-label')), menu: [...bar.querySelectorAll('.list-bar-more-menu [role=menuitem]')].map(b => b.textContent), results: st && !st.hidden ? bar.querySelector('.mb-search-results').textContent : null, chips: [...bar.querySelectorAll('.list-bar-chip-text')].map(e => e.textContent),
             rows: rows.length, unique: new Set(ids).size === ids.length, marks: c.querySelectorAll('mark.mb-hit').length, matchRows: c.querySelectorAll('.mb-message-match, .mb-message-current').length, current: cur && Number(cur.dataset.messageId),
             curVisible: cur ? (() => { const a = cur.getBoundingClientRect(), b = c.getBoundingClientRect(); return a.top >= b.top - 2 && a.bottom <= b.bottom + 2; })() : null, focusOnCurrent: !!cur && document.activeElement === cur,
             steps: [...bar.querySelectorAll('button[data-step]')].map(b => b.dataset.step + (b.disabled ? ':off' : ':on')).join(), firstId: rows.length ? Number(rows[0].dataset.messageId) : null, atTop: c.scrollTop < 4, atBottom: c.scrollHeight - c.scrollTop - c.clientHeight < 6 }; })()`);
     const onScreen = () => settle(`(() => { const c = document.getElementById('mb-messages'); const m = c.querySelector(':scope > .mb-message-current'); if (!m) return false; const a = m.getBoundingClientRect(), b = c.getBoundingClientRect(); return a.top >= b.top - 2 && a.bottom <= b.bottom + 2 && document.activeElement === m; })()`, 'the match on screen');
     const type = async (sel, text) => { await ev(`document.querySelector(${JSON.stringify(sel)}).focus(); true`); await Input.insertText({ text }); };
     const click = sel => ev(`document.querySelector(${JSON.stringify(sel)}).click(); true`);
+    const jump = async (name) => { await click('#mb-tools .list-bar-more-btn'); await settle(`!document.querySelector('#mb-tools .list-bar-more-menu').hidden`, 'the More menu'); await ev(`[...document.querySelectorAll('#mb-tools .list-bar-more-menu [role=menuitem]')].find(b => b.textContent === ${JSON.stringify(name)}).click(); true`); }; // a jump is a menu item of the More icon
     const ratio = theme => ev(`(() => { ${themeJs(theme)};
         const px = c => { const x = document.createElement('canvas').getContext('2d'); x.fillStyle = '#000'; x.fillStyle = c; x.fillRect(0, 0, 1, 1); return [...x.getImageData(0, 0, 1, 1).data].slice(0, 3); };
         const L = ([r, g, bl]) => [r, g, bl].map(v => v / 255).map(v => v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4).reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0);
@@ -72,7 +73,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await settle(`document.querySelectorAll('#mb-messages > .mb-message').length >= 50`, 'the latest page');
 
         let s = await snap();
-        check('the tools row has Filters, Jump to first and Jump to latest; no results line yet (#7183)', s.controls.join() === 'Filters,Jump to first,Jump to latest' && s.results === null, JSON.stringify([s.controls, s.results]));
+        check('the tools row has the Filters icon and the More icon (the jumps are in its menu, #7686); no results line yet (#7183)', s.controls.join() === 'Filters and sort,More' && s.menu.join() === 'Jump to first message,Jump to latest message' && s.results === null, JSON.stringify([s.controls, s.menu, s.results]));
         // The retry total: messages with the word retry in any form (the code messages hold it too).
         await type('#bm-search', 'retry');
         await settle(`document.querySelector('#mb-tools .mb-search-results')?.textContent.startsWith('1 of ')`, 'the first result');
@@ -99,7 +100,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         check('a match older than the loaded page loads the pages between, each message once, and lands on it', s.rows > rowsBefore && s.unique && s.curVisible === true && s.focusOnCurrent, JSON.stringify([rowsBefore, s.rows, s.unique, s.curVisible]));
 
         // From and the search together
-        await click('#mb-tools .list-bar-filter-btn');
+        await click('#mb-tools .list-bar-toggle');
         await type('#bm-from', 'dev-2');
         await settle(`document.querySelector('#mb-tools .mb-search-results')?.textContent === '1 of ${EXPECT.retryDev2} matches'`, 'retry from dev-2');
         s = await snap();
@@ -107,7 +108,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         // Mentions me alone (clear the text and the sender first)
         await click('#mb-tools .list-bar-clear-all');
         await settle(`document.querySelector('#mb-tools .mb-search-status').hidden`, 'cleared by Clear all');
-        await click('#mb-tools .list-bar-filter-btn');
+        await click('#mb-tools .list-bar-toggle');
         await ev(`(() => { const k = document.getElementById('bm-mentions'); k.checked = true; k.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
         await settle(`document.querySelector('#mb-tools .mb-search-results')?.textContent === '1 of ${EXPECT.mentions} matches'`, 'mentions me');
         await onScreen(); s = await snap();
@@ -118,12 +119,12 @@ const { removeBoards } = require('./helpers/board_cleanup');
         check('Clear takes the search away: no results line, no marks, no marked rows', s.results === null && s.marks === 0 && s.matchRows === 0 && s.chips.length === 0, JSON.stringify([s.results, s.marks, s.matchRows]));
 
         // First and Latest
-        await click('#mb-tools .mb-tool-btn');
+        await jump('Jump to first message');
         await settle(`document.getElementById('mb-messages').scrollTop < 4 && document.querySelectorAll('#mb-messages > .mb-message').length >= ${N}`, 'First: everything loaded, at the top');
         s = await snap();
         const ids = await ev(`[...document.querySelectorAll('#mb-messages > .mb-message')].map(r => Number(r.dataset.messageId))`);
         check('First loads every earlier page and lands on the first message of the board, each once', s.atTop && s.unique && ids[0] === Math.min(...ids) && s.rows >= N, JSON.stringify([s.rows, ids[0], s.atTop]));
-        await ev(`[...document.querySelectorAll('#mb-tools .mb-tool-btn')].find(b => b.textContent === 'Jump to latest').click(); true`);
+        await jump('Jump to latest message');
         await settle(`(() => { const c = document.getElementById('mb-messages'); return c.scrollHeight - c.scrollTop - c.clientHeight < 6; })()`, 'Latest: the bottom');
         check('Latest is the bottom of the board', (await snap()).atBottom);
 

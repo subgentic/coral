@@ -67,18 +67,19 @@ const A = 'a'.repeat(64), B = 'b'.repeat(64), C = 'c'.repeat(64);
             assert.equal((await rows()).length, 2, `the row is gone: ${JSON.stringify(await rows())}`);
             assert.ok(await ev(`document.activeElement && document.activeElement.classList.contains('team-row-btn')`), 'the focus is on a row, not the page');
         });
-        await S.run('Refresh asks the list again', async () => {
+        await S.run('the list reads itself again (it has no Refresh button: the tab refreshes itself, #7686)', async () => {
             const before = (await ev(`window.__req`)).length;
-            assert.ok(await click('#team-panel-artifacts button', /^Refresh$/), 'a Refresh button'); await settle(500);
+            assert.equal(await ev(`![...document.querySelectorAll('#team-panel-artifacts button')].some(x => /^Refresh$/.test(window.__na.name(x)))`), true, 'no Refresh button');
+            await ev(`import((window.__coralStatic || '/static/') + 'team_artifacts_page.js').then(m => m.loadArtifacts({ keep: true })); true`); await settle(500);
             assert.ok((await ev(`window.__req`)).length > before, 'a new request');
         });
         // The panel is rebuilt on every change, which once dropped the keyboard focus (team_artifacts.js keeps it): a guard the old keyboard suite held, now for the team page (#7457).
-        await S.run('Refresh and Load more keep the keyboard focus in the list, not on the page', async () => {
+        await S.run('a reload and Load more keep the keyboard focus in the list, not on the page', async () => {
             const inList = `!!document.activeElement && document.activeElement !== document.body && !!document.activeElement.closest('#team-panel-artifacts')`;
             await ev(`window.__paged = true; true`);
-            await ev(`(() => { const b = [...document.querySelectorAll('#team-panel-artifacts button')].find(x => /^Refresh$/.test(window.__na.name(x))); b.focus(); b.click(); return true; })()`);
+            await ev(`document.querySelector('#team-panel-artifacts tbody .team-row-btn').focus(); import((window.__coralStatic || '/static/') + 'team_artifacts_page.js').then(m => m.loadArtifacts({ keep: true })); true`); // a reload with the focus on a row
             await waitFor(`!![...document.querySelectorAll('#team-panel-artifacts button')].find(x => /^Load more$/.test(window.__na.name(x)))`, 'Load more after the refreshed first page', 6000);
-            assert.ok(await ev(inList), 'after Refresh the focus is still in the list');
+            assert.ok(await ev(inList), 'after a reload the focus is still in the list');
             await ev(`(() => { const b = [...document.querySelectorAll('#team-panel-artifacts button')].find(x => /^Load more$/.test(window.__na.name(x))); b.focus(); b.click(); return true; })()`);
             await waitFor(`document.querySelectorAll('#team-panel-artifacts tbody tr').length === 3`, 'the next page', 6000);
             await waitFor(inList, 'the focus back in the list after Load more', 3000).catch(async e => { throw new Error(e.message + ' (focus is on ' + JSON.stringify(await ev(`(() => { const a = document.activeElement; return a ? a.tagName + '.' + a.className + ' ' + (a.textContent || '').slice(0, 30) : null; })()`)) + ')'); });
