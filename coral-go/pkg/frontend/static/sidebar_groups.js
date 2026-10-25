@@ -72,7 +72,7 @@ export function syncPaneGroupToggle(kind) {
 
 let open = null;     // { kind, key }: the table on screen
 
-const dash = '<span aria-label="none">&mdash;</span>';
+const dash = '<span aria-hidden="true">&mdash;</span><span class="sr-only">none</span>'; // an empty cell: the mark is drawn, a reader hears "none" (a span with only an aria-label is not announced)
 
 /** The actions a row's button may name, each as the literal attribute: a source names one of these, never its own text. */
 const ROW_ACTION_ATTR = { 'history-open': 'data-on-click="history-open"', 'board-open': 'data-on-click="board-open"', 'job-select': 'data-on-click="job-select"', 'doc-open': 'data-on-click="doc-open"', 'wf-select': 'data-on-click="wf-select"' };
