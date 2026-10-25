@@ -250,7 +250,7 @@ function drawDetailRaw() {
     else if (tasks.failed !== undefined) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, W.failedText(tasks.failed).replace('Goals', 'Tasks')), btn('btn btn-small', 'Try again', () => loadTasks(g.id))); col.append(f); }
     else if (!tasks.rows.length) { /* said by the rollup sentence above */ }
     else {
-        const live = tasks.rows.filter(t => W.taskStateWord(t.state) !== 'Done'), idle = live.filter(t => !agentFor(t));
+        const live = tasks.rows.filter(t => W.taskStateWord(t.state) !== 'Done'), idle = live.filter(t => W.taskStateWord(t.state) === 'Queued' && !t.assignee); // nobody has taken these: a task whose agent runs on another computer is not one of them (UI/UX's review of #7404)
         if (idle.length) col.append(el('p', 'goals-note goals-nobody', W.nobodyWorkingText(idle.length, live.length)));
         const ul = el('ul', 'goal-tasks'); ul.setAttribute('aria-label', `Tasks of ${g.title}`); for (const t of tasks.rows.slice(0, tasks.shown)) ul.append(taskRow(t)); col.append(ul);
         const total = taskTotal(g, tasks), left = Math.max(tasks.rows.length - tasks.shown, 0) || (tasks.cursor ? Math.max(total - tasks.shown, 1) : 0);

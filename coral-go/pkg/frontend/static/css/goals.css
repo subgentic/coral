@@ -141,7 +141,7 @@
     .goal-task-sub { grid-column: 3; max-width: 24ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .goal-task .goal-chip { grid-column: 4; }
     .goal-task-actions { grid-column: 5; justify-content: flex-end; }
-    .goal-task { grid-template-columns: auto minmax(0, 1fr) auto auto auto; }
+    .goal-task { grid-template-columns: 3rem minmax(0, 1fr) auto auto auto; } /* the number has a column of its own, so the titles line up (#101 and #7414 alike) */
 }
 @container (max-width: 559px) { .goal-task-sub { grid-column: 2 / -1; grid-row: 2; max-width: none; white-space: normal; } }
 @container (max-width: 879px) { .goals-cols { grid-template-columns: minmax(0, 1fr); } }

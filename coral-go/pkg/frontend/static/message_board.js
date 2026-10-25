@@ -194,6 +194,7 @@ export function showMessageBoardProjects() {
     applyBoardFace(null);
     hideBoardSubscribers();
     for (const list of ['mb-subscribers-list', 'mb-subscribers-sheet-list']) { const el = document.getElementById(list); if (el) el.innerHTML = '<li class="mb-project-meta">Open a board to see who is subscribed.</li>'; }
+    setMembersCount(0);
     boardPageChanged();
     document.getElementById('messageboard-view').classList.remove('mb-has-board');
     const backBtn2 = document.getElementById('mb-back-btn');
@@ -689,6 +690,9 @@ function formatTime(iso) {
 
 
 
+/** One word for the right panel, with how many are in it: the header's Members button (the desktop's, which brings the panel back on the Goals face, and the phone's, which opens its sheet). */
+function setMembersCount(n) { for (const id of ['mb-members-btn', 'mb-subscribers-btn']) { const b = document.getElementById(id); if (b) b.textContent = n ? `Members ${n}` : 'Members'; } }
+
 async function loadBoardSubscribers(project) {
     try {
         const subs = await fetchSubscribers(project);
@@ -698,7 +702,8 @@ async function loadBoardSubscribers(project) {
         // The column and the phone sheet (#3610) show the same list.
         const lists = ['mb-subscribers-list', 'mb-subscribers-sheet-list'].map(id => document.getElementById(id)).filter(Boolean);
         if (!subs.length) {
-            for (const list of lists) list.innerHTML = '<li class="mb-project-meta">No subscribers</li>';
+            for (const list of lists) list.innerHTML = '<li class="mb-project-meta">No members</li>';
+            setMembersCount(0);
             return;
         }
         const html = subs.map(s => {
@@ -711,6 +716,7 @@ async function loadBoardSubscribers(project) {
             </li>`;
         }).join('');
         for (const list of lists) list.innerHTML = html;
+        setMembersCount(subs.length);
     } catch (e) {
         console.error('Failed to load subscribers:', e);
     }

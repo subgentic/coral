@@ -73,7 +73,7 @@ const innerHeightOf = h => h;
             assert.equal(await ev(`document.querySelector('.goal-tasks').getAttribute('aria-label')`), 'Tasks of ' + (await texts('.goals-detail-title'))[0], `${at}: the task list has a name (#7250)`);
             assert.deepEqual(await texts('.goal-task-sub'), ['goal-qa · signing', 'nobody-here']);
             assert.equal(await ev(`document.querySelectorAll('#mb-goals .goal-open-agent').length`), 0, `${at}: no agent runs here: no disabled button on any row`);
-            assert.deepEqual(await texts('.goals-nobody'), ['Nobody is working on these yet'], `${at}: said once over the tasks, not on every row`);
+            assert.deepEqual(await texts('.goals-nobody'), ['Nobody is working on 1 of these yet'], `${at}: said once over the tasks, not on every row; only the queued task nobody has taken counts (#101 and #102 have an assignee whose agent is not on this computer, #7414)`);
             await ev(`document.querySelector('.goal-open-task').click(); true`);
             assert.deepEqual(await ev(`window.__shownTasks`), [101], `${at}: Open task opens that task`);
             if (mobile && !zoom && process.env.CORAL_SCREENSHOT_DIR) { const fs = require('node:fs'); fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); await new Promise(r => setTimeout(r, 300)); /* sleep-ok: a screenshot waits out transitions */ fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/goals-390-detail.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
@@ -177,7 +177,7 @@ const innerHeightOf = h => h;
         await ev(`document.querySelector('.goal-card[data-goal-id="1"]').click(); true`);
         await waitFor(`document.querySelectorAll('#mb-goals .goal-task').length === 3`, 'the tasks', 8000);
         assert.equal(await ev(`document.querySelectorAll('.goal-open-agent').length`), 1, 'only the task whose agent runs here has Open the agent');
-        assert.deepEqual(await texts('.goals-nobody'), ['Nobody is working on 2 of these yet'], 'and the line says how many have nobody');
+        assert.deepEqual(await texts('.goals-nobody'), ['Nobody is working on 1 of these yet'], 'the line says how many have nobody: the same with or without the agent here, only the queued task nobody has taken counts (#7414)');
         await ev(`document.querySelector('.goal-open-agent').click(); true`);
         assert.equal(await ev(`window.__opened.length`), 1); assert.equal(await ev(`window.__opened[0][2]`), 'goal-qa-id', 'it opens that agent');
         const shotDir = process.env.CORAL_SCREENSHOT_DIR;

@@ -115,7 +115,7 @@ const VIEWS = [
                 return { display: getComputedStyle(b).display, right: Math.round(innerWidth - r.right), left: Math.round(r.left), clipped: b.scrollWidth > b.clientWidth + 0.5,
                     name: b.textContent.trim(), haspopup: b.getAttribute('aria-haspopup'), controls: b.getAttribute('aria-controls'), expanded: b.getAttribute('aria-expanded') }; })()`);
             check(`${tag}: a Subscribers button shows in the header, inside the gutter, not clipped, named and marked as opening a dialog`,
-                !!btn && btn.display !== 'none' && btn.right >= v.gutter && btn.left >= v.gutter && !btn.clipped && btn.name === 'Subscribers'
+                !!btn && btn.display !== 'none' && btn.right >= v.gutter && btn.left >= v.gutter && !btn.clipped && /^Members( \d+)?$/.test(btn.name)
                 && btn.haspopup === 'dialog' && btn.controls === 'mb-subscribers-sheet' && btn.expanded === 'false', JSON.stringify(btn));
             if (!btn) return; // nothing to open
             await openSheet();
@@ -130,7 +130,7 @@ const VIEWS = [
                     sheet: [Math.round(c.left), Math.round(c.right), Math.round(c.bottom)], innerWidth, innerHeight,
                     pageScroll: document.documentElement.scrollWidth - document.documentElement.clientWidth }; })()`);
             check(`${tag}: the sheet is a labelled modal dialog listing every subscriber, inside the window, none clipped`,
-                m.role === 'dialog' && m.modal === 'true' && m.label === 'Subscribers' && m.expanded === 'true' && m.rows >= 3
+                m.role === 'dialog' && m.modal === 'true' && m.label === 'Members' && m.expanded === 'true' && m.rows >= 3
                 && !m.clipped.length && !m.outside.length && m.sheet[0] >= 0 && m.sheet[1] <= m.innerWidth && m.sheet[2] <= m.innerHeight + 1 && m.pageScroll <= 0, JSON.stringify(m));
             if (shots) await save(`board-spacing-sheet-${tag.replace(/ /g, '-')}.png`);
             const inside = [];
