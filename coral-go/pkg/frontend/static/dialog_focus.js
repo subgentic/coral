@@ -22,7 +22,7 @@ function focusables(dialog) {
 // face, rebuilt when a task arrives) is gone from the page: its successor, the element with the same id, takes the focus, so it does not drop to the page.
 function returnTarget(opener) {
     if (!opener) return null;
-    if (!opener.isConnected) { const next = opener.id ? document.getElementById(opener.id) : null; return visible(next) ? next : null; }
+    if (!opener.isConnected) { const next = opener.id ? document.getElementById(opener.id) : null; return visible(next) && next.tagName === opener.tagName ? next : null; } // the same kind of element: an id now on an input or a link is not the opener redrawn
     if (visible(opener)) return opener;
     for (let el = opener.parentElement; el; el = el.parentElement) {
         if (!el.id) continue;
