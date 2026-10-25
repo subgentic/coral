@@ -523,9 +523,9 @@
 
     <!-- Restart Modal -->
     <div id="restart-modal" class="modal" role="dialog" aria-labelledby="restart-title" aria-modal="true" style="display:none">
-        <div class="modal-content sd-modal-content">
+        <div class="modal-content sd-modal-content launch-wizard restart-wizard-content">
             <div class="modal-header">
-                <h3 id="restart-title">Restart Session</h3>
+                <h3 id="restart-title">Restart agent</h3>
                 <p id="restart-modal-name" class="sd-sub"></p>
             </div>
             <div class="modal-body settings-modal-body">
@@ -538,7 +538,7 @@
                 </div>
             </div>
             <div class="modal-actions modal-footer">
-                <button class="btn" data-on-click="m-hide-restart-modal">Cancel</button>
+                <button class="btn" id="restart-cancel" data-on-click="m-hide-restart-modal">Cancel</button>
                 <button class="btn btn-warning" data-on-click="m-confirm-restart">Restart</button>
             </div>
         </div>

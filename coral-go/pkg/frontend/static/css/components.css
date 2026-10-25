@@ -4850,7 +4850,7 @@ body:has(#nav-tab-hub-inbox.active) #saved-btn .saved-count { display: none; }
    Step 1 the folder (and, above, the machine), step 2 the persona page, step 3 the tabs Agent, Permissions and Advanced. The dialog has ONE size for every step and
    tab (the smaller of 640 px and the window minus 32 px; a full-height sheet on a phone): the body scrolls inside it, the header, the recap and the footer stay put, and
    the notes a provider adds sit in a slot already as tall as the longest one, so nothing moves when a note comes or goes. Cancel is leftmost on every step. */
-#launch-modal .modal-content.launch-wizard-content { width: min(60rem, 94vw); height: min(640px, calc(100dvh - 32px)); max-height: none; min-height: 0; }
+#launch-modal .modal-content.launch-wizard-content, #restart-modal .modal-content.restart-wizard-content { width: min(60rem, 94vw); height: min(640px, calc(100dvh - 32px)); max-height: none; min-height: 0; }
 .launch-wizard .settings-modal-body { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0; overflow: auto; }
 .launch-page-folder { flex: none; padding: 20px 24px; }
 .launch-page-agent { flex: 1; min-height: 0; display: flex; flex-direction: column; }
@@ -4882,7 +4882,7 @@ body:has(#nav-tab-hub-inbox.active) #saved-btn .saved-count { display: none; }
 .launch-recap { flex: none; margin: 0; padding: 10px 24px 0; border-top: 1px solid var(--border); color: var(--text-secondary); font-size: .8125rem; overflow-wrap: anywhere; }
 .launch-recap b { color: var(--text-primary); font-weight: 600; }
 .launch-recap[hidden] { display: none; }
-.sd-modal-content .launch-wizard > .modal-actions { display: flex; align-items: center; gap: 8px; padding: 10px 24px 16px; border-top: 0; }
+.sd-modal-content .launch-wizard > .modal-actions, .sd-modal-content.launch-wizard > .modal-actions { display: flex; align-items: center; gap: 8px; padding: 10px 24px 16px; border-top: 0; }
 .launch-wizard[data-stage="folder"] > .modal-actions { border-top: 1px solid var(--border); padding-top: 16px; }
 .launch-wizard > .modal-actions #launch-agent-cancel { margin-right: auto; }
 .launch-wizard > .modal-actions [hidden] { display: none; }
@@ -4912,10 +4912,10 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .acf-tools-details > summary { cursor: pointer; font-weight: 600; min-height: 32px; }
 .acf-tools-details .acf-perms-summary { font-weight: 400; margin-left: 6px; }
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
-    #launch-modal .modal-content.launch-wizard-content { width: 100vw; max-width: none; height: 100dvh; max-height: none; border-radius: 0; }
+    #launch-modal .modal-content.launch-wizard-content, #restart-modal .modal-content.restart-wizard-content { width: 100vw; max-width: none; height: 100dvh; max-height: none; border-radius: 0; }
     .launch-page-folder, .launch-wizard .settings-panes { padding: 16px; }
-    .launch-recap { padding: 10px 16px 0; }
-    .sd-modal-content .launch-wizard > .modal-actions { padding: 10px 16px 14px; }
+    .launch-recap { padding: 10px 16px 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; } /* two lines at most, so large text leaves the body room */
+    .sd-modal-content .launch-wizard > .modal-actions, .sd-modal-content.launch-wizard > .modal-actions { padding: 10px 16px 14px; }
     .launch-agent-pick, .seg-group:not(.seg-cards) { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
     #launch-agent-pick .launch-agent-opt:nth-child(2n) { border-right: 0; }
     #launch-agent-pick .launch-agent-opt:nth-child(-n+2) { border-bottom: 1px solid var(--control-border); }
@@ -4935,3 +4935,16 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .launch-persona-row .persona-files { flex-basis: auto; }
 .launch-persona-row .persona-files > summary { display: inline-flex; align-items: center; width: auto; padding: 8px 14px; min-height: 40px; font-size: var(--fs-md); font-weight: 500; color: var(--text-primary); border: 1px solid var(--control-border); border-radius: var(--radius-md); background: var(--bg-primary); box-sizing: border-box; }
 .launch-persona-row .persona-files[open] .persona-files-row { position: absolute; right: 0; z-index: 3; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 8px; }
+
+.launch-wizard .launch-cli-slot { margin: 0 0 6px; }
+.launch-wizard .launch-cli-slot .acf-cli-warning { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+/* Restart on the same shell (#7391): the provider line has a slot of its own so the tabs do not move when it appears. */
+.restart-wizard-content > .modal-actions #restart-cancel { margin-right: auto; }
+.restart-wizard-content > .modal-actions { display: flex; align-items: center; gap: 8px; }
+.acf-restart-name { margin: 0 0 16px; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-secondary); color: var(--text-primary); overflow-wrap: anywhere; }
+.acf-provider-label { display: block; margin: 0 0 14px; }
+.acf-provider-head { display: block; font-size: .875rem; font-weight: 600; margin-bottom: 4px; }
+.acf-provider-change { min-height: 1.5em; margin: -6px 0 10px; }
+.restart-wizard-content > .modal-actions .btn-warning { background: var(--accent-dim); border-color: var(--accent-dim); color: var(--text-on-accent); }
+.restart-wizard-content > .modal-actions .btn-warning:hover { background: color-mix(in srgb, var(--accent-dim) 85%, var(--bg-primary)); border-color: color-mix(in srgb, var(--accent-dim) 85%, var(--bg-primary)); color: var(--text-on-accent); }
