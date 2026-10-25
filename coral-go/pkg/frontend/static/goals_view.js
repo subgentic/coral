@@ -12,7 +12,7 @@ import { whenText } from './when_text.js';
 import { toGoalList, mergeGoalLists, toTaskPage, toDrivers, createBody, errorOf, LIST_PATH } from './goals_adapter.js';
 import { importOnce } from './import_once.js';
 const { teamTable, rowButton, stateChip: tableStateChip } = await importOnce('./team_table.js'); // lazy: its failure is retried
-const { attachDockResize } = await importOnce('./dock_resize.js');
+const { attachDockResize, DOCK_MIN_WIDTH, dockMaxWidth } = await importOnce('./dock_resize.js');
 
 const PAGE = 50; // a goal's tasks are drawn this many at a time
 import * as W from './goal_words.js';
@@ -476,6 +476,12 @@ async function showTaskInMain(main, g) {
     });
 }
 
+/** The separator's value for a screen reader: the column's width and its limits (the dock's, dock_resize.js). */
+function gripValue(grip, split, side) {
+    grip.setAttribute('aria-valuemin', String(DOCK_MIN_WIDTH)); grip.setAttribute('aria-valuemax', String(dockMaxWidth(split)));
+    grip.setAttribute('aria-valuenow', String(Math.round(side.getBoundingClientRect().width)));
+}
+
 function drawGoalPageRaw(col) {
     const g = goalById(model.openId);
     const same = col.querySelector('.goal-split');
@@ -490,7 +496,7 @@ function drawGoalPageRaw(col) {
     const main = el('div', 'goal-main'), side = el('aside', 'goal-side'); side.setAttribute('aria-label', `Tasks of ${g.title}`);
     const grip = el('div', 'goal-side-grip'); grip.setAttribute('role', 'separator'); grip.setAttribute('aria-orientation', 'vertical'); grip.setAttribute('aria-label', 'Resize the task list'); grip.tabIndex = 0; grip.title = 'Drag to resize, double click to reset';
     split.append(main, side, grip); col.append(split);
-    attachDockResize(grip, { panel: side, row: split, key: 'coral-goal-side-width', apply: (w) => split.style.setProperty('--goal-side-w', w ? `${w}px` : '') }).restore();
+    attachDockResize(grip, { panel: side, row: split, key: 'coral-goal-side-width', apply: (w) => { split.style.setProperty('--goal-side-w', w ? `${w}px` : ''); gripValue(grip, split, side); } }).restore();
     drawGoalSide(side, g);
     if (model.taskId) { showTaskInMain(main, g); return; }
     const h = drawGoalMain(main, g);

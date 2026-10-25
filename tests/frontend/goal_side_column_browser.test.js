@@ -63,6 +63,16 @@ const BASE = require('./test_base').BASE;
         check('the width is remembered when the goal page is drawn again', (await width()) === 400, String(await width()));
         await ev(`localStorage.removeItem('coral-goal-side-width'); true`);
         await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'goals' }); true`); await openGoal(goal);
+        const sep = await ev(`(() => { const g = document.querySelector('.goal-side-grip'), w = Math.round(document.querySelector('.goal-side').getBoundingClientRect().width); return { role: g.getAttribute('role'), name: g.getAttribute('aria-label'), now: g.getAttribute('aria-valuenow'), min: g.getAttribute('aria-valuemin'), max: g.getAttribute('aria-valuemax'), w, tab: g.tabIndex }; })()`);
+        check('the handle is a separator named "Resize the task list" with its value, minimum and maximum, reachable by Tab', sep.role === 'separator' && sep.name === 'Resize the task list' && sep.now === String(sep.w) && sep.min === '280' && Number(sep.max) > 280 && sep.tab === 0, JSON.stringify(sep));
+        const idle = await ev(`getComputedStyle(document.querySelector('.goal-side-grip'), '::before').backgroundColor`);
+        await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'Shift', code: 'ShiftLeft', modifiers: 8, windowsVirtualKeyCode: 16 }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Shift', code: 'ShiftLeft', windowsVirtualKeyCode: 16 }); // the last input was the keyboard, so a focus shows as :focus-visible
+        await ev(`document.querySelector('.goal-side-grip').focus(); true`);
+        await waitFor(`getComputedStyle(document.querySelector('.goal-side-grip'), '::before').backgroundColor !== 'rgba(0, 0, 0, 0)'`, 'the focus line to be drawn (its colour fades in over 150 ms)', { timeout: 3000 });
+        const focused = await ev(`({ onGrip: document.activeElement.classList.contains('goal-side-grip'), color: getComputedStyle(document.querySelector('.goal-side-grip'), '::before').backgroundColor, width: getComputedStyle(document.querySelector('.goal-side-grip'), '::before').width, accent: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() })`);
+        check('a clear 2 px line in the accent colour shows on keyboard focus, and none at rest', idle === 'rgba(0, 0, 0, 0)' && focused.onGrip && focused.width === '2px' && focused.color !== 'rgba(0, 0, 0, 0)', JSON.stringify([idle, focused]));
+        await shot('goal-column-handle-focus');
+        await ev(`document.activeElement.blur(); true`);
         await shot('goal-column-flush-desktop');
 
         console.log('2. Search');

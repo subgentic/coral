@@ -34,7 +34,6 @@ export function attachDockResize(handle, { panel, row, key, apply }) {
         e.preventDefault();
         const w = clamp(next);
         apply(w); browserLocal.set(key, Math.round(w));
-        handle.setAttribute('aria-valuenow', String(Math.round(w)));
     });
     handle.addEventListener('dblclick', () => { browserLocal.remove(key); apply(null); });
     return { restore };
