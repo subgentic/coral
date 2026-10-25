@@ -147,8 +147,10 @@ func TestProxyHeaderTimeoutAfterBody(t *testing.T) {
 					if body != nil {
 						body.ctx = r.Context()
 					}
-					if _, err := io.Copy(io.Discard, r.Body); err != nil {
-						return nil, err
+					if r.Body != nil && r.Body != http.NoBody { // a request with no body reaches the transport with none
+						if _, err := io.Copy(io.Discard, r.Body); err != nil {
+							return nil, err
+						}
 					}
 					bodyEnded = time.Now()
 					<-r.Context().Done() // The machine never sends response headers.
