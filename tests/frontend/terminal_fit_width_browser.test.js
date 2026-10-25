@@ -155,6 +155,9 @@ async function openTab({ contextId, width, height, mobile, fakeHubView = false, 
         try { await client.close(); } catch {}
     };
     await load();
+    // The browser applies the emulation a moment after it is asked: a terminal shown before it sees a mouse and a desktop window, sizes the shared pane to itself (a landscape phone's 68x20) and draws the desktop
+    // font (#7505, 5 of 20 runs on the base). The page asks the media queries each time it decides, so wait until they report the device it was asked to be, before any session is shown.
+    await waitFor(`(() => { const d = { coarse: matchMedia('(pointer: coarse)').matches, w: innerWidth, h: innerHeight }; return d.coarse === ${!!mobile} && d.w === ${width} && d.h === ${height} ? d : false; })()`, 'the emulated device (pointer and window size)', 5000);
     const metrics = (w, h) => Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: dpr, mobile });
     return { ev, waitFor, load, close, metrics };
 }
@@ -348,6 +351,7 @@ function assertFits(v, what) {
             const tab = await openTab({ contextId: ctx, width: 390, height: 844, mobile: true });
             tabs.push(tab);
             v = await show(tab, A, eighty);
+            v = await settled(tab, 'the chosen 14 drawn on a phone', 'v.font === 14', 8000).catch(() => v); // the size is read from the settings as the terminal is built: wait for it, then say what was drawn
             assert.equal(v.font, 14, 'a chosen 14 is drawn at 14 on a phone');
             await tab.close(); tabs.pop();
             assert.equal((await put({ terminal_font_size: '13' })).status, 200);
@@ -355,6 +359,7 @@ function assertFits(v, what) {
             const tab2 = await openTab({ contextId: ctx2, width: 390, height: 844, mobile: true });
             tabs.push(tab2);
             v = await show(tab2, A, eighty);
+            v = await settled(tab2, 'the chosen 13 drawn on a phone', 'v.font === 13', 8000).catch(() => v);
             assert.equal(v.font, 13, 'a chosen 13 (the old default) is a choice: it stays 13 on a phone');
             await tab2.close(); tabs.pop();
         } finally { await guard.restore(); }
@@ -408,7 +413,8 @@ function assertFits(v, what) {
             await show(tab, A, null);
             await sleep(900); // sleep-ok: a resize that must NOT happen: nothing to wait for
             const after = paneSize(A.name);
-            assert.deepEqual(after, eighty, `${label}: a landscape phone does not set the shared pane's size (it is ${after.cols}x${after.rows})`);
+            // The message names what this tab sent (view.sent, view.http) and the device it saw, so a pane that is not 80x24 says whether this tab set it or another window did (#7505).
+            assert.deepEqual(after, eighty, `${label}: a landscape phone does not set the shared pane's size (it is ${after.cols}x${after.rows}; this tab: ${JSON.stringify(await tab.ev(VIEW))}, device: ${JSON.stringify(await tab.ev(`({ coarse: matchMedia('(pointer: coarse)').matches, phone: matchMedia('(max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px)').matches, w: innerWidth, h: innerHeight })`))})`);
             const view = await tab.waitFor(`(async () => { const v = await ${VIEW}; return v && v.following && v.cols === ${eighty.cols} && v.rows === ${eighty.rows} ? v : null; })()`, `${label}: the xterm following the pane at 80x24`, 15000); // it catches up with the pane within a few seconds
             assert.deepEqual(paneSize(A.name), eighty, `${label}: and the pane is still 80x24 once it has`);
             assert.equal(view.sent + view.http, 0, `${label}: no resize was sent (${JSON.stringify(view)})`);
