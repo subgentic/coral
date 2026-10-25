@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"syscall"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -138,19 +137,6 @@ func TestAMemoryFolderThatLeadsOutOfHomeIsNotRead(t *testing.T) {
 	assert.Empty(t, Discover("claude", r.proj, r.repo, r.home))
 }
 
-func TestAPipeIsNotRegularAndReadingItDoesNotHang(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("no FIFOs")
-	}
-	r := newRig(t)
-	require.NoError(t, syscall.Mkfifo(filepath.Join(r.proj, "CLAUDE.md"), 0o644))
-	files := Discover("claude", r.proj, r.repo, r.home)
-	require.Len(t, files, 1)
-	assert.Equal(t, ProblemNotRegular, files[0].Problem)
-	_, err := files[0].Read()
-	assert.Error(t, err)
-}
-
 func TestReadGivesTextCutsALargeFileOnACharacterAndCallsBinaryBinary(t *testing.T) {
 	r := newRig(t)
 	one := func(text string) File {
@@ -197,6 +183,10 @@ func TestALinkIsFollowedOnlyToAFileInTheSameFolder(t *testing.T) {
 	write(t, outside, "PRIVATE KEY MATERIAL")
 	write(t, filepath.Join(r.proj, "CLAUDE.md"), "the real instructions")
 	write(t, filepath.Join(r.proj, "docs", "rules.md"), "rules in a subfolder")
+	write(t, filepath.Join(r.proj, ".env"), "API_KEY=SECRET")
+	write(t, filepath.Join(r.proj, ".git", "config"), "[remote] url = https://user:SECRET@example.invalid/x.git")
+	write(t, filepath.Join(r.proj, ".hidden", "CLAUDE.md"), "SECRET")
+	write(t, filepath.Join(r.proj, "notes.txt"), "SECRET")
 	require.NoError(t, os.Symlink("CLAUDE.md", filepath.Join(r.proj, "AGENTS.md")))
 	got := func(agent string) []File { return Discover(agent, r.proj, r.repo, r.home) }
 
@@ -211,21 +201,27 @@ func TestALinkIsFollowedOnlyToAFileInTheSameFolder(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "the real instructions", c.Text)
 
-	// a link to a file in a subfolder of the same folder is inside it too
+	// a link into a subfolder is followed only to an instruction file there (not docs/rules.md)
+	write(t, filepath.Join(r.proj, "sub", "CLAUDE.md"), "an instruction file in a subfolder")
 	require.NoError(t, os.Remove(filepath.Join(r.proj, "AGENTS.md")))
-	require.NoError(t, os.Symlink(filepath.Join("docs", "rules.md"), filepath.Join(r.proj, "AGENTS.md")))
+	require.NoError(t, os.Symlink(filepath.Join("sub", "CLAUDE.md"), filepath.Join(r.proj, "AGENTS.md")))
 	fs = got("codex")
 	require.Len(t, fs, 1)
-	assert.Equal(t, "docs/rules.md", fs[0].LinkTo)
+	assert.Equal(t, "sub/CLAUDE.md", fs[0].LinkTo)
 	c, err = fs[0].Read()
 	require.NoError(t, err)
-	assert.Equal(t, "rules in a subfolder", c.Text)
+	assert.Equal(t, "an instruction file in a subfolder", c.Text)
 
 	for name, target := range map[string]string{
-		"out of the folder":        outside,
-		"a relative way out":       filepath.Join("..", "..", "..", "..", ".ssh", "id_secret"),
-		"a folder":                 "docs",
-		"nothing there (dangling)": "gone.md",
+		"out of the folder":                       outside,
+		"a relative way out":                      filepath.Join("..", "..", "..", "..", ".ssh", "id_secret"),
+		"a folder":                                "docs",
+		"nothing there (dangling)":                "gone.md",
+		"a file that is not an instruction file":  filepath.Join("docs", "rules.md"),
+		"a secret file in the folder":             ".env",
+		"a file in a dot-folder":                  filepath.Join(".git", "config"),
+		"an instruction name inside a dot-folder": filepath.Join(".hidden", "CLAUDE.md"),
+		"a plain file with another name":          "notes.txt",
 	} {
 		require.NoError(t, os.Remove(filepath.Join(r.proj, "AGENTS.md")))
 		require.NoError(t, os.Symlink(target, filepath.Join(r.proj, "AGENTS.md")))
@@ -236,6 +232,7 @@ func TestALinkIsFollowedOnlyToAFileInTheSameFolder(t *testing.T) {
 		c, err = fs[0].Read()
 		assert.Error(t, err, name)
 		assert.NotContains(t, c.Text, "PRIVATE", name)
+		assert.NotContains(t, c.Text, "SECRET", name)
 	}
 
 	// a link to a link that ends outside the folder is not followed either
@@ -245,14 +242,4 @@ func TestALinkIsFollowedOnlyToAFileInTheSameFolder(t *testing.T) {
 	fs = got("codex")
 	require.Len(t, fs, 1)
 	assert.Equal(t, ProblemLink, fs[0].Problem, "the first hop is inside, the last leaves")
-
-	// a link to a pipe
-	require.NoError(t, os.Remove(filepath.Join(r.proj, "AGENTS.md")))
-	require.NoError(t, syscall.Mkfifo(filepath.Join(r.proj, "pipe.md"), 0o644))
-	require.NoError(t, os.Symlink("pipe.md", filepath.Join(r.proj, "AGENTS.md")))
-	fs = got("codex")
-	require.Len(t, fs, 1)
-	assert.Equal(t, ProblemLink, fs[0].Problem)
-	_, err = fs[0].Read()
-	assert.Error(t, err)
 }

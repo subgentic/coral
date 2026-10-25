@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/subgentic/coral/internal/agenttypes"
@@ -188,7 +189,7 @@ func memoryFiles(dir, home string) []File {
 	var names []string
 	for _, e := range ents {
 		n := e.Name()
-		if strings.HasSuffix(strings.ToLower(n), ".md") && safefs.CheckName(n) == nil {
+		if strings.HasSuffix(strings.ToLower(n), ".md") && safefs.CheckName(n) == nil && cleanName(n) {
 			names = append(names, n)
 		}
 	}
@@ -208,6 +209,19 @@ func memoryFiles(dir, home string) []File {
 		}
 	}
 	return out
+}
+
+// cleanName reports whether a listed file name is shown as it is: valid UTF-8, no control or format character (a name is text the page prints and the API sends).
+func cleanName(n string) bool {
+	if !utf8.ValidString(n) {
+		return false
+	}
+	for _, r := range n {
+		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) || r == '\u2028' || r == '\u2029' {
+			return false
+		}
+	}
+	return true
 }
 
 // stat describes dir/name, through dir held open: false when there is no such name.
@@ -230,8 +244,10 @@ func stat(dir, name, kind, level, home string) (File, bool) {
 			f.Problem = ProblemLink
 			return f, true
 		}
+		// ...and only to a file the CLI itself would read there: an instruction name in an instruction folder, a .md file in a memory folder, never inside a dot-folder (.git) or a dot-file (.env): a link
+		// planted in a cloned repository must not make the Operator read a secret on screen.
 		tfi, err := root.Lstat(rel)
-		if err != nil || !tfi.Mode().IsRegular() {
+		if err != nil || !tfi.Mode().IsRegular() || !readableTarget(kind, rel) {
 			f.Problem = ProblemLink
 			return f, true
 		}
@@ -242,6 +258,24 @@ func stat(dir, name, kind, level, home string) (File, bool) {
 		f.Problem = ProblemNotRegular
 	}
 	return f, true
+}
+
+// instructionFiles are the names any CLI reads as instructions (a link such as AGENTS.md to CLAUDE.md crosses CLIs).
+var instructionFiles = map[string]bool{"CLAUDE.md": true, "CLAUDE.local.md": true, "AGENTS.md": true, "AGENTS.override.md": true, "GEMINI.md": true}
+
+// readableTarget reports whether a followed link may lead to rel (a path below the folder): no part of it starts with a dot, and its name is an instruction file (an instruction folder) or a .md file (a
+// memory folder).
+func readableTarget(kind, rel string) bool {
+	for _, part := range strings.Split(filepath.ToSlash(rel), "/") {
+		if part == "" || strings.HasPrefix(part, ".") {
+			return false
+		}
+	}
+	base := filepath.Base(rel)
+	if kind == KindMemory {
+		return strings.HasSuffix(strings.ToLower(base), ".md")
+	}
+	return instructionFiles[base]
 }
 
 // linkTarget is where the link dir/name leads, as a path below dir, when every link on the way resolves inside dir: false for a dangling link and for one that ends outside it.
