@@ -2475,8 +2475,8 @@ body.panel-dragging .agentic-state {
 .list-bar-panel .list-bar-field > .list-bar-by { flex: 1 1 9rem; width: auto; min-width: 0; max-width: none; } /* the text field (Agent, Uploaded by) spans the panel like the selects beside it (UI/UX #5293): its datalist is the field's last child, so the inline rule above never reached the input */
 .list-bar-panel > * { flex: 0 0 auto; } /* the dropdown's rule gives each child a whole line of the box's height; in a column, which is as tall as its rows, that stretched the rows */
 /* The activity bars' panel (#7653): the tool-group boxes go two to a line in it as they did in the dropdown; the other fields, the count and Clear filters are a line each. */
-.list-bar-menu-inline:has(> .list-bar-group) { flex-direction: row; flex-wrap: wrap; align-items: center; column-gap: 8px; }
-.list-bar-menu-inline:has(> .list-bar-group) > :not(.list-bar-group) { flex: 0 0 100%; }
+.list-bar-menu-groups { flex-direction: row; flex-wrap: wrap; align-items: center; column-gap: 8px; }
+.list-bar-menu-groups > :not(.list-bar-group) { flex: 0 0 100%; }
 .list-bar-menu-inline > .list-bar-group { flex: 0 0 calc(50% - 4px); min-width: 0; }
 .list-bar-menu-inline .list-bar-group { flex-wrap: nowrap; }
 .list-bar-menu-inline .list-bar-group > .list-bar-field-label { flex: 1 1 auto; min-width: 0; }

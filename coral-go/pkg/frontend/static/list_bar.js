@@ -120,6 +120,8 @@ export function buildListBar(spec, onChange, hooks = {}) {
     menu.append(...fields.map(x => x.wrap), ...((inline || collapsible) && sort ? [sort.wrap] : []), ...(inline ? [count] : []), clearAll);
     if (inline) { menu.hidden = false; menu.classList.add('list-bar-menu-inline'); clearAll.textContent = 'Clear filters'; }
     if (collapsible) { menu.classList.add('list-bar-menu-inline', 'list-bar-panel'); clearAll.textContent = 'Clear filters'; menu.setAttribute('aria-label', 'Filters and sort'); }
+    // A panel with tool-group boxes (the activity bars) lays them out two to a line: a class on the menu, not a :has() rule, which made every DOM change in the page, the agent list's included, check for it (#7671).
+    if (collapsible && fields.some(x => x.wrap.classList.contains('list-bar-group'))) menu.classList.add('list-bar-menu-groups');
 
     const chipList = make('ul', 'list-bar-chips'); chipList.setAttribute('aria-label', 'Active filters'); chipList.hidden = true;
     if (noSearch) node.classList.add('list-bar-nosearch');
