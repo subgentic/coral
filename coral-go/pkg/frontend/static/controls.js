@@ -570,6 +570,8 @@ async function showRestartModal() {
             showPreset: false,
             showName: false,
             sections: true,
+            restart: true, // the New Agent shell: Agent, Persona, Permissions, Advanced (#7391)
+            restartName: s.display_name || s.name,
             value: {
                 agentType: s.agent_type || 'claude',
                 model: s.model || '',
