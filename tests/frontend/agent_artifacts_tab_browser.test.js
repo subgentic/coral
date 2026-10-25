@@ -1,9 +1,9 @@
-// The agent's Artifacts tab and Team Artifacts, cleaned up (#5283; operator: "detail expand can be an info icon in the actions. The refresh can be a reload icon. We are also missing the filters that we added to the
-// team artifact search."): (1) a row's Details is an (i) icon button in the Actions column (labelled, aria-expanded, 44 px on a phone, by keyboard), not a "▶ Details" disclosure under the name, in both panels;
-// (2) Refresh is a reload icon button (aria-label and tooltip Refresh) in both panels; (3) an agent's Artifacts tab has the Team Artifacts search, Filters, Sort and "N of M", scoped to that agent: the same
-// component (team_artifact_bar.js), the same query (session_id plus q, kind, sort ...), kept per agent; an agent with no team (its list is not the board's) has none. Desktop and 390 px, both themes; names (the
-// accessibility tree) and 4.5:1 contrast. The board route is stood in for by a page-side stub that applies the contract and records every request. Drives Chrome over CDP through the harness.
+// The agent's Artifacts tab on the team Artifacts pattern (#7622, over #5283): the team page's table (Name, Type, Size, Task, Created) scoped to the agent in the dock's panel, with the team's search, Filters and Sort ('N of M'), kept per agent;
+// a row opens its document as a sheet over the panel itself (the chat stays beside it) with the actions pinned under it (Open, Download, Copy link, Keep, Delete as a danger button); Escape and Close give the focus back to the row; a narrow panel folds
+// Type, Size and Task under the name; an agent with no team has the table with no search (its route has no query). Desktop and 390 px, both themes; names (the accessibility tree) and 4.5:1 contrast. The board route is stood in for by a page-side stub
+// that applies the contract and records every request. Drives Chrome over CDP through the harness.
 const assert = require('node:assert/strict');
+
 const fs = require('node:fs');
 const path = require('node:path');
 const { connect } = require('./agent_view_harness');
@@ -73,90 +73,67 @@ const STUB = `(() => {
         await ev(`(() => { const side = document.getElementById('agentic-state'); if (window.innerWidth <= 767 && side.getBoundingClientRect().width === 0) (document.getElementById('popout-panel-toggle-btn') || document.getElementById('panel-toggle-btn')).click(); return true; })()`); await settle(500);
         await ev(`localStorage.removeItem('coral-agentic-tab-top'); window.switchAgenticTab('${tab}', 'top'); true`);
     };
-    const panel = tab => `#agentic-panel-${tab}`;
-    const settled = (tab) => waitFor(`document.getElementById('agentic-panel-${tab}-view').getAttribute('aria-busy') === 'false' && document.querySelectorAll('${panel(tab)} tr.team-artifact-row').length > 0`, `${tab}: the list`, 8000);
+    const settled = () => waitFor(`document.querySelectorAll('#agentic-panel-artifacts tbody tr').length > 0 && !document.querySelector('#agentic-panel-artifacts .team-count-line')?.textContent.startsWith('Loading')`, 'the agent\'s artifacts: the table');
     const last = () => ev(`window.__req[window.__req.length - 1]`);
+    const panel = '#agentic-panel-artifacts';
 
     try {
         await Page.enable();
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        for (const view of [{ name: 'desktop', w: 1280, h: 900, phone: false, theme: 'dark' }, { name: 'desktop', w: 1280, h: 900, phone: false, theme: 'light' }, { name: '390px', w: 390, h: 844, phone: true, theme: 'dark' }, { name: '390px', w: 390, h: 844, phone: true, theme: 'light' }, { name: '320px', w: 320, h: 700, phone: true, theme: 'light' }, { name: '320px', w: 320, h: 700, phone: true, theme: 'dark' }]) {
+        for (const view of [{ name: 'desktop', w: 1280, h: 900, phone: false, theme: 'dark' }, { name: 'desktop', w: 1280, h: 900, phone: false, theme: 'light' }, { name: '390px', w: 390, h: 844, phone: true, theme: 'dark' }, { name: '390px', w: 390, h: 844, phone: true, theme: 'light' }]) {
             const tag = `${view.name} ${view.theme}`; console.log(tag);
             await open(view);
-            // ═══ an agent on a team: the search bar is its own, scoped to the agent
-            await showAgent({ board_project: TEAM }, 'artifacts'); await settled('artifacts');
+            // ═══ an agent on a team: the table, the search bar, scoped to the agent
+            await showAgent({ board_project: TEAM }, 'artifacts'); await settled();
             let r = await last();
-            check(`${tag}: the agent's list is asked for with its session, the newest first, and the board's route (${JSON.stringify(r.query)})`, r.kind === 'board' && r.query.session_id === 'aa-1' && r.query.sort === 'newest' && r.query.offset === '0');
-            const bar = await ev(`(() => { const p = document.querySelector('${panel('artifacts')}'); const q = s => p.querySelector(s); const vis = e => !!e && e.getClientRects().length > 0; return { search: vis(q('.list-bar-search')), filters: vis(q('.list-bar-toggle')), sort: !!q('select[aria-label="Sort artifacts"]'), count: (q('.list-bar-count') || {}).textContent, label: (q('.list-bar-search') || {}).getAttribute && q('.list-bar-search').getAttribute('aria-label') }; })()`);
-            check(`${tag}: the agent's Artifacts tab has the search, the filter icon (Filters and Sort in its panel) and the count (${JSON.stringify(bar)})`, bar.search && bar.filters && bar.sort && /^7 artifacts?$/.test(bar.count || '') && /this agent/i.test(bar.label || ''));
-            await ev(`document.querySelector('${panel('artifacts')} .list-bar-search').focus(); true`); await type('zebra'); await settle(900, 450);
+            check(`${tag}: the agent's list is asked for with its session, the newest first, and the board's route (${JSON.stringify(r.query)})`, r.kind === 'board' && r.query.session_id === 'aa-1' && r.query.sort === 'newest' && r.project === TEAM);
+            const head = await ev(`(() => { const p = document.querySelector('${panel}'); const q = s => p.querySelector(s); const vis = e => !!e && e.getClientRects().length > 0; return { search: vis(q('.list-bar-search')), filters: vis(q('.list-bar-toggle')), title: (q('.team-artifacts-title') || {}).textContent, refresh: vis(q('.team-artifacts-refresh')), copy: vis(q('.team-artifacts-help')), rows: p.querySelectorAll('tbody tr').length, heads: [...p.querySelectorAll('thead th')].map(h => h.textContent), count: (q('.list-bar-count') || {}).textContent }; })()`);
+            check(`${tag}: the tab is a table with the search, the filter icon, Refresh and Copy, titled with the agent (${JSON.stringify(head)})`, head.search && head.filters && head.refresh && head.copy && head.title === 'Artifacts · aa-agent' && head.rows === 7 && head.heads[0] === 'Name' && /^7 artifact/.test(head.count || ''));
+            await ev(`document.querySelector('${panel} .list-bar-search').focus(); true`); await type('zebra'); await settle(900, 450);
             r = await last();
-            check(`${tag}: a search is the server's, scoped to the agent (${JSON.stringify(r.query)}), and the count says N of M`, r.query.q === 'zebra' && r.query.session_id === 'aa-1' && (await ev(`document.querySelector('${panel('artifacts')} .list-bar-count').textContent`)) === '1 of 7');
-            await ev(`document.querySelector('${panel('artifacts')} select[aria-label="Sort artifacts"]').value = 'name'; document.querySelector('${panel('artifacts')} select[aria-label="Sort artifacts"]').dispatchEvent(new Event('change', { bubbles: true })); true`); await settle(500, 450);
+            check(`${tag}: a search is the server's, scoped to the agent (${JSON.stringify(r.query)}), and the count says N of M`, r.query.q === 'zebra' && r.query.session_id === 'aa-1' && (await ev(`document.querySelector('${panel} .list-bar-count').textContent`)).includes('1 of 7'));
+            await ev(`(() => { const s = document.querySelector('${panel} select[aria-label="Sort artifacts"]'); s.value = 'name'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); await settle(700);
             check(`${tag}: Sort is sent (${JSON.stringify((await last()).query)})`, (await last()).query.sort === 'name' && (await last()).query.q === 'zebra');
             // the filters are kept per agent: another agent starts clean, the first one finds its search again
             await showAgent({ board_project: TEAM, session_id: 'aa-2', name: 'aa-other' }, 'artifacts'); await settle(900);
             check(`${tag}: another agent's tab starts with no search (${(await last()).query.q})`, !(await last()).query.q && (await last()).query.session_id === 'aa-2');
             await showAgent({ board_project: TEAM, session_id: 'aa-1' }, 'artifacts'); await settle(900);
             check(`${tag}: and the first agent's search is remembered (${(await last()).query.q})`, (await last()).query.q === 'zebra');
-            await ev(`document.querySelector('${panel('artifacts')} .list-bar-search').value = ''; document.querySelector('${panel('artifacts')} .list-bar-search').dispatchEvent(new Event('input', { bubbles: true })); true`); await settle(900, 450);
-            await settled('artifacts');
+            await ev(`(() => { const q = document.querySelector('${panel} .list-bar-search'); q.value = ''; q.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+            await settle(900); await settled();
 
-            // ═══ Refresh is a reload icon, in both panels; Details is an (i) in the Actions column
-            for (const tab of ['artifacts']) { // the team's artifacts are the team page's (#7457)
-                const sec = `${tab}: `;
-                // #5315 (operator): the list's header is ONE row: the title, then the search box taking what is left, the filter icons, and Refresh and Copy at the right; no separate heading above the bar
-                const row = await ev(`(() => { const p = document.querySelector('${panel(tab)}'); const g = s => { const e = p.querySelector(s); if (!e || !e.getClientRects().length) return null; const r = e.getBoundingClientRect(); return { l: Math.round(r.left), r: Math.round(r.right), t: Math.round(r.top), cy: Math.round(r.top + r.height / 2), w: Math.round(r.width) }; };
-                    const view = p.querySelector('.team-artifacts-view') || p; const v = view.getBoundingClientRect();
-                    return { title: g('.team-artifacts-title'), text: (p.querySelector('.team-artifacts-title') || {}).textContent, search: g('.list-bar-search'), tog: g('.list-bar-toggle'), exp: g('.list-bar-expand-all'), refresh: g('.team-artifacts-refresh'), copy: g('.team-artifacts-help'), heading: !!p.querySelector('.team-artifacts-heading'), viewRight: Math.round(v.right), paneW: Math.round(v.width), overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth }; })()`);
-                const lineOf = e => e && e.cy;
-                const rest = [row.search, row.tog, row.exp, row.refresh, row.copy];
-                const narrow = row.paneW <= 380, slim = row.paneW <= 560; // the layout follows the PANE's width (a container query), not the screen's (UI/UX on #5315): a 320 px list: Refresh and Copy go up to the title's line, the search and the two filter icons take the one below (nothing wraps alone)
-                const same = (...xs) => Math.max(...xs.map(lineOf)) - Math.min(...xs.map(lineOf)) <= 6;
-                check(`${tag}: ${sec}one header row: ${narrow ? 'the title, Refresh and Copy on one line, the search, filter and expand icons on the next' : 'search, filter icon, expand icon, Refresh and Copy share a line' + (slim ? ' (a phone gives the title a line above)' : ' with the title')} (${JSON.stringify(row)})`,
-                    row.title && rest.every(Boolean) && !row.heading && (narrow ? same(row.title, row.refresh, row.copy) && same(row.search, row.tog, row.exp) && row.search.cy > row.title.cy + 8 : same(...rest) && (slim ? row.title.cy < row.search.cy - 8 : same(row.title, row.search))));
-                check(`${tag}: ${sec}in that order, the search taking the width, Refresh and Copy at the right edge, nothing wider than the screen (${row.text})`,
-                    (slim || row.title.r <= row.search.l) && row.search.r <= row.tog.l && row.tog.r <= row.exp.l + 1 && (narrow ? row.title.r <= row.refresh.l + 1 : row.exp.r <= row.refresh.l + 1) && row.refresh.r <= row.copy.l + 1 && row.viewRight - row.copy.r <= 24 && row.search.w >= (narrow ? 150 : slim ? 100 : 160) && row.overflow <= 0 && /^(Team )?Artifacts · /.test(row.text));
-                await shot(`artifacts-header-${tab}-${view.name}-${view.theme}`);
-                // #5314 (operator): each row shows the Browse tab's file-type icon left of its name, picked by the name, and by the media type for a name with no extension
-                const ic = await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'file_explorer.js'); const p = document.querySelector('${panel(tab)}');
-                    const rows = [...p.querySelectorAll('tr.team-artifact-row')].map(r => { const n = r.querySelector('.team-artifact-name'); const svg = n.querySelector('svg.explorer-file-icon'); const name = n.textContent.trim();
-                        return { name, has: !!svg, first: !!svg && n.firstElementChild === svg, same: !!svg && svg.outerHTML === m.fileIconHtml(name), hidden: !!svg && svg.getAttribute('aria-hidden') === 'true', left: svg ? Math.round(svg.getBoundingClientRect().right) <= Math.round(n.getBoundingClientRect().right) : false, w: svg ? Math.round(svg.getBoundingClientRect().width) : 0 }; });
-                    const html = (n, t) => m.fileIconFor(n, t).outerHTML;
-                    return { rows, byMedia: [html('report', 'application/pdf') === m.fileIconHtml('x.pdf'), html('notes', 'text/markdown; charset=utf-8') === m.fileIconHtml('x.md'), html('photo', 'image/jpeg') === m.fileIconHtml('x.png'), html('clip', 'video/mp4') === m.fileIconHtml('x.mp4'), html('data', 'application/json') === m.fileIconHtml('x.json'), html('mystery', 'application/octet-stream') === m.fileIconHtml('x'), html('a.png', 'application/pdf') === m.fileIconHtml('x.png'), html('Makefile', 'text/plain') === m.fileIconHtml('Makefile')] }; })()`);
-                check(`${tag}: ${sec}every row has the Browse tab's icon for its name, first in the name, 16 px, hidden from a screen reader (${ic.rows.length} rows)`, ic.rows.length >= 7 && ic.rows.every(r => r.has && r.first && r.same && r.hidden && r.w === 16), JSON.stringify(ic.rows.filter(r => !(r.has && r.first && r.same && r.hidden)).slice(0, 2)));
-                check(`${tag}: ${sec}a name with no extension takes the media type's icon, a name with one keeps its own, an unknown type is the plain page (${JSON.stringify(ic.byMedia)})`, ic.byMedia.every(Boolean));
-                const ref = await ev(`(() => { const b = document.querySelector('${panel(tab)} .team-artifacts-refresh'); if (!b) return null; const r = b.getBoundingClientRect(); return { label: b.getAttribute('aria-label'), title: b.title, text: b.textContent.trim(), svg: !!b.querySelector('svg'), w: Math.round(r.width), h: Math.round(r.height), tag: b.tagName, anyText: [...document.querySelectorAll('${panel(tab)}-view .team-artifacts-action')].some(x => x.textContent.trim() === 'Refresh') }; })()`);
-                check(`${tag}: ${sec}Refresh is a reload icon button, named, with a tooltip, no text (${JSON.stringify(ref)})`, ref && ref.tag === 'BUTTON' && ref.label === 'Refresh' && ref.title === 'Refresh' && ref.text === '' && ref.svg && !ref.anyText && (!view.phone || (ref.w >= 44 && ref.h >= 44)));
-                const before = await ev('window.__req.length');
-                await ev(`document.querySelector('${panel(tab)} .team-artifacts-refresh').click(); true`); await settle(600);
-                check(`${tag}: ${sec}it refreshes (${before} -> ${await ev('window.__req.length')} requests)`, (await ev('window.__req.length')) > before);
-                const rows = await ev(`(() => { const p = document.querySelector('${panel(tab)}'); const row = p.querySelector('tr.team-artifact-row'); const b = row.querySelector('.team-artifact-info-btn'); const cell = row.querySelector('td.team-artifact-col-actions'); const r = b.getBoundingClientRect();
-                    return { n: p.querySelectorAll('tr.team-artifact-row').length, infos: p.querySelectorAll('.team-artifact-info-btn').length, label: b.getAttribute('aria-label'), expanded: b.getAttribute('aria-expanded'), inActions: cell.contains(b), hiddenDetails: row.querySelector('.team-artifact-details').hidden, summaries: p.querySelectorAll('summary, details').length, disclosure: /▶|Details$/.test(row.querySelector('td.team-artifact-col-name, td.team-artifact-info').textContent.replace(/\\s+/g, ' ')), w: Math.round(r.width), h: Math.round(r.height) }; })()`);
-                check(`${tag}: ${sec}every row has an (i) button in the Actions column, closed, and no disclosure under the name (${JSON.stringify(rows)})`, rows.infos === rows.n && /^Details for /.test(rows.label) && rows.expanded === 'false' && rows.inActions && rows.hiddenDetails && rows.summaries === 0 && !rows.disclosure && (!view.phone || (rows.w >= 44 && rows.h >= 44)));
-                await ev(`document.querySelector('${panel(tab)} .team-artifact-info-btn').focus(); true`); await press('Enter', 'Enter', 13);
-                let d = await ev(`(() => { const row = document.querySelector('${panel(tab)} tr.team-artifact-row'); const b = row.querySelector('.team-artifact-info-btn'); const det = row.querySelector('.team-artifact-details'); return { open: !det.hidden, expanded: b.getAttribute('aria-expanded'), controls: b.getAttribute('aria-controls') === det.id, mime: /MIME/.test(det.textContent), focus: document.activeElement === b }; })()`);
-                check(`${tag}: ${sec}Enter on it opens the details (MIME, size, task ...), says it is expanded, and keeps focus (${JSON.stringify(d)})`, d.open && d.expanded === 'true' && d.controls && d.mime && d.focus);
-                await ev(`document.querySelector('${panel(tab)} .team-artifacts-refresh').click(); true`); await settle(700);
-                check(`${tag}: ${sec}a refresh keeps the row's details open`, await ev(`!document.querySelector('${panel(tab)} tr.team-artifact-row .team-artifact-details').hidden`));
-                await ev(`document.querySelector('${panel(tab)} .team-artifact-info-btn').click(); true`);
-                check(`${tag}: ${sec}pressed again it closes`, await ev(`document.querySelector('${panel(tab)} tr.team-artifact-row .team-artifact-details').hidden`));
-                await ev(`document.querySelector('${panel(tab)} .team-artifact-info-btn').click(); true`); await settle(200);
-                await shot(`${tag} ${tab} details open`);
-                await ev(`document.querySelector('${panel(tab)} .team-artifact-info-btn').click(); true`);
-                const un = await axUnnamed(`#agentic-panel-${tab}-view`);
-                const au = await auditRegion(ev, [`#agentic-panel-${tab}-view`]);
-                check(`${tag}: ${sec}every control has a name (${JSON.stringify(un)}) and the text has 4.5:1 contrast (${JSON.stringify((au.fails || []).slice(0, 2))})`, un.length === 0 && (au.fails || []).length === 0);
-                await shot(`${tag} ${tab}`);
-            }
-            const dup = await ev(`(() => { const ids = [...document.querySelectorAll('[id]')].map(e => e.id); return ids.filter((id, i) => ids.indexOf(id) !== i); })()`);
-            check(`${tag}: the two panels' bars share no id (${JSON.stringify(dup)})`, dup.length === 0);
+            // ═══ Refresh asks again
+            const before = await ev('window.__req.length');
+            await ev(`document.querySelector('${panel} .team-artifacts-refresh').click(); true`); await settle(600);
+            check(`${tag}: Refresh asks again (${before} -> ${await ev('window.__req.length')} requests)`, (await ev('window.__req.length')) > before);
 
-            // ═══ an agent with no team: its list is the files it uploaded, no search (the standalone route has no query)
-            await showAgent({ board_project: null, session_id: 'solo-1', name: 'solo' }, 'artifacts'); await settle(900);
+            // ═══ a row opens its document as a sheet over the panel; the chat is still there
+            await ev(`document.querySelector('${panel} tbody tr .team-row-btn').focus(); document.querySelector('${panel} tbody tr .team-row-btn').click(); true`);
+            await waitFor(`!document.getElementById('agentic-detail-pane').hidden`, 'the sheet opens');
+            const sheet = await ev(`(() => { const a = document.getElementById('agentic-detail-pane'), p = document.querySelector('${panel}'); const ar = a.getBoundingClientRect(), pr = p.getBoundingClientRect(); const foot = [...a.querySelectorAll('.detail-foot .btn')]; const d = foot.find(b => b.textContent === 'Delete'); return { inside: p.contains(a), covers: Math.abs(ar.left - pr.left) <= 1 && Math.abs(ar.width - pr.width) <= 1 && Math.abs(ar.top - pr.top) <= 1, noPageClass: !document.body.classList.contains('team-detail-open'), foot: foot.map(b => b.textContent), danger: !!d && d.classList.contains('btn-danger'), title: (a.querySelector('.detail-title') || {}).textContent, focus: document.activeElement === a.querySelector('.detail-title'), chat: !!document.querySelector('#live-session-view') && document.querySelector('#live-session-view').getClientRects().length > 0 }; })()`);
+            check(`${tag}: the document is a sheet over the panel itself, the actions pinned, Delete a danger button, the title focused (${JSON.stringify(sheet)})`, sheet.inside && sheet.covers && sheet.noPageClass && ['Open', 'Download', 'Copy link', 'Keep', 'Delete'].every(t => sheet.foot.includes(t)) && sheet.danger && sheet.focus && sheet.chat);
+            await shot(`sheet-${view.name}-${view.theme}`);
+            await press('Escape', 'Escape', 27);
+            const back = await ev(`(() => ({ hidden: document.getElementById('agentic-detail-pane').hidden, onRow: document.activeElement === document.querySelector('${panel} tbody tr .team-row-btn') }))()`);
+            check(`${tag}: Escape closes the sheet and the focus is back on the row (${JSON.stringify(back)})`, back.hidden && back.onRow);
+            await ev(`document.querySelector('${panel} tbody tr .team-row-btn').click(); true`); await waitFor(`!document.getElementById('agentic-detail-pane').hidden`, 'the sheet opens again');
+            await ev(`document.querySelector('#agentic-detail-pane .detail-close').click(); true`);
+            check(`${tag}: Close closes it too, the focus on the row`, await ev(`document.getElementById('agentic-detail-pane').hidden && document.activeElement === document.querySelector('${panel} tbody tr .team-row-btn')`));
+
+            // ═══ the table follows the PANEL's width: narrow, Type, Size and Task fold under the name; Created stays
+            const cols = await ev(`(() => { const p = document.querySelector('${panel}'); const vis = e => e.getClientRects().length > 0; const w = p.getBoundingClientRect().width; return { w, th: [...p.querySelectorAll('thead th')].filter(vis).map(h => h.textContent), phone: vis(p.querySelector('.team-row-phone')) }; })()`);
+            const folded = cols.w <= 560;
+            check(`${tag}: ${folded ? 'a narrow panel shows Name and Created, the rest folded under the name' : 'a wide panel shows every column'} (${JSON.stringify(cols)})`, folded ? cols.phone && cols.th.join() === 'Name,Created' : cols.th.length === 5 && !cols.phone);
+            const un = await axUnnamed(`#agentic-panel-artifacts-view`);
+            const au = await auditRegion(ev, [`#agentic-panel-artifacts-view`]);
+            check(`${tag}: every control has a name (${JSON.stringify(un)}) and the text has 4.5:1 contrast (${JSON.stringify((au.fails || []).slice(0, 2))})`, un.length === 0 && (au.fails || []).length === 0);
+            await shot(`${tag} artifacts`);
+
+            // ═══ an agent with no team: the table of the files it uploaded, no search (the standalone route has no query)
+            await showAgent({ board_project: null, session_id: 'solo-1', name: 'solo' }, 'artifacts'); await settled();
             r = await last();
-            const solo = await ev(`(() => { const p = document.querySelector('${panel('artifacts')}'); return { bar: !!p.querySelector('.list-bar-search') && p.querySelector('.list-bar-search').getClientRects().length > 0, rows: p.querySelectorAll('tr.team-artifact-row').length, info: p.querySelectorAll('.team-artifact-info-btn').length, refresh: !!p.querySelector('.team-artifacts-refresh') }; })()`);
-            check(`${tag}: an agent with no team: the standalone route, rows with the (i) and the reload icon, no search bar (${JSON.stringify(solo)})`, r.kind === 'standalone' && !solo.bar && solo.rows === 3 && solo.info === 3 && solo.refresh);
+            const solo = await ev(`(() => { const p = document.querySelector('${panel}'); const vis = e => !!e && e.getClientRects().length > 0; return { bar: vis(p.querySelector('.list-bar-search')), rows: p.querySelectorAll('tbody tr').length, title: (p.querySelector('.team-artifacts-title') || {}).textContent, refresh: vis(p.querySelector('.team-artifacts-refresh')) }; })()`);
+            check(`${tag}: an agent with no team: the standalone route, the table, the title and Refresh, no search bar (${JSON.stringify(solo)})`, r.kind === 'standalone' && r.query.session_id === 'solo-1' && !solo.bar && solo.rows === 3 && solo.title === 'Artifacts · solo' && solo.refresh);
         }
         const failed = results.filter(x => !x).length;
         console.log(`${results.length - failed} of ${results.length} checks passed`);

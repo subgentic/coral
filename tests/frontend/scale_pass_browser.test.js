@@ -34,11 +34,11 @@ const { connect } = require('./agent_view_harness');
             const {showView} = await import(base + 'utils.js'); showView('live-session-view'); const files = await import(base + 'changed_files.js');
             const side = document.getElementById('agentic-state'); side.classList.remove('collapsed'); side.style.width = '680px'; files.initFileSearch(); files.syncFilesViewerSession(); return true; })()`);
         await ev(`localStorage.removeItem('coral-agentic-tab-top'); document.getElementById('agentic-tab-artifacts').click(); true`);
-        await waitFor(`document.querySelectorAll('tr.team-artifact-row').length === 3`, 'the three rows', 8000);
+        await waitFor(`document.querySelectorAll('#agentic-panel-artifacts tbody tr').length === 3`, 'the three rows', 8000);
         const v = '#agentic-panel-artifacts-view';
         assert.equal(await ev(`document.querySelector('${v} .team-artifacts-title').textContent`), 'Artifacts · ux-ui');
         assert.equal(await ev(`document.querySelector('${v} .list-bar-count').textContent`), '500+ artifacts');
-        assert.equal(await ev(`document.querySelector('${v} .team-artifacts-status').textContent`), 'Showing 3 of 500+');
+        assert.equal(await ev(`document.querySelector('${v} .team-count-line').textContent`), 'Showing 3 of 500+');
 
         console.log('2. Servers: Add server above a long list, under a short one');
         const where = () => ev(`(() => { const b = document.querySelector('#servers-view [data-action="add"]'); const l = document.querySelector('#servers-view .servers-table'); if (!b || !l) return null; return { above: !!(b.compareDocumentPosition(l) & Node.DOCUMENT_POSITION_FOLLOWING), n: document.querySelectorAll('#servers-view [data-action="add"]').length, summary: (document.querySelector('#servers-view .servers-summary') || {}).textContent || '' }; })()`);

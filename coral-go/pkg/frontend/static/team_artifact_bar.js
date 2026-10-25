@@ -1,6 +1,7 @@
 /* The Team Artifacts panel's search box, filter menu, sort and chips (#4573): its words, fields and sorts on the shared list bar (list_bar.js, #4744). The server does the work: this only
  * collects what to ask for (team_artifact_filters.js). */
-import { EMPTY, KINDS, ORIGINS, SORTS, KIND_LABEL, ORIGIN_LABEL, SORT_LABEL, clean, chips, isFiltered, without } from './team_artifact_filters.js';
+import { importOnce } from './import_once.js';
+const { EMPTY, KINDS, ORIGINS, SORTS, KIND_LABEL, ORIGIN_LABEL, SORT_LABEL, clean, chips, isFiltered, without } = await importOnce('./team_artifact_filters.js'); // lazy: its failure is retried
 import { buildListBar } from './list_bar.js';
 
 // The same fields for the team's list and for one agent's list (#5283): only the words and the ids differ, so the two bars (one per panel, both in the page) never share an id.

@@ -148,11 +148,6 @@ export function fileIconHtml(name) {
     return createFileIcon(name, false, false).outerHTML;
 }
 
-/** The same icon as a node, for a file known by its name and, when the name has no extension, its media type (the artifact lists, #5314). */
-export function fileIconFor(name, mediaType) {
-    return createFileIcon(String(name || ''), false, false, mediaType);
-}
-
 function reset() {
     ++generation;
     for (const dir of directories.values()) dir.controller?.abort();

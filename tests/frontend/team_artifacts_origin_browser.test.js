@@ -1,7 +1,7 @@
-// #4396: the Team Artifacts panel says where a row came from (stubbed data; it does not wait for the server side of C1).
-//  - provenance "unverified": the link text with "Link not verified", no size, no type, no Preview, no Download, never merged with a real row of the same id
-//  - source "shared": "Sent to <server>/<board>"; source "received": "From <server>", "not scanned" in Details; neither shows a producer
-//  - a legacy row (no provenance) renders as before: a missing object still says Missing
+// #4396: the Artifacts table says where a row came from (stubbed data; it does not wait for the server side of C1); the agent's tab is the team page's table since #7622, the details are in the sheet a row opens.
+//  - provenance "unverified": the link text with "Link not verified", no size, no type; its sheet says why and has no Open, Download or Copy link; never merged with a real row of the same id
+//  - source "shared": "Sent to <server>/<board>"; source "received": "From <server>", "not scanned" in the sheet; neither shows a producer
+//  - a legacy row (no provenance) renders as before: a missing object has no actions
 //  - the words are in the page (screen readers read them with the name), the rows keep their keyboard order, and the table fits a 390 px phone at 200% text
 // Run against an isolated Coral dev server and headless Chrome via CDP. CORAL_SCREENSHOT_DIR=<dir> saves screenshots.
 const assert = require('node:assert/strict');
@@ -26,7 +26,15 @@ const SHOTS = process.env.CORAL_SCREENSHOT_DIR;
         const { data } = await Page.captureScreenshot({ format: 'png' });
         fs.writeFileSync(path.join(SHOTS, name + '.png'), Buffer.from(data, 'base64'));
     };
-    const rowOf = name => `[...document.querySelectorAll('tr.team-artifact-row')].find(r => r.querySelector('.team-artifact-name').textContent === ${JSON.stringify(name)})`;
+    const ROWS = '#agentic-panel-artifacts-view tbody tr';
+    const rowOf = name => `[...document.querySelectorAll('${ROWS}')].find(r => r.querySelector('.team-row-btn').textContent === ${JSON.stringify(name)})`;
+    const until = async expr => { for (let i = 0; i < 300; i++) { if (await ev(expr)) return; await ev('new Promise(r => setTimeout(r, 20))'); } throw new Error('timed out waiting for ' + expr); };
+    // open a row's sheet and read it: its facts as label/value, its actions, whether it is open
+    const sheetOf = async name => {
+        await ev(`(${rowOf(name)}).querySelector('.team-row-btn').click(); true`);
+        await until(`!document.getElementById('agentic-detail-pane').hidden && document.querySelector('#agentic-detail-pane .detail-title').textContent === ${JSON.stringify(name)}`);
+        return ev(`(() => { const a = document.getElementById('agentic-detail-pane'); return { facts: [...a.querySelectorAll('.detail-facts > *')].map(c => c.tagName + ':' + c.textContent), actions: [...a.querySelectorAll('.detail-foot .btn')].map(b => b.textContent) }; })()`);
+    };
     try {
         await Page.enable();
         await Emulation.setDeviceMetricsOverride({ width: 1200, height: 900, deviceScaleFactor: 1, mobile: false });
@@ -57,56 +65,64 @@ const SHOTS = process.env.CORAL_SCREENSHOT_DIR;
             };
             files.initFileSearch(); files.syncFilesViewerSession();
         })()`);
-        await ev(`localStorage.removeItem('coral-agentic-tab-top'); document.getElementById('agentic-tab-artifacts').click()`); await settle();
-        assert.equal(await ev(`document.querySelectorAll('tr.team-artifact-row').length`), 7, 'every row is listed: the unverified one is not merged into the real row with the same id');
+        await ev(`localStorage.removeItem('coral-agentic-tab-top'); document.getElementById('agentic-tab-artifacts').click()`);
+        await until(`document.querySelectorAll('${ROWS}').length === 7`); // every row is listed: the unverified one is not merged into the real row with the same id
+        assert.equal(await ev(`document.querySelectorAll('${ROWS}').length`), 7);
 
         console.log('1. An unverified row says so and offers nothing to open');
-        const unv = await ev(`(() => { const rows = [...document.querySelectorAll('tr.team-artifact-row')].filter(r => r.dataset.origin === 'unverified'); return rows.map(r => ({ name: r.querySelector('.team-artifact-name').textContent, tag: r.querySelector('.team-artifact-name').tagName, badge: r.querySelector('.team-artifact-badge').textContent, type: r.querySelector('td.team-artifact-col-type').textContent, preview: r.querySelectorAll('.team-artifact-preview').length, links: r.querySelectorAll('a[href]').length, action: r.querySelector('.team-artifact-col-actions').textContent, details: r.querySelector('dl').textContent })); })()`);
+        const unvNames = ['Design review.md', "Another team's report.pdf"];
+        const unv = await ev(`[...document.querySelectorAll('${ROWS}')].filter(r => r.querySelector('.team-artifact-badge-unverified')).map(r => ({ name: r.querySelector('.team-row-btn').textContent, badge: r.querySelector('.team-artifact-badge').textContent, cells: [...r.querySelectorAll('td')].slice(1, 3).map(c => c.textContent) }))`);
         assert.equal(unv.length, 2);
         for (const r of unv) {
             assert.equal(r.badge, 'Link not verified');
-            assert.equal(r.tag, 'SPAN', 'the name is not a button: nothing to preview');
-            assert.equal(r.type, '—');
-            assert.equal(r.preview, 0); assert.equal(r.links, 0);
-            assert.equal(r.action, 'Not verified');
-            assert.doesNotMatch(r.details, /MIME|Size/);
-            assert.match(r.details, /Statusthis team has not uploaded|StatusLink not verified/);
+            assert.deepEqual(r.cells, ['—', '—'], 'no type and no size');
         }
+        const un = await ev(`(() => { const r = document.querySelector('${ROWS} .team-artifact-badge-unverified').closest('tr'); r.querySelector('.team-row-btn').click(); return r.querySelector('.team-row-btn').textContent; })()`);
+        await until(`document.querySelector('#agentic-detail-pane .detail-title').textContent === ${JSON.stringify(un)}`);
+        const unSheet = await ev(`(() => { const a = document.getElementById('agentic-detail-pane'); return { facts: [...a.querySelectorAll('.detail-facts > *')].map(c => c.textContent), actions: a.querySelectorAll('.detail-foot .btn').length }; })()`);
+        assert.equal(unSheet.actions, 0, 'nothing to open, download or copy');
+        assert.ok(!unSheet.facts.some(f => /MIME|^Size/.test(f)), 'no MIME or size: ' + JSON.stringify(unSheet.facts));
+        assert.ok(unSheet.facts.some(f => /this team has not uploaded|Link not verified/.test(f)), 'the sheet says why: ' + JSON.stringify(unSheet.facts));
         await shot('origin-desktop');
 
         console.log('2. The real row with the same id is still managed');
-        const real = await ev(`(() => { const r = ${rowOf('Design review.md')}; return { origin: r.dataset.origin || '', preview: r.querySelectorAll('.team-artifact-preview').length, type: r.querySelector('td.team-artifact-col-type').textContent, badge: !!r.querySelector('.team-artifact-badge') }; })()`);
-        assert.deepEqual(real, { origin: '', preview: 1, type: 'Markdown', badge: false });
+        const real = await sheetOf('Design review.md').catch(() => null);
+        const realRow = await ev(`(() => { const r = [...document.querySelectorAll('${ROWS}')].find(r => r.querySelector('.team-row-btn').textContent === 'Design review.md' && !r.querySelector('.team-artifact-badge')); return r ? { type: r.querySelectorAll('td')[1].textContent, badge: false } : null; })()`);
+        assert.deepEqual(realRow, { type: 'Markdown', badge: false });
+        void real;
 
         console.log('3. A shared row and a received row are labelled and never show a producer');
-        const sh = await ev(`(() => { const r = ${rowOf('Test report.txt')}; return { badge: r.querySelector('.team-artifact-badge').textContent, preview: r.querySelectorAll('.team-artifact-preview').length, details: r.querySelector('dl').textContent }; })()`);
-        assert.equal(sh.badge, 'Sent to homelab/qa'); assert.equal(sh.preview, 1);
-        assert.doesNotMatch(sh.details, /Producer/); assert.match(sh.details, /Sent tohomelab\/qa/); assert.match(sh.details, /Sent byOrchestrator/);
-        const rc = await ev(`(() => { const r = ${rowOf('Their logs.txt')}; return { badge: r.querySelector('.team-artifact-badge').textContent, preview: r.querySelectorAll('.team-artifact-preview').length, details: r.querySelector('dl').textContent }; })()`);
-        assert.equal(rc.badge, 'From homelab (ab12cd34)'); assert.equal(rc.preview, 1);
-        assert.doesNotMatch(rc.details, /Producer/);
-        assert.match(rc.details, /Board \(claimed by the sender\)platform/); assert.match(rc.details, /CheckedNot scanned/); assert.match(rc.details, /Sent byOrchestrator \(platform\)/);
+        const shRow = await ev(`${rowOf('Test report.txt')}.querySelector('.team-artifact-badge').textContent`);
+        assert.equal(shRow, 'Sent to homelab/qa');
+        const sh = await sheetOf('Test report.txt');
+        assert.ok(sh.actions.includes('Open') && sh.actions.includes('Download'), 'it opens: ' + sh.actions);
+        const shText = sh.facts.join('|');
+        assert.doesNotMatch(shText, /Producer/); assert.match(shText, /DT:Sent to\|DD:homelab\/qa/); assert.match(shText, /DT:Sent by\|DD:Orchestrator/);
+        assert.equal(await ev(`${rowOf('Their logs.txt')}.querySelector('.team-artifact-badge').textContent`), 'From homelab (ab12cd34)');
+        const rc = await sheetOf('Their logs.txt');
+        assert.ok(rc.actions.includes('Open'));
+        const rcText = rc.facts.join('|');
+        assert.doesNotMatch(rcText, /Producer/);
+        assert.match(rcText, /DT:Board \(claimed by the sender\)\|DD:platform/); assert.match(rcText, /DT:Checked\|DD:Not scanned/); assert.match(rcText, /DT:Sent by\|DD:Orchestrator \(platform\)/);
         // A file received again from other Corals lists each later sender on a line of its own, worded as the first
         // source is, after the Board line (#4454 item 3).
-        const also = await ev(`(() => { const dl = ${rowOf('Their logs.txt')}.querySelector('dl'); const kids = [...dl.children].map(c => c.tagName + ':' + c.textContent); const at = kids.indexOf('DT:Also received from'); return { kids, at, board: kids.indexOf('DT:Board (claimed by the sender)') }; })()`);
-        assert.ok(also.at > 0 && also.at > also.board, 'Also received from comes after the Board line: ' + JSON.stringify(also.kids));
-        assert.deepEqual(also.kids.slice(also.at + 1, also.at + 4), [
-            'DD:laptop (cd34ef56), board platform (claimed by the sender)',
-            'DD:office-mac-studio (12ab34cd), board design-review-board (claimed by the sender)',
-            'DD:cloud-runner-17 (99aa88bb), board ops (claimed by the sender)']);
+        const at = rc.facts.indexOf('DT:Also received from'), board = rc.facts.indexOf('DT:Board (claimed by the sender)');
+        assert.ok(at > 0 && at > board, 'Also received from comes after the Board line: ' + JSON.stringify(rc.facts));
+        assert.deepEqual(rc.facts.slice(at + 1, at + 2), ['DD:laptop (cd34ef56), board platform (claimed by the sender)\noffice-mac-studio (12ab34cd), board design-review-board (claimed by the sender)\ncloud-runner-17 (99aa88bb), board ops (claimed by the sender)']);
 
-        const cited = await ev(`(() => { const r = ${rowOf('Their logs (cited).txt')}; return { badge: r.querySelector('.team-artifact-badge').textContent, preview: r.querySelectorAll('.team-artifact-preview').length }; })()`);
-        assert.deepEqual(cited, { badge: 'Received file', preview: 1 }, 'a task result citing a received file is labelled and still opens');
+        assert.equal(await ev(`${rowOf('Their logs (cited).txt')}.querySelector('.team-artifact-badge').textContent`), 'Received file', 'a task result citing a received file is labelled');
+        assert.ok((await sheetOf('Their logs (cited).txt')).actions.includes('Open'), 'and still opens');
 
         console.log('4. A legacy row renders as before');
-        const old = await ev(`(() => { const r = ${rowOf('Earlier screenshot.png')}; return { badge: !!r.querySelector('.team-artifact-badge'), action: r.querySelector('.team-artifact-col-actions').textContent, origin: r.dataset.origin || '' }; })()`);
-        assert.deepEqual(old, { badge: false, action: 'Missing', origin: '' });
+        assert.equal(await ev(`!!${rowOf('Earlier screenshot.png')}.querySelector('.team-artifact-badge')`), false);
+        assert.equal((await sheetOf('Earlier screenshot.png')).actions.length, 0, 'a missing object has no actions');
 
         console.log('5. The words are in the page for a screen reader, and the keyboard order is unchanged');
-        const ax = await ev(`(() => { const r = ${rowOf('Their logs.txt')}; const b = r.querySelector('.team-artifact-badge'); return { hidden: !!b.closest('[aria-hidden=true]'), after: !!(r.querySelector('.team-artifact-name').compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING), stops: [...r.querySelectorAll('button, a[href], summary')].length }; })()`);
+        const ax = await ev(`(() => { const r = ${rowOf('Their logs.txt')}; const b = r.querySelector('.team-artifact-badge'); return { hidden: !!b.closest('[aria-hidden=true]'), after: !!(r.querySelector('.team-row-btn').compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) }; })()`);
         assert.equal(ax.hidden, false); assert.equal(ax.after, true);
-        const stops = await ev(`[...document.querySelectorAll('tr.team-artifact-row')].map(r => r.querySelectorAll('button, a[href], summary').length)`);
-        assert.ok(stops[1] === 1 && stops[2] === 1, 'an unverified row has one stop (Details) and no Preview or Download: ' + JSON.stringify(stops));
+        const stops = await ev(`[...document.querySelectorAll('${ROWS}')].map(r => r.querySelectorAll('button, a[href], summary').length)`);
+        assert.ok(stops.every(n => n === 1), 'every row has one stop, its name: ' + JSON.stringify(stops));
+        await ev(`document.querySelector('#agentic-detail-pane .detail-close').click(); true`);
 
         console.log('6. A 390 px phone at 200% text: the table fits and the words stay in their row');
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
@@ -114,7 +130,7 @@ const SHOTS = process.env.CORAL_SCREENSHOT_DIR;
         await ev(`document.getElementById('agentic-state').style.width = ''; document.documentElement.style.fontSize = '32px'; (document.getElementById('popout-panel-toggle-btn') || document.getElementById('panel-toggle-btn')).click(); true`); await settle();
         await ev(`window.switchAgenticTab('artifacts', 'top'); true`); await settle();
         assert.ok(await ev(`[...document.querySelectorAll('.team-artifact-badge')].filter(b => b.getBoundingClientRect().width > 0).length`) >= 4, 'the badges are on screen on the phone (the drawer is open)');
-        const fit = await ev(`(() => { const s = document.querySelector('.team-artifacts-scroll'); const sr = s.getBoundingClientRect(); const out = [...document.querySelectorAll('.team-artifact-badge')].filter(b => { const r = b.getBoundingClientRect(); return r.right > sr.right + 1 || r.left < sr.left - 1; }).length; return { fits: s.scrollWidth <= s.clientWidth + 1, docOver: document.documentElement.scrollWidth - innerWidth, out, badge: parseFloat(getComputedStyle(document.querySelector('.team-artifact-badge')).fontSize) }; })()`);
+        const fit = await ev(`(() => { const s = document.querySelector('#agentic-panel-artifacts-view .team-table-scroll'); const sr = s.getBoundingClientRect(); const out = [...document.querySelectorAll('#agentic-panel-artifacts-view .team-artifact-badge')].filter(b => { const r = b.getBoundingClientRect(); return r.right > sr.right + 1 || r.left < sr.left - 1; }).length; return { fits: s.scrollWidth <= s.clientWidth + 1, docOver: document.documentElement.scrollWidth - document.documentElement.clientWidth, out, badge: parseFloat(getComputedStyle(document.querySelector('.team-artifact-badge')).fontSize) }; })()`);
         assert.equal(fit.fits, true, 'no horizontal scroll in the table'); assert.ok(fit.docOver <= 0, 'no sideways scroll'); assert.equal(fit.out, 0, 'every badge stays inside the table');
         assert.ok(fit.badge >= 20, 'the badge text grows with the root font: ' + fit.badge);
         await shot('origin-phone-200');

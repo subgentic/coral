@@ -15,6 +15,9 @@ const sample = fs.readFileSync(path.join(__dirname,'fixtures/verification_report
         return r.result.value;
     };
     const settle=()=>ev('new Promise(r=>setTimeout(r,80))');
+    const until=async expr=>{for(let i=0;i<300;i++){if(await ev(expr))return;await ev('new Promise(r=>setTimeout(r,20))');}throw Error('timed out waiting for '+expr);};
+    // a row opens its sheet over the panel; Open in the sheet is the report in the preview pane
+    const openReport=async()=>{await until("document.querySelectorAll('#agentic-panel-artifacts tbody tr .team-row-btn').length>0");await ev(`document.querySelector('#agentic-panel-artifacts tbody tr .team-row-btn').click()`);await until("[...document.querySelectorAll('#agentic-detail-pane .detail-foot .btn')].some(b=>b.textContent==='Open')");await ev(`[...document.querySelectorAll('#agentic-detail-pane .detail-foot .btn')].find(b=>b.textContent==='Open').click()`);await ev(`document.querySelector('#agentic-detail-pane .detail-close').click()`);await settle();}; // the sheet shows the report too: it is closed so the report in the preview pane is the only one
     const shot=async(name,mobile=false)=>{
         if(!process.env.CORAL_SCREENSHOT_DIR)return;
         fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR,{recursive:true});
@@ -41,7 +44,8 @@ const sample = fs.readFileSync(path.join(__dirname,'fixtures/verification_report
             };
             files.initFileSearch();files.syncFilesViewerSession();document.getElementById('agentic-tab-artifacts').click();
         })()`);await settle();
-        await ev(`document.querySelector('.team-artifact-preview').click()`);await settle();
+        await openReport();
+        const readsAfterOpen=await ev('window.__reads'); // the sheet's preview read it once and the preview tab once
         assert.equal(await ev(`document.querySelector('.artifact-report-title').textContent`),'Task #2254');
         assert.equal(await ev(`document.querySelector('.artifact-report-outcome').textContent`),'Reported outcome: success');
         assert.deepEqual(await ev(`[...document.querySelectorAll('.artifact-report-section h2')].map(x=>x.textContent)`),['Summary','Verification','Files','Isolation','Limits']);
@@ -57,10 +61,10 @@ const sample = fs.readFileSync(path.join(__dirname,'fixtures/verification_report
         assert.equal(await ev(`document.querySelector('.artifact-report-raw').hidden`),false);
         assert.equal(await ev(`document.querySelector('.artifact-report-raw').textContent`),sample,'raw JSON must be byte-for-byte original UTF-8 text');
         await ev(`document.querySelector('.artifact-report-controls button').click()`);
-        assert.equal(await ev('window.__reads'),1,'toggle never refetches');
+        assert.equal(await ev('window.__reads'),readsAfterOpen,'toggle never refetches');
         // Managed application/json uses the same report renderer.
         await ev(`window.closeAllPreviewTabs();window.__inline=false;document.querySelector('#agentic-panel-artifacts .team-artifacts-refresh').click()`);await settle();
-        await ev(`document.querySelector('.team-artifact-preview').click()`);await settle();
+        await openReport();
         assert.equal(await ev(`document.querySelector('.artifact-report-title').textContent`),'Task #2254');
         // Module-level adversarial and fallback checks run in the real browser.
         const probe=await ev(`(async()=>{
@@ -82,8 +86,8 @@ const sample = fs.readFileSync(path.join(__dirname,'fixtures/verification_report
         assert.deepEqual(probe.outcomes,['Reported outcome: failure','Reported outcome: unknown']);
         for(const result of [probe.depth,probe.wide]){assert.equal(result.notice,true);assert.equal(result.raw,true);assert.ok(result.nodes<10);}
         // A narrow pane wraps long report paths/prose instead of overflowing horizontally.
-        await ev(`window.closeAllPreviewTabs();const side=document.getElementById('agentic-state');side.style.width='350px';side.style.minWidth='0';document.querySelector('.team-artifact-preview').click()`);await settle();
-        assert.ok(await ev(`!!document.querySelector('#preview-body .artifact-report')`));
+        await ev(`window.closeAllPreviewTabs();const side=document.getElementById('agentic-state');side.style.width='350px';side.style.minWidth='0'`);await settle();await ev(`document.getElementById('agentic-detail-pane').querySelector('.detail-close')?.click()`);await openReport();
+        assert.ok(await ev(`!!document.querySelector('.artifact-report')`)); // a managed artifact opens in the viewer (Open in the sheet), an inline one in the preview pane
         assert.ok(await ev(`(()=>{const r=document.querySelector('.artifact-report');return r.scrollWidth<=r.clientWidth+1})()`),'narrow report must not overflow horizontally');
         await shot('verification-report-2254-narrow',true);
         await ev('window.closeAllPreviewTabs()');

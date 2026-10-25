@@ -1,6 +1,6 @@
-// "Who can read this" (#5577): a small disclosure for the Operator in the artifact viewer and in an Artifacts row's details, from
-// GET /api/artifacts/{id}/readers. Against the real server: an agent uploads an artifact, its Artifacts tab row has the disclosure in its
-// details, opening it says who holds the artifact and carries the server's note that this is a Coral control, not an operating-system
+// "Who can read this" (#5577): a small disclosure for the Operator in the artifact viewer and in the sheet an Artifacts row opens, from
+// GET /api/artifacts/{id}/readers. Against the real server: an agent uploads an artifact, its Artifacts tab row's sheet has the disclosure
+// above the document, opening it says who holds the artifact and carries the server's note that this is a Coral control, not an operating-system
 // boundary; the viewer has it under its header. Then the machine's answers are stubbed: a refusal (anyone else) draws nothing, and
 // hostile names are text, never markup. Drives Chrome over CDP against the isolated dev server.
 const assert = require('node:assert/strict');
@@ -24,23 +24,23 @@ const BASE = require('./test_base').BASE;
         assert.equal(up.status, 201, JSON.stringify(up));
         const hex = String(up.body.uri).split('/').pop();
 
-        console.log('1. The row: the disclosure is in its details, closed, and says who holds it');
+        console.log('1. The row sheet: the disclosure is above the document, closed, and says who holds it');
         await Page.navigate({ url: `${BASE}/agents/${sid}` }); await Page.loadEventFired(); await coralReady();
         await waitFor(`!!document.getElementById('agentic-tab-artifacts')`, 'the Artifacts tab', 15000);
         await ev(`document.getElementById('agentic-tab-artifacts').click(); true`);
-        await waitFor(`!!document.querySelector('.team-artifact-row .team-artifact-info-btn')`, 'the row', 15000);
-        assert.equal(await ev(`document.querySelectorAll('.artifact-readers').length`), 0, 'a listing asks nothing: the disclosure comes with the details');
-        await ev(`document.querySelector('.team-artifact-row .team-artifact-info-btn').click(); true`);
-        await waitFor(`!!document.querySelector('.team-artifact-row .artifact-readers')`, 'the disclosure in the row', 15000, `({ rows: document.querySelectorAll('.team-artifact-row').length, rd: document.querySelectorAll('.artifact-readers').length, html: (document.querySelector('.team-artifact-row') || {}).outerHTML && document.querySelector('.team-artifact-row').outerHTML.slice(0, 300) })`);
-        assert.deepEqual(await ev(`(() => { const d = document.querySelector('.team-artifact-row .artifact-readers'); return { open: d.open, summary: d.querySelector('summary').textContent.replace('expand_more', ''), chevron: !!d.querySelector('summary .artifact-readers-chevron'), inDetails: !!d.closest('.team-artifact-details') }; })()`), { open: false, summary: 'Who can read this', chevron: true, inDetails: true });
-        const turn = () => ev(`getComputedStyle(document.querySelector('.team-artifact-row .artifact-readers-chevron')).transform`);
+        await waitFor(`!!document.querySelector('#agentic-panel-artifacts tbody tr .team-row-btn')`, 'the row', 15000);
+        assert.equal(await ev(`document.querySelectorAll('.artifact-readers').length`), 0, 'a listing asks nothing: the disclosure comes with the sheet');
+        await ev(`document.querySelector('#agentic-panel-artifacts tbody tr .team-row-btn').click(); true`);
+        await waitFor(`!!document.querySelector('#agentic-detail-pane .artifact-readers')`, 'the disclosure in the sheet', 15000, `({ rows: document.querySelectorAll('#agentic-panel-artifacts tbody tr').length, rd: document.querySelectorAll('.artifact-readers').length, html: (document.querySelector('.team-artifact-row') || {}).outerHTML && document.querySelector('.team-artifact-row').outerHTML.slice(0, 300) })`);
+        assert.deepEqual(await ev(`(() => { const d = document.querySelector('#agentic-detail-pane .artifact-readers'); return { open: d.open, summary: d.querySelector('summary').textContent.replace('expand_more', ''), chevron: !!d.querySelector('summary .artifact-readers-chevron'), inDetails: !!d.closest('.detail-body') }; })()`), { open: false, summary: 'Who can read this', chevron: true, inDetails: true });
+        const turn = () => ev(`getComputedStyle(document.querySelector('#agentic-detail-pane .artifact-readers-chevron')).transform`);
         assert.equal(await turn(), 'none', 'the chevron points down while it is closed');
-        await ev(`document.querySelector('.team-artifact-row .artifact-readers > summary').click(); true`);
-        await waitFor(`document.querySelector('.team-artifact-row .artifact-readers').open`, 'open');
+        await ev(`document.querySelector('#agentic-detail-pane .artifact-readers > summary').click(); true`);
+        await waitFor(`document.querySelector('#agentic-detail-pane .artifact-readers').open`, 'open');
         await new Promise(r => setTimeout(r, 250)); // sleep-ok: the chevron's turn is a 0.12 s transition, there is no event to wait for
         assert.notEqual(await turn(), 'none', 'and turned once it is open');
-        await waitFor(`document.querySelectorAll('.team-artifact-row .artifact-readers-body p').length >= 2`, 'the readers', 10000);
-        const body = await ev(`[...document.querySelectorAll('.team-artifact-row .artifact-readers-body p')].map(p => p.textContent)`);
+        await waitFor(`document.querySelectorAll('#agentic-detail-pane .artifact-readers-body p').length >= 2`, 'the readers', 10000);
+        const body = await ev(`[...document.querySelectorAll('#agentic-detail-pane .artifact-readers-body p')].map(p => p.textContent)`);
         assert.match(body[0], /^On this computer, the Operator reads, manages and deletes every artifact/, JSON.stringify(body));
         assert.ok(body.some(t => /^Held by the Operator on this computer/.test(t)), JSON.stringify(body));
         assert.match(body[body.length - 1], /not an operating-system boundary.*its own shell\.$/, 'the whole plain note is last: ' + body[body.length - 1]);

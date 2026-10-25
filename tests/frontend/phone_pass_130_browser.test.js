@@ -72,10 +72,6 @@ const LONG_WAIT = "⏳ This agent hasn't done anything yet — check the termina
                 await panel.show(ctx, { w, theme, phone: true });
                 await setTheme(ev, theme); await installAudit(ev); await settle(500);
                 await scene(`${key} with its filter panel open`, key === 'tasks' ? '#agentic-state' : '#agentic-panel-artifacts');
-                if (key === 'artifacts') {
-                    const ic = await ev(`(() => { const rows = [...document.querySelectorAll('#agentic-panel-artifacts tr.team-artifact-row .team-artifact-name')]; return { n: rows.length, icons: rows.filter(r => { const i = r.querySelector('.explorer-file-icon'); return i && i.getAttribute('aria-hidden') === 'true' && Math.round(i.getBoundingClientRect().width) <= 20; }).length }; })()`);
-                    if (!ic.n || ic.icons !== ic.n) problems.push(`${tag} artifacts: every name starts with its small hidden file icon (${JSON.stringify(ic)})`);
-                }
             }
             // 2. the two overlay pills, with their longest texts, over an agent's view
             await load(w, theme);

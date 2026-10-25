@@ -223,3 +223,23 @@
 
 /* narrow, in rem so a larger text size stacks sooner: the label and its hint above the control, the control at the left; no word is broken */
 @container (max-width: 56rem) { .ts-row { grid-template-columns: minmax(0, 1fr); } .ts-row:not(.ts-row-switch) .ts-control { justify-content: flex-start; } .ts-mode-control .working-mode-desc { text-align: left; } }
+
+/* the agent's Artifacts tab (the dock panel): the team's table in a narrow panel, and the document as a sheet over the panel itself (the chat beside it stays) */
+#agentic-panel-artifacts { position: relative; }
+#agentic-panel-artifacts-view { container-type: inline-size; }
+.dock-detail-pane { position: absolute; inset: 0; z-index: 5; width: auto; border-left: 0; }
+.team-artifacts-title { font-weight: 600; margin-right: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.team-artifacts-plain-head { display: flex; align-items: center; gap: 4px; padding: 8px 12px; }
+.team-artifacts-plain-head .team-artifacts-title { flex: 1; min-width: 0; }
+@container (max-width: 560px) {
+    .team-table th, .team-table td { padding-left: 8px; padding-right: 8px; } /* a narrow panel gives the cells less air: Name and Created fit at 200% text */
+    .team-table th:nth-child(n+2):nth-child(-n+4), .team-table td:nth-child(n+2):nth-child(-n+4) { display: none; } /* Type, Size and Task fold under the name (and Task is in the pane's facts); Created stays on the right */
+    .team-row-phone { display: block; }
+}
+@media (max-width: 760px) {
+    #agentic-panel-artifacts-view .team-row-btn { min-height: 44px; display: inline-flex; align-items: center; } /* a 44 px target on a touch screen */
+    #agentic-panel-artifacts-view .team-table th:nth-child(5), #agentic-panel-artifacts-view .team-table td:nth-child(5) { display: table-cell; } /* the page's phone table is Name and State; here Created stays beside the name, as in any narrow panel */
+}
+.detail-readers:not(:empty) { margin-bottom: 12px; }
+.team-row-cell .team-artifact-badge { white-space: normal; overflow-wrap: anywhere; } /* the origin words wrap in the name cell (a 390 px phone at 200% text) instead of widening the table */
+.team-artifacts-error { color: var(--error-text); } /* a failed load is red, not the grey of the other lines (UX #4469) */
