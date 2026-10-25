@@ -60,11 +60,12 @@ func setup() (cleanup func()) {
 			return func() {}
 		}
 	}
+	release := hold(dir, tmp, home, data) // closed first in cleanup
 	os.Setenv(Marker, dir)
 	for k, v := range map[string]string{"TMPDIR": tmp, "TMP": tmp, "TEMP": tmp, "HOME": home, "USERPROFILE": home, "CORAL_DATA_DIR": data} {
 		os.Setenv(k, v)
 	}
-	return func() { os.Unsetenv(Marker); os.RemoveAll(dir) }
+	return func() { os.Unsetenv(Marker); release(); os.RemoveAll(dir) }
 }
 
 // Run is a TestMain body: the package's tests in a private world, whose exit code it returns (os.Exit(testtemp.Run(m))).
