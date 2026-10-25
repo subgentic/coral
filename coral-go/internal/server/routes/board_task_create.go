@@ -192,6 +192,12 @@ func (h *BoardHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		task.RemindAt = &at
 	}
 
+	h.announceCreatedTask(project, task)
+	writeJSON(w, http.StatusCreated, task)
+}
+
+// announceCreatedTask tells the board (and nudges an agent) about a task that was just created: a draft or blocked one on the queue line, a published one with its assignment.
+func (h *BoardHandler) announceCreatedTask(project string, task *board.Task) {
 	assignee := ""
 	if task.AssignedTo != nil {
 		assignee = *task.AssignedTo
@@ -234,7 +240,6 @@ func (h *BoardHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 			}
 		})
 	}
-	writeJSON(w, http.StatusCreated, task)
 }
 
 // parseBlockedBy handles both shorthand [1, 2, 3] and full [{task_id: 1, board_id: "x"}] formats.

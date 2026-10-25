@@ -39,6 +39,7 @@ GET /api/board/{project}/artifacts | board-claims +token-session
 GET /api/board/{project}/cross-team-candidates | board-claims +token-session | operator-only
 GET /api/board/{project}/cross-team-state | board-claims +token-session | operator-only
 GET /api/board/{project}/cross-team/settings | board-claims | operator-only
+GET /api/board/{project}/goal-requests | board-claims
 GET /api/board/{project}/goals | board-claims
 GET /api/board/{project}/goals/{goalID} | board-claims
 GET /api/board/{project}/groups | board-claims
@@ -134,6 +135,9 @@ POST /api/board/{project}/cross-team/files/disable | board-claims | operator-onl
 POST /api/board/{project}/cross-team/files/enable | board-claims | operator-only
 POST /api/board/{project}/external-artifacts | board-claims
 POST /api/board/{project}/external-messages | board-claims +token-session
+POST /api/board/{project}/goal-requests | board-claims +token-session
+POST /api/board/{project}/goal-requests/{requestID}/accept | board-claims
+POST /api/board/{project}/goal-requests/{requestID}/decline | board-claims
 POST /api/board/{project}/goals | board-claims
 POST /api/board/{project}/goals/{goalID}/close | board-claims
 POST /api/board/{project}/groups/{groupID}/members | board-claims | operator-only
