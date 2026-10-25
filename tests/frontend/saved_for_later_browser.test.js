@@ -197,10 +197,10 @@ const hex = i => i.toString(16).padStart(20, '0');
         assert.equal(await ev(`document.activeElement.id`), 'agentic-tab-saved', 'the focus stays on the tab, as with every tab');
         assert.equal(await ev(`document.getElementById('agentic-tab-saved').getAttribute('aria-label')`), 'Saved for later on this page'); // not the top bar button's name: that one opens everything's list
         await ev(`document.getElementById('agentic-tab-files').click(); true`);
-        // The top bar's bookmark is the Inbox's, from an agent's page too (#4905): Enter on it opens the page with the focus inside, and pressing it again goes back to the agent.
+        // The top bar's bookmark is the Inbox's, from an agent's page too (#4905): Enter on it opens the page with the focus on its Saved sub-tab, and pressing it again goes back to the agent.
         await ev(`document.getElementById('saved-btn').focus(); true`);
         await key('Enter', 'Enter', 13);
-        await waitFor(`document.getElementById('saved-view').getClientRects().length > 0 && document.getElementById('saved-view').contains(document.activeElement)`, 'the Inbox at Saved with the focus inside it', 6000);
+        await waitFor(`document.getElementById('saved-view').getClientRects().length > 0 && (document.getElementById('saved-view').contains(document.activeElement) || document.activeElement.id === 'inbox-tab-saved')`, 'the Inbox at Saved with the focus on its Saved sub-tab or inside the list (#7431)', 6000);
         await ev(`document.getElementById('saved-btn').click(); true`); // pressed again: back to the agent
         await waitFor(`document.getElementById('saved-view').getClientRects().length === 0`, 'the Inbox left', 6000);
         await ev(`document.getElementById('agentic-state').classList.add('collapsed'); true`); // the sidebar closed

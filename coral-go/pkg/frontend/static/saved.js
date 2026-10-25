@@ -329,8 +329,14 @@ async function probe(it) {
     return { state: live ? 'live' : 'ended', index: d.index };
 }
 
+let _drawn = false; // the list has been drawn once: a later read keeps what is on screen until the answer comes
 async function refresh() {
-    try { await load(); render(); } catch (e) { $('saved-status').textContent = `Could not read the saved messages (${e.message}).`; }
+    if (!_drawn) { // the first read: the bar is already there and one line says it is loading, so nothing moves when the list arrives (#7431)
+        syncBar(0);
+        const li = document.createElement('li'); li.className = 'saved-empty saved-loading'; li.setAttribute('role', 'status'); li.textContent = 'Loading saved items';
+        $('saved-list').replaceChildren(li);
+    }
+    try { await load(); render(); _drawn = true; } catch (e) { $('saved-status').textContent = `Could not read the saved messages (${e.message}).`; }
 }
 
 /** On a phone the side panel is an overlay over the chat: it gives way so the jump is seen (the tab is where it was when it is opened again). */
@@ -423,7 +429,7 @@ async function openSavedView({ toggle = false } = {}) {
         const onSaved = !$('inbox-panel-saved')?.hidden;
         if (toggle && onSaved) { closeSaved(); return; }
         if (!onSaved) selectInboxTab('saved'); // the Inbox is open on Needs you: the button brings its Saved tab up
-        $('saved-list').querySelector('.btn')?.focus();
+        $('inbox-tab-saved')?.focus({ preventScroll: true }); // the selected tab, no jump; the ring is the browser's: after a key, not after a click
         return;
     }
     dropJumpBar();
@@ -432,8 +438,8 @@ async function openSavedView({ toggle = false } = {}) {
     selectInboxTab('saved'); // before the switch: the Inbox opens on its Saved tab
     window.switchNavTab?.('hub-inbox');
     try { await showSavedView(); } finally { wantAllScope(false); }
-    $('saved-view')?.scrollIntoView({ block: 'start' }); // the Inbox at its Saved part
-    ($('saved-list').querySelector('.btn') || $('saved-tab-open')).focus();
+    // The Inbox page as the Inbox tab shows it: no scroll to the list (the same screen either way), and the focus on the Saved sub-tab, not on a button of the list (#7431).
+    $('inbox-tab-saved')?.focus({ preventScroll: true });
 }
 
 let _before = null; // {open, tab}: the dock as it was when the Saved button opened it
