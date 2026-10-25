@@ -1,4 +1,4 @@
-// The side panel's Tasks list and Notes by keyboard (#4026 follow-up): a task row opens its details and a column heading sorts on
+// The side panel's Tasks list and Notes by keyboard (#4026 follow-up): a task row opens its page and a column heading sorts on
 // Enter or Space (both were mouse-only), and the rendered notes open for editing on Enter. Tasks come from the page state; run
 // against an isolated dev server.
 const assert = require('node:assert/strict');
@@ -42,12 +42,14 @@ const { connect } = require('./agent_view_harness');
             await press(k, code, vk);
             await waitFor(`document.querySelector('#board-task-list [data-sort="priority"]').textContent !== ${JSON.stringify(before)}`, `${JSON.stringify(k)} sorts by the heading`, 4000);
         }
-        await ev(`document.querySelector('#board-task-list .board-task-open').focus(); true`);
+        // a board task's name opens the team page's task page (#7644): the page needs a real board, so the opener is recorded here (task_page_actions_browser opens it for real)
+        await ev(`window.__opened = []; window.openTeamPage = (board, opts) => { window.__opened.push({ board, ...opts }); return Promise.resolve(true); }; document.querySelector('#board-task-list .board-task-open').focus(); true`);
         await press('Enter', 'Enter', 13);
-        await waitFor(`getComputedStyle(document.getElementById('task-detail-modal')).display !== 'none'`, 'the task details open on Enter', 5000);
-        assert.ok((await ev(`document.getElementById('task-detail-modal').textContent`)).includes('keyboard test') || (await ev(`document.getElementById('task-detail-modal').textContent`)).includes('focus ring'), 'the details are the task\'s');
-        await ev(`(async () => { const m = await import(${S} + 'tasks.js'); m.hideTaskDetailModal?.(); document.getElementById('task-detail-modal').style.display = 'none'; return true; })()`);
-        console.log('   ✓ Enter opens a task, Enter and Space sort by a heading');
+        await waitFor(`window.__opened.length === 1`, 'the task opens on Enter', 5000);
+        const opened = await ev(`window.__opened[0]`);
+        assert.ok(opened.tab === 'tasks' && [11, 12].includes(opened.item) && opened.board === 'task-bot', 'it opens that task on the team page: ' + JSON.stringify(opened));
+        assert.equal(await ev(`getComputedStyle(document.getElementById('task-detail-modal')).display`), 'none', 'and no dialog');
+        console.log('   ✓ Enter opens a task page, Enter and Space sort by a heading');
 
         console.log('2. Notes');
         await ev(`window.switchAgenticTab('notes', 'top'); true`);

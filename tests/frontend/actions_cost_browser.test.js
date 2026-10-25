@@ -22,7 +22,7 @@ const SUMMARY = {
         { session_id: 'aaaaaaaa-0000-4000-8000-000000000002', agent_name: 'Other Agent', board_name: 'team-y', folder: 'proj', cost_usd: 1, requests: 3 },
     ],
 };
-const TASKS = { tasks: [{ id: 4242, title: 'A costly task', status: 'completed', priority: 'high', cost_usd: 1.5, assigned_to: 'Ended Agent' }] };
+const TASKS = { tasks: [{ id: 4242, board_id: 'cost-board', title: 'A costly task', status: 'completed', priority: 'high', cost_usd: 1.5, assigned_to: 'Ended Agent' }] };
 
 (async () => {
     const client = await CDP({ port: Number(process.env.CDP_PORT || 9222) });
@@ -144,14 +144,14 @@ const TASKS = { tasks: [{ id: 4242, title: 'A costly task', status: 'completed',
             JSON.stringify(nav.calls) === JSON.stringify(['tab:history', 'history:' + nav.sid]) && nav.prevented, JSON.stringify(nav));
 
         const task = await ev(`(() => {
-            const keep = window.showTaskDetailModal;
+            const keep = window.openTeamPage;
             let shown = null;
-            window.showTaskDetailModal = id => { shown = id; };
+            window.openTeamPage = (board, opts) => { shown = JSON.stringify([board, opts]); };
             document.querySelector('#cost-by-task tr[data-on-click="cost-task"]').click();
-            window.showTaskDetailModal = keep;
+            window.openTeamPage = keep;
             return shown;
         })()`);
-        check('a task row opens its detail', task === 4242, String(task));
+        check('a task row opens its page on its team', task === JSON.stringify(['cost-board', { tab: 'tasks', item: 4242 }]), String(task));
     } catch (e) {
         check('the test ran', false, e.stack || String(e));
     } finally {

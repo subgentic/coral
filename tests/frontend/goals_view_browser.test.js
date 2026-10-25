@@ -23,7 +23,7 @@ const innerHeightOf = h => h;
         if (zoom) await ev(`document.documentElement.style.fontSize = '${zoom}'; true`);
         await ev(STUB);
         await ev(`fetch('/api/board/${board}/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'qa', as: 'QA', content: 'hello' }) }).then(() => true)`);
-        await ev(`window.__shownTasks = []; window.showTaskDetailModal = id => window.__shownTasks.push(id); (async () => { const m = await import(${S} + 'message_board.js'); const { showView } = await import(${S} + 'utils.js'); showView('messageboard-view'); m.selectBoardProject(${JSON.stringify(board)}); return true; })()`);
+        await ev(`window.__shownTasks = []; window.openTeamPage = (board, opts) => window.__shownTasks.push(opts.item); (async () => { const m = await import(${S} + 'message_board.js'); const { showView } = await import(${S} + 'utils.js'); showView('messageboard-view'); m.selectBoardProject(${JSON.stringify(board)}); return true; })()`);
         await waitFor(`document.getElementById('mb-post-input').getClientRects().length > 0`, 'the board', 10000);
     };
     const toGoals = async () => { await ev(`document.getElementById('mb-face-goals').click(); true`); await waitFor(`document.querySelectorAll('#mb-goals .goal-card').length > 0 || !!document.querySelector('#mb-goals .goals-empty, #mb-goals .goals-failed')`, 'the goals', 8000); };

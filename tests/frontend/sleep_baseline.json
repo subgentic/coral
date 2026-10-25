@@ -17,7 +17,6 @@
   "server_update_notice_browser.test.js": 1,
   "servers_tab_browser.test.js": 2,
   "static_versioning_browser.test.js": 4,
-  "task_completion_modal.test.js": 1,
   "team_availability.test.js": 1,
   "terminal_scroll.test.js": 1,
   "topbar_overlay_browser.test.js": 5,

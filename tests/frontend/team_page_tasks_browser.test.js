@@ -65,8 +65,9 @@ const TEAM = `qa-tasks-${Date.now() % 100000}`;
         });
         await S.run("a task's page shows what blocks it and its cost", async () => {
             await ev(`(() => { const b = [...document.querySelectorAll('#team-panel-tasks .team-row-btn')].find(x => /Write docs/.test(x.textContent)); b.click(); return true; })()`); await settle(600);
+            await waitFor(`!!document.querySelector('#team-panel-item .team-task-extra')`, 'the details under the facts (blocked by, cost)', 4000);
             const t = await ev(`window.__na.text(document.getElementById('team-panel-item'))`);
-            assert.ok(/Blocked by\s*#1 Fix the login bug/.test(t), `Blocked by names the task: ${t.slice(0, 300)}`); assert.ok(/Cost\s*\$1\.50/.test(t), 'Cost');
+            assert.ok(/Blocked By\s*unmet\s*#1 — Fix the login bug/i.test(t), `Blocked by names the task: ${t.slice(0, 400)}`); assert.ok(/Cost\s*\$1\.50/.test(t), 'Cost');
         });
         await S.run("the description reads as the Inbox's does: Markdown bullets, and text from an agent is never markup (no script, no image, nothing runs)", async () => {
             await waitFor(`!!document.querySelector('#team-panel-item .team-task-md')`, 'the description is rendered', 4000);

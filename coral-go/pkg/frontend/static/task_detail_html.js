@@ -194,7 +194,7 @@ function _taskBlockedByHtml(task) {
             </div>`;
         }).join('');
         html += `<div class="task-detail-section">
-            <div class="task-detail-label">Blocked By</div>
+            <div class="task-detail-label">Blocked by</div>
             <div class="task-deps-list">${depsHtml}</div>
         </div>`;
     }
@@ -268,6 +268,11 @@ function _taskLiveCostHtml(liveCost) {
         </div>`;
     }
     return html;
+}
+
+/** What a task's page shows beyond its own facts (#7644): the instruction revision, the workflow with its review and artifacts, the verification line, the tasks it waits for and the cost. The same escaped markup as the dialog's. */
+export function taskExtraHtml(task, liveCost) {
+    return _verifyLine(task) + _taskRevisionHtml(task) + _taskWorkflowHtml(task) + _taskBlockedByHtml(task) + _taskCostHtml(task) + _taskLiveCostHtml(liveCost);
 }
 
 export function _taskDetailHtml(task, liveCost) {
