@@ -169,8 +169,8 @@
 .ts-control select { max-width: 100%; min-width: min(12rem, 100%); }
 .ts-mode-control { flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 4px; }
 .ts-mode-control .working-mode-desc { text-align: right; }
-.ts-hint .ts-learn { padding: 0; min-height: 0; }
-@media (pointer: coarse) { .ts-hint .ts-learn { min-height: var(--control-touch-height, 44px); } }
+.ts-hint .ts-learn { padding: 0; min-height: 0; position: relative; }
+.ts-hint .ts-learn::after { content: ''; position: absolute; left: -8px; right: -8px; top: 50%; height: var(--control-touch-height, 44px); transform: translateY(-50%); } /* its 44 px touch target is invisible, so a phone's hint line keeps its height (a 44 px button made a gap before it, UI/UX #7663) */
 .ts-control .check-hit { justify-content: flex-end; }
 .ts-inline { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8125rem; color: var(--text-secondary); }
 .ts-inline input { width: 5em; }
@@ -280,6 +280,6 @@
     .team-settings-page .settings-shell { flex-direction: column; }
     .team-settings-page .settings-tabs { display: none; }
     .team-settings-page .settings-nav .settings-group-pick { display: block; }
-    .team-settings-page .settings-group-pick select { width: 100%; min-height: var(--control-touch-height, 44px); }
+    .team-settings-page .settings-group-pick select { width: 100%; min-height: var(--control-touch-height, 44px); font-size: 0.875rem; } /* in rem: the word grows with the text size (it stayed 12 px at 200%) */
     .team-settings-page .settings-panes { padding: .8rem 1rem 1.2rem; }
 }
