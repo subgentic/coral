@@ -87,6 +87,9 @@ function releaseBoardActions() {
 
 // ── the header: the team's name and one status ───────────────────────────
 
+/** The header again (the board was renamed). */
+export const refreshTeamHeader = () => { if (S.team) drawHeader(); };
+
 function drawHeader() {
     const h = $('team-page-title');
     h.textContent = keyLabel(S.team);
@@ -189,37 +192,43 @@ const teamHooks = () => ({
 
 async function fillTab(tab, item = 0) {
     const team = S.team, host = panel(tab);
+    const stale = () => tab !== S.tab || team !== S.team; // another tab was chosen while this one's module loaded: it must not draw over the newer one
     try {
         if (tab === 'goals') {
             const m = await importOnce('./goals_view.js');
+            if (stale()) return;
             m.showGoals(host, team, { page: true, hooks: { ...teamHooks(), onCount: (n) => { S.counts.goals = n; drawCounts(); } } });
             if (item) m.openGoalWhenKnown(item); else if (m.openGoalId()) { S.quiet = true; m.closeGoal(); S.quiet = false; }
         } else if (tab === 'tasks') {
             const m = await importOnce('./team_tasks_page.js');
+            if (stale()) return;
             await m.showTasks(host, team, { ...teamHooks(), onCount: (n) => { S.counts.tasks = n; drawCounts(); } });
             if (item) openTaskById(item, { kind: 'tasks' });
         } else if (tab === 'artifacts') {
             const m = await importOnce('./team_artifacts_page.js');
+            if (stale()) return;
             m.showArtifacts(host, team, { onCount: (n, more) => { S.counts.artifacts = more ? `${n}+` : n; drawCounts(); } });
         } else if (tab === 'messages') {
             const m = await importOnce('./message_board.js');
+            if (stale()) return;
             m.showBoardInPage(team, host);
             adoptBoardActions();
         } else if (tab === 'agents') {
-            await moveIn(host, 'agentic-panel-team-view', async () => (await importOnce('./team_availability.js')).showTeamAvailability(team, { workspace: true }));
+            const m = await importOnce('./team_agents_page.js');
+            if (stale()) return;
+            await m.showAgents(host, team, { openAgent: (agent) => openAgentPage(agent), onCount: (n) => { S.counts.agents = n; drawCounts(); } });
         } else if (tab === 'settings') {
-            await moveIn(host, 'agentic-panel-team-settings', async () => { (await importOnce('./team_working_mode.js')).showTeamWorkingMode(team, { workspace: true }); });
+            const m = await importOnce('./team_working_mode.js');
+            if (stale()) return;
+            const built = host.querySelector('#team-settings-workspace');
+            if (built && built.dataset.team === team && m.hasUnsavedTeamSettings()) return; // edits are waiting: the page stays as it is
+            await m.showTeamWorkingMode(team, { page: host });
         } else if (tab === 'knowledge') {
-            await moveIn(host, 'agentic-panel-knowledge', async () => { const m = await importOnce('./team_artifacts.js'); await m.showKnowledgeInPage(team); });
+            const m = await importOnce('./team_knowledge_page.js');
+            if (stale()) return;
+            await m.showKnowledge(host, team, { onCount: (n) => { S.counts.knowledge = n; drawCounts(); } });
         }
     } catch (e) { console.error('team page tab', tab, e); host.textContent = ''; host.append(el('p', 'goals-note', 'This tab could not be shown. Reload the page and try again.')); }
-}
-
-// A panel of the right dock moved into the page, until its own build.
-async function moveIn(host, panelId, render) {
-    const p = $(panelId);
-    if (p && p.parentElement !== host) { host.replaceChildren(p); p.classList.add('active', 'team-moved-panel'); }
-    await render();
 }
 
 function leaveMessages(nextTab) {
@@ -253,14 +262,25 @@ async function openTaskById(id, from) {
     if (t) openTaskPage(t, from);
 }
 
+/** An agent's page under the Agents tab's header: the same header and tabs, a link back that returns to the row. */
+async function openAgentPage(agent) {
+    const m = await importOnce('./team_agents_page.js');
+    const host = $('team-panel-item'), origin = panel('agents');
+    S.item = { kind: 'agent', id: agent.subscriber_id || agent.session_id || agent.name, origin };
+    origin.hidden = true;
+    host.hidden = false;
+    m.renderAgentPage(host, agent, { onBack: () => closeItem(true) });
+}
+
 export function closeItem(restoreFocus) {
     if (!S.item) return;
-    const { origin, id, from } = S.item;
+    const { origin, id, from, kind } = S.item;
     S.item = null;
     $('team-panel-item').hidden = true;
     $('team-panel-item').replaceChildren();
     origin.hidden = false;
-    if (restoreFocus) {
+    if (restoreFocus && kind === 'agent') importOnce('./team_agents_page.js').then(m => m.focusAgentRow(id));
+    else if (restoreFocus) {
         if (from && from.kind === 'goal') { note(keyRoute('team', S.team, 'goals', from.goal.id)); origin.querySelector('#goals-detail-title')?.focus(); origin.querySelector(`[data-task-id="${id}"]`)?.focus(); }
         else { note(keyRoute('team', S.team, 'tasks')); importOnce('./team_tasks_page.js').then(m => m.focusTaskRow(id)); }
     }
@@ -290,7 +310,7 @@ export async function openTeamPage(team, opts = {}) {
     showView('team-page-view');
     buildOnce();
     if (changed) { // another team: the tables of the last one go, the moved-in panels and the board's column are drawn again for this one
-        for (const t of ['goals', 'tasks', 'artifacts']) { const p = panel(t); p.removeAttribute('data-built'); p.replaceChildren(); }
+        for (const t of ['goals', 'tasks', 'artifacts', 'agents', 'knowledge', 'settings']) { const p = panel(t); p.removeAttribute('data-built'); p.replaceChildren(); }
         drawCounts(); drawStatus(null);
     }
     drawHeader();
@@ -318,8 +338,6 @@ export function leaveTeamPage() {
     closeDetailPane();
     releaseBoardActions();
     importOnce('./message_board.js').then(m => m.leaveBoardPage?.()).catch(() => {});
-    const home = document.getElementById('agentic-block-top');
-    for (const id of ['agentic-panel-team-view', 'agentic-panel-team-settings', 'agentic-panel-knowledge']) { const p = $(id); if (p && home && p.parentElement !== home) { home.append(p); p.classList.remove('active', 'team-moved-panel'); } }
     S.team = ''; S.item = null;
 }
 

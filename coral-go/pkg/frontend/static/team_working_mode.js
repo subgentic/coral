@@ -7,6 +7,7 @@ const { boardRenameControl } = await importOnce('./board_rename.js'); // lazy mo
 const { infoButton, infoBox, bindInfo } = await importOnce('./info_toggle.js');
 const { refusalOf, answeredLocally } = await importOnce('./owner_refusal.js');
 const { requireGoalSentence } = await importOnce('./task_goals.js');
+const { pageRow, pageSwitch } = await importOnce('./team_settings_rows.js');
 import { changedFields, rebaseChanges, NOTHING_TO_SAVE } from './settings_diff.js';
 
 const PRESET_NAMES = { none: 'None', shared_checkout: 'Shared checkout', worktrees: 'Worktrees', merge_queue: 'Merge queue' };
@@ -29,14 +30,6 @@ export function confirmTeamWorkspaceChange() {
     if (!hasUnsavedTeamSettings()) return Promise.resolve(true);
     return new Promise(resolve => window.showConfirmModal('Unsaved Team Settings', 'Team settings have unsaved changes. Leave without saving?',
         () => resolve(true), () => resolve(false)));
-}
-
-// The team's settings opened on its Health check tab (#4962): the icon beside the team's info button. The tab is added once the
-// settings arrive, so the wish waits for it and is dropped if the team has none (Coral Hub leaves the tab out).
-let wantHealthTab = false;
-export function showTeamHealthSettings(team) {
-    wantHealthTab = true;
-    return showTeamWorkingModeWorkspace(team);
 }
 
 /** Open the team page on its Settings tab (#7453). */
@@ -137,8 +130,64 @@ function _teamSettingsShell(workspaceMode) {
     return dialog;
 }
 
+// The page the team's Settings tab shows: one page of four sections (Workflow, Health check, Messaging, Prompts) and a bar pinned under it (the status line, Cancel at the left, Save settings at the right).
+function _teamSettingsPageShell() {
+    const page = document.createElement('section');
+    page.id = 'team-settings-workspace';
+    page.className = 'team-settings-workspace team-settings-page';
+    page.setAttribute('aria-label', 'Team settings');
+    page.innerHTML = `<div class="ts-scroll">
+      <div class="ts-body">
+      <p class="ts-lead">Only the Operator on this computer can change these.</p>
+      <section class="ts-section" aria-labelledby="ts-h-workflow">
+      <h2 class="ts-h" id="ts-h-workflow">Workflow</h2>
+      <div class="ts-row ts-name-row"><div class="ts-text"><span class="ts-label">Board name</span><p class="ts-hint">Only the label changes: its agents, tasks and history stay.</p></div><div class="ts-control ts-rename"></div></div>
+      <form class="working-mode-form ts-main" autocomplete="off">
+        ${pageRow({ id: 'tsr-mode', label: 'Working mode', hint: '', control: '<select name="mode" aria-labelledby="tsr-mode-l" aria-describedby="working-mode-desc"><option value="none">None</option><option value="shared_checkout">Shared checkout</option><option value="worktrees">Worktrees</option></select>' })}
+        <p class="ts-hint ts-mode-desc working-mode-desc" id="working-mode-desc"></p>
+        ${pageSwitch('dependency_guidance', 'Include dependent-queue guidance', 'Tells agents how to work when a task waits on another.')}
+        ${pageSwitch('require_goal', 'Require a goal', requireGoalSentence)}
+        ${pageRow({ id: 'tsr-instr', label: 'Additional instructions', hint: 'Team-specific conventions, given to agents with each task.', wide: true, control: '<textarea name="custom_instructions" rows="4" aria-labelledby="tsr-instr-l" aria-describedby="tsr-instr-h" placeholder="Team-specific conventions"></textarea>' })}
+      <details class="disclosure team-settings-section workflow-presets-section preset-editor ts-presets">
+        <summary>Edit presets</summary>
+        <p class="ts-hint">A preset saves with Save preset, not Save settings.</p>
+        <label>Preset<select name="preset"></select></label>
+        <div class="workflow-preset-actions"><button type="button" class="btn preset-new">New preset</button><button type="button" class="btn preset-reset" hidden>Reset built-in</button></div>
+        <label class="preset-name-field">Preset name<input name="preset_name" maxlength="80" autocomplete="off"></label>
+        <label>Preset instructions<textarea name="preset_instructions" rows="5" maxlength="4096" placeholder="Instructions agents should follow"></textarea></label>
+        <p class="ts-hint preset-state"></p>
+        <button type="button" class="btn preset-save">Save preset</button>
+      </details>
+      </form>
+      </section>
+      <section class="ts-section" aria-labelledby="ts-h-health"><h2 class="ts-h" id="ts-h-health">Health check</h2><div id="team-settings-health"><p class="ts-hint ct-loading" role="status">Loading…</p></div></section>
+      <section class="ts-section" aria-labelledby="ts-h-messaging"><h2 class="ts-h" id="ts-h-messaging">Messaging</h2><div id="team-settings-messaging"><p class="ts-hint ct-loading" role="status">Loading…</p></div></section>
+      <section class="ts-section" aria-labelledby="ts-h-prompts"><h2 class="ts-h" id="ts-h-prompts">Prompts</h2>
+        <p class="ts-hint">Read-only preview of the prompts agents get.</p>
+        <div class="prompt-inspection-content" aria-live="polite">Loading prompt inspection…</div>
+      </section>
+      </div>
+    </div>
+    <footer class="ts-bar"><span class="ts-status" role="status" aria-live="polite">No changes to save.</span><div class="ts-bar-buttons"><button type="button" class="btn ts-cancel" disabled>Cancel</button><button type="button" class="btn btn-primary ts-save" disabled>Save settings</button></div></footer>`;
+    return page;
+}
+
 // Puts the dialog on the page: the team's name and its rename control, the sidebar panel or a modal, and the link to the docs.
-function _mountTeamSettings(dialog, team, workspaceMode) {
+function _mountTeamSettings(dialog, team, workspaceMode, pageHost = null) {
+    if (pageHost) { // the team page's Settings tab: the page replaces what the panel held, and the board's name is a row with its Rename button
+        pageHost.replaceChildren(dialog);
+        dialog.querySelector('.ts-rename').append(boardRenameControl(team, { onRenamed: () => { document.getElementById('team-page-title') && importOnce('./team_page.js').then(m => m.refreshTeamHeader?.()).catch(() => {}); importOnce('./render.js').then(m => m.scheduleLiveSessionsRender()); } }));
+        bindInfo(dialog.querySelector('.ts-main'));
+        dialog.addEventListener('click', event => {
+            const docLink = event.target.closest('.working-mode-docs-link');
+            if (!docLink) return;
+            event.preventDefault();
+            const docName = docLink.dataset.doc;
+            if (window.switchNavTab) window.switchNavTab('docs');
+            importOnce('./lazy_panels.js').then(l => l.loadDocs()).then(m => m.selectDoc(docName)).catch(() => {});
+        });
+        return;
+    }
     dialog.querySelector('.working-mode-team').textContent = keyLabel(team);
     dialog.querySelector('.working-mode-team').dataset.team = team; // which team, as data (the text is its label)
     // Rename the board (#3536): its label only; the heading and every list follow.
@@ -205,15 +254,17 @@ function _wireSettingsTabs(dialog, form) {
 }
 
 export async function showTeamWorkingMode(team, options = {}) {
-    const openHealthTab = wantHealthTab; // asked for by the health icon (#4962); taken now so a load that fails does not leave it for the next open
-    wantHealthTab = false;
-    const workspaceMode = Boolean(options.workspace);
-    const dialog = _teamSettingsShell(workspaceMode);
-    _mountTeamSettings(dialog, team, workspaceMode);
+    const pageHost = options.page || null; // the team page's Settings tab: one page of sections and its own bar
+    const workspaceMode = Boolean(options.workspace) || Boolean(pageHost);
+    const dialog = pageHost ? _teamSettingsPageShell() : _teamSettingsShell(workspaceMode);
+    if (pageHost) dialog.dataset.team = team; // which team this page is for: the tab keeps a page with unsaved changes when it is opened again
+    _mountTeamSettings(dialog, team, workspaceMode, pageHost);
 
     const form = dialog.querySelector('form');
-    const status = dialog.querySelector('[role=status]');
-    const save = form.querySelector('[type=submit]');
+    const status = pageHost ? dialog.querySelector('.ts-status') : dialog.querySelector('[role=status]');
+    const save = pageHost ? dialog.querySelector('.ts-save') : form.querySelector('[type=submit]');
+    const cancel = pageHost ? dialog.querySelector('.ts-cancel') : null;
+    let healthApi = null, crossApi = null, barBusy = false, barSaid = '', barError = false;
     const presetSelect = form.elements.preset;
     const presetName = form.elements.preset_name;
     const presetInstructions = form.elements.preset_instructions;
@@ -249,10 +300,26 @@ export async function showTeamWorkingMode(team, options = {}) {
     let opened = null, openedRequire = false;
     const modeValues = () => ({ mode: form.elements.mode.value, dependency_guidance: form.elements.dependency_guidance.checked, custom_instructions: form.elements.custom_instructions.value });
 
-    const { tabs, panels, bindTab } = _wireSettingsTabs(dialog, form);
+    const { tabs, panels, bindTab } = pageHost ? { tabs: [], panels: [], bindTab: () => {} } : _wireSettingsTabs(dialog, form);
     // The Health check tab (#4230) exists only when the settings GET returned a "health" object: not through Coral Hub, which leaves it out.
     async function addHealthTab(health) {
         const m = await importOnce('./team_health_settings.js');
+        if (pageHost) { // the page's Health check section: the same form, without its own Save (the bar saves it)
+            const host = dialog.querySelector('#team-settings-health');
+            host.replaceChildren();
+            if (!healthMonitorOn) {
+                const note = document.createElement('p');
+                note.className = 'ts-hint health-global-off'; note.setAttribute('role', 'status');
+                note.append('Team health checks are turned off for all of Coral, so this team\'s check will not run. Turn on "Team health checks" in ');
+                const link = document.createElement('button');
+                link.type = 'button'; link.className = 'working-mode-settings-link'; link.textContent = 'Settings';
+                link.addEventListener('click', () => window.showSettingsModal?.('agents'));
+                note.append(link, '. It takes effect after Coral restarts.');
+                host.before(note);
+            }
+            healthApi = await m.mountHealthSettings(host, team, health, { embedded: true });
+            return;
+        }
         const tab = document.createElement('button');
         tab.type = 'button'; tab.setAttribute('role', 'tab'); tab.setAttribute('aria-selected', 'false'); tab.setAttribute('aria-controls', 'team-settings-health');
         tab.dataset.settingsTab = 'health'; tab.id = 'team-settings-tab-health'; tab.tabIndex = -1; tab.textContent = 'Health check';
@@ -289,7 +356,7 @@ export async function showTeamWorkingMode(team, options = {}) {
         const panel = dialog.querySelector('#team-settings-messaging');
         if (!panel) return;
         const m = await importOnce('./team_cross_team_settings.js');
-        await m.mountCrossTeamSettings(panel, team, info || {});
+        crossApi = await m.mountCrossTeamSettings(panel, team, info || {}, { embedded: Boolean(pageHost) });
     }
 
     const selectedPreset = () => presets.find(p => p.id === presetSelect.value);
@@ -327,8 +394,23 @@ export async function showTeamWorkingMode(team, options = {}) {
         syncModeDescription();
     }
     function setStatus(message, error = false) {
+        if (pageHost) { barSaid = message; barError = error; refreshBar(); return; } // the page's bar says it with the other parts' state
         status.textContent = message;
         status.classList.toggle('is-error', error);
+    }
+    // The bar of the page: the status line, and Cancel and Save settings on while any part (the workflow form, the health check, the messaging switches) holds a change.
+    const parts = () => [form.dataset.initialState !== undefined && settingsFormSnapshot(form) !== form.dataset.initialState, healthApi && healthApi.dirty(), crossApi && crossApi.dirty()];
+    function refreshBar() {
+        if (!pageHost) return;
+        const dirty = parts().some(Boolean);
+        save.disabled = barBusy || !dirty; cancel.disabled = barBusy || !dirty;
+        status.textContent = barSaid && !dirty ? barSaid : barSaid && barError ? barSaid : dirty ? 'You have unsaved changes.' : 'No changes to save.';
+        status.classList.toggle('is-error', barError && !!barSaid);
+    }
+    if (pageHost) {
+        const touched = () => { if (barSaid && !barError) barSaid = ''; setTimeout(refreshBar, 0); }; // after the part's own handlers have run
+        dialog.addEventListener('input', touched); dialog.addEventListener('change', touched);
+        dialog.addEventListener('health-saved', () => setTimeout(refreshBar, 0)); dialog.addEventListener('cross-team-saved', () => setTimeout(refreshBar, 0));
     }
     presetSelect.onchange = () => {
         syncPresetForm();
@@ -431,11 +513,6 @@ export async function showTeamWorkingMode(team, options = {}) {
                     crossTeam = stateResponse?.ok ? await stateResponse.json().catch(() => null) : null;
                 }
                 await fillMessagingPanel({ state: crossTeam, settings: boardSettings }).catch(() => fillMessagingPanel({}));
-                if (openHealthTab) { // the Health check tab is selected, and the keyboard goes where the selection is (not left on the first tab)
-                    const healthTab = document.getElementById('team-settings-tab-health');
-                    healthTab?.click();
-                    if (healthTab && document.activeElement?.matches?.('[data-settings-tab]')) healthTab.focus();
-                }
             } else {
                 // The board settings could not be loaded: through Coral Hub the owner-only settings can be refused (#5323): the Messaging tab says why, in our words (and the Health check tab is not drawn).
                 await fillMessagingPanel({ refusal: boardSettingsResponse ? await refusalOf(boardSettingsResponse, answeredLocally(team)) : '' });
@@ -444,21 +521,17 @@ export async function showTeamWorkingMode(team, options = {}) {
             setStatus('');
             form.dataset.initialState = settingsFormSnapshot(form);
             opened = { mode: modeValues() };
-            save.disabled = false;
+            if (pageHost) refreshBar(); else save.disabled = false;
         } catch (error) { setStatus(error.message, true); inspection.textContent = 'Prompt inspection could not be loaded.'; fillMessagingPanel({}).catch(() => {}); }
     }
-    form.onsubmit = async event => {
-        event.preventDefault(); save.disabled = true; setStatus('Saving…');
+    // Saves the workflow form's changes (what changed since it loaded): resolves to '' when saved or the reason it was not.
+    async function saveMain() {
         let modeError = null;
         const base = opened || { mode: {} };
         const mode = modeValues();
         const modeChanged = Object.keys(changedFields(base.mode, mode)).length > 0;
         const requireChanged = form.elements.require_goal.checked !== openedRequire;
-        if (!modeChanged && !requireChanged) {
-            setStatus(NOTHING_TO_SAVE);
-            save.disabled = false;
-            return;
-        }
+        if (!modeChanged && !requireChanged) return '';
         if (modeChanged) {
             try {
                 // The working mode is saved whole: what the server has now, with only the fields changed here.
@@ -480,10 +553,39 @@ export async function showTeamWorkingMode(team, options = {}) {
             } catch (error) { modeError = error.message; }
         }
         opened = base;
+        if (!modeError) form.dataset.initialState = settingsFormSnapshot(form);
+        return modeError || '';
+    }
+    form.onsubmit = async event => {
+        event.preventDefault(); save.disabled = true; setStatus('Saving…');
+        const modeChanged = Object.keys(changedFields((opened || { mode: {} }).mode, modeValues())).length > 0;
+        const requireChanged = form.elements.require_goal.checked !== openedRequire;
+        if (!modeChanged && !requireChanged) { setStatus(NOTHING_TO_SAVE); save.disabled = false; return; }
+        const modeError = await saveMain();
         if (!modeError) setStatus(modeChanged ? 'Saved. Working mode applies on first claim.' : 'Saved.');
         else setStatus(`Save failed: ${modeError}`, true);
-        if (!modeError) form.dataset.initialState = settingsFormSnapshot(form);
         save.disabled = false;
     };
+    if (pageHost) {
+        // The one Save: the parts that hold a change are saved in turn; the bar says what happened.
+        save.addEventListener('click', async () => {
+            barBusy = true; barSaid = 'Saving…'; barError = false; refreshBar();
+            const failures = [];
+            const [mainDirty, healthDirty, crossDirty] = parts();
+            const modeChanged = mainDirty && Object.keys(changedFields((opened || { mode: {} }).mode, modeValues())).length > 0;
+            if (mainDirty) { const why = await saveMain(); if (why) failures.push(why); }
+            if (healthDirty && healthApi) { const why = await healthApi.save(); if (why) failures.push(why); }
+            if (crossDirty && crossApi) { const why = await crossApi.save(); if (why) failures.push(why); }
+            barBusy = false;
+            if (failures.length) { barSaid = `Could not save: ${failures[0].replace(/^Could not save( the health check)?\.?\s*/i, '') || failures[0]}`; barError = true; }
+            else { barSaid = modeChanged ? 'Saved. Working mode applies on first claim.' : 'Saved.'; barError = false; }
+            refreshBar();
+        });
+        // Cancel puts every part back as it was read: the page is drawn again from the server.
+        cancel.addEventListener('click', async () => {
+            await showTeamWorkingMode(team, options);
+            const h = pageHost.querySelector('.ts-h'); if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); } // the button that had the focus is gone: it goes to the page's first heading
+        });
+    }
     load();
 }

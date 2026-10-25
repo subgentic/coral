@@ -13,6 +13,7 @@ import { escapeHtml, escapeAttr } from './utils.js';
 import { boardFetch } from './server_base.js';
 import { rebaseChanges } from './settings_diff.js';
 const { fieldRow } = await importOnce('./field_row.js');
+const { pageRow, pageSwitch } = await importOnce('./team_settings_rows.js');
 const { infoButton, infoBox, bindInfo } = await importOnce('./info_toggle.js'); // lazy modules load each other through importOnce, so a failed load is retried
 const { refusalOf, answeredLocally } = await importOnce('./owner_refusal.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried
 
@@ -43,7 +44,7 @@ function rule(key, title, why, on, knobs, extra = '') {
 }
 
 /** The panel's HTML for a health object and the team's members (active subscribers: { subscriber_id, job_title }). */
-export function healthPanelHTML(h, members) {
+export function healthPanelHTML(h, members, embedded = false) {
     const names = members.map(m => m.subscriber_id);
     const rcpt = h.recipient || '';
     const options = [`<option value="">The orchestrator (default)</option>`]
@@ -58,12 +59,15 @@ export function healthPanelHTML(h, members) {
         !!h.held_notice.on, knob('held_notice_after_min', 'After', h.held_notice.after_min, MIN_LO, MIN_HI, 'minutes held')) : '';
     return `<form class="health-form working-mode-form" autocomplete="off" novalidate>
       <fieldset class="team-settings-section" aria-label="Health check">
-        <div class="health-line">${switchRow({ label: 'Send health check', name: 'on', checked: h.on, labelClass: 'health-rule-head', labelId: 'hc-on-t', titleTag: 'b', desc: 'Uses tokens each time.', descId: 'hc-on-h', descClass: 'health-why', descInside: true, sep: ' ', describedBy: ['hc-on-w'] })}${infoButton('hc-on-w', 'the health check')}</div>
+      ${embedded ? `${pageSwitch('on', 'Send health check', 'Checks on stuck or idle agents. Uses tokens each time.', { checked: h.on })}
+        ${pageRow({ id: 'hc-every', label: 'Every', control: `<span class="ts-inline"><input type="number" name="interval_min" id="hk-interval_min" value="${Number(h.interval_min)}" min="${MIN_LO}" max="${MIN_HI}" aria-labelledby="hc-every-l" title="${escapeAttr(`${MIN_LO} to ${MIN_HI}`)}"> minutes</span>` })}
+        ${pageRow({ id: 'hc-to', label: 'Send it to', control: `<select name="recipient" aria-labelledby="hc-to-l">${options.join('')}</select>` })}
+        <span data-check-dep>${pageSwitch('all_clear', 'Post when all is well', 'So a quiet team is not mistaken for a stopped check.', { checked: h.all_clear })}</span>` : `<div class="health-line">${switchRow({ label: 'Send health check', name: 'on', checked: h.on, labelClass: 'health-rule-head', labelId: 'hc-on-t', titleTag: 'b', desc: 'Uses tokens each time.', descId: 'hc-on-h', descClass: 'health-why', descInside: true, sep: ' ', describedBy: ['hc-on-w'] })}${infoButton('hc-on-w', 'the health check')}</div>
         ${infoBox('hc-on-w', 'Checks in on the team every few minutes to spot stuck or idle agents, and tells one person who is idle, stuck or waiting, and what changed.')}
         <div class="health-row">${knob('interval_min', 'Every', h.interval_min, MIN_LO, MIN_HI, 'min', 'minutes')}
           <label class="health-wide-select">Send it to<select name="recipient">${options.join('')}</select></label></div>
         <div class="health-line" data-check-dep>${switchRow({ label: 'Post when all is well', name: 'all_clear', checked: h.all_clear, labelClass: 'health-rule-head', labelId: 'hc-clear-t', describedBy: ['hc-clear-w'] })}${infoButton('hc-clear-w', 'posting when all is well')}</div>
-        ${infoBox('hc-clear-w', 'A short line so a quiet team is not mistaken for a stopped check.')}
+        ${infoBox('hc-clear-w', 'A short line so a quiet team is not mistaken for a stopped check.')}`}
       </fieldset>
       <details class="disclosure health-advanced"><summary>Reviews and automatic rules</summary>
       <fieldset class="team-settings-section"><legend>Reviews</legend>
@@ -139,18 +143,18 @@ export function wireHealthForm(form) {
 }
 
 /** Draw the tab's panel into host for the team (a team key) from the health object the settings GET returned. Returns { dirty() }. */
-export async function mountHealthSettings(host, team, health) {
+export async function mountHealthSettings(host, team, health, options = {}) {
     let members = [];
     try {
         const resp = await boardFetch(team, '/subscribers');
         if (resp.ok) members = (await resp.json()).filter(m => m.is_active !== 0);
     } catch { /* the recipient list is then just the default and the saved name */ }
-    return bind(host, team, JSON.parse(JSON.stringify(health)), members, '');
+    return bind(host, team, JSON.parse(JSON.stringify(health)), members, '', options);
 }
 
 /** Draw the form for base and wire it; said is a line to show at once (after a save). */
-function bind(host, team, base, members, said) {
-    host.innerHTML = healthPanelHTML(base, members);
+function bind(host, team, base, members, said, options = {}) {
+    host.innerHTML = healthPanelHTML(base, members, !!options.embedded);
     bindInfo(host);
     const form = host.querySelector('form');
     const save = form.querySelector('[type=submit]');
@@ -188,23 +192,27 @@ function bind(host, team, base, members, said) {
         say('The defaults are filled in. Save to apply them.');
         field(form, 'on').focus();
     });
-    form.addEventListener('submit', async event => {
-        event.preventDefault();
+    // Saves the form; resolves to '' when it saved (and the form is drawn again from what the server kept) or the reason it did not. The page's one Save calls it too (options.embedded).
+    async function saveForm() {
         const problem = healthProblem(form);
-        if (problem) { say(problem.text, true); const folded = problem.el.closest('details'); if (folded) folded.open = true; problem.el.focus(); return; } // a field behind "Reviews and automatic rules" opens it first
+        if (problem) { say(problem.text, true); const folded = problem.el.closest('details'); if (folded) folded.open = true; problem.el.focus(); return problem.text; } // a field behind "Reviews and automatic rules" opens it first
         save.disabled = true; say('Saving…');
         try {
             const now = await boardFetch(team, '/settings');
             const fresh = now.ok ? (await now.json()).health : null;
-            if (!fresh || typeof fresh !== 'object') { say(`Could not read the current health check to save it. ${now.ok ? 'Try again.' : await refusalOf(now, answeredLocally(team))}`, true); save.disabled = false; return; }
+            if (!fresh || typeof fresh !== 'object') { const why = `Could not read the current health check to save it. ${now.ok ? 'Try again.' : await refusalOf(now, answeredLocally(team))}`; say(why, true); save.disabled = false; return why; }
             const health = rebaseChanges(base, readHealth(form, base), fresh);
             const resp = await boardFetch(team, '/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Operator', health }) });
-            if (!resp.ok) { say(`Could not save the health check. ${await refusalOf(resp, answeredLocally(team))}`, true); save.disabled = false; return; } // the refusal in our words, never the server's (#5323)
+            if (!resp.ok) { const why = `Could not save the health check. ${await refusalOf(resp, answeredLocally(team))}`; say(why, true); save.disabled = false; return why; } // the refusal in our words, never the server's (#5323)
             const saved = (await resp.json()).health;
             // Drawn again from what the server kept: it clamps every value.
-            bind(host, team, saved ? JSON.parse(JSON.stringify(saved)) : readHealth(form, base), members, 'Saved.');
+            bind(host, team, saved ? JSON.parse(JSON.stringify(saved)) : readHealth(form, base), members, 'Saved.', options);
             host.dispatchEvent(new CustomEvent('health-saved', { bubbles: true }));
-        } catch (error) { say(error.message || 'Could not save the health check.', true); save.disabled = false; }
-    });
-    return { dirty: () => snapshot(host.querySelector('form')) !== host.querySelector('form').dataset.initialState };
+            return '';
+        } catch (error) { const why = error.message || 'Could not save the health check.'; say(why, true); save.disabled = false; return why; }
+    }
+    form.addEventListener('submit', event => { event.preventDefault(); saveForm(); });
+    if (options.embedded) form.classList.add('health-embedded'); // the page's one Save bar saves it: the form's own Save and its line are not drawn
+    host._healthApi = { dirty: () => snapshot(form) !== form.dataset.initialState, save: () => saveForm() }; // the form is drawn again after a save: the newest one answers
+    return { dirty: () => host._healthApi.dirty(), save: () => host._healthApi.save() };
 }

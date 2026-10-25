@@ -39,7 +39,7 @@ function cleanLinks(list) {
 }
 
 /** Draw the tab into host. `info` is { state, settings, refusal }: state is the cross-team-state object or null, settings the board's settings (null when they could not be read, with refusal the reason in words). */
-export async function mountCrossTeamSettings(host, team, info = {}) {
+export async function mountCrossTeamSettings(host, team, info = {}, options = {}) {
     const hub = _hubForTests === null ? isCloud() : _hubForTests;
     const local = answeredLocally(team);
     let state = info.state && typeof info.state === 'object' ? info.state : null;
@@ -55,7 +55,7 @@ export async function mountCrossTeamSettings(host, team, info = {}) {
         p.className = 'working-mode-hint ct-unavailable'; p.setAttribute('role', 'status');
         p.textContent = info.refusal ? `Messaging settings: ${info.refusal}` : 'Cross-team messaging settings are not available here.';
         host.append(p);
-        return { dirty: () => false };
+        return { dirty: () => false, save: async () => '' };
     }
     if (!hub) { // this computer's Coral Hub id, for the "How this works" line (text only, and only when it has the shape of an id)
         try { const r = await fetch('/api/cloud/status'); if (r.ok) { const st = await r.json(); if (['connecting', 'connected', 'retrying'].includes(st.state) && SERVER_ID.test(String(st.server_id || ''))) serverId = String(st.server_id); } } catch { /* no id shown */ }
@@ -142,14 +142,14 @@ export async function mountCrossTeamSettings(host, team, info = {}) {
         else if (act === 'new-team') { if (typeof window.showLaunchModal === 'function') { const d = form.closest('dialog'); if (d && typeof d.close === 'function' && d.matches(':modal')) d.close(); window.showLaunchModal(); window._selectLaunchType?.('team'); } }
         else if (act === 'copy-id') { const ok = await copyText(serverId); btn.textContent = ok ? 'Copied' : 'Copy failed'; setTimeout(() => { btn.textContent = 'Copy'; }, 1500); }
     });
-    form.addEventListener('submit', async event => {
-        event.preventDefault();
+    // Saves the switches; resolves to '' when saved or the reason it was not. The page's one Save calls it too (options.embedded).
+    async function saveForm() {
         const save = form.querySelector('[type=submit]');
         save.disabled = true; say('Saving…');
         const body = { subscriber_id: 'Operator', ...(draft.messaging !== saved.messaging || forceMessaging ? { cross_team_messaging: draft.messaging } : {}), ...(draft.files !== saved.files ? { cross_team_artifacts: draft.files } : {}) };
         try {
             const resp = await boardFetch(team, '/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-            if (!resp.ok) { say(`Could not save. ${hub && (resp.status === 404 || resp.status === 403) ? lockedText() : await refusalOf(resp, local)}`, true); save.disabled = false; return; } // through Coral Hub a 404 or 403 on this save is "not changeable from here", never a raw word // the refusal in our words, never the server's (#5323)
+            if (!resp.ok) { const why = `Could not save. ${hub && (resp.status === 404 || resp.status === 403) ? lockedText() : await refusalOf(resp, local)}`; say(why, true); save.disabled = false; return why; } // through Coral Hub a 404 or 403 on this save is "not changeable from here", never a raw word // the refusal in our words, never the server's (#5323)
             const fresh = await boardFetch(team, '/settings');
             if (fresh.ok) { const s = await fresh.json(); saved = { messaging: !!s.cross_team_messaging, files: !!s.cross_team_artifacts }; } else saved = { ...draft };
             draft = { ...saved }; forceMessaging = false;
@@ -158,8 +158,11 @@ export async function mountCrossTeamSettings(host, team, info = {}) {
             said = 'Saved.'; sayError = false;
             draw();
             host.dispatchEvent(new CustomEvent('cross-team-saved', { bubbles: true }));
-        } catch (error) { say(error.message || 'Could not save.', true); save.disabled = false; }
-    });
+            return '';
+        } catch (error) { const why = error.message || 'Could not save.'; say(why, true); save.disabled = false; return why; }
+    }
+    form.addEventListener('submit', event => { event.preventDefault(); saveForm(); });
+    if (options.embedded) form.classList.add('xt-embedded'); // the page's one Save bar saves it: the form's own Save is not drawn
     draw();
-    return { dirty: () => form.dataset.initialState !== undefined && snapshot() !== form.dataset.initialState };
+    return { dirty: () => form.dataset.initialState !== undefined && snapshot() !== form.dataset.initialState, save: () => saveForm() };
 }

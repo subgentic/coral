@@ -302,7 +302,7 @@ registerActions({
 // The team view and its settings (with the Health check tab) load the first time a team is opened (#5364): about 40 KB of source the page does not need to start.
 const { enterTeamContext, exitTeamContext, renderTeamSettingsTab } = lazyFns(loadTeamContext, ['enterTeamContext', 'exitTeamContext', 'renderTeamSettingsTab']);
 const { openTeamPage, applyTeamRoute } = lazyFns(loadTeamPage, ['openTeamPage', 'applyTeamRoute']);
-const { showTeamWorkingModeWorkspace, showTeamHealthSettings } = lazyFns(loadTeamSettings, ['showTeamWorkingModeWorkspace', 'showTeamHealthSettings']);
+const { showTeamWorkingModeWorkspace } = lazyFns(loadTeamSettings, ['showTeamWorkingModeWorkspace']);
 const stopCostDashboard = () => { loadCostDashboard.module?.stopCostDashboard(); };
 const { showDocsTab, selectDoc } = lazyFns(loadDocs, ['showDocsTab', 'selectDoc']);
 const { showThemeConfigurator, hideThemeConfigurator } = lazyFns(loadThemeConfig, ['showThemeConfigurator', 'hideThemeConfigurator']);
@@ -594,7 +594,7 @@ Object.assign(window, {
     moveSessionUp, moveSessionDown,
     toggleTeamSleep, toggleAgentSleep, toggleAgentArchive, toggleArchivedSection,
     enterTeamContext, exitTeamContext, renderTeamSettingsTab, openTeamPage,
-    showTeamAvailabilityWorkspace, showTeamWorkingModeWorkspace, showTeamHealthSettings,
+    showTeamAvailabilityWorkspace, showTeamWorkingModeWorkspace,
     shareAgentTeam, saveTeamFromSidebar, showTeamTokenUsage, distillTeamKnowledge,
     showConfirmModal, hideConfirmModal, showPromptModal, hidePromptModal, showAlertModal, hideAlertModal,
     killSessionDirect, showInfoDirect, attachDirect, restartDirect,

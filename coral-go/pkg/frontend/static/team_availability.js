@@ -184,7 +184,7 @@ export function showTeamAvailabilityWorkspace(team, options = {}) {
     return importOnce('./team_page.js').then(m => m.openTeamPage(team, { tab: 'agents', replace: !!options.restore }));
 }
 
-const remindAgent = async (team, subscriber, existing = null, onChanged = null) => {
+export const remindAgent = async (team, subscriber, existing = null, onChanged = null) => {
     // Its own dialog (#6329): window.prompt is not available in the native app
     const { openReminderDialog } = await importOnce('./reminder_dialog.js');
     const name = existing?.name || subscriber;
@@ -215,7 +215,7 @@ const remindAgent = async (team, subscriber, existing = null, onChanged = null) 
     });
 };
 
-const stopAgentReminder = async (team, subscriber, onChanged = null) => {
+export const stopAgentReminder = async (team, subscriber, onChanged = null) => {
     try {
         const response = await boardFetch(team, `/reminder`, { method:'DELETE', headers:{'Content-Type':'application/json'}, body:JSON.stringify({subscriber_id:subscriber}) });
         const data = await response.json().catch(() => ({}));

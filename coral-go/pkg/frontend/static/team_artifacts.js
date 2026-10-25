@@ -662,8 +662,6 @@ let knowledgeData = null;
 let knowledgeMode = 'preview'; // 'preview' or 'edit'
 let knowledgeActiveTab = 'index';
 
-/** The team page's Knowledge tab, until its own build (#7453): today's tab, drawn into the panel moved into the page. */
-export function showKnowledgeInPage() { return loadKnowledgeTab(); }
 
 async function loadKnowledgeTab() {
     const panel = document.getElementById('team-knowledge-view');

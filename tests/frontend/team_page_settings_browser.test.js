@@ -15,7 +15,7 @@ const TEAM = `qa-settings-${Date.now() % 100000}`;
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const { settle } = require('./helpers/wait').bind(ev);
     const S = scenarios();
-    const bar = () => ev(`(() => { const save = window.__tp.find('button', /^Save settings$/i), cancel = window.__tp.find('button', /^Cancel$/i); const st = [...window.__tp.page().querySelectorAll('[role=status], output, p, div')].filter(window.__na.vis).map(e => window.__na.text(e)).find(t => /No changes to save|Unsaved|changes? (to|not)|Saved/i.test(t) && t.length < 80) || ''; return { save: save ? { disabled: save.disabled || save.getAttribute('aria-disabled') === 'true', ...window.__na.box(save) } : null, cancel: cancel ? window.__na.box(cancel) : null, status: st.trim(), vh: innerHeight }; })()`);
+    const bar = () => ev(`(() => { const save = window.__tp.find('button', /^Save settings$/i), cancel = window.__tp.find('button', /^Cancel$/i); const st = [...window.__tp.page().querySelectorAll('[role=status], output, p, div')].filter(window.__na.vis).map(e => window.__na.text(e)).find(t => /No changes to save|Unsaved|changes? (to|not)|Saved|Could not save/i.test(t) && t.length < 80) || ''; return { save: save ? { disabled: save.disabled || save.getAttribute('aria-disabled') === 'true', ...window.__na.box(save) } : null, cancel: cancel ? window.__na.box(cancel) : null, status: st.trim(), vh: innerHeight }; })()`);
     const sw = n => `(() => { const e = [...window.__tp.page().querySelectorAll('[role=switch], input[type=checkbox]')].filter(window.__na.vis).find(x => window.__na.name(x) === ${JSON.stringify(n)}); return e; })()`;
     const state = n => ev(`(() => { const e = ${sw(n)}; return e ? (e.getAttribute('aria-checked') || String(e.checked)) : null; })()`);
     try {
@@ -53,7 +53,7 @@ const TEAM = `qa-settings-${Date.now() % 100000}`;
             await S.run(`${label}: a change turns Save on and the status moves on; Cancel puts the switch back and the bar as it was`, async () => {
                 const was = await state('Require a goal');
                 await ev(`${sw('Require a goal')}.click(); true`); await settle(250);
-                const b = await bar(); assert.equal(b.save.disabled, false, 'Save settings is on'); assert.ok(!/No changes to save/.test(b.status), `the status moved on (got ${JSON.stringify(b.status)})`);
+                const b = await bar(); assert.equal(b.save.disabled, false, 'Save settings is on'); assert.match(b.status, /^You have unsaved changes\.$/, `the status says there are unsaved changes (got ${JSON.stringify(b.status)})`);
                 await ev(`window.__tp.find('button', /^Cancel$/i).click(); true`); await settle(250);
                 assert.equal(await state('Require a goal'), was, 'Cancel put the switch back'); const b2 = await bar(); assert.equal(b2.save.disabled, true, 'Save is off again'); assert.match(b2.status, /No changes to save/, 'the status is back');
             });
@@ -61,7 +61,12 @@ const TEAM = `qa-settings-${Date.now() % 100000}`;
                 await ev(`window.__tp.record(); ${sw('Require a goal')}.click(); true`); await settle(250);
                 await ev(`window.__tp.find('button', /^Save settings$/i).click(); true`); await settle(900);
                 const sent = await ev(`window.__writes.filter(x => /\\/settings$/.test(x.p))`); assert.equal(sent.length, 1, `one write to the settings (${JSON.stringify(sent.map(x => x.m + ' ' + x.p))})`);
-                const b = await bar(); assert.match(b.status, /Saved|saved/, `the status says it saved (got ${JSON.stringify(b.status)})`); assert.equal(b.save.disabled, true, 'Save is off after saving');
+                const b = await bar(); assert.match(b.status, /^Saved\.$/, `the status says Saved. (got ${JSON.stringify(b.status)})`); assert.equal(b.save.disabled, true, 'Save is off after saving');
+            });
+            await S.run(`${label}: a failed save says "Could not save: <reason>" in the status and Save is on again`, async () => {
+                await ev(`(() => { const R = window.fetch.bind(window); window.fetch = (u, o = {}) => (String((o && o.method) || 'GET').toUpperCase() !== 'GET' && /\\/settings$/.test(new URL(String(u), location.origin).pathname)) ? Promise.resolve(new Response(JSON.stringify({ error: 'disk full' }), { status: 500, headers: { 'Content-Type': 'application/json' } })) : R(u, o); ${sw('Send health check')}.click(); return true; })()`); await settle(250);
+                await ev(`window.__tp.find('button', /^Save settings$/i).click(); true`); await settle(900);
+                const b = await bar(); assert.match(b.status, /^Could not save: /, `the status says it could not save and why (got ${JSON.stringify(b.status)})`); assert.equal(b.save.disabled, false, 'Save settings is on again');
             });
         }
         await removeBoards(ev, [TEAM]); S.finish(); // finish() exits the process, so the board goes first

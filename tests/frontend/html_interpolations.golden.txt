@@ -647,6 +647,9 @@
 1	team_cross_team_settings.js	switchRow({ label: 'Message teams on other computers', name: 'cross_team_messaging', checked: draft.messaging,
 1	team_cross_team_settings.js	switchRow({ label: 'Share files with teams on other computers', name: 'cross_team_artifacts', checked: draft.f
 1	team_cross_team_settings.js	turnOn
+1	team_health_settings.js	MIN_HI
+1	team_health_settings.js	MIN_LO
+1	team_health_settings.js	embedded ? `${pageSwitch('on', 'Send health check', 'Checks on stuck or idle agents. Uses tokens each time.', 
 1	team_health_settings.js	extra
 1	team_health_settings.js	held
 1	team_health_settings.js	infoBox('hc-clear-w', 'A short line so a quiet team is not mistaken for a stopped check.')
@@ -658,7 +661,11 @@
 1	team_health_settings.js	knob('interval_min', 'Every', h.interval_min, MIN_LO, MIN_HI, 'min', 'minutes')
 1	team_health_settings.js	knobs
 1	team_health_settings.js	names.map(n => `<option value="${escapeAttr(n)}">`).join('')
-1	team_health_settings.js	options.join('')
+2	team_health_settings.js	options.join('')
+1	team_health_settings.js	pageRow({ id: 'hc-every', label: 'Every', control: `<span class="ts-inline"><input type="number" name="interva
+1	team_health_settings.js	pageRow({ id: 'hc-to', label: 'Send it to', control: `<select name="recipient" aria-labelledby="hc-to-l">${opt
+1	team_health_settings.js	pageSwitch('all_clear', 'Post when all is well', 'So a quiet team is not mistaken for a stopped check.', { che
+1	team_health_settings.js	pageSwitch('on', 'Send health check', 'Checks on stuck or idle agents. Uses tokens each time.', { checked: h.o
 1	team_health_settings.js	rule('auto_delegate', 'Hand reviews to the default reviewers', 'When a task is submitted for review and nobody
 1	team_health_settings.js	rule('claim_nudge', 'Nudge an idle agent to claim its work', 'An agent that is idle with ready work gets a rem
 1	team_health_settings.js	rule('mention_renudge', 'Remind the orchestrator of an unanswered mention', 'A message that @mentions the orch
@@ -670,6 +677,7 @@
 1	team_launch_settings.js	switchRow({ label: 'Message teams on other computers', name: 'cross_team_messaging', attrs: ' id="team-xt-msg"
 1	team_launch_settings.js	switchRow({ label: 'Require a goal', name: 'require_goal', attrs: ' id="team-wm-goal"', labelClass: 'check-hit
 1	team_launch_settings.js	switchRow({ label: 'Share files with teams on other computers', name: 'cross_team_artifacts', attrs: ' id="tea
+1	team_settings_rows.js	control
 1	team_working_mode.js	applicability
 1	team_working_mode.js	body
 1	team_working_mode.js	cards
@@ -679,6 +687,10 @@
 1	team_working_mode.js	infoButton(infoId, `${label} prompts`)
 2	team_working_mode.js	label
 1	team_working_mode.js	options
+1	team_working_mode.js	pageRow({ id: 'tsr-instr', label: 'Additional instructions', hint: 'Team-specific conventions, given to agents
+1	team_working_mode.js	pageRow({ id: 'tsr-mode', label: 'Working mode', hint: '', control: '<select name="mode" aria-labelledby="tsr-
+1	team_working_mode.js	pageSwitch('dependency_guidance', 'Include dependent-queue guidance', 'Tells agents how to work when a task wa
+1	team_working_mode.js	pageSwitch('require_goal', 'Require a goal', requireGoalSentence)
 1	team_working_mode.js	switchRow({ label: 'Include dependent-queue guidance', name: 'dependency_guidance', labelClass: 'check-hit' })
 1	team_working_mode.js	switchRow({ label: 'Require a goal', name: 'require_goal', labelClass: 'check-hit', describedBy: ['require-goa
 1	team_working_mode.js	title

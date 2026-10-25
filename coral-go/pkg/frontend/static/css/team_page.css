@@ -39,7 +39,6 @@
 .team-panel { flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; }
 .team-panel[hidden] { display: none; }
 #team-panel-messages > .mb-board { flex: 1; min-height: 0; }
-.team-moved-panel { display: flex !important; flex-direction: column; flex: 1; min-height: 0; overflow: auto; padding: 0 24px; }
 
 /* the tables of the tabs and the pages that hold them (the goals engine's classes, now a table and a page) */
 .goals-table-page { padding: 16px 24px 0; max-width: 1100px; width: 100%; box-sizing: border-box; flex: 1; display: flex; flex-direction: column; gap: 12px; min-height: 100%; }
@@ -117,6 +116,8 @@
     .goals-pinbar .btn { flex: 1; }
     .team-table th:nth-child(n+3), .team-table td:nth-child(n+3) { display: none; } /* the name cell carries its second line: who and which goal fold into it (the phone's table is Name and State) */
     .team-row-phone { display: block; }
+    .team-table-agents th:nth-child(5), .team-table-agents td:nth-child(5) { display: table-cell; } /* the Agents table keeps Remind on a phone: Agent, Status, Remind */
+    .team-table-agents td:nth-child(5) { vertical-align: middle; }
     .detail-pane { position: fixed; inset: 0; z-index: 30; width: auto; border-left: 0; }
     .detail-close { width: 44px; height: 44px; }
     .detail-foot .btn { flex: 1; min-height: 44px; }
@@ -140,3 +141,54 @@
 .sidebar-goal-task { display: block; width: 100%; padding: 4px 8px; background: none; border: 0; border-radius: var(--radius-md); color: var(--text-secondary); font: inherit; font-size: 0.75rem; text-align: left; cursor: pointer; overflow-wrap: anywhere; }
 .sidebar-goal-none { margin: 0 0 4px 38px; font-size: 0.75rem; color: var(--text-secondary); }
 .sidebar-goal-chev:focus-visible, .sidebar-goal-open:focus-visible, .sidebar-goal-task:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* The Agents tab (stage 3): a quiet line and Refresh, status chips with counts on one line (they scroll sideways when too many), Remind as a quiet button in its row */
+.team-state-bad { --goal-hue: var(--error); }
+.team-agents-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.team-chips { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 6px; scrollbar-width: thin; }
+.team-chip { flex: none; background: none; border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; min-height: 32px; font: inherit; font-size: 0.8125rem; color: var(--text-secondary); cursor: pointer; white-space: nowrap; }
+.team-chip:hover { background: var(--bg-hover); }
+.team-chip[aria-pressed="true"] { background: var(--bg-tertiary); border-color: var(--accent); color: var(--text-primary); font-weight: 600; }
+.team-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.team-remind { white-space: nowrap; }
+.team-agent-tasks { margin: 0; padding-left: 18px; }
+@media (max-width: 767px), (pointer: coarse) { .team-chip, .team-remind { min-height: var(--control-touch-height, 44px); } }
+
+/* The Settings tab (stage 3): one page of four sections, rows with the label and hint at the left and the control at the right, and a bar pinned under it (the status line, Cancel at the left, Save settings at the right). */
+.team-settings-page { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.team-settings-page .ts-scroll { flex: 1; min-height: 0; overflow: auto; }
+.team-settings-page .ts-body { max-width: 860px; padding: 16px 24px 24px; box-sizing: border-box; }
+.ts-lead { margin: 0 0 4px; font-size: 0.75rem; color: var(--text-secondary); }
+.ts-section { margin-top: 20px; }
+.ts-h { margin: 0 0 4px; font-size: 0.875rem; font-weight: 600; color: var(--text-primary); }
+.ts-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(12rem, 22rem); gap: 4px 24px; align-items: start; padding: 10px 0; border-top: 1px solid var(--border-subtle, var(--border)); }
+.ts-row-wide { grid-template-columns: minmax(0, 1fr); }
+.ts-row-wide .ts-control textarea { width: 100%; box-sizing: border-box; }
+.ts-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ts-label { font-size: 0.8125rem; font-weight: 500; color: var(--text-primary); }
+.ts-hint { margin: 0; font-size: 0.75rem; color: var(--text-secondary); overflow-wrap: anywhere; }
+.ts-hint:empty { display: none; }
+.ts-control { min-width: 0; display: flex; justify-content: flex-end; align-items: center; }
+.ts-control select { max-width: 100%; min-width: 12rem; }
+.ts-control .check-hit { justify-content: flex-end; }
+.ts-mode-desc { padding: 0 0 8px; }
+.ts-inline { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8125rem; color: var(--text-secondary); }
+.ts-inline input { width: 5em; }
+.ts-presets { margin-top: 8px; }
+.ts-bar { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 24px; border-top: 1px solid var(--border); background: var(--bg-primary); }
+.ts-status { font-size: 0.75rem; font-weight: 500; color: var(--text-secondary); min-width: 0; overflow-wrap: anywhere; }
+.ts-status.is-error { color: var(--error-text); }
+.ts-bar-buttons { display: flex; align-items: center; gap: 8px; flex: none; }
+.health-embedded .health-actions [type="submit"], .health-embedded .health-state, .xt-embedded .xt-save { display: none; }
+.health-embedded .health-actions { margin-top: 8px; }
+@media (max-width: 760px) {
+    .team-settings-page .ts-body { padding: 12px 16px 16px; }
+    .ts-row { grid-template-columns: minmax(0, 1fr); }
+    .ts-row-switch { grid-template-columns: minmax(0, 1fr) auto; align-items: center; } /* a switch stays at the right of its words on a phone, as on a desktop */
+    .team-table-agents th, .team-table-agents td { padding-left: 8px; padding-right: 8px; }
+    .team-table-agents td:nth-child(1) { min-width: 8.5rem; overflow-wrap: break-word; }
+    .ts-control { justify-content: flex-start; }
+    .ts-bar { padding: 8px 16px; flex-wrap: wrap; }
+    .ts-bar .btn { min-height: 44px; }
+    .team-settings-page select, .team-settings-page input:not([type="checkbox"]), .team-settings-page .btn { min-height: var(--control-touch-height, 44px); } /* every control of the page is a touch target (the prompt role list too) */
+}

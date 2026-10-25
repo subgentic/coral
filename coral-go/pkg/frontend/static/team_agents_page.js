@@ -1,0 +1,221 @@
+/* The team page's Agents tab (#7453 stage 3, UI/UX's Team view design): status chips with counts, one table of everyone on the board (Agent, Status, Doing, Provider, Remind), and an agent's own page.
+ * "Remind <name>" is on every row and opens a small dialog (the message, a repeat, Remind): the message goes now as an @mention board message to the agent, and with a repeat the repeating reminder is set too; then "Reminded <name>."
+ * in a polite status. An agent that already has a repeating reminder has Edit reminder and Remove reminder on its page. Everything drawn is built with the DOM and textContent: names, reasons and task titles are written by agents.
+ * Lazy: team_page.js imports it. */
+import { importOnce } from './import_once.js';
+import { state } from './state.js';
+import { boardFetch, inTeam } from './server_base.js';
+import { OPERATOR_ID } from './utils.js';
+import { refreshTeamAvailability, remindAgent, stopAgentReminder } from './team_availability.js';
+const { openRemindDialog, REPEATS } = await importOnce('./team_remind_dialog.js');
+const { teamTable, rowButton, rowFocusTarget, stateChip, el } = await importOnce('./team_table.js'); // lazy modules load the others they need through importOnce, so a failed load is retried
+
+const WORD = { available: 'Free', busy: 'Busy', task_idle: 'Task assigned, idle', queued: 'Queued', waiting: 'Waiting', needs_input: 'Needs input', sleeping: 'Sleeping', offline: 'Offline', unknown: 'No signal yet', unavailable: 'Unavailable' };
+// The chips: the statuses people look for first; any other status that has agents gets its own chip after them.
+const FIRST = ['available', 'busy', 'queued', 'sleeping', 'offline'];
+const CHIP_WORD = { available: 'Free', unknown: 'Unknown' };
+const CLASS = { available: 'goal-state-done', busy: 'goal-state-active', queued: 'goal-state-blocked', needs_input: 'goal-state-blocked', offline: 'team-state-bad', unavailable: 'team-state-bad' }; // the colours of the goals' own states; Sleeping and the rest stay quiet
+const PROVIDER = { claude: 'Claude', codex: 'Codex', agy: 'Antigravity', antigravity: 'Antigravity', gemini: 'Antigravity', pi: 'Pi', terminal: 'Terminal' };
+
+const model = { team: '', data: null, filter: 'all', failed: '', loading: false };
+let root = null, hooks = {};
+const subscribed = new Set(); // teams the operator is already subscribed to on this page, so a Remind is one write
+let itemStatus = null; // the agent page's own live region while that page is on screen: the tab's is hidden then and would not be read
+const say = (t) => { const s = itemStatus && itemStatus.isConnected && !itemStatus.closest('[hidden]') ? itemStatus : root && root.querySelector('.team-agents-status'); if (s) { s.textContent = ''; s.textContent = t; } };
+const btn = (cls, text, onClick) => { const b = el('button', cls, text); b.type = 'button'; if (onClick) b.addEventListener('click', onClick); return b; };
+
+const statusWord = (a) => WORD[a.availability] || 'No signal yet';
+const providerOf = (a) => PROVIDER[a.agent_type] || (a.agent_type ? a.agent_type.charAt(0).toUpperCase() + a.agent_type.slice(1) : 'Claude');
+const canRemind = (a) => a.agent_type !== 'terminal' || a.reminder; // a terminal is not an agent: a reminder to it does nothing (UI audit #5589)
+const taskLine = (t) => `#${Number(t.id)} ${String(t.status || '').replaceAll('_', ' ')}: ${t.title}`;
+/** What the agent is doing: its first task as one line, else the reason its status gives. */
+const doingOf = (a) => (a.tasks && a.tasks.length ? taskLine(a.tasks[0]) + (a.tasks.length > 1 ? ` (+${a.tasks.length - 1} more)` : '') : (a.reason || ''));
+
+/** The statuses with at least one agent, in the order of the chips, with their counts. */
+export function chipCounts(agents) {
+    const count = {};
+    for (const a of agents) count[a.availability || 'unknown'] = (count[a.availability || 'unknown'] || 0) + 1;
+    const keys = [...FIRST, ...Object.keys(count).filter(k => !FIRST.includes(k))].filter(k => count[k] || k === 'available');
+    return [['all', 'All', agents.length], ...keys.map(k => [k, CHIP_WORD[k] || WORD[k] || k, count[k] || 0])];
+}
+
+// ── the tab ──────────────────────────────────────────────────────────────
+
+async function load({ manual = false } = {}) {
+    const team = model.team; if (!team) return;
+    if (!model.data) { model.loading = true; draw(); }
+    try {
+        const data = await refreshTeamAvailability(team, true);
+        if (team !== model.team) return;
+        if (!data || !Array.isArray(data.agents)) throw new Error('no answer');
+        model.data = data; model.failed = '';
+        hooks.onCount?.(data.agents.length);
+        if (manual) say(`Updated: ${data.agents.length} agent${data.agents.length === 1 ? '' : 's'}.`);
+    } catch (e) {
+        if (team !== model.team) return;
+        model.failed = 'The agents could not be read.';
+    }
+    model.loading = false;
+    draw();
+}
+
+/** Send the reminder: the message now, as an @mention board message to the agent; with a repeat, also the repeating reminder (POST /reminder). Resolves to { ok, error }. */
+async function sendReminder(agent, { message, seconds }) {
+    const name = agent.name, team = model.team;
+    try {
+        if (!subscribed.has(team)) {
+            const r = await boardFetch(team, '/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: OPERATOR_ID, job_title: 'Operator' }) });
+            if (r.ok) subscribed.add(team);
+        }
+        const r = await boardFetch(team, '/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: OPERATOR_ID, as: 'Operator', content: `@${name} ${message}` }) });
+        if (!r.ok) { const b = await r.json().catch(() => ({})); return { ok: false, error: `Could not remind ${name}: ${b && b.error ? b.error : `HTTP ${r.status}`}` }; }
+        let every = '';
+        if (seconds > 0) {
+            const rr = await boardFetch(team, '/reminder', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: agent.subscriber_id || name, message, interval_seconds: seconds }) });
+            if (!rr.ok) { const b = await rr.json().catch(() => ({})); return { ok: false, error: `${name} was reminded, but the repeat was not set: ${b && b.error ? b.error : `HTTP ${rr.status}`}` }; }
+            every = (REPEATS.find(x => x[0] === seconds) || [])[2] || '';
+        }
+        say(`Reminded ${name}${every ? ` and ${every}` : ''}.`);
+        if (every) load();
+        return { ok: true };
+    } catch (e) {
+        return { ok: false, error: `Could not remind ${name}: ${e && e.message ? e.message : 'no answer'}` };
+    }
+}
+
+const askRemind = (agent, opener) => openRemindDialog(agent.name, { opener, onSend: (v) => sendReminder(agent, v) });
+
+function remindButton(agent) {
+    const b = btn('btn btn-small team-remind', 'Remind');
+    b.setAttribute('aria-label', `Remind ${agent.name}`); // one button per row, each named for whose
+    b.addEventListener('click', (e) => { e.stopPropagation(); askRemind(agent, b); });
+    return b;
+}
+
+// The agents that need a person come first (the header's "N need attention" opens this tab): a waiting agent, then a queued one, then an offline one; the rest keep their order.
+const NEEDS = ['waiting', 'needs_input', 'queued', 'offline'];
+const rank = (a) => { const i = NEEDS.indexOf(a.availability); return i < 0 ? NEEDS.length : i; };
+function visibleAgents() {
+    const all = (model.data && model.data.agents) || [];
+    const shown = model.filter === 'all' ? all : all.filter(a => (a.availability || 'unknown') === model.filter);
+    return [...shown].sort((x, y) => rank(x) - rank(y)); // a stable sort
+}
+
+function drawChips(host) {
+    const agents = (model.data && model.data.agents) || [];
+    const group = el('div', 'team-chips'); group.setAttribute('role', 'group'); group.setAttribute('aria-label', 'Show agents that are');
+    const chips = chipCounts(agents);
+    if (!chips.some(c => c[0] === model.filter)) model.filter = 'all';
+    for (const [key, word, n] of chips) {
+        const b = btn('team-chip', `${word} ${n}`);
+        b.dataset.filter = key; b.setAttribute('aria-pressed', String(model.filter === key));
+        b.addEventListener('click', () => { model.filter = key; draw(); root.querySelector(`.team-chip[data-filter="${key}"]`)?.focus({ preventScroll: true }); say(`Showing ${visibleAgents().length} agent${visibleAgents().length === 1 ? '' : 's'}.`); });
+        group.append(b);
+    }
+    host.append(group);
+}
+
+function directoryLine(agents) {
+    const live = (state.liveSessions || []).filter(s => inTeam(s, model.team));
+    const dir = live.find(s => s.working_directory)?.working_directory || '', branch = live.find(s => s.branch)?.branch || '';
+    return `${agents.length} agent${agents.length === 1 ? '' : 's'}${branch ? ` on ${branch}` : ''}${dir ? ` in ${dir}` : ''}`;
+}
+
+function draw() {
+    const body = root && root.querySelector('.team-agents-body'); if (!body) return;
+    const a = document.activeElement;
+    const held = a && body.contains(a) ? (a.closest('tr[data-key]')?.dataset.key && a.classList.contains('team-row-btn') ? `row:${a.closest('tr').dataset.key}` : a.dataset.filter ? `chip:${a.dataset.filter}` : '') : '';
+    body.replaceChildren();
+    if (model.failed) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, model.failed), btn('btn btn-small', 'Try again', () => load())); body.append(f); }
+    if (model.loading) { body.append(el('p', 'goals-note', 'Checking agents…')); return; }
+    const data = model.data;
+    if (!data) return;
+    if (!data.agents.length) { body.append(el('div', 'goals-empty', 'No agents on this board yet.')); return; }
+    const top = el('div', 'team-agents-top');
+    top.append(el('p', 'goals-note team-count-line', directoryLine(data.agents)), btn('btn btn-small', 'Refresh', () => load({ manual: true })));
+    body.append(top);
+    drawChips(body);
+    const rows = visibleAgents();
+    body.append(teamTable({
+        label: `Agents, ${rows.length}`, columns: ['Agent', 'Status', 'Doing', 'Provider', 'Remind'],
+        className: 'team-table-agents', rows: rows.map(ag => {
+            const key = ag.subscriber_id || ag.session_id || ag.name;
+            const b = rowButton(ag.name);
+            const first = el('div', 'team-row-cell'); first.append(b, el('span', 'team-row-phone', [doingOf(ag), providerOf(ag)].filter(Boolean).join(' · '))); // a phone's table folds what it does and its provider under the name
+            return {
+                key, open: (tr) => hooks.openAgent?.(ag, tr.querySelector('.team-row-btn')),
+                cells: [first, stateChip(statusWord(ag), CLASS[ag.availability]), doingOf(ag), providerOf(ag), canRemind(ag) && ag.agent_type !== 'terminal' ? remindButton(ag) : ''],
+            };
+        }),
+    }));
+    if (held) { const sel = held.startsWith('row:') ? rowFocusTarget(body, held.slice(4)) : body.querySelector(`.team-chip[data-filter="${CSS.escape(held.slice(5))}"]`); sel?.focus({ preventScroll: true }); }
+}
+
+/** Show the team's agents in `host`. hooks: onCount(n), openAgent(agent, opener). */
+export function showAgents(host, team, h = {}) {
+    if (team !== model.team) Object.assign(model, { team, data: null, filter: 'all', failed: '', loading: false });
+    hooks = h;
+    if (!host.dataset.built) {
+        host.dataset.built = '1';
+        const page = el('div', 'goals-page goals-table-page');
+        const status = el('div', 'team-agents-status sr-only'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
+        page.append(status, el('div', 'team-agents-body'));
+        host.replaceChildren(page);
+    }
+    root = host.firstChild;
+    draw();
+    return load();
+}
+
+/** Put the focus back on an agent's row (the agent page's back link). */
+export function focusAgentRow(key) {
+    const t = root && rowFocusTarget(root, key);
+    if (t) t.focus({ preventScroll: true });
+}
+
+// ── an agent's page ──────────────────────────────────────────────────────
+
+const fact = (dl, k, v) => { if (v == null || v === '') return; const d = el('div', 'goals-fact'); d.append(el('dt', null, k)); const dd = el('dd'); if (v instanceof Node) dd.append(v); else dd.textContent = String(v); d.append(dd); dl.append(d); };
+
+function sessionOf(agent) {
+    const live = (state.liveSessions || []).filter(s => inTeam(s, model.team));
+    return live.find(s => agent.session_id && s.session_id === agent.session_id) || live.find(s => s.name === agent.name) || null;
+}
+
+/** An agent's own page, under the Agents tab's header: back link, the name, status, what it does, and Remind and Open chat. ctx: { onBack }. */
+export function renderAgentPage(host, agent, ctx) {
+    host.replaceChildren();
+    host.setAttribute('aria-label', agent.name);
+    const back = el('button', 'goals-back'); back.type = 'button';
+    const arrow = el('span', 'goals-back-arrow', '←'); arrow.setAttribute('aria-hidden', 'true');
+    back.append(arrow, document.createTextNode(' Agents'));
+    back.addEventListener('click', () => ctx.onBack());
+    const page = el('div', 'goals-page goals-table-page team-agent-page');
+    const status = el('div', 'team-agents-status sr-only'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
+    const h = el('h2', 'goals-detail-title', agent.name); h.tabIndex = -1; h.id = 'team-agent-title';
+    const line = el('div', 'goals-detail-line'); line.append(stateChip(statusWord(agent), CLASS[agent.availability]));
+    const dl = el('dl', 'goals-facts');
+    fact(dl, 'Provider', providerOf(agent));
+    fact(dl, 'Role', agent.role);
+    fact(dl, 'Status', agent.reason);
+    if (agent.tasks && agent.tasks.length) { const ul = el('ul', 'team-agent-tasks'); for (const t of agent.tasks) ul.append(el('li', null, taskLine(t))); fact(dl, 'Working on', ul); }
+    if (agent.reminder) fact(dl, 'Repeating reminder', agent.reminder_interval_seconds ? `every ${Math.round(agent.reminder_interval_seconds / 60)} min` : 'on');
+    itemStatus = status;
+    page.append(status, back, h, line, dl);
+    const bar = el('div', 'goals-pinbar');
+    if (canRemind(agent) && agent.agent_type !== 'terminal') {
+        const b = btn('btn', 'Remind', null); b.setAttribute('aria-label', `Remind ${agent.name}`);
+        b.addEventListener('click', () => askRemind(agent, b));
+        bar.append(b);
+    }
+    const session = sessionOf(agent);
+    if (session) bar.append(btn('btn', 'Open chat', () => { window.switchNavTab?.('agents'); window.selectLiveSession?.(session.name, session.agent_type, session.session_id, session.server); }));
+    if (agent.reminder) {
+        const id = agent.subscriber_id || agent.name;
+        bar.append(btn('btn', 'Edit reminder', () => remindAgent(model.team, id, agent, () => load())), btn('btn', 'Remove reminder', async () => { if (await stopAgentReminder(model.team, id, () => load())) ctx.onBack(); }));
+    }
+    page.append(bar);
+    host.append(page);
+    h.focus({ preventScroll: true });
+}
+

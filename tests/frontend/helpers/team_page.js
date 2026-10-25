@@ -32,10 +32,11 @@ const TABS = ['Goals', 'Messages', 'Tasks', 'Agents', 'Artifacts', 'Knowledge', 
 
 // A team as the sidebar shows it (live agents of one board_project, the way team_header_open does) and the same board's goals and tasks on the real isolated server, made through the page's own fetch.
 const post = (ev, url, body) => ev(`fetch(${JSON.stringify(url)}, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(${JSON.stringify(body)}) }).then(r => r.json().catch(() => ({})))`);
+// The rows carry team_health_on, as the live list's do: the team's health icon is there.
 async function seed(ev, board) {
     await ev(`(() => { localStorage.removeItem('coral_collapsed_groups'); window.__m.agents = {};
         for (const [i, n] of ['Orchestrator', 'Backend Dev'].entries()) window.__m.add(n, 'A', 1, { sleeping: false, session_id: 'sid-' + (i + 1), board_project: ${JSON.stringify(board)} });
-        window.__LIVE = Object.values(window.__m.agents).map(x => window.__m.entry(x)); T.state.liveSessions = window.__LIVE; T.render.renderLiveSessions(window.__LIVE); return true; })()`);
+        window.__LIVE = Object.values(window.__m.agents).map(x => ({ ...window.__m.entry(x), team_health_on: true })); T.state.liveSessions = window.__LIVE; T.render.renderLiveSessions(window.__LIVE); return true; })()`);
     const B = `/api/board/${board}`;
     await post(ev, `${B}/subscribe`, { subscriber_id: 'Orchestrator', job_title: 'Orchestrator' });
     await post(ev, `${B}/subscribe`, { subscriber_id: 'Backend Dev', job_title: 'Developer' });

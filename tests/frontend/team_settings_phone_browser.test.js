@@ -50,33 +50,28 @@ const { removeBoards } = require('./helpers/board_cleanup');
         };
         const insideScreen = (r, what) => assert.ok(r && r.w > 0 && r.h > 0 && r.l >= 0 && r.r <= 390.5 && r.t >= 0 && r.b <= 844.5, `${what} is on the screen: ` + JSON.stringify(r));
         const reach = async theme => {
-            await waitFor(`!!document.querySelector('#team-settings-workspace [data-settings-tab=health]')`, 'the Health check tab', 15000);
+            await waitFor(`!!document.querySelector('#team-settings-workspace #team-settings-health form')`, 'the Health check section', 15000);
             await settle(300);
             insideScreen(await rect('#team-settings-workspace'), `${theme}: the Team settings page`);
-            const tabs = await ev(`[...document.querySelectorAll('#team-settings-workspace [data-settings-tab]')].map(t => { const r = t.getBoundingClientRect(); return { id: t.dataset.settingsTab, text: t.textContent.trim(), h: r.height, w: r.width }; })`);
-            for (const want of ['workflow', 'prompts', 'health', 'messaging']) assert.ok(tabs.some(t => t.id === want), `a ${want} tab: ` + JSON.stringify(tabs));
-            for (const t of tabs) assert.ok(t.h >= 44, `${theme}: the ${t.text} tab is 44 px tall (${t.h})`);
-            for (const t of tabs) {
-                await ev(`document.querySelector('#team-settings-workspace [data-settings-tab=${t.id}]').scrollIntoView({ inline: 'nearest', block: 'nearest' }); true`); await settle(600); // the tab strip scrolls sideways on a phone: a tab past the edge is scrolled to, as a person does
-                await tap(`#team-settings-workspace [data-settings-tab=${t.id}]`);
-                const state = await ev(`(() => { const p = document.querySelector('#team-settings-workspace [data-settings-panel=${t.id}]') || document.getElementById('team-settings-${t.id}'); const r = p && p.getBoundingClientRect(); const sel = document.querySelector('#team-settings-workspace [data-settings-tab=${t.id}]').getAttribute('aria-selected'); return { sel, shown: !!p && !p.hidden && r.width > 0 && r.height > 0, overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth }; })()`);
-                assert.deepEqual({ sel: state.sel, shown: state.shown }, { sel: 'true', shown: true }, `${theme}: a tap on ${t.text} shows its panel`);
-                assert.equal(state.overflow, 0, `${theme}: ${t.text}: nothing scrolls sideways`);
-                const stripH = await ev(`document.querySelector('#team-settings-workspace .team-settings-tabs').getBoundingClientRect().height`);
-                assert.ok(stripH >= 44, `${theme}: with ${t.text} open the tab strip keeps its height, it is not squeezed by a tall panel (${stripH})`); // the strip was a shrinkable flex item: a tall panel squeezed it to 10 px and the tabs after it could not be tapped (#5516)
+            // one page of four sections (the style guide's settings panel): each heading is reached by scrolling and is on the screen, and nothing scrolls sideways
+            for (const id of ['workflow', 'health', 'messaging', 'prompts']) {
+                await ev(`document.querySelector('#ts-h-${id}').scrollIntoView({ block: 'start' }); true`); await settle(300);
+                insideScreen(await rect(`#team-settings-workspace #ts-h-${id}`), `${theme}: the ${id} heading`);
             }
+            assert.equal(await ev(`document.querySelector('#team-settings-workspace .ts-scroll').scrollWidth - document.querySelector('#team-settings-workspace .ts-scroll').clientWidth`), 0, `${theme}: nothing scrolls sideways`);
+            for (const sel of ['.ts-cancel', '.ts-save']) { const r = await rect(`#team-settings-workspace ${sel}`); assert.ok(r && r.h >= 44, `${theme}: ${sel} is 44 px tall (${r && r.h})`); }
             const audit = await auditRegion(ev, ['#team-settings-workspace']);
             assert.deepEqual(audit.fails, [], `${theme}: contrast of the Team settings page: ` + JSON.stringify(audit.fails.slice(0, 3)));
         };
 
         await open();
         await reach('dark');
-        console.log('   ✓ dark: the team menu → Team settings opens the page, and a tap reaches Workflow, Prompt inspection and Health check');
+        console.log('   ✓ dark: the team menu → Team settings opens the page, and the four sections are reached by scrolling');
 
         // the page's own link: a reload on /team/<name>/settings opens the settings, in the light theme
         await load('light', '/team/' + TEAM + '/settings');
         await reach('light');
-        console.log('   ✓ light: the link /team/<name>/settings opens the settings on a phone, every tab reached');
+        console.log('   ✓ light: the link /team/<name>/settings opens the settings on a phone, every section reached');
 
         // and by the menu in the light theme
         await load('light');
