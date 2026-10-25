@@ -35,11 +35,12 @@ export const CODEX_AUTO_DESCRIPTION = 'Workspace sandbox, with the network on so
 const WORKERS_REFUSED = { plan: 'Claude agents cannot start workers in this mode.' };
 const WORKERS_REFUSED_ANY = 'Agents cannot start workers in this mode.';
 
-export function _updatePermModeDescription(selectEl) {
+// `unset`: nothing is saved, so nothing is refused, though the select reads Auto (Security's #7587 point: only a saved mode, or a pick that will be saved, refuses)
+export function _updatePermModeDescription(selectEl, unset = false) {
     const warn = selectEl.closest('.settings-row')?.querySelector('.perm-mode-warn'); // only the Settings row has it
     if (warn) {
         warn.textContent = WORKERS_REFUSED[selectEl.value] || WORKERS_REFUSED_ANY;
-        warn.hidden = selectEl.value === 'default';
+        warn.hidden = unset || selectEl.value === 'default';
     }
     const hint = selectEl.parentElement?.querySelector('.perm-mode-desc');
     if (!hint) return;

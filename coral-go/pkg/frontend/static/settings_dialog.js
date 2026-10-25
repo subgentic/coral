@@ -677,7 +677,7 @@ function _fillDefaults(s) {
     const permModeSelect = document.getElementById("settings-permission-mode");
     if (permModeSelect) {
         permModeSelect.value = currentPermMode;
-        _updatePermModeDescription(permModeSelect);
+        _updatePermModeDescription(permModeSelect, !s.default_permission_mode);
     }
 
     // Default Working Directory

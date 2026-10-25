@@ -64,6 +64,15 @@ const SCALE = new Set(['16/700', '17/700', '14/600', '14/400', '13/500', '13/400
         await ev(`document.getElementById('settings-tab-agents').click(); true`); await ev(framesJs(3));
         const perm = await ev(`(() => { const h = document.querySelector('#settings-pane-agents .perm-mode-desc').getBoundingClientRect(), s = document.getElementById('settings-permission-mode').getBoundingClientRect(), l = document.getElementById('settings-permission-mode-label').getBoundingClientRect(); return { underLabel: h.top >= l.bottom - 2 && h.left < s.left, name: document.getElementById('settings-permission-mode').getAttribute('aria-labelledby') }; })()`);
         assert.deepEqual(perm, { underLabel: true, name: 'settings-permission-mode-label' }, 'the permission mode hint is under its label, on the left');
+        const savedLine = await ev(`(async () => {
+            const st = window.__coralStatic || '/static/'; const { state } = await import(st + 'state.js'); const out = {};
+            for (const [k, v] of [['unset', undefined], ['saved auto', 'auto'], ['saved default', 'default']]) {
+                window.hideSettingsModal(); if (v === undefined) delete state.settings.default_permission_mode; else state.settings.default_permission_mode = v;
+                window.showSettingsModal('agents'); await ${framesJs(3)};
+                const sel = document.getElementById('settings-permission-mode'); out[k] = [sel.value, sel.closest('.settings-row').querySelector('.perm-mode-warn').getBoundingClientRect().height > 0];
+            }
+            return out; })()`);
+        assert.deepEqual(savedLine, { unset: ['auto', false], 'saved auto': ['auto', true], 'saved default': ['default', false] }, 'the line follows the SAVED mode: a fresh install (nothing saved, the select reads Auto) refuses nothing and shows no line (Security, #7587)');
         const ANY = 'Agents cannot start workers in this mode.';
         const warnState = await ev(`(() => { const sel = document.getElementById('settings-permission-mode'), row = sel.closest('.settings-row'), warn = row.querySelector('.perm-mode-warn'), learn = row.querySelector('.settings-learn'), out = {}; const shown = () => warn.getBoundingClientRect().height > 0;
             for (const m of ['plan', 'bypassPermissions', 'default', 'dontAsk', 'acceptEdits', 'auto']) { sel.value = m; sel.dispatchEvent(new Event('change', { bubbles: true })); out[m] = shown() ? warn.textContent : null; }
