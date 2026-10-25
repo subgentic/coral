@@ -556,3 +556,26 @@
 
 /* The usage with no thinking level recorded (#4969): not a level, so quieter than the rows that are. */
 #cost-by-thinking .cost-table tr.cost-row-unreported td { color: var(--text-muted); }
+
+/* Tokens per commit (analytics_spend.js, #7526) */
+.spend-head { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; }
+.spend-team { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8125rem; color: var(--text-secondary); }
+.spend-sub { margin: 0 0 4px; font-size: 0.8125rem; color: var(--text-secondary); }
+.spend-headline { margin: 0 0 12px; font-size: 1.0625rem; font-weight: 700; }
+.spend-cards { margin-bottom: 12px; }
+.spend-card-sub { font-size: 0.75rem; color: var(--text-secondary); margin-top: 2px; }
+.spend-grid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; align-items: start; margin-bottom: 16px; }
+.spend-box { border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-secondary); padding: 14px 16px; min-width: 0; }
+.spend-box-title { margin: 0 0 8px; font-size: 0.875rem; font-weight: 600; }
+.spend-how { align-self: start; }
+.spend-note { margin: 8px 0 0; font-size: 0.75rem; color: var(--text-secondary); }
+.spend-bars { position: relative; height: 140px; display: flex; align-items: flex-end; gap: 10px; border-bottom: 1px solid var(--border); }
+.spend-bar-col { flex: 1; height: 100%; display: flex; align-items: flex-end; }
+.spend-bar { width: 100%; background: var(--accent); border-radius: var(--radius-sm) var(--radius-sm) 0 0; min-height: 2px; }
+.spend-bar-high { background: var(--warning); }
+.spend-usual { position: absolute; left: 0; right: 0; border-top: 2px dashed var(--text-secondary); pointer-events: none; }
+.spend-axis { display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px; }
+.spend-not-measured, .spend-muted { color: var(--text-secondary); }
+.spend-who { margin-bottom: 16px; }
+@media (max-width: 760px) { .spend-grid { grid-template-columns: minmax(0, 1fr); } .spend-bars { height: 120px; gap: 6px; } }
+.spend-table th[scope=row] { text-align: left; font-weight: 600; }

@@ -9,6 +9,8 @@ import { emptyState } from './dom_write.js';
 import { pollEvery } from './overload.js';
 import { keyLabel } from './server_base.js';
 import { formatTokens, formatDuration, formatCost } from './format.js';
+import { importOnce } from './import_once.js';
+const { showSpend } = await importOnce('./analytics_spend.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried
 
 // What an empty table says: where the numbers come from and what to try (#6975), not just that there are none.
 const NO_DATA = 'No data in this range yet. It appears once an agent has used tokens; try a longer range.';
@@ -485,6 +487,7 @@ export async function _refreshCostDashboard() {
 
     // Flash live indicator
     _flashLiveIndicator();
+    showSpend(document.getElementById('cost-spend'), period); // tokens per commit, one team (#7526): its own read, its own errors
 
     try {
         const [summaryResp, taskResp, tsResp, teamResp, branchResp] = await Promise.all([
