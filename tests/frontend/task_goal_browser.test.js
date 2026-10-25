@@ -53,6 +53,10 @@ const BASE = require('./test_base').BASE;
         assert.equal(await shown('task-detail-modal'), false, 'the task dialog closed');
         await ev(`window.showTaskDetailModal(${t1.json.id}); true`);
         await waitFor(`!!document.getElementById('task-detail-goal-open')`, 'the Goal line again', 8000);
+        // The Goals face redraws while this dialog is open (a read that found a change, or the tasks arriving late on a slow runner): the goal's heading is a new element when the dialog closes.
+        assert.equal((await api('POST', `/api/board/${B}/tasks`, { subscriber_id: 'Boss', title: 'Arrives while the dialog is open', priority: 'low', goal_id: g1 })).status, 201);
+        await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'goals_view.js'); const before = document.getElementById('goals-detail-title'); await m.loadGoals(); window.__redrawn = before !== document.getElementById('goals-detail-title'); return true; })()`);
+        assert.equal(await ev(`window.__redrawn`), true, 'the redraw replaced the goal\'s heading while the task dialog was open');
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
         assert.ok(await ev(`document.getElementById('task-detail-goal-open').getBoundingClientRect().height >= 44`), 'the Goal line button is a 44 px target on a phone (#7313)');
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });

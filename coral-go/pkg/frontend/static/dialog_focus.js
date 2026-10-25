@@ -18,9 +18,11 @@ function focusables(dialog) {
     return [...dialog.querySelectorAll(FOCUSABLE)].filter(visible);
 }
 
-// Where focus goes back to: the opener, or the control of the hidden menu it sits in.
+// Where focus goes back to: the opener, or the control of the hidden menu it sits in. An opener that a redraw replaced while the dialog was open (the goal's heading on the Goals
+// face, rebuilt when a task arrives) is gone from the page: its successor, the element with the same id, takes the focus, so it does not drop to the page.
 function returnTarget(opener) {
-    if (!opener || !opener.isConnected) return null;
+    if (!opener) return null;
+    if (!opener.isConnected) { const next = opener.id ? document.getElementById(opener.id) : null; return visible(next) ? next : null; }
     if (visible(opener)) return opener;
     for (let el = opener.parentElement; el; el = el.parentElement) {
         if (!el.id) continue;
