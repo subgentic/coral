@@ -583,8 +583,30 @@ async function showRestartModal() {
         });
     }
 
+    restartStage('persona'); // Restart always opens on step 1
     document.getElementById("restart-modal").style.display = "flex";
-    importOnce('./quiet_focus.js').then(m => m.quietFocus(document.getElementById('restart-modal')), () => {}); // the selected tab takes the focus: no ring until a key is pressed (#7391)
+    document.querySelector('#restart-modal .acf-prompt')?.focus();
+}
+
+const RESTART_STAGES = ['persona', 'agent'];
+const RESTART_STAGE_NAMES = { persona: 'Persona', agent: 'The agent' };
+
+/** Restart's two steps, New Agent's without its first (the agent is fixed): the persona page, then the agent's tabs (Model, Permissions, Advanced). Restart is in the footer of both: a restart that changes nothing needs no walk through the steps. `arg` is a stage name, "next" or "back". */
+export function restartStage(arg) {
+    const wiz = document.getElementById('restart-wizard');
+    if (!wiz) return;
+    const at = RESTART_STAGES.indexOf(wiz.dataset.stage);
+    const to = arg === 'next' ? RESTART_STAGES[Math.min(at + 1, RESTART_STAGES.length - 1)] : arg === 'back' ? RESTART_STAGES[Math.max(at - 1, 0)] : arg;
+    if (!RESTART_STAGES.includes(to)) return;
+    wiz.dataset.stage = to;
+    const sub = `Step ${RESTART_STAGES.indexOf(to) + 1} of ${RESTART_STAGES.length}: ${RESTART_STAGE_NAMES[to]}`;
+    document.getElementById('restart-stage-sub').textContent = sub;
+    document.getElementById('restart-back').hidden = to === 'persona';
+    document.getElementById('restart-next').hidden = to === 'agent';
+    const live = document.getElementById('restart-stage-live'); if (live) live.textContent = sub;
+    const modal = document.getElementById('restart-modal');
+    if (to === 'agent') importOnce('./quiet_focus.js').then(m => m.quietFocus(modal), () => {}); // the selected tab takes the focus: no ring until a key is pressed (#7391)
+    (to === 'persona' ? modal.querySelector('.acf-prompt') : modal.querySelector('.settings-tab[aria-selected="true"]'))?.focus();
 }
 
 export function hideRestartModal() {

@@ -100,16 +100,17 @@ const BASE = require('./test_base').BASE;
             await key('Escape'); await waitFor(`!window.__na.dialog()`, 'Escape closes New agent', 4000);
             assert.ok(await ev(`document.activeElement === window.__qaOpener`), 'focus is back on the New agent button');
         });
-        await S.run('Restart Session: modal and named, opens on the Agent tab, the same tab keys and radiogroup keys work, Escape closes it', async () => {
+        await S.run('Restart Session: modal and named, opens on the persona and Next opens the Model tab, the same tab keys and radiogroup keys work, Escape closes it', async () => {
             await ev(`window.__m.add('qa-agent', 'A', 3, { sleeping: false }); T.render.renderLiveSessions(T.state.liveSessions); true`);
             await select('qa-agent');
             await ev(`(async () => { await window.restartSession(); return true; })()`);
             await waitFor(`!!window.__na.dialog() && /^Restart/i.test(window.__na.name(window.__na.dialog()))`, 'Restart Session dialog', 6000);
             assert.equal(await ev(`window.__na.dialog().getAttribute('aria-modal')`), 'true');
+            await ev(`document.getElementById('restart-next').click(); true`); // step 1 is the persona page; the tabs are step 2
             await ev(`(() => { const t = [...window.__na.dialog().querySelectorAll('[role=tab]')].find(x => x.getAttribute('aria-selected') === 'true'); t.focus(); return true; })()`);
             const vertical = await ev(`window.__na.dialog().querySelector('[role=tablist]').getAttribute('aria-orientation') === 'vertical'`);
             await key(vertical ? 'ArrowDown' : 'ArrowRight');
-            assert.equal(await ev(`window.__na.name([...window.__na.dialog().querySelectorAll('[role=tab]')].find(x => x.getAttribute('aria-selected') === 'true'))`), 'Persona', 'the second Restart tab is Persona');
+            assert.equal(await ev(`window.__na.name([...window.__na.dialog().querySelectorAll('[role=tab]')].find(x => x.getAttribute('aria-selected') === 'true'))`), 'Permissions', 'the second Restart tab is Permissions');
             await key('Escape'); await waitFor(`!window.__na.dialog()`, 'Escape closes Restart', 4000);
         });
         S.finish();

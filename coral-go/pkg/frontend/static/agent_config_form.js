@@ -262,10 +262,10 @@ export function renderAgentConfigForm(containerId, opts = {}) {
                 <select class="acf-permission-mode" data-on-change="perm-mode-describe">
                     <option value="default"${permModeVal === 'default' ? ' selected' : ''}>Default</option>
                     <option value="plan"${permModeVal === 'plan' ? ' selected' : ''}>Plan</option>
-                    <option value="acceptEdits"${permModeVal === 'acceptEdits' ? ' selected' : ''}>Accept Edits</option>
+                    <option value="acceptEdits"${permModeVal === 'acceptEdits' ? ' selected' : ''}>Accept edits</option>
                     <option value="auto"${permModeVal === 'auto' ? ' selected' : ''}>Auto</option>
-                    <option value="bypassPermissions"${permModeVal === 'bypassPermissions' ? ' selected' : ''}>Bypass Permissions</option>
-                    <option value="dontAsk"${permModeVal === 'dontAsk' ? ' selected' : ''}>Don't Ask</option>
+                    <option value="bypassPermissions"${permModeVal === 'bypassPermissions' ? ' selected' : ''}>Bypass permissions</option>
+                    <option value="dontAsk"${permModeVal === 'dontAsk' ? ' selected' : ''}>Don't ask</option>
                 </select>
                 <span class="settings-hint perm-mode-desc">${escapeHtml(permModeDesc)}</span>
                 <span class="settings-hint acf-mode-override" role="status" hidden></span>
@@ -324,12 +324,12 @@ export function renderAgentConfigForm(containerId, opts = {}) {
                 pane('advanced', 'Advanced', 'tune', '', `<label>Flags <span style="color:var(--text-muted);font-weight:normal">(optional)</span>:${flagsInput}</label>`),
             ].join('');
         } else if (opts.restart) {
-            // Restart (#7391): the same shell as New Agent. Agent (Provider, Model, Thinking), Persona (the name, read-only, and the prompt), Permissions, Advanced.
+            // Restart (#7391): New Agent's steps without the first, the agent being fixed. Step 1 is the persona page (the name, read-only, and the prompt); step 2 is the tabs Model (with Thinking), Permissions, Advanced. The Provider is said in a line; its select stays, hidden, for the form's reads.
             const toolsHTML = `<details class="acf-tools-details"><summary>Tool permissions <span class="acf-perms-summary settings-hint"></span></summary>${permEditorHTML(true)}</details>`;
-            const agentHTML = topHTML.replace('<label>Agent Type:', '<label class="acf-provider-label"><span class="acf-provider-head">Provider</span>');
+            const agentHTML = topHTML.replace('<label>Agent Type:', '<label class="acf-provider-label" hidden><span class="acf-provider-head">Provider</span>');
             container.innerHTML = [
-                pane('agent', 'Agent', 'smart_toy', '', `${agentHTML}<p class="settings-hint acf-provider-change" role="status" hidden></p>`),
-                pane('persona', 'Persona', 'badge', '', `<p class="launch-field-head"><span>Name</span></p><p class="acf-restart-name"></p><div class="launch-prompt-field"><span class="launch-field-head" id="${escapeAttr(uid)}-prompt-label">Behavior prompt</span><textarea class="acf-prompt" aria-labelledby="${escapeAttr(uid)}-prompt-label" rows="8" placeholder="Describe the agent's role and behavior...">${escapeHtml(promptVal)}</textarea></div>`),
+                `<div class="acf-persona-page"><p class="launch-field-head"><span>Name</span></p><p class="acf-restart-name"></p><div class="launch-prompt-field"><span class="launch-field-head" id="${escapeAttr(uid)}-prompt-label">Behavior prompt</span><textarea class="acf-prompt" aria-labelledby="${escapeAttr(uid)}-prompt-label" rows="8" placeholder="Describe the agent's role and behavior...">${escapeHtml(promptVal)}</textarea></div></div>`,
+                pane('agent', 'Model', 'smart_toy', '', `<p class="settings-hint acf-provider-fixed"></p>${agentHTML}`),
                 pane('permissions', 'Permissions', 'lock', '', `${autoPermissionsHTML}${toolsHTML}`),
                 pane('advanced', 'Advanced', 'tune', '', `<label>Flags <span style="color:var(--text-muted);font-weight:normal">(optional)</span>:${flagsInput}</label>`),
             ].join('');
@@ -426,18 +426,11 @@ export function renderAgentConfigForm(containerId, opts = {}) {
         _syncACFModelField(container);
         _syncEnforcement(container);
     });
-    if (opts.restart) { // Restart's controls (#7391): the provider as segments, a line when it differs from the running agent's, the name read-only
+    if (opts.restart) { // Restart's controls (#7391): the provider fixed and said in a line, the name read-only
         const type = container.querySelector('.acf-agent-type');
-        const first = type.value;
-        if (launchFlags.restartProvider) segmentSelect(type, { label: 'Provider' }); else type.disabled = true;
-        const note = container.querySelector('.acf-provider-change');
-        container.querySelector('.acf-provider-label')?.after(note); // under the Provider, in its own slot
-        const sync = () => {
-            const differs = type.value !== first;
-            note.hidden = !differs;
-            note.textContent = differs ? `Restarting as ${type.options[type.selectedIndex].textContent.trim()} instead of ${[...type.options].find(o => o.value === first)?.textContent.trim() || first}.` : '';
-        };
-        type.addEventListener('change', sync);
+        type.disabled = true;
+        const fixed = container.querySelector('.acf-provider-fixed');
+        if (fixed) fixed.textContent = `Runs on ${type.options[type.selectedIndex]?.textContent.trim() || type.value}. To change the provider, launch a new agent.`;
         const nm = container.querySelector('.acf-restart-name'); if (nm) nm.textContent = opts.restartName || '';
     }
     if (opts.sections && !opts.wizard && !opts.restart) segmentSelect(container.querySelector('.acf-agent-type'), { label: 'Provider' }); // the member and board dialogs: the provider as segments, as in Restart (#7407)

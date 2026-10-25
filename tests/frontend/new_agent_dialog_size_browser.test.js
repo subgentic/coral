@@ -67,23 +67,21 @@ const VIEWS = [['1280x800', 1280, 800, false, false], ['390x844', 390, 844, true
             await ev(`window.hideLaunchModal && window.hideLaunchModal(); true`);
 
             // Restart: one screen, the same rectangle as New agent, on all four tabs, and the Provider warning moves nothing
-            await S.run(`${label}: Restart Session is the same rectangle on its four tabs (Agent, Persona, Permissions, Advanced), opens on Agent, and changing the provider (the long warning) moves nothing`, async () => {
+            await S.run(`${label}: Restart Session is the same rectangle on its persona step and its three tabs (Model, Permissions, Advanced), and the provider is fixed`, async () => {
                 await ev(`window.__m.add('qa-agent', 'A', 3, { sleeping: false }); T.render.renderLiveSessions(T.state.liveSessions); true`);
                 await select('qa-agent');
                 await ev(`(async () => { await window.restartSession(); return true; })()`);
                 await waitFor(`!!window.__na.dialog() && /^Restart/i.test(window.__na.name(window.__na.dialog()))`, 'the Restart Session dialog (role=dialog named Restart Session)', 6000);
                 await settle(400);
                 const r0 = await rect(); same(base, r0, 'Restart opens at New agent\'s rectangle');
+                await ev(`document.getElementById('restart-next').click(); true`); // step 1 is the persona page: Next opens the tabs
+                await settle(200); same(base, await rect(), 'Restart step 2');
                 const open = await ev(`(() => { const t = [...window.__na.dialog().querySelectorAll('[role=tab]')].find(x => x.getAttribute('aria-selected') === 'true'); return t ? window.__na.name(t) : (window.__na.find('select', /section$/i) ? window.__na.find('select', /section$/i).selectedOptions[0].textContent.trim() : null); })()`);
-                assert.equal(open, 'Agent', 'Restart opens on Agent');
+                assert.equal(open, 'Model', 'step 2 opens on Model');
                 const names = await ev(`(() => { const tl = window.__na.dialog().querySelector('[role=tablist]'); const tabs = tl ? [...tl.querySelectorAll('[role=tab]')].filter(window.__na.vis).map(t => window.__na.name(t)) : []; return tabs.length ? tabs : [...window.__na.find('select', /section$/i).options].map(o => o.textContent.trim()); })()`);
-                assert.deepEqual(names, N.restartTabs, 'Restart has four sections');
-                for (const t of N.restartTabs) { await section(t); same(base, await rect(), `Restart tab ${t}`); }
-                await section('Agent');
-                const radios = await ev(`(() => { const g = [...window.__na.dialog().querySelectorAll('[role=radiogroup]')].find(e => ${N.provider}.test(window.__na.name(e))); return g ? window.__na.radios(g).map(r => window.__na.radioName(r)) : null; })()`);
-                if (radios) { // the provider may be changed (UI/UX's lean): every choice leaves the rectangle alone
-                    for (const n of radios) { await ev(`(() => { const g = [...window.__na.dialog().querySelectorAll('[role=radiogroup]')].find(e => ${N.provider}.test(window.__na.name(e))); window.__na.radios(g).find(r => window.__na.radioName(r) === ${JSON.stringify(n)}).click(); return true; })()`); await settle(300); same(base, await rect(), `Restart provider ${n}`); }
-                }
+                assert.deepEqual(names, ['Model', 'Permissions', 'Advanced'], 'Restart has three sections: the agent is fixed, so no Agent step');
+                for (const t of ['Model', 'Permissions', 'Advanced']) { await section(t); same(base, await rect(), `Restart tab ${t}`); }
+                assert.equal(await ev(`[...window.__na.dialog().querySelectorAll('[role=radiogroup]')].some(e => ${N.provider}.test(window.__na.name(e)))`), false, 'no provider choice: the provider is fixed');
                 await click('button', N.cancel); await waitFor(`!window.__na.dialog()`, 'Cancel closes Restart', 4000);
             });
             await ev(`document.documentElement.style.fontSize = ''; true`);

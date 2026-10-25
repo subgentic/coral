@@ -182,6 +182,7 @@ const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
         await open(1280, 900, false);
         await ev(`T.state.currentSession = ${JSON.stringify({ name: 'ag', display_name: 'QA Engineer', session_id: 'sid-r', type: 'live', agent_type: 'claude', model: 'claude-opus-4', prompt: 'Be kind.', capabilities: { allow: ['file_read'] }, tmux_session: 'ag' })}; window.restartSession(); true`);
         await waitFor(`!!document.querySelector('#restart-modal .settings-tabs [role=tab]') && !!document.querySelector('#restart-acf .acf-agent-type')`, 'the restart dialog', 8000);
+        await ev(`document.getElementById('restart-next').click(); true`); // step 1 is the persona page; the tabs are step 2
         const tl = await ax('#restart-modal .settings-tabs'); assert.equal(tl.role, 'tablist'); assert.ok(tl.name, 'the tablist is named'); assert.equal(tl.props.orientation, 'vertical');
         const tabs = await ev(`[...document.querySelectorAll('#restart-modal .settings-tabs [role=tab]')].map(t => ({ id: t.id, sel: t.getAttribute('aria-selected'), tab: t.tabIndex, ctl: t.getAttribute('aria-controls') }))`);
         assert.ok(tabs.length >= 3 && tabs.filter(t => t.sel === 'true').length === 1 && tabs.filter(t => t.tab === 0).length === 1, 'one selected tab is the one in the Tab order (roving): ' + JSON.stringify(tabs));
@@ -190,12 +191,12 @@ const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
         await focus('#restart-modal .settings-tabs [aria-selected=true]'); await key('ArrowDown');
         assert.equal(await ev(`document.activeElement.getAttribute('aria-selected')`), 'true', 'an arrow moves to the next section and opens it');
         // a field with a problem in another section: its tab's name says so, and the status the dialog gives is in the tree
-        await ev(`(() => { const f = document.querySelector('#restart-acf .acf-prompt'); f.setAttribute('aria-invalid', 'true'); return true; })()`);
+        await ev(`(() => { const f = document.querySelector('#restart-acf .acf-flags'); f.setAttribute('aria-invalid', 'true'); return true; })()`);
         await waitFor(`!![...document.querySelectorAll('#restart-modal .settings-tabs [role=tab]')].find(t => /has a problem/.test(t.getAttribute('aria-label') || ''))`, 'the problem is in a tab name', 4000);
         const bad = await ev(`[...document.querySelectorAll('#restart-modal .settings-tabs [role=tab]')].find(t => /has a problem/.test(t.getAttribute('aria-label') || '')).id`);
         const badAx = await ax('#' + bad); assert.match(badAx.name, /has a problem/, badAx.name);
         assert.equal(await ev(`document.querySelector('#${bad} .sd-dot').getAttribute('aria-hidden')`), 'true', 'the dot itself is decoration: the name carries the problem');
-        await ev(`document.querySelector('#restart-acf .acf-prompt').removeAttribute('aria-invalid'); true`);
+        await ev(`document.querySelector('#restart-acf .acf-flags').removeAttribute('aria-invalid'); true`);
 
         console.log('the contrast of all of it, light and dark');
         await open(1280, 900, false); await stubs(); await installAudit(ev);
@@ -244,13 +245,13 @@ const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
         await ev(`document.getElementById('a11y-box').remove(); true`);
         await ev(`T.state.currentSession = ${JSON.stringify({ name: 'ag', display_name: 'QA Engineer', session_id: 'sid-r', type: 'live', agent_type: 'claude', model: 'claude-opus-4', prompt: 'Be kind.', capabilities: { allow: ['file_read'] }, tmux_session: 'ag' })}; window.restartSession(); true`);
         await waitFor(`!!document.querySelector('#restart-modal .settings-tabs [role=tab]')`, 'the restart dialog', 8000);
-        await ev(`document.querySelector('#restart-acf .acf-prompt').setAttribute('aria-invalid', 'true'); true`);
+        await ev(`document.getElementById('restart-next').click(); document.querySelector('#restart-acf .acf-flags').setAttribute('aria-invalid', 'true'); true`); // the tabs are step 2; a problem is flagged in a section
         for (const theme of ['light', 'dark']) {
             await setTheme(ev, theme);
             const r = await auditRegion(ev, ['#restart-modal .settings-nav'], { focus: ['#restart-modal .settings-tabs [aria-selected=true]'] });
             assert.deepEqual(r.fails, [], `${theme}: the sectioned dialog's list (with a problem dot) reaches contrast: ` + JSON.stringify(r.fails));
         }
-        await ev(`document.querySelector('#restart-acf .acf-prompt').removeAttribute('aria-invalid'); window.hideRestartModal && window.hideRestartModal(); true`);
+        await ev(`document.querySelector('#restart-acf .acf-flags').removeAttribute('aria-invalid'); window.hideRestartModal && window.hideRestartModal(); true`);
         await ev(`window.switchNavTab('tokens'); true`); await ev(`import(${MOD} + 'analytics_views.js').then(m => { m.selectView('thinking'); return true; })`); await waitFor(`document.querySelectorAll('#cost-by-thinking tbody tr').length === 2`, 'cost table', 8000);
         for (const theme of ['light', 'dark']) {
             await setTheme(ev, theme);

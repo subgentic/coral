@@ -340,7 +340,7 @@
                 <div hidden aria-hidden="true">
                     <select id="team-agent-type"><option value="claude">Claude</option><option value="agy">Antigravity (agy)</option><option value="codex">Codex</option><option value="pi">Pi</option></select>
                     <select id="team-backend"><option value="tmux">tmux</option><option value="pty">PTY</option></select>
-                    <select id="team-permission-mode"><option value="default" selected>Default</option><option value="plan">Plan</option><option value="acceptEdits">Accept Edits</option><option value="auto">Auto</option><option value="bypassPermissions">Bypass Permissions</option><option value="dontAsk">Don't Ask</option></select>
+                    <select id="team-permission-mode"><option value="default" selected>Default</option><option value="plan">Plan</option><option value="acceptEdits">Accept edits</option><option value="auto">Auto</option><option value="bypassPermissions">Bypass permissions</option><option value="dontAsk">Don't ask</option></select>
                     <span class="perm-mode-desc"></span>
                 </div>
                 <div id="team-tmux-slot" class="launch-cli-slot"></div>
@@ -520,23 +520,29 @@
 
     <!-- Restart Modal -->
     <div id="restart-modal" class="modal" role="dialog" aria-labelledby="restart-title" aria-modal="true" style="display:none">
-        <div class="modal-content sd-modal-content launch-wizard restart-wizard-content">
-            <div class="modal-header">
+        <div class="modal-content sd-modal-content launch-wizard restart-wizard-content" id="restart-wizard" data-stage="persona">
+            <div class="modal-header sd-step-header">
                 <h3 id="restart-title">Restart Session</h3>
                 <p id="restart-modal-name" class="sd-sub"></p>
+                <p id="restart-stage-sub" class="sd-sub launch-stage-sub">Step 1 of 2: Persona</p>
             </div>
             <div class="modal-body settings-modal-body">
-                <div class="settings-shell">
+                <div class="launch-page-agent">
+                <div class="settings-shell launch-shell">
                     <nav class="settings-nav" aria-label="Restart sections">
                         <div class="settings-group-pick"><select class="settings-select" aria-label="Restart section"></select></div>
                         <div class="settings-tabs" role="tablist" aria-orientation="vertical" aria-label="Restart sections"></div>
                     </nav>
                     <div id="restart-acf" class="settings-panes"></div>
                 </div>
+                </div>
             </div>
             <div class="modal-actions modal-footer">
                 <button class="btn" id="restart-cancel" data-on-click="m-hide-restart-modal">Cancel</button>
-                <button class="btn btn-warning" data-on-click="m-confirm-restart">Restart</button>
+                <button class="btn" id="restart-back" data-on-click="m-restart-step" data-arg="back" hidden>Back</button>
+                <button class="btn" id="restart-next" data-on-click="m-restart-step" data-arg="next">Next</button>
+                <button class="btn btn-warning" id="restart-go" data-on-click="m-confirm-restart">Restart</button>
+                <p id="restart-stage-live" class="sr-only" role="status"></p>
             </div>
         </div>
     </div>
@@ -687,10 +693,10 @@
                     <select aria-labelledby="settings-permission-mode-label" id="settings-permission-mode" class="settings-select" data-on-change="m-perm-mode-describe">
                         <option value="default">Default</option>
                         <option value="plan">Plan</option>
-                        <option value="acceptEdits">Accept Edits</option>
+                        <option value="acceptEdits">Accept edits</option>
                         <option value="auto" selected>Auto</option>
-                        <option value="bypassPermissions">Bypass Permissions</option>
-                        <option value="dontAsk">Don't Ask</option>
+                        <option value="bypassPermissions">Bypass permissions</option>
+                        <option value="dontAsk">Don't ask</option>
                     </select>
                 </dd>
                 </div>

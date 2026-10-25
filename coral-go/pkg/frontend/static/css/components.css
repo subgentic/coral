@@ -4499,7 +4499,8 @@ body:has(#nav-tab-hub-inbox.active) #saved-btn .saved-count { display: none; }
 #launch-modal[data-agent-stage="persona"] .launch-server-row, #launch-modal[data-agent-stage="agent"] .launch-server-row { display: none !important; } /* the machine is a step 1 choice; its row is set by style where it is drawn (launch_dialog.js) */
 .launch-field-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; margin: 0 0 6px; font-size: .875rem; font-weight: 600; }
 .launch-field-head label, .launch-field-head span:first-child { margin: 0; flex: none; } /* the label stays on one line; "optional" wraps under it at 200% text (UI/UX, #7407) */
-.sd-modal-content.restart-wizard-content .settings-pane textarea.acf-prompt { font-family: inherit; font-size: var(--fs-md, .875rem); } /* the prompt is the person's writing: the product font, not mono */
+.sd-modal-content.restart-wizard-content :is(.settings-pane, .acf-persona-page) textarea.acf-prompt { font-family: inherit; font-size: var(--fs-md, .875rem); }
+.sd-modal-content.restart-wizard-content .acf-persona-page textarea.acf-prompt { min-height: 16rem; resize: vertical; } /* the prompt is the person's writing: the product font, not mono */
 .launch-required { color: var(--warning-text, var(--warning)); font-size: .6875rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
 .launch-optional { color: var(--text-secondary); font-size: .75rem; font-weight: 400; }
 .launch-recent-label { align-self: center; color: var(--text-secondary); font-size: .8125rem; }
@@ -4584,7 +4585,7 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .acf-restart-name { margin: 0 0 16px; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-secondary); color: var(--text-primary); overflow-wrap: anywhere; }
 .acf-provider-label { display: block; margin: 0 0 14px; }
 .acf-provider-head { display: block; font-size: .875rem; font-weight: 600; margin-bottom: 4px; }
-.acf-provider-change { min-height: 1.5em; margin: -6px 0 10px; }
+.acf-provider-fixed { margin: 0 0 14px; }
 .restart-wizard-content > .modal-actions .btn-warning { background: var(--accent-dim); border-color: var(--accent-dim); color: var(--text-on-accent); }
 .restart-wizard-content > .modal-actions .btn-warning:hover { background: color-mix(in srgb, var(--accent-dim) 85%, var(--bg-primary)); border-color: color-mix(in srgb, var(--accent-dim) 85%, var(--bg-primary)); color: var(--text-on-accent); }
 

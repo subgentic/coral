@@ -86,7 +86,7 @@ const BASE = require('./test_base').BASE;
         await setTeamMode('plan'); await waitFor(`${roleRow('Open')}.querySelector('.team-agent-summary').lastElementChild.textContent.startsWith('Plan')`, 'Plan');
         assert.equal(await modeOf('Open'), 'Plan mode', 'team Plan: four chips do not widen it');
         await setTeamMode('bypassPermissions'); await waitFor(`${roleRow('Open')}.querySelector('.team-agent-summary').lastElementChild.textContent.startsWith('Bypass')`, 'Bypass');
-        assert.equal(await modeOf('Open'), 'Bypass Permissions mode', 'team Bypass: Shell restricts nothing, the mode stands'); assert.equal(await ev(`${roleRow('Open')}.querySelector('.team-agent-summary').lastElementChild.classList.contains('team-mode-warn')`), true, 'and it is a warning');
+        assert.equal(await modeOf('Open'), 'Bypass permissions mode', 'team Bypass: Shell restricts nothing, the mode stands'); assert.equal(await ev(`${roleRow('Open')}.querySelector('.team-agent-summary').lastElementChild.classList.contains('team-mode-warn')`), true, 'and it is a warning');
         assert.equal(await modeOf('Careful'), 'Read-only sandbox', 'team Bypass: read-only chips narrow it');
         await setTeamMode('default'); await waitFor(`${roleRow('Open')}.querySelector('.team-agent-summary').lastElementChild.textContent === 'Sandboxed: can change files in its folder and use the network'`, 'Default again');
         await ev(`window.launchTeam(); true`);

@@ -109,6 +109,7 @@ const NOT_POPOUT_RELEVANT = new Map(Object.entries({
     'folder-tag-remove': 'sidebar folder tag menu; a label, not an agent',
     'job-delete': 'Jobs view (dashboard nav only), after showConfirmModal',
     'm-close-top-bar-settings-then-stop-all-auto-accept': 'top bar menu (a popout has no top bar)',
+    'm-restart-step': 'the restart dialog\'s Next and Back: change the step shown, restart nothing',
     'm-hide-restart-modal': 'the restart dialog\'s Cancel: closes it, restarts nothing',
     'm-reset-default-prompt': 'Settings > default prompts (top bar only); resets an editor field',
     'macro-delete': 'removes a saved quick-action button (the operator\'s own setting); command toolbar, gated with it',
