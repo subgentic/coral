@@ -13,6 +13,7 @@ import { pollEvery } from './overload.js';
 import { onDockPage } from './dock_page.js';
 const { closeDetailPane } = await importOnce('./detail_pane.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried
 const { el } = await importOnce('./team_table.js');
+const { quietFocus } = await importOnce('./quiet_focus.js');
 import { refreshGoalsTree } from './sidebar_goals.js';
 
 const LABEL = { goals: 'Goals', messages: 'Messages', tasks: 'Tasks', agents: 'Agents', artifacts: 'Artifacts', knowledge: 'Knowledge', settings: 'Settings' };
@@ -45,6 +46,8 @@ function buildOnce() {
     });
     $('team-page-add-agent').addEventListener('click', () => { window.showAddAgentToBoard?.(S.team, teamDir()); });
     buildMore();
+    // A click or a tap that opens a page or the pane puts the focus on its heading by script: no ring for a pointer, the ring for a key (the dialogs' rule, quiet_focus.js).
+    $('team-page-view').addEventListener('click', () => quietFocus($('team-page-view')), true);
 }
 
 /** The folder the team works in: where an agent added to it starts. */
@@ -59,6 +62,9 @@ function buildMore() {
     const host = $('team-page-actions');
     const b = el('button', 'btn team-page-more', 'More'); b.type = 'button'; b.id = 'team-page-more'; b.setAttribute('aria-expanded', 'false'); b.setAttribute('aria-controls', 'team-page-more-menu');
     const menu = el('div', 'team-more-menu'); menu.id = 'team-page-more-menu'; menu.hidden = true; menu.setAttribute('aria-label', 'More team actions');
+    const add = el('button', 'team-more-add', 'Add agent'); add.type = 'button'; add.id = 'team-page-more-add'; // a phone's header has one button: More, with Add agent first
+    add.addEventListener('click', () => { window.showAddAgentToBoard?.(S.team, teamDir()); });
+    menu.append(add);
     host.append(b, menu);
     const set = (open, { focus = false } = {}) => { moreOpen = open; menu.hidden = !open; b.setAttribute('aria-expanded', String(open)); if (open) menu.querySelector('button:not([hidden])')?.focus(); else if (focus) b.focus(); };
     b.addEventListener('click', () => set(!moreOpen));

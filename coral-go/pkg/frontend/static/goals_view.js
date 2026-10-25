@@ -299,7 +299,7 @@ function drawTableRaw(col) {
     col.replaceChildren();
     const counts = W.filterCounts(model.goals);
     const bar = el('div', 'goals-toolbar');
-    const chips = el('div', 'goals-chips'); chips.setAttribute('role', 'group'); chips.setAttribute('aria-label', 'Show goals that are');
+    const chips = el('div', 'goals-chips goals-chips-row'); chips.setAttribute('role', 'group'); chips.setAttribute('aria-label', 'Show goals that are');
     for (const f of W.FILTERS) {
         const c = btn('goals-chip', `${W.filterLabel(f)} ${counts[f]}`, () => { model.filter = f; say(W.filterAnnouncement(f, counts[f])); drawList(); });
         c.setAttribute('aria-pressed', String(model.filter === f)); c.dataset.filter = f;
@@ -308,6 +308,7 @@ function drawTableRaw(col) {
     }
     bar.append(chips, btn('btn btn-primary goals-new', 'New goal', () => openCreate()));
     col.append(bar);
+    chips.querySelector('[aria-pressed="true"]')?.scrollIntoView({ inline: 'nearest', block: 'nearest' }); // the chosen chip stays in view in the one-line row
     if (model.requireGoal) col.append(Object.assign(el('p', 'goals-note goals-require'), { textContent: W.requireGoalNote }));
     if (state.hubConnected || window.__goalsHub) col.append(el('p', 'goals-note', W.otherBoardsNote));
     if (model.noGoalOpen > 0) col.append(el('p', 'goals-note goals-no-goal', W.noGoalTasksText(model.noGoalOpen)));
