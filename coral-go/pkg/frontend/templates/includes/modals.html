@@ -1053,18 +1053,7 @@
                     <div id="net-remote-note" class="settings-hint" role="status"></div>
                     <div class="settings-hint" id="settings-remote-access-enabled-desc" data-info>Allow connections from other devices. Plain HTTP (unencrypted) unless Coral was started with --tls-cert and --tls-key.</div>
                 </div>
-                
-                        <!-- About: the version (Coral has no paid licence, #3221) -->
-                        <div class="settings-section settings-about-section" id="about-section">
-                            <h6 class="settings-about-title">About</h6>
-                            <div id="app-version-label" class="settings-version-label"></div>
-                            <!-- This machine's health from the feed (#3446); a hub-served page has no machine of its own: it is part of About (UI audit #5589, finding 19) -->
-                            <div class="settings-machine-health" data-local-only>
-                                <div id="machine-health-local"></div>
-                            </div>
-                            <button type="button" class="btn btn-small settings-editions-btn" data-editions="open">Connect to Coral Hub…</button>
-                        </div>
-                    </section>
+                </section>
                 <section class="settings-row settings-row-wide net-group" id="net-group-setup" aria-labelledby="net-setup-title" hidden>
                 <div class="net-group-head"><h5 id="net-setup-title" class="net-group-title">Setup code</h5></div>
                 <div class="net-body">
@@ -1074,6 +1063,17 @@
                         <button type="button" class="btn btn-icon" id="settings-setup-code-copy" aria-label="Copy setup code" title="Copy setup code"><span class="material-icons" aria-hidden="true">content_copy</span></button>
                     </div>
                     <div id="settings-setup-code-hint" class="settings-hint" role="status">To sign in from another device.</div>
+                </div>
+                </section>
+                <section class="net-group" id="about-section" aria-labelledby="net-status-title">
+                <!-- Status: the version (Coral has no paid licence, #3221) and this machine's health from the feed (#3446); a hub-served page has no machine of its own, so it hides the group (UI audit #5589, finding 19) -->
+                <div class="net-group-head"><h5 id="net-status-title" class="net-group-title">Status</h5></div>
+                <div class="net-body">
+                    <div id="app-version-label" class="settings-version-label"></div>
+                    <div class="settings-machine-health" data-local-only>
+                        <div id="machine-health-local"></div>
+                    </div>
+                    <button type="button" class="btn btn-small settings-editions-btn" data-editions="open">Connect to Coral Hub…</button>
                 </div>
                 </section>
                 <section class="settings-row settings-row-wide net-group" id="net-group-hub" aria-labelledby="net-hub-title">
@@ -1111,13 +1111,17 @@
                             <div id="settings-cloud-owner-status" class="settings-hint" data-cloud="owner-status" role="status"></div>
                         </div>
                         <div id="settings-cloud-owner-confirmed" class="settings-hint" data-cloud="owner-confirmed" hidden></div>
-                        <label for="settings-cloud-max-mode">What may Coral Hub do on this computer?</label>
-                        <div id="settings-cloud-mode-levels" class="settings-hint">View: look only. Interact: send and answer. Launch: start agents.</div>
-                        <select id="settings-cloud-max-mode" data-cloud="max-mode" class="settings-select" aria-describedby="settings-cloud-mode-levels settings-cloud-mode-desc">
-                            <option value="view">View</option>
-                            <option value="interact">Interact</option>
-                            <option value="launch">Launch</option>
-                        </select>
+                        <div class="net-level-row">
+                            <div class="net-level-text">
+                                <label for="settings-cloud-max-mode">What may Coral Hub do on this computer?</label>
+                                <div id="settings-cloud-mode-levels" class="settings-hint">View: look only. Interact: send and answer. Launch: start agents.</div>
+                            </div>
+                            <select id="settings-cloud-max-mode" data-cloud="max-mode" class="settings-select" aria-describedby="settings-cloud-mode-levels settings-cloud-mode-desc">
+                                <option value="view">View</option>
+                                <option value="interact">Interact</option>
+                                <option value="launch">Launch</option>
+                            </select>
+                        </div>
                         <div id="settings-cloud-mode-desc" data-cloud="mode-desc" class="settings-hint"></div>
                         <div id="settings-cloud-mode-full" data-cloud="mode-full" class="settings-hint"></div>
                         {{ template "includes/cloud_switch_row" (cloudSwitch "settings-cloud-auto-accept-row" "data-cloud=\"auto-accept-row\" hidden" "settings-cloud-allow-auto-accept" "Coral Hub can turn on auto-accept" "settings-cloud-auto-accept-desc" "While access is Launch, a hub user can let an agent's permission prompts be approved for it, for up to 8 hours (1 hour unless they choose otherwise). Turn this off to keep that on this computer only; it also stops any auto-accept the hub turned on." "data-cloud=\"allow-auto-accept\" aria-describedby=\"settings-cloud-auto-accept-desc settings-cloud-auto-accept-changed\"") }}

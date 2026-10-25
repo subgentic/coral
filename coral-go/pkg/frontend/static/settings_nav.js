@@ -69,6 +69,7 @@ const SHORT_HINTS = {
     'Fit pane width': 'Sizes the terminal to this window (tmux).',
     'Artifact store limit': "Above it, agents' new uploads are refused.",
     'Received files limit': 'Above it, new received files are refused.',
+    'Remote access': 'Let other devices on your network use Coral.',
     'Free space': 'Shrink or prune old saved diffs and artifacts.',
     'Automatic cleanup': 'Prunes what is older than this, every hour. 0 is off.',
 };

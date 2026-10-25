@@ -3320,20 +3320,7 @@ button.subscriber-history-link {
     margin: 16px 0;
 }
 
-/* ── Settings / About Section ────────────────────────────── */
-
-.settings-about-section {
-    margin-top: 16px;
-    padding-top: 16px;
-    border-top: 1px solid var(--border);
-}
-
-.settings-about-title {
-    font-size: 0.8125rem;
-    font-weight: 600;
-    margin-bottom: 8px;
-    color: var(--text-secondary);
-}
+/* ── Settings / Status (the version) ─────────────────────── */
 
 .settings-version-label {
     font-size: var(--fs-base);
@@ -4380,7 +4367,6 @@ body:has(#launch-modal[style*="flex"] :is(#launch-tmux-slot, #team-tmux-slot)[da
 .settings-row-hub { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .4rem 1.5rem; align-items: center; padding: .7rem 0; border-top: 1px solid var(--border); }
 .settings-row-hub > dt { grid-column: 1; grid-row: 1; }
 .settings-row-hub > dd { display: contents; }
-.settings-row-hub .settings-hub-mode-toggle { grid-column: 2; grid-row: 1; justify-self: end; align-self: center; margin: 0; }
 .settings-row-hub #settings-hub-mode-desc, .settings-row-hub #settings-hub-mode-status, .settings-row-hub #settings-hub-mode-restart { grid-column: 1 / -1; justify-self: start; }
 #settings-cloud .settings-cloud-actions { margin: 6px 0; padding: 0; justify-content: flex-start; }
 #settings-cloud .settings-cloud-actions .btn { margin-left: 0; }
@@ -4391,7 +4377,6 @@ body:has(#launch-modal[style*="flex"] :is(#launch-tmux-slot, #team-tmux-slot)[da
 #settings-cloud .settings-cloud-connect-row { margin: 10px 0 4px; }
 #settings-cloud .settings-cloud-notice { border: 1px solid var(--warning); border-radius: var(--radius-md); padding: 8px 10px; margin: 8px 0 12px; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
 #settings-cloud .settings-cloud-notice[hidden] { display: none; }
-#settings-cloud .settings-cloud-mode > label[for="settings-cloud-max-mode"] { margin-top: 10px; display: block; }
 #settings-cloud .settings-cloud-more { margin-top: 10px; }
 #settings-cloud .settings-cloud-more > summary { color: var(--text-primary); font-weight: 600; overflow-wrap: anywhere; }
 #settings-cloud .settings-cloud-warn { display: block; color: var(--warning-text, var(--warning)); font-weight: 500; margin-top: 2px; }
@@ -4403,6 +4388,20 @@ body:has(#launch-modal[style*="flex"] :is(#launch-tmux-slot, #team-tmux-slot)[da
 .settings-row-hub .settings-hub-mode-toggle { display: flex; align-items: center; min-height: var(--control-touch-height, 44px); }
 #settings-modal .settings-row-hub .settings-hub-mode-toggle > input[type="checkbox"] { align-self: center; position: relative; top: 0; }
 .settings-row-hub .settings-hub-mode-toggle { justify-content: center; min-width: var(--control-touch-height, 44px); }
+/* Network and Hub on the settings row (#7626): every switch is at the far end of its head (the Manage switch had lost its auto margin to a rule written for the old grid), Status is a group with the machine's state at the right of its row, the level question is the label with its hint at the left and the select at the right, and the Hub command is a full-width box with Copy at its end. */
+#about-section { display: grid; padding: .7rem 0; border-top: 1px solid var(--border); } /* a group like the others, but not a .settings-row: the hub page hides it and the settings trace counts hidden rows */
+#about-section[hidden] { display: none; }
+#about-section .net-body > :not(.settings-editions-btn) { align-self: stretch; }
+#about-section .machine-health-card { margin: 0; padding: 0; border: 0; background: none; }
+#about-section .machine-health-head .machine-health-status { margin-left: auto; color: var(--text-primary); }
+#about-section .machine-health-title { font: var(--dlg-label); }
+.net-level-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(12rem, 22rem); gap: .4rem 1.5rem; align-items: start; margin-top: 10px; }
+.net-level-row > select { width: 100%; }
+.net-level-text > label { display: block; }
+#settings-cloud .cloud-command-row { align-self: stretch; flex-wrap: nowrap; }
+#settings-cloud .cloud-command-row code { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+#settings-cloud .cloud-command-row .btn { flex: none; margin: 0; }
+@container settingspane (max-width: 40rem) { .net-level-row { grid-template-columns: minmax(0, 1fr); } }
 /* New Agent (#5990): a Launch that is off (the CLI it needs is missing) looks off; the line under the folder is its reason. */
 #launch-modal .btn:disabled { opacity: .5; cursor: not-allowed; }
 .launch-dir-note { margin: 6px 0 0; }

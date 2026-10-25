@@ -43,13 +43,26 @@ const BASE = require('./test_base').BASE;
             const remote = () => ev(`(() => { const c = document.getElementById('settings-remote-access-enabled'); c.click(); return c.checked; })()`);
 
             // 1. the groups: headings, and the order (one order at every width)
-            assert.deepEqual(await headings(), ['Remote access', 'Coral Hub', 'Manage other computers from this one'], at + 'the headings list, with nothing that could use a setup code yet');
+            assert.deepEqual(await headings(), ['Remote access', 'Status', 'Coral Hub', 'Manage other computers from this one'], at + 'the headings list, with nothing that could use a setup code yet');
             const order = await ev(`(() => { const t = id => document.getElementById(id).getBoundingClientRect().top; return { hubFirst: t('net-group-hub') < t('net-group-access'), accessFirst: t('net-group-access') < t('net-group-hub'), manageLast: t('net-group-manage') > t('net-group-hub') && t('net-group-manage') > t('net-group-access') }; })()`);
             assert.equal(order.accessFirst, true, at + 'Remote access comes first at every width (#7040)');
             assert.equal(order.manageLast, true, at + 'Manage other computers last');
             assert.equal(await ev(`document.getElementById('settings-remote-access-enabled').getAttribute('aria-labelledby')`), 'net-access-title', at + 'the switch is named by its heading');
             assert.equal(await ev(vis('#net-group-setup')), false, at + 'no Setup code group while Remote access is off and no link is being made');
 
+            // 1b. the rows (#7626): both switches are at the far end of their rows, Remote access says in one line what it does, the level question has its select at the right, the Hub command is a full-width box
+            const rows = await ev(`(() => { const r = id => document.getElementById(id).getBoundingClientRect(); const box = b => ({ left: b.left, right: b.right, top: b.top, bottom: b.bottom }); const hint = document.querySelector('#net-group-access + .settings-hint-wrap .settings-hint-short, #net-group-access .settings-hint-short') || document.createElement('i');
+                return { remoteRight: r('settings-remote-access-enabled').right, manageRight: r('settings-hub-mode-enabled').right, groupRight: r('net-group-access').right, manageGroupRight: r('net-group-manage').right,
+                    hint: hint.textContent.trim(), hintShown: hint.checkVisibility(), statusTitle: document.getElementById('net-status-title').textContent, aboutWords: document.getElementById('about-section').innerText, level: { select: box(r('settings-cloud-max-mode')), label: box(document.querySelector('.net-level-text label').getBoundingClientRect()) } }; })()`);
+            assert.ok(rows.groupRight - rows.remoteRight < 24, at + `the Remote access switch is at the far end of its row (${rows.groupRight - rows.remoteRight} px from the edge)`);
+            assert.ok(rows.manageGroupRight - rows.manageRight < 24, at + `the Manage switch is at the far end of its row too (${rows.manageGroupRight - rows.manageRight} px from the edge)`);
+            assert.equal(rows.hintShown, true, at + 'Remote access has its hint line on the screen');
+            assert.ok(rows.hint.split(/\s+/).length <= 12 && /\.$/.test(rows.hint), at + 'one short sentence: ' + rows.hint);
+            assert.equal(rows.statusTitle, 'Status');
+            assert.ok(!/About/.test(rows.aboutWords), at + 'no About header');
+            assert.ok(/Unknown|OK|Busy|Stalled/.test(rows.aboutWords) && /(not connected|waiting|Waiting|reading)/i.test(rows.aboutWords), at + 'the machine state is in words, and an unknown one says why: ' + rows.aboutWords.replace(/\s+/g, ' '));
+            if (!mobile) assert.ok(rows.level.select.left > rows.level.label.right - 4, at + 'the level select sits at the right of its question ' + JSON.stringify(rows.level));
+            else assert.ok(rows.level.select.top >= rows.level.label.bottom - 2, at + 'on a phone the select is under its question');
             // 2. Manage other computers: its wording
             assert.equal(await text('#settings-hub-mode-line'), 'Adds a Servers tab, with full control of those computers.', at + 'a hub has full control of what it manages, said where the switch is');
             assert.equal(await ev(`document.getElementById('settings-hub-mode-enabled').getAttribute('aria-labelledby')`), 'settings-hub-mode-label');
@@ -62,7 +75,7 @@ const BASE = require('./test_base').BASE;
             assert.equal(await ev(`document.getElementById('net-remote-note').getAttribute('role')`), 'status');
             assert.equal(await ev(`document.getElementById('net-remote-note').hasAttribute('hidden')`), false, at + 'the live region is always in the page');
             await waitFor(`!document.getElementById('net-group-setup').hidden`, 'the Setup code group once Remote access is on', 8000);
-            assert.deepEqual(await headings(), ['Remote access', 'Setup code', 'Coral Hub', 'Manage other computers from this one'].filter(x => true), at + 'Setup code is a heading under Remote access');
+            assert.deepEqual(await headings(), ['Remote access', 'Setup code', 'Status', 'Coral Hub', 'Manage other computers from this one'], at + 'Setup code is a heading under Remote access');
             await ev(`document.getElementById('settings-remote-access-enabled').click(); true`);
             assert.equal(await text('#net-remote-note'), '', at + 'back to what is saved: no note');
             assert.equal(await ev(vis('#net-group-setup')), false, at + 'and the group goes');
@@ -118,6 +131,15 @@ const BASE = require('./test_base').BASE;
             await waitFor(`document.getElementById('settings-cloud-operator-line').textContent === 'Coral Hub may not act as the Operator.' && !document.getElementById('settings-cloud-operator-line').hidden`, 'the opt-out said while unlinked', 8000);
             await ev(`(async () => { window.__op = { linked: false, disabled: false }; const p = document.getElementById('settings-cloud')._cloudPanel; p.enrolled = undefined; await window.__cc.loadCloudStatus(); return true; })()`);
             await waitFor(`document.getElementById('settings-cloud-operator-line').hidden`, 'and nothing said when not opted out', 8000);
+            // 7. a Coral with no hub says what to run: the command is a full-width box with Copy at its end (#7626)
+            await ev(`(async () => { window.__st = { configured: false, state: 'off' }; await window.__cc.loadCloudStatus(); return true; })()`);
+            await waitFor(`!!document.querySelector('#settings-cloud [data-cloud=command-row]:not([hidden])')`, 'the command row', 8000);
+            const cmd = await ev(`(() => { const row = document.querySelector('#settings-cloud [data-cloud=command-row]'); const body = document.getElementById('settings-cloud').getBoundingClientRect(); const r = row.getBoundingClientRect(), c = row.querySelector('code').getBoundingClientRect(), b = row.querySelector('button').getBoundingClientRect(); return { rowW: r.width, bodyW: body.width, codeW: c.width, copyRight: b.right, bodyRight: body.right, copyTop: b.top, rowTop: r.top }; })()`);
+            assert.ok(cmd.rowW >= cmd.bodyW - 2, at + `the command row is as wide as its card (${cmd.rowW} of ${cmd.bodyW})`);
+            assert.ok(cmd.bodyRight - cmd.copyRight < 4, at + 'Copy is at the end of the row ' + JSON.stringify(cmd));
+            assert.ok(cmd.codeW >= cmd.bodyW - 120, at + `the command box takes the rest of the row (${cmd.codeW} of ${cmd.bodyW})`);
+            await ev(`document.getElementById('settings-pane-network').scrollTop = 0; document.querySelector('#settings-cloud [data-cloud=command-row]').scrollIntoView({ block: 'center' }); true`);
+            await shot(`net-pane-command-${w}`);
             await ev(`window.scrollTo(0, 0); document.getElementById('settings-pane-network').scrollTop = 0; true`);
             await shot(`net-pane-${w}`);
             assert.equal(await ev(`document.documentElement.scrollWidth <= innerWidth`), true, at + 'no sideways scroll');

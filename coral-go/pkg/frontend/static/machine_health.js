@@ -146,7 +146,7 @@ export function healthCard(h, { title = 'Machine health', online = false, waitin
 function renderLocalCard() {
     const slot = document.getElementById('machine-health-local');
     if (!slot) return;
-    slot.replaceChildren(healthCard(localMachineHealth(), { title: 'This machine' }));
+    slot.replaceChildren(healthCard(localMachineHealth(), { title: 'This computer' }));
 }
 onBuilt('settings-modal', renderLocalCard); // the card's slot is in Settings, built on first open (#4500)
 if (typeof document !== 'undefined') { // a page (pure-node tests import this module too)
