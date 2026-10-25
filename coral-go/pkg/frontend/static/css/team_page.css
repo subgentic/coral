@@ -134,7 +134,7 @@
     .team-more-menu > button.team-more-add { display: block !important; }
     .goals-table-page { padding: 12px 16px 0; }
     .goals-pinbar .btn { flex: 1 1 auto; }
-    .goals-table-page .goals-back { min-height: 44px; }
+    .goals-table-page .goals-back { min-height: 44px; min-width: 44px; } /* a short label ("Goals") is still a 44 px target both ways */
     .team-task-extra summary { min-height: 44px; display: flex; align-items: center; } /* the dialog's folded sections are 44 px targets on a phone */
     .team-table th:nth-child(n+3), .team-table td:nth-child(n+3) { display: none; } /* the name cell carries its second line: who and which goal fold into it (the phone's table is Name and State) */
     .team-row-phone { display: block; }

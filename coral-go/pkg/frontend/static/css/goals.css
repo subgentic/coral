@@ -74,7 +74,7 @@
     .goals-cols { grid-template-columns: minmax(0, 1fr); }
     .goals-page.goals-open .goals-list-col { display: none; }
     .goals-detail-col { border: none; padding: 0; background: none; }
-    .goals-back { display: inline-flex; align-items: center; }
+    .goals-back { display: inline-flex; align-items: center; min-width: 44px; }
     .goals-chip, .goals-dialog .btn, .goals-new, .goal-task-actions .btn, .goals-failed .btn, .goals-empty .btn { min-height: var(--control-touch-height, 44px); }
     .goals-dialog { width: 100vw; height: 100dvh; max-width: none; max-height: none; border-radius: 0; margin: 0; }
     .goals-field input, .goals-field select { min-height: var(--control-touch-height, 44px); }
