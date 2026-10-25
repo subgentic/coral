@@ -6,6 +6,7 @@ const { connect } = require('./agent_view_harness');
 const { safePaused } = require('./helpers/paused');
 const { scene, tap: tapSel, problems, required, useThemeSetter } = require('./helpers/phone_targets');
 const { BASE } = require('./test_base');
+const { framesJs } = require('./helpers/wait');
 const HOST = new URL(BASE).host;
 const CSP = ["default-src 'self'", "script-src 'self'", "style-src 'self'", "style-src-attr 'unsafe-inline'", "font-src 'self'", "img-src 'self' data: blob:", `connect-src 'self' ws://${HOST}`, "object-src 'none'", "base-uri 'none'", "form-action 'self'", "frame-ancestors 'none'"].join('; ');
 
@@ -20,7 +21,7 @@ const CSP = ["default-src 'self'", "script-src 'self'", "style-src 'self'", "sty
         await Network.setBypassServiceWorker({ bypass: true });
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
         // the hub's page follows the system theme (#6087): the contrast pass switches the emulated colour scheme, not the dashboard's own setting
-        useThemeSetter(async (_ev, theme) => { await Emulation.setEmulatedMedia({ features: [{ name: 'prefers-color-scheme', value: theme }] }); await new Promise(r => setTimeout(r, 300)); }); // sleep-ok: the page repaints for the new scheme
+        useThemeSetter(async (_ev, theme) => { await Emulation.setEmulatedMedia({ features: [{ name: 'prefers-color-scheme', value: theme }] }); await waitFor(`matchMedia('(prefers-color-scheme: ${theme})').matches`, 'the ' + theme + ' scheme', 3000); await ev(framesJs(2)); }); // the page repaints for the new scheme: the media query answers, then two frames (its change listeners run before a frame), in place of a 300 ms sleep (#352)
         await Fetch.enable({ patterns: [{ urlPattern: `${BASE}/*`, resourceType: 'Document', requestStage: 'Response' }] });
         safePaused(client, async e => {
             if (e.responseStatusCode !== 200) return Fetch.continueRequest({ requestId: e.requestId });

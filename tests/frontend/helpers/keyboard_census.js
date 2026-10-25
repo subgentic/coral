@@ -1,4 +1,5 @@
 'use strict';
+const { waitFor } = require('./wait');
 // The keyboard-only census (#6188): on a screen, walk it with real Tab key presses (CDP Input.dispatchKeyEvent, not .focus()) and report what a person who cannot use a mouse would hit:
 //   unreachable  a visible, enabled control that no Tab press reaches (a member of a composite widget, a tablist, menu, listbox, radiogroup or toolbar, counts as reached when one of its members is: arrows move inside)
 //   noFocus      a control Tab reaches that shows nothing when focused (no outline, shadow, border, fill, colour or underline difference from when it is not)
@@ -105,8 +106,9 @@ async function dialogCheck(ev, Input, { opener, box, open, closedWhen }) {
     const pick = `[...document.querySelectorAll(${JSON.stringify(opener)})].find(e => window.__kb.vis(e))`;
     if (!(await ev(`(() => { const o = ${pick}; if (!o) return false; o.focus(); return document.activeElement === o; })()`))) return ['the opener is not on the screen or does not take focus (' + opener + ')'];
     await open();
-    await new Promise(r => setTimeout(r, 300)); // sleep-ok: the dialog's open transition
-    const inside = () => ev(`(() => { const d = document.querySelector(${JSON.stringify(box)}); const a = document.activeElement; return !!d && !!a && a !== document.body && d.contains(a); })()`);
+    const INSIDE = `(() => { const d = document.querySelector(${JSON.stringify(box)}); const a = document.activeElement; return !!d && !!a && a !== document.body && d.contains(a); })()`;
+    const inside = () => ev(INSIDE);
+    await waitFor(ev, INSIDE, 'focus in the dialog', { timeout: 3000, soft: true }); // in place of a 300 ms sleep for its open transition (#352): checked below either way
     if (!(await inside())) bad.push('focus did not move into the dialog when it opened');
     let escaped = false;
     for (let i = 0; i < 60 && !escaped; i++) { await press(Input, 'Tab'); if (!(await inside())) escaped = true; }
@@ -115,8 +117,9 @@ async function dialogCheck(ev, Input, { opener, box, open, closedWhen }) {
     await press(Input, 'Tab', { shift: true });
     if (!(await inside())) bad.push('Shift+Tab left the dialog');
     await press(Input, 'Escape');
-    await new Promise(r => setTimeout(r, 300)); // sleep-ok: the dialog's close transition
-    const closed = await ev(closedWhen || `(() => { const d = document.querySelector(${JSON.stringify(box)}); return !d || !d.getClientRects().length || getComputedStyle(d).display === 'none' || d.hidden || !d.open && d.tagName === 'DIALOG'; })()`);
+    const CLOSED = closedWhen || `(() => { const d = document.querySelector(${JSON.stringify(box)}); return !d || !d.getClientRects().length || getComputedStyle(d).display === 'none' || d.hidden || !d.open && d.tagName === 'DIALOG'; })()`;
+    await waitFor(ev, `(${CLOSED}) && (() => { const o = ${pick}; return !!o && document.activeElement === o; })()`, 'the dialog closed and focus back', { timeout: 3000, soft: true }); // in place of a 300 ms sleep for its close transition (#352): both are checked below either way
+    const closed = await ev(CLOSED);
     if (!closed) bad.push('Escape did not close the dialog');
     else {
         const back = await ev(`(() => { const o = ${pick}; const a = document.activeElement; const d = document.querySelector(${JSON.stringify(box)}); return { ok: !!o && a === o, now: a ? window.__kb.name(a) : 'nothing', recorded: d && d._focusOpener ? window.__kb.name(d._focusOpener) : (d && d._focusAttached ? 'attached, no opener' : 'not attached'), shown: d ? getComputedStyle(d).display : '' }; })()`);

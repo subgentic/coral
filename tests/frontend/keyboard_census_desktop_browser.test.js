@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { launchStandIn } = require('./helpers/stand_in_agent');
 const { guardSettings } = require('./helpers/settings_guard');
-const { tap: tapSel, required, openBoardComposer, BOARD_COMPOSER_UP, showUpdateReady, UPDATE_NOTICE_UP, UPDATE_DIALOG_UP } = require('./helpers/phone_targets');
+const { sceneStart, sceneReady, tap: tapSel, required, openBoardComposer, BOARD_COMPOSER_UP, showUpdateReady, UPDATE_NOTICE_UP, UPDATE_DIALOG_UP } = require('./helpers/phone_targets');
 const VERSIONS = require('./helpers/artifact_versions_stub');
 const { requiredScenes } = require('./helpers/census_required'); // the scenes the suite must visit: one file each, so commits that add scenes do not conflict
 const { STUB, HEX } = require('./helpers/comments_scale');
@@ -24,8 +24,7 @@ const BUBBLES = [{ type: 'user', content: 'Is the build green?', key: 'c1', time
     const results = [];
     const found = [];
     const sc = async (name, setup, { expect } = {}) => {
-        try { await setup(); if (expect) { await new Promise(r => setTimeout(r, 400)); if (!(await ev(expect))) throw new Error('the scene is not showing (' + expect.slice(0, 80) + ')'); } } catch (e) { results.push({ name, error: String(e && e.message || e).slice(0, 200) }); return; } // sleep-ok: the scene's own transition settles
-        await new Promise(r => setTimeout(r, 500)); // sleep-ok: the scene's own transitions settle
+        try { await sceneStart(ev); await setup(); await sceneReady(ev, expect, 900); } catch (e) { results.push({ name, error: String(e && e.message || e).slice(0, 200) }); return; }
         const r = await kb.walk(ev, client.Input);
         results.push({ name, stops: r.stops.length, path: r.stops.map(x => x.d).join(' > ') });
         found.push(...kb.problems(name, r));

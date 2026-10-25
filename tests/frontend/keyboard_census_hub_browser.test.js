@@ -3,7 +3,7 @@
 // stop shows focus, and the dialogs trap Tab, close on Escape and give focus back. KEYBOARD_REPORT=<file> writes the findings to that file instead of failing.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
-const { tap: tapSel, required } = require('./helpers/phone_targets');
+const { sceneStart, sceneReady, tap: tapSel, required } = require('./helpers/phone_targets');
 const kb = require('./helpers/keyboard_census');
 const { setupHubWorld, BASE } = require('./helpers/hub_world');
 
@@ -12,8 +12,7 @@ const { setupHubWorld, BASE } = require('./helpers/hub_world');
     const results = [];
     const found = [];
     const sc = async (name, setup, { expect } = {}) => {
-        try { await setup(); if (expect) { await new Promise(r => setTimeout(r, 400)); if (!(await ev(expect))) throw new Error('the scene is not showing (' + expect.slice(0, 80) + ')'); } } catch (e) { results.push({ name, error: String(e && e.message || e).slice(0, 300) }); return; } // sleep-ok: the scene's own transition settles
-        await new Promise(r => setTimeout(r, 500)); // sleep-ok: the scene's own transitions settle
+        try { await sceneStart(ev); await setup(); await sceneReady(ev, expect, 900); } catch (e) { results.push({ name, error: String(e && e.message || e).slice(0, 300) }); return; }
         const r = await kb.walk(ev, client.Input);
         results.push({ name, stops: r.stops.length, path: r.stops.map(x => x.d).join(' > ') });
         found.push(...kb.problems(name, r));

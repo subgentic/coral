@@ -1,5 +1,6 @@
 'use strict';
 const { installAudit, setTheme } = require('./contrast');
+const { waitFor, settle, framesJs } = require('./wait');
 // The phone touch-target census (#6130): at 390 px with touch, every visible control on a scene is at least 44 x 44 px. measure() is an expression for ev(): the controls (buttons, links, inputs, selects,
 // summaries, role=button/tab/menuitem/switch) under 44 px in either direction, and how many controls the scene has at all (so a scene that never rendered cannot pass by being empty). A checkbox or radio
 // counts as its label. A link inside running text is inline and exempt (WCAG 2.2 target size, inline exception); everything else under 44 px fails, unless it is on the reviewed ALLOW list below.
@@ -185,7 +186,7 @@ async function scaleOf(ev, name) {
     try {
         const base = await ev(TEXT_SIZES);
         await ev(`document.documentElement.style.fontSize = '32px'; true`);
-        await new Promise(r => setTimeout(r, 350)); // sleep-ok: the page reflows at the new size
+        await settle(ev, 350, QUIET_MS); // the page reflows at the new size
         const r = await ev(SCALE);
         const big = await ev(TEXT_SIZES);
         // paired by what the text is (the element's description and its words, the nth of each), not by position: a scene that shows more or fewer elements at the larger size is still measured for every text it has at both
@@ -209,13 +210,37 @@ async function tap(ev, selector) {
     if (r !== 'ok') throw new Error(`${selector}: ${r}`);
 }
 
+// A scene's quiet tail (#352): before it is measured, its geometry has held still and no request it made is in flight for QUIET_MS, so a scene that is still drawing (a panel sliding in) or
+// still loading (a side panel tab whose list is fetched after the tab shows, a launch step whose agent choices arrive later) is not measured half done.
+const QUIET_MS = 150;
+// Counts the page's fetches in flight (window.__censusNet()). Installed before a scene's setup, so the requests the setup starts are counted; once per document.
+const NET_WATCH = `(() => { if (!window.__censusNet) { let n = 0; const f = window.fetch; window.fetch = function (...a) { n++; let p; try { p = f.apply(this, a); } catch (e) { n--; throw e; } return p.finally(() => { n--; }); }; window.__censusNet = () => n; } return true; })()`;
+/** Before a scene's setup: start counting its requests. */
+const sceneStart = ev => ev(NET_WATCH);
+/** A scene is ready when `expect` (if given) is true, polled for up to 5 s, and then the quiet tail has held, or `ms` at most. In place of fixed sleeps of 400 ms before `expect` and `ms` after it
+ * (about 1 s a scene, 670 s across the census suites, #348): a scene that is ready sooner is measured sooner, and one still loading is waited for up to the old total. Throws "the scene is not
+ * showing" as before. */
+async function sceneReady(ev, expect, ms) {
+    if (expect && !(await waitFor(ev, expect, 'the scene', { timeout: 5000, soft: true }))) throw new Error(`the scene is not showing (${expect.slice(0, 80)})`);
+    await ev(`(async () => {
+        const fp = () => { let s = 0; for (const e of document.querySelectorAll('body *')) { const b = e.getBoundingClientRect(); s += b.left + b.top + b.width + b.height; } return Math.round(s); };
+        const busy = () => !!window.__censusNet && window.__censusNet() > 0;
+        const start = performance.now(); let prev = fp(), since = start;
+        while (performance.now() - start < ${ms}) {
+            await ${framesJs(1)};
+            const v = fp();
+            if (v !== prev || busy()) { prev = v; since = performance.now(); } else if (performance.now() - since >= ${QUIET_MS}) return true; // a request in flight restarts the tail: what it brings is drawn after it ends
+        }
+        return false; })()`);
+}
+
 /** Record one scene: its controls and the ones under 44 px (minus the allow list). `expect` is an expression that must be true once the scene is open (its own content is showing), checked before anything is measured. */
 async function scene(ev, results, name, setup, { min = 3, expect, contrastOnly = false } = {}) {
     try {
+        await sceneStart(ev);
         await setup();
-        if (expect) { await new Promise(r => setTimeout(r, 400)); if (!(await ev(expect))) throw new Error(`the scene is not showing (${expect.slice(0, 80)})`); } // sleep-ok: the scene's own transition settles
+        await sceneReady(ev, expect, 1000);
     } catch (e) { results.push({ name, error: String(e && e.message || e).slice(0, 200) }); return; }
-    await new Promise(r => setTimeout(r, 600)); // sleep-ok: the scene's own transitions settle
     const m = contrastOnly ? { n: min, small: [], dups: [], unnamed: [] } : await ev(MEASURE); // contrastOnly (the desktop pass): only the colours are looked at
     const cr = await contrastOf(ev, name);
     const ia = await ev(ICON_ALIGN); // before the 200% pass: that pass puts the root font back and the (i) is still shrinking (a transition) for a moment, 45 to 48 px, when it ends
@@ -275,4 +300,4 @@ async function openBoardComposer(ev, waitFor, team, select = true) {
 }
 const BOARD_COMPOSER_UP = `!!document.getElementById('board-panel-input') && !!document.getElementById('board-panel-input').offsetParent && document.querySelector('#board-chat-input-pane .board-mention-chip').getClientRects().length > 0`;
 
-module.exports = { showUpdateReady, UPDATE_NOTICE_UP, UPDATE_DIALOG_UP, openBoardComposer, BOARD_COMPOSER_UP, useScaleShot, scaleOf, SCALE, MEASURE, ALLOW, ALLOW_DUPS, ALLOW_UNNAMED, ALLOW_CONTRAST, useThemeSetter, scene, tap, problems, required };
+module.exports = { sceneStart, sceneReady, showUpdateReady, UPDATE_NOTICE_UP, UPDATE_DIALOG_UP, openBoardComposer, BOARD_COMPOSER_UP, useScaleShot, scaleOf, SCALE, MEASURE, ALLOW, ALLOW_DUPS, ALLOW_UNNAMED, ALLOW_CONTRAST, useThemeSetter, scene, tap, problems, required };
