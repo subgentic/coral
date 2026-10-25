@@ -452,6 +452,11 @@ func (s *Server) registerCloud(r *chi.Mux) {
 	r.Post("/api/system/update/check", upd.CheckNow)                   // #5280 step 3 B: local only, 404 until the feature is on
 	r.Put("/api/system/update/settings", upd.SetAuto)                  // check automatically
 	s.goBackground(upd.RunBackgroundChecks)                            // returns at once while the feature is off
+	// the goal events the feed names are pruned to the newest thousand per board (#7355)
+	if s.boardStore != nil {
+		prune := background.NewGoalEventsPrune(s.boardStore)
+		s.goBackground(func(ctx context.Context) { _ = prune.Run(ctx) })
+	}
 	r.Post("/api/cloud/redeem", s.cloudHandler.Redeem)
 	r.Post("/api/cloud/cli-hello", s.cloudHandler.CLIHello)
 	r.Method(http.MethodGet, serverproof.Path, s.cloudHandler.Proof()) // #6103: a tool asks before it sends a credential; public, never through Coral Hub

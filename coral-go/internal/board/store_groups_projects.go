@@ -225,6 +225,7 @@ func (s *Store) deleteProject(ctx context.Context, project string, onlyIfUnused 
 		{"DELETE FROM task_ready_notifications WHERE task_id IN " + mine, 1},
 		{"DELETE FROM board_tasks WHERE board_id = ?", 1},
 		{"DELETE FROM board_goals WHERE board_id = ?", 1},
+		{"DELETE FROM board_goal_events WHERE board_id = ?", 1}, // after the goals: deleting them writes goal_deleted events of their own (#7355)
 		{"DELETE FROM board_goal_meta WHERE board_id = ?", 1},
 		{"DELETE FROM board_messages WHERE project = ?", 1},
 		{"DELETE FROM board_subscribers WHERE project = ?", 1},
