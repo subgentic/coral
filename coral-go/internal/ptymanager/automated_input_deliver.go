@@ -76,8 +76,10 @@ func DeliverAutomated(ctx context.Context, in AutomatedInput) (Delivery, error) 
 func (g *inputGate) sendChecked(ctx context.Context, in AutomatedInput) (enterHeld bool, err error) {
 	// Coral's automated sends to one team are spaced (#3613): the first goes at once, the next
 	// 2-3 s after. Only here, where a send really goes: a held send waits nothing until it's due.
-	if err := SpaceTeam(ctx, teamFor(in.Name)); err != nil {
-		return false, err
+	if !in.force {
+		if err := SpaceTeam(ctx, teamFor(in.Name)); err != nil {
+			return false, err
+		}
 	}
 	if !strings.HasSuffix(in.Key, "#enter") {
 		// what the gate types is Coral's, if it is found in the box later (#247): a paste (its Enter is confirmed from the screen) for hours, a typed send for two minutes
@@ -146,6 +148,9 @@ func (g *inputGate) pasteChecked(ctx context.Context, in AutomatedInput) (enterH
 		if err := in.Ready(ctx); err != nil {
 			return false, err, true
 		}
+	}
+	if in.force {
+		return g.forcePaste(ctx, in, ps)
 	}
 	agentType, sessionID := in.identity()
 	sr, _ := in.Term.(ScreenReader)

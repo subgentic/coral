@@ -33,6 +33,10 @@ func TestHeldListsAndSendsNow(t *testing.T) {
 			mu.Lock()
 			posted = append(posted, m)
 			mu.Unlock()
+			if len(posted) == 2 {
+				_, _ = w.Write([]byte(`{"ok":true,"sent":0,"held_again":0,"dropped":0,"left":1,"draft_in_box":true}`))
+				return
+			}
 			_, _ = w.Write([]byte(`{"ok":true,"sent":1,"held_again":0,"dropped":0,"left":0}`))
 		default:
 			w.WriteHeader(http.StatusNotFound)
@@ -52,12 +56,22 @@ func TestHeldListsAndSendsNow(t *testing.T) {
 	require.Zero(t, run.code, run.stderr)
 	assert.Contains(t, run.stdout, "Sent 1 now")
 	assert.Contains(t, run.stdout, "middle of a turn")
+	count := func() int { mu.Lock(); defer mu.Unlock(); return len(posted) }
 	mu.Lock()
-	defer mu.Unlock()
 	require.Len(t, posted, 1)
 	assert.Equal(t, map[string]string{"agent_type": "claude", "session_id": sid, "id": "abc123"}, posted[0])
+	mu.Unlock()
+
+	run = runBoard(t, s.URL, dir, "held", "send", "Backend Dev") // all of it: the server answers that a draft is in the box
+	require.Zero(t, run.code, run.stderr)
+	assert.Contains(t, run.stdout, "Sent 0 now")
+	assert.Contains(t, run.stdout, "draft in the agent's input box: nothing was sent")
+	require.Equal(t, 2, count())
+	mu.Lock()
+	assert.Equal(t, "", posted[1]["id"])
+	mu.Unlock()
 
 	run = runBoard(t, s.URL, dir, "held", "send", "Nobody")
 	assert.NotZero(t, run.code, "an agent that is not on the board is an error")
-	assert.Len(t, posted, 1)
+	assert.Equal(t, 2, count())
 }
