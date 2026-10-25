@@ -130,6 +130,18 @@ const STUB = `(() => {
             assert.deepEqual(await ev(`(() => { const t = getComputedStyle(document.querySelector('#group-table-title')), c = getComputedStyle(document.querySelector('#group-table-view .group-table-head .session-group-count')); return [t.fontSize, t.fontWeight, c.fontSize, c.fontWeight]; })()`), ['20px', '700', '11px', '600'], at + "the table's title is 20/700 and its count 11/600");
             assert.deepEqual(await ev(`(${ON_SCALE})(document.getElementById('group-table-view'), [11, 12, 13, 14, 17, 20])`), [], at + 'every text of the chats table is on the scale');
             const todayTitle = await rect('#group-table-title');
+            { // a mouse click on the title shows no focus box; the keyboard's focus shows the ring (QA Reviewer 2's #7577 note)
+                const ring = () => ev(`(() => { const t = document.querySelector('#group-table-title'); return { focused: document.activeElement === t, ring: getComputedStyle(t).outlineStyle }; })()`);
+                const [x, y, w, h] = todayTitle;
+                await client.Input.dispatchMouseEvent({ type: 'mousePressed', x: x + w / 2, y: y + h / 2, button: 'left', clickCount: 1 });
+                await client.Input.dispatchMouseEvent({ type: 'mouseReleased', x: x + w / 2, y: y + h / 2, button: 'left', clickCount: 1 });
+                assert.deepEqual(await ring(), { focused: true, ring: 'none' }, at + 'a mouse click on the group title shows no focus box');
+                await ev(`document.activeElement.blur(); true`);
+                await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'Shift', code: 'ShiftLeft', windowsVirtualKeyCode: 16 }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Shift', code: 'ShiftLeft', windowsVirtualKeyCode: 16 });
+                await ev(`document.querySelector('#group-table-title').focus(); true`);
+                assert.deepEqual(await ring(), { focused: true, ring: 'solid' }, at + 'the title focused after a key shows the ring');
+                await ev(`document.activeElement.blur(); true`);
+            }
             await ev(`document.querySelector('${pane('history')} .sgroup-header[data-group-name="history:day-yesterday"]').click(); true`);
             await waitFor(`document.querySelector('#group-table-title').textContent === 'Yesterday'`, at + 'Yesterday opens its table', 8000);
             { const t = await rect('#group-table-title'); assert.deepEqual([t[0], t[1], t[3]], [todayTitle[0], todayTitle[1], todayTitle[3]], at + 'the title does not move from group to group'); }

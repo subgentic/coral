@@ -37,7 +37,7 @@ Run `coral-agent docs` to list the topics, `coral-agent docs <topic>` to read on
 - [Message Board](board.md) — Multi-agent message board, subscriptions, groups, board status/routing, board tasks
 - [Cross-team Messaging](cross-team.md) — Orchestrator-to-Orchestrator messages between teams (`coral-board send`): Coral Hub team links grant permission; messaging and file switches are on by default as kill switches, while local and legacy paths need explicit opt-ins
 - [Notifications](notifications.md) — Push toast and alert notifications to the Coral UI
-- [Saved for later](saved-messages.md) — The Operator's bookmarks on chat and board messages (`/api/saved`), the stable message key, jump back to a message
+- [Saved messages](saved-messages.md) — The Operator's bookmarks on chat and board messages (`/api/saved`), the stable message key, jump back to a message
 
 ### Configuration
 - [Multi-Server Hub](hub.md) — Register remote Coral servers, merged agent list, proxy and remote launch, Coral Hub tunnel refusals, versions

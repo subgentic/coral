@@ -910,6 +910,8 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .group-table-view { flex: 1; min-width: 0; padding: var(--space-2xl); overflow: auto; }
 .group-table-head { display: flex; align-items: center; gap: var(--space-md); margin-bottom: var(--space-xl); }
 .group-table-head h2 { margin: 0; font-size: 1.25rem; font-weight: 700; line-height: 1.3; color: var(--text-primary); } /* a group's table is titled at the page-title size, with its count (#7443) */
+#group-table-title:focus { outline: none; } /* it takes the focus by script when a group opens: a mouse click on a group header shows no box, a keyboard start does (QA Reviewer 2's #7577 note) */
+#group-table-title:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm, 2px); }
 .group-table-head .session-group-count { font-weight: 600; }
 .group-table-head .group-table-extra { display: inline-flex; align-items: center; gap: 6px; margin: 0 0 0 auto; }
 .group-table-head .group-table-extra .material-icons { font-size: 1rem; }

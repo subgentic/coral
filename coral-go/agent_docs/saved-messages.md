@@ -1,4 +1,4 @@
-# Saved for later
+# Saved messages
 
 The Operator can bookmark a message of an agent's chat or of a board with **Save for later**, and click the bookmark in the **Saved** list to go back to that point of the conversation (#4510). The bookmarks are the Operator's own notes: an agent's token is refused on every route below (`403 operator_only`), and nothing an agent does adds one.
 
