@@ -30,17 +30,17 @@ const { settle } = require('./helpers/wait');
         console.log('1. Docs list by keyboard');
         await load(1280, 800);
         await ev(`window.switchNavTab('docs'); true`);
-        await waitFor(`document.querySelectorAll('#docs-nav-list li').length >= 2`, 'the docs list', 8000);
-        const items = await ev(`[...document.querySelectorAll('#docs-nav-list li')].map(li => ({ tab: li.tabIndex, role: li.getAttribute('role') }))`);
-        assert.ok(items.every(i => i.role === 'option') && items.filter(i => i.tab === 0).length === 1 && items.every(i => i.tab === 0 || i.tab === -1), 'every doc item is an option of the Docs list box, and one is the Tab stop while the arrows reach the rest (#6586)');
+        await waitFor(`document.querySelectorAll('#docs-nav-list .row-btn').length >= 2`, 'the docs list', 8000);
+        const items = await ev(`[...document.querySelectorAll('#docs-nav-list .row-btn')].map(b => ({ tab: b.tabIndex, tag: b.tagName }))`);
+        assert.ok(items.every(i => i.tag === 'BUTTON') && items.filter(i => i.tab === 0).length === 1 && items.every(i => i.tab === 0 || i.tab === -1), 'every doc item is a button of the Docs list, and one is the Tab stop while the arrows reach the rest (#6586)');
         for (const [k, code] of [['Enter', 13], [' ', 32]]) {
             const want = k === 'Enter' ? 1 : 2;   // a different item each time, so the change is the key's
-            await ev(`document.querySelectorAll('#docs-nav-list li')[${want}].focus(); true`);
+            await ev(`document.querySelectorAll('#docs-nav-list .row-btn')[${want}].focus(); true`);
             await key(k, code);
-            await waitFor(`document.querySelectorAll('#docs-nav-list li')[${want}].getAttribute('aria-selected') === 'true'`, `${JSON.stringify(k)} opens the focused doc`, 5000);
-            assert.equal(await ev(`document.querySelectorAll('#docs-nav-list li[aria-selected="true"]').length`), 1, 'one item is selected');
+            await waitFor(`document.querySelectorAll('#docs-nav-list .row-btn')[${want}].getAttribute('aria-current') === 'true'`, `${JSON.stringify(k)} opens the focused doc`, 5000);
+            assert.equal(await ev(`document.querySelectorAll('#docs-nav-list .row-btn[aria-current="true"]').length`), 1, 'one item is the open one');
         }
-        console.log('   ✓ Enter and Space open the focused doc; the open one is aria-selected');
+        console.log('   ✓ Enter and Space open the focused doc; the open one is aria-current');
 
         console.log('2. Reduced motion');
         await Emulation.setEmulatedMedia({ features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });

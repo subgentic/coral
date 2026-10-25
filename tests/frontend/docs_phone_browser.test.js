@@ -1,5 +1,5 @@
 // The Docs page and two controls on a phone (#7162, UI Accessibility's #7159): every table sits in a focusable, labelled scroll region with a visible line that says it scrolls (nothing makes the page scroll
-// sideways); a Topics button opens the topics (the sidebar's list is not on screen on a phone); a topic or a doc link loads the new page and the focus goes to its heading; Home's "Mobile QR code" is a real button
+// sideways); the page has a way back to the topics (the list is the phone's page, #7443); a topic or a doc link loads the new page and the focus goes to its heading; Home's "Mobile QR code" is a real button
 // (Space works); the Remote access switch is a 44 px target. 390 px at 100% and 200% text, and 1280 px (no Topics button, no hint). Drives Chrome over CDP through agent_view_harness.js.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -16,7 +16,8 @@ const BASE = require('./test_base').BASE;
         await ev(`window.__coralReady.then(() => true)`);
         if (zoom) await ev(`document.documentElement.style.fontSize = '${zoom}'; true`);
     };
-    const docs = async () => { await ev(`window.switchNavTab('docs'); true`); await waitFor(`document.querySelectorAll('#docs-content h1').length > 0`, 'a doc', 10000); };
+    // the tab opens on its first group's table on a wide screen and on its list on a phone (#7443): the README is opened from there
+    const docs = async () => { await ev(`window.switchNavTab('docs'); true`); await waitFor(`document.querySelectorAll('#docs-nav-list .row-btn').length > 3`, 'the topics', 10000); await ev(`window.selectDoc('README'); true`); await waitFor(`document.querySelectorAll('#docs-content h1').length > 0`, 'a doc', 10000); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, mobile, zoom] of [[390, true, ''], [390, true, '200%'], [1280, false, '']]) {
@@ -33,21 +34,20 @@ const BASE = require('./test_base').BASE;
             await ev(`document.querySelector('.docs-table-wrap').focus(); true`);
             assert.equal(await ev(`document.activeElement.classList.contains('docs-table-wrap')`), true, `${at}: a table's region takes the keyboard`);
             console.log(`${at}: topics and the heading`);
-            if (!mobile) { assert.equal(await shown('#docs-topics-btn'), false, `${at}: the sidebar has the topics: no button`); continue; }
-            assert.equal(await shown('#docs-topics-btn'), true, `${at}: a Topics button on a phone`);
-            assert.ok(await ev(`document.getElementById('docs-topics-btn').getBoundingClientRect().height >= 43.5`), `${at}: 44 px`);
+            if (!mobile) { assert.equal(await ev(`document.getElementById('docs-topics-btn')`), null, `${at}: the sidebar has the topics: no button`); continue; }
+            assert.equal(await shown('#docs-phone-back'), true, `${at}: a way back to the list on a phone`);
+            assert.ok(await ev(`document.getElementById('docs-phone-back').getBoundingClientRect().height >= 43.5`), `${at}: 44 px`);
             const before = await ev(`document.querySelector('#docs-content h1').textContent`);
-            await ev(`document.getElementById('docs-topics-btn').click(); true`);
-            await waitFor(`!!document.querySelector('dialog.docs-topics-dialog[open]')`, 'the topics', 3000);
-            const names = await ev(`[...document.querySelectorAll('.docs-topic')].map(b => b.textContent)`);
+            await ev(`document.getElementById('docs-phone-back').click(); true`);
+            await waitFor(`document.getElementById('mobile-docs-list').getClientRects().length > 0`, 'the topics', 3000);
+            const names = await ev(`[...document.querySelectorAll('#mobile-docs-list #docs-nav-list .row-btn')].map(b => b.textContent)`);
             assert.ok(names.length > 3, `${at}: the topics are listed: ${names.length}`);
-            assert.equal(await ev(`document.querySelectorAll('.docs-topic[aria-current]').length`), 1, `${at}: the open one says so`);
-            assert.ok(await ev(`[...document.querySelectorAll('.docs-topic')].every(b => b.getBoundingClientRect().height >= 43.5)`), `${at}: every topic is 44 px`);
-            await ev(`[...document.querySelectorAll('.docs-topic')].find(b => !b.hasAttribute('aria-current')).click(); true`);
-            await waitFor(`!document.querySelector('#docs-content .docs-empty') && document.querySelectorAll('#docs-content h1').length > 0 && document.querySelector('#docs-content h1').textContent !== ${JSON.stringify(before)}`, `${at}: the new page loaded`, 8000);
+            assert.ok(await ev(`[...document.querySelectorAll('#mobile-docs-list #docs-nav-list .row-btn')].every(b => b.getBoundingClientRect().height >= 43.5)`), `${at}: every topic is 44 px`);
+            await ev(`[...document.querySelectorAll('#mobile-docs-list #docs-nav-list .row-btn')].find(b => b.dataset.doc !== 'README').click(); true`);
+            await waitFor(`document.querySelectorAll('#docs-content h1').length > 0 && document.querySelector('#docs-content h1').textContent !== ${JSON.stringify(before)}`, `${at}: the new page loaded`, 8000);
             const landed = await ev(`({ tag: document.activeElement && document.activeElement.tagName, text: document.activeElement && document.activeElement.textContent.slice(0, 40), h1: document.querySelector('#docs-content h1').textContent.slice(0, 40) })`);
             assert.ok(landed.tag === 'H1' && landed.text === landed.h1, `${at}: the new page's heading takes the focus: ${JSON.stringify(landed)}`);
-            assert.equal(await shown('dialog.docs-topics-dialog'), false, `${at}: the sheet closed`);
+            assert.equal(await ev(`document.getElementById('mobile-docs-list').getClientRects().length`), 0, `${at}: the list is not under the page`);
             console.log(`${at}: a doc link`);
             const link = await ev(`(() => { const a = [...document.querySelectorAll('#docs-content a[href]')].find(a => /^\\/docs\\//.test(a.getAttribute('href') || '')); return a ? a.getAttribute('href') : ''; })()`);
             if (link) {

@@ -186,6 +186,22 @@ function syncMobileJobsList() {
     }
 }
 
+// The Docs topics: the same move (#7443): on a phone the pane is the page's own list, a wide screen puts it back.
+let _docsHome = null;
+function syncMobileDocsList() {
+    const section = document.querySelector('[data-pane="docs"]');
+    const host = document.getElementById('mobile-docs-list');
+    if (!section || !host) return;
+    if (isMobile()) {
+        if (!_docsHome) _docsHome = { parent: section.parentElement, next: section.nextSibling };
+        if (section.parentElement !== host) host.appendChild(section);
+    } else if (_docsHome) {
+        const { parent, next } = _docsHome;
+        parent.insertBefore(section, next?.parentNode === parent ? next : null);
+        _docsHome = null;
+    }
+}
+
 // ── Intercept Session Selection on Mobile ─────────────────────────────────
 
  function wrapSelectLiveSession() {
@@ -437,6 +453,7 @@ export function initMobile() {
     }
     syncMobileHistoryList();
     syncMobileJobsList();
+    syncMobileDocsList();
     // Set default tab
     if (isMobile()) {
         switchMobileTab('agents');
@@ -459,6 +476,7 @@ export function initMobile() {
         if (mobile !== wasMobile) {
             syncMobileHistoryList();
             syncMobileJobsList();
+            syncMobileDocsList();
             const list = document.getElementById('mobile-agent-list');
             const welcome = document.getElementById('welcome-screen');
             if (mobile) {

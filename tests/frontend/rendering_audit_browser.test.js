@@ -236,9 +236,9 @@ const PAYLOAD = [
         safePaused(client, ({ requestId }) => Fetch.fulfillRequest({ requestId, responseCode: 200,
             responseHeaders: [{ name: 'Content-Type', value: 'application/json' }],
             body: Buffer.from(JSON.stringify({ name: 'qa-3622', content: DOC })).toString('base64') }).catch(() => {}));
-        // The tab opens README first (its list loads, then README); the QA doc after that.
+        // The tab opens on its first group's table once its list loads (#7443); the QA doc is opened after that.
         await ev(`window.switchNavTab('docs'); true`);
-        await waitFor(`!!document.querySelector('#docs-content h1')`, 'the Docs tab with its first doc');
+        await waitFor(`!!document.querySelector('#docs-nav-list .row-btn')`, 'the Docs tab with its list');
         await ev(`(async () => { const l = await import((window.__coralStatic || '/static/') + 'lazy_panels.js'); const m = await l.loadDocs(); await m.selectDoc('qa-3622'); return true; })()`);
         await waitFor(`!!document.querySelector('#docs-content h1') && document.querySelector('#docs-content h1').textContent === 'QA doc'`, 'the QA doc');
         const doc = await ev(`(() => { const c = document.getElementById('docs-content');

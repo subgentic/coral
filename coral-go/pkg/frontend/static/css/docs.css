@@ -13,17 +13,21 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
+    justify-content: space-between;
     gap: 8px 12px;
     padding: 16px 32px 0;
     max-width: 800px;
 }
+.docs-toolbar #docs-copy-agent-line { margin-left: auto; } /* the button is the page's header action, at its right whether or not there is a way back */
+.docs-toolbar .group-back { margin: 0; }
 
 .docs-toolbar .btn { display: inline-flex; align-items: center; gap: 6px; margin: 0; } /* .btn-small carries a 20px margin for the sidebars */
 .docs-toolbar .material-icons { font-size: 1rem; }
-.docs-toolbar-hint { font-size: 0.8125rem; color: var(--text-secondary); min-width: 0; }
+.docs-toolbar-hint { margin: 4px 32px 0; max-width: 736px; font-size: var(--fs-base); color: var(--text-secondary); min-width: 0; } /* a hint is 12/400 */
 
 @media (max-width: 600px) {
     .docs-toolbar { padding: 12px 16px 0; }
+    .docs-toolbar-hint { margin: 4px 16px 0; }
 }
 
 /* ── Content area ─────────────────────────────────────────── */
@@ -33,28 +37,19 @@
     max-width: 800px;
 }
 
-.docs-empty {
-    text-align: center;
-    padding: 60px 20px;
-    color: var(--text-secondary);
-}
-
-.docs-empty p {
-    margin-top: 8px;
-    font-size: 0.875rem;
-}
-
 /* ── Markdown rendering ───────────────────────────────────── */
 
 .docs-content h1 {
     font-size: var(--type-page-size);
+    font-weight: 700;
     margin: 0 0 12px;
     padding-bottom: 8px;
     border-bottom: 1px solid var(--border);
 }
 
 .docs-content h2 {
-    font-size: var(--fs-xl);
+    font-size: 1.0625rem; /* the document keeps its reading scale: headings 20/700 and 17/700 (#7443) */
+    font-weight: 700;
     margin: 24px 0 8px;
     padding-bottom: 4px;
     border-bottom: 1px solid var(--border);
@@ -126,8 +121,10 @@
 
 .docs-content th {
     background: var(--bg-tertiary);
-    font-weight: 600;
+    font-size: var(--fs-base); /* a table's header is 12/500 */
+    font-weight: 500;
 }
+.docs-content strong, .docs-content b { font-size: 0.875rem; font-weight: 600; } /* bold labels 14/600 */
 
 .docs-content ul,
 .docs-content ol {
@@ -175,15 +172,15 @@
 .docs-table-hint { margin: 8px 0 0; color: var(--text-secondary); font-size: 0.75rem; }
 .docs-table-hint[hidden] { display: none; }
 
-/* The topics sheet (#7162): on a phone the sidebar's list is not on screen, so this button opens it. */
-.docs-toolbar .docs-topics-btn { display: none; }
-.docs-topics-dialog { margin: auto; border: 1px solid var(--border-light); border-radius: var(--radius-lg); background: var(--bg-secondary); color: var(--text-primary); padding: 16px; width: min(420px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; }
-.docs-topics-dialog::backdrop { background: rgba(var(--black-rgb), 0.5); }
-.docs-topics-dialog h3 { margin: 0 0 8px; }
-.docs-topics-list { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 4px; }
-.docs-topic { width: 100%; text-align: left; justify-content: flex-start; min-height: var(--control-touch-height, 44px); }
-.docs-topic[aria-current="true"] { border-color: var(--accent); color: var(--accent); }
-@media (max-width: 767px) {
-    .docs-toolbar .docs-topics-btn { display: inline-flex; align-items: center; min-height: var(--control-touch-height, 44px); }
-    .docs-topics-dialog .btn { min-height: var(--control-touch-height, 44px); }
+/* Docs on a phone (#7443): the pane is the page's list, and an open document is the screen after it, with a way back to the list */
+#mobile-docs-list { display: none; }
+.docs-toolbar .docs-phone-back { display: none; }
+@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
+    #mobile-docs-list { display: block; }
+    #docs-view:not([data-phone-item]) .docs-page { display: none; }
+    #docs-view[data-phone-item] #mobile-docs-list { display: none; }
+    #docs-view .docs-phone-back { display: inline-flex; align-items: center; min-height: var(--control-touch-height, 44px); }
+    #docs-back { display: none; } /* a phone has its own back, to the list */
+    #mobile-docs-list .sidebar-hide-btn { display: none; } /* the page is the whole screen: there is no column to hide */
+    #mobile-docs-list .sidebar-header { padding: 12px; }
 }

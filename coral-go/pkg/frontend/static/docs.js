@@ -5,6 +5,9 @@ import { registerActions, textOf } from './actions.js';
 import { apiFetch } from './api.js';
 import { loadHighlight } from './vendor_loader.js';
 import { note, currentRoute } from './nav.js';
+import { registerGroupSource, groupHeaderHtml, isGroupFolded, syncPaneGroupToggle, refreshGroupTable, openFirstGroupTable, setBackLink } from './sidebar_groups.js';
+import { onViewShown } from './view_switch.js';
+import { isPhoneLayout } from './phone_layout.js';
 
 /** The line the "Copy docs line for agents" button copies: what a user pastes to an agent so it can read
  *  these docs. The agent prompt says the same (internal/agent DocsPromptLine; a Go test keeps them equal). */
@@ -13,31 +16,71 @@ export const DOCS_FOR_AGENTS = "Coral's docs for agents: run `coral-agent docs` 
 let docsList = [];
 let selectedDoc = null;
 let wantedDoc = null; // a /docs/<name> page opened before the list loaded (#3532)
+let docsQuery = '';   // the sidebar search's text, lower case
+
+// ── Groups (#7443): Getting started and API ───────────────────────────
+// The list the server sends has no groups; these topics are the ones a new reader starts with, every other topic is the API.
+const GETTING_STARTED = new Set(['README', 'quickstart', 'using-the-dashboard', 'views', 'worked-demos', 'workflow-quickstart', 'troubleshooting']);
+const DOC_GROUPS = [
+    { key: 'getting-started', label: 'Getting started', has: d => GETTING_STARTED.has(d.name) },
+    { key: 'api', label: 'API', has: d => !GETTING_STARTED.has(d.name) },
+];
+const titleOf = d => d.title || d.name;
+const matches = d => !docsQuery || titleOf(d).toLowerCase().includes(docsQuery) || d.name.toLowerCase().includes(docsQuery);
+const docGroups = () => DOC_GROUPS.map(g => ({ ...g, docs: docsList.filter(matches).filter(g.has) })).filter(g => g.docs.length);
+const groupOfDoc = name => { const d = docsList.find(x => x.name === name); const g = d && DOC_GROUPS.find(x => x.has(d)); return g ? { key: g.key, label: g.label } : null; };
+
+export function filterDocs(value) { docsQuery = String(value || '').trim().toLowerCase(); renderDocNav(); }
+
+registerGroupSource('docs', {
+    keys: () => docGroups().map(g => g.key),
+    redraw: () => renderDocNav(),
+    table: key => { const g = docGroups().find(x => x.key === key); return g ? { title: g.label, columns: ['Topic'], rows: g.docs.map(d => ({ title: titleOf(d), action: 'doc-open', data: { doc: d.name }, cells: [] })), extra: { action: 'docs-copy-agent-line', label: 'Copy docs line for agents', icon: 'content_copy', title: 'Copies one line you can paste to an agent so it can read these docs' } } : null; },
+    isEmpty: () => false, // the tab opens its first table itself (showDocsTab)
+    showList: () => { selectedDoc = null; window.switchNavTab?.('docs'); },
+    empty: () => { selectedDoc = null; window.switchNavTab?.('docs'); },
+});
+
+// A group's table on screen is the page: no document is open (the sidebar's open row clears).
+onViewShown(id => { if (id === 'group-table-view' && document.body.getAttribute('data-nav-tab') === 'docs' && selectedDoc) { selectedDoc = null; renderDocNav(); } });
+
+/** One empty, loading or error line, the same size on every tab (14/400, with an optional hint). */
+const emptyHtml = (line, hint = '') => `<div class="empty-pane"><p class="empty-line">${esc(line)}</p>${hint ? `<p class="empty-hint">${esc(hint)}</p>` : ''}</div>`;
 
 // ── Initialization ─────────────────────────────────────────────────────
 
 export async function showDocsTab() {
     showView('docs-view');
-    if (!docsList.length) await loadDocsList();
+    if (!docsList.length) { await loadDocsList(); return; }
+    if (!selectedDoc && !isPhoneLayout()) openFirstGroupTable('docs'); // the tab opens on its first group's table; a phone shows the list
+    syncPhonePage();
 }
 
-/** Load the list and open README; a failed load shows an error with Retry
- *  instead of a blank page (#3152). */
+/** On a phone the list is the page and an open document is the screen after it (data-phone-item, docs.css). */
+function syncPhonePage() {
+    const view = document.getElementById('docs-view');
+    if (!view) return;
+    if (isPhoneLayout() && selectedDoc) view.setAttribute('data-phone-item', ''); else view.removeAttribute('data-phone-item');
+}
+
+/** Load the list; the document the page names opens, else a desktop opens the first group's table. A failed load shows an error with Retry instead of a blank page (#3152). */
 async function loadDocsList() {
     const content = document.getElementById('docs-content');
-    if (content) content.innerHTML = '<div class="docs-empty"><span class="material-icons" style="font-size:1.5rem;animation:spin 1s linear infinite" aria-hidden="true">refresh</span></div>';
+    if (content) content.innerHTML = emptyHtml('Loading\u2026');
     const ok = await fetchDocsList();
     renderDocNav();
     if (!ok) {
         showDocsError('Could not load the documentation. Check the connection to Coral, then try again.', loadDocsList);
         return;
     }
-    // The doc the page names, else README, else the first document; an empty list says so.
-    const first = startDoc(wantedDoc);
-    if (wantedDoc && (!first || first.name !== wantedDoc)) docNotFound();
+    if (content) content.replaceChildren();
+    const wanted = wantedDoc && docsList.find(d => d.name === wantedDoc);
+    if (wantedDoc && !wanted) docNotFound();
     wantedDoc = null;
-    if (first) selectDoc(first.name, { noteRoute: false });
-    else if (content) content.innerHTML = '<div class="docs-empty"><p>No documentation found.</p></div>';
+    if (wanted) selectDoc(wanted.name, { noteRoute: false });
+    else if (!docsList.length) { if (content) content.innerHTML = emptyHtml('No documentation found.'); }
+    else if (!isPhoneLayout()) openFirstGroupTable('docs');
+    syncPhonePage();
 }
 
 /** An error in the content pane with a Retry button that calls retry. */
@@ -45,9 +88,10 @@ function showDocsError(message, retry) {
     const content = document.getElementById('docs-content');
     if (!content) return;
     const box = document.createElement('div');
-    box.className = 'docs-empty docs-error';
+    box.className = 'empty-pane docs-error';
     box.setAttribute('role', 'alert');
     const p = document.createElement('p');
+    p.className = 'empty-line';
     p.textContent = message;
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -88,13 +132,15 @@ function renderDocNav() {
     const list = document.getElementById('docs-nav-list');
     if (!list) return;
 
-    // The topics are one Tab stop (the open one, or the first), and the arrow keys move between them (#6586): 37 stops stood between the top bar and the page's text.
-    const stop = docsList.some(d => d.name === selectedDoc) ? selectedDoc : (docsList[0] || {}).name;
-    list.innerHTML = docsList.map(d => {
-        const active = selectedDoc === d.name ? ' active' : '';
-        // A topic of the Docs list box: the open one is selected; Enter or Space opens the focused one like a click (#4026), the arrows move between them (#6586).
-        return `<li class="session-list-item${escapeAttr(active)}" role="option" tabindex="${Number(d.name === stop ? 0 : -1)}" aria-selected="${escapeAttr(selectedDoc === d.name ? 'true' : 'false')}" data-on-click="doc-open" data-on-keydown="doc-open-key" data-doc="${escapeAttr(d.name)}">${esc(d.title)}</li>`;
-    }).join('');
+    // The topics are one Tab stop (the open one, or the first shown), and the arrow keys move between them (#6586): 37 stops stood between the top bar and the page's text.
+    const groups = docGroups();
+    const shown = groups.filter(g => !isGroupFolded('docs', g.key)).flatMap(g => g.docs);
+    const stop = shown.some(d => d.name === selectedDoc) ? selectedDoc : (shown[0] || {}).name;
+    const row = d => `<li class="session-list-item${escapeAttr(selectedDoc === d.name ? ' active' : '')}"><button type="button" class="row-btn" tabindex="${Number(d.name === stop ? 0 : -1)}"${selectedDoc === d.name ? ' aria-current="true"' : ''} data-on-click="doc-open" data-doc="${escapeAttr(d.name)}" data-on-keydown="doc-open-key">${esc(titleOf(d))}</button></li>`;
+    list.innerHTML = groups.map(g => groupHeaderHtml('docs', g.key, g.label, g.docs.length) + (isGroupFolded('docs', g.key) ? '' : g.docs.map(row).join(''))).join('')
+        || (docsList.length ? '<li class="empty-state">No topic matches the search.</li>' : '');
+    syncPaneGroupToggle('docs');
+    refreshGroupTable('docs');
 }
 
 /** Say which topic is showing, politely (the text changes under a reader without a word otherwise, #6586). */
@@ -108,31 +154,30 @@ function docNotFound() {
     if (currentRoute()?.view === 'docs') note({ view: 'docs' }, { replace: true });
 }
 
-/** The doc to show: the named one if the list has it, else README, else the first. */
-function startDoc(name) {
-    return (name && docsList.find(d => d.name === name)) || docsList.find(d => d.name === 'README') || docsList[0];
-}
-
-/** Show the doc a /docs[/<name>] page names (the router already wrote the page). */
+/** Show the doc a /docs[/<name>] page names (the router already wrote the page); /docs alone is the tab's own page. */
 export function openDoc(name) {
     if (!docsList.length) { wantedDoc = name; return; } // loading (showDocsTab): it opens this one
-    const doc = startDoc(name);
-    if (name && doc && doc.name !== name) docNotFound();
-    if (doc && doc.name !== selectedDoc) selectDoc(doc.name, { noteRoute: false });
+    const doc = name && docsList.find(d => d.name === name);
+    if (name && !doc) docNotFound();
+    if (doc) { if (doc.name !== selectedDoc) selectDoc(doc.name, { noteRoute: false }); return; }
+    if (!selectedDoc && !isPhoneLayout()) openFirstGroupTable('docs');
 }
 
 export async function selectDoc(name, { noteRoute = true, focusHeading = false } = {}) {
-    const acted = focusHeading || !!document.activeElement?.closest?.('#docs-content, .docs-topics-dialog'); // a person chose this page from a link or the topics sheet: they are told where they landed (#7162); the sidebar's list keeps the focus on the topic (docs_a11y)
+    const acted = focusHeading || isPhoneLayout() || !!document.activeElement?.closest?.('#docs-content'); // a person chose this page from a link, or on a phone from the list that is gone once it opens: they are told where they landed (#7162); a wide screen's sidebar keeps its focus
     selectedDoc = name;
     const hadFocus = !!document.activeElement?.closest?.('#docs-nav-list'); // the list is drawn again: focus goes back to the topic that was opened
+    showView('docs-view'); // a group's table may be on screen: the document is the page now
     renderDocNav();
     if (hadFocus) [...document.querySelectorAll('#docs-nav-list [data-doc]')].find(e => e.dataset.doc === name)?.focus({ preventScroll: true });
+    setBackLink('docs-back', 'docs', groupOfDoc(name)); // "← Getting started": the way back to its group's table
+    syncPhonePage();
     if (noteRoute && currentRoute()?.view === 'docs') note({ view: 'docs', id: name });
 
     const content = document.getElementById('docs-content');
     if (!content) return;
 
-    content.innerHTML = '<div class="docs-empty"><span class="material-icons" style="font-size:1.5rem;animation:spin 1s linear infinite" aria-hidden="true">refresh</span></div>';
+    content.innerHTML = emptyHtml('Loading\u2026');
 
     const doc = await fetchDocContent(name);
     if (!doc || !doc.content) {
@@ -143,7 +188,7 @@ export async function selectDoc(name, { noteRoute = true, focusHeading = false }
     // Markdown through the dashboard's shared sanitizer and link policy (#3622 F4): a doc link is a
     // router link, a web link opens a new tab, anything else is text.
     const shown = docsList.find(d => d.name === name);
-    sayDocs(`Showing ${shown ? shown.title : name}`);
+    sayDocs(`Showing ${shown ? titleOf(shown) : name}`);
     const html = renderDocsMarkdown(doc.content);
     if (html !== null) {
         content.innerHTML = html;
@@ -169,7 +214,7 @@ export async function copyDocsLine() {
     else showToast('Could not copy: select the text in the hint and copy it', true);
 }
 
-// ── Tables and topics on a phone (#7162) ───────────────────────────────
+// ── Tables on a phone (#7162) ──────────────────────────────────────────
 
 /** Each table sits in a labelled, focusable scroll region (a keyboard reaches what overflows) with a visible line that says it scrolls sideways, drawn only while it does. */
 function wrapTables(content) {
@@ -186,39 +231,26 @@ function wrapTables(content) {
     });
 }
 
-/** The topics as a sheet, for a phone (the sidebar's list is not on screen there): a button per topic; the open one says so. */
-export function openTopics() {
-    if (!docsList.length) return;
-    const dlg = document.createElement('dialog'); dlg.className = 'docs-topics-dialog'; dlg.setAttribute('aria-labelledby', 'docs-topics-title');
-    const title = document.createElement('h3'); title.id = 'docs-topics-title'; title.textContent = 'Topics';
-    const ul = document.createElement('ul'); ul.className = 'docs-topics-list';
-    for (const d of docsList) {
-        const li = document.createElement('li');
-        const b = document.createElement('button'); b.type = 'button'; b.className = 'btn docs-topic'; b.textContent = d.title || d.name;
-        if (d.name === selectedDoc) b.setAttribute('aria-current', 'true');
-        b.addEventListener('click', () => { dlg.dataset.picked = '1'; dlg.close(); selectDoc(d.name, { focusHeading: true }); });
-        li.append(b); ul.append(li);
-    }
-    const close = document.createElement('button'); close.type = 'button'; close.className = 'btn'; close.textContent = 'Close'; close.addEventListener('click', () => dlg.close());
-    dlg.append(title, ul, close); document.body.append(dlg);
-    dlg.addEventListener('close', () => { const picked = dlg.dataset.picked === '1'; dlg.remove(); if (!picked) document.getElementById('docs-topics-btn')?.focus(); }); // a topic chosen: the new page's heading has the focus, not this button
-    dlg.showModal();
-    (ul.querySelector('[aria-current]') || ul.querySelector('button'))?.focus();
-}
-
 // ── Helpers ────────────────────────────────────────────────────────────
 
 // A doc in the Docs list (#3645).
 registerActions({
     'doc-open': el => { const d = textOf(el.dataset.doc, 200); if (d) window.selectDoc(d); },
     'doc-open-key': (el, event) => {
-        if (event.target === el && ['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) { // between the topics: the one Tab stop goes with the focus
+        if (event.target === el && ['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) { // between the topics: the one Tab stop goes with the focus (Enter and Space press the button itself)
             const all = [...document.querySelectorAll('#docs-nav-list [data-doc]')], at = all.indexOf(el);
             const to = event.key === 'Home' ? 0 : event.key === 'End' ? all.length - 1 : event.key === 'ArrowDown' ? (at + 1) % all.length : (at + all.length - 1) % all.length;
             event.preventDefault();
             all.forEach((e, i) => { e.tabIndex = i === to ? 0 : -1; });
             all[to].focus();
-            return;
         }
-        if (event.target !== el || (event.key !== 'Enter' && event.key !== ' ')) return; event.preventDefault(); const d = textOf(el.dataset.doc, 200); if (d) window.selectDoc(d); },
+    },
 });
+
+/** A phone's way from the open document back to the list of topics. */
+export function docsPhoneBack() {
+    selectedDoc = null;
+    syncPhonePage();
+    renderDocNav();
+    document.querySelector('#docs-nav-list .row-btn')?.focus({ preventScroll: true });
+}

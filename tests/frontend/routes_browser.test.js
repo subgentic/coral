@@ -117,7 +117,7 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         await open('/docs/hooks');
         await until(`${activeDoc} === ${JSON.stringify(hooks.title)}`, 'the hooks doc');
         check('/docs/hooks opens hooks (not README)', (await ev(activeDoc)) === hooks.title && (await url()) === '/docs/hooks', await ev(activeDoc));
-        await ev(`[...document.querySelectorAll('#docs-nav-list li')].find(li => li.textContent.trim() === ${JSON.stringify(readme.title)}).click(); true`);
+        await ev(`[...document.querySelectorAll('#docs-nav-list .row-btn')].find(b => b.textContent.trim() === ${JSON.stringify(readme.title)}).click(); true`);
         await atUrl('/docs/README');
         check('choosing README is /docs/README', (await url()) === '/docs/README', await url());
         await ev('history.back(); true');

@@ -318,7 +318,7 @@ export const SIDEBAR_PANES = {
     agents: { search: 'Search agents', action: { name: 'launch-show', label: 'New agent' } },
     history: { search: 'Search chats', action: null },
     jobs: { search: 'Search jobs', action: { name: 'job-new', label: 'New job' } },
-    docs: { search: null, action: null },
+    docs: { search: 'Search docs', action: null },
 };
 
 const RAIL_KEY = 'coral-sidebar-collapsed-rail'; // the Agents tab's (its name from before the other tabs had one)

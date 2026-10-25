@@ -5,7 +5,7 @@
  * this (a team's name opens the team, its chevron folds: group_cards.js); this is the same header for the tabs that have groups of their own (Chats by day, Jobs by state).
  *
  * A tab registers a source: { keys(): the group keys as drawn, redraw(): draws the list again, table(key): { title, columns, rows }, isEmpty(): whether the tab's centre is
- * its empty page, showList() and empty(): back to the tab's own page }. A row is { title, action: the delegated action the first cell's button names, data: the data-* values it carries (name: value),
+ * its empty page, showList() and empty(): back to the tab's own page }. A table may also carry { extra: { action, label, icon, title } }, one action button in its head. A row is { title, action: the delegated action the first cell's button names, data: the data-* values it carries (name: value),
  * cells: the other cells as text }. */
 import { browserLocal } from './safe_storage.js';
 import { escapeHtml, escapeAttr, showView } from './utils.js';
@@ -75,7 +75,14 @@ let open = null;     // { kind, key }: the table on screen
 const dash = '<span aria-label="none">&mdash;</span>';
 
 /** The actions a row's button may name, each as the literal attribute: a source names one of these, never its own text. */
-const ROW_ACTION_ATTR = { 'history-open': 'data-on-click="history-open"', 'board-open': 'data-on-click="board-open"', 'job-select': 'data-on-click="job-select"' };
+const ROW_ACTION_ATTR = { 'history-open': 'data-on-click="history-open"', 'board-open': 'data-on-click="board-open"', 'job-select': 'data-on-click="job-select"', 'doc-open': 'data-on-click="doc-open"' };
+
+/** The one action a table may carry in its head (Docs: "Copy docs line for agents"), as the literal attribute: a source names one of these. */
+const EXTRA_ACTION_ATTR = { 'docs-copy-agent-line': 'data-on-click="docs-copy-agent-line"' };
+function extraHtml(x) {
+    if (!x || !EXTRA_ACTION_ATTR[x.action]) return '';
+    return `<button type="button" class="btn btn-small group-table-extra" ${EXTRA_ACTION_ATTR[x.action]} title="${escapeAttr(x.title || '')}"><span class="material-icons" aria-hidden="true">${escapeHtml(x.icon || '')}</span> ${escapeHtml(x.label)}</button>`;
+}
 
 /** The data-* attributes of a row's button, from the names the source wrote and the values it was given. */
 function dataAttrs(data) { return Object.entries(data || {}).map(([k, v]) => `data-${escapeAttr(k)}="${escapeAttr(v)}"`).join(' '); }
@@ -84,7 +91,7 @@ function tableHtml(t, kind, key) {
     const head = t.columns.map(c => `<th scope="col">${escapeHtml(c)}</th>`).join('');
     const rows = t.rows.map(r => `<tr><td><button type="button" class="group-table-link" ${ROW_ACTION_ATTR[r.action] || ''} ${dataAttrs(r.data)}>${escapeHtml(r.title)}</button></td>`
         + r.cells.map(c => `<td>${c ? escapeHtml(c) : dash}</td>`).join('') + '</tr>').join('');
-    return `<div class="group-table-head"><h2 id="group-table-title" tabindex="-1">${escapeHtml(t.title)}</h2><span class="session-group-count">${t.rows.length}</span></div>`
+    return `<div class="group-table-head"><h2 id="group-table-title" tabindex="-1">${escapeHtml(t.title)}</h2><span class="session-group-count">${t.rows.length}</span>${extraHtml(t.extra)}</div>`
         + `<div class="group-table-scroll"><table class="group-table" aria-labelledby="group-table-title"><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 

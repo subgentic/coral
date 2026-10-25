@@ -66,7 +66,7 @@ const MODULES = ['workflows.js', 'cost_dashboard.js', 'docs.js', 'theme_config.j
         console.log('   ✓ 0 requests for the 6 modules; stubs in place');
 
         console.log('2. Each panel loads once on first use; stubs become the real functions');
-        for (const [tab, mod, view] of [['workflows', 'workflows.js', 'workflows-view'], ['docs', 'docs.js', 'docs-view'], ['tokens', 'cost_dashboard.js', 'cost-dashboard-view']]) {
+        for (const [tab, mod, view] of [['workflows', 'workflows.js', 'workflows-view'], ['docs', 'docs.js', 'group-table-view'], ['tokens', 'cost_dashboard.js', 'cost-dashboard-view']]) {
             const stubBefore = await ev(`String(window[${JSON.stringify({ workflows: 'showWorkflowsTab', docs: 'showDocsTab', tokens: 'showCostDashboard' }[tab])}])`);
             await ev(`window.switchNavTab(${JSON.stringify(tab)}); true`);
             await waitFor(`(() => { const v = document.getElementById(${JSON.stringify(view)}); return !!v && getComputedStyle(v).display !== 'none'; })()`, `${view} after switching to ${tab}`, 8000);
@@ -118,7 +118,7 @@ const MODULES = ['workflows.js', 'cost_dashboard.js', 'docs.js', 'theme_config.j
         assert.equal(await visible('docs-view'), false, 'no Docs view after a failed load');
         await ev(`window.switchNavTab('agents'); true`); await sleep(100);
         await ev(`window.switchNavTab('docs'); true`);
-        await waitFor(`(() => { const v = document.getElementById('docs-view'); return !!v && getComputedStyle(v).display !== 'none'; })()`, 'Docs after the retry', 8000);
+        await waitFor(`(() => { const v = document.getElementById('group-table-view'); return !!v && getComputedStyle(v).display !== 'none'; })()`, 'Docs after the retry', 8000);
         assert.ok(seen.includes('docs.js?retry=1'), `the retry imported docs.js?retry=1 (${JSON.stringify(seen.filter(x => x.startsWith('docs')))})`);
         // A failed panel opened through an inline-handler stub retries the same way.
         plan['theme_config.js'] = 'fail';

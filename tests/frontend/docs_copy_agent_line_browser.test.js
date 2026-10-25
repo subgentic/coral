@@ -26,7 +26,7 @@ const LINE = "Coral's docs for agents: run `coral-agent docs` to list the topics
 
         for (const [label, w, h, mobile] of [['1. Desktop', 1280, 900, false], ['2. Phone', 390, 844, true]]) {
             console.log(`${label}: one click copies the exact line and says Copied`);
-            await load('/docs', w, h, mobile);
+            await load('/docs/README', w, h, mobile);
             await stubClipboard(true);
             const before = await ev(`({ text: document.getElementById('docs-copy-agent-line').textContent.replace(/\\s+/g, ' ').trim(), vw: innerWidth, page: document.documentElement.scrollWidth - innerWidth,
                 box: (r => ({ l: r.left, r: r.right, h: r.height }))(document.getElementById('docs-copy-agent-line').getBoundingClientRect()) })`);
@@ -48,14 +48,14 @@ const LINE = "Coral's docs for agents: run `coral-agent docs` to list the topics
         }
 
         console.log('3. A keyboard press copies it too (a real button, in the tab order)');
-        await load('/docs', 1280, 900, false);
+        await load('/docs/README', 1280, 900, false);
         await stubClipboard(true);
         const kb = await ev(`(() => { const b = document.getElementById('docs-copy-agent-line'); return { tag: b.tagName, type: b.type, tab: b.tabIndex, disabled: b.disabled }; })()`);
         assert.deepEqual(kb, { tag: 'BUTTON', type: 'button', tab: 0, disabled: false });
         console.log('   ✓');
 
         console.log('4. When the clipboard refuses, the toast does not claim a copy');
-        await load('/docs', 1280, 900, false);
+        await load('/docs/README', 1280, 900, false);
         await ev(`window.__copied = []; Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: () => Promise.reject(new Error('refused')) } }); document.execCommand = () => false; true`);
         await ev(`document.getElementById('docs-copy-agent-line').click(); true`);
         await waitFor(`[...document.querySelectorAll('.toast .toast-message')].some(t => /Could not copy/.test(t.textContent))`, 'the failure toast', 5000);

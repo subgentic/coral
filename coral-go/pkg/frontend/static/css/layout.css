@@ -210,6 +210,7 @@
     background: var(--bg-secondary);
     border-right: none;
     overflow-y: auto;
+    scrollbar-gutter: stable; /* a list that scrolls does not move the header's parts left of where a short one has them (#7443) */
     /* The pinned New Agent footer covers the bottom of the scroll area: a row the keyboard focuses at that edge is scrolled clear of it (#6159). */
     scroll-padding-bottom: 5rem;
     display: flex;
@@ -472,29 +473,6 @@ body.panel-dragging .sidebar {
     display: none;
 }
 
-.sidebar-section-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 12px 8px 12px;
-    cursor: pointer;
-    user-select: none;
-}
-
-.sidebar-section-header:hover {
-    background: rgba(var(--white-rgb), 0.02);
-}
-
-.sidebar-section-header h2 {
-    padding: 0;
-}
-
-.sidebar-section-title {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
 .section-count-badge {
     font-size: var(--fs-sm);
     font-weight: 600;
@@ -543,14 +521,6 @@ body.panel-dragging .sidebar {
     letter-spacing: normal;
     color: var(--text-secondary);
     padding: 0 16px 8px;
-}
-
-.sidebar-section .sidebar-section-header h2 {
-    font-size: 0.875rem;
-    text-transform: none;
-    letter-spacing: normal;
-    color: var(--text-primary);
-    padding: 0;
 }
 
 /* ── Advanced Filter Panel (in the Chats Display options, #7443) ─────────────────────────────────── */
@@ -941,6 +911,8 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .group-table-head { display: flex; align-items: center; gap: var(--space-md); margin-bottom: var(--space-xl); }
 .group-table-head h2 { margin: 0; font-size: 1.25rem; font-weight: 700; line-height: 1.3; color: var(--text-primary); } /* a group's table is titled at the page-title size, with its count (#7443) */
 .group-table-head .session-group-count { font-weight: 600; }
+.group-table-head .group-table-extra { display: inline-flex; align-items: center; gap: 6px; margin: 0 0 0 auto; }
+.group-table-head .group-table-extra .material-icons { font-size: 1rem; }
 /* One empty line on every tab: 14/400 in the primary colour, with an optional 12/400 hint under it; what to do is the sidebar's pinned action */
 .empty-pane { display: flex; flex-direction: column; gap: var(--space-xs); padding: var(--space-2xl); }
 .welcome > .empty-pane { margin: 0; align-self: stretch; }
@@ -958,6 +930,7 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .group-table-link:hover { color: var(--accent); text-decoration: underline; }
 .group-table-back { margin-bottom: var(--space-lg); }
 .group-back { display: inline-flex; align-items: center; align-self: flex-start; min-height: 32px; margin: 0 0 var(--space-xs); padding: 4px 0; border: 1px solid transparent; border-radius: var(--radius-md); background: none; color: var(--text-secondary); font: 500 var(--fs-md)/1.4 var(--font-sans); cursor: pointer; }
+.group-back[hidden] { display: none; }
 .group-back:hover { color: var(--text-primary); text-decoration: underline; }
 /* A group header of a tab's list: the name opens the table, so it reads as a link on hover */
 .session-list .sgroup-header { align-items: center; } /* the list's own rule starts the items at the top: a header's chevron sits level with its name */

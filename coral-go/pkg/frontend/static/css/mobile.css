@@ -1397,7 +1397,6 @@
     #mobile-jobs-list .sidebar-footer { position: static; padding: 12px; } /* in the page's flow: the page scrolls, not the column the footer is pinned in, so a pinned one would cover rows at large text */
     #mobile-jobs-list .sidebar-hide-btn, #mobile-history-list .sidebar-hide-btn { display: none; } /* the page is the whole screen: there is no column to hide (#7443) */
     #mobile-jobs-list .sidebar-section { padding: 12px 0; } /* the rows start where the page heading does (#6521) */
-    #mobile-jobs-list .sidebar-section-header { display: none; } /* the page already says "Jobs" */
     #mobile-jobs-list button, #mobile-jobs-list .session-list > li { min-height: 44px; }
     #mobile-jobs-list button { min-width: 44px; }
 }
@@ -1410,7 +1409,6 @@
     #chats-empty-view > .empty-pane { display: none; } /* the phone's list is the page */
     #mobile-history-list { display: block; width: 100%; margin: 0; min-height: 0; }
     #mobile-history-list .sidebar-section { padding: 16px 12px; }
-    #mobile-history-list .sidebar-section-header { padding: 0 0 12px; }
     #mobile-history-list input,
     #mobile-history-list select,
     #mobile-history-list button { min-height: 44px; }
