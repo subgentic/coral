@@ -1,5 +1,5 @@
 // Workflows on the shared sidebar (#7471, part 2 of one sidebar, UI/UX's audit c2596330): the pane has the header's parts in the same pixels as the other tabs (search "Search workflows", no Display
-// options, Expand or collapse all, Hide), the groups Active and Drafts (a workflow that is off), and "+ New workflow" pinned under the list; a group's name opens a table at 20/700 with its count and the columns
+// options, Expand or collapse all, Hide), the groups Active and Paused (a workflow that is switched off), and "+ New workflow" pinned under the list; a group's name opens a table at 20/700 with its count and the columns
 // Workflow, Steps, Last run, Result, Run (a Run button per row, named for its workflow) with Build with Agent in its head; a workflow's page has its link back, a 17/700 name, one facts line, Steps and Runs as tables,
 // and a bar pinned at the foot (More, Edit with Agent, Edit, Run as the primary); a run's page has its link back to the workflow and a bar (Re-run); with no workflow the page is one empty line with its hint and
 // Build with Agent; the search narrows the list; both themes and 200% text; a phone's list is the page and a workflow the screen after it. Drives Chrome over CDP through agent_view_harness.js, stubbed API.
@@ -33,6 +33,7 @@ const STUB = `(() => { const real = window.fetch; const J = b => Promise.resolve
         const one = /\\/api\\/workflows\\/(\\d+)$/.exec(s);
         if (get && one) return J(${JSON.stringify(WFS)}.find(w => w.id === Number(one[1])));
         if (get && /\\/api\\/workflows$/.test(s)) return J({ workflows: window.__wfEmpty ? [] : ${JSON.stringify(WFS)} });
+        if (!get && /\\/api\\/workflows\\/1\\/trigger$/.test(s)) return new Promise(r => setTimeout(() => r(new Response(JSON.stringify({ run_id: 2 }), { status: 200, headers: { 'Content-Type': 'application/json' } })), 500));
         return real(u, o); }; })();`;
 
 (async () => {
@@ -61,7 +62,7 @@ const STUB = `(() => { const real = window.fetch; const J = b => Promise.resolve
 
             await openTab('workflows');
             await waitFor(`document.querySelectorAll('${pane('workflows')} .sgroup-header').length === 2 && document.querySelectorAll('${pane('workflows')} li .row-btn').length === 3`, at + 'the groups and the workflows', 10000);
-            assert.deepEqual(await ev(`[...document.querySelectorAll('${pane('workflows')} .sgroup-header .group-name-text')].map(e => e.textContent)`), ['Active', 'Drafts'], at + 'Active and Drafts');
+            assert.deepEqual(await ev(`[...document.querySelectorAll('${pane('workflows')} .sgroup-header .group-name-text')].map(e => e.textContent)`), ['Active', 'Paused'], at + 'Active and Paused');
             assert.deepEqual(await ev(`[...document.querySelectorAll('${pane('workflows')} .sgroup-header .session-group-count')].map(e => e.textContent)`), ['2', '1'], at + 'with their counts');
             assert.equal(await ev(`document.querySelector('${pane('workflows')} .sidebar-search-input').getAttribute('aria-label')`), 'Search workflows', at + 'the search is named for the tab');
             assert.equal(await ev(`!!document.querySelector('${pane('workflows')} [data-display-button]')`), false, at + 'no Display options');
@@ -109,12 +110,21 @@ const STUB = `(() => { const real = window.fetch; const J = b => Promise.resolve
             assert.deepEqual(await ev(`(() => { const t = getComputedStyle(document.querySelector('#group-table-title')), c = getComputedStyle(document.querySelector('#group-table-view .group-table-head .session-group-count')); return [t.fontSize, t.fontWeight, c.fontSize, c.fontWeight]; })()`), ['20px', '700', '11px', '600'], at + 'the title is 20/700, its count 11/600');
             assert.match(await ev(`document.querySelector('#group-table-view .group-table-head .group-table-extra').textContent`), /Build with Agent/, at + 'Build with Agent is in the table head');
             assert.deepEqual(await ev(`(${ON_SCALE})(document.getElementById('group-table-view'), ${SCALE})`), [], at + 'every text of the table is on the scale');
+            assert.equal(await ev(`(() => { const sc = document.querySelector('#group-table-view .group-table-scroll'); return document.documentElement.scrollWidth <= document.documentElement.clientWidth && sc.scrollWidth <= sc.clientWidth + 1; })()`), true, at + 'the table fits the page with no sideways scroll');
             await shot(`workflows-one-table-${w}`);
 
-            // Drafts opens its own table; the title does not move
+            // Run in the table: the button says Starting\u2026 and is off until the run exists, then a line says Started <name> and the run's page is open
+            await ev(`document.querySelector('#group-table-view tbody .group-table-cell-btn').click(); true`);
+            assert.deepEqual(await ev(`(() => { const b = document.querySelector('#group-table-view tbody .group-table-cell-btn'); return [b.textContent.trim(), b.disabled]; })()`), ['Starting\u2026', true], at + 'Run reads Starting\u2026 and is disabled while the run is being made');
+            await waitFor(`!!document.querySelector('#wf-run-detail .wf-run-title')`, at + "the run's page", 8000);
+            assert.equal(await ev(`document.getElementById('wf-status').textContent`), 'Started nightly-build', at + 'a status line says what started');
+            assert.equal(await ev(`(document.querySelector('#wf-run-detail .wf-started-line') || {}).textContent`), 'Started nightly-build', at + "and the run's page shows it");
+            await ev(`window.workflowsBackToList(); true`);
+            await waitFor(`document.getElementById('group-table-view').checkVisibility() && document.querySelector('#group-table-title').textContent === 'Active'`, at + 'back on the table', 8000);
+            // Paused opens its own table; the title does not move
             const t1 = await rect('#group-table-title');
-            await ev(`document.querySelector('${pane('workflows')} .sgroup-header[data-group-name="workflows:wf-drafts"]').click(); true`);
-            await waitFor(`document.querySelector('#group-table-title').textContent === 'Drafts'`, at + 'Drafts opens its table', 8000);
+            await ev(`document.querySelector('${pane('workflows')} .sgroup-header[data-group-name="workflows:wf-paused"]').click(); true`);
+            await waitFor(`document.querySelector('#group-table-title').textContent === 'Paused'`, at + 'Paused opens its table', 8000);
             const t2 = await rect('#group-table-title');
             assert.deepEqual([t2[0], t2[1], t2[3]], [t1[0], t1[1], t1[3]], at + 'the title does not move from group to group');
 

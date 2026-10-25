@@ -22,8 +22,8 @@ let editingWorkflowId = null; // non-null when editing
 let shownRun = null; // the run renderRunDetail last drew, for the Kill confirmation's wording
 let wfQuery = '';    // the sidebar search's text, lower case
 
-// ── Groups (#7471): Active and Drafts (a workflow that is off) ─────────
-const WF_GROUPS = [{ key: 'active', label: 'Active', has: w => w.enabled }, { key: 'wf-drafts', label: 'Drafts', has: w => !w.enabled }];
+// ── Groups (#7471): Active and Paused (a workflow that is switched off: it is finished, not a draft) ─────────
+const WF_GROUPS = [{ key: 'active', label: 'Active', has: w => w.enabled }, { key: 'wf-paused', label: 'Paused', has: w => !w.enabled }];
 const stepsOf = w => w.step_count || (w.steps ? w.steps.length : 0);
 const wfMatches = w => !wfQuery || String(w.name || '').toLowerCase().includes(wfQuery) || String(w.description || '').toLowerCase().includes(wfQuery);
 const wfGroups = () => WF_GROUPS.map(g => ({ ...g, items: workflows.filter(wfMatches).filter(g.has) })).filter(g => g.items.length);
@@ -562,6 +562,7 @@ function renderRunDetail(run) {
         ${backHtml}
         <button type="button" class="group-back wf-phone-back" data-on-click="wf-phone-back">&larr; Back to the list</button>
         <h2 class="wf-item-title wf-run-title">Run #${run.id}</h2>
+        ${startedNote && startedNote.runId === Number(run.id) ? `<p class="item-meta wf-started-line">${esc(startedNote.text)}</p>` : ''}
         <div class="wf-run-meta">
             <span><span class="wf-status-badge ${esc(run.status)}">${esc(run.status)}</span></span>
             <span><span class="material-icons" aria-hidden="true">bolt</span> ${esc(run.trigger_type || 'api')}</span>
@@ -589,20 +590,32 @@ function renderRunDetail(run) {
 
 // ── Trigger ────────────────────────────────────────────────────────────
 
-export async function triggerWorkflow(id) {
+export async function triggerWorkflow(id, btn) {
+    // The button says it is working and is off until the run exists (a second click would start a second run); a status line then says what started (#7471)
+    const idle = btn ? btn.innerHTML : '';
+    if (btn) { btn.disabled = true; btn.textContent = 'Starting\u2026'; }
     try {
         const result = await apiFetch(`/api/workflows/${id}/trigger`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ trigger_type: 'ui' }),
         });
-        showToast(`Workflow triggered — run #${result.run_id}`);
+        const wf = workflows.find(w => Number(w.id) === Number(id));
+        const name = wf ? wf.name : (shownRun && shownRun.workflow_name) || `workflow ${id}`;
+        startedNote = { runId: Number(result.run_id), text: `Started ${name}` };
+        sayStarted(startedNote.text);
+        showToast(`Workflow triggered \u2014 run #${result.run_id}`);
         // Navigate to the run detail
-        selectWorkflowRun(result.run_id);
+        await selectWorkflowRun(result.run_id);
     } catch (e) {
         showToast('Failed to trigger workflow: ' + e.message, true);
+    } finally {
+        if (btn && btn.isConnected) { btn.disabled = false; btn.innerHTML = idle; }
     }
 }
+
+let startedNote = null; // { runId, text }: "Started <name>", shown on the run's page it opened
+function sayStarted(text) { const s = document.getElementById('wf-status'); if (s) s.textContent = text; }
 
 // ── Kill ───────────────────────────────────────────────────────────────
 
@@ -909,7 +922,7 @@ document.addEventListener('focusin', e => { if (document.querySelector('.wf-more
 registerActions({
     'wf-select': el => withId(el.dataset.workflowId, selectWorkflow),
     'wf-run': el => withId(el.dataset.runId, selectWorkflowRun),
-    'wf-trigger': el => withId(el.dataset.workflowId, triggerWorkflow),
+    'wf-trigger': el => withId(el.dataset.workflowId, id => triggerWorkflow(id, el)),
     'wf-edit': el => withId(el.dataset.workflowId, editWorkflow),
     'wf-edit-agent': el => withId(el.dataset.workflowId, editWorkflowWithAgent),
     // Deleting still asks first (deleteWorkflow's confirmation dialog); the name is only shown in it.
