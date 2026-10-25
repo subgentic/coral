@@ -206,7 +206,7 @@ func agentLaunchNeedsMode(agentType string, flags []string, onBoard bool, userSe
 	return setreg.Enum(userSettings, "default_permission_mode") == ""
 }
 
-const agentLaunchNeedsModeMessage = "an agent's Codex launch with no permission mode asks first, and a Codex that asks first cannot reach Coral from its sandbox: ask the Operator to start it, or to set a default permission mode in Settings"
+const agentLaunchNeedsModeMessage = "an agent's Codex launch with no permission mode asks first, and a Codex that asks first cannot reach Coral from its sandbox: ask the Operator to start it (the Operator's launch gets Auto)"
 
 // agentLaunchInheritsSkippingDefault says whether an agent's launch of agentType would start in the Operator's saved default permission mode and that mode skips the prompts
 // (Auto, Don't ask, Bypass Permissions, and for Claude also Plan and Accept edits: SkipsPermissionPrompts reads the mode as the --permission-mode flag Coral translates per type).
