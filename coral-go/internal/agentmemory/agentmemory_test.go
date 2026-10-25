@@ -69,7 +69,7 @@ func TestClaudeFilesAreTheProjectsParentsUpToTheGitRootTheUsersAndTheMemoryNeare
 		"project/instructions/" + r.w(r.proj) + "/CLAUDE.md",
 		"parent/instructions/" + r.w(filepath.Join(r.repo, "pkg")) + "/CLAUDE.md",
 		"parent/instructions/" + r.w(r.repo) + "/CLAUDE.md",
-		"user/instructions/~/.claude/CLAUDE.md",
+		"user/instructions/" + filepath.Join("~", ".claude") + "/CLAUDE.md",
 		"project/memory/" + filepath.Join("~", ".claude", "projects", transcriptlink.ClaudeProjectDirName(r.proj), "memory") + "/MEMORY.md",
 		"project/memory/" + filepath.Join("~", ".claude", "projects", transcriptlink.ClaudeProjectDirName(r.proj), "memory") + "/alpha.md",
 		"project/memory/" + filepath.Join("~", ".claude", "projects", transcriptlink.ClaudeProjectDirName(r.proj), "memory") + "/zeta.md",
@@ -82,7 +82,7 @@ func TestACodexAgentSeesItsOwnNamesNotClaudes(t *testing.T) {
 	write(t, filepath.Join(r.proj, "AGENTS.md"), "codex's")
 	write(t, filepath.Join(r.home, ".codex", "AGENTS.md"), "user")
 	write(t, filepath.Join(r.home, ".claude", "CLAUDE.md"), "claude's user file")
-	assert.Equal(t, []string{"project/instructions/" + r.w(r.proj) + "/AGENTS.md", "user/instructions/~/.codex/AGENTS.md"}, names(Discover("codex", r.proj, r.repo, r.home)))
+	assert.Equal(t, []string{"project/instructions/" + r.w(r.proj) + "/AGENTS.md", "user/instructions/" + filepath.Join("~", ".codex") + "/AGENTS.md"}, names(Discover("codex", r.proj, r.repo, r.home)))
 	assert.Equal(t, []string{"project/instructions/" + r.w(r.proj) + "/AGENTS.md", "project/instructions/" + r.w(r.proj) + "/CLAUDE.md"}, names(Discover("pi", r.proj, r.repo, r.home)), "Pi reads both")
 }
 
