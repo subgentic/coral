@@ -63,7 +63,7 @@ func SweepStaleTempFiles(dir string, opt TempSweep) []string {
 		}
 		path := filepath.Join(dir, e.Name())
 		info, err := os.Lstat(path)
-		if err != nil || !info.Mode().IsRegular() || !ownedByCurrentUser(info) || now().Sub(info.ModTime()) <= opt.MinAge {
+		if err != nil || !info.Mode().IsRegular() || !ownedByCurrentUser(path, info) || now().Sub(info.ModTime()) <= opt.MinAge {
 			continue
 		}
 		cands = append(cands, candidate{path, m[2]})
@@ -84,10 +84,10 @@ func SweepStaleTempFiles(dir string, opt TempSweep) []string {
 		}
 		// Checked again just before removing it: the same file, still a regular one of ours.
 		info, err := os.Lstat(c.path)
-		if err != nil || !info.Mode().IsRegular() || !ownedByCurrentUser(info) {
+		if err != nil || !info.Mode().IsRegular() || !ownedByCurrentUser(c.path, info) {
 			continue
 		}
-		if err := os.Remove(c.path); err != nil {
+		if err := removeOwnedFile(c.path); err != nil {
 			slog.Debug("launch temp file sweep: could not remove", "path", logsafe.Dir(c.path), "error", err)
 			continue
 		}

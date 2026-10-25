@@ -2,7 +2,6 @@ package startup
 
 import (
 	"context"
-	"errors"
 	"github.com/subgentic/coral/internal/logsafe"
 	"log"
 	"os"
@@ -104,7 +103,7 @@ func runningCommandLines(ctx context.Context) (string, error) {
 	var args []string
 	switch runtime.GOOS {
 	case "windows":
-		return "", errors.New("no process list on Windows")
+		return windowsCommandLines(ctx)
 	case "linux":
 		args = []string{"-e", "-ww", "-o", "args="} // procps
 	default:
