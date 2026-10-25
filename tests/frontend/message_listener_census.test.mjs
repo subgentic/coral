@@ -17,6 +17,7 @@ const WINDOW_LISTENERS = { 'agent_ui.js': 1, 'panel_sandbox.js': 1, 'view_sandbo
 const CHANNEL_LISTENERS = {
     'ownership.js': 1,      // BroadcastChannel between this browser's own tabs: the message is an ownership claim, never acted on without the tab's own checks
     'team_artifacts.js': 1, // BroadcastChannel: a 64-hex id of a deleted artifact, shape-checked, only used to forget it
+    'team_artifacts_page.js': 1, // BroadcastChannel (the team page's Artifacts tab, #7453): the same 64-hex id of a deleted artifact, shape-checked, only used to drop its row
     'websocket.js': 2,      // the live feed's WebSocket to the server (set, and cleared on the old socket): a message from this page's own connection, not a window message
     'xterm_renderer.js': 1, // the terminal's WebSocket to the server: the same
 };
