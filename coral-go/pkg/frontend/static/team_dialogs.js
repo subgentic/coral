@@ -742,7 +742,7 @@ async function launchTeam() {
         if (launchBtn) { launchBtn.disabled = false; launchBtn.textContent = 'Launch team'; }
     }
 }
-/** Open the launched team, and post the goal to its lead: the agent named Orchestrator, else the first member. The goal that could not be sent is left in the board's message box with a toast, to send again without launching the team twice. */
+/** Open the launched team, and post the goal to its lead: the agent named Orchestrator, else the first member. The goal that could not be sent is left in the message box of the team page's Messages tab with a toast, to send again without launching the team twice. */
 async function _openLaunchedTeam(server, boardName, goal, agents, seen, boardSettings = null) {
     const key = identityKey(server, boardName);
     const lead = (agents.find(a => isOrchestrator(a.name)) || agents[0]).name;
@@ -764,11 +764,11 @@ async function _openLaunchedTeam(server, boardName, goal, agents, seen, boardSet
     try {
         await loadLiveSessions();
         const { openTeamPage } = await importOnce('./team_page.js');
-        await openTeamPage(key);
+        await openTeamPage(key, { tab: 'messages' }); // the team opens on its board, where the first task was sent (or waits to be)
     } catch { /* the toast and the row are still there */ }
-    const input = document.getElementById('board-panel-input');
+    const input = document.getElementById('mb-post-input');
     if (!sent) {
-        if (input && !input.value) input.value = content;
+        if (input && !input.value) { input.value = content; input.dispatchEvent(new Event('input', { bubbles: true })); }
         showToast('The team started, but the first task was not sent. It is in the message box: press Send to try again.', true);
     }
     if (!goal || !sent) input?.focus();

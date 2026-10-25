@@ -126,7 +126,7 @@ const BASE = require('./test_base').BASE;
         await waitFor(`window.__posts.length === 1`, 'the post that fails');
         assert.equal(await ev(`window.__posts[0].path`), '/api/board/crew-1-2/messages', 'the first task goes to the id the server made ("Create another" on a name in use), not the label typed');
         await waitFor(`[...document.querySelectorAll('.toast')].some(t => /first task was not sent/.test(t.textContent))`, 'the toast that says so');
-        await waitFor(`document.getElementById('board-panel-input')?.value === '@Orchestrator Try again.'`, 'the draft in the message box');
+        await waitFor(`document.getElementById('mb-post-input')?.value === '@Orchestrator Try again.' && !!document.getElementById('mb-post-input').closest('#team-panel-messages')`, 'the draft in the message box of the team page');
         assert.equal(await ev(`T.state.selectedTeam`), 'crew-1-2', 'and the team that opens is that board');
         await ev(`window.__postStatus = 200; window.__launchAnswer = { status: 200, body: { agents: [{ name: 'A', session_id: 's' }] } }; true`);
         await openTeam();
