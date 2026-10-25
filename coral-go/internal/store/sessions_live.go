@@ -204,7 +204,7 @@ func (s *SessionStore) GetAllLiveSessions(ctx context.Context) ([]LiveSession, e
 	var sessions []LiveSession
 	err := s.reader().SelectContext(ctx, &sessions,
 		`SELECT session_id, agent_type, agent_name, working_dir, display_name,
-		 resume_from_id, flags, is_job, prompt, board_name, board_server, backend, icon, name_color, is_sleeping, is_archived, sleep_reason, board_type, capabilities, model, thinking, observed_model, context_window, tools, pid, worktree_path, worktree_repo, team_id, created_at, stopped_at, permission_mode
+		 resume_from_id, flags, is_job, prompt, board_name, board_server, backend, icon, name_color, is_sleeping, is_archived, sleep_reason, start_failure, launched_at, board_type, capabilities, model, thinking, observed_model, context_window, tools, pid, worktree_path, worktree_repo, team_id, created_at, stopped_at, permission_mode
 		 FROM live_sessions WHERE status = 'active' ORDER BY created_at, rowid`)
 	return sessions, err
 }
@@ -335,7 +335,7 @@ func (s *SessionStore) GetLiveSession(ctx context.Context, sessionID string) (*L
 	var ls LiveSession
 	err := s.reader().GetContext(ctx, &ls,
 		`SELECT session_id, agent_type, agent_name, working_dir, display_name,
-		 resume_from_id, flags, is_job, prompt, board_name, board_server, backend, icon, name_color, is_sleeping, is_archived, sleep_reason, board_type, git_diff_mode, capabilities, model, thinking, observed_model, context_window, tools, pid, worktree_path, worktree_repo, team_id, created_at, stopped_at, status, permission_mode
+		 resume_from_id, flags, is_job, prompt, board_name, board_server, backend, icon, name_color, is_sleeping, is_archived, sleep_reason, start_failure, launched_at, board_type, git_diff_mode, capabilities, model, thinking, observed_model, context_window, tools, pid, worktree_path, worktree_repo, team_id, created_at, stopped_at, status, permission_mode
 		 FROM live_sessions WHERE session_id = ?`, sessionID)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -599,9 +599,13 @@ const SleepReasonTerminalGone = "terminal_gone"
 // (#6058). The dashboard says "Ended" and offers Restart, not a plain "Sleeping". Waking clears it.
 const SleepReasonAgentExited = "agent_exited"
 
-// SleepReasonCLIMissing: a start of the agent (a wake, a restart, a resume, or the launch line a shell could not run) was refused because its CLI is missing or cannot be run (#353).
-// The dashboard says "Failed to start" and why, in the row, the header and the composer. Waking it successfully, or starting it again, clears it like any sleep reason.
-const SleepReasonCLIMissing = "cli_missing"
+// Why the last start of an agent was refused (#353), in the field start_failure and never in the sleep reason: an agent Coral stopped (coral_stopped) still auto-wakes at the next
+// start once the CLI is fixed. The dashboard says "Failed to start" and the reason's sentence; a wake clears it.
+const (
+	StartFailureCLIMissing     = "cli_missing"         // the CLI is on neither PATH nor a common place
+	StartFailureUntrustedMount = "cli_untrusted_mount" // Windows will not open a folder on PATH or the CLI's own (#340)
+	StartFailureCLIPath        = "cli_path_unusable"   // the configured Settings > CLI paths entry can't be run (#115)
+)
 
 // SleepReasonCoralStopped: the agent was running when a pty Coral stopped (cleanly, or a crash
 // found at the next start), so Coral may wake it again at its next start (#3636). Only Coral's
@@ -624,7 +628,7 @@ func (s *SessionStore) setSessionSleeping(ctx context.Context, sessionID string,
 	args := []any{reason, sessionID}
 	code := AutoAcceptAgentSlept
 	if !sleeping {
-		query = "UPDATE live_sessions SET is_sleeping = 0, is_archived = 0, sleep_reason = NULL WHERE session_id = ?"
+		query = "UPDATE live_sessions SET is_sleeping = 0, is_archived = 0, sleep_reason = NULL, start_failure = NULL WHERE session_id = ?"
 		args = []any{sessionID}
 		code = AutoAcceptAgentWoken
 	}
@@ -637,6 +641,18 @@ func (s *SessionStore) setSessionSleeping(ctx context.Context, sessionID string,
 		_, err := tx.ExecContext(ctx, query, args...)
 		return err
 	})
+}
+
+// SetStartFailure records why the last start of a session was refused (StartFailureCLIMissing); "" clears it. It touches nothing else: the sleep reason stays.
+func (s *SessionStore) SetStartFailure(ctx context.Context, sessionID, failure string) error {
+	_, err := s.db.ExecContext(ctx, "UPDATE live_sessions SET start_failure = NULLIF(?, '') WHERE session_id = ?", failure, sessionID)
+	return err
+}
+
+// StampLaunch records that Coral just typed the session's launch line (a wake reuses the row, so created_at is not it).
+func (s *SessionStore) StampLaunch(ctx context.Context, sessionID string) error {
+	_, err := s.db.ExecContext(ctx, "UPDATE live_sessions SET launched_at = ? WHERE session_id = ?", nowUTC(), sessionID)
+	return err
 }
 
 // SetSessionArchived archives a session (archived implies sleeping) or

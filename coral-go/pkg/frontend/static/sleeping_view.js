@@ -55,13 +55,13 @@ export function applySleepingView(sleeping, { manageInput = true, archived } = {
     // The agent by the name its row shows (its role or name), not its folder (#10439: "home stopped before answering"); a message it never answered stays in the chat, marked, and its Working clock stops.
     const who = (row && resolveSessionIdentity(row)) || (cur && (cur.display_name || cur.name)) || 'This agent';
     // Its start was refused for its CLI (#353): said with fixed words and the fix, as text.
-    const failedStart = isStartFailed({ sleeping, archived, sleep_reason: row && row.sleep_reason });
+    const failedStart = isStartFailed({ sleeping, archived, start_failure: row && row.start_failure });
     const endedText = `${who} has ended`;
     if (ended && cur && state.lastSendAt && state.lastSendAt.has(cur.session_id)) importOnce('./pending_messages.js').then(m => m.markUnanswered(cur.session_id)).catch(() => {});
     const hint = document.getElementById('sleeping-composer-hint');
     if (hint) { const words = ended ? 'Wake continues this conversation; Restart starts a fresh session with new settings.' : ''; if (hint.textContent !== words) hint.textContent = words; hint.hidden = !ended; }
     if (text) {
-        const next = archived ? 'This agent is archived' : gone ? "This agent's terminal is gone" : failedStart ? startFailedText(who, row.agent_type) : ended ? endedText : 'This agent is sleeping';
+        const next = archived ? 'This agent is archived' : failedStart ? startFailedText(who, row) : gone ? "This agent's terminal is gone" : ended ? endedText : 'This agent is sleeping';
         if (text.textContent !== next) text.textContent = next; // a status line: written only when it changes, so it is announced once
     }
     // What it asked before Coral restarted (#10368): its CLI is gone, so the words, with Restart (below) and Dismiss; written only when they change, so a status is announced once.

@@ -60,7 +60,9 @@ func TestReconciler_AgentWhoseShellCouldNotFindItsCLIIsMarkedFailedToStartAtOnce
 	ls, err := ss.GetLiveSession(ctx, testUUID)
 	require.NoError(t, err)
 	require.NotNil(t, ls.SleepReason)
-	assert.Equal(t, store.SleepReasonCLIMissing, *ls.SleepReason)
+	assert.Equal(t, store.SleepReasonAgentExited, *ls.SleepReason, "it ended")
+	require.NotNil(t, ls.StartFailure)
+	assert.Equal(t, store.StartFailureCLIMissing, *ls.StartFailure, "and why")
 	assert.Empty(t, rt.killed, "nothing is killed")
 	assert.Zero(t, rt.sends, "and nothing is typed into the terminal")
 }
@@ -111,5 +113,30 @@ func TestReconciler_TheSamePhraseLongAfterTheLaunchIsAnOrdinaryExitNotAFailedSta
 	ls, err := ss.GetLiveSession(ctx, testUUID)
 	require.NoError(t, err)
 	require.NotNil(t, ls.SleepReason)
-	assert.Equal(t, store.SleepReasonAgentExited, *ls.SleepReason, "not cli_missing")
+	assert.Equal(t, store.SleepReasonAgentExited, *ls.SleepReason)
+	assert.Nil(t, ls.StartFailure, "an ordinary exit is not a failed start")
+}
+
+// The window runs from the last launch line Coral typed, a wake's included: an old session whose wake passed the lookup but whose shell still can't find the CLI is caught; the same
+// session with no recent launch is not.
+func TestReconciler_AWakeWhoseShellCouldNotFindTheCLIIsCaughtByItsLaunchTime(t *testing.T) {
+	ss, rt, r := newMissingCLIFixture(t)
+	ctx := context.Background()
+	registerAwake(t, ss, "codex", testUUID)
+	rt.listed = []AgentInfo{{AgentType: "codex", SessionID: testUUID}}
+	name := FormatSessionName("codex", testUUID)
+	rt.set(name, "powershell")
+	rt.screens[name] = "The term 'codex' is not recognized as the name of a cmdlet, function, script file, or operable program."
+	r.now = func() time.Time { return time.Now().Add(3 * time.Hour) } // the row was created hours ago
+	r.reconcileOnce(ctx)
+	ls, _ := ss.GetLiveSession(ctx, testUUID)
+	assert.Nil(t, ls.StartFailure, "created hours ago and never launched since: the words are not the launch's")
+
+	require.NoError(t, ss.StampLaunch(ctx, testUUID)) // a wake typed its line just now
+	r.now = time.Now
+	r.reconcileOnce(ctx)
+	ls, err := ss.GetLiveSession(ctx, testUUID)
+	require.NoError(t, err)
+	require.NotNil(t, ls.StartFailure)
+	assert.Equal(t, store.StartFailureCLIMissing, *ls.StartFailure)
 }

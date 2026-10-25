@@ -5,10 +5,16 @@ import (
 	"strings"
 )
 
-// MissingCommandIn reports whether out holds a shell's "no such command" error for binary: PowerShell's ("The term 'codex' is not recognized as the name of a cmdlet,
-// function, script file, or operable program"), cmd's ("'codex' is not recognized as an internal or external command"), and the POSIX shells' ("codex: command not found",
-// "zsh: command not found: codex", "sh: 1: codex: not found"). It is the safety net under the CLI checks (#353): a launch line typed anyway leaves the shell's own error in
-// the pane. An error about another command does not count.
+// MissingCommandIn reports whether out holds a shell's "no such command" error for binary. It is the backup under the CLI checks (#353): the refusal before the launch line is typed is the
+// main guard, and this reads the error a typed line leaves in the pane. The wordings, with where each comes from:
+//   - Windows PowerShell 5.1: "The term 'codex' is not recognized as the name of a cmdlet, function, script file, or operable program."
+//   - PowerShell 7: "The term 'codex' is not recognized as a name of a cmdlet, function, script file, or executable program." (PowerShell's own DiscoveryExceptions.resx,
+//     https://github.com/PowerShell/PowerShell/blob/master/src/System.Management.Automation/resources/DiscoveryExceptions.resx, key CommandNotFoundException)
+//   - cmd: "'codex' is not recognized as an internal or external command, operable program or batch file."
+//   - POSIX shells: "bash: codex: command not found", "zsh: command not found: codex", "sh: 1: codex: not found".
+//
+// These are English: a Windows or a shell in another language words them differently and the backup does not match. A pane narrower than the sentence wraps it, so the PowerShell and cmd
+// phrases are matched on the text with its whitespace and line breaks collapsed. An error about another command does not count.
 func MissingCommandIn(out, binary string) bool {
 	b := strings.TrimSuffix(strings.ToLower(strings.TrimSpace(binary)), ".exe")
 	if b == "" || out == "" {
@@ -16,14 +22,20 @@ func MissingCommandIn(out, binary string) bool {
 	}
 	q := regexp.QuoteMeta(b)
 	name := `['"` + "`" + `]?` + q + `(?:\.(?:exe|cmd|bat|ps1))?['"` + "`" + `]?`
-	res := []*regexp.Regexp{
-		regexp.MustCompile(`the term ` + name + ` is not recognized as the name of a`),
-		regexp.MustCompile(`(?m)^\s*` + name + ` is not recognized as an internal or external command`),
+	low := strings.ToLower(out)
+	collapsed := strings.Join(strings.Fields(low), " ")
+	for _, re := range []*regexp.Regexp{
+		regexp.MustCompile(`the term ` + name + ` is not recognized as (?:the|a) name of a`),
+		regexp.MustCompile(`(?:^| )` + name + ` is not recognized as an internal or external command`),
+	} {
+		if re.MatchString(collapsed) {
+			return true
+		}
+	}
+	for _, re := range []*regexp.Regexp{
 		regexp.MustCompile(`(?m)^(?:[^\n:]*:\s*)*` + q + `: (?:command )?not found\s*$`),
 		regexp.MustCompile(`(?m)^[^\n]*command not found: ` + q + `\s*$`),
-	}
-	low := strings.ToLower(out)
-	for _, re := range res {
+	} {
 		if re.MatchString(low) {
 			return true
 		}

@@ -6,7 +6,7 @@ import { showToast } from './utils.js';
 import { serverFetch, sessionServer } from './server_base.js';
 import { responseError } from './server_status.js';
 import { reportSendError, noteHooksAnswered } from './terminal_gone.js';
-import { isStartFailed, startFailedFix } from './start_failed.js';
+import { isStartFailed, startFailedSentence } from './start_failed.js';
 import { announcePrompt, promptOptionsBySession, syncNeedsInputCard } from './needs_input_card.js';
 import { importOnce } from './import_once.js';
 import { noteOwnAnswer, answeredElsewhere } from './held_sends.js';
@@ -75,7 +75,7 @@ function emptyStateWords(session) {
     if (isStarting(row) && deriveSessionState(row) === "idle") return [`Waiting for ${cli} to start`, "Its first screen is not up yet. You can type below once it is."];
     switch (deriveSessionState(row)) {
         case 'sleeping': if (row.archived) return ["This agent is archived", ""]; // archived says archived only: the bar above has Unarchive; 'asleep, use Wake' is not what it is (#10784)
-            if (isStartFailed(row)) return ["This agent failed to start", startFailedFix(row.agent_type)];
+            if (isStartFailed(row)) return ["This agent failed to start", startFailedSentence(row).replace(/^failed to start: /, "")];
             return row.sleep_reason === 'agent_exited' ? ["This agent has ended", "Its CLI exited. Use Restart below to start it again."] : ["This agent is asleep", "Use Wake below to chat with it."];
         default: return ["Say hello to your agent", [worksIn(row), "Type below to start."].filter(Boolean).join(' ')];
     }

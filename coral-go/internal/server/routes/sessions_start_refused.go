@@ -20,50 +20,67 @@ import (
 // cliDisplayName is how a CLI is named to a person.
 var cliDisplayName = map[string]string{"claude": "Claude", "codex": "Codex", "pi": "Pi", "agy": "Antigravity", "gemini": "Antigravity"}
 
-// startRefusal is the fixed sentence for a refused start, from the agent's type alone: the CLI's name and its program's name, never a path, a setting's value or anything from the
-// environment. ok is false for an error that is not a missing or unusable CLI.
-func startRefusal(agentType string, err error) (sentence string, ok bool) {
+// startRefusal is the reason code of a refused start (store.StartFailure...): ok is false for an error that is not a missing or unusable CLI.
+func startRefusal(err error) (code string, ok bool) {
 	var nf *agent.CLINotFoundError
 	var um *agent.CLIUntrustedMountError
 	var cp *agent.CLIPathError
-	name := cliDisplayName[agentType]
-	if name == "" {
-		name = "The agent's"
+	switch {
+	case errors.As(err, &nf):
+		return store.StartFailureCLIMissing, true
+	case errors.As(err, &um):
+		return store.StartFailureUntrustedMount, true
+	case errors.As(err, &cp):
+		return store.StartFailureCLIPath, true
 	}
-	prog := "its program"
+	return "", false
+}
+
+// startFailureSentence is the one fixed sentence set for a reason code, from the agent's type alone: the CLI's display name and its program's name, never a path, a setting's value or
+// anything from the environment. The server puts it in the board line and in the live row (start_failure_text), and the page writes that text as it is (textContent), so the two cannot
+// drift. It begins with "failed to start" so the page can put the agent's name before it.
+func startFailureSentence(agentType, code string) string {
+	name := cliDisplayName[agentType]
+	prog := ""
 	if info := agent.GetCLIInfo(agentType); info != nil && info.Binary != "" {
 		prog = info.Binary
 		if runtime.GOOS == "windows" && !strings.Contains(prog, ".") {
 			prog += ".exe"
 		}
 	}
-	fix := "Set Settings > CLI paths > " + strings.TrimPrefix(name, "The agent's") + " to " + prog + "."
-	if name == "The agent's" {
-		fix = "Set its path in Settings > CLI paths."
+	fix := "Set its path in Settings > CLI paths."
+	if name != "" && prog != "" {
+		fix = "Set Settings > CLI paths > " + name + " to its " + prog + "."
 	}
-	switch {
-	case errors.As(err, &nf):
-		return "failed to start: the " + name + " CLI was not found. " + fix, true
-	case errors.As(err, &um):
-		return "failed to start: Windows will not open the folder the " + name + " CLI is in. " + fix, true
-	case errors.As(err, &cp):
-		return "failed to start: the " + name + " CLI path in Settings > CLI paths can't be run. Fix it or clear it.", true
+	cli := "agent's"
+	if name != "" {
+		cli = name
 	}
-	return "", false
+	switch code {
+	case store.StartFailureCLIMissing:
+		return "failed to start: the " + cli + " CLI was not found. " + fix
+	case store.StartFailureUntrustedMount:
+		return "failed to start: Windows will not open the folder the " + cli + " CLI is in. " + fix
+	case store.StartFailureCLIPath:
+		return "failed to start: the " + cli + " CLI path in Settings > CLI paths can't be run. " + fix + " Or clear it."
+	}
+	return ""
 }
 
-// markStartRefused marks a sleeping agent whose start was refused for its CLI, and posts one line to its board when it was not marked already (a retry of the same wake adds no line).
-// It changes nothing else: no relaunch, no kill, no setting, and nothing is typed into the terminal.
+// markStartRefused marks a sleeping agent whose start was refused for its CLI (the field start_failure, apart from the sleep reason: an agent Coral stopped still auto-wakes at the next start
+// once the CLI is fixed), and posts one line to its board when it was not marked already (a retry of the same wake, or the next start's auto-wake while the CLI is still missing, adds no
+// line). It changes nothing else: no relaunch, no kill, no setting, and nothing is typed into the terminal.
 func (h *SessionsHandler) markStartRefused(ctx context.Context, ls *store.LiveSession, err error) {
 	if ls == nil || h.ss == nil {
 		return
 	}
-	sentence, ok := startRefusal(ls.AgentType, err)
+	code, ok := startRefusal(err)
 	if !ok || ls.IsSleeping != 1 || ls.IsArchived == 1 {
 		return
 	}
-	already := ptr.Value(ls.SleepReason) == store.SleepReasonCLIMissing
-	if serr := h.ss.SetSessionSleepingFor(ctx, ls.SessionID, store.SleepReasonCLIMissing); serr != nil {
+	sentence := startFailureSentence(ls.AgentType, code)
+	already := ptr.Value(ls.StartFailure) == code
+	if serr := h.ss.SetStartFailure(ctx, ls.SessionID, code); serr != nil {
 		slog.Warn("could not mark an agent whose start was refused", "session_id", ls.SessionID, "error", serr)
 		return
 	}
