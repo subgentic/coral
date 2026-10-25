@@ -170,7 +170,7 @@ export async function sendCommand({ nudge = false } = {}) {
         addPendingMessage(sentSessionId, command, sentAt, { sending: true });
         input.value = "";
         const notSent = () => {
-            removePendingMessage(sentSessionId, sentAt);
+            removePendingMessage(sentSessionId, sentAt, { announce: false }); // each refusal below shows the error under the composer, which says why (#352)
             // The typed text only: the attachments stay attached until a send of them succeeds.
             if (!input.value && state.currentSession && state.currentSession.session_id === sentSessionId) input.value = textPart;
         };

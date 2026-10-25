@@ -225,8 +225,8 @@ export function confirmPendingMessage(sessionId, sentAt) {
     announceSend(sessionId, p.queued ? "Message queued" : "Message sent");
 }
 
-/** Withdraw the pending bubble of a send that was refused (its terminal was gone, #3218). */
-export function removePendingMessage(sessionId, sentAt) {
+/** Withdraw the pending bubble of a send that was refused (its terminal was gone, #3218). announce: false when the caller shows the error under the composer itself, which then says why. */
+export function removePendingMessage(sessionId, sentAt, { announce = true } = {}) {
     const list = pendingBySession.get(sessionId);
     const i = list ? list.findIndex(p => p.at === sentAt) : -1;
     if (i < 0) return;
@@ -238,8 +238,9 @@ export function removePendingMessage(sessionId, sentAt) {
         syncPendingBubbles(container, sessionId);
         syncWorkingIndicator(container, state.currentSession);
     }
-    // The error under the composer (an alert) says why, a moment after this: say it here only when that did not appear (one failure, one announcement, #6213).
-    setTimeout(() => { if (document.getElementById("composer-error")?.hidden !== false) announceSend(sessionId, "Message not sent, your text is back in the box"); }, 50);
+    // The error under the composer (an alert) says why, a moment after this: say it here only when that did not appear (one failure, one announcement, #6213). A caller that shows that error
+    // passes announce: false: the 50 ms look lost the race when the error came after reading the server's answer on a loaded machine, and the failure was said twice (#352).
+    if (announce) setTimeout(() => { if (document.getElementById("composer-error")?.hidden !== false) announceSend(sessionId, "Message not sent, your text is back in the box"); }, 50);
 }
 
 // An interrupt ends the current work; Claude Code then submits whatever was
