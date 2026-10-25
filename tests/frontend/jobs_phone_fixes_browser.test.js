@@ -45,7 +45,7 @@ const S = `(window.__coralStatic || '/static/')`;
             // a phone: a back row to the list
             if (mobile) {
                 const back = await ev(`(() => { const b = document.querySelector('#scheduler-detail .sched-back'); return b ? { shown: b.getClientRects().length > 0, text: b.textContent.trim(), h: Math.round(b.getBoundingClientRect().height) } : null; })()`);
-                assert.ok(back && back.shown && /Jobs/.test(back.text) && back.h >= 44, `${tag}: a "‹ Jobs" row, 44 px high, is on the job: ` + JSON.stringify(back));
+                assert.ok(back && back.shown && /Back to the list/.test(back.text) && back.h >= 44, `${tag}: a "Back to the list" row, 44 px high, is on the job: ` + JSON.stringify(back));
                 await ev(`document.querySelector('#scheduler-detail .sched-back').click(); true`); await sleep(500); // sleep-ok: the page scrolls back to the list
                 const list = await ev(`(() => { const r = document.getElementById('scheduled-jobs-list').getBoundingClientRect(); const a = document.activeElement; return { top: Math.round(r.top), inView: r.top >= -2 && r.top < innerHeight, focusInList: !!(a && a.closest && a.closest('#scheduled-jobs-list')) }; })()`);
                 assert.ok(list.inView && list.focusInList, `${tag}: the back row shows the list and focuses the open job: ` + JSON.stringify(list));

@@ -12,13 +12,25 @@
 }
 
 .history-title-row h2 {
-    font-size: 1rem;
-    font-weight: 600;
+    font-size: 1.0625rem; /* an item's page title: 17/700 (#7443) */
+    font-weight: 700;
 }
 
 .history-title-row .btn-small {
     margin: 0;
 }
+
+/* A chat's actions are its pinned bar at the foot of the page, the primary (Resume) last (#7443); the tag dropdown opens in it */
+#history-session-view > .item-bar {
+    position: static;
+    margin: 0;
+    padding: var(--space-lg) 20px;
+    flex-shrink: 0;
+    flex-wrap: wrap; /* one row of three buttons; at large text they wrap rather than run off the screen, and the open tag dropdown takes a row of its own */
+    align-content: flex-start;
+    background: var(--bg-secondary);
+}
+#history-session-view > .item-bar .tag-dropdown { flex: 1 0 100%; margin: 0 0 var(--space-md); }
 
 /* ── History Tabs ──────────────────────────────────────────── */
 
@@ -329,6 +341,7 @@
 .chat-search-target { outline:2px solid var(--accent-secondary); outline-offset:3px; }
 
 /* A named source for linked-computer history, including the phone sidebar. */
-.history-computer-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: var(--space-sm); color: var(--text-secondary); }
+.history-computer-row { display: flex; margin: 0; padding: var(--space-md) var(--space-lg); border-bottom: 1px solid var(--border); } /* its own full-width row directly under the header, so the header's icons keep their places: whose chats the list shows is not behind Display options (#7443) */
 .history-computer-row[hidden] { display: none; }
-.history-computer-row select { width: 100%; min-width: 0; min-height: 44px; color: var(--text-primary); background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.history-computer-row select { width: 100%; min-width: 0; height: 36px; padding: 0 var(--space-md); color: var(--text-primary); background: var(--bg-primary); border: 1px solid var(--control-border); border-radius: var(--radius-lg); font: inherit; font-size: 0.8125rem; }
+@media (pointer: coarse) { .history-computer-row select { height: 44px; } }

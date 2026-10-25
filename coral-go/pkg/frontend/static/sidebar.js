@@ -6,7 +6,7 @@ import { makeDraggable } from './draggable.js';
 import { browserLocal } from './safe_storage.js';
 import { dockKey, dockOpenByDefault, onDockPage } from './dock_page.js';
 import { machineState } from './launch_server.js';
-import { setText, setAttr } from './dom_write.js';
+import { setText, setAttr, setHidden, setTitle, setData } from './dom_write.js';
 
 export function initSidebarResize() {
     const handle = document.getElementById("sidebar-resize-handle");
@@ -340,19 +340,19 @@ export function showSidebarPane(tab) {
     const pane = SIDEBAR_PANES[tab] ? tab : null;
     currentPane = pane || currentPane;
     const layout = document.querySelector('.layout');
-    for (const el of document.querySelectorAll('.sidebar-pane[data-pane]')) el.hidden = el.dataset.pane !== pane;
+    for (const el of document.querySelectorAll('.sidebar-pane[data-pane]')) setHidden(el, el.dataset.pane !== pane);
     if (!pane || !layout) return;
-    if (layout.dataset.sidebarPane !== pane) layout.dataset.sidebarPane = pane;
+    setData(layout, 'sidebarPane', pane);
     const cfg = SIDEBAR_PANES[pane];
     const search = document.getElementById('sidebar-rail-search');
     if (search) {
-        search.hidden = !cfg.search;
-        if (cfg.search) { search.title = cfg.search; search.setAttribute('aria-label', cfg.search); }
+        setHidden(search, !cfg.search);
+        if (cfg.search) { setTitle(search, cfg.search); setAttr(search, 'aria-label', cfg.search); }
     }
     const add = document.getElementById('sidebar-rail-new');
     if (add) {
-        add.hidden = !cfg.action;
-        if (cfg.action) { add.title = cfg.action.label; add.setAttribute('aria-label', cfg.action.label); add.setAttribute('data-on-click', cfg.action.name); }
+        setHidden(add, !cfg.action);
+        if (cfg.action) { setTitle(add, cfg.action.label); setAttr(add, 'aria-label', cfg.action.label); setAttr(add, 'data-on-click', cfg.action.name); }
     }
     const collapsed = readRail(pane);
     if (layout.classList.contains('sidebar-collapsed') !== collapsed) applyRail(collapsed);

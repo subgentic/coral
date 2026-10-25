@@ -23,7 +23,8 @@ const RUN_AGENT = { id: 32, workflow_id: 7, workflow_name: 'Nightly', status: 'r
 const JOB = { id: 5, name: 'Hourly "job"', cron_expr: '0 * * * *', enabled: true, workflow_id: 7, workflow_name: 'Nightly', consecutive_failures: 0,
     workflow_runs: [{ id: 31, status: 'completed', current_step: 0, started_at: '2026-10-15T10:00:00Z', finished_at: '2026-10-15T10:01:00Z' }] };
 // An agent job: its runs table links each run's session.
-const AGENT_JOB = { id: 6, name: 'Agent job', cron_expr: '0 * * * *', enabled: true, agent_type: 'claude', prompt: 'p', repo_path: '/tmp', consecutive_failures: 0 };
+const LONG_PROMPT = 'p'.repeat(700); // a short prompt is shown on the job's page; only a long one is folded (#7443)
+const AGENT_JOB = { id: 6, name: 'Agent job', cron_expr: '0 * * * *', enabled: true, agent_type: 'claude', prompt: LONG_PROMPT, repo_path: '/tmp', consecutive_failures: 0 };
 const JOB_RUNS = { runs: [{ id: 44, status: 'completed', scheduled_at: '2026-10-15T10:00:00Z', started_at: '2026-10-15T10:00:00Z', finished_at: '2026-10-15T10:01:00Z', session_id: SID }] };
 
 (async () => {
@@ -178,11 +179,11 @@ const JOB_RUNS = { runs: [{ id: 44, status: 'completed', scheduled_at: '2026-10-
         await ev(`window.__hist = []; window.selectHistorySession = id => window.__hist.push(id); true`);
         await click('#scheduled-jobs-list [data-on-click="job-select"][data-job-id="6"]');
         await until(`!!document.querySelector('#scheduler-view [data-on-click="job-run-session"]')`, 'the agent job\'s runs', 5000);
-        check('the full job prompt starts folded', await ev(`(() => { const d=document.querySelector('.sched-prompt-section');return !d.open && !d.querySelector('pre').checkVisibility() && d.querySelector('pre').textContent==='p'; })()`));
+        check('the full job prompt starts folded', await ev(`(() => { const d=document.querySelector('.sched-prompt-section');return !d.open && !d.querySelector('pre').checkVisibility() && d.querySelector('pre').textContent==='${LONG_PROMPT}'; })()`));
         await ev(`document.querySelector('.sched-prompt-section > summary').focus();true`);
         await Input.dispatchKeyEvent({type:'keyDown',key:' ',code:'Space',windowsVirtualKeyCode:32,text:' '});
         await Input.dispatchKeyEvent({type:'keyUp',key:' ',code:'Space',windowsVirtualKeyCode:32});
-        check('Space opens the complete prompt in a bounded scroll region', await ev(`(() => { const d=document.querySelector('.sched-prompt-section'),p=d.querySelector('pre');return d.open && p.checkVisibility() && p.textContent==='p' && getComputedStyle(p).overflowY==='auto' && parseFloat(getComputedStyle(p).maxHeight)<=innerHeight*0.4+1; })()`));
+        check('Space opens the complete prompt in a bounded scroll region', await ev(`(() => { const d=document.querySelector('.sched-prompt-section'),p=d.querySelector('pre');return d.open && p.checkVisibility() && p.textContent==='${LONG_PROMPT}' && getComputedStyle(p).overflowY==='auto' && parseFloat(getComputedStyle(p).maxHeight)<=innerHeight*0.4+1; })()`));
         await click('#scheduler-view [data-on-click="job-run-session"]');
         check('a run\'s session link opens that session\'s history', JSON.stringify(await ev(`window.__hist`)) === JSON.stringify([SID]), JSON.stringify(await ev(`window.__hist`)));
         await ev(`(() => { const b = document.createElement('a'); b.setAttribute('data-on-click', 'job-run-session'); b.dataset.sessionId = '../../etc'; document.body.appendChild(b); b.click(); b.remove(); return true; })()`);
@@ -203,7 +204,7 @@ const JOB_RUNS = { runs: [{ id: 44, status: 'completed', scheduled_at: '2026-10-
         await click('#scheduler-view [data-on-click="job-edit"]');
         check('Edit opens the job dialog', await until(`(() => { const m = document.getElementById('job-modal'); return !!m && getComputedStyle(m).display !== 'none'; })()`, 'the job dialog', 5000).then(() => ev(`(() => { const m = document.getElementById('job-modal'); return !!m && getComputedStyle(m).display !== 'none'; })()`)));
         await ev(`window.hideJobModal && window.hideJobModal(); true`);
-        await click('#scheduler-view [data-on-click="job-new"]');
+        await click('.sidebar-pane[data-pane="jobs"] [data-on-click="job-new"]'); // New job is the Jobs sidebar's pinned action (#7443)
         check('New job opens an empty job dialog', await until(`(() => { const m = document.getElementById('job-modal'); return !!m && getComputedStyle(m).display !== 'none'; })()`, 'the new job dialog', 5000).then(() => ev(`(() => { const m = document.getElementById('job-modal'); return !!m && getComputedStyle(m).display !== 'none'; })()`)));
         await ev(`window.hideJobModal && window.hideJobModal(); true`);
 

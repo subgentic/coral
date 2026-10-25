@@ -8,9 +8,33 @@ const CDP = require('chrome-remote-interface');
 const root = path.resolve(__dirname, '../../coral-go/pkg/frontend');
 const baseline = process.env.CORAL_UI_BASELINE;
 const shots = process.env.CORAL_SCREENSHOT_DIR;
+// The sidebar's shared header is a Go template called with a kind ({{ template "includes/sidebar_header" "history" }}): its body is chosen with if / else if / else / end on eq and ne of that kind.
+// This evaluates just those forms, so the page this test builds has each tab's header as the server draws it.
+function expandKind(body, kind) {
+    const out = [], stack = [];   // stack: { live, taken, parent }
+    let live = true;
+    for (const part of body.split(/({{[^}]*}})/)) {
+        const m = /^{{\s*(.*?)\s*}}$/.exec(part);
+        if (!m) { if (live) out.push(part); continue; }
+        const act = m[1];
+        let c;
+        if ((c = /^if (eq|ne) \. "([^"]+)"$/.exec(act))) { const yes = (c[1] === 'eq') === (kind === c[2]); stack.push({ taken: yes, parent: live }); live = live && yes; }
+        else if ((c = /^else if (eq|ne) \. "([^"]+)"$/.exec(act))) { const top = stack[stack.length - 1], yes = (c[1] === 'eq') === (kind === c[2]) && !top.taken; top.taken = top.taken || yes; live = top.parent && yes; }
+        else if (act === 'else') { const top = stack[stack.length - 1]; live = top.parent && !top.taken; top.taken = true; }
+        else if (act === 'end') { live = stack.pop().parent; }
+        else if (act === '.') { if (live) out.push(kind); }
+        else if (live) out.push(part);
+    }
+    return out.join('');
+}
 function template(name) {
     const old = baseline && path.join(baseline, 'templates', name);
-    return fs.readFileSync(old && fs.existsSync(old) ? old : path.join(root, 'templates', name), 'utf8')
+    let text = fs.readFileSync(old && fs.existsSync(old) ? old : path.join(root, 'templates', name), 'utf8');
+    const def = /{{\s*define "includes\/sidebar_header"\s*}}([\s\S]*?)\n{{\s*end\s*}}/.exec(text);
+    if (def) {
+        text = text.replace(def[0], '').replace(/{{\s*template "includes\/sidebar_header" "([^"]+)"\s*}}/g, (_, kind) => expandKind(def[1], kind));
+    }
+    return text
         .replace(/{{\s*template "([^"]+)" \.\s*}}/g, (_, file) => template(file))
         .replace(/{{\s*\$base\s*}}/g, '/static/')
         .replace(/{{[^}]+}}/g, '');

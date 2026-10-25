@@ -383,6 +383,7 @@
 1	sandbox_frame.js	DOC_CSP
 1	sandbox_frame.js	content
 2	saved_marks.js	BOOKMARK_SVG
+1	scheduler.js	backLinkHtml('jobs', group.key, group.label)
 1	scheduler.js	cls
 1	scheduler.js	doesHtml
 1	scheduler.js	dot
@@ -392,6 +393,7 @@
 1	scheduler.js	fails === 1 ? 'The last run failed' : `The last ${fails} runs failed`
 1	scheduler.js	k
 1	scheduler.js	paused
+1	scheduler.js	promptHtml
 2	scheduler.js	resultCell(r)
 1	scheduler.js	runFailureTag(r)
 1	scheduler.js	runs.map(r => `<tr data-on-click="job-run" data-run-id="${Number(r.id)}" style="cursor:pointer"> <td><button t

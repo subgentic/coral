@@ -1,7 +1,7 @@
 /* The groups of a sidebar list that is not the Agents one (#7443), and the table a group's name opens in the centre.
  *
  * A group header is a chevron, the group's name and a count. The chevron only folds the group; the name opens the whole group in the centre as a table (a real table: column
- * headers, the first column the button that opens the item, a dash for an empty cell). The item then says "‹ <group>" to go back to the table. The Agents list's teams already do
+ * headers, the first column the button that opens the item, a dash for an empty cell). The item's page says "← <group>" to go back to the table (backLinkHtml). The Agents list's teams already do
  * this (a team's name opens the team, its chevron folds: group_cards.js); this is the same header for the tabs that have groups of their own (Chats by day, Jobs by state).
  *
  * A tab registers a source: { keys(): the group keys as drawn, redraw(): draws the list again, table(key): { title, columns, rows }, isEmpty(): whether the tab's centre is
@@ -71,7 +71,6 @@ export function syncPaneGroupToggle(kind) {
 // ── The table in the centre ──────────────────────────────────────────────
 
 let open = null;     // { kind, key }: the table on screen
-let backTo = null;   // { kind, key, label }: the table the item on screen was opened from
 
 const dash = '<span aria-label="none">&mdash;</span>';
 
@@ -83,7 +82,7 @@ function dataAttrs(data) { return Object.entries(data || {}).map(([k, v]) => `da
 
 function tableHtml(t, kind, key) {
     const head = t.columns.map(c => `<th scope="col">${escapeHtml(c)}</th>`).join('');
-    const rows = t.rows.map(r => `<tr><td><button type="button" class="group-table-link" ${ROW_ACTION_ATTR[r.action] || ''} ${dataAttrs(r.data)} data-from-group="${escapeAttr(kind + '|' + key)}">${escapeHtml(r.title)}</button></td>`
+    const rows = t.rows.map(r => `<tr><td><button type="button" class="group-table-link" ${ROW_ACTION_ATTR[r.action] || ''} ${dataAttrs(r.data)}>${escapeHtml(r.title)}</button></td>`
         + r.cells.map(c => `<td>${c ? escapeHtml(c) : dash}</td>`).join('') + '</tr>').join('');
     return `<div class="group-table-head"><h2 id="group-table-title" tabindex="-1">${escapeHtml(t.title)}</h2><span class="session-group-count">${t.rows.length}</span></div>`
         + `<div class="group-table-scroll"><table class="group-table" aria-labelledby="group-table-title"><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>`;
@@ -101,7 +100,7 @@ function drawTable() {
 
 /** Opens a group as a table in the centre. */
 export function openGroupTable(kind, key) {
-    open = { kind, key }; backTo = null;
+    open = { kind, key };
     if (!drawTable()) { open = null; return false; }
     showView('group-table-view');
     document.querySelectorAll('.sidebar-pane .session-list > li.active').forEach(li => { li.classList.remove('active'); li.querySelector('[aria-current]')?.removeAttribute('aria-current'); });
@@ -130,39 +129,26 @@ export function openFirstGroupTable(kind) {
     return first != null ? openGroupTable(kind, first) : false;
 }
 
-// The way back from an item to the table it was opened from.
-function renderBack(viewId) {
-    document.getElementById('group-back')?.remove();
-    if (!backTo || !viewId || viewId === 'group-table-view') return;
-    const view = document.getElementById(viewId);
-    if (!view) return;
-    const btn = document.createElement('button');
-    btn.type = 'button'; btn.id = 'group-back'; btn.className = 'group-back';
-    btn.setAttribute('data-on-click', 'sgroup-back');
-    btn.textContent = `‹ ${backTo.label}`;
-    view.prepend(btn);
+// The view on screen is not the table: it is not open any more.
+onViewShown(id => { if (id !== 'group-table-view') open = null; });
+
+/** The link at the top of an item's page back to its group's table ("← Today"): the text link of the style guide, not a button of its own kind. */
+export function backLinkHtml(kind, key, label, id) {
+    return `<button type="button" class="group-back"${id ? ` id="${escapeAttr(id)}"` : ''} data-on-click="sgroup-open" data-kind="${escapeAttr(kind)}" data-group="${escapeAttr(key)}">\u2190 ${escapeHtml(label)}</button>`;
 }
 
-onViewShown(id => {
-    if (id === 'group-table-view') { backTo = null; document.getElementById('group-back')?.remove(); return; }
-    if (id !== 'group-table-view') open = null;
-    renderBack(id);
-});
-
-// An item opened from the table remembers its table; an item opened from a sidebar row does not.
-document.addEventListener('click', e => {
-    const link = e.target.closest?.('[data-from-group]');
-    if (link) {
-        const [kind, key] = link.dataset.fromGroup.split('|');
-        const t = sources.get(kind)?.table(key);
-        backTo = t ? { kind, key, label: t.title } : null;
-        return;
-    }
-    if (e.target.closest?.('.sidebar-pane .session-list')) backTo = null;
-}, true);
+/** Sets an item page's static back link (history_session.html's #history-back) to a group, or hides it for an item that has none. */
+export function setBackLink(id, kind, group) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.hidden = !group;
+    if (!group) return;
+    el.dataset.kind = kind; el.dataset.group = group.key;
+    el.textContent = `\u2190 ${group.label}`;
+}
 
 registerActions({
-    'sgroup-open': el => { const kind = textOf(el.dataset.kind), key = textOf(el.dataset.group); if (kind && key) openGroupTable(kind, key); },
+    'sgroup-open': el => { const kind = textOf(el.dataset.kind), key = textOf(el.dataset.group); if (kind && key && !openGroupTable(kind, key)) sources.get(kind)?.showList?.(); }, // a group that has gone (a filter, a fold of the list) leaves for the tab's own page
     'sgroup-chevron': (el, event) => { event.stopPropagation(); const kind = textOf(el.dataset.kind), key = textOf(el.dataset.group); if (kind && key) toggleGroupFold(kind, key); },
     'sgroup-key': (el, event) => {
         if (event.target !== el || (event.key !== 'Enter' && event.key !== ' ')) return;
@@ -170,6 +156,5 @@ registerActions({
         const kind = textOf(el.dataset.kind), key = textOf(el.dataset.group);
         if (kind && key) openGroupTable(kind, key);
     },
-    'sgroup-back': () => { if (backTo) { const { kind, key } = backTo; openGroupTable(kind, key); document.getElementById('group-table-title')?.focus(); } },
     'sgroup-list': el => { const kind = textOf(el.dataset.kind); open = null; sources.get(kind)?.showList?.(); },
 });

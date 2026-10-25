@@ -16,7 +16,8 @@ All sizes are CSS pixels at the browser's default zoom. The exact role is chosen
 
 | Role | Size / line height / weight | Token mapping and use |
 | --- | --- | --- |
-| Page title | 20px / 1.3 / 600 | **Target** `--type-page-size: 20px`; main page/dialog workspace title. |
+| Page title | 20px / 1.3 / 700 | **Target** `--type-page-size: 20px`; main page/dialog workspace title, and a group's table. |
+| Item page title | 17px / 1.3 / 700 | The name on a chat's or a job's own page, under its link back (see Sidebar). |
 | Section title | `--fs-xl` 16px / 1.4 / 600 | Major section and dialog heading. |
 | Item title | `--fs-lg` 14px / 1.4 / 600 | Card, artifact, task, and file group title. |
 | Body / chat prose | `--fs-lg` 14px / 1.5 / 400 | Reading text, descriptions, assistant/human prose. Preserve existing rich text hierarchy and user font choices. |
@@ -94,6 +95,24 @@ The example shows structure only; production URLs, data, local time and accessib
 - **Tasks, board, workflows:** use the same item title, metadata and status roles. Keep status words/icons and task actions. Use semantic success/warning/error tokens in both themes, including workflow timelines.
 - **Agent UI:** style Coral's surrounding tabs, labels, request controls, help text, status and dialog. Agent-published iframe content is separate and sandboxed; do not impose workspace CSS inside it. Preserve expand/collapse and published interaction semantics.
 - **Forms/settings/dialogs:** labels are 13px/500, field values 13px/400, help/errors 12px/400, dialog title 16px/600; vertical field gap 16px and footer action gap 8px. Keep form labels programmatically associated, native checkbox/select behavior, focus trapping/return for dialogs, and current modal dimensions.
+
+## Sidebar and the pages it opens
+
+Every tab with a list uses one sidebar: a pane of the left column, 320px wide, with the same parts in the same place on every tab (the style is `.sidebar-pane`, the header `.sidebar-header`; the template is `includes/sidebar.html`).
+
+- **Header, one row:** a search field named for the tab ("Search chats"); **Display options** where the tab has some (a tab without them has no button, and the search takes the width); **Expand or collapse all** where the tab has groups; **Hide** at the far right, in the same pixels on every tab. Icon buttons are 32px on a desktop and 44px on touch, each with an accessible name.
+- **List:** groups with a chevron, a name and a count (11/600), and rows with a title (13/500) and one muted line (12/400). **The chevron only folds its group; the group's name opens the whole group in the centre as a table.**
+- **Pinned action** under the list where the tab has one (+ New agent, + New job): at the foot of the column, not scrolled away. Creating is the sidebar's action, not a button in the main pane.
+- **Hide** turns the column into a 56px rail with the tab's own search and action, and gives the width to the main pane; the choice is kept per tab.
+- **Computer** (Coral Hub): the picker for whose chats a list shows is above the list, not inside Display options.
+
+**A group's table** is titled with the group's name at 20/700 and its count; the title does not move from group to group. It is a real table (`th scope="col"`, one `tr` per item), the first column the item's name as a button that opens it, a dash for an empty cell, and two to four more columns as 12/400 text under 12/500 headers. A tab opens on its first group's table.
+
+**An item's page** starts with a text link back to its group ("← Today", 13/500, not a bordered button), then its name at 17/700 and one 12/400 line under it (who and when, or the status). Its facts are labels at 13/500 and values at 13/400. Its actions are a bar pinned at the foot of the page, the primary last (More, Edit, Pause). Lists inside a page (a job's runs) are tables as above.
+
+**One empty line** on every tab: 14/400 in the primary colour (`.empty-line`), with an optional 12/400 hint under it (`.empty-hint`). What to do next is the sidebar's pinned action.
+
+On a phone the sidebar is the tab's own page: the pane moves into it, without Hide, and a group's name or a row opens its table or item full screen.
 
 ## Do / don't
 

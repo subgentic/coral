@@ -31,6 +31,9 @@
             </div>
             <div class="sidebar-pane" data-pane="history" hidden>
                 {{ template "includes/sidebar_header" "history" }}
+                <label id="history-computer-row" class="history-computer-row" hidden><span class="sr-only">Computer</span>
+                    <select id="history-computer" aria-label="Computer for chat history" data-on-change="history-computer"></select>
+                </label>
                 <section class="sidebar-section" data-section="history">
                     <div class="sidebar-section-body">
                         <div id="chat-search-status" class="sr-only" role="status"></div>
@@ -109,10 +112,7 @@
                         <label class="list-display-option" data-display-row="thinking"><input type="checkbox" id="display-show-thinking" data-display-input="thinking" data-on-change="toggle-show-thinking"> Show thinking level</label>
                     </div>
                     <p class="list-display-hint" data-display-hint role="status" hidden></p>
-                        {{ else }}<label id="history-computer-row" class="history-computer-row" hidden>Computer
-                            <select id="history-computer" aria-label="Computer for chat history" data-on-change="history-computer"></select>
-                        </label>
-                        <div class="hf-row">
+                        {{ else }}<div class="hf-row">
                             <label class="hf-label">Group by</label>
                             <div class="hf-toggle-group" role="group" aria-label="Group chats by">
                                 <button type="button" class="hf-toggle active" data-chat-group="day" aria-pressed="true">Day</button>

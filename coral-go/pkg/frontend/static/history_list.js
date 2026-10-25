@@ -11,6 +11,7 @@ import { whenText } from './when_text.js';
 import { renderTranscript } from './live_chat.js';
 import { historyLabel } from './history_label.js';
 import { browserLocal } from './safe_storage.js';
+import { setAttr } from './dom_write.js';
 import { registerGroupSource, groupHeaderHtml, isGroupFolded, syncPaneGroupToggle, refreshGroupTable } from './sidebar_groups.js';
 
 
@@ -88,22 +89,23 @@ export function setChatsGroupBy(by) {
 }
 export function syncGroupByButtons() {
     const by = chatsGroupBy();
-    for (const b of document.querySelectorAll('.hf-toggle[data-chat-group]')) { b.classList.toggle('active', b.dataset.chatGroup === by); b.setAttribute('aria-pressed', String(b.dataset.chatGroup === by)); }
+    for (const b of document.querySelectorAll('.hf-toggle[data-chat-group]')) {
+        const on = b.dataset.chatGroup === by;
+        if (b.classList.contains('active') !== on) b.classList.toggle('active', on); // (a write of the value it has is still a mutation)
+        setAttr(b, 'aria-pressed', String(on));
+    }
 }
 
 const isGroupChat = s => s.type === 'group' || (s.session_id && s.session_id.startsWith('board:'));
-const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-/** The day a chat last spoke, as a group: its sortable key and its name (Today, Yesterday, "Oct 17", with the year when it is not this one). */
+/** The day a chat last spoke, as a group: Today, Yesterday, or Earlier. */
 export function dayGroup(iso, now = new Date()) {
     const d = new Date(iso);
-    if (!iso || isNaN(d)) return { key: 'unknown', label: 'Date unknown' };
+    if (!iso || isNaN(d)) return { key: 'day-earlier', label: 'Earlier' };
     const day0 = x => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
     const days = Math.round((day0(now) - day0(d)) / 86400000);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    if (days === 0) return { key, label: 'Today' };
-    if (days === 1) return { key, label: 'Yesterday' };
-    return { key, label: `${MONTHS_SHORT[d.getMonth()]} ${d.getDate()}${d.getFullYear() !== now.getFullYear() ? `, ${d.getFullYear()}` : ''}` };
+    if (days <= 0) return { key: 'day-today', label: 'Today' };
+    if (days === 1) return { key: 'day-yesterday', label: 'Yesterday' };
+    return { key: 'day-earlier', label: 'Earlier' };
 }
 
 function groupOfChat(s) {
@@ -144,16 +146,24 @@ function chatTableRow(s) {
     if (isGroupChat(s)) {
         const name = s.title || s.session_id.replace(/^board:/, '');
         const when = chatWhen(s.updated_at, null);
-        return { title: name, action: 'board-open', data: { board: identityKey(historyServer(), name) }, cells: ['Group chat', when ? when.day : ''] };
+        return { title: name, action: 'board-open', data: { board: identityKey(historyServer(), name) }, cells: ['Group chat', when ? when.day : '', ''] };
     }
     const when = chatWhen(s.last_timestamp, s.duration_sec);
-    return { title: historyLabel(s), action: 'history-open', data: { 'session-id': s.session_id }, cells: [s.display_name || s.agent_name || '', when ? when.day : ''] };
+    return { title: historyLabel(s), action: 'history-open', data: { 'session-id': s.session_id }, cells: [s.display_name || s.agent_name || '', when ? when.day : '', when ? when.ran.replace(/^ran /, '') : ''] };
+}
+
+/** The page of an open chat: the group it is in (for the way back) and the line under its title (who, when, how long it ran). */
+export function describeChat(entry) {
+    if (!entry) return { group: null, meta: '' };
+    const when = chatWhen(isGroupChat(entry) ? entry.updated_at : entry.last_timestamp, entry.duration_sec);
+    const meta = [entry.display_name || entry.agent_name || '', when ? when.day : '', when ? when.ran : ''].filter(Boolean).join(' \u00b7 ');
+    return { group: groupOfChat(entry), meta };
 }
 
 registerGroupSource('history', {
     keys: () => drawn.map(g => g.key),
     redraw: redrawHistoryGroups,
-    table: key => { const g = drawn.find(x => x.key === key); return g ? { title: g.label, columns: ['Chat', 'Agent', 'When'], rows: g.sessions.map(chatTableRow) } : null; },
+    table: key => { const g = drawn.find(x => x.key === key); return g ? { title: g.label, columns: ['Chat', 'Agent', 'When', 'Ran'], rows: g.sessions.map(chatTableRow) } : null; },
     isEmpty: () => document.getElementById('chats-empty-view')?.style.display === 'flex' && document.body.getAttribute('data-nav-tab') === 'history',
     showList: () => window.switchNavTab?.('history'),
     empty: () => window.switchNavTab?.('history'),

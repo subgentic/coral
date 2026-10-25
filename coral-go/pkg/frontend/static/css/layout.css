@@ -229,6 +229,7 @@ body.panel-dragging .sidebar {
     flex-shrink: 0;
     /* The search box, the server button and the icon buttons share one height (#4062). */
     --ctl-h: 36px;
+    /* The header row is 57 px from the top of the column to its rule (10 + 36 + 10 + the 1 px rule) on every tab: one component, one height (UI/UX's spec said 53; #7443). A tab without Display options is the same height, its search is wider. */
 }
 
 .sidebar-footer {
@@ -938,7 +939,16 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 /* ── A sidebar group opened as a table in the centre (sidebar_groups.js, #7443) ── */
 .group-table-view { flex: 1; min-width: 0; padding: var(--space-2xl); overflow: auto; }
 .group-table-head { display: flex; align-items: center; gap: var(--space-md); margin-bottom: var(--space-xl); }
-.group-table-head h2 { margin: 0; font-size: var(--fs-xl); font-weight: 600; line-height: 1.4; color: var(--text-primary); }
+.group-table-head h2 { margin: 0; font-size: 1.25rem; font-weight: 700; line-height: 1.3; color: var(--text-primary); } /* a group's table is titled at the page-title size, with its count (#7443) */
+.group-table-head .session-group-count { font-weight: 600; }
+/* One empty line on every tab: 14/400 in the primary colour, with an optional 12/400 hint under it; what to do is the sidebar's pinned action */
+.empty-pane { display: flex; flex-direction: column; gap: var(--space-xs); padding: var(--space-2xl); }
+.welcome > .empty-pane { margin: 0; align-self: stretch; }
+.empty-pane .empty-line { margin: 0; font-size: var(--fs-lg); font-weight: 400; line-height: 1.5; color: var(--text-primary); }
+.empty-pane .empty-hint { margin: 0; font-size: var(--fs-base); font-weight: 400; line-height: 1.4; color: var(--text-secondary); }
+.runs-empty-line { margin: 0; font-size: var(--fs-lg); font-weight: 400; line-height: 1.5; color: var(--text-primary); }
+/* The line under an item page's title: who, when, how long */
+.item-meta { margin: 2px 0 0; font-size: var(--fs-base); font-weight: 400; line-height: 1.4; color: var(--text-secondary); }
 .group-table-scroll { max-width: 100%; overflow-x: auto; }
 .group-table { width: 100%; border-collapse: collapse; }
 .group-table th, .group-table td { padding: var(--space-lg); text-align: left; border-bottom: 1px solid var(--border); font-size: var(--fs-base); line-height: 1.4; color: var(--text-secondary); }
@@ -947,8 +957,8 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .group-table-link { padding: 0; border: 0; background: none; color: var(--text-primary); font: 600 var(--fs-md)/1.4 var(--font-sans); text-align: left; cursor: pointer; }
 .group-table-link:hover { color: var(--accent); text-decoration: underline; }
 .group-table-back { margin-bottom: var(--space-lg); }
-.group-back { display: inline-flex; align-items: center; align-self: flex-start; min-height: 32px; margin: var(--space-md) var(--space-lg) 0; padding: 4px 8px; border: 1px solid transparent; border-radius: var(--radius-md); background: none; color: var(--text-secondary); font: 500 var(--fs-md)/1.4 var(--font-sans); cursor: pointer; }
-.group-back:hover { background: var(--bg-hover); color: var(--text-primary); }
+.group-back { display: inline-flex; align-items: center; align-self: flex-start; min-height: 32px; margin: 0 0 var(--space-xs); padding: 4px 0; border: 1px solid transparent; border-radius: var(--radius-md); background: none; color: var(--text-secondary); font: 500 var(--fs-md)/1.4 var(--font-sans); cursor: pointer; }
+.group-back:hover { color: var(--text-primary); text-decoration: underline; }
 /* A group header of a tab's list: the name opens the table, so it reads as a link on hover */
 .session-list .sgroup-header { align-items: center; } /* the list's own rule starts the items at the top: a header's chevron sits level with its name */
 .sgroup-header .group-chevron { margin-left: -6px; }

@@ -478,6 +478,7 @@ function switchNavTab(tab, opts = {}) {
     if (tab === 'board') {
         showMessageBoardProjects();
     } else if (tab === 'jobs') {
+        document.getElementById('scheduler-view')?.removeAttribute('data-phone-item'); // a phone opens Jobs on its list
         showView('scheduler-view');
     } else if (tab === 'workflows') {
         showWhenLoaded(loadWorkflows, 'showWorkflowsTab');
