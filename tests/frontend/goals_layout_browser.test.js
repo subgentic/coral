@@ -6,6 +6,7 @@ const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const S = `(window.__coralStatic || '/static/')`;
 const { GOALS_STUB } = require('./helpers/goals_stub');
+const { removeBoards } = require('./helpers/board_cleanup');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -104,5 +105,5 @@ const { GOALS_STUB } = require('./helpers/goals_stub');
         assert.equal(cols, 1, 'one column');
         await shot('goals-layout-390');
         console.log('PASS goals layout');
-    } finally { await client.close(); }
+    } finally { await removeBoards(ev, [board]).catch(() => {}); await client.close(); } // the board it made (5 messages, 2 subscribers) goes away again (#4959)
 })().catch(e => { console.error(e); process.exit(1); });
