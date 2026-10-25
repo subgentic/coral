@@ -295,8 +295,11 @@ func TestSwitchModelRefusedByTheCLIOrNotConfirmed(t *testing.T) {
 	})
 	t.Run("an old /model entry does not confirm a new one", func(t *testing.T) {
 		r := newSwitchRig(t, "claude")
+		prev := switchClockAllowance
+		switchClockAllowance = 50 * time.Millisecond
+		t.Cleanup(func() { switchClockAllowance = prev })
 		r.localCommand(t, "/model", "x", "Set model to `Old` and saved")
-		time.Sleep(1100 * time.Millisecond) // sleep-ok: the stale entry must be older than the command by more than the clock allowance
+		time.Sleep(110 * time.Millisecond) // sleep-ok: the stale entry must be older than the command by more than the (test-shortened) clock allowance
 		_, _ = r.post(t, map[string]any{"model": "claude-sonnet-5-5"})
 		sw := r.waitState(t, switchFailed)
 		assert.Contains(t, sw.Message, "did not confirm")
@@ -742,4 +745,10 @@ func TestAConfirmedSwitchStaysConfirmedAcrossARestartAndAWake(t *testing.T) {
 	r.assistant(t, "high")
 	r.row(t) // the list reads the transcript
 	assert.Equal(t, "high", r.row(t)["thinking_actual"], "a turn recorded after the setting is the transcript's")
+}
+
+// #359: the allowance is a variable only so one test can shorten it; its product value is one second.
+func TestSwitchClockAllowanceDefaultIsOneSecond(t *testing.T) {
+	assert.Equal(t, time.Second, defaultSwitchClockAllowance)
+	assert.Equal(t, defaultSwitchClockAllowance, switchClockAllowance, "nothing leaves it shortened")
 }

@@ -56,7 +56,7 @@ func TestUpdateTaskAgreesWithBefore4756(t *testing.T) {
 	t.Cleanup(func() { setIdentityActorEnforced(prevEnforced) })
 	counts := map[string]int{}
 	var countsMu sync.Mutex
-	// The 60 seeds share nothing but the process-wide enforce flag (updateOracleFlagMu holds it for one request on each side), so they run
+	// The 60 seeds share nothing but the process-wide enforce flag (oracleEnforceFlagMu holds it for one request on each side), so they run
 	// together; the parent test waits for them all before it checks the floors (#4852).
 	t.Run("seeds", func(t *testing.T) {
 		for seed := int64(1); seed <= 60; seed++ {
@@ -78,8 +78,8 @@ func TestUpdateTaskAgreesWithBefore4756(t *testing.T) {
 	}
 }
 
-// updateOracleFlagMu serialises the one request per side that depends on the process-wide enforce flag.
-var updateOracleFlagMu sync.Mutex
+// oracleEnforceFlagMu serialises the one request per side that depends on the process-wide enforce flag: the update-task and the relay oracles hold it from setting the flag to the end of the request's background work (#359).
+var oracleEnforceFlagMu sync.Mutex
 
 func runUpdateTaskOracle(t *testing.T, seed int64, counts map[string]int) {
 	ctx := context.Background()
@@ -215,11 +215,11 @@ func runUpdateTaskOracle(t *testing.T, seed int64, counts map[string]int) {
 			req := httptest.NewRequest(http.MethodPatch, "/api/board/p/tasks/"+id, bytes.NewReader(raw))
 			req = withActor(req, caller)
 			rec := httptest.NewRecorder()
-			updateOracleFlagMu.Lock() // the enforce flag is the process's: set, serve and let the background work finish under one hold
+			oracleEnforceFlagMu.Lock() // the enforce flag is the process's: set, serve and let the background work finish under one hold
 			setIdentityActorEnforced(enforced)
 			s.mux.ServeHTTP(rec, req)
 			s.h.WaitBackground()
-			updateOracleFlagMu.Unlock()
+			oracleEnforceFlagMu.Unlock()
 			tasks, err := s.h.bs.ListTasks(ctx, "p")
 			require.NoError(t, err)
 			tj, _ := json.Marshal(tasks)
