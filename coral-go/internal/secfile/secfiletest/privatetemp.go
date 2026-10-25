@@ -26,5 +26,10 @@ func UsePrivateTemp() (cleanup func()) {
 	}
 	os.Setenv("TMP", dir)
 	os.Setenv("TEMP", dir)
+	// t.TempDir() makes its folders in GOTMPDIR when that is set (a runner on another volume sets it), not in TEMP: it would then step around the protected folder, and a
+	// secret file a test makes would inherit the other folder's access list.
+	if os.Getenv("GOTMPDIR") != "" {
+		os.Setenv("GOTMPDIR", dir)
+	}
 	return func() { os.RemoveAll(dir) }
 }
