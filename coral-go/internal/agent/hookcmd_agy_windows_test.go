@@ -36,7 +36,9 @@ func TestCmdHookCommandRunsUnderAgysCmd(t *testing.T) {
 
 			cmd, ok := ResolveCmdHookCommand("coral-hook-agentic-state --agy PreToolUse")
 			assert.NotContains(t, cmd, `"`, "cmd.exe can't read Go's escaped quotes")
-			assert.True(t, strings.HasSuffix(cmd, " --agy PreToolUse"), cmd)
+			if ok { // a volume without 8.3 names gives no command at all (the switch below checks that case)
+				assert.True(t, strings.HasSuffix(cmd, " --agy PreToolUse"), cmd)
+			}
 			// The quoted form fails exactly as the operator saw.
 			out, err := runAsAgy(work, ResolveHookCommand("coral-hook-agentic-state --agy PreToolUse"))
 			require.Error(t, err, "%s", out)
