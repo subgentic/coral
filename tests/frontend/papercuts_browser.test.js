@@ -7,6 +7,7 @@
 // unreachable row; opening a view before the first list load is not re-opened.
 const assert = require('node:assert/strict');
 const { safePaused } = require('./helpers/paused');
+const { framesJs } = require('./helpers/wait');
 const CDP = require('chrome-remote-interface');
 const BASE = require('./test_base').BASE;
 
