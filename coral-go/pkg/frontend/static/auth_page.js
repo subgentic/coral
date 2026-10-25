@@ -215,6 +215,8 @@ async function sendKey() {
     fail($('api-key'), $('key-err'), res.data.error || 'Invalid API key.');
 }
 keyForm.addEventListener('submit', e => { e.preventDefault(); sendKey(); });
+// The submit buttons are in the markup disabled: until the handlers above exist, a click or Enter in a field would be the browser's own submit, a GET that puts the password in the address and the history (#7379).
+for (const b of document.querySelectorAll('button[data-needs-script]')) b.disabled = false;
 const hashParams = new URLSearchParams(window.location.hash.slice(1));
 const urlKey = hashParams.get('api_key') || params.get('api_key');
 if (urlKey) {

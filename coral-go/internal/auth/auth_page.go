@@ -151,7 +151,7 @@ var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "hubwarn"}
       <input type="text" name="username" value="coral" autocomplete="username" hidden aria-hidden="true" readonly tabindex="-1">
       <label class="pw-field"><span class="pw-label">Password</span><span class="pw-input-row"><input class="pw-input" id="password" name="password" type="password" autocomplete="current-password" spellcheck="false" autocapitalize="off" autofocus><button type="button" class="pw-toggle" data-toggle="password" aria-pressed="false" aria-label="Show password">Show</button></span></label>
       <label class="check"><input type="checkbox" id="keep"><span>Keep me signed in on this browser<small>For 30 days. Leave it off on a shared computer.</small></span></label>
-      <div class="btnrow"><button type="submit" id="submit" class="btn btn-primary wide">Sign in</button></div>
+      <div class="btnrow"><button type="submit" disabled data-needs-script id="submit" class="btn btn-primary wide">Sign in</button></div>
     </form>
 {{template "hub" .}}
     <div class="linkrow"><button type="button" class="link" id="show-forgot">Forgot password?</button><button type="button" class="link" id="show-key">Use an API key instead</button></div>
@@ -181,7 +181,7 @@ var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "hubwarn"}
       <div class="pw-strength" id="meter" data-level="empty"><div class="pw-meter" role="img" aria-label="Strength"><i></i></div><p class="pw-hint" id="strength" aria-live="polite"></p></div>
       <label class="pw-field"><span class="pw-label">Confirm password</span><span class="pw-input-row"><input class="pw-input" id="confirm" name="confirm-password" type="password" autocomplete="new-password" spellcheck="false" autocapitalize="off"><button type="button" class="pw-toggle" data-toggle="confirm" aria-pressed="false" aria-label="Show confirm password">Show</button></span></label>
       <label class="check"><input type="checkbox" id="keep"><span>Keep me signed in on this browser<small>For 30 days. Leave it off on a shared computer.</small></span></label>
-      <div class="btnrow"><button type="submit" id="submit" class="btn btn-primary wide">Create password and open Coral</button></div>
+      <div class="btnrow"><button type="submit" disabled data-needs-script id="submit" class="btn btn-primary wide">Create password and open Coral</button></div>
     </form>
     <p class="note">Your password manager can save it. There is no email: if you forget it, run coral reset-password on this computer.</p>
 {{template "hubquiet" .}}
@@ -198,7 +198,7 @@ var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "hubwarn"}
       <span class="note" style="display:block;margin:6px 0 14px">In Coral on that computer, open <b>Settings &rsaquo; Network and Hub</b> (or the tray menu), or run <b>coral setup-code</b> there.</span></label>
       <div class="warn"><span style="font-size:1rem">&#9888;</span><span><b>Coral Hub can then sign you in here with full control of this computer.</b> A Coral Hub account that is signed in can run commands on this computer, like your password can.</span></div>
       <label class="check" style="margin-top:0"><input type="checkbox" id="hub-enable"><span>Let Coral Hub sign me in here<small>Off unless you tick it. You can change it later in Settings, Browser sign-in.</small></span></label>
-      <div class="btnrow"><button type="submit" id="hub-link-go" class="btn btn-primary wide">Link this computer to Coral Hub and sign in</button></div>
+      <div class="btnrow"><button type="submit" disabled data-needs-script id="hub-link-go" class="btn btn-primary wide">Link this computer to Coral Hub and sign in</button></div>
       <div class="btnrow" style="margin-top:10px"><button type="button" class="btn wide" data-back="main">Not now, use a password</button></div>
     </form>
   </section>
@@ -218,7 +218,7 @@ var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "hubwarn"}
     <div id="key-err" class="err" role="alert" hidden></div>
     <form id="key-form" autocomplete="off">
       <label class="pw-field"><span class="pw-label">API key</span><span class="pw-input-row"><input class="pw-input" id="api-key" name="api-key" type="password" autocomplete="off" spellcheck="false" style="padding-right:11px"></span></label>
-      <div class="btnrow"><button type="submit" id="key-submit" class="btn btn-primary wide">Connect</button></div>
+      <div class="btnrow"><button type="submit" disabled data-needs-script id="key-submit" class="btn btn-primary wide">Connect</button></div>
     </form>
     <div class="linkrow"><button type="button" class="link" data-back="main">Back</button></div>
   </section>

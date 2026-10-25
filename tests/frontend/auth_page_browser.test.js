@@ -32,6 +32,8 @@ const GOLD = n => fs.readFileSync(path.join(__dirname, '../../coral-go/internal/
     const DONE = `location.pathname === '/zz-done' && document.readyState === 'complete'`;
     let navSeq = 0;                // the navigation open() last started: the stamp on the page served for it
     let page = 'signin';            // which golden /auth serves
+    let holdScript = false;        // /static/auth_page.js is held (answered when released): the page's markup is there and its handlers are not
+    const heldScript = [];
     const posts = [];              // {url, body}
     let replies = [];              // queue of {status, body, headers} for the next POSTs
     let statusReplies = [];        // the link poll's GET /auth/hub/link/status answers, in order (the last one repeats)
@@ -51,11 +53,12 @@ const GOLD = n => fs.readFileSync(path.join(__dirname, '../../coral-go/internal/
         const navLog = []; const servedLog = [];
         const keep = (log, x) => { log.push(x); if (log.length > 14) log.shift(); };
         client.Network.requestWillBeSent(e => { if (e.type === 'Document') keep(navLog, `${e.request.method} ${e.request.url.replace(BASE, '')} by ${e.initiator.type}${e.redirectResponse ? ' redirect-from ' + e.redirectResponse.url.replace(BASE, '') + ' ' + e.redirectResponse.status : ''} @${navSeq}`); });
-        await Fetch.enable({ patterns: [{ urlPattern: BASE + '/auth*' }, { urlPattern: BASE + '/zz-done*' }] });
+        await Fetch.enable({ patterns: [{ urlPattern: BASE + '/auth*' }, { urlPattern: BASE + '/zz-done*' }, { urlPattern: BASE + '/static/auth_page.js*' }] });
         safePaused(client, async p => {
             const u = new URL(p.request.url);
             keep(servedLog, `${p.request.method} ${u.pathname}${u.search} @${navSeq}${p.redirectedRequestId ? ' (redirect hop)' : ''}`);
             const fulfill = (status, body, type, headers = {}) => Fetch.fulfillRequest({ requestId: p.requestId, responseCode: status, responseHeaders: [{ name: 'Content-Type', value: type }, ...Object.entries(headers).map(([name, value]) => ({ name, value }))], body: Buffer.from(body).toString('base64') });
+            if (u.pathname === '/static/auth_page.js') { if (holdScript) { heldScript.push(p.requestId); return; } return Fetch.continueRequest({ requestId: p.requestId }); }
             if (u.pathname === '/zz-done') return fulfill(200, '<title>done</title><p id="done">done</p>', 'text/html');
             if (u.pathname === '/auth/hub/link/status') { const r = statusReplies.length > 1 ? statusReplies.shift() : statusReplies[0]; return fulfill(200, JSON.stringify(r || { state: 'enrolling', ready: false, error: '' }), 'application/json'); }
             if (p.request.method === 'POST') {
@@ -310,6 +313,37 @@ const GOLD = n => fs.readFileSync(path.join(__dirname, '../../coral-go/internal/
         await submit('hub-link-form');
         await waitFor(`!document.getElementById('hub-setup-field').hidden`, 'the code field appears when the server asks');
         assert.equal(await text('hub-link-err'), 'Enter the setup code.');
+
+        // ── before the page's script has run: no submit puts the password in the address (#7379) ──
+        // The form is in the HTML and its script is a module fetched after it, so for a moment a click or Enter in a field is the browser's own submit: a GET with the password in the address and the history.
+        // The script is held here; the submit buttons are disabled until its handlers exist, which also stops Enter in a field.
+        await client.Network.setCacheDisabled({ cacheDisabled: true });
+        for (const name of ['signin', 'create']) {
+            holdScript = true; heldScript.length = 0; page = name; posts.length = 0; nextReplies = []; replies = [];
+            const seq = ++navSeq, start = navLog.length;
+            await Page.navigate({ url: BASE + '/auth?return_to=/zz-done' });
+            await waitFor(`!!document.getElementById('submit') && !!document.querySelector('meta[name=zz-nav]') && document.querySelector('meta[name=zz-nav]').content === '${seq}'`, `${name}: the markup, with the script held`);
+            const t0 = Date.now(); while (!heldScript.length && Date.now() - t0 < 6000) await sleep(20);
+            assert.ok(heldScript.length > 0, `${name}: the script's request was held`);
+            assert.equal(await ev(`document.documentElement.dataset.authReady || ''`), '', `${name}: its script has not run`);
+            assert.equal(await $('submit', 'disabled'), true, `${name}: the submit button is disabled until the script's handlers exist`);
+            for (const id of ['password', 'confirm']) if (await ev(`!!document.getElementById('${id}')`)) await type(id, 'zz-secret-pw-7379');
+            await ev(`document.getElementById('password').focus(); true`);
+            for (const type of ['rawKeyDown', 'keyUp']) await client.Input.dispatchKeyEvent({ type, key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: type === 'rawKeyDown' ? '\r' : undefined });
+            const box = await ev(`(() => { const r = document.getElementById('submit').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+            for (const type of ['mousePressed', 'mouseReleased']) await client.Input.dispatchMouseEvent({ type, x: box.x, y: box.y, button: 'left', clickCount: 1 });
+            await sleep(300); // sleep-ok: nothing to wait for, the check is that no navigation starts after the Enter and the click
+            assert.equal(await ev(`location.search`), '?return_to=/zz-done', `${name}: Enter and a click before the script ran left the address as it was`);
+            assert.equal(await ev(`document.querySelector('meta[name=zz-nav]').content`), String(seq), `${name}: and did not replace the page`);
+            assert.ok(!navLog.slice(start).some(l => /password|secret/.test(l)), `${name}: no document request carried the password: ${navLog.slice(start).join(' | ')}`);
+            assert.equal(posts.length, 0, `${name}: nothing was sent`);
+            holdScript = false;
+            for (const id of heldScript.splice(0)) await Fetch.continueRequest({ requestId: id });
+            await waitFor(`document.documentElement.dataset.authReady === 'true'`, `${name}: the script running once released`);
+            assert.equal(await $('submit', 'disabled'), false, `${name}: the submit button is enabled once its handlers exist`);
+            assert.equal(await $('password'), 'zz-secret-pw-7379', `${name}: and what was typed is still there`);
+        }
+        await client.Network.setCacheDisabled({ cacheDisabled: false });
 
         // ── phone width: no horizontal scroll ──
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });

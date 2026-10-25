@@ -81,7 +81,7 @@
       <input type="text" name="username" value="coral" autocomplete="username" hidden aria-hidden="true" readonly tabindex="-1">
       <label class="pw-field"><span class="pw-label">Password</span><span class="pw-input-row"><input class="pw-input" id="password" name="password" type="password" autocomplete="current-password" spellcheck="false" autocapitalize="off" autofocus><button type="button" class="pw-toggle" data-toggle="password" aria-pressed="false" aria-label="Show password">Show</button></span></label>
       <label class="check"><input type="checkbox" id="keep"><span>Keep me signed in on this browser<small>For 30 days. Leave it off on a shared computer.</small></span></label>
-      <div class="btnrow"><button type="submit" id="submit" class="btn btn-primary wide">Sign in</button></div>
+      <div class="btnrow"><button type="submit" disabled data-needs-script id="submit" class="btn btn-primary wide">Sign in</button></div>
     </form>
 
 
@@ -108,7 +108,7 @@
     <div id="key-err" class="err" role="alert" hidden></div>
     <form id="key-form" autocomplete="off">
       <label class="pw-field"><span class="pw-label">API key</span><span class="pw-input-row"><input class="pw-input" id="api-key" name="api-key" type="password" autocomplete="off" spellcheck="false" style="padding-right:11px"></span></label>
-      <div class="btnrow"><button type="submit" id="key-submit" class="btn btn-primary wide">Connect</button></div>
+      <div class="btnrow"><button type="submit" disabled data-needs-script id="key-submit" class="btn btn-primary wide">Connect</button></div>
     </form>
     <div class="linkrow"><button type="button" class="link" data-back="main">Back</button></div>
   </section>
