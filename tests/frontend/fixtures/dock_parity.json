@@ -580,6 +580,19 @@
       "why": "Files and diff stay in the agent view dock"
     },
     {
+      "id": "files/action/file-more",
+      "tab": "files",
+      "kind": "action",
+      "what": "click -> file-more",
+      "action": "file-more",
+      "source": "static/changed_files.js:16",
+      "status": "stays",
+      "newHome": "agent page: Files tab (a phone row has one More button, #7652)",
+      "proof": null,
+      "okRef": "Orchestrator 2026-10-25 11:26Z board post 'Operator correction on the dock removal (#7457)': it is ONLY for the team view; the agent's own view keeps its dock",
+      "why": "Files stays in the agent view dock; #7652 put a phone row's Copy, Preview and Edit behind More"
+    },
+    {
       "id": "files/label/unstar",
       "tab": "files",
       "kind": "label",
@@ -2892,7 +2905,7 @@
       "newHome": "team page: task page, Assigned to opens the agent that has the task (UI/UX and the Orchestrator: board tasks have no subagent rows)",
       "proof": {
         "file": "static/team_tasks_page.js",
-        "needle": "fact(dl, 'Assigned to', who ? btn('team-link', task.assigned_to"
+        "needle": "who && !isDoneTask(task) && doer === task.assigned_to ? btn('team-link', doer"
       }
     },
     {
@@ -2933,7 +2946,7 @@
       "newHome": "team page: task page, Assigned to opens the agent that has the task (UI/UX and the Orchestrator: board tasks have no subagent rows)",
       "proof": {
         "file": "static/team_tasks_page.js",
-        "needle": "fact(dl, 'Assigned to', who ? btn('team-link', task.assigned_to"
+        "needle": "who && !isDoneTask(task) && doer === task.assigned_to ? btn('team-link', doer"
       }
     },
     {
@@ -4194,6 +4207,19 @@
       "proof": null,
       "okRef": "Orchestrator 2026-10-25 11:26Z board post 'Operator correction on the dock removal (#7457)': it is ONLY for the team view; the agent's own view keeps its dock (its tab strip with it: #7621, 170 UI 1, approved by UI/UX in #7630)",
       "why": "the agent view keeps its dock; #7621 put its rarely used tabs behind More"
+    },
+    {
+      "id": "dock chrome/action/diff-mode",
+      "tab": "dock chrome",
+      "kind": "action",
+      "what": "change -> diff-mode",
+      "action": "diff-mode",
+      "source": "templates/includes/right_dock.html:61",
+      "status": "stays",
+      "newHome": "agent page: Files tab, the comparison select",
+      "proof": null,
+      "okRef": "Orchestrator 2026-10-25 11:26Z board post 'Operator correction on the dock removal (#7457)': it is ONLY for the team view; the agent's own view keeps its dock",
+      "why": "the agent view keeps its dock and its Files tab; the diff comparison mode select is its own"
     },
     {
       "id": "dock chrome/label/saved-for-later-messages-you-bookmarked",
