@@ -50,7 +50,7 @@ const BASE = require('./test_base').BASE;
             assert.ok(!(await ev(`!![...window.__nt.dlg(${N.team}).querySelectorAll('[role=tablist]')].filter(window.__na.vis).length`)), 'no tabs on step 1');
         });
         await S.run('step 1: the three recent folders are a group named "Recent folders" that starts with "Recent:", and pressing one fills the folder', async () => {
-            const g = await ev(`(() => { const d = window.__nt.dlg(${N.team}); const g = [...d.querySelectorAll('[role=group]')].find(e => ${N.recents}.test(window.__na.name(e))); return g ? { text: window.__na.text(g), b: [...g.querySelectorAll('button')].map(x => window.__na.text(x)) } : null; })()`);
+            const g = await ev(`(() => { const d = window.__nt.dlg(${N.team}); const g = [...d.querySelectorAll('[role=group]')].filter(window.__na.vis).find(e => ${N.recents}.test(window.__na.name(e))); return g ? { text: window.__na.text(g), b: [...g.querySelectorAll('button')].map(x => window.__na.text(x)) } : null; })()`);
             assert.ok(g, 'a role=group named "Recent folders"'); assert.match(g.text, /^Recent:/); assert.deepEqual(g.b, ['payments-app', 'website', 'docs']);
             await t.click('button', /^payments-app$/);
             assert.equal(await ev(`window.__nt.find(window.__nt.dlg(${N.team}), 'input', ${N.folder}).value`), '/work/payments-app');
@@ -138,7 +138,7 @@ const BASE = require('./test_base').BASE;
         await S.run('step 3 is "Step 3 of 3: Start and team settings": a vertical tablist Start, Workflow, Health check, Messaging (Start open), recap above Back, Cancel and Launch team, no Next', async () => {
             await t.click('button', N.next); await t.step(3);
             assert.match(await stepLine(ev), /^Step 3 of 3: Start and team settings/);
-            const tabs = await ev(`(() => { const tl = window.__nt.dlg(${N.team}).querySelector('[role=tablist]'); return tl ? { o: tl.getAttribute('aria-orientation'), t: [...tl.querySelectorAll('[role=tab]')].filter(window.__na.vis).map(x => ({ n: window.__na.name(x), s: x.getAttribute('aria-selected') })) } : null; })()`);
+            const tabs = await ev(`(() => { const tl = window.__nt.tablist(window.__nt.dlg(${N.team})); return tl ? { o: tl.getAttribute('aria-orientation'), t: [...tl.querySelectorAll('[role=tab]')].filter(window.__na.vis).map(x => ({ n: window.__na.name(x), s: x.getAttribute('aria-selected') })) } : null; })()`);
             assert.ok(tabs, 'a role=tablist'); assert.deepEqual(tabs.t.map(x => x.n), N.tabs); assert.equal(tabs.t[0].s, 'true', 'Start is the open tab');
             for (const rx of [N.back, N.cancel, N.launch]) assert.ok(await t.has('button', rx), `${rx}`);
             assert.ok(!(await t.has('button', N.next)), 'no Next on step 3'); await footer(N.launch, 'step 3');

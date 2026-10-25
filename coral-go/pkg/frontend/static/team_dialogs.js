@@ -378,6 +378,10 @@ async function _initTeamForm() {
         dirInput.addEventListener('input', () => { clearTimeout(_gitCheckTimer); _gitCheckTimer = setTimeout(_checkTeamGitDir, 500); });
         dirInput.addEventListener('change', _checkTeamGitDir);
     }
+    for (const id of ['team-board-name', 'launch-team-dir']) { // Enter in either is Next (#7407)
+        const el = document.getElementById(id);
+        if (el && !el.dataset.enterWired) { el.dataset.enterWired = '1'; el.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing && currentTeamStep() === 'team') { e.preventDefault(); teamStepMove(1); } }); }
+    }
     document.getElementById('launch-team-base-branch')?.addEventListener('input', e => { e.target.dataset.edited = '1'; }); // a branch the person typed is kept when the folder changes
     _checkTeamGitDir(); // initial check
     _renderTeamDirRecents();

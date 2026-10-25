@@ -45,7 +45,7 @@ async function openNewAgent(ev, waitFor) {
     await ev(`(async () => { await window.showLaunchModal(); const c = document.querySelector('#launch-step-chooser [data-arg="agent"]'); if (c && c.getClientRects().length) c.click(); return true; })()`);
     await waitFor(`!!window.__na.dialog()`, 'the New agent dialog (role=dialog named New agent)', 6000);
 }
-const stepLine = ev => ev(`(() => { const d = window.__na.dialog(); if (!d) return ''; const hits = [...d.querySelectorAll('*')].map(e => window.__na.text(e)).filter(t => /^Step \\d of 3: /.test(t)); hits.sort((a, b) => a.length - b.length); return hits[0] || ''; })()`);
+const stepLine = ev => ev(`(() => { const d = window.__na.dialog(); if (!d) return ''; const hits = [...d.querySelectorAll('*')].filter(window.__na.vis).map(e => window.__na.text(e)).filter(t => /^Step \\d of 3: /.test(t)); hits.sort((a, b) => a.length - b.length); return hits[0] || ''; })()`);
 
 // A scenario list that reports every one, not the first: a failing-first suite says what is missing in each place.
 function scenarios() {

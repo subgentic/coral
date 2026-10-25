@@ -97,7 +97,7 @@ const BASE = require('./test_base').BASE;
         });
         await S.run('Edit member is a dialog named "Edit member" with the tabs Persona, Agent, Permissions, Advanced; Cancel is leftmost and Save member the rightmost; it is the same size as New team', async () => {
             const roles0 = await roles(); await openRow(roles0[1]);
-            const tabs = await ev(`(() => { const d = window.__nt.dlg(${N.member}); const tl = d.querySelector('[role=tablist]'); const t = tl ? [...tl.querySelectorAll('[role=tab]')].filter(window.__na.vis).map(x => window.__na.name(x)) : []; return t.length ? t : [...window.__nt.find(d, 'select', ${N.section}).options].map(o => o.textContent.trim()); })()`);
+            const tabs = await ev(`(() => { const d = window.__nt.dlg(${N.member}); const tl = window.__nt.tablist(d); const t = tl ? [...tl.querySelectorAll('[role=tab]')].filter(window.__na.vis).map(x => window.__na.name(x)) : []; return t.length ? t : [...window.__nt.find(d, 'select', ${N.section}).options].map(o => o.textContent.trim()); })()`);
             assert.deepEqual(tabs, N.memberTabs);
             const b = await ev(`window.__nt.buttons(window.__nt.dlg(${N.member}))`); const cancel = b.find(x => N.cancel.test(x.name)), saveB = b.find(x => N.save.test(x.name));
             assert.ok(cancel && saveB, 'Cancel and Save member'); assert.ok(cancel.x < saveB.x, 'Cancel is left of Save member'); assert.ok(Math.abs(cancel.y - saveB.y) < 4, 'one row');

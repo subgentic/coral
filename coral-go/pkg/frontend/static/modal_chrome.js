@@ -125,7 +125,7 @@ document.addEventListener("keydown", (e) => {
             if (modal.style.display !== 'none' && modal.getClientRects().length > 0) {
                 const focusable = Array.from(modal.querySelectorAll(
                     'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), a[href], summary, [tabindex]:not([tabindex="-1"])' // summary: a disclosure that is the last control (the artifact viewer's "Who can read this") is not skipped by the wrap
-                )).filter(el => el.getClientRects().length > 0);
+                )).filter(el => el.getClientRects().length > 0 && el.tabIndex >= 0); // a roving-tabindex tab (-1) is not a stop: the first and last are the first and last the Tab key reaches (#7407)
                 if (focusable.length === 0) return;
                 const first = focusable[0];
                 const last = focusable[focusable.length - 1];
