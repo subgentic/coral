@@ -1252,6 +1252,12 @@
     transition: height 0.1s ease-out;
 }
 
+/* A sidebar row on a phone or a touch screen: the button is the row, 44 px high, and the li around it adds nothing (session.css has the desktop 36 px) */
+@media (max-width: 767px), (pointer: coarse) {
+    .sidebar-pane .session-list > li:not(.session-group-header):has(> .row-btn) { min-height: 0; }
+    .sidebar-pane .session-list > li:not(.session-group-header) > .row-btn { min-height: var(--control-touch-height, 44px); }
+}
+
 /* ── Touch-friendly adjustments ───────────────────────────── */
 
 @media (hover: none) and (pointer: coarse) {

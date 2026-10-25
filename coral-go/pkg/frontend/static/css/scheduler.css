@@ -317,7 +317,7 @@ div.job-field#sched-label { margin-bottom: 6px; }
 .item-bar .btn { margin: 0; } /* the bar's gap is the bar's own */
 @media (pointer: coarse), (max-width: 767px) {
     .sched-actions .btn, .sched-more-menu .btn { min-height: var(--control-touch-height, 44px); }
-    #scheduled-jobs-list .sched-row { min-height: var(--control-touch-height, 44px); padding-inline: 0; }
+    #scheduled-jobs-list .sched-row { min-height: var(--control-touch-height, 44px); padding-inline: 0; } #scheduled-jobs-list .sched-row > .row-btn { padding-inline: 0; } /* the button is the row (session.css): on a phone its text starts where the heading does */
     #scheduled-jobs-list { padding-inline: 0; } /* the rows start where the page heading does */
     .sched-settings > summary { min-height: var(--control-touch-height, 44px); }
 }

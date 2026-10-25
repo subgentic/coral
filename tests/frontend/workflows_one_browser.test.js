@@ -64,6 +64,9 @@ const STUB = `(() => { const real = window.fetch; const J = b => Promise.resolve
             await waitFor(`document.querySelectorAll('${pane('workflows')} .sgroup-header').length === 2 && document.querySelectorAll('${pane('workflows')} li .row-btn').length === 3`, at + 'the groups and the workflows', 10000);
             assert.deepEqual(await ev(`[...document.querySelectorAll('${pane('workflows')} .sgroup-header .group-name-text')].map(e => e.textContent)`), ['Active', 'Paused'], at + 'Active and Paused');
             assert.deepEqual(await ev(`[...document.querySelectorAll('${pane('workflows')} .sgroup-header .session-group-count')].map(e => e.textContent)`), ['2', '1'], at + 'with their counts');
+            // the button is the row: the li around it has no padding and the button is 36 px high (44 on a phone), UI/UX's rule for every sidebar list (#7473)
+            assert.deepEqual(await ev(`(() => { const b = document.querySelector('${pane('workflows')} li:not(.session-group-header) > .row-btn'), li = b.parentElement, cs = getComputedStyle(li); return { pad: [cs.paddingTop, cs.paddingBottom], h: Math.round(b.getBoundingClientRect().height) >= ${mobile ? 44 : 36}, same: Math.abs(li.getBoundingClientRect().height - b.getBoundingClientRect().height) <= 1 }; })()`), { pad: ['0px', '0px'], h: true, same: true }, at + 'a row is its button, no padding on the li, at least ${mobile ? 44 : 36} px high');
+
             assert.equal(await ev(`document.querySelector('${pane('workflows')} .sidebar-search-input').getAttribute('aria-label')`), 'Search workflows', at + 'the search is named for the tab');
             assert.equal(await ev(`!!document.querySelector('${pane('workflows')} [data-display-button]')`), false, at + 'no Display options');
             assert.equal(await ev(`document.querySelector('${pane('workflows')} .sidebar-footer .btn').textContent.trim()`), '+ New workflow', at + '"+ New workflow" is pinned under the list');

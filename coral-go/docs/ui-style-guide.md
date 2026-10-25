@@ -172,6 +172,7 @@ Every tab with a list uses one sidebar: a pane of the left column, 320px wide, w
 
 - **Header, one row:** a search field named for the tab ("Search chats"); **Display options** where the tab has some (a tab without them has no button, and the search takes the width); **Expand or collapse all** where the tab has groups; **Hide** at the far right, in the same pixels on every tab. Icon buttons are 32px on a desktop and 44px on touch, each with an accessible name.
 - **List:** groups with a chevron, a name and a count (11/600), and rows with a title (13/500) and one muted line (12/400). **The chevron only folds its group; the group's name opens the whole group in the centre as a table.**
+- **A row is its button:** the `li` has no padding; the button inside it is the row, 36px high on a desktop and 44px on a phone or a touch screen (a gap between rows is fine only if the targets stay 44). A row that looks 60px high is padding on the `li`, not a design. One rule in `session.css` and `mobile.css`, so every tab changes together.
 - **Pinned action** under the list where the tab has one (+ New agent, + New job): at the foot of the column, not scrolled away. Creating is the sidebar's action, not a button in the main pane.
 - **Hide** turns the column into a 56px rail with the tab's own search and action, and gives the width to the main pane; the choice is kept per tab.
 - **Computer** (Coral Hub): the picker for whose chats a list shows is above the list, not inside Display options.

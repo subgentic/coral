@@ -38,6 +38,9 @@ const BASE = require('./test_base').BASE;
             await openTab('docs');
             await waitFor(`document.querySelectorAll('${pane('docs')} .sgroup-header').length === 2 && document.querySelectorAll('${pane('docs')} li .row-btn').length > 10`, at + 'the groups and the topics', 15000);
             assert.deepEqual(await ev(`[...document.querySelectorAll('${pane('docs')} .sgroup-header .group-name-text')].map(e => e.textContent)`), ['Getting started', 'API'], at + 'two groups');
+            // the button is the row: the li around it has no padding and the button is 36 px high (44 on a phone), UI/UX's rule for every sidebar list (#7473)
+            assert.deepEqual(await ev(`(() => { const b = document.querySelector('${pane('docs')} li:not(.session-group-header) > .row-btn'), li = b.parentElement, cs = getComputedStyle(li); return { pad: [cs.paddingTop, cs.paddingBottom], h: Math.round(b.getBoundingClientRect().height) >= ${mobile ? 44 : 36}, same: Math.abs(li.getBoundingClientRect().height - b.getBoundingClientRect().height) <= 1 }; })()`), { pad: ['0px', '0px'], h: true, same: true }, at + 'a row is its button, no padding on the li, at least ${mobile ? 44 : 36} px high');
+
             const counts = await ev(`[...document.querySelectorAll('${pane('docs')} .sgroup-header .session-group-count')].map(e => Number(e.textContent))`);
             assert.equal(counts[0] + counts[1], await ev(`document.querySelectorAll('${pane('docs')} li .row-btn').length`), at + 'the counts are the topics');
             assert.ok(counts[0] >= 1 && counts[1] >= 1, at + 'both groups have topics: ' + counts);

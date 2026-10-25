@@ -20,6 +20,10 @@
     transition: background 0.15s ease, box-shadow 0.15s ease;
 }
 
+/* The button is the row (UI/UX's rule for every sidebar list, #7473): the li around it has no padding, the button has it, 36 px high; a phone has 44 (mobile.css). The li's focus ring and hover stay the li's. */
+.sidebar-pane .session-list > li:not(.session-group-header):has(> .row-btn) { padding: 0; }
+.sidebar-pane .session-list > li:not(.session-group-header) > .row-btn { padding: 8px 16px; min-height: 36px; }
+
 #history-sessions-list li:not(.session-group-header) { /* a group's header is a row (chevron, name, count), not a chat's column (#7443) */
     display: flex;
     flex-direction: column;
