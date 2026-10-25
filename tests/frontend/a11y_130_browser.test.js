@@ -8,6 +8,7 @@ const { STUB: COMMENTS_STUB, HEX } = require('./helpers/comments_scale');
 const PANELS = require('./helpers/list_bars_panels');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const CONTENT = ['# Pricing', '', 'The starter plan costs nine dollars a month and includes three seats for the whole team.', '', 'The team plan costs thirty dollars a month and includes twenty seats and the audit log.'].join('\n');
 const FX = {
@@ -32,7 +33,7 @@ const FX = {
     const load = async (w, theme) => {
         await view(w, theme);
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`); await installAudit(ev); await setTheme(ev, theme);
+        await coralReady(ev); await installAudit(ev); await setTheme(ev, theme);
     };
     const team = 'a11y-' + Date.now().toString(36);
     const results = [];

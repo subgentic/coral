@@ -18,7 +18,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 
 const BASE = require('./test_base').BASE;
-const { settle } = require('./helpers/wait');
+const { settle, coralReady } = require('./helpers/wait');
 
 // WCAG contrast ratio of two '#rrggbb' colours.
 const contrast = (a, b) => {
@@ -219,7 +219,7 @@ const contrast = (a, b) => {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
             for (const theme of ['dark', 'light']) {
                 await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-                await ev(`window.__coralReady.then(() => true)`);
+                await coralReady(ev);
                 await ev(`localStorage.setItem('coral-live-view-mode', 'chat'); (async () => { const m = await import((window.__coralStatic || '/static/') + 'settings_core.js'); m.clearCustomThemeVars(); m.applyTheme('${theme}'); })(); window.__m.add('docs-bot', 'A', 6, { sleeping: false }); window.__m.add('api-worker', 'B', 3, { sleeping: false }); true`);
                 await ev(`document.documentElement.style.setProperty('--zz', '1'); const st = document.createElement('style'); st.textContent = '* { transition: none !important }'; document.head.appendChild(st); true`);
                 await settle(ev, 500);   // sleep-ok: a scene settles over several answers; there is no single completion event
@@ -254,7 +254,7 @@ const contrast = (a, b) => {
         console.log('7. Every kind of focusable control shows a focus indicator');
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`localStorage.setItem('coral-live-view-mode', 'chat'); window.__m.add('docs-bot', 'A', 6, { sleeping: false }); true`);
         await settle(ev, 500);   // sleep-ok: a scene settles over several answers; there is no single completion event
         await ev(`window.selectLiveSession('docs-bot', 'claude', 'docs-bot-id', 'local'); true`); await settle(ev, 1000);   // sleep-ok: a scene settles over several answers; there is no single completion event

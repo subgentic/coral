@@ -8,6 +8,7 @@ const { watch, clear, log, problems, said } = require('./helpers/announce_census
 const { openBoardComposer } = require('./helpers/phone_targets');
 const VERSIONS = require('./helpers/artifact_versions_stub');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const S = `(window.__coralStatic || '/static/')`;
 
 (async () => {
@@ -28,7 +29,7 @@ const S = `(window.__coralStatic || '/static/')`;
         for (const [w, h, mobile, tag] of [[1280, 800, false, 'desktop'], [390, 844, true, 'phone']]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             await ev(`window.__m.add('rep', 'R', 4, { sleeping: false }); window._coralSetLiveSessions && window._coralSetLiveSessions(Object.values(window.__m.agents).map(a => window.__m.entry(a))); true`);
             await ev(`localStorage.setItem('coral-live-view-mode', 'chat'); true`);
             await select('rep');

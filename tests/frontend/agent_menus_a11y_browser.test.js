@@ -3,6 +3,7 @@
 // has no sidebar). Drives Chrome over CDP through agent_view_harness.js with its mocked agents, against the isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, PRELOAD, install } = await connect();
@@ -14,7 +15,7 @@ const { connect } = require('./agent_view_harness');
         await Emulation.setFocusEmulationEnabled({ enabled: true }); // the menus close on Tab only while the page has focus (as it does for a person)
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         await ev(`window.__m.add('a1', 'A', 2, { sleeping: false, board_project: 'team-x' }); window.__m.add('a2', 'B', 2, { sleeping: true }); window._coralSetLiveSessions(Object.values(window.__m.agents).map(a => window.__m.entry(a))); true`);
         await new Promise(r => setTimeout(r, 1200)); // sleep-ok: the list draws from the mocked agents
         for (const [what, sel] of [['a team', '.group-kebab-btn'], ['an agent', '.session-group-item .sidebar-kebab-btn']]) {

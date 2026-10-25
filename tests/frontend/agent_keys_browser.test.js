@@ -9,6 +9,7 @@ const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const KEYS = [['Esc', 'Escape', 'Escape'], ['←', 'Left', 'Left arrow'], ['↑', 'Up', 'Up arrow'], ['↓', 'Down', 'Down arrow'], ['→', 'Right', 'Right arrow'], ['Enter', 'Enter', 'Enter'], ['Ctrl-C', 'C-c', 'Ctrl-C, interrupt']];
 const STUB = `(() => { const real = window.fetch; window.__keys = [];
@@ -29,7 +30,7 @@ const STUB = `(() => { const real = window.fetch; window.__keys = [];
         const load = async (w, h, mobile) => {
             await size(w, h, mobile); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`); await ev(STUB);
+            await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings'); await ev(STUB);
             await ev(`window.__m.add('ak', 'A', 6, { sleeping: false, session_id: 'ak-sid' }); window._coralSetLiveSessions(Object.values(window.__m.agents).map(a => window.__m.entry(a))); localStorage.setItem('coral-live-view-mode', 'chat'); true`);
             await select('ak');
             await waitFor(`window.__rendered && window.__rendered().length >= 3`, 'the chat', 15000);

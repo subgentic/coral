@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install, select } = await connect();
@@ -13,7 +14,7 @@ const BASE = require('./test_base').BASE;
             const at = `${w}px${mobile ? '' : ' (a narrow desktop window)'}: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             await ev(`window.__m.add('oat-a', 'A', 4, { sleeping: false, session_id: 'oat-sid' }); true`);
             await ev(`window.switchNavTab('agents'); Promise.resolve(window._coralLoadLiveSessions && window._coralLoadLiveSessions()).then(() => true)`);
             await waitFor(`document.querySelectorAll('#mobile-agent-list .sidebar-kebab-btn[aria-controls^="kebab-agent-"]').length >= 1`, 'an agent row', 10000);
@@ -30,7 +31,7 @@ const BASE = require('./test_base').BASE;
         // the header's right edge at 320 px
         await Emulation.setDeviceMetricsOverride({ width: 320, height: 800, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`window.__m.add('oat-b', 'B', 4, { sleeping: false, session_id: 'oat-sid2' }); true`); await select('oat-b');
         await waitFor(`!!document.getElementById('terminal-header-label') && document.getElementById('terminal-header-label').textContent.length > 0`, 'the header', 8000);
         await new Promise(r => setTimeout(r, 500)); // sleep-ok: the header lays out after the selection
