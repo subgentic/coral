@@ -2454,16 +2454,7 @@ button.subscriber-history-link {
 
 
 
-.team-generate-ai-btn {
-    border-color: rgba(var(--fx-indigo-rgb), 0.35) !important;
-    color: var(--accent-light) !important; /* 4.5:1 on the light panel (--accent was 3.8) */
-    background: rgba(var(--fx-indigo-rgb), 0.08) !important;
-}
 
-.team-generate-ai-btn:hover {
-    background: rgba(var(--fx-indigo-rgb), 0.16) !important;
-    border-color: var(--accent) !important;
-}
 
 
 .team-advanced {
@@ -3495,11 +3486,6 @@ button.subscriber-history-link {
     flex: 1;
 }
 
-.icon-btn-inline {
-    font-size: 0.875rem;
-    vertical-align: -2px;
-    margin-right: 2px;
-}
 
 /* Tmux missing banner — shown across the top when tmux can't be found.
    Agents need tmux to run, so we surface install instructions instead of
@@ -4439,13 +4425,6 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
     .cm-row .btn, .cm-actions .btn, .cm-add { min-height: 44px; min-width: 44px; }
 }
 .modal-content:has(.settings-shell) #launch-step-agent .settings-modal-body { flex-direction: column; overflow: auto; }
-.sd-essentials { flex: none; padding: 1.1rem 1.6rem .4rem; }
-.sd-essentials label { display: block; margin-bottom: .6rem; }
-.sd-essentials input[type="text"] { box-sizing: border-box; }
-@container sd (max-width: 40rem) {
-    .sd-essentials { padding: .8rem 1rem .3rem; }
-    .sd-essentials :is(input[type="text"], .btn) { min-height: 44px; }
-}
 /* Agent Team (UI audit #5589, findings 5 and 6): the team name, which every launch needs, is above the sections; the template tools are one disclosure after the picker, so the members come first. */
 .modal-content:has(.settings-shell) #launch-step-team .settings-modal-body { flex-direction: column; }
 /* Folded section: one summary style. A user sets only the --dz-* variables that differ. */
@@ -4453,11 +4432,6 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .disclosure[open] > summary { margin-bottom: var(--dz-gap, .4rem); }
 .health-advanced { --dz-gap: 10px; }
 .health-advanced > fieldset + fieldset { margin-top: 16px; }
-#launch-step-team .sd-essentials { padding-bottom: .3rem; }
-#launch-step-team .sd-name-grid { display: grid; grid-template-columns: max-content minmax(0, 38rem); gap: .6rem; align-items: start; }
-#launch-step-team .sd-name-grid > label { margin: 0; padding-top: .6rem; }
-#launch-step-team .sd-name-field #team-board-name { width: 100%; }
-@container sd (max-width: 40rem) { #launch-step-team .sd-name-grid { grid-template-columns: minmax(0, 1fr); gap: .3rem; } #launch-step-team .sd-name-grid > label { padding-top: 0; } }
 .launch-type-glyph { font-size: 2rem; } /* the agent card draws the same robot as the start page */
 
 /* Settings' footer: the note that something is not saved yet, on the left (UI audit #5589, finding 27); and the CLI paths behind one line. */
@@ -4781,7 +4755,7 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .team-agent-summary b { color: var(--text-primary); font-weight: 600; }
 .team-agent-chev { color: var(--text-secondary); font-size: 1.25rem; }
 .team-agent-menu-btn { display: inline-grid; place-items: center; width: 36px; height: 36px; background: var(--bg-primary); border: 1px solid var(--control-border); border-radius: var(--radius-md); color: var(--text-primary); cursor: pointer; }
-.team-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 6; min-width: 12rem; padding: 4px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: 0 6px 20px rgba(0, 0, 0, .35); }
+.team-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 6; min-width: 12rem; padding: 4px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: var(--shadow-md); }
 .team-menu[hidden] { display: none; }
 .team-menu.team-menu-up { top: auto; bottom: calc(100% + 4px); }
 .team-menu-item { display: block; width: 100%; min-height: 36px; padding: 6px 12px; background: none; border: 0; border-radius: var(--radius-sm); color: var(--text-primary); font: inherit; text-align: left; cursor: pointer; }

@@ -411,10 +411,6 @@ async function _initTeamForm() {
     _validateTeamName();
 }
 
-window._loadTeamTemplateFromSelect = function(name) {
-    if (!name) return;
-    _loadTeamTemplate(name);
-};
 
 function _loadTeamTemplate(name) {
     const all = [...BUILTIN_TEAM_TEMPLATES, ..._getSavedTeamTemplates()];
