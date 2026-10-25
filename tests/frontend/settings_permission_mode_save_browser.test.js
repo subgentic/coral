@@ -1,7 +1,7 @@
 // The default permission mode when nothing is saved (#7620, from the 169 real-Codex check): the field shows Auto, and
-//   - a Save that never touched it leaves it unset (a dialog saved without touching a field does not turn the default into a saved mode, #5836);
-//   - a pick is saved even when it is the Auto the field showed: pick another mode, pick Auto back, Save, and Auto is saved (the person thinks it is), after which
-//     the line "Agents cannot start workers in this mode." shows (#7587), and a saved Default shows none.
+//   - nothing saved: the select shows its own first option, "Not set (Auto)", chosen, with the line "Nothing is saved: new agents use Auto." and no warning;
+//   - a Save that never touched it leaves it unset (#5836); picking Auto is a real change from Not set and is saved, after which the line "Agents cannot start workers in this mode." shows (#7587);
+//   - once a mode is saved the Not set option is not offered (a saved mode is not cleared from this select).
 // Real isolated server; the shard's own setting is put back at the end by the settings guard.
 const assert = require('node:assert/strict');
 const CDP = require('chrome-remote-interface');
@@ -27,25 +27,27 @@ const BASE = require('./test_base').BASE;
     await Page.enable(); await Page.navigate({ url: BASE }); await Page.loadEventFired();
     await ev(`new Promise(r=>{const t=setInterval(()=>{if(window.__coralStatic||document.readyState==='complete'){clearInterval(t);r(true)}},50)})`);
 
+    const state = () => ev(`(()=>{const s=document.getElementById('settings-permission-mode');const row=s.closest('.settings-row');const w=row.querySelector('.perm-mode-warn');return {value:s.value,notSet:[...s.options].some(o=>o.value===''),first:s.options[0].textContent,mode:row.querySelector('.perm-mode-desc').textContent,warn:!w.hidden&&w.getBoundingClientRect().height>0};})()`);
     assert.equal(await put({ default_permission_mode: '' }), 200, 'nothing saved to start with');
     assert.equal(await saved(), '');
     await openDialog();
-    assert.deepEqual(await line(), { shown: false, select: 'auto' }, 'unset shows Auto and no line');
+    assert.deepEqual(await state(), { value: '', notSet: true, first: 'Not set (Auto)', mode: 'Nothing is saved: new agents use Auto.', warn: false }, 'unset: "Not set (Auto)" is chosen, with its line and no warning');
     await save();
-    assert.equal(await saved(), '', 'a Save that never touched the field leaves it unset');
+    assert.equal(await saved(), '', 'a Save that never touched the select leaves it unset');
 
     await openDialog();
-    await pick('default'); assert.equal((await line()).shown, false, 'Default: no line');
-    await pick('auto'); assert.deepEqual(await line(), { shown: true, select: 'auto' }, 'picking Auto shows the line at once');
+    await pick('auto');
+    assert.deepEqual(await state(), { value: 'auto', notSet: true, first: 'Not set (Auto)', mode: 'Everything, with safety checks.', warn: true }, 'picking Auto shows its own line and the warning at once');
     await save();
-    assert.equal(await saved(), 'auto', 'picking Auto and pressing Save saves Auto, though the field showed Auto already');
+    assert.equal(await saved(), 'auto', 'picking Auto from Not set is a real change, and it is saved');
     await openDialog();
-    assert.deepEqual(await line(), { shown: true, select: 'auto' }, 'a saved Auto shows the line when the dialog opens');
+    assert.deepEqual(await state(), { value: 'auto', notSet: false, first: 'Default', mode: 'Everything, with safety checks.', warn: true }, 'a saved Auto: no Not set option, and the warning line');
 
     await pick('default'); await save();
     assert.equal(await saved(), 'default', 'Default is saved');
     await openDialog();
-    assert.deepEqual(await line(), { shown: false, select: 'default' }, 'a saved Default shows no line');
+    assert.deepEqual(await state(), { value: 'default', notSet: false, first: 'Default', mode: "Asks before acting (each CLI's normal mode)", warn: false }, 'a saved Default shows no warning and still has no Not set option');
+
     console.log('PASS settings permission mode save');
   } finally { await guard.restore().catch(e => console.error('settings restore: ' + (e && e.message))); await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

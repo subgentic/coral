@@ -18,7 +18,7 @@ import { attachDialogFocus } from './dialog_focus.js';
 import { browserLocal } from './safe_storage.js';
 import { openSettingsGroup } from './settings_nav.js';
 const { _fillModelDatalist, _getAgentModels, _invalidateAgentModels, _invalidateDefaultModels } = await importOnce('./launch_models.js');
-const { defaultPermissionMode, _updatePermModeDescription } = await importOnce('./permission_flags.js');
+const { _updatePermModeDescription } = await importOnce('./permission_flags.js');
 
 // ── Settings: API key (#3152) ─────────────────────────────────────────────
 // Masked at full width with Show and Copy; a status message (not configured,
@@ -680,10 +680,12 @@ function _fillDefaults(s) {
     if (agentTypeSelect) agentTypeSelect.value = currentAgentType;
 
     // Default Permission Mode
-    const currentPermMode = defaultPermissionMode(s, "claude"); // not saved: Claude starts in Auto, the other CLIs keep their own default (#5836)
     const permModeSelect = document.getElementById("settings-permission-mode");
     if (permModeSelect) {
-        permModeSelect.value = currentPermMode;
+        // Nothing saved: the first option, "Not set (Auto)", is chosen (Claude starts in Auto, #5836), and picking Auto is then a real change that is saved (#7620). Once a mode is saved that option is not offered: a saved mode is not cleared from here.
+        const notSet = [...permModeSelect.options].find(o => o.value === '');
+        if (s.default_permission_mode) { notSet?.remove(); permModeSelect.value = s.default_permission_mode; }
+        else { if (!notSet) permModeSelect.prepend(new Option('Not set (Auto)', '')); permModeSelect.value = ''; }
         _updatePermModeDescription(permModeSelect, !s.default_permission_mode);
         // A pick is a choice even when it is the mode the field showed (nothing saved shows Auto): it is saved, so a person who picks Auto and saves has Auto saved (#7620)
         permModeSelect.dataset.edited = '';
@@ -1026,7 +1028,7 @@ function readSettingsForm() {
 
     // Only what the person changed since the dialog opened: a field this dialog never touched (a CLI path another
     // tab saved meanwhile) is not written back with the value this page opened with.
-    payload = changedSettings(dropUnfilledCLIPaths(payload), _settingsAtOpen, themeValue, [...editedCLIPathKeys(), ...(document.getElementById('settings-permission-mode')?.dataset.edited === '1' ? ['default_permission_mode'] : [])], defaultThemeChoice());
+    payload = changedSettings(dropUnfilledCLIPaths(payload), _settingsAtOpen, themeValue, [...editedCLIPathKeys(), ...(document.getElementById('settings-permission-mode')?.dataset.edited === '1' && document.getElementById('settings-permission-mode').value ? ['default_permission_mode'] : [])], defaultThemeChoice());
     // The hub accepts only the per-user keys (anything else refuses the whole request); the machine ones are hidden.
     if (isCloud()) payload = filterSettingsPayload(payload).kept;
 

@@ -18,6 +18,7 @@ const PERM_FLAGS = {
 export { defaultPermissionMode, syncDefaultPermissionMode, trackPermissionPick }; // pure, in preset_enforcement.js (node-tested)
 
 export const PERMISSION_MODE_DESCRIPTIONS = {
+    '': 'Nothing is saved: new agents use Auto.', // Settings' first option while no mode is saved (#7620)
     default: "Asks before acting (each CLI's normal mode)",
     acceptEdits: 'Reads, file edits, and common filesystem commands (mkdir, touch, mv, cp, etc.) — best for iterating on code you\'re reviewing',
     plan: 'Reads only — best for exploring a codebase before changing it',
@@ -40,9 +41,9 @@ export function _updatePermModeDescription(selectEl, unset = false) {
     const warn = selectEl.closest('.settings-row')?.querySelector('.perm-mode-warn'); // only the Settings row has it
     if (warn) {
         warn.textContent = WORKERS_REFUSED[selectEl.value] || WORKERS_REFUSED_ANY;
-        warn.hidden = unset || selectEl.value === 'default';
+        warn.hidden = unset || selectEl.value === 'default' || selectEl.value === ''; // nothing saved refuses nothing
     }
-    const hint = selectEl.parentElement?.querySelector('.perm-mode-desc');
+    const hint = selectEl.parentElement?.querySelector('.perm-mode-desc') || selectEl.closest('.settings-row')?.querySelector('.perm-mode-desc'); // Settings' line is in the label, not beside the select
     if (!hint) return;
     const codex = selectEl.closest('[data-acf-uid]')?.querySelector('.acf-agent-type')?.value === 'codex';
     hint.textContent = codex && CODEX_NETWORK_MODES.includes(selectEl.value) ? CODEX_AUTO_DESCRIPTION : PERMISSION_MODE_DESCRIPTIONS[selectEl.value] || '';

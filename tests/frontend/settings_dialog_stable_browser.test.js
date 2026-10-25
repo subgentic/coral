@@ -76,7 +76,7 @@ const SCALE = new Set(['16/700', '17/700', '14/600', '14/400', '13/500', '13/400
                 const sel = document.getElementById('settings-permission-mode'); out[k] = [sel.value, sel.closest('.settings-row').querySelector('.perm-mode-warn').getBoundingClientRect().height > 0];
             }
             window.fetch = realFetch; return out; })()`);
-        assert.deepEqual(savedLine, { unset: ['auto', false], 'saved auto': ['auto', true], 'saved default': ['default', false] }, 'the line follows the SAVED mode: a fresh install (nothing saved, the select reads Auto) refuses nothing and shows no line (Security, #7587)');
+        assert.deepEqual(savedLine, { unset: ['', false], 'saved auto': ['auto', true], 'saved default': ['default', false] }, 'the line follows the SAVED mode: a fresh install (nothing saved, the select reads Not set) refuses nothing and shows no line (Security, #7587)');
         const ANY = 'Agents cannot start workers in this mode.';
         const warnState = await ev(`(() => { const sel = document.getElementById('settings-permission-mode'), row = sel.closest('.settings-row'), warn = row.querySelector('.perm-mode-warn'), learn = row.querySelector('.settings-learn'), out = {}; const shown = () => warn.getBoundingClientRect().height > 0;
             for (const m of ['plan', 'bypassPermissions', 'default', 'dontAsk', 'acceptEdits', 'auto']) { sel.value = m; sel.dispatchEvent(new Event('change', { bubbles: true })); out[m] = shown() ? warn.textContent : null; }

@@ -691,10 +691,11 @@
                 <dt><span id="settings-permission-mode-label">Default permission mode</span><span class="settings-hint perm-mode-desc">Everything, with safety checks.</span><span class="settings-hint perm-mode-warn" hidden>Agents cannot start workers in this mode.</span><span class="settings-hint" data-info>With such a default, an orchestrator's launches are refused until you pick Default or start them yourself.</span></dt>
                 <dd>
                     <select aria-labelledby="settings-permission-mode-label" id="settings-permission-mode" class="settings-select" data-on-change="m-perm-mode-describe">
+                        <option value="" selected>Not set (Auto)</option>
                         <option value="default">Default</option>
                         <option value="plan">Plan</option>
                         <option value="acceptEdits">Accept edits</option>
-                        <option value="auto" selected>Auto</option>
+                        <option value="auto">Auto</option>
                         <option value="bypassPermissions">Bypass permissions</option>
                         <option value="dontAsk">Don't ask</option>
                     </select>
