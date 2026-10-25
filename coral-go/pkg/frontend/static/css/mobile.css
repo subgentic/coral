@@ -1351,7 +1351,6 @@
 
 /* The artifacts table scrolls sideways; on a phone the default scrollbar is a thick grey bar under the header. */
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
-    .team-artifacts-scroll { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
 }
 
 /* 200 percent page zoom on a phone is a page under 260 px wide: the top bar (brand, view dropdown, home and settings buttons) needs 216 px,

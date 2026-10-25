@@ -211,7 +211,7 @@ PANELS.push({
             const side = document.getElementById('agentic-state'); side.classList.remove('collapsed'); side.style.width = '680px'; files.initFileSearch(); files.syncFilesViewerSession(); return true; })()`);
         if (ctx.__phone) await ctx.ev(`window.toggleAgenticPanel(true); true`);
         await ctx.ev(`document.getElementById('agentic-tab-artifacts').click(); true`);
-        await ctx.settle(`!!document.querySelector('#agentic-panel-artifacts .list-bar-search') && document.querySelectorAll('tr.team-artifact-row').length > 0`, 'the list and its search bar');
+        await ctx.settle(`!!document.querySelector('#agentic-panel-artifacts .list-bar-search') && document.querySelectorAll('#agentic-panel-artifacts tbody tr').length > 0`, 'the list and its search bar');
         await openMenu(ctx, '#agentic-panel-artifacts');
         await pick(ctx, '#aa-origin', 'received');
         await ctx.settle(`!!document.querySelector('#agentic-panel-artifacts .list-bar-chip')`, 'a chip');

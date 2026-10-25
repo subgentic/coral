@@ -1,7 +1,7 @@
-// The big HTML builders, before they are split (#4895, from #4893 proposal C): what team_artifacts.js render, needsInputHtml, renderArtifact, _renderSessionItem and renderRunDetail
+// The big HTML builders, before they are split (#4895, from #4893 proposal C): what needsInputHtml, renderArtifact, _renderSessionItem and renderRunDetail
 // produce for a table of states, serialized with the volatile parts fixed (the time zone and locale, the clock, ids that count up) and compared exactly with fixtures/html_builders_golden.json.
 // Each builder is reached the way the dashboard reaches it (a stubbed answer, a state, a click), not by an export made for the test, so splitting a builder into smaller ones must leave every
-// case byte for byte as it is. For team_artifacts the listeners the render attaches are recorded too (a split that drops a click handler changes no markup). CORAL_UPDATE_GOLDEN=1 rewrites
+// case byte for byte as it is. (The agent's Artifacts list, whose cases were here, is the team page's table since #7622: team_page_artifacts_browser and agent_artifacts_tab_browser own it.) CORAL_UPDATE_GOLDEN=1 rewrites
 // the golden. Drives Chrome over CDP through agent_view_harness.js against the isolated dev server.
 const path = require('node:path');
 const { connect } = require('./agent_view_harness');
@@ -22,88 +22,12 @@ const HEX = c => c.repeat(64);
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
         await ev(`window.__coralReady.then(() => true)`);
 
-        // ── team_artifacts.js render ──────────────────────────────────────────────
         const TEAM = 'golden-team';
-        const ITEMS = [
-            { id: HEX('a'), uri: 'coral://artifacts/' + HEX('a'), name: 'report.md', media_type: 'text/markdown', size: 2048, task_id: 21, task_title: 'Write the report', created_at: '2026-10-01T10:00:00Z', produced_by: 'writer', reference_count: 2, source: 'local' },
-            { id: HEX('b'), uri: 'coral://artifacts/' + HEX('b'), name: HEX('b') + '.json', media_type: 'application/json', size: 12, created_at: '2026-10-02T11:30:00Z', task_id: 0 },
-            { id: HEX('c'), uri: '/api/artifacts/' + HEX('c'), name: 'photo.png', media_type: 'image/png', size: 3 * 1024 * 1024, created_at: '2026-10-03T08:15:00Z', source: 'shared', shared_to: 'other-team', sent_by: 'lead' },
-            { id: HEX('d'), uri: 'coral://artifacts/' + HEX('d'), name: 'from-afar.txt', media_type: 'text/plain', size: 900, created_at: '2026-10-04T09:00:00Z', source: 'received', received_from: 'laptop', from_board: 'their-board', also_received_from: ['desk/board-x', 'server only'], sent_by: 'peer' },
-            { id: HEX('e'), uri: 'coral://artifacts/' + HEX('e'), name: 'cited.txt', provenance: 'unverified', created_at: '2026-10-05T09:00:00Z', task_id: 7, task_title: 'Cites a file' },
-            { id: HEX('f'), uri: 'https://example.com/docs/spec.html', name: 'spec (link)', media_type: 'text/html', created_at: 'not a date' },
-            { id: HEX('9'), uri: 'coral://artifacts/' + HEX('9'), name: 'gone.bin', available: false, media_type: 'application/octet-stream', size: 5 },
-            { id: HEX('8'), uri: 'mailto:nobody', name: '', media_type: '', task_id: 3, created_at: '2026-10-06T00:00:00Z' },
-            { id: HEX('7'), inline: true, content_url: `/api/board/${TEAM}/artifacts/inline-1/content`, uri: 'inline:1', name: 'inline-note.md', media_type: 'text/markdown', size: 40, created_at: '2026-10-07T12:00:00Z' },
-        ];
-        await ev(`(() => { const R = window.fetch; window.__ta = { mode: 'normal', items: [], kept: [], extra: {}, personal: [] };
-            const json = (b, s = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } }));
-            window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin); const m = (o.method || 'GET').toUpperCase(); const p = url.pathname, T = window.__ta;
-                if (p.startsWith('/api/board/') && p.endsWith('/artifacts') && m === 'GET') {
-                    const body = () => json({ session_id: url.searchParams.get('session_id') || undefined, project: decodeURIComponent(p.split('/')[3]), artifacts: T.items, ...T.extra });
-                    if (T.mode === 'error') return json({}, 500); if (T.mode === 'deferred') return new Promise(res => { T.release = () => res(body()); }); return body(); }
-                if (p === '/api/session-artifacts') { if (T.mode === 'error') return json({}, 500); return json({ session_id: url.searchParams.get('session_id'), artifacts: T.personal }); }
-                if (p === '/api/system/artifact-store/kept') return json({ kept: T.kept });
-                { const d = /^\\/api\\/artifacts\\/([a-f0-9]{64})$/.exec(p); if (d && m === 'DELETE') return json({ deleted: true }); }
-                if (p.startsWith('/api/')) return json({}); return R(u, o); };
-            // every listener a render attaches, as "tag.class:type"
-            window.__listeners = []; const add = EventTarget.prototype.addEventListener;
-            EventTarget.prototype.addEventListener = function (t, ...r) { const d = this instanceof Element ? this.tagName.toLowerCase() + '.' + String(this.className).trim().replace(/\\s+/g, '.') : (this === window ? 'window' : this === document ? 'document' : 'other'); window.__listeners.push(d + ':' + t); return add.call(this, t, ...r); };
+        await ev(`(() => { const R = window.fetch; const json = (b, s = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } })); // the answers the cases below do not stub themselves are empty
+            window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin); if (url.pathname.startsWith('/api/')) return json({}); return R(u, o); };
             return true; })()`);
-        await ev(`(async () => { const st = ${S}; window.TA = await import(st + 'team_artifacts.js'); window.ST = (await import(st + 'state.js')).state; const {showView} = await import(st + 'utils.js'); showView('live-session-view');
+        await ev(`(async () => { const st = ${S}; window.ST = (await import(st + 'state.js')).state; const {showView} = await import(st + 'utils.js'); showView('live-session-view');
             const side = document.getElementById('agentic-state'); side.classList.remove('collapsed'); side.style.width = '680px'; return true; })()`);
-        const ROOT = id => `document.getElementById('agentic-panel-${id}-view')`;
-        // the markup of a panel, with the listeners its last render attached (sorted, one line each)
-        const snap = async id => ev(`(() => { const r = ${ROOT(id)}; return r.outerHTML + '\\n<!-- listeners\\n' + [...new Set(window.__listeners.filter(l => !/^(window|document|other):/.test(l)))].sort().join('\\n') + '\\n-->'; })()`);
-        const settled = id => waitFor(`${ROOT(id)}.getAttribute('aria-busy') === 'false'`, 'the panel to settle: ' + id, 8000);
-        const teamState = (t, session) => ev(`(() => { window.ST.selectedTeam = ${JSON.stringify(t)}; window.ST.currentSession = ${JSON.stringify(session)}; window.TA.syncFilesSourceTeam(); return true; })()`);
-        const refresh = id => ev(`window.__listeners.length = 0; ${ROOT(id)}.querySelector('.team-artifacts-refresh').click(); true`);
-        const SESSION = { type: 'live', name: 'golden-agent', session_id: 'golden-sid', board_project: TEAM };
-
-        // no team: the line says to pick one
-        await ev(`localStorage.removeItem('coral-agentic-tab-top'); window.TA.selectFilesSource('artifacts'); true`);
-        await teamState(null, null);
-        await ev(`window.__RealDate = Date; { const RD = Date, FIXED = RD.parse('2026-10-10T12:00:00Z'); window.Date = class extends RD { constructor(...a) { if (a.length) super(...a); else super(FIXED); } static now() { return FIXED; } }; } true`); // the artifacts lists say "today" and "Oct 1" from the clock (#6751): fixed for these cases
-        // a team, a list that is still loading, then the answer
-        await teamState(TEAM, SESSION);
-        await settled('artifacts');
-        await ev(`window.__ta.mode = 'deferred'; true`); await refresh('artifacts');
-        await waitFor(`${ROOT('artifacts')}.getAttribute('aria-busy') === 'true'`, 'the loading state');
-        cases['agent artifacts, on a team: loading'] = await snap('artifacts');
-        await ev(`window.__ta.release(); window.__ta.mode = 'normal'; true`); await settled('artifacts');
-        cases['agent artifacts, on a team: empty'] = await snap('artifacts');
-        await ev(`window.__ta.mode = 'error'; true`); await refresh('artifacts'); await settled('artifacts');
-        cases['agent artifacts, on a team: error'] = await snap('artifacts');
-        await ev(`window.__ta.mode = 'normal'; window.__ta.items = ${JSON.stringify(ITEMS)}; window.__ta.kept = []; true`); await refresh('artifacts'); await settled('artifacts');
-        cases['agent artifacts, on a team: rows'] = await snap('artifacts');
-        await ev(`window.__ta.extra = { has_more: true, next_cursor: 'c2', total: 9, all: 40 }; true`); await refresh('artifacts'); await settled('artifacts');
-        cases['agent artifacts, on a team: more rows to load, 9 of 40'] = await snap('artifacts');
-        // a later page that fails keeps the rows already shown and says so, with Retry (UX's note on #4895: the Retry button is built from the rows it is given)
-        await ev(`window.__ta.mode = 'error'; ${ROOT('artifacts')}.querySelector('.team-artifacts-more').click(); true`);
-        await waitFor(`!!${ROOT('artifacts')}.querySelector('.team-artifacts-retry') && ${ROOT('artifacts')}.getAttribute('aria-busy') === 'false'`, 'the failed page and its Retry');
-        cases['agent artifacts, on a team: a later page failed (the rows stay, with Retry)'] = await snap('artifacts');
-        await ev(`window.__ta.mode = 'normal'; true`);
-        await ev(`window.__ta.extra = { truncated: true, total: 9, all: 9 }; true`); await refresh('artifacts'); await settled('artifacts');
-        cases['agent artifacts, on a team: the server cut the list'] = await snap('artifacts');
-        await ev(`window.__ta.extra = {}; window.__ta.kept = [${JSON.stringify(HEX('a'))}]; true`); await refresh('artifacts'); await settled('artifacts');
-        cases['agent artifacts, on a team: one artifact kept'] = await snap('artifacts');
-        await ev(`document.body.classList.add('popout-mode'); true`); await refresh('artifacts'); await settled('artifacts');
-        cases['agent artifacts, on a team: pop-out (no Delete or Keep)'] = await snap('artifacts');
-        await ev(`document.body.classList.remove('popout-mode'); true`);
-        // the outcome of a delete: the notice line and the live region
-        await ev(`window.__ta.items = ${JSON.stringify(ITEMS)}.slice(0, 2); true`); await refresh('artifacts'); await settled('artifacts');
-        await ev(`${ROOT('artifacts')}.querySelector('.team-artifact-delete').click(); true`);
-        await waitFor(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'the confirmation');
-        await ev(`window.__ta.items = window.__ta.items.slice(1); document.getElementById('confirm-modal-yes').click(); true`);
-        await waitFor(`!!${ROOT('artifacts')}.querySelector('.team-artifacts-notice')`, 'the notice');
-        cases['agent artifacts, on a team: after a delete'] = (await snap('artifacts')) + '\n' + await ev(`(document.getElementById('agentic-panel-artifacts-live') || {}).textContent`);
-        // the personal list (a standalone agent: no team)
-        await ev(`window.__ta.personal = ${JSON.stringify(ITEMS.slice(0, 3))}; window.__ta.mode = 'normal'; window.TA.selectFilesSource('artifacts'); true`);
-        await teamState(null, { type: 'live', name: 'solo', session_id: 'solo-sid' });
-        await settled('artifacts');
-        cases['agent artifacts: a standalone agent'] = await snap('artifacts');
-        await teamState(null, null);
-        cases['agent artifacts: no agent'] = await snap('artifacts');
-        await ev(`window.Date = window.__RealDate; true`);
 
         // ── needs_input_card.js needsInputHtml (through syncNeedsInputCard, which the chat calls on every poll) ──
         await ev(`(async () => { const st = ${S}; window.NI = await import(st + 'needs_input_card.js'); return true; })()`);

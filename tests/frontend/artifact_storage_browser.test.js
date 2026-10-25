@@ -83,11 +83,14 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         await coralReady();
         await until(`!!document.getElementById('agentic-tab-artifacts')`, 'the Artifacts tab');
         await ev(`document.getElementById('agentic-tab-artifacts').click(); true`);
-        const row = `[...document.querySelectorAll('.team-artifact-row')].find(r => r.textContent.includes('keep-me.txt'))`;
-        await until(`!!(${row}) && !!(${row}).querySelector('.team-artifact-keep')`, 'the Keep toggle');
-        const before = await ev(`(${row}).querySelector('.team-artifact-keep').getAttribute('aria-pressed')`);
-        await ev(`(${row}).querySelector('.team-artifact-keep').click(); true`);
-        await until(`(${row}).querySelector('.team-artifact-keep').getAttribute('aria-pressed') === 'true'`, 'kept');
+        const row = `[...document.querySelectorAll('#agentic-panel-artifacts tbody tr')].find(r => r.textContent.includes('keep-me.txt'))`;
+        const keep = `[...document.querySelectorAll('#agentic-detail-pane .detail-foot .btn')].find(b => /^(Keep|Kept)$/.test(b.textContent))`; // the sheet's toggle
+        const openRow = async () => { await until(`!!(${row})`, 'the row'); await ev(`(${row}).querySelector('.team-row-btn').click(); true`); };
+        await openRow();
+        await until(`!!(${keep})`, 'the Keep toggle');
+        const before = await ev(`(${keep}).getAttribute('aria-pressed')`);
+        await ev(`(${keep}).click(); true`);
+        await until(`(${keep}).getAttribute('aria-pressed') === 'true'`, 'kept');
         const list = await ev(`fetch('/api/system/artifact-store/kept').then(r => r.json())`);
         check('Keep marks it (pressed) and Coral lists it as kept', before === 'false' && (list.kept || []).includes(hex), JSON.stringify({ before, list }));
         loaded = Page.loadEventFired();
@@ -96,18 +99,20 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         await coralReady();
         await until(`!!document.getElementById('agentic-tab-artifacts')`, 'the Artifacts tab again');
         await ev(`document.getElementById('agentic-tab-artifacts').click(); true`);
-        await until(`!!(${row}) && (${row}).querySelector('.team-artifact-keep').getAttribute('aria-pressed') === 'true'`, 'kept after the reload');
-        check('still kept after a reload', (await ev(`(${row}).querySelector('.team-artifact-keep').getAttribute('aria-pressed')`)) === 'true');
-        await ev(`(${row}).querySelector('.team-artifact-keep').click(); true`);
-        await until(`(${row}).querySelector('.team-artifact-keep').getAttribute('aria-pressed') === 'false'`, 'released');
+        await openRow();
+        await until(`!!(${keep}) && (${keep}).getAttribute('aria-pressed') === 'true'`, 'kept after the reload');
+        check('still kept after a reload', (await ev(`(${keep}).getAttribute('aria-pressed')`)) === 'true');
+        await ev(`(${keep}).click(); true`);
+        await until(`(${keep}).getAttribute('aria-pressed') === 'false'`, 'released');
         const after = await ev(`fetch('/api/system/artifact-store/kept').then(r => r.json())`);
         check('a second click releases it', !(after.kept || []).includes(hex), JSON.stringify(after));
 
         // Not offered in the pop-out.
         await ev(`document.body.classList.add('popout-mode'); true`);
-        await ev(`(() => { const b = [...document.querySelectorAll('#agentic-panel-artifacts-view .team-artifacts-action')].find(x => x.getAttribute('aria-label') === 'Refresh'); b && b.click(); return !!b; })()`);
-        await until(`!!(${row}) && !(${row}).querySelector('.team-artifact-keep')`, 'the pop-out list');
-        check('no Keep in the pop-out', !(await ev(`!!(${row}) && !!(${row}).querySelector('.team-artifact-keep')`)));
+        await ev(`document.querySelector('#agentic-panel-artifacts-view .team-artifacts-refresh').click(); true`);
+        await openRow();
+        await until(`document.querySelectorAll('#agentic-detail-pane .detail-foot .btn').length > 0`, 'the pop-out sheet');
+        check('no Keep in the pop-out', !(await ev(`!!(${keep})`)));
         await ev(`document.body.classList.remove('popout-mode'); true`);
     } catch (e) {
         check('no error', false, e.message);

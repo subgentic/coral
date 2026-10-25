@@ -31,18 +31,19 @@ const live = (t) => { const s = document.getElementById('team-page-live'); if (s
 export const detailKey = () => (current ? current.key : null);
 
 function modalOpen() {
-    return !!document.querySelector('dialog[open], .modal[aria-modal="true"]:not([hidden])') && [...document.querySelectorAll('.modal[aria-modal="true"]')].some(m => m.getClientRects().length > 0);
+    return !!document.querySelector('dialog[open]') || [...document.querySelectorAll('.modal[aria-modal="true"]:not([hidden])')].some(m => m.getClientRects().length > 0); // a native dialog (the reminder, the confirmation) closes first on Escape
 }
 
-export function openDetailPane({ key, title, sub = '', facts = [], body = null, actions = [], opener = null, onClose = null }) {
-    const aside = pane();
+export function openDetailPane({ key, title, sub = '', facts = [], body = null, actions = [], opener = null, onClose = null, host = null }) {
+    const aside = host || pane(); // host: a pane of its own, a sheet over a panel (the agent's Artifacts), not the team page's aside
     if (!aside) return false;
+    if (current && current.aside !== aside) closeDetailPane(); // one document at a time: the other pane is put away
     const replacing = !!current;
     if (current) { current.abort.abort(); }
     const abort = new AbortController();
     const mine = ++gen;
     // Replacing keeps the opener the pane was first opened from, so Escape returns to a row that still exists: the newest row is the one chosen.
-    current = { key, opener: opener || (replacing ? current.opener : document.activeElement), onClose, abort, gen: mine };
+    current = { key, opener: opener || (replacing ? current.opener : document.activeElement), onClose, abort, gen: mine, aside, hosted: !!host };
     aside.replaceChildren();
     const head = el('div', 'detail-head');
     const text = el('div', 'detail-head-text');
@@ -78,10 +79,12 @@ export function openDetailPane({ key, title, sub = '', facts = [], body = null, 
     aside.append(head, main);
     if (actions.length) aside.append(foot);
     aside.hidden = false;
-    page()?.classList.add('detail-open');
-    page()?.classList.toggle('detail-sheet', asSheet());
-    document.body.classList.add('team-detail-open');
-    rail(true);
+    if (!host) {
+        page()?.classList.add('detail-open');
+        page()?.classList.toggle('detail-sheet', asSheet());
+        document.body.classList.add('team-detail-open');
+        rail(true);
+    }
     if (body) { try { body(doc, { signal: abort.signal, isStale: () => current === null || current.gen !== mine }); } catch (e) { doc.textContent = 'This document could not be shown.'; } }
     h.focus({ preventScroll: true }); // keyboard and screen reader: the pane's title (the row's own button keeps the way back)
     live(`${title}, details`);
@@ -89,21 +92,22 @@ export function openDetailPane({ key, title, sub = '', facts = [], body = null, 
 }
 
 export function closeDetailPane({ restoreFocus = false } = {}) {
-    const aside = pane();
-    if (!current || !aside) return false;
-    const { opener, key, onClose, abort } = current;
+    if (!current) return false;
+    const { opener, key, onClose, abort, aside, hosted } = current;
     current = null;
     abort.abort();
     aside.hidden = true;
     aside.replaceChildren();
-    page()?.classList.remove('detail-open', 'detail-sheet');
-    document.body.classList.remove('team-detail-open');
-    rail(false);
+    if (!hosted) {
+        page()?.classList.remove('detail-open', 'detail-sheet');
+        document.body.classList.remove('team-detail-open');
+        rail(false);
+    }
     if (onClose) { try { onClose(); } catch { /* the pane is closed either way */ } }
     if (restoreFocus) {
         // The row that opened it, or the row with its key when the table was drawn again.
-        const again = opener && opener.isConnected ? opener : [...document.querySelectorAll('#team-page-view tr[data-key]')].find(r => r.dataset.key === String(key))?.querySelector('.team-row-btn');
-        (again || document.getElementById('team-page-title'))?.focus();
+        const again = opener && opener.isConnected ? opener : [...document.querySelectorAll(hosted ? '#agentic-panel-artifacts tr[data-key]' : '#team-page-view tr[data-key]')].find(r => r.dataset.key === String(key))?.querySelector('.team-row-btn');
+        (again || (hosted ? null : document.getElementById('team-page-title')))?.focus();
     }
     return true;
 }
@@ -111,14 +115,14 @@ export function closeDetailPane({ restoreFocus = false } = {}) {
 // Escape closes it (not under a dialog: that one closes first), from the page or the pane.
 document.addEventListener('keydown', (e) => {
     if (!current || e.key !== 'Escape' || e.defaultPrevented || modalOpen()) return;
-    if (!page() || !page().getClientRects().length) return;
+    if (current.hosted ? !current.aside.getClientRects().length : (!page() || !page().getClientRects().length)) return;
     e.preventDefault();
     closeDetailPane({ restoreFocus: true });
 });
 
 // Tab stays in the pane on a phone, where it is a sheet over the page.
 document.addEventListener('keydown', (e) => {
-    const aside = pane();
-    if (!current || e.key !== 'Tab' || !aside || !aside.contains(document.activeElement) || !window.matchMedia('(max-width: 760px)').matches) return;
+    const aside = current && current.aside;
+    if (!current || e.key !== 'Tab' || !aside || !aside.contains(document.activeElement) || !(current.hosted || window.matchMedia('(max-width: 760px)').matches)) return;
     trapTab(aside, e);
 });

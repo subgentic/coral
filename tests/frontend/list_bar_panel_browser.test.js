@@ -67,13 +67,8 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 const cl = await ev(`(() => { const t = document.querySelector('${root} .list-bar-toggle'); return { dot: !t.querySelector('.display-badge').hidden, name: t.getAttribute('aria-label') }; })()`);
                 check(`${tag}: Clear filters: no dot, plain name (${JSON.stringify(cl)}); the sort goes back with them? (kept: it is a choice, not a filter)`, !cl.dot === (cl.name === 'Filters and sort') || cl.name === 'Filters and sort, 1 on');
                 await ev(`document.querySelector('${root} .list-bar-toggle').click(); true`);
-                // the artifact list's second icon: open or close every row's details
-                if (key === 'artifacts') {
-                    const ex = await ev(`(() => { const c = document.querySelector('${root} .list-bar-expand-all'); const rows = [...document.querySelectorAll('${root} tr.team-artifact-row')]; const before = rows.filter(r => !r.querySelector('.team-artifact-details').hidden).length; const label = c.getAttribute('aria-label'); c.click(); const mid = [...document.querySelectorAll('${root} tr.team-artifact-row')].filter(r => !r.querySelector('.team-artifact-details').hidden).length; return { label, n: rows.length, before, mid, after: document.querySelector('${root} .list-bar-expand-all').getAttribute('aria-label') }; })()`);
-                    check(`${tag}: the second icon opens every row's details and then offers to close them (${JSON.stringify(ex)})`, ex.label === 'Expand all details' && ex.before === 0 && ex.mid === ex.n && ex.n > 0 && ex.after === 'Collapse all details');
-                    await ev(`document.querySelector('${root} .list-bar-expand-all').click(); true`);
-                    check(`${tag}: and closes them again`, (await ev(`[...document.querySelectorAll('${root} tr.team-artifact-row')].filter(r => !r.querySelector('.team-artifact-details').hidden).length`)) === 0);
-                } else check(`${tag}: no second icon (task rows have nothing to expand)`, !(await q('.list-bar-expand-all')));
+                // no second icon in either list: the artifacts' details are in the sheet the row opens, and task rows have nothing to expand
+                check(`${tag}: no second icon (${key} rows have nothing to expand)`, !(await q('.list-bar-expand-all')));
             }
             if (key === 'tasks') await removeBoards(ev, [ctx.TBOARD]);
         }

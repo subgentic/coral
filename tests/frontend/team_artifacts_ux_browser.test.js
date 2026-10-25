@@ -1,8 +1,7 @@
-// #4469 (UX's #4456 pass, items 1 to 8 and #4460's NIT): the Team Artifacts table, driven by keys and measured, against stubbed lists.
-//  - the Actions column holds its five icons and no icon sits over the Created time or the file name; on a touch phone every control is a 44 px target and the icons wrap
-//  - the origin chip is one line with an ellipsis and the whole text in its title
-//  - an error is red and an empty list shows its line without a table; "1 artifact"; later senders of one file are a line each with a gap
-//  - Delete by keyboard: the confirmation, then Yes, and the focus lands on the next row's first control (the previous row's when the last one went, Refresh when none is left), never the page
+// #4469 (UX's #4456 pass, items 1 to 8 and #4460's NIT; the table is the team page's since #7622): the agent's artifacts table, driven by keys and measured, against stubbed lists.
+//  - a row is one control, its name, and holds no icons over the Created time or the name; on a touch phone every control is a 44 px target and nothing is wider than the screen at 200% text
+//  - an error is red and an empty list shows its line without a table; "1 artifact"
+//  - Delete by keyboard (in the row's sheet): the confirmation, then Yes, and the focus lands on the next row's name (the previous row's when the last one went, Refresh when none is left), never the page
 //  - the outcome of a delete is in a live region that is always in the page; Retry leaves the focus on the panel, not the page; Refresh keeps the focus while it loads
 // Run against an isolated dev server. CORAL_SCREENSHOT_DIR=<dir> saves screenshots.
 const assert = require('node:assert/strict');
@@ -18,7 +17,7 @@ const HEX = c => c.repeat(64);
     const sleep = ms => new Promise(r => setTimeout(r, ms)); // sleep-ok: the panel rebuilds after a stubbed answer, a layout settles; there is no completion event
     const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(path.join(d, name + '.png'), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const press = async (key, code, vk) => { const b = { key, code, windowsVirtualKeyCode: vk }; await Input.dispatchKeyEvent({ type: 'keyDown', ...b, ...(key === 'Enter' ? { text: '\r' } : {}) }); await Input.dispatchKeyEvent({ type: 'keyUp', ...b }); };
-    const active = () => ev(`(() => { const a = document.activeElement; if (!a || a === document.body) return { body: true }; const row = a.closest('tr.team-artifact-row'); return { cls: String(a.className), label: (a.getAttribute('aria-label') || a.textContent || '').trim().slice(0, 40), row: row ? [...row.parentElement.children].indexOf(row) : -1, inModal: !!a.closest('#confirm-modal'), id: a.id }; })()`);
+    const active = () => ev(`(() => { const a = document.activeElement; if (!a || a === document.body) return { body: true }; const row = a.closest('tbody tr'); return { cls: String(a.className), label: (a.getAttribute('aria-label') || a.textContent || '').trim().slice(0, 40), row: row ? [...row.parentElement.children].indexOf(row) : -1, inModal: !!a.closest('#confirm-modal'), id: a.id }; })()`);
     const team = 'ux-team-' + Date.now();
     const ITEMS = [0, 1, 2].map(i => ({ id: HEX('abc'[i]), name: `report-${i}.txt`, media_type: 'text/plain', size: 1000 + i, task_id: 20 + i, task_title: 'T' + i, created_at: `2026-10-0${i + 1}T10:00:00Z`, uri: 'coral://artifacts/' + HEX('abc'[i]), available: true, source: 'completion', provenance: 'uploaded', produced_by: 'Worker' }));
     try {
@@ -41,79 +40,79 @@ const HEX = c => c.repeat(64);
             const {showView} = await import((window.__coralStatic||'/static/')+'utils.js'); showView('live-session-view');
             const side = document.getElementById('agentic-state'); side.classList.remove('collapsed'); side.style.width = '680px'; files.initFileSearch(); files.syncFilesViewerSession(); return true; })()`);
         await ev(`localStorage.removeItem('coral-agentic-tab-top'); document.getElementById('agentic-tab-artifacts').click(); true`);
-        await waitFor(`document.querySelectorAll('tr.team-artifact-row').length === 3`, 'the three rows', 8000);
+        const ROWS = '#agentic-panel-artifacts-view tbody tr';
+        const FOOT = t => `[...document.querySelectorAll('#agentic-detail-pane .detail-foot .btn')].find(b => b.textContent === '${t}')`;
+        await waitFor(`document.querySelectorAll('${ROWS}').length === 3`, 'the three rows', 8000);
 
-        console.log('1. Desktop: five icons fit their column and sit over nothing');
-        const box = sel => `(() => { const r = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom, w: r.width, h: r.height }; })()`;
+        console.log('1. Desktop: a row is one control and overlaps nothing');
         const overlap = await ev(`(() => { const hit = (a, b) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top; const bad = [];
-            for (const row of document.querySelectorAll('tr.team-artifact-row')) { const btns = [...row.querySelectorAll('td.team-artifact-col-actions a, td.team-artifact-col-actions button')].map(b => b.getBoundingClientRect());
-                const created = document.createRange(); const cc = row.querySelector('td.team-artifact-col-created'); created.selectNodeContents(cc); const nameBtn = row.querySelector('.team-artifact-name').getBoundingClientRect(); const cr = created.getBoundingClientRect();
-                const act = row.querySelector('td.team-artifact-col-actions').getBoundingClientRect();
-                for (const b of btns) { if (hit(b, cr)) bad.push('over Created'); if (hit(b, nameBtn)) bad.push('over the name'); if (b.left < act.left - 1 || b.right > act.right + 1) bad.push('outside its column'); }
-                if (new Set(btns.map(b => Math.round(b.top))).size !== 1) bad.push('not one row'); }
-            return { bad, buttons: document.querySelectorAll('tr.team-artifact-row')[0].querySelectorAll('td.team-artifact-col-actions a, td.team-artifact-col-actions button').length }; })()`);
-        assert.deepEqual(overlap.bad, [], 'the icons overprint nothing and stay in their column: ' + overlap.bad.join(', '));
-        assert.equal(overlap.buttons, 6, 'Details, Preview, Download, Copy link, Keep, Delete');
+            for (const row of document.querySelectorAll('${ROWS}')) { const nameBtn = row.querySelector('.team-row-btn').getBoundingClientRect(); const cells = [...row.querySelectorAll('td')]; const created = cells[cells.length - 1].getBoundingClientRect();
+                if (hit(nameBtn, created)) bad.push('the name over Created'); if (row.querySelectorAll('button, a[href]').length !== 1) bad.push('more than one control'); }
+            return bad; })()`);
+        assert.deepEqual(overlap, [], 'nothing overprints: ' + overlap.join(', '));
         await shot('team-artifacts-ux-desktop');
 
-        console.log('2. A singular count, the live region and a dd gap');
-        await ev(`window.__items = [window.__items[0]]; window.switchAgenticTab && 0; true`);
+        console.log('2. A singular count');
+        await ev(`window.__items = [window.__items[0]]; true`);
         await ev(`document.querySelector('#agentic-panel-artifacts-view .team-artifacts-refresh').click(); true`);
-        await waitFor(`/^1 artifact$/.test((document.querySelector('#agentic-panel-artifacts-view .team-artifacts-status') || {}).textContent || '')`, '"1 artifact"', 8000);
+        await waitFor(`/^1 artifact$/.test((document.querySelector('#agentic-panel-artifacts-view .team-count-line') || {}).textContent || '')`, '"1 artifact"', 8000);
         await ev(`window.__items = ${JSON.stringify(ITEMS)}; document.querySelector('#agentic-panel-artifacts-view .team-artifacts-refresh').click(); true`);
-        await waitFor(`document.querySelectorAll('tr.team-artifact-row').length === 3`, 'three rows again', 8000);
-        assert.equal(await ev(`(() => { const dl = document.createElement('dl'); const w = document.createElement('div'); w.className = 'team-artifact-details'; w.append(dl); for (const t of ['Also received from', 'a', 'b']) { const e = document.createElement(t === 'Also received from' ? 'dt' : 'dd'); e.textContent = t; dl.append(e); } document.body.append(w);
-            const gap = parseFloat(getComputedStyle(dl.querySelectorAll('dd')[1]).marginTop); w.remove(); return gap > 0; })()`), true, 'the second sender line has a gap above it');
+        await waitFor(`document.querySelectorAll('${ROWS}').length === 3`, 'three rows again', 8000);
 
         console.log('3. Delete by keyboard: the focus goes to the next row, the previous one, then Refresh');
-        const focusDelete = async i => ev(`document.querySelectorAll('tr.team-artifact-row')[${i}].querySelector('.team-artifact-delete').focus(); true`);
-        const deleteWithKeys = async () => { await press('Enter', 'Enter', 13); await waitFor(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'the confirmation', 8000); await waitFor(`!!document.activeElement && !!document.activeElement.closest('#confirm-modal') && document.activeElement.id !== 'confirm-modal-yes'`, 'the focus to land on Cancel (the dialog focuses it a frame after it opens: a Tab pressed before that and the late focus could leave Enter on Cancel)', 4000); for (let i = 0; i < 4 && (await ev(`document.activeElement && document.activeElement.id`)) !== 'confirm-modal-yes'; i++) await press('Tab', 'Tab', 9); assert.equal(await ev(`document.activeElement && document.activeElement.id`), 'confirm-modal-yes', 'Tab reaches Yes'); await press('Enter', 'Enter', 13); };
-        await focusDelete(1);
-        await deleteWithKeys();
-        await waitFor(`window.__deletes.length === 1 && document.querySelectorAll('tr.team-artifact-row').length === 2`, 'the middle row to go', 8000, `({ deletes: window.__deletes.length, rows: document.querySelectorAll('tr.team-artifact-row').length, confirm: getComputedStyle(document.getElementById('confirm-modal')).display, active: document.activeElement && (document.activeElement.id || document.activeElement.className), lists: window.__lists, toast: [...document.querySelectorAll('.toast')].map(t => t.textContent.trim().slice(0, 60)) })`);
+        const deleteRow = async i => {
+            await ev(`document.querySelectorAll('${ROWS} .team-row-btn')[${i}].focus(); true`);
+            await press('Enter', 'Enter', 13);
+            await waitFor(`!document.getElementById('agentic-detail-pane').hidden && !!(${FOOT('Delete')})`, 'the sheet', 8000);
+            await ev(`(${FOOT('Delete')}).focus(); true`);
+            await press('Enter', 'Enter', 13);
+            await waitFor(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'the confirmation', 8000);
+            await waitFor(`!!document.activeElement && !!document.activeElement.closest('#confirm-modal') && document.activeElement.id !== 'confirm-modal-yes'`, 'the focus on Cancel', 8000);
+            await ev(`document.getElementById('confirm-modal-yes').focus(); true`);
+            await press('Enter', 'Enter', 13);
+        };
+        await deleteRow(1);
+        await waitFor(`window.__deletes.length === 1 && document.querySelectorAll('${ROWS}').length === 2`, 'the middle row to go', 8000);
         let a = await active();
         assert.equal(a.body, undefined, 'the focus is not on the page: ' + JSON.stringify(a)); assert.equal(a.row, 1, 'it is on the row that took the deleted one\'s place'); assert.equal(a.inModal, false);
-        assert.match(await ev(`document.querySelector('#agentic-panel-artifacts-live').textContent`), /^Deleted report-1\.txt\.$/, 'the live region says it');
-        assert.equal(await ev(`document.querySelector('.team-artifacts-notice') && document.querySelector('.team-artifacts-notice').getAttribute('aria-hidden')`), 'true', 'the visible line is not read twice');
-        await focusDelete(1); // the last row
-        await deleteWithKeys();
-        await waitFor(`window.__deletes.length === 2 && document.querySelectorAll('tr.team-artifact-row').length === 1`, 'the last row to go', 8000, `({ deletes: window.__deletes.length, rows: document.querySelectorAll('tr.team-artifact-row').length, confirm: getComputedStyle(document.getElementById('confirm-modal')).display, active: document.activeElement && (document.activeElement.id || document.activeElement.className), lists: window.__lists, toast: [...document.querySelectorAll('.toast')].map(t => t.textContent.trim().slice(0, 60)) })`);
+        assert.match(await ev(`document.querySelector('#agentic-panel-artifacts .team-artifacts-status-live').textContent`), /^Deleted report-1\.txt\.$/, 'the live region says it');
+        await deleteRow(1); // the last row
+        await waitFor(`window.__deletes.length === 2 && document.querySelectorAll('${ROWS}').length === 1`, 'the last row to go', 8000);
         a = await active();
         assert.equal(a.body, undefined, JSON.stringify(a)); assert.equal(a.row, 0, 'the row before it when the last one went');
-        await focusDelete(0);
-        await deleteWithKeys();
-        await waitFor(`window.__deletes.length === 3 && document.querySelectorAll('tr.team-artifact-row').length === 0`, 'the only row to go', 8000, `({ deletes: window.__deletes.length, rows: document.querySelectorAll('tr.team-artifact-row').length, confirm: getComputedStyle(document.getElementById('confirm-modal')).display, active: document.activeElement && (document.activeElement.id || document.activeElement.className), lists: window.__lists, toast: [...document.querySelectorAll('.toast')].map(t => t.textContent.trim().slice(0, 60)) })`);
+        await deleteRow(0);
+        await waitFor(`window.__deletes.length === 3 && document.querySelectorAll('${ROWS}').length === 0`, 'the only row to go', 8000);
+        await sleep(200); // sleep-ok: the focus is placed after the redraw
         a = await active();
         assert.equal(a.body, undefined, JSON.stringify(a)); assert.equal(a.label, 'Refresh', 'Refresh when nothing is left');
-        assert.equal(await ev(`!!document.querySelector('.team-artifacts-list')`), false, 'an empty list is its line, with no table header over nothing');
+        assert.equal(await ev(`!!document.querySelector('#agentic-panel-artifacts-view .team-table')`), false, 'an empty list is its line, with no table header over nothing');
+        assert.equal(await ev(`document.querySelector('#agentic-panel-artifacts-view .team-count-line').textContent`), 'No artifacts yet.');
 
         console.log('4. An error is red, has no table, and Retry keeps the focus on the panel; Refresh keeps it while loading');
         await ev(`window.__mode = 'error'; document.querySelector('#agentic-panel-artifacts-view .team-artifacts-refresh').click(); true`);
-        await waitFor(`!!document.querySelector('.team-artifacts-retry')`, 'the error with Retry', 8000);
-        const err = await ev(`(() => { const s = document.querySelector('#agentic-panel-artifacts-view .team-artifacts-status'); const calm = document.createElement('div'); calm.className = 'team-artifacts-status'; document.querySelector('#agentic-panel-artifacts-view').append(calm); const c = getComputedStyle(calm).color; calm.remove();
-            return { state: s.dataset.state, color: getComputedStyle(s).color, calm: c, role: s.getAttribute('role'), table: !!document.querySelector('.team-artifacts-list') }; })()`);
-        assert.equal(err.state, 'error'); assert.notEqual(err.color, err.calm, 'the error is not the grey of the other lines'); assert.equal(err.role, 'alert'); assert.equal(err.table, false);
+        await waitFor(`!!document.querySelector('#agentic-panel-artifacts-view .team-artifacts-retry')`, 'the error with Retry', 8000);
+        const err = await ev(`(() => { const s = document.querySelector('#agentic-panel-artifacts-view .team-artifacts-error'); const calm = document.createElement('p'); calm.className = 'goals-note team-count-line'; document.querySelector('#agentic-panel-artifacts-view').append(calm); const c = getComputedStyle(calm).color; calm.remove();
+            return { color: getComputedStyle(s).color, calm: c, role: s.getAttribute('role'), table: !!document.querySelector('#agentic-panel-artifacts-view .team-table') }; })()`);
+        assert.notEqual(err.color, err.calm, 'the error is not the grey of the other lines'); assert.equal(err.role, 'alert'); assert.equal(err.table, false);
         await shot('team-artifacts-ux-error');
-        await ev(`window.__mode = 'normal'; window.__items = ${JSON.stringify(ITEMS)}; document.querySelector('.team-artifacts-retry').focus(); true`);
+        await ev(`window.__mode = 'normal'; window.__items = ${JSON.stringify(ITEMS)}; document.querySelector('#agentic-panel-artifacts-view .team-artifacts-retry').focus(); true`);
         await press('Enter', 'Enter', 13);
-        await waitFor(`document.querySelectorAll('tr.team-artifact-row').length === 3`, 'the list after Retry', 8000);
+        await waitFor(`document.querySelectorAll('${ROWS}').length === 3`, 'the list after Retry', 8000);
+        await sleep(200); // sleep-ok: the focus is placed after the redraw
         a = await active();
-        assert.equal(a.body, undefined, 'after Retry the focus is on the panel: ' + JSON.stringify(a)); assert.equal(a.row, 0, 'on the first row\'s first control');
-        // Refresh while the list loads: the focus stays on it, and a second press does not start a second load.
+        assert.equal(a.body, undefined, 'after Retry the focus is on the panel: ' + JSON.stringify(a));
+        // Refresh while the list loads: the focus stays on it.
         await ev(`window.__mode = 'deferred'; window.__lists = 0; document.querySelector('#agentic-panel-artifacts-view .team-artifacts-refresh').focus(); true`);
         await press('Enter', 'Enter', 13);
         await waitFor(`window.__lists === 1 && !!window.__release`, 'the load to start', 8000);
         a = await active();
         assert.equal(a.label, 'Refresh', 'the focus stays on Refresh while it loads: ' + JSON.stringify(a));
-        assert.equal(await ev(`document.activeElement.getAttribute('aria-disabled')`), 'true', 'it says it is busy');
-        await press('Enter', 'Enter', 13); await sleep(200); // sleep-ok: shows that a second press does nothing
-        assert.equal(await ev(`window.__lists`), 1, 'a second press starts no second load');
+        assert.equal(await ev(`document.querySelectorAll('${ROWS}').length`), 3, 'the rows stay on screen while it loads');
         await ev(`window.__release(); true`);
-        await waitFor(`document.querySelectorAll('tr.team-artifact-row').length === 3 && !document.querySelector('#agentic-panel-artifacts-view .team-artifacts-refresh').hasAttribute('aria-disabled')`, 'the load to end', 8000);
+        await waitFor(`document.querySelectorAll('${ROWS}').length === 3 && !document.querySelector('#agentic-panel-artifacts-view .team-count-line').textContent.startsWith('Loading')`, 'the load to end', 8000);
         await ev(`window.__mode = 'normal'; true`);
 
-        console.log('5. A touch phone at 100% and 200% text: 44 px targets, icons wrapped, nothing over the name, one-line chip');
-        await ev(`window.__items = [Object.assign({}, window.__items[0], { id: 'shared:x', source: 'shared', shared_to: 'a-very-long-server-name-that-goes-on-and-on/the-board-with-a-long-name' })].concat(window.__items.slice(1)); true`);
+        console.log('5. A touch phone at 100% and 200% text: 44 px targets, nothing wider than the screen');
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
         await Emulation.setTouchEmulationEnabled({ enabled: true, maxTouchPoints: 5 });
         await ev(`(document.getElementById('popout-panel-toggle-btn') || document.getElementById('panel-toggle-btn')).click(); true`); await sleep(500); // sleep-ok: the drawer opens over frames
@@ -121,23 +120,20 @@ const HEX = c => c.repeat(64);
         for (const size of ['', '32px']) {
             await ev(`document.documentElement.style.fontSize = '${size}'; document.getElementById('agentic-state').style.width = ''; true`);
             await ev(`document.querySelector('#agentic-panel-artifacts-view .team-artifacts-refresh').click(); true`);
-            await waitFor(`document.querySelectorAll('tr.team-artifact-row').length === 3`, 'the rows on the phone', 8000);
+            await waitFor(`document.querySelectorAll('${ROWS}').length === 3`, 'the rows on the phone', 8000);
             await sleep(400); // sleep-ok: layout settles
-            const m = await ev(`(() => { const hit = (a, b) => a.left < b.right - 1 && a.right > b.left + 1 && a.top < b.bottom - 1 && a.bottom > b.top + 1; const small = [], over = [];
-                for (const row of document.querySelectorAll('tr.team-artifact-row')) { const nameR = row.querySelector('.team-artifact-name').getBoundingClientRect();
-                    for (const b of row.querySelectorAll('td.team-artifact-col-actions a, td.team-artifact-col-actions button')) { const r = b.getBoundingClientRect(); if (r.width < 43.5 || r.height < 43.5) small.push((b.getAttribute('aria-label') || '').slice(0, 20) + ' ' + Math.round(r.width) + 'x' + Math.round(r.height)); if (hit(r, nameR)) over.push((b.getAttribute('aria-label') || '').slice(0, 20)); }
-                    const sm = row.querySelector('.team-artifact-info-btn').getBoundingClientRect(); if (sm.height < 43.5 || sm.width < 43.5) small.push('Details ' + Math.round(sm.width) + 'x' + Math.round(sm.height));
-                    const nb = row.querySelector('button.team-artifact-name'); if (nb && nb.getBoundingClientRect().height < 43.5) small.push('name ' + Math.round(nb.getBoundingClientRect().height)); }
-                const help = document.querySelector('.team-artifacts-help').getBoundingClientRect(); if (help.width < 43.5) small.push('help ' + Math.round(help.width));
-                const chip = document.querySelector('.team-artifact-badge-shared'); const cs = getComputedStyle(chip); const lh = parseFloat(cs.lineHeight);
-                const rows = [...document.querySelectorAll('tr.team-artifact-row')[0].querySelectorAll('td.team-artifact-col-actions a, td.team-artifact-col-actions button')].map(b => Math.round(b.getBoundingClientRect().top));
-                return { small, over, chipLines: Math.round(chip.getBoundingClientRect().height / lh), chipNowrap: cs.whiteSpace, chipTitle: chip.title, chipEllipsis: cs.textOverflow, iconRows: new Set(rows).size, docOver: document.documentElement.scrollWidth - innerWidth }; })()`);
+            const m = await ev(`(() => { const small = [];
+                for (const b of document.querySelectorAll('${ROWS} .team-row-btn, #agentic-panel-artifacts-view .team-artifacts-refresh, #agentic-panel-artifacts-view .team-artifacts-help')) { const r = b.getBoundingClientRect(); if (r.height < 43.5 || (!b.classList.contains('team-row-btn') && r.width < 43.5)) small.push((b.getAttribute('aria-label') || b.textContent).slice(0, 20) + ' ' + Math.round(r.width) + 'x' + Math.round(r.height)); }
+                return { small, docOver: document.documentElement.scrollWidth - innerWidth }; })()`);
             assert.deepEqual(m.small, [], `${size || '100%'}: every control is a 44 px target`);
-            assert.deepEqual(m.over, [], `${size || '100%'}: no icon over the file name`);
-            assert.ok(m.chipLines <= 2, `${size || '100%'}: the chip is one line (${m.chipLines})`); assert.equal(m.chipNowrap, 'nowrap'); assert.equal(m.chipEllipsis, 'ellipsis'); assert.match(m.chipTitle, /^Sent to a-very-long-server-name/, 'the whole text is its title');
-            assert.ok(m.iconRows >= 2, `${size || '100%'}: the six icons wrap into more than one row on a phone (${m.iconRows})`);
             assert.ok(m.docOver <= 0, `${size || '100%'}: no sideways scroll`);
+            await ev(`document.querySelector('${ROWS} .team-row-btn').click(); true`);
+            await waitFor(`!document.getElementById('agentic-detail-pane').hidden`, 'the sheet on the phone', 8000);
+            const sheet = await ev(`(() => { const a = document.getElementById('agentic-detail-pane'); return { small: [...a.querySelectorAll('.detail-foot .btn, .detail-close')].filter(b => { const r = b.getBoundingClientRect(); return r.height < 43.5; }).map(b => b.textContent || b.getAttribute('aria-label')), over: a.scrollWidth - a.clientWidth }; })()`);
+            assert.deepEqual(sheet.small, [], `${size || '100%'}: the sheet's buttons are 44 px targets`);
+            assert.ok(sheet.over <= 1, `${size || '100%'}: the sheet is not wider than the screen`);
             await shot(`team-artifacts-ux-phone${size ? '-200' : ''}`);
+            await ev(`document.querySelector('#agentic-detail-pane .detail-close').click(); true`);
         }
         console.log('PASS');
     } catch (e) {

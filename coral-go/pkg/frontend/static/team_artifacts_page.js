@@ -13,11 +13,13 @@ const { buildBar } = await importOnce('./team_artifact_bar.js');
 const { loadFilters, saveFilters, toParams, isFiltered, EMPTY } = await importOnce('./team_artifact_filters.js');
 const { loadPanelOpen, savePanelOpen } = await importOnce('./list_bar.js');
 const { isOwnerLabelRefusal, OWNER_LABEL_TEXT } = await importOnce('./owner_label.js');
+const { inlineArtifactPath } = await importOnce('./artifact_paths.js');
+const { readersAllowed, readersDisclosure } = await importOnce('./artifact_readers.js');
 
 const PAGE = 100;
 const HEX_RE = /^[a-f0-9]{64}$/;
 const MANAGED_RE = /^(?:coral:\/\/artifacts\/|\/api\/artifacts\/)([a-f0-9]{64})(?:\?v=\d+)?$/i;
-const model = { project: '', items: [], hasMore: false, cursor: '', counts: null, truncated: false, loading: false, error: '', loadingMore: false, filters: { ...EMPTY }, kept: new Set(), gen: 0, controller: null };
+const model = { project: '', scope: null, key: '', loaded: false, items: [], hasMore: false, cursor: '', counts: null, truncated: false, loading: false, error: '', loadingMore: false, filters: { ...EMPTY }, kept: new Set(), gen: 0, controller: null };
 let root = null, hooks = {}, bar = null, barKey = '';
 const btn = (cls, text, onClick) => { const b = el('button', cls, text); b.type = 'button'; if (onClick) b.addEventListener('click', onClick); return b; };
 const say = (t) => { const s = root && root.querySelector('.team-artifacts-status-live'); if (s) { s.textContent = ''; s.textContent = t; } };
@@ -27,6 +29,8 @@ const AGENT_ARTIFACT_PROMPT = `To publish an artifact in Coral (so it shows in t
 It appears in the Artifacts tab right away. A team agent's upload also appears in Team Artifacts.
 Local paths like /tmp/<file> are not reachable by the user, so always upload. Full docs: artifacts.md in the Coral agent docs.`;
 
+/** The computer the list is about: an agent's own (its session's), else the team's. */
+const server = () => (model.scope ? model.scope.server : splitKey(model.project).server);
 const managedHex = (item) => { const m = MANAGED_RE.exec(item.uri || ''); return m ? m[1].toLowerCase() : (HEX_RE.test(String(item.id || '')) ? String(item.id) : ''); };
 const itemKey = (item) => managedHex(item) || `${item.source || ''}|${item.uri || ''}|${item.name || ''}`;
 const isUnverified = (item) => item.provenance === 'unverified';
@@ -50,10 +54,12 @@ function originBadge(item) {
 /** Where the bytes are: a stored artifact (previewable, downloadable) or an external https link (opens in a new tab); null for an unavailable or unverified one. */
 function linkOf(item) {
     if (item.available === false || isUnverified(item)) return null;
-    const server = splitKey(model.project).server;
+    const at = server();
     const hex = managedHex(item);
-    if (hex) return { url: serverUrl(artifactPath(hex), server), preview: true, hex, server };
-    try { const u = new URL(item.uri); if (u.protocol === 'https:' || u.protocol === 'http:') return { url: u.href, preview: false, server }; } catch { /* unavailable or unsupported reference */ }
+    if (hex) return { url: serverUrl(artifactPath(hex), at), preview: true, hex, server: at };
+    const inline = item.inline ? inlineArtifactPath(item.content_url, splitKey(model.project).name) : null; // a task's completion artifact: its text is read from the task, not stored under a digest
+    if (inline) return { url: serverUrl(inline, at), preview: true, inline: true, contentURL: item.content_url, server: at };
+    try { const u = new URL(item.uri); if (u.protocol === 'https:' || u.protocol === 'http:') return { url: u.href, preview: false, server: at }; } catch { /* unavailable or unsupported reference */ }
     return null;
 }
 
@@ -78,15 +84,15 @@ const taskText = (item) => (item.task_id ? `#${item.task_id}${item.task_title ? 
 // ── what is kept and what is deleted ─────────────────────────────────────
 
 // Keep and Delete act on this computer's store: only for a team of this computer (a linked computer's artifact is its own, and the same route here would reach our copy of the same bytes, or none), and not through the Hub or in the pop-out (Security, #7520).
-const local = () => !isCloud() && !document.body.classList.contains('popout-mode') && splitKey(model.project).server === LOCAL_SERVER;
+const local = () => !isCloud() && !document.body.classList.contains('popout-mode') && server() === LOCAL_SERVER;
 async function loadKept() {
     if (!local()) return new Set();
     try { const r = await fetch('/api/system/artifact-store/kept'); return new Set(r.ok ? (await r.json()).kept || [] : []); } catch { return new Set(); }
 }
 const deletions = typeof BroadcastChannel === 'function' ? new BroadcastChannel('coral-artifact-deletions') : null; // other tabs of this dashboard drop a row deleted here
 deletions?.addEventListener('message', (e) => { // the message names the server it was about (the old tab's names none: this computer)
-    const d = e.data, hex = typeof d === 'string' ? d : d && d.hex, server = typeof d === 'string' ? LOCAL_SERVER : d && d.server;
-    if (HEX_RE.test(String(hex)) && server === splitKey(model.project).server) forget(hex);
+    const d = e.data, hex = typeof d === 'string' ? d : d && d.hex, origin = typeof d === 'string' ? LOCAL_SERVER : d && d.server;
+    if (HEX_RE.test(String(hex)) && origin === server()) forget(hex);
 });
 function forget(hex) {
     model.items = model.items.filter(it => managedHex(it) !== hex);
@@ -113,10 +119,10 @@ function deleteArtifact(hex, name, size) {
                 const r = await fetch(`/api/artifacts/${hex}`, { method: 'DELETE' });
                 if (r.ok || r.status === 404) {
                     const at = [...(root?.querySelectorAll('tbody tr') || [])].findIndex(tr => tr.dataset.key === hex);
-                    forget(hex); deletions?.postMessage({ hex, server: splitKey(model.project).server });
+                    forget(hex); deletions?.postMessage({ hex, server: server() });
                     say(r.ok ? `Deleted ${name}.` : `${name} was already gone.`);
                     // the row the focus was on is gone: the same place in the list (the next row, else the one before), never the page (#4469)
-                    const after = [...(root?.querySelectorAll('tbody tr') || [])]; (after[at] || after[at - 1])?.querySelector('.team-row-btn')?.focus();
+                    const after = [...(root?.querySelectorAll('tbody tr') || [])]; ((after[at] || after[at - 1])?.querySelector('.team-row-btn') || root?.querySelector('.team-artifacts-refresh'))?.focus(); // and Refresh when none is left
                 } else { const d = await r.json().catch(() => ({})); showToast(`Couldn't delete ${name}: ${d.error || `HTTP ${r.status}`}`, true); }
             } catch { showToast(`Couldn't delete ${name}: Coral didn't answer.`, true); }
         }, null, { label: 'Delete' });
@@ -126,7 +132,8 @@ function deleteArtifact(hex, name, size) {
 // ── reading the list ─────────────────────────────────────────────────────
 
 export async function loadArtifacts({ append = false, keep = false } = {}) {
-    const project = model.project; if (!project) return;
+    const { project, key } = model; if (!key) return;
+    const scope = model.scope;
     model.controller?.abort();
     const gen = ++model.gen, ctrl = model.controller = new AbortController();
     if (!append) { if (!keep || !model.items.length) { model.items = []; model.hasMore = false; model.truncated = false; model.counts = null; } model.cursor = ''; model.loading = !model.items.length; }
@@ -134,19 +141,21 @@ export async function loadArtifacts({ append = false, keep = false } = {}) {
     draw();
     try {
         const params = new URLSearchParams({ limit: String(PAGE) });
-        for (const [k, v] of Object.entries(toParams(model.filters))) params.set(k, v); // the search, the filters and the sort are the server's to apply
+        if (!(scope && scope.standalone)) for (const [k, v] of Object.entries(toParams(model.filters))) params.set(k, v); // the search, the filters and the sort are the server's to apply
         if (!append) params.set('offset', '0'); else if (model.cursor) params.set('cursor', model.cursor); else params.set('offset', String(model.items.length));
-        const r = await boardFetch(project, `/artifacts?${params}`, { signal: ctrl.signal });
-        if (!r.ok) { if (await isOwnerLabelRefusal(r)) throw new Error(OWNER_LABEL_TEXT); throw new Error(`Unable to load team artifacts (${r.status}).`); }
+        if (scope) params.set('session_id', scope.session); // one agent's list: the same query, scoped to the agent (its totals are the agent's)
+        const r = await (scope && scope.standalone ? fetch(serverUrl(`/api/session-artifacts?${params}`, scope.server), { signal: ctrl.signal }) : boardFetch(project, `/artifacts?${params}`, { signal: ctrl.signal }));
+        if (!r.ok) { if (await isOwnerLabelRefusal(r)) throw new Error(OWNER_LABEL_TEXT); throw new Error(`Unable to load ${scope ? 'agent' : 'team'} artifacts (${r.status}).`); }
         const data = await r.json();
-        if (gen !== model.gen || project !== model.project) return;
-        if (data.project !== splitKey(project).name || !Array.isArray(data.artifacts)) throw new Error('Unable to load artifacts: unexpected response scope.');
+        if (gen !== model.gen || key !== model.key) return;
+        if ((!(scope && scope.standalone) && data.project !== splitKey(project).name) || !Array.isArray(data.artifacts) || (scope && data.session_id !== scope.session)) throw new Error('Unable to load artifacts: unexpected response scope.');
         const rows = data.artifacts.filter(a => a && (a.uri || a.id || a.name));
         model.items = append ? model.items.concat(rows) : rows;
         model.hasMore = !!data.has_more; model.truncated = !!data.truncated; model.cursor = typeof data.next_cursor === 'string' ? data.next_cursor : '';
         const matched = Number.isSafeInteger(data.total) ? data.total : model.items.length;
-        model.counts = { matched, all: Number.isSafeInteger(data.all) ? Math.max(data.all, matched) : matched };
+        model.counts = { matched, all: Number.isSafeInteger(data.all) ? Math.max(data.all, matched) : matched, truncated: !!data.truncated };
         if (!append) model.kept = await loadKept();
+        model.loaded = true;
         hooks.onCount?.(model.counts.all, false);
     } catch (e) {
         if (gen !== model.gen || e.name === 'AbortError') return;
@@ -156,19 +165,22 @@ export async function loadArtifacts({ append = false, keep = false } = {}) {
     }
 }
 
+/** What the filters are remembered under: the board, or for an agent the board and the agent (the key the old agent tab used). */
+const filterKey = () => (model.scope ? `${model.project}::agent::${model.scope.session}` : model.project);
 function setFilters(next) {
     model.filters = next;
-    saveFilters(model.project, next, browserLocal);
+    saveFilters(filterKey(), next, browserLocal);
     loadArtifacts();
 }
 
 // ── drawing ──────────────────────────────────────────────────────────────
 
 function ensureBar() {
-    if (bar && barKey === model.project) return;
-    barKey = model.project;
-    bar = buildBar(setFilters, { page: true, hooks: { onPanel: open => savePanelOpen('team-artifacts', model.project, open) } });
-    bar.setOpen(loadPanelOpen('team-artifacts', model.project));
+    if (bar && barKey === model.key) return;
+    barKey = model.key;
+    const panel = model.scope ? 'artifacts' : 'team-artifacts';
+    const plain = !!(model.scope && model.scope.standalone); // an agent with no team: its list has no search or filters, only the title, Refresh and the copy icon
+    if (!plain) { bar = buildBar(setFilters, { page: true, personal: !!model.scope, hooks: { onPanel: open => savePanelOpen(panel, filterKey(), open) } }); bar.setOpen(loadPanelOpen(panel, filterKey())); }
     const refresh = btn('team-artifacts-action team-artifact-icon-btn team-artifacts-refresh', null, () => loadArtifacts({ keep: true }));
     const ri = el('span', 'material-icons', 'refresh'); ri.setAttribute('aria-hidden', 'true'); refresh.append(ri);
     refresh.title = 'Refresh'; refresh.setAttribute('aria-label', 'Refresh');
@@ -179,24 +191,33 @@ function ensureBar() {
         try { await navigator.clipboard.writeText(AGENT_ARTIFACT_PROMPT); icon.textContent = 'check'; } catch { icon.textContent = 'error_outline'; }
         setTimeout(() => { icon.textContent = 'content_copy'; }, 1500);
     });
-    bar.setHeader(el('span', 'sr-only', `Artifacts of ${keyLabel(model.project)}`), [refresh, help]);
+    const title = model.scope ? el('span', 'team-artifacts-title', `Artifacts · ${model.scope.name}`) : el('span', 'sr-only', `Artifacts of ${keyLabel(model.project)}`);
+    if (plain) { const node = el('div', 'team-artifacts-plain-head'); node.append(title, refresh, help); bar = { node, names() {}, set() {}, setOpen() {} }; }
+    else bar.setHeader(title, [refresh, help]);
 }
 
 function statusLine() {
     if (model.error) return model.error;
-    if (model.loading) return 'Loading team artifacts…';
+    if (model.loading) return model.scope ? 'Loading agent artifacts…' : 'Loading team artifacts…';
     if (!model.items.length) return isFiltered(model.filters) ? 'No artifacts match this search.' : 'No artifacts yet.';
     const c = model.counts;
     return c && c.matched > model.items.length ? `Showing ${model.items.length} of ${c.matched}${model.truncated ? '+' : ''}` : `${model.items.length} artifact${model.items.length === 1 ? '' : 's'}`;
 }
 
+/** The box the list scrolls in (the tab's panel, or the team page), found from the list up: a redraw that empties it for a moment would let the browser clamp its scroll to the top (#6509). */
+function scrollBox(node) {
+    for (let e = node; e; e = e.parentElement) if (e.scrollHeight > e.clientHeight + 20 && /(auto|scroll)/.test(getComputedStyle(e).overflowY)) return e;
+    return null;
+}
 let drawnRows = 0; // the rows of the last drawing: the first new row is the one after them
 function draw() {
     const body = root && root.querySelector('.team-artifacts-body'); if (!body) return;
     const rowsBefore = drawnRows;
+    const box = scrollBox(body), at = box ? box.scrollTop : 0;
+    const tableBox = body.querySelector('.team-table-scroll'), tableAt = tableBox ? tableBox.scrollTop : 0; // the table's own box is built again with the table
     ensureBar();
     const a = document.activeElement;
-    const held = a && body.contains(a) && !bar.node.contains(a) ? (a.dataset.artifactId || (a.classList.contains('goals-more') ? '#load-more' : '')) : '';
+    const held = a && body.contains(a) && !bar.node.contains(a) ? (a.dataset.artifactId || (a.classList.contains('goals-more') ? '#load-more' : a.classList.contains('team-artifacts-retry') ? '#retry' : '')) : '';
     for (const c of [...body.children]) if (c !== bar.node) c.remove();
     if (bar.node.parentElement !== body) body.prepend(bar.node);
     const status = el('p', `goals-note team-count-line${model.error ? ' team-artifacts-error' : ''}`, statusLine());
@@ -224,8 +245,11 @@ function draw() {
     bar.names([...new Set(model.items.flatMap(i => [i.produced_by, i.sent_by]).filter(n => typeof n === 'string' && n))].sort().slice(0, 50)); // the names on screen, offered in the Uploaded by field
     bar.set(model.filters, model.counts ? model.counts : model.items.length || !model.loading ? { matched: model.items.length, all: model.items.length } : null);
     drawnRows = model.items.length;
+    if (tableAt) { const now = body.querySelector('.team-table-scroll'); if (now) now.scrollTop = tableAt; }
+    if (box && box.scrollTop !== at) box.scrollTop = at; // the same place in the list, as the redraw left the box shorter for a moment
     // Load more: the button again, or, when the last page came and the button is gone, the first new row (the keyboard stays in the list, not on the page)
     if (held === '#load-more') (body.querySelector('.goals-more') || body.querySelectorAll('[data-artifact-id]')[Math.min(rowsBefore, model.items.length - 1)])?.focus({ preventScroll: true });
+    else if (held === '#retry') (body.querySelector('.team-artifacts-retry') || body.querySelector('[data-artifact-id]') || bar.node.querySelector('.team-artifacts-refresh'))?.focus({ preventScroll: true }); // Retry is drawn away by the answer: the list's first row, never the page
     else if (held) body.querySelector(`[data-artifact-id="${CSS.escape(held)}"]`)?.focus({ preventScroll: true });
 }
 
@@ -252,10 +276,11 @@ function openArtifact(item, opener) {
     ];
     const actions = [];
     if (link) {
-        if (hex) actions.push({ label: 'Open', primary: true, run: () => importOnce('./artifact_viewer.js').then(m => m.openArtifactViewer(hex, { server: link.server, filename: name, mediaType: item.media_type }), () => window.open(link.url, '_blank', 'noopener,noreferrer')) });
+        if (link.inline) actions.push({ label: 'Open', primary: true, run: () => importOnce('./preview_pane.js').then(m => m.openArtifactTab(item.uri || '', { contentURL: item.content_url, mediaType: item.media_type, filename: name, phoneFull: true })) });
+        else if (hex) actions.push({ label: 'Open', primary: true, run: () => importOnce('./artifact_viewer.js').then(m => m.openArtifactViewer(hex, { server: link.server, filename: name, mediaType: item.media_type }), () => window.open(link.url, '_blank', 'noopener,noreferrer')) });
         if (link.preview) actions.push(isCloud() ? { label: 'Download', run: () => importOnce('./artifact_download.js').then(m => m.downloadArtifact(link.url, m.sanitizeDownloadName(name))).catch(() => showToast('The artifact could not be downloaded', true)) } : { label: 'Download', href: link.url, download: true });
         else actions.push({ label: 'Open link', primary: true, href: link.url });
-        actions.push({ label: 'Copy link', run: () => { navigator.clipboard?.writeText(hex ? `coral://artifacts/${hex}` : link.url).then(() => showToast('Link copied'), () => showToast('The link could not be copied', true)); } });
+        actions.push({ label: 'Copy link', run: () => { navigator.clipboard?.writeText(hex ? `coral://artifacts/${hex}` : new URL(link.url, location.href).href).then(() => showToast('Link copied'), () => showToast('The link could not be copied', true)); } });
         if (hex && local()) {
             const on = model.kept.has(hex);
             actions.push({ label: on ? 'Kept' : 'Keep', title: on ? 'Kept: never pruned (click to release)' : 'Keep: never prune this', pressed: on, run: b => toggleKeep(hex, name, b) });
@@ -263,19 +288,27 @@ function openArtifact(item, opener) {
         }
     }
     openDetailPane({
-        key, opener, title: name,
+        key, opener, title: name, host: hooks.detailHost || null,
         sub: [un ? '' : typeText(item), un ? '' : sizeText(item.size), whenText(item.created_at)].filter(Boolean).join(' · '),
         facts: facts.filter(([, v]) => v != null && v !== ''),
-        body: link && link.preview ? (host, { signal, isStale }) => renderArtifact(host, `coral://artifacts/${hex}`, { server: link.server, filename: name, mediaType: item.media_type }, { signal, isStale, renderContent: renderText, openEntry: () => {}, setMeta: () => {} }) : null,
+        body: link && link.preview ? (host, { signal, isStale }) => { // the Operator's "Who can read this" (#5577) sits above the document, for a stored artifact
+            if (hex) { const slot = el('div', 'detail-readers'); host.before(slot); readersAllowed(hex, link.server).then(ok => { if (ok && !isStale()) slot.append(readersDisclosure(hex, link.server)); }).catch(() => {}); }
+            return renderArtifact(host, hex ? `coral://artifacts/${hex}` : item.uri || '', { server: link.server, filename: name, mediaType: item.media_type, contentURL: link.contentURL }, { signal, isStale, renderContent: renderText, openEntry: () => {}, setMeta: () => {} }); } : null,
         actions,
         onClose: () => { root?.querySelectorAll('tr[aria-current="true"]').forEach(r => r.removeAttribute('aria-current')); },
     });
     root?.querySelectorAll('tr[data-key]').forEach(r => { if (r.dataset.key === key) r.setAttribute('aria-current', 'true'); else r.removeAttribute('aria-current'); });
 }
 
-/** Show the team's artifacts in `host`. hooks: onCount(n). */
-export function showArtifacts(host, project, h = {}) {
-    if (project !== model.project) { model.controller?.abort(); Object.assign(model, { project, items: [], hasMore: false, cursor: '', counts: null, truncated: false, loading: false, error: '', loadingMore: false, filters: loadFilters(project, browserLocal), kept: new Set() }); bar = null; }
+/** Show the team's artifacts in `host`; with `scope` ({ session, server, standalone, name }) one agent's (standalone: it has no team, its list has no search). hooks: onCount(n). */
+export function showArtifacts(host, project, h = {}, scope = null) {
+    const key = scope ? `${project}|${scope.session}` : project;
+    const sameKey = key === model.key;
+    if (!sameKey) {
+        model.controller?.abort();
+        Object.assign(model, { project, scope, key, loaded: false, items: [], hasMore: false, cursor: '', counts: null, truncated: false, loading: false, error: '', loadingMore: false, filters: scope && scope.standalone ? { ...EMPTY } : loadFilters(scope ? `${project}::agent::${scope.session}` : project, browserLocal), kept: new Set() });
+        bar = null;
+    } else if (scope) model.scope = scope;
     hooks = h;
     if (!host.dataset.built) {
         host.dataset.built = '1';
@@ -287,6 +320,7 @@ export function showArtifacts(host, project, h = {}) {
     }
     root = host.firstChild;
     draw();
+    if (scope && sameKey && model.loaded) return Promise.resolve(); // an agent's tab drawn again (another tab and back) keeps its list until Refresh or another agent
     return loadArtifacts();
 }
 

@@ -1,5 +1,5 @@
 // The Operator deletes an artifact from the dashboard (#3553): an agent's Artifacts tab lists
-// its upload with a Delete button; the confirmation has no default (focus on Cancel) and says
+// its upload, and the row's sheet (#7622) has a Delete danger button; the confirmation has no default (focus on Cancel) and says
 // links will show "unavailable" and a browser's cached copy may remain; Delete removes the row
 // and the artifact answers 404; the button isn't offered in the pop-out; and Settings shows the
 // store's size, with the saved diffs on their own lines.
@@ -48,13 +48,16 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         await coralReady();
         await until(`!!document.getElementById('agentic-tab-artifacts')`, 'the Artifacts tab');
         await ev(`document.getElementById('agentic-tab-artifacts').click(); true`);
-        const row = `[...document.querySelectorAll('.team-artifact-row')].find(r => r.textContent.includes('delete-me.txt'))`;
+        const row = `[...document.querySelectorAll('#agentic-panel-artifacts tbody tr')].find(r => r.textContent.includes('delete-me.txt'))`;
+        const del = `[...document.querySelectorAll('#agentic-detail-pane .detail-foot .btn')].find(b => b.textContent === 'Delete')`; // the sheet's Delete
+        const openRow = async tr => { await ev(`(${tr}).querySelector('.team-row-btn').click(); true`); await until(`!document.getElementById('agentic-detail-pane').hidden`, 'the sheet'); };
         await until(`!!(${row})`, 'the uploaded artifact');
-        const btn = await ev(`(() => { const b = (${row}) && (${row}).querySelector('.team-artifact-delete'); return b && { tag: b.tagName, type: b.type, aria: b.getAttribute('aria-label') }; })()`);
-        check('its row has a Delete button', !!btn && btn.tag === 'BUTTON' && btn.aria === 'Delete delete-me.txt', JSON.stringify(btn));
+        await openRow(row);
+        const btn = await ev(`(() => { const b = ${del}; return b && { tag: b.tagName, type: b.type, danger: b.classList.contains('btn-danger') }; })()`);
+        check('its sheet has a Delete button, a danger button', !!btn && btn.tag === 'BUTTON' && btn.type === 'button' && btn.danger, JSON.stringify(btn));
 
         // The confirmation: no default, honest text.
-        await ev(`(${row}).querySelector('.team-artifact-delete').click(); true`);
+        await ev(`(${del}).click(); true`);
         await until(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'the confirmation');
         await until(`document.activeElement && document.activeElement.closest('#confirm-modal') && document.activeElement.id !== 'confirm-modal-yes'`, 'focus on Cancel');
         const dlg = await ev(`({ text: document.getElementById('confirm-modal-message').textContent, focus: document.activeElement.textContent.trim() })`);
@@ -66,22 +69,22 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         check('Cancel deletes nothing', st === 200 && (await ev(`!!(${row})`)), String(st));
 
         // Delete.
-        await ev(`(${row}).querySelector('.team-artifact-delete').click(); true`);
+        await ev(`(${del}).click(); true`);
         await until(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'the confirmation again');
         await ev(`document.getElementById('confirm-modal-yes').click(); true`);
         await until(`!(${row})`, 'the row gone');
         st = await ev(`fetch('/api/artifacts/${hex}').then(r => r.status)`);
-        const note = await ev(`((document.querySelector('.team-artifacts-notice') || {}).textContent || '')`);
-        check('Delete removes the row, says so, and the artifact is gone (404)', !(await ev(`!!(${row})`)) && st === 404 && note === 'Deleted delete-me.txt.', JSON.stringify({ st, note }));
+        const note = await ev(`((document.querySelector('#agentic-panel-artifacts .team-artifacts-status-live') || {}).textContent || '')`); // said in the panel's live region
+        check('Delete removes the row, closes the sheet, says so, and the artifact is gone (404)', !(await ev(`!!(${row})`)) && st === 404 && note === 'Deleted delete-me.txt.' && (await ev(`document.getElementById('agentic-detail-pane').hidden`)), JSON.stringify({ st, note }));
 
         // Not offered in the pop-out (its page is the agent, not the Operator's console).
         await ev(`document.body.classList.add('popout-mode'); true`);
-        const kept = `[...document.querySelectorAll('.team-artifact-row')].find(r => r.textContent.includes('kept.txt'))`;
-        await ev(`(() => { const b = [...document.querySelectorAll('#agentic-panel-artifacts-view .team-artifacts-action')].find(x => x.getAttribute('aria-label') === 'Refresh'); b && b.click(); return !!b; })()`);
-        await until(`!!(${kept}) && !(${kept}).querySelector('.team-artifact-delete')`, 'the list re-rendered in pop-out mode');
-        const pop = await ev(`({ up: ${up2}, rows: [...document.querySelectorAll('.team-artifact-row')].map(r => r.textContent.slice(0, 40)), del: !!(${kept}) && !!(${kept}).querySelector('.team-artifact-delete'),
-            status: (document.querySelector('.team-artifacts-status') || {}).textContent })`);
-        check('no Delete in the pop-out', pop.up === 201 && pop.rows.some(r => r.includes('kept.txt')) && !pop.del, JSON.stringify(pop));
+        const kept = `[...document.querySelectorAll('#agentic-panel-artifacts tbody tr')].find(r => r.textContent.includes('kept.txt'))`;
+        await ev(`document.querySelector('#agentic-panel-artifacts .team-artifacts-refresh').click(); true`);
+        await until(`!!(${kept})`, 'the list re-rendered in pop-out mode');
+        await openRow(kept);
+        const pop = await ev(`({ up: ${up2}, rows: [...document.querySelectorAll('#agentic-panel-artifacts tbody tr')].map(r => r.textContent.slice(0, 40)), del: !!(${del}), foot: [...document.querySelectorAll('#agentic-detail-pane .detail-foot .btn')].map(b => b.textContent) })`);
+        check('no Delete in the pop-out', pop.up === 201 && pop.rows.some(r => r.includes('kept.txt')) && !pop.del && pop.foot.length > 0, JSON.stringify(pop));
         await ev(`document.body.classList.remove('popout-mode'); true`);
 
         // Settings: the store's size, the diffs on their own lines, the limit.

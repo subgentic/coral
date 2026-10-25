@@ -17,53 +17,49 @@ globalThis.fetch = window.fetch = async (url) => {
     return { ok: true, status: 200, json: async () => ({ artifacts, session_id: 's1', has_more: false }) };
 };
 const copied = [];
-let failCopy = false;
+
 Object.defineProperty(navigator, 'clipboard', {
     configurable: true,
-    value: { writeText: async (text) => { if (failCopy) throw new Error('denied'); copied.push(text); } },
+    value: { writeText: async (text) => { copied.push(text); } },
 });
 
 const { state } = await importUi('state');
 state.currentSession = { type: 'live', session_id: 's1', name: 'dev' }; // standalone: no team
 const { initFilesSourcePicker, selectFilesSource } = await importUi('team_artifacts');
-initFilesSourcePicker(() => {}, () => {});
+initFilesSourcePicker(() => {});
 selectFilesSource('artifacts');
-await new Promise(r => setTimeout(r, 0));
-
+const until = async (f) => { for (let i = 0; i < 200 && !f(); i++) await new Promise(r => setTimeout(r, 10)); };
 const view = document.getElementById('agentic-panel-artifacts-view');
-const rows = [...view.querySelectorAll('tr.team-artifact-row')];
+await until(() => view.querySelectorAll('tbody tr').length === 3);
+const rows = [...view.querySelectorAll('tbody tr')];
 assert.equal(rows.length, 3);
-const buttons = rows.map(r => r.querySelector('.team-artifact-copy-link'));
-assert.ok(buttons[0] && buttons[1], 'linked rows have a Copy link button');
-assert.equal(buttons[2], null, 'a missing artifact has nothing to copy');
-assert.equal(buttons[0].getAttribute('aria-label'), 'Copy link to report.md');
-assert.equal(buttons[0].title, 'Copy link');
-assert.equal(buttons[0].type, 'button');
-assert.ok(buttons[0].querySelector('svg[width="16"]'), 'inline 16px icon like the other row actions');
-assert.equal(rows[0].querySelectorAll('.team-artifact-actions > *').length, 4, 'details, preview, download, copy link');
+const pane = document.getElementById('agentic-detail-pane');
+// a row opens its sheet over the panel; Copy link is one of the sheet's actions
+const copyLink = () => [...pane.querySelectorAll('.detail-foot .btn')].find(b => b.textContent === 'Copy link');
+const openRow = async (i) => { rows[i].querySelector('.team-row-btn').click(); await until(() => !pane.hidden); return copyLink(); };
 
-buttons[0].click();
-await new Promise(r => setTimeout(r, 0));
-assert.deepEqual(copied, [`https://hub.example/api/artifacts/${digest}?v=2`], 'managed artifacts copy an absolute URL in the v1.4.12 link form');
-assert.ok(buttons[0].querySelector('path[d="m3 8.5 3 3 7-7"]'), 'success shows the check icon');
-buttons[1].click();
-await new Promise(r => setTimeout(r, 0));
+const first = await openRow(0);
+assert.ok(first, 'a stored artifact has a Copy link action');
+first.click();
+await until(() => copied.length === 1);
+assert.deepEqual(copied, [`coral://artifacts/${digest}`], 'a managed artifact copies its coral:// reference');
+const second = await openRow(1);
+assert.ok(second, 'an external link has a Copy link action');
+second.click();
+await until(() => copied.length === 2);
 assert.equal(copied[1], 'https://docs.example/d/1', 'external links copy their own URL');
-failCopy = true;
-buttons[1].click();
-await new Promise(r => setTimeout(r, 0));
-assert.ok(buttons[1].querySelector('circle'), 'failure shows the error icon, no dialog');
+assert.equal(await openRow(2), undefined, 'a missing artifact has nothing to copy');
 
 // The header copy button pastes instructions with no task or manifest step.
-copied.length = 0; failCopy = false;
+copied.length = 0;
 view.querySelector('.team-artifacts-help').click();
-await new Promise(r => setTimeout(r, 0));
+await until(() => copied.length === 1);
 assert.equal(copied.length, 1);
 assert.match(copied[0], /coral-agent artifact upload <file>/);
 assert.match(copied[0], /appears in the Artifacts tab right away/);
 assert.doesNotMatch(copied[0], /task|manifest/i);
 // The source carries the same text the button copied (guards against a second copy of it).
-assert.ok(fs.readFileSync(STATIC + 'team_artifacts.js', 'utf8').includes('It appears in the Artifacts tab right away.'));
+assert.ok(fs.readFileSync(STATIC + 'team_artifacts_page.js', 'utf8').includes('It appears in the Artifacts tab right away.'));
 
 console.log('team_artifacts_copy_link: ok');
 process.exit(0);

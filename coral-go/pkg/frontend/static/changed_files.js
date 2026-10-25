@@ -174,7 +174,7 @@ function _hideSearchDropdown() {
 }
 
 export function initFileSearch() {
-    initFilesSourcePicker(openTeamArtifactPreview, openFilePreview);
+    initFilesSourcePicker(openFilePreview);
     const input = document.getElementById('files-search-input');
     if (!input || input.dataset.searchBound) return;
     input.dataset.searchBound = '1';
@@ -330,21 +330,11 @@ export function openFilePreview(filepath, line, opts) {
     openPreviewTab(filepath, line, opts);
 }
 
-function openTeamArtifactPreview(item) {
-    openArtifactTab(item.uri || '', {
-        contentURL: item.inline ? item.content_url : null,
-        externalURL: item.external_url,
-        mediaType: item.media_type,
-        filename: item.name,
-        phoneFull: true,
-    });
-}
-
 // Called immediately after a session switch, before transcript/file requests.
 export function syncFilesViewerSession() {
     syncFilesSourceTeam();
     setPreviewSession(state.currentSession?.type === 'live' ? state.currentSession.session_id : null);
-    initFilesSourcePicker(openTeamArtifactPreview, openFilePreview);
+    initFilesSourcePicker(openFilePreview);
 }
 
 /** Open file directly in edit mode (clicking the edit icon). */

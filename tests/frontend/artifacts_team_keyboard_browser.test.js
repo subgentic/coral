@@ -1,7 +1,6 @@
-// The side panel's Artifacts tab and the Team view by keyboard (#4026 follow-up), against stubbed APIs:
-//   Artifacts: every control is a real, named, focusable control in a sensible order (Refresh, the help button, then per row Details, Preview,
-//   Download, Copy link, Keep, Delete); Enter opens a Preview; Space opens Details; Keep toggles by Space and the focus stays on it; Refresh
-//   by Enter keeps the focus on Refresh; Delete asks first, with the focus on Cancel, and Escape returns to the Delete button.
+// The side panel's Artifacts tab and the Team view by keyboard (#4026 follow-up; the tab is the team page's table since #7622), against stubbed APIs:
+//   Artifacts: every control is a real, named, focusable control in a sensible order (Refresh, the help button, then each row's name); Enter on a row opens its sheet (the title focused) and Escape closes it with the focus back on the row; in the
+//   sheet Keep toggles by Space and the focus stays on it; Refresh by Enter keeps the focus on Refresh; Delete asks first, with the focus on Cancel, and Escape returns to the Delete button.
 //   Team view: Refresh and each agent's Remind button are reachable and work by Enter (the prompt is stubbed); the modal Team view traps
 //   Tab, closes on Escape and gives the focus back.
 // Run against an isolated dev server.
@@ -17,6 +16,7 @@ const HEX = n => String(n).repeat(64).slice(0, 64);
     const press = async (k, code, vk, modifiers = 0) => { const b = { key: k, code, windowsVirtualKeyCode: vk, modifiers }; await Input.dispatchKeyEvent({ type: 'keyDown', ...b, ...(k === 'Enter' ? { text: '\r' } : k === ' ' ? { text: ' ' } : {}) }); await Input.dispatchKeyEvent({ type: 'keyUp', ...b }); };
     const active = () => ev(`(() => { const a = document.activeElement; return a ? { cls: String(a.className), label: a.getAttribute('aria-label') || a.textContent.trim().slice(0, 30), tag: a.tagName.toLowerCase(), row: a.closest('tr') ? [...a.closest('tr').parentElement.children].indexOf(a.closest('tr')) : -1 } : null; })()`);
     const ART = (i, extra = {}) => ({ name: `report-${i}.md`, uri: `coral://artifacts/${HEX(i)}`, media_type: 'text/markdown', size: 2048 * i, created_at: '2026-10-16T10:00:00Z', task_id: i, task_title: `Task ${i}`, produced_by: 'QA', ...extra });
+    let a;
     try {
         await Page.enable();
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -43,38 +43,45 @@ const HEX = n => String(n).repeat(64).slice(0, 64);
 
         console.log('1. Artifacts: controls and order');
         await ev(`window.switchAgenticTab('artifacts', 'top'); true`);
-        await waitFor(`document.querySelectorAll('#agentic-panel-artifacts-view .team-artifact-row').length === 3`, 'the artifact rows', 8000);
-        const controls = await ev(`[...document.querySelectorAll('#agentic-panel-artifacts-view button, #agentic-panel-artifacts-view a[href]')].map(e => ({ cls: String(e.className).split(' ').filter(c => c.startsWith('team-artifact') ).join(' ') || e.tagName, name: (e.getAttribute('aria-label') || e.textContent || '').trim(), tab: e.tabIndex, shown: e.getClientRects().length > 0 }))`);
+        const ROW = '#agentic-panel-artifacts-view tbody tr';
+        await waitFor(`document.querySelectorAll('${ROW}').length === 3`, 'the artifact rows', 8000);
+        const controls = await ev(`[...document.querySelectorAll('#agentic-panel-artifacts-view button, #agentic-panel-artifacts-view a[href]')].filter(e => !e.closest('.list-bar-menu')).map(e => ({ name: (e.getAttribute('aria-label') || e.textContent || '').trim(), tab: e.tabIndex, shown: e.getClientRects().length > 0 }))`);
         assert.ok(controls.every(c => c.shown && c.tab >= 0 && c.name), 'every control is shown, focusable and named: ' + JSON.stringify(controls.filter(c => !(c.shown && c.tab >= 0 && c.name))));
-        const first = controls.slice(0, 2).map(c => c.name);
-        assert.deepEqual(first, ['Refresh', 'Copy instructions for agents on how to publish an artifact'], 'Refresh and the help button come first');
-        const rowOrder = await ev(`[...document.querySelectorAll('#agentic-panel-artifacts-view .team-artifact-row:first-child button, #agentic-panel-artifacts-view .team-artifact-row:first-child a[href]')].map(e => (e.getAttribute('aria-label') || '').split(' ')[0])`);
-        assert.deepEqual(rowOrder, ['', 'Details', 'Preview', 'Download', 'Copy', 'Keep', 'Delete'], 'a row reads: name, Details, Preview, Download, Copy link, Keep, Delete');
+        const bar = await ev(`[...document.querySelectorAll('#agentic-panel-artifacts-view .team-artifacts-refresh, #agentic-panel-artifacts-view .team-artifacts-help')].map(e => e.getAttribute('aria-label'))`);
+        assert.deepEqual(bar, ['Refresh', 'Copy instructions for agents on how to publish an artifact'], 'Refresh and the help button are in the header');
+        assert.deepEqual(await ev(`[...document.querySelectorAll('${ROW}')].map(r => r.querySelectorAll('button').length)`), [1, 1, 1], 'a row is one button: its name');
 
-        console.log('2. Preview by Enter, Details by Space');
-        await ev(`document.querySelector('#agentic-panel-artifacts-view .team-artifact-row .team-artifact-preview').focus(); true`);
+        console.log('2. A row opens by Enter; Escape closes it with the focus back on the row');
+        await ev(`document.querySelector('${ROW} .team-row-btn').focus(); true`);
         await press('Enter', 'Enter', 13);
-        await waitFor(`document.getElementById('preview-pane') && getComputedStyle(document.getElementById('preview-pane')).display !== 'none'`, 'the preview pane after Enter', 6000);
-        await ev(`const s = document.querySelector('#agentic-panel-artifacts-view .team-artifact-row .team-artifact-info-btn'); s.focus(); true`);
-        assert.equal(await ev(`document.querySelector('#agentic-panel-artifacts-view .team-artifact-row .team-artifact-details').hidden`), true);
-        await press(' ', 'Space', 32);
-        assert.equal(await ev(`document.querySelector('#agentic-panel-artifacts-view .team-artifact-row .team-artifact-details').hidden`), false, 'Space opens Details');
+        await waitFor(`!document.getElementById('agentic-detail-pane').hidden`, 'the sheet after Enter', 6000);
+        assert.equal(await ev(`document.activeElement === document.querySelector('#agentic-detail-pane .detail-title')`), true, 'the title of the sheet has the focus');
+        await press('Escape', 'Escape', 27);
+        assert.equal(await ev(`document.getElementById('agentic-detail-pane').hidden`), true, 'Escape closes the sheet');
+        a = await active(); assert.match(a.cls, /team-row-btn/, 'the focus is back on the row: ' + JSON.stringify(a)); assert.equal(a.row, 0);
 
         console.log('3. Keep by Space keeps the focus');
-        await ev(`document.querySelector('#agentic-panel-artifacts-view .team-artifact-row:nth-child(2) .team-artifact-keep').focus(); true`);
+        const FOOT = (t) => `[...document.querySelectorAll('#agentic-detail-pane .detail-foot .btn')].find(b => /^(${t})$/.test(b.textContent))`;
+        await ev(`document.querySelectorAll('${ROW} .team-row-btn')[1].focus(); true`);
+        await press('Enter', 'Enter', 13);
+        await waitFor(`!document.getElementById('agentic-detail-pane').hidden && !!(${FOOT('Keep|Kept')})`, 'the second row\'s sheet', 6000);
+        await ev(`(${FOOT('Keep|Kept')}).focus(); true`);
         await press(' ', 'Space', 32);
-        await waitFor(`document.querySelector('#agentic-panel-artifacts-view .team-artifact-row:nth-child(2) .team-artifact-keep').getAttribute('aria-pressed') === 'true'`, 'Keep to toggle', 4000);
-        let a = await active(); assert.match(a.cls, /team-artifact-keep/, 'the focus stays on the Keep button: ' + JSON.stringify(a)); assert.equal(a.row, 1);
+        await waitFor(`(${FOOT('Keep|Kept')}).getAttribute('aria-pressed') === 'true'`, 'Keep to toggle', 4000);
+        a = await active(); assert.equal(a.label, 'Kept', 'the focus stays on the Keep button: ' + JSON.stringify(a));
 
         console.log('4. Refresh by Enter keeps the focus on Refresh');
         await ev(`document.querySelector('#agentic-panel-artifacts-view .team-artifacts-refresh').focus(); true`);
         await press('Enter', 'Enter', 13);
-        await waitFor(`document.querySelectorAll('#agentic-panel-artifacts-view .team-artifact-row').length === 3 && document.getElementById('agentic-panel-artifacts-view').getAttribute('aria-busy') === 'false'`, 'the reload', 6000);
+        await waitFor(`document.querySelectorAll('${ROW}').length === 3 && window.__calls.filter(c => c === 'GET artifacts').length >= 2`, 'the reload', 6000);
         await sleep(300); // sleep-ok: a redraw and a layout settle over frames; no completion event
         a = await active(); assert.equal(a.label, 'Refresh', 'after a refresh the focus is still on Refresh: ' + JSON.stringify(a));
 
         console.log('5. Delete asks first; Escape returns to the Delete button');
-        await ev(`document.querySelector('#agentic-panel-artifacts-view .team-artifact-row:nth-child(3) .team-artifact-delete').focus(); true`);
+        await ev(`document.querySelectorAll('${ROW} .team-row-btn')[2].focus(); true`);
+        await press('Enter', 'Enter', 13);
+        await waitFor(`!document.getElementById('agentic-detail-pane').hidden && !!(${FOOT('Delete')}) && document.querySelector('#agentic-detail-pane .detail-title').textContent === 'report-3.md'`, 'the third row\'s sheet', 6000);
+        await ev(`(${FOOT('Delete')}).focus(); true`);
         await press('Enter', 'Enter', 13);
         await waitFor(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'the confirm dialog', 4000);
         await sleep(300); // sleep-ok: a redraw and a layout settle over frames; no completion event
@@ -82,7 +89,7 @@ const HEX = n => String(n).repeat(64).slice(0, 64);
         await press('Escape', 'Escape', 27); await sleep(400); // sleep-ok: a redraw and a layout settle over frames; no completion event
         assert.equal(await ev(`getComputedStyle(document.getElementById('confirm-modal')).display`), 'none', 'Escape closes the confirm dialog');
         assert.ok(!(await ev(`window.__calls.includes('DELETE')`)), 'nothing was deleted');
-        a = await active(); assert.match(a.cls, /team-artifact-delete/, 'the focus is back on the Delete button: ' + JSON.stringify(a));
+        a = await active(); assert.equal(a.label, 'Delete', 'the focus is back on the Delete button: ' + JSON.stringify(a));
 
         console.log('6. Team view');
         await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'team_availability.js'); window.__tv = m; await m.showTeamAvailability(${JSON.stringify(team)}); return true; })()`);

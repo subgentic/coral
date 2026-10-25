@@ -2304,11 +2304,10 @@ body.panel-dragging .agentic-state {
 /* Text tabs share the workspace's theme, type and spacing tokens. */
 .team-artifacts-action { display: inline-flex; align-items: center; justify-content: center; min-height: 32px; box-sizing: border-box; padding: var(--space-xs) var(--space-md); font: 500 var(--fs-md)/1.4 var(--font-sans); color: var(--text-primary); background: transparent; border: 1px solid transparent; border-radius: var(--radius-md); cursor: pointer; text-decoration: none; white-space: nowrap; }
 .team-artifacts-action:hover { background: var(--bg-hover); }
-.team-artifacts-action:focus-visible, .team-artifact-name:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.team-artifacts-action:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .team-artifacts-view { display: flex; flex: 1; flex-direction: column; min-height: 0; }
 .team-artifacts-view { overflow-y: auto; container-type: inline-size; }
-.team-artifacts-heading, .explorer-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; font-size: 0.75rem; overflow-wrap: anywhere; }
-.team-artifacts-status { padding: 8px 12px; font-size: 0.75rem; color: var(--text-secondary); }
+.explorer-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; font-size: 0.75rem; overflow-wrap: anywhere; }
 
 /* The Team Artifacts search, filter menu, sort and chips (#4573). The search is on its own row; the filters are a menu; at a narrow width (a phone, 200% text) everything wraps. */
 .list-bar-bar { padding: 4px 12px 8px; display: flex; flex-direction: column; gap: 8px; position: relative; }
@@ -2359,45 +2358,10 @@ body.panel-dragging .agentic-state {
 .list-bar-chip-x { color: var(--text-primary); } /* 4.4:1 in the light theme with the secondary text colour on the chip's fill (#4851) */
 .list-bar-chip-all { background: none; }
 .list-bar-search:focus-visible, .list-bar-clear-q:focus-visible, .list-bar-filter-btn:focus-visible, .list-bar-clear-all:focus-visible, .list-bar-select:focus-visible, .list-bar-by:focus-visible, .list-bar-chip:focus-visible, .list-bar-field input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.team-artifacts-scroll { flex-shrink: 0; max-width: 100%; }
-/* Fits its panel: Size and Task are in each row's Details (#3044). */
-.team-artifacts-list { width: 100%; table-layout: fixed; border-collapse: collapse; color: var(--text-primary); font-size: var(--fs-base); line-height: 1.5; }
-.team-artifacts-caption { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-.team-artifacts-list :is(th, td) { padding: var(--space-md) var(--space-lg); vertical-align: top; text-align: left; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
-.team-artifacts-list th { color: var(--text-secondary); font-weight: 500; }
-.team-artifact-col-type { width: 72px; }
-.team-artifact-col-created { width: 112px; } /* short times ("today 9:46", "Oct 21"): Name gets the free width (#6751) */
-.team-artifact-col-actions { width: calc(212px + 2 * var(--space-lg)); } /* six 32 px icon buttons and their gaps: Details, Preview, Download, Copy link, Keep, Delete (#4469, #5283) */
-/* The file icon beside the name, one line, an ellipsis only when the name is truly long; the full name is the tooltip (#6751). */
-.team-artifact-name > :not(.team-artifact-name-text) { flex: none; }
-.team-artifact-name { min-height: 32px; } /* the height of the action icons beside it: the name, the time and the icons share one centre line (#6751) */
-.team-artifacts-list :is(td.team-artifact-col-type, td.team-artifact-col-created) { line-height: 32px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.team-artifact-name-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.team-artifact-name { display: flex; align-items: center; gap: 6px; max-width: 100%; min-width: 0; overflow: hidden; padding: 0; background: none; border: 0; color: var(--text-primary); font: 500 var(--fs-md)/1.4 var(--font-sans); text-align: left; overflow-wrap: anywhere; }
-button.team-artifact-name { cursor: pointer; }
-.team-artifact-missing { font-size: var(--fs-base); color: var(--text-secondary); }
 /* Where a row came from: a file this team sent, one from another computer, or a link Coral could not verify (#4396). Words, not colour alone. */
 .team-artifact-badge { display: inline-block; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: top; margin-top: var(--space-xs); padding: 0.125rem 0.5rem; border: 1px solid var(--border); border-radius: 0.75rem; color: var(--text-secondary); font-size: var(--fs-base); line-height: 1.4; overflow-wrap: anywhere; }
 .team-artifact-badge-unverified { border-color: var(--warning); color: var(--text-primary); }
-.team-artifact-details { margin-top: var(--space-xs); color: var(--text-secondary); font-size: var(--fs-base); }
-.team-artifact-details[hidden] { display: none; }
-.team-artifact-info-btn[aria-expanded="true"] { background: var(--bg-hover); }
-.team-artifact-details dl { margin: var(--space-md) 0 0; }
-.team-artifact-details dt { font-weight: 600; margin-top: var(--space-md); }
-.team-artifact-details dd { margin: 0; overflow-wrap: anywhere; }
-.team-artifact-details dd + dd { margin-top: var(--space-xs); } /* several senders of one file are one line each, with a gap between them (#4460) */
-/* A middle panel drops Type first (it is in Details); a narrow one shows Name and Actions only. */
-@container (max-width: 760px) { .team-artifacts-list .team-artifact-col-type { display: none; } }
-/* A narrow panel shows Name and Actions; Type and Created are in Details. */
-@container (max-width: 520px) {
-    .team-artifacts-list :is(.team-artifact-col-type, .team-artifact-col-created) { display: none; }
-    .team-artifacts-list :is(th, td) { padding-left: var(--space-md); padding-right: var(--space-md); }
-}
-.team-artifacts-more { align-self: center; margin: 12px; }
 .team-artifacts-action:disabled, .team-artifacts-action[aria-disabled="true"] { opacity: 0.6; cursor: default; }
-.team-artifacts-status[data-state="error"] { color: var(--danger); } /* the same red as Settings' error lines */
-/* A live region for the outcome of a delete: always in the page, empty until there is something to say, so screen readers announce it (a region that appears already filled is often missed). */
-.team-artifacts-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 
 /* The icons sit in one row so rows stay short. */
 .team-artifact-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-xs); flex-shrink: 0; }
@@ -2412,9 +2376,7 @@ button.team-artifact-name { cursor: pointer; }
 /* On a touch screen every control of the table is a 44 px target, and the five icons wrap into two rows of three and two inside their column (#4469). */
 @media (pointer: coarse) {
     .team-artifact-icon-btn { min-width: 44px; min-height: 44px; }
-    .team-artifact-col-actions { width: calc(3 * 44px + 2 * var(--space-xs) + 2 * var(--space-lg)); }
     .team-artifacts-help { min-width: 44px; min-height: 44px; }
-    button.team-artifact-name { min-height: 44px; align-content: center; }
 }
 
 /* Human-readable JSON artifacts, without changing their source/download. */
@@ -2448,7 +2410,6 @@ button.team-artifact-name { cursor: pointer; }
 .explorer-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .explorer-chevron { flex: 0 0 12px; color: var(--text-secondary); }
 .explorer-file-icon { flex: 0 0 16px; }
-.team-artifact-name .explorer-file-icon { display: inline-block; vertical-align: -3px; margin-right: 6px; }
 .explorer-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .explorer-actions { display: flex; gap: 2px; margin-left: auto; flex-shrink: 0; opacity: 0; transition: opacity 0.15s; }
 .explorer-item:hover .explorer-actions, .explorer-item:focus-within .explorer-actions { opacity: 1; }

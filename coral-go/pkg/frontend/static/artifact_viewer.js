@@ -12,7 +12,7 @@ import { downloadArtifact, sanitizeDownloadName } from './artifact_download.js';
 import { trapTab } from './dialog_focus.js';
 import { importOnce } from './import_once.js';
 import { pushOverlay, popOverlay } from './overlay_history.js';
-import { readersAllowed, readersDisclosure } from './artifact_readers.js';
+const { readersAllowed, readersDisclosure } = await importOnce('./artifact_readers.js'); // lazy: its failure is retried
 // Asked for when used, not imported: this module loads lazily and may only import startup modules statically.
 const { attachComments, commentBoard } = await importOnce('./artifact_comments.js');
 const { attachVersions } = await importOnce('./artifact_versions.js');
