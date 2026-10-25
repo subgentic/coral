@@ -69,6 +69,14 @@ const TEAM = `qa-settings-${Date.now() % 100000}`;
                 await ev(`window.__tp.find('button', /^Cancel$/i).click(); true`); await settle(500);
                 assert.equal(await sel(), 'Health check', 'Cancel redraws the page on the group that was open');
             });
+            if (mobile) await S.run(`${label}: the group selector's word grows with the text size, and Learn more adds no height to the Working mode hint (UI/UX on #7663)`, async () => {
+                await group('Workflow'); await settle(150);
+                const at = z => ev(`(() => { document.documentElement.style.fontSize = ${JSON.stringify(z)}; const sel = [...window.__tp.page().querySelectorAll('select')].filter(window.__na.vis).find(x => window.__na.name(x) === 'Team settings group'); const l = window.__tp.find('button', /^Learn more about working modes$/i), a = getComputedStyle(l, '::after'), h = document.getElementById('tsr-mode-h'), lh = parseFloat(getComputedStyle(h).lineHeight) || parseFloat(getComputedStyle(h).fontSize) * 1.4; return { font: parseFloat(getComputedStyle(sel).fontSize), root: parseFloat(getComputedStyle(document.documentElement).fontSize), learnH: l.getBoundingClientRect().height, lh, target: a.position === 'absolute' && parseFloat(a.height) >= 43.5, lines: Math.round(h.getBoundingClientRect().height / lh) }; })()`);
+                const n = await at(''), big = await at('32px');
+                assert.ok(big.font >= n.font * 1.9, `the selector's word doubles at 200% text (${n.font}px then ${big.font}px)`);
+                for (const m of [n, big]) { assert.ok(m.learnH <= m.lh * 1.6, `Learn more is a line high, not a 44 px button (${m.learnH}px for a ${m.lh}px line)`); assert.equal(m.target, true, 'its 44 px touch target is the invisible ::after'); }
+                await ev(`document.documentElement.style.fontSize = ''; true`);
+            });
             await S.run(`${label}: the bar is pinned at the bottom: status "No changes to save.", Cancel at the left, Save settings at the right, Save off`, async () => {
                 const b = await bar(); assert.ok(b.save && b.cancel, 'Cancel and Save settings are there');
                 assert.match(b.status, /No changes to save/, `the status says there is nothing to save (got ${JSON.stringify(b.status)})`);
