@@ -2,6 +2,7 @@ package routes
 
 import (
 	"errors"
+	"io"
 	"io/fs"
 	"net/http"
 	"path/filepath"
@@ -48,9 +49,7 @@ func (h *AgentDocsHandler) List(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		name := strings.TrimSuffix(e.Name(), ".md")
-		title := strings.ReplaceAll(name, "-", " ")
-		title = titleCase(title)
-		docs = append(docs, docEntry{Name: name, Title: title})
+		docs = append(docs, docEntry{Name: name, Title: docTitle(h.docsFS, e.Name(), name)})
 	}
 	sort.Slice(docs, func(i, j int) bool {
 		// README first, then alphabetical
@@ -165,15 +164,102 @@ func (h *AgentDocsHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(strings.Join(parts, "\n\n---\n\n")))
 }
 
-// titleCase capitalizes the first letter of each word.
-func titleCase(s string) string {
-	prev := ' '
-	return strings.Map(func(r rune) rune {
-		if unicode.IsSpace(rune(prev)) || prev == ' ' {
-			prev = r
-			return unicode.ToTitle(r)
+// docTitle is a doc's title for the list: its own first heading in sentence case (the style guide's), else its file name made readable the same way (#7516). The title-cased file name it replaced read
+// "Using The Dashboard" and "Agent Ui".
+func docTitle(docs fs.FS, file, name string) string {
+	if h := firstHeading(docs, file); h != "" {
+		return sentenceCase(h)
+	}
+	return sentenceCase(strings.ReplaceAll(name, "-", " "))
+}
+
+// firstHeading is the text of the first "# " line in the first 4 KiB of a doc, or "".
+func firstHeading(docs fs.FS, file string) string {
+	f, err := docs.Open(file)
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+	buf := make([]byte, 4096)
+	n, _ := io.ReadFull(f, buf)
+	for _, line := range strings.Split(string(buf[:n]), "\n") {
+		if t, ok := strings.CutPrefix(strings.TrimRight(line, "\r"), "# "); ok {
+			return strings.TrimSpace(t)
 		}
-		prev = r
-		return r
-	}, s)
+	}
+	return ""
+}
+
+// docProperNouns are words kept capitalised in a sentence-case title; docAcronyms are kept (or made) upper case.
+var (
+	docProperNouns = map[string]string{"coral": "Coral", "claude": "Claude", "codex": "Codex", "gemini": "Gemini", "hub": "Hub", "windows": "Windows", "linux": "Linux", "macos": "macOS", "github": "GitHub"}
+	docAcronyms    = map[string]string{"ui": "UI", "api": "API", "cli": "CLI", "json": "JSON", "url": "URL", "id": "ID", "poc": "POC", "http": "HTTP", "tls": "TLS", "html": "HTML", "ai": "AI"}
+)
+
+// sentenceCase writes a heading in sentence case: the first word capitalised, every other word lower case, except proper nouns (Coral, Hub), acronyms (API, UI, CLI) and words that are already
+// code-like or carry a capital inside them (coral-agent, WebSocket, agent.json). A heading that is already in sentence case comes back unchanged.
+func sentenceCase(s string) string {
+	words := strings.Fields(s)
+	for i, w := range words {
+		core := strings.Trim(w, "()[]{}:,;.\"'`")
+		if core == "" {
+			continue
+		}
+		words[i] = strings.Replace(w, core, wordCase(core, i == 0), 1)
+	}
+	return strings.Join(words, " ")
+}
+
+// wordCase is one word in a sentence-case title; first says it opens the title.
+func wordCase(core string, first bool) string {
+	low := strings.ToLower(core)
+	switch {
+	case docAcronyms[low] != "":
+		return docAcronyms[low]
+	case docProperNouns[low] != "":
+		return docProperNouns[low]
+	case strings.Contains(core, "-") && core != low && !strings.ContainsAny(core, "._/"):
+		// Multi-Server: each part on its own, the first part carrying the title's first-word rule
+		parts := strings.Split(core, "-")
+		for j, part := range parts {
+			parts[j] = wordCase(part, first && j == 0)
+		}
+		return strings.Join(parts, "-")
+	case strings.ContainsAny(core, "-._/") && core == low:
+		return core // code-like and already lower case (coral-agent, agent.json)
+	case hasInnerCapital(core) || isAllUpper(core):
+		return core // CamelCase and acronyms the list does not know (WebSocket, GPU)
+	case first:
+		return upperFirst(low)
+	}
+	return low
+}
+
+func hasInnerCapital(s string) bool {
+	for i, r := range s {
+		if i > 0 && unicode.IsUpper(r) {
+			return true
+		}
+	}
+	return false
+}
+
+func isAllUpper(s string) bool {
+	letters := 0
+	for _, r := range s {
+		if unicode.IsLetter(r) {
+			letters++
+			if !unicode.IsUpper(r) {
+				return false
+			}
+		}
+	}
+	return letters >= 2
+}
+
+func upperFirst(s string) string {
+	for i, r := range s {
+		return string(unicode.ToUpper(r)) + s[i+len(string(r)):]
+	}
+	return s
 }
