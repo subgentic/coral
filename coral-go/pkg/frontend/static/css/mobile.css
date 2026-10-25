@@ -627,7 +627,7 @@
         padding: 12px !important;
     }
 
-    .scheduler-view .item-bar { bottom: -12px; margin-bottom: -12px; padding-bottom: calc(var(--space-lg) + 12px); }
+    .scheduler-view .item-bar { position: static; margin-bottom: 0; padding-bottom: var(--space-lg); } /* in the flow after the job's content, as the workflow's is (a long page would have a pinned bar over its runs) */
 
 
     /* Job cards stack full width */
