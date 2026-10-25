@@ -1,0 +1,89 @@
+// The agent's side panel tabs say their words (UI/UX's 170 list, item 1, #7621): at 1280 px and up each tab shows its word beside its icon when all the words fit the row on one line (a panel dragged
+// narrow, or text at 200%, falls back to icons alone: no word clipped, no wrapped row), the Tasks count stays a badge, and the three rarely used tabs (Browse, Activity, Agent UI) are behind one More menu that
+// opens them with the keyboard and carries the open one's word. Below 1280 the tabs are icons alone with their names as title and aria-label. Drives the real dashboard over CDP; an isolated dev server.
+const assert = require('node:assert/strict');
+const { connect } = require('./agent_view_harness');
+const { settle } = require('./helpers/wait');
+
+(async () => {
+    const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const { Input } = client;
+    const key = async k => { const vk = { ArrowDown: 40, ArrowUp: 38, Escape: 27, Enter: 13, Tab: 9 }[k]; for (const type of ['keyDown', 'keyUp']) await Input.dispatchKeyEvent({ type, key: k, code: k, windowsVirtualKeyCode: vk, ...(type === 'keyDown' && k === 'Enter' ? { text: '\r' } : {}) }); };
+    const ok = name => console.log(`   ✓ ${name}`);
+    const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
+    const ROW = '#agentic-block-top .agentic-state-tabs';
+    const row = () => ev(`(() => { const r = document.querySelector('${ROW}'); const tabs = [...r.querySelectorAll('.agentic-tab')].filter(b => getComputedStyle(b).display !== 'none' && !b.classList.contains('tab-more') && !b.classList.contains('agentic-tab-close'));
+        const word = b => { const w = b.querySelector('.agentic-tab-word'); return w && getComputedStyle(w).display !== 'none' ? w.textContent : null; };
+        return { words: r.hasAttribute('data-words'), shown: tabs.map(b => [b.dataset.tab || b.id.replace('agentic-tab-', ''), word(b)]), tops: [...new Set(tabs.map(b => b.offsetTop))], clipped: r.scrollWidth > r.clientWidth, more: (() => { const m = document.getElementById('agentic-tab-more'); return m.hidden ? null : [m.getAttribute('aria-label'), m.classList.contains('active'), m.getAttribute('aria-expanded')]; })() }; })()`);
+    const load = async (w, mobile) => {
+        await Emulation.setDeviceMetricsOverride({ width: w, height: 900, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
+        await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await ev(`localStorage.removeItem('coral-agentic-tab-prefs'); window.__m.add('dock-bot', 'A', 3, { sleeping: false }); true`);
+        await settle(ev, 600); // sleep-ok: the first live list renders from several answers; no single completion event
+        await ev(`window.selectLiveSession('dock-bot', 'claude', 'dock-bot-id', 'local'); true`);
+        await ev(`(() => { const p = document.getElementById('agentic-state'); if (p.classList.contains('collapsed') || document.getElementById('agentic-tab-files').getBoundingClientRect().width === 0) window.toggleAgenticPanel(true); return true; })()`);
+        await waitFor(`document.getElementById('agentic-tab-files').getBoundingClientRect().width > 0 && !document.getElementById('agentic-tab-more').hidden`, 'the panel and its More', 8000);
+    };
+    try {
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+
+        console.log('1280: words when they all fit');
+        await load(1280, false);
+        await waitFor(`document.querySelector('${ROW}').hasAttribute('data-words')`, 'the words show at the default panel width', 4000);
+        let r = await row();
+        const named = r.shown.filter(([t]) => t !== 'customize'); // the Customize button at the row's end is an icon alone, as it was
+        assert.deepEqual(named.map(([t, w]) => [t, w]), [['files', 'Files'], ['artifacts', 'Artifacts'], ['tasks', 'Tasks'], ['notes', 'Notes'], ['saved', 'Saved'], ['more', 'More']], 'each shown tab says its word: ' + JSON.stringify(r.shown));
+        assert.deepEqual([r.tops.length, r.clipped], [1, false], 'one line, nothing clipped: ' + JSON.stringify(r));
+        assert.ok(!r.shown.some(([t]) => ['browse', 'activity', 'agent-ui'].includes(t)), 'the three rare tabs are not in the row: ' + JSON.stringify(r.shown));
+        assert.equal(r.more[0], 'More tabs'); ok('Files, Artifacts, Tasks, Notes, Saved and More with their words, on one line');
+        await shot('dock-tabs-1280');
+
+        console.log('More opens the rare tabs');
+        await ev(`document.getElementById('agentic-tab-more').focus(); true`);
+        await key('ArrowDown');
+        await waitFor(`!document.getElementById('agentic-more-menu').hidden && document.activeElement.getAttribute('role') === 'menuitem'`, 'the menu opens on ArrowDown with the focus in it', 4000);
+        const items = await ev(`[...document.querySelectorAll('#agentic-more-menu [role=menuitem]')].map(i => i.dataset.tab + ':' + i.textContent.trim())`);
+        assert.deepEqual(items, ['browse:folder_openBrowse', 'activity:timelineActivity', 'agent-ui:widgetsAgent UI'], JSON.stringify(items));
+        await shot('dock-tabs-more-open');
+        await key('ArrowDown'); await key('Enter');
+        await waitFor(`document.getElementById('agentic-panel-activity').classList.contains('active')`, 'Enter opens Activity', 4000);
+        r = await row();
+        assert.deepEqual(r.more, ['More: Activity, open', true, 'false'], 'More carries the open tab: ' + JSON.stringify(r.more));
+        assert.equal(await ev(`document.querySelector('#agentic-tab-more .agentic-tab-word').textContent`), 'Activity', 'and says its word');
+        assert.equal(await ev(`document.getElementById('agentic-menu') === null && document.getElementById('agentic-more-menu').hidden`), true, 'the menu closed');
+        await ev(`document.getElementById('agentic-tab-more').focus(); true`); await key('ArrowDown'); await key('Escape');
+        assert.equal(await ev(`document.activeElement.id`), 'agentic-tab-more', 'Escape closes the menu with the focus back on More');
+        await ev(`document.getElementById('agentic-tab-files').click(); true`);
+        r = await row(); assert.deepEqual([r.more[0], r.more[1]], ['More tabs', false], 'another tab: More says More again');
+        ok('the keyboard opens, picks and closes; the open rare tab is seen on More');
+
+        console.log('a panel dragged narrow: icons alone');
+        await ev(`document.getElementById('agentic-state').style.width = '300px'; window.dispatchEvent(new Event('resize')); true`);
+        await waitFor(`!document.querySelector('${ROW}').hasAttribute('data-words')`, 'the words give way when they do not fit', 4000);
+        r = await row();
+        assert.ok(r.shown.every(([, w]) => w === null) && r.tops.length === 1 && !r.clipped, 'icons alone, one line: ' + JSON.stringify(r));
+        assert.ok(await ev(`[...document.querySelectorAll('${ROW} .agentic-tab')].filter(b => getComputedStyle(b).display !== 'none' && !b.classList.contains('tab-more')).every(b => b.getAttribute('aria-label') && b.title)`), 'each keeps its name as aria-label and title');
+        await shot('dock-tabs-narrow'); ok('words fall back to icons with the names kept');
+        await ev(`document.getElementById('agentic-state').style.width = ''; true`);
+
+        console.log('200% text: icons alone, the row does not wrap');
+        await ev(`document.documentElement.style.fontSize = '32px'; true`);
+        await settle(ev, 400); // sleep-ok: layout settles over frames after a font-size change
+        r = await row();
+        assert.ok(r.shown.every(([, w]) => w === null) || (r.tops.length === 1 && !r.clipped), 'words only if they fit: ' + JSON.stringify(r));
+        await ev(`document.documentElement.style.fontSize = ''; true`);
+
+        console.log('below 1280: icons alone; the phone has More too');
+        await load(1100, false);
+        r = await row(); assert.ok(!r.words && r.shown.every(([, w]) => w === null), 'icons alone below 1280: ' + JSON.stringify(r));
+        await load(390, true);
+        r = await row(); assert.ok(r.more && r.shown.every(([, w]) => w === null), 'the phone: icons, and More: ' + JSON.stringify(r));
+        await ev(`document.getElementById('agentic-tab-more').click(); true`);
+        await waitFor(`!document.getElementById('agentic-more-menu').hidden`, 'More opens on the phone', 4000);
+        const target = await ev(`Math.round(document.querySelector('#agentic-more-menu [role=menuitem]').getBoundingClientRect().height)`);
+        assert.ok(target >= 44, 'a 44 px target on the phone: ' + target);
+        await shot('dock-tabs-more-390'); ok('below 1280 and on the phone');
+        console.log('PASS dock tabs');
+    } catch (e) { console.error(e && e.stack || e); process.exitCode = 1; }
+    try { await client.close(); } catch (_) {}
+})();

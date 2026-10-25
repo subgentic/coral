@@ -44,6 +44,7 @@ import './command_mention.js';
 import './agent_notes.js';
 import { loadCustomViews, activateCustomView } from './custom_views.js';
 import { initTabCustomize } from './tab_customize.js';
+import { initDockTabs } from './dock_tabs.js';
 import { startNav, go, note, onRoute, currentRoute } from './nav.js';
 import { liveRoute, keyRoute, routeKey, AGENT_SUBTABS, parse as parseRoute } from './routes.js';
 import { initPopout, applyPopoutBodyClass, popoutRetry } from './popout.js';
@@ -829,7 +830,7 @@ function loadInitialData(popout) {
     if (!popout) loadPinnedFolders();
     if (!popout) importOnce('./received_cap_notice.js').then(m => m.checkReceivedCap()).catch(() => {}); // #4441: told once when received files reach 80% of their limit
     if (!popout) importOnce('./terminal_backend.js').then(m => { m.checkTerminalNotices(); m.watchAutoWake(); m.watchHooksStatus(); }).catch(() => {}); // #3634, #3636, #3665
-    for (const [n, f] of [['loadCustomViews', loadCustomViews], ['initTabCustomize', initTabCustomize], ['initAgentUI', initAgentUI]]) { // a failing step must not stop the feed
+    for (const [n, f] of [['loadCustomViews', loadCustomViews], ['initTabCustomize', initTabCustomize], ['initDockTabs', initDockTabs], ['initAgentUI', initAgentUI]]) { // a failing step must not stop the feed
         const fail = e => console.error(`init step ${n} failed`, e);
         try { Promise.resolve(f()).catch(fail); } catch (e) { fail(e); }
     }

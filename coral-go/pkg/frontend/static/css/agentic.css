@@ -181,6 +181,30 @@ body.panel-dragging .agentic-state {
 /* A tab the user hid; !important so it wins over the scope rules that show tabs. */
 .agentic-tab.tab-hidden { display: none !important; }
 .agentic-tab-customize { flex: 0 0 auto; min-width: 40px; }
+
+/* The tabs' words (UI/UX's 170 list, #7621): shown beside the icon when dock_tabs.js measured that all of them fit the row on one line at 1280 px and up (data-words); the name is the title and the
+   aria-label either way. The rarely used tabs are drawn out of the row (.tab-more: still real buttons, out of the tab order) and open from the More menu. */
+.agentic-tab-word { display: none; white-space: nowrap; }
+.agentic-state-tabs[data-words] .agentic-tab-word { display: inline; }
+.agentic-tab.active .agentic-tab-word { color: var(--text-primary); } /* the accent on the light panel is 4.44:1 at 12 px, under AA: the icon and the underline carry the accent, the word is the page's text colour */
+.agentic-state-tabs[data-words] .agentic-tab { flex: 1 0 auto; /* a tab is never narrower than its word: the row wraps, the check sees it and drops the words */ padding-inline: 3px; gap: 3px; font-size: var(--fs-base); }
+.agentic-state-tabs[data-words] .agentic-tab .material-icons { font-size: 1rem; }
+.agentic-state-tabs[data-words] .agentic-tab-customize { min-width: 32px; flex: 0 0 auto; }
+.agentic-state-tabs .agentic-tab { transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease; } /* not `all`: dock_tabs.js reads the tabs' sizes right after the words go on, and a size that transitions is read as it was */
+.agentic-tab[hidden] { display: none; }
+.agentic-tab.tab-more { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); pointer-events: none; }
+.agentic-more { position: relative; display: flex; flex: 0 0 auto; }
+.agentic-more > .agentic-tab, .agentic-state-tabs[data-words] .agentic-more > .agentic-tab { flex: 0 0 auto; padding-inline: 4px; }
+.agentic-more-menu { position: fixed; top: 100%; right: 0; z-index: 30; min-width: 180px; padding: 6px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-md); display: flex; flex-direction: column; gap: 2px; }
+.agentic-more-menu[hidden] { display: none; }
+.agentic-more-item { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 6px 10px; border: 0; border-radius: var(--radius-md); background: none; color: var(--text-primary); font: inherit; font-size: var(--fs-md); text-align: left; cursor: pointer; }
+.agentic-more-item:hover, .agentic-more-item:focus-visible { background: var(--bg-hover); }
+.agentic-more-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.agentic-more-item.active { color: var(--accent); font-weight: 600; }
+.agentic-more-item .material-icons { font-size: 1.125rem; }
+.agentic-more-count { margin-left: auto; color: var(--text-secondary); font-size: var(--fs-base); }
+.agentic-more-count:empty { display: none; }
+@media (pointer: coarse), (max-width: 767px) { .agentic-more-item { min-height: var(--control-touch-height, 44px); } }
 .agentic-tab-customize[aria-expanded="true"] { background: var(--bg-hover); color: var(--text-primary); }
 
 .tab-customize {
