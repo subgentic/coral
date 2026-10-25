@@ -7,6 +7,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
+const { openBoardTasksTab } = require('./helpers/board_tasks_tab');
 const BASE = require('./test_base').BASE;
 const { removeBoards } = require('./helpers/board_cleanup');
 
@@ -77,9 +78,7 @@ const ADD = `(() => {
             await post('/tasks/' + t.id + '/complete', { subscriber_id: 'worker', message: 'done ' + title });
         }
         await post('/tasks', { title: 'open-one', body: 'still open', created_by: 'Operator' });
-        await ev(`window.selectBoardProject(${JSON.stringify(BOARD)}); true`);
-        await waitFor(`document.getElementById('agentic-state').dataset.page === 'board'`, 'the board page');
-        await ev(`window.toggleAgenticPanel(true); document.getElementById('agentic-tab-tasks').click(); true`);
+        await openBoardTasksTab({ ev, waitFor }, BOARD); // the board's tasks are an agent's Tasks tab (#7457)
         await waitFor(`document.querySelectorAll('#board-task-list .board-task-item:not(.board-task-header)').length === 8`, 'eight task rows', 10000, `JSON.stringify({ n: document.querySelectorAll('#board-task-list .board-task-item:not(.board-task-header)').length, txt: document.getElementById('board-task-list').textContent.slice(0, 160), tab: document.getElementById('agentic-panel-tasks').className, bt: (T.state.currentBoardTasks || []).length, page: document.getElementById('agentic-state').dataset.page, proj: T.state.boardPageProject })`);
 
         console.log('1. Quiet: no chip, no words, no filter in the list; a small muted icon after the title only for evidence attached (the words are its tooltip and accessible name); nothing for a verified task, an unverified one, an open one, or one the server sent no state for');

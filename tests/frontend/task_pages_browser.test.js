@@ -4,6 +4,7 @@
 // title in the list is drawn as the link it is; and a priority is not in capitals. Drives Chrome over CDP through agent_view_harness.js.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { openBoardTasksTab } = require('./helpers/board_tasks_tab');
 const BASE = require('./test_base').BASE;
 const S = `(window.__coralStatic || '/static/')`;
 
@@ -30,9 +31,7 @@ const S = `(window.__coralStatic || '/static/')`;
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
             if (font) await ev(`document.documentElement.style.fontSize = '${font}'; true`);
-            await ev(`(async () => { const m = await import(${S} + 'message_board.js'); const { showView } = await import(${S} + 'utils.js'); showView('messageboard-view'); m.selectBoardProject(${JSON.stringify(B)}); return true; })()`);
-            await waitFor(`document.getElementById('mb-post-input') && document.getElementById('mb-post-input').getClientRects().length > 0`, 'the board', 12000); await sleep(600); // sleep-ok: layout settles after the panel draws
-            await ev(`(() => { const b = document.getElementById('panel-toggle-btn') || document.getElementById('popout-panel-toggle-btn'); if (b) b.click(); const t = document.getElementById('agentic-tab-tasks'); if (t) t.click(); return true; })()`);
+            await openBoardTasksTab({ ev, waitFor }, B); await sleep(600); // sleep-ok: layout settles after the panel draws
             await waitFor(`document.querySelectorAll('#agentic-panel-tasks .board-task-item:not(.board-task-header)').length === 4`, 'four tasks', 12000); await sleep(400); // sleep-ok: layout settles after the panel draws
             // the tab says how many are done; every title is a link; a priority is not in capitals
             const tab = await ev(`(() => { const rows = [...document.querySelectorAll('#agentic-panel-tasks .board-task-item:not(.board-task-header):not(.completed) .board-task-desc')]; const link = getComputedStyle(document.documentElement).getPropertyValue('--link-text').trim(); const probe = document.createElement('span'); probe.style.color = link; document.body.append(probe); const lc = getComputedStyle(probe).color; probe.remove();

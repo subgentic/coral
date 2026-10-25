@@ -166,7 +166,7 @@ const HOOK = `(() => {
         // ── open the pages ─────────────────────────────────────────────────────
         const wfId = (await ev(`fetch('/api/workflows').then(r => r.json()).then(d => ((d.workflows || d)[0] || {}).id)`).catch(() => null));
         const visits = ['/', `/agents/${sid}`, ...['board', 'tasks', 'notes', 'files', 'browse', 'artifacts', 'activity'].map(s => `/agents/${sid}/${s}`),
-            `/board/${BOARD}`, `/team/${BOARD}`, '/jobs', '/workflows', ...(wfId ? [`/workflows/${wfId}`] : []), '/analytics'];
+            `/board/${BOARD}`, `/team/${BOARD}`, ...['messages', 'tasks', 'agents', 'artifacts', 'knowledge', 'settings'].map(t => `/team/${BOARD}/${t}`), '/jobs', '/workflows', ...(wfId ? [`/workflows/${wfId}`] : []), '/analytics'];
 
         // The safe controls the dashboard has for looking at an item (opening, expanding, editing without saving, dialogs that only ask), clicked once each:
         // never a delete, kill, sleep, send, run, trigger, publish or "do" action.
