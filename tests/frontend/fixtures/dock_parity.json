@@ -2299,10 +2299,10 @@
       "what": "change handler: if (!goalSelect.dataset.bound) { goalSelect.dataset.bound = 'true'; goalSelect.addEventListener('change', () =",
       "source": "static/task_create.js:78",
       "status": "moved",
-      "newHome": "team page: Tasks tab, the task page keeps the task dialog behind its Task actions button (Edit, Complete, Cancel, Publish, Nudge, Remind, dependencies, outputs: unchanged, they move onto the page with the Tasks build)",
+      "newHome": "the task page's Edit form: the Goal select is filled by the same goal code",
       "proof": {
-        "file": "static/team_tasks_page.js",
-        "needle": "Task actions"
+        "file": "static/team_task_actions.js",
+        "needle": "fillGoalSelect(goal,"
       }
     },
     {
@@ -2312,10 +2312,10 @@
       "what": "invalid handler: details.addEventListener('invalid', () => { details.open = true; }, { capture: true });",
       "source": "static/task_create.js:103",
       "status": "moved",
-      "newHome": "team page: Tasks tab, the task page keeps the task dialog behind its Task actions button (Edit, Complete, Cancel, Publish, Nudge, Remind, dependencies, outputs: unchanged, they move onto the page with the Tasks build)",
+      "newHome": "the task page's Edit form: a goal the board requires is flagged on the Goal select",
       "proof": {
-        "file": "static/team_tasks_page.js",
-        "needle": "Task actions"
+        "file": "static/team_task_actions.js",
+        "needle": "showGoalInvalid(goal, goalError"
       }
     },
     {
@@ -2326,10 +2326,10 @@
       "action": "dep-picker-toggle",
       "source": "static/task_dep_picker.js:14",
       "status": "moved",
-      "newHome": "team page: Tasks tab, the task page keeps the task dialog behind its Task actions button (Edit, Complete, Cancel, Publish, Nudge, Remind, dependencies, outputs: unchanged, they move onto the page with the Tasks build)",
+      "newHome": "the task page's Edit form: the Blocked by picker (the same picker code)",
       "proof": {
-        "file": "static/team_tasks_page.js",
-        "needle": "Task actions"
+        "file": "static/team_task_actions.js",
+        "needle": "_renderDepPicker('task-edit-deps'"
       }
     },
     {
@@ -2340,10 +2340,10 @@
       "action": "dep-picker-change",
       "source": "static/task_dep_picker.js:21",
       "status": "moved",
-      "newHome": "team page: Tasks tab, the task page keeps the task dialog behind its Task actions button (Edit, Complete, Cancel, Publish, Nudge, Remind, dependencies, outputs: unchanged, they move onto the page with the Tasks build)",
+      "newHome": "the task page's Edit form: the Blocked by picker (the same picker code)",
       "proof": {
-        "file": "static/team_tasks_page.js",
-        "needle": "Task actions"
+        "file": "static/team_task_actions.js",
+        "needle": "_renderDepPicker('task-edit-deps'"
       }
     },
     {
@@ -2354,10 +2354,10 @@
       "action": "dep-tag-remove",
       "source": "static/task_dep_picker.js:41",
       "status": "moved",
-      "newHome": "team page: Tasks tab, the task page keeps the task dialog behind its Task actions button (Edit, Complete, Cancel, Publish, Nudge, Remind, dependencies, outputs: unchanged, they move onto the page with the Tasks build)",
+      "newHome": "the task page's Edit form: the Blocked by picker (the same picker code)",
       "proof": {
-        "file": "static/team_tasks_page.js",
-        "needle": "Task actions"
+        "file": "static/team_task_actions.js",
+        "needle": "_renderDepPicker('task-edit-deps'"
       }
     },
     {
@@ -2367,10 +2367,10 @@
       "what": "names a control: \"Remove dependency ${escapeAttr(label)}\"",
       "source": "static/task_dep_picker.js:41",
       "status": "moved",
-      "newHome": "team page: Tasks tab, the task page keeps the task dialog behind its Task actions button (Edit, Complete, Cancel, Publish, Nudge, Remind, dependencies, outputs: unchanged, they move onto the page with the Tasks build)",
+      "newHome": "the task page's Edit form: the Blocked by picker (its remove buttons keep their names)",
       "proof": {
-        "file": "static/team_tasks_page.js",
-        "needle": "Task actions"
+        "file": "static/team_task_actions.js",
+        "needle": "_renderDepPicker('task-edit-deps'"
       }
     },
     {
@@ -2381,10 +2381,10 @@
       "action": "task-cancel",
       "source": "static/task_detail.js:80",
       "status": "moved",
-      "newHome": "team page: Tasks tab, the task page keeps the task dialog behind its Task actions button (Edit, Complete, Cancel, Publish, Nudge, Remind, dependencies, outputs: unchanged, they move onto the page with the Tasks build)",
+      "newHome": "team page: a task's page, its pinned bar: Cancel task",
       "proof": {
-        "file": "static/team_tasks_page.js",
-        "needle": "Task actions"
+        "file": "static/team_task_actions.js",
+        "needle": "'Cancel task', () => ctx.redraw(task, 'cancel')"
       }
     },
     {
@@ -2395,10 +2395,10 @@
       "action": "task-close",
       "source": "static/task_detail.js:82",
       "status": "moved",
-      "newHome": "team page: Tasks tab, the task page keeps the task dialog behind its Task actions button (Edit, Complete, Cancel, Publish, Nudge, Remind, dependencies, outputs: unchanged, they move onto the page with the Tasks build)",
+      "newHome": "the task page's Back link (there is no dialog to close)",
       "proof": {
         "file": "static/team_tasks_page.js",
-        "needle": "Task actions"
+        "needle": "back.addEventListener('click', () => ctx.onBack())"
       }
     },
     {
@@ -2409,10 +2409,10 @@
       "action": "task-nudge",
       "source": "static/task_detail.js:83",
       "status": "moved",
-      "newHome": "team page: Tasks tab, the task page keeps the task dialog behind its Task actions button (Edit, Complete, Cancel, Publish, Nudge, Remind, dependencies, outputs: unchanged, they move onto the page with the Tasks build)",
+      "newHome": "team page: a task's page, its pinned bar: Nudge",
       "proof": {
-        "file": "static/team_tasks_page.js",
-        "needle": "Task actions"
+        "file": "static/team_task_actions.js",
+        "needle": "'Nudge', () => nudgeBoardTask(task.id)"
       }
     },
     {
@@ -2423,10 +2423,10 @@
       "action": "task-remind",
       "source": "static/task_detail.js:83",
       "status": "moved",
-      "newHome": "team page: Tasks tab, the task page keeps the task dialog behind its Task actions button (Edit, Complete, Cancel, Publish, Nudge, Remind, dependencies, outputs: unchanged, they move onto the page with the Tasks build)",
+      "newHome": "team page: a task's page, its pinned bar: Remind",
       "proof": {
-        "file": "static/team_tasks_page.js",
-        "needle": "Task actions"
+        "file": "static/team_task_actions.js",
+        "needle": "'Remind', () => remindBoardTask(task.id)"
       }
     },
     {
@@ -2437,10 +2437,10 @@
       "action": "task-remind-stop",
       "source": "static/task_detail.js:83",
       "status": "moved",
-      "newHome": "team page: Tasks tab, the task page keeps the task dialog behind its Task actions button (Edit, Complete, Cancel, Publish, Nudge, Remind, dependencies, outputs: unchanged, they move onto the page with the Tasks build)",
+      "newHome": "team page: a task's page, its pinned bar: Stop reminders",
       "proof": {
-        "file": "static/team_tasks_page.js",
-        "needle": "Task actions"
+        "file": "static/team_task_actions.js",
+        "needle": "'Stop reminders', () => stopBoardTaskReminder(task.id)"
       }
     },
     {
@@ -2450,10 +2450,10 @@
       "what": "names a control: \"Send periodic reminders to ${escapeAttr(task.assigned_to)}\"",
       "source": "static/task_detail.js:83",
       "status": "moved",
-      "newHome": "team page: Tasks tab, the task page keeps the task dialog behind its Task actions button (Edit, Complete, Cancel, Publish, Nudge, Remind, dependencies, outputs: unchanged, they move onto the page with the Tasks build)",
+      "newHome": "team page: a task's page, its pinned bar: Remind keeps the name in its title",
       "proof": {
-        "file": "static/team_tasks_page.js",
-        "needle": "Task actions"
+        "file": "static/team_task_actions.js",
+        "needle": "Send periodic reminders to ${task.assigned_to}"
       }
     },
     {
@@ -2463,10 +2463,10 @@
       "what": "names a control: \"Stop periodic reminders\"",
       "source": "static/task_detail.js:83",
       "status": "moved",
-      "newHome": "team page: Tasks tab, the task page keeps the task dialog behind its Task actions button (Edit, Complete, Cancel, Publish, Nudge, Remind, dependencies, outputs: unchanged, they move onto the page with the Tasks build)",
+      "newHome": "team page: a task's page, its pinned bar: Stop reminders keeps the name in its title",
       "proof": {
-        "file": "static/team_tasks_page.js",
-        "needle": "Task actions"
+        "file": "static/team_task_actions.js",
+        "needle": "'Stop periodic reminders'"
       }
     },
     {
@@ -2477,10 +2477,10 @@
       "action": "task-edit",
       "source": "static/task_detail.js:84",
       "status": "moved",
-      "newHome": "team page: Tasks tab, the task page keeps the task dialog behind its Task actions button (Edit, Complete, Cancel, Publish, Nudge, Remind, dependencies, outputs: unchanged, they move onto the page with the Tasks build)",
+      "newHome": "team page: a task's page, its pinned bar: Edit",
       "proof": {
-        "file": "static/team_tasks_page.js",
-        "needle": "Task actions"
+        "file": "static/team_task_actions.js",
+        "needle": "'Edit', () => ctx.redraw(task, 'edit')"
       }
     },
     {
@@ -2491,10 +2491,10 @@
       "action": "task-publish",
       "source": "static/task_detail.js:85",
       "status": "moved",
-      "newHome": "team page: Tasks tab, the task page keeps the task dialog behind its Task actions button (Edit, Complete, Cancel, Publish, Nudge, Remind, dependencies, outputs: unchanged, they move onto the page with the Tasks build)",
+      "newHome": "team page: a task's page, its pinned bar: Publish",
       "proof": {
-        "file": "static/team_tasks_page.js",
-        "needle": "Task actions"
+        "file": "static/team_task_actions.js",
+        "needle": "'Publish', () => publish(task, ctx)"
       }
     },
     {
@@ -2505,10 +2505,10 @@
       "action": "task-complete",
       "source": "static/task_detail.js:86",
       "status": "moved",
-      "newHome": "team page: Tasks tab, the task page keeps the task dialog behind its Task actions button (Edit, Complete, Cancel, Publish, Nudge, Remind, dependencies, outputs: unchanged, they move onto the page with the Tasks build)",
+      "newHome": "team page: a task's page, its pinned bar: Complete",
       "proof": {
-        "file": "static/team_tasks_page.js",
-        "needle": "Task actions"
+        "file": "static/team_task_actions.js",
+        "needle": "'Complete', () => ctx.redraw(task, 'complete')"
       }
     },
     {
@@ -2519,10 +2519,10 @@
       "action": "task-close",
       "source": "static/task_detail.js:88",
       "status": "moved",
-      "newHome": "team page: Tasks tab, the task page keeps the task dialog behind its Task actions button (Edit, Complete, Cancel, Publish, Nudge, Remind, dependencies, outputs: unchanged, they move onto the page with the Tasks build)",
+      "newHome": "the task page's Back link (there is no dialog to close)",
       "proof": {
         "file": "static/team_tasks_page.js",
-        "needle": "Task actions"
+        "needle": "back.addEventListener('click', () => ctx.onBack())"
       }
     },
     {
@@ -2533,10 +2533,10 @@
       "action": "task-close",
       "source": "static/task_detail.js:128",
       "status": "moved",
-      "newHome": "team page: Tasks tab, the task page keeps the task dialog behind its Task actions button (Edit, Complete, Cancel, Publish, Nudge, Remind, dependencies, outputs: unchanged, they move onto the page with the Tasks build)",
+      "newHome": "the task page's Back link (there is no dialog to close)",
       "proof": {
         "file": "static/team_tasks_page.js",
-        "needle": "Task actions"
+        "needle": "back.addEventListener('click', () => ctx.onBack())"
       }
     },
     {
@@ -2547,10 +2547,10 @@
       "action": "task-complete",
       "source": "static/task_detail.js:129",
       "status": "moved",
-      "newHome": "team page: Tasks tab, the task page keeps the task dialog behind its Task actions button (Edit, Complete, Cancel, Publish, Nudge, Remind, dependencies, outputs: unchanged, they move onto the page with the Tasks build)",
+      "newHome": "the task page's completion form: its bar's Complete",
       "proof": {
         "file": "static/team_tasks_page.js",
-        "needle": "Task actions"
+        "needle": "btn('btn btn-success', 'Complete', () => form.submit())"
       }
     },
     {
@@ -2561,10 +2561,10 @@
       "action": "task-edit-cancel",
       "source": "static/task_detail.js:246",
       "status": "moved",
-      "newHome": "team page: Tasks tab, the task page keeps the task dialog behind its Task actions button (Edit, Complete, Cancel, Publish, Nudge, Remind, dependencies, outputs: unchanged, they move onto the page with the Tasks build)",
+      "newHome": "the task page's Edit form: its bar's Cancel",
       "proof": {
         "file": "static/team_tasks_page.js",
-        "needle": "Task actions"
+        "needle": "btn('btn', 'Cancel', () => acts.redraw(task, 'view'))"
       }
     },
     {
@@ -2575,10 +2575,10 @@
       "action": "task-edit-save",
       "source": "static/task_detail.js:247",
       "status": "moved",
-      "newHome": "team page: Tasks tab, the task page keeps the task dialog behind its Task actions button (Edit, Complete, Cancel, Publish, Nudge, Remind, dependencies, outputs: unchanged, they move onto the page with the Tasks build)",
+      "newHome": "the task page's Edit form: its bar's Save",
       "proof": {
         "file": "static/team_tasks_page.js",
-        "needle": "Task actions"
+        "needle": "btn('btn btn-primary', 'Save', () => form.save())"
       }
     },
     {
@@ -2588,10 +2588,10 @@
       "what": "names a control: \"Required outputs\"",
       "source": "static/task_detail.js:361",
       "status": "moved",
-      "newHome": "team page: Tasks tab, the task page keeps the task dialog behind its Task actions button (Edit, Complete, Cancel, Publish, Nudge, Remind, dependencies, outputs: unchanged, they move onto the page with the Tasks build)",
+      "newHome": "the task page's completion form: Required outputs",
       "proof": {
-        "file": "static/team_tasks_page.js",
-        "needle": "Task actions"
+        "file": "static/team_task_actions.js",
+        "needle": "'Required outputs'"
       }
     },
     {
@@ -2601,10 +2601,10 @@
       "what": "names a control: \"Complete task\"",
       "source": "static/task_detail.js:364",
       "status": "moved",
-      "newHome": "team page: Tasks tab, the task page keeps the task dialog behind its Task actions button (Edit, Complete, Cancel, Publish, Nudge, Remind, dependencies, outputs: unchanged, they move onto the page with the Tasks build)",
+      "newHome": "the task page's completion form is a section named Complete task",
       "proof": {
-        "file": "static/team_tasks_page.js",
-        "needle": "Task actions"
+        "file": "static/team_task_actions.js",
+        "needle": "'Complete task'"
       }
     },
     {
@@ -2615,10 +2615,10 @@
       "action": "task-complete-back",
       "source": "static/task_detail.js:383",
       "status": "moved",
-      "newHome": "team page: Tasks tab, the task page keeps the task dialog behind its Task actions button (Edit, Complete, Cancel, Publish, Nudge, Remind, dependencies, outputs: unchanged, they move onto the page with the Tasks build)",
+      "newHome": "the task page's completion form: its bar's Back",
       "proof": {
         "file": "static/team_tasks_page.js",
-        "needle": "Task actions"
+        "needle": "btn('btn', 'Back', () => acts.redraw(task, 'view'))"
       }
     },
     {
@@ -2629,10 +2629,10 @@
       "action": "task-complete-do",
       "source": "static/task_detail.js:385",
       "status": "moved",
-      "newHome": "team page: Tasks tab, the task page keeps the task dialog behind its Task actions button (Edit, Complete, Cancel, Publish, Nudge, Remind, dependencies, outputs: unchanged, they move onto the page with the Tasks build)",
+      "newHome": "the task page's completion form: its bar's Complete submits it",
       "proof": {
         "file": "static/team_tasks_page.js",
-        "needle": "Task actions"
+        "needle": "form.submit()"
       }
     },
     {
@@ -2643,10 +2643,10 @@
       "action": "task-cancel-back",
       "source": "static/task_detail.js:463",
       "status": "moved",
-      "newHome": "team page: Tasks tab, the task page keeps the task dialog behind its Task actions button (Edit, Complete, Cancel, Publish, Nudge, Remind, dependencies, outputs: unchanged, they move onto the page with the Tasks build)",
+      "newHome": "the task page's bar while Cancel asks: Keep task (the safe answer, focused)",
       "proof": {
-        "file": "static/team_tasks_page.js",
-        "needle": "Task actions"
+        "file": "static/team_task_actions.js",
+        "needle": "'Keep task', () => ctx.redraw(task, 'view')"
       }
     },
     {
@@ -2657,10 +2657,10 @@
       "action": "task-cancel-do",
       "source": "static/task_detail.js:464",
       "status": "moved",
-      "newHome": "team page: Tasks tab, the task page keeps the task dialog behind its Task actions button (Edit, Complete, Cancel, Publish, Nudge, Remind, dependencies, outputs: unchanged, they move onto the page with the Tasks build)",
+      "newHome": "the task page's bar while Cancel asks: Cancel task sends it",
       "proof": {
-        "file": "static/team_tasks_page.js",
-        "needle": "Task actions"
+        "file": "static/team_task_actions.js",
+        "needle": "const yes = btn('btn btn-danger', 'Cancel task', async () =>"
       }
     },
     {
@@ -2670,10 +2670,10 @@
       "what": "names a control: \"Claim priority: ${escapeAttr(task.priority || 'none')}\"",
       "source": "static/task_detail_html.js:32",
       "status": "moved",
-      "newHome": "team page: Tasks tab, the task page keeps the task dialog behind its Task actions button (Edit, Complete, Cancel, Publish, Nudge, Remind, dependencies, outputs: unchanged, they move onto the page with the Tasks build)",
+      "newHome": "the task page's Priority fact keeps the dialog's name as its title",
       "proof": {
         "file": "static/team_tasks_page.js",
-        "needle": "Task actions"
+        "needle": "Claim priority: ${task.priority || 'none'}"
       }
     },
     {
@@ -2684,10 +2684,10 @@
       "action": "task-artifact-open",
       "source": "static/task_detail_html.js:74",
       "status": "moved",
-      "newHome": "team page: Tasks tab, the task page keeps the task dialog behind its Task actions button (Edit, Complete, Cancel, Publish, Nudge, Remind, dependencies, outputs: unchanged, they move onto the page with the Tasks build)",
+      "newHome": "the task page shows what the dialog showed under its facts (taskExtraHtml): the outputs, their links keep opening the artifact",
       "proof": {
         "file": "static/team_tasks_page.js",
-        "needle": "Task actions"
+        "needle": "taskExtraHtml"
       }
     },
     {
@@ -2712,10 +2712,10 @@
       "action": "task-open",
       "source": "static/task_detail_html.js:189",
       "status": "moved",
-      "newHome": "team page: Tasks tab, the task page keeps the task dialog behind its Task actions button (Edit, Complete, Cancel, Publish, Nudge, Remind, dependencies, outputs: unchanged, they move onto the page with the Tasks build)",
+      "newHome": "every task name opens its page (and the dependency links under the facts, taskExtraHtml, open the task)",
       "proof": {
         "file": "static/team_tasks_page.js",
-        "needle": "Task actions"
+        "needle": "open: () => hooks.openTask?.(t)"
       }
     },
     {
@@ -4168,6 +4168,32 @@
       "proof": null,
       "okRef": "Operator 2026-10-25: right dock removed completely (UI/UX team page doc 7aa984fe); delegated OK by Orchestrator 06:56Z (coral-go-team board message of 2026-10-25T06:55)",
       "why": "the dock goes away with its tab strip, panel toggle, width and last-tab memory; the page tabs are fixed in a set order (UI/UX doc, section 4b)"
+    },
+    {
+      "id": "dock chrome/action/dock-more-toggle",
+      "tab": "dock chrome",
+      "kind": "action",
+      "what": "click -> dock-more-toggle",
+      "action": "dock-more-toggle",
+      "source": "templates/includes/right_dock.html:44",
+      "status": "stays",
+      "newHome": "agent page: the dock's More menu (Browse, Activity, Agent UI)",
+      "proof": null,
+      "okRef": "Orchestrator 2026-10-25 11:26Z board post 'Operator correction on the dock removal (#7457)': it is ONLY for the team view; the agent's own view keeps its dock (its tab strip with it: #7621, 170 UI 1, approved by UI/UX in #7630)",
+      "why": "the agent view keeps its dock; #7621 put its rarely used tabs behind More"
+    },
+    {
+      "id": "dock chrome/action/dock-more-open-key",
+      "tab": "dock chrome",
+      "kind": "action",
+      "what": "keydown -> dock-more-open-key",
+      "action": "dock-more-open-key",
+      "source": "templates/includes/right_dock.html:44",
+      "status": "stays",
+      "newHome": "agent page: the dock's More menu (Browse, Activity, Agent UI)",
+      "proof": null,
+      "okRef": "Orchestrator 2026-10-25 11:26Z board post 'Operator correction on the dock removal (#7457)': it is ONLY for the team view; the agent's own view keeps its dock (its tab strip with it: #7621, 170 UI 1, approved by UI/UX in #7630)",
+      "why": "the agent view keeps its dock; #7621 put its rarely used tabs behind More"
     },
     {
       "id": "dock chrome/label/saved-for-later-messages-you-bookmarked",
