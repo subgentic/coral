@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -48,6 +49,9 @@ exit 0
 // TestAutomatedMultiLineTextOfOnlyControlCharactersIsRefusedOnTmux, 170 gate #3). The fake logs every call, so the warm-up's own line is removed.
 func settleExec(t *testing.T, bin, log string) {
 	t.Helper()
+	if runtime.GOOS == "windows" { // a shell script named tmux is not an executable there: the tests that use the fake on Windows never run it, and ETXTBSY is a Unix error
+		return
+	}
 	var err error
 	for i := 0; i < 200; i++ {
 		if err = exec.Command(bin, "-V").Run(); err == nil || !strings.Contains(err.Error(), "text file busy") {
