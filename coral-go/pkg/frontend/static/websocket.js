@@ -203,10 +203,10 @@ function _mergeFeedDiff(data) {
     data.sessions = sessions;
 }
 
-/** How long a Codex approval request may stand before it is alerted (#7420). Codex can have its own reviewer decide a command approval (approvals_reviewer = "auto_review"): the PermissionRequest hook
+/** How long a Codex approval request may stand before it is alerted (#7420; 6 s: the reviewer was seen to take 1.7, 3.4 and 3.9 s, and the row clears about a second after it allows). Codex can have its own reviewer decide a command approval (approvals_reviewer = "auto_review"): the PermissionRequest hook
  * fires, the reviewer allows it about two seconds later and the tool runs, with no dialog and nobody to ask. Alerting at once made every such command a "needs your input" for the person. A request
  * that is still open after this long is shown; one the turn has moved past by then (the tool ran, the turn stopped) never is. */
-export const CODEX_REVIEW_HOLD_MS = 4000;
+export const CODEX_REVIEW_HOLD_MS = 6000;
 
 /** The needs-input toast, and the opt-in desktop alert, for row s. */
 function _raiseNeedsInputAlert(s, id) {
