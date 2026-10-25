@@ -18,7 +18,7 @@ const BASE = require('./test_base').BASE;
         const bar = document.querySelector('header.top-bar');
         const panel = document.getElementById('agentic-state');
         const barRect = bar.getBoundingClientRect(), pr = panel.getBoundingClientRect();
-        const tabs = [...panel.querySelectorAll('.agentic-tab')].filter(t => t.getBoundingClientRect().width > 0 && getComputedStyle(t).display !== 'none');
+        const tabs = [...panel.querySelectorAll('.agentic-tab')].filter(t => t.getBoundingClientRect().width > 0 && getComputedStyle(t).display !== 'none' && !t.classList.contains('tab-more')); // the rare tabs are drawn out of the row, behind the More menu (#7621)
         // A tab can be scrolled out of the horizontal tab strip; test the part of it that is on screen.
         const strip = panel.querySelector('.agentic-state-tabs') || panel;
         const visiblePart = t => {

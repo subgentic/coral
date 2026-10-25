@@ -87,14 +87,14 @@ const HIT = id => `(() => {
         const bar = await barBottom();
         assert.ok(bar > 49, `the coarse-pointer top bar is taller than the desktop 49px (bottom ${bar})`);
         assert.ok(Math.abs(await panelTop() - bar) <= 1, `the overlay starts at the bar's bottom (${await panelTop()} vs ${bar})`);
-        for (const id of ['agentic-tab-browse', 'agentic-tab-artifacts']) {
+        for (const id of ['agentic-tab-files', 'agentic-tab-artifacts']) { // Browse is behind the More menu now (#7621): Files and Artifacts are the tabs in the row
             const h = await ev(HIT(id));
             assert.ok(h.ok, `${id} is not covered (elementFromPoint at its centre is ${h.at})`);
             await tap(h.x, h.y);
             assert.ok(await ev(`document.getElementById(${JSON.stringify(id)}).classList.contains('active')`), `tapping ${id} selects it`);
         }
         assert.deepEqual(await ev(UNDER_BAR), [], 'phone: no fixed element starts under the top bar');
-        console.log(`PASS phone 390 coarse: bar bottom ${bar}px, overlay below it, Browse and Artifacts tappable`);
+        console.log(`PASS phone 390 coarse: bar bottom ${bar}px, overlay below it, Files and Artifacts tappable`);
 
         // The bar's height changes (fine pointer: smaller buttons): the overlay follows.
         await coarse(false); await sleep(400);

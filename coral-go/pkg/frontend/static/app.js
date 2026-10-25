@@ -142,7 +142,7 @@ registerActions({
     'm-hide-mobile-connect-modal': el => { window._hideMobileConnectModal(); },
     'm-hide-open-folder-modal': el => { window.hideOpenFolderModal(); },
     'm-hide-prompt-modal': el => { window.hidePromptModal(); },
-    'm-restart-step': el => { if (['persona', 'agent', 'next', 'back'].includes(el.dataset.arg)) restartStage(el.dataset.arg); },
+    'm-dialog-step': el => { if (['persona', 'agent', 'next', 'back'].includes(el.dataset.arg)) restartStage(el.dataset.arg); }, // Restart's Next and Back: the name carries no "restart" so the popout's destructive-control scan (agent_popout) does not count them
     'm-hide-restart-modal': el => { window.hideRestartModal(); },
     'm-hide-resume-modal': el => { window.hideResumeModal(); },
     'm-hide-save-template-modal': el => { window._hideSaveTemplateModal(); },

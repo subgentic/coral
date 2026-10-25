@@ -5,6 +5,7 @@
     "model": "claude-opus-4",
     "prompt": "Be kind.",
     "flags": "--permission-mode auto",
+    "permissionMode": "auto",
     "capabilities": {
       "allow": [
         "file_read"
@@ -29,6 +30,7 @@
     "model": "gpt-x",
     "prompt": "A new prompt.\nSecond line.",
     "flags": "--verbose --foo bar --sandbox read-only -a on-request",
+    "permissionMode": "plan",
     "capabilities": {
       "allow": [
         "file_read",
@@ -78,6 +80,7 @@
     "model": "",
     "prompt": "",
     "flags": "--permission-mode auto",
+    "permissionMode": "auto",
     "capabilities": null
   },
   "agent_minimal": {
@@ -95,6 +98,7 @@
     "model": "gpt-x",
     "prompt": "Test everything.\nTwice.",
     "flags": "--verbose --sandbox workspace-write -a on-request",
+    "permissionMode": "acceptEdits",
     "capabilities": {
       "allow": [
         "shell",
@@ -142,6 +146,7 @@
     "model": "gpt-x",
     "prompt": "Write the code.\nCarefully.",
     "flags": "--sandbox workspace-write -a never",
+    "permissionMode": "auto",
     "capabilities": null
   },
   "team_full": {
