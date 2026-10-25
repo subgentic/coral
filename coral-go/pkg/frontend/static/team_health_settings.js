@@ -19,7 +19,7 @@ const { refusalOf, answeredLocally } = await importOnce('./owner_refusal.js'); /
 const HEALTH_LIMITS = { minutes: [5, 1440], nudges: [1, 5], reviewers: 8 };
 
 // The server's defaults (DefaultHealthSettings); held_notice is the Lead's #4225 field, filled in only when the server returns it.
-const HEALTH_DEFAULTS = {
+export const HEALTH_DEFAULTS = {
     on: false, interval_min: 10, recipient: '', all_clear: true, default_reviewers: [], // the check is off until a team turns it on (#4962)
     auto_delegate: { on: true },
     claim_nudge: { on: true, after_min: 10, nudges: 2 },
@@ -43,7 +43,7 @@ function rule(key, title, why, on, knobs, extra = '') {
 }
 
 /** The panel's HTML for a health object and the team's members (active subscribers: { subscriber_id, job_title }). */
-function healthPanelHTML(h, members) {
+export function healthPanelHTML(h, members) {
     const names = members.map(m => m.subscriber_id);
     const rcpt = h.recipient || '';
     const options = [`<option value="">The orchestrator (default)</option>`]
@@ -89,7 +89,7 @@ const field = (form, name) => form.elements[name];
 const num = (form, name) => parseInt(field(form, name).value, 10);
 
 /** The form's values as a health object: what it shows over what was read (so a field it does not know goes back as it was). */
-function readHealth(form, base) {
+export function readHealth(form, base) {
     const h = JSON.parse(JSON.stringify(base));
     h.on = field(form, 'on').checked;
     // what the three show is saved as shown; a number that is not a whole number (typed, then the check turned off) keeps what was read
@@ -110,7 +110,7 @@ function readHealth(form, base) {
 const snapshot = form => JSON.stringify(Array.from(form.elements).filter(el => el.name).map(el => ({ name: el.name, type: el.type, value: el.type === 'checkbox' ? el.checked : el.value })));
 
 /** The first problem with the numbers or reviewers, in plain words, and the field to focus; null when the form is fine. */
-function healthProblem(form) {
+export function healthProblem(form) {
     for (const el of form.querySelectorAll('input[type=number]:not(:disabled)')) {
         const v = el.value.trim();
         const n = Number(v);
@@ -119,6 +119,23 @@ function healthProblem(form) {
     const revs = field(form, 'default_reviewers').value.split(',').map(s => s.trim()).filter(Boolean);
     if (new Set(revs).size > HEALTH_LIMITS.reviewers) return { el: field(form, 'default_reviewers'), text: `Default reviewers: at most ${HEALTH_LIMITS.reviewers} names.` };
     return null;
+}
+
+/** The form's on and off dimming wired for a form drawn somewhere else (the launch dialog's Health check tab, #7407): with the check off, how often, to whom and the all-clear line are dimmed and off; a rule off disables its numbers. */
+export function wireHealthForm(form) {
+    const sync = () => {
+        const on = field(form, 'on').checked;
+        for (const name of ['interval_min', 'recipient', 'all_clear']) field(form, name).disabled = !on;
+        for (const el of form.querySelectorAll('.health-row, [data-check-dep]')) el.classList.toggle('off', !on);
+        for (const card of form.querySelectorAll('.health-rule')) {
+            const ruleOn = card.querySelector('.health-rule-head input').checked;
+            card.classList.toggle('off', !ruleOn);
+            for (const el of card.querySelectorAll('.health-knobs input')) el.disabled = !ruleOn;
+        }
+    };
+    form.addEventListener('input', sync); form.addEventListener('change', sync);
+    sync();
+    return sync;
 }
 
 /** Draw the tab's panel into host for the team (a team key) from the health object the settings GET returned. Returns { dirty() }. */

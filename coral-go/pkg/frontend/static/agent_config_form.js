@@ -221,7 +221,7 @@ export function renderAgentConfigForm(containerId, opts = {}) {
     let nameHTML = '';
     if (showName) {
         nameHTML = `
-            <label>Name / Role:
+            <label>${escapeHtml(opts.nameLabel || 'Name / Role')}:
                 <input type="text" class="acf-name" placeholder="e.g. QA Engineer, Frontend Dev" value="${escapeAttr(nameVal)}">
             </label>`;
     }
@@ -315,7 +315,7 @@ export function renderAgentConfigForm(containerId, opts = {}) {
             const promptHTML = `<label class="launch-prompt-field"><span class="launch-field-head">Behavior prompt</span><textarea class="acf-prompt" rows="10" placeholder="Describe the agent's role and behavior...">${escapeHtml(promptVal)}</textarea></label>`;
             container.innerHTML = [
                 pane('persona', 'Persona', 'badge', '', `${(showPreset || showName) ? `${presetHTML}${nameHTML}` : ''}${promptHTML}`),
-                pane('agent', 'Agent', 'smart_toy', '', topHTML),
+                pane('agent', 'Agent', 'smart_toy', '', topHTML.replace('<label>Agent Type:', '<label class="acf-provider-label"><span class="acf-provider-head">Provider</span>')),
                 pane('permissions', 'Permissions', 'lock', '', `${autoPermissionsHTML}${toolsHTML}`),
                 pane('advanced', 'Advanced', 'tune', '', `<label>Flags <span style="color:var(--text-muted);font-weight:normal">(optional)</span>:${flagsInput}</label>`),
             ].join('');
@@ -416,6 +416,7 @@ export function renderAgentConfigForm(containerId, opts = {}) {
         type.addEventListener('change', sync);
         const nm = container.querySelector('.acf-restart-name'); if (nm) nm.textContent = opts.restartName || '';
     }
+    if (opts.sections && !opts.wizard && !opts.restart) segmentSelect(container.querySelector('.acf-agent-type'), { label: 'Provider' }); // the member and board dialogs: the provider as segments, as in Restart (#7407)
     if (opts.wizard || opts.restart || opts.sections) { // the controls drawn over the selects (#7391): the thinking levels as segments, the Mode as cards (or the select, launch_flags.js)
         const thinking = container.querySelector('.acf-thinking');
         if (thinking) segmentSelect(thinking, { labelledby: 'acf-thinking-label' });
@@ -561,3 +562,24 @@ export function setAgentConfig(containerId, values) {
     _checkAgentCLI(typeEl?.value || 'claude', cliWarningOf(container));
 }
 (window.__coral ||= {}).setAgentConfig = setAgentConfig;
+
+
+/** Give a form another provider the way a person's choice does (#7407, Set all workers to): its Model and Thinking go back to their defaults (the provider's own), its Mode, name and prompt stay. */
+export function resetProviderChoices(containerId, type) {
+    const container = document.getElementById(containerId);
+    const sel = container?.querySelector('.acf-agent-type');
+    if (!sel) return;
+    const modeEl = container.querySelector('.acf-permission-mode');
+    const mode = modeEl?.value, picked = modeEl?.dataset.pickedByPerson;
+    sel.value = type;
+    sel.dispatchEvent(new Event('change', { bubbles: true })); // the form's own handler: CLI check, the Mode's flags for the provider, Thinking back to Default
+    if (modeEl && mode && [...modeEl.options].some(o => o.value === mode)) { // the Mode stays what it was: the provider's default Mode is for a person's own change of provider
+        modeEl.value = mode;
+        if (picked) modeEl.dataset.pickedByPerson = picked; else delete modeEl.dataset.pickedByPerson;
+        modeEl.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    const model = container.querySelector('.acf-model');
+    if (model) { model.value = ''; container.dataset.acfModelDirty = 'false'; container.dataset.acfModelClassifying = 'false'; syncModelPicker(container); }
+    _syncACFModelField(container);
+    setThinking(container, undefined);
+}

@@ -4,13 +4,13 @@ import { scrollBehavior } from './motion.js';
 import { showToast, escapeHtml, escapeAttr, boardNameProblem, OPERATOR_ID } from './utils.js';
 import { loadLiveSessions } from './api.js';
 import { loadBoardProjects } from './message_board.js';
-import { recordRecentDir } from './browser.js';
+import { recordRecentDir, getRecentDirs } from './browser.js';
 import { serverFetch, boardFetch, identityKey, LOCAL_SERVER } from './server_base.js';
 const { launch } = await importOnce('./launch_state.js');
 const { _acfServer, _effectiveServer, _settingsFor } = await importOnce('./launch_models.js');
 const { trackPermissionPick, _getPermissionFlagsForAgentMode, _normalizePermFlagsForAgent, _updatePermModeDescription } = await importOnce('./permission_flags.js');
 const { _findPersona, _getSavedTeamTemplates, _upsertSavedTeamTemplates } = await importOnce('./persona_store.js');
-const { getAgentConfig, renderAgentConfigForm, setAgentConfig } = await importOnce('./agent_config_form.js');
+const { getAgentConfig, renderAgentConfigForm, setAgentConfig, resetProviderChoices } = await importOnce('./agent_config_form.js');
 const { markFieldInvalid, _launchBlocked, _launchOn, _onServerSuffix, _refreshAfterLaunch, _resetDirInputs, _showLaunchStep, hideLaunchModal, showTeamLaunchFailures } = await importOnce('./launch_core.js');
 const { _syncFlagButtons } = await importOnce('./flag_shortcuts.js');
 const { showSettingsModal } = await importOnce('./settings_dialog.js');
@@ -18,9 +18,18 @@ const { modelName, levelName } = await importOnce('./model_labels.js');
 const { launchedMode } = await importOnce('./preset_enforcement.js');
 const { BUILTIN_TEAM_TEMPLATES, _renderTeamTemplateSelector, markTeamTemplate, resetTeamTemplatePicker } = await importOnce('./team_templates_ui.js');
 const { showTeamStep, currentTeamStep, TEAM_STEPS } = await importOnce('./team_steps.js');
+const { mountTeamLaunchSettings, readTeamLaunchSettings, applyTeamBoardSettings } = await importOnce('./team_launch_settings.js');
 
 
 const _modeLabel = v => [...(document.getElementById('team-permission-mode')?.options || [])].find(o => o.value === v)?.textContent || v;
+
+// A member counts as the Orchestrator when its role is exactly the word, in any case and with spaces round it: the server reads it the same way (#7407).
+const isOrchestrator = name => String(name || '').trim().toLowerCase() === 'orchestrator';
+const teamRows = () => [...document.querySelectorAll('#team-agents-list .team-agent-row')];
+const rowRole = row => ((row.dataset.acfId ? getAgentConfig(row.dataset.acfId).name : '') || '').trim();
+const hasOrchestrator = () => teamRows().some(r => isOrchestrator(rowRole(r)));
+/** The row that gets the first task: the Orchestrator, else the first member (what _openLaunchedTeam posts to). */
+const leadRow = () => teamRows().find(r => isOrchestrator(rowRole(r))) || teamRows()[0] || null;
 
 // A member follows the team's provider unless it was given one (a template's own, or one picked in the dialog): the form's select is set from the team's, so the launch sends it.
 function _followTeamType() {
@@ -32,50 +41,104 @@ function _followTeamType() {
     }
 }
 
+// One quiet line under the role: "Claude · default model · default mode"; what the member changed is bold ("Claude · Opus 5.5 · High thinking · Plan mode").
 function _updateTeamAgentSummary(row) {
     if (!row) return;
     const acfId = row.dataset.acfId;
     const config = acfId ? getAgentConfig(acfId) : {};
-    const name = config.name || 'New Agent';
+    const name = config.name || 'New member';
     const typeSelect = document.getElementById('team-agent-type');
     const typeLabel = v => [...(typeSelect?.options || [])].find(o => o.value === v)?.textContent.replace(/ \(.*\)$/, '') || v;
-    // A cell shows the value that will be used; a small mark says where it comes from when the member did not choose it.
-    const set = (sel, text, mark = '') => {
-        const el = row.querySelector(sel); if (!el) return;
-        el.textContent = text;
-        if (mark) { const m = document.createElement('span'); m.className = 'team-default-mark'; m.textContent = mark; el.append(' ', m); }
-    };
     const type = config.agentType || typeSelect?.value || 'claude';
-    set('.team-agent-role-name', name);
-    set('.team-agent-provider', typeLabel(type));
+    const parts = []; // [text, changed]
+    parts.push([typeLabel(type), false]);
     const modelId = config.model || '';
-    set('.team-agent-model', modelId ? modelName(type, modelId, _effectiveServer(launch.server)) : 'CLI default', modelId && modelId === _settingsFor(_effectiveServer(launch.server))['default_model_' + type] ? 'default' : '');
-    set('.team-agent-thinking', config.thinking ? levelName(config.thinking) : 'CLI default');
+    parts.push([modelId ? modelName(type, modelId, _effectiveServer(launch.server)) : 'default model', !!modelId && modelId !== _settingsFor(_effectiveServer(launch.server))['default_model_' + type]]);
+    if (config.thinking) parts.push([`${levelName(config.thinking)} thinking`, true]);
     // What launches (#6425): the member's own Mode, else the team's, is applied; for Codex and Antigravity the capabilities may only narrow it, and with no Mode they decide.
     const acf = acfId ? document.getElementById(acfId) : null;
     const ownMode = acf?.querySelector('.acf-permission-mode')?.value || 'default';
     const teamMode = document.getElementById('team-permission-mode')?.value || 'default';
     const mode = ownMode !== 'default' ? ownMode : teamMode;
     const lm = launchedMode(type, mode, config.capabilities);
-    if (lm.narrowed) set('.team-agent-mode', lm.text);
-    else set('.team-agent-mode', _modeLabel(mode), ownMode === 'default' ? 'team' : '');
-    row.querySelector('.team-agent-mode')?.classList.toggle('team-mode-warn', !!lm.warn);
-    const prompt = row.querySelector('.team-agent-prompt');
-    if (prompt) prompt.textContent = config.prompt || 'No behavior prompt yet.';
-    const nameBtn = row.querySelector('.team-agent-role-name');
-    nameBtn?.setAttribute('aria-label', `${name}: show or hide its prompt`);
-    row.querySelector('.team-agent-edit-btn')?.setAttribute('aria-label', `Edit ${name}`);
-    row.querySelector('.team-agent-remove')?.setAttribute('aria-label', `Remove ${name}`);
-    for (const dir of ['up', 'down']) {
-        const b = row.querySelector(`[data-dir="${dir}"]`);
-        b?.setAttribute('aria-label', `Move ${name} ${dir}`);
-        b?.setAttribute('title', `Move ${dir}`);
+    parts.push([lm.narrowed ? lm.text : `${_modeLabel(mode)} mode`.replace(/^Default mode$/, 'default mode'), mode !== 'default' || !!lm.narrowed, !!lm.warn]);
+    const line = row.querySelector('.team-agent-summary');
+    if (line) {
+        line.replaceChildren();
+        parts.forEach(([text, changed, warn], i) => {
+            if (i) line.append(' · ');
+            const el = document.createElement(changed ? 'b' : 'span');
+            el.textContent = text;
+            if (warn) el.className = 'team-mode-warn';
+            line.append(el);
+        });
     }
+    const roleEl = row.querySelector('.team-agent-role-name');
+    if (roleEl) roleEl.textContent = name;
+    const summaryText = parts.map(p => p[0]).join(', ');
+    row.querySelector('.team-agent-open')?.setAttribute('aria-label', `Edit ${name}: ${summaryText}`);
+    row.querySelector('.team-agent-menu-btn')?.setAttribute('aria-label', `Actions for ${name}`);
 }
 
-function _refreshTeamSummaries() {
-    document.querySelectorAll('#team-agents-list .team-agent-row').forEach(_updateTeamAgentSummary);
+/** The things that follow the list of members: each row's summary, the badge on the one that gets the first task, the Orchestrator's own limits, the buttons of the ends, the line above the list, and the gate. */
+function _syncTeamMembers() {
+    const rows = teamRows(), lead = leadRow();
+    rows.forEach((row, i) => {
+        _updateTeamAgentSummary(row);
+        const orch = isOrchestrator(rowRole(row));
+        const badge = row.querySelector('.team-agent-badge'); if (badge) badge.hidden = row !== lead;
+        row.dataset.orchestrator = orch ? '1' : '';
+        const up = row.querySelector('[data-dir="up"]'), down = row.querySelector('[data-dir="down"]'), rm = row.querySelector('.team-agent-remove');
+        if (up) { up.disabled = i === 0; up.hidden = orch; } // the Orchestrator does not move up (#7407)
+        if (down) down.disabled = i === rows.length - 1;
+        if (rm) rm.hidden = orch; // and is not removed: renaming its role is the way out
+    });
+    const empty = document.querySelector('#team-panel-members .team-agents-empty'); if (empty) empty.hidden = rows.length > 0;
+    const count = document.getElementById('team-agents-count');
+    if (count) count.textContent = rows.length ? `${rows.length} ${rows.length === 1 ? 'member' : 'members'}. Select one to edit it.` : '';
+    const line = document.getElementById('team-orchestrator-line'); if (line) line.hidden = hasOrchestrator();
+    const all = document.getElementById('team-allworkers'); if (all) all.hidden = !rows.some(r => !isOrchestrator(rowRole(r)));
+    _syncTeamGate();
 }
+
+/** Why Next (or Launch team) is off on this step, in words; '' when it is on. */
+function _teamGateReason() {
+    const step = currentTeamStep();
+    if (step === 'team') {
+        const name = (document.getElementById('team-board-name')?.value || '').trim(), dir = (document.getElementById('launch-team-dir')?.value || '').trim();
+        if (!name && !dir) return 'Name the team and choose a folder first';
+        if (!name) return 'Name the team first';
+        if (boardNameProblem(name)) return boardNameProblem(name);
+        if (!dir) return 'Choose a folder first';
+    } else if (step === 'members') {
+        if (!hasOrchestrator()) return 'Add an Orchestrator to continue';
+    }
+    return '';
+}
+
+/** The line above the buttons: the reason the next button is off, else (from step 2) the recap "<team>: N members, <folder>". Always in the page, only its text changes. */
+function _syncTeamGate() {
+    const step = currentTeamStep();
+    const reason = _teamGateReason();
+    const next = document.getElementById('launch-team-next'), go = document.getElementById('launch-team-go');
+    const recap = document.getElementById('team-recap');
+    for (const b of [next]) {
+        if (!b) continue;
+        if (reason) { b.setAttribute('aria-disabled', 'true'); b.setAttribute('aria-describedby', 'team-recap'); } else { b.removeAttribute('aria-disabled'); b.removeAttribute('aria-describedby'); }
+    }
+    if (go && !go.disabled) go.removeAttribute('aria-disabled');
+    if (!recap) return;
+    recap.classList.toggle('launch-recap-warn', !!reason);
+    recap.replaceChildren();
+    if (reason) { recap.append(reason); return; }
+    if (step === 'team') return;
+    const name = (document.getElementById('team-board-name')?.value || '').trim(), dir = (document.getElementById('launch-team-dir')?.value || '').trim(), n = teamRows().length;
+    const b = document.createElement('b'); b.textContent = name || 'unnamed';
+    recap.append(b, `: ${n} ${n === 1 ? 'member' : 'members'}`);
+    if (dir) { recap.append(', '); const d = document.createElement('b'); d.textContent = dir; recap.append(d); }
+}
+document.addEventListener('team-step-shown', _syncTeamGate);
+document.addEventListener('input', e => { if (e.target && (e.target.id === 'team-board-name' || e.target.id === 'launch-team-dir')) _syncTeamGate(); });
 
 // Remove keeps the row aside for Undo (one removal back); a new removal, a template or a closed dialog makes the last one final.
 let _removedTeamAgent = null;
@@ -86,9 +149,11 @@ function _clearTeamUndo() {
 }
 function _removeTeamAgent(row) {
     if (!row) return;
+    if (isOrchestrator(rowRole(row))) return; // the Orchestrator is not removed (#7407)
     const name = row.querySelector('.team-agent-role-name')?.textContent || 'Member';
     _removedTeamAgent = { row, next: row.nextElementSibling, list: row.parentElement };
     row.remove();
+    _syncTeamMembers();
     const line = document.getElementById('team-undo');
     if (!line) return;
     line.textContent = '';
@@ -96,24 +161,18 @@ function _removeTeamAgent(row) {
     const undo = document.createElement('button');
     undo.type = 'button'; undo.className = 'btn-link'; undo.setAttribute('data-on-click', 'team-agent-undo'); undo.textContent = 'Undo';
     line.append(undo);
+    document.querySelector('#launch-step-team .team-add-agent-btn')?.focus(); // the row the focus was in is gone
 }
 function _undoTeamAgentRemoval() {
     const r = _removedTeamAgent;
     if (!r) return;
     r.list.insertBefore(r.row, r.next && r.next.parentElement === r.list ? r.next : null);
     _clearTeamUndo();
-    r.row.querySelector('.team-agent-edit-btn')?.focus();
-}
-function _toggleTeamAgentPrompt(row) {
-    const btn = row?.querySelector('.team-agent-role-name');
-    const box = row?.querySelector('.team-agent-prompt');
-    if (!btn || !box) return;
-    const open = box.hidden;
-    box.hidden = !open;
-    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    _syncTeamMembers();
+    r.row.querySelector('.team-agent-open')?.focus();
 }
 
-// Next on the Team step needs what every launch needs: a name that is fine, and a folder.
+// Next needs what this step needs; on a step that is not met, it says so where the person looks (the field, or the line that says what is missing) and does not go on.
 function teamStepMove(dir) {
     const step = currentTeamStep();
     const i = TEAM_STEPS.indexOf(step);
@@ -124,8 +183,9 @@ function teamStepMove(dir) {
         if (!_validateTeamName()) { markFieldInvalid(name, boardNameProblem(name.value.trim()) || 'Team name must be unique'); return; }
         if (!dirInput.value.trim()) { markFieldInvalid(dirInput, 'Choose a folder for the team'); return; }
     }
+    if (dir > 0 && step === 'members' && !hasOrchestrator()) { document.getElementById('team-add-orchestrator')?.focus(); _syncTeamGate(); return; }
     const to = TEAM_STEPS[Math.min(TEAM_STEPS.length - 1, Math.max(0, i + dir))];
-    if (to === 'members') _refreshTeamSummaries();
+    if (to === 'members') _syncTeamMembers();
     showTeamStep(to, { focus: true });
 }
 
@@ -139,24 +199,26 @@ function _defaultTeamAgentModalConfig() {
         agentType,
         model: '',
         capabilities: null,
-        flags: _teamModeFlags(agentType), // a new member starts at the team's Mode, not Auto (#6412)
+        flags: _teamModeFlags(agentType), // a new member starts at the saved default Mode, not Auto (#6412)
     };
 }
 
-function showTeamAgentModal(row = null) {
+// The Edit member dialog (#7407): the one place a member's role, prompt, provider, model, thinking, mode and permissions are changed. Its changes are held until Save member; Cancel throws them away.
+function showTeamAgentModal(row = null, { role = '' } = {}) {
     launch.teamAgentModalRow = row;
     const title = document.getElementById('team-agent-modal-title');
     const subtitle = document.getElementById('team-agent-modal-subtitle');
     const modal = document.getElementById('team-agent-modal');
     if (!title || !subtitle || !modal) return;
 
-    title.textContent = row ? 'Edit Team Agent' : 'Add Team Agent';
+    title.textContent = row ? 'Edit member' : 'Add member';
     subtitle.textContent = ''; // no sub-title (#6012): the title and the form say it
+    const save = document.getElementById('team-agent-modal-save'); if (save) save.textContent = 'Save member';
 
-    const acfValue = row?.dataset.acfId ? getAgentConfig(row.dataset.acfId) : _defaultTeamAgentModalConfig();
-    // A member with no Mode of its own launches with the team's: the dialog shows that Mode (saving it unchanged keeps the member following the team, see saveTeamAgentFromModal).
+    const acfValue = row?.dataset.acfId ? getAgentConfig(row.dataset.acfId) : { ..._defaultTeamAgentModalConfig(), name: role };
+    // A member with no Mode of its own launches with the saved default Mode: the dialog shows that Mode (saving it unchanged keeps the member following it, see saveTeamAgentFromModal).
     if (row && !/--permission-mode|--mode|--sandbox|--full-auto|--dangerously/.test(acfValue.flags || '')) acfValue.flags = [acfValue.flags, _teamModeFlags(acfValue.agentType)].filter(Boolean).join(' ');
-    renderAgentConfigForm('team-agent-modal-acf', { showPreset: true, showName: true, showAutoPermissions: true, sections: true, value: acfValue });
+    renderAgentConfigForm('team-agent-modal-acf', { showPreset: true, showName: true, nameLabel: 'Role', showAutoPermissions: true, sections: true, value: acfValue });
     modal.style.display = 'flex';
 }
 window.showTeamAgentModal = showTeamAgentModal;
@@ -171,24 +233,25 @@ window.hideTeamAgentModal = hideTeamAgentModal;
 function saveTeamAgentFromModal() {
     const config = getAgentConfig('team-agent-modal-acf');
     if (!config.name) {
-        showToast('Agent name is required', true);
-        markFieldInvalid(document.querySelector('#team-agent-modal-acf .acf-name'), 'Agent name is required');
+        showToast('A member needs a role', true);
+        markFieldInvalid(document.querySelector('#team-agent-modal-acf .acf-name'), 'A member needs a role');
         return;
     }
 
-    // The Mode left at the team's is not the member's own: it keeps following the team, which the launch needs (an own Mode beats the team's, #6440).
+    // The Mode left at the default is not the member's own: it keeps following the saved default, which the launch needs (an own Mode beats it, #6440).
     const modalMode = document.querySelector('#team-agent-modal-acf .acf-permission-mode')?.value;
     if (modalMode && modalMode === (document.getElementById('team-permission-mode')?.value || 'default')) config.flags = _normalizePermFlagsForAgent(config.flags, config.agentType, 'default');
-    const followsType = config.agentType === document.getElementById('team-agent-type')?.value; // a provider left at the team's keeps following it
-    if (launch.teamAgentModalRow?.dataset.acfId) {
-        launch.teamAgentModalRow.dataset.followsTeamType = followsType ? '1' : '';
-        setAgentConfig(launch.teamAgentModalRow.dataset.acfId, config);
-        _updateTeamAgentSummary(launch.teamAgentModalRow);
+    const followsType = config.agentType === document.getElementById('team-agent-type')?.value; // a provider left at the default keeps following it
+    const opener = launch.teamAgentModalRow;
+    if (opener?.dataset.acfId) {
+        opener.dataset.followsTeamType = followsType ? '1' : '';
+        setAgentConfig(opener.dataset.acfId, config);
     } else {
         _addTeamAgent(config.name, config.prompt, config.capabilities, followsType ? '' : config.agentType, config.model, config.flags, { reveal: true });
     }
-
     hideTeamAgentModal();
+    _syncTeamMembers(); // a rename can make or lose the Orchestrator
+    (opener || document.querySelector('#team-agents-list .team-agent-row:last-child'))?.querySelector('.team-agent-open')?.focus();
 }
 window.saveTeamAgentFromModal = saveTeamAgentFromModal;
 
@@ -260,6 +323,19 @@ function _applyTeamDefaultMode() {
     _updatePermModeDescription(el);
 }
 
+/** The last three folders as buttons under the folder field (a repeat launch is one click), with the "Recent:" label (#7407). */
+function _renderTeamDirRecents() {
+    const box = document.getElementById('launch-team-dir-recents');
+    if (!box) return;
+    const dirs = getRecentDirs(_effectiveServer(launch.server)).slice(0, 3);
+    box.replaceChildren(...(dirs.length ? [Object.assign(document.createElement('span'), { className: 'launch-recent-label', textContent: 'Recent:' })] : []), ...dirs.map(d => {
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'btn btn-small launch-dir-recent'; b.title = d; b.dataset.dir = d; b.dataset.team = '1'; b.setAttribute('data-on-click', 'launch-dir-recent');
+        b.textContent = d.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || d;
+        return b;
+    }));
+}
+
 async function _initTeamForm() {
     // Hide generated-team banner on normal opens
     const banner = document.getElementById('generated-team-banner');
@@ -267,7 +343,8 @@ async function _initTeamForm() {
 
     // Reset form
     document.getElementById("team-board-name").value = "";
-    document.getElementById("team-board-server").value = "";
+    const addr = document.getElementById("team-board-server");
+    if (addr) { addr.value = ""; addr.disabled = true; } // the machine's own entry reveals it (launch_dialog.js _syncTeamAddress)
     launch.existingTeamBoardNames = new Set();
     _validateTeamName();
     const tapEl = document.getElementById("team-permission-mode");
@@ -280,6 +357,7 @@ async function _initTeamForm() {
     const list = document.getElementById("team-agents-list");
     list.innerHTML = "";
     _clearTeamUndo();
+    mountTeamLaunchSettings(); // step 3's tabs, with a new team's own settings
     showTeamStep('team');
     _applyTeamDefaultMode();
 
@@ -302,13 +380,14 @@ async function _initTeamForm() {
     }
     document.getElementById('launch-team-base-branch')?.addEventListener('input', e => { e.target.dataset.edited = '1'; }); // a branch the person typed is kept when the folder changes
     _checkTeamGitDir(); // initial check
+    _renderTeamDirRecents();
     const typeSelect = document.getElementById("team-agent-type");
     if (s.default_agent_type && typeSelect) typeSelect.value = s.default_agent_type;
     if (typeSelect) {
         typeSelect.onchange = () => {
             _followTeamType(); // the members with no provider of their own take the team's (#6440)
             _applyTeamDefaultMode(); // still the default: it follows the saved setting (#5836)
-            _refreshTeamSummaries();
+            _syncTeamMembers();
             const tfEl = document.getElementById("team-flags");
             if (tfEl) {
                 const modeEl = document.getElementById("team-permission-mode");
@@ -323,6 +402,7 @@ async function _initTeamForm() {
 
     // The template picker starts with nothing chosen
     resetTeamTemplatePicker();
+    _syncTeamMembers();
 
     // The dialog opens on the template choice with no members (#5989): four agents nobody picked were launched by a first-time Launch Team.
     launch.skipDefaultTeamAgents = false;
@@ -356,52 +436,46 @@ function _loadTeamTemplate(name) {
         if (tfEl) { tfEl.value = tmpl.flags; _syncFlagButtons("team-flags"); }
     }
     markTeamTemplate(name);
+    _syncTeamMembers();
 }
 
-// reveal: scroll the new card into view. Only for an agent the person added; the default agents and a template's are added while the dialog opens or fills, and scrolling to the last of them
-// left the Members section opened past its heading and the template picker (#4950).
-function _addTeamAgent(defaultName, defaultPrompt, defaultCapabilities, defaultAgentType, defaultModel, defaultFlags, { reveal = false } = {}) {
+// reveal: scroll the new row into view. Only for a member the person added; the default members and a template's are added while the dialog opens or fills, and scrolling to the last of them
+// left the Members step opened past its heading and the template picker (#4950). top: put the row first (Add Orchestrator).
+function _addTeamAgent(defaultName, defaultPrompt, defaultCapabilities, defaultAgentType, defaultModel, defaultFlags, { reveal = false, top = false } = {}) {
     launch.teamAgentCounter++;
     const idx = launch.teamAgentCounter;
     const acfId = `team-agent-acf-${idx}`;
+    const menuId = `team-agent-menu-${idx}`;
     const list = document.getElementById("team-agents-list");
-    const row = document.createElement("tr");
+    const row = document.createElement("div");
     row.className = "team-agent-row";
+    row.setAttribute('role', 'listitem');
     row.draggable = true;
     row.dataset.idx = idx;
     row.dataset.acfId = acfId;
     if (!defaultAgentType) row.dataset.followsTeamType = '1';
 
+    // A member is one quiet row, read-only: its role and one summary line. The row opens the Edit member dialog; its actions are behind the button at its end. The form that holds the member's values is kept (hidden) in the row.
     row.innerHTML = `
-        <td class="team-agent-role" data-label="Role">
-            <button type="button" class="team-agent-role-name" aria-expanded="false" data-on-click="team-agent-prompt">${escapeHtml(defaultName || 'New Agent')}</button>
-            <div class="team-agent-prompt" hidden></div>
-            <div class="team-agent-form" hidden><div id="${escapeAttr(acfId)}"></div></div>
-        </td>
-        <td class="team-agent-provider" data-label="Provider"></td>
-        <td class="team-agent-model" data-label="Model"></td>
-        <td class="team-agent-thinking" data-label="Thinking"></td>
-        <td class="team-agent-mode" data-label="Mode"></td>
-        <td class="team-agent-actions-cell"><div class="team-agent-summary-actions">
-            <button type="button" class="team-agent-reorder-btn" data-on-click="team-agent-move" data-dir="up">
-                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3v10M4 7l4-4 4 4"/></svg>
-            </button>
-            <button type="button" class="team-agent-reorder-btn" data-on-click="team-agent-move" data-dir="down">
-                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 13V3M4 9l4 4 4-4"/></svg>
-            </button>
-            <button type="button" class="btn btn-small btn-subtle team-agent-edit-btn" data-on-click="team-agent-edit">Edit</button>
-            <button type="button" class="btn btn-small btn-subtle team-agent-remove" data-on-click="team-agent-remove">Remove</button>
-        </div></td>
+        <button type="button" class="team-agent-open" data-on-click="team-agent-edit">
+            <span class="team-agent-main"><span class="team-agent-role-name">${escapeHtml(defaultName || 'New member')}</span><span class="team-agent-badge" hidden>Gets the first task</span></span>
+            <span class="team-agent-summary"></span>
+            <svg class="team-agent-chev" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg>
+        </button>
+        <div class="team-agent-more">
+            <button type="button" class="team-agent-menu-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="${escapeAttr(menuId)}" data-on-click="team-menu"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3" cy="8" r="1.5"/><circle cx="8" cy="8" r="1.5"/><circle cx="13" cy="8" r="1.5"/></svg></button>
+            <div class="team-menu" id="${escapeAttr(menuId)}" role="menu" hidden>
+                <button type="button" role="menuitem" class="team-menu-item" data-on-click="team-agent-edit">Edit member</button>
+                <button type="button" role="menuitem" class="team-menu-item" data-on-click="team-agent-move" data-dir="up">Move up</button>
+                <button type="button" role="menuitem" class="team-menu-item" data-on-click="team-agent-move" data-dir="down">Move down</button>
+                <button type="button" role="menuitem" class="team-menu-item team-agent-remove" data-on-click="team-agent-remove">Remove</button>
+            </div>
+        </div>
+        <div class="team-agent-form" hidden><div id="${escapeAttr(acfId)}"></div></div>
     `;
-    list.appendChild(row);
-    // Cards come and go (add, remove, drag, move): keep the ends' buttons in step with the order.
-    if (!list.dataset.moveSync) {
-        list.dataset.moveSync = '1';
-        new MutationObserver(() => _syncTeamMoveButtons(list)).observe(list, { childList: true });
-    }
-    _syncTeamMoveButtons(list);
+    if (top) list.prepend(row); else list.appendChild(row);
 
-    // Render ACF inside the card
+    // Render ACF inside the row (hidden: it holds the member's values)
     const caps = defaultCapabilities || _findPersona(defaultName)?.capabilities || null;
     const acfValue = {
         name: defaultName || '',
@@ -410,15 +484,13 @@ function _addTeamAgent(defaultName, defaultPrompt, defaultCapabilities, defaultA
         model: defaultModel || '',
         capabilities: caps,
     };
-    acfValue.flags = defaultFlags || ''; // a member with no mode of its own starts at Default and follows the team's Mode on the Start step (#6397)
+    acfValue.flags = defaultFlags || ''; // a member with no mode of its own starts at Default and follows the saved default Mode (#6397)
     renderAgentConfigForm(acfId, {
         showPreset: false,
         showName: true,
         showAutoPermissions: true,
         value: acfValue,
     });
-
-    _updateTeamAgentSummary(row);
 
     // Drag-and-drop reorder handlers
     row.addEventListener('dragstart', (e) => {
@@ -452,24 +524,16 @@ function _addTeamAgent(defaultName, defaultPrompt, defaultCapabilities, defaultA
             } else {
                 list.insertBefore(draggedRow, row);
             }
+            _syncTeamMembers();
         }
     });
 
+    _syncTeamMembers();
     if (reveal) row.scrollIntoView({ block: 'nearest', behavior: scrollBehavior() });
+    return row;
 }
 
-// The first card cannot move up and the last cannot move down: those buttons are disabled (#3770).
-function _syncTeamMoveButtons(list) {
-    const rows = [...list.querySelectorAll(':scope > .team-agent-row')];
-    rows.forEach((row, i) => {
-        const up = row.querySelector('.team-agent-reorder-btn[data-dir="up"]');
-        const down = row.querySelector('.team-agent-reorder-btn[data-dir="down"]');
-        if (up) up.disabled = i === 0;
-        if (down) down.disabled = i === rows.length - 1;
-    });
-}
-
-// Move a team agent card up or down
+// Move a member up or down (from its actions menu).
 function _moveTeamAgent(btn, direction) {
     const row = btn.closest('.team-agent-row');
     if (!row) return;
@@ -479,11 +543,53 @@ function _moveTeamAgent(btn, direction) {
     } else if (direction === 1 && row.nextElementSibling) {
         list.insertBefore(row.nextElementSibling, row);
     }
+    _syncTeamMembers();
+    row.querySelector('.team-agent-menu-btn')?.focus();
 }
 
 window._addTeamAgent = (name, prompt) => {
     _addTeamAgent(name || "", prompt || "");
 };
+
+/** Add an Orchestrator at the top of the list (#7407): it gets the first task. Nothing is added unasked: each member starts a CLI process. */
+function _addOrchestrator() {
+    if (hasOrchestrator()) return;
+    const prompt = _findPersona('Orchestrator')?.prompt || BUILTIN_TEAM_TEMPLATES[0].agents.find(a => a.name === 'Orchestrator')?.prompt || '';
+    const row = _addTeamAgent('Orchestrator', prompt, null, '', '', '', { reveal: true, top: true });
+    row?.querySelector('.team-agent-open')?.focus();
+}
+
+/** The template select: Blank team clears the members, a template replaces them (as loading a template always did). */
+function _pickTeamTemplate(name) {
+    if (!name) {
+        launch.teamAgentCounter = 0;
+        document.getElementById('team-agents-list').innerHTML = '';
+        _clearTeamUndo();
+        markTeamTemplate('');
+        _syncTeamMembers();
+        return;
+    }
+    _loadTeamTemplate(name);
+}
+
+/** Set all workers to a provider (#7407): every member whose role is not the Orchestrator takes it, and their Model and Thinking go back to the provider's defaults; Mode, role and prompt stay. */
+function _setAllWorkers(type) {
+    const sel = document.getElementById('team-set-all');
+    if (!type) return;
+    let n = 0;
+    for (const row of teamRows()) {
+        if (isOrchestrator(rowRole(row))) continue;
+        row.dataset.followsTeamType = '';
+        resetProviderChoices(row.dataset.acfId, type);
+        n++;
+    }
+    if (sel) sel.value = '';
+    const label = [...(document.getElementById('team-agent-type')?.options || [])].find(o => o.value === type)?.textContent.replace(/ \(.*\)$/, '') || type;
+    _clearTeamUndo();
+    const line = document.getElementById('team-undo');
+    if (line) line.textContent = `Set ${n} ${n === 1 ? 'worker' : 'workers'} to ${label}.`;
+    _syncTeamMembers();
+}
 
 function _validateTeamName() {
     const input = document.getElementById("team-board-name");
@@ -547,9 +653,9 @@ async function launchTeam() {
     // Collect agent definitions
     const rows = document.querySelectorAll("#team-agents-list .team-agent-row");
     const members = () => showTeamStep('members'); // the problem is in Members: open it
-    if (rows.length === 0) {
-        showToast("Add at least one agent", true);
-        members();
+    if (rows.length === 0 || !hasOrchestrator()) {
+        showToast("Add an Orchestrator", true);
+        members(); _syncTeamGate();
         return;
     }
 
@@ -558,7 +664,7 @@ async function launchTeam() {
         const acfId = row.dataset.acfId;
         const config = acfId ? getAgentConfig(acfId) : {};
         if (!config.name) {
-            showToast("Each agent needs a name", true);
+            showToast("Each member needs a role", true);
             members();
             return;
         }
@@ -573,6 +679,15 @@ async function launchTeam() {
         agents.push(agent);
     }
 
+    const settings = readTeamLaunchSettings(); // step 3's tabs (#7407)
+    if (settings.problem) {
+        showTeamStep('start');
+        document.querySelector('#launch-step-team .settings-tab[data-section="health"], #launch-step-team .settings-tab[id$="-tab-health"]')?.click();
+        showToast(settings.problem.text, true);
+        settings.problem.el.closest('details') && (settings.problem.el.closest('details').open = true);
+        settings.problem.el.focus();
+        return;
+    }
     const goal = document.getElementById("team-goal")?.value.trim() || "";
     const boardServer = document.getElementById("team-board-server").value.trim();
     const useWorktree = document.getElementById("launch-team-worktree")?.checked;
@@ -586,14 +701,16 @@ async function launchTeam() {
         agents,
     };
     if (boardServer) payload.board_server = boardServer;
+    if (settings.working_mode) payload.working_mode = settings.working_mode; // the working mode, its guidance and the Additional instructions (#7407)
+    if (settings.health_monitor) payload.health_monitor = true;
     if (useWorktree) {
         payload.worktree = true;
         if (baseBranch) payload.base_branch = baseBranch;
     }
 
     // Disable launch button to prevent double-clicks
-    const launchBtn = document.querySelector('#launch-step-team .btn-primary');
-    if (launchBtn) { launchBtn.disabled = true; launchBtn.textContent = 'Launching...'; }
+    const launchBtn = document.getElementById('launch-team-go');
+    if (launchBtn) { launchBtn.disabled = true; launchBtn.textContent = 'Launching\u2026'; }
 
     try {
         const result = await _launchOn(server, "/api/sessions/launch-team", payload, undefined, { teamFailures: true, fields: { base_branch: document.getElementById('launch-team-base-branch') } });
@@ -615,23 +732,25 @@ async function launchTeam() {
                 const boardId = result.board_id || boardName; // the id the server made (a repeated name gets its own, "Create another"), not the label that was typed
                 const seen = _refreshAfterLaunch(server, { boardName: boardId });
                 // The team opens the way a single agent does (#5989): its board with the Team view beside it, and the goal, if one was typed, as the Operator's first message to the lead. On a remote this waits for the hub to see the team.
-                if (launched.length - failed.length > 0) _openLaunchedTeam(server, boardId, goal, agents, seen);
+                if (launched.length - failed.length > 0) _openLaunchedTeam(server, boardId, goal, agents, seen, settings.board);
             }
         }
     } catch (e) {
         showToast("Failed to launch team", true);
     } finally {
-        if (launchBtn) { launchBtn.disabled = false; launchBtn.textContent = 'Launch Team'; }
+        if (launchBtn) { launchBtn.disabled = false; launchBtn.textContent = 'Launch team'; }
     }
 }
 /** Open the launched team, and post the goal to its lead: the agent named Orchestrator, else the first member. The goal that could not be sent is left in the board's message box with a toast, to send again without launching the team twice. */
-async function _openLaunchedTeam(server, boardName, goal, agents, seen) {
+async function _openLaunchedTeam(server, boardName, goal, agents, seen, boardSettings = null) {
     const key = identityKey(server, boardName);
-    const lead = (agents.find(a => a.name === 'Orchestrator') || agents[0]).name;
+    const lead = (agents.find(a => isOrchestrator(a.name)) || agents[0]).name;
     const content = goal ? `@${lead} ${goal}` : '';
     let sent = !goal;
     try {
         await seen; // on a remote, until the hub lists the team (or the wait runs out: the post and the open are still tried)
+        const unsaved = await applyTeamBoardSettings(key, boardSettings); // Require a goal, the health check's rules and the messaging switches, held until the board existed (#7407)
+        if (unsaved) showToast(unsaved, true);
         if (goal) {
             const r = await boardFetch(key, '/messages', {
                 method: 'POST',
@@ -655,4 +774,4 @@ async function _openLaunchedTeam(server, boardName, goal, agents, seen) {
 }
 window.launchTeam = launchTeam;
 
-export { _openLaunchedTeam, _addTeamAgent, _applyACFPresetFor, _checkTeamGitDir, _initTeamForm, _loadExistingTeamBoards, _moveTeamAgent, _renderTeamTemplateSelector, _removeTeamAgent, _undoTeamAgentRemoval, _toggleTeamAgentPrompt, _refreshTeamSummaries, teamStepMove };
+export { _openLaunchedTeam, _addTeamAgent, _applyACFPresetFor, _checkTeamGitDir, _initTeamForm, _loadExistingTeamBoards, _moveTeamAgent, _renderTeamTemplateSelector, _removeTeamAgent, _undoTeamAgentRemoval, _syncTeamMembers, _pickTeamTemplate, _setAllWorkers, _addOrchestrator, _renderTeamDirRecents, teamStepMove };
