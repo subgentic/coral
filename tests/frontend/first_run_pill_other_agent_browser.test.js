@@ -21,7 +21,7 @@ const SID = require('crypto').randomUUID();
               return window.__origFetch(url, opts); };` });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        await require('./helpers/wait').coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         await ev(`window.switchNavTab('agents'); window._coralSetLiveSessions(JSON.parse(JSON.stringify(window.__sessions))); true`);
         await ev(`Promise.resolve(window.selectLiveSession('cx', 'codex', ${JSON.stringify(SID)})).then(() => { window.setLiveViewMode('chat'); return true; })`);
         await waitFor(`(() => { const b = document.getElementById('waiting-banner'); return !!b && !b.hidden; })()`, 'the pill for a not-started codex agent', 15000);

@@ -4,6 +4,7 @@
 // The minute is shortened by window.__coralHeldAfterMs here. Drives Chrome over CDP through agent_view_harness.js against the isolated dev server.
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, sleep, PRELOAD, install } = await connect();
@@ -16,7 +17,7 @@ const BASE = require('./test_base').BASE;
             const tag = `${w}px`;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             const mod = await ev(`import(${S} + 'held_inputs.js').then(m => ({ after: m.HELD_AFTER_MS, none: m.heldNotice({ session_id: 'x', held_inputs: 0 }), early: m.heldNotice({ session_id: 'y', held_inputs: 2 }), junk: m.heldCount({ held_inputs: 'abc' }), neg: m.heldCount({ held_inputs: -3 }), big: m.heldCount({ held_inputs: 5000 }) }))`);
             check(`${tag}: the minute is a minute; a row with nothing held, or only just holding, says nothing; a junk or negative count is 0`, mod.after === 60000 && mod.none === null && mod.early === null && mod.junk === 0 && mod.neg === 0 && mod.big === 999, JSON.stringify(mod));
 

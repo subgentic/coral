@@ -4,6 +4,7 @@
 // The hub's wrapper is installed over a scripted fetch (installCloudFetch), as the Hub-served dashboard has it. Drives Chrome over CDP through agent_view_harness.js against the isolated dev server.
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
+const { coralReady } = require('./helpers/wait');
 
 const LINE = 'That may have reached the computer. Check before trying again.';
 
@@ -19,7 +20,7 @@ const LINE = 'That may have reached the computer. Check before trying again.';
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         // the scripted hub: every write answers 502 outcome_unknown (a launch too), and counts; the hub's session for the CSRF token; everything else is the page's own scripted fetch
         await ev(`(() => {
             const under = window.fetch.bind(window); window.__posts = []; window.__mode = 'unknown';

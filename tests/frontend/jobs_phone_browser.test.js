@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { tap } = require('./helpers/phone_targets');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const JOB = { id: 5, name: 'Hourly job', cron_expr: '0 * * * *', enabled: true, agent_type: 'claude', prompt: 'p', repo_path: '/tmp', consecutive_failures: 0 };
 const STUB = `(() => {
     const inner = window.fetch;
@@ -23,7 +24,7 @@ const STUB = `(() => {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: STUB });
         for (const [name, w, h, phone] of [['phone', 390, 844, true], ['desktop', 1280, 800, false]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile: phone }); await Emulation.setTouchEmulationEnabled({ enabled: phone });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
             await ev(`window.switchNavTab('jobs'); true`);
             const where = await ev(`(() => { const s = document.querySelector('[data-section="jobs"]'); return { inPage: !!s.closest('#mobile-jobs-list'), inSidebar: !!s.closest('.sidebar') }; })()`);
             if (!phone) { assert.deepEqual(where, { inPage: false, inSidebar: true }, 'desktop: the list stays in the sidebar'); console.log('ok desktop'); continue; }

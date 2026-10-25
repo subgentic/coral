@@ -4,7 +4,7 @@
 // Run against an isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
-const { settle } = require('./helpers/wait');
+const { settle, coralReady } = require('./helpers/wait');
 
 const AUDIT = `(() => { const root = window.__scanRoot ? document.querySelector(window.__scanRoot) : document.body; if (!root) return { missing: true };
     const hiddenByAncestor = e => { for (let p = e; p; p = p.parentElement) if (p.getAttribute && p.getAttribute('aria-hidden') === 'true') return true; return false; };
@@ -33,7 +33,7 @@ const AUDIT = `(() => { const root = window.__scanRoot ? document.querySelector(
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`window.__m.add('icon-bot', 'A', 6, { sleeping: false }); true`); await settle(ev, 900); // sleep-ok: views and dialogs fill from several answers; there is no completion event
         await scan('welcome (no agent open)');
         for (const tab of ['history', 'workflows', 'jobs', 'tokens', 'docs', 'board']) { await ev(`window.switchNavTab('${tab}'); true`); await settle(ev, 900); await scan('tab ' + tab); } // sleep-ok: views and dialogs fill from several answers; there is no completion event

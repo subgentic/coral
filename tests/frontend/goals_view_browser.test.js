@@ -7,6 +7,7 @@ const BASE = require('./test_base').BASE;
 const S = `(window.__coralStatic || '/static/')`;
 
 const { GOALS, GOALS_STUB } = require('./helpers/goals_stub');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -18,7 +19,7 @@ const { GOALS, GOALS_STUB } = require('./helpers/goals_stub');
         await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
         await ev(`localStorage.setItem('coral.board.face', 'messages'); true`);
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         if (zoom) await ev(`document.documentElement.style.fontSize = '${zoom}'; true`);
         await ev(STUB);
         await ev(`fetch('/api/board/${board}/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'qa', as: 'QA', content: 'hello' }) }).then(() => true)`);

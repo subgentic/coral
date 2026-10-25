@@ -9,7 +9,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
-const { framesJs } = require('./helpers/wait');
+const { framesJs, coralReady } = require('./helpers/wait');
 const { removeBoards } = require('./helpers/board_cleanup');
 const { launchStandIn } = require('./helpers/stand_in_agent');
 const BASE = require('./test_base').BASE;
@@ -86,7 +86,7 @@ async function httpJson(method, path, body) {
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`localStorage.clear(); localStorage.setItem('coral-live-view-mode', 'chat'); true`);
         await ev(`(() => { for (let i = 0; i < ${AGENTS}; i++) window.__m.add('hg-' + i, String.fromCharCode(65 + i), 200, { sleeping: false, board_project: 'team-' + (i % 4) });
             T.render.renderLiveSessions(T.state.liveSessions); window.__round = 0; return true; })()`);

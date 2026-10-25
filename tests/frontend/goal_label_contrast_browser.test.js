@@ -5,6 +5,7 @@
 // (CSS.forcePseudoState for :hover and :focus-visible), so the check does not depend on the mouse.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 const STATES = [[], ['active'], ['sleeping'], ['needs-attention'], ['needs-attention', 'is-stuck'], ['active', 'sleeping']];
 const PSEUDO = [[], ['hover'], ['focus-visible'], ['hover', 'focus-visible']];
@@ -37,7 +38,7 @@ const RATIO = `(() => {
         let checked = 0;
         for (const theme of ['dark', 'light']) {
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             await ev(`(() => { window.__m.add('docs-bot', 'A', 2, { sleeping: false }); window.__m.add('api-worker', 'B', 2, { sleeping: false });
                 T.render.renderLiveSessions(T.state.liveSessions); return true; })()`);
             await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'settings_core.js'); m.clearCustomThemeVars(); m.applyTheme('${theme}'); })()`);

@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const STUB = `(() => {
     const real = window.fetch; window.__saved = []; window.__wf = [{ id: 7, name: 'nightly-build', description: 'Build and test' }];
@@ -28,7 +29,7 @@ const STUB = `(() => {
             const at = `at ${w}px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`); await ev(STUB);
+            await coralReady(ev); await ev(STUB);
             await ev(`window.showJobModal(); true`);
             await waitFor(`document.querySelectorAll('#job-modal-workflow option').length === 2`, 'the workflow list', 8000);
             await waitFor(`/Runs every hour/.test(document.getElementById('cron-preview').textContent)`, 'the preview', 8000);

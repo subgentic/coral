@@ -10,6 +10,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -29,7 +30,7 @@ const BASE = require('./test_base').BASE;
     const open = async (w, mobile) => {
         await Emulation.setDeviceMetricsOverride({ width: w, height: 900, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`(() => { const entry = window.__m.entry.bind(window.__m); window.__m.entry = a => ({ ...entry(a), waiting_for_input: a.session_id === 'tb-w', waiting_kind: a.session_id === 'tb-w' ? 'permission' : null, board_project: a.session_id === 'tb-w' ? 'tb-team-id' : undefined });
             window.__m.add('Tab Waiting', 'A', 4, { sleeping: false, session_id: 'tb-w' }); window.__m.add('Tab Idle', 'B', 4, { sleeping: false, session_id: 'tb-i' }); return true; })()`);
         await waitFor(`(window.__qaState && window.__qaState.liveSessions || []).length === 2`, 'two agents', 8000);
@@ -42,7 +43,7 @@ const BASE = require('./test_base').BASE;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         for (const it of (await api('GET', '/api/saved')).body.items) await api('DELETE', `/api/saved/${it.id}`);
         const r = await api('POST', '/api/saved', { kind: 'agent', ref: 'tb-i', key: '0'.repeat(19) + '1', title: 'Tab Idle', snippet: 'a message kept for later', agent_type: 'claude', said_at: '2026-10-17T08:00:00Z' });
         assert.equal(r.status, 200, JSON.stringify(r));

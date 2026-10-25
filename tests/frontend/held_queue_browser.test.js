@@ -4,6 +4,7 @@
 // Drives Chrome over CDP through agent_view_harness.js against the isolated dev server; the held frames are the page's own events, and the cancel request is answered by a stand-in fetch.
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, sleep, PRELOAD, install } = await connect();
@@ -20,7 +21,7 @@ const BASE = require('./test_base').BASE;
             const tag = `${w}px`;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             await ev(`(() => { const inner = window.__innerFetch || (window.__innerFetch = window.fetch); window.__calls = []; window.__cancelStatus = 200;
                 window.fetch = (url, opts = {}) => { const u = String(url); if (/\\/api\\/sessions\\/live\\/hq\\/held\\//.test(u)) { window.__calls.push([(opts.method || 'GET'), u.replace(/^https?:\\/\\/[^/]+/, '')]); return Promise.resolve(new Response('{}', { status: window.__cancelStatus, headers: { 'content-type': 'application/json' } })); } return inner(url, opts); }; return true; })()`);
             await ev(`window.__m.add('hq', 'A', 0, { sleeping: false, agent_type: 'claude', session_id: 'hq-id' }); true`);
