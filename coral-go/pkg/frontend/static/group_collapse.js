@@ -52,7 +52,9 @@ export function setAllGroupsCollapsed(collapsed) {
     if (!collapsed) browserLocal.set('coral_collapsed_groups', '[]');
     else {
         const names = new Set(_getCollapsedGroups());
-        for (const h of document.querySelectorAll('.session-group-header[data-group-name]')) names.add(h.dataset.groupName);
+        // The Agents list's own headers only: the Inbox's, Chats', Jobs' and the other tabs' groups are in the page too, and keep folding from their own key (#7606: the Inbox's three landed here as junk)
+        const list = document.getElementById('live-sessions-list') || document.getElementById('mobile-session-list');
+        for (const h of list ? list.querySelectorAll('.session-group-header[data-group-name]') : []) names.add(h.dataset.groupName);
         browserLocal.set('coral_collapsed_groups', JSON.stringify([...names]));
     }
     redrawLiveList();

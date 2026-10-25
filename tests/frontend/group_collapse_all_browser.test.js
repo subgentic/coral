@@ -29,6 +29,11 @@ const { connect } = require('./agent_view_harness');
             const press = async name => { assert.equal(await label(), name, dev + ': the toggle offers ' + name); await ev(`${toggle}.click(); true`); };
             const after = name => waitFor(`${toggle}.getAttribute('aria-label') === ${JSON.stringify(name)}`, 'the toggle now offers ' + name);
             await build();
+            // The Inbox has been shown, so its three headers are in the page too (#7606): Collapse all folds the Agents list's own groups and stores nothing of the Inbox's
+            await ev(`window.switchNavTab('hub-inbox'); true`);
+            await waitFor(`document.querySelectorAll('[data-pane="hub-inbox"] .session-group-header').length === 3`, dev + ': the Inbox\'s headers are drawn', 10000);
+            await ev(`window.switchNavTab('agents'); true`);
+            await waitFor(`document.querySelectorAll(${JSON.stringify(root)} + ' .session-group-header[data-group-name]').length === 10`, dev + ': back on the Agents list', 5000);
             let s = await state();
             assert.deepEqual([s.heads, s.collapsed, s.rows], [10, 0, 20], dev + ': 10 teams, all open: ' + JSON.stringify(s));
 
@@ -40,6 +45,7 @@ const { connect } = require('./agent_view_harness');
             s = await state(); assert.equal(s.collapsed, 1, dev + ': one team closed by hand');
             await press('Collapse all groups');
             s = await state(); assert.deepEqual([s.collapsed, s.rows, s.stored], [10, 0, 10], dev + ': it folds every team, headers say so: ' + JSON.stringify(s));
+            assert.deepEqual(await ev(`JSON.parse(localStorage.getItem('coral_collapsed_groups') || '[]').filter(n => !/^team-/.test(n) && !/^folder/.test(n))`), [], dev + ': nothing of the Inbox is stored with them');
             await after('Expand all groups');
             await ev(`T.render.renderLiveSessions(window.__LIVE); window.syncMobileAgentList && window.syncMobileAgentList(); true`);
             s = await state(); assert.equal(s.collapsed, 10, dev + ': and it stays after a render');
