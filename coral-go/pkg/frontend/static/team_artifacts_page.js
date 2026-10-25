@@ -191,7 +191,7 @@ function ensureBar() {
         try { await navigator.clipboard.writeText(AGENT_ARTIFACT_PROMPT); icon.textContent = 'check'; } catch { icon.textContent = 'error_outline'; }
         setTimeout(() => { icon.textContent = 'content_copy'; }, 1500);
     });
-    const title = model.scope ? el('span', 'team-artifacts-title', `Artifacts · ${model.scope.name}`) : el('span', 'sr-only', `Artifacts of ${keyLabel(model.project)}`);
+    const title = el('span', 'sr-only', model.scope ? `Artifacts of ${model.scope.name}` : `Artifacts of ${keyLabel(model.project)}`); // the tab names the list: no label beside the search (UI/UX, #7622);
     if (plain) { const node = el('div', 'team-artifacts-plain-head'); node.append(title, refresh, help); bar = { node, names() {}, set() {}, setOpen() {} }; }
     else bar.setHeader(title, [refresh, help]);
 }

@@ -87,8 +87,8 @@ const STUB = `(() => {
             await showAgent({ board_project: TEAM }, 'artifacts'); await settled();
             let r = await last();
             check(`${tag}: the agent's list is asked for with its session, the newest first, and the board's route (${JSON.stringify(r.query)})`, r.kind === 'board' && r.query.session_id === 'aa-1' && r.query.sort === 'newest' && r.project === TEAM);
-            const head = await ev(`(() => { const p = document.querySelector('${panel}'); const q = s => p.querySelector(s); const vis = e => !!e && e.getClientRects().length > 0; return { search: vis(q('.list-bar-search')), filters: vis(q('.list-bar-toggle')), title: (q('.team-artifacts-title') || {}).textContent, refresh: vis(q('.team-artifacts-refresh')), copy: vis(q('.team-artifacts-help')), rows: p.querySelectorAll('tbody tr').length, heads: [...p.querySelectorAll('thead th')].map(h => h.textContent), count: (q('.list-bar-count') || {}).textContent }; })()`);
-            check(`${tag}: the tab is a table with the search, the filter icon, Refresh and Copy, titled with the agent (${JSON.stringify(head)})`, head.search && head.filters && head.refresh && head.copy && head.title === 'Artifacts · aa-agent' && head.rows === 7 && head.heads[0] === 'Name' && /^7 artifact/.test(head.count || ''));
+            const head = await ev(`(() => { const p = document.querySelector('${panel}'); const q = s => p.querySelector(s); const vis = e => !!e && e.getClientRects().length > 0; return { search: vis(q('.list-bar-search')), filters: vis(q('.list-bar-toggle')), refresh: vis(q('.team-artifacts-refresh')), copy: vis(q('.team-artifacts-help')), rows: p.querySelectorAll('tbody tr').length, heads: [...p.querySelectorAll('thead th')].map(h => h.textContent), count: (q('.list-bar-count') || {}).textContent }; })()`);
+            check(`${tag}: the tab is a table with the search, the filter icon, Refresh and Copy, (${JSON.stringify(head)})`, head.search && head.filters && head.refresh && head.copy && head.rows === 7 && head.heads[0] === 'Name' && /^7 artifact/.test(head.count || ''));
             await ev(`document.querySelector('${panel} .list-bar-search').focus(); true`); await type('zebra'); await settle(900, 450);
             r = await last();
             check(`${tag}: a search is the server's, scoped to the agent (${JSON.stringify(r.query)}), and the count says N of M`, r.query.q === 'zebra' && r.query.session_id === 'aa-1' && (await ev(`document.querySelector('${panel} .list-bar-count').textContent`)).includes('1 of 7'));
@@ -132,8 +132,8 @@ const STUB = `(() => {
             // ═══ an agent with no team: the table of the files it uploaded, no search (the standalone route has no query)
             await showAgent({ board_project: null, session_id: 'solo-1', name: 'solo' }, 'artifacts'); await settled();
             r = await last();
-            const solo = await ev(`(() => { const p = document.querySelector('${panel}'); const vis = e => !!e && e.getClientRects().length > 0; return { bar: vis(p.querySelector('.list-bar-search')), rows: p.querySelectorAll('tbody tr').length, title: (p.querySelector('.team-artifacts-title') || {}).textContent, refresh: vis(p.querySelector('.team-artifacts-refresh')) }; })()`);
-            check(`${tag}: an agent with no team: the standalone route, the table, the title and Refresh, no search bar (${JSON.stringify(solo)})`, r.kind === 'standalone' && r.query.session_id === 'solo-1' && !solo.bar && solo.rows === 3 && solo.title === 'Artifacts · solo' && solo.refresh);
+            const solo = await ev(`(() => { const p = document.querySelector('${panel}'); const vis = e => !!e && e.getClientRects().length > 0; return { bar: vis(p.querySelector('.list-bar-search')), rows: p.querySelectorAll('tbody tr').length, refresh: vis(p.querySelector('.team-artifacts-refresh')) }; })()`);
+            check(`${tag}: an agent with no team: the standalone route, the table and Refresh, no search bar (${JSON.stringify(solo)})`, r.kind === 'standalone' && r.query.session_id === 'solo-1' && !solo.bar && solo.rows === 3 && solo.refresh);
         }
         const failed = results.filter(x => !x).length;
         console.log(`${results.length - failed} of ${results.length} checks passed`);

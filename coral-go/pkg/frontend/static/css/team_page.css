@@ -228,9 +228,7 @@
 #agentic-panel-artifacts { position: relative; }
 #agentic-panel-artifacts-view { container-type: inline-size; }
 .dock-detail-pane { position: absolute; inset: 0; z-index: 5; width: auto; border-left: 0; }
-.team-artifacts-title { font-weight: 600; margin-right: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.team-artifacts-plain-head { display: flex; align-items: center; gap: 4px; padding: 8px 12px; }
-.team-artifacts-plain-head .team-artifacts-title { flex: 1; min-width: 0; }
+.team-artifacts-plain-head { display: flex; align-items: center; justify-content: flex-end; gap: 4px; padding: 8px 12px; }
 @container (max-width: 560px) {
     .team-table th, .team-table td { padding-left: 8px; padding-right: 8px; } /* a narrow panel gives the cells less air: Name and Created fit at 200% text */
     .team-table th:nth-child(n+2):nth-child(-n+4), .team-table td:nth-child(n+2):nth-child(-n+4) { display: none; } /* Type, Size and Task fold under the name (and Task is in the pane's facts); Created stays on the right */
