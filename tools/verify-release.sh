@@ -177,7 +177,7 @@ if [ -n "$meta" ]; then
     fail notes "RELEASE_NOTES.md at $TAG" "could not be read"
   else
     # this version's section: the lines after its "## vX.Y.Z" heading, up to the next "## "
-    section="$(awk -v v="## v$want_ver" 'index($0, v) == 1 && substr($0, length(v)+1, 1) !~ /[0-9.]/ {on=1; next} on && /^## / {exit} on {print}' <<<"$notes" | sed '/./,$!d')"
+    section="$(release_notes_section "$want_ver" <<<"$notes")"
     section="$(notes_drop_edited "$TAG" <<<"$section")"   # lines removed from the published body on purpose (tools/release-notes-edits.txt)
     if [ -z "$section" ]; then
       fail notes "section for v$want_ver" "RELEASE_NOTES.md at the tag has none"

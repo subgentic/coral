@@ -25,4 +25,11 @@ ok "no table: everything is kept" "$(notes_drop_edited v1.4.142 <<<"$in")" "$(pr
 unset RELEASE_NOTES_EDITS_FILE
 ok "the shipped table drops the v1.4.142 Team settings line" "$(notes_drop_edited v1.4.142 <<<'- **The Team settings tab strip no longer changes after it appears:** x' | wc -l | tr -d ' ')" "0"
 ok "the shipped table does not touch v1.4.143" "$(notes_drop_edited v1.4.143 <<<'- **The Team settings tab strip no longer changes after it appears:** x' | wc -l | tr -d ' ')" "1"
+# release_notes_section: a final's section ends at the release-candidate headings below it; a release candidate's own section is found by its full version
+RN="$(printf '%s\n' '# Release Notes' '' '## v1.4.167 - final' '' '### Changes' '- final line' '' '## v1.4.167-rc2 - rc two' '' '- rc2 line' '' '## v1.4.167-rc1 - rc one' '- rc1 line' '' '## v1.4.166 - older' '- older line')"
+ok "a final stops at the rc2 heading below it" "$(release_notes_section 1.4.167 <<<"$RN")" "$(printf '%s\n' '### Changes' '- final line' '')"
+ok "an rc is found by its full version" "$(release_notes_section 1.4.167-rc2 <<<"$RN")" "- rc2 line"
+ok "rc1 is found by its full version" "$(release_notes_section 1.4.167-rc1 <<<"$RN")" "- rc1 line"
+ok "1.4.16 is not 1.4.167 (digits still stop a prefix)" "$(release_notes_section 1.4.16 <<<"$RN" | wc -l | tr -d ' ')" "0"
+ok "an older release is found" "$(release_notes_section 1.4.166 <<<"$RN")" "- older line"
 exit "$fail"

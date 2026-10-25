@@ -23,3 +23,10 @@ notes_drop_edited() {
     printf '%s\n' "$line"
   done
 }
+
+# release_notes_section VER < RELEASE_NOTES.md: the lines of this version's section (after its "## vVER" heading, up to the next "## "). A heading whose version
+# goes on with a digit, a dot or a dash is another release: v1.4.167-rc2 is not v1.4.167, so a final's section stops at the first release-candidate heading
+# below it (before, the dash did not stop it, and the final's expected notes ran on through the rc1 and rc2 sections).
+release_notes_section() {
+  awk -v v="## v$1" 'index($0, v) == 1 && substr($0, length(v)+1, 1) !~ /[0-9.-]/ {on=1; next} on && /^## / {exit} on {print}' | sed '/./,$!d'
+}
