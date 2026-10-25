@@ -17,7 +17,10 @@ import (
 
 // staticImport matches a static import or re-export with a relative specifier, and a bare
 // `import './x.js'`. Dynamic imports (importOnce) are not matched: those modules load lazily.
-var staticImport = regexp.MustCompile(`(?m)^\s*(?:import|export)\b[^;'"` + "`" + `]*?\bfrom\s*['"](\./[^'"]+)['"]|^\s*import\s*['"](\./[^'"]+)['"]`)
+//
+// A statement starts at a line start or after a `;` or `}`: the release's files are minified onto one line (import{a}from"./a.js";import"./b.js";...), where only the first import of a line would
+// be found by a line-start anchor (#7185 made the list two modules long in a release, instead of 263).
+var staticImport = regexp.MustCompile(`(?m)(?:^|[;}])\s*(?:import|export)\b[^;'"` + "`" + `]*?\bfrom\s*['"](\./[^'"]+)['"]|(?:^|[;}])\s*import\s*['"](\./[^'"]+)['"]`)
 
 var (
 	blockComment = regexp.MustCompile(`(?s)/\*.*?\*/`)
