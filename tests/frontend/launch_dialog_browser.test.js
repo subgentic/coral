@@ -85,7 +85,7 @@ const BASE = require('./test_base').BASE;
         await waitFor(`window.__launches.length === 1`, 'the terminal'); sent = await lastLaunch();
         assert.deepEqual([sent.agent_type, sent.display_name, sent.board_id, sent.board_name, sent.working_dir], ['terminal', 'Terminal', 'crew', 'crew', '/work/board']);
         await flush(); await ev(`window.__broken = true; window.launchTerminalToBoard('crew', '/work/board'); true`);
-        await waitFor(`[...document.querySelectorAll('.toast')].some(t => t.textContent.trim().replace(/×$/, '') === 'Failed to launch terminal')`, 'the terminal failure toast');
+        await waitFor(`[...document.querySelectorAll('.toast')].some(t => t.textContent.trim().replace(/×$/, '') === 'Could not start the terminal. Check that the folder exists, then try again.')`, 'the terminal failure toast');
         await ev(`window.__broken = false; true`);
         await flush(); await ev(`window.launchDefaultAgent('/work/solo'); true`);
         await waitFor(`window.__launches.length === 1`, 'the default agent'); sent = await lastLaunch();
