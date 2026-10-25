@@ -149,7 +149,11 @@ type cached struct {
 	at      time.Time
 	commits []Commit
 	capped  bool
+	err     error // a failed read, kept for ErrorTTL so a burst against a broken repository does not wait for git once per request
 }
+
+// ErrorTTL is how long a failed read is remembered.
+const ErrorTTL = 5 * time.Second
 
 // CacheTTL is how long an answer is reused.
 const CacheTTL = 60 * time.Second
@@ -161,16 +165,21 @@ func (c *Cache) Read(ctx context.Context, root, branch string, since, until time
 		now = c.now
 	}
 	key := root + "\x00" + branch + "\x00" + since.UTC().Truncate(time.Minute).Format(time.RFC3339) + "\x00" + until.UTC().Truncate(time.Minute).Format(time.RFC3339)
-	lookup := func() ([]Commit, bool, bool) {
+	lookup := func() ([]Commit, bool, error, bool) {
 		c.mu.Lock()
 		defer c.mu.Unlock()
-		if e, ok := c.m[key]; ok && now().Sub(e.at) < CacheTTL {
-			return e.commits, e.capped, true
+		if e, ok := c.m[key]; ok {
+			if e.err != nil && now().Sub(e.at) < ErrorTTL {
+				return nil, false, e.err, true
+			}
+			if e.err == nil && now().Sub(e.at) < CacheTTL {
+				return e.commits, e.capped, nil, true
+			}
 		}
-		return nil, false, false
+		return nil, false, nil, false
 	}
-	if commits, capped, ok := lookup(); ok {
-		return commits, capped, nil
+	if commits, capped, err, ok := lookup(); ok {
+		return commits, capped, err
 	}
 	c.mu.Lock()
 	if c.repos == nil {
@@ -184,18 +193,15 @@ func (c *Cache) Read(ctx context.Context, root, branch string, since, until time
 	c.mu.Unlock()
 	rm.Lock()
 	defer rm.Unlock()
-	if commits, capped, ok := lookup(); ok { // an earlier request of the burst has read it
-		return commits, capped, nil
+	if commits, capped, err, ok := lookup(); ok { // an earlier request of the burst has read it (or failed)
+		return commits, capped, err
 	}
 	commits, capped, err := readFn(ctx, root, branch, since, until)
-	if err != nil {
-		return nil, false, err
-	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.m == nil || len(c.m) > 256 {
 		c.m = map[string]cached{}
 	}
-	c.m[key] = cached{at: now(), commits: commits, capped: capped}
-	return commits, capped, nil
+	c.m[key] = cached{at: now(), commits: commits, capped: capped, err: err}
+	return commits, capped, err
 }
