@@ -274,6 +274,8 @@
     .goal-tasks-open { display: inline-flex; align-self: flex-start; min-height: 44px; margin-top: 12px; }
     .goal-side-row { min-height: 44px; padding: 10px 12px; }
     .goal-side-search { min-height: 44px; }
+}
+
 /* narrow, in rem as the main Settings' (components.css): the groups become a selector at the top of the page */
 @container (max-width: 50rem) {
     .team-settings-page .settings-nav { width: auto; flex: none; border-right: 0; border-bottom: 1px solid var(--border); padding: .6rem 1rem; overflow: visible; }
