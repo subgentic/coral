@@ -85,9 +85,9 @@ const BASE = require('./test_base').BASE;
         }
         // a list that cannot be read: the loading line is gone and the error is said (the screen does not say it is loading and that it failed)
         await open(1280, 900, false, '');
-        await ev(`(() => { const real = window.fetch; window.fetch = async (u, o) => { if (/^\\/api\\/saved(\\?|$)/.test(String(u)) && (!o || !o.method || o.method === 'GET')) return new Response('{}', { status: 500 }); return real(u, o); }; return true; })()`);
+        await ev(`(() => { const real = window.fetch; window.__realFetch = real; window.fetch = async (u, o) => { if (/^\\/api\\/saved(\\?|$)/.test(String(u)) && (!o || !o.method || o.method === 'GET')) return new Response('{}', { status: 500 }); return real(u, o); }; return true; })()`);
         await click('#saved-btn'); await waitFor(`/Could not read the saved messages/.test(document.getElementById('saved-status').textContent)`, 'the error line', 8000);
         assert.equal(await ev(`!!document.querySelector('#saved-list .saved-loading')`), false, 'a rejected list leaves no "Loading saved items" line under the error');
         console.log('PASS the bookmark and the Inbox tab are one screen');
-    } finally { try { for (const it of (await api('GET', '/api/saved')).body.items) await api('DELETE', `/api/saved/${it.id}`); } catch { /* the page is gone */ } await client.close(); }
+    } finally { try { await ev('if (window.__realFetch) window.fetch = window.__realFetch; true'); /* the list read above is rejected on purpose: put the real fetch back so the cleanup can read and delete what the test saved */ for (const it of (await api('GET', '/api/saved')).body.items) await api('DELETE', `/api/saved/${it.id}`); } catch { /* the page is gone */ } await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
