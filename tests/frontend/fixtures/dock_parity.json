@@ -3187,9 +3187,12 @@
       "kind": "listener",
       "what": "click handler: b.addEventListener('click', onClick);",
       "source": "static/saved.js:142",
-      "status": "todo",
-      "newHome": "the Saved bookmark: Inbox > Saved",
-      "proof": null,
+      "status": "moved",
+      "newHome": "Inbox Saved table: a row's link opens the message's page, whose primary button calls saved.savedOpen = openSavedLink, the function the old Open button called",
+      "proof": {
+        "file": "static/saved.js",
+        "needle": "openSavedLink"
+      },
       "note": "waits for #7472 (Inbox > Saved); the saved.js / saved_marks.js module stays because the agent dock still uses it (Orchestrator 11:28Z)"
     },
     {
@@ -3212,9 +3215,12 @@
       "kind": "listener",
       "what": "click handler: rm.addEventListener('click', () => { closeMore(false); remove(it); });",
       "source": "static/saved.js:165",
-      "status": "todo",
-      "newHome": "the Saved bookmark: Inbox > Saved",
-      "proof": null,
+      "status": "moved",
+      "newHome": "Inbox: a saved message's page, More > Remove calls saved.savedRemove(it): DELETE /api/saved/<id>, as remove(it) did",
+      "proof": {
+        "file": "static/inbox_sidebar.js",
+        "needle": "saved.savedRemove("
+      },
       "note": "waits for #7472 (Inbox > Saved); the saved.js / saved_marks.js module stays because the agent dock still uses it (Orchestrator 11:28Z)"
     },
     {
@@ -3265,9 +3271,12 @@
       "kind": "listener",
       "what": "click handler: else { src = document.createElement('button'); src.type = 'button'; src.className = 'src saved-open'; src.setA",
       "source": "static/saved.js:195",
-      "status": "todo",
-      "newHome": "the Saved bookmark: Inbox > Saved",
-      "proof": null,
+      "status": "moved",
+      "newHome": "Inbox: a saved message's page, its primary Open button calls saved.savedOpen = openSavedLink (the old Open button's function)",
+      "proof": {
+        "file": "static/inbox_sidebar.js",
+        "needle": "savedOpen"
+      },
       "note": "waits for #7472 (Inbox > Saved); the saved.js / saved_marks.js module stays because the agent dock still uses it (Orchestrator 11:28Z)"
     },
     {
@@ -3276,9 +3285,12 @@
       "kind": "listener",
       "what": "click handler: for (const t of ['open', 'done']) $(`saved-tab-${t}`).addEventListener('click', () => { tab = t; render(); });",
       "source": "static/saved.js:372",
-      "status": "todo",
-      "newHome": "the Saved bookmark: Inbox > Saved",
-      "proof": null,
+      "status": "moved",
+      "newHome": "Inbox Saved table: Open and Done are chips (inbox-saved-chip), clicked to switch",
+      "proof": {
+        "file": "static/inbox_sidebar.js",
+        "needle": "action: 'inbox-saved-chip'"
+      },
       "note": "waits for #7472 (Inbox > Saved); the saved.js / saved_marks.js module stays because the agent dock still uses it (Orchestrator 11:28Z)"
     },
     {
@@ -3287,10 +3299,12 @@
       "kind": "listener",
       "what": "keydown handler: $('saved-tab-open').parentElement.addEventListener('keydown', (e) => {",
       "source": "static/saved.js:374",
-      "status": "todo",
+      "status": "removed-ok",
       "newHome": "the Saved bookmark: Inbox > Saved",
       "proof": null,
-      "note": "waits for #7472 (Inbox > Saved); the saved.js / saved_marks.js module stays because the agent dock still uses it (Orchestrator 11:28Z)"
+      "note": "waits for #7472 (Inbox > Saved); the saved.js / saved_marks.js module stays because the agent dock still uses it (Orchestrator 11:28Z)",
+      "okRef": "Orchestrator 2026-10-25 13:03Z board post (Saved row d): the arrow keys between Open and Done are dropped, they are chips reached with Tab as every other chip group",
+      "why": "Open and Done are chips, reached with Tab, not a tablist: no arrow keys between them"
     },
     {
       "id": "saved/listener/saved.js:497:click",
@@ -3298,9 +3312,12 @@
       "kind": "listener",
       "what": "click handler: back.addEventListener('click', () => { dropJumpBar(); if (_jumpFrom === 'view') openSavedView(); else openSave",
       "source": "static/saved.js:497",
-      "status": "todo",
-      "newHome": "the Saved bookmark: Inbox > Saved",
-      "proof": null,
+      "status": "moved",
+      "newHome": "Inbox: Open on a saved message's page calls openSavedLink, which shows the jump bar (saved-jumpbar) with its Back; Back to Saved returns to the Inbox's Saved table",
+      "proof": {
+        "file": "static/saved.js",
+        "needle": "dropJumpBar"
+      },
       "note": "waits for #7472 (Inbox > Saved); the saved.js / saved_marks.js module stays because the agent dock still uses it (Orchestrator 11:28Z)"
     },
     {
@@ -3309,9 +3326,12 @@
       "kind": "listener",
       "what": "click handler: x.addEventListener('click', dropJumpBar);",
       "source": "static/saved.js:499",
-      "status": "todo",
-      "newHome": "the Saved bookmark: Inbox > Saved",
-      "proof": null,
+      "status": "moved",
+      "newHome": "Inbox: the jump bar's close (dropJumpBar), shown after Open in context",
+      "proof": {
+        "file": "static/saved.js",
+        "needle": "saved-jumpbar"
+      },
       "note": "waits for #7472 (Inbox > Saved); the saved.js / saved_marks.js module stays because the agent dock still uses it (Orchestrator 11:28Z)"
     },
     {
@@ -5028,9 +5048,12 @@
       "kind": "control",
       "what": "button \"Filters\"",
       "source": "running page (board)",
-      "status": "todo",
-      "newHome": "the Saved bookmark: Inbox > Saved",
-      "proof": null,
+      "status": "moved",
+      "newHome": "Inbox (sidebar): Display options holds Saved's list bar (Filters, Sort, Type, From), mounted into #inbox-saved-bar",
+      "proof": {
+        "file": "static/saved.js",
+        "needle": "mountInboxSavedBar"
+      },
       "note": "waits for #7472 (Inbox > Saved); the saved.js / saved_marks.js module stays because the agent dock still uses it (Orchestrator 11:28Z)"
     },
     {
@@ -5039,9 +5062,12 @@
       "kind": "control",
       "what": "combobox \"Sort saved messages\"",
       "source": "running page (board)",
-      "status": "todo",
-      "newHome": "the Saved bookmark: Inbox > Saved",
-      "proof": null,
+      "status": "moved",
+      "newHome": "Inbox (sidebar): Display options holds Saved's list bar (Filters, Sort, Type, From), mounted into #inbox-saved-bar",
+      "proof": {
+        "file": "static/saved.js",
+        "needle": "mountInboxSavedBar"
+      },
       "note": "waits for #7472 (Inbox > Saved); the saved.js / saved_marks.js module stays because the agent dock still uses it (Orchestrator 11:28Z)"
     },
     {
@@ -5672,9 +5698,12 @@
       "kind": "control",
       "what": "button \"Filters\"",
       "source": "running page (team:agent)",
-      "status": "todo",
-      "newHome": "the Saved bookmark: Inbox > Saved",
-      "proof": null,
+      "status": "moved",
+      "newHome": "Inbox (sidebar): Display options holds Saved's list bar (Filters, Sort, Type, From), mounted into #inbox-saved-bar",
+      "proof": {
+        "file": "static/saved.js",
+        "needle": "mountInboxSavedBar"
+      },
       "note": "waits for #7472 (Inbox > Saved); the saved.js / saved_marks.js module stays because the agent dock still uses it (Orchestrator 11:28Z)"
     },
     {
@@ -5683,9 +5712,12 @@
       "kind": "control",
       "what": "combobox \"Sort saved messages\"",
       "source": "running page (team:agent)",
-      "status": "todo",
-      "newHome": "the Saved bookmark: Inbox > Saved",
-      "proof": null,
+      "status": "moved",
+      "newHome": "Inbox (sidebar): Display options holds Saved's list bar (Filters, Sort, Type, From), mounted into #inbox-saved-bar",
+      "proof": {
+        "file": "static/saved.js",
+        "needle": "mountInboxSavedBar"
+      },
       "note": "waits for #7472 (Inbox > Saved); the saved.js / saved_marks.js module stays because the agent dock still uses it (Orchestrator 11:28Z)"
     }
   ]
