@@ -43,6 +43,12 @@ def split(names, shards):
     return out
 
 
+def empty_shards(parts, mine):
+    """The 1-based numbers of the selected shards that were given no test. A shard that runs nothing passes, so an empty one is an error:
+    a test list that did not come out (a package that lists nothing, a --shards larger than the package) must not look like a pass."""
+    return [i + 1 for i in mine if not parts[i]]
+
+
 def verify(assigned, results):
     """Problems with a shard's results: a Test or Fuzz name that did not report exactly once, a name nobody assigned, or an Example that
     reported twice. (An Example without an Output comment is built but never run, so it need not report.)"""
@@ -149,11 +155,15 @@ def main(argv):
         parts = split(names, a.shards)
         assert sorted(sum(parts, [])) == sorted(names), "the shards are not the whole package"
         mine = [i for i in range(a.shards) if a.shard in (None, i + 1)]
+        empty = empty_shards(parts, mine)
+        if empty:
+            print("FAIL: %s lists %d tests, and shard(s) %s of %d would run none" % (a.pkg, len(names), ",".join(map(str, empty)), a.shards))
+            return 2
         print("%s: %d tests; shards %s of %d: %s tests" % (a.pkg, len(names), ",".join(str(i + 1) for i in mine), a.shards,
                                                           ",".join(str(len(parts[i])) for i in mine)), flush=True)
         failed = []
         with concurrent.futures.ThreadPoolExecutor(max_workers=len(mine)) as pool:
-            jobs = [pool.submit(run_shard, i, parts[i], binary, pkgdir, work, a.flags, a.timeout, a.count) for i in mine if parts[i]]
+            jobs = [pool.submit(run_shard, i, parts[i], binary, pkgdir, work, a.flags, a.timeout, a.count) for i in mine]
             for job in concurrent.futures.as_completed(jobs):
                 idx, rc, lines = job.result()
                 problems = verify(parts[idx], top_level_results(lines))

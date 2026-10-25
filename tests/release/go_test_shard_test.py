@@ -44,6 +44,18 @@ class SplitTests(unittest.TestCase):
         self.assertLess(max(sizes) - min(sizes), 120, sizes)
 
 
+class EmptyShardTests(unittest.TestCase):
+    def test_a_shard_with_no_test_is_reported(self):
+        self.assertEqual([2], shard.empty_shards([["TestA"], [], ["TestB"]], [0, 1, 2]))
+        self.assertEqual([], shard.empty_shards([["TestA"], [], ["TestB"]], [0, 2]), "only the selected shards count")
+
+    def test_a_package_that_lists_nothing_leaves_every_shard_empty(self):
+        self.assertEqual([1, 2, 3, 4], shard.empty_shards(shard.split([], 4), range(4)))
+
+    def test_more_shards_than_tests_is_caught(self):
+        self.assertTrue(shard.empty_shards(shard.split(["TestA", "TestB"], 8), range(8)))
+
+
 class VerifyTests(unittest.TestCase):
     def test_a_clean_shard_has_no_problem(self):
         self.assertEqual([], shard.verify(["TestA", "TestB"], ["TestB", "TestA"]))
