@@ -18,7 +18,7 @@ const TEAM = `qa-tasks-${Date.now() % 100000}`;
         window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin);
             if (url.pathname === '/api/board/tasks') { window.__q.push(url.search); const q = (url.searchParams.get('q') || '').toLowerCase(); const hit = ALL.filter(t => !q || t.title.toLowerCase().includes(q)); if (url.searchParams.getAll('status').includes('completed')) return j({ tasks: [], next_cursor: '', total: 0, truncated: false }); // the done phase has none
             const cur = url.searchParams.get('cursor'); const page = cur ? hit.slice(1) : hit.slice(0, 1); return j({ tasks: page, next_cursor: !cur && hit.length > 1 ? 'next' : '', total: hit.length, truncated: false }); }
-            if (/^\\/api\\/board\\/[^/]+\\/tasks$/.test(url.pathname)) return j({ tasks: ALL, next_cursor: '', total_open: 3, total_completed: 0 });
+            if (/^\\/api\\/board\\/[^/]+\\/tasks$/.test(url.pathname)) return j({ tasks: [...(window.__more ? [...ALL, T(4, 'A task made while the tab was open', 'pending')] : ALL), T(9, 'Finished long ago', 'completed')], next_cursor: '', total_open: window.__more ? 4 : 3, total_completed: 1 });
             if (/^\\/api\\/board\\/[^/]+\\/tasks\\/3$/.test(url.pathname)) return j(ALL[2]);
             return R(u, o); }; return true; })()`);
     const rows = () => ev(`[...document.querySelectorAll('#team-panel-tasks tbody tr')].map(r => window.__na.text(r))`);
@@ -28,9 +28,18 @@ const TEAM = `qa-tasks-${Date.now() % 100000}`;
         await Emulation.setDeviceMetricsOverride({ width: 1600, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installTP(ev);
         await seed(ev, TEAM); await stub(); await openTeam(ev, waitFor, TEAM); await goTab(ev, settle, 'Tasks'); await settle(600);
+        await S.run('Hide completed is the Open chip, on by default, remembered until All is chosen', async () => {
+            assert.equal((await rows()).length, 3, 'a finished task is not in the table by default');
+            assert.ok(await ev(`document.querySelector('#team-panel-tasks .goals-chip[aria-pressed="true"]').dataset.filter === 'open'`), 'Open is the chosen chip');
+            await ev(`document.querySelector('#team-panel-tasks .goals-chip[data-filter="all"]').click(); true`); await settle(300);
+            assert.equal((await rows()).length, 4, 'All shows the finished one too');
+            assert.equal(await ev(`localStorage.getItem('coral-hide-completed')`), 'false', 'the choice is kept under the old key');
+            await ev(`document.querySelector('#team-panel-tasks .goals-chip[data-filter="open"]').click(); true`); await settle(300);
+            assert.equal(await ev(`localStorage.getItem('coral-hide-completed')`), 'true');
+        });
         await S.run('the search bar is there and a search asks the task query (q), paged with a total and Load more', async () => {
             assert.ok(await ev(`!!document.querySelector('#team-panel-tasks input[aria-label="Search tasks"]')`), 'a search box named Search tasks');
-            assert.equal((await rows()).length, 3, 'the default list: three tasks');
+            assert.equal((await rows()).length, 3, 'the default list: three open tasks');
             await typeSearch('fix'); await settle(700);
             const q = await ev(`window.__q`); assert.ok(q.some(s => /q=fix/.test(s) && /board=/.test(s)), `the query carries the search and the board: ${JSON.stringify(q)}`);
             assert.equal((await rows()).length, 1, 'the first page: one task');
@@ -42,6 +51,12 @@ const TEAM = `qa-tasks-${Date.now() % 100000}`;
         await S.run('clearing the search goes back to the default list', async () => {
             await typeSearch(''); await settle(700);
             assert.equal((await rows()).length, 3, 'three tasks again');
+        });
+        await S.run('the tab keeps itself current: a task made meanwhile shows when the window comes back to the front', async () => {
+            assert.equal((await rows()).length, 3);
+            await ev(`window.__more = true; window.dispatchEvent(new Event('focus')); true`); await settle(700);
+            assert.equal((await rows()).length, 4, 'the new task is in the table without a click');
+            await ev(`window.__more = false; window.dispatchEvent(new Event('focus')); true`); await settle(700);
         });
         await S.run('New task opens the task dialog', async () => {
             assert.ok(await ev(`(() => { const b = [...document.querySelectorAll('#team-panel-tasks button')].find(x => /^New task$/.test(x.textContent.trim())); if (!b) return false; b.click(); return true; })()`), 'a New task button'); await settle(500);
