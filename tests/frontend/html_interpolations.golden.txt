@@ -560,12 +560,8 @@
 1	tags.js	tags.map(t => `<span class="sidebar-tag-pill" style="background:${escapeAttr(tagColor(t.color))}" title="${esc
 1	task_dep_picker.js	checked
 1	task_dep_picker.js	t.id
-1	task_detail.js	assigneeOptions
-1	task_detail.js	p
-1	task_detail.js	priorityOptions
 1	task_detail.js	requiredLabel
 1	task_detail.js	requiredOutputs.map(output => `<li>${escapeHtml(output)}</li>`).join('')
-1	task_detail.js	revision
 1	task_detail_html.js	(input.artifacts || []).map(artifactHtml).join('')
 1	task_detail_html.js	(review.artifacts || []).map(artifactHtml).join('')
 1	task_detail_html.js	(workflow.gate_results || []).length ? `<div>Gate results: ${(workflow.gate_results || []).map(g => `<span cla

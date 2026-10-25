@@ -929,13 +929,9 @@ function _renderCostSVG(turns) {
 let _costTaskCache = [];
 
 function _showCostTaskDetail(taskId) {
-    // Merge into state so showTaskDetailModal can find it
-    const existing = state.currentBoardTasks || [];
     const task = _costTaskCache.find(t => t.id === taskId);
-    if (task && !existing.find(t => t.id === taskId)) {
-        state.currentBoardTasks = [...existing, task];
-    }
-    window.showTaskDetailModal(taskId);
+    const board = task && task.board_id || state.selectedTeam;
+    if (board) window.openTeamPage?.(board, { tab: 'tasks', item: taskId }); // the task's own page on its team's page (#7644)
 }
 
 function _renderTaskTable(tasks) {

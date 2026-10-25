@@ -1,5 +1,5 @@
-// A task names its goal (#7253, UI/UX's #7249 findings 2 and 6): the Create Task and Edit dialogs have a Goal select listing the board's open goals, a task's detail has a Goal line that opens
-// the goal on the Goals face, a Tasks row has a quiet goal chip, and a board that requires a goal has no empty choice (the select says "Choose a goal", and Create refuses without one).
+// A task names its goal (#7253, UI/UX's #7249 findings 2 and 6; the task's page since #7644): the Create Task dialog and the task page's Edit have a Goal select listing the board's open goals, a task's page has a Goal line that opens
+// the goal on the team page's Goals tab, a Tasks row has a quiet goal chip, and a board that requires a goal has no empty choice (the select says "Choose a goal", and Create refuses without one).
 // Real board over the API. Drives Chrome over CDP against the isolated dev server; run_cdp_suites.mjs finds it by name.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -46,38 +46,27 @@ const BASE = require('./test_base').BASE;
         const mine = (made.tasks || made).find(t => t.title === 'Stabilise CI');
         assert.equal(mine && mine.goal_id, g2, 'the new task works toward the chosen goal: ' + JSON.stringify(mine));
 
-        console.log('3. a task\'s detail has a Goal line that names the goal and opens it on the Goals face');
+        console.log('3. a task\'s page has a Goal line that names the goal and opens it on the Goals tab');
         await waitFor(`document.querySelectorAll('#agentic-panel-tasks .board-task-item').length >= 3`, 'the new row', 8000);
         await ev(`[...document.querySelectorAll('#agentic-panel-tasks .board-task-item')].find(r => /Build the installer/.test(r.textContent)).querySelector('.board-task-open').click(); true`);
-        await waitFor(`!!document.getElementById('task-detail-goal-open') && document.getElementById('task-detail-goal-open').textContent === 'Ship the new installer'`, 'the Goal line to name its goal', 8000);
-        assert.equal(await ev(`document.getElementById('task-detail-goal-open').getAttribute('aria-label')`), 'Open the goal: Ship the new installer');
-        await ev(`document.getElementById('task-detail-goal-open').click(); true`);
-        await waitFor(`!!document.querySelector('#mb-goals .goals-detail-title') && document.querySelector('#mb-goals .goals-detail-title').textContent === 'Ship the new installer'`, 'the goal to open on the Goals face', 10000);
-        assert.equal(await shown('task-detail-modal'), false, 'the task dialog closed');
-        await ev(`window.showTaskDetailModal(${t1.json.id}); true`);
-        await waitFor(`!!document.getElementById('task-detail-goal-open')`, 'the Goal line again', 8000);
-        // The Goals face redraws while this dialog is open (a read that found a change, or the tasks arriving late on a slow runner): the goal's heading is a new element when the dialog closes.
-        assert.equal((await api('POST', `/api/board/${B}/tasks`, { subscriber_id: 'Boss', title: 'Arrives while the dialog is open', priority: 'low', goal_id: g1 })).status, 201);
-        await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'goals_view.js'); const before = document.getElementById('goals-detail-title'); await m.loadGoals(); window.__redrawn = before !== document.getElementById('goals-detail-title'); return true; })()`);
-        assert.equal(await ev(`window.__redrawn`), true, 'the redraw replaced the goal\'s heading while the task dialog was open');
-        await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
-        assert.ok(await ev(`document.getElementById('task-detail-goal-open').getBoundingClientRect().height >= 44`), 'the Goal line button is a 44 px target on a phone (#7313)');
-        await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
-        await ev(`window.hideTaskDetailModal(); true`);
-        assert.equal(await ev(`document.activeElement.id`), 'goals-detail', 'focus is on the goal\'s detail');
+        await waitFor(`!!document.querySelector('#team-panel-item #team-task-title') && !!document.querySelector('#team-panel-item .goals-facts button.team-link[data-goal-link], #team-panel-item .goals-facts dd button.team-link')`, 'the task page with its Goal line', 12000);
+        await waitFor(`[...document.querySelectorAll('#team-panel-item .goals-facts dd button.team-link')].some(b => b.textContent === 'Ship the new installer')`, 'the Goal line to name its goal', 8000);
+        assert.equal(await shown('task-detail-modal'), false, 'no dialog opened');
+        await ev(`[...document.querySelectorAll('#team-panel-item .goals-facts dd button.team-link')].find(b => b.textContent === 'Ship the new installer').click(); true`);
+        await waitFor(`!!document.querySelector('#team-panel-goals .goals-detail-title') && document.querySelector('#team-panel-goals .goals-detail-title').textContent === 'Ship the new installer'`, 'the goal to open on the Goals tab', 10000);
 
         console.log('4. Edit: the Goal select moves the task to another goal and back to none');
-        await ev(`localStorage.setItem('coral.board.face', 'messages'); true`);
-        await ev(`(async () => { const m = await import('/static/message_board.js').catch(() => null); return true; })()`);
-        await ev(`window.showTaskDetailModal(${t2.json.id}); true`);
-        await waitFor(`!!document.querySelector('#task-detail-content [data-on-click="task-edit"], #task-detail-modal-footer [data-on-click="task-edit"]')`, 'Edit', 8000);
-        await ev(`document.querySelector('#task-detail-modal-footer [data-on-click="task-edit"]').click(); true`);
+        await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'tasks', item: ${t2.json.id} }); true`);
+        await waitFor(`!!document.querySelector('#team-panel-item #team-task-title') && [...document.querySelectorAll('#team-panel-item .goals-pinbar .btn')].some(b => b.textContent === 'Edit')`, 'Edit', 12000);
+        await ev(`[...document.querySelectorAll('#team-panel-item .goals-pinbar .btn')].find(b => b.textContent === 'Edit').click(); true`);
         await waitFor(`!!document.getElementById('task-edit-goal') && document.getElementById('task-edit-goal').options.length === 3`, 'the Goal select in Edit', 8000);
         assert.equal(await ev(`document.getElementById('task-edit-goal').value`), '', 'a task with no goal starts on No goal');
-        await ev(`document.getElementById('task-edit-goal').value = '${g1}'; document.querySelector('#task-detail-modal-footer [data-on-click="task-edit-save"]').click(); true`);
-        await waitFor(`true`, 'a beat', 10);
+        await ev(`document.getElementById('task-edit-goal').value = '${g1}'; [...document.querySelectorAll('#team-panel-item .goals-pinbar .btn')].find(b => b.textContent === 'Save').click(); true`);
         for (let n = 0; n < 40 && (await taskOf(t2.json.id)).goal_id !== g1; n++) await ev(`new Promise(r => setTimeout(r, 150))`); // sleep-ok: the save goes over the network
         assert.equal((await taskOf(t2.json.id)).goal_id, g1, 'Save moved the task to the chosen goal');
+        await waitFor(`!document.getElementById('task-edit-goal') && [...document.querySelectorAll('#team-panel-item .goals-facts dd button.team-link')].some(b => b.textContent === 'Ship the new installer')`, 'the page naming the new goal', 8000);
+        await ev(`window.exitTeamPage && window.exitTeamPage({ force: true }); window.selectLiveSession('goal-agent', 'claude', 'goal-agent-id', 'local'); true`);
+        await waitFor(`!!document.querySelector('.btn-create-task') && document.querySelector('.btn-create-task').getClientRects().length > 0`, 'the Tasks tab again', 8000);
 
         console.log('5. a board that requires a goal: the empty choice says "Choose a goal" and Create refuses without one');
         assert.equal((await api('PUT', `/api/board/${B}/settings`, { subscriber_id: 'Operator', require_goal: true })).status, 200);

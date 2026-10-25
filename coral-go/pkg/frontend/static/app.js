@@ -37,7 +37,7 @@ import { toggleAgenticPanel, toggleSidebarRail, showSidebarPane, focusSidebarSea
 import { connectTerminalWs, disconnectTerminalWs } from './xterm_renderer.js';
 import { saveNotes, generateSummary, toggleNotesEdit, cancelNotesEdit, switchHistoryTab } from './notes.js';
 import { addTagToSession, removeTagFromSession, showTagDropdown, hideTagDropdown, createTag } from './tags.js';
-import { loadMoreBoardTasks, showTaskDetailModal, hideTaskDetailModal, showCreateTaskModal, hideCreateTaskModal, submitCreateTask, enableTaskEditMode, saveTaskEdit, cancelTaskEdit, completeBoardTask, cancelBoardTask, _doCompleteTask, _doCancelTask, _restoreTaskFooter, publishBoardTask, nudgeBoardTask, remindBoardTask, stopBoardTaskReminder } from './tasks.js';
+import { loadMoreBoardTasks, hideTaskDetailModal, showCreateTaskModal, hideCreateTaskModal, submitCreateTask, completeAgentTask, _doCompleteAgentTask, showAgentTaskDetailModal } from './tasks.js';
 import { openFilePreview, openFileEdit, refreshChangedFiles, copyFilePath } from './changed_files.js';
 import './file_mention.js';
 import './command_mention.js';
@@ -372,10 +372,9 @@ Object.assign(window, {
     openFilePreview, openFileEdit, refreshChangedFiles,
     copyFilePath, 
     // tasks
-    showTaskDetailModal, hideTaskDetailModal, loadMoreBoardTasks,
+    hideTaskDetailModal, loadMoreBoardTasks,
     showCreateTaskModal, hideCreateTaskModal, submitCreateTask,
-    enableTaskEditMode, saveTaskEdit, cancelTaskEdit,
-    completeBoardTask, cancelBoardTask, _doCompleteTask, _doCancelTask, _restoreTaskFooter, publishBoardTask, nudgeBoardTask, remindBoardTask, stopBoardTaskReminder,
+    completeAgentTask, _doCompleteAgentTask, showAgentTaskDetailModal,
     // agent_notes
     // agentic_state
     switchAgenticTab,

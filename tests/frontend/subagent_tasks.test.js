@@ -227,14 +227,14 @@ async function run() {
   check('open modal follows: completed, final cost, duration', m.open && m.status === 'Completed' && m.cost === '$1.25' && !m.costLive && m.fields['Duration'] === '5m 30s', JSON.stringify([m.status, m.cost, m.fields['Duration']]));
   check('open modal fetches the result once the subagent finishes', (await ev(`window.__detailFetches`)).includes('b7running00000000') && /The design is done\./.test(m.sections['Result']), m.sections['Result']);
 
-  // ── The overlay is shared with board tasks ──
-  await ev(`(async () => { const {state} = await import((window.__coralStatic||'/static/')+'state.js'); state.currentBoardTasks = JSON.parse(JSON.stringify(window.__boardTasks)); window.showTaskDetailModal(77); return true; })()`); await until(MODAL_OPEN, 'the board task modal'); await settledHtml('#task-detail-content', 'the board task modal');
+  // ── The overlay is shared with the agent's own tasks (a board's task is the team page's page since #7644) ──
+  await ev(`window.showAgentTaskDetailModal(11); true`); await until(MODAL_OPEN, 'the agent task modal'); await settledHtml('#task-detail-content', 'the agent task modal');
   m = await modal();
-  check('board task modal still works', m.open && m.header === 'Task #77' && m.title === '#77 · A board task', m.header + ' / ' + m.title);
+  check('the agent task modal still works', m.open && m.header === 'Task #11' && m.title === '#11 · Ordinary agent task', m.header + ' / ' + m.title);
   await ev(`window.__subagents[${JSON.stringify(A)}][0] = { ...window.__subagents[${JSON.stringify(A)}][0], cost_usd: 9.99 }; true`);
   for (let i = 0; i < 100; i++) { await sleep(50); const r = bySub(await rows(), 'aca6223d75309e7ca'); if (r && r.cost === '$9.99') break; }
   m = await modal();
-  check('a subagent poll does not overwrite an open board task modal', m.header === 'Task #77' && m.title === '#77 · A board task' && !('Subagent ID' in m.fields), m.header + ' / ' + m.title);
+  check('a subagent poll does not overwrite an open agent task modal', m.header === 'Task #11' && m.title === '#11 · Ordinary agent task' && !('Subagent ID' in m.fields), m.header + ' / ' + m.title);
   await ev(`window.hideTaskDetailModal(); true`);
 
   // ── Agent B shares the name "coral-go" but launched nothing ──

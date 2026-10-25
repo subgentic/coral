@@ -2,7 +2,7 @@
 //   - a load shows every open task and the newest 50 done tasks, as light items (no body,
 //     no workflow); the counts are the server's totals, not the loaded rows;
 //   - "Load more" pages the older done tasks, once each, and a poll keeps them;
-//   - the detail view and Edit use the full task, fetched on open (never the preview);
+//   - the task page and Edit use the full task, fetched on open (never the preview);
 //   - a fetch that never answers ends at the timeout, and a failed refresh keeps the list.
 //
 // Expects CORAL_TEST_URL + CDP_PORT from tests/frontend/run.sh. Exit 0 / 1.
@@ -101,14 +101,17 @@ const { removeBoards } = require('./helpers/board_cleanup');
         check('counts follow (61 done of 63)', d.count === '61/63', d.count);
 
         // ── Detail and Edit use the full task ──
-        await ev(`(async () => { ${MODS} tasks.showTaskDetailModal(${openIds[0]}); return true; })()`);
-        await waitFor(`(document.getElementById('task-detail-content')?.textContent || '').includes(${JSON.stringify(MARKER)})`, 'the full body in the detail view', { timeout: 5000 })
-            .then(() => check('the detail view shows the full task, fetched on open', true))
-            .catch(e => check('the detail view shows the full task, fetched on open', false, e.message));
-        await ev(`(async () => { ${MODS} await tasks.enableTaskEditMode(${openIds[1]}); return true; })()`);
+        await ev(`window.openTeamPage(${JSON.stringify(BOARD)}, { tab: 'tasks', item: ${openIds[0]} }); true`);
+        await waitFor(`(document.getElementById('team-panel-item')?.textContent || '').includes(${JSON.stringify(MARKER)})`, 'the full body on the task page', { timeout: 8000 })
+            .then(() => check('the task page shows the full task, fetched on open', true))
+            .catch(e => check('the task page shows the full task, fetched on open', false, e.message));
+        await ev(`window.openTeamPage(${JSON.stringify(BOARD)}, { tab: 'tasks', item: ${openIds[1]} }); true`);
+        await waitFor(`!!document.querySelector('#team-panel-item #team-task-title') && document.querySelector('#team-task-title').textContent.startsWith('#${openIds[1]} ') && [...document.querySelectorAll('#team-panel-item .goals-pinbar .btn')].some(b => b.textContent === 'Edit')`, 'the second task page', { timeout: 8000 });
+        await ev(`[...document.querySelectorAll('#team-panel-item .goals-pinbar .btn')].find(b => b.textContent === 'Edit').click(); true`);
+        await waitFor(`!!document.getElementById('task-edit-body')`, 'the edit form', { timeout: 8000 });
         const editBody = await ev(`document.getElementById('task-edit-body')?.value || ''`);
         check('Edit on a task never opened edits the full body, never the preview', editBody === LONG_BODY, `${editBody.length} chars`);
-        await ev(`(async () => { ${MODS} tasks.cancelTaskEdit && tasks.cancelTaskEdit(${openIds[1]}); tasks.hideTaskDetailModal(); return true; })()`);
+        await ev(`[...document.querySelectorAll('#team-panel-item .goals-pinbar .btn')].find(b => b.textContent === 'Cancel').click(); true`);
 
         // ── A fetch that never answers ends at the timeout; a failed refresh keeps the list ──
         await ev(`(async () => { ${MODS} tasks.boardTaskFetchHooks.timeoutMs = 300; window.__hang.add(${JSON.stringify(BOARD)}); return true; })()`);

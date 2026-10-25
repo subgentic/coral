@@ -121,12 +121,6 @@ function agentFor(task) {
     return live.find(s => s && (s.board_project === model.project || !s.board_project) && (s.display_name === name || s.name === name)) || null;
 }
 
-function openTask(task) {
-    const existing = state.currentBoardTasks || [];
-    if (task.raw && !existing.find(t => t.id === task.id)) state.currentBoardTasks = [...existing, task.raw]; // showTaskDetailModal reads the task from here (the Analytics page does the same)
-    window.showTaskDetailModal?.(task.id);
-}
-
 function openAgent(session) {
     window.switchNavTab?.('agents');
     window.selectLiveSession?.(session.name, session.agent_type, session.session_id, session.server);
@@ -210,7 +204,7 @@ function taskRow(t) {
     const sub = [t.assignee, t.statusLine].filter(Boolean).join(' · ');
     if (sub) li.append(el('span', 'goal-task-sub', sub));
     const acts = el('span', 'goal-task-actions');
-    const openT = btn('btn btn-small goal-open-task', 'Open task', () => openTask(t)); openT.setAttribute('aria-label', `Open task #${t.id}: ${t.title}`); // three rows, three names (the visible words start the name)
+    const openT = btn('btn btn-small goal-open-task', 'Open task', () => { const raw = t.raw || t; if (hooks.openTask) hooks.openTask(raw, goalById(raw.goal_id)); else window.openTeamPage?.(model.project, { tab: 'tasks', item: t.id }); }); openT.setAttribute('aria-label', `Open task #${t.id}: ${t.title}`); // three rows, three names (the visible words start the name); the click opens the task's own page (#7644)
     acts.append(openT);
     if (W.taskStateWord(t.state) === 'Done') { li.append(acts); return li; } // a finished task has no agent to open: a long done list is not 120 repeats of "Not running here" (#7142)
     const session = agentFor(t);

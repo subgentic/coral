@@ -1,7 +1,7 @@
-// The Create task dialog and the task detail view for the keyboard, a screen reader and both themes (#5814): a refusal in the Create dialog is spoken (role=alert) and marks the
-// title; "+ Add dependency" and a dependency tag's × are buttons (they were links with no href: not reachable by Tab, and the × had no name); the task detail dialog is named
-// by its task, not only "Task #1"; and the real light theme holds 4.5:1 in both dialogs (the Open chip, Complete, the Add dependency link). Focus goes to the title on open and back
-// to what opened each dialog on Escape. Real board over the API. Drives Chrome over CDP against the isolated dev server.
+// The Create task dialog and the task page for the keyboard, a screen reader and both themes (#5814, #7644): a refusal in the Create dialog is spoken (role=alert) and marks the
+// title; "+ Add dependency" and a dependency tag's × are buttons (they were links with no href: not reachable by Tab, and the × had no name); the task's page is named by its task and
+// has the focus on its title, its back link gives the focus back to the row; and the real light theme holds 4.5:1 in the Create dialog and on the task page in its three states (the page, Edit, Complete).
+// Focus goes to the title on open and back to what opened the dialog on Escape. Real board over the API. Drives Chrome over CDP against the isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { openBoardTasksTab } = require('./helpers/board_tasks_tab');
@@ -73,28 +73,38 @@ const BASE = require('./test_base').BASE;
         assert.equal(await ev(`document.querySelector('.task-workflow-options').open`), false, 'fresh tasks reset to folded');
         await key('Escape', 'Escape', 27);
 
-        console.log('2. the task detail dialog is named by its task');
+        console.log('2. the task page is named by its task and gives the focus back');
         await ev(`document.querySelector('#agentic-panel-tasks .board-task-open').focus(); document.querySelector('#agentic-panel-tasks .board-task-open').click(); true`);
-        await waitFor(`getComputedStyle(document.getElementById('task-detail-modal')).display !== 'none' && !!document.getElementById('task-detail-heading')`, 'the detail', 10000);
-        const nm = await ev(`(() => { const m = document.getElementById('task-detail-modal'); const ids = m.getAttribute('aria-labelledby').split(' '); return ids.map(i => (document.getElementById(i) || {}).textContent).join(' ').replace(/\\s+/g, ' ').trim(); })()`);
-        assert.ok(/Task #\d+ #\d+ · (Ship the queue|Write the docs)/.test(nm), 'the dialog is named by its number and its task: ' + nm);
-        await key('Escape', 'Escape', 27);
-        await waitFor(`getComputedStyle(document.getElementById('task-detail-modal')).display === 'none'`, 'Escape closes it', 4000);
-        assert.ok(await ev(`document.activeElement.classList.contains('board-task-open')`), 'focus goes back to the task that was opened');
+        await waitFor(`!!document.querySelector('#team-panel-item #team-task-title') && getComputedStyle(document.getElementById('task-detail-modal')).display === 'none'`, 'the task page (and no dialog)', 12000);
+        const nm = await ev(`({ region: document.getElementById('team-panel-item').getAttribute('aria-label'), title: document.getElementById('team-task-title').textContent, focus: document.activeElement.id })`);
+        assert.ok(/^Task \d+$/.test(nm.region) && /^#\d+ (Ship the queue|Write the docs)$/.test(nm.title) && nm.focus === 'team-task-title', 'the page is named by its number and its task, the title has the focus: ' + JSON.stringify(nm));
+        await ev(`document.querySelector('#team-panel-item .goals-back').focus(); document.querySelector('#team-panel-item .goals-back').click(); true`);
+        await waitFor(`!document.querySelector('#team-panel-item #team-task-title') && document.activeElement && document.activeElement.classList.contains('team-row-btn') && !!document.activeElement.dataset.taskId`, 'the focus back on the task\'s row', 8000);
 
-        console.log('3. both themes hold 4.5:1 in both dialogs');
+        console.log('3. both themes hold 4.5:1 in the dialog and on the page');
         await installAudit(ev);
+        const ids = await ev(`fetch('/api/board/${B}/tasks').then(r => r.json()).then(j => j.tasks.map(t => t.id))`);
         for (const theme of ['dark', 'light']) {
             await setTheme(ev, theme);
+            await ev(`window.exitTeamPage && window.exitTeamPage({ force: true }); window.selectLiveSession('bt-agent', 'claude', 'bt-agent-id', 'local'); true`);
+            await waitFor(`!!document.querySelector('.btn-create-task') && document.querySelector('.btn-create-task').getClientRects().length > 0`, 'the Tasks tab again', 8000);
             await ev(`document.querySelector('.btn-create-task').click(); true`);
             await waitFor(`getComputedStyle(document.getElementById('create-task-modal')).display !== 'none'`, 'create', 5000);
             const c = await auditRegion(ev, ['#create-task-modal']); await shot(`create-${theme}`);
-            await ev(`document.querySelector('#create-task-modal .modal-close-btn').click(); document.querySelector('#agentic-panel-tasks .board-task-open').click(); true`);
-            await waitFor(`!!document.getElementById('task-detail-heading') && getComputedStyle(document.getElementById('task-detail-modal')).display !== 'none'`, 'detail', 8000);
-            const d = await auditRegion(ev, ['#task-detail-modal']); await shot(`detail-${theme}`);
-            await ev(`document.querySelector('#task-detail-modal .modal-close-btn').click(); true`);
+            await ev(`document.querySelector('#create-task-modal .modal-close-btn').click(); true`);
             assert.ok(c.checked > 0 && !c.fails.length, `${theme}: the Create task dialog holds 4.5:1: ` + JSON.stringify(c.fails).slice(0, 400));
-            assert.ok(d.checked > 0 && !d.fails.length, `${theme}: the task detail holds 4.5:1: ` + JSON.stringify(d.fails).slice(0, 400));
+            await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'tasks', item: ${ids[0]} }); true`);
+            await waitFor(`!!document.querySelector('#team-panel-item #team-task-title') && document.querySelector('#team-task-title').getClientRects().length > 0 && !!document.querySelector('#team-panel-item .goals-pinbar .btn')`, 'the page (drawn, not the last one left behind a hidden view)', 12000);
+            const d = await auditRegion(ev, ['#team-panel-item']); await shot(`page-${theme}`);
+            assert.ok(d.checked > 0 && !d.fails.length, `${theme}: the task page holds 4.5:1: ` + JSON.stringify(d.fails).slice(0, 400));
+            const bar = text => ev(`[...document.querySelectorAll('#team-panel-item .goals-pinbar .btn')].find(b => b.textContent === ${JSON.stringify(text)}).click(); true`);
+            await bar('Edit'); await waitFor(`!!document.getElementById('task-edit-title')`, 'the form', 8000);
+            const e = await auditRegion(ev, ['#team-panel-item']); await shot(`edit-${theme}`);
+            assert.ok(e.checked > 0 && !e.fails.length, `${theme}: the edit form holds 4.5:1: ` + JSON.stringify(e.fails).slice(0, 400));
+            await bar('Cancel'); await waitFor(`!document.getElementById('task-edit-title')`, 'back on the page', 8000);
+            await bar('Complete'); await waitFor(`!!document.getElementById('task-complete-message')`, 'the completion form', 8000);
+            const k = await auditRegion(ev, ['#team-panel-item']); await shot(`complete-${theme}`);
+            assert.ok(k.checked > 0 && !k.fails.length, `${theme}: the completion form holds 4.5:1: ` + JSON.stringify(k.fails).slice(0, 400));
         }
         console.log('   ✓');
     } finally { await removeBoards(ev, [B]); await client.close(); }

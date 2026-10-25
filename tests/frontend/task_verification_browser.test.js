@@ -1,5 +1,5 @@
 // A finished task's verification, quietly (#4564, operator feedback): in the board's Tasks list a small muted icon after the title only for Evidence attached,
-// its words only in the tooltip and the accessible name, and nothing at all for a verified or an unverified one; in the task detail one plain muted line ("Verified by ..." or "Not independently verified (evidence attached)"), none for unverified, no chip; no filter in the
+// its words only in the tooltip and the accessible name, and nothing at all for a verified or an unverified one; on the task's page one plain muted line ("Verified by ..." or "Not independently verified (evidence attached)"), none for unverified, no chip; no filter in the
 // list (the API's filter is for agents and coral-hub). The icon reaches 3:1 in both themes and fits a 390 px phone. The tasks are the real isolated server's; the verification field (Backend's #4563:
 // {state, by, at}) is added to its answers in the page, and a task without the field gets nothing.
 //
@@ -93,14 +93,15 @@ const ADD = `(() => {
             marks: [...document.querySelectorAll('#board-task-list .board-task-verify-mark')].map(m => m.textContent.trim().length > 0 && /^[a-z_]+$/.test(m.textContent.trim())).every(Boolean) })`), { chips: 0, filter: 0, marks: true }, 'no chip, no filter, and a mark is an icon with no words');
         await shot('verify-list-dark');
 
-        console.log('2. The task detail has one plain muted line (no chip)');
+        console.log('2. The task page has one plain muted line (no chip)');
         const detailLine = async title => {
             await ev(`[...document.querySelectorAll('#board-task-list .board-task-item')].find(r => r.textContent.includes(${JSON.stringify(title)})).click(); true`);
-            await waitFor(`!!document.querySelector('#task-detail-content .task-detail-title') && document.querySelector('#task-detail-content .task-detail-title').textContent.includes(${JSON.stringify(title)})`, 'the detail of ' + title, 8000);
+            await waitFor(`!!document.querySelector('#team-panel-item #team-task-title') && document.querySelector('#team-task-title').textContent.includes(${JSON.stringify(title)}) && !!document.querySelector('#team-panel-item .goals-pinbar')`, 'the page of ' + title, 12000);
+            await sleep(250); // sleep-ok: the page's other sections are added when their module is there; an absent line has no event
             if (title === 'e-one') await shot('verify-detail');
-            const out = await ev(`({ line: (document.querySelector('#task-detail-content .task-detail-verification') || {}).textContent || null, chip: !!document.querySelector('#task-detail-content .board-task-verify, #task-detail-content .board-task-verify-mark') })`);
-            await ev(`document.querySelector('#task-detail-modal [data-on-click="task-close"]').click(); true`);
-            await sleep(120); // sleep-ok: the dialog closes over a frame
+            const out = await ev(`({ line: (document.querySelector('#team-panel-item .task-detail-verification') || {}).textContent || null, chip: !!document.querySelector('#team-panel-item .board-task-verify, #team-panel-item .board-task-verify-mark') })`);
+            await ev(`window.exitTeamPage && window.exitTeamPage({ force: true }); window.selectLiveSession('bt-agent', 'claude', 'bt-agent-id', 'local'); true`);
+            await waitFor(`document.querySelectorAll('#board-task-list .board-task-item').length > 0 && document.getElementById('board-task-list').getClientRects().length > 0`, 'the list again', 8000);
             return out;
         };
         let d = await detailLine('v-two'); assert.match(d.line, /^Verified by QA Engineer, Security Reviewer, /); assert.equal(d.chip, false);

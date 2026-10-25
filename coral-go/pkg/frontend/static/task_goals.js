@@ -97,15 +97,6 @@ export async function refreshGoalTitles(project) {
     return JSON.stringify([...byId]) !== before;
 }
 
-/** The Goal line of a task's detail: the goal's title on the button once it is read ("Goal #n" until then). */
-export async function fillGoalLine(project, id) {
-    const btn = document.getElementById('task-detail-goal-open');
-    if (!btn || !project || !id) return;
-    const goal = await readGoal(project, id);
-    const now = document.getElementById('task-detail-goal-open');
-    if (goal && goal.title && now && now.dataset.goalId === String(id)) { now.textContent = goal.title; now.setAttribute('aria-label', `Open the goal: ${goal.title}`); }
-}
-
 /** Show a goal on the Goals face of its board: the Messages | Goals choice is set to Goals, the board is selected, the goal opens. */
 export async function openGoalOnBoard(project, id) {
     if (!project || !id) return;

@@ -90,7 +90,7 @@ const BASE = require('./test_base').BASE;
                 assert.equal(row.nestedInButton, false);
                 assert.ok(row.stops.some(x => /^BUTTON:Open task #\d+: /.test(x)), 'the row has the native Open button: ' + JSON.stringify(row.stops));
                 assert.ok(row.stops.length <= 2, 'one control, and at most the status detail: ' + JSON.stringify(row.stops));
-                await ev(`window.__opened = 0; { const w = window.showTaskDetailModal; window.showTaskDetailModal = id => { window.__opened++; window.__openedId = id; }; } true`);
+                await ev(`window.__opened = 0; window.openTeamPage = (board, opts) => { window.__opened++; window.__openedId = opts.item; return Promise.resolve(true); }; true`); // a board task opens the team page's task page (#7644): recorded here
                 await ev(`document.querySelector('#agentic-panel-tasks .board-task-open').focus(); true`);
                 await Input.dispatchKeyEvent({ type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' }); await Input.dispatchKeyEvent({ type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
                 await waitFor(`window.__opened >= 1`, 'Enter on the button opens the task', 4000);
