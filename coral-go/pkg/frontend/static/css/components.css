@@ -4638,6 +4638,6 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .servers-fact dt { font-size: var(--fs-md); font-weight: 500; color: var(--text-secondary); }
 .servers-fact dd { margin: 0; font-size: var(--fs-md); font-weight: 400; color: var(--text-primary); overflow-wrap: anywhere; }
 .servers-page .item-bar { margin-top: auto; bottom: calc(-1 * var(--space-lg, 16px)); margin-bottom: calc(-1 * var(--space-lg, 16px)); padding-bottom: calc(var(--space-lg) + var(--space-lg, 16px)); } /* the view's padding is taken back so nothing shows under the bar */
-.servers-view:has(.servers-page) .servers-tab { min-height: 100%; display: flex; flex-direction: column; }
-.servers-view:has(.servers-page) .servers-tab-body { flex: 1 1 auto; display: flex; flex-direction: column; }
+.servers-view.servers-view-page .servers-tab { min-height: 100%; display: flex; flex-direction: column; }
+.servers-view.servers-view-page .servers-tab-body { flex: 1 1 auto; display: flex; flex-direction: column; }
 @media (pointer: coarse), (max-width: 767px) { .servers-table .group-table-link { min-width: var(--control-touch-height, 44px); } } /* a short name is still a 44 px target */

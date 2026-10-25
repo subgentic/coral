@@ -71,6 +71,7 @@ export function hideServersModal() {
     clearInterval(_timer); _timer = null;
     _editing = null; _open = null;
     const title = document.getElementById('servers-tab-title'); if (title) title.hidden = false;
+    const v = document.getElementById('servers-view'); if (v) v.classList.remove('servers-view-page');
     resetServersBar();
 }
 
@@ -243,6 +244,7 @@ function render() {
             ${body}`;
     const title = document.getElementById('servers-tab-title');
     if (title) title.hidden = !!(_open && page); // a server's page has its back link, "← Servers", for the title
+    const view = document.getElementById('servers-view'); if (view) view.classList.toggle('servers-view-page', !!(_open && page)); // a class, not a :has() rule: the view fills its height when a page is open
     restoreFocus();
     if (keep) {
         const r = document.getElementById(keep.row);
