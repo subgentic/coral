@@ -7,7 +7,7 @@ const { install: installTP, seed, openTeam, goTab, scenarios } = require('./help
 const BASE = require('./test_base').BASE;
 const { removeBoards } = require('./helpers/board_cleanup');
 
-const VIEWS = [['1280x800 at 200% text', 1280, 800, false, 32], ['390x844', 390, 844, true, 16], ['390x844 at 200% text', 390, 844, true, 32]];
+const VIEWS = [['1280x800', 1280, 800, false, 16], ['1280x800 at 200% text', 1280, 800, false, 32], ['390x844', 390, 844, true, 16], ['390x844 at 200% text', 390, 844, true, 32]];
 const TEAM = `qa-layout-${Date.now() % 100000}`;
 // words wider than the room they are in: a word the line broke in the middle (canvas-measured with the element's own font)
 const BROKEN = (sel) => `(() => { const c = document.createElement('canvas').getContext('2d'); const vis = e => e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden';
@@ -58,11 +58,15 @@ const BROKEN = (sel) => `(() => { const c = document.createElement('canvas').get
             await S.run(`${label}: Knowledge: no word of the table or its count line is broken`, async () => {
                 await goTab(ev, settle, 'Knowledge'); await settle(900);
                 const broken = await ev(BROKEN('#team-panel-knowledge td, #team-panel-knowledge th, #team-panel-knowledge .team-count-line, #team-panel-knowledge .team-row-btn')); assert.deepEqual(broken, [], 'no word is broken: ' + JSON.stringify(broken));
+                const sc = await ev(`(() => { const page = document.querySelector('#team-panel-knowledge .goals-table-page'), box = document.querySelector('#team-panel-knowledge .team-table-scroll'); const cs = getComputedStyle(page); return { pageScrolls: /auto|scroll/.test(cs.overflowX) || page.scrollWidth > page.clientWidth + 1, box: !!box && /auto|scroll/.test(getComputedStyle(box).overflowX) }; })()`);
+                assert.equal(sc.pageScrolls, false, 'the tab page is not the scroller: the count line and Distill knowledge stay put'); assert.equal(sc.box, true, 'the table scrolls in a box of its own');
             });
             await S.run(`${label}: the pane is a sheet over the page: the sidebar keeps its width or is out of the way, no rail of letters`, async () => {
                 await ev(`(() => { const b = [...window.__tp.table().querySelectorAll('button')].find(x => /Backend Dev/.test(window.__na.name(x))); b.click(); return true; })()`); await settle(600);
                 const r = await ev(`(() => { const p = window.__tp.pane(); const b = p.getBoundingClientRect(); const side = document.querySelector('.layout > .sidebar'); const s = side && getComputedStyle(side).display !== 'none' ? side.getBoundingClientRect().width : 0; return { pane: { w: Math.round(b.width), left: Math.round(b.left) }, sidebar: Math.round(s), collapsed: !!document.querySelector('.layout.sidebar-collapsed'), vw: innerWidth }; })()`);
-                assert.equal(r.collapsed, false, `the sidebar is not squeezed to a rail (${JSON.stringify(r)})`);
+                if (font > 16 || mobile) assert.equal(r.collapsed, false, `the sidebar is not squeezed to a rail (${JSON.stringify(r)})`); // at 100% on a desktop the pane sits beside a 56 px rail, by design
+                const under = await ev(`(() => { const p = window.__tp.pane().getBoundingClientRect(), t = document.querySelector('#team-panel-knowledge .team-table-scroll').getBoundingClientRect(); return t.right > p.left + 1 && p.left > 1 && p.width < innerWidth - 2; })()`);
+                assert.equal(under, false, 'the table does not run under the pane');
                 if (font > 16 || mobile) assert.ok(r.pane.w >= r.vw - 2 && r.pane.left <= 1, `the pane is a sheet over the whole window (${JSON.stringify(r)})`);
             });
             await S.run(`${label}: the Discard bar: the question on its own line, Keep editing plain and focused, Discard in the danger style`, async () => {
@@ -71,9 +75,9 @@ const BROKEN = (sel) => `(() => { const c = document.createElement('canvas').get
                 await ev(`${btnIn('/^Edit$/')}.click(); true`); await settle(300);
                 await ev(`(() => { const t = ${pane}.querySelector('textarea'); t.value = 'Changed notes.'; t.dispatchEvent(new Event('input', { bubbles: true })); t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); return true; })()`); await settle(300);
                 const r = await ev(`(() => { const f = ${pane}.querySelector('.detail-foot'); const q = f.querySelector('.detail-status'); const keep = ${btnIn('/^Keep editing$/')}, drop = ${btnIn('/^Discard$/')}; const fb = f.getBoundingClientRect(), qb = q.getBoundingClientRect(); const lines = Math.round(qb.height / parseFloat(getComputedStyle(q).lineHeight === 'normal' ? parseFloat(getComputedStyle(q).fontSize) * 1.3 : getComputedStyle(q).lineHeight));
-                    return { text: q.textContent, lines, ownLine: qb.width >= fb.width * 0.8, below: Math.min(keep.getBoundingClientRect().top, drop.getBoundingClientRect().top) >= qb.bottom - 1, focusKeep: document.activeElement === keep, danger: drop.classList.contains('btn-danger-text'), keepPrimary: keep.classList.contains('btn-primary'), dropPrimary: drop.classList.contains('btn-primary') }; })()`);
+                    return { text: q.textContent, lines, ownLine: qb.width >= fb.width * 0.8, below: Math.min(keep.getBoundingClientRect().top, drop.getBoundingClientRect().top) >= qb.bottom - 1, focusKeep: document.activeElement === keep, danger: drop.classList.contains('btn-danger'), keepPrimary: keep.classList.contains('btn-primary'), dropPrimary: drop.classList.contains('btn-primary') }; })()`);
                 assert.equal(r.text, 'Discard your changes?'); assert.ok(r.ownLine, `the question has the bar's width (${JSON.stringify(r)})`); assert.ok(r.lines <= 2, `the question is one or two lines (${r.lines})`); assert.ok(r.below, 'the buttons are under it');
-                assert.equal(r.focusKeep, true, 'Keep editing has the focus'); assert.equal(r.keepPrimary || r.dropPrimary, false, 'neither is the blue primary'); assert.equal(r.danger, true, 'Discard is the danger style');
+                assert.equal(r.focusKeep, true, 'Keep editing has the focus'); assert.equal(r.keepPrimary || r.dropPrimary, false, 'neither is the blue primary'); assert.equal(r.danger, true, 'Discard is the danger button (error text with an error edge)');
             });
         }
         await removeBoards(ev, [TEAM]); S.finish(); // finish() exits the process, so the board goes first

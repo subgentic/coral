@@ -44,7 +44,7 @@
 #team-panel-messages > .mb-board { flex: 1; min-height: 0; }
 
 /* the tables of the tabs and the pages that hold them (the goals engine's classes, now a table and a page) */
-.goals-table-page { overflow-x: auto; padding: 16px 24px 0; max-width: 1100px; width: 100%; box-sizing: border-box; flex: 1; display: flex; flex-direction: column; gap: 12px; min-height: 100%; }
+.goals-table-page { padding: 16px 24px 0; max-width: 1100px; width: 100%; box-sizing: border-box; flex: 1; display: flex; flex-direction: column; gap: 12px; min-height: 100%; }
 .goals-body, .team-tasks-body, .team-artifacts-body { display: flex; flex-direction: column; gap: 12px; flex: 1; min-height: 0; }
 .goals-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .goals-table-page .goals-chips-row { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; min-width: 0; flex: 1; gap: 6px; } /* one line that scrolls sideways, its scrollbar hidden: the Goals and Tasks chips are alike */
@@ -100,6 +100,7 @@
 .detail-foot { flex: none; display: flex; gap: 8px; flex-wrap: wrap; padding: 12px 18px; border-top: 1px solid var(--border); }
 .detail-foot .btn { min-height: 36px; }
 .detail-foot .btn-danger { color: var(--error-text); border-color: var(--error); background: transparent; margin-left: auto; } /* one danger button: error-colour text with a 1 px error-colour edge, no fill, the size of the other buttons (UI/UX) */
+.team-table-scroll { overflow-x: auto; max-width: 100%; }
 .detail-foot a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 #team-panel-messages { padding: 0 16px; }
 .team-row-phone { display: none; font-size: 0.75rem; color: var(--text-secondary); }

@@ -38,7 +38,8 @@ export function teamTable({ label, columns, rows, className = '' }) {
         body.append(tr);
     }
     table.append(body);
-    return table;
+    const box = el('div', 'team-table-scroll'); box.append(table); // a table wider than the page scrolls in its own box, the lines above it stay put
+    return box;
 }
 
 /** The row of a table that holds `key`, and its button: where the focus goes back to when a page or the pane closes. */

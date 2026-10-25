@@ -402,7 +402,7 @@ function drawGoalPageRaw(col) {
         const live = tasks.rows.filter(t => W.taskStateWord(t.state) !== 'Done'), idle = live.filter(t => !agentFor(t));
         if (idle.length) col.append(el('p', 'goals-note goals-nobody', W.nobodyWorkingText(idle.length, live.length)));
         const tbl = teamTable({ label: `Tasks of ${g.title}`, columns: ['Task', 'State', 'Assigned to', 'Priority'], rows: taskTableRows(g, tasks) });
-        if (!agrees) tbl.setAttribute('aria-busy', 'true');
+        if (!agrees) tbl.querySelector('table').setAttribute('aria-busy', 'true');
         col.append(tbl);
         const left = Math.max(tasks.rows.length - tasks.shown, 0) || (tasks.cursor ? Math.max(taskTotal(g, tasks) - tasks.shown, 1) : 0);
         if (left) col.append(btn('btn goals-more', W.showMoreText(left, PAGE), () => showMoreTasks(g.id)));

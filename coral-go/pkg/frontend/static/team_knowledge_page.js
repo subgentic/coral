@@ -51,7 +51,7 @@ function openEntry(entry, opener) {
         const dirty = () => box.value !== (entry.text || '');
         const toEdit = () => { foot()?.replaceChildren(status, cancel, save); };
         const askDiscard = () => {
-            const keep = btn('btn', 'Keep editing', () => { toEdit(); box.focus(); }), drop = btn('btn btn-danger-text', 'Discard', () => { say(''); toView(); }); // Keep editing is the plain button and has the focus; Discard is the danger style, never the blue primary
+            const keep = btn('btn', 'Keep editing', () => { toEdit(); box.focus(); }), drop = btn('btn btn-danger', 'Discard', () => { say(''); toView(); }); // Keep editing is the plain button and has the focus; Discard is the danger style, never the blue primary
             const q = el('span', 'detail-status detail-ask', 'Discard your changes?'); q.setAttribute('role', 'alert');
             foot()?.replaceChildren(q, keep, drop); keep.focus();
         };
