@@ -17,6 +17,14 @@ const BASE = require('./test_base').BASE;
     const options = () => ev(`(() => { const s = window.__na.find('select', ${N.persona}); return s ? [...s.options].map(o => o.textContent.trim()) : null; })()`);
     const key = async (k, vk, text) => { for (const type of ['keyDown', 'keyUp']) await Input.dispatchKeyEvent({ type, key: k, code: k === ' ' ? 'Space' : k, windowsVirtualKeyCode: vk, ...(type === 'keyDown' && text ? { text } : {}) }); await settle(150); };
     const NAME = 'QA Persona ' + Date.now();
+    // The persona this suite saves is a setting (saved_personas): put the settings back as found, and check that this one is (the runner's --fail-on-leak named it on the 168 Windows run, #7527).
+    const { guardSettings } = require('./helpers/settings_guard');
+    const guard = await guardSettings();
+    const restoreAndCheck = async () => {
+        await guard.restore();
+        const now = await guardSettings();
+        assert.equal(now.before.saved_personas || '', guard.before.saved_personas || '', 'saved_personas is back to what it was');
+    };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
@@ -69,6 +77,6 @@ const BASE = require('./test_base').BASE;
             assert.ok(!(await ev(`!!window.__na.find('button', /^Export$/i)`)), 'Space on the summary closes it again (a details element)');
             assert.ok(await ev(`!!window.__na.dialog()`), 'the dialog is still open');
         });
-        S.finish();
-    } finally { await client.close(); }
+        await restoreAndCheck(); S.finish(); // finish() exits the process, so the setting goes back first
+    } finally { await restoreAndCheck().catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
