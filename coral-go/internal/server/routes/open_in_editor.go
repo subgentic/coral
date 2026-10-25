@@ -51,7 +51,7 @@ func (h *SessionsHandler) OpenInEditor(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, "filepath and editor are required")
 		return
 	}
-	f, err := h.resolveFileRef(r.Context(), chi.URLParam(r, "name"), body.SessionID, ref, strictBounds(r))
+	f, err := h.resolveFileRef(agentCtx(r), chi.URLParam(r, "name"), body.SessionID, ref, strictBounds(r))
 	if err != nil {
 		writeResolveErr(w, err)
 		return

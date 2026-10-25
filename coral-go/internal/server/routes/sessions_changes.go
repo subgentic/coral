@@ -30,13 +30,16 @@ func (h *SessionsHandler) Diff(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")
 	fp := r.URL.Query().Get("filepath")
 	sessionID := r.URL.Query().Get("session_id")
+	if !h.requireAgentSession(w, r, name, sessionID) {
+		return
+	}
 
 	if fp == "" || strings.HasPrefix(fp, "-") || strings.ContainsAny(fp, "\x00") {
 		errBadRequest(w, "invalid filepath")
 		return
 	}
 
-	workdir := h.resolveGitRoot(r.Context(), name, "", sessionID)
+	workdir := h.resolveGitRoot(agentCtx(r), name, "", sessionID)
 	if workdir == "" {
 		errBadRequest(w, "Could not determine working directory")
 		return
@@ -119,7 +122,10 @@ func (h *SessionsHandler) Diff(w http.ResponseWriter, r *http.Request) {
 func (h *SessionsHandler) ChangesDiff(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")
 	sessionID := r.URL.Query().Get("session_id")
-	workdir := h.resolveGitRoot(r.Context(), name, "", sessionID)
+	if !h.requireAgentSession(w, r, name, sessionID) {
+		return
+	}
+	workdir := h.resolveGitRoot(agentCtx(r), name, "", sessionID)
 	if workdir == "" {
 		errBadRequest(w, "Could not determine working directory")
 		return
