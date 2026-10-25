@@ -1,6 +1,6 @@
 /* Held messages the person should know about (#6473, the dashboard side of #6466): Coral holds an agent's automated input (board nudges, reminders) while a prompt or menu is open or the CLI's input box
  * is not on screen (held_inputs on the live row, #3578). A few seconds is the gate doing its job; past a minute Coral cannot see the input box and the messages are not getting through, so the row and the
- * agent view say so, with the terminal one click away. Nothing is delivered from here: there is no deliver-now button. The row has the count and no time, so the minute is counted from when this page first saw
+ * agent view say so, with the terminal one click away. The agent view also has Send now (held_send_now.js, #7554), the Operator's way to deliver them at once. The row has the count and no time, so the minute is counted from when this page first saw
  * the agent holding (a `held_since` on the row, when the server sends one, is the start instead). */
 export const HELD_AFTER_MS = 60 * 1000;
 const firstHeld = new Map(); // session_id -> ms when this page first saw it holding
@@ -46,4 +46,12 @@ export function syncHeldNotice(row) {
     if (t && t.textContent !== (note ? note.text : '')) t.textContent = note ? note.text : '';
     const b = el.querySelector('button');
     if (b && b.hidden === !!note) b.hidden = !note;
+    // Send now, and the line that says what it does; "Send all now" when more than one is held (#7554).
+    const send = document.getElementById('composer-held-send'), hint = document.getElementById('composer-held-hint');
+    if (send) {
+        if (send.hidden === !!note) send.hidden = !note;
+        const label = note && note.n > 1 ? 'Send all now' : 'Send now';
+        if (send.textContent !== label) send.textContent = label;
+    }
+    if (hint && hint.hidden === !!note) hint.hidden = !note;
 }
