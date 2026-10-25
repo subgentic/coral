@@ -346,11 +346,15 @@ func TestGoalRequestFromARealAgentSessionToAnotherBoard(t *testing.T) {
 	assert.Equal(t, http.StatusCreated, code, out)
 
 	// A session cannot ask as another team's Orchestrator: gamma's "Orchestrator A" names alpha as its board
-	code, _ = do(tokG, "beta", good)
+	code, out = do(tokG, "beta", good)
 	assert.Equal(t, http.StatusForbidden, code, "the session is not the Orchestrator of the board it names")
+	assert.Contains(t, out, "job title must be the word Orchestrator", "a refused send says the job title is the literal word")
+	assert.Contains(t, out, "own session")
 	// a worker's session is refused, and so is a request the guard still reads as impersonation (the Operator's name)
-	code, _ = do(tokDev, "beta", `{"from_board":"alpha","subscriber_id":"Dev A","goal_id":`+itoa(goal.ID)+`,"ask":"x"}`)
+	code, out = do(tokDev, "beta", `{"from_board":"alpha","subscriber_id":"Dev A","goal_id":`+itoa(goal.ID)+`,"ask":"x"}`)
 	assert.Equal(t, http.StatusForbidden, code)
+	assert.Contains(t, out, "job title must be the word Orchestrator")
+	assert.NotContains(t, out, "create or change goals", "a send has its own sentence, not the goal write's")
 	code, _ = do(tokA, "beta", `{"from_board":"alpha","subscriber_id":"Operator","goal_id":`+itoa(goal.ID)+`,"ask":"x"}`)
 	assert.Equal(t, http.StatusForbidden, code)
 	// the answering routes stay on the board's own members: A's session cannot accept on B
@@ -360,4 +364,25 @@ func TestGoalRequestFromARealAgentSessionToAnotherBoard(t *testing.T) {
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusForbidden, rec.Code, "only the receiving team's own session answers")
+}
+
+// QA's #7372 note B: a refused send says what a send needs, in its own words, and says the job title is the literal word Orchestrator; it is not the goal write's sentence.
+func TestGoalRequestSendRefusalWording(t *testing.T) {
+	call, h, goal := goalRequestEnv(t)
+	_, err := h.bs.Subscribe(context.Background(), "alpha", "Worker", "Developer", "tmux-w", nil, "mentions", false)
+	require.NoError(t, err)
+	code, out := call("POST", "/api/board/beta/goal-requests", map[string]any{"from_board": "alpha", "subscriber_id": "Worker", "goal_id": goal, "ask": "x"})
+	require.Equal(t, 403, code)
+	msg, _ := out["error"].(string)
+	assert.Contains(t, msg, "can send its goal requests")
+	assert.Contains(t, msg, `job title must be the word Orchestrator`)
+	assert.Contains(t, msg, `"alpha"`, "it names the board it sends from")
+	assert.NotContains(t, msg, "create or change goals", "not the sentence of a goal write")
+	// a name that is not a member at all gets the same sentence
+	code, out = call("POST", "/api/board/beta/goal-requests", map[string]any{"from_board": "alpha", "subscriber_id": "Nobody", "goal_id": goal, "ask": "x"})
+	require.Equal(t, 403, code)
+	assert.Contains(t, out["error"], "job title must be the word Orchestrator")
+	// the answering routes keep the goal routes' sentence: accepting or declining is not sending
+	code, out = call("POST", "/api/board/beta/goal-requests/1/decline", map[string]any{"subscriber_id": "Worker"})
+	assert.Equal(t, 403, code)
 }

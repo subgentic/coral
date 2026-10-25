@@ -70,6 +70,42 @@ func goalRequestError(w http.ResponseWriter, err error) bool {
 	return true
 }
 
+// goalRequestSender is who sends a goal request: the name the request claims, as the identity layer verified it, and the Operator or an active registered Orchestrator of the board it sends from. Its refusal is
+// the send's own sentence (the goal routes' "create or change goals" is about writing a goal, and the job title is a literal word a worker does not have).
+func (h *BoardHandler) goalRequestSender(w http.ResponseWriter, r *http.Request, from, claim string) (string, bool) {
+	who, ok := attributedTo(w, r, claim)
+	if !ok {
+		return "", false
+	}
+	actor := strings.TrimSpace(claim)
+	if identityActorEnforced() {
+		actor = who
+	}
+	if actor == "" {
+		errBadRequest(w, "subscriber_id required")
+		return "", false
+	}
+	refuse := func() {
+		errForbidden(w, fmt.Sprintf("only the Operator or an active Orchestrator of %q can send its goal requests: the member's job title must be the word Orchestrator (a Developer or any other title is refused)", from))
+	}
+	switch {
+	case callerActor(r).IsOperator():
+		return actor, true
+	case actor == "Operator":
+		if identityActorEnforced() {
+			refuse()
+			return "", false
+		}
+		noteEnforceDiffers("goal-request-sender", r)
+		return actor, true
+	}
+	if err := h.bs.RequireTaskReviewer(r.Context(), from, actor); err != nil {
+		refuse()
+		return "", false
+	}
+	return actor, true
+}
+
 // PostGoalRequest: POST /api/board/{target}/goal-requests
 // {"from_board": "alpha", "subscriber_id": "Orchestrator", "goal_id": 12, "ask": "what is asked"}
 // The asker is the Operator or an active registered orchestrator of from_board (the goal routes' rule); both boards must have messaging explicitly on (the cross-team admission between two
@@ -99,7 +135,7 @@ func (h *BoardHandler) PostGoalRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := r.Context()
-	actor, ok := h.goalActor(w, r, body.FromBoard, body.SubscriberID)
+	actor, ok := h.goalRequestSender(w, r, body.FromBoard, body.SubscriberID)
 	if !ok {
 		return
 	}
@@ -110,7 +146,7 @@ func (h *BoardHandler) PostGoalRequest(w http.ResponseWriter, r *http.Request) {
 			errInternalServer(w, err.Error())
 			return
 		} else if refusal != senderAllowed {
-			errForbidden(w, fmt.Sprintf("only an active Orchestrator of %q, from its own session, or the Operator can send its goal requests", body.FromBoard))
+			errForbidden(w, fmt.Sprintf("only the Operator or an active Orchestrator of %q can send its goal requests, from that member's own session: the member's job title must be the word Orchestrator, and another team's Orchestrator of the same name does not count", body.FromBoard))
 			return
 		}
 	}
