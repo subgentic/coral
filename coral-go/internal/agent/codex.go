@@ -713,9 +713,9 @@ func appendCodexPermissionMode(parts []string, bypassSandbox bool, mode string) 
 // the mode. Chips that keep approvals (on-request) and the modes that ask do not: the person who chose to be
 // asked is asked.
 func codexCoralSandboxNetwork(parts []string, params LaunchParams) []string {
-	defaultMode := params.Capabilities.IsEmpty() && (params.PermissionMode == "auto" || params.PermissionMode == "dontAsk")
-	boardMember := params.BoardName != ""
-	if !defaultMode && !boardMember {
+	// The pair is what decides, not how it was asked for: Auto sent as the mode and Auto sent as the flags the dashboard turns it into (--sandbox workspace-write -a never, no mode) are the same launch, and
+	// the second one used to start a Codex that could not reach Coral (#7483, Codex Test's #7485). Chips are left alone unless the agent is on a board (see above).
+	if !params.Capabilities.IsEmpty() && params.BoardName == "" {
 		return parts
 	}
 	sandbox, approval := "", ""

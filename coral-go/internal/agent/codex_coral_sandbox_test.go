@@ -101,3 +101,39 @@ func TestCodexBoardMemberWithShellChipsReachesCoral(t *testing.T) {
 	// the launch carries no write access to Coral's folder either way
 	assert.NotContains(t, launch(LaunchParams{PermissionMode: "auto", Capabilities: shell, BoardName: "coral-go-team"}), "writable_roots")
 }
+
+// #7483 / Codex Test's #7485: Auto sent as the FLAGS the dashboard turns it into (no permission mode) is the same launch as Auto sent as the mode: it gets Coral's network too. The old dialog and the new
+// team dialog send flags, and those launches started a Codex whose coral-board could not connect.
+func TestCodexAutoSentAsFlagsReachesCoralLikeTheMode(t *testing.T) {
+	const net = "sandbox_workspace_write.network_access=true"
+	launch := func(p LaunchParams) string {
+		t.Helper()
+		p.CLIPath = "codex"
+		cmd, err := (&CodexAgent{}).LaunchCommand(p)
+		require.NoError(t, err)
+		return cmd
+	}
+	for name, flags := range map[string][]string{
+		"long flags":   {"--sandbox", "workspace-write", "-a", "never"},
+		"equals forms": {"--sandbox=workspace-write", "--ask-for-approval=never"},
+		"short flags":  {"-s", "workspace-write", "-a", "never"},
+	} {
+		assert.Contains(t, launch(LaunchParams{Flags: flags}), net, name+": no mode, the pair is Auto")
+		assert.Contains(t, launch(LaunchParams{PermissionMode: "default", Flags: flags}), net, name+": mode default, the pair is Auto")
+	}
+	// the other pairs and the other modes keep their own policy
+	for name, flags := range map[string][]string{
+		"on-request":    {"--sandbox", "workspace-write", "-a", "on-request"},
+		"read-only":     {"--sandbox", "read-only", "-a", "never"},
+		"untrusted":     {"--sandbox", "workspace-write", "-a", "untrusted"},
+		"bypass":        {"--dangerously-bypass-approvals-and-sandbox"},
+		"nothing typed": nil,
+	} {
+		assert.NotContains(t, launch(LaunchParams{Flags: flags}), net, name)
+	}
+	// a person's own network setting still wins
+	cmd := launch(LaunchParams{Flags: []string{"--sandbox", "workspace-write", "-a", "never", "-c", "sandbox_workspace_write.network_access=false"}})
+	assert.Less(t, strings.Index(cmd, "network_access=true"), strings.Index(cmd, "network_access=false"), cmd)
+	// chips on no board keep their own policy
+	assert.NotContains(t, launch(LaunchParams{Capabilities: &Capabilities{Allow: []string{CapShell}}, Flags: []string{"--sandbox", "workspace-write", "-a", "never"}}), net)
+}
