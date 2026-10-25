@@ -247,7 +247,7 @@ PANELS.push({
         await pick(ctx, '#ev-type', 'prompt');
         await ctx.settle(`!!document.querySelector('#event-search-bar .list-bar-chip')`, 'a chip');
         await ctx.ev(`new Promise(r => setTimeout(r, 400))`);
-        return { roots: ['#event-search-bar', '#agentic-state-events'], focus: ['#ev-search', '#event-search-bar .list-bar-filter-btn'] };
+        return { roots: ['#event-search-bar', '#agentic-state-events'], focus: ['#ev-search', '#event-search-bar .list-bar-toggle'] };
     },
 });
 PANELS.push({
@@ -261,7 +261,7 @@ PANELS.push({
         await pick(ctx, '#hev-type', 'prompt');
         await ctx.settle(`!!document.querySelector('#history-event-search-bar .list-bar-chip')`, 'a chip');
         await ctx.ev(`new Promise(r => setTimeout(r, 400))`);
-        return { roots: ['#history-session-view'], focus: ['#hev-search', '#history-event-search-bar .list-bar-filter-btn'] };
+        return { roots: ['#history-session-view'], focus: ['#hev-search', '#history-event-search-bar .list-bar-toggle'] };
     },
 });
 
