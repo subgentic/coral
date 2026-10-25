@@ -10,6 +10,14 @@ import (
 // the counter it last saw (coralFeed.goalEventsFor), at most goalEventsPerFrame, and goal_events_gap when it cannot be told everything: the page then refetches, as it did before events existed.
 
 // ownBoardGoalEvents is the events of the agent's own board: an agent sees no other board's, and an agent with no board sees none (the shared tick is not changed).
+// ownBoardGoalScope is the boards an agent's socket is told goal events and gaps for: its own, or none.
+func ownBoardGoalScope(boardID string) map[string]bool {
+	if boardID == "" {
+		return map[string]bool{}
+	}
+	return map[string]bool{boardID: true}
+}
+
 func ownBoardGoalEvents(all map[string][]board.GoalEvent, boardID string) map[string][]board.GoalEvent {
 	if boardID == "" {
 		return nil
@@ -31,8 +39,15 @@ func (f *coralFeed) goalEventsFor(tick *wsTick) (events []board.GoalEvent, gap b
 	}
 	sort.Strings(boards)
 	for _, id := range boards {
+		if tick.goalScope != nil && !tick.goalScope[id] {
+			continue // an agent's socket: a board it cannot see moving its counter is not a gap in what it can see
+		}
 		last, now := f.prevGoalSeqs[id], tick.goals[id].Seq
-		if now <= last {
+		if now == last {
+			continue
+		}
+		if now < last { // a counter that fell: the board was deleted and made again, so nothing above the old counter means anything: a gap, and the connection reads on from the new counter
+			gap = true
 			continue
 		}
 		var mine []board.GoalEvent

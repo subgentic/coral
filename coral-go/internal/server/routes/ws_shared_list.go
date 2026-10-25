@@ -62,6 +62,8 @@ type wsTick struct {
 	goalsSeq  int64
 	// The newest goalEventsWindow goal events of each board that has goals (#7355): ids, a kind and the counter value, no text. Each connection takes the ones above the counter it last saw.
 	goalEvents map[string][]board.GoalEvent
+	// goalScope, when set, is the only boards a connection is told goal events and gaps for (an agent's socket: its own board); nil is every board.
+	goalScope map[string]bool
 }
 
 // goalEventsWindow is how many goal events of a board a tick carries: one more than a frame may send (goalEventsPerFrame), so a window that is full says there were more than a frame can hold.

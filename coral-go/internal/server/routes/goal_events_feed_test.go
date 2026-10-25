@@ -106,6 +106,19 @@ func TestFeedNamesTheGoalEventsSinceTheCounterTheConnectionSaw(t *testing.T) {
 	assert.Equal(t, true, msg["goal_events_gap"])
 	assert.NotContains(t, msg, "goal_events")
 
+	// A counter that goes DOWN (a board deleted and made again while the connection is open: it starts at 1): a gap, never silence; the same counter is no change (Security's MUST on #7355).
+	d := newFeed()
+	send(d, eventsTick(map[string]board.GoalsBrief{"team-a": {Open: 1, Seq: 10}}, nil))
+	msg = send(d, eventsTick(map[string]board.GoalsBrief{"team-a": {Open: 1, Seq: 1}}, map[string][]board.GoalEvent{"team-a": evRun("team-a", 3, "goal_created", 1, 1)}))
+	require.NotNil(t, msg, "the brief changed")
+	assert.Equal(t, true, msg["goal_events_gap"], "a counter that fell is a gap")
+	assert.Empty(t, events(msg), "the events of the new board are not above the old counter")
+	msg = send(d, eventsTick(map[string]board.GoalsBrief{"team-a": {Open: 1, Seq: 1}}, map[string][]board.GoalEvent{"team-a": evRun("team-a", 3, "goal_created", 1, 1)}))
+	assert.Nil(t, msg, "the same counter again is no change and no gap")
+	msg = send(d, eventsTick(map[string]board.GoalsBrief{"team-a": {Open: 1, Seq: 2}}, map[string][]board.GoalEvent{"team-a": evRun("team-a", 3, "goal_created", 1, 2)}))
+	assert.Equal(t, []int64{2}, []int64{events(msg)[0].Seq}, "after the gap the connection reads on from the new counter")
+	assert.NotContains(t, msg, "goal_events_gap")
+
 	// One counter step with two events (a task moved from one goal to another): both are sent, no gap.
 	k := newFeed()
 	send(k, eventsTick(map[string]board.GoalsBrief{"team-a": {Open: 1, Seq: 10}}, nil))
@@ -127,6 +140,38 @@ func TestAgentSocketGetsOnlyItsOwnBoardsGoalEvents(t *testing.T) {
 	assert.Len(t, tick.goalEvents, 2, "the shared tick is not changed")
 	unknown := scopeTickForAgent(tick, "no-such-session")
 	assert.Empty(t, unknown.goalEvents)
+}
+
+// An agent's socket is told "gap" only for its own board: another board moving its counter is not a gap in what the agent can see (Security's LOW on #7355).
+func TestAgentSocketIsToldAGapOnlyForItsOwnBoard(t *testing.T) {
+	now := time.Date(2026, 10, 24, 12, 0, 0, 0, time.UTC)
+	rows := []map[string]any{{"session_id": "sess-a", "board_project": "team-a", "name": "A"}}
+	mk := func(a, b int64, events map[string][]board.GoalEvent) *wsTick {
+		tick := eventsTick(map[string]board.GoalsBrief{"team-a": {Seq: a}, "team-b": {Seq: b}}, events)
+		tick.sessions = rows
+		return scopeTickForAgent(tick, "sess-a")
+	}
+	f := &coralFeed{prevSessions: map[string]string{}, prevByKey: map[string]map[string]any{}, prevRunsJSON: "[]", prevServersJSON: "null", firstMessage: true}
+	send := func(tick *wsTick) map[string]any {
+		msg, kind := f.frame(tick, nil, nil, nil, now, 15*time.Second)
+		if msg != nil {
+			f.sent(kind, tick, nil, nil, now)
+		}
+		return msg
+	}
+	send(mk(5, 5, nil))
+	msg := send(mk(5, 6, map[string][]board.GoalEvent{"team-b": evRun("team-b", 2, "goal_updated", 6, 6)}))
+	require.NotNil(t, msg, "the brief it gets still moves")
+	assert.NotContains(t, msg, "goal_events_gap", "another board moved: no gap for this agent")
+	assert.NotContains(t, msg, "goal_events")
+	msg = send(mk(6, 6, map[string][]board.GoalEvent{"team-a": evRun("team-a", 1, "goal_updated", 6, 6), "team-b": evRun("team-b", 2, "goal_updated", 6, 6)}))
+	require.NotNil(t, msg)
+	assert.Equal(t, []board.GoalEvent{{Board: "team-a", Goal: 1, Kind: "goal_updated", Seq: 6}}, func() []board.GoalEvent {
+		b, _ := json.Marshal(msg["goal_events"])
+		var o []board.GoalEvent
+		_ = json.Unmarshal(b, &o)
+		return o
+	}(), "its own board's event, not the other's")
 }
 
 // The shared tick is built from the store: the newest 51 events of the boards that have goals, and nothing for a board that has none.
