@@ -146,7 +146,9 @@ export async function showTeamTokenUsage(boardName) {
 }
 
 export async function distillTeamKnowledge(boardName) {
-    if (window.openTeamPage) await window.openTeamPage(boardName, { tab: 'knowledge' });
+    const oldContext = document.getElementById('team-center-view') && !document.getElementById('team-center-view').hidden; // the dock's team tabs (until #7457) keep their own Knowledge tab
+    if (oldContext && window.enterTeamContext) await window.enterTeamContext(boardName, { tab: 'knowledge' });
+    else if (window.openTeamPage) await window.openTeamPage(boardName, { tab: 'knowledge' });
     const { distillKnowledgeInTab } = await importOnce('./team_artifacts.js');
     distillKnowledgeInTab(boardName);
 }

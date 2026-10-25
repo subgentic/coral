@@ -25,7 +25,7 @@ import { LOCAL_SERVER } from './server_base.js';
 import { machineState } from './launch_server.js';
 import { syncHubFirstRun, hubEmptyListHtml } from './hub_first_run.js';
 import './format.js';
-import { registerLiveListRenderer, redrawLiveList, liveListEl } from './list_hooks.js';
+import { registerLiveListRenderer, registerLastRedraw, redrawLiveList, liveListEl } from './list_hooks.js';
 import { _boardChatSelectAll, _boardChatSelectNone, _boardMentionInput, _boardMentionKey, _cancelBoardChatSelect, _exportBoardChatSelected, _insertBoardMention, _toggleBoardChatMsgSelect, _toggleBoardChatPause } from './board_chat.js';
 import { buildSessionTooltip } from './session_state.js';
 import './board_accents.js';
@@ -142,7 +142,9 @@ export function agentSearchKey(e) {
 
 /** Render the agent list now (user actions, which may read the DOM right after).
  *  A pending scheduled render is dropped: this one shows the latest list. */
+let _lastSessions = [];
 export function renderLiveSessions(sessions) {
+    _lastSessions = sessions;
     if (_scheduledRender) { cancelAnimationFrame(_scheduledRender); _scheduledRender = 0; }
     followServerOrder(sessions); // a replaced agent's place was moved to its new id on the server (#4943)
     noteBoardLabels(sessions); // board_label beside board_project (#3536): what keyLabel shows
@@ -173,6 +175,7 @@ export function flushLiveSessionsRender() {
 }
 
 registerLiveListRenderer(renderLiveSessions); // the hook other modules redraw through (list_hooks.js)
+registerLastRedraw(() => renderLiveSessions(_lastSessions));
 
 /** The session a list row shows (by id and server, by name when the row has no id). */
 function _rowSession(item) {

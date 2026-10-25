@@ -19,7 +19,7 @@ const { connect } = require('./agent_view_harness');
                 for (let a = 1; a <= 2; a++) window.__m.add('ta' + a, 'A', 1, { sleeping: false, session_id: 'sid-' + a, board_project: 'team-one' });
                 window.__LIVE = Object.values(window.__m.agents).map(x => window.__m.entry(x)); T.state.liveSessions = window.__LIVE; T.render.renderLiveSessions(window.__LIVE);
                 if (${dev === 'phone'}) window.syncMobileAgentList && window.syncMobileAgentList();
-                window.__entered = []; window.enterTeamContext = (b) => { window.__entered.push(b); return true; }; return true; })()`);
+                window.__entered = []; window.openTeamPage = (b) => { window.__entered.push(b); return true; }; return true; })()`);
             const head = `document.querySelector(${JSON.stringify(root)} + ' .session-group-header[data-group="team-one"]')`;
             const chev = `${head}.querySelector('.group-chevron')`;
             const b = await ev(`(() => { const c = ${chev}, r = c.getBoundingClientRect(); return { tag: c.tagName, expanded: c.getAttribute('aria-expanded'), label: c.getAttribute('aria-label'), w: Math.round(r.width), h: Math.round(r.height), headerExpanded: ${head}.getAttribute('aria-expanded'), headerLabel: ${head}.getAttribute('aria-label') }; })()`);

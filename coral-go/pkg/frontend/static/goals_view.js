@@ -318,6 +318,7 @@ function drawTableRaw(col) {
     bar.append(chips, btn('btn btn-primary goals-new', 'New goal', () => openCreate()));
     col.append(bar);
     if (model.requireGoal) col.append(Object.assign(el('p', 'goals-note goals-require'), { textContent: W.requireGoalNote }));
+    if (state.hubConnected || window.__goalsHub) col.append(el('p', 'goals-note', W.otherBoardsNote));
     if (model.noGoalOpen > 0) col.append(el('p', 'goals-note goals-no-goal', W.noGoalTasksText(model.noGoalOpen)));
     if (model.failed) {
         const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert');
