@@ -30,6 +30,7 @@ export const ALLOW = new Map([
     ['_resetForTests', 'artifact_readers.js remembers once per page whether this person may see who can read an artifact; the suite forgets it between its cases'],
     ['_setHubForTests', 'update_settings.js and team_cross_team_settings.js load lazily, so test_hooks.js cannot import them; update_channel_browser and team_messaging_tab_browser import the module by URL to draw the Hub view of the pane or tab'],
     ['_resetHubNavForTests', 'hub_nav.js loads lazily, so test_hooks.js cannot import it; its suite imports the module by URL'],
+    ['enterTeamContext', 'the old team context (the right dock\'s team tabs) stays until the dock is removed (#7457); the team page is opened by openTeamPage, and the suites of the old tabs drive this one by name'],
     ['savedLinkUrl', 'saved_link.js loads lazily, so test_hooks.js cannot import it; its suite imports the module by URL'],
 ]);
 

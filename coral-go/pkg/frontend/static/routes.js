@@ -7,7 +7,7 @@
      /agents/[@<server>/]<session>[/<sub>]?view=terminal  the same, plus terminal: true (the link opens the agent on its terminal; coral-hub, #6752)
      /chats[/@<server>][?filters]         { view: 'chats', query }
      /chats/[@<server>/]<id>              { view: 'chats', id }
-     /team/[@<server>/]<team>[/settings]  { view: 'team', server, id, sub }
+     /team/[@<server>/]<team>[/<tab>[/<n>]]  { view: 'team', server, id, sub, item }: the team page (#7453); <tab> is one of TEAM_TABS (none = Goals), <n> a goal or a task
      /board/[@<server>/]<name>            { view: 'board', server, id }
      /workflows[/<id>[/runs/<run>]]       { view: 'workflows', id, run }
      /jobs, /analytics, /docs[/<name>], /servers[/<id>]
@@ -25,6 +25,9 @@
 // An agent doc's name: its file name without .md (README, coral-board, ...).
  const DOC_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
  const INT_RE = /^[1-9][0-9]{0,15}$/;
+// The team page's tabs, in order (#7453). /team/<name> with no tab is the first.
+export const TEAM_TABS = ['goals', 'messages', 'tasks', 'agents', 'artifacts', 'knowledge', 'settings'];
+const TEAM_ITEM_TABS = ['goals', 'tasks']; // the tabs with an item page: /team/<name>/goals/<id>, /team/<name>/tasks/<id>
 // An agent's own tabs (live_session.html #agentic-tab-<id>); the team-scoped ones belong to /team.
 export const AGENT_SUBTABS = ['board', 'tasks', 'notes', 'files', 'browse', 'artifacts', 'activity', 'agent-ui'];
 const NAME_MAX = 200; // board.MaxIdentityRunes
@@ -99,7 +102,9 @@ export function parse(pathname, search = '') {
             if (n === null) return null;
             if (top === 'board') return rest.length === 1 ? { view: 'board', server: t.server, id: n } : null;
             if (rest.length === 1) return { view: 'team', server: t.server, id: n, sub: null };
-            return rest.length === 2 && rest[1] === 'settings' ? { view: 'team', server: t.server, id: n, sub: 'settings' } : null;
+            if (!TEAM_TABS.includes(rest[1])) return null;
+            if (rest.length === 2) return { view: 'team', server: t.server, id: n, sub: rest[1] };
+            return rest.length === 3 && TEAM_ITEM_TABS.includes(rest[1]) && INT_RE.test(rest[2]) ? { view: 'team', server: t.server, id: n, sub: rest[1], item: Number(rest[2]) } : null;
         }
         case 'workflows': {
             if (!rest.length) return { view: 'workflows' };
@@ -155,7 +160,7 @@ export function build(r) {
         case 'chats':
             return r.id ? `/chats/${srvSeg(r.server)}${seg(r.id)}` : `/chats${r.server ? '/' + srvSeg(r.server).replace(/\/$/, '') : ''}${r.query ? '?' + r.query : ''}`;
         case 'team':
-            return `/team/${srvSeg(r.server)}${seg(r.id)}${r.sub === 'settings' ? '/settings' : ''}`;
+            return `/team/${srvSeg(r.server)}${seg(r.id)}${TEAM_TABS.includes(r.sub) ? '/' + r.sub + (r.item && TEAM_ITEM_TABS.includes(r.sub) ? '/' + r.item : '') : ''}`;
         case 'board':
             return `/board/${srvSeg(r.server)}${seg(r.id)}`;
         case 'workflows':
@@ -182,7 +187,7 @@ export function fromLegacyHash(hash) {
         const key = decode(team[2]);
         if (key === null) return null;
         const m = /^@([^/]+)\/(.+)$/.exec(key);
-        return { view: 'team', server: m ? m[1] : null, id: m ? m[2] : key, sub: team[1] === 'settings' ? 'settings' : null };
+        return { view: 'team', server: m ? m[1] : null, id: m ? m[2] : key, sub: team[1] === 'settings' ? 'settings' : 'agents' }; // the Team view is the Agents tab (#7453)
     }
     const [v, ...parts] = h.split('/');
     const d = parts.map(decode);
@@ -238,13 +243,13 @@ export function liveRoute(server, sessionId, sub = null) {
 }
 
 /** The route of a team or board from its identity key. */
-export function keyRoute(view, key, sub = null) {
+export function keyRoute(view, key, sub = null, item = null) {
     const k = String(key ?? '');
     // As splitKey reads it: "@<server>/name" only when <server> is a server id ("@x!/y" is a name).
     const m = /^@([^/]+)\/(.+)$/.exec(k);
     const remote = m && SERVER_RE.test(m[1]);
     const r = { view, server: remote ? routeServer(m[1]) : null, id: remote ? m[2] : k };
-    if (view === 'team') r.sub = sub === 'settings' ? 'settings' : null;
+    if (view === 'team') { r.sub = TEAM_TABS.includes(sub) ? sub : null; if (item && TEAM_ITEM_TABS.includes(r.sub)) r.item = Number(item); }
     return r;
 }
 

@@ -146,7 +146,7 @@ export async function showTeamTokenUsage(boardName) {
 }
 
 export async function distillTeamKnowledge(boardName) {
-    if (window.enterTeamContext) await window.enterTeamContext(boardName, { tab: 'knowledge' });
+    if (window.openTeamPage) await window.openTeamPage(boardName, { tab: 'knowledge' });
     const { distillKnowledgeInTab } = await importOnce('./team_artifacts.js');
     distillKnowledgeInTab(boardName);
 }

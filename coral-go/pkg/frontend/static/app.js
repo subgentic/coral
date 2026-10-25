@@ -74,7 +74,7 @@ import { toggleAllGroups } from './group_collapse.js'; // the list header's one 
 import { toggleDisplayPanel, displayPanelKey } from './display_panel.js'; // the Display expander
 import { registerActions, tokenOf } from './actions.js'; // delegated data-on-* handlers, replacing inline ones (#3645)
 import { markReady } from './ready.js';
-import { lazyFns, lazyWindowFns, loadTeamContext, loadTeamSettings, loadWorkflows, loadCostDashboard, loadDocs, loadThemeConfig, loadModals, loadResumeDialog, loadDefaultPromptsDialog } from './lazy_panels.js';
+import { lazyFns, lazyWindowFns, loadTeamContext, loadTeamPage, loadTeamSettings, loadWorkflows, loadCostDashboard, loadDocs, loadThemeConfig, loadModals, loadResumeDialog, loadDefaultPromptsDialog } from './lazy_panels.js';
 
 // Panels off the landing view load on first use (#3083 phase 2, lazy_panels.js).
 const {
@@ -295,6 +295,7 @@ registerActions({
 // Runs on every tab switch: there is nothing to stop until the dashboard has loaded.
 // The team view and its settings (with the Health check tab) load the first time a team is opened (#5364): about 40 KB of source the page does not need to start.
 const { enterTeamContext, exitTeamContext, renderTeamSettingsTab } = lazyFns(loadTeamContext, ['enterTeamContext', 'exitTeamContext', 'renderTeamSettingsTab']);
+const { openTeamPage, applyTeamRoute } = lazyFns(loadTeamPage, ['openTeamPage', 'applyTeamRoute']);
 const { showTeamWorkingModeWorkspace, showTeamHealthSettings } = lazyFns(loadTeamSettings, ['showTeamWorkingModeWorkspace', 'showTeamHealthSettings']);
 const stopCostDashboard = () => { loadCostDashboard.module?.stopCostDashboard(); };
 const { showDocsTab, selectDoc } = lazyFns(loadDocs, ['showDocsTab', 'selectDoc']);
@@ -595,7 +596,7 @@ Object.assign(window, {
     copyFolderPath, killBoard, setBoardAccentColor, resetTeam,
     moveSessionUp, moveSessionDown,
     toggleTeamSleep, toggleAgentSleep, toggleAgentArchive, toggleArchivedSection,
-    enterTeamContext, exitTeamContext, renderTeamSettingsTab,
+    enterTeamContext, exitTeamContext, renderTeamSettingsTab, openTeamPage,
     showTeamAvailabilityWorkspace, showTeamWorkingModeWorkspace, showTeamHealthSettings,
     shareAgentTeam, saveTeamFromSidebar, showTeamTokenUsage, distillTeamKnowledge,
     showConfirmModal, hideConfirmModal, showPromptModal, hidePromptModal, showAlertModal, hideAlertModal,
@@ -730,9 +731,7 @@ function registerRouteHandlers() {
     onRoute('team', async r => {
         await liveListReady;
         switchNavTab('agents', { fromHistory: true });
-        const tab = r.sub === 'settings' ? 'team-settings' : 'team-view';
-        const ok = await enterTeamContext(routeKey(r), { tab, restore: true, silent: true });
-        if (ok === false && state.selectedTeam) note(keyRoute('team', state.selectedTeam), { replace: true });
+        await applyTeamRoute(routeKey(r), r.sub || 'goals', r.item || 0); // the team page (#7453); /team/<name> is its Goals tab
     });
 
     route('board', r => {

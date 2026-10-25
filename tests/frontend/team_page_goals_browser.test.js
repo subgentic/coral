@@ -39,7 +39,9 @@ const GOAL = 'Explore goals with two teams';
                 assert.ok(rows.some(r => r.includes(GOAL)) && rows.some(r => r.includes('Plan the release notes')), 'the two goals are the rows');
                 await click('button', /^New goal$/i, 'button');
                 await ev(`(() => { const e = document.activeElement; if (e && e.tagName === 'TEXTAREA' || e && e.tagName === 'INPUT') {} return true; })()`);
-                await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`); await settle(300);
+                // A real key press: the New goal dialog is a native modal dialog, and only the browser's own Escape closes it (a script-made keydown does not, and the page stays inert behind it).
+                await client.Input.dispatchKeyEvent({ type: 'rawKeyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }); await settle(300);
+                assert.equal(await ev(`!!document.querySelector('dialog[open]')`), false, 'Escape closed the New goal dialog');
             });
             await S.run(`${label}: choosing a goal swaps the body for the goal's page: back link, h2, Outcome and Done when, its tasks table, and a pinned bar with Add task and Close goal`, async () => {
                 await goTab(ev, settle, 'Goals');
@@ -72,7 +74,7 @@ const GOAL = 'Explore goals with two teams';
                 const f = await activeName(); assert.ok(f.includes('Add the goal filter'), `the focus is on the task's row (got ${JSON.stringify(f.slice(0, 60))})`);
             });
             await S.run(`${label}: the sidebar lists the goals under the team, and a chevron named "Show the tasks of <goal>" opens the goal's tasks`, async () => {
-                if (mobile) await ev(`(() => { const b = [...document.querySelectorAll('button')].find(x => /^(Show|Open)( the)? (agents|list|sidebar)/i.test(window.__na.name(x))); if (b) b.click(); return true; })()`);
+                if (mobile) { await ev(`(() => { const b = [...document.querySelectorAll('.mobile-tab-bar [role=tab], .mobile-tab-bar button')].find(x => /^Agents$/i.test(window.__na.name(x))); if (b) b.click(); return true; })()`); await settle(400); }
                 const side = () => ev(`(() => { const s = window.__tp.sidebar(); return s ? [...s.querySelectorAll('button, a, [role=button], [role=treeitem]')].filter(window.__na.vis).map(e => window.__na.name(e)) : null; })()`);
                 const names = await side(); assert.ok(names, 'a sidebar named Agents');
                 assert.ok(names.some(n => n.includes(GOAL)), `the goal ${GOAL} is under the team (got ${names.length} controls)`);

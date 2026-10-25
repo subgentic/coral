@@ -88,7 +88,7 @@ export const CHEVRON_DECO = '<span class="group-chevron group-chevron-deco" aria
 export function teamHeaderKey(event, header = event.currentTarget) {
     if (event.target !== header || (event.key !== 'Enter' && event.key !== ' ')) return;
     event.preventDefault();
-    window.enterTeamContext(header.dataset.board);
+    window.openTeamPage(header.dataset.board);
 }
 
 export function toggleGroupCollapse(groupName) {

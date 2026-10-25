@@ -4,14 +4,15 @@
 const na = require('./new_agent');
 const SOURCE = `(() => {
     const A = window.__na;
-    const main = () => [...document.querySelectorAll('main, [role=main]')].filter(A.vis).find(m => m.querySelector('h1')) || null;
+    const main = () => [...document.querySelectorAll('main, [role=main]')].filter(A.vis).find(m => [...m.querySelectorAll('h1')].some(A.vis)) || null;
     const page = () => main();
-    const h1 = () => { const m = main(); return m ? m.querySelector('h1') : null; };
+    const h1 = () => { const m = main(); return m ? [...m.querySelectorAll('h1')].find(A.vis) || null : null; };
     const tablist = () => { const m = main(); return m ? [...m.querySelectorAll('[role=tablist]')].find(t => /^Team$/i.test(A.name(t))) || null : null; };
     const tabs = () => { const t = tablist(); return t ? [...t.querySelectorAll('[role=tab]')].filter(A.vis) : []; };
     const tabLabel = e => A.name(e).replace(/\\s*\\d[\\d,]*\\s*$/, '').trim();
     const find = (sel, rx) => { const m = main(); return m ? [...m.querySelectorAll(sel)].filter(A.vis).find(e => rx.test(A.name(e))) || null : null; };
-    const sidebar = () => [...document.querySelectorAll('aside')].filter(A.vis).find(a => /^Agents$/i.test(A.name(a))) || null;
+    // On a phone the list the sidebar holds is the Agents screen (the bottom bar's Agents tab), not an aside.
+    const sidebar = () => [...document.querySelectorAll('aside')].filter(A.vis).find(a => /^Agents$/i.test(A.name(a))) || [...document.querySelectorAll('#mobile-agent-list')].filter(A.vis)[0] || null;
     const pane = () => [...document.querySelectorAll('aside')].filter(A.vis).find(a => /^Details$/i.test(A.name(a))) || null;
     const box = e => e ? A.box(e) : null;
     window.__tp = { page, h1, tablist, tabs, tabLabel, find, sidebar, pane, box };
@@ -29,6 +30,10 @@ async function seed(ev, board) {
     const B = `/api/board/${board}`;
     await post(ev, `${B}/subscribe`, { subscriber_id: 'Orchestrator', job_title: 'Orchestrator' });
     await post(ev, `${B}/subscribe`, { subscriber_id: 'Backend Dev', job_title: 'Developer' });
+    // The suites seed the same board once per screen size: goals and tasks made already are the ones the next size sees (a second seed would double the counts).
+    const made = await ev(`fetch(${JSON.stringify(B + '/goals?state=proposed,active,blocked,done,dropped')}).then(r => r.ok ? r.json() : []).then(j => (Array.isArray(j) ? j : j.goals || []).length).catch(() => 0)`);
+    const names = { goals: ['Explore goals with two teams', 'Plan the release notes'], tasks: ['Add the goal filter', 'Check the Settings dialog', 'Review the filter', 'Write the release notes', 'Fix the focus ring'] };
+    if (made) return names;
     const g1 = await post(ev, `${B}/goals`, { title: 'Explore goals with two teams', outcome: 'Try goals, task links and cross-team requests.', done_when: 'You have linked tasks and closed a goal.', state: 'active', subscriber_id: 'Orchestrator', created_by: 'Orchestrator' });
     const g2 = await post(ev, `${B}/goals`, { title: 'Plan the release notes', outcome: 'Release notes are drafted and reviewed.', done_when: 'The Orchestrator approved the draft.', state: 'active', subscriber_id: 'Orchestrator', created_by: 'Orchestrator' });
     const id = r => r && (r.id || (r.goal && r.goal.id));

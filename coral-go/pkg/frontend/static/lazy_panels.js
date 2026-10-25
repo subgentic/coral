@@ -35,6 +35,8 @@ export const loadTemplateBrowser = panel('the template browser', './template_bro
 export const loadChatSearch = panel('chat search', './chat_search.js');
 // The team view and the team's settings (with its Health check tab): opened from a team's button, not needed to start (#5364).
 export const loadTeamContext = panel('the team view', './team_context.js');
+// The team page (#7453): opened by a team's row, its Team view and Team settings items, its address.
+export const loadTeamPage = panel('the team page', './team_page.js');
 export const loadTeamSettings = panel('the team settings', './team_working_mode.js');
 // The task detail dialog and its editing, completing and cancelling (#5364): opened from a task row.
 export const loadTaskDetail = panel('the task', './task_detail.js');
