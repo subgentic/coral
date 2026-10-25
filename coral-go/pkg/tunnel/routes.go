@@ -75,6 +75,16 @@ type route struct {
 	pattern string
 	tier    Tier
 	owner   OwnerMode // how the owner marker applies to the route (ownerroutes.go); OwnerNone for nearly every route
+	service bool      // the Hub's own service reads it (hubservice.go, #7364): the connector stamps who asked on it and on nothing else
+}
+
+// service marks the routes of the groups as the Hub's service-only reads (hubservice.go): not an owner's and not a viewer's, and the machine refuses everyone but a stream the Hub's service stamped.
+func service(groups ...[]route) []route {
+	out := cat(groups...)
+	for i := range out {
+		out[i].service = true
+	}
+	return out
 }
 
 func rules(method string, t Tier, patterns ...string) []route {
@@ -254,6 +264,9 @@ var routeTable = cat(
 	// message of a bookmark (the text of its source, redacted and cut to 64 KiB; the source is the stored bookmark's, never a ref from the request) is read from its own route. The
 	// changes (POST, PATCH, DELETE) stay as they were (Interact).
 	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/saved", "/api/saved/{id}/message")),
+	// The Hub's service-only per-machine read of the tasks that came from one accepted goal request (#7364, #7331 section 6): forwarded at View, and the machine answers only a stream the Hub's own service stamped
+	// with who asked (hubservice.go): an owner, a viewer or a local program gets 403 there.
+	service(rules(http.MethodGet, TierView, "/api/goal-links")),
 	// ... and so are its changes (#5763, Security's SHOULD 3 on #5761): a bookmark is the owner's own note, so a hub Interact grantee can neither read, create, mark done nor delete one.
 	// Still Interact for the tier (they move no work); the machine also refuses anyone but the owner.
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/saved")),
