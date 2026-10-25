@@ -21,6 +21,7 @@ const BUDGET = { chooser: 18, /* +1: the title "New agent or team" (#7064) */ fo
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await ev(`window.__coralReady.then(() => true)`);
+            await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'launch_server.js'); localStorage.removeItem(m.recentDirsKey('local')); return true; })()`); // an earlier suite's folders would add the Recent: row to the count
             await ev(`(async () => { await window.showLaunchModal(); return true; })()`);
             await waitFor(`getComputedStyle(document.getElementById('launch-step-chooser')).display !== 'none'`, `${tag}: the chooser`, 8000);
             let n = await words();
