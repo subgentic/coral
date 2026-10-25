@@ -33,7 +33,7 @@ async function _saveCurrentPersona(nameInputId, promptInputId, flagsInputId) {
     showToast(`Saved persona "${name}"`);
 
     // Re-render all preset containers
-    _renderPresetButtons("agent-preset-selector", "agent");
+    _renderPresetButtons("agent-preset-selector", "agent", { blankFirst: true, selectId: 'launch-persona-select' });
 }
 window._saveCurrentPersona = _saveCurrentPersona;
 
@@ -90,7 +90,7 @@ export async function importPersonas() {
     const added = entries.length;
     try { await _upsertSavedPersonas(entries); } catch { showToast("Could not save the imported personas", "error"); return; }
     showToast(`Imported ${added} persona(s)`);
-    _renderPresetButtons("agent-preset-selector", "agent");
+    _renderPresetButtons("agent-preset-selector", "agent", { blankFirst: true, selectId: 'launch-persona-select' });
 }
 
 export function exportTeamTemplates() {
@@ -116,7 +116,7 @@ export async function importTeamTemplates() {
 // ── Agent Preset Selector (single-agent modal) ───────────────────────────
 
 function _initAgentPresets() {
-    _renderPresetButtons("agent-preset-selector", "agent");
+    _renderPresetButtons("agent-preset-selector", "agent", { blankFirst: true, selectId: 'launch-persona-select' });
 }
 
 function _selectAgentPreset(name) {
@@ -133,12 +133,20 @@ function _selectAgentPreset(name) {
             capabilities: persona.capabilities,
         });
         if (nameInput) nameInput.value = persona.name;
+        _nameHelp(true);
     } else {
         setAgentConfig('launch-agent-acf', {
             agentType: _settingsFor(_effectiveServer(launch.server)).default_agent_type || current.agentType,
         });
         if (nameInput) nameInput.value = '';
+        _nameHelp(false);
     }
+}
+
+// The line under Name says where the name came from: one line either way, so nothing on the page moves (#7391).
+function _nameHelp(filled) {
+    const el = document.getElementById('launch-name-help');
+    if (el) el.textContent = filled ? 'Filled from the persona. Change it if you want a different name.' : 'Choose a persona above and its name goes here, or type your own.';
 }
 
 export { _initAgentPresets, _selectAgentPreset };

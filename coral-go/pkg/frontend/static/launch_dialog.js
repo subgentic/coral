@@ -17,20 +17,28 @@ const { _syncACFModelField, getAgentConfig, renderAgentConfigForm, cliWarningOf 
 const { _checkPermissionFlag } = await importOnce('./cli_dialogs.js');
 const { _checkTeamGitDir, _initTeamForm, _loadExistingTeamBoards } = await importOnce('./team_dialogs.js');
 const { _initAgentPresets } = await importOnce('./persona_io.js');
-const { markFieldInvalid, _launchBlocked, _launchOn, _refreshAfterLaunch, _resetDirInputs, _showLaunchStep, _syncMobileLaunchSections, hideLaunchModal, setLaunchMore } = await importOnce('./launch_core.js');
-const { wireAgentSummary, syncAgentSummary } = await importOnce('./launch_agent_summary.js');
+const { markFieldInvalid, _launchBlocked, _launchOn, _refreshAfterLaunch, _resetDirInputs, _showLaunchStep, _syncMobileLaunchSections, hideLaunchModal, setLaunchMore, setLaunchStage, LAUNCH_STAGES } = await importOnce('./launch_core.js');
+const { wireRecap, syncRecap } = await importOnce('./launch_recap.js');
 
-/** New Agent's two steps (#6333): Next goes from the folder to the details (a folder is needed first), Back or Change returns. Focus follows, and a screen reader hears which step. */
-function _launchStage(stage) {
+/** New Agent's three steps (#7391): Next goes from the folder to the persona to the agent (a folder is needed first), Back returns. `arg` is a stage name, "next" or "back" (the old "details" is the persona step). Focus follows, and a screen reader hears which step. */
+function _launchStage(arg) {
+    const step = document.getElementById('launch-step-agent');
+    const cur = step?.dataset.stage || 'folder', at = LAUNCH_STAGES.indexOf(cur);
+    const to = arg === 'details' ? 'persona' : arg === 'next' ? LAUNCH_STAGES[Math.min(at + 1, 2)] : arg === 'back' ? LAUNCH_STAGES[Math.max(at - 1, 0)] : arg;
+    if (!LAUNCH_STAGES.includes(to)) return;
     const input = document.getElementById('launch-dir');
-    if (stage === 'details') {
-        if (!input || !input.value.trim()) { if (input) { markFieldInvalid(input, "Choose a folder"); input.focus(); } return; }
-        const list = document.getElementById('dir-browser'); if (list) list.style.display = 'none'; // display-ok: the folder list is shown and hidden by style.display where it is opened (browser.js)
+    if (to !== 'folder' && (!input || !input.value.trim())) { // a folder is the one thing a launch needs: said where it is, on the folder's own step
+        setLaunchStage('folder');
+        if (input) { markFieldInvalid(input, "Choose a folder"); input.focus(); }
+        return;
     }
-    setLaunchMore(stage === 'details');
+    const list = document.getElementById('dir-browser'); if (list) list.style.display = 'none'; // display-ok: the folder list is shown and hidden by style.display where it is opened (browser.js)
+    const sub = setLaunchStage(to);
+    syncRecap(); _syncLaunchBlock();
     const live = document.getElementById('launch-stage-live');
-    if (live) live.textContent = stage === 'details' ? 'Step 2 of 2: name, agent and options' : 'Step 1 of 2: folder';
-    (stage === 'details' ? document.getElementById('launch-agent-name-input') : input)?.focus();
+    if (live) live.textContent = sub || '';
+    const first = to === 'folder' ? input : to === 'persona' ? document.querySelector('#launch-step-agent .agent-preset-select') : document.querySelector('#launch-step-agent .settings-tab[aria-selected="true"]');
+    first?.focus();
 }
 window._launchStage = _launchStage;
 
@@ -42,24 +50,27 @@ function _selectLaunchType(type) {
         return;
     }
     launch.mode = type;
-    if (type === "agent") setLaunchMore(false); // New Agent always opens on the folder; its sections are behind "More options" (#5595)
+    if (type === "agent") setLaunchMore(false); // New Agent always opens on step 1, the folder (#7391)
     _showLaunchStep(type);
     if (type === "agent") {
         _loadAgentBoardProjects();
+        document.getElementById('agent-preset-selector')?.replaceChildren(); // a new dialog starts from Blank again (#7391)
+        const help = document.getElementById('launch-name-help'); if (help) help.textContent = 'Choose a persona above and its name goes here, or type your own.';
         _initAgentPresets();
         // Render agent config form
         renderAgentConfigForm('launch-agent-acf', {
             showPreset: false,
             showName: false,
-            cliSlot: 'launch-cli-slot', // a missing CLI is said under the folder, not only inside More options (#5835)
-            sections: true, // New Agent is a sectioned dialog (#4950): Workspace, then the form's own sections, the board in Advanced
-            adopt: { advanced: 'launch-advanced-extra' },
+            cliSlot: 'launch-cli-slot', // a missing CLI is said under the provider, in the reserved note slot (#5835, #7391)
+            sections: true, // step 3 is a sectioned dialog (#4950): Agent, Permissions, Advanced
+            wizard: true, // the persona page for step 2 and three panes for step 3 (#7391)
+            adopt: { persona: 'launch-persona-top', agent: 'launch-agent-provider', advanced: 'launch-advanced-extra' },
             value: { agentType: _settingsFor(_effectiveServer(launch.server)).default_agent_type || 'claude' },
         });
         // The agent is chosen in this step, not only under More options (#6199): a radio group that follows the form's own select, the installed agents first.
         importOnce('./launch_agent_pick.js').then(m => m.buildAgentPick({ group: document.getElementById('launch-agent-pick'), form: document.getElementById('launch-agent-acf'), server: _effectiveServer(launch.server), implicitDefault: !_settingsFor(_effectiveServer(launch.server)).default_agent_type })).catch(() => {});
         _wireDirNote(); _syncDirNote(); _syncLaunchBlock(); _renderDirRecents();
-        wireAgentSummary(); syncAgentSummary();
+        wireRecap(); syncRecap(); _syncLaunchBlock();
         _checkTmuxHere(); // tmux missing: said once, Launch off (#6046)
         document.getElementById('launch-dir')?.focus(); // the one thing most launches need: the folder
     } else if (type === "team") {
@@ -225,11 +236,19 @@ document.addEventListener('coral:server-access-loaded', () => { if (document.get
 // A missing CLI is said once, under the folder, and Launch stays off until it is there (#5990); the message is the button's reason.
 const _cliBlock = () => document.querySelector('#launch-step-agent [data-blocks-launch]');
 function _syncLaunchBlock() {
-    const go = document.getElementById('launch-agent-go');
+    const go = document.getElementById('launch-agent-go'), next = document.getElementById('launch-agent-next');
     if (!go) return;
     const why = _cliBlock();
     go.disabled = !!why;
-    if (why) { why.id ||= 'launch-cli-warning'; go.setAttribute('aria-describedby', why.id); } else go.removeAttribute('aria-describedby');
+    // The reason a button is off is its description (#7391): the missing CLI's line, or "Choose a folder first". The folder one leaves the button focusable (aria-disabled), and pressing it says it where the folder is.
+    const noDir = !(document.getElementById('launch-dir')?.value || '').trim();
+    const reason = why ? (why.id ||= 'launch-cli-warning') : noDir ? 'launch-folder-reason' : '';
+    for (const b of [go, next]) {
+        if (!b) continue;
+        const off = b === go ? !!why || noDir : noDir;
+        if (off && !b.disabled) b.setAttribute('aria-disabled', 'true'); else b.removeAttribute('aria-disabled');
+        if (off && reason) b.setAttribute('aria-describedby', reason); else b.removeAttribute('aria-describedby');
+    }
 }
 document.addEventListener('cli-blocks-launch', e => { if (e.target.closest && e.target.closest('#launch-step-agent')) _syncLaunchBlock(); });
 // The tmux line is about this computer: a launch on another server (a local multi-server hub) is reported by that server's own launch (#6046).
@@ -254,7 +273,7 @@ function _renderDirRecents() {
     const box = document.getElementById('launch-dir-recents'), hint = document.getElementById('launch-dir-hint');
     if (!box || !hint) return;
     const dirs = getRecentDirs(_effectiveServer(launch.server)).slice(0, 3);
-    box.replaceChildren(...dirs.map(d => {
+    box.replaceChildren(...(dirs.length ? [Object.assign(document.createElement('span'), { className: 'launch-recent-label', textContent: 'Recent:' })] : []), ...dirs.map(d => {
         const b = document.createElement('button');
         b.type = 'button'; b.className = 'btn btn-small launch-dir-recent'; b.title = d; b.dataset.dir = d; b.setAttribute('data-on-click', 'launch-dir-recent');
         b.textContent = d.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || d;
@@ -281,7 +300,8 @@ function _wireDirNote() {
     if (!input || input.dataset.noteWired) return;
     input.dataset.noteWired = '1';
     input.addEventListener('input', _syncDirNote); input.addEventListener('change', _syncDirNote);
-    input.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); _launchStage('details'); } }); // Enter is Next
+    input.addEventListener('input', _syncLaunchBlock); input.addEventListener('change', _syncLaunchBlock); // Next and Launch say why they are off until there is a folder
+    input.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); _launchStage('next'); } }); // Enter is Next
 }
 
 
@@ -364,7 +384,7 @@ export async function launchSession() {
 
     // Disable launch button to prevent double-clicks
     const stepId = launch.mode === "terminal" ? "launch-step-terminal" : "launch-step-agent";
-    const launchBtn = document.querySelector(`#${stepId} .btn-primary`);
+    const launchBtn = launch.mode === "terminal" ? document.querySelector(`#${stepId} .btn-primary`) : document.getElementById('launch-agent-go');
     if (launchBtn) { launchBtn.disabled = true; launchBtn.textContent = 'Launching...'; }
 
     try {
