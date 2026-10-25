@@ -30,7 +30,10 @@ func (h *SessionsHandler) ResolvePath(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, "filepath is required")
 		return
 	}
-	f, err := h.resolveFileRef(r.Context(), chi.URLParam(r, "name"), r.URL.Query().Get("session_id"), ref, strictBounds(r))
+	if !h.requireAgentSession(w, r, chi.URLParam(r, "name"), r.URL.Query().Get("session_id")) {
+		return
+	}
+	f, err := h.resolveFileRef(agentCtx(r), chi.URLParam(r, "name"), r.URL.Query().Get("session_id"), ref, strictBounds(r))
 	if err != nil {
 		writeResolveErr(w, err)
 		return
