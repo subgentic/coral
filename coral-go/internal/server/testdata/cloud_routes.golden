@@ -103,6 +103,7 @@ GET /api/filesystem/is-git launch
 GET /api/filesystem/list launch
 GET /api/folder-tags view
 GET /api/folder-tags/{folderName} view
+GET /api/goal-links view
 GET /api/goals view
 GET /api/goals/metrics view
 GET /api/health view
