@@ -125,7 +125,10 @@ var allowedSenders = map[string]sender{
 	// #5114: the one 0 that dismisses Claude's session survey (never a rating), only when it is the only thing open.
 	"internal/ptymanager/survey_dismiss.go\tinputGate.dismissSurvey\tSendRawInput": {guardScreen, "gate (a single 0, only for the exact session survey directly above the input box; waits for it to go; at most once per 30 s; #5114)", "TestSurveyWithADraftInTheInputBoxGetsNoZero"},
 	// #3457: automated text as a bracketed paste.
-	"internal/ptymanager/automated_input_deliver.go\tinputGate.pasteAndEnter\tSendPrompt":     {guardGate, "gate (the paste, Enter only after the re-check)", ""},
+	"internal/ptymanager/automated_input_deliver.go\tinputGate.pasteAndEnter\tSendPrompt": {guardGate, "gate (the paste, Enter only after the re-check)", ""},
+	// #7579: Send now's forced typing: the Operator chose it, so the box is not looked for, but a real prompt on the screen and a draft in the box still refuse (held_force.go).
+	"internal/ptymanager/held_force.go\tinputGate.forcePaste\tSendPrompt":                     {guardGate, "gate (Send now: the paste, never into a prompt open on the screen or over a draft; Enter only after the prompt re-check)", ""},
+	"internal/ptymanager/held_force.go\tinputGate.forcePaste\tSendEnter":                      {guardGate, "gate (Send now: the Enter of a paste already made, after the screen shows no prompt and no draft was seen)", ""},
 	"internal/ptymanager/paste_check.go\tinputGate.enterAndConfirm\tSendEnter":                {guardGate, "gate (a held paste's Enter, once its text is in the box and no prompt is open; confirmed, #4104)", ""},
 	"internal/ptymanager/paste_check.go\tinputGate.submitLeftover\tSendEnter":                 {guardGate, "gate (the Enter of Coral's own earlier paste left in the box, an exact match; never a person's draft, #4104)", ""},
 	"internal/background/runtime_tmux.go\tTmuxRuntime.SendPrompt\tSendPrompt":                 {guardPrimitive, "primitive", ""},
