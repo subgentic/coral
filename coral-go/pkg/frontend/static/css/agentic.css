@@ -476,38 +476,31 @@ body.panel-dragging .agentic-state {
     overflow: hidden;
 }
 
-/* Count / Time switch above the bars */
+/* Count / Time switch above the bars: a pair of ordinary buttons like the list bar's, only while there is timing to chart */
 .activity-chart-mode {
     display: flex;
     justify-content: flex-end;
-    gap: 2px;
-    height: 18px;
     flex-shrink: 0;
 }
 .activity-chart-mode button {
-    font-size: 0.625rem;
-    line-height: 16px;
-    padding: 0 8px;
+    font: 500 var(--fs-base)/1.4 var(--font-sans);
+    padding: 2px 10px;
+    min-height: 24px;
     border: 1px solid var(--control-border);
-    border-radius: 9px;
     background: transparent;
-    color: var(--text-muted);
+    color: var(--text-secondary);
     cursor: pointer;
 }
+.activity-chart-mode button:first-child { border-radius: var(--radius-md) 0 0 var(--radius-md); }
+.activity-chart-mode button:last-child { border-radius: 0 var(--radius-md) var(--radius-md) 0; border-left: 0; }
 .activity-chart-mode button:hover {
     color: var(--text-primary);
 }
 .activity-chart-mode button.active {
     background: var(--bg-tertiary);
     color: var(--text-primary);
-    border-color: var(--control-border);
 }
-.activity-chart-empty {
-    font-size: 0.6875rem;
-    color: var(--text-muted);
-    text-align: center;
-    padding: 6px 0;
-}
+.activity-timing-note { padding: var(--space-md) var(--space-lg); font-size: var(--fs-base); color: var(--text-secondary); }
 
 .activity-chart:empty {
     display: none;
@@ -1598,33 +1591,8 @@ body.panel-dragging .agentic-state {
 .file-star-btn:focus-visible { opacity: 0.7; outline: 2px solid var(--accent); outline-offset: 1px; border-radius: var(--radius-xs); }
 .file-star-btn.starred { opacity: 1; color: var(--warning); }
 
-.refresh-files-btn {
-    background: none;
-    border: none;
-    color: var(--text-muted);
-    font-size: 1.375rem;
-    cursor: pointer;
-    padding: 4px 8px;
-    border-radius: var(--radius-sm);
-    line-height: 1;
-    transition: color 0.15s, background 0.15s;
-}
-
-.refresh-files-btn:hover {
-    color: var(--text-primary);
-    background: var(--bg-tertiary);
-}
-
-.refresh-files-btn svg {
-    display: block;
-    width: 20px;
-    height: 20px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.8;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-}
+.refresh-files-btn { color: var(--text-secondary); } /* the size, padding and shape are the tabs' icon button (team-artifact-icon-btn) */
+.refresh-files-btn:hover { color: var(--text-primary); }
 
 .refresh-files-btn.refreshing {
     animation: spin 1s linear infinite;
@@ -1638,25 +1606,15 @@ body.panel-dragging .agentic-state {
 }
 
 .diff-mode-select {
-    background: var(--bg-tertiary);
+    font: 400 0.8125rem/1.4 var(--font-sans);
+    color: var(--text-primary);
+    background-color: var(--bg-primary);
     border: 1px solid var(--control-border);
-    border-radius: var(--radius-xs);
-    color: var(--text-muted);
-    font-size: 0.625rem;
-    padding: 1px 4px;
+    border-radius: var(--radius-md);
+    padding: 4px 8px;
     cursor: pointer;
-    text-transform: none;
-    letter-spacing: normal;
-    font-weight: normal;
     margin-left: 4px;
     vertical-align: middle;
-    outline: none;
-    -webkit-appearance: none;
-    appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 8 8'%3E%3Cpath fill='%23888' d='M0 2l4 4 4-4z'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 4px center;
-    padding-right: 14px;
 }
 
 .diff-mode-select:hover,
@@ -2048,24 +2006,22 @@ body.panel-dragging .agentic-state {
 
 /* ── Notes Panel (Markdown) ────────────────────────────────── */
 
-.note-md-rendered {
+.note-list {
     flex: 1;
     overflow-y: auto;
     padding: 12px 14px;
-    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
 }
-
-.note-md-rendered:hover {
-    background: var(--bg-hover);
-}
-
-.note-md-placeholder {
-    color: var(--text-muted);
-    font-style: italic;
-    font-size: 0.75rem;
-    text-align: center;
-    padding: 20px 0;
-}
+.note-card { border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-secondary); }
+.note-card-time { padding: var(--space-md) var(--space-lg) 0; font-size: var(--fs-base); font-weight: 500; color: var(--text-secondary); }
+.note-md-rendered { padding: var(--space-md) var(--space-lg) var(--space-lg); cursor: pointer; border-radius: var(--radius-lg); overflow-wrap: anywhere; }
+.note-md-rendered:hover { background: var(--bg-hover); }
+.note-md-rendered:focus-visible, .note-add:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.note-add { align-self: flex-start; padding: var(--space-xs) var(--space-md); min-height: 32px; border: 1px dashed var(--control-border); border-radius: var(--radius-md); background: none; color: var(--text-secondary); font: 500 var(--fs-md)/1.4 var(--font-sans); cursor: pointer; }
+.note-add:hover { color: var(--text-primary); background: var(--bg-hover); }
+@media (pointer: coarse) { .note-add { min-height: var(--control-touch-height, 44px); } }
 
 .note-md-editor {
     flex: 1;
@@ -2282,6 +2238,8 @@ body.panel-dragging .agentic-state {
     overflow-wrap: anywhere;
 }
 .agent-ui-home-row:hover { border-color:var(--accent); }
+.agent-ui-home-row { font: 400 var(--fs-md)/1.4 var(--font-sans); } /* a button: the page font and rem sizes, so a panel's title grows with the text size like its "Revision 1 · 0 events" (UI Accessibility, #7653 item 5) */
+.agent-ui-home-row strong { font-size: var(--fs-md); font-weight: 600; }
 .inline-preview-artifact-fallback { display:flex; flex-direction:column; gap:8px; max-width:560px; margin:32px auto; padding:18px; color:var(--text-primary); background:var(--bg-secondary); border:1px solid var(--border); border-radius:var(--radius-lg); overflow-wrap:anywhere; }
 .inline-preview-artifact-fallback span { color:var(--text-secondary); font-size:0.75rem; }
 .inline-preview-artifact-fallback p { margin:0; color:var(--text-secondary); }
@@ -2397,7 +2355,7 @@ body.panel-dragging .agentic-state {
 /* Four lazy viewer sources and the selected agent's directory tree. */
 .file-explorer-view { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; }
 .file-explorer-view[hidden] { display: none; }
-.explorer-root { min-width: 0; overflow-wrap: anywhere; }
+.explorer-root { min-width: 0; overflow-wrap: anywhere; font-size: var(--fs-md); font-weight: 600; color: var(--text-primary); }
 .explorer-item { display: flex; align-items: center; gap: 5px; width: 100%; min-width: 0; padding: 5px 10px; color: var(--text-primary); background: transparent; border: 0; text-align: left; font: inherit; font-size: var(--fs-md); cursor: pointer; }
 .explorer-item:hover, .explorer-item:focus { background: var(--bg-tertiary); }
 .explorer-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
@@ -2516,6 +2474,10 @@ body.panel-dragging .agentic-state {
 .list-bar-panel { padding: 6px 0; }
 .list-bar-panel .list-bar-field > .list-bar-by { flex: 1 1 9rem; width: auto; min-width: 0; max-width: none; } /* the text field (Agent, Uploaded by) spans the panel like the selects beside it (UI/UX #5293): its datalist is the field's last child, so the inline rule above never reached the input */
 .list-bar-panel > * { flex: 0 0 auto; } /* the dropdown's rule gives each child a whole line of the box's height; in a column, which is as tall as its rows, that stretched the rows */
+/* The activity bars' panel (#7653): the tool-group boxes go two to a line in it as they did in the dropdown; the other fields, the count and Clear filters are a line each. */
+.list-bar-menu-inline:has(> .list-bar-group) { flex-direction: row; flex-wrap: wrap; align-items: center; column-gap: 8px; }
+.list-bar-menu-inline:has(> .list-bar-group) > :not(.list-bar-group) { flex: 0 0 100%; }
+.list-bar-menu-inline > .list-bar-group { flex: 0 0 calc(50% - 4px); min-width: 0; }
 .list-bar-expand-all[hidden] { display: none; }
 @media (pointer: coarse) { .list-bar-toggle, .list-bar-expand-all { min-width: 44px; min-height: 44px; } }
 

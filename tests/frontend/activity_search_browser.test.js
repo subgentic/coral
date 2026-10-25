@@ -69,7 +69,16 @@ async function run() {
         await settle(`!!document.querySelector('#event-search-bar .list-bar-search') && document.querySelectorAll('#agentic-state-events .event-item').length === 50`, 'the bar and the live feed (the newest 50)');
 
         console.log('The live feed, with nothing asked for');
-        check('the bar is above the feed, and it is the only filter button (the older tool-group menu is gone)', (await ev(`!document.getElementById('event-search-bar').hidden && document.querySelectorAll('#agentic-panel-activity .list-bar-filter-btn').length === 1 && !document.querySelector('.filter-dropdown-btn, #event-filters')`)));
+        check('the bar is above the feed, and it is the only filter button (the older tool-group menu is gone)', (await ev(`!document.getElementById('event-search-bar').hidden && document.querySelectorAll('#agentic-panel-activity .list-bar-toggle').length === 1 && !document.querySelector('.filter-dropdown-btn, #event-filters')`)));
+        const chart = await ev(`(async () => { const er = await import((window.__coralStatic || '/static/') + 'event_row.js'); const c = document.getElementById('live-activity-chart'), body = document.querySelector('#agentic-panel-activity .agentic-events-body');
+            const groups = [{ key: 'read', title: 'Read', cls: 'tool-read', match: e => e.tool_name === 'Read' }];
+            er.renderActivityChart(c, [{ tool_name: 'Read', summary: 'a' }], groups);
+            const none = { switch: !!c.querySelector('.activity-chart-mode'), hidden: getComputedStyle(c).display === 'none', note: (body.querySelector(':scope > .activity-timing-note') || {}).textContent, above: !c.textContent.includes('No timing') };
+            er.renderActivityChart(c, [{ tool_name: 'Read', summary: 'a', duration_ms: 1500 }], groups);
+            const timed = { switch: !!c.querySelector('.activity-chart-mode'), note: !!body.querySelector(':scope > .activity-timing-note') };
+            er.renderActivityChart(c, [], groups);
+            return { none, timed, cleared: !body.querySelector(':scope > .activity-timing-note') }; })()`);
+        check('with no timing: no Time or Count switch, no chart, and one muted line inside the list says why; with timing the switch is back (#7653)', chart.none.switch === false && chart.none.hidden && chart.none.note === 'No timing recorded yet' && chart.timed.switch && !chart.timed.note && chart.cleared, JSON.stringify(chart));
         check('the feed shows the newest 50 events, as before', (await rows()).length === 50 && (await rows())[0].startsWith('Heads up 9'), (await rows())[0]);
         check('the count says nothing yet, and so does the status region', (await count()) === '' && (await live()) === '', JSON.stringify([await count(), await live()]));
 
@@ -132,15 +141,15 @@ async function run() {
         console.log('The tool groups are in the same Filters menu and narrow the rows loaded, with or without a search');
         await clearAll(); await settle(`document.querySelectorAll('#agentic-state-events .event-item').length === 50`, 'the feed');
         check('the menu has a Show box for each tool group, all ticked', (await ev(`document.querySelectorAll('#event-search-bar .list-bar-kept input:checked').length`)) === 15);
-        await ev(`document.querySelector('#event-search-bar .list-bar-filter-btn').click(); true`);
+        await ev(`document.querySelector('#event-search-bar .list-bar-toggle').click(); true`);
         const lay = await ev(`(() => { const r = id => document.getElementById(id).closest('label').getBoundingClientRect(), t = r('ev-type'), a = r('ev-g-read'), b = r('ev-g-write'), c = r('ev-g-edit'); return { typeFull: t.width > a.width * 1.8, pair: Math.abs(a.top - b.top) < 2 && b.left > a.left, next: c.top > a.top + 10, half: a.width > 40 && a.width < t.width * 0.6 }; })()`);
         check('the Show boxes go two to a line (the other fields a line each)', lay.typeFull && lay.pair && lay.next && lay.half, JSON.stringify(lay));
-        await ev(`document.querySelector('#event-search-bar .list-bar-filter-btn').click(); true`);
+        await ev(`document.querySelector('#event-search-bar .list-bar-toggle').click(); true`);
         await ev(`window.__evReqs = 0; const r0 = window.fetch; window.__r0 = r0; window.fetch = (u, o) => { if (/\\/events\\?/.test(String(u))) window.__evReqs++; return r0(u, o); }; true`);
         await ev(`document.getElementById('ev-g-read').click(); true`);
         await settle(`document.querySelectorAll('#agentic-state-events .event-item').length === 20`, 'the feed without Read');
         check('Show Read unticked hides the 30 Reads of the 50 loaded, nothing is asked of the server', (await rows()).every(s => !s.startsWith('Read ')) && (await ev(`window.__evReqs`)) === 0, `${(await rows()).length} rows, ${await ev(`window.__evReqs`)} requests`);
-        check('a chip names it and the Filters button counts it', (await ev(`[...document.querySelectorAll('#event-search-bar .list-bar-chip-text')].map(e => e.textContent).join()`)) === 'Hidden: Read' && (await ev(`document.querySelector('#event-search-bar .list-bar-filter-btn').textContent`)) === 'Filters (1)');
+        check('a chip names it and the filters icon counts it', (await ev(`[...document.querySelectorAll('#event-search-bar .list-bar-chip-text')].map(e => e.textContent).join()`)) === 'Hidden: Read' && (await ev(`document.querySelector('#event-search-bar .list-bar-toggle').getAttribute('aria-label')`)) === 'Filters and sort, 1 on');
         check('the page keeps the hidden group in its Set', (await ev(`[...T.state.eventFiltersHidden].join()`)) === 'read');
         await type('#ev-search', 'read notes');
         await settle(`document.querySelector('#event-search-bar .list-bar-count').textContent === '30 events'`, 'the 30 reads');

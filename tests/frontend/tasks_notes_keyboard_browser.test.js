@@ -51,12 +51,12 @@ const { connect } = require('./agent_view_harness');
 
         console.log('2. Notes');
         await ev(`window.switchAgenticTab('notes', 'top'); true`);
-        const r = await ev(`(() => { const e = document.getElementById('note-md-rendered'); return { tab: e.tabIndex, role: e.getAttribute('role'), label: e.getAttribute('aria-label') }; })()`);
-        assert.deepEqual(r, { tab: 0, role: 'button', label: 'Edit notes' }, 'the rendered notes are a named, focusable button');
-        await ev(`document.getElementById('note-md-rendered').focus(); true`);
+        const r = await ev(`(() => { const e = document.querySelector('#note-md-rendered .note-add'); return { tag: e.tagName, tab: e.tabIndex, label: e.getAttribute('aria-label') }; })()`);
+        assert.deepEqual(r, { tag: 'BUTTON', tab: 0, label: 'Add a note' }, 'with no note, the way to write one is a named, focusable button');
+        await ev(`document.querySelector('#note-md-rendered .note-add').focus(); true`);
         await press('Enter', 'Enter', 13);
         await waitFor(`document.activeElement === document.getElementById('note-md-editor')`, 'Enter starts editing and focus moves to the editor', 4000);
-        console.log('   ✓ Enter on the notes starts editing');
+        console.log('   ✓ Enter on Add notes starts editing');
         console.log('\nPASS tasks and notes by keyboard');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

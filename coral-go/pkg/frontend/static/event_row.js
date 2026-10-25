@@ -51,6 +51,15 @@ function getChartMode() {
     try { return browserLocal.get(CHART_MODE_KEY) === 'count' ? 'count' : 'time'; } catch { return 'time'; }
 }
 
+/** The line "No timing recorded yet", the first line inside the events list under the chart (not a line of its own above the search). */
+function timingNote(container, on) {
+    const body = container.parentElement && container.parentElement.querySelector(':scope > .agentic-events-body');
+    if (!body) return;
+    let note = body.querySelector(':scope > .activity-timing-note');
+    if (!on) { if (note) note.remove(); return; }
+    if (!note) { note = document.createElement('div'); note.className = 'activity-timing-note'; note.textContent = 'No timing recorded yet'; body.prepend(note); }
+}
+
 /** Activity histogram per filter group: how many events, or how much time they took in total.
  *  The Count / Time switch is remembered across sessions and shared by the live and history tabs. */
 export function renderActivityChart(container, events, groups) {
@@ -58,6 +67,7 @@ export function renderActivityChart(container, events, groups) {
     if (!events || events.length === 0) {
         container.innerHTML = '';
         container._chartHtml = '';
+        timingNote(container, false);
         return;
     }
 
@@ -103,7 +113,9 @@ export function renderActivityChart(container, events, groups) {
 
     // The live tab re-renders on every poll; rewriting identical markup would
     // replace the switch mid-click and swallow the click.
-    const html = toggle + (bars || '<div class="activity-chart-empty">No timing recorded yet</div>');
+    // No timing: no switch and no bars (the chart is not drawn), and one muted line at the top of the list says why (#7653).
+    const html = bars ? toggle + bars : '';
+    timingNote(container, !bars);
     if (container._chartHtml !== html) {
         container.innerHTML = html;
         container._chartHtml = html;

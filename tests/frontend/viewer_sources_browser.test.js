@@ -36,7 +36,7 @@ const base=require('./test_base').BASE;
  if(u.pathname.endsWith('/search-files')&&u.searchParams.get('view')==='explorer'){
  const sid=u.searchParams.get('session_id'),dir=u.searchParams.get('dir'),offset=Number(u.searchParams.get('offset'));
  if(dir==='locked'&&window.locked)return new Response('{}',{status:403});
- const names=dir==='.'?(offset?['later.txt']:['image.png','src/','.env','empty/','locked/']):dir==='src'?['main.go','nested/']:dir==='src/nested'?['worker.go']:[];
+ const names=dir==='.'?(offset?['later.txt']:['.git/','image.png','src/','.env','empty/','locked/']):dir==='src'?['main.go','nested/']:dir==='src/nested'?['worker.go']:[];
  const data={root:'/repo-'+sid,entries:names.map(n=>({name:n.replace(/\\/$/,''),path:(dir==='.'?'':dir+'/')+n.replace(/\\/$/,''),type:n.endsWith('/')?'dir':'file'})),has_more:dir==='.'&&!offset};
  const respond=()=>new Response(JSON.stringify(data));if(window.defer)return new Promise(r=>pending.push(()=>r(respond())));return respond();
  }
@@ -59,10 +59,13 @@ const base=require('./test_base').BASE;
  assert.equal(await ev(`calls.filter(x=>x.includes('view=explorer')||x.includes('/artifacts?')).length`),0);
  await tab('browse');assert.equal(await ev(`calls.filter(x=>x.includes('view=explorer')).length`),1);
  assert.equal(await ev(`document.querySelector('.explorer-item').dataset.directory`),'true');assert.match(await tree(),/\.env/);
+ assert.doesNotMatch(await tree(),/\.git(?![a-z])/,'git\'s own folder is not listed (#7653)');
+ assert.deepEqual(await ev(`[...document.querySelectorAll('.explorer-heading button')].map(b=>[b.getAttribute('aria-label'),b.title,!!b.querySelector('.material-icons,svg')])`),[['Refresh','Refresh',true],['Collapse all','Collapse all',true]],'Refresh and Collapse all are icon buttons, named');
  await click('[data-path="src"]');assert.equal(await ev(`calls.filter(x=>x.includes('view=explorer')).length`),2);
  await tab('files');await tab('browse');assert.ok(await ev(`!!document.querySelector('[data-path="src/main.go"]')`));
  assert.equal(await ev(`s.currentSession.working_directory`),'/repo-a/subdir');
- assert.equal(await ev(`document.querySelector('.explorer-root').textContent`),'/repo-a');
+ assert.equal(await ev(`document.querySelector('.explorer-root').textContent`),'repo-a'); // the folder's name, its path as the title (#7653)
+ assert.equal(await ev(`document.querySelector('.explorer-root').title`),'/repo-a');
  // Explicitly check the fixture rejects the old bug and a cwd-relative guess.
  assert.deepEqual(await ev(`Promise.all(['/repo-a/src/main.go','subdir/src/main.go','missing.go','../escape.go'].map(async filepath=>{const r=await fetch('/api/sessions/live/UI/file-content?'+new URLSearchParams({session_id:'a',filepath}));return [r.status,(await r.json()).error]}))`),[[404,'File not found'],[404,'File not found'],[404,'File not found'],[403,'Path traversal not allowed']]);
  await click('[data-path="src/main.go"]');

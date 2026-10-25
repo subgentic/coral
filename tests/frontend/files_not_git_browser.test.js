@@ -42,6 +42,9 @@ const NAME = 'claude-' + SID;
         let p = await panel();
         check('a git folder keeps its count and its comparison picker', /^1 file changed/.test(p.title) && p.pickers === 1 && p.count === '1', JSON.stringify(p));
 
+        const look = await ev(`(() => { const t = document.getElementById('changed-files-title'), cs = getComputedStyle(t.querySelector('.changed-files-count') || t), sel = getComputedStyle(t.querySelector('.diff-mode-select')), b = document.querySelector('.refresh-files-btn'); return { upper: cs.textTransform, weight: cs.fontWeight, size: cs.fontSize, selSize: sel.fontSize, selRadius: sel.borderTopLeftRadius, icon: !!b.querySelector('.material-icons'), btnH: b.getBoundingClientRect().height, label: b.getAttribute('aria-label') }; })()`);
+        check('the header is sentence case 12/500, the comparison select is the page\'s control size, Refresh is the tabs\' icon button (#7653)', look.upper === 'none' && look.weight === '500' && look.size === '12px' && look.selSize === '13px' && look.selRadius !== '0px' && look.icon && look.label === 'Refresh file changes', JSON.stringify(look));
+
         await ev(`window.__answer = 'plain'; true`); await load();
         p = await panel();
         check('a folder that is not a git repository says "Not a git folder"', p.title === 'Not a git folder', JSON.stringify(p));

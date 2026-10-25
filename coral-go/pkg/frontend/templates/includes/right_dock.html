@@ -59,7 +59,7 @@
                 <div id="agentic-panel-files" class="agentic-panel active">
                     <div class="changed-files-header" id="changed-files-header">
                         <span class="changed-files-title" id="changed-files-title">0 files changed</span>
-                        <button class="refresh-files-btn" data-on-click="files-refresh" title="Refresh git diff" aria-label="Refresh file changes">&#x21bb;</button>
+                        <button class="refresh-files-btn team-artifacts-action team-artifact-icon-btn" type="button" data-on-click="files-refresh" title="Refresh git diff" aria-label="Refresh file changes"><span class="material-icons" aria-hidden="true">refresh</span></button>
                     </div>
                     <div id="files-search-results" class="changed-files-list" style="display:none"></div>
                     <div id="starred-files-list" class="changed-files-list" style="display:none"></div>
@@ -93,8 +93,8 @@
                 </div>
                 <!-- Notes tab -->
                 <div id="agentic-panel-notes" class="agentic-panel">
-                    <div id="note-md-rendered" class="note-md-rendered notes-rendered" role="button" tabindex="0" data-key-click aria-label="Edit notes">
-                        <div class="note-md-placeholder">Add notes</div>
+                    <div id="note-md-rendered" class="note-list" role="region" aria-label="Notes">
+                        <button type="button" class="note-add" aria-label="Add a note">Add notes</button>
                     </div>
                     <textarea id="note-md-editor" class="note-md-editor" placeholder="Write notes in markdown..." style="display:none"></textarea>
                 </div>

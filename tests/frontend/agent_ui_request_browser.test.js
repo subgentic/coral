@@ -37,6 +37,8 @@ const base=require('./test_base').BASE;
  await ui.refreshAgentUI();
  })()`);
  assert.equal(await ev('posts.length'),0);assert.equal(await ev(`document.querySelector('.agent-ui-prompt').readOnly`),false);
+ // a published panel's row is in the page font and rem sizes, so its title grows with the text size like its meta line (#7653)
+ assert.deepEqual(await ev(`(()=>{const b=document.createElement('button');b.className='agent-ui-home-row';b.innerHTML='<strong>Title</strong><span>Revision 1 · 0 events</span>';document.body.append(b);document.documentElement.style.fontSize='32px';const t=getComputedStyle(b.querySelector('strong')),m=getComputedStyle(b.querySelector('span'));const o={font:/Jakarta|sans/i.test(t.fontFamily)&&!/^"?Arial/i.test(t.fontFamily),titleBigger:parseFloat(t.fontSize)>=parseFloat(m.fontSize)};document.documentElement.style.fontSize='';b.remove();return o;})()`),{font:true,titleBigger:true},'the panel row title uses the page font and a size that scales');
  assert.equal(await ev(`document.querySelector('.agent-ui-send').disabled`),true);
  await type('Build an architecture diagram\nInclude service dependencies.');
  await ev(`window.input=document.querySelector('.agent-ui-prompt');input.focus();input.setSelectionRange(7,12);await ui.refreshAgentUI()`);

@@ -240,6 +240,7 @@ function renderDirectory(nodes, path, level) {
     const dir = record(path);
     for (const entry of dir.entries) {
         const cleanName = entry.name.replace(/\/$/, '');
+        if (cleanName === '.git') continue; // git's own folder is not the agent's work: hidden (#7653)
         const child = entry.path || `${path === '.' ? '' : path + '/'}${cleanName}`;
         const isDir = entry.type === 'dir';
         let row = rowByPath.get(child);
@@ -325,17 +326,20 @@ function render() {
         const heading = element('div','explorer-heading');
         rootLabel = element('span','explorer-root');
         const actions=element('div','team-artifact-actions');
-        refreshButton=element('button','team-artifacts-action','Refresh');refreshButton.type='button';
+        refreshButton=element('button','team-artifacts-action team-artifact-icon-btn');refreshButton.type='button';
+        refreshButton.innerHTML='<span class="material-icons" aria-hidden="true">refresh</span>';refreshButton.title='Refresh';refreshButton.setAttribute('aria-label','Refresh');
         refreshButton.addEventListener('click',()=>{reset();load('.');});
-        collapseButton=element('button','team-artifacts-action','Collapse all');collapseButton.type='button';
+        collapseButton=element('button','team-artifacts-action team-artifact-icon-btn');collapseButton.type='button';
+        collapseButton.innerHTML='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4l5 5 5-5M7 20l5-5 5 5"/></svg>';collapseButton.title='Collapse all';collapseButton.setAttribute('aria-label','Collapse all');
         collapseButton.addEventListener('click',()=>{expanded.clear();focused=null;render();});
         actions.append(refreshButton,collapseButton);heading.append(rootLabel,actions);
         tree=element('div','explorer-tree');tree.setAttribute('role','tree');tree.setAttribute('aria-label','Working directory');
         tree.addEventListener('keydown',handleKeydown);
         root.replaceChildren(heading,tree);
     }
-    const label = rootPath || 'Working directory';
-    if (rootLabel.textContent !== label) {rootLabel.textContent=label;rootLabel.title=rootPath;}
+    // The folder's name, its whole path as the title (a long absolute path above the tree was the page's loudest line).
+    const label = (rootPath && rootPath.replace(/[\\/]+$/, '').split(/[\\/]/).pop()) || rootPath || 'Working directory';
+    if (rootLabel.textContent !== label || rootLabel.title !== (rootPath || '')) {rootLabel.textContent=label;rootLabel.title=rootPath || '';}
     refreshButton.disabled=!session;collapseButton.disabled=!expanded.size;
     const nodes=[];
     visibleRows=[];

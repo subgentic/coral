@@ -30,6 +30,7 @@ export function createEventSearch(cfg) {
         noun: 'ev' + 'ent', // spelled in two parts: the icon-name lint reads that quoted word as an icon name
         label: 'Search and filter activity',
         searchLabel: 'Search activity',
+        collapsible: true, // the agents tab's pattern (#5293): one icon opens Filters and Sort, the count beside it
         placeholder: 'Search activity',
         sorts: { values: SORTS, labels: SORT_LABEL, aria: 'Sort activity' },
         fields: [

@@ -65,7 +65,7 @@ async function run() {
         await settle(`!!document.querySelector('#history-event-search-bar .list-bar-search') && document.querySelectorAll('#history-events-list .event-item').length === 120`, 'the bar and the session\'s 120 events');
 
         console.log('The session\'s events, with nothing asked for');
-        check('the bar is above the list and is its only filter button (the older tool-group menu is gone), and the events are all there', (await ev(`!document.getElementById('history-event-search-bar').hidden && document.querySelectorAll('#history-tab-activity .list-bar-filter-btn').length === 1 && !document.querySelector('.filter-dropdown-btn, #history-event-filters')`)) && (await rows()).length === 120);
+        check('the bar is above the list and is its only filter button (the older tool-group menu is gone), and the events are all there', (await ev(`!document.getElementById('history-event-search-bar').hidden && document.querySelectorAll('#history-tab-activity .list-bar-toggle').length === 1 && !document.querySelector('.filter-dropdown-btn, #history-event-filters')`)) && (await rows()).length === 120);
         check('the count says nothing yet, and so does the status region', (await count()) === '' && (await region()) === '', JSON.stringify([await count(), await region()]));
 
         console.log('A text search covers every event of the session');
@@ -125,7 +125,7 @@ async function run() {
         await ev(`document.getElementById('hev-g-read').click(); true`);
         await settle(`document.querySelectorAll('#history-events-list .event-item').length === 90`, 'the list without Read');
         check('Show Read unticked hides the 30 Reads, nothing is asked of the server', (await rows()).every(s => !s.startsWith('Read ')) && (await ev(`window.__evReqs`)) === 0, `${(await rows()).length} rows`);
-        check('a chip names it, the Filters button counts it, and the page keeps it in its Set', (await ev(`[...document.querySelectorAll('#history-event-search-bar .list-bar-chip-text')].map(e => e.textContent).join()`)) === 'Hidden: Read' && (await ev(`document.querySelector('#history-event-search-bar .list-bar-filter-btn').textContent`)) === 'Filters (1)' && (await ev(`[...window.__coral.historyFilterHidden].join()`)) === 'read');
+        check('a chip names it, the filters icon counts it, and the page keeps it in its Set', (await ev(`[...document.querySelectorAll('#history-event-search-bar .list-bar-chip-text')].map(e => e.textContent).join()`)) === 'Hidden: Read' && (await ev(`document.querySelector('#history-event-search-bar .list-bar-toggle').getAttribute('aria-label')`)) === 'Filters and sort, 1 on' && (await ev(`[...window.__coral.historyFilterHidden].join()`)) === 'read');
         await type('#hev-search', 'read notes');
         await settle(`document.querySelector('#history-event-search-bar .list-bar-count').textContent === '30 events'`, 'the 30 reads');
         check('a search with Read hidden: the server counts 30, the rows are filtered out, and it says so', (await ev(`document.querySelector('#history-events-list .event-empty')?.textContent`)) === 'All events filtered out', await count());
