@@ -14,7 +14,8 @@ import (
 
 // #354: the heavy tests that only compute run in parallel with each other. Go runs the parallel tests after every sequential test of the package has finished, so the tests that measure
 // time (the linearity guards) run alone first, on a quiet machine, and the ones below never run beside them. A test that measures time, changes the environment or swaps a package-level
-// value must not be parallel: this fails when one is.
+// value must not be parallel: this fails when one is. The limit: it reads each test's own body only, so a parallel test that reaches the clock or the environment through a helper is
+// not caught; a new helper that does either must not be called from a parallel test (the review's job, as the timing tests' being sequential is).
 func TestNoParallelTestMeasuresTimeOrChangesTheEnvironment(t *testing.T) {
 	files, err := filepath.Glob("*_test.go")
 	require.NoError(t, err)

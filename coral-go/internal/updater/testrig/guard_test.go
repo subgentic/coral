@@ -43,6 +43,12 @@ func releasedPrograms(t *testing.T) []string {
 
 // No program a release ships links the fake Sigstore, the rehearsal's packages, or sigstore-go's test CA, on any platform or build tier: the rig's keys and
 // its trust of them exist only in the rehearsal's own program.
+// cgoOnly says whether a released program is known not to build without cgo on goos (CGO_ENABLED=0 is how every list here is made): the native app window, on Linux and macOS (on
+// Windows it builds without cgo). Such a program is checked where it builds; any other failure of a list is a program that would drop out of this guard.
+func cgoOnly(prog, goos string) bool {
+	return prog == "coral-app" && (goos == "linux" || goos == "darwin")
+}
+
 func TestNoReleasedProgramLinksTheRehearsalOrAFakeSigstore(t *testing.T) {
 	if testing.Short() {
 		t.Skip("runs go list over every released program")
@@ -81,6 +87,24 @@ func TestNoReleasedProgramLinksTheRehearsalOrAFakeSigstore(t *testing.T) {
 		}()
 	}
 	wg.Wait()
+	// A list that failed is tried once more, alone: under six-way load a transient failure must not make a program look like one that is not built here. What still fails is skipped only if it
+	// is a known program that needs cgo (the GUI ones, checked where they build); any other skip fails the test, so a program cannot drop out of this release-trust guard unnoticed.
+	var skipped []string
+	for k, j := range jobs {
+		if oks[k] {
+			continue
+		}
+		cmd := exec.Command("go", "list", "-deps", "-tags", j.tags, "-f", "{{.ImportPath}}", "./cmd/"+j.prog)
+		cmd.Dir = root
+		cmd.Env = append(os.Environ(), "GOOS="+j.goos, "GOARCH=amd64", "CGO_ENABLED=0")
+		if out, err := cmd.CombinedOutput(); err == nil {
+			outs[k], oks[k] = string(out), true
+			continue
+		}
+		skipped = append(skipped, j.prog+" ("+j.goos+", "+j.tags+")")
+		assert.True(t, cgoOnly(j.prog, j.goos), "go list failed twice for %s (%s, %s), which is not a known cgo-only program: it would drop out of this check", j.prog, j.goos, j.tags)
+	}
+	t.Logf("skipped (cgo-only programs, checked where they build): %v", skipped)
 	checked := 0
 	for k, j := range jobs {
 		if !oks[k] {
