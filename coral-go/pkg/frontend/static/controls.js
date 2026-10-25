@@ -214,7 +214,7 @@ export async function sendCommand({ nudge = false } = {}) {
             const result = await resp.json();
             if (result.held) {
                 // The agent waits on a question for the person (#6610): the server holds the message and types it once none is left. It shows in the chat then; no "Sent" now.
-                removePendingMessage(sentSessionId, sentAt);
+                removePendingMessage(sentSessionId, sentAt, { announce: false }); // held, not refused: the toast below says so, and the box stays empty (it was announced as not sent, #352)
                 clearAttachments(targetSession);
                 const heldKey = sessionKey(targetSession);
                 if (heldKey) saveSessionDraft(heldKey, "");
