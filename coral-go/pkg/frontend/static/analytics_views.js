@@ -1,6 +1,6 @@
 /* The Analytics tab's list of views (#7473, UI/UX's part-2 audit): the sidebar lists the views (Overview, one per table, the two per-team ones) and the page shows the one chosen, so the
  * page is one view at a time under a 20/700 title: its name, the time range and the live mark under it. Every section of the page carries data-cview, and the page's data-view
- * says which one is on screen (cost_dashboard.css shows only that one). The time range is in the sidebar's Display options. On a phone the list is the page and a view is the screen after it. */
+ * says which one is on screen (cost_dashboard.css shows only that one). The time range is a select in the page's header beside Refresh (#7666). On a phone the list is the page and a view is the screen after it. */
 import { escapeHtml, escapeAttr } from './utils.js';
 import { isPhoneLayout } from './phone_layout.js';
 import { setText } from './dom_write.js';
@@ -42,7 +42,7 @@ export function drawViews() {
 
 export function filterViews(text) { query = String(text || ''); drawViews(); }
 
-/** The time range as the page says it under the title ("Last 24 hours"), from the sidebar's select. */
+/** The time range as the page says it under the title ("Last 24 hours"), from the header's select. */
 export function syncRangeLine() {
     const sel = document.getElementById('cost-time-range');
     const opt = sel && sel.options[sel.selectedIndex];

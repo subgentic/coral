@@ -65,7 +65,7 @@ const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve
             assert.deepEqual(await ev(`[...document.querySelectorAll('${pane} li .row-btn')].map(b => b.textContent.trim())`), VIEWS, at + 'the list is the views, in order');
             assert.equal(await ev(`document.querySelector('${pane} li .row-btn[aria-current="true"]').textContent.trim()`), 'Overview', at + 'Overview is the one open');
             assert.equal(await ev(`document.querySelector('${pane} .sidebar-search-input').getAttribute('aria-label')`), 'Search views', at + 'the search is named for the tab');
-            assert.equal(await ev(`document.querySelector('${pane} [data-display-button]').getAttribute('aria-label')`), 'Display options', at + 'Display options is there');
+            assert.equal(await ev(`!!document.querySelector('${pane} [data-display-button]')`), false, at + 'no Display options here: the time range is in the page header (#7666)');
             assert.equal(await ev(`!!document.querySelector('${pane} .sidebar-footer')`), false, at + 'no pinned action: nothing is created here');
             assert.equal(await ev(`[...document.querySelectorAll('${pane} .group-toggle-btn')].some(b => b.getClientRects().length > 0)`), false, at + 'no Expand or collapse all: there are no groups');
             assert.equal(await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth`), true, at + 'no sideways scroll');
@@ -82,6 +82,9 @@ const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve
                 assert.equal(await ev(`document.querySelector('.cost-phone-back').textContent.trim()`), '← Back to the list', at + 'with the way back');
                 assert.equal(await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1`), true, at + 'no sideways scroll on the view');
                 await shot(`analytics-one-view-${w}`);
+                const pr = await ev(`(() => { const s = document.getElementById('cost-time-range'), r = s.getBoundingClientRect(), b = document.querySelector('.cost-header-actions [data-on-click="cost-refresh"]').getBoundingClientRect(); return { count: document.querySelectorAll('#cost-time-range').length, shown: r.width > 0, beside: Math.abs((r.top + r.bottom) / 2 - (b.top + b.bottom) / 2) < 8 && r.right <= b.left + 1, inView: r.top >= 0 && r.bottom <= innerHeight && r.right <= innerWidth && scrollY === 0, h: Math.round(r.height), side: document.documentElement.scrollWidth - document.documentElement.clientWidth }; })()`);
+                assert.ok(pr.count === 1 && pr.shown && pr.beside && pr.inView && pr.h >= 44 && pr.side <= 0, at + 'the phone view has the time range in the header beside Refresh, 44 px, in view without scrolling: ' + JSON.stringify(pr));
+                await shot(`analytics-one-range-${w}`);
                 await ev(`document.querySelector('.cost-phone-back').click(); true`);
                 await waitFor(`document.getElementById('mobile-analytics-list').getClientRects().length > 0 && document.getElementById('cost-page').getClientRects().length === 0`, at + 'back is the list', 4000);
                 assert.equal(await ev(`document.activeElement.dataset.view`), 'model', at + 'back puts the focus on the view just left, not on the first row');
@@ -123,12 +126,24 @@ const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve
             await shot(`analytics-one-provider-${w}`);
             for (const label of ['By thinking level', 'By team', 'Tokens per commit', 'Task time']) { await choose(label); await shot(`analytics-one-${label.toLowerCase().replace(/ /g, '-')}-${w}`); }
 
-            // the time range is in Display options and the page says it
-            await ev(`document.querySelector('${pane} [data-display-button]').click(); true`);
-            assert.equal(await ev(`document.querySelector('${pane} [data-display-panel] select').getAttribute('id')`), 'cost-time-range', at + 'the range is a Display option');
+            // the time range is one select in the page header, beside Refresh, on every view; the sidebar has no copy (#7666)
+            assert.equal(await ev(`!!document.querySelector('${pane} [data-display-button]') || !!document.querySelector('${pane} #cost-time-range')`), false, at + 'the sidebar has no Display options and no Time range');
+            const range = () => ev(`(() => { const s = document.getElementById('cost-time-range'), r = s && s.getBoundingClientRect(); const b = document.querySelector('.cost-header-actions [data-on-click="cost-refresh"]'), q = b && b.getBoundingClientRect(); const h = document.querySelector('.cost-header').getBoundingClientRect();
+                return s ? { count: document.querySelectorAll('#cost-time-range').length, name: s.getAttribute('aria-label'), shown: r.width > 0 && getComputedStyle(s).visibility !== 'hidden', inActions: !!s.closest('.cost-header-actions'), beside: q.width > 0 && Math.abs((r.top + r.bottom) / 2 - (q.top + q.bottom) / 2) < 8 && r.right <= q.left + 1, right: r.right <= h.right + 1 && r.left >= 0, inView: r.top >= 0 && r.bottom <= innerHeight && scrollY === 0, h: Math.round(r.height) } : null; })()`);
+            for (const label of VIEWS) {
+                await choose(label);
+                const r = await range();
+                assert.ok(r && r.count === 1 && r.shown && r.inActions && r.beside && r.right && r.inView, at + `${label}: the time range is in the header beside Refresh, reachable without scrolling: ` + JSON.stringify(r));
+                assert.equal(r.name, 'Time range', at + `${label}: the select is named`);
+                if (mobile) assert.ok(r.h >= 44, at + `${label}: a 44 px target on a phone: ` + r.h);
+            }
+            await choose('Overview');
             await ev(`(() => { const s = document.getElementById('cost-time-range'); s.value = 'week'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
             await waitFor(`document.getElementById('cost-range-text').textContent === 'Last 7 days'`, at + 'the page says the range', 5000);
-            await ev(`document.querySelector('${pane} [data-display-button]').click(); true`);
+            await choose('Task time');
+            assert.equal(await ev(`document.getElementById('cost-time-range').value`), 'week', at + 'the one state follows to the other views');
+            await shot(`analytics-one-range-${w}`);
+            await choose('Overview');
 
             // the search narrows the list
             await ev(`(() => { const i = document.querySelector('${pane} .sidebar-search-input'); i.value = 'team'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
