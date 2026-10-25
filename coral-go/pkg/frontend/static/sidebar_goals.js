@@ -61,7 +61,7 @@ export function goalsTreeHtml(team) {
     const b = entry(team);
     if (b.goals === null) { readGoals(team); return ''; }
     if (!b.goals.length) return '';
-    let html = '';
+    let html = '<li class="sidebar-goals-head"><h3 class="sidebar-goals-title">Goals</h3></li>';
     for (const g of b.goals) {
         const open = b.open.has(g.id);
         const count = g.total ? `${g.done} of ${g.total} done` : 'No tasks';

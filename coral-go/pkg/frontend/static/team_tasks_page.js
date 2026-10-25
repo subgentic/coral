@@ -81,7 +81,7 @@ function draw() {
     const held = a && body.contains(a) ? { filter: a.dataset.filter, task: a.dataset.taskId, cls: a.className, text: a.textContent } : null;
     body.replaceChildren();
     const c = counts();
-    const chips = el('div', 'goals-chips'); chips.setAttribute('role', 'group'); chips.setAttribute('aria-label', 'Show tasks that are');
+    const chips = el('div', 'goals-chips goals-chips-row'); chips.setAttribute('role', 'group'); chips.setAttribute('aria-label', 'Show tasks that are');
     for (const [key, label] of FILTERS) {
         const b = btn('goals-chip', `${label} ${c[key]}`, () => { model.filter = key; say(`${label}: ${c[key]} tasks`); draw(); });
         b.setAttribute('aria-pressed', String(model.filter === key)); b.dataset.filter = key;
@@ -89,6 +89,7 @@ function draw() {
         chips.append(b);
     }
     const bar = el('div', 'goals-toolbar'); bar.append(chips); body.append(bar);
+    chips.querySelector('[aria-pressed="true"]')?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
     if (model.failed) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, model.failed), btn('btn btn-small', 'Try again', loadTasks)); body.append(f); }
     if (model.loading) body.append(el('p', 'goals-note', 'Loading tasks…'));
     else if (!model.rows.length) { if (!model.failed) { const e = el('div', 'goals-empty'); e.append(el('p', null, 'No tasks yet')); body.append(e); } }
