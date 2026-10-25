@@ -126,7 +126,7 @@ function drawCounts() {
     for (const t of TEAM_TABS) {
         const c = document.querySelector(`#team-tab-${t} .team-tab-count`); if (!c) continue;
         const n = S.counts[t];
-        const text = n == null ? '' : String(n);
+        const text = n ? String(n) : ''; // no badge at zero or unknown: one rule for every tab
         if (c.textContent !== text) c.textContent = text;
         c.hidden = !text;
         const label = $(`team-tab-${t}`).querySelector('.team-tab-label');

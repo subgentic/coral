@@ -49,6 +49,7 @@
 .goals-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .goals-table-page .goals-chips-row { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; min-width: 0; flex: 1; gap: 6px; } /* one line that scrolls sideways, its scrollbar hidden: the Goals and Tasks chips are alike */
 .goals-table-page .goals-chips-row::-webkit-scrollbar { display: none; }
+.goals-table-page .goals-chips-more { -webkit-mask-image: linear-gradient(to right, currentColor calc(100% - 28px), transparent); mask-image: linear-gradient(to right, currentColor calc(100% - 28px), transparent); } /* the strip's edge never shows a half chip as if it were the end: the last 28 px fade while more is scrolled out of sight */
 .goals-table-page .goals-chip { flex: none; min-height: 32px; white-space: nowrap; }
 .goals-table-page .goals-new { flex: none; }
 .goals-table-page .goals-back { display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; padding: 4px 0; min-height: 36px; }
@@ -102,10 +103,16 @@
 .detail-foot .btn-danger { color: var(--error-text); border-color: var(--error); background: transparent; margin-left: auto; } /* one danger button: error-colour text with a 1 px error-colour edge, no fill, the size of the other buttons (UI/UX) */
 .team-table-scroll { overflow-x: auto; max-width: 100%; }
 .detail-foot a.btn { text-decoration: none; display: inline-flex; align-items: center; }
-#team-panel-messages { padding: 0 16px; }
+#team-panel-messages { padding: 20px 24px 0; } /* the same top as the other tabs, and the search row's left edge where theirs is (the messages themselves stay on the tables' edge) */
+#team-panel-messages .mb-tools { padding: 0; }
+#team-panel-messages .list-bar-filter-btn { background: var(--bg-tertiary); font-weight: 500; min-height: 32px; padding: 0 12px; } /* Filters, Jump to first and Jump to latest are the page's buttons: 13/500 on the tertiary fill, as Add agent and More (UI/UX #7588 item 4) */
+#team-panel-messages .list-bar-filter-btn:hover { background: var(--bg-hover); }
+#team-panel-messages .mb-tools .list-bar-bar { padding: 4px 12px 8px; }
 .team-row-phone { display: none; font-size: 0.75rem; color: var(--text-secondary); }
 
 @media (max-width: 760px) {
+    #team-panel-messages { padding: 12px 16px 0; }
+    #team-panel-messages .mb-tools { padding: 0 12px; } /* the Search row starts where the other tabs' search box does */
     .team-page-head, .team-tabs { padding-left: 16px; padding-right: 16px; }
     .team-page-head { flex-wrap: nowrap; padding-top: 8px; min-height: 0; gap: 2px 8px; display: grid; grid-template-columns: minmax(0, 1fr) auto; }
     .team-page-title { font-size: 1.0625rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* 17/700, one line: at 200% text the header and the tabs stay near a quarter of the screen */
@@ -154,9 +161,9 @@
 .team-chip:hover { background: var(--bg-hover); }
 .team-chip[aria-pressed="true"] { background: var(--bg-tertiary); border-color: var(--accent); color: var(--text-primary); font-weight: 600; }
 .team-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.team-remind { white-space: nowrap; }
+.team-table .team-remind { white-space: nowrap; margin: -5px 0; } /* in its cell, left-aligned with the column header and on the name's line: the .btn-small side margin and its height are taken out of the row */
 .team-agent-tasks { margin: 0; padding-left: 18px; }
-@media (max-width: 767px), (pointer: coarse) { .team-chip, .team-remind { min-height: var(--control-touch-height, 44px); } }
+@media (max-width: 767px), (pointer: coarse) { .team-chip, .team-remind { min-height: var(--control-touch-height, 44px); } .team-table .team-remind { margin: -12px 0; } }
 
 /* The Settings tab (stage 3): one page of four sections, rows with the label and hint at the left and the control at the right, and a bar pinned under it (the status line, Cancel at the left, Save settings at the right). */
 .team-settings-page { flex: 1; min-height: 0; display: flex; flex-direction: column; container-type: inline-size; }

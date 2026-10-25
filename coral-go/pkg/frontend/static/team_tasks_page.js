@@ -15,6 +15,8 @@ const TF = await importOnce('./task_filters.js');
 
 const PAGE = 50;
 const FILTERS = [['open', 'Open'], ['all', 'All'], ['queued', 'Queued'], ['active', 'In progress'], ['blocked', 'Blocked'], ['review', 'In review'], ['done', 'Done']];
+const PHONE = matchMedia('(max-width: 760px)'); // the team page's phone layout (team_page.css)
+let phoneWatched = false, newTask = null; // one New task button, moved between the search row and the chips' row
 const emptyQuery = () => ({ rows: [], phase: 0, cursor: '', total: null, doneTotal: 0, truncated: false, busy: false, error: '' });
 // Hide completed (the old tab's toggle, same stored key): the Open chip, chosen until the person picks All; kept in this browser (#7453).
 const HIDE_KEY = 'coral-hide-completed';
@@ -152,6 +154,7 @@ const counts = () => {
 
 function draw() {
     const body = root && root.querySelector('.team-tasks-body'); if (!body) return;
+    if (!phoneWatched) { phoneWatched = true; PHONE.addEventListener('change', () => draw()); }
     ensureBar();
     const a = document.activeElement;
     const held = a && body.contains(a) && !bar.node.contains(a) ? { filter: a.dataset.filter, task: a.dataset.taskId, cls: a.className, text: a.textContent } : null;
@@ -166,8 +169,13 @@ function draw() {
         if (!c[key] && key !== 'all') b.classList.add('goals-chip-zero');
         chips.append(b);
     }
-    const tools = el('div', 'goals-toolbar'); tools.append(chips, btn('btn btn-primary goals-new', 'New task', () => { (window.showCreateTaskModal || (() => {}))(); })); body.append(tools);
+    newTask = newTask || btn('btn btn-primary goals-new', 'New task', () => { (window.showCreateTaskModal || (() => {}))(); });
+    const tools = el('div', 'goals-toolbar'); tools.append(chips); body.append(tools);
+    // on a phone New task is on the search row, so the chip strip has the whole width; on a desktop it stays beside the chips
+    if (PHONE.matches) bar.node.querySelector('.list-bar-search-row').append(newTask); else tools.append(newTask);
     chips.querySelector('[aria-pressed="true"]')?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+    const fade = () => chips.classList.toggle('goals-chips-more', chips.scrollWidth - chips.clientWidth - chips.scrollLeft > 1); // a chip cut by the strip's edge fades out: more is there, sideways
+    chips.addEventListener('scroll', fade, { passive: true }); requestAnimationFrame(fade);
     const count = query && L.total != null && L.total > all.length ? `Showing ${all.length} of ${L.total}${L.truncated ? '+' : ''}` : `${all.length} task${all.length === 1 ? '' : 's'}`;
     if (all.length && !model.loading) body.append(el('p', 'goals-note team-count-line', count));
     if (failed) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, failed), btn('btn btn-small', 'Try again', loadTasks)); body.append(f); }

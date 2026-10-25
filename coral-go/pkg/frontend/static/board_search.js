@@ -10,8 +10,8 @@ const SPEC = {
     idp: 'bm',
     noun: 'message',
     label: 'Search and filter the board',
-    searchLabel: 'Search this board',
-    placeholder: 'Search this board',
+    searchLabel: 'Search messages',
+    placeholder: 'Search messages',
     sorts: null,
     fields: [
         { type: 'text', key: 'from', id: 'bm-from', className: 'list-bar-by', label: 'From', max: 80, placeholder: 'Agent or person', datalist: 'bm-from-list' },
