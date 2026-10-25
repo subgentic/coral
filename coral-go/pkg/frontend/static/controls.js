@@ -561,8 +561,7 @@ async function showRestartModal() {
     // never goes out with an empty config. A failed load already showed a toast.
     try { await loadModals(); } catch { return; }
     const s = state.currentSession;
-    document.getElementById("restart-modal-name").textContent =
-        `Restarting: ${s.display_name || s.name}`;
+    document.getElementById('restart-wizard').dataset.who = s.display_name || s.name; // said in the header's step line (restartStage)
 
     // Render unified config form pre-filled from session
     if (window.renderAgentConfigForm) {
@@ -600,7 +599,10 @@ export function restartStage(arg) {
     if (!RESTART_STAGES.includes(to)) return;
     wiz.dataset.stage = to;
     const sub = `Step ${RESTART_STAGES.indexOf(to) + 1} of ${RESTART_STAGES.length}: ${RESTART_STAGE_NAMES[to]}`;
-    document.getElementById('restart-stage-sub').textContent = sub;
+    const subEl = document.getElementById('restart-stage-sub'); // the one header line New Agent has: the step, then who: "Step 1 of 2: Persona. Restarting <b>name</b>" (#7689)
+    const who = wiz.dataset.who || '';
+    subEl.textContent = '';
+    if (who) { subEl.append(`${sub}. Restarting `); const b = document.createElement('b'); b.textContent = who; subEl.append(b); } else subEl.textContent = sub;
     document.getElementById('restart-back').hidden = to === 'persona';
     document.getElementById('restart-next').hidden = to === 'agent';
     const live = document.getElementById('restart-stage-live'); if (live) live.textContent = sub;

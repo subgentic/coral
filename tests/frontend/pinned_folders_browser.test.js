@@ -85,7 +85,7 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         const chooser = await ev(`(() => { const cards = [...document.querySelectorAll('#launch-step-chooser .launch-type-card')].filter(c => c.getClientRects().length);
             const tops = cards.map(c => Math.round(c.getBoundingClientRect().top));
             return { labels: cards.map(c => c.querySelector('.launch-type-label').textContent.trim()), oneRow: new Set(tops).size === 1 }; })()`);
-        check('the +New chooser offers Open Folder, the four choices in one row', chooser.labels.includes('Open Folder') && chooser.labels.length === 4 && chooser.oneRow, JSON.stringify(chooser));
+        check('the +New chooser offers Open Folder, the four choices in one row', chooser.labels.includes('Open folder') && chooser.labels.length === 4 && chooser.oneRow, JSON.stringify(chooser));
         await ev(`document.getElementById('launch-type-open-folder').click(); true`);
         await until(`getComputedStyle(document.getElementById('open-folder-modal')).display !== 'none'`, 'the Open folder dialog from +New');
         const fromNew = await ev(`({ dialog: getComputedStyle(document.getElementById('open-folder-modal')).display !== 'none', launch: getComputedStyle(document.getElementById('launch-modal')).display })`);

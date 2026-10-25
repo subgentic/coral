@@ -147,7 +147,7 @@ const SLEEPING_PLACEHOLDER = '';
         await firstPage();
         await ev(`document.getElementById('sleeping-restart-btn').click()`);
         await waitFor(`getComputedStyle(document.getElementById('restart-modal')).display !== 'none'`, 'restart modal', 2000);
-        assert.match(await ev(`document.getElementById('restart-modal-name').textContent`), /qa-sleep-r/);
+        assert.match(await ev(`document.getElementById('restart-stage-sub').textContent`), /qa-sleep-r/);
         await ev(`window.hideRestartModal ? window.hideRestartModal() : (document.getElementById('restart-modal').style.display = 'none')`);
         console.log('   ✓ restart modal opens for the sleeping agent');
 

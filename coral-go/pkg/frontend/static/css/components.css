@@ -4409,10 +4409,9 @@ body:has(#nav-tab-hub-inbox.active) #saved-btn .saved-count { display: none; }
 .launch-field-head label, .launch-field-head span:first-child { margin: 0; flex: none; } /* the label stays on one line; "optional" wraps under it at 200% text (UI/UX, #7407) */
 .sd-modal-content.restart-wizard-content :is(.settings-pane, .acf-persona-page) textarea.acf-prompt { font-family: inherit; font-size: var(--fs-md, .875rem); }
 .sd-modal-content.restart-wizard-content .acf-persona-page textarea.acf-prompt { min-height: 16rem; resize: vertical; } /* the prompt is the person's writing: the product font, not mono */
-.launch-required { color: var(--warning-text, var(--warning)); font-size: .6875rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.launch-required { color: var(--warning-text, var(--warning)); font-size: .75rem; font-weight: 600; } /* sentence case like every other badge (UI/UX's consistency pass 2, #7689) */
 .launch-optional { color: var(--text-secondary); font-size: .75rem; font-weight: 400; }
 .launch-recent-label { align-self: center; color: var(--text-secondary); font-size: .8125rem; }
-.launch-next-line { margin: 18px 0 0; }
 .launch-persona-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 6px; }
 .launch-persona-row .agent-preset-selector { flex: 1 1 14rem; min-width: 0; }
 .launch-persona-row .agent-preset-select { width: 100%; max-width: none; }
