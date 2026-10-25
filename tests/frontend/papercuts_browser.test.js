@@ -82,7 +82,7 @@ const BASE = require('./test_base').BASE;
 
         // ── (7) Chats with nothing open: its own empty state, not the Agents home.
         await ev(`switchNavTab('history'); true`);
-        await waitFor(`getComputedStyle(document.getElementById('chats-empty-view')).display !== 'none'`, 'the chats empty state');
+        await waitFor(`getComputedStyle(document.getElementById('chats-empty-view')).display !== 'none'`, 'the chats empty state', { diag: `({ tab: document.body.getAttribute('data-nav-tab'), url: location.pathname + location.search, shown: [...document.querySelectorAll('#main-content > *, .main-view, [id$="-view"]')].filter(e => getComputedStyle(e).display !== 'none' && e.getClientRects().length).map(e => e.id).slice(0, 8), session: (window.T && T.state.currentSession) ? T.state.currentSession.type : null })` }); // the diag says which view held the page when it timed out on Windows (#7647)
         assert.equal(await ev(`getComputedStyle(document.getElementById('welcome-screen')).display`), 'none', 'not the Agents home');
         await ev(`switchNavTab('agents'); true`);
         await waitFor(`getComputedStyle(document.getElementById('welcome-screen')).display !== 'none'`, 'the Agents home on Agents');
