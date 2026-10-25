@@ -33,7 +33,7 @@ func (h *SessionsHandler) wakeExistingSession(ctx context.Context, ls *store.Liv
 		}
 		if err == nil && launched {
 			h.noteLaunchedHooks(ctx, ls.SessionID, ls.AgentType)
-			_ = h.ss.StampLaunch(ctx, ls.SessionID) // the launch line was typed now: the safety net's window starts here (#353)
+			h.noteStartSucceeded(ctx, ls.SessionID)          // the launch line was typed now: the safety net's window starts here, and no start failure stands (#353)
 			_ = h.ss.StampSessionSettings(ctx, ls.SessionID) // the CLI now runs with the stored model and level: turns the transcript recorded before are older than them (#6225)
 		}
 	}()

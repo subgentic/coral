@@ -244,7 +244,8 @@ func (r *SessionReconciler) cliMissing(ctx context.Context, ls store.LiveSession
 	if info == nil || info.Binary == "" || !ok {
 		return false
 	}
-	launched, err := time.Parse(store.ISOFormat, ptr.Value(ls.LaunchedAt)) // when Coral last typed the launch line (a wake included)
+	// When Coral last typed the launch line: launched_at, which a wake stamps because it reuses the row; a launch, restart or resume makes a new row, whose created_at is that moment.
+	launched, err := time.Parse(store.ISOFormat, ptr.Value(ls.LaunchedAt))
 	if err != nil {
 		launched, err = time.Parse(store.ISOFormat, ls.CreatedAt)
 	}

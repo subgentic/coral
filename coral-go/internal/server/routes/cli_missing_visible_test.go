@@ -192,3 +192,60 @@ func TestAnAgentCoralStoppedIsRefusedWhileTheCLIIsMissingAndWakesOnceItIsFixed(t
 	assert.Nil(t, ls.SleepReason)
 	assert.Equal(t, 1, failedLines(), "no further line")
 }
+
+// A restart or resume of a failed agent, once the CLI is findable, replaces its row with a new one that carries no start failure (ReplaceLiveSession copies only the listed fields), and its
+// launched_at is stamped on it, as a wake stamps its reused row, so the safety net's window starts at the launch line on every start path.
+func TestRestartAndResumeOfAFailedAgentGiveANewRowWithoutTheFailure(t *testing.T) {
+	for _, via := range []string{"restart", "resume"} {
+		t.Run(via, func(t *testing.T) {
+			server, _, _, ss := noCodexFixture(t)
+			ctx := context.Background()
+			board := "tm"
+			require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{AgentName: "codex-failed", AgentType: "codex", WorkingDir: t.TempDir(), SessionID: "codex-failed-1", BoardName: &board}))
+			require.NoError(t, ss.SetSessionSleeping(ctx, "codex-failed-1", true))
+			body := map[string]any{"session_id": "codex-failed-1"}
+			if via == "resume" {
+				body = map[string]any{"session_id": "11111111-2222-4333-8444-555555555555", "agent_type": "codex", "current_session_id": "codex-failed-1"}
+			}
+			code, out := postBody(t, server.URL+"/api/sessions/live/codex-failed/"+via, body)
+			requireCLINotFound(t, code, out, via)
+			old, err := ss.GetLiveSession(ctx, "codex-failed-1")
+			require.NoError(t, err)
+			require.Equal(t, store.StartFailureCLIMissing, ptr.Value(old.StartFailure), "marked by the refused %s", via)
+
+			cliOnlyOnPath(t, "codex")
+			code, out = postBody(t, server.URL+"/api/sessions/live/codex-failed/"+via, body)
+			require.Equal(t, http.StatusOK, code, "%v", out)
+			newID, _ := out["session_id"].(string)
+			require.NotEmpty(t, newID)
+			fresh, err := ss.GetLiveSession(ctx, newID)
+			require.NoError(t, err)
+			require.NotNil(t, fresh)
+			assert.Nil(t, fresh.StartFailure, "the new row carries no failure")
+			assert.EqualValues(t, 0, fresh.IsSleeping)
+			require.NotNil(t, fresh.LaunchedAt, "the launch line's time is stamped on the new row")
+			at, perr := time.Parse(store.ISOFormat, *fresh.LaunchedAt)
+			require.NoError(t, perr)
+			assert.WithinDuration(t, time.Now(), at, time.Minute)
+		})
+	}
+}
+
+// A wake that types the launch line (the agent has no terminal) stamps when, and clears a standing start failure: the safety net's window starts at the line.
+func TestAWakeThatTypesItsLaunchLineStampsItsTimeAndClearsTheFailure(t *testing.T) {
+	_, h, _, ss := noCodexFixture(t)
+	ctx := context.Background()
+	r := chi.NewRouter()
+	r.Post("/api/sessions/live/{sessionID}/wake", h.WakeSession)
+	srv := httptestServer(t, r)
+	sid := "55555555-6666-4777-8888-999999999999"
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: "codex", AgentName: "repo", WorkingDir: t.TempDir(), IsSleeping: 1}))
+	require.NoError(t, ss.SetStartFailure(ctx, sid, store.StartFailureCLIMissing)) // a refusal earlier
+	cliOnlyOnPath(t, "codex")
+	code, body := postBody(t, srv+"/api/sessions/live/"+sid+"/wake", map[string]any{})
+	require.Equal(t, http.StatusOK, code, "%v", body)
+	ls, err := ss.GetLiveSession(ctx, sid)
+	require.NoError(t, err)
+	assert.Nil(t, ls.StartFailure)
+	require.NotNil(t, ls.LaunchedAt, "the wake typed a launch line and stamped its time")
+}

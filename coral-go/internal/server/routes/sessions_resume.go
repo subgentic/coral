@@ -206,7 +206,7 @@ func (h *SessionsHandler) resumeCommand(ctx context.Context, p *restartPlan, age
 	}
 	cliPath, cerr := agent.LaunchCLIScreened(userSettings, p.agentType, h.commonPlaceScreen(ctx)) // a broken cli_path_<agent> refuses the resume (#115)
 	if cerr != nil {
-		h.markStartRefused(ctx, p.sleeping, cerr)
+		h.markStartRefused(ctx, p.stored, cerr)
 		refuse, _ := cliPathRefusal(ctx, cerr)
 		return "", refuse
 	}
@@ -274,6 +274,7 @@ func (h *SessionsHandler) resumeRecord(ctx context.Context, p *restartPlan, resu
 		}(),
 	})
 	h.noteLaunchedHooks(ctx, p.newSessionID, p.agentType) // #3665
+	h.noteStartSucceeded(ctx, p.newSessionID)
 	h.ss.MigrateDisplayName(ctx, oldID, p.newSessionID)
 	h.ss.MigrateSessionTags(ctx, oldID, p.newSessionID)
 	// The new row inherits the sleeping flag; the resumed agent is running now, as after a restart. Left asleep,

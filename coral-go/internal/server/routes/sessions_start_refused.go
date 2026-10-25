@@ -95,3 +95,13 @@ func (h *SessionsHandler) markStartRefused(ctx context.Context, ls *store.LiveSe
 		slog.Warn("could not post an agent's refused start to its board", "session_id", ls.SessionID, "error", perr)
 	}
 }
+
+// noteStartSucceeded is what a restart or resume that typed its launch line records on the new row (a wake does the same on its reused row): when the line was typed, which is where the
+// reconciler's safety net starts its window, and no start failure (the new row has none; this says so, and clears one a future copy of the row might carry).
+func (h *SessionsHandler) noteStartSucceeded(ctx context.Context, sessionID string) {
+	if sessionID == "" || h.ss == nil {
+		return
+	}
+	_ = h.ss.StampLaunch(ctx, sessionID)
+	_ = h.ss.SetStartFailure(ctx, sessionID, "")
+}
