@@ -22,6 +22,7 @@ function check(text) {
             const end = text.indexOf('*/', i + 2);
             const start = line;
             if (end < 0) { note('a comment that never ends', start); return errors; }
+            if (text.slice(i + 2, end).includes('/*')) note('a comment that holds another /* (two comments glued by a cut: the rules between them are inside the comment, #7471)', start);
             line += (text.slice(i, end).match(/\n/g) || []).length; i = end + 2; continue;
         }
         if (c === '"' || c === "'") {
@@ -61,6 +62,7 @@ const samples = {
     'an unclosed block': '.a { color: red;\n.b { color: blue; }\n',
     'a stray }': '.a { color: red; }\n}\n',
     'an unterminated comment': '.a { color: red; } /* never ends\n.b { color: blue; }\n',
+    'two comments glued by a cut': '.a { color: red; }/* one { x: 1; }/* two\n.b { color: blue; }\n*/\n.c { color: green; }\n',
 };
 for (const [name, css] of Object.entries(samples)) if (!check(css).length) { console.error(`[FAIL] the checker misses ${name}`); process.exit(1); }
 const fine = '@charset "utf-8";\n@import url(x.css);\n@media (min-width: 1px) { .a { color: red; background: url(data:image/png;base64,AAAA); } }\n@keyframes k { from { opacity: 0; } to { opacity: 1; } }\n.a { color: red; &:hover { color: blue; } }\n/* a ; in a comment { */\n.b::after { content: "};"; }\n';
