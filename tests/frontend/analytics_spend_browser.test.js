@@ -84,6 +84,8 @@ const FIX = { board: TEAM, range_hours: 24, generated_at: '2026-10-25T10:00:00Z'
             await ev(`document.querySelector('#cost-task-time .spend-toggle [data-key="day"]').click(); true`);
             const rows = await ev(`[...document.querySelectorAll('#cost-task-time .spend-table tbody tr')].map(r => [...r.children].map(c => c.textContent.trim()))`);
             assert.deepEqual(rows, [['Frontend Dev', '5', '52 min', '2'], ['Backend Dev', '3', '34 min', '0']]);
+            const pad = await ev(`(() => { const t = document.querySelector('#cost-task-time .spend-table'); const left = sel => parseFloat(getComputedStyle(t.querySelector(sel)).paddingLeft); return [left('thead th'), left('tbody th[scope=row]'), left('tbody td')]; })()`);
+            assert.ok(pad[1] >= 4 && pad[1] === pad[0], 'the agent names sit as far in as the AGENT header: ' + JSON.stringify(pad));
             await ev(`delete window.__spend.task_time.window.p90_s; delete window.__spend.task_time.window.wait_median_s; true`);
             await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard(); return true; })()`);
             await waitFor(`document.querySelectorAll('#cost-task-time .spend-card').length === 4`, 'two measures left out', 6000);
