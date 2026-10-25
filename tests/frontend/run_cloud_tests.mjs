@@ -1,6 +1,6 @@
 // npm run test:cloud's steps, several at a time (#351): the same steps, read from package.json's test:cloud so the two lists cannot drift, each in its
 // own process with its own temp folder (TMPDIR, TEMP and TMP), longest first from cloud_durations.json. A step's output is printed whole when it ends;
-// the exit code is 1 when any step failed, and every failed step is listed at the end. test:cloud itself stays the serial run.
+// the exit code is 1 when any step failed or never reported, and every such step is listed at the end. test:cloud itself stays the serial run.
 //   node run_cloud_tests.mjs [--jobs N] [--record]
 // --record rewrites cloud_durations.json from this run's passing steps. Every step was checked for fixed ports, shared temp paths and ~/.coral before
 // it ran in parallel: a step that needs any of them goes in SERIAL, and runs alone after the others.
@@ -56,9 +56,13 @@ await Promise.all(Array.from({ length: Math.min(jobs, queue.length) }, async () 
 for (const s of serial) report(await runStep(s));
 
 const failed = results.filter(r => r.code !== 0);
+// A step that never reported (a worker that stopped early) fails the run too: every step of test:cloud must have exactly one result.
+const left = steps.slice();
+for (const r of results) { const i = left.indexOf(r.step); if (i >= 0) left.splice(i, 1); }
 if (record) {
     const d = Object.fromEntries(steps.flatMap(s => { const r = results.find(x => x.step === s && x.code === 0); return r ? [[s, Math.round(r.secs * 10) / 10]] : []; }));
     fs.writeFileSync(DURATIONS, JSON.stringify(d, null, 1) + '\n');
 }
-console.log(`\ntest:cloud in parallel: ${results.length} steps, ${jobs} at a time, ${((Date.now() - t0) / 1000).toFixed(1)} s; ${failed.length ? `${failed.length} failed:\n  ${failed.map(r => r.step).join('\n  ')}` : 'all passed'}`);
-process.exit(failed.length ? 1 : 0);
+console.log(`\ntest:cloud in parallel: ${results.length} of ${steps.length} steps, ${jobs} at a time, ${((Date.now() - t0) / 1000).toFixed(1)} s; ${failed.length ? `${failed.length} failed:\n  ${failed.map(r => r.step).join('\n  ')}` : left.length ? 'none failed' : 'all passed'}`);
+if (left.length) console.log(`${left.length} never reported:\n  ${left.join('\n  ')}`);
+process.exit(failed.length || left.length || results.length !== steps.length ? 1 : 0);
