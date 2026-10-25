@@ -35,7 +35,7 @@ const BASE = require('./test_base').BASE;
             window.__m.add('pv-a', 'P', 4, { sleeping: false, session_id: 'pv-a-id' });
             state.currentSession = { type: 'live', name: 'pv-a', session_id: 'pv-a-id', agent_type: 'claude' }; showView('live-session-view');
             window.PP.setPreviewSession('pv-a-id');
-            window.PP.openArtifactTab('coral://artifacts/' + 'a'.repeat(64), { name: 'a.md', mediaType: 'text/markdown' }); return true; })()`);
+            window.PP.openArtifactTab('coral://artifacts/' + 'a'.repeat(64), { name: 'a.md', mediaType: 'text/markdown' }); if (document.getElementById('preview-pane').classList.contains('preview-phone-full')) document.getElementById('preview-full-back').click(); return true; })()`); // a phone opens it full screen (#7652): this check starts from the docked sheet and tests the full-screen toggle from there
         await waitFor(`getComputedStyle(document.getElementById('preview-pane')).display !== 'none'`, 'the preview pane', 8000);
         await waitFor(`!!document.querySelector('#preview-body .preview-pane-markdown, #preview-body h1')`, 'the artifact drawn', 8000);
     };

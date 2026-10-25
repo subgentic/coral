@@ -505,6 +505,7 @@ export async function refreshChangedFiles() {
     }
 
     const starred = new Set(_getStarredFiles());
+    const heldMore = list.contains(document.activeElement) && document.activeElement.classList.contains('file-more-btn') ? document.activeElement.dataset.path : ''; // the list is drawn again on every poll: the row's More button that had the keyboard gets it back (#7652)
     list.innerHTML = files.map((f) => {
         const { dir, name } = splitPath(f.filepath);
         const statusCls = getStatusClass(f.status);
@@ -542,6 +543,7 @@ export async function refreshChangedFiles() {
             <div class="file-action-btns">${copyBtn}${previewBtn}${editBtn}</div>
         </div>`;
     }).join('');
+    if (heldMore) [...list.querySelectorAll('.file-more-btn')].find(b => b.dataset.path === heldMore)?.focus({ preventScroll: true });
 }
 
 // The changed and starred files' markup (#3645): data-on-* names, never code. The path is the file's
