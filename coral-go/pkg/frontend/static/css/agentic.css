@@ -2449,6 +2449,7 @@ body.panel-dragging .agentic-state {
 .changed-files-header > .changed-files-title { flex: 1 1 0; min-width: 0; flex-wrap: wrap; row-gap: 2px; }
 /* The header is as high as its comparison select from the first draw: the page's "0 files changed" has no select until the first list comes, and the header grew by the select's height when it did (a layout shift on a slow runner, #7671). */
 .changed-files-header > .changed-files-title { min-height: calc(0.8125rem * 1.4 + 10px); }
+@media (pointer: coarse), (max-width: 767px) { .changed-files-header > .changed-files-title { min-height: var(--control-touch-height, 2.75rem); } } /* the select is a touch target there */
 .diff-mode-select { max-width: 100%; }
 
 /* ── The right sidebar on every page (#4539) ─────────────────
