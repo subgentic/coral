@@ -51,6 +51,9 @@ func (h *SessionsHandler) Git(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")
 	sessionID := r.URL.Query().Get("session_id")
 	limit := clampLimit(queryInt(r, "limit", 20), 20, 100)
+	if !h.requireAgentSession(w, r, name, sessionID) { // a bounded caller's snapshots are its own session's, never the name's (#7584)
+		return
+	}
 
 	var snapshots []store.GitSnapshot
 	var err error
