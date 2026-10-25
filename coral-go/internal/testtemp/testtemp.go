@@ -6,35 +6,23 @@
 // `go test ./...` of nothing to run took 908 s. In a private folder the listing is the package's own.
 //
 // Home and data folder: no test may touch the person's real ~/.coral or home (a package's tests stat it thousands of times, and a test that wrote there would write the person's data), so
-// HOME, USERPROFILE and CORAL_DATA_DIR point into the folder as well. The Go tool keeps what it needs from the real home: its build cache, GOPATH and GOENV are fixed to where they
-// were, so a test that runs `go build` or `go list` does not start a cold cache.
+// HOME, USERPROFILE and CORAL_DATA_DIR point into the folder as well. The Go tool keeps what it needs from the real home: its build cache, GOPATH, module cache and settings file are fixed to where `go env` says they are (a person's `go env -w` included), so a test that runs `go build` or `go list` does not start a cold cache.
 package testtemp
 
 import (
+	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 )
 
 // Use points TMPDIR, TMP, TEMP, HOME, USERPROFILE and CORAL_DATA_DIR at a new folder for the rest of the process and returns the func that removes it. A test that sets one of them
 // itself (t.Setenv) still can. If the folder can't be made it changes nothing.
 func Use() (cleanup func()) {
-	// The Go tool's own places first, from the real home, before it is replaced.
-	if os.Getenv("GOCACHE") == "" {
-		if d, err := os.UserCacheDir(); err == nil {
-			os.Setenv("GOCACHE", filepath.Join(d, "go-build"))
-		}
-	}
-	if home, err := os.UserHomeDir(); err == nil {
-		if os.Getenv("GOPATH") == "" {
-			os.Setenv("GOPATH", filepath.Join(home, "go"))
-		}
-	}
-	if os.Getenv("GOENV") == "" {
-		if d, err := os.UserConfigDir(); err == nil {
-			os.Setenv("GOENV", filepath.Join(d, "go", "env"))
-		}
-	}
+	pinGoTool()
 	dir, err := os.MkdirTemp("", "ct-")
 	if err != nil {
 		return func() {}
@@ -64,4 +52,35 @@ func Run(m *testing.M) int {
 func Exit(cleanup func(), code int) {
 	cleanup()
 	os.Exit(code)
+}
+
+// pinGoTool fixes where the Go tool keeps its build cache, GOPATH, module cache and settings file to where they are now, before HOME moves: it asks `go env`, which knows the person's
+// `go env -w` settings, so a test that runs `go build` or `go list` uses the same warm cache and modules. Where `go` can't be asked, the defaults a plain install has are pinned.
+func pinGoTool() {
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	if out, err := exec.CommandContext(ctx, "go", "env", "GOCACHE", "GOPATH", "GOMODCACHE", "GOENV").Output(); err == nil {
+		lines := strings.Split(strings.ReplaceAll(string(out), "\r\n", "\n"), "\n")
+		if len(lines) >= 4 {
+			for i, k := range []string{"GOCACHE", "GOPATH", "GOMODCACHE", "GOENV"} {
+				if v := strings.TrimSpace(lines[i]); v != "" {
+					os.Setenv(k, v)
+				}
+			}
+			return
+		}
+	}
+	if os.Getenv("GOCACHE") == "" {
+		if d, err := os.UserCacheDir(); err == nil {
+			os.Setenv("GOCACHE", filepath.Join(d, "go-build"))
+		}
+	}
+	if home, err := os.UserHomeDir(); err == nil && os.Getenv("GOPATH") == "" {
+		os.Setenv("GOPATH", filepath.Join(home, "go"))
+	}
+	if os.Getenv("GOENV") == "" {
+		if d, err := os.UserConfigDir(); err == nil {
+			os.Setenv("GOENV", filepath.Join(d, "go", "env"))
+		}
+	}
 }
