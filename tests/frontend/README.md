@@ -6,6 +6,15 @@ server and Chrome pairs (temp data directories, `--cloud-url off`) and runs ever
 `coral-go/agent_docs/troubleshooting.md` for the test-server isolation rules and the disk space
 a run needs.
 
+## The node tests: `npm run test:cloud`
+
+`npm run test:cloud` runs the node tests one after another. `npm run test:cloud:parallel` (`node
+run_cloud_tests.mjs [--jobs N]`) runs the same steps, read from `test:cloud`, several at a time:
+longest first from `cloud_durations.json`, each with its own temp folder, each step's output printed
+whole when it ends, and exit code 1 when any step failed. On Windows it took 44 s with 8 jobs, against
+142 s one after another. A new step must not use a fixed port, a shared temp path or `~/.coral`;
+one that has to goes in the runner's `SERIAL` list. `--record` rewrites `cloud_durations.json`.
+
 ## "Failed to fetch dynamically imported module" on a first attempt
 
 A suite that fails on its first attempt with "Failed to fetch dynamically imported module"
