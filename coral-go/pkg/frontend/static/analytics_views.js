@@ -33,9 +33,11 @@ function shown() {
 export function drawViews() {
     const list = document.getElementById('cost-nav-list');
     if (!list) return;
+    const held = list.contains(document.activeElement) ? document.activeElement.dataset.view : null; // the list is drawn again: the keyboard stays on its row
     const rows = shown();
     list.innerHTML = rows.map(v => `<li class="session-list-item${escapeAttr(v.key === current ? ' active' : '')}"><button type="button" class="row-btn"${v.key === current ? ' aria-current="true"' : ''} data-on-click="analytics-view" data-view="${escapeAttr(v.key)}">${escapeHtml(v.label)}</button></li>`).join('')
         || '<li class="empty-state">No view matches the search.</li>';
+    if (held) list.querySelector(`.row-btn[data-view="${CSS.escape(held)}"]`)?.focus({ preventScroll: true });
 }
 
 export function filterViews(text) { query = String(text || ''); drawViews(); }
@@ -69,7 +71,7 @@ export function selectView(key, { focus = false } = {}) {
 export function phoneBack() {
     page()?.removeAttribute('data-phone-item');
     drawViews();
-    document.querySelector('#cost-nav-list .row-btn[aria-current="true"], #cost-nav-list .row-btn')?.focus({ preventScroll: true });
+    (document.querySelector('#cost-nav-list .row-btn[aria-current="true"]') || document.querySelector('#cost-nav-list .row-btn'))?.focus({ preventScroll: true }); // the view just left, else the first
 }
 
 /** The tab was opened: the list is drawn, the view that was open stays (a phone starts at the list). */

@@ -83,6 +83,7 @@ const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve
                 await shot(`analytics-one-view-${w}`);
                 await ev(`document.querySelector('.cost-phone-back').click(); true`);
                 await waitFor(`document.getElementById('mobile-analytics-list').getClientRects().length > 0 && document.getElementById('cost-page').getClientRects().length === 0`, at + 'back is the list', 4000);
+                assert.equal(await ev(`document.activeElement.dataset.view`), 'model', at + 'back puts the focus on the view just left, not on the first row');
                 continue;
             }
 
@@ -102,6 +103,12 @@ const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve
             assert.deepEqual(await ev(`[...document.querySelectorAll('#cost-dashboard-view [data-cview]')].filter(e => e.getClientRects().length).map(e => e.dataset.cview)`).then(a => [...new Set(a)]), ['overview'], at + 'only the Overview parts are shown');
             assert.deepEqual(await ev(`(() => { const t = getComputedStyle(document.querySelector('#cost-dashboard-view .cost-section[data-cview=overview] .cost-section-title')); return [t.fontSize, t.fontWeight]; })()`), ['14px', '600'], at + 'a section heading is 14/600');
             await shot(`analytics-one-overview-${w}`);
+
+            // choosing a view from the keyboard keeps the focus on its row (the list is drawn again, the button was a new one)
+            await ev(`(() => { const b = document.querySelector('${pane} li .row-btn[data-view="model"]'); b.focus(); b.click(); return true; })()`);
+            await waitFor(`document.getElementById('cost-view-title').textContent === 'By model'`, at + 'By model', 4000);
+            assert.equal(await ev(`document.activeElement.dataset.view`), 'model', at + 'the focus is still on the row that was chosen');
+            await choose('Overview');
 
             // a table view: its own section under the title; the section heading is for a reader, not drawn twice
             await choose('By provider');
@@ -148,6 +155,7 @@ const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve
                         const au = await auditRegion(ev, ['.sidebar', '#cost-page']);
                         assert.deepEqual(au.fails.map(f => `${f.sel} ${f.what} ${f.ratio}`), [], how + label + ': contrast');
                         assert.equal(await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1`), true, how + label + ': no sideways scroll');
+                        if (label === 'Overview') assert.deepEqual(await ev(`[...document.querySelectorAll('#cost-summary-cards .cost-card')].filter(c => c.scrollWidth > c.clientWidth + 1 || c.getBoundingClientRect().right > document.getElementById('cost-page').getBoundingClientRect().right + 1 || [...c.querySelectorAll('.cost-card-value, .cost-card-label')].some(v => v.scrollWidth > v.clientWidth + 1)).map(c => c.textContent.trim().slice(0, 20))`), [], how + 'no tile clips its figure or its label (they wrap when the text is large)');
                     }
                 }
                 await setTheme(ev, 'dark'); await ev(`document.documentElement.style.fontSize = ''; true`);
