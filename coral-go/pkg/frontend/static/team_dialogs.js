@@ -750,7 +750,7 @@ async function _openLaunchedTeam(server, boardName, goal, agents, seen, boardSet
     try {
         await seen; // on a remote, until the hub lists the team (or the wait runs out: the post and the open are still tried)
         const unsaved = await applyTeamBoardSettings(key, boardSettings); // Require a goal, the health check's rules and the messaging switches, held until the board existed (#7407)
-        if (unsaved) showToast(unsaved, true);
+        if (unsaved) showToast(unsaved, true, undefined, { action: { label: 'Open Team settings', onClick: () => window.showTeamWorkingModeWorkspace?.(key) } });
         if (goal) {
             const r = await boardFetch(key, '/messages', {
                 method: 'POST',
