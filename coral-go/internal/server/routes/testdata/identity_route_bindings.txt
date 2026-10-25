@@ -93,6 +93,7 @@ GET /api/sessions/live/{name}/file-content | unbound
 GET /api/sessions/live/{name}/file-original | unbound
 GET /api/sessions/live/{name}/files | unbound
 GET /api/sessions/live/{name}/git | unbound
+GET /api/sessions/live/{name}/held | unbound | operator-only
 GET /api/sessions/live/{name}/history/context | token-bound
 GET /api/sessions/live/{name}/history/search | token-bound
 GET /api/sessions/live/{name}/info | unbound
@@ -195,6 +196,7 @@ POST /api/sessions/live/{name}/context-window | token-bound
 POST /api/sessions/live/{name}/events | token-session
 POST /api/sessions/live/{name}/files/refresh | unbound
 POST /api/sessions/live/{name}/goal | unbound | operator-only
+POST /api/sessions/live/{name}/held/send | unbound | operator-only
 POST /api/sessions/live/{name}/keys | unbound | operator-only
 POST /api/sessions/live/{name}/kill | unbound | operator-only
 POST /api/sessions/live/{name}/model | unbound | operator-only

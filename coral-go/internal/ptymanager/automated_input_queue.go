@@ -170,41 +170,61 @@ func (g *inputGate) flushQueue(ctx context.Context, name string) bool {
 			g.mu.Unlock()
 			continue // replaced meanwhile: look again
 		}
-		send := h.in
-		send.heldSince, send.heldWhy, send.heldReported, send.heldReportedPrompt = h.heldAt, h.why, h.reported, h.reportedPrompt
-		send.urgent = mentionWaiting(ctx)
-		for _, behind := range g.held[name] {
-			send.urgent = send.urgent || behind.in.Mention
-		}
-		g.mu.Unlock()
-		enterHeld, err := g.sendChecked(ctx, send)
-		g.mu.Lock()
-		if g.inflight[name] == h { // not already replaced by the send's own hold
-			delete(g.inflight, name)
-		}
-		g.mu.Unlock()
-		if enterHeld {
+		if g.typeHeld(ctx, name, h) == heldAgain { // releases g.mu
 			return true
-		} else if errors.Is(err, ErrTeamBusy) {
-			// Not now (#3613): back at the front, for the loop's next pass.
-			g.mu.Lock()
-			h.why, h.kind = whyTeamSpaced, ""
-			g.held[name] = append([]*heldInput{h}, g.held[name]...)
-			g.mu.Unlock()
-			return true
-		} else if errors.Is(err, ErrNotWanted) {
-			g.shadowForget(name, h.in.Key)
-			slog.Info("automated input dropped after the hold ended: no longer wanted", "session", name, "sender", h.in.What,
-				"held_for", g.now().Sub(h.heldAt).Round(time.Second).String())
-		} else if err != nil {
-			logHeldSendFailure(name, h.in.What, err)
-		} else {
-			g.shadowForget(name, h.in.Key)
-			g.noteDelivered(name, h.in.Key)
-			noteDeliveredText(name, h.in.Text)
-			slog.Info("automated input delivered after the hold ended", "session", name, "sender", h.in.What, "held_for", g.now().Sub(h.heldAt).Round(time.Second).String(), "released", releasedBecause(h.why))
 		}
 	}
+}
+
+// heldOutcome is what typeHeld did with a send taken off the queue.
+type heldOutcome int
+
+const (
+	heldSent  heldOutcome = iota // typed
+	heldAgain                    // held again (its Enter was withheld, or the team's next slot is not due): it is back in the queue
+	heldGone                     // no longer wanted, or its send failed: gone
+)
+
+// typeHeld types h, which the caller took off name's queue and recorded as inflight, with g.mu held, which typeHeld releases once the send is prepared (as flushQueue always did, so a DropHeld cannot come between): it is typed once (it is not in the queue while it goes) and the outcome says
+// where it is now. flushQueue's step once the agent is no longer waiting, and SendHeldNow's, which skips that check.
+func (g *inputGate) typeHeld(ctx context.Context, name string, h *heldInput) heldOutcome {
+	send := h.in
+	send.heldSince, send.heldWhy, send.heldReported, send.heldReportedPrompt = h.heldAt, h.why, h.reported, h.reportedPrompt
+	send.urgent = mentionWaiting(ctx)
+	for _, behind := range g.held[name] {
+		send.urgent = send.urgent || behind.in.Mention
+	}
+	g.mu.Unlock()
+	enterHeld, err := g.sendChecked(ctx, send)
+	g.mu.Lock()
+	if g.inflight[name] == h { // not already replaced by the send's own hold
+		delete(g.inflight, name)
+	}
+	g.mu.Unlock()
+	switch {
+	case enterHeld:
+		return heldAgain
+	case errors.Is(err, ErrTeamBusy):
+		// Not now (#3613): back at the front, for the loop's next pass.
+		g.mu.Lock()
+		h.why, h.kind = whyTeamSpaced, ""
+		g.held[name] = append([]*heldInput{h}, g.held[name]...)
+		g.mu.Unlock()
+		return heldAgain
+	case errors.Is(err, ErrNotWanted):
+		g.shadowForget(name, h.in.Key)
+		slog.Info("automated input dropped after the hold ended: no longer wanted", "session", name, "sender", h.in.What,
+			"held_for", g.now().Sub(h.heldAt).Round(time.Second).String())
+		return heldGone
+	case err != nil:
+		logHeldSendFailure(name, h.in.What, err)
+		return heldGone
+	}
+	g.shadowForget(name, h.in.Key)
+	g.noteDelivered(name, h.in.Key)
+	noteDeliveredText(name, h.in.Text)
+	slog.Info("automated input delivered after the hold ended", "session", name, "sender", h.in.What, "held_for", g.now().Sub(h.heldAt).Round(time.Second).String(), "released", releasedBecause(h.why))
+	return heldSent
 }
 
 // giveUpMentionsBehindDialog gives up every mention held for name behind a dialog for
