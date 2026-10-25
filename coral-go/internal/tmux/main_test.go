@@ -2,6 +2,7 @@ package tmux
 
 import (
 	"github.com/subgentic/coral/internal/testleak"
+	"github.com/subgentic/coral/internal/testtemp"
 	"os"
 	"runtime"
 	"testing"
@@ -11,6 +12,7 @@ import (
 // TestMain removes the tmux variables a developer's shell may carry. Running these tests from inside
 // a Coral (or any tmux) session would otherwise point the tests' tmux clients at that live server.
 func TestMain(m *testing.M) {
+	cleanupTemp := testtemp.Use() // a private temp, home and data folder for this package (#356)
 	os.Unsetenv("TMUX")
 	os.Unsetenv("TMUX_PANE")
 	// The tests' tmux servers start their panes with $SHELL. A developer's interactive shell and its
@@ -20,8 +22,8 @@ func TestMain(m *testing.M) {
 	// Enter (production keeps it for agent TUIs).
 	SetSendKeysSettleForTest(20 * time.Millisecond)
 	code := m.Run()
-	drainAgentPriority()          // the second look at a pane's priority is a timer that can fire after the last test (#5217)
-	os.Exit(testleak.Check(code)) // no goroutine left running (#4167)
+	drainAgentPriority()                             // the second look at a pane's priority is a timer that can fire after the last test (#5217)
+	testtemp.Exit(cleanupTemp, testleak.Check(code)) // no goroutine left running (#4167)
 }
 
 // skipWithoutUnixTmux skips a test that needs a real tmux, its socket, a shell script standing in

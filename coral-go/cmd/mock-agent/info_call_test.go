@@ -11,6 +11,7 @@ import (
 
 	"github.com/subgentic/coral/internal/agent"
 	"github.com/subgentic/coral/internal/agentsignin"
+	"github.com/subgentic/coral/internal/testtemp"
 )
 
 // The test binary is its own mock: with MOCK_AGENT_TEST_MAIN=1 it runs main(), so a test can start "the mock" with real arguments and watch what it does.
@@ -19,7 +20,8 @@ func TestMain(m *testing.M) {
 		main()
 		os.Exit(0)
 	}
-	os.Exit(m.Run())
+	cleanupTemp := testtemp.Use() // a private temp, home and data folder for this package (#356)
+	testtemp.Exit(cleanupTemp, m.Run())
 }
 
 // #5330: a mock-agent that went on into its agent loop on "--version" stayed running after Coral's version probe, in every suite that launched mocks.

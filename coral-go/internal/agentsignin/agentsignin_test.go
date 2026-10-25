@@ -14,6 +14,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/testtemp"
 )
 
 // The tests start this test binary as the stand-in CLI: with AGENTSIGNIN_STANDIN set it acts as "claude auth status --json" or "codex login status" and exits, so no
@@ -22,7 +24,8 @@ func TestMain(m *testing.M) {
 	if mode := os.Getenv("AGENTSIGNIN_STANDIN"); mode != "" {
 		os.Exit(standIn(mode, os.Args[1:]))
 	}
-	os.Exit(m.Run())
+	cleanupTemp := testtemp.Use() // a private temp, home and data folder for this package (#356)
+	testtemp.Exit(cleanupTemp, m.Run())
 }
 
 func standIn(mode string, args []string) int {

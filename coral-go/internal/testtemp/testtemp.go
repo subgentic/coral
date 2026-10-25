@@ -1,0 +1,67 @@
+// Package testtemp gives a test package a private world: its TestMain calls Use (or Run), and the package's tests find one new folder where the system temp folder, the home folder and
+// Coral's data folder would be. It is removed when the package's tests end (#354).
+//
+// Temp: Go's t.TempDir opens the temp folder itself, and `go test` re-lists every directory a cached test opened each time it checks the cache. With a person's real %TEMP% holding
+// hundreds of thousands of entries (Codex launch files that tests left there before they had private folders), every cached package that called t.TempDir paid for that listing: a warm
+// `go test ./...` of nothing to run took 908 s. In a private folder the listing is the package's own.
+//
+// Home and data folder: no test may touch the person's real ~/.coral or home (a package's tests stat it thousands of times, and a test that wrote there would write the person's data), so
+// HOME, USERPROFILE and CORAL_DATA_DIR point into the folder as well. The Go tool keeps what it needs from the real home: its build cache, GOPATH and GOENV are fixed to where they
+// were, so a test that runs `go build` or `go list` does not start a cold cache.
+package testtemp
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
+
+// Use points TMPDIR, TMP, TEMP, HOME, USERPROFILE and CORAL_DATA_DIR at a new folder for the rest of the process and returns the func that removes it. A test that sets one of them
+// itself (t.Setenv) still can. If the folder can't be made it changes nothing.
+func Use() (cleanup func()) {
+	// The Go tool's own places first, from the real home, before it is replaced.
+	if os.Getenv("GOCACHE") == "" {
+		if d, err := os.UserCacheDir(); err == nil {
+			os.Setenv("GOCACHE", filepath.Join(d, "go-build"))
+		}
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		if os.Getenv("GOPATH") == "" {
+			os.Setenv("GOPATH", filepath.Join(home, "go"))
+		}
+	}
+	if os.Getenv("GOENV") == "" {
+		if d, err := os.UserConfigDir(); err == nil {
+			os.Setenv("GOENV", filepath.Join(d, "go", "env"))
+		}
+	}
+	dir, err := os.MkdirTemp("", "ct-")
+	if err != nil {
+		return func() {}
+	}
+	tmp, home, data := filepath.Join(dir, "tmp"), filepath.Join(dir, "home"), filepath.Join(dir, "coral-data")
+	for _, d := range []string{tmp, home, data} {
+		if os.MkdirAll(d, 0o700) != nil {
+			os.RemoveAll(dir)
+			return func() {}
+		}
+	}
+	for k, v := range map[string]string{"TMPDIR": tmp, "TMP": tmp, "TEMP": tmp, "HOME": home, "USERPROFILE": home, "CORAL_DATA_DIR": data} {
+		os.Setenv(k, v)
+	}
+	return func() { os.RemoveAll(dir) }
+}
+
+// Run is a TestMain body: the package's tests in a private world, whose exit code it returns (os.Exit(testtemp.Run(m))).
+func Run(m *testing.M) int {
+	cleanup := Use()
+	code := m.Run()
+	cleanup()
+	return code
+}
+
+// Exit removes the private folder and exits with code: for a TestMain that has its own checks to run after the tests (os.Exit(testleak.Check(code)) becomes testtemp.Exit(cleanup, testleak.Check(code))).
+func Exit(cleanup func(), code int) {
+	cleanup()
+	os.Exit(code)
+}

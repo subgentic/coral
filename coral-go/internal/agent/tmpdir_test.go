@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/subgentic/coral/internal/testtemp"
 )
 
 // argvEchoEnv makes this test binary print each argument it got and exit (TestMain).
@@ -30,6 +32,7 @@ func TestMain(m *testing.M) {
 		fmt.Print("--\n")
 		os.Exit(0)
 	}
+	cleanupTemp := testtemp.Use() // a private temp, home and data folder for this package (#356)
 	dir, err := os.MkdirTemp("", "coral-agent-test-")
 	if err == nil {
 		os.Setenv("TMPDIR", dir)
@@ -45,5 +48,5 @@ func TestMain(m *testing.M) {
 	if err == nil {
 		os.RemoveAll(dir)
 	}
-	os.Exit(code)
+	testtemp.Exit(cleanupTemp, code)
 }
