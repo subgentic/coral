@@ -86,3 +86,21 @@ func TestTheConnectorRefusesAUserOnTheServiceRouteAtEveryTier(t *testing.T) {
 	resp.Body.Close()
 	_ = strings.TrimSpace
 }
+
+// #7411 (coral-hub's point 3): the service stamp is person-less. A stream that carries it with any part of a person's identity (hub_user, hub_role, hub_org, hub_team_role, hub_user_id) is not a
+// well formed stream at all, so the connector never serves it; a service stream with no identity is.
+func TestAServiceStreamCarriesNoPersonsIdentity(t *testing.T) {
+	base := Header{Kind: KindHTTP, Method: "GET", Path: "/api/goal-links", Query: "request_id=" + strings.Repeat("a", 32), HubService: true, AskBoard: "alpha"}
+	require.NoError(t, base.validate(Limits{}.withDefaults()))
+	for name, mut := range map[string]func(*Header){
+		"hub_user":      func(h *Header) { h.HubUser = "hub-user-0123abcd" },
+		"hub_role":      func(h *Header) { h.HubRole = HubRoleOwner },
+		"hub_org":       func(h *Header) { h.HubOrg = "0123456789abcdef0123456789abcdef"[:8] + "-0000-4000-8000-000000000000" },
+		"hub_user_id":   func(h *Header) { h.HubUserID = "hub-uid-" + strings.Repeat("a", 32) },
+		"hub_team_role": func(h *Header) { h.HubOrg = "01234567-0000-4000-8000-000000000000"; h.HubTeamRole = "member" },
+	} {
+		h := base
+		mut(&h)
+		assert.ErrorIs(t, h.validate(Limits{}.withDefaults()), ErrBadHeader, name)
+	}
+}

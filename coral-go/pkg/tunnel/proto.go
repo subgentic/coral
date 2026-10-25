@@ -387,6 +387,9 @@ func (h *Header) validate(l Limits) error {
 	if (h.HubService || h.AskServer != "" || h.AskBoard != "") && !(h.HubService && ValidHubAsker(HubAsker{Server: h.AskServer, Board: h.AskBoard})) {
 		return fmt.Errorf("%w: hub service", ErrBadHeader) // a half-stamp is no stamp
 	}
+	if h.HubService && (h.HubUser != "" || h.HubRole != "" || h.HubOrg != "" || h.HubTeamRole != "" || h.HubUserID != "") {
+		return fmt.Errorf("%w: hub service with a person's identity", ErrBadHeader) // the service is person-less: a stream for a person is never also the service's
+	}
 	if h.HubTeamRole != "" && !ValidHubTeamRole(h.HubTeamRole) {
 		return fmt.Errorf("%w: hub team role", ErrBadHeader)
 	}
