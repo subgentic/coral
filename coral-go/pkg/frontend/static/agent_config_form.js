@@ -283,7 +283,7 @@ export function renderAgentConfigForm(containerId, opts = {}) {
                     <option value="terminal"${agentTypeVal === 'terminal' ? ' selected' : ''}>Terminal</option>
                 </select>
             </label>
-            <label class="acf-model-wrap">Model <span style="color:var(--text-muted);font-weight:normal">(optional)</span>:
+            <label class="acf-model-wrap">Model <span style="color:var(--text-muted);font-weight:normal">(optional)</span>
                 ${modelPickerHtml()}
                 <input type="text" class="acf-model" list="acf-models-${uid}" placeholder="Leave blank to use default" autocomplete="off" value="${escapeAttr(modelVal)}">
                 <datalist id="acf-models-${escapeAttr(uid)}"></datalist>
