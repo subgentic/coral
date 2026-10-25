@@ -47,7 +47,14 @@ func TestFileAndDiffReadsNeedTheSessionOfTheAgentNamed(t *testing.T) {
 	stale := sidStale
 	require.NoError(t, h.gs.UpsertGitSnapshot(ctx, &store.GitSnapshot{AgentName: "agent-a", AgentType: "claude", WorkingDirectory: dirStale, SessionID: &stale}))
 
+	// A fresh cache of the changed files under the NAME, and under the ended session: a bounded caller with no id must not be answered from them.
+	cached := []store.ChangedFile{{Filepath: "a.txt", Status: "M"}}
+	require.NoError(t, h.gs.ReplaceChangedFiles(ctx, "agent-a", dirA, cached, nil, "branch_point"))
+	require.NoError(t, h.gs.ReplaceChangedFiles(ctx, "agent-a", dirStale, []store.ChangedFile{{Filepath: "old.txt", Status: "M"}}, &stale, "branch_point"))
+
 	r := chi.NewRouter()
+	r.Get("/api/sessions/live/{name}/git", h.Git)
+	r.Post("/api/sessions/live/{name}/open-in-editor", h.OpenInEditor)
 	r.Get("/api/sessions/live/{name}/file-content", h.GetFileContent)
 	r.Get("/api/sessions/live/{name}/file-original", h.GetFileOriginal)
 	r.Get("/api/sessions/live/{name}/diff", h.Diff)
@@ -73,6 +80,10 @@ func TestFileAndDiffReadsNeedTheSessionOfTheAgentNamed(t *testing.T) {
 			return call{http.MethodPost, "files/refresh", "", `{"session_id":"` + sid + `"}`}
 		},
 		"search-files": func(sid string) call { return call{http.MethodGet, "search-files", "q=a" + sidQ(sid), ""} },
+		"git":          func(sid string) call { return call{http.MethodGet, "git", strings.TrimPrefix(sidQ(sid), "&"), ""} },
+		"open-in-editor": func(sid string) call {
+			return call{http.MethodPost, "open-in-editor", "", `{"filepath":"a.txt","editor":"none-such","session_id":"` + sid + `"}`}
+		},
 		"explorer":     func(sid string) call { return call{http.MethodGet, "search-files", "view=explorer" + sidQ(sid), ""} },
 		"resolve-path": func(sid string) call { return call{http.MethodGet, "resolve-path", "filepath=a.txt" + sidQ(sid), ""} },
 		"save": func(sid string) call {
