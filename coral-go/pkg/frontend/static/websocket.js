@@ -203,6 +203,43 @@ function _mergeFeedDiff(data) {
     data.sessions = sessions;
 }
 
+/** How long a Codex approval request may stand before it is alerted (#7420). Codex can have its own reviewer decide a command approval (approvals_reviewer = "auto_review"): the PermissionRequest hook
+ * fires, the reviewer allows it about two seconds later and the tool runs, with no dialog and nobody to ask. Alerting at once made every such command a "needs your input" for the person. A request
+ * that is still open after this long is shown; one the turn has moved past by then (the tool ran, the turn stopped) never is. */
+export const CODEX_REVIEW_HOLD_MS = 4000;
+
+/** The needs-input toast, and the opt-in desktop alert, for row s. */
+function _raiseNeedsInputAlert(s, id) {
+    const label = escapeHtml(s.display_name || s.name);
+    const detail = s.waiting_summary ? escapeHtml(s.waiting_summary) : null;
+    const sessionName = s.name;
+    const agentType = s.agent_type;
+    const sessionId = s.session_id;
+    const sessionSrv = sessionServer(s);
+    const openSession = () => importOnce('./sessions.js').then(m => m.selectLiveSession(sessionName, agentType, sessionId, sessionSrv));
+    showNotificationToast(label, detail, openSession);
+    // Opt-in desktop alert while this tab is in the background; names only.
+    const srvLabel = (state.servers || []).find(x => x.id === sessionSrv);
+    notifyNeedsInput({ agent: s.display_name || s.name, where: srvLabel ? srvLabel.label : '', tag: id, onClick: openSession });
+}
+
+/** A Codex row whose request is the agent's own approval request (its PermissionRequest hook), which Codex's reviewer may settle by itself. */
+function _isCodexApprovalRequest(s) {
+    return s.agent_type === 'codex' && s.waiting_kind === 'permission';
+}
+
+/** Alert for a Codex approval request once it has stood for CODEX_REVIEW_HOLD_MS: still the same request on the current row, or nothing. */
+const _codexHolds = new Map();
+function _holdCodexApprovalAlert(s, id) {
+    clearTimeout(_codexHolds.get(id));
+    const since = s.waiting_since || null;
+    _codexHolds.set(id, setTimeout(() => {
+        _codexHolds.delete(id);
+        const now = (state.liveSessions || []).find(x => _feedKey(x) === id);
+        if (now && now.waiting_for_input && (now.waiting_since || null) === since) _raiseNeedsInputAlert(now, id);
+    }, CODEX_REVIEW_HOLD_MS));
+}
+
 /** The agents that just started waiting for input get a toast and a desktop alert; the first snapshot only seeds who is waiting. */
 function _toastNewlyWaiting(data) {
     // Detect sessions that just transitioned to "needs input"
@@ -215,17 +252,8 @@ function _toastNewlyWaiting(data) {
         // agent the operator is typing into never toasts itself.
         if (notifyEnabled && _waitingSeeded && s.waiting_for_input && !wasWaiting
             && popoutAllowsToastFor(s.session_id) && !_operatorIsTypingIn(s)) {
-            const label = escapeHtml(s.display_name || s.name);
-            const detail = s.waiting_summary ? escapeHtml(s.waiting_summary) : null;
-            const sessionName = s.name;
-            const agentType = s.agent_type;
-            const sessionId = s.session_id;
-            const sessionSrv = sessionServer(s);
-            const openSession = () => importOnce('./sessions.js').then(m => m.selectLiveSession(sessionName, agentType, sessionId, sessionSrv));
-            showNotificationToast(label, detail, openSession);
-            // Opt-in desktop alert while this tab is in the background; names only.
-            const srvLabel = (state.servers || []).find(x => x.id === sessionSrv);
-            notifyNeedsInput({ agent: s.display_name || s.name, where: srvLabel ? srvLabel.label : '', tag: id, onClick: openSession });
+            if (_isCodexApprovalRequest(s)) _holdCodexApprovalAlert(s, id);
+            else _raiseNeedsInputAlert(s, id);
         }
         state.prevWaitingState[id] = !!s.waiting_for_input;
 
