@@ -53,6 +53,8 @@ type SendNowResult struct {
 	Left  int // still in the queue after this call (what is behind a send held again, or behind an open prompt, is not tried)
 	// Prompt is why nothing more was typed when a real prompt or menu is open on the agent's screen ("" otherwise): text put into it could answer it, so that stays the gate's rule even here.
 	Prompt string
+	// Draft: nothing more was typed because the agent's input box holds text that is not Coral's (a person's draft), which is never added to.
+	Draft bool
 }
 
 // SendHeldNow types the sends held for name now, without asking whether the agent is waiting: the one with the given id, or every one when id is "". The Operator chose it, knowing the agent may be in the middle of a turn.
@@ -100,13 +102,22 @@ func SendHeldNow(ctx context.Context, name, id string) (SendNowResult, error) {
 			g.inflight = map[string]*heldInput{}
 		}
 		g.inflight[name] = h
-		switch g.typeHeld(ctx, name, h) { // releases g.mu
+		outcome, why := g.typeHeld(ctx, name, h, true) // releases g.mu
+		switch outcome {
 		case heldSent:
 			res.Sent++
 		case heldGone:
 			res.Gone++
-		case heldAgain:
-			res.Again++
+		case heldAgain, heldRefused:
+			if outcome == heldRefused {
+				if why == ForceRefusedDraft {
+					res.Draft = true
+				} else {
+					res.Prompt = "a prompt opened"
+				}
+			} else {
+				res.Again++
+			}
 			if rest := taken[i+1:]; len(rest) > 0 {
 				// Order is kept: what was not tried goes back right behind the one held again.
 				g.mu.Lock()

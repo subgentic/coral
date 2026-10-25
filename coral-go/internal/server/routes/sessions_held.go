@@ -66,5 +66,8 @@ func (h *SessionsHandler) SendHeldNow(w http.ResponseWriter, r *http.Request) {
 	if res.Prompt != "" {
 		out["prompt_open"] = true // a prompt or menu is open on the agent's terminal: nothing was typed into it
 	}
+	if res.Draft {
+		out["draft_in_box"] = true // the agent's input box holds text that is not Coral's: nothing was added to it (#7579)
+	}
 	writeJSON(w, http.StatusOK, out)
 }
