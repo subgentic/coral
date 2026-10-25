@@ -52,12 +52,12 @@ const PRELOAD = `(() => {
             await waitFor(`!document.getElementById('claude-signin-line').hidden`, 'the line from the first status answer');
             let s = await state();
             check(`${view.name}: "${s.text}"`, s.shown && s.text === (view.mobile ? "info Claude isn't signed in" : "info Claude isn't signed in: scheduled jobs and workflows that use it are waiting")); // a phone: the short fact, the rest behind the button (#6737)
-            check('hover says what to do (title)', s.title === 'Sign in with claude in a terminal');
+            check('hover says what to do (title)', s.title === 'Open a terminal, run claude, and follow the steps');
             check('a calm line: it is said by a status region that is always in the page (the line itself is not live), no alert, no toast, not the error colour', s.role === 'status' && s.lineRole === null && s.live === "Claude isn't signed in: scheduled jobs and workflows that use it are waiting" && s.alerts === 0 && s.color !== s.errorColor, JSON.stringify([s.role, s.lineRole, s.live, s.text]));
             check('the hint is shut until it is tapped', s.hintShown === false && s.expanded === 'false');
             await ev(`document.getElementById('signin-line-btn').click(); true`);
             s = await state();
-            check('a tap opens "Sign in with claude in a terminal."', s.hintShown === true && s.expanded === 'true' && /Sign in with claude in a terminal\./.test(await ev(`document.getElementById('signin-line-hint').textContent`)));
+            check('a tap opens "Open a terminal, run claude, and follow the steps."', s.hintShown === true && s.expanded === 'true' && /Open a terminal, run claude, and follow the steps\./.test(await ev(`document.getElementById('signin-line-hint').textContent`)));
             check('it fits the screen (no horizontal overflow)', s.fits && s.overflow === 0, `overflow ${s.overflow}`);
             const audit = await auditRegion(ev, ['#claude-signin-line'], { focus: ['#signin-line-btn'] });
             check(`both themes: readable (4.5:1) and a visible focus ring (${audit.checked} checked)`, audit.fails.length === 0 && audit.checked >= 2, JSON.stringify(audit.fails));
