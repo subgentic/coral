@@ -2431,6 +2431,8 @@ body.panel-dragging .agentic-state {
 
 /* #4344: the Files tab's title row (count, +/- stats, the diff select) wraps beside the refresh button at large text instead of pushing it off the screen. */
 .changed-files-header > .changed-files-title { flex: 1 1 0; min-width: 0; flex-wrap: wrap; row-gap: 2px; }
+/* The header is as high as its comparison select from the first draw: the page's "0 files changed" has no select until the first list comes, and the header grew by the select's height when it did (a layout shift on a slow runner, #7671). */
+.changed-files-header > .changed-files-title { min-height: calc(0.8125rem * 1.4 + 10px); }
 .diff-mode-select { max-width: 100%; }
 
 /* ── The right sidebar on every page (#4539) ─────────────────
