@@ -67,6 +67,10 @@ let _dock = 'bottom';      // 'bottom' (under the side panel tabs) | 'column' (f
 let _phoneFull = false;     // a phone's preview covers the screen (#5173); not saved
 let _fullOverlay = 0;       // its entry in overlay_history.js, while it is open
 let _fullOpener = null;     // what had focus when it opened
+let _fullOpenerPath = '';   // and the path of the file it opened: the list is drawn again meanwhile, so Back finds the row (its More button) again by it (#7652)
+let _lastOpenedPath = '';
+const _pathOf = el => (el && el.closest && el.closest('[data-path]') ? el.closest('[data-path]').dataset.path : '') || '';
+const _rowFor = p => (p ? document.querySelector(`.file-more-btn[data-path="${CSS.escape(p)}"]`) || document.querySelector(`[data-path="${CSS.escape(p)}"][tabindex]`) : null);
 let _maximised = false;    // the column covers Chat (#4931): not saved (a reload opens with Chat); ends when the pane is hidden, moves to the bottom, or another agent is shown
 
 const DOCK_ICONS = {
@@ -248,7 +252,7 @@ function _setPhoneFull(on, { popped = false } = {}) {
     pane.classList.toggle('preview-phone-full', on);
     if (on) {
         pane.setAttribute('role', 'dialog'); pane.setAttribute('aria-modal', 'true'); pane.setAttribute('aria-label', 'Preview');
-        _fullOpener = document.activeElement;
+        _fullOpener = document.activeElement; _fullOpenerPath = _pathOf(_fullOpener) || _lastOpenedPath;
         _fullOverlay = pushOverlay(() => _setPhoneFull(false, { popped: true })); // Back closes it, in its order among the overlays (overlay_history.js)
     } else {
         pane.removeAttribute('role'); pane.removeAttribute('aria-modal'); pane.removeAttribute('aria-label');
@@ -256,7 +260,7 @@ function _setPhoneFull(on, { popped = false } = {}) {
     }
     _paintMaxButton();
     if (on) document.getElementById('preview-full-back')?.focus();
-    else { const o = _fullOpener; _fullOpener = null; if (o && o.isConnected) o.focus({ preventScroll: true }); }
+    else { const o = _fullOpener, back = o && o.isConnected && o !== document.body ? o : _rowFor(_fullOpenerPath); _fullOpener = null; _fullOpenerPath = ''; if (back) back.focus({ preventScroll: true }); }
 }
 
 /** Move the pane between the side panel (bottom) and its own column, then show it if it has tabs. */
@@ -446,6 +450,7 @@ function _newTab(props) {
 }
 
 function _activate(tab) {
+    _lastOpenedPath = tab.kind === 'file' ? tab.filepath : '';
     _captureEditor();
     _activeId = tab.id;
     _renderTabs();

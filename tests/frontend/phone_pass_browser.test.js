@@ -94,7 +94,7 @@ const LONG = 'worktree-agent-a1b2c3d4e5f60718/feature/calm-the-dashboard-remove-
         await ev(`(async () => { const st = ${S}; const { state } = await import(st + 'state.js'); window.PP = await import(st + 'preview_pane.js'); const { showView } = await import(st + 'utils.js');
             { const real = window.fetch; window.fetch = (u, o) => /\\/api\\/artifacts\\/a{64}/.test(String(u)) ? Promise.resolve(new Response('# Release notes\\n\\n' + 'A line of the notes that is long enough to wrap on a phone.\\n\\n'.repeat(30), { status: 200, headers: { 'Content-Type': 'text/markdown' } })) : real(u, o); }
             state.currentSession = { type: 'live', name: 'boss', session_id: 'boss-sid', agent_type: 'claude' }; showView('live-session-view'); window.PP.setPreviewSession('boss-sid');
-            window.PP.openArtifactTab('coral://artifacts/' + 'a'.repeat(64), { name: 'a.md', mediaType: 'text/markdown' }); return true; })()`);
+            window.PP.openArtifactTab('coral://artifacts/' + 'a'.repeat(64), { name: 'a.md', mediaType: 'text/markdown' }); if (document.getElementById('preview-pane').classList.contains('preview-phone-full')) document.getElementById('preview-full-back').click(); return true; })()`); // a phone opens it full screen (#7652): this check starts from the docked sheet and tests the full-screen toggle from there
         await waitFor(`getComputedStyle(document.getElementById('preview-pane')).display !== 'none'`, 'the preview pane', 8000); await settle(500);
     };
     const openViewer = async () => {

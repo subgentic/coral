@@ -1,7 +1,7 @@
 // The agent's Files, Browse and Activity tabs on a phone and at 200% text (task 7652, items 1, 2, 3, 4 and 6 of the real-content report on the Files, Browse, Notes, Activity and Agent UI tabs):
 //   1. a Files row keeps its whole name: Copy, Preview and Edit are behind one More button that opens them on a line under the row;
 //   2. a file opened on a phone is a screen of its own (the phone-full preview) with a Back button, and Back returns to the list;
-//   3. Browse's folder is a short path on one line (its last two names, the whole path as its title), the two buttons never share its row when they do not fit;
+//   3. Browse's folder is its name on one line (the whole path as its title), the two buttons never share its row when they do not fit;
 //   4. Activity's summaries keep their words at 200% (the time goes under them) and the Time and Count switch is 44 px;
 //   6. the panel's tab strip scrolls the open tab into view.
 // The routes are stubbed on the page. Drives Chrome over CDP through agent_view_harness.js against an isolated dev server.
@@ -66,8 +66,16 @@ const ROOT = '/work/demo/projects/queue-service';
             const full = await ev(`(() => { const p = document.getElementById('preview-pane').getBoundingClientRect(), b = document.getElementById('preview-full-back').getBoundingClientRect(); return { covers: p.left <= 1 && p.right >= innerWidth - 1 && p.height >= innerHeight * 0.9, back: b.width >= 43.5 && b.height >= 43.5, name: document.getElementById('preview-full-back').textContent.trim() }; })()`);
             await shot(`viewer-${zoom}`);
             assert.deepEqual([full.covers, full.back], [true, true], at + 'it covers the screen and has a 44 px Back: ' + JSON.stringify(full));
-            await ev(`document.getElementById('preview-full-back').click(); true`);
-            await waitFor(`!document.getElementById('preview-pane').classList.contains('preview-phone-full')`, at + 'Back leaves it', 5000);
+            const depth = () => ev(`(history.state && history.state.coralOverlay) || 0`);
+            assert.equal(await depth(), 1, at + 'the full-screen viewer is one history entry');
+            await ev(`history.back(); true`);
+            await waitFor(`!document.getElementById('preview-pane').classList.contains('preview-phone-full')`, at + 'one Back closes the viewer', 5000);
+            assert.equal(await depth(), 0, at + 'and leaves no entry behind');
+            assert.deepEqual(await ev(`(() => { const a = document.activeElement; return { more: !!a && a.classList.contains('file-more-btn'), path: a && a.dataset.path }; })()`), { more: true, path: 'docs/guide.md' }, at + 'Back returns the keyboard to the row that opened the file (its More button)');
+            // the list is drawn again on every poll: the focused More button keeps the focus
+            await ev(`document.querySelector('#changed-files-list .file-more-btn').focus(); true`);
+            await ev(`import((window.__coralStatic || '/static/') + 'changed_files.js').then(m => m.loadChangedFiles('dock-a', 'dock-a-id')).then(() => true)`);
+            assert.equal(await ev(`document.activeElement.classList.contains('file-more-btn') && document.activeElement.dataset.path`), 'docs/guide.md', at + 'after the list is drawn again the focus is still on the More button');
             await ev(`import((window.__coralStatic || '/static/') + 'preview_pane.js').then(m => { m.closeAllTabs(); return true; })`);
 
             console.log(at + 'Browse');
@@ -75,7 +83,7 @@ const ROOT = '/work/demo/projects/queue-service';
             await waitFor(`document.querySelectorAll('#file-explorer-view .explorer-item').length === 2`, at + 'the tree', 10000);
             const root = await ev(`(() => { const r = document.querySelector('#file-explorer-view .explorer-root'), a = document.querySelector('#file-explorer-view .team-artifact-actions'), rb = r.getBoundingClientRect(), ab = a.getBoundingClientRect(), lh = parseFloat(getComputedStyle(r).lineHeight) || parseFloat(getComputedStyle(r).fontSize) * 1.3; return { text: r.textContent, title: r.title, oneLine: rb.height <= lh * 1.6, apart: ab.top >= rb.bottom - 1 || ab.left >= rb.right - 1 }; })()`);
             await shot(`browse-${zoom}`);
-            assert.equal(root.text, '…/projects/queue-service', at + 'the last two names, shortened from the left'); assert.equal(root.title, ROOT, at + 'the whole path is its title');
+            assert.equal(root.text, 'queue-service', at + "the folder's name (the stack's Browse header), not its path"); assert.equal(root.title, ROOT, at + 'the whole path is its title');
             assert.ok(root.oneLine && root.apart, at + 'one line, and the buttons do not sit on its words: ' + JSON.stringify(root));
 
             console.log(at + 'Activity');
