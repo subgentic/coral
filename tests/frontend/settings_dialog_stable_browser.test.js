@@ -23,12 +23,15 @@ const SCALE = new Set(['16/700', '17/700', '14/600', '14/400', '13/500', '13/400
         // the ring (quiet_focus.js, the same file as #7391's): Settings opened with no input at all (a script) shows it, as the browser would; opened a moment after a pointer press it shows none on what took the
         // focus, and the first key press brings it back
         const ringOf = () => ev(`({ marked: document.getElementById('settings-modal').hasAttribute('data-quiet-focus'), inDialog: document.getElementById('settings-modal').contains(document.activeElement), ring: (a => a ? getComputedStyle(a).outlineStyle + ' ' + getComputedStyle(a).outlineWidth : '')(document.activeElement) })`);
+        // the dialog moves focus in one frame after it shows (dialog_focus.js, requestAnimationFrame): wait for it, so a slow frame is not read as focus left outside (#7612)
+        await waitFor(`document.getElementById('settings-modal').contains(document.activeElement)`, 'Settings opened by a script: focus moves into it', 10000);
         const scripted = await ringOf();
         assert.ok(!scripted.marked && scripted.inDialog, 'Settings opened by a script (no input): focus is in it and the ring is not suppressed: ' + JSON.stringify(scripted));
         await ev(`window.hideSettingsModal(); true`);
         await client.Input.dispatchMouseEvent({ type: 'mousePressed', x: 5, y: 5, button: 'left', clickCount: 1 }); await client.Input.dispatchMouseEvent({ type: 'mouseReleased', x: 5, y: 5, button: 'left', clickCount: 1 });
         await ev(`window.showSettingsModal(); true`);
         await waitFor(`document.getElementById('settings-modal').getClientRects().length > 0 && !!document.querySelector('#settings-modal .settings-pane:not([hidden])')`, 'Settings opened after a click', 10000);
+        await waitFor(`document.getElementById('settings-modal').contains(document.activeElement)`, 'Settings opened after a click: focus moves into it', 10000);
         const pointer = await ringOf();
         assert.ok(pointer.marked && pointer.inDialog && /^none |^[a-z]+ 0px$/.test(pointer.ring), 'Settings opened just after a click: focus is in it and wears no ring: ' + JSON.stringify(pointer));
         await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 }); await ev(framesJs(2));
