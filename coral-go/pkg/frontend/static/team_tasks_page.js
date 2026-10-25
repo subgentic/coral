@@ -3,6 +3,7 @@
  * textContent: titles, bodies and names are written by agents. The task's own actions (Edit, Complete, Cancel, Publish, Nudge) stay in the task dialog for now ("Task actions"): they move onto this page with the Tasks build. Lazy: team_page.js imports it. */
 import { boardFetch, pathId, serverUrl, splitKey } from './server_base.js';
 import { browserLocal } from './safe_storage.js';
+import { pollEvery } from './overload.js';
 import { whenText } from './when_text.js';
 import { importOnce } from './import_once.js';
 const { teamTable, rowButton, rowFocusTarget, stateChip, el } = await importOnce('./team_table.js'); // lazy: its failure is retried
@@ -13,9 +14,12 @@ const { buildTaskBar } = await importOnce('./task_bar.js'); // the old tab's sea
 const TF = await importOnce('./task_filters.js');
 
 const PAGE = 50;
-const FILTERS = [['all', 'All'], ['queued', 'Queued'], ['active', 'In progress'], ['blocked', 'Blocked'], ['review', 'In review'], ['done', 'Done']];
+const FILTERS = [['open', 'Open'], ['all', 'All'], ['queued', 'Queued'], ['active', 'In progress'], ['blocked', 'Blocked'], ['review', 'In review'], ['done', 'Done']];
 const emptyQuery = () => ({ rows: [], phase: 0, cursor: '', total: null, doneTotal: 0, truncated: false, busy: false, error: '' });
-const model = { project: '', filters: { ...TF.EMPTY }, q: emptyQuery(), seq: 0, moreLoaded: false, rows: [], cursor: '', totalOpen: null, totalDone: null, filter: 'all', loading: false, failed: '', loadingMore: false, moreFailed: '' };
+// Hide completed (the old tab's toggle, same stored key): the Open chip, chosen until the person picks All; kept in this browser (#7453).
+const HIDE_KEY = 'coral-hide-completed';
+const startFilter = () => (browserLocal.get(HIDE_KEY) === 'false' ? 'all' : 'open');
+const model = { project: '', filters: { ...TF.EMPTY }, q: emptyQuery(), seq: 0, moreLoaded: false, rows: [], cursor: '', totalOpen: null, totalDone: null, filter: startFilter(), loading: false, failed: '', loadingMore: false, moreFailed: '' };
 let root = null, hooks = {};
 const say = (t) => { const s = root && root.querySelector('.team-tasks-status'); if (s) { s.textContent = ''; s.textContent = t; } };
 const bucket = (t) => { const w = taskStatusWord(t.status, t.review_requested); return { 'Queued': 'queued', 'In progress': 'active', 'Blocked': 'blocked', 'In review': 'review', 'Done': 'done' }[w] || 'queued'; };
@@ -86,11 +90,11 @@ async function queryFetch(pairs) {
     } finally { clearTimeout(timer); }
 }
 
-async function loadQuery({ append = false } = {}) {
+async function loadQuery({ append = false, quiet = false } = {}) {
     const project = model.project, f = model.filters, ph = TF.phases(f), seq = ++model.seq;
-    if (!append) model.q = Object.assign(emptyQuery(), { busy: true }); else model.q.busy = true;
-    model.q.error = ''; model.loading = !append; model.loadingMore = append;
-    draw();
+    if (!append && !quiet) model.q = Object.assign(emptyQuery(), { busy: true }); else model.q.busy = true; // a quiet read (the refresh) keeps what is drawn until the answer replaces it
+    model.q.error = ''; model.loading = !append && !quiet; model.loadingMore = append;
+    if (!quiet) draw();
     const L = model.q;
     try {
         if (append) {
@@ -136,12 +140,13 @@ function ensureBar() {
 const rowsNow = () => (TF.isQuery(model.filters) ? model.q.rows : model.rows);
 
 const counts = () => {
-    const c = { all: 0, queued: 0, active: 0, blocked: 0, review: 0, done: 0 };
+    const c = { open: 0, all: 0, queued: 0, active: 0, blocked: 0, review: 0, done: 0 };
     for (const t of rowsNow()) { c.all++; c[bucket(t)]++; }
     if (!TF.isQuery(model.filters)) {
         if (model.totalOpen != null && model.totalDone != null) c.all = model.totalOpen + model.totalDone;
         if (model.totalDone != null) c.done = model.totalDone;
     }
+    c.open = c.all - c.done;
     return c;
 };
 
@@ -156,7 +161,7 @@ function draw() {
     const c = counts();
     const chips = el('div', 'goals-chips goals-chips-row'); chips.setAttribute('role', 'group'); chips.setAttribute('aria-label', 'Show tasks that are');
     for (const [key, label] of FILTERS) {
-        const b = btn('goals-chip', `${label} ${c[key]}`, () => { model.filter = key; say(`${label}: ${c[key]} tasks`); draw(); });
+        const b = btn('goals-chip', `${label} ${c[key]}`, () => { model.filter = key; if (key === 'open' || key === 'all') browserLocal.set(HIDE_KEY, key === 'open' ? 'true' : 'false'); say(`${label}: ${c[key]} tasks`); draw(); });
         b.setAttribute('aria-pressed', String(model.filter === key)); b.dataset.filter = key;
         if (!c[key] && key !== 'all') b.classList.add('goals-chip-zero');
         chips.append(b);
@@ -169,7 +174,7 @@ function draw() {
     if (model.loading) body.append(el('p', 'goals-note', 'Loading tasks…'));
     else if (!all.length) { if (!failed) { const e = el('div', 'goals-empty'); e.append(el('p', null, query && TF.isFiltered(model.filters) ? 'No tasks match this search.' : 'No tasks yet')); body.append(e); } }
     else {
-        const shown = all.filter(t => model.filter === 'all' || bucket(t) === model.filter);
+        const shown = all.filter(t => model.filter === 'all' || (model.filter === 'open' ? bucket(t) !== 'done' : bucket(t) === model.filter));
         if (!shown.length) {
             const e = el('div', 'goals-empty'); e.append(el('p', null, 'No tasks match this filter.'), btn('btn', 'Show all', () => { model.filter = 'all'; draw(); })); body.append(e);
         } else {
@@ -203,8 +208,25 @@ function rowOf(t) {
 }
 
 /** Show the board's tasks in `host`. hooks: openTask(task), openGoal(id), onCount(openCount). */
+// The tab keeps itself current (the old tab polled every 10 s): when the window comes back to the front, and on a slow read while it is on screen; a list the person paged further is left as it is.
+let watching = false, reading = false;
+function refresh() {
+    if (!root || !root.isConnected || root.closest('[hidden]') || document.hidden || reading || !model.project) return;
+    const query = TF.isQuery(model.filters);
+    if ((query ? model.q.rows.length : model.rows.length) > PAGE * 2 || model.loading || model.loadingMore) return;
+    reading = true;
+    (query ? loadQuery({ quiet: true }) : loadTasks()).finally(() => { reading = false; });
+}
+function watch() {
+    if (watching) return;
+    watching = true;
+    pollEvery(refresh, 15000);
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
+}
+
 export function showTasks(host, project, h = {}) {
-    if (project !== model.project) { bar = null; Object.assign(model, { project, filters: TF.loadFilters(project, browserLocal), q: emptyQuery(), rows: [], cursor: '', moreLoaded: false, totalOpen: null, totalDone: null, filter: 'all', loading: false, failed: '', loadingMore: false, moreFailed: '' }); }
+    if (project !== model.project) { bar = null; Object.assign(model, { project, filters: TF.loadFilters(project, browserLocal), q: emptyQuery(), rows: [], cursor: '', moreLoaded: false, totalOpen: null, totalDone: null, filter: startFilter(), loading: false, failed: '', loadingMore: false, moreFailed: '' }); }
     hooks = h;
     if (!host.dataset.built) {
         host.dataset.built = '1';
@@ -213,6 +235,7 @@ export function showTasks(host, project, h = {}) {
         host.firstChild.append(status, el('div', 'team-tasks-body'));
     }
     root = host.firstChild;
+    watch();
     draw();
     return loadTasks();
 }
@@ -260,7 +283,8 @@ export function renderTaskPage(host, task, ctx) {
     const word = taskStatusWord(task.status, task.review_requested || (task.workflow && task.workflow.completion_review));
     const line = el('div', 'goals-detail-line'); line.append(stateChip(word, statusClass(word)));
     const dl = el('dl', 'goals-facts');
-    fact(dl, 'Assigned to', task.assigned_to || 'Nobody yet');
+    const who = agentOf(ctx.project, task); // the agent that has it, when it runs here: its name opens it (the old subagent row's "Launched by", for a board's tasks)
+    fact(dl, 'Assigned to', who ? btn('team-link', task.assigned_to, () => { window.switchNavTab?.('agents'); window.selectLiveSession?.(who.name, who.agent_type, who.session_id, who.server); }) : (task.assigned_to || 'Nobody yet'));
     if (task.goal_id) {
         const g = btn('team-link', goalTitle(ctx.project, task.goal_id) || `Goal ${task.goal_id}`, () => ctx.openGoal(task.goal_id));
         fact(dl, 'Goal', g);
