@@ -975,7 +975,8 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .inbox-page .item-bar { margin-top: auto; bottom: -20px; margin-bottom: -20px; padding-bottom: calc(var(--space-lg) + 20px); }
 .inbox-task-mount { margin-top: var(--space-lg); }
 .inbox-saved-snippet { margin: 0 0 var(--space-lg); font-size: var(--fs-lg); line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
-.inbox-saved-why { margin: 0 0 var(--space-lg); font-size: var(--fs-base); color: var(--text-secondary); }
+.inbox-saved-why { margin: 0 0 var(--space-lg); font-size: var(--fs-md); color: var(--text-secondary); }
+#inbox-page .ibx-why, .dock-detail-pane .ibx-why { font-size: var(--fs-md); } /* the reason a message cannot be shown is read at the page's text size, not the component's 11 px hint (UI/UX, #7660) */
 .inbox-phone-back { display: none; }
 /* The Inbox on a phone: the pane is the page's list; a task or a message is the screen after it, with a way back */
 #mobile-inbox-list { display: none; }
