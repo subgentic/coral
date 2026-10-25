@@ -173,6 +173,7 @@ export function showBoardInPage(project, host) {
             if (d && typeof d.board_label === 'string') noteBoardLabel(splitKey(project).server, splitKey(project).name, d.board_label);
         }).catch(() => {});
     }
+    nameComposerForPage(true);
     mountBoardSearch(document.getElementById('mb-tools'), project, SEARCH_HOOKS);
     subscribeDashboard(project);
     loadPausedState(project);
@@ -184,9 +185,20 @@ export function showBoardInPage(project, host) {
     boardPageChanged();
 }
 
+/** On the team page the composer is "Message the team" and its button "Send" (UI/UX's design); on the board page they keep the names they have: they are put back when the column goes home. */
+function nameComposerForPage(on) {
+    const box = document.getElementById('mb-post-input'), send = document.querySelector('#mb-board .mb-post-send-btn');
+    for (const [e, name] of [[box, 'Message the team'], [send, 'Send']]) {
+        if (!e) continue;
+        if (on) { if (e.dataset.boardLabel === undefined) e.dataset.boardLabel = e.getAttribute('aria-label') || ''; e.setAttribute('aria-label', name); }
+        else if (e.dataset.boardLabel !== undefined) { e.setAttribute('aria-label', e.dataset.boardLabel); delete e.dataset.boardLabel; }
+    }
+}
+
 export function leaveBoardPage() {
     const board = document.getElementById('mb-board');
     if (!board || !_boardHome) return;
+    nameComposerForPage(false);
     stopBoardPoll();
     currentProject = null;
     board.style.display = 'none'; // display-ok: as above
