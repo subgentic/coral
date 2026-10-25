@@ -42,11 +42,11 @@ const VIEWS = [['1280x800', 1280, 800, false, false], ['390x844', 390, 844, true
                 assert.ok(await ev(`document.documentElement.scrollWidth <= innerWidth + 1`), 'no sideways scroll');
             });
             await S.run(`${label}: the worktree option and the remote address open in their reserved slot: step 1 does not move`, async () => {
-                await ev(`window.hideLaunchModal && window.hideLaunchModal(); T.state.hub = true; T.state.cloud = true; T.state.serversKnown = true; T.state.servers = [{ id: 'm1', label: 'build-server', status: 'online', version: '1.4.6', last_seen: new Date().toISOString() }]; true`);
+                await ev(`window.hideLaunchModal && window.hideLaunchModal(); T.state.hub = true; T.state.cloud = false; T.state.serversKnown = true; T.state.servers = [{ id: 'm1', label: 'build-server', status: 'online', version: '1.4.6', last_seen: new Date().toISOString() }]; true`);
                 await openNewTeam(ev, waitFor); await settle(300); const r1 = await t.rect();
                 await t.type('input', N.teamName, 'alpha'); await t.type('input', N.folder, '/work/payments-app'); await settle(300); same(r1, await t.rect(), 'step 1 with a folder');
                 await t.pick(N.machine, /^Another computer/); await settle(300); same(r1, await t.rect(), 'the remote address open');
-                await t.pick(N.machine, /^This computer/); await t.type('input', N.folder, gitDir);
+                assert.ok(await t.pick(N.machine, /^This computer/), 'the Machine select has an entry named This computer (UI/UX 07:36Z; it read Local (this machine))'); await t.type('input', N.folder, gitDir);
                 await waitFor(`!!window.__nt.find(window.__nt.dlg(${N.team}), 'input', /worktree/i)`, 'the worktree option', 6000); same(r1, await t.rect(), 'the worktree option shown');
                 await ev(`window.__nt.find(window.__nt.dlg(${N.team}), 'input', /worktree/i).click(); true`); await settle(300); same(r1, await t.rect(), 'the worktree ticked with its base branch');
                 await ev(`window.hideLaunchModal(); T.state.servers = []; T.state.hub = false; T.state.cloud = false; true`);
