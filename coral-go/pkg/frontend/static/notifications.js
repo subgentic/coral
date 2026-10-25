@@ -15,6 +15,9 @@ import { routeHref } from './markdown.js';
  *   stays until it is used or dismissed (WCAG 2.2.1: a keyboard-only person is
  *   far from it, and nothing runs out under them). A plain toast keeps its timer.
  *
+ * opts.group = { key, text(n) }: toasts of one kind fold into one card ("Restarting 5 agents"): a toast of the same key that is still shown says text(n) for the nth and starts its time again,
+ *   instead of a second card (UI/UX 170 consistency pass 2, item 4).
+ *
  * Returns the toast element. Text is set with textContent only.
  */
 /** How long a toast with no duration of its own stays (#6727): a short one 4 s; an error at least 8 s, and either longer by the length of its words (40 ms a character past 80, at most 20 s): a person has to be able to read what went wrong. */
@@ -25,6 +28,9 @@ export function toastMs(text, error) {
 
 export function showToast(message, isError = false, duration, opts = {}) {
     const error = !!isError;
+    const group = opts.group && opts.group.key ? opts.group : null;
+    const folded = group && [...toastHost().querySelectorAll(".toast[data-group]")].find(t => t.dataset.group === group.key);
+    if (folded && folded._fold) return folded._fold();
     const toast = document.createElement("div");
     toast.className = `toast ${error ? "error" : ""}`;
 
@@ -62,7 +68,8 @@ export function showToast(message, isError = false, duration, opts = {}) {
     // named by its toast, so two toasts on screen are two buttons to a screen reader (#6152); the toast's own words, cut at a word
     const words = text.replace(/\s+/g, " ").trim();
     const cut = words.lastIndexOf(" ", 40);
-    close.setAttribute("aria-label", words.length > 40 ? `Dismiss: ${words.slice(0, cut > 20 ? cut : 40)}…` : `Dismiss: ${words}`);
+    const dismissLabel = (w, c) => (w.length > 40 ? `Dismiss: ${w.slice(0, c > 20 ? c : 40)}…` : `Dismiss: ${w}`);
+    close.setAttribute("aria-label", dismissLabel(words, cut));
     close.textContent = "×";
     close.addEventListener("click", dismiss);
     toast.appendChild(close);
@@ -70,6 +77,17 @@ export function showToast(message, isError = false, duration, opts = {}) {
     // On a phone a long toast shows two lines (css); a tap opens the rest. The full text is in the element either way, so a screen reader reads it all.
     toast.addEventListener("click", (e) => { if (!e.target.closest("button")) { toast.classList.toggle("expanded"); clearTimeout(timer); timer = 0; } }); // a toast that is being read is not timed out (#6727)
 
+    if (group) {
+        let n = 1;
+        toast.dataset.group = group.key;
+        toast._fold = () => { // the next of its kind: one card that counts, its time starts again, and the count is said
+            n += 1;
+            const said = String(group.text(n)); body.textContent = said; close.setAttribute("aria-label", dismissLabel(said.replace(/\s+/g, " ").trim(), said.replace(/\s+/g, " ").trim().lastIndexOf(" ", 40)));
+            if (!opts.silent) announceNotice(said, error);
+            if (timer) { clearTimeout(timer); timer = Number.isFinite(duration) ? setTimeout(dismiss, duration) : 0; }
+            return toast;
+        };
+    }
     toastHost().appendChild(toast);
     if (Number.isFinite(duration)) timer = setTimeout(dismiss, duration);
     return toast;

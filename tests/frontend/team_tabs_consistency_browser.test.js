@@ -52,6 +52,17 @@ const TEAM = `qa-consist-${Date.now() % 100000}`;
                 const kn = await empty(); assert.deepEqual([kn.text, kn.size, kn.weight, kn.boxed], ['No knowledge yet.', '14px', '400', false], 'Knowledge: ' + JSON.stringify(kn));
                 assert.deepEqual(kn.hint && kn.hint.slice(1), ['12px', '400'], 'its hint is 12/400: ' + JSON.stringify(kn.hint)); await shot(`${label}-knowledge-empty`);
             });
+            await S.run(`${label}: item 5 (Goals, Tasks), a filter with nothing in it draws the same empty line (14/400, no box)`, async () => {
+                for (const tab of ['Goals', 'Tasks']) {
+                    await goTab(ev, settle, tab); await settle(400);
+                    const clicked = await ev(`(() => { const c = [...document.querySelectorAll('[role=tabpanel]:not([hidden]) .goals-chip')].find(x => window.__na.vis(x) && /\\b0$/.test(x.textContent.trim())); if (!c) return false; c.click(); return true; })()`);
+                    assert.ok(clicked, `${tab} has a filter with nothing in it`); await settle(400);
+                    const e = await ev(`(() => { const p = document.querySelector('[role=tabpanel]:not([hidden]) .goals-empty'); if (!p) return null; const c = getComputedStyle(p); return { size: c.fontSize, weight: c.fontWeight, boxed: c.borderTopStyle !== 'none', color: c.color, primary: (() => { const t = document.createElement('i'); t.style.color = 'var(--text-primary)'; document.body.append(t); const v = getComputedStyle(t).color; t.remove(); return v; })() }; })()`);
+                    assert.ok(e, `${tab}: its empty line is there`); assert.deepEqual([e.size, e.weight, e.boxed, e.color], ['14px', '400', false, e.primary], `${tab}: ` + JSON.stringify(e));
+                    if (tab === 'Tasks') await shot(`${label}-tasks-empty`);
+                    await ev(`(() => { const c = [...document.querySelectorAll('[role=tabpanel]:not([hidden]) .goals-chip')].find(x => /^All\\b/.test(x.textContent.trim())); if (c) c.click(); return true; })()`);
+                }
+            });
             await S.run(`${label}: item 2, a back link is the link colour at 13/500 on the team page, in a group's page and in the Jobs page`, async () => {
                 const style = sel => ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; const c = getComputedStyle(e); return { color: c.color, size: c.fontSize, weight: c.fontWeight }; })()`);
                 await goTab(ev, settle, 'Goals'); await settle(400);

@@ -104,7 +104,14 @@
 .detail-foot { flex: none; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; padding: 12px 18px; border-top: 1px solid var(--border); } /* the one rule of every pinned bar (#7684): right-aligned, secondary buttons, the primary last, a danger button alone at the left edge (the same as .item-bar and .goals-pinbar) */
 .detail-foot .btn { min-height: 36px; }
 .detail-foot .btn-danger { color: var(--error-text); border-color: var(--error); background: transparent; margin-right: auto; } /* one danger button, at the left edge: error-colour text with a 1 px error-colour edge, no fill, the size of the other buttons (UI/UX) */
-.team-table-scroll { overflow-x: auto; max-width: 100%; }
+.team-table-scroll { overflow-x: auto; max-width: 100%; container: teamtable / inline-size; }
+.team-row-phone-status { display: none; }
+/* The Agents table at a narrow width in rem (a phone at 200% text is 11 rem wide, at 100% 20: the page's rem is 18 px): Status folds under the name, as Doing and Provider do, and Remind stays on the screen (UI/UX 170 consistency pass 2, item 5). */
+@container teamtable (max-width: 18rem) {
+    .team-table-agents th:nth-child(2), .team-table-agents td:nth-child(2) { display: none; }
+    .team-table-agents tbody td:nth-child(1) { min-width: 0; }
+    .team-row-phone-status { display: block; margin-top: 4px; }
+}
 .detail-foot a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 #team-panel-messages { padding: 16px 24px 0; } /* the same top as the other tabs (a tab's body starts 16 px under the strip, 12 on a phone), and the search row's left edge where theirs is (the messages themselves stay on the tables' edge) */
 .team-panel .list-bar-bar { padding: 0 0 8px; } /* a tab's search starts on the page edge where its chips and table do, not 12 px in (UI/UX 170 consistency, item 3) */
@@ -212,10 +219,10 @@
 
 /* the agent's Artifacts tab (the dock panel): the team's table in a narrow panel, and the document as a sheet over the panel itself (the chat beside it stays) */
 #agentic-panel-artifacts, #agentic-panel-saved { position: relative; } /* the document is a sheet over the panel (the Saved tab's message as well) */
-#agentic-panel-artifacts-view { container-type: inline-size; }
+#agentic-panel-artifacts-view { container: artifactsview / inline-size; } /* named: an unnamed @container query below would otherwise read the nearest container, the tables' own box (teamtable) */
 .dock-detail-pane { position: absolute; inset: 0; z-index: 5; width: auto; border-left: 0; }
 .team-artifacts-plain-head { display: flex; align-items: center; justify-content: flex-end; gap: 4px; padding: 8px 12px; }
-@container (max-width: 560px) {
+@container artifactsview (max-width: 560px) {
     .team-table th, .team-table td { padding-left: 8px; padding-right: 8px; } /* a narrow panel gives the cells less air: Name and Created fit at 200% text */
     .team-table th:nth-child(n+2):nth-child(-n+4), .team-table td:nth-child(n+2):nth-child(-n+4) { display: none; } /* Type, Size and Task fold under the name (and Task is in the pane's facts); Created stays on the right */
     .team-row-phone { display: block; }

@@ -650,7 +650,7 @@ export async function confirmRestart() {
         // Show restarting overlay instead of session-ended
         const xtermMod = await _getXtermModule();
         if (xtermMod.setRestarting) xtermMod.setRestarting(true, restartId);
-        showToast(`Restarting ${state.currentSession.name}...`);
+        showToast(`Restarting ${state.currentSession.name}...`, false, undefined, { group: { key: 'restarting', text: n => `Restarting ${n} agents` } });
         const payload = { agent_type: config.agentType || state.currentSession.agent_type, session_id: state.currentSession.session_id };
         if (config.flags) {
             payload.extra_flags = config.flags;

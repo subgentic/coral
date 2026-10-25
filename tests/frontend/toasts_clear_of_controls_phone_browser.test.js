@@ -50,14 +50,19 @@ async function httpJson(method, p, body) { const r = await fetch(BASE + p, { met
         check('phone: the arrow opens and folds a notice (44 px, named, aria-expanded), and the folded details stay in the page', open.folded.exp === 'false' && open.folded.area <= 4 && open.folded.text > 40 && open.folded.w >= 44 && open.folded.h >= 44 && open.opened.exp === 'true' && open.opened.area > 1000 && open.opened.name === 'Hide details' && open.back === 'false', JSON.stringify(open));
         check('phone: the column of notices is at the top, in the screen, and ends above the composer', geo.stack.t >= 0 && geo.stack.b < geo.composer.t && geo.stack.l >= 0 && geo.stack.r <= geo.vw, JSON.stringify(geo.stack));
         check('phone: the update notice is inside that column (not a second layer on top of it)', geo.update.t >= geo.stack.t - 1 && geo.update.b <= geo.stack.b + 1, JSON.stringify(geo.update));
-        check('phone: the short toasts are at the top, inside the screen, above the composer', geo.toasts.length >= 2 && geo.toasts.every(t => t.t >= 0 && t.b < geo.composer.t && t.l >= 0 && t.r <= geo.vw), JSON.stringify(geo.toasts));
-        check('phone: the short toasts are below the notices, not over them', geo.toasts.every(t => t.t >= geo.stack.b - 1), JSON.stringify({ stack: geo.stack, toasts: geo.toasts }));
+        check('phone: a warning or the update notice replaces the short toasts while it is shown (none is drawn)', geo.toasts.length >= 2 && geo.toasts.every(t => t.b - t.t === 0), JSON.stringify(geo.toasts));
         const noticeButtons = await ev(`[...document.querySelectorAll('#warning-toasts .update-toast-more, #warning-toasts .update-toast-close')].map(e => { const b = e.getBoundingClientRect(); const t = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2); return (t === e || e.contains(t)) ? 'ok' : (e.className + ' covered by ' + (t ? t.tagName + '.' + String(t.className).slice(0, 30) : 'nothing')); })`);
         check('phone: every notice arrow and dismiss is hit-testable while short toasts are shown', noticeButtons.length >= 7 && noticeButtons.every(v => v === 'ok'), JSON.stringify(noticeButtons));
-        const [a, b] = geo.toasts.slice().sort((x, y) => x.t - y.t);
-        check('phone: two short toasts are one under the other, not on each other', !!b && a.b <= b.t + 1, JSON.stringify(geo.toasts));
-        const seen = await hits({ toast: '.toast', errorToast: '.toast.error' });
-        check('phone: the short toasts are on top of the notices, not hidden under them', Object.values(seen).every(v => v === 'ok'), JSON.stringify(seen));
+        // the notices gone: one short toast at a time, the newest, one compact card just under the app bar (UI/UX 170 consistency pass 2, item 4)
+        await ev(`document.querySelectorAll('#warning-toasts > *').forEach(e => e.remove()); document.getElementById('update-toast')?.remove(); true`);
+        await waitFor(`[...document.querySelectorAll('.toast')].every(e => e.getAnimations().length === 0)`, 'the toast to settle (it slides in again when it is drawn)', 5000);
+        const card = await ev(`(() => { const r = e => { const b = e.getBoundingClientRect(); return { t: Math.round(b.top), b: Math.round(b.bottom), l: Math.round(b.left), r: Math.round(b.right) }; }; const all = [...document.querySelectorAll('.toast')], shown = all.filter(e => e.getClientRects().length > 0);
+            const m = shown[0] && shown[0].querySelector('.toast-message'); return { count: all.length, shown: shown.map(r), text: shown[0] && shown[0].textContent, size: m && getComputedStyle(m).fontSize, bar: r(document.querySelector('header.top-bar')), composer: r(document.getElementById('command-input')), vw: innerWidth }; })()`);
+        check('phone: of two short toasts one is drawn, the newest', card.count === 2 && card.shown.length === 1 && /^Could not do that/.test(card.text), JSON.stringify(card));
+        const c0 = card.shown[0] || { t: 0, b: 0, l: 0, r: 0 };
+        check('phone: it is one compact card just under the app bar, not full width, above the composer', c0.t >= card.bar.b && c0.t - card.bar.b <= 16 && c0.b - c0.t <= 56 && c0.r - c0.l < card.vw - 80 && c0.b < card.composer.t && c0.l >= 0 && c0.r <= card.vw, JSON.stringify(card));
+        const seen = await hits({ toast: '.toast:last-child', errorToast: '.toast.error' });
+        check('phone: the short toast is hit-testable, not under anything', seen.toast === 'ok', JSON.stringify(seen));
         // a long error toast is four lines, a tap shows the rest (an error says what went wrong and what to do: four lines, #6727)
         const LONG = 'Could not save the file because the folder it is in cannot be written to by this account, and the disk may be full or read-only; check the folder and try again later, or choose another place for it to go. Nothing was changed on disk, and the file you were editing is still open with your changes in it, so you can save it somewhere else without losing them.';
         await ev(`(async () => { const n = await import(${S} + 'notifications.js'); n.showToast(${JSON.stringify(LONG)}, true, 600000); return true; })()`);

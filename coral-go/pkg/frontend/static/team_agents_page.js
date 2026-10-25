@@ -138,7 +138,8 @@ function draw() {
         className: 'team-table-agents', rows: rows.map(ag => {
             const key = ag.subscriber_id || ag.session_id || ag.name;
             const b = rowButton(ag.name);
-            const first = el('div', 'team-row-cell'); first.append(b, el('span', 'team-row-phone', [doingOf(ag), providerOf(ag)].filter(Boolean).join(' · '))); // a phone's table folds what it does and its provider under the name
+            const first = el('div', 'team-row-cell'); const folded = el('span', 'team-row-phone-status'); folded.append(stateChip(statusWord(ag), CLASS[ag.availability]));
+            first.append(b, el('span', 'team-row-phone', [doingOf(ag), providerOf(ag)].filter(Boolean).join(' · ')), folded); // a phone's table folds what it does and its provider under the name, and at a narrow width (200% text) its status too
             return {
                 key, open: (tr) => hooks.openAgent?.(ag, tr.querySelector('.team-row-btn')),
                 cells: [first, stateChip(statusWord(ag), CLASS[ag.availability]), doingOf(ag), providerOf(ag), canRemind(ag) && ag.agent_type !== 'terminal' ? remindButton(ag) : ''],
