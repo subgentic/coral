@@ -26,6 +26,8 @@ const stagedFrom = (source, relaunch = {}) => { const st = staged('1.4.160', {},
         window.fetch = (u, o) => {
             const url = String(u), method = (o && o.method) || 'GET';
             if (url.includes('/api/cloud/status')) return json({ connected: false, hub_relaunch_updates: false, hub_relaunch_available: true });
+            // the switch's own save answers the status it leaves: stubbed too, so the sentence under it is the same on every OS (the real server on Windows says hub_relaunch_needs_here and the sentence is the Windows one, #7338)
+            if (url.includes('/api/cloud/hub-relaunch')) return json({ connected: false, hub_relaunch_updates: !!(o && o.body && JSON.parse(o.body).allow), hub_relaunch_available: true });
             if (url.includes('/api/system/update')) {
                 window.__upd.calls.push({ method, url: url.replace(/^.*\\/api\\/system\\/update/, '') || '/status' });
                 if (url.endsWith('/api/system/update')) { const answer = () => (window.__upd.status ? json(window.__upd.status) : json({ error: 'none' }, 404)); return window.__upd.delay ? new Promise(r => setTimeout(() => r(answer()), window.__upd.delay)) : answer(); }
