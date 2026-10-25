@@ -14,6 +14,7 @@ var boardOwnedRows = []struct{ table, col string }{
 	{"board_subscribers", "project"}, {"board_messages", "project"}, {"board_reminders", "project"}, {"board_groups", "project"},
 	{"board_tasks", "board_id"}, {"board_settings", "project"}, {"board_waits", "project"}, {"board_working_modes", "board_id"},
 	{"board_workflow_presets", "board_id"}, {"health_counters", "project"}, {"health_items", "project"}, {"boards", "id"},
+	{"board_goals", "board_id"}, {"board_goal_meta", "board_id"}, {"board_goal_events", "board_id"}, {"board_settings_log", "board_id"}, // the goals tables were missing from this census until #7355
 }
 
 // Audit trails: what the Hub's operators did and what the health rules did are a record of what happened, not part of the board, so they stay.
@@ -55,6 +56,7 @@ func fillBoard(t *testing.T, s *Store, project string) (taskIDs []int64) {
 	}{
 		{`INSERT INTO board_reminders (project, subscriber_id, message, interval_seconds) VALUES (?, 'Dev', 'remind', 60)`, []any{project}},
 		{`INSERT INTO board_groups (project, group_id, session_id) VALUES (?, 'g1', 'claude-x')`, []any{project}},
+		{`INSERT INTO board_settings_log (board_id, at, kind, actor, field, old_value, new_value) VALUES (?, '2026-10-19T00:00:00Z', 'change', 'Boss', 'x', 'a', 'b')`, []any{project}},
 		{`INSERT INTO health_actions (project, rule, target, at) VALUES (?, 'claim', 'Dev', '2026-10-19T00:00:00Z')`, []any{project}},
 		{`INSERT INTO health_counters (project, rule, target, subject, count, last_at) VALUES (?, 'claim', 'Dev', '1', 1, '2026-10-19T00:00:00Z')`, []any{project}},
 		{`INSERT INTO health_items (project, item, state, shown_at) VALUES (?, 'stuck:Dev', 'open', '2026-10-19T00:00:00Z')`, []any{project}},
@@ -76,6 +78,10 @@ func fillBoard(t *testing.T, s *Store, project string) (taskIDs []int64) {
 	require.NoError(t, err)
 	_, err = s.SetWorkingMode(ctx, project, WorkingMode{Mode: "none"})
 	require.NoError(t, err)
+	// a goal with a task on it: the goal, its counter and its events (written by triggers) are the board's too
+	goal, err := s.CreateGoal(ctx, project, GoalInput{Title: "Ship " + project, CreatedBy: "Boss"})
+	require.NoError(t, err)
+	require.NoError(t, s.SetTaskGoal(ctx, project, first.ID, &goal.ID))
 	return []int64{first.ID, second.ID}
 }
 
@@ -222,4 +228,38 @@ func TestDeleteProjectIfUnusedTakesABoardNobodyUsed(t *testing.T) {
 	assert.Equal(t, 0, countRows(t, s, "boards", "id = ?", "made"))
 	assert.Equal(t, 0, countRows(t, s, "board_settings", "project = ?", "made"))
 	assert.Greater(t, countRows(t, s, "board_tasks", "board_id = ?", "other"), 0, "another board is untouched")
+}
+
+// Every table of the board database that has a board key column is either cleaned by DeleteProject (boardOwnedRows), an audit trail that stays (auditRows), or named here with the reason it is neither: a new
+// per-board table that is none of these fails this test, so it cannot be left behind by a deleted board (#7355: board_goal_events was, until Security's probe).
+var notCleanedWithTheBoard = map[string]string{
+	"cross_team_switch_log": "an audit trail of what the cross-team switches did, like the audit rows above: a record of what happened, not part of the board",
+}
+
+func TestEveryTableKeyedByABoardIsCleanedOrNamedAsKept(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	var tables []string
+	require.NoError(t, s.db.SelectContext(ctx, &tables, `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name`))
+	known := map[string]bool{}
+	for _, r := range boardOwnedRows {
+		known[r.table] = true
+	}
+	for _, r := range auditRows {
+		known[r.table] = true
+	}
+	for tbl := range notCleanedWithTheBoard {
+		known[tbl] = true
+	}
+	var unknown []string
+	for _, tbl := range tables {
+		var cols []string
+		require.NoError(t, s.db.SelectContext(ctx, &cols, `SELECT name FROM pragma_table_info(?)`, tbl))
+		for _, c := range cols {
+			if (c == "board_id" || c == "project") && !known[tbl] {
+				unknown = append(unknown, tbl+"."+c)
+			}
+		}
+	}
+	assert.Empty(t, unknown, "a table keyed by a board that DeleteProject neither cleans nor is named as kept: add it to boardOwnedRows (and the delete list) or to notCleanedWithTheBoard with the reason")
 }

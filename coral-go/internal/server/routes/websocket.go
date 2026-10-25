@@ -285,6 +285,7 @@ type coralFeed struct {
 	prevByKey       map[string]map[string]any // session key -> the row last sent (read-only tick data)
 	prevRunsJSON    string
 	prevGoalsJSON   string            // the goals brief as last sent (#7116)
+	prevGoalSeqs    map[string]int64  // each board's goals counter as last sent: the goal events a frame carries are the ones above it (#7355)
 	prevHealth      map[string]string // machine_health: each top-level field as last sent (#3444)
 	prevServersJSON string
 	firstMessage    bool
@@ -376,6 +377,15 @@ func (f *coralFeed) frame(tick *wsTick, pending []Notification, healthDelta map[
 		}
 		if goalsChanged { // a goal write or a task change touching a goal moves a board's seq: the diff carries the brief only then (#7116)
 			payload["goals_brief"], payload["goals_open"], payload["goals_seq"] = tick.goals, tick.goalsOpen, tick.goalsSeq
+			// and what changed, ids and kinds only (#7355): the events above the counter this connection saw; the first frame carries none
+			if events, gap := f.goalEventsFor(tick); len(events) > 0 || gap {
+				if len(events) > 0 {
+					payload["goal_events"] = events
+				}
+				if gap {
+					payload["goal_events_gap"] = true
+				}
+			}
 		}
 		if hasNotifications {
 			payload["notifications"] = pending
@@ -410,6 +420,10 @@ func (f *coralFeed) sent(kind coralFrame, tick *wsTick, healthDelta map[string]a
 	f.prevByKey = tick.byKey
 	f.prevRunsJSON = tick.runsJSON
 	f.prevGoalsJSON = tick.goalsJSON
+	f.prevGoalSeqs = make(map[string]int64, len(tick.goals))
+	for id, b := range tick.goals {
+		f.prevGoalSeqs[id] = b.Seq
+	}
 	f.firstMessage = false
 }
 
