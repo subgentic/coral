@@ -74,6 +74,7 @@ const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve
                 assert.equal(await ev(`!!document.querySelector('#mobile-analytics-list ${pane}')`), true, at + 'the pane is in the phone page');
                 assert.equal(await ev(`[...document.querySelectorAll('#mobile-analytics-list .sidebar-hide-btn')].some(b => b.getClientRects().length > 0)`), false, at + 'no Hide on a phone');
                 assert.equal(await ev(`document.getElementById('cost-page').getClientRects().length`), 0, at + 'the page is not shown until a view is chosen');
+                assert.deepEqual(await ev(`(() => { const rows = [...document.querySelectorAll('${pane} li')].filter(l => l.querySelector('.row-btn')); return [rows.length, [...new Set(rows.map(l => Math.round(l.getBoundingClientRect().height)))]]; })()`), [11, [44]], at + 'the views are the shared row: 44 px on a phone');
                 await shot(`analytics-one-list-${w}`);
                 await choose('By model');
                 await waitFor(`document.getElementById('cost-page').getClientRects().length > 0`, at + 'the view as a screen', 6000);
@@ -100,6 +101,8 @@ const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve
             assert.deepEqual(await ev(`[...new Set([...document.querySelectorAll('#cost-summary-cards .cost-card-value')].map(e => getComputedStyle(e).fontSize + '/' + getComputedStyle(e).fontWeight))]`), ['20px/700'], at + 'every tile number is 20/700');
             assert.deepEqual(await ev(`[...new Set([...document.querySelectorAll('#cost-summary-cards .cost-card-label')].map(e => getComputedStyle(e).fontSize + '/' + getComputedStyle(e).fontWeight))]`), ['12px/500'], at + 'every tile label is 12/500');
             assert.equal(await ev(`document.querySelectorAll('#cost-summary-cards .cost-card').length`), 7, at + 'seven tiles');
+            assert.deepEqual(await ev(`[...document.querySelectorAll('#cost-summary-cards .cost-card-value')].filter(v => { const r = document.createRange(); r.selectNodeContents(v); return new Set([...r.getClientRects()].map(x => Math.round(x.top))).size > 1; }).map(v => v.textContent)`), [], at + 'every figure is on one line, whole');
+            assert.deepEqual(await ev(`(() => { const rows = [...document.querySelectorAll('${pane} li')].filter(l => l.querySelector('.row-btn')); const h = [...new Set(rows.map(l => Math.round(l.getBoundingClientRect().height)))]; return [rows.length, h]; })()`), [11, [mobile ? 44 : 36]], at + 'the views are the shared sidebar row: 36 px on a desktop, 44 on a phone, the button is the row');
             assert.deepEqual(await ev(`[...document.querySelectorAll('#cost-dashboard-view [data-cview]')].filter(e => e.getClientRects().length).map(e => e.dataset.cview)`).then(a => [...new Set(a)]), ['overview'], at + 'only the Overview parts are shown');
             assert.deepEqual(await ev(`(() => { const t = getComputedStyle(document.querySelector('#cost-dashboard-view .cost-section[data-cview=overview] .cost-section-title')); return [t.fontSize, t.fontWeight]; })()`), ['14px', '600'], at + 'a section heading is 14/600');
             await shot(`analytics-one-overview-${w}`);
