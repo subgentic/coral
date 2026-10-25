@@ -46,7 +46,6 @@ const FULL_WIDTH_VIEWS = new Set([
     "cost-dashboard-view",
     "timeline-view",
     "kanban-view",
-    "workflows-view",
     "servers-view",
     "inbox-view",
     "artifacts-view",

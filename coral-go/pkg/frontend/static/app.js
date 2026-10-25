@@ -279,7 +279,8 @@ registerActions({
 // The Workflows view's own buttons and create dialog (#3645); its generated markup's actions
 // register with its module.
 registerActions({
-    'wf-back': () => workflowsBackToList(),
+    'workflows-search-filter': el => { const v = el.value; importOnce('./workflows.js').then(m => m.filterWorkflows(v)).catch(() => {}); }, // the Workflows sidebar's search box is in the page from the start; workflows.js loads with the tab
+    'wf-phone-back': () => { importOnce('./workflows.js').then(m => m.workflowsPhoneBack()).catch(() => {}); },
     'wf-build-agent': () => launchWorkflowAgent(),
     'wf-create': () => showWorkflowCreateModal(),
     'job-create-workflow': () => { hideJobModal(); showWorkflowCreateModal(); }, // New job with no workflow to run
@@ -462,7 +463,7 @@ function switchNavTab(tab, opts = {}) {
     }
 
     // Toggle sidebar visibility — full-width views hide the sidebar
-    const fullWidthTabs = new Set(['tokens', 'workflows', 'servers', 'hub-inbox', 'artifacts']);
+    const fullWidthTabs = new Set(['tokens', 'servers', 'hub-inbox', 'artifacts']); // Workflows has its sidebar (#7471)
     const layout = document.querySelector('.layout');
     if (layout) layout.classList.toggle('sidebar-hidden', fullWidthTabs.has(tab));
 

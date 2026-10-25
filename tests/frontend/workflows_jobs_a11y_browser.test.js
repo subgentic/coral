@@ -20,8 +20,8 @@ const { DATA_WORLD } = require('./helpers/census_world');
 
             // the workflow editor
             await ev(`window.switchNavTab('workflows'); true`);
-            await waitFor(`!!document.querySelector('#wf-list-container .wf-card[data-on-click="wf-select"]')`, `${tag}: workflows`, 10000);
-            await ev(`document.querySelector('.wf-card[data-on-click="wf-select"]').click(); true`);
+            await waitFor(`!!document.querySelector('#wf-nav-list .row-btn[data-on-click="wf-select"]')`, `${tag}: workflows`, 10000);
+            await ev(`document.querySelector('#wf-nav-list .row-btn[data-on-click="wf-select"]').click(); true`);
             await waitFor(`!!document.querySelector('[data-on-click="wf-edit"]')`, `${tag}: workflow`, 10000);
             await ev(`document.querySelector('[data-on-click="wf-edit"]').click(); true`);
             await waitFor(`!!document.querySelector('#wf-create-modal [data-on-click="wf-add-step"]') && !!document.querySelector('#wf-steps-editor .wf-step-editor-item')`, `${tag}: the editor`, 10000);

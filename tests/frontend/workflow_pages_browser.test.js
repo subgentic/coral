@@ -27,18 +27,18 @@ const BASE = require('./test_base').BASE;
             await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
             if (font) await ev(`document.documentElement.style.fontSize = '${font}'; true`);
             await ev(`window.switchNavTab('workflows'); true`);
-            await waitFor(`[...document.querySelectorAll('.wf-card')].some(c => c.textContent.includes(${JSON.stringify(name)}))`, 'the workflow card', 10000);
-            await ev(`[...document.querySelectorAll('.wf-card')].find(c => c.textContent.includes(${JSON.stringify(name)})).click(); true`);
-            await waitFor(`!!document.querySelector('.wf-detail-meta') && !!document.querySelector('.wf-last-failed') && !!document.querySelector('.wf-runs-table')`, 'the workflow page with its failed run', 12000); await sleep(300); // sleep-ok: the page draws after the click
+            await waitFor(`[...document.querySelectorAll('#wf-nav-list .row-btn')].some(c => c.textContent.includes(${JSON.stringify(name)}))`, 'the workflow row', 10000);
+            await ev(`[...document.querySelectorAll('#wf-nav-list .row-btn')].find(c => c.textContent.includes(${JSON.stringify(name)})).click(); true`);
+            await waitFor(`!!document.querySelector('.wf-facts-line') && !!document.querySelector('.wf-last-failed') && !!document.querySelector('.wf-runs-table')`, 'the workflow page with its failed run', 12000); await sleep(300); // sleep-ok: the page draws after the click
             // the workflow page: the failure's number, the folder's words, Delete behind More
-            const page = await ev(`(() => ({ last: (document.querySelector('.wf-last-failed') || {}).textContent || '', meta: document.querySelector('.wf-detail-meta').textContent.replace(/\\s+/g, ' ').trim(), deleteShown: [...document.querySelectorAll('[data-on-click="wf-delete"]')].some(b => b.getClientRects().length > 0), more: !!document.querySelector('.wf-more-btn'), moreMenuHidden: (document.querySelector('.wf-more-menu') || {}).hidden, delInMenu: !!document.querySelector('.wf-more-menu [data-on-click="wf-delete"]') }))()`);
+            const page = await ev(`(() => ({ last: (document.querySelector('.wf-last-failed') || {}).textContent || '', meta: document.querySelector('.wf-facts-line').textContent.replace(/\\s+/g, ' ').trim(), deleteShown: [...document.querySelectorAll('[data-on-click="wf-delete"]')].some(b => b.getClientRects().length > 0), more: !!document.querySelector('.wf-more-btn'), moreMenuHidden: (document.querySelector('.wf-more-menu') || {}).hidden, delInMenu: !!document.querySelector('.wf-more-menu [data-on-click="wf-delete"]') }))()`);
             assert.match(page.last, /step 2 \(Test\)/, `${tag}: the workflow page says step 2: ` + page.last);
-            assert.match(page.meta, /Folder: not set/, `${tag}: the folder is worded: ` + page.meta);
+            assert.match(page.meta, /Folder not set/, `${tag}: the folder is worded: ` + page.meta);
             assert.ok(page.more && page.moreMenuHidden === true && page.delInMenu && !page.deleteShown, `${tag}: Delete is behind a closed More: ` + JSON.stringify(page));
             if (mobile) {
-                const order = await ev(`(() => { const meta = document.querySelector('.wf-detail-meta'), steps = document.querySelector('.wf-steps-section'), cs = getComputedStyle(meta); return { stepsTop: Math.round(steps.getBoundingClientRect().top), metaTop: Math.round(meta.getBoundingClientRect().top), dir: cs.flexDirection, wrap: cs.flexWrap, display: cs.display }; })()`);
-                assert.ok(order.stepsTop < order.metaTop, `${tag}: Steps come before the meta line: ` + JSON.stringify(order));
-                assert.ok(order.display === 'flex' && order.dir === 'row' && order.wrap === 'wrap', `${tag}: the meta is one wrapping line: ` + JSON.stringify(order));
+                // one facts line under the name (UI/UX's rule, #7471), above the steps; it wraps rather than scrolls sideways
+                const order = await ev(`(() => { const meta = document.querySelector('.wf-facts-line'), steps = document.querySelector('.wf-steps-section'); return { stepsTop: Math.round(steps.getBoundingClientRect().top), metaTop: Math.round(meta.getBoundingClientRect().top), over: document.documentElement.scrollWidth - document.documentElement.clientWidth }; })()`);
+                assert.ok(order.metaTop < order.stepsTop && order.over <= 1, `${tag}: the facts line is above the Steps and nothing scrolls sideways: ` + JSON.stringify(order));
             }
             // the More menu closes on Escape (focus back to More) and when focus leaves it (UI Accessibility's note on #7156)
             await ev(`document.querySelector('.wf-more-btn').click(); true`);

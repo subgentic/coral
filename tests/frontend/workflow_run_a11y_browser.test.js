@@ -17,8 +17,8 @@ const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
             await installAudit(ev);
             const open = async (id) => {
                 await ev(`window.switchNavTab('workflows'); true`);
-                await waitFor(`!!document.querySelector('.wf-card[data-on-click="wf-select"]') && document.querySelector('.wf-card[data-on-click="wf-select"]').getClientRects().length > 0`, `${tag}: the workflows`, 10000);
-                await ev(`document.querySelector('.wf-card[data-on-click="wf-select"]').click(); true`);
+                await waitFor(`!!document.querySelector('#wf-nav-list .row-btn[data-on-click="wf-select"]') && document.querySelector('#wf-nav-list .row-btn[data-on-click="wf-select"]').getClientRects().length > 0`, `${tag}: the workflows`, 10000);
+                await ev(`document.querySelector('#wf-nav-list .row-btn[data-on-click="wf-select"]').click(); true`);
                 await waitFor(`!!document.querySelector('#wf-detail-container tr[data-run-id="${id}"]')`, `${tag}: the runs`, 10000);
                 await ev(`document.querySelector('#wf-detail-container tr[data-run-id="${id}"]').click(); true`);
                 await waitFor(`!!document.querySelector('#wf-run-detail-container .wf-run-step')`, `${tag}: run ${id}`, 10000);
@@ -33,13 +33,13 @@ const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
             assert.equal(new Set(f.out).size, f.out.length, `${tag}: no two Output buttons share a name (${JSON.stringify(f.out)})`);
             assert.ok(f.out.every(n => /^Output/.test(n)) && f.out.every(n => n.includes('Output')), `${tag}: each still contains its visible word`);
             // the passed run with an agent step
-            await ev(`document.getElementById('wf-back-btn').click(); true`);
+            await ev(`([...document.querySelectorAll('.wf-phone-back')].find(b => b.getClientRects().length) || document.getElementById('wf-back-btn') || document.getElementById('wf-run-back')).click(); true`);
             await open(32);
             const a = await ev(`(() => { const l = document.querySelector('#wf-run-detail-container .wf-step-agent-link'); return l ? { tag: l.tagName, tab: l.tabIndex, role: l.getAttribute('role') } : null; })()`);
             assert.ok(a && (a.tag === 'BUTTON' || a.tag === 'A' || (a.role === 'button' && a.tab === 0)), `${tag}: "View agent" is a control the keyboard reaches (${JSON.stringify(a)})`);
             // light theme contrast of the run page, both runs
             for (const id of [32, 31]) {
-                if (id === 31) { await ev(`document.getElementById('wf-back-btn').click(); true`); await open(31); }
+                if (id === 31) { await ev(`([...document.querySelectorAll('.wf-phone-back')].find(b => b.getClientRects().length) || document.getElementById('wf-back-btn') || document.getElementById('wf-run-back')).click(); true`); await open(31); }
                 for (const theme of ['dark', 'light']) {
                     await setTheme(ev, theme);
                     const c = await auditRegion(ev, ['#wf-run-detail-container']);
@@ -47,7 +47,7 @@ const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
                 }
             }
             // a run that is still going is read again every few seconds: what the person opened stays open and focus stays where it was
-            await ev(`document.getElementById('wf-back-btn').click(); true`);
+            await ev(`([...document.querySelectorAll('.wf-phone-back')].find(b => b.getClientRects().length) || document.getElementById('wf-back-btn') || document.getElementById('wf-run-back')).click(); true`);
             await ev(`import((window.__coralStatic || '/static/') + 'workflows.js').then(m => m.selectWorkflowRun(34)).then(() => true)`);
             await waitFor(`!!document.querySelector('#wf-run-detail-container .wf-run-step-output-toggle')`, `${tag}: the running run`, 10000);
             const tg = `document.querySelectorAll('#wf-run-detail-container .wf-run-step-output-toggle')[1]`;

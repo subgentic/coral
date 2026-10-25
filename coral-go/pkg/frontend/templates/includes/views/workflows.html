@@ -1,50 +1,32 @@
 {{ define "includes/views/workflows.html" }}
 <!-- Workflows View -->
 <div id="workflows-view" class="workflows-view" style="display:none">
-    <div class="wf-header">
-        <div class="wf-header-left">
-            <h2 id="wf-title">Workflows</h2>
-            <span class="wf-count-badge" id="wf-count-badge"></span>
+    <!-- On a phone the sidebar's pane is the page's list, here (mobile.js), and a workflow or a run is the screen after it (#7471) -->
+    <div id="mobile-workflows-list"></div>
+    <div class="wf-page" id="wf-page">
+        <!-- With no workflow yet: one empty line, the two ways to make one and what starts one as its hint (#7001, #6988). Creating is the sidebar's pinned "+ New workflow". -->
+        <div id="wf-list-container" class="wf-list-container">
+            <div class="empty-pane" id="wf-list-empty">
+                <p class="empty-line">No workflows yet.</p>
+                <p class="empty-hint" id="wf-hint-build"><strong>Build with Agent</strong> starts an agent that builds the workflow with you. <strong>New workflow</strong>, in the sidebar, opens an empty form to write the steps yourself.</p>
+                <p class="empty-hint" id="wf-hint-start">A workflow runs when you press Run, when a job schedules it, or through the API.</p>
+                <div class="wf-empty-actions">
+                    <button class="btn btn-sm" id="wf-build-agent-btn" data-on-click="wf-build-agent" aria-describedby="wf-hint-build">
+                        <span class="material-icons" style="font-size:1rem" aria-hidden="true">smart_toy</span> Build with Agent
+                    </button>
+                </div>
+            </div>
         </div>
-        <div class="wf-header-actions">
-            <button class="btn btn-sm" id="wf-back-btn" style="display:none" data-on-click="wf-back">
-                <span class="material-icons" style="font-size:1rem" aria-hidden="true">arrow_back</span> Back
-            </button>
-            <button class="btn btn-sm" id="wf-build-agent-btn" data-on-click="wf-build-agent" aria-describedby="wf-hint-build">
-                <span class="material-icons" style="font-size:1rem" aria-hidden="true">smart_toy</span> Build with Agent
-            </button>
-            <button class="btn btn-sm btn-primary" id="wf-create-btn" data-on-click="wf-create" aria-describedby="wf-hint-new">
-                <span class="material-icons" style="font-size:1rem" aria-hidden="true">add</span> New Workflow
-            </button>
+
+        <!-- Workflow Detail (single workflow) -->
+        <div id="wf-detail-container" class="wf-detail-container" style="display:none">
+            <div id="wf-detail"></div>
         </div>
-    </div>
 
-    <!-- Workflow List -->
-    <div id="wf-list-container" class="wf-list-container">
-        <!-- One short line each (#6988): how the two ways to make a workflow differ, and what starts one. Text, not hover; the two buttons name theirs with aria-describedby. -->
-        <!-- #7001: shown while the list is empty; once there are workflows it is a closed "How workflows start" disclosure (workflows.js renderWorkflowList) -->
-        <details class="disclosure wf-hints" id="wf-hints" open>
-            <summary>How workflows start</summary>
-            <p id="wf-hint-build"><strong>Build with Agent</strong> starts an agent that builds the workflow with you.</p>
-            <p id="wf-hint-new"><strong>New Workflow</strong> opens an empty form to write the steps yourself.</p>
-            <p id="wf-hint-start">A workflow runs when you press Run, when a job schedules it, or through the API.</p>
-        </details>
-        <div class="wf-empty" id="wf-list-empty">
-            <span class="material-icons wf-empty-icon" aria-hidden="true">account_tree</span>
-            <p>No workflows yet</p>
-            <span class="wf-empty-hint">Chain shell commands and AI agents.</span>
+        <!-- Run Detail -->
+        <div id="wf-run-detail-container" class="wf-run-detail-container" style="display:none">
+            <div id="wf-run-detail"></div>
         </div>
-        <div class="wf-list" id="wf-list"></div>
-    </div>
-
-    <!-- Workflow Detail (single workflow) -->
-    <div id="wf-detail-container" class="wf-detail-container" style="display:none">
-        <div id="wf-detail"></div>
-    </div>
-
-    <!-- Run Detail -->
-    <div id="wf-run-detail-container" class="wf-run-detail-container" style="display:none">
-        <div id="wf-run-detail"></div>
     </div>
 </div>
 

@@ -71,10 +71,10 @@ const JOB_RUNS = { runs: [{ id: 44, status: 'completed', scheduled_at: '2026-10-
 
         // ── Workflows ──────────────────────────────────────────────────────
         await ev(`window.switchNavTab('workflows'); true`);
-        await until(`!!document.querySelector('#wf-list-container .wf-card[data-on-click="wf-select"]')`, 'the workflow list');
+        await until(`!!document.querySelector('#wf-nav-list .row-btn[data-on-click="wf-select"]')`, 'the workflow list');
         await clear();
-        await click('.wf-card[data-on-click="wf-select"]');
-        check('a workflow card opens the workflow', await sent('GET /api/workflows/7', 'the workflow') && await ev(`document.getElementById('wf-detail-container').style.display !== 'none'`));
+        await click('#wf-nav-list .row-btn[data-on-click="wf-select"]');
+        check('a workflow row opens the workflow', await sent('GET /api/workflows/7', 'the workflow') && await ev(`document.getElementById('wf-detail-container').style.display !== 'none'`));
         await until(`!!document.querySelector('#wf-detail-container tr[data-on-click="wf-run"]')`, 'its runs');
 
         await clear();
@@ -139,8 +139,10 @@ const JOB_RUNS = { runs: [{ id: 44, status: 'completed', scheduled_at: '2026-10-
         await until(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'the confirm dialog again');
         await click('#confirm-modal-yes');
         check('Yes kills the run', await sent('POST /api/workflows/runs/31/kill', 'the kill'));
-        await click('[data-on-click="wf-back"]');
-        check('Back returns to the list', await ev(`document.getElementById('wf-list-container').style.display !== 'none'`));
+        await click('#wf-run-back'); // a run's way back is its workflow; the workflow's is its group's table (#7471)
+        await until(`!!document.getElementById('wf-back-btn')`, 'the workflow page');
+        await click('#wf-back-btn');
+        check('Back returns to the list (the group table)', await ev(`document.getElementById('group-table-view').style.display !== 'none'`));
         // A run whose agent step is running: Kill says what happens to the agent's terminal log (Security's #4371 table, #4399).
         await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'workflows.js'); await m.selectWorkflowRun(32, { workflowId: 7 }); return true; })()`);
         await until(`!!document.querySelector('#wf-run-detail-container [data-on-click="wf-kill-run"]')`, 'the run with a running agent step');

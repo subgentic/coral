@@ -160,7 +160,7 @@ const fixtures = async () => {
                     const modal=view==='tasks'?'task-detail-modal':'settings-modal';
                     assert.ok(await ev(`(()=>{const r=document.getElementById('${modal}').querySelector('.modal-content').getBoundingClientRect();return r.width>0&&r.height>0&&r.left>=-1&&r.right<=innerWidth+1&&r.bottom<=innerHeight+1})()`),`${view} fits ${device}`);
                 }
-                const required={workspace:'.chat-bubble.assistant .message-text',tasks:'#task-detail-content',settings:'#settings-working-dir','team-settings':'.working-mode-form',board:'.mb-message-body','agent-ui':'.agent-ui-request',workflows:'.wf-step-item',scheduler:'.sched-header',docs:'#docs-content h1',analytics:'.cost-card-value'};
+                const required={workspace:'.chat-bubble.assistant .message-text',tasks:'#task-detail-content',settings:'#settings-working-dir','team-settings':'.working-mode-form',board:'.mb-message-body','agent-ui':'.agent-ui-request',workflows:'.wf-steps-table',scheduler:'.sched-header',docs:'#docs-content h1',analytics:'.cost-card-value'};
                 assert.ok(await ev(`Array.from(document.querySelectorAll('${required[view]}')).some(node=>node.getBoundingClientRect().width>0)`),`${view} renderer produced visible content`);
                 if(!baseline && view==='team-settings') {
                     assert.equal(await ev(`document.querySelector('.team-settings-actions [type=submit]').disabled`),false);
