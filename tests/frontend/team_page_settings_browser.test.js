@@ -18,6 +18,10 @@ const TEAM = `qa-settings-${Date.now() % 100000}`;
     const bar = () => ev(`(() => { const save = window.__tp.find('button', /^Save settings$/i), cancel = window.__tp.find('button', /^Cancel$/i); const st = [...window.__tp.page().querySelectorAll('[role=status], output, p, div')].filter(window.__na.vis).map(e => window.__na.text(e)).find(t => /^(No changes to save|You have unsaved changes|Saved\.|Could not save)/.test(t.trim()) && t.length < 80) || ''; return { save: save ? { disabled: save.disabled || save.getAttribute('aria-disabled') === 'true', ...window.__na.box(save) } : null, cancel: cancel ? window.__na.box(cancel) : null, status: st.trim(), vh: innerHeight }; })()`);
     const sw = n => `(() => { const e = [...window.__tp.page().querySelectorAll('[role=switch], input[type=checkbox]')].filter(window.__na.vis).find(x => window.__na.name(x) === ${JSON.stringify(n)}); return e; })()`;
     const state = n => ev(`(() => { const e = ${sw(n)}; return e ? (e.getAttribute('aria-checked') || String(e.checked)) : null; })()`);
+    // The groups of the page are the main Settings' (#7663): a list at the left (a selector on a phone); one group's pane is open at a time.
+    const group = name => ev(`(() => { const page = window.__tp.page(); const tab = [...page.querySelectorAll('[role=tab]')].filter(window.__na.vis).find(t => window.__na.name(t) === ${JSON.stringify(name)}); if (tab) { tab.click(); return 'tab'; }
+        const sel = [...page.querySelectorAll('select')].filter(window.__na.vis).find(x => window.__na.name(x) === 'Team settings group'); if (!sel) return null; const o = [...sel.options].find(x => x.textContent === ${JSON.stringify(name)}); if (!o) return null; sel.value = o.value; sel.dispatchEvent(new Event('change', { bubbles: true })); return 'select'; })()`);
+    const openFor = async n => { for (const g of ['Workflow', 'Health check', 'Messaging', 'Prompts']) { await group(g); if (await ev(`!!${sw(n)}`)) return g; } return null; };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [label, w, h, mobile] of VIEWS) {
@@ -29,19 +33,41 @@ const TEAM = `qa-settings-${Date.now() % 100000}`;
             await openTeam(ev, waitFor, TEAM).catch(() => {});
             await S.run(`${label}: Settings has the sections Workflow, Health check, Messaging and Prompts, and a select named Working mode`, async () => {
                 await goTab(ev, settle, 'Settings'); await settle(500);
-                const heads = await ev(`[...window.__tp.page().querySelectorAll('h2, h3')].filter(window.__na.vis).map(e => window.__na.text(e).trim())`);
-                for (const n of ['Workflow', 'Health check', 'Messaging', 'Prompts']) assert.ok(heads.includes(n), `a section heading ${n} (got ${JSON.stringify(heads)})`);
+                const how = [];
+                for (const n of ['Workflow', 'Health check', 'Messaging', 'Prompts']) {
+                    how.push(await group(n)); await settle(150);
+                    const heads = await ev(`[...window.__tp.page().querySelectorAll('h4')].filter(window.__na.vis).map(e => window.__na.text(e).trim())`);
+                    assert.ok(heads.includes(n), `opening the group ${n} shows its heading (got ${JSON.stringify(heads)})`);
+                }
+                assert.deepEqual([...new Set(how)], [mobile ? 'select' : 'tab'], 'the groups are a list of tabs at the left on a desktop and a selector on a phone');
+                if (!mobile) { const g = await ev(`(() => { const t = [...window.__tp.page().querySelectorAll('[role=tab]')].filter(window.__na.vis).find(x => window.__na.name(x) === 'Workflow'); const pane = [...window.__tp.page().querySelectorAll('h4')].filter(window.__na.vis)[0]; return t && pane ? { tab: window.__na.box(t), pane: window.__na.box(pane), icon: !!t.querySelector('.material-icons') } : null; })()`); assert.ok(g && g.tab.x + g.tab.w <= g.pane.x && g.icon, 'the list is left of the pane and each entry has an icon: ' + JSON.stringify(g)); }
+                await group('Workflow'); await settle(150);
                 assert.ok(await ev(`!!window.__tp.find('select', /^Working mode$/i)`), 'a select named Working mode');
             });
             await S.run(`${label}: the switches "Require a goal", "Send health check" and "Post when all is well" are described by their hint`, async () => {
                 for (const n of ['Require a goal', 'Send health check', 'Post when all is well']) {
+                    await openFor(n);
                     const s = await ev(`(() => { const e = ${sw(n)}; return e ? { described: !!(e.getAttribute('aria-describedby') && document.getElementById(e.getAttribute('aria-describedby'))) } : null; })()`);
                     assert.ok(s, `a switch named ${n}`); assert.ok(s.described, `${n} is described by its hint`);
                 }
             });
             if (!mobile) await S.run(`${label}: a row has its label and hint at the left and its control at the right`, async () => {
+                await openFor('Require a goal');
                 const r = await ev(`(() => { const e = ${sw('Require a goal')}; const l = [...window.__tp.page().querySelectorAll('label, span, div, p')].filter(window.__na.vis).find(x => window.__na.text(x).trim() === 'Require a goal'); return e && l ? { label: window.__na.box(l), control: window.__na.box(e) } : null; })()`);
                 assert.ok(r, 'the label and the switch are found'); assert.ok(r.control.x > r.label.x + r.label.w, `the control (x ${r.control.x}) is right of the label (ends ${r.label.x + r.label.w})`);
+            });
+            if (!mobile) await S.run(`${label}: the group list is the main Settings' (arrows move and open a group), and Cancel keeps the open group`, async () => {
+                await group('Workflow'); await settle(150);
+                const sel = () => ev(`(() => { const t = [...window.__tp.page().querySelectorAll('[role=tab]')].filter(window.__na.vis).find(x => x.getAttribute('aria-selected') === 'true' && ['Workflow', 'Health check', 'Messaging', 'Prompts'].includes(window.__na.name(x))); return t ? window.__na.name(t) : null; })()`);
+                assert.equal(await sel(), 'Workflow', 'Workflow is the open group at first');
+                await ev(`[...window.__tp.page().querySelectorAll('[role=tab]')].filter(window.__na.vis).find(x => window.__na.name(x) === 'Workflow').focus(); true`);
+                await ev(`document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })); true`); await settle(200);
+                assert.equal(await sel(), 'Health check', 'ArrowDown opens the next group');
+                assert.ok(await ev(`[...window.__tp.page().querySelectorAll('h4')].filter(window.__na.vis).some(h => window.__na.text(h).trim() === 'Health check')`), 'its pane is open');
+                await openFor('Send health check');
+                await ev(`${sw('Send health check')}.click(); true`); await settle(250);
+                await ev(`window.__tp.find('button', /^Cancel$/i).click(); true`); await settle(500);
+                assert.equal(await sel(), 'Health check', 'Cancel redraws the page on the group that was open');
             });
             await S.run(`${label}: the bar is pinned at the bottom: status "No changes to save.", Cancel at the left, Save settings at the right, Save off`, async () => {
                 const b = await bar(); assert.ok(b.save && b.cancel, 'Cancel and Save settings are there');
@@ -51,6 +77,7 @@ const TEAM = `qa-settings-${Date.now() % 100000}`;
                 await ev(`window.scrollTo(0, 0); true`); const b2 = await bar(); assert.ok(Math.abs(b2.save.y - b.save.y) <= 1, 'the bar does not scroll away');
             });
             await S.run(`${label}: a change turns Save on and the status moves on; Cancel puts the switch back and the bar as it was`, async () => {
+                await openFor('Require a goal');
                 const was = await state('Require a goal');
                 await ev(`${sw('Require a goal')}.click(); true`); await settle(250);
                 const b = await bar(); assert.equal(b.save.disabled, false, 'Save settings is on'); assert.match(b.status, /^You have unsaved changes\.$/, `the status says there are unsaved changes (got ${JSON.stringify(b.status)})`);
@@ -58,16 +85,19 @@ const TEAM = `qa-settings-${Date.now() % 100000}`;
                 assert.equal(await state('Require a goal'), was, 'Cancel put the switch back'); const b2 = await bar(); assert.equal(b2.save.disabled, true, 'Save is off again'); assert.match(b2.status, /No changes to save/, 'the status is back');
             });
             await S.run(`${label}: Save settings sends the board's settings once and the status says it saved`, async () => {
+                await openFor('Require a goal');
                 await ev(`window.__tp.record(); ${sw('Require a goal')}.click(); true`); await settle(250);
                 await ev(`window.__tp.find('button', /^Save settings$/i).click(); true`); await settle(900);
                 const sent = await ev(`window.__writes.filter(x => /\\/settings$/.test(x.p))`); assert.equal(sent.length, 1, `one write to the settings (${JSON.stringify(sent.map(x => x.m + ' ' + x.p))})`);
                 const b = await bar(); assert.match(b.status, /^Saved\.$/, `the status says Saved. (got ${JSON.stringify(b.status)})`); assert.equal(b.save.disabled, true, 'Save is off after saving');
             });
             await S.run(`${label}: a failed save says "Could not save: <reason>" in the status and Save is on again`, async () => {
+                await openFor('Send health check');
                 await ev(`(() => { const R = window.fetch.bind(window); window.fetch = (u, o = {}) => (String((o && o.method) || 'GET').toUpperCase() !== 'GET' && /\\/settings$/.test(new URL(String(u), location.origin).pathname)) ? Promise.resolve(new Response(JSON.stringify({ error: 'disk full' }), { status: 500, headers: { 'Content-Type': 'application/json' } })) : R(u, o); ${sw('Send health check')}.click(); return true; })()`); await settle(250);
                 await ev(`window.__tp.find('button', /^Save settings$/i).click(); true`); await settle(900);
                 const b = await bar(); assert.match(b.status, /^Could not save: /, `the status says it could not save and why (got ${JSON.stringify(b.status)})`); assert.equal(b.save.disabled, false, 'Save settings is on again');
             });
+            await group('Workflow'); await settle(150);
             await S.run(`${label}: the Working mode row has one hint line with a Learn more (the old "About working modes"), and the mode's own description stays under the select`, async () => {
                 const r = await ev(`(() => { const sel = window.__tp.find('select', /^Working mode$/i); if (!sel) return null; const ids = (sel.getAttribute('aria-describedby') || '').split(/\\s+/); const row = sel.closest('.ts-row'); const h = document.getElementById(ids[0]); const more = h && h.querySelector('[aria-controls]'); const d = document.getElementById(ids[1] || ''); return { hint: h ? window.__na.text(h).replace(/Learn more/, '').trim().split(/\\s{2,}|\\n/)[0] : null, inRow: !!(h && row && row.contains(h)), learn: more ? { name: window.__na.name(more), expanded: more.getAttribute('aria-expanded') } : null, desc: d ? window.__na.text(d).trim() : null, descUnder: !!(d && sel.compareDocumentPosition(d) & Node.DOCUMENT_POSITION_FOLLOWING) }; })()`);
                 assert.ok(r, 'a select named Working mode'); assert.match(r.hint, /^Instructions are saved with each task when it is first claimed\./); assert.equal(r.inRow, true, 'the hint is in the Working mode row');
@@ -80,6 +110,7 @@ const TEAM = `qa-settings-${Date.now() % 100000}`;
             // The leave question moved here from team_settings_keyboard when the right dock went (#7457): leaving the team page for another page with an unsaved change asks; Escape stays and keeps the change; Leave goes.
             if (!mobile) await S.run(`${label}: leaving the team page with an unsaved change asks first; Escape stays on the page with the change kept, and Leave goes`, async () => {
                 const shown = `(() => { const m = document.getElementById('confirm-modal'); return !!m && getComputedStyle(m).display !== 'none' && m.getClientRects().length > 0; })()`;
+                await openFor('Require a goal');
                 const was = await state('Require a goal');
                 await ev(`${sw('Require a goal')}.click(); true`); await settle(250);
                 const go = () => ev(`(() => { const r = document.querySelector('#live-sessions-list li[data-session-id]'); if (!r) return false; r.click(); return true; })()`);
