@@ -15,7 +15,7 @@ const VIEWS = [['1280x800', 1280, 800, false, false], ['390x844', 390, 844, true
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const { settle } = require('./helpers/wait').bind(ev);
     const S = scenarios(); const t = T(ev, waitFor);
-    const gitDir = fs.mkdtempSync(path.join('/tmp', 'qa-team-git-')); execFileSync('git', ['init', '-q', gitDir]);
+    const gitDir = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'qa-team-git-')); execFileSync('git', ['init', '-q', gitDir]);
     const same = (a, b, what) => { assert.ok(a && b, `${what}: the dialog is open`); for (const k of ['x', 'y', 'w', 'h']) assert.ok(Math.abs(a[k] - b[k]) <= 0.5, `${what}: dialog ${k} changed from ${a[k]} to ${b[k]}`); };
     const goSection = async (rx, name, within) => { const used = await ev(`(() => { const d = window.__nt.dlg(${within}); const tab = [...d.querySelectorAll('[role=tab]')].filter(window.__na.vis).find(x => window.__na.name(x) === ${JSON.stringify(name)}); if (tab) { tab.click(); return true; } const s = window.__nt.find(d, 'select', ${N.section}); if (!s) return false; const o = [...s.options].find(o => o.textContent.trim() === ${JSON.stringify(name)}); s.value = o.value; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); assert.ok(used, `a ${name} tab or section choice`); await settle(300); };
     try {

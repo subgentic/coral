@@ -15,7 +15,7 @@ const BASE = require('./test_base').BASE;
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const { settle } = require('./helpers/wait').bind(ev);
     const S = scenarios(); const t = T(ev, waitFor);
-    const gitDir = fs.mkdtempSync(path.join('/tmp', 'qa-team-git-')); execFileSync('git', ['init', '-q', gitDir]);
+    const gitDir = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'qa-team-git-')); execFileSync('git', ['init', '-q', gitDir]);
     const names = (sel, within = N.team) => ev(`(() => { const d = window.__nt.dlg(${within}); return d ? [...d.querySelectorAll(${JSON.stringify(sel)})].filter(window.__na.vis).map(e => window.__na.name(e)) : []; })()`);
     const footer = async (primary, label) => {
         const b = await ev(`window.__nt.buttons(window.__nt.dlg(${N.team}))`);
