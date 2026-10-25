@@ -2588,6 +2588,8 @@ func setupSessionsTestServerWithConfig(t *testing.T, cfg *config.Config) (*httpt
 	r.Post("/api/sessions/live/{name}/keys", handler.Keys)
 	r.Post("/api/sessions/live/{name}/resize", handler.Resize)
 	r.Post("/api/sessions/live/{name}/kill", handler.Kill)
+	r.Get("/api/sessions/live/{name}/held", handler.ListHeld)
+	r.Post("/api/sessions/live/{name}/held/send", handler.SendHeldNow)
 	r.Post("/api/sessions/live/{name}/set-display-name", handler.SetDisplayName)
 	r.Post("/api/sessions/live/{name}/set-icon", handler.SetIcon)
 	r.Put("/api/sessions/live/{name}/name-color", handler.SetNameColor)

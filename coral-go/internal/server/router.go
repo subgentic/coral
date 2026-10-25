@@ -305,6 +305,8 @@ func (s *Server) registerSessions(r *chi.Mux, h *routeHandlers) {
 	r.Post("/api/sessions/live/{name}/keys", sessHandler.Keys)
 	r.Post("/api/sessions/live/{name}/resize", sessHandler.Resize)
 	r.Post("/api/sessions/live/{name}/kill", sessHandler.Kill)
+	r.Get("/api/sessions/live/{name}/held", sessHandler.ListHeld)          // what the gate holds for the agent (#7554)
+	r.Post("/api/sessions/live/{name}/held/send", sessHandler.SendHeldNow) // Send now (#7554)
 	r.Post("/api/sessions/live/{name}/restart", sessHandler.Restart)
 	r.Post("/api/sessions/live/{name}/model", sessHandler.SwitchModel) // the live model and thinking-level switch (#4969)
 	r.Post("/api/sessions/live/{name}/resume", sessHandler.Resume)
