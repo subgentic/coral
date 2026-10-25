@@ -84,8 +84,8 @@ const REMOTE = `(() => {
     // The dock's Saved tab is the Inbox's Saved table, filtered to the page's scope (#7631); on a hub its Computer column says which server a message is on. A row opens the message's page in the Inbox (Open on it jumps, More has Remove).
     const items = () => ev(`[...document.querySelectorAll('#saved-table tbody tr')].map(tr => { const a = tr.querySelector('.group-table-link'); return { id: a.dataset.id, src: a.textContent.split(', ')[0], server: tr.cells.length > 4 ? tr.cells[1].textContent.trim() : null }; })`);
     const INBOX_SAVED = `(() => { const t = document.getElementById('group-table-view'); return t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved'; })()`;
-    const pageOf = async id => { await ev(`document.querySelector('#saved-table .group-table-link[data-id="${id}"]').click(); true`); await waitFor(`!!document.querySelector('#inbox-page .item-bar')`, 'the message page of ' + id, 8000); };
-    const removeFromPage = async () => { await ev(`document.querySelector('#inbox-page .wf-more > .btn').click(); document.querySelector('#inbox-page .wf-more-menu .btn').click(); true`); await waitFor(INBOX_SAVED, 'back at the Saved table', 6000); };
+    const pageOf = async id => { await ev(`document.querySelector('#saved-table .group-table-link[data-id="${id}"]').click(); true`); await waitFor(`!!document.querySelector('#agentic-saved-detail-pane:not([hidden]) .detail-foot .btn')`, 'the message sheet of ' + id, 8000); };
+    const removeFromPage = async () => { await ev(`[...document.querySelectorAll('#agentic-saved-detail-pane .detail-foot .btn')].find(b => b.textContent === 'Remove from saved').click(); true`); await waitFor(`document.getElementById('agentic-saved-detail-pane').hidden`, 'back at the Saved table', 6000); };
     // The merged list is home's: the dock's Saved tab (the list the sidebar keeps for the scope on screen) is read here. The Inbox's own Saved table over the same list is inbox_one's and inbox_local's.
     const openSaved = async () => {
         if (await ev(`document.getElementById('nav-tab-hub-inbox').classList.contains('active')`)) { await ev(`window.switchNavTab('agents'); true`); await waitFor(`document.querySelector('.top-nav-tab.active').dataset.arg === 'agents'`, 'the page left', 4000); }
@@ -175,7 +175,7 @@ const REMOTE = `(() => {
         await waitFor(`document.querySelectorAll('#saved-table tbody tr').length === 2`, 'two items', 8000);
         await ev(`window.selectLiveSession('', '', '', 'local'); true`);
         await pageOf(await ev(`document.querySelector('#saved-table .group-table-link[data-id^="box-b:"]').dataset.id`));
-        await ev(`document.querySelector('#inbox-page .item-bar .btn-primary').click(); true`);
+        await ev(`document.querySelector('#agentic-saved-detail-pane .detail-foot .btn-primary').click(); true`);
         await waitFor(`T.state.currentSession && T.state.currentSession.session_id === 'rb-id' && !!${C}.querySelector('.chat-search-target')`, 'the remote agent open at the message', 12000);
         assert.equal(await ev(`T.state.currentSession.server`), 'box-b');
         assert.equal(await ev(`${C}.querySelector('.chat-search-target').dataset.msgKey`), hex(20));
@@ -185,7 +185,7 @@ const REMOTE = `(() => {
         await refresh();
         await waitFor(`!!document.querySelector('#saved-table .group-table-link[data-id="box-b:102"]')`, 'the board item', 6000);
         await pageOf('box-b:102');
-        await ev(`document.querySelector('#inbox-page .item-bar .btn-primary').click(); true`);
+        await ev(`document.querySelector('#agentic-saved-detail-pane .detail-foot .btn-primary').click(); true`);
         await waitFor(`window.__opened !== null`, 'the board opened', 6000);
         assert.deepEqual(await ev(`window.__opened`), ['@box-b/box-board', 9]);
 
@@ -235,7 +235,7 @@ const REMOTE = `(() => {
         await refresh();
         await waitFor(`!!document.querySelector('#saved-table .group-table-link[data-id="box-b:102"]') && document.querySelector('#saved-table .group-table-link[data-id="box-b:102"]').closest('tr').cells[3].textContent.trim() === 'Gone'`, 'the deleted board message Gone', 8000);
         await pageOf('box-b:103');
-        const ended = await ev(`(() => ({ openOff: document.querySelector('#inbox-page .item-bar .btn-primary').disabled, snippet: document.querySelector('#inbox-page .inbox-saved-snippet').textContent, why: (document.querySelector('#inbox-page .inbox-saved-why') || {}).textContent || '', remove: !!document.querySelector('#inbox-page .wf-more-menu .btn') }))()`);
+        const ended = await ev(`(() => ({ openOff: !document.querySelector('#agentic-saved-detail-pane .detail-foot .btn-primary'), snippet: document.querySelector('#agentic-saved-detail-pane .inbox-saved-snippet').textContent, why: (document.querySelector('#agentic-saved-detail-pane .inbox-saved-why') || {}).textContent || '', remove: !!document.querySelector('#agentic-saved-detail-pane .detail-foot .btn') }))()`);
         assert.deepEqual({ open: ended.openOff, remove: ended.remove, snippet: ended.snippet }, { open: true, remove: true, snippet: 'from an agent that ended' });
         assert.ok(/Box B/.test(ended.why) && /cannot be opened/.test(ended.why), ended.why);
         console.log('   ✓');

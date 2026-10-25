@@ -109,12 +109,43 @@ function savedTableSpec(where = '') {
 
 }
 
+/** A message of the agent's Saved tab, as a sheet over the dock panel (the pane the Artifacts tab uses, detail_pane.js): what the Inbox's page holds (the text, why it cannot be opened, Read the whole message) with Open (the chat) and Remove from saved in its bar. Back, the close button and Escape return to the Saved table, the focus on the row. */
+let dockSheetId = '';
+async function openDockSavedSheet(id, opener) {
+    const it = saved.findSavedItem(id);
+    if (!it) return;
+    const f = saved.savedItemFacts(it);
+    const { openDetailPane, closeDetailPane } = await importOnce('./detail_pane.js');
+    const x = f.gone ? null : savedExpandFor(it, f.which);
+    const back = () => closeDetailPane({ restoreFocus: true });
+    const cannotOpen = f.gone || f.noopen;
+    const actions = [];
+    if (!cannotOpen) actions.push({ label: f.open.text, primary: true, ariaLabel: f.open.name, run: () => saved.savedOpen(it) });
+    actions.push({ label: 'Remove from saved', ariaLabel: `Remove from saved: ${f.which}`, run: async () => { if (await saved.savedRemove(it)) { sayLive('Removed from saved'); back(); } } });
+    dockSheetId = id;
+    openDetailPane({
+        key: `saved:${id}`, title: f.title, sub: [f.said ? `Said ${f.said}` : '', `Saved ${f.saved}`, f.state, f.serverName].filter(Boolean).join(' · '),
+        host: $('agentic-saved-detail-pane'), opener, actions,
+        body: doc => {
+            const link = el('button', 'group-back', '\u2190 Saved'); link.type = 'button'; link.addEventListener('click', back);
+            doc.append(link, el('p', 'inbox-saved-snippet', f.snippet || '(no text)'));
+            if (cannotOpen && f.why) doc.append(el('p', 'inbox-saved-why', f.why));
+            if (x && !x.root.hidden) { x.button.classList.add('btn-small'); doc.append(x.button, x.region); }
+        },
+        onClose: () => {
+            dockSheetId = '';
+            if (!opener.isConnected) $('saved-table')?.querySelector('.group-chip, .group-table-link')?.focus({ preventScroll: true }); // the row went (removed, or the table was drawn again)
+        },
+    });
+}
+
 /** The dock's Saved tab (#saved-table, saved.js render): the same table for the page's scope, drawn into the dock; the keyboard stays on the control it was on when it is still there. */
 export function drawDockSaved(host) {
     const held = host.contains(document.activeElement) ? document.activeElement : null;
     const was = held && { cls: held.className, id: held.dataset.id || held.closest('tr')?.querySelector('.group-table-link')?.dataset.id || '', tab: held.dataset.tab || '' };
     const html = tableMarkup(savedTableSpec('dock-tab'));
     if (host.dataset.drawn !== html) { host.innerHTML = html; host.dataset.drawn = html; }
+    if (dockSheetId && !saved.savedView().shown.some(i => saved.savedItemFacts(i).id === dockSheetId)) importOnce('./detail_pane.js').then(m => m.closeDetailPane()); // another agent's Saved is on screen, or the message left the list: its sheet goes
     if (!was) return;
     const same = [...host.querySelectorAll('.group-table-link, .group-table-cell-btn, .group-chip')].find(e => e.className === was.cls && (e.dataset.id || e.closest('tr')?.querySelector('.group-table-link')?.dataset.id || '') === was.id && (e.dataset.tab || '') === was.tab);
     (same || host.querySelector('.group-chip, .group-table-link'))?.focus({ preventScroll: true }); // a row that went (Done, Reopen) leaves the focus on the table's first control, not on the page
@@ -327,7 +358,7 @@ registerActions({
         window.selectLiveSession?.(name, type, sid, server);
     },
     'inbox-task-open': el => { const p = textOf(el.dataset.project), id = textOf(el.dataset.taskId); if (p && id) openTaskPage(p, id); },
-    'inbox-saved-open': el => { const id = textOf(el.dataset.id); if (!id) return; if (el.dataset.where === 'dock-tab') saved.openSavedAll().then(() => openSavedPage(id)); else openSavedPage(id); }, // the dock's rows open the message in the Inbox's page
+    'inbox-saved-open': el => { const id = textOf(el.dataset.id); if (!id) return; if (el.dataset.where === 'dock-tab') openDockSavedSheet(id, el); else openSavedPage(id); }, // the dock's rows open the message as a sheet over the dock (the person stays with the agent)
     'inbox-saved-chip': el => { const t = textOf(el.dataset.tab); if (t) { saved.setSavedTab(t); sayLive(t === 'done' ? 'Showing the messages marked done' : 'Showing the open messages'); } },
     'inbox-saved-done': async el => {
         const it = saved.findSavedItem(textOf(el.dataset.id));

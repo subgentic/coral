@@ -154,14 +154,27 @@ const hex = i => i.toString(16).padStart(20, '0');
         await waitFor(`document.querySelectorAll('${ROWS}').length === 2`, 'both open again', 6000);
         console.log('   \u2713');
 
-        console.log('5. Click a row: its page opens in the Inbox, Open on it goes to the agent, pages up to the message, which is marked and has the focus');
+        console.log('5. Click a row: the message opens as a sheet over the dock (the person stays with the agent), Back returns to the table with the focus on the row, Open goes to the chat, pages up to the message, which is marked and has the focus');
         await select('sv-a'); // the newest page again: the old message is not on screen
         await waitFor(`!${C}.querySelector('[data-msg-key="${hex(OLD)}"]')`, 'the old message to be off screen', 6000);
         await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'saved.js'); await m.openSaved(); return true; })()`); // the page's own Saved tab; the top bar's bookmark is the Inbox's (#4905)
         await waitFor(`document.querySelectorAll('${ROWS}').length === 2`, 'the Saved tab', 6000);
+        const SHEET = '#agentic-saved-detail-pane';
         await ev(`document.querySelector('#saved-table .group-table-link[data-id="local:${list.items[0].id}"]').click(); true`);
-        await waitFor(`!!document.querySelector('#inbox-page .item-bar .btn-primary:not([disabled])')`, 'the message page in the Inbox with its Open button', 8000);
-        await ev(`document.querySelector('#inbox-page .item-bar .btn-primary').click(); true`);
+        await waitFor(`!!document.querySelector('${SHEET} .detail-foot .btn-primary')`, 'the message as a sheet over the dock, with its Open button', 8000);
+        assert.equal(await ev(`!!document.querySelector('#group-table-view:not([hidden])') && getComputedStyle(document.getElementById('group-table-view')).display !== 'none'`), false, 'the person is not sent to the Inbox');
+        const sheet = await ev(`(() => { const s = document.querySelector('${SHEET}'), p = document.getElementById('agentic-panel-saved'); const r = s.getBoundingClientRect(), q = p.getBoundingClientRect(); return { covers: Math.abs(r.top - q.top) < 2 && Math.abs(r.bottom - q.bottom) < 2 && Math.abs(r.left - q.left) < 2 && Math.abs(r.right - q.right) < 2, title: s.querySelector('.detail-title').textContent, snippet: s.querySelector('.inbox-saved-snippet').textContent, foot: [...s.querySelectorAll('.detail-foot .btn')].map(b => b.textContent), focus: document.activeElement === s.querySelector('.detail-title') }; })()`);
+        assert.ok(sheet.covers, 'the sheet is over the dock panel'); assert.ok(sheet.snippet.length > 0 && sheet.title.length > 0); assert.equal(sheet.foot.length, 2); assert.equal(sheet.foot[1], 'Remove from saved', 'Open first (the primary), Remove after'); assert.ok(sheet.focus, 'the keyboard starts at its heading');
+        await shot('saved-sheet-desktop');
+        await ev(`document.querySelector('${SHEET} .group-back').click(); true`);
+        await waitFor(`document.querySelector('${SHEET}').hidden && document.activeElement && document.activeElement.classList.contains('group-table-link') && document.activeElement.dataset.id === 'local:${list.items[0].id}'`, 'Back to bring the table back with the focus on the row', 4000);
+        await ev(`document.querySelector('#saved-table .group-table-link[data-id="local:${list.items[0].id}"]').click(); true`);
+        await waitFor(`!!document.querySelector('${SHEET} .detail-foot .btn-primary')`, 'the sheet again', 8000);
+        await key('Escape', 'Escape', 27);
+        await waitFor(`document.querySelector('${SHEET}').hidden`, 'Escape to close the sheet', 4000);
+        await ev(`document.querySelector('#saved-table .group-table-link[data-id="local:${list.items[0].id}"]').click(); true`);
+        await waitFor(`!!document.querySelector('${SHEET} .detail-foot .btn-primary')`, 'the sheet a third time', 8000);
+        await ev(`document.querySelector('${SHEET} .detail-foot .btn-primary').click(); true`);
         await waitFor(`!!${C}.querySelector('[data-msg-key="${hex(OLD)}"].chat-search-target')`, 'the jump to the old message', 12000);
         const at = await ev(`(() => { const t = ${C}.querySelector('[data-msg-key="${hex(OLD)}"]'); const r = t.getBoundingClientRect(), c = ${C}.getBoundingClientRect(); return { focused: document.activeElement === t, visible: r.top >= c.top - 1 && r.bottom <= c.bottom + 1 }; })()`);
         assert.ok(at.focused, 'the focus is on the message'); assert.ok(at.visible, 'the message is in view');
@@ -169,7 +182,7 @@ const hex = i => i.toString(16).padStart(20, '0');
         assert.equal(await ev(`document.querySelector('#saved-jumpbar .btn').textContent`), 'Back to Saved', 'a way back to the list');
         await shot('saved-jump-desktop');
         await ev(`document.querySelector('#saved-jumpbar .btn').click(); true`);
-        await waitFor(`${INBOX_SAVED} && !document.getElementById('saved-jumpbar')`, 'Back to Saved to bring the Saved list back (the Inbox\'s, everything\'s)', 6000);
+        await waitFor(`${TAB_OPEN} && !document.getElementById('saved-jumpbar')`, 'Back to Saved to bring the agent\'s Saved tab back (the jump began in the dock)', 6000);
         console.log('   \u2713');
 
         console.log('6. A message that is gone: its row says Gone, its page says why and can only remove it');
@@ -186,11 +199,11 @@ const hex = i => i.toString(16).padStart(20, '0');
         assert.deepEqual(seen.filter(u => /messages\/all\?|find_key=|\/api\/sessions\/history\//.test(u)), [], 'no request per bookmark');
         await shot('saved-gone-desktop');
         await ev(`${rowWith('no longer has')}.querySelector('.group-table-link').click(); true`);
-        await waitFor(`!!document.querySelector('#inbox-page .inbox-saved-why')`, 'the gone message\'s page', 8000);
-        const g = await ev(`(() => ({ why: document.querySelector('#inbox-page .inbox-saved-why').textContent, snippet: document.querySelector('#inbox-page .inbox-saved-snippet').textContent, openOff: document.querySelector('#inbox-page .item-bar .btn-primary').disabled, bar: [...document.querySelectorAll('#inbox-page .item-bar > .btn, #inbox-page .item-bar .wf-more > .btn')].map(b => b.textContent.trim()) }))()`);
-        assert.match(g.why, /no longer has this message|transcript is gone/); assert.match(g.snippet, /no longer has/); assert.ok(g.openOff, 'a gone message cannot be opened'); assert.equal(g.bar[0], 'More', 'More (with Remove) and Open, the primary, last'); assert.equal(g.bar.length, 2);
-        await ev(`document.querySelector('#inbox-page .wf-more > .btn').click(); document.querySelector('#inbox-page .wf-more-menu .btn').click(); true`);
-        await waitFor(`${INBOX_SAVED} && document.querySelectorAll('#group-table-view tbody tr').length === 2`, 'the gone item removed, back at the table', 6000);
+        await waitFor(`!!document.querySelector('#agentic-saved-detail-pane .inbox-saved-why')`, 'the gone message\'s sheet', 8000);
+        const g = await ev(`(() => ({ why: document.querySelector('#agentic-saved-detail-pane .inbox-saved-why').textContent, snippet: document.querySelector('#agentic-saved-detail-pane .inbox-saved-snippet').textContent, bar: [...document.querySelectorAll('#agentic-saved-detail-pane .detail-foot .btn')].map(b => b.textContent) }))()`);
+        assert.match(g.why, /no longer has this message|transcript is gone/); assert.match(g.snippet, /no longer has/); assert.deepEqual(g.bar, ['Remove from saved'], 'a gone message cannot be opened: only Remove is in the bar');
+        await ev(`document.querySelector('#agentic-saved-detail-pane .detail-foot .btn').click(); true`);
+        await waitFor(`document.getElementById('agentic-saved-detail-pane').hidden && document.querySelectorAll('${ROWS}').length === 2`, 'the gone item removed, back at the dock table', 6000);
         console.log('   \u2713');
 
         console.log('7. The tab works with the keyboard: Enter on its tab shows it; the top bar button opens the Inbox with the focus inside; the link in the toast opens the sidebar on it');
@@ -331,8 +344,11 @@ const hex = i => i.toString(16).padStart(20, '0');
         await shot('saved-tab-phone');
         // Opening an item on a phone gives the overlay way, so the jump is seen.
         await ev(`document.querySelector('#saved-table .group-table-link').click(); true`);
-        await waitFor(`!!document.querySelector('#inbox-page .item-bar .btn-primary:not([disabled])')`, 'the message page on the phone', 8000);
-        await ev(`document.querySelector('#inbox-page .item-bar .btn-primary').click(); true`);
+        await waitFor(`!!document.querySelector('#agentic-saved-detail-pane .detail-foot .btn-primary')`, 'the message sheet on the phone', 8000);
+        const sh = await ev(`(() => { const s = document.getElementById('agentic-saved-detail-pane'), vw = document.documentElement.clientWidth, r = s.getBoundingClientRect(); const small = [...s.querySelectorAll('button')].filter(b => b.getBoundingClientRect().width && (b.getBoundingClientRect().height < 43.5 || b.getBoundingClientRect().width < 43.5)).map(b => (b.className || b.textContent) + ' ' + Math.round(b.getBoundingClientRect().width) + 'x' + Math.round(b.getBoundingClientRect().height)); return { left: Math.round(r.left), right: Math.round(r.right), vw, page: document.documentElement.scrollWidth, small }; })()`);
+        assert.ok(sh.left >= 0 && sh.right <= sh.vw && sh.page <= sh.vw, 'the sheet fits the phone: ' + JSON.stringify(sh)); assert.deepEqual(sh.small, [], 'every control of the sheet is a 44 px target: ' + JSON.stringify(sh.small));
+        await shot('saved-sheet-phone');
+        await ev(`document.querySelector('#agentic-saved-detail-pane .detail-foot .btn-primary').click(); true`);
         await waitFor(`!document.getElementById('agentic-state').classList.contains('mobile-panel-overlay')`, 'the overlay to give way to the conversation', 12000);
         // The message button is a 44 px target on a phone too.
         await select('sv-a');

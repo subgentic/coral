@@ -225,9 +225,10 @@
 @container (max-width: 56rem) { .ts-row { grid-template-columns: minmax(0, 1fr); } .ts-row:not(.ts-row-switch) .ts-control { justify-content: flex-start; } .ts-mode-control .working-mode-desc { text-align: left; } }
 
 /* the agent's Artifacts tab (the dock panel): the team's table in a narrow panel, and the document as a sheet over the panel itself (the chat beside it stays) */
-#agentic-panel-artifacts { position: relative; }
+#agentic-panel-artifacts, #agentic-panel-saved { position: relative; } /* the document is a sheet over the panel (the Saved tab's message as well) */
 #agentic-panel-artifacts-view { container-type: inline-size; }
 .dock-detail-pane { position: absolute; inset: 0; z-index: 5; width: auto; border-left: 0; }
+.dock-detail-pane .detail-doc .ibx-saved-toggle { margin: 12px 0 0; } /* a saved message's Read the whole message sits under its text, on the text's left edge */
 .team-artifacts-plain-head { display: flex; align-items: center; justify-content: flex-end; gap: 4px; padding: 8px 12px; }
 @container (max-width: 560px) {
     .team-table th, .team-table td { padding-left: 8px; padding-right: 8px; } /* a narrow panel gives the cells less air: Name and Created fit at 200% text */
