@@ -229,3 +229,25 @@ func TestMemoryFollowsALinkInTheSameFolderAndSaysSo(t *testing.T) {
 	assert.Equal(t, "the real text", out["text"])
 	assert.Equal(t, "CLAUDE.md", out["link_to"])
 }
+
+// Security's SHOULD on #7454: a link planted in a cloned repository must not make the Operator read a secret: only a name the CLI itself reads is a followed target.
+func TestMemoryDoesNotFollowALinkToASecret(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlinks need privileges on Windows")
+	}
+	m := newMemRig(t)
+	writeMem(t, filepath.Join(m.proj, ".env"), "API_KEY=SECRETVALUE")
+	writeMem(t, filepath.Join(m.proj, ".git", "config"), "[remote] url = https://user:SECRETVALUE@example.invalid/x.git")
+	require.NoError(t, os.Symlink(".env", filepath.Join(m.proj, "CLAUDE.md")))
+	require.NoError(t, os.Symlink(filepath.Join(".git", "config"), filepath.Join(m.proj, "CLAUDE.local.md")))
+	rows := m.list(t, m.sid)
+	require.Len(t, rows, 2)
+	for _, r := range rows {
+		assert.Equal(t, "link", r["problem"], "%v", r["file"])
+		assert.NotContains(t, r, "link_to")
+		code, out := m.get(t, "/api/sessions/live/alpha/memory/"+r["id"].(string)+"?session_id="+m.sid)
+		assert.Equal(t, http.StatusOK, code)
+		assert.NotContains(t, mustJSON(t, out), "SECRETVALUE")
+		assert.NotContains(t, out, "text")
+	}
+}
