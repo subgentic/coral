@@ -47,6 +47,39 @@ var relayArtifactOutcomes = map[string]int{
 func TestRelayArtifactAgreesWithBefore4857(t *testing.T) {
 	oldIdle := artifactNow().idleFor
 	setArtifactTimings(t, func(*artifactTimings) {}) // puts the timings back after the test, whatever a scenario sets
+	var mu sync.Mutex
+	counts := map[string]int{}
+	add := func(name string) {
+		mu.Lock()
+		counts[name]++
+		mu.Unlock()
+	}
+	// Each seed has its own hub and connection, so the seeds run together. The idle time is the one thing they share: the seeds whose scenario
+	// sets a short one (a body that blocks, a slow answer, a trickle) run in a second group, under 600 ms (they ran under 200 or 300 ms, one
+	// seed at a time, and now share a loaded host).
+	for _, shortIdle := range []bool{false, true} {
+		name, idle := "default idle", oldIdle
+		if shortIdle {
+			name, idle = "short idle", 600*time.Millisecond
+		}
+		t.Run(name, func(t *testing.T) {
+			setArtifactIdle(idle)
+			for seed := int64(1); seed <= 220; seed++ {
+				t.Run(fmt.Sprintf("seed %d", seed), func(t *testing.T) {
+					t.Parallel()
+					relayArtifactSeed(t, seed, shortIdle, add)
+				})
+			}
+		})
+	}
+	t.Logf("compared, per outcome: %v", counts)
+	for name, floor := range relayArtifactOutcomes {
+		require.GreaterOrEqual(t, counts[name], floor, "%q went (almost) unexercised", name)
+	}
+}
+
+// relayArtifactSeed runs one seed of the oracle, if its scenario belongs to this idle-time group (shortIdle), and counts its outcome with add.
+func relayArtifactSeed(t *testing.T, seed int64, shortIdle bool, add func(string)) {
 	type hubMode struct {
 		kind   string // "all", "early", "half", "slow"
 		status int
@@ -130,167 +163,161 @@ func TestRelayArtifactAgreesWithBefore4857(t *testing.T) {
 		}
 	}
 	sizes := []int64{1, 1000, 64 << 10, 64<<10 + 1, 200 << 10, 6 << 20}
-	counts := map[string]int{}
-	for seed := int64(1); seed <= 220; seed++ {
-		rng := rand.New(rand.NewSource(seed))
-		n := sizes[rng.Intn(len(sizes)-1)] // the 6 MiB size only where a scenario asks for it
-		m := hubMode{kind: "all", status: []int{200, 202, 429, 500}[rng.Intn(4)]}
-		if m.status == 429 {
-			m.retry = 1 + rng.Intn(3)
+	rng := rand.New(rand.NewSource(seed))
+	n := sizes[rng.Intn(len(sizes)-1)] // the 6 MiB size only where a scenario asks for it
+	m := hubMode{kind: "all", status: []int{200, 202, 429, 500}[rng.Intn(4)]}
+	if m.status == 429 {
+		m.retry = 1 + rng.Intn(3)
+	}
+	bodyKind := "exact"
+	client := cs
+	cancelled := false
+	scenario := rng.Intn(18)
+	// the idle time is one process-wide setting: the seeds that need a short one (6, 9, 13) run together in their own phase
+	if (scenario == 6 || scenario == 9 || scenario == 13) != shortIdle {
+		return
+	}
+	switch scenario {
+	case 0:
+		n = []int64{0, -1, RelayMaxArtifact + 1}[rng.Intn(3)]
+	case 1:
+		client = csOff
+	case 2, 3:
+		bodyKind = "short"
+	case 4, 5:
+		bodyKind = "long"
+	case 6:
+		bodyKind = "block"
+	case 7:
+		m.kind = "early"
+	case 11:
+		m.kind, n = "early", 6<<20 // far past the stream window: the writer is blocked when the hub answers
+	case 12:
+		m.kind = "bad"
+	case 13:
+		// a body that gives each chunk 100 ms apart: progress keeps a 300 ms idle time from firing
+		bodyKind, n = "trickle", 4*64<<10
+	case 8:
+		m.kind, n = "half", 200<<10
+	case 9:
+		m.kind = "slow"
+	case 10:
+		cancelled = true
+	}
+	mode.Store(m)
+	shortBy := 1 + rng.Intn(5)
+	body := func() io.Reader {
+		size := n
+		if size < 0 || size > 8<<20 {
+			size = 10
 		}
-		setArtifactIdle(oldIdle)
-		bodyKind := "exact"
-		client := cs
-		cancelled := false
-		switch rng.Intn(18) {
-		case 0:
-			n = []int64{0, -1, RelayMaxArtifact + 1}[rng.Intn(3)]
-		case 1:
-			client = csOff
-		case 2, 3:
-			bodyKind = "short"
-		case 4, 5:
-			bodyKind = "long"
-		case 6:
-			bodyKind = "block"
-			setArtifactIdle(300 * time.Millisecond)
-		case 7:
-			m.kind = "early"
-		case 11:
-			m.kind, n = "early", 6<<20 // far past the stream window: the writer is blocked when the hub answers
-		case 12:
-			m.kind = "bad"
-		case 13:
-			// a body that gives each chunk 100 ms apart: progress keeps a 300 ms idle time from firing
-			bodyKind, n = "trickle", 4*64<<10
-			setArtifactIdle(300 * time.Millisecond)
-		case 8:
-			m.kind, n = "half", 200<<10
-		case 9:
-			m.kind = "slow"
-			setArtifactIdle(200 * time.Millisecond)
-		case 10:
-			cancelled = true
+		payload := bytes.Repeat([]byte{byte(seed)}, int(size))
+		for i := range payload {
+			payload[i] = byte((int64(i)*7 + seed) % 251)
 		}
-		mode.Store(m)
-		shortBy := 1 + rng.Intn(5)
-		body := func() io.Reader {
-			size := n
-			if size < 0 || size > 8<<20 {
-				size = 10
-			}
-			payload := bytes.Repeat([]byte{byte(seed)}, int(size))
-			for i := range payload {
-				payload[i] = byte((int64(i)*7 + seed) % 251)
-			}
-			switch bodyKind {
-			case "short":
-				return bytes.NewReader(payload[:max(0, len(payload)-shortBy)])
-			case "long":
-				return bytes.NewReader(append(payload, 'x', 'y'))
-			case "trickle":
-				return &trickleReader{r: bytes.NewReader(payload), every: 100 * time.Millisecond}
-			case "block":
-				pr, pw := io.Pipe()
-				go func() {
-					defer safego.Recover("test")
-					pw.Write(payload) // exactly n, then blocks
-				}()
-				t.Cleanup(func() { pw.Close() })
-				return pr
-			}
-			return bytes.NewReader(payload)
+		switch bodyKind {
+		case "short":
+			return bytes.NewReader(payload[:max(0, len(payload)-shortBy)])
+		case "long":
+			return bytes.NewReader(append(payload, 'x', 'y'))
+		case "trickle":
+			return &trickleReader{r: bytes.NewReader(payload), every: 100 * time.Millisecond}
+		case "block":
+			pr, pw := io.Pipe()
+			go func() {
+				defer safego.Recover("test")
+				pw.Write(payload) // exactly n, then blocks
+			}()
+			t.Cleanup(func() { pw.Close() })
+			return pr
 		}
-		// A frame reaches the hub's hook when the capability is on, the size is in range and the context is live.
-		// A body that is too short or too long, or stops after n bytes, ends in the CLIENT's error (length, idle): the call resets the stream
-		// as soon as it sees it, and whether the hub's hook had started, and how much it had read when the reset reached it, is a race in the
-		// old call and the new one alike (seeds 77, 95, 168 under load, #5007). What the hub received is compared only where the call ends
-		// without its own abort.
-		clientAborts := bodyKind == "short" || bodyKind == "long" || bodyKind == "block"
-		expectHook := !cancelled && client == cs && n >= 1 && n <= RelayMaxArtifact && !clientAborts
-		var outs [2]string
-		for i := range outs {
-			ctx, cancel := context.WithCancel(context.Background())
-			if cancelled {
-				cancel()
-			}
-			mu.Lock()
-			got = "nothing"
-			mu.Unlock()
-			// The last call's hook has returned and the session has released its in-flight slot (a call that began while it was held was answered
-			// 429 rate_limited, seeds 28, 156, 218 under load): nothing of the last call is still running.
-			waitHub(func() bool {
-				hs := hubSession.Load()
-				return hooksStarted.Load() == hooksEnded.Load() && (hs == nil || hs.artifactInflight.Load() == 0)
-			})
-			endedBefore := hooksEnded.Load()
-			b := body() // the same body for both calls
-			var resp RelayResponse
-			var err error
-			if i == 0 {
-				resp, err = client.relayArtifactBefore4857(ctx, n, b)
-			} else {
-				resp, err = client.RelayArtifact(ctx, n, b)
-			}
+		return bytes.NewReader(payload)
+	}
+	// A frame reaches the hub's hook when the capability is on, the size is in range and the context is live.
+	// A body that is too short or too long, or stops after n bytes, ends in the CLIENT's error (length, idle): the call resets the stream
+	// as soon as it sees it, and whether the hub's hook had started, and how much it had read when the reset reached it, is a race in the
+	// old call and the new one alike (seeds 77, 95, 168 under load, #5007). What the hub received is compared only where the call ends
+	// without its own abort.
+	clientAborts := bodyKind == "short" || bodyKind == "long" || bodyKind == "block"
+	expectHook := !cancelled && client == cs && n >= 1 && n <= RelayMaxArtifact && !clientAborts
+	var outs [2]string
+	for i := range outs {
+		ctx, cancel := context.WithCancel(context.Background())
+		if cancelled {
 			cancel()
-			if expectHook {
-				// The hub's hook returns when it has read the body, which a loaded or -race host can put well after the call returned (seed 198
-				// failed with "nothing" against 204800 bytes, #5007). Wait for it; a hook that never runs (it should always) leaves "nothing", as
-				// before, after the deadline.
-				waitHub(func() bool { return hooksEnded.Load() > endedBefore })
-			} else {
-				time.Sleep(20 * time.Millisecond) // no frame reaches the hub (range, capability off, cancelled): nothing to wait for
-			}
-			mu.Lock()
-			hub := got
-			if cancelled || (clientAborts && client == cs && n >= 1 && n <= RelayMaxArtifact) {
-				hub = "-" // whether the header reached the hub before the stream closed is a race, in both
-			}
-			outs[i] = fmt.Sprintf("status=%d retry=%d body=%s err=%s hub=%s", resp.Status, resp.RetryAfter, resp.Body, class(err), hub)
-			mu.Unlock()
 		}
-		label := fmt.Sprintf("seed %d n=%d body=%s hub=%+v cancelled=%v off=%v", seed, n, bodyKind, m, cancelled, client == csOff)
-		require.Equal(t, outs[0], outs[1], label)
+		mu.Lock()
+		got = "nothing"
+		mu.Unlock()
+		// The last call's hook has returned and the session has released its in-flight slot (a call that began while it was held was answered
+		// 429 rate_limited, seeds 28, 156, 218 under load): nothing of the last call is still running.
+		waitHub(func() bool {
+			hs := hubSession.Load()
+			return hooksStarted.Load() == hooksEnded.Load() && (hs == nil || hs.artifactInflight.Load() == 0)
+		})
+		endedBefore := hooksEnded.Load()
+		b := body() // the same body for both calls
+		var resp RelayResponse
+		var err error
+		if i == 0 {
+			resp, err = client.relayArtifactBefore4857(ctx, n, b)
+		} else {
+			resp, err = client.RelayArtifact(ctx, n, b)
+		}
+		cancel()
+		if expectHook {
+			// The hub's hook returns when it has read the body, which a loaded or -race host can put well after the call returned (seed 198
+			// failed with "nothing" against 204800 bytes, #5007). Wait for it; a hook that never runs (it should always) leaves "nothing", as
+			// before, after the deadline.
+			waitHub(func() bool { return hooksEnded.Load() > endedBefore })
+		} else {
+			time.Sleep(20 * time.Millisecond) // no frame reaches the hub (range, capability off, cancelled): nothing to wait for
+		}
+		mu.Lock()
+		hub := got
+		if cancelled || (clientAborts && client == cs && n >= 1 && n <= RelayMaxArtifact) {
+			hub = "-" // whether the header reached the hub before the stream closed is a race, in both
+		}
+		outs[i] = fmt.Sprintf("status=%d retry=%d body=%s err=%s hub=%s", resp.Status, resp.RetryAfter, resp.Body, class(err), hub)
+		mu.Unlock()
+	}
+	label := fmt.Sprintf("seed %d n=%d body=%s hub=%+v cancelled=%v off=%v", seed, n, bodyKind, m, cancelled, client == csOff)
+	require.Equal(t, outs[0], outs[1], label)
 
-		o := outs[1]
-		switch {
-		case strings.Contains(o, "outside 1 to"):
-			counts["out of range"]++
-		case strings.Contains(o, "err=unsupported"):
-			counts["unsupported"]++
-		case strings.Contains(o, "err=cancelled"):
-			counts["a cancelled context"]++
-		case strings.Contains(o, "ended") && strings.Contains(o, "short"):
-			counts["body short"]++
-		case strings.Contains(o, "longer than the declared"):
-			counts["body long"]++
-		case bodyKind == "block" && strings.Contains(o, "err=idle"):
-			counts["body blocked after n bytes: idle"]++
-		case m.kind == "early" && strings.Contains(o, "err=nil") && n == 6<<20:
-			counts["refused before reading, big body"]++
-		case m.kind == "early" && strings.Contains(o, "err=nil"):
-			counts["refused before reading, small body"]++
-		case m.kind == "bad" && !strings.Contains(o, "err=nil"):
-			counts["an answer the connector can't read"]++
-		case bodyKind == "trickle" && strings.Contains(o, "err=nil"):
-			counts["a slow but steady body"]++
-		case m.kind == "half" && strings.Contains(o, "err=nil"):
-			counts["answered after reading half"]++
-		case m.kind == "slow" && strings.Contains(o, "err=nil"):
-			counts["a slow answer after the body"]++
-		case m.kind == "all" && strings.Contains(o, "err=nil"):
-			counts["answered after the whole body"]++
-			if n > 64<<10 {
-				counts["several chunks"]++
-			}
-		}
-		if strings.Contains(o, "err=nil") && m.status >= 400 {
-			counts["a refusal answered"]++
+	o := outs[1]
+	switch {
+	case strings.Contains(o, "outside 1 to"):
+		add("out of range")
+	case strings.Contains(o, "err=unsupported"):
+		add("unsupported")
+	case strings.Contains(o, "err=cancelled"):
+		add("a cancelled context")
+	case strings.Contains(o, "ended") && strings.Contains(o, "short"):
+		add("body short")
+	case strings.Contains(o, "longer than the declared"):
+		add("body long")
+	case bodyKind == "block" && strings.Contains(o, "err=idle"):
+		add("body blocked after n bytes: idle")
+	case m.kind == "early" && strings.Contains(o, "err=nil") && n == 6<<20:
+		add("refused before reading, big body")
+	case m.kind == "early" && strings.Contains(o, "err=nil"):
+		add("refused before reading, small body")
+	case m.kind == "bad" && !strings.Contains(o, "err=nil"):
+		add("an answer the connector can't read")
+	case bodyKind == "trickle" && strings.Contains(o, "err=nil"):
+		add("a slow but steady body")
+	case m.kind == "half" && strings.Contains(o, "err=nil"):
+		add("answered after reading half")
+	case m.kind == "slow" && strings.Contains(o, "err=nil"):
+		add("a slow answer after the body")
+	case m.kind == "all" && strings.Contains(o, "err=nil"):
+		add("answered after the whole body")
+		if n > 64<<10 {
+			add("several chunks")
 		}
 	}
-	t.Logf("compared, per outcome: %v", counts)
-	for name, floor := range relayArtifactOutcomes {
-		require.GreaterOrEqual(t, counts[name], floor, "%q went (almost) unexercised", name)
+	if strings.Contains(o, "err=nil") && m.status >= 400 {
+		add("a refusal answered")
 	}
 }
 
