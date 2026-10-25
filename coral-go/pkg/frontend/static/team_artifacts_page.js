@@ -186,7 +186,7 @@ function ensureBar() {
     refresh.title = 'Refresh'; refresh.setAttribute('aria-label', 'Refresh');
     const help = btn('team-artifacts-action team-artifacts-help', null);
     const icon = el('span', 'material-icons', 'content_copy'); icon.setAttribute('aria-hidden', 'true'); help.append(icon);
-    help.title = 'Copy instructions for agents on how to publish an artifact'; help.setAttribute('aria-label', help.title);
+    help.title = 'Copy publishing instructions'; help.setAttribute('aria-label', help.title); // what an agent is told to do to publish an artifact
     help.addEventListener('click', async () => {
         try { await navigator.clipboard.writeText(AGENT_ARTIFACT_PROMPT); icon.textContent = 'check'; } catch { icon.textContent = 'error_outline'; }
         setTimeout(() => { icon.textContent = 'content_copy'; }, 1500);
