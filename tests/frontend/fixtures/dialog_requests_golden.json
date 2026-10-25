@@ -156,7 +156,7 @@
     ],
     "agents": [
       {
-        "name": "Lead",
+        "name": "Orchestrator",
         "prompt": "Lead the team.",
         "capabilities": {
           "allow": [
