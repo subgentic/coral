@@ -3832,6 +3832,7 @@ button.terminal-gone-header { margin: 0 4px 0 0; font-size: 0.6875rem; line-heig
 .tb-t { font-weight: 600; font-size: var(--fs-md); color: var(--text-primary); }
 .tb-default { font-weight: 400; color: var(--text-muted); }
 .tb-learn { align-self: flex-start; background: none; border: 0; padding: 2px 0; color: var(--link-text, var(--accent)); font: inherit; font-size: var(--fs-base); cursor: pointer; text-decoration: underline; }
+@media (pointer: coarse) { .acf-learn { min-height: var(--control-touch-height, 44px); } } /* the member form's Learn more (the Codex network line) is a 44 px target on touch */
 .tb-d[hidden] { display: none; }
 .tb-d { font-size: var(--fs-base); color: var(--text-secondary); line-height: 1.45; }
 .tb-note { font-size: var(--fs-sm); color: var(--text-muted); line-height: 1.45; margin: var(--space-xs) 0 0; }

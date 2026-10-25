@@ -30,6 +30,11 @@ export function codexEnforced(caps) {
  *   answer. warn: nothing is sandboxed or asked (Bypass Permissions, or Antigravity skipping prompts).
  */
 const CODEX_MODE = { plan: ['read-only', 'on-request'], acceptEdits: ['workspace-write', 'on-request'], auto: ['workspace-write', 'never'], dontAsk: ['workspace-write', 'never'], bypassPermissions: ['none', 'never'] };
+// What Sandboxed means for Codex now: its workspace sandbox has the network on (Security's #7483)
+const SANDBOXED = 'Sandboxed: can change files in its folder and use the network';
+const SANDBOXED_ASKS = 'Sandboxed, asks first: can change files in its folder, no network'; // on-request members get no network switch (Security's #7503): decided by the sandbox and approval pair
+/** Only a workspace-write sandbox that never asks has the network on: the flag that turns it off. */
+export const NETWORK_OFF_FLAG = '-c sandbox_workspace_write.network_access=false';
 const CODEX_SANDBOX_RANK = { 'read-only': 1, 'workspace-write': 2, none: 3 };
 const AGY_MODE_RANK = { plan: 1, dontAsk: 1, acceptEdits: 2, auto: 3, bypassPermissions: 3 };
 const AGY_CAPS_RANK = { default: 0, plan: 1, 'accept-edits': 2, 'skip-permissions': 3 };
@@ -39,15 +44,14 @@ export function launchedMode(agentType, mode, caps) {
     const hasCaps = !!(caps?.allow?.length || caps?.deny?.length);
     if (family === 'codex') {
         const m = codexEnforced(caps), mp = CODEX_MODE[mode];
-        const sandboxText = sb => sb === 'read-only' ? 'Read-only sandbox' : 'Sandboxed';
-        if (!mp) return m ? { narrowed: true, text: sandboxText(m.sandbox) } : { narrowed: false };
+        if (!mp) return m ? { narrowed: true, text: m.sandbox === 'read-only' ? 'Read-only sandbox' : m.approval === 'never' ? SANDBOXED : SANDBOXED_ASKS } : { narrowed: false };
         // no capabilities, or Shell with no deny (Codex's full auto: it restricts nothing against an explicit mode, so the mode stands as chosen)
         if (!m || (m.sandbox === 'workspace-write' && m.approval === 'never')) return mp[0] === 'none' ? { narrowed: false, warn: true } : { narrowed: false };
         const narrowerSandbox = CODEX_SANDBOX_RANK[m.sandbox] < CODEX_SANDBOX_RANK[mp[0]];
         const asksMore = m.approval !== 'never' && mp[1] === 'never';
         if (!narrowerSandbox && !asksMore) return mp[0] === 'none' ? { narrowed: false, warn: true } : { narrowed: false };
         const sb = narrowerSandbox ? m.sandbox : mp[0];
-        return { narrowed: true, text: sb === 'read-only' ? 'Read-only sandbox' : asksMore ? 'Sandboxed, asks first' : 'Sandboxed' };
+        return { narrowed: true, text: sb === 'read-only' ? 'Read-only sandbox' : asksMore || mp[1] !== 'never' ? SANDBOXED_ASKS : SANDBOXED };
     }
     if (family === 'agy') {
         const mr = AGY_MODE_RANK[mode], cr = AGY_CAPS_RANK[agyEnforced(caps)];
@@ -71,7 +75,8 @@ export function agyEnforced(caps) {
 }
 
 const CODEX_SANDBOX = {
-    'workspace-write': 'a sandbox that can write the working folder',
+    'workspace-write': 'a sandbox that can change files in its folder, with no network',
+    'workspace-write-never': 'a sandbox that can change files in its folder and use the network',
     'read-only': 'a read-only sandbox',
 };
 const CODEX_APPROVAL = {
@@ -112,10 +117,12 @@ export function presetEnforcement(agentType, caps, permMode) {
         if (!m) {
             text = 'Codex: no capabilities set, so the Permission Mode decides its sandbox and approvals.';
         } else {
-            text = `Codex keeps only a sandbox and an approval mode: ${CODEX_SANDBOX[m.sandbox]}, and ${CODEX_APPROVAL[m.approval]}${m.search ? '; web search on' : ''}.`;
+            text = `Codex keeps only a sandbox and an approval mode: ${CODEX_SANDBOX[m.sandbox === 'workspace-write' && m.approval === 'never' ? 'workspace-write-never' : m.sandbox]}, and ${CODEX_APPROVAL[m.approval]}${m.search ? '; web search on' : ''}.`;
         }
+        const networkOn = m ? m.sandbox === 'workspace-write' && m.approval === 'never' : ['auto', 'dontAsk'].includes(permMode);
+        if (networkOn && m && !m.search) text += ' Leaving out Web Access does not turn the network off.';
         text += ' Deny entries and shell patterns are not enforced (a Deny entry only changes the mode).';
-        return { text, denyEnforced: false, patternsEnforced: false };
+        return { text, denyEnforced: false, patternsEnforced: false, ...(networkOn ? { more: NETWORK_OFF_FLAG } : {}) };
     }
     if (family === 'agy') {
         const mode = agyEnforced(caps);
