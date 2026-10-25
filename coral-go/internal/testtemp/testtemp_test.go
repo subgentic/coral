@@ -105,3 +105,13 @@ func TestAHelperChildKeepsTheEnvironmentItsParentGaveIt(t *testing.T) {
 	// Without the marker, a process go test started does make its own: the values differ.
 	assert.NotEqual(t, want, run("-test.paniconexit0"), "a top-level test process gets its own")
 }
+
+// The loud check Security and the Orchestrator asked for: testtemp acts only in a process that has go test's -test.paniconexit0. If a future Go stops passing it, every package would
+// silently run without a private world; this test, which runs in every `go test`, then fails and says so. (A test binary run directly, not by go test or the shard script, has no flag: set
+// TESTTEMP_DIRECT=1 for such a run.)
+func TestGoTestStillMarksItsTestBinaries(t *testing.T) {
+	if os.Getenv("TESTTEMP_DIRECT") == "1" {
+		t.Skip("run directly, not by go test")
+	}
+	require.True(t, startedByGoTest(os.Args), "go test no longer passes -test.paniconexit0 (args: %v): every test package would run in the real temp, home and ~/.coral; update testtemp.startedByGoTest to what go test passes now", os.Args)
+}
