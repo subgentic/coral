@@ -247,7 +247,7 @@
 
 /* a goal's page (#7665): its details beside its tasks. The main pane is the goal or the picked task's page; the column is the shared sidebar's look */
 .goal-split { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 24px; align-items: stretch; flex: 1 1 auto; min-height: 0; } /* the main pane runs the page's height, so its bar is pinned at the foot */
-.goal-main { min-width: 0; display: flex; flex-direction: column; }
+.goal-main { min-width: 0; display: flex; flex-direction: column; gap: 10px; } /* the title has its gap under the back link, the state line under the title */
 .goal-side { align-self: start; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-secondary); position: sticky; top: 8px; max-height: calc(100vh - 140px); overflow-y: auto; }
 .goal-side-head { display: flex; align-items: baseline; gap: 8px; padding: 12px 12px 8px; font-size: 0.875rem; }
 .goal-side-counts { color: var(--text-secondary); font-size: 0.75rem; font-weight: 500; }
@@ -270,7 +270,7 @@
     .goal-split { display: flex; flex-direction: column; }
     .goal-main { flex: 1; }
     .goal-split-column .goal-main, .goal-split:not(.goal-split-column) .goal-side { display: none; } /* the list is a screen of its own: the goal or a task is the other */
-    .goal-side { position: static; max-height: none; border: 0; background: none; }
+    .goal-side { position: static; max-height: none; border: 0; background: none; align-self: stretch; } /* the list screen is the page's whole width */
     .goals-table-page .goal-side-back { display: inline-flex; margin: 0 0 8px; }
     .goal-tasks-open { display: inline-flex; align-self: flex-start; min-height: 44px; margin-top: 12px; }
     .goal-side-row { min-height: 44px; padding: 10px 12px; }
