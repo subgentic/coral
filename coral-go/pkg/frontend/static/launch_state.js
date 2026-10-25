@@ -7,6 +7,7 @@ export const launch = {
     mode: null,
     existingTeamBoardNames: new Set(),
     teamAgentModalRow: null,
+    teamAddress: false, // the team's Machine is "Another computer's address..." (#7407)
     // A launch always runs on exactly one server (multi-server hub, spec section 5). `server` is the Server dropdown of the
     // launch modal and `addAgentServer` the server inherited by "add agent to board" / folder-group launches.
     // With hub mode off both stay "local" and nothing touches /api/remote/*.

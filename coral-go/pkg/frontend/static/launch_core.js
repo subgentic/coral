@@ -53,7 +53,8 @@ export function setLaunchMore(open) { setLaunchStage(open ? 'agent' : 'folder');
 document.addEventListener("sd-more-open", e => { if (e.target.closest && e.target.closest("#launch-step-agent")) setLaunchStage('agent'); });
 
 function _showLaunchStep(step) {
-    document.getElementById("launch-modal")?.setAttribute('aria-labelledby', step === 'agent' ? 'launch-agent-title-text' : 'launch-title'); // the three steps are "New agent"; the chooser keeps its own title
+    document.getElementById("launch-modal")?.setAttribute('aria-labelledby', step === 'agent' ? 'launch-agent-title-text' : step === 'team' ? 'launch-team-title-text' : 'launch-title'); // the three steps are "New agent" or "New team"; the chooser keeps its own title
+    if (step !== 'team') document.getElementById("launch-modal")?.removeAttribute('data-team-stage');
     document.getElementById("launch-step-chooser").style.display = step === "chooser" ? "flex" : "none";
     document.getElementById("launch-step-agent").style.display = step === "agent" ? "flex" : "none";
     document.getElementById("launch-step-terminal").style.display = step === "terminal" ? "flex" : "none";
@@ -66,7 +67,7 @@ function _showLaunchStep(step) {
         content.classList.toggle("sd-modal-content", sectioned);
         content.classList.toggle("modal-content-wide", !sectioned);
         content.classList.toggle("launch-choosing", step === "chooser"); // four choices in a row (#3630)
-        content.classList.toggle("launch-wizard-content", step === "agent"); // one size for every step and tab of New Agent (#7391)
+        content.classList.toggle("launch-wizard-content", step === "agent" || step === "team"); // one size for every step and tab of New Agent and New team (#7391, #7407)
     }
     _syncMobileLaunchSections(step);
 }
