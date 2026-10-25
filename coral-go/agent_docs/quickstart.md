@@ -246,8 +246,9 @@ URL alone does not trigger the offer. `--cloud-connect off` suppresses it;
 ## 4. Launch your first agent
 
 On Home choose **New agent** (elsewhere, **+ New agent**). Enter an existing
-project folder on the computer running Coral. Open **More options > Agent** to choose
-your installed CLI, then choose **Launch**. In **Chat**, type a task and press Enter
+project folder on the computer running Coral and choose **Next**. Step 2 is the
+persona (optional); step 3 has the **Agent** tab, where you choose your installed
+CLI, then choose **Launch** (it is available from every step once a folder is set). In **Chat**, type a task and press Enter
 to send it; check **Terminal** first for any sign-in or trust prompt. The equivalent API call (with [strict local auth](auth.md#strict-local-auth-the-default), the default, add
 `-H "Authorization: Bearer $(coral api-key)"` to every `curl` in this guide; the key is for a script you run yourself, never an agent):
 

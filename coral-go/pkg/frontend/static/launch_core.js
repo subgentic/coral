@@ -9,7 +9,7 @@ import { loadLiveSessions } from './api.js';
 import { isHub, normServer, LOCAL_SERVER, noteBoardLabels } from './server_base.js';
 import { chooseBoard, retryPayload, isBoardNameExists } from './board_choice.js';
 import { serverLabel, launchBlockReason, postLaunch, waitForLaunched } from './launch_server.js';
-import { launchFlags } from './launch_flags.js';
+const { launchFlags } = await importOnce('./launch_flags.js');
 const { _loadServerSettings } = await importOnce('./launch_models.js');
 const { _showCLINotFoundModal } = await importOnce('./cli_dialogs.js');
 const { revealField } = await importOnce('./section_dialog.js');
@@ -32,7 +32,7 @@ export function setLaunchStage(stage) {
     if (!step) return;
     step.dataset.stage = stage;
     const modal = document.getElementById("launch-modal");
-    if (modal) modal.dataset.agentStage = stage;
+    if (modal) modal.setAttribute('data-agent-stage', stage);
     const n = LAUNCH_STAGES.indexOf(stage) + 1, dir = (document.getElementById("launch-dir")?.value || '').trim();
     const sub = `Step ${n} of 3: ${STAGE_NAMES[stage]}${stage !== 'folder' && dir ? '. In ' + dir : ''}`;
     const subEl = document.getElementById("launch-stage-sub");

@@ -61,6 +61,3 @@ export function segmentSelect(select, { label = '', labelledby = '', cards = fal
     draw();
     return group;
 }
-
-/** Hide or show the control with its select (a thinking level list that is empty for a provider). */
-export function segmentVisible(select, on) { if (select?._segmented) select._segmented.hidden = !on; }

@@ -309,13 +309,18 @@ export function renderAgentConfigForm(containerId, opts = {}) {
                 pane('permissions', 'Permissions', 'lock', '', `${autoPermissionsHTML}${toolsHTML}`),
                 pane('advanced', 'Advanced', 'tune', '', `<label>Flags <span style="color:var(--text-muted);font-weight:normal">(optional)</span>:${flagsInput}</label>`),
             ].join('');
-        } else container.innerHTML = [
-            (showPreset || showName) ? pane('role', 'Role', 'badge', '', `${presetHTML}${nameHTML}`) : '',
-            pane('agent', 'Agent', 'smart_toy', '', topHTML),
-            pane('prompt', 'Prompt', 'description', '', `<textarea class="acf-prompt" rows="14" aria-label="Behavior prompt" placeholder="Describe the agent's role and behavior...">${escapeHtml(promptVal)}</textarea>`),
-            pane('permissions', 'Permissions', 'lock', '', `${autoPermissionsHTML}${permEditorHTML(true)}`),
-            pane('advanced', 'Advanced', 'tune', '', `<label>Flags <span style="color:var(--text-muted);font-weight:normal">(optional)</span>:${flagsInput}</label>`),
-        ].join('');
+        } else {
+            // The team member and Add-agent-to-board dialogs (#7391): the same panes as New Agent's step 3, and one Persona pane (the persona, the name, the prompt) where New Agent has a page.
+            const toolsHTML = `<details class="acf-tools-details"><summary>Tool permissions <span class="acf-perms-summary settings-hint"></span></summary>${permEditorHTML(true)}</details>`;
+            const promptHTML = `<label class="launch-prompt-field"><span class="launch-field-head">Behavior prompt</span><textarea class="acf-prompt" rows="10" placeholder="Describe the agent's role and behavior...">${escapeHtml(promptVal)}</textarea></label>`;
+            container.innerHTML = [
+                pane('persona', 'Persona', 'badge', '', `${(showPreset || showName) ? `${presetHTML}${nameHTML}` : ''}${promptHTML}`),
+                pane('agent', 'Agent', 'smart_toy', '', topHTML),
+                pane('permissions', 'Permissions', 'lock', '', `${autoPermissionsHTML}${toolsHTML}`),
+                pane('advanced', 'Advanced', 'tune', '', `<label>Flags <span style="color:var(--text-muted);font-weight:normal">(optional)</span>:${flagsInput}</label>`),
+            ].join('');
+            container.dataset.acfPersonaPane = '1';
+        }
         for (const [paneId, el] of adopted) container.querySelector(`[data-section="${CSS.escape(paneId)}"], [data-adopt="${CSS.escape(paneId)}"]`)?.prepend(el);
     } else container.innerHTML = `
         ${presetHTML}
@@ -410,7 +415,7 @@ export function renderAgentConfigForm(containerId, opts = {}) {
         type.addEventListener('change', sync);
         const nm = container.querySelector('.acf-restart-name'); if (nm) nm.textContent = opts.restartName || '';
     }
-    if (opts.wizard || opts.restart) { // the controls drawn over the selects (#7391): the thinking levels as segments, the Mode as cards (or the select, launch_flags.js)
+    if (opts.wizard || opts.restart || opts.sections) { // the controls drawn over the selects (#7391): the thinking levels as segments, the Mode as cards (or the select, launch_flags.js)
         const thinking = container.querySelector('.acf-thinking');
         if (thinking) segmentSelect(thinking, { labelledby: 'acf-thinking-label' });
         const mode = container.querySelector('.acf-permission-mode');

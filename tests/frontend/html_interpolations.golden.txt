@@ -1,10 +1,12 @@
 1	agent_config_form.js	CAPABILITY_LABELS[cap] || cap
+1	agent_config_form.js	agentHTML
 1	agent_config_form.js	autoPermissionsHTML
 1	agent_config_form.js	body
-2	agent_config_form.js	flagsInput
+4	agent_config_form.js	flagsInput
 1	agent_config_form.js	modelPickerHtml()
 1	agent_config_form.js	nameHTML
 1	agent_config_form.js	permEditorHTML(false)
+3	agent_config_form.js	permEditorHTML(true)
 1	agent_config_form.js	presetHTML
 1	agent_config_form.js	thinkingPickerHtml()
 1	agent_config_form.js	title
