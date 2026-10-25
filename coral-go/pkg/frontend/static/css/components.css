@@ -4584,7 +4584,7 @@ body:has(#nav-tab-hub-inbox.active) #saved-btn .saved-count { display: none; }
    Step 1 the folder (and, above, the machine), step 2 the persona page, step 3 the tabs Agent, Permissions and Advanced. The dialog has ONE size for every step and
    tab (the smaller of 640 px and the window minus 32 px; a full-height sheet on a phone): the body scrolls inside it, the header, the recap and the footer stay put, and
    the notes a provider adds sit in a slot already as tall as the longest one, so nothing moves when a note comes or goes. Cancel is leftmost on every step. */
-#launch-modal .modal-content.launch-wizard-content, #restart-modal .modal-content.restart-wizard-content, #team-agent-modal .modal-content.restart-wizard-content { width: min(60rem, 94vw); height: min(640px, calc(100dvh - 32px)); max-height: none; min-height: 0; }
+#launch-modal .modal-content.launch-wizard-content, #restart-modal .modal-content.restart-wizard-content, #team-agent-modal .modal-content.restart-wizard-content, #add-agent-board-modal .modal-content.restart-wizard-content { width: min(60rem, 94vw); height: min(640px, calc(100dvh - 32px)); max-height: none; min-height: 0; }
 .launch-wizard .settings-modal-body { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0; overflow: auto; }
 .launch-page-folder { flex: none; padding: 20px 24px; }
 .launch-page-agent { flex: 1; min-height: 0; display: flex; flex-direction: column; }
@@ -4646,9 +4646,9 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .acf-tools-details > summary { cursor: pointer; font-weight: 600; min-height: 32px; }
 .acf-tools-details .acf-perms-summary { font-weight: 400; margin-left: 6px; }
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
-    #launch-modal .modal-content.launch-wizard-content, #restart-modal .modal-content.restart-wizard-content, #team-agent-modal .modal-content.restart-wizard-content { width: 100vw; max-width: none; height: 100dvh; max-height: none; border-radius: 0; padding: 0 !important; } /* (!important: mobile.css's tighter padding is one too) */
-    #team-agent-modal .restart-wizard-content > .modal-header, #restart-modal .restart-wizard-content > .modal-header { margin: 0 !important; padding: 16px 16px 10px; }
-    #team-agent-modal .restart-wizard-content > .modal-footer, #restart-modal .restart-wizard-content > .modal-footer { margin: 0 !important; padding: 10px 16px 14px !important; }
+    #launch-modal .modal-content.launch-wizard-content, #restart-modal .modal-content.restart-wizard-content, #team-agent-modal .modal-content.restart-wizard-content, #add-agent-board-modal .modal-content.restart-wizard-content { width: 100vw; max-width: none; height: 100dvh; max-height: none; border-radius: 0; padding: 0 !important; } /* (!important: mobile.css's tighter padding is one too) */
+    #team-agent-modal .restart-wizard-content > .modal-header, #add-agent-board-modal .restart-wizard-content > .modal-header, #restart-modal .restart-wizard-content > .modal-header { margin: 0 !important; padding: 16px 16px 10px; }
+    #team-agent-modal .restart-wizard-content > .modal-footer, #add-agent-board-modal .restart-wizard-content > .modal-footer, #restart-modal .restart-wizard-content > .modal-footer { margin: 0 !important; padding: 10px 16px 14px !important; }
     .launch-page-folder, .launch-wizard .settings-panes { padding: 16px; }
     .launch-recap { padding: 10px 16px 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; } /* two lines at most, so large text leaves the body room */
     .sd-modal-content .launch-wizard > .modal-actions, .sd-modal-content.launch-wizard > .modal-actions { padding: 10px 16px 14px; }
@@ -4677,7 +4677,7 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .launch-wizard .launch-cli-slot .acf-cli-warning { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 
 /* Restart on the same shell (#7391): the provider line has a slot of its own so the tabs do not move when it appears. */
-.restart-wizard-content > .modal-actions #restart-cancel, .restart-wizard-content > .modal-actions #team-agent-cancel { margin-right: auto; }
+.restart-wizard-content > .modal-actions #restart-cancel, .restart-wizard-content > .modal-actions #team-agent-cancel, .restart-wizard-content > .modal-actions #add-agent-board-cancel { margin-right: auto; }
 .restart-wizard-content > .modal-actions { display: flex; align-items: center; gap: 8px; }
 .acf-restart-name { margin: 0 0 16px; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-secondary); color: var(--text-primary); overflow-wrap: anywhere; }
 .acf-provider-label { display: block; margin: 0 0 14px; }
