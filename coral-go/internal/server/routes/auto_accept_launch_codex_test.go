@@ -34,6 +34,6 @@ func TestShellRiskLauncherAndArchiveCorrectionsLeaveOrdinaryCommandsAlone(t *tes
 		`zip -O new.zip in.zip x`, `zip -b tmpdir out.zip x`, `zip -O new.zip /tmp/in.zip x`,
 		`zstd --output-dir-flat=out x`, `zstd -o x.zst x`, `zstd /tmp/x -o out.zst`, `zstd --rm --output-dir-flat=out x`, `zstd --output-dir-flat out /tmp/x`, `zstd -o out.zst /tmp/x`, `flock -w 5 /tmp/l ls`,
 	} {
-		assert.Empty(t, shellRisk(c, dir), "must pass: %s", c)
+		assertOrdinaryPasses(t, shellRisk(c, dir), c, windowsLayerHolds, "must pass")
 	}
 }

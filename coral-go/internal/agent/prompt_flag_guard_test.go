@@ -85,6 +85,7 @@ func runLaunchLine(t *testing.T, line string) {
 			t.Skip("no Windows PowerShell")
 		}
 		cmd = exec.Command(ps, "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", line)
+		cmd.Dir = t.TempDir() // a folder of its own: see psquote_roundtrip_windows_test.go
 	} else {
 		cmd = exec.Command("/bin/sh", "-c", line)
 	}

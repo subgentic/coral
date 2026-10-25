@@ -94,6 +94,7 @@ func promptRoundTrip(t *testing.T, ps string, program, cases []string) {
 	file := filepath.Join(t.TempDir(), "prompts.ps1")
 	require.NoError(t, os.WriteFile(file, []byte(script.String()), 0o600))
 	cmd := exec.Command(ps, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", file)
+	cmd.Dir = filepath.Dir(file) // a folder of its own: see psquote_roundtrip_windows_test.go
 	cmd.Env = append(os.Environ(), argvEchoEnv+"=1", "PYTHONIOENCODING=utf-8", "PYTHONUTF8=1")
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, "%s", out)

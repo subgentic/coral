@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/linktest"
 	"github.com/subgentic/coral/internal/transcriptlink"
 )
 
@@ -19,7 +20,7 @@ func TestTheTranscriptOfAProjectReachedThroughASymlinkIsTheOneWrittenLast(t *tes
 	realDir, err := filepath.EvalSymlinks(t.TempDir())
 	require.NoError(t, err)
 	link := filepath.Join(t.TempDir(), "project-link")
-	require.NoError(t, os.Symlink(realDir, link))
+	linktest.Symlink(t, realDir, link) // where this account can't make a symbolic link (Windows without Developer Mode) it skips, and on CI it fails: the repo's rule
 	const sid = "00000000-0000-4000-8000-000000006219"
 	file := func(dir string) string {
 		p := filepath.Join(base, transcriptlink.ClaudeProjectDirName(dir), sid+".jsonl")

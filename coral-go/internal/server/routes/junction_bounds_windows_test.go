@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/linktest"
 	"github.com/subgentic/coral/internal/safefs"
 )
 
@@ -27,20 +28,31 @@ func TestJunctionOutOfTheRepositoryIsRefusedEverywhere(t *testing.T) {
 	out, err := exec.Command("cmd", "/c", "mklink", "/J", junc, outdir).CombinedOutput()
 	require.NoError(t, err, "mklink /J: %s", out)
 
-	// The helpers every route uses.
-	if _, err := safefs.Resolve(filepath.Join(junc, "j.txt")); err != nil {
-		t.Errorf("safefs.Resolve of a file under the junction: %v", err)
+	// The helpers every route uses. Where Windows lets a program open a file through a junction, Coral's layer decides (realPath follows it, and the checks say outside);
+	// since build 26300 Windows refuses any path through a junction ("untrusted mount point"), so the system refuses first and every check below sees a refusal. Either
+	// way nothing out of the repository is read; the test says which layer refused (#350).
+	traversable := linktest.JunctionsTraversable(t)
+	t.Logf("a junction out of the repository is refused by: %s", map[bool]string{true: "Coral (safefs, realPath, the routes' checks)", false: "Windows (untrusted mount point)"}[traversable])
+	_, resolveErr := safefs.Resolve(filepath.Join(junc, "j.txt"))
+	if traversable {
+		assert.NoError(t, resolveErr, "safefs.Resolve of a file under the junction")
+	} else {
+		assert.True(t, linktest.UntrustedMountPoint(resolveErr), "Windows refuses the junction in safefs.Resolve: %v", resolveErr)
 	}
 	realOut, err := safefs.Resolve(outdir)
 	require.NoError(t, err)
-	assert.Equal(t, filepath.Join(realOut, "j.txt"), realPath(filepath.Join(junc, "j.txt")), "realPath follows the junction")
+	if traversable {
+		assert.Equal(t, filepath.Join(realOut, "j.txt"), realPath(filepath.Join(junc, "j.txt")), "realPath follows the junction")
+	} else {
+		assert.Empty(t, realPath(filepath.Join(junc, "j.txt")), "realPath names no place for a path Windows refuses")
+	}
 	assert.False(t, isPathWithinDir(e.repo, filepath.Join(junc, "j.txt")))
 	assert.False(t, within(realPath(e.repo), realPath(filepath.Join(junc, "j.txt"))))
 
 	for _, fp := range []string{`app\juncdir\j.txt`, "app/juncdir/j.txt", filepath.Join(junc, "j.txt")} {
 		for _, via := range []bool{tunneled, dashboard} {
 			code, body := e.get(fc, via, "filepath", fp)
-			if via == dashboard && filepath.IsAbs(fp) {
+			if via == dashboard && filepath.IsAbs(fp) && traversable {
 				// By design the local dashboard opens any ABSOLUTE path read-only, wherever it
 				// is (TestFileContentTunnelBounds reads an outside file the same way); only the
 				// relative paths and the hub are bounded to the session root.
@@ -61,7 +73,11 @@ func TestJunctionOutOfTheRepositoryIsRefusedEverywhere(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	serveExplorerDirectory(w, httptest.NewRequest("GET", "/", nil), e.repo, `app\juncdir`, false)
-	assert.Equal(t, 400, w.Code, "the explorer refuses the junction")
+	if traversable {
+		assert.Equal(t, 400, w.Code, "the explorer refuses the junction")
+	} else {
+		assert.Contains(t, []int{400, 404}, w.Code, "the explorer refuses the junction (Windows does first)")
+	}
 	assert.NotContains(t, w.Body.String(), "j.txt")
 
 	// A plain file inside still reads.

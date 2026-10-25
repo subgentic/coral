@@ -20,4 +20,6 @@ func TestShellRiskNestedShellWrappersAreBoundedInTime(t *testing.T) {
 	start := time.Now()
 	_ = shellRisk(cmd, wd)
 	assert.Less(t, time.Since(start), 1*time.Second, "bash -c nested 13 deep (%d bytes) took %s", len(cmd), time.Since(start))
+	// And the work itself, counted: 48 commands judged at this depth, each once; the exponential reading judged thousands.
+	assertWrapperWork(t, cmd, wd, 13, 13*13)
 }

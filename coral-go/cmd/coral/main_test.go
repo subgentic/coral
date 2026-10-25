@@ -42,6 +42,8 @@ func setupTestServerWithHub(t *testing.T, hub bool) *httptest.Server {
 		CoralRoot:       tmpDir,
 		HubMode:         hub,
 	}
+	// A Config without a data folder keeps its board database, key and themes in the working directory, which is this package's source folder (#350).
+	cfg.UseCoralDir(tmpDir)
 
 	db, err := storetest.Open(t, cfg.DBPath)
 	if err != nil {

@@ -30,9 +30,14 @@ func TestPSLiteralRoundTripsThroughPowerShell(t *testing.T) {
 	for _, q := range []string{"\u2018", "\u2019", "\u201a", "\u201b"} {
 		words = append(words, "Jane"+q+"s; Write-Output INJECTED", q, q+q+"x"+q, "C:\\Users\\Jane"+q+"s\\claude.exe")
 	}
+	// PowerShell runs in a folder of its own: after a full run a Microsoft\Windows\PowerShell\ModuleAnalysisCache was left under internal/agent (the working directory of a test)
+	// and made every package that reads the tree a cache miss (#350). The tests here, and in literal_path, prompt_arg and prompt_flag_guard, start PowerShell.
+	scratch := t.TempDir()
 	for _, word := range words {
 		script := "$s = " + psquote.Literal(word) + "; [string]::Join(',', [int[]][char[]]$s)"
-		out, err := exec.Command(ps, "-NoProfile", "-NonInteractive", "-Command", script).CombinedOutput()
+		cmd := exec.Command(ps, "-NoProfile", "-NonInteractive", "-Command", script)
+		cmd.Dir = scratch
+		out, err := cmd.CombinedOutput()
 		if err != nil {
 			t.Fatalf("%q: powershell failed: %v\n%s", word, err, out)
 		}
