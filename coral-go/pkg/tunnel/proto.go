@@ -277,6 +277,11 @@ type Header struct {
 	HubOrg      string `json:"hub_org,omitempty"`
 	HubTeamRole string `json:"hub_team_role,omitempty"`
 	HubUserID   string `json:"hub_user_id,omitempty"`
+	// HubService, AskServer and AskBoard are the Hub's own service asking for one per-machine read (#7364, hubservice.go): the sender server and board the request being read about was sent from. Fields of
+	// the stream like HubRole, set from the hub's context only; the connector turns them into headers on the service route and nowhere else.
+	HubService bool   `json:"hub_service,omitempty"`
+	AskServer  string `json:"ask_server,omitempty"`
+	AskBoard   string `json:"ask_board,omitempty"`
 }
 
 // ResponseHeader answers a Header (connector to hub).
@@ -374,6 +379,9 @@ func (h *Header) validate(l Limits) error {
 	}
 	if h.HubOrg != "" && !ValidHubOrg(h.HubOrg) {
 		return fmt.Errorf("%w: hub org", ErrBadHeader)
+	}
+	if (h.HubService || h.AskServer != "" || h.AskBoard != "") && !(h.HubService && ValidHubAsker(HubAsker{Server: h.AskServer, Board: h.AskBoard})) {
+		return fmt.Errorf("%w: hub service", ErrBadHeader) // a half-stamp is no stamp
 	}
 	if h.HubTeamRole != "" && !ValidHubTeamRole(h.HubTeamRole) {
 		return fmt.Errorf("%w: hub team role", ErrBadHeader)

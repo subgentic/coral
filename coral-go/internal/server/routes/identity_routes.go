@@ -33,6 +33,7 @@ var operatorOnlyRoutes = map[string]string{
 	// #3668 (the board authorization audit): deleting a message, and pausing or resuming a board
 	// (the Operator's brake), are the Operator's.
 	"DELETE /api/board/{project}/messages/{messageID}": "delete a board message",
+	"GET /api/goal-links":                              "read the tasks another team made for a goal request (Coral Hub's own service reads it, #7364)",
 	"POST /api/board/{project}/pause":                  "pause a board",
 	"POST /api/board/{project}/resume":                 "resume a board",
 	// #6329: the instruction of an agent's reminder is the Operator's own text to that agent; another agent's token cannot read it.
