@@ -31,7 +31,7 @@ func shortOf(t *testing.T, p string) string {
 // newest: the comparison is of strings after EvalSymlinks, which expands short names on 1.27.3.
 func TestCLICheckRefusesABinaryInATempFolderBySpellingOfEitherPath(t *testing.T) {
 	h := newSystemHandlerForTest(t)
-	script, marker := markerCLI(t, t.TempDir(), "claude")
+	script, marker := markerCLI(t, systemTempFolder(t), "claude")
 	short := shortOf(t, script)
 	t.Logf("binary: %s\n  by its short name: %s", script, short)
 

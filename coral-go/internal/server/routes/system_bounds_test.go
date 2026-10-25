@@ -184,10 +184,20 @@ func markerCLI(t *testing.T, dir, name string) (script, marker string) {
 	return script, marker
 }
 
+// systemTempFolder is a new folder in the system temp folder (os.TempDir), removed with the test. t.TempDir() is not that where GOTMPDIR is set: Go puts it there, and a test
+// that means "in the temp folder" would then place its binary outside it and fail (QA's shell sets GOTMPDIR).
+func systemTempFolder(t *testing.T) string {
+	t.Helper()
+	dir, err := os.MkdirTemp(os.TempDir(), "coral-cli-check-")
+	require.NoError(t, err)
+	t.Cleanup(func() { os.RemoveAll(dir) })
+	return dir
+}
+
 func TestCLICheckRefusesABinaryInATempFolder(t *testing.T) {
 	h := newSystemHandlerForTest(t)
 	for _, name := range []string{"x", "claude"} {
-		script, marker := markerCLI(t, t.TempDir(), name)
+		script, marker := markerCLI(t, systemTempFolder(t), name)
 		rec := cliCheckAs(h, "binary="+script, asOperator)
 		assert.Equal(t, http.StatusBadRequest, rec.Code, "%s: %s", name, rec.Body.String())
 		time.Sleep(50 * time.Millisecond) // sleep-ok: a run would have left the marker by now

@@ -190,17 +190,21 @@ func TestParsedReadingKeepsTheWorkingDirectory(t *testing.T) {
 // QA's round 1 (#7086): a command nested n deep costs n passes over its own text, because each level is a command with the rest inside it. It is answered as risky once reading it would print more
 // than a few times its own length, in about the time of one pass, whatever the nesting.
 // raceSlowdown is how much longer a bound on the clock may be when the race detector is on (QA's round 3: the 2 s limits failed under -race at 3.8 s and 3.1 s).
-// On Windows shellRisk also reads the command a second time as PowerShell and cmd do (winVerbRisk), so one pass is about twice the work: the 1 s bound of the 65 KB
-// wrapper test was met at 0.9 s to 1.4 s there, a red run that cached nothing (#350). A nesting that cost n passes, the thing the bounds catch, is far over 3 s.
 func raceSlowdown() time.Duration {
-	n := time.Duration(1)
-	if runtime.GOOS == "windows" {
-		n = 3
-	}
 	if raceEnabled {
-		n *= 8
+		return 8
 	}
-	return n
+	return 1
+}
+
+// memoBound is the clock bound of the 65 KB nested-wrapper test (1 s). On Windows shellRisk also reads the command a second time as PowerShell and cmd do (winVerbRisk), so one
+// pass is about twice the work: measured alone, on a quiet process, on main, the test takes 1.0 s to 1.4 s there (QA 1.10 s, 1.11 s, 1.38 s), a red run that caches nothing (#350).
+// It is 3 s there. That is the only bound widened: the work itself is asserted by counting (assertWrapperWork), and every other bound keeps its value.
+func memoBound() time.Duration {
+	if runtime.GOOS == "windows" {
+		return 3 * time.Second * raceSlowdown()
+	}
+	return time.Second * raceSlowdown()
 }
 
 // assertOnePass asserts, by counting and not by the clock, that a command is judged in one evaluation (no inner command is judged again) and that what the parser
@@ -285,7 +289,7 @@ func TestShellRiskWrapperRecursionIsMemoizedPerRun(t *testing.T) {
 		}
 		start := time.Now()
 		why := shellRisk(cmd, wd)
-		assert.Less(t, time.Since(start), time.Second*raceSlowdown(), "bash -c nested %d deep (%d bytes)", depth, len(cmd))
+		assert.Less(t, time.Since(start), memoBound(), "bash -c nested %d deep (%d bytes)", depth, len(cmd))
 		assert.Empty(t, why, "an ordinary command in wrappers is not risky")
 		assertWrapperWork(t, cmd, wd, depth, depth*depth)
 		// A risky command at the bottom of the same wrappers is still found.
