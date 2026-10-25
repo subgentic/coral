@@ -2,6 +2,8 @@
 // role=alert region): an agent's reply is announced once when the turn is done, not per message or streamed step; a send says Sending and Sent once each; a failed send is said once, not by two regions; an agent
 // that falls asleep and is woken says each state once; the toasts and notices of the Notifications column say their words once. ANNOUNCE_REPORT=<file> writes every scene's log to the file instead of failing.
 // Drives Chrome over CDP through agent_view_harness.js with its mocked agents, against the isolated dev server.
+// One viewport per suite, so each runs well inside the runner's time limit (#351: both took 69 s): this file runs the desktop, and announcements_census_phone_browser.test.js
+// runs the phone through run('phone'). The body stays in this file, so the sleep and waitFor hygiene checks still read it.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { watch, clear, log, problems, said } = require('./helpers/announce_census');
@@ -10,7 +12,7 @@ const VERSIONS = require('./helpers/artifact_versions_stub');
 const BASE = require('./test_base').BASE;
 const S = `(window.__coralStatic || '/static/')`;
 
-(async () => {
+const run = viewport => (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install, select } = await connect();
     const scenes = []; const found = [];
     const wait = ms => new Promise(r => setTimeout(r, ms)); // sleep-ok: announcements are timed; there is no event to wait for
@@ -25,7 +27,7 @@ const S = `(window.__coralStatic || '/static/')`;
     };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        for (const [w, h, mobile, tag] of [[1280, 800, false, 'desktop'], [390, 844, true, 'phone']]) {
+        for (const [w, h, mobile, tag] of [[1280, 800, false, 'desktop'], [390, 844, true, 'phone']].filter(v => v[3] === viewport)) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await ev(`window.__coralReady.then(() => true)`);
@@ -117,6 +119,10 @@ const S = `(window.__coralStatic || '/static/')`;
         }
     } finally { await client.close(); }
     if (process.env.ANNOUNCE_REPORT) { require('node:fs').writeFileSync(process.env.ANNOUNCE_REPORT, scenes.map(s => `## ${s.name}\n` + s.entries.map(e => `  ${String(e.t).padStart(5)} ms ${e.loud ? '!' : ' '} ${e.region}: ${e.text}${process.env.ANNOUNCE_HOW ? '   [' + e.how + ']' : ''}`).join('\n')).join('\n') + '\n--\n' + found.join('\n') + '\n'); process.exit(0); }
+    assert.ok(scenes.length >= 12, `the ${viewport} ran only ${scenes.length} scenes`);
     assert.deepEqual(found, [], 'screen-reader announcement problems:\n  ' + found.join('\n  '));
     console.log(`PASS ${scenes.length} scenes: each state is announced once, nothing chatters`);
 })().catch(e => { console.error(e); process.exit(1); });
+
+module.exports = { run };
+if (require.main === module) run('desktop');

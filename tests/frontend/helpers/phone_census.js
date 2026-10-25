@@ -1,7 +1,8 @@
-// The phone touch-target census's scenes, in two halves so each suite runs inside the runner's time limit (it was one file of 129 s). Part 'a' is the agent screens, side panel, artifact,
-// history, board, workflows and jobs; part 'b' (from the fresh page that follows the editors) is the Inbox, Docs, analytics, update, settings, launch, create task, chat bubbles and toasts.
-// The two suites phone_targets_census_browser.test.js and phone_targets_census_b_browser.test.js call this with 'a' and 'b'; each half has its own folder of required scenes
-// (fixtures/census_required/phone-a, phone-b).
+// The phone touch-target census's scenes, in three parts so each suite runs well inside the runner's time limit (it was one file of 129 s, then two halves, the first of 78 to 120 s, #351).
+// Part 'a1' is the agent screens, side panel and artifacts; part 'a2' (from a fresh page) the team settings, history, board, workflows and jobs; part 'b' (from the fresh page that follows
+// the editors) is the Inbox, Docs, analytics, update, settings, launch, create task, chat bubbles and toasts. Every part seeds the same data and starts its own stand-in agent.
+// The suites phone_targets_census_browser.test.js, phone_targets_census_a2_browser.test.js and phone_targets_census_b_browser.test.js call this with 'a1', 'a2' and 'b'; each part has its
+// own folder of required scenes (fixtures/census_required/phone-a1, phone-a2, phone-b).
 
 // The phone touch-target census, on this computer's own dashboard (#6130): at 390 px with touch, every visible control on each main screen is at least 44 x 44 px (helpers/phone_targets.js holds the measure and
 // the reviewed allow list: a link inside running text is exempt, nothing else is). A stand-in agent and a team board give the screens real content; the Hub's screens are phone_targets_census_hub_browser's.
@@ -41,7 +42,7 @@ module.exports = part => (async () => {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: DATA_WORLD });
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
         await load();
-        if (part === 'a') {
+        if (part === 'a1') {
             await sc('home (agent list)', async () => { await ev(`window.__m.add('rowa', 'Row A', 2, {}); window.__m.add('rowb', 'Row B', 2, {}); window.__m.add('rowc', 'Row C', 2, {}); window.switchNavTab('agents'); Promise.resolve(window._coralLoadLiveSessions && window._coralLoadLiveSessions()).then(() => true)`); await waitFor(`document.querySelectorAll('#mobile-agent-list .sidebar-kebab-btn').length >= 3`, 'three agent rows', 10000); }, { min: 5, expect: `document.getElementById('nav-select').textContent.includes('Agents')` });
             // the Agents list's menus and the agent view's other states (#6524): a row's menu, the Display options, a sleeping agent (Wake), and an agent whose automated messages are held
             const vis = `e => e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden'`;
@@ -126,6 +127,8 @@ module.exports = part => (async () => {
                 await waitFor(`!!document.querySelector('#artifact-viewer .av-heading')`, 'the compare view', 10000);
             }, { min: 5, expect: `!!document.querySelector('#artifact-viewer .av-heading')` });
             await ev(`document.querySelector('#artifact-viewer .artifact-viewer-close').click(); true`);
+        }
+        if (part === 'a2') {
             await load();
             await sc('team settings: workflow', async () => { await ev(`import(${S} + 'team_working_mode.js').then(m => m.showTeamWorkingMode(${JSON.stringify(TEAM)}, { workspace: false })).then(() => true)`); await waitFor(`!!document.querySelector('dialog[open] [data-settings-tab=workflow]')`, 'team settings', 10000); }, { min: 8, expect: `!!document.querySelector('dialog[open] form.working-mode-form') && document.querySelector('dialog[open] [data-settings-tab=workflow]').getAttribute('aria-selected') !== 'false'` });
             for (const t of ['health', 'prompts']) await sc(`team settings: ${t}`, async () => { await tap(`dialog[open] [data-settings-tab=${t}]`); }, { min: 6, expect: `!!document.getElementById('team-settings-${t}') && !document.getElementById('team-settings-${t}').hidden` });
