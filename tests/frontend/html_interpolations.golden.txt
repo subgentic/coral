@@ -481,6 +481,13 @@
 1	sessions.js	filtered.map(e => `<button class="emoji-picker-btn" data-emoji="${escapeAttr(e)}">${e}</button>`).join("")
 1	settings_dialog.js	label
 1	settings_nav.js	p.dataset.icon
+1	sidebar_groups.js	CHEVRON
+1	sidebar_groups.js	ROW_ACTION_ATTR[r.action] || ''
+2	sidebar_groups.js	attrs
+1	sidebar_groups.js	c ? escapeHtml(c) : dash
+1	sidebar_groups.js	dataAttrs(r.data)
+1	sidebar_groups.js	head
+1	sidebar_groups.js	rows
 1	sidebar_rail.js	_RAIL_ICONS[g.kind]
 1	sidebar_rail.js	_railRoleIcon(s)
 1	sidebar_rail.js	badge

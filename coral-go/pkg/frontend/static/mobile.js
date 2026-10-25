@@ -157,7 +157,7 @@ function restoreSidebarList() {
 // Moving it preserves search/filter listeners, current values, results and pagination.
 let _historyHome = null;
 function syncMobileHistoryList() {
-    const section = document.querySelector('[data-section="history"]');
+    const section = document.querySelector('[data-pane="history"]'); // the pane: its header (search, Display options) goes with its list (#7443)
     const host = document.getElementById('mobile-history-list');
     if (!section || !host) return;
     if (isMobile()) {
@@ -173,7 +173,7 @@ function syncMobileHistoryList() {
 // The Jobs list: on a phone the sidebar is not shown, so the section moves into the Jobs page (the same move as History's), above the job's detail; a wide screen puts it back (#6139).
 let _jobsHome = null;
 function syncMobileJobsList() {
-    const section = document.querySelector('[data-section="jobs"]');
+    const section = document.querySelector('[data-pane="jobs"]');
     const host = document.getElementById('mobile-jobs-list');
     if (!section || !host) return;
     if (isMobile()) {

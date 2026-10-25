@@ -136,7 +136,7 @@ total += scenario('live sessions',
 total += scenario('history sessions',
     p => { state.currentSession = null; state.historySessionsList = [{ ...session(p), session_id: 'h-' + p, title: p, updated_at: '2026-01-01T00:00:00Z', type: 'session', message_count: 3, first_message: p, summary: p, tags: [{ id: 1, name: p, color: p }] }]; },
     () => { try { render.renderHistorySessions(state.historySessionsList, 1, 1, 50); } catch (e) { if (!/not defined|Cannot read|null/.test(String(e))) throw e; } },
-    () => { const l = document.getElementById('history-sessions-list'); if (l) l.innerHTML = ''; });
+    () => { const l = document.getElementById('history-sessions-list'); if (l) l.innerHTML = ''; const t = document.getElementById('group-table-view'); if (t) { t.replaceChildren(); t.style.display = 'none'; delete t.dataset.drawn; } for (const a of ['data-page', 'data-page-applied']) document.getElementById('agentic-state')?.removeAttribute(a); document.body.removeAttribute('data-dock-page'); }); // a group's name, fired as an action, opens its table (sidebar_groups.js) and so shows a view: the next round starts without it
 
 // ── agent tasks in the board task table ──────────────────────────────
 const tasksMod = await importUi('tasks');

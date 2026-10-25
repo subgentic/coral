@@ -31,8 +31,8 @@ const { setupHubWorld, BASE } = require('./helpers/hub_world');
         // the Chats page's search through the Hub (#6305): the results, the advanced filters, a search that finds nothing
         const histType = text => ev(`(() => { const i = document.getElementById('history-search'); i.focus(); i.value = ${JSON.stringify(text)}; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
         await sc(`${tag}: hub: search results`, async () => { await histType('needle'); await waitFor(`document.querySelectorAll('#chat-search-results .chat-search-hit').length >= 1`, 'search hits', 10000); }, {  expect: `document.querySelectorAll('#chat-search-results .chat-search-hit').length >= 1` });
-        await sc(`${tag}: hub: search, advanced filters`, async () => { await tap('#hf-adv-toggle'); await waitFor(`document.getElementById('hf-advanced').style.display !== 'none'`, 'advanced filters', 5000); }, {  expect: `document.getElementById('hf-advanced').style.display !== 'none'` });
-        await tap('#hf-adv-toggle');
+        await sc(`${tag}: hub: search, advanced filters`, async () => { await tap('[data-pane="history"] [data-display-button]'); await waitFor(`document.getElementById('hf-advanced').checkVisibility()`, 'advanced filters', 5000); }, {  expect: `document.getElementById('hf-advanced').checkVisibility()` });
+        await tap('[data-pane="history"] [data-display-button]');
         await sc(`${tag}: hub: search finds nothing`, async () => { await histType('zzz'); await waitFor(`/No matching chats/.test(document.getElementById('chat-search-results').textContent)`, 'no results', 10000); }, {  expect: `/No matching chats/.test(document.getElementById('chat-search-results').textContent)` });
         await histType(''); await waitFor(`!document.getElementById('history-sessions-list').hidden`, 'the chat list again', 10000);
         await sc(`${tag}: hub: chat transcript`, async () => { await tap('#history-sessions-list [data-on-click="history-open"]'); await waitFor(`document.getElementById('history-messages').textContent.includes('needle from')`, 'chat'); });

@@ -19,8 +19,8 @@ const { DATA_WORLD } = require('./helpers/census_world');
             await waitFor(`document.getElementById('history-sessions-list').textContent.includes('Release notes chat')`, `${tag}: the chats`, 10000);
 
             // the advanced filters
-            await ev(`document.getElementById('hf-adv-toggle').click(); true`);
-            await waitFor(`document.getElementById('hf-advanced').style.display !== 'none'`, `${tag}: advanced filters`, 5000);
+            await ev(`(() => { const b = document.querySelector('[data-pane="history"] [data-display-button]'); if (b.getAttribute('aria-expanded') !== 'true') b.click(); return true; })()`); // the advanced filters are in Display options (#7443)
+            await waitFor(`document.getElementById('hf-advanced').checkVisibility()`, `${tag}: advanced filters`, 5000);
             const f = await ev(`(() => {
                 const name = e => { const l = e.getAttribute('aria-labelledby'); if (l) return l.split(' ').map(i => (document.getElementById(i) || {}).textContent || '').join(' ').trim(); if (e.getAttribute('aria-label')) return e.getAttribute('aria-label'); return e.labels && e.labels.length ? [...e.labels].map(x => x.textContent).join(' ').trim() : ''; };
                 const adv = document.getElementById('hf-advanced');
@@ -45,7 +45,7 @@ const { DATA_WORLD } = require('./helpers/census_world');
             const stray = await ev(`['data-mode', 'data-source', 'data-logic', 'data-chat-type'].map(a => { const b = document.getElementById('qa-stray-' + a); return { a, pressed: b.getAttribute('aria-pressed'), active: b.classList.contains('active') }; })`);
             assert.deepEqual(stray.filter(x => x.pressed !== null || x.active), [], `${tag}: a button outside the filters with the same data attribute is not touched: ${JSON.stringify(stray)}`);
             await ev(`for (const e of document.querySelectorAll('[id^="qa-stray-"]')) e.remove(); document.querySelector('.hf-toggle[data-mode="or"]').click(); document.querySelector('.hf-toggle[data-source="all"]').click(); document.querySelector('.hf-toggle[data-logic="AND"]').click(); document.querySelector('.hf-toggle[data-chat-type="all"]').click(); true`);
-            await ev(`document.querySelector('[data-source="claude"]').click(); document.getElementById('hf-adv-toggle').click(); true`);
+            await ev(`document.querySelector('[data-source="claude"]').click(); document.querySelector('[data-pane="history"] [data-display-button]').click(); true`);
 
             // the results
             await typeSearch('release');

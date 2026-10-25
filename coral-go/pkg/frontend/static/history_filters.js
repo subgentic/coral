@@ -2,10 +2,11 @@
 import { refreshHistorySource } from './history_source_ui.js';
 import { setHistoryPage, getHistoryPage } from './history_state.js';
 import { loadHistorySessionsPaged } from './api.js';
-import { filterState, serializeToUrl, countActiveFilters, hasActiveFilters, resetFilters } from './search_filters.js';
+import { filterState, serializeToUrl, countActiveFilters, resetFilters } from './search_filters.js';
 import { loadAllTags } from './tags.js';
 import { escapeHtml } from './utils.js';
 import { loadChatSearch } from './lazy_panels.js';
+import { setChatsGroupBy, syncGroupByButtons } from './history_list.js';
 
 let filterGeneration = 0;
 
@@ -84,8 +85,10 @@ function updateFilterBadge() {
     const badge = document.getElementById('hf-active-count');
     if (!badge) return;
     const n = countActiveFilters();
-    badge.textContent = String(n);
-    badge.style.display = n > 0 ? '' : 'none';
+    // The Display options button's dot (the Agents list's own: no count, a name that says how many are on)
+    badge.hidden = n === 0;
+    const button = badge.closest('[data-display-button]');
+    if (button) button.setAttribute('aria-label', n ? `Display options, ${n} filter${n === 1 ? '' : 's'} on` : 'Display options');
 }
 
 export function syncFilterDomToState() {
@@ -118,11 +121,6 @@ export function syncFilterDomToState() {
     document.querySelectorAll('.hf-toggle[data-mode]').forEach(b =>
         setToggle(b, b.dataset.mode === filterState.ftsMode));
 
-    if (hasActiveFilters()) {
-        const panel = document.getElementById('hf-advanced');
-        if (panel) panel.style.display = '';
-    }
-
     const ftsModeRow = document.getElementById('hf-fts-mode-row');
     if (ftsModeRow) ftsModeRow.style.display = filterState.q ? '' : 'none';
 
@@ -151,14 +149,9 @@ export function wireHistoryFilters() {
         });
     }
 
-    // Advanced panel toggle
-    const advToggle = document.getElementById('hf-adv-toggle');
-    if (advToggle) {
-        advToggle.addEventListener('click', () => {
-            const panel = document.getElementById('hf-advanced');
-            if (panel) panel.style.display = panel.style.display === 'none' ? '' : 'none';
-        });
-    }
+    // Group by (Display options): the list's groups are the days, or the agents
+    syncGroupByButtons();
+    document.querySelectorAll('.hf-toggle[data-chat-group]').forEach(btn => btn.addEventListener('click', () => setChatsGroupBy(btn.dataset.chatGroup)));
 
     // FTS mode buttons
     document.querySelectorAll('.hf-toggle[data-mode]').forEach(btn => {

@@ -1,7 +1,7 @@
 {
   "agent_config_form.js": 4,
   "agent_notes.js": 4,
-  "app.js": 11,
+  "app.js": 5,
   "app_wiring.js": 3,
   "artifact_download.js": 1,
   "board_chat.js": 11,
@@ -19,7 +19,7 @@
   "dom_write.js": 1,
   "editions.js": 3,
   "history_changes.js": 2,
-  "history_filters.js": 7,
+  "history_filters.js": 4,
   "info_dialog.js": 10,
   "launch_core.js": 5,
   "launch_dialog.js": 8,

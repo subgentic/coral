@@ -10,6 +10,8 @@ import { getCachedAgentAvailability } from './team_availability.js';
 import { whenText } from './when_text.js';
 import { renderTranscript } from './live_chat.js';
 import { historyLabel } from './history_label.js';
+import { browserLocal } from './safe_storage.js';
+import { registerGroupSource, groupHeaderHtml, isGroupFolded, syncPaneGroupToggle, refreshGroupTable } from './sidebar_groups.js';
 
 
 /** The usual branches say nothing: only another one is worth a word in a row. */
@@ -36,6 +38,127 @@ export function chatWhen(iso, durationSec, now = new Date()) {
     return { day: whenText(iso, now), iso: d.toISOString(), full: d.toLocaleString(), ran: ranFor(durationSec) };
 }
 
+/** One chat's row in the list. */
+function chatRowHtml(s) {
+    const isGroup = s.type === 'group' || (s.session_id && s.session_id.startsWith('board:'));
+    if (isGroup) {
+        const projectName = s.title || s.session_id.replace(/^board:/, '');
+        const label = projectName;
+        const isActive = state.currentSession && state.currentSession.type === "board" && state.currentSession.name === projectName;
+        const gwhen = chatWhen(s.updated_at, null);
+        const gWhenTag = gwhen ? `<span class="session-time"><time datetime="${escapeAttr(gwhen.iso)}" title="${escapeAttr(gwhen.full)}">${escapeHtml(gwhen.day)}</time></span>` : '';
+        const countInfo = s.message_count != null ? `<span class="session-meta">${escapeHtml(`${s.message_count} msgs`)}</span>` : "";
+        const subsInfo = s.subscriber_count != null ? `<span class="session-meta">${escapeHtml(`${s.subscriber_count} members`)}</span>` : "";
+        // laid out as a chat row (#6961): the title and its Group badge, then one line of facts: how many messages and members, and when
+        const gfacts = [countInfo, subsInfo, gWhenTag].filter(Boolean).join('<span class="chat-sep" aria-hidden="true"> · </span>');
+        return `<li class="${escapeAttr(isActive ? 'active' : '')}" data-on-click="board-open" data-board="${escapeAttr(identityKey(historyServer(), projectName))}"><button type="button" class="row-btn"${isActive ? ' aria-current="true"' : ''}>
+            <div class="session-row-mid chat-row-title"><span class="session-label" title="${escapeHtml(label)}">${escapeHtml(label)}</span><span class="badge board-badge">Group</span></div>
+            ${gfacts ? `<div class="session-row-bottom chat-row-facts">${gfacts}</div>` : ""}
+        </button></li>`;
+    }
+    const label = historyLabel(s);
+    const isActive = state.currentSession && state.currentSession.type === "history" && state.currentSession.name === s.session_id;
+    // A chat is its title, then one line of facts: who, which branch (not the usual one), when, and how long it ran (#6580). The provider is a badge only where it is not Claude.
+    const typeTag = providerBadge(s.source_type);
+    const agentName = s.display_name || s.agent_name || "";
+    const agentTag = agentName ? `<span class="sidebar-agent-name">${escapeHtml(agentName)}</span>` : "";
+    const reminderTag = getCachedAgentAvailability(s)?.reminder
+        ? `<span class="agent-reminder-icon" title="Periodic reminder active" aria-label="Periodic reminder active">⏰</span>`
+        : "";
+    const branchTag = unusualBranch(s.branch) ? `<span class="sidebar-branch">${escapeHtml(s.branch)}</span>` : "";
+    const tagDots = s.tags ? renderSidebarTagDots(s.tags) : "";
+    const when = chatWhen(s.last_timestamp, s.duration_sec);
+    const whenTag = when ? `<span class="session-time"><time datetime="${escapeAttr(when.iso)}" title="${escapeAttr(when.full)}">${escapeHtml(when.day)}</time>${when.ran ? `, ${escapeHtml(when.ran)}` : ''}</span>` : '';
+    const noWhen = !when ? '<span class="session-time">date unknown</span>' : '';
+    const facts = [agentTag, branchTag, whenTag || noWhen].filter(Boolean).join('<span class="chat-sep" aria-hidden="true"> · </span>');
+    return `<li class="${escapeAttr(isActive ? 'active' : '')}" data-on-click="history-open" data-session-id="${escapeAttr(s.session_id)}"><button type="button" class="row-btn"${isActive ? ' aria-current="true"' : ''}>
+        <div class="session-row-mid chat-row-title"><span class="session-label" title="${escapeHtml(label)}">${escapeHtml(label)}</span>${typeTag}${tagDots}${reminderTag}</div>
+        ${facts ? `<div class="session-row-bottom chat-row-facts">${facts}</div>` : ""}
+    </button></li>`;
+}
+
+// ── Groups (#7443): the list is grouped by day (the default) or by agent; a group's name opens it as a table in the centre, its chevron folds it ──
+
+const GROUP_BY_KEY = 'coral-chats-group-by';
+export function chatsGroupBy() { return browserLocal.get(GROUP_BY_KEY) === 'agent' ? 'agent' : 'day'; }
+export function setChatsGroupBy(by) {
+    browserLocal.set(GROUP_BY_KEY, by === 'agent' ? 'agent' : 'day');
+    syncGroupByButtons();
+    redrawHistoryGroups();
+}
+export function syncGroupByButtons() {
+    const by = chatsGroupBy();
+    for (const b of document.querySelectorAll('.hf-toggle[data-chat-group]')) { b.classList.toggle('active', b.dataset.chatGroup === by); b.setAttribute('aria-pressed', String(b.dataset.chatGroup === by)); }
+}
+
+const isGroupChat = s => s.type === 'group' || (s.session_id && s.session_id.startsWith('board:'));
+const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** The day a chat last spoke, as a group: its sortable key and its name (Today, Yesterday, "Oct 17", with the year when it is not this one). */
+export function dayGroup(iso, now = new Date()) {
+    const d = new Date(iso);
+    if (!iso || isNaN(d)) return { key: 'unknown', label: 'Date unknown' };
+    const day0 = x => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+    const days = Math.round((day0(now) - day0(d)) / 86400000);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    if (days === 0) return { key, label: 'Today' };
+    if (days === 1) return { key, label: 'Yesterday' };
+    return { key, label: `${MONTHS_SHORT[d.getMonth()]} ${d.getDate()}${d.getFullYear() !== now.getFullYear() ? `, ${d.getFullYear()}` : ''}` };
+}
+
+function groupOfChat(s) {
+    if (chatsGroupBy() === 'agent') {
+        if (isGroupChat(s)) return { key: 'group-chats', label: 'Group chats' };
+        const name = s.display_name || s.agent_name || '';
+        return name ? { key: 'agent:' + name, label: name } : { key: 'no-agent', label: 'No agent' };
+    }
+    return dayGroup(isGroupChat(s) ? s.updated_at : s.last_timestamp);
+}
+
+/** The chats of the page, in the order they came, as groups. */
+function chatGroups(sessions) {
+    const groups = [], at = new Map();
+    for (const s of sessions) {
+        const g = groupOfChat(s);
+        if (!at.has(g.key)) { at.set(g.key, groups.length); groups.push({ ...g, sessions: [] }); }
+        groups[at.get(g.key)].sessions.push(s);
+    }
+    return groups;
+}
+
+let drawn = []; // the groups as last drawn
+function drawHistoryGroups(list, sessions) {
+    drawn = chatGroups(sessions);
+    list.innerHTML = drawn.map(g => groupHeaderHtml('history', g.key, g.label, g.sessions.length)
+        + (isGroupFolded('history', g.key) ? '' : g.sessions.map(chatRowHtml).join(''))).join('');
+    syncPaneGroupToggle('history');
+    refreshGroupTable('history');
+}
+
+function redrawHistoryGroups() {
+    const list = document.getElementById('history-sessions-list');
+    if (list && state.historySessionsList?.length) drawHistoryGroups(list, state.historySessionsList);
+}
+
+function chatTableRow(s) {
+    if (isGroupChat(s)) {
+        const name = s.title || s.session_id.replace(/^board:/, '');
+        const when = chatWhen(s.updated_at, null);
+        return { title: name, action: 'board-open', data: { board: identityKey(historyServer(), name) }, cells: ['Group chat', when ? when.day : ''] };
+    }
+    const when = chatWhen(s.last_timestamp, s.duration_sec);
+    return { title: historyLabel(s), action: 'history-open', data: { 'session-id': s.session_id }, cells: [s.display_name || s.agent_name || '', when ? when.day : ''] };
+}
+
+registerGroupSource('history', {
+    keys: () => drawn.map(g => g.key),
+    redraw: redrawHistoryGroups,
+    table: key => { const g = drawn.find(x => x.key === key); return g ? { title: g.label, columns: ['Chat', 'Agent', 'When'], rows: g.sessions.map(chatTableRow) } : null; },
+    isEmpty: () => document.getElementById('chats-empty-view')?.style.display === 'flex' && document.body.getAttribute('data-nav-tab') === 'history',
+    showList: () => window.switchNavTab?.('history'),
+    empty: () => window.switchNavTab?.('history'),
+});
+
 export function renderHistorySessions(sessions, total, page, pageSize) {
     const list = document.getElementById("history-sessions-list");
     state.historySessionsList = sessions || [];
@@ -43,48 +166,15 @@ export function renderHistorySessions(sessions, total, page, pageSize) {
     updateSectionVisibility('history', total || (sessions ? sessions.length : 0));
 
     if (!sessions || !sessions.length) {
+        drawn = [];
         list.innerHTML = '<li class="empty-state">No history found</li>';
+        syncPaneGroupToggle('history');
+        refreshGroupTable('history');
         renderPaginationControls(0, 1, 50);
         return;
     }
 
-    list.innerHTML = sessions.map(s => {
-        const isGroup = s.type === 'group' || (s.session_id && s.session_id.startsWith('board:'));
-        if (isGroup) {
-            const projectName = s.title || s.session_id.replace(/^board:/, '');
-            const label = projectName;
-            const isActive = state.currentSession && state.currentSession.type === "board" && state.currentSession.name === projectName;
-            const gwhen = chatWhen(s.updated_at, null);
-            const gWhenTag = gwhen ? `<span class="session-time"><time datetime="${escapeAttr(gwhen.iso)}" title="${escapeAttr(gwhen.full)}">${escapeHtml(gwhen.day)}</time></span>` : '';
-            const countInfo = s.message_count != null ? `<span class="session-meta">${escapeHtml(`${s.message_count} msgs`)}</span>` : "";
-            const subsInfo = s.subscriber_count != null ? `<span class="session-meta">${escapeHtml(`${s.subscriber_count} members`)}</span>` : "";
-            // laid out as a chat row (#6961): the title and its Group badge, then one line of facts: how many messages and members, and when
-            const gfacts = [countInfo, subsInfo, gWhenTag].filter(Boolean).join('<span class="chat-sep" aria-hidden="true"> · </span>');
-            return `<li class="${escapeAttr(isActive ? 'active' : '')}" data-on-click="board-open" data-board="${escapeAttr(identityKey(historyServer(), projectName))}"><button type="button" class="row-btn"${isActive ? ' aria-current="true"' : ''}>
-                <div class="session-row-mid chat-row-title"><span class="session-label" title="${escapeHtml(label)}">${escapeHtml(label)}</span><span class="badge board-badge">Group</span></div>
-                ${gfacts ? `<div class="session-row-bottom chat-row-facts">${gfacts}</div>` : ""}
-            </button></li>`;
-        }
-        const label = historyLabel(s);
-        const isActive = state.currentSession && state.currentSession.type === "history" && state.currentSession.name === s.session_id;
-        // A chat is its title, then one line of facts: who, which branch (not the usual one), when, and how long it ran (#6580). The provider is a badge only where it is not Claude.
-        const typeTag = providerBadge(s.source_type);
-        const agentName = s.display_name || s.agent_name || "";
-        const agentTag = agentName ? `<span class="sidebar-agent-name">${escapeHtml(agentName)}</span>` : "";
-        const reminderTag = getCachedAgentAvailability(s)?.reminder
-            ? `<span class="agent-reminder-icon" title="Periodic reminder active" aria-label="Periodic reminder active">⏰</span>`
-            : "";
-        const branchTag = unusualBranch(s.branch) ? `<span class="sidebar-branch">${escapeHtml(s.branch)}</span>` : "";
-        const tagDots = s.tags ? renderSidebarTagDots(s.tags) : "";
-        const when = chatWhen(s.last_timestamp, s.duration_sec);
-        const whenTag = when ? `<span class="session-time"><time datetime="${escapeAttr(when.iso)}" title="${escapeAttr(when.full)}">${escapeHtml(when.day)}</time>${when.ran ? `, ${escapeHtml(when.ran)}` : ''}</span>` : '';
-        const noWhen = !when ? '<span class="session-time">date unknown</span>' : '';
-        const facts = [agentTag, branchTag, whenTag || noWhen].filter(Boolean).join('<span class="chat-sep" aria-hidden="true"> · </span>');
-        return `<li class="${escapeAttr(isActive ? 'active' : '')}" data-on-click="history-open" data-session-id="${escapeAttr(s.session_id)}"><button type="button" class="row-btn"${isActive ? ' aria-current="true"' : ''}>
-            <div class="session-row-mid chat-row-title"><span class="session-label" title="${escapeHtml(label)}">${escapeHtml(label)}</span>${typeTag}${tagDots}${reminderTag}</div>
-            ${facts ? `<div class="session-row-bottom chat-row-facts">${facts}</div>` : ""}
-        </button></li>`;
-    }).join("");
+    drawHistoryGroups(list, sessions);
 
     if (total !== undefined) {
         renderPaginationControls(total, page || 1, pageSize || 50);

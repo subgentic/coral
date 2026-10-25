@@ -20,7 +20,7 @@
     transition: background 0.15s ease, box-shadow 0.15s ease;
 }
 
-#history-sessions-list li {
+#history-sessions-list li:not(.session-group-header) { /* a group's header is a row (chevron, name, count), not a chat's column (#7443) */
     display: flex;
     flex-direction: column;
     gap: 2px;

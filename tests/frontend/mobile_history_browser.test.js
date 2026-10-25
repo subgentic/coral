@@ -42,7 +42,7 @@ const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
         await waitFor(`document.getElementById('history-session-view').checkVisibility() && document.getElementById('history-messages').textContent.includes('needle')`, 'list row opens transcript');
         await ev(`document.querySelector('.mobile-history-back').click();true`);
         await waitFor(`document.getElementById('history-search').checkVisibility()`, 'Chats returns from list selection');
-        await ev(`window.__historySection=document.querySelector('[data-section="history"]'); document.getElementById('hf-adv-toggle').click(); true`);
+        await ev(`window.__historySection=document.querySelector('[data-section="history"]'); (() => { const b = document.querySelector('[data-pane="history"] [data-display-button]'); if (b.getAttribute('aria-expanded') !== 'true') b.click(); })(); true`); // Display options holds the advanced filters (#7443)
         assert.ok(await ev(`document.getElementById('hf-advanced').checkVisibility()`), 'advanced filters reachable');
         await ev(`document.querySelector('[data-chat-type="agent"]').click();document.getElementById('history-search').value='needle';document.getElementById('history-search').dispatchEvent(new Event('input',{bubbles:true}));true`);
         await waitFor(`document.querySelector('.chat-search-hit') && window.__historyRequests.some(q=>q.includes('needle'))`, 'search from phone input');

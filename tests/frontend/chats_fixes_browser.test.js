@@ -32,6 +32,11 @@ const S = `(window.__coralStatic || '/static/')`;
             await ev(`window.switchNavTab('history'); true`); await sleep(800); // sleep-ok: the list draws after the tab opens
             await ev(`(async () => { const m = await import(${S} + 'history_list.js'); if (m.loadHistorySessions) await m.loadHistorySessions(); return true; })().catch(() => true)`);
             await waitFor(`document.querySelectorAll('#history-sessions-list li[data-session-id]').length === 3`, 'three chats', 10000);
+            // On a wide screen the tab opens on its first group's table (#7443): the empty pane is what shows with no chat and no group, so it is put on screen here to be measured
+            if (!mobile) {
+                assert.ok(await ev(`document.getElementById('group-table-view').checkVisibility() && !!document.querySelector('#group-table-view table.group-table')`), `${tag}: the Chats tab opens on its first group's table`);
+                await ev(`(async () => { const u = await import(${S} + 'utils.js'); u.showView('chats-empty-view'); return true; })()`);
+            }
             // the empty pane
             const empty = await ev(`(() => { const v = document.getElementById('chats-empty-view'); const h = v && v.querySelector('h1'); if (!h || !h.getClientRects().length) return null; const root = parseFloat(getComputedStyle(document.documentElement).fontSize); return { ratio: parseFloat(getComputedStyle(h).fontSize) / root, color: getComputedStyle(h).color, primary: getComputedStyle(document.body).color }; })()`);
             if (!mobile) { assert.ok(empty && empty.ratio <= 1.25 && empty.color !== empty.primary, `${tag}: the empty pane's hint is a small grey line: ` + JSON.stringify(empty)); }

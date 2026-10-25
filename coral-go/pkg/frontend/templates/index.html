@@ -350,13 +350,13 @@
 
             {{ template "includes/views/history_session.html" . }}
 
+            <!-- A sidebar group opened as a table (sidebar_groups.js, #7443) -->
+            <div id="group-table-view" style="display:none" class="group-table-view"></div>
+
             <!-- Scheduler Job Detail View -->
             <div id="scheduler-view" style="display:none" class="scheduler-view">
                 <div class="sched-view-header" id="sched-view-header">
                     <h2>Jobs</h2>
-                    <button class="btn btn-sm btn-primary" data-on-click="job-new">
-                        <span class="material-icons" style="font-size:1rem" aria-hidden="true">add</span> New Job
-                    </button>
                 </div>
                 <div id="mobile-jobs-list"></div>
                 <div id="scheduler-detail"><p class="sched-empty-hint">Choose a job in the list to see what it does and how its runs went.</p></div>

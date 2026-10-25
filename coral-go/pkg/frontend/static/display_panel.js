@@ -12,11 +12,14 @@ export const DISPLAY_PANEL_OPEN = 'coral:display-panel-open';
 
 const KEY = 'coral_display_panel_open';
 
-/** The elements the Display expander is made of, found inside the two headers that hold it (the sidebar's and the phone's), not by an attribute selector over the whole
- *  page: the list's render asks for them every time, and the page (with a long chat in it) has thousands of nodes (#4990). */
+/** Every header that holds a Display expander: each tab's sidebar header (#7443) and the phone's. */
+function allHeaders() { return [...document.getElementsByClassName('sidebar-header'), ...document.getElementsByClassName('mobile-list-header')]; }
+
+/** The elements of the AGENT list's header (the sidebar's Agents pane and the phone's), found inside the headers, not by an attribute selector over the whole
+ *  page: the list's render asks for them every time, and the page (with a long chat in it) has thousands of nodes (#4990). The other tabs' headers (data-header) are not the agent list's. */
 export function inListHeaders(selector) {
     const out = [];
-    for (const h of [...document.getElementsByClassName('sidebar-header'), ...document.getElementsByClassName('mobile-list-header')]) out.push(...h.querySelectorAll(selector));
+    for (const h of allHeaders()) if (!h.dataset.header || h.dataset.header === 'agents') out.push(...h.querySelectorAll(selector));
     return out;
 }
 
@@ -26,8 +29,10 @@ export function isDisplayPanelOpen() { return browserLocal.get(KEY) === '1'; }
  *  looked for inside its own header (the sidebar's and the phone's), never over the whole page: this runs on every list render (#4985's budget). */
 export function syncDisplayPanels() {
     const open = isDisplayPanelOpen();
-    for (const b of inListHeaders('[data-display-button]')) setAttr(b, 'aria-expanded', open);
-    for (const p of inListHeaders('[data-display-panel]')) setHidden(p, !open);
+    for (const h of allHeaders()) {
+        for (const b of h.querySelectorAll('[data-display-button]')) setAttr(b, 'aria-expanded', open);
+        for (const p of h.querySelectorAll('[data-display-panel]')) setHidden(p, !open);
+    }
 }
 
 export function toggleDisplayPanel(button) {
@@ -36,7 +41,7 @@ export function toggleDisplayPanel(button) {
     syncDisplayPanels();
     if (open) document.dispatchEvent(new Event(DISPLAY_PANEL_OPEN));
     // Opening puts the keyboard in the panel's first control; closing leaves it on the button that was used.
-    if (open) document.querySelector((button?.closest('.mobile-list-header') ? '.mobile-list-header' : '.sidebar-header') + ' [data-display-panel] :is(select, input):not([hidden])')?.focus();
+    if (open) button?.closest('.sidebar-header, .mobile-list-header')?.querySelector('[data-display-panel] :is(select, input, button):not([hidden])')?.focus();
 }
 
 /** Escape inside the panel closes it and returns to its button. */

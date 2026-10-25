@@ -311,8 +311,19 @@ export function toggleAgenticPanel(forceState) {
 }
 
 
-/* Collapse the agent sidebar to an icon rail (avatars rendered by render.js). */
-const RAIL_KEY = 'coral-sidebar-collapsed-rail';
+/* The sidebar's panes (#7443): one pane per tab (header, list, pinned action), shown for the tab on screen. The header's parts and the 56 px rail are the same on every tab;
+ * what differs is what the search is for, whether the tab has Display options and groups, and its one pinned action. Hide turns the column into the rail; the choice is the
+ * tab's own, kept in this browser. */
+export const SIDEBAR_PANES = {
+    agents: { search: 'Search agents', action: { name: 'launch-show', label: 'New agent' } },
+    history: { search: 'Search chats', action: null },
+    jobs: { search: 'Search jobs', action: { name: 'job-new', label: 'New job' } },
+    docs: { search: null, action: null },
+};
+
+const RAIL_KEY = 'coral-sidebar-collapsed-rail'; // the Agents tab's (its name from before the other tabs had one)
+const railKey = pane => pane === 'agents' ? RAIL_KEY : `${RAIL_KEY}-${pane}`;
+let currentPane = 'agents';
 
 function applyRail(collapsed) {
     document.querySelector('.layout')?.classList.toggle('sidebar-collapsed', collapsed);
@@ -320,14 +331,45 @@ function applyRail(collapsed) {
     requestAnimationFrame(() => fitTerminal?.());
 }
 
+function readRail(pane) {
+    try { return browserLocal.get(railKey(pane)) === '1'; } catch { return false; /* storage unavailable */ }
+}
+
+/** Shows the pane of the tab that was opened (none for a tab that has no sidebar) and gives the rail that tab's search and action. */
+export function showSidebarPane(tab) {
+    const pane = SIDEBAR_PANES[tab] ? tab : null;
+    currentPane = pane || currentPane;
+    const layout = document.querySelector('.layout');
+    for (const el of document.querySelectorAll('.sidebar-pane[data-pane]')) el.hidden = el.dataset.pane !== pane;
+    if (!pane || !layout) return;
+    if (layout.dataset.sidebarPane !== pane) layout.dataset.sidebarPane = pane;
+    const cfg = SIDEBAR_PANES[pane];
+    const search = document.getElementById('sidebar-rail-search');
+    if (search) {
+        search.hidden = !cfg.search;
+        if (cfg.search) { search.title = cfg.search; search.setAttribute('aria-label', cfg.search); }
+    }
+    const add = document.getElementById('sidebar-rail-new');
+    if (add) {
+        add.hidden = !cfg.action;
+        if (cfg.action) { add.title = cfg.action.label; add.setAttribute('aria-label', cfg.action.label); add.setAttribute('data-on-click', cfg.action.name); }
+    }
+    const collapsed = readRail(pane);
+    if (layout.classList.contains('sidebar-collapsed') !== collapsed) applyRail(collapsed);
+}
+
 export function toggleSidebarRail() {
     const collapsed = !document.querySelector('.layout')?.classList.contains('sidebar-collapsed');
-    try { browserLocal.set(RAIL_KEY, collapsed ? '1' : '0'); } catch { /* storage unavailable */ }
+    try { browserLocal.set(railKey(currentPane), collapsed ? '1' : '0'); } catch { /* storage unavailable */ }
     applyRail(collapsed);
 }
 
 export function initSidebarRail() {
-    let collapsed = false;
-    try { collapsed = browserLocal.get(RAIL_KEY) === '1'; } catch { /* storage unavailable */ }
-    if (collapsed) applyRail(true);
+    if (readRail(currentPane)) applyRail(true);
+}
+
+/** The search of the pane on screen: opens the column first when it is the rail. */
+export function focusSidebarSearch() {
+    if (document.querySelector('.layout')?.classList.contains('sidebar-collapsed')) toggleSidebarRail();
+    document.querySelector('.sidebar-pane:not([hidden]) .sidebar-search-input')?.focus();
 }
