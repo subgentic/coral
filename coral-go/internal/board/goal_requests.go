@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -38,6 +39,19 @@ const (
 	GoalRequestDeclined  = "declined"
 	GoalRequestExpired   = "expired"
 )
+
+// GoalRequestStates are the CLOSED lists of a request's state words (the frozen API, #7411): what the receiver's row says, and what the asker's row says. Nothing else is ever written to a status
+// column (the tables' CHECK constraints hold the same words), and the Hub reads these and no others.
+var (
+	GoalRequestReceiverStates = []string{GoalRequestPending, GoalRequestAccepted, GoalRequestDeclined, GoalRequestExpired}
+	GoalRequestAskerStates    = []string{GoalRequestRequested, GoalRequestAccepted, GoalRequestDeclined, GoalRequestExpired}
+)
+
+// goalRequestIDRe is the one form of a request id: Coral makes exactly 32 lower-case hex digits, and every end that takes one (the read, a reply, the relay's receive path) holds it to that.
+var goalRequestIDRe = regexp.MustCompile(`^[0-9a-f]{32}$`)
+
+// ValidGoalRequestID reports whether id is a request id: exactly 32 lower-case hexadecimal digits.
+func ValidGoalRequestID(id string) bool { return goalRequestIDRe.MatchString(id) }
 
 // GoalRequestError is a refusal with a stable code.
 type GoalRequestError struct{ Code, Message string }
@@ -128,8 +142,11 @@ func (s *Store) ensureGoalRequestsSchema(ctx context.Context) error {
 			created_at  TEXT NOT NULL,
 			answered_at TEXT
 		)`,
-		// The key of a request is per sender: one sender can never suppress another sender's request by choosing its id.
-		`CREATE UNIQUE INDEX IF NOT EXISTS idx_goal_requests_in_sender ON board_goal_requests_in(from_server, request_id)`,
+		// The key of a received request is (receiving board, sender server, sender board, request id) (#7411): one sender can never suppress another sender's request by choosing its id, and two boards of
+		// one sender cannot either. (The first form of this index, (from_server, request_id), is dropped below.)
+		`DROP INDEX IF EXISTS idx_goal_requests_in_sender`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_goal_requests_in_key ON board_goal_requests_in(board_id, from_server, from_board, request_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_goal_requests_in_lookup ON board_goal_requests_in(from_server, from_board, request_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_goal_requests_in_board ON board_goal_requests_in(board_id, status, id)`,
 		// A goal's request rows move the board's goal counter (the Goals view refreshes on it): the asker's own, when one is made or answered.
 		`CREATE TRIGGER IF NOT EXISTS board_goal_requests_out_seq_insert AFTER INSERT ON board_goal_requests_out BEGIN ` + fmt.Sprintf(goalSeqBump, "NEW.board_id") + ` END`,
@@ -144,13 +161,26 @@ func (s *Store) ensureGoalRequestsSchema(ctx context.Context) error {
 		"ALTER TABLE board_tasks ADD COLUMN remote_board_uid TEXT",
 		"ALTER TABLE board_tasks ADD COLUMN remote_goal_uid TEXT",
 		"ALTER TABLE board_tasks ADD COLUMN request_id TEXT",
+		"ALTER TABLE board_tasks ADD COLUMN request_server TEXT",
+		"ALTER TABLE board_tasks ADD COLUMN request_board TEXT",
 	} {
 		if _, err := s.db.ExecContext(ctx, ddl); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 			return err
 		}
 	}
-	// One task per request, whatever races: a second accept of the same request cannot insert a second task.
-	_, err := s.db.ExecContext(ctx, `CREATE UNIQUE INDEX IF NOT EXISTS idx_board_tasks_request ON board_tasks(request_id) WHERE request_id IS NOT NULL`)
+	// A task made for a request carries who sent it (#7411, Security's MUST 2): the sender's server and board next to the request id, so two senders that use one id cannot meet in a task. Tasks made
+	// before this took their sender from the received row they were made for.
+	if _, err := s.db.ExecContext(ctx, `UPDATE board_tasks SET
+			request_server = (SELECT r.from_server FROM board_goal_requests_in r WHERE r.board_id = board_tasks.board_id AND r.request_id = board_tasks.request_id LIMIT 1),
+			request_board = (SELECT r.from_board FROM board_goal_requests_in r WHERE r.board_id = board_tasks.board_id AND r.request_id = board_tasks.request_id LIMIT 1)
+		WHERE request_id IS NOT NULL AND request_board IS NULL`); err != nil {
+		return err
+	}
+	// One task per request, whatever races: a second accept of the same request (the same receiver, sender server, sender board and id) cannot insert a second task.
+	if _, err := s.db.ExecContext(ctx, `DROP INDEX IF EXISTS idx_board_tasks_request`); err != nil {
+		return err
+	}
+	_, err := s.db.ExecContext(ctx, `CREATE UNIQUE INDEX IF NOT EXISTS idx_board_tasks_request_key ON board_tasks(board_id, request_server, request_board, request_id) WHERE request_id IS NOT NULL`)
 	return err
 }
 
@@ -191,8 +221,10 @@ func (s *Store) expireGoalRequests(ctx context.Context, q sqlExecer) error {
 // reconcileAcceptedRequests marks a pending request accepted when a task made for it exists (a crash between the task and the mark leaves exactly that).
 func (s *Store) reconcileAcceptedRequests(ctx context.Context, q sqlExecer) error {
 	_, err := q.ExecContext(ctx, `UPDATE board_goal_requests_in
-		SET status = 'accepted', task_id = (SELECT id FROM board_tasks WHERE request_id = board_goal_requests_in.request_id AND board_id = board_goal_requests_in.board_id), answered_at = COALESCE(answered_at, ?)
-		WHERE status = 'pending' AND EXISTS (SELECT 1 FROM board_tasks WHERE request_id = board_goal_requests_in.request_id AND board_id = board_goal_requests_in.board_id)`, nowUTC())
+		SET status = 'accepted', task_id = (SELECT id FROM board_tasks WHERE request_id = board_goal_requests_in.request_id AND board_id = board_goal_requests_in.board_id
+			AND request_server = board_goal_requests_in.from_server AND request_board = board_goal_requests_in.from_board), answered_at = COALESCE(answered_at, ?)
+		WHERE status = 'pending' AND EXISTS (SELECT 1 FROM board_tasks WHERE request_id = board_goal_requests_in.request_id AND board_id = board_goal_requests_in.board_id
+			AND request_server = board_goal_requests_in.from_server AND request_board = board_goal_requests_in.from_board)`, nowUTC())
 	return err
 }
 
@@ -361,9 +393,9 @@ func (s *Store) AcceptGoalRequest(ctx context.Context, board string, id int64, t
 	if in.FromServer == "" {
 		_ = s.reader().GetContext(ctx, &boardUID, `SELECT board_uid FROM boards WHERE id = ?`, in.FromBoard)
 	}
-	task, err := s.CreateTaskWithOpts(ctx, board, title, body, priority, actor, &CreateTaskOpts{remote: &remoteGoalLink{BoardUID: boardUID.String, GoalUID: in.GoalUID, RequestID: in.RequestID}}, assignee)
+	task, err := s.CreateTaskWithOpts(ctx, board, title, body, priority, actor, &CreateTaskOpts{remote: &remoteGoalLink{BoardUID: boardUID.String, GoalUID: in.GoalUID, RequestID: in.RequestID, Server: in.FromServer, Board: in.FromBoard}}, assignee)
 	if err != nil {
-		if strings.Contains(err.Error(), "UNIQUE constraint failed: board_tasks.request_id") {
+		if strings.Contains(err.Error(), "UNIQUE constraint failed: board_tasks.board_id, board_tasks.request_server") {
 			return nil, nil, ErrGoalRequestAnswered
 		}
 		return nil, nil, err
@@ -390,7 +422,7 @@ func (s *Store) AcceptGoalRequest(ctx context.Context, board string, id int64, t
 // ApplyGoalRequestReply records the other team's answer on the asker's row: only for a request this board made (by its request id), still `requested`, whose target is the board and server
 // the reply came from. The first reply wins and a repeat changes nothing; anything else is not applicable. Nothing of the other team's work comes with it: a status and the reason a decline gave.
 func (s *Store) ApplyGoalRequestReply(ctx context.Context, board, requestID, fromServer, fromBoard, status, reason string) (*GoalRequestOut, error) {
-	if status != GoalRequestAccepted && status != GoalRequestDeclined {
+	if status != GoalRequestAccepted && status != GoalRequestDeclined || !ValidGoalRequestID(requestID) {
 		return nil, ErrGoalRequestReplyUnknown
 	}
 	reason, err := requestText("reason", reason, GoalRequestReasonMax, true)
@@ -452,4 +484,4 @@ func (s *Store) AcceptedGoalRequests(ctx context.Context, board string, goalID i
 }
 
 // remoteGoalLink is the task-side link to a goal of another team (set only by AcceptGoalRequest: nothing a request carries can set it).
-type remoteGoalLink struct{ BoardUID, GoalUID, RequestID string }
+type remoteGoalLink struct{ BoardUID, GoalUID, RequestID, Server, Board string }
