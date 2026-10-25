@@ -498,6 +498,7 @@ func (h *SessionsHandler) agentRow(trace *phaseTrace, agent AgentInfo, lv liveIn
 		"board_unread":          boardUnread,
 		"held_inputs":           ptymanager.HeldCount(tmuxName), // automated sends the gate holds (#3578)
 		"held_since":            heldSinceField(tmuxName),       // when the oldest of them was first held, UTC, null at none (#6503)
+		"held_reason":           heldReasonField(tmuxName),      // why the oldest is held: turn, prompt, dialog, draft, box or other; null at none (#7433)
 		"board_is_orchestrator": boardSubscriberFlag(boardSub),
 		"log_path":              agent.LogPath,
 		"sleeping":              lv.sleeping[sid],
@@ -985,6 +986,14 @@ func (h *SessionsHandler) terminalOfAgent(launchPath string) string {
 func heldSinceField(name string) any {
 	if t := ptymanager.HeldSince(name); !t.IsZero() {
 		return t.UTC().Format(time.RFC3339)
+	}
+	return nil
+}
+
+// heldReasonField is the live row's held_reason: one of ptymanager.HeldReasons, why the oldest held automated send is held, or nil when none is held (#7433).
+func heldReasonField(name string) any {
+	if r := ptymanager.HeldReason(name); r != "" {
+		return r
 	}
 	return nil
 }
