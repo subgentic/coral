@@ -55,15 +55,23 @@ type modelSwitchTracker struct {
 	seq   int64
 	typed sync.Map // session id -> when a switch command was last typed
 	runs  sync.Map // session id -> *sync.Mutex: one switch types at a time, a replaced one finishes before the next starts
+	// allowance is how much older than the command a /model entry in the transcript may be and still count as its confirmation; zero is defaultSwitchClockAllowance. Only a test sets it,
+	// on its own handler before any switch starts (#359).
+	allowance time.Duration
+}
+
+// defaultSwitchClockAllowance is the allowance in production: the transcript's own clock may differ a little from Coral's.
+const defaultSwitchClockAllowance = time.Second
+
+// clockAllowance is the allowance this tracker uses.
+func (t *modelSwitchTracker) clockAllowance() time.Duration {
+	if t.allowance > 0 {
+		return t.allowance
+	}
+	return defaultSwitchClockAllowance
 }
 
 // runLock is the session's lock for typing a switch's commands: a new choice waits for the one it replaced to stop, so two are never typed at once.
-// defaultSwitchClockAllowance is how much older than the command a /model entry in the transcript may be and still count as its confirmation: the transcript's own clock may differ a little.
-const defaultSwitchClockAllowance = time.Second
-
-// switchClockAllowance is defaultSwitchClockAllowance; only a test sets it (shorter, so the "stale entry" case need not sleep past a whole second, #359).
-var switchClockAllowance = defaultSwitchClockAllowance
-
 func (t *modelSwitchTracker) runLock(sessionID string) *sync.Mutex {
 	m, _ := t.runs.LoadOrStore(sessionID, &sync.Mutex{})
 	return m.(*sync.Mutex)
@@ -263,7 +271,7 @@ func (h *SessionsHandler) typeSwitchCommand(ctx context.Context, tm *switchTimin
 			return err
 		}
 	}
-	since := time.Now().Add(-switchClockAllowance)
+	since := time.Now().Add(-h.modelSwitches.clockAllowance())
 	for attempt := 0; attempt < 2; attempt++ {
 		if err := h.deliverHumanSend(ctx, name, agentType, sessionID, command); err != nil {
 			return err
@@ -357,7 +365,7 @@ func (h *SessionsHandler) runModelSwitch(ctx context.Context, seq int64, name, a
 		h.switchFail(sessionID, seq, "The change was cancelled.")
 		return
 	}
-	sent := time.Now().Add(-switchClockAllowance) // the transcript's own clock may differ a little
+	sent := time.Now().Add(-h.modelSwitches.clockAllowance()) // the transcript's own clock may differ a little
 	if setModel {
 		if err := h.typeSwitchCommand(ctx, tm, name, agentType, sessionID, workDir, "/model "+model); err != nil {
 			h.switchFail(sessionID, seq, "Could not type /model into the agent: "+err.Error())
@@ -379,7 +387,7 @@ func (h *SessionsHandler) runModelSwitch(ctx context.Context, seq int64, name, a
 			h.switchFail(sessionID, seq, "The change was cancelled.")
 			return
 		}
-		sent = time.Now().Add(-switchClockAllowance)
+		sent = time.Now().Add(-h.modelSwitches.clockAllowance())
 		if err := h.typeSwitchCommand(ctx, tm, name, agentType, sessionID, workDir, cmd); err != nil {
 			h.switchFail(sessionID, seq, "Could not type /effort into the agent: "+err.Error())
 			return
