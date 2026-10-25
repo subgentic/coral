@@ -13,7 +13,8 @@ const BASE = require('./test_base').BASE;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await ev(`window.__coralReady.then(() => true)`);
-            await ev(`window.showSettingsModal('cleanup'); true`);
+            await ev(`window.showSettingsModal('cleanup').then(() => true)`); // the dialog is shown at the end of this, after awaited requests: the retention field's loaded flag can come first, and its labels have no boxes until the dialog is shown (Windows CI, #7282)
+            await waitFor(`document.getElementById('settings-modal').getClientRects().length > 0`, 'the settings dialog shown', 10000);
             await waitFor(`document.getElementById('settings-retention-days') && document.getElementById('settings-retention-days').dataset.loaded === '1'`, 'automatic cleanup loaded', 10000);
             const tag = `${w} px`;
             const off = await ev(`(() => ({ status: document.getElementById('settings-retention-status').textContent.trim(), kindDisabled: document.getElementById('settings-retention-kind').disabled, days: document.getElementById('settings-retention-days').value }))()`);
