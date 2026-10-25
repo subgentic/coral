@@ -2,6 +2,7 @@ package routes
 
 import (
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -62,7 +63,7 @@ func TestShellRiskHyphenatedProgramNames(t *testing.T) {
 	dir := t.TempDir()
 	for _, c := range []string{`ssh-keygen -l -f key`, `ssh-add -l`, `ts-node x.ts`} {
 		if runtime.GOOS == "windows" {
-			assert.Contains(t, shellRisk(c, dir), "which is not known to only read", "asks on Windows: %s", c)
+			assert.Equal(t, "it runs "+strings.Fields(c)[0]+", which is not known to only read", shellRisk(c, dir), "asks on Windows: %s", c)
 		} else {
 			assert.Empty(t, shellRisk(c, dir), "must pass: %s", c)
 		}
