@@ -189,7 +189,7 @@ export function wireModelPicker(container) {
 // the chosen model's own `efforts` when the catalog lists them (the CLI clamps a level its model does not take, so the form only
 // offers levels it accepts). Hidden when the type takes none. The form's value is `thinkingValue`: undefined until the user chooses or
 // the form is given a level, so a restart that was not asked to change it leaves the agent's level alone.
-const LEVEL_NAMES = { low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Extra high', max: 'Max' };
+const LEVEL_NAMES = { minimal: 'Minimal', low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Extra high', max: 'Max' };
 
 /** The markup of the Thinking select (after the Model label's row). */
 export function thinkingPickerHtml() {

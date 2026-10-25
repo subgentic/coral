@@ -9,10 +9,10 @@ const BUDGET = { chooser: 18, /* +1: the title "New agent or team" (#7064) */ fo
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    // (the "not installed" marks are the machine's words, not the dialog's: left out)
+    // (the "not installed" marks and the "Updating the list..." line under Model are the machine's and a moment's words, not the dialog's: left out)
     const words = () => ev(`(() => { let n = 0; const shown = e => { for (let p = e; p; p = p.parentElement) { const s = getComputedStyle(p); if (s.display === 'none' || s.visibility === 'hidden' || p.hidden || (p.parentElement && p.parentElement.matches('details:not([open])') && p.tagName !== 'SUMMARY')) return false; } return true; };
         const w = document.createTreeWalker(document.getElementById('launch-modal'), NodeFilter.SHOW_TEXT);
-        for (let t = w.nextNode(); t; t = w.nextNode()) { const e = t.parentElement; if (!e || e.closest('script, style, .material-icons, select, option, .launch-agent-missing') || !shown(e)) continue; n += t.nodeValue.trim().split(/\\s+/).filter(Boolean).length; }
+        for (let t = w.nextNode(); t; t = w.nextNode()) { const e = t.parentElement; if (!e || e.closest('script, style, .material-icons, select, option, .launch-agent-missing, .acf-model-note') || !shown(e)) continue; n += t.nodeValue.trim().split(/\\s+/).filter(Boolean).length; }
         return n; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -38,7 +38,7 @@ const BUDGET = { chooser: 18, /* +1: the title "New agent or team" (#7064) */ fo
             assert.ok(n <= BUDGET.persona, `${tag}: New Agent step 2 (the persona) shows ${n} words, budget ${BUDGET.persona}`);
             await ev(`document.getElementById('launch-agent-next').click(); true`);
             await waitFor(`document.getElementById('launch-step-agent').dataset.stage === 'agent'`, `${tag}: step 3`, 8000);
-            await waitFor(`document.getElementById('launch-agent-acf').classList.contains('has-agent-pick')`, `${tag}: the agent choice is built`, 8000); // counted with the agent choice in it, which the CLI probes build when they answer: a runner without the CLIs answers later than a laptop with them
+            await waitFor(`document.getElementById('launch-agent-acf').classList.contains('has-agent-pick')`, `${tag}: the agent choice is built`, 8000);
             n = await words();
             assert.ok(n <= BUDGET.agent, `${tag}: New Agent step 3 (the agent) shows ${n} words, budget ${BUDGET.agent}`);
             const title = await ev(`getComputedStyle(document.querySelector('#launch-agent-acf .settings-pane:not([hidden]) .settings-pane-title')).display`);

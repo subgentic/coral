@@ -4794,7 +4794,7 @@ body:has(#nav-tab-hub-inbox.active) #saved-btn .saved-count { display: none; }
 #launch-modal[data-agent-stage="persona"] .launch-server-row, #launch-modal[data-agent-stage="agent"] .launch-server-row { display: none !important; } /* the machine is a step 1 choice; its row is set by style where it is drawn (launch_dialog.js) */
 .launch-field-head { display: flex; align-items: baseline; gap: 8px; margin: 0 0 6px; font-size: .875rem; font-weight: 600; }
 .launch-field-head label, .launch-field-head span:first-child { margin: 0; }
-.launch-required { color: var(--warning-text, var(--warning)); font-size: .6875rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.launch-required { color: var(--warning-text, var(--warning)); font-size: .6875rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
 .launch-optional { color: var(--text-secondary); font-size: .75rem; font-weight: 400; }
 .launch-recent-label { align-self: center; color: var(--text-secondary); font-size: .8125rem; }
 .launch-next-line { margin: 18px 0 0; }
@@ -4826,14 +4826,14 @@ body:has(#nav-tab-hub-inbox.active) #saved-btn .saved-count { display: none; }
 #launch-agent-pick .launch-agent-opt:has(input:checked) .launch-agent-missing { color: inherit; }
 #launch-agent-pick .launch-agent-opt input { position: absolute; opacity: 0; width: 1px; height: 1px; }
 #launch-agent-pick .launch-agent-opt:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
-.launch-note-slot { display: flow-root; min-height: 5.6em; margin: 0; } /* flow-root: a note's or an empty slot's margin stays inside it, so nothing moves when a note comes */
+.launch-note-slot { display: flow-root; min-height: 2.2em; margin: 0; } /* one note, as tall as the longest at this width in em: it wraps to more lines as the box narrows or the text grows (container queries below) */ /* flow-root: a note's or an empty slot's margin stays inside it, so nothing moves when a note comes */
 .launch-note-slot .settings-hint, .launch-note-slot .launch-cli-slot:empty { margin: 0 0 6px; }
 /* Segmented controls and cards drawn over a select (segmented.js). */
 select.seg-source { display: none; } /* (.modal-content select is display: block, one class more specific than the class alone) */
 .seg-group { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--control-border); border-radius: var(--radius-md); overflow: hidden; margin: 2px 0 8px; }
-.seg-btn { min-height: 36px; padding: 6px 16px; background: var(--bg-primary); color: var(--text-primary); border: 0; border-right: 1px solid var(--control-border); font: inherit; cursor: pointer; }
+.seg-btn { min-height: 36px; padding: 6px 16px; background: var(--bg-primary); color: var(--text-primary); border: 0; border-right: 1px solid var(--control-border); font: inherit; font-size: var(--fs-md); font-weight: 500; cursor: pointer; }
 .seg-btn:last-child { border-right: 0; }
-.seg-btn[aria-checked="true"] { background: var(--accent-dim); color: var(--text-on-accent); }
+.seg-btn[aria-checked="true"] { background: var(--accent-dim); color: var(--text-on-accent); font-weight: 600; }
 .seg-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .seg-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); gap: 8px; border: 0; overflow: visible; }
 .seg-cards .seg-btn { border: 1px solid var(--control-border); border-radius: var(--radius-md); text-align: left; min-height: 44px; }
@@ -4901,3 +4901,13 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
     #launch-agent-pick .launch-agent-opt, .acf-provider-label .seg-btn { border-right: 0 !important; border-bottom: 1px solid var(--control-border) !important; }
     #launch-agent-pick .launch-agent-opt:last-child, .acf-provider-label .seg-btn:last-child { border-bottom: 0 !important; }
 }
+
+/* The type scale of the dialogs (UI/UX's #7391 review): segments and the provider 13/500 (selected 600), hints 12/400, the back arrow in the product's font. */
+.launch-wizard .acf-model-note, .launch-wizard .acf-thinking-note, .launch-wizard .acf-thinking-ran { font-size: var(--fs-base); font-weight: 400; }
+#launch-agent-pick .launch-agent-opt { font-size: var(--fs-md); font-weight: 500; }
+#launch-agent-pick .launch-agent-opt:has(input:checked) { font-weight: 600; }
+.sd-step-header .launch-back-btn { font-family: inherit; }
+[data-quiet-focus] :focus-visible { outline: 0 !important; box-shadow: none !important; }
+
+@container (max-width: 40em) { .launch-note-slot { min-height: 3.8em; } }
+@container (max-width: 17em) { .launch-note-slot { min-height: 5.6em; } }
