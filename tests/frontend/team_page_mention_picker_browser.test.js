@@ -95,6 +95,20 @@ const TEAM = `qa-mention-${Date.now() % 100000}`;
                 assert.equal(await ev(`${box}.value`), 'see @Orchestrator and more', 'one space between the name and "and"');
                 assert.equal(await ev(`${box}.selectionStart`), 'see @Orchestrator '.length, 'the caret is after the space, in front of "and"');
             });
+            await S.run(`${label}: Escape keeps the list closed when the caret moves (it opens again when something is typed), and a caret move keeps the highlighted row`, async () => {
+                await type('@Or'); await settle(200);
+                await key('Escape'); await settle(150);
+                assert.equal(await list(), null, 'Escape closed it');
+                await ev(`(() => { const b = ${box}; b.selectionStart = b.selectionEnd = 2; b.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowLeft', bubbles: true })); return true; })()`); await settle(150);
+                assert.equal(await list(), null, 'an arrow after Escape does not open it again');
+                await type('@Or'); await key('Escape'); await type('@Orc'); await settle(200);
+                assert.ok(await list(), 'typing opens it again');
+                await type('@'); await settle(200);
+                await key('ArrowDown'); await settle(100);
+                const before = (await list()).options.findIndex(o => o.selected === 'true');
+                await ev(`(() => { const b = ${box}; b.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowRight', bubbles: true })); return true; })()`); await settle(150);
+                assert.equal((await list()).options.findIndex(o => o.selected === 'true'), before, 'the highlighted row stays where the arrow put it');
+            });
         }
         await removeBoards(ev, [TEAM]); S.finish(); // finish() exits the process, so the board goes first
     } finally { await removeBoards(ev, [TEAM]); await client.close(); }

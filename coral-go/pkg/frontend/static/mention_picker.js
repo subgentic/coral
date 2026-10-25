@@ -28,7 +28,7 @@ export function attachMentionPicker(input, names) {
     const list = el('div', 'mention-list'); list.id = id; list.setAttribute('role', 'listbox'); list.setAttribute('aria-label', 'Mention an agent'); list.hidden = true;
     input.setAttribute('role', 'combobox'); input.setAttribute('aria-autocomplete', 'list'); input.setAttribute('aria-haspopup', 'listbox'); input.setAttribute('aria-controls', id); input.setAttribute('aria-expanded', 'false');
     (input.closest('.mb-post-card') || input.parentElement).append(list);
-    let active = 0, current = null;
+    let active = 0, current = null, dismissed = null; // dismissed: where Escape closed the list (the @ and the text then): moving the caret there does not open it again, typing does
 
     const sync = () => {
         const open = !list.hidden;
@@ -51,9 +51,11 @@ export function attachMentionPicker(input, names) {
     function open() {
         const q = mentionQuery(input.value, input.selectionStart);
         if (!q) { close(); return; }
+        if (dismissed && dismissed.at === q.at && dismissed.value === input.value) return; // closed by Escape and the text is as it was
         const choices = mentionChoices(q.query, typeof names === 'function' ? names() : names);
         if (!choices.length) { close(); return; }
         current = q;
+        const kept = list.hidden ? '' : (list.children[active] && list.children[active].dataset.name); // a re-read keeps the highlighted row when it is still there
         list.replaceChildren(...choices.map((n, i) => {
             const o = el('div', 'mention-option'); o.id = `${id}-opt-${i}`; o.setAttribute('role', 'option'); o.setAttribute('aria-selected', 'false'); o.dataset.name = n;
             o.append(el('span', 'mention-name', n === ALL ? '@all' : n));
@@ -62,7 +64,7 @@ export function attachMentionPicker(input, names) {
             return o;
         }));
         list.hidden = false;
-        mark(0);
+        mark(Math.max(0, choices.indexOf(kept)));
     }
     input.addEventListener('input', open);
     input.addEventListener('click', open);
@@ -73,7 +75,7 @@ export function attachMentionPicker(input, names) {
         const n = list.children.length;
         if (e.key === 'ArrowDown' || e.key === 'ArrowUp') mark((active + (e.key === 'ArrowDown' ? 1 : n - 1)) % n);
         else if ((e.key === 'Enter' && !e.ctrlKey && !e.metaKey && !e.shiftKey) || e.key === 'Tab') pick(list.children[active].dataset.name);
-        else if (e.key === 'Escape') close();
+        else if (e.key === 'Escape') { dismissed = { at: current.at, value: input.value }; close(); }
         else return;
         e.preventDefault(); e.stopPropagation(); // the composer's own Enter (send) is not reached while the list is open
     });
