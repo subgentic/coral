@@ -106,7 +106,7 @@ function jobRowHtml(job) {
     const note = exitNote(job.last_run); // what the last run's exit_reason adds to its status (#6907): on the row as text, not only on hover
     const nextTitle = job.enabled && job.next_fire_at ? `Next run ${atWords(job.next_fire_at)} your time` : '';
     return `<li class="session-list-item sched-row ${escapeAttr(active)}" data-on-click="job-select" data-job-id="${Number(job.id)}" title="${escapeAttr(nextTitle)}"><button type="button" class="row-btn"${active ? ' aria-current="true"' : ''}>
-        <span class="sched-row-head"><span class="sched-dot sched-dot-${dot}" role="img" aria-label="${escapeAttr(dotWords)}" title="${escapeAttr(dotWords)}"></span> <span class="sched-row-name">${escapeHtml(job.name)}</span> ${paused} ${failBadge}</span>
+        <span class="sched-row-head"><span class="sched-row-title"><span class="sched-dot sched-dot-${dot}" role="img" aria-label="${escapeAttr(dotWords)}" title="${escapeAttr(dotWords)}"></span><span class="sched-row-name">${escapeHtml(job.name)}</span></span>${paused}${failBadge}</span>
         <span class="sched-row-meta">${escapeHtml(meta)}</span>
         ${problem ? `<span class="sched-row-problem">${escapeHtml(problem)}</span>` : note && !problem ? `<span class="sched-row-note">${escapeHtml(note)}</span>` : ''}
     </button></li>`;

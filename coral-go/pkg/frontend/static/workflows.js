@@ -264,7 +264,7 @@ function renderWorkflowList() {
         const n = stepsOf(w);
         const rd = runDot(w.last_run); // the dot a job's row has: one state, one look
         const open = Number(selectedWorkflowId) === Number(w.id);
-        return `<li class="session-list-item wf-nav-row${escAttr(open ? ' active' : '')}"><button type="button" class="row-btn"${open ? ' aria-current="true"' : ''} data-on-click="wf-select" data-workflow-id="${Number(w.id)}"><span class="sched-row-head"><span class="sched-dot sched-dot-${escAttr(rd.dot)}" role="img" aria-label="${escAttr(rd.words)}" title="${escAttr(rd.words)}"></span><span class="sched-row-name wf-nav-name">${esc(w.name)}</span></span><span class="sched-row-meta wf-nav-meta">${esc(`${n} step${n !== 1 ? 's' : ''} \u00b7 ${last}`)}</span></button></li>`;
+        return `<li class="session-list-item wf-nav-row${escAttr(open ? ' active' : '')}"><button type="button" class="row-btn"${open ? ' aria-current="true"' : ''} data-on-click="wf-select" data-workflow-id="${Number(w.id)}"><span class="sched-row-head"><span class="sched-row-title"><span class="sched-dot sched-dot-${escAttr(rd.dot)}" role="img" aria-label="${escAttr(rd.words)}" title="${escAttr(rd.words)}"></span><span class="sched-row-name wf-nav-name">${esc(w.name)}</span></span></span><span class="sched-row-meta wf-nav-meta">${esc(`${n} step${n !== 1 ? 's' : ''} \u00b7 ${last}`)}</span></button></li>`;
     };
     list.innerHTML = groups.map(g => groupHeaderHtml('workflows', g.key, g.label, g.items.length) + (isGroupFolded('workflows', g.key) ? '' : g.items.map(row).join(''))).join('')
         || (workflows.length ? '<li class="empty-state">No workflow matches the search.</li>' : '<li class="empty-state">No workflows yet.</li>');
