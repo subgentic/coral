@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"io/fs"
 	"reflect"
 	"testing"
@@ -46,4 +47,23 @@ func TestTwoServersShareOneStaticBuild(t *testing.T) {
 	require.NotEmpty(t, a.staticVersion)
 	require.Equal(t, a.staticVersion, b.staticVersion)
 	require.Equal(t, a.bundleBase, b.bundleBase)
+}
+
+// A failed build is not remembered: the next caller tries again, and once one succeeds nobody builds again.
+func TestAFailedStaticBuildIsRetriedAndASuccessIsKept(t *testing.T) {
+	var once builtOnce[string]
+	calls := 0
+	failing := func() (string, error) { calls++; return "", errors.New("esbuild could not start") }
+	for i := 0; i < 2; i++ {
+		_, err := once.get(failing)
+		require.Error(t, err)
+	}
+	require.Equal(t, 2, calls, "each caller after a failure builds again")
+	v, err := once.get(func() (string, error) { calls++; return "built", nil })
+	require.NoError(t, err)
+	require.Equal(t, "built", v)
+	v, err = once.get(failing)
+	require.NoError(t, err)
+	require.Equal(t, "built", v, "a success is kept")
+	require.Equal(t, 3, calls, "and not built again")
 }
