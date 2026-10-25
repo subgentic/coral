@@ -3198,9 +3198,12 @@
       "kind": "listener",
       "what": "click handler: document.addEventListener('click', e => { if (openMore && !openMore.wrap.contains(e.target)) closeMore(false);",
       "source": "static/saved.js:155",
-      "status": "todo",
-      "newHome": "the Saved bookmark: Inbox > Saved",
-      "proof": null,
+      "status": "moved",
+      "newHome": "Inbox (sidebar): a saved message's page, its More menu (ported with the same code)",
+      "proof": {
+        "file": "static/inbox_sidebar.js",
+        "needle": "document.addEventListener('click', e => { if (openMore && !o"
+      },
       "note": "waits for #7472 (Inbox > Saved); the saved.js / saved_marks.js module stays because the agent dock still uses it (Orchestrator 11:28Z)"
     },
     {
@@ -3220,9 +3223,12 @@
       "kind": "listener",
       "what": "click handler: toggle.addEventListener('click', () => { if (openMore && openMore.wrap === wrap) closeMore(true); else open();",
       "source": "static/saved.js:168",
-      "status": "todo",
-      "newHome": "the Saved bookmark: Inbox > Saved",
-      "proof": null,
+      "status": "moved",
+      "newHome": "Inbox (sidebar): a saved message's page, its More menu (ported with the same code)",
+      "proof": {
+        "file": "static/inbox_sidebar.js",
+        "needle": "toggle.addEventListener('click', () => { if (openMore && ope"
+      },
       "note": "waits for #7472 (Inbox > Saved); the saved.js / saved_marks.js module stays because the agent dock still uses it (Orchestrator 11:28Z)"
     },
     {
@@ -3231,9 +3237,12 @@
       "kind": "listener",
       "what": "keydown handler: wrap.addEventListener('keydown', e => {",
       "source": "static/saved.js:169",
-      "status": "todo",
-      "newHome": "the Saved bookmark: Inbox > Saved",
-      "proof": null,
+      "status": "moved",
+      "newHome": "Inbox (sidebar): a saved message's page, its More menu (ported with the same code)",
+      "proof": {
+        "file": "static/inbox_sidebar.js",
+        "needle": "wrap.addEventListener('keydown', e => {"
+      },
       "note": "waits for #7472 (Inbox > Saved); the saved.js / saved_marks.js module stays because the agent dock still uses it (Orchestrator 11:28Z)"
     },
     {
@@ -3242,9 +3251,12 @@
       "kind": "listener",
       "what": "focusout handler: wrap.addEventListener('focusout', e => { if (openMore && openMore.wrap === wrap && !wrap.contains(e.relatedTar",
       "source": "static/saved.js:175",
-      "status": "todo",
-      "newHome": "the Saved bookmark: Inbox > Saved",
-      "proof": null,
+      "status": "moved",
+      "newHome": "Inbox (sidebar): a saved message's page, its More menu (ported with the same code)",
+      "proof": {
+        "file": "static/inbox_sidebar.js",
+        "needle": "wrap.addEventListener('focusout', e => { if (openMore && ope"
+      },
       "note": "waits for #7472 (Inbox > Saved); the saved.js / saved_marks.js module stays because the agent dock still uses it (Orchestrator 11:28Z)"
     },
     {
@@ -3308,9 +3320,12 @@
       "kind": "label",
       "what": "names a control: \"Save for later\"",
       "source": "static/saved_marks.js:16",
-      "status": "todo",
-      "newHome": "the Saved bookmark: Inbox > Saved",
-      "proof": null,
+      "status": "moved",
+      "newHome": "the Save for later bookmark of a message: saved_marks.js is shared and the Messages tab (message_board.js) and the agent chat use it",
+      "proof": {
+        "file": "static/message_board.js",
+        "needle": "BOARD_SAVE_BUTTON(currentProject"
+      },
       "note": "waits for #7472 (Inbox > Saved); the saved.js / saved_marks.js module stays because the agent dock still uses it (Orchestrator 11:28Z)"
     },
     {
@@ -3319,9 +3334,12 @@
       "kind": "label",
       "what": "names a control: \"Save for later\"",
       "source": "static/saved_marks.js:16",
-      "status": "todo",
-      "newHome": "the Saved bookmark: Inbox > Saved",
-      "proof": null,
+      "status": "moved",
+      "newHome": "the Save for later bookmark of a message: saved_marks.js is shared and the Messages tab (message_board.js) and the agent chat use it",
+      "proof": {
+        "file": "static/message_board.js",
+        "needle": "BOARD_SAVE_BUTTON(currentProject"
+      },
       "note": "waits for #7472 (Inbox > Saved); the saved.js / saved_marks.js module stays because the agent dock still uses it (Orchestrator 11:28Z)"
     },
     {
@@ -3330,9 +3348,12 @@
       "kind": "label",
       "what": "names a control: \"Save for later\"",
       "source": "static/saved_marks.js:17",
-      "status": "todo",
-      "newHome": "the Saved bookmark: Inbox > Saved",
-      "proof": null,
+      "status": "moved",
+      "newHome": "the Save for later bookmark of a message: saved_marks.js is shared and the Messages tab (message_board.js) and the agent chat use it",
+      "proof": {
+        "file": "static/message_board.js",
+        "needle": "BOARD_SAVE_BUTTON(currentProject"
+      },
       "note": "waits for #7472 (Inbox > Saved); the saved.js / saved_marks.js module stays because the agent dock still uses it (Orchestrator 11:28Z)"
     },
     {
@@ -3341,9 +3362,12 @@
       "kind": "label",
       "what": "names a control: \"Save for later\"",
       "source": "static/saved_marks.js:17",
-      "status": "todo",
-      "newHome": "the Saved bookmark: Inbox > Saved",
-      "proof": null,
+      "status": "moved",
+      "newHome": "the Save for later bookmark of a message: saved_marks.js is shared and the Messages tab (message_board.js) and the agent chat use it",
+      "proof": {
+        "file": "static/message_board.js",
+        "needle": "BOARD_SAVE_BUTTON(currentProject"
+      },
       "note": "waits for #7472 (Inbox > Saved); the saved.js / saved_marks.js module stays because the agent dock still uses it (Orchestrator 11:28Z)"
     },
     {
@@ -3352,9 +3376,12 @@
       "kind": "listener",
       "what": "resize handler: window.addEventListener('resize', syncSavedButton); // a phone's overlay and a desktop's collapsed dock are th",
       "source": "static/saved_marks.js:168",
-      "status": "todo",
-      "newHome": "the Saved bookmark: Inbox > Saved",
-      "proof": null,
+      "status": "moved",
+      "newHome": "the Save for later bookmark of a message: saved_marks.js is shared and the Messages tab (message_board.js) and the agent chat use it",
+      "proof": {
+        "file": "static/message_board.js",
+        "needle": "BOARD_SAVE_BUTTON(currentProject"
+      },
       "note": "waits for #7472 (Inbox > Saved); the saved.js / saved_marks.js module stays because the agent dock still uses it (Orchestrator 11:28Z)"
     },
     {
@@ -3363,9 +3390,12 @@
       "kind": "listener",
       "what": "keydown handler: document.addEventListener('keydown', (e) => {",
       "source": "static/saved_marks.js:170",
-      "status": "todo",
-      "newHome": "the Saved bookmark: Inbox > Saved",
-      "proof": null,
+      "status": "moved",
+      "newHome": "the Save for later bookmark of a message: saved_marks.js is shared and the Messages tab (message_board.js) and the agent chat use it",
+      "proof": {
+        "file": "static/message_board.js",
+        "needle": "BOARD_SAVE_BUTTON(currentProject"
+      },
       "note": "waits for #7472 (Inbox > Saved); the saved.js / saved_marks.js module stays because the agent dock still uses it (Orchestrator 11:28Z)"
     },
     {
@@ -3374,9 +3404,12 @@
       "kind": "listener",
       "what": "click handler: document.addEventListener('click', async (e) => {",
       "source": "static/saved_marks.js:251",
-      "status": "todo",
-      "newHome": "the Saved bookmark: Inbox > Saved",
-      "proof": null,
+      "status": "moved",
+      "newHome": "the Save for later bookmark of a message: saved_marks.js is shared and the Messages tab (message_board.js) and the agent chat use it",
+      "proof": {
+        "file": "static/message_board.js",
+        "needle": "BOARD_SAVE_BUTTON(currentProject"
+      },
       "note": "waits for #7472 (Inbox > Saved); the saved.js / saved_marks.js module stays because the agent dock still uses it (Orchestrator 11:28Z)"
     },
     {
@@ -3385,9 +3418,12 @@
       "kind": "listener",
       "what": "resize handler: window.addEventListener('resize', fitSavedButton);",
       "source": "static/saved_marks.js:295",
-      "status": "todo",
-      "newHome": "the Saved bookmark: Inbox > Saved",
-      "proof": null,
+      "status": "moved",
+      "newHome": "the Save for later bookmark of a message: saved_marks.js is shared and the Messages tab (message_board.js) and the agent chat use it",
+      "proof": {
+        "file": "static/message_board.js",
+        "needle": "BOARD_SAVE_BUTTON(currentProject"
+      },
       "note": "waits for #7472 (Inbox > Saved); the saved.js / saved_marks.js module stays because the agent dock still uses it (Orchestrator 11:28Z)"
     },
     {
@@ -4729,9 +4765,12 @@
       "kind": "tab",
       "what": "the tab \"Saved for later on this page\" on the board page, badge/count text \"\"",
       "source": "running page (board)",
-      "status": "todo",
-      "newHome": "the Saved bookmark: Inbox > Saved",
-      "proof": null,
+      "status": "moved",
+      "newHome": "Inbox (sidebar): the Saved group (the bookmark opens Inbox > Saved)",
+      "proof": {
+        "file": "static/inbox_sidebar.js",
+        "needle": "{ key: 'saved', label: 'Saved', search: 'Search saved messages'"
+      },
       "note": "waits for #7472 (Inbox > Saved); the saved.js / saved_marks.js module stays because the agent dock still uses it (Orchestrator 11:28Z)"
     },
     {
@@ -4934,9 +4973,12 @@
       "kind": "control",
       "what": "tab \"Open\"",
       "source": "running page (board)",
-      "status": "todo",
-      "newHome": "the Saved bookmark: Inbox > Saved",
-      "proof": null,
+      "status": "moved",
+      "newHome": "Inbox Saved table: Open and Done as chips with counts above the table",
+      "proof": {
+        "file": "static/inbox_sidebar.js",
+        "needle": "action: 'inbox-saved-chip', data: { tab: 'open' }"
+      },
       "note": "waits for #7472 (Inbox > Saved); the saved.js / saved_marks.js module stays because the agent dock still uses it (Orchestrator 11:28Z)"
     },
     {
@@ -4945,9 +4987,12 @@
       "kind": "control",
       "what": "tab \"Done\"",
       "source": "running page (board)",
-      "status": "todo",
-      "newHome": "the Saved bookmark: Inbox > Saved",
-      "proof": null,
+      "status": "moved",
+      "newHome": "Inbox Saved table: Open and Done as chips with counts above the table",
+      "proof": {
+        "file": "static/inbox_sidebar.js",
+        "needle": "action: 'inbox-saved-chip', data: { tab: 'open' }"
+      },
       "note": "waits for #7472 (Inbox > Saved); the saved.js / saved_marks.js module stays because the agent dock still uses it (Orchestrator 11:28Z)"
     },
     {
@@ -4956,10 +5001,12 @@
       "kind": "control",
       "what": "button \"Close Saved for later\" (click:saved-close)",
       "source": "running page (board)",
-      "status": "todo",
+      "status": "removed-ok",
       "newHome": "the Saved bookmark: Inbox > Saved",
       "proof": null,
-      "note": "waits for #7472 (Inbox > Saved); the saved.js / saved_marks.js module stays because the agent dock still uses it (Orchestrator 11:28Z)"
+      "note": "waits for #7472 (Inbox > Saved); the saved.js / saved_marks.js module stays because the agent dock still uses it (Orchestrator 11:28Z)",
+      "okRef": "Operator 2026-10-25: right dock removed completely (UI/UX team page doc 7aa984fe); delegated OK by Orchestrator 06:56Z, and the Orchestrator's 12:52Z note: the Saved rows are answered against c1636887f",
+      "why": "the dock's own Close: Saved is a group of the Inbox sidebar now, nothing to close"
     },
     {
       "id": "saved/control/board/textbox/search-saved-messages/sv-search",
@@ -4967,9 +5014,12 @@
       "kind": "control",
       "what": "textbox \"Search saved messages\"",
       "source": "running page (board)",
-      "status": "todo",
-      "newHome": "the Saved bookmark: Inbox > Saved",
-      "proof": null,
+      "status": "moved",
+      "newHome": "Inbox (sidebar): one search named for the group, 'Search saved messages' on Saved",
+      "proof": {
+        "file": "static/inbox_sidebar.js",
+        "needle": "{ key: 'saved', label: 'Saved', search: 'Search saved messages'"
+      },
       "note": "waits for #7472 (Inbox > Saved); the saved.js / saved_marks.js module stays because the agent dock still uses it (Orchestrator 11:28Z)"
     },
     {
@@ -5076,9 +5126,12 @@
       "kind": "tab",
       "what": "the tab \"Saved for later on this page\" on the team:agent page, badge/count text \"\"",
       "source": "running page (team:agent)",
-      "status": "todo",
-      "newHome": "the Saved bookmark: Inbox > Saved",
-      "proof": null,
+      "status": "moved",
+      "newHome": "Inbox (sidebar): the Saved group (the bookmark opens Inbox > Saved)",
+      "proof": {
+        "file": "static/inbox_sidebar.js",
+        "needle": "{ key: 'saved', label: 'Saved', search: 'Search saved messages'"
+      },
       "note": "waits for #7472 (Inbox > Saved); the saved.js / saved_marks.js module stays because the agent dock still uses it (Orchestrator 11:28Z)"
     },
     {
@@ -5564,9 +5617,12 @@
       "kind": "control",
       "what": "tab \"Open\"",
       "source": "running page (team:agent)",
-      "status": "todo",
-      "newHome": "the Saved bookmark: Inbox > Saved",
-      "proof": null,
+      "status": "moved",
+      "newHome": "Inbox Saved table: Open and Done as chips with counts above the table",
+      "proof": {
+        "file": "static/inbox_sidebar.js",
+        "needle": "action: 'inbox-saved-chip', data: { tab: 'open' }"
+      },
       "note": "waits for #7472 (Inbox > Saved); the saved.js / saved_marks.js module stays because the agent dock still uses it (Orchestrator 11:28Z)"
     },
     {
@@ -5575,9 +5631,12 @@
       "kind": "control",
       "what": "tab \"Done\"",
       "source": "running page (team:agent)",
-      "status": "todo",
-      "newHome": "the Saved bookmark: Inbox > Saved",
-      "proof": null,
+      "status": "moved",
+      "newHome": "Inbox Saved table: Open and Done as chips with counts above the table",
+      "proof": {
+        "file": "static/inbox_sidebar.js",
+        "needle": "action: 'inbox-saved-chip', data: { tab: 'open' }"
+      },
       "note": "waits for #7472 (Inbox > Saved); the saved.js / saved_marks.js module stays because the agent dock still uses it (Orchestrator 11:28Z)"
     },
     {
@@ -5586,10 +5645,12 @@
       "kind": "control",
       "what": "button \"Close Saved for later\" (click:saved-close)",
       "source": "running page (team:agent)",
-      "status": "todo",
+      "status": "removed-ok",
       "newHome": "the Saved bookmark: Inbox > Saved",
       "proof": null,
-      "note": "waits for #7472 (Inbox > Saved); the saved.js / saved_marks.js module stays because the agent dock still uses it (Orchestrator 11:28Z)"
+      "note": "waits for #7472 (Inbox > Saved); the saved.js / saved_marks.js module stays because the agent dock still uses it (Orchestrator 11:28Z)",
+      "okRef": "Operator 2026-10-25: right dock removed completely (UI/UX team page doc 7aa984fe); delegated OK by Orchestrator 06:56Z, and the Orchestrator's 12:52Z note: the Saved rows are answered against c1636887f",
+      "why": "the dock's own Close: Saved is a group of the Inbox sidebar now, nothing to close"
     },
     {
       "id": "saved/control/team:agent/textbox/search-saved-messages/sv-search",
@@ -5597,9 +5658,12 @@
       "kind": "control",
       "what": "textbox \"Search saved messages\"",
       "source": "running page (team:agent)",
-      "status": "todo",
-      "newHome": "the Saved bookmark: Inbox > Saved",
-      "proof": null,
+      "status": "moved",
+      "newHome": "Inbox (sidebar): one search named for the group, 'Search saved messages' on Saved",
+      "proof": {
+        "file": "static/inbox_sidebar.js",
+        "needle": "{ key: 'saved', label: 'Saved', search: 'Search saved messages'"
+      },
       "note": "waits for #7472 (Inbox > Saved); the saved.js / saved_marks.js module stays because the agent dock still uses it (Orchestrator 11:28Z)"
     },
     {
