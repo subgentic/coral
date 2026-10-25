@@ -8,6 +8,7 @@ const path = require('node:path');
 const { connect } = require('./agent_view_harness');
 const { setTheme, installAudit } = require('./helpers/contrast');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -28,7 +29,7 @@ const BASE = require('./test_base').BASE;
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
         await ev(`localStorage.clear(); true`);
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await installAudit(ev); await setTheme(ev, theme);
         await ev(`(async () => { const st = ${S}; const { state } = await import(st + 'state.js'); window.PP = await import(st + 'preview_pane.js'); const { showView } = await import(st + 'utils.js');
             { const real = window.fetch; window.fetch = (u, o) => /\\/api\\/artifacts\\/a{64}/.test(String(u)) ? Promise.resolve(new Response('# Release notes\\n\\nThe preview shows a **markdown** artifact.\\n\\n' + 'A line of the notes that is long enough to wrap on a phone, and then some more words.\\n\\n'.repeat(40) + '\`\`\`\\n' + 'x'.repeat(300) + '\\n\`\`\`\\n', { status: 200, headers: { 'Content-Type': 'text/markdown' } })) : real(u, o); }

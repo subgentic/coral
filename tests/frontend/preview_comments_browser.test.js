@@ -9,6 +9,7 @@ const { connect } = require('./agent_view_harness');
 const { setTheme } = require('./helpers/contrast');
 const { STUB, HEX } = require('./helpers/comments_scale');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const CONTENT = ['# Pricing', '', 'The starter plan costs nine dollars a month and includes three seats for the whole team.', '', 'The team plan costs thirty dollars a month and includes twenty seats and the audit log.', '', 'Enterprise is quoted by sales and includes single sign-on and a named contact.'].join('\n');
 const FX = {
@@ -34,7 +35,7 @@ const IMG = 'f'.repeat(64);
         await Emulation.setTouchEmulationEnabled({ enabled: mobile });
         await Emulation.setEmulatedMedia({ features: [{ name: 'prefers-color-scheme', value: theme }] });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`); await setTheme(ev, theme);
+        await coralReady(ev); await setTheme(ev, theme);
         await ev(`(async()=>{(await import(${S} + 'safe_storage.js')).browserLocal.remove('coral-artifact-comments-open');})()`);
         await ev(STUB(FX));
         // a PNG for the image artifact, on top of the stub

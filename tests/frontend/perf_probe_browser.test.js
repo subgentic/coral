@@ -10,7 +10,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
-const { framesJs } = require('./helpers/wait');
+const { framesJs, coralReady } = require('./helpers/wait');
 
 const FIXTURE = `(() => {
   const mock = window.__m;
@@ -69,7 +69,7 @@ if (!process.env.PERF_PROBE) { console.log('perf_probe: skipped (set PERF_PROBE=
         // 1. first load
         const m0 = await metrics(); const t0 = Date.now(); await profStart(); await traceStart();
         await Page.navigate({ url: BASE }); await Page.loadEventFired();
-        await ev(`window.__coralReady.startup('liveList')`);
+        await coralReady(ev, 'startup', 'liveList');
         await profStop('firstLoad'); await traceStop('firstLoad'); const m1 = await metrics();
         const nav = await ev(`(() => { const n = performance.getEntriesByType('navigation')[0]; const r = performance.getEntriesByType('resource'); return { domContentLoaded: Math.round(n.domContentLoadedEventEnd), load: Math.round(n.loadEventEnd), requests: r.length, kb: Math.round(r.reduce((s, e) => s + (e.transferSize || 0), 0) / 1024), scripts: r.filter(e => e.initiatorType === 'script' || /\\.js/.test(e.name)).length, fcp: Math.round((performance.getEntriesByName('first-contentful-paint')[0] || {}).startTime || 0), longtasks: window.__longtasks.slice(0, 10), biggest: r.filter(e => e.decodedBodySize > 20000).sort((a, b) => b.decodedBodySize - a.decodedBodySize).slice(0, 10).map(e => e.name.split('/static/').pop() + ' ' + Math.round(e.decodedBodySize / 1024) + 'KB'), rows: document.querySelectorAll('#live-sessions-list .session-group-item').length, firstList: window.__firstList }; })()`);
         out.firstLoad = { wallMs: Date.now() - t0, ...nav, cpu: delta(m0, m1) };

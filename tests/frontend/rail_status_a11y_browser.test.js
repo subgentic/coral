@@ -4,6 +4,7 @@
 // Run against an isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, PRELOAD, install } = await connect();
@@ -14,7 +15,7 @@ const { connect } = require('./agent_view_harness');
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         // One agent per state the rail can show; the fields are the ones the sidebar's own resolver reads.
         const STATES = [['w-working', { working: true }, 'Working'], ['w-needs', { waiting_for_input: true }, 'Needs input'], ['w-stuck', { stuck: true }, 'Stuck'],
             ['w-idle', {}, 'Idle'], ['w-your', { awaiting_user: true }, 'Ready for input']];  // a sleeping agent is left out of the rail

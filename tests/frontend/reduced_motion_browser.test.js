@@ -9,6 +9,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -28,7 +29,7 @@ const BASE = require('./test_base').BASE;
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`(() => { const entry = window.__m.entry.bind(window.__m); const st = { 'rm-work': { working: true }, 'rm-wait': { waiting_for_input: true, waiting_kind: 'permission' }, 'rm-stuck': { stuck: true } };
             window.__m.entry = a => ({ ...entry(a), ...(st[a.session_id] || {}) });
             for (const n of Object.keys(st)) window.__m.add(n, n.slice(3, 4).toUpperCase(), 3, { sleeping: false, session_id: n }); return true; })()`);

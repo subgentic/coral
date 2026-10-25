@@ -8,6 +8,7 @@ const { connect } = require('./agent_view_harness');
 
 const BASE = require('./test_base').BASE;
 const { removeBoards } = require('./helpers/board_cleanup');
+const { coralReady } = require('./helpers/wait');
 const hex = i => i.toString(16).padStart(20, '0');
 
 (async () => {
@@ -105,7 +106,7 @@ const hex = i => i.toString(16).padStart(20, '0');
         assert.equal(await ev(`location.search`), '', 'the dashboard wrote its own URL');
         for (const bad of [{ saved: 'zz', kind: 'agent', ref: 'x' }, { saved: hex(1), kind: 'board', ref: 'x' }, { saved: hex(1), kind: 'agent', ref: '../../etc' }, { saved: hex(1), kind: 'agent', ref: 'a\nb' }, { saved: hex(1), kind: 'nope', ref: 'x' }]) {
             await Page.navigate({ url: BASE + link(bad) }); await Page.loadEventFired();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             await sleep(1200); // sleep-ok: a link that is ignored does nothing to wait for; the absence of a toast and a request is the assertion
             assert.deepEqual(await toasts(), [], 'ignored: ' + JSON.stringify(bad));
             assert.deepEqual(await ev(SAVED_URLS), [], 'no request for ' + JSON.stringify(bad));

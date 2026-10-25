@@ -7,7 +7,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
-const { framesJs } = require('./helpers/wait');
+const { framesJs, coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -20,7 +20,7 @@ const { framesJs } = require('./helpers/wait');
             })();`;
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD + SPY + `;localStorage.setItem('coral-live-view-mode', 'chat');` });
         await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'settings');
         // a chat with a few hundred messages on screen, so the page has something to walk
         await ev(`(() => { const a = window.__m.add('perf-a', 'P', 0, { sleeping: false, session_id: 'perf-a-id' }); const m = []; for (let i = 0; i < 400; i++) { m.push({ type: 'user', content: 'question ' + i, key: 'u' + i }); m.push({ type: 'assistant', text: 'answer ' + i + ' with **bold** and \`code\`', key: 'a' + i }); } a.msgs = m;
             window.selectLiveSession('perf-a', 'claude', 'perf-a-id', 'local'); return true; })()`);

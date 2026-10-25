@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const S = `(window.__coralStatic || '/static/')`;
 
 (async () => {
@@ -13,7 +14,7 @@ const S = `(window.__coralStatic || '/static/')`;
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         console.log('1. one side-panel toggle: the agent bar\'s while an agent is on screen');
         await ev(`window.__m.add('pc-a', 'A', 3, { sleeping: false, session_id: 'pc-a-id' }); window.selectLiveSession('pc-a', 'claude', 'pc-a-id', 'local'); true`);
         await waitFor(`document.querySelector('#mobile-send-btn')?.getClientRects().length > 0`, 'the agent view', 10000);

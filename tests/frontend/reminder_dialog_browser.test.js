@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { setTheme, auditRegion } = require('./helpers/contrast');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -43,7 +44,7 @@ const BASE = require('./test_base').BASE;
             await Emulation.setDeviceMetricsOverride({ width: view.w, height: view.h, deviceScaleFactor: 2, mobile: view.phone });
             await Emulation.setTouchEmulationEnabled({ enabled: view.phone });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             await setTheme(ev, view.theme);
             await ev(`window.prompt = () => { throw new Error('window.prompt must not be used'); }; const b = document.createElement('button'); b.id = '__opener'; b.textContent = 'Remind agent'; b.style.cssText = 'position:fixed;left:8px;top:120px;z-index:5'; document.body.append(b); true`);
 

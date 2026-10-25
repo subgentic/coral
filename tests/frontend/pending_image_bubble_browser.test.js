@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const H1 = 'a'.repeat(64), H2 = 'b'.repeat(64);
 const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 
@@ -18,7 +19,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
             const tag = `${w}px`;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             await ev(`(() => { const real = window.fetch; window.fetch = async (u, o = {}) => { const p = String(u); if (/\\/api\\/artifacts\\/[ab]{64}/.test(p)) { const b = Uint8Array.from(atob('${PNG}'), c => c.charCodeAt(0)); return new Response(b, { status: 200, headers: { 'Content-Type': 'image/png' } }); } return real(u, o); }; return true; })()`);
             const SID = 'sess-pending-' + w;
             const typed = await ev(`(async () => { const m = await import(${S} + 'shared_images.js'); const links = ['coral://artifacts/${H1}', 'coral://artifacts/${H2}']; return links.join(' ') + ' ' + m.imageHint(links) + ' what are these two?'; })()`);
