@@ -3935,7 +3935,6 @@ body[data-saved-scope="all"][data-dock-page="other"] #panel-toggle-btn, body[dat
 .ibx-thread-list { list-style: none; margin: 0; padding: 0; }
 .ibx-thread-item { padding: 10px 0; border-top: 1px solid var(--border); min-width: 0; }
 .ibx-thread-who { margin: 0 0 4px; font-size: 0.75rem; color: var(--text-secondary); }
-.ibx-thread-mine .ibx-thread-who { color: var(--text-primary); }
 .ibx-thread-text .md { overflow-wrap: anywhere; line-height: 1.5; font-size: var(--fs-md, 0.875rem); color: var(--text-primary); }
 .ibx-thread-earlier, .ibx-thread-new { margin: 0 0 8px; }
 .ibx-thread-earlier[hidden], .ibx-thread-new[hidden] { display: none; }

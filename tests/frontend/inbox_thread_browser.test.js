@@ -57,6 +57,7 @@ const STUB = `(() => { const real = window.fetch; const J = (b, s) => Promise.re
         it = await items();
         assert.match(it[1].who, /^Orchestrator, /); assert.equal(it[1].text, 'About half done: two of four steps.'); assert.equal(it[1].mine, false);
         assert.equal(await ev(`document.querySelectorAll('#qa-thread-host .ibx-thread-text strong').length`), 1, 'the text goes through the safe Markdown renderer');
+        assert.equal(await ev(`new Set([...document.querySelectorAll('#qa-thread-host .ibx-thread-who')].map(e => getComputedStyle(e).color)).size`), 1, 'one colour for every name line, You and the agents alike (UI/UX)');
 
         console.log('a long thread: the last five, Show earlier (N) above, all of them after it');
         await ev(`for (let i = 0; i < 6; i++) window.__post('Orchestrator', 'more ' + i); true`);
