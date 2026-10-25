@@ -30,6 +30,8 @@ func taskClaimNudge(taskID int64) string {
 type BoardHandler struct {
 	// goalReqWake is when each target board had its Orchestrators last woken for a goal request (#7361): one wake per few minutes, with the count, so a loop cannot make a paid turn per request.
 	goalReqWake sync.Map
+	// goalLinks limits the Hub service's reads of GET /api/goal-links per asker (#7411).
+	goalLinks goalLinksLimiter
 	// artifactNudge reminds an agent whose own post links a claude.ai artifact (#6583); nil: never.
 	artifactNudge                 *ClaudeArtifactNudger
 	bs                            *board.Store

@@ -15,6 +15,9 @@ import (
 // task made by accepting that request, only for the asker (server and board) that sent it, never by goal uid, never for a request that is pending, declined or expired.
 func acceptedRequest(t *testing.T, s *Store, ctx context.Context, from, to, title, assignee string) (reqID string, task *Task) {
 	t.Helper()
+	on := true
+	_, err := s.UpdateBoardSettings(ctx, to, BoardSettingsUpdate{GoalRequests: &on})
+	require.NoError(t, err)
 	g := newGoal(t, s, from, "Goal of "+from)
 	_, in, err := s.SendGoalRequest(ctx, from, g.ID, to, "do it", "Lead", nil)
 	require.NoError(t, err)
@@ -29,45 +32,62 @@ func TestGoalLinksAreTheTaskMadeByAcceptingThatRequestForThatAsker(t *testing.T)
 	rid, task := acceptedRequest(t, s, ctx, "alpha", "beta", "Build the importer", "Dev B")
 	rid2, task2 := acceptedRequest(t, s, ctx, "alpha", "beta", "A second job", "")
 
-	page, err := s.GoalLinks(ctx, rid, "", "alpha", "", nil)
+	reply, err := s.GoalLinks(ctx, rid, "", "alpha", "", 50, nil)
 	require.NoError(t, err)
-	require.Len(t, page.Links, 1, "one request, the one task made by accepting it")
-	l := page.Links[0]
-	assert.Equal(t, task.ID, l.ID)
+	assert.Equal(t, rid, reply.RequestID)
+	assert.Equal(t, 1, reply.AcceptedTotal)
+	require.Len(t, reply.Accepted, 1, "one request, the one task made by accepting it")
+	assert.Nil(t, reply.NextCursor)
+	l := reply.Accepted[0]
+	assert.Equal(t, task.ID, l.TaskID)
+	assert.Equal(t, rid, l.RequestID)
 	assert.Equal(t, "Build the importer", l.Title)
-	assert.Equal(t, "pending", l.State)
+	assert.Equal(t, "pending", l.TaskStatus)
+	assert.Equal(t, "accepted", l.RequestState)
 	assert.Equal(t, "Dev B", l.Assignee)
-	assert.NotEmpty(t, l.UpdatedAt)
 	assert.Equal(t, "beta", l.Board)
-	assert.Empty(t, page.Next)
-	page2, err := s.GoalLinks(ctx, rid2, "", "alpha", "", nil)
+	assert.NotEmpty(t, l.GoalUID)
+	assert.Regexp(t, `^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$`, l.AcceptedAt)
+	assert.Regexp(t, `^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$`, l.UpdatedAt)
+	reply2, err := s.GoalLinks(ctx, rid2, "", "alpha", "", 50, nil)
 	require.NoError(t, err)
-	require.Len(t, page2.Links, 1)
-	assert.Equal(t, task2.ID, page2.Links[0].ID, "the other request's task is its own")
+	require.Len(t, reply2.Accepted, 1)
+	assert.Equal(t, task2.ID, reply2.Accepted[0].TaskID, "the other request's task is its own")
 
 	// not the asker: another board, another server (this request was sent from this computer, so its server is empty)
 	for _, c := range []struct{ server, board string }{{"", "gamma"}, {"srv-x", "alpha"}, {"srv-x", "gamma"}, {"", "ALPHA"}, {"", "alpha "}} {
-		none, err := s.GoalLinks(ctx, rid, c.server, c.board, "", nil)
+		none, err := s.GoalLinks(ctx, rid, c.server, c.board, "", 50, nil)
 		require.NoError(t, err, "%v", c)
-		assert.Empty(t, none.Links, "asker %v sees nothing of another's request", c)
+		assert.Empty(t, none.Accepted, "asker %v sees nothing of another's request", c)
+		assert.Zero(t, none.AcceptedTotal)
 	}
-	// an id nobody sent, an empty id, a wrong-case id
-	for _, id := range []string{"no-such-request", "", strings.ToUpper(rid)} {
-		none, err := s.GoalLinks(ctx, id, "", "alpha", "", nil)
-		require.NoError(t, err)
-		assert.Empty(t, none.Links, "request id %q", id)
+	// an id nobody sent answers empty; an id that is not 32 lower-case hex digits is a bad query
+	none, err := s.GoalLinks(ctx, strings.Repeat("0", 32), "", "alpha", "", 50, nil)
+	require.NoError(t, err)
+	assert.Empty(t, none.Accepted)
+	assert.Equal(t, `{"request_id":"`+strings.Repeat("0", 32)+`","accepted_requests":[],"accepted_requests_total":0,"next_cursor":null}`, string(func() []byte { b, err := json.Marshal(none); require.NoError(t, err); return b }()), "an empty answer is an empty list, never null")
+	for _, id := range []string{"no-such-request", "", strings.ToUpper(rid), rid + "0", rid[:31]} {
+		_, err := s.GoalLinks(ctx, id, "", "alpha", "", 50, nil)
+		assert.ErrorIs(t, err, ErrBadGoalLinksQuery, "request id %q", id)
+	}
+	for _, limit := range []int{0, -1, GoalLinksMaxLimit + 1} {
+		_, err := s.GoalLinks(ctx, rid, "", "alpha", "", limit, nil)
+		assert.ErrorIs(t, err, ErrBadGoalLinksQuery, "limit %d", limit)
 	}
 }
 
 func TestGoalLinksNeedAnAcceptedRequestAndNothingLabelledAnyOtherWay(t *testing.T) {
 	s := testStore(t)
 	ctx := context.Background()
+	on := true
+	_, err := s.UpdateBoardSettings(ctx, "beta", BoardSettingsUpdate{GoalRequests: &on})
+	require.NoError(t, err)
 	g := newGoal(t, s, "alpha", "Goal")
 	_, in, err := s.SendGoalRequest(ctx, "alpha", g.ID, "beta", "do it", "Lead", nil)
 	require.NoError(t, err)
-	page, err := s.GoalLinks(ctx, in.RequestID, "", "alpha", "", nil)
+	reply, err := s.GoalLinks(ctx, in.RequestID, "", "alpha", "", 50, nil)
 	require.NoError(t, err)
-	assert.Empty(t, page.Links, "pending")
+	assert.Empty(t, reply.Accepted, "pending")
 
 	// a task B labelled with the goal's uid some other way (no request id) shows nothing, even for the right asker and an accepted request
 	other, err := s.CreateTask(ctx, "beta", "labelled by hand", "", "medium", "Lead")
@@ -76,88 +96,195 @@ func TestGoalLinksNeedAnAcceptedRequestAndNothingLabelledAnyOtherWay(t *testing.
 	require.NoError(t, err)
 	_, _, err = s.AcceptGoalRequest(ctx, "beta", in.ID, "The real one", "", "medium", "Orch", "")
 	require.NoError(t, err)
-	page, err = s.GoalLinks(ctx, in.RequestID, "", "alpha", "", nil)
+	reply, err = s.GoalLinks(ctx, in.RequestID, "", "alpha", "", 50, nil)
 	require.NoError(t, err)
-	require.Len(t, page.Links, 1)
-	assert.Equal(t, "The real one", page.Links[0].Title, "by request id, never by goal uid")
+	require.Len(t, reply.Accepted, 1)
+	assert.Equal(t, "The real one", reply.Accepted[0].Title, "by request id, never by goal uid")
 
 	// declined and expired requests have no task
 	_, in2, err := s.SendGoalRequest(ctx, "alpha", g.ID, "beta", "again", "Lead", nil)
 	require.NoError(t, err)
 	_, err = s.DeclineGoalRequest(ctx, "beta", in2.ID, "no", "Orch")
 	require.NoError(t, err)
-	none, err := s.GoalLinks(ctx, in2.RequestID, "", "alpha", "", nil)
+	none, err := s.GoalLinks(ctx, in2.RequestID, "", "alpha", "", 50, nil)
 	require.NoError(t, err)
-	assert.Empty(t, none.Links)
+	assert.Empty(t, none.Accepted)
 	_, in3, err := s.SendGoalRequest(ctx, "alpha", g.ID, "beta", "late", "Lead", nil)
 	require.NoError(t, err)
 	_, err = s.db.ExecContext(ctx, `UPDATE board_goal_requests_in SET status = 'expired' WHERE id = ?`, in3.ID)
 	require.NoError(t, err)
-	none, err = s.GoalLinks(ctx, in3.RequestID, "", "alpha", "", nil)
+	none, err = s.GoalLinks(ctx, in3.RequestID, "", "alpha", "", 50, nil)
 	require.NoError(t, err)
-	assert.Empty(t, none.Links)
+	assert.Empty(t, none.Accepted)
 }
 
-func TestGoalLinksTitlesAreRedactedAndTheRowIsExactlySixFields(t *testing.T) {
+func TestGoalLinksTitlesAreRedactedBoundedAndTheRowIsExactlyTheseFields(t *testing.T) {
 	s := testStore(t)
 	ctx := context.Background()
 	rid, _ := acceptedRequest(t, s, ctx, "alpha", "beta", "Rotate key ghp" + "_abcdefghijklmnopqrstuvwxyz0123456789", "Dev")
-	page, err := s.GoalLinks(ctx, rid, "", "alpha", "", func(s string) string {
+	reply, err := s.GoalLinks(ctx, rid, "", "alpha", "", 50, func(s string) string {
 		return strings.ReplaceAll(s, "ghp" + "_abcdefghijklmnopqrstuvwxyz0123456789", "[redacted]")
 	})
 	require.NoError(t, err)
-	require.Len(t, page.Links, 1)
-	assert.Equal(t, "Rotate key [redacted]", page.Links[0].Title)
-	assert.Equal(t, `{"id":`+fmt.Sprint(page.Links[0].ID)+`,"title":"Rotate key [redacted]","state":"pending","assignee":"Dev","updated_at":"`+page.Links[0].UpdatedAt+`","board":"beta"}`, string(func() []byte { b, err := json.Marshal(page.Links[0]); require.NoError(t, err); return b }()), "the golden: id, title, state, assignee, updated_at, board; no body, no goal, no request id")
+	require.Len(t, reply.Accepted, 1)
+	l := reply.Accepted[0]
+	assert.Equal(t, "Rotate key [redacted]", l.Title)
+	b, err := json.Marshal(l)
+	require.NoError(t, err)
+	assert.Equal(t, `{"request_id":"`+rid+`","board":"beta","goal_uid":"`+l.GoalUID+`","task_id":`+fmt.Sprint(l.TaskID)+`,"task_status":"pending","request_state":"accepted","accepted_at":"`+l.AcceptedAt+`","title":"Rotate key [redacted]","assignee":"Dev","updated_at":"`+l.UpdatedAt+`"}`, string(b), "the golden of a row; no body, no sender, no reason")
+
+	// the two free-text fields are cut to their bound, before and after redaction
+	rid2, task := acceptedRequest(t, s, ctx, "alpha", "beta", strings.Repeat("é", GoalLinksTitleMax+50), strings.Repeat("a", GoalLinksAssigneeMax+10))
+	_, err = s.db.ExecContext(ctx, `UPDATE board_tasks SET assigned_to = ? WHERE id = ?`, strings.Repeat("a", GoalLinksAssigneeMax+10), task.ID)
+	require.NoError(t, err)
+	reply, err = s.GoalLinks(ctx, rid2, "", "alpha", "", 50, func(s string) string { return s + s })
+	require.NoError(t, err)
+	assert.Equal(t, GoalLinksTitleMax, len([]rune(reply.Accepted[0].Title)))
+	assert.Equal(t, GoalLinksAssigneeMax, len([]rune(reply.Accepted[0].Assignee)))
+
+	// a full page of the largest rows is far under the one reply cap
+	row := reply.Accepted[0]
+	row.Board = strings.Repeat("b", 120)
+	row.Title = strings.Repeat("\u00e9", GoalLinksTitleMax)
+	one, err := json.Marshal(row)
+	require.NoError(t, err)
+	assert.Less(t, len(one)*GoalLinksMaxLimit, GoalLinksReplyMaxBytes)
 }
 
-// Paged: 50 a page, a cursor bound to the request, each row once. The unique index that makes it one task per request is dropped here to have rows to page over; the cursor logic does not depend on it.
-func TestGoalLinksPageExactlyOnceAndTheCursorIsBoundToTheRequest(t *testing.T) {
+// Paged: a limit (default 50, at most 100), stable order (accepted_at, task_id), a cursor bound to the request and the asker, each row once, an exact total. The unique indexes that make it one task per
+// request are dropped here to have rows to page over; the paging does not depend on them.
+func TestGoalLinksPageExactlyOnceInOrderAndTheCursorIsBoundToTheRequest(t *testing.T) {
 	s := testStore(t)
 	ctx := context.Background()
 	rid, first := acceptedRequest(t, s, ctx, "alpha", "beta", "t0", "")
 	rid2, _ := acceptedRequest(t, s, ctx, "alpha", "beta", "other", "")
-	_, err := s.db.ExecContext(ctx, `DROP INDEX idx_board_tasks_request`)
-	require.NoError(t, err)
+	for _, q := range []string{`DROP INDEX idx_board_tasks_request_key`, `DROP INDEX idx_goal_requests_in_key`} {
+		_, err := s.db.ExecContext(ctx, q)
+		require.NoError(t, err)
+	}
+	ids := []int64{first.ID}
 	for i := 1; i < 120; i++ {
 		task, err := s.CreateTask(ctx, "beta", fmt.Sprintf("t%d", i), "", "medium", "Lead")
 		require.NoError(t, err)
-		_, err = s.db.ExecContext(ctx, `UPDATE board_tasks SET request_id = ? WHERE id = ?`, rid, task.ID)
+		_, err = s.db.ExecContext(ctx, `UPDATE board_tasks SET request_id = ?, request_server = '', request_board = 'alpha' WHERE id = ?`, rid, task.ID)
 		require.NoError(t, err)
+		// ten accepted rows share each second, so the order within a second is the task id
+		_, err = s.db.ExecContext(ctx, `INSERT INTO board_goal_requests_in (board_id, request_id, from_server, from_board, goal_uid, status, task_id, created_at, answered_at)
+			VALUES ('beta', ?, '', 'alpha', 'g', 'accepted', ?, '2026-01-01T00:00:00Z', ?)`, rid, task.ID, fmt.Sprintf("2030-01-01T00:00:%02dZ", 1+i/10))
+		require.NoError(t, err)
+		ids = append(ids, task.ID)
 	}
-	seen := map[int64]int{}
+	var got []int64
 	cursor, pages := "", 0
 	for {
-		page, err := s.GoalLinks(ctx, rid, "", "alpha", cursor, nil)
+		reply, err := s.GoalLinks(ctx, rid, "", "alpha", cursor, 50, nil)
 		require.NoError(t, err)
 		pages++
-		assert.LessOrEqual(t, len(page.Links), GoalLinksPageSize)
-		for _, l := range page.Links {
-			seen[l.ID]++
+		assert.Equal(t, 120, reply.AcceptedTotal, "the total is exact on every page")
+		for _, l := range reply.Accepted {
+			got = append(got, l.TaskID)
 		}
-		if page.Next == "" {
+		if reply.NextCursor == nil {
 			break
 		}
-		assert.Len(t, page.Links, GoalLinksPageSize, "a full page when there is a next one")
-		cursor = page.Next
+		assert.Len(t, reply.Accepted, 50, "a full page when there is a next one")
+		assert.LessOrEqual(t, len(*reply.NextCursor), GoalLinksMaxCursor)
+		cursor = *reply.NextCursor
 		require.Less(t, pages, 10)
 	}
 	assert.Equal(t, 3, pages, "50, 50 and 20")
-	assert.Len(t, seen, 120)
-	for id, n := range seen {
-		assert.Equal(t, 1, n, "task %d once", id)
+	// the first request's own row was made at accept time (now), after the 2030 ones? no: before. Either way each row is once and the order is (accepted_at, task_id).
+	assert.ElementsMatch(t, ids, got)
+	seen := map[int64]bool{}
+	for _, id := range got {
+		assert.False(t, seen[id], "task %d once", id)
+		seen[id] = true
 	}
-	assert.Contains(t, seen, first.ID)
-	assert.Equal(t, 50, GoalLinksPageSize)
 
-	// a cursor of one request is no good on another, for another asker, or when made up
-	page, err := s.GoalLinks(ctx, rid, "", "alpha", "", nil)
+	// a limit smaller than the default pages by that many
+	small, err := s.GoalLinks(ctx, rid, "", "alpha", "", 7, nil)
 	require.NoError(t, err)
-	require.NotEmpty(t, page.Next)
+	assert.Len(t, small.Accepted, 7)
+	require.NotNil(t, small.NextCursor)
+	assert.Equal(t, got[:7], func() (o []int64) {
+		for _, l := range small.Accepted {
+			o = append(o, l.TaskID)
+		}
+		return
+	}(), "the same order whatever the limit")
+
+	// a cursor of one request is no good on another, for another asker, or when made up or too long
 	for _, bad := range []struct{ id, server, board, cursor string }{
-		{rid2, "", "alpha", page.Next}, {rid, "srv", "alpha", page.Next}, {rid, "", "alpha", "not-a-cursor"},
+		{rid2, "", "alpha", *small.NextCursor}, {rid, "srv", "alpha", *small.NextCursor}, {rid, "", "alpha", "not-a-cursor"}, {rid, "", "alpha", strings.Repeat("A", GoalLinksMaxCursor+1)},
 	} {
-		_, err := s.GoalLinks(ctx, bad.id, bad.server, bad.board, bad.cursor, nil)
+		_, err := s.GoalLinks(ctx, bad.id, bad.server, bad.board, bad.cursor, 50, nil)
 		assert.ErrorIs(t, err, ErrBadGoalLinksQuery, "%+v", bad)
+	}
+}
+
+// The receiving board's switch off: the Hub is told by name, but only for a request this asker really sent; for any other asker or an unknown id the answer is the same empty one as ever.
+func TestGoalLinksSayGoalRequestsOffOnlyForTheAskersOwnRequest(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	rid, _ := acceptedRequest(t, s, ctx, "alpha", "beta", "job", "")
+	off := false
+	_, err := s.UpdateBoardSettings(ctx, "beta", BoardSettingsUpdate{GoalRequests: &off})
+	require.NoError(t, err)
+	_, err = s.GoalLinks(ctx, rid, "", "alpha", "", 50, nil)
+	assert.ErrorIs(t, err, ErrGoalRequestsOff)
+	for _, c := range []struct{ id, server, board string }{{rid, "", "gamma"}, {rid, "srv-x", "alpha"}, {strings.Repeat("0", 32), "", "alpha"}} {
+		reply, err := s.GoalLinks(ctx, c.id, c.server, c.board, "", 50, nil)
+		require.NoError(t, err, "%+v", c)
+		assert.Empty(t, reply.Accepted, "%+v: no oracle for a request that is not this asker's", c)
+	}
+}
+
+// The state words are the closed lists of the frozen API (#7411); the tables' CHECK constraints say the same words.
+func TestGoalRequestStateWordsAreTheClosedLists(t *testing.T) {
+	assert.Equal(t, []string{"pending", "accepted", "declined", "expired"}, GoalRequestReceiverStates)
+	assert.Equal(t, []string{"requested", "accepted", "declined", "expired"}, GoalRequestAskerStates)
+	s := testStore(t)
+	ctx := context.Background()
+	for _, w := range []string{"pending", "accepted", "declined", "expired"} {
+		_, err := s.db.ExecContext(ctx, `INSERT INTO board_goal_requests_in (board_id, request_id, from_board, goal_uid, status, created_at) VALUES ('b', ?, 'a', 'g', ?, 'x')`, w+strings.Repeat("0", 32-len(w)), w)
+		assert.NoError(t, err, w)
+	}
+	_, err := s.db.ExecContext(ctx, `INSERT INTO board_goal_requests_in (board_id, request_id, from_board, goal_uid, status, created_at) VALUES ('b', 'zz', 'a', 'g', 'requested', 'x')`)
+	assert.Error(t, err, "the receiver's table does not take the asker's word")
+}
+
+// #7411 (Security's MUST 2): the key of a request is (receiving board, sender server, sender board, request id), in the received rows and in the tasks made from them. Two senders that choose the same
+// id, or two boards of one sender, each get their own row and their own task, and each is told only its own.
+func TestTwoSendersWithOneRequestIDEachGetTheirOwnRowAndTask(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	on := true
+	_, err := s.UpdateBoardSettings(ctx, "beta", BoardSettingsUpdate{GoalRequests: &on})
+	require.NoError(t, err)
+	rid := strings.Repeat("ab", 16)
+	type sender struct{ server, board string }
+	senders := []sender{{"srv-1", "alpha"}, {"srv-2", "alpha"}, {"srv-1", "gamma"}}
+	titles := map[sender]string{}
+	for i, sd := range senders {
+		_, err := s.db.ExecContext(ctx, `INSERT INTO board_goal_requests_in (board_id, request_id, from_server, from_board, goal_uid, status, created_at) VALUES ('beta', ?, ?, ?, ?, 'pending', '2030-01-01T00:00:00Z')`,
+			rid, sd.server, sd.board, fmt.Sprintf("goal-%d", i))
+		require.NoError(t, err, "a second sender's row with the same id is not a conflict")
+	}
+	// the same sender and id again IS a conflict
+	_, err = s.db.ExecContext(ctx, `INSERT INTO board_goal_requests_in (board_id, request_id, from_server, from_board, goal_uid, status, created_at) VALUES ('beta', ?, 'srv-1', 'alpha', 'x', 'pending', 'x')`, rid)
+	require.Error(t, err)
+	for i, sd := range senders {
+		var id int64
+		require.NoError(t, s.db.GetContext(ctx, &id, `SELECT id FROM board_goal_requests_in WHERE from_server = ? AND from_board = ?`, sd.server, sd.board))
+		titles[sd] = fmt.Sprintf("job for %s/%s", sd.server, sd.board)
+		task, _, err := s.AcceptGoalRequest(ctx, "beta", id, titles[sd], "", "medium", "Orch", "")
+		require.NoError(t, err, "sender %d", i)
+		require.NotZero(t, task.ID)
+	}
+	for _, sd := range senders {
+		reply, err := s.GoalLinks(ctx, rid, sd.server, sd.board, "", 50, nil)
+		require.NoError(t, err)
+		require.Len(t, reply.Accepted, 1, "%v sees one row: its own", sd)
+		assert.Equal(t, titles[sd], reply.Accepted[0].Title, "%v sees its own task, not another sender's", sd)
 	}
 }

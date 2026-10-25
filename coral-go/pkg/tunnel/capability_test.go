@@ -42,4 +42,5 @@ func TestAHelloCarryingBothCapabilitiesIsRead(t *testing.T) {
 	assert.True(t, HasCapability(h.Capabilities, CapCrossTeamAllowlist))
 	assert.True(t, HasCapability(h.Capabilities, CapCrossTeamLinks))
 	assert.Equal(t, "cross_team_links/1", CapCrossTeamLinks)
+	assert.Equal(t, "goal_links/1", CapGoalLinks)
 }
