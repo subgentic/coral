@@ -6,7 +6,6 @@ import { switchRow } from './switch_row.js';
 import { escapeHtml } from './utils.js';
 import { boardFetch } from './server_base.js';
 const { healthPanelHTML, readHealth, healthProblem, wireHealthForm, HEALTH_DEFAULTS } = await importOnce('./team_health_settings.js');
-const { bindInfo } = await importOnce('./info_toggle.js');
 const { requireGoalSentence } = await importOnce('./task_goals.js');
 const { initSectionDialog } = await importOnce('./section_dialog.js');
 
@@ -46,11 +45,18 @@ export function mountTeamLaunchSettings() {
     const rcpt = hc.querySelector('select[name="recipient"]');
     if (rcpt) { rcpt.value = ''; const label = rcpt.closest('label'); if (label) label.hidden = true; }
     const why = hc.querySelector('#hc-on-h'); if (why) why.textContent = 'Checks in on the team every few minutes. Sent to the Orchestrator. Uses tokens each time.';
-    bindInfo(hc);
+    // No (i) icons here: each switch's line is on the page (the Workflow tab's pattern), and the rows that only matter while the check is on are hidden until it is.
+    hc.querySelectorAll('.settings-info-btn').forEach(b => b.remove());
+    hc.querySelector('#hc-on-w')?.remove();
+    const clearHint = hc.querySelector('#hc-clear-w'); if (clearHint) { clearHint.hidden = false; clearHint.className = 'settings-hint'; hc.querySelector('[data-check-dep]')?.after(clearHint); }
     const hform = hc.querySelector('form');
     hform.classList.remove('working-mode-form'); hform.classList.add('team-launch-health'); // not the Team settings dialog's form: that name is looked up page-wide
     hform.addEventListener('submit', e => e.preventDefault()); // there is no Save here: Launch team saves it
     wireHealthForm(hform);
+    const dependents = [...hform.querySelectorAll('.health-row, [data-check-dep]'), clearHint].filter(Boolean);
+    const syncDependents = () => { const on = hform.querySelector('[name="on"]').checked; for (const e of dependents) e.hidden = !on; };
+    hform.querySelector('[name="on"]').addEventListener('change', syncDependents);
+    syncDependents();
     ms.innerHTML = messagingHTML();
     for (const id of ['team-goal', 'team-custom-instructions']) { const el = document.getElementById(id); if (el) el.value = ''; }
     const shell = document.querySelector('#launch-step-team .settings-shell');
