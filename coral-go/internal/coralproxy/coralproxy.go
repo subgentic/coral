@@ -25,13 +25,15 @@ func Active() bool {
 	return v != "" && v != "0" && v != "false" && v != "no"
 }
 
-// loopbackHost reports whether host (no port) is localhost or a loopback address.
-func loopbackHost(host string) bool {
-	if strings.EqualFold(host, "localhost") {
-		return true
-	}
+// loopbackIP reports whether host (no port) is a loopback IP address.
+func loopbackIP(host string) bool {
 	ip := net.ParseIP(strings.Trim(host, "[]"))
 	return ip != nil && ip.IsLoopback()
+}
+
+// loopbackHost reports whether host (no port) is localhost or a loopback IP address: the request side.
+func loopbackHost(host string) bool {
+	return strings.EqualFold(host, "localhost") || loopbackIP(host)
 }
 
 // codexProxy is Codex's proxy from the environment: an http(s) URL on a loopback address, or nil.
@@ -45,7 +47,7 @@ func codexProxy() *url.URL {
 			raw = "http://" + raw
 		}
 		u, err := url.Parse(raw)
-		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" || !loopbackHost(u.Hostname()) {
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" || !loopbackIP(u.Hostname()) { // an IP, never the name localhost: a changed hosts file must not move the proxy
 			continue
 		}
 		return u

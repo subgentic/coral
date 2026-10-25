@@ -58,7 +58,7 @@ func TestWithoutCodexsMarkerAPersonsProxyIsNeverUsedForLoopback(t *testing.T) {
 func TestAProxyThatIsNotOnThisComputerIsNeverGivenCorasRequest(t *testing.T) {
 	clearProxyEnv(t)
 	t.Setenv(Marker, "1")
-	for _, bad := range []string{"http://proxy.example.invalid:3128", "http://10.0.0.5:3128", "socks5://127.0.0.1:1080", "http://", "://x", "http://user:pw@corp.example.invalid:8080"} {
+	for _, bad := range []string{"http://localhost:43999", "http://127.0.0.1@evil.example.invalid:3128", "http://localhost.evil.example.invalid:3128", "http://127.0.0.1.evil.example.invalid:3128", "http://0.0.0.0:3128", "http://127.1:3128", "http://2130706433:3128", "http://proxy.example.invalid:3128", "http://10.0.0.5:3128", "socks5://127.0.0.1:1080", "http://", "://x", "http://user:pw@corp.example.invalid:8080"} {
 		t.Setenv("HTTP_PROXY", bad)
 		u, _ := Func(reqFor(t, "http://127.0.0.1:8420/"))
 		assert.Nil(t, u, "the request carries Coral's session token: %q must not be used", bad)
@@ -69,6 +69,20 @@ func TestAProxyThatIsNotOnThisComputerIsNeverGivenCorasRequest(t *testing.T) {
 	u, _ := Func(reqFor(t, "http://127.0.0.1:8420/"))
 	require.NotNil(t, u)
 	assert.Equal(t, "127.0.0.1:43999", u.Host)
+}
+
+// Security's LOW on #7489: with the marker on and a good Codex proxy, a request for a host that is NOT loopback is never sent to the Codex proxy by this function.
+func TestARemoteTargetIsNeverSentToTheCodexProxy(t *testing.T) {
+	clearProxyEnv(t)
+	t.Setenv(Marker, "1")
+	t.Setenv("HTTP_PROXY", "http://127.0.0.1:43999")
+	for _, target := range []string{"http://coral.example.invalid:8420/", "http://10.0.0.5:8420/", "https://example.invalid/", "http://127.0.0.1.evil.example.invalid:8420/"} {
+		// the decision is http.ProxyFromEnvironment's (the person's own settings), exactly as before: the Codex branch is not taken for a target that is not loopback
+		want, wantErr := http.ProxyFromEnvironment(reqFor(t, target))
+		got, err := Func(reqFor(t, target))
+		assert.Equal(t, wantErr, err, target)
+		assert.Equal(t, want, got, target)
+	}
 }
 
 func TestARequestToAnotherHostGoesTheNormalWay(t *testing.T) {
