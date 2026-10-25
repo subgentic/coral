@@ -69,6 +69,14 @@ func filesCacheFresh(files []store.ChangedFile, maxAge time.Duration, now time.T
 func (h *SessionsHandler) Files(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")
 	sidPtr := querySessionID(r)
+	if sid := ""; sidPtr != nil {
+		sid = *sidPtr
+		if !h.requireAgentSession(w, r, name, sid) {
+			return
+		}
+	} else if !h.requireAgentSession(w, r, name, "") {
+		return
+	}
 
 	diffMode := h.getDiffMode(r.Context())
 	if diffMode == "" {
@@ -133,7 +141,10 @@ func gitCmd(ctx context.Context, workdir string, args ...string) *exec.Cmd {
 
 // refreshFilesInner contains the shared logic for computing fresh changed files.
 func (h *SessionsHandler) refreshFilesInner(w http.ResponseWriter, r *http.Request, name, sessionID string) {
-	workdir := h.resolveGitRoot(r.Context(), name, "", sessionID)
+	if !h.requireAgentSession(w, r, name, sessionID) {
+		return
+	}
+	workdir := h.resolveGitRoot(agentCtx(r), name, "", sessionID)
 	if workdir == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "Could not determine working directory", "files": []any{}})
 		return
