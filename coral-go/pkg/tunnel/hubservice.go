@@ -59,6 +59,11 @@ func hubServiceFrom(ctx context.Context) (HubAsker, bool) {
 	return a, ok
 }
 
+// serviceStamped reports whether the stream carries the Hub service's complete stamp: the flag and a well formed asker.
+func serviceStamped(h Header) bool {
+	return h.HubService && ValidHubAsker(HubAsker{Server: h.AskServer, Board: h.AskBoard})
+}
+
 // IsServiceRoute reports whether (method, decodedPath) is a service route of the table (routes.go).
 func IsServiceRoute(method, decodedPath string) bool {
 	if method == http.MethodHead {
