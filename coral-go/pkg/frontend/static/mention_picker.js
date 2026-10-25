@@ -41,7 +41,8 @@ export function attachMentionPicker(input, names) {
     function pick(name) {
         if (!current) return;
         const text = input.value, cursor = input.selectionStart, before = text.slice(0, current.at), after = text.slice(cursor);
-        input.value = `${before}@${name} ${after}`;
+        const spaced = /^\s/.test(after); // a picked name in the middle of a text is followed by the space already there, not a second one
+        input.value = `${before}@${name}${spaced ? '' : ' '}${after}`;
         input.selectionStart = input.selectionEnd = before.length + name.length + 2;
         close();
         input.focus();
@@ -65,6 +66,7 @@ export function attachMentionPicker(input, names) {
     }
     input.addEventListener('input', open);
     input.addEventListener('click', open);
+    input.addEventListener('keyup', (e) => { if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) open(); }); // moving the caret fires no input event: the list follows the @ the caret is at, or closes
     input.addEventListener('blur', () => { if (!list.hidden) close(); });
     input.addEventListener('keydown', (e) => {
         if (list.hidden || e.isComposing) return;

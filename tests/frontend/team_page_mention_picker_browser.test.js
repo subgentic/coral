@@ -76,6 +76,25 @@ const TEAM = `qa-mention-${Date.now() % 100000}`;
                 const sent = await ev(`window.__writes`);
                 assert.ok(sent.some(x => x.m === 'POST' && /\/messages$/.test(x.p) && /Look @Orchestrator/.test(x.b)), `Enter sent the message (${JSON.stringify(sent.map(x => x.m + ' ' + x.p))})`);
             });
+            await S.run(`${label}: moving the caret re-reads the @ it is at (QA Reviewer 2's #7549 follow-up A): Enter then picks at the caret`, async () => {
+                await type('@Ba'); await settle(200);
+                assert.deepEqual((await list()).options.map(o => o.text), ['Backend Dev'], 'the query is "Ba"');
+                await ev(`(() => { const b = ${box}; b.selectionStart = b.selectionEnd = 2; b.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowLeft', bubbles: true })); return true; })()`); await settle(200);
+                assert.deepEqual((await list()).options.map(o => o.text.replace(/\s+Notify.*/, '')), ['Backend Dev'], 'the caret is after "B": the query is "B"');
+                await key('Enter'); await settle(200);
+                assert.equal(await ev(`${box}.value`), '@Backend Dev a', 'the pick replaced "@B" at the caret and kept the "a" after it');
+                await type('x @Orch'); await settle(200);
+                assert.ok(await list(), 'open at the end');
+                await ev(`(() => { const b = ${box}; b.selectionStart = b.selectionEnd = 1; b.dispatchEvent(new KeyboardEvent('keyup', { key: 'Home', bubbles: true })); return true; })()`); await settle(200);
+                assert.equal(await list(), null, 'the caret moved away from the @: the list closes');
+            });
+            await S.run(`${label}: a name picked in the middle of a text keeps one space (follow-up B)`, async () => {
+                await ev(`(() => { const b = ${box}; b.focus(); b.value = 'see @ and more'; b.selectionStart = b.selectionEnd = 5; b.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`); await settle(200);
+                assert.ok(await list(), 'the list opens at the @ in the middle');
+                await key('ArrowDown'); await key('Enter'); await settle(200);
+                assert.equal(await ev(`${box}.value`), 'see @Orchestrator and more', 'one space between the name and "and"');
+                assert.equal(await ev(`${box}.selectionStart`), 'see @Orchestrator '.length, 'the caret is after the space, in front of "and"');
+            });
         }
         await removeBoards(ev, [TEAM]); S.finish(); // finish() exits the process, so the board goes first
     } finally { await removeBoards(ev, [TEAM]); await client.close(); }
