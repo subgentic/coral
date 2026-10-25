@@ -43,6 +43,12 @@ def split(names, shards):
     return out
 
 
+def unknown_alone(alone, names):
+    """The --alone names the package has no test of: a renamed test must not silently leave the quiet step and run in a shard."""
+    have = set(names)
+    return sorted(n for n in set(alone) if n not in have)
+
+
 def empty_shards(parts, mine):
     """The 1-based numbers of the selected shards that were given no test. A shard that runs nothing passes, so an empty one is an error:
     a test list that did not come out (a package that lists nothing, a --shards larger than the package) must not look like a pass."""
@@ -109,18 +115,34 @@ def go(args, **kw):
     return subprocess.run(["go"] + args, cwd=MODULE_DIR, **kw)
 
 
-def run_shard(idx, names, binary, pkgdir, work, flags, timeout, count):
-    listfile = os.path.join(work, "shard-%d.txt" % (idx + 1))
+def run_shard(label, names, binary, pkgdir, work, flags, timeout, count):
+    listfile = os.path.join(work, "%s.txt" % label)
     with open(listfile, "w", newline="\n") as f:
         f.write("\n".join(names) + "\n")
     env = dict(os.environ, CORAL_TEST_SHARD_LIST=listfile)
     cmd = ["go", "tool", "test2json", "-p", "shard", binary, "-test.v=test2json", "-test.timeout=" + timeout, "-test.count=%d" % count] + flags
-    log = os.path.join(work, "shard-%d.log" % (idx + 1))
+    log = os.path.join(work, "%s.log" % label)
     with open(log, "wb") as out:
         rc = subprocess.run(cmd, cwd=pkgdir, env=env, stdout=out, stderr=subprocess.STDOUT).returncode
     with open(log, encoding="utf-8", errors="replace") as f:
         lines = f.read().splitlines()
-    return idx, rc, lines
+    return label, rc, lines
+
+
+def report(label, rc, lines, assigned):
+    """Print one process's result; True when it failed (a non-zero exit, or a test that did not report exactly once)."""
+    problems = verify(assigned, top_level_results(lines))
+    counts = {}
+    for e, _ in parse(lines):
+        if e and e.get("Test") and "/" not in e["Test"] and e.get("Action") in ("pass", "fail", "skip"):
+            counts[e["Action"]] = counts.get(e["Action"], 0) + 1
+    print("%s: exit %d, %s" % (label, rc, ", ".join("%d %s" % (v, k) for k, v in sorted(counts.items())) or "no results"), flush=True)
+    if rc or problems:
+        print(failure_output(lines))
+        for p in problems:
+            print("%s: %s" % (label, p))
+        return True
+    return False
 
 
 def main(argv):
@@ -130,6 +152,8 @@ def main(argv):
     ap.add_argument("--tags", default="")
     ap.add_argument("--timeout", default="40m")
     ap.add_argument("--count", type=int, default=1)
+    ap.add_argument("--alone", action="append", default=[], metavar="TEST",
+                    help="a test with a wall-clock bound: run by itself, in one process before the shards start (with --shard, in shard 1's run), and in no shard. Repeatable. A name the package does not have is an error")
     ap.add_argument("pkg")
     ap.add_argument("flags", nargs="*", help="after --: flags for the test binary, as -test.short")
     a = ap.parse_args(argv)
@@ -152,33 +176,35 @@ def main(argv):
             sys.stderr.write(listing.stdout + listing.stderr)
             return 2
         names = [n for n in listing.stdout.split() if n.startswith(LISTABLE)]
-        parts = split(names, a.shards)
-        assert sorted(sum(parts, [])) == sorted(names), "the shards are not the whole package"
+        missing = unknown_alone(a.alone, names)
+        if missing:
+            print("FAIL: --alone names no test of %s: %s (renamed or removed? edit the list)" % (a.pkg, ", ".join(missing)))
+            return 2
+        alone = sorted(set(a.alone))
+        shared = [n for n in names if n not in alone]
+        parts = split(shared, a.shards)
+        assert sorted(sum(parts, []) + alone) == sorted(names), "the shards are not the whole package"
         mine = [i for i in range(a.shards) if a.shard in (None, i + 1)]
         empty = empty_shards(parts, mine)
         if empty:
             print("FAIL: %s lists %d tests, and shard(s) %s of %d would run none" % (a.pkg, len(names), ",".join(map(str, empty)), a.shards))
             return 2
-        print("%s: %d tests; shards %s of %d: %s tests" % (a.pkg, len(names), ",".join(str(i + 1) for i in mine), a.shards,
-                                                          ",".join(str(len(parts[i])) for i in mine)), flush=True)
+        print("%s: %d tests; shards %s of %d: %s tests; alone: %d" % (a.pkg, len(names), ",".join(str(i + 1) for i in mine), a.shards,
+                                                               ",".join(str(len(parts[i])) for i in mine), len(alone)), flush=True)
         failed = []
+        if alone and 0 in mine:
+            # The timing tests run first, in a quiet process: nothing else of this run is using the machine yet.
+            label, rc, lines = run_shard("alone", alone, binary, pkgdir, work, a.flags, a.timeout, a.count)
+            if report(label, rc, lines, alone):
+                failed.append(label)
         with concurrent.futures.ThreadPoolExecutor(max_workers=len(mine)) as pool:
-            jobs = [pool.submit(run_shard, i, parts[i], binary, pkgdir, work, a.flags, a.timeout, a.count) for i in mine]
+            jobs = [pool.submit(run_shard, "shard %d" % (i + 1), parts[i], binary, pkgdir, work, a.flags, a.timeout, a.count) for i in mine]
             for job in concurrent.futures.as_completed(jobs):
-                idx, rc, lines = job.result()
-                problems = verify(parts[idx], top_level_results(lines))
-                counts = {}
-                for e, _ in parse(lines):
-                    if e and e.get("Test") and "/" not in e["Test"] and e.get("Action") in ("pass", "fail", "skip"):
-                        counts[e["Action"]] = counts.get(e["Action"], 0) + 1
-                print("shard %d: exit %d, %s" % (idx + 1, rc, ", ".join("%d %s" % (v, k) for k, v in sorted(counts.items())) or "no results"), flush=True)
-                if rc or problems:
-                    failed.append(idx + 1)
-                    print(failure_output(lines))
-                    for p in problems:
-                        print("shard %d: %s" % (idx + 1, p))
+                label, rc, lines = job.result()
+                if report(label, rc, lines, parts[int(label.split()[1]) - 1]):
+                    failed.append(label)
         if failed:
-            print("FAIL: shard(s) %s" % ",".join(str(i) for i in sorted(failed)))
+            print("FAIL: %s" % ", ".join(sorted(failed)))
             return 1
         print("ok: every test of the shard(s) ran exactly once")
         return 0

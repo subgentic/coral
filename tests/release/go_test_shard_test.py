@@ -56,6 +56,19 @@ class EmptyShardTests(unittest.TestCase):
         self.assertTrue(shard.empty_shards(shard.split(["TestA", "TestB"], 8), range(8)))
 
 
+class AloneTests(unittest.TestCase):
+    def test_a_name_the_package_lacks_is_reported(self):
+        self.assertEqual(["TestGone"], shard.unknown_alone(["TestA", "TestGone"], ["TestA", "TestB"]))
+        self.assertEqual([], shard.unknown_alone([], ["TestA"]))
+
+    def test_the_alone_tests_and_the_shards_are_the_whole_package(self):
+        names = ["Test%d" % i for i in range(100)]
+        alone = ["Test3", "Test50"]
+        parts = shard.split([n for n in names if n not in alone], 4)
+        self.assertEqual(sorted(names), sorted(sum(parts, []) + alone))
+        self.assertFalse(set(alone) & set(sum(parts, [])))
+
+
 class VerifyTests(unittest.TestCase):
     def test_a_clean_shard_has_no_problem(self):
         self.assertEqual([], shard.verify(["TestA", "TestB"], ["TestB", "TestA"]))

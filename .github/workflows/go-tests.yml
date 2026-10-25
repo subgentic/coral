@@ -85,7 +85,9 @@ jobs:
           if [ "$SHARD" = routes ]; then
             # routes' 2,200 tests run one after another in a single process (about 20 minutes here); the same tests split over four processes
             # of this runner (#350), and the script fails when a test did not run exactly once.
-            python3 ../tools/go_test_shard.py --shards 4 --timeout 45m ${TAGS:+--tags "$TAGS"} "${pkgs[0]}"
+            # The tests with a wall-clock bound (the slow-input guards of the shell-risk reading) run first and alone, in a quiet process: the bound holds
+            # unchanged, and four processes sharing the CPU can't trip it. The script fails when one of these names no longer exists.
+            python3 ../tools/go_test_shard.py --shards 4 --timeout 45m ${TAGS:+--tags "$TAGS"}               --alone TestShellRiskDeepNestingIsAnsweredInOnePass --alone TestShellRiskWrapperRecursionIsMemoizedPerRun               --alone TestShellRiskNestedShellWrappersAreBoundedInTime --alone TestShellRiskNestedLaunchersAreBounded               --alone TestShellRiskNestedSubstitutionIsBoundedInTime "${pkgs[0]}"
           else
             go test -count=1 -p 4 -timeout 45m ${TAGS:+-tags "$TAGS"} "${pkgs[@]}"
           fi
