@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -28,9 +29,9 @@ import (
 
 var (
 	// personHoldSettle is how long the agent must show no box before a held message is typed: a next box opens within moments of the last one's answer.
-	personHoldSettle = 1500 * time.Millisecond
+	personHoldSettle = newHoldDuration(1500 * time.Millisecond)
 	// personHoldPoll is how often the agent's signals are read while a message waits.
-	personHoldPoll = 250 * time.Millisecond
+	personHoldPoll = newHoldDuration(250 * time.Millisecond)
 	// personHoldMax is how long a message waits for the boxes to clear.
 	personHoldMax = 30 * time.Minute
 	// personHoldMaxPerAgent and personHoldMaxTotal bound what can wait.
@@ -279,7 +280,7 @@ func (h *SessionsHandler) releaseOne(m *personHeld) error {
 			clearSince = time.Time{}
 		case clearSince.IsZero():
 			clearSince = time.Now()
-		case time.Since(clearSince) >= personHoldSettle:
+		case time.Since(clearSince) >= personHoldSettle.Load():
 			if m.viaHub && MaxModeFromSettings(h.ss)() < tunnel.TierInteract {
 				return errSendModeLowered // the message waited with the authority a Coral Hub viewer at Interact had; it is not typed under a lower mode (Security's SHOULD on #6610)
 			}
@@ -295,7 +296,7 @@ func (h *SessionsHandler) releaseOne(m *personHeld) error {
 			defer scancel()
 			return h.deliverHumanSend(sctx, m.name, m.agentType, m.sessionID, m.text)
 		}
-		if err := sleepCtx(ctx, personHoldPoll); err != nil {
+		if err := sleepCtx(ctx, personHoldPoll.Load()); err != nil {
 			if errors.Is(err, context.DeadlineExceeded) {
 				return errSendHeldExpired
 			}
@@ -341,3 +342,17 @@ func (h *SessionsHandler) CancelHeld(w http.ResponseWriter, r *http.Request) {
 		errInternalServer(w, err.Error())
 	}
 }
+
+// holdDuration is a timing a test shortens while a hold's goroutine may still be running (a message held when its test ends is released by the session's end, a moment later): read and set atomically, so the
+// -race detector sees no race between the two (#7448).
+type holdDuration struct{ ns atomic.Int64 }
+
+func newHoldDuration(d time.Duration) *holdDuration {
+	v := &holdDuration{}
+	v.ns.Store(int64(d))
+	return v
+}
+
+// Load is the timing; Store sets it.
+func (v *holdDuration) Load() time.Duration   { return time.Duration(v.ns.Load()) }
+func (v *holdDuration) Store(d time.Duration) { v.ns.Store(int64(d)) }

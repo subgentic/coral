@@ -82,12 +82,13 @@ func newHoldRig(t *testing.T, withSignals bool) *holdRig {
 		r.post(`{"event_type":"session_end","summary":"Session ended: other","detail_json":{"reason":"other"}}`)
 		require.Eventually(t, func() bool { return !r.h.holds.waiting(personKey(name, sid)) }, 5*time.Second, 10*time.Millisecond, "the holds ended")
 	})
-	oldS, oldP := personHoldSettle, personHoldPoll
-	personHoldSettle, personHoldPoll = 150*time.Millisecond, 10*time.Millisecond
+	oldS, oldP := personHoldSettle.Load(), personHoldPoll.Load()
+	personHoldSettle.Store(150 * time.Millisecond)
+	personHoldPoll.Store(10 * time.Millisecond)
 	r.h.sendGate.set(func(tm *humanSendTimings) {
 		tm.ReadyWait, tm.PollEvery, tm.EnterWait, tm.ConfirmWait, tm.SlowCommandWait = 400*time.Millisecond, 5*time.Millisecond, 30*time.Millisecond, 400*time.Millisecond, 400*time.Millisecond
 	})
-	t.Cleanup(func() { personHoldSettle, personHoldPoll = oldS, oldP })
+	t.Cleanup(func() { personHoldSettle.Store(oldS); personHoldPoll.Store(oldP) })
 	return r
 }
 
@@ -124,7 +125,7 @@ func TestPersonMessageIsHeldWhileAnAgentBoxIsOpenAndSentOnceNoneIsLeft(t *testin
 			assert.Equal(t, true, out["held"])
 			assert.Equal(t, heldNote, out["note"])
 
-			time.Sleep(4 * personHoldSettle)
+			time.Sleep(4 * personHoldSettle.Load())
 			assert.Empty(t, r.typed(), "nothing is typed into the box, however long it stays open")
 
 			r.answered()
@@ -140,20 +141,20 @@ func TestPersonMessageWaitsThroughEveryBoxInARow(t *testing.T) {
 	require.Equal(t, http.StatusAccepted, r.send("go on").Code)
 
 	r.answered()
-	time.Sleep(personHoldSettle / 3) // the next box opens right after the first one's answer, inside the settle time
+	time.Sleep(personHoldSettle.Load() / 3) // the next box opens right after the first one's answer, inside the settle time
 	r.box("permission")
-	time.Sleep(3 * personHoldSettle)
+	time.Sleep(3 * personHoldSettle.Load())
 	assert.Empty(t, r.typed(), "the second box in the row holds it too")
 
 	r.answered()
-	time.Sleep(personHoldSettle / 3)
+	time.Sleep(personHoldSettle.Load() / 3)
 	r.box("question") // and a third
-	time.Sleep(3 * personHoldSettle)
+	time.Sleep(3 * personHoldSettle.Load())
 	assert.Empty(t, r.typed(), "and the third")
 
 	r.answered()
 	r.waitTyped(1, 3*time.Second)
-	time.Sleep(2 * personHoldSettle)
+	time.Sleep(2 * personHoldSettle.Load())
 	assert.Equal(t, []string{"go on"}, r.typed(), "sent once, when none was left")
 }
 
@@ -259,7 +260,7 @@ func TestHeldPersonMessageKeepsWaitingWhenTheSignalsCannotBeReadNow(t *testing.T
 	require.NoError(t, err)
 	_, ok := r.h.gateState(context.Background(), r.name, "claude", r.sid)
 	require.False(t, ok, "the signals are unreadable now")
-	time.Sleep(5 * personHoldSettle)
+	time.Sleep(5 * personHoldSettle.Load())
 	assert.Empty(t, r.typed(), "no evidence the box is gone: nothing is typed into it")
 	assert.True(t, r.h.holds.waiting(personKey(r.name, r.sid)), "and it is still held: no delivery was even tried")
 }
