@@ -33,7 +33,7 @@
 .team-tab:hover { color: var(--text-primary); }
 .team-tab[aria-selected="true"] { color: var(--text-primary); font-weight: 600; border-bottom-color: var(--accent); }
 .team-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: var(--radius-sm); }
-.team-tab-count { margin-left: 6px; padding: 0 7px; border-radius: 999px; background: var(--bg-hover); color: var(--text-secondary); font-size: 0.6875rem; font-weight: 600; line-height: 1.5; }
+.team-tab-count { margin-left: 6px; padding: 0 7px; border-radius: 999px; background: var(--bg-hover); color: var(--text-primary); font-size: 0.6875rem; font-weight: 600; line-height: 1.5; }
 .team-tab-count[hidden] { display: none; }
 
 .team-page-row { flex: 1; min-height: 0; display: flex; }
@@ -78,7 +78,7 @@
 .goals-updating { min-height: 1.2em; margin: 0; } /* its slot keeps its height whether or not it says Updating */
 .team-task-md { overflow-wrap: anywhere; font-size: 0.875rem; max-width: 80ch; }
 .team-task-text { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: 0.875rem; margin: 0; max-width: 80ch; }
-.goals-pinbar { position: sticky; bottom: 0; margin-top: auto; display: flex; gap: 8px; justify-content: flex-end; padding: 12px 0; background: var(--bg-primary); border-top: 1px solid var(--border); z-index: 2; }
+.goals-pinbar { position: sticky; bottom: 0; margin-top: auto; display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; padding: 12px 0; background: var(--bg-primary); border-top: 1px solid var(--border); z-index: 2; }
 .goals-pinbar .btn { min-height: 36px; }
 
 /* the detail pane: documents only */
@@ -124,7 +124,9 @@
     .team-page-actions .btn, .goals-pinbar .btn, .team-more-menu > button { min-height: 44px; }
     .team-more-menu > button.team-more-add { display: block !important; }
     .goals-table-page { padding: 12px 16px 0; }
-    .goals-pinbar .btn { flex: 1; }
+    .goals-pinbar .btn { flex: 1 1 auto; }
+    .goals-table-page .goals-back { min-height: 44px; }
+    .team-task-extra summary { min-height: 44px; display: flex; align-items: center; } /* the dialog's folded sections are 44 px targets on a phone */
     .team-table th:nth-child(n+3), .team-table td:nth-child(n+3) { display: none; } /* the name cell carries its second line: who and which goal fold into it (the phone's table is Name and State) */
     .team-row-phone { display: block; }
     .team-table-agents th:nth-child(5), .team-table-agents td:nth-child(5) { display: table-cell; } /* the Agents table keeps Remind on a phone: Agent, Status, Remind */
@@ -225,3 +227,20 @@
 .detail-readers:not(:empty) { margin-bottom: 12px; }
 .team-row-cell .team-artifact-badge { white-space: normal; overflow-wrap: anywhere; } /* the origin words wrap in the name cell (a 390 px phone at 200% text) instead of widening the table */
 .team-artifacts-error { color: var(--error-text); } /* a failed load is red, not the grey of the other lines (UX #4469) */
+
+/* a task's page as a form (#7644): Edit and Complete on the page, the fields the dialog had, one column */
+.team-task-form, #team-panel-item .task-completion-form { max-width: 760px; margin-top: 12px; }
+.team-task-form label, #team-panel-item .task-completion-form label { display: flex; flex-direction: column; gap: 4px; margin: 0 0 12px; font-size: 0.8125rem; font-weight: 500; color: var(--text-primary); }
+.team-task-form input[type="text"], .team-task-form select, .team-task-form textarea,
+#team-panel-item .task-completion-form input:not([type="file"]), #team-panel-item .task-completion-form select, #team-panel-item .task-completion-form textarea { width: 100%; box-sizing: border-box; padding: 8px 10px; font: inherit; font-weight: 400; color: var(--text-primary); background: var(--bg-primary); border: 1px solid var(--control-border, var(--border)); border-radius: var(--radius-md); }
+.team-task-form ::placeholder, #team-panel-item .task-completion-form ::placeholder { color: var(--text-secondary); opacity: 1; }
+.team-task-form textarea, #team-panel-item .task-completion-form textarea { resize: vertical; min-height: 72px; }
+.team-task-form-label { margin: 0 0 6px; font-size: 0.8125rem; font-weight: 500; }
+.team-task-form .task-edit-revision { margin: 0 0 12px; }
+.team-task-extra { max-width: 760px; margin-top: 16px; }
+.team-task-extra .task-detail-section { margin-top: 12px; }
+.team-task-cancel { margin-left: auto; } /* the danger button at the far end of the bar */
+/* the dialog's sections under a task's facts read like the page's other labels: sentence case, 14/600 (UI/UX, #7644) */
+.team-task-extra .task-detail-label { text-transform: none; letter-spacing: 0; font-size: 0.875rem; font-weight: 600; }
+.team-task-extra summary { font-size: 0.875rem; font-weight: 600; }
+.team-task-extra .task-dep-status { text-transform: capitalize; } /* the pill reads Unmet, not UNMET (UI/UX, #7644) */

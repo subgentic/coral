@@ -31,10 +31,9 @@ import { lazyFns, loadTaskDetail } from './lazy_panels.js';
 export { boardTaskFetchHooks, boardTaskPollHooks, loadAgentTasks, loadBoardTasks, loadMoreBoardTasks, renderBoardTaskList, renderTaskList, startBoardTaskPoll, stopBoardTaskPoll } from './task_list.js';
 export { hideCreateTaskModal, showCreateTaskModal, submitCreateTask } from './task_create.js';
 // The task detail dialog is loaded the first time a task is opened (#5364: 43 KB the page does not need to start). Its functions are stubs until then (lazy_panels.js); closing one that was never opened has nothing to do.
-const detail = lazyFns(loadTaskDetail, ['_doCancelTask', '_doCompleteTask', '_restoreTaskFooter', 'cancelBoardTask', 'cancelTaskEdit', 'completeBoardTask', 'enableTaskEditMode', 'publishBoardTask', 'saveTaskEdit', 'showAgentTaskDetailModal', 'showTaskDetailModal']);
-export const { _doCancelTask, _doCompleteTask, _restoreTaskFooter, cancelBoardTask, cancelTaskEdit, completeBoardTask, enableTaskEditMode, publishBoardTask, saveTaskEdit, showAgentTaskDetailModal, showTaskDetailModal } = detail;
+const detail = lazyFns(loadTaskDetail, ['_doCompleteAgentTask', 'completeAgentTask', 'showAgentTaskDetailModal']);
+export const { _doCompleteAgentTask, completeAgentTask, showAgentTaskDetailModal } = detail;
 export const hideTaskDetailModal = (...a) => (loadTaskDetail.module ? loadTaskDetail.module.hideTaskDetailModal(...a) : undefined);
-export { nudgeBoardTask, remindBoardTask, stopBoardTaskReminder } from './task_reminders.js';
 export { clearOpenSubagent, loadSubagents } from './subagents.js';
 
 
@@ -138,13 +137,13 @@ registerTaskView({ renderBoardTaskList, hideTaskDetailModal });
 // Cancelling and completing a task still go through their confirm footers (task-cancel shows
 // "Yes, Cancel"; task-complete shows the completion form), as before.
 const TASK_SORTS = new Set(['id', 'priority', 'type', 'assignee', 'created_at', 'cost']);
-const isPersonal = el => el.dataset.personal === '1';
+const openTaskPage = (id, board = _getBoardProject()) => { if (board) window.openTeamPage?.(board, { tab: 'tasks', item: id }); };
 const depContainer = el => { const id = tokenOf(el.dataset.container); return id ? document.getElementById(id) : null; };
 registerActions({
     'task-close': () => window.hideTaskDetailModal(),
     'task-hide-done': () => _toggleHideCompleted(),
     'task-sort': el => { if (TASK_SORTS.has(el.dataset.sort)) window.__coral._toggleTaskSort(el.dataset.sort); },
-    'task-open': el => withId(el.dataset.taskId, id => (el.dataset.kind === 'agent' ? window.showAgentTaskDetailModal(id) : window.showTaskDetailModal(id))),
+    'task-open': el => withId(el.dataset.taskId, id => (el.dataset.kind === 'agent' ? window.showAgentTaskDetailModal(id) : openTaskPage(id))), // an agent's own task is the dialog's; a board's is the team page's task page (#7644)
     'task-subagent-open': el => { const sid = textOf(el.dataset.subagentId); if (sid) showSubagentDetailModal(sid); },
     'task-load-more': () => window.loadMoreBoardTasks(),
     'dep-picker-toggle': el => {
@@ -156,20 +155,10 @@ registerActions({
         const box = depContainer(el), id = idOf(el.dataset.taskId);
         if (box && id) box.querySelector(`input[type="checkbox"][value="${id}"]`)?.click();
     },
-    'task-cancel': el => withId(el.dataset.taskId, id => window.cancelBoardTask(id)),
-    'task-cancel-back': el => withId(el.dataset.taskId, id => window._restoreTaskFooter(id)),
-    'task-cancel-do': el => withId(el.dataset.taskId, id => window._doCancelTask(id)),
-    'task-nudge': el => withId(el.dataset.taskId, id => window.nudgeBoardTask(id)),
-    'task-remind': el => withId(el.dataset.taskId, id => window.remindBoardTask(id)),
-    'task-remind-stop': el => withId(el.dataset.taskId, id => window.stopBoardTaskReminder(id)),
-    'task-edit': el => withId(el.dataset.taskId, id => window.enableTaskEditMode(id)),
     'task-goal-open': el => { const id = idOf(el.dataset.goalId), project = _getBoardProject(); if (!id || !project) return; window.hideTaskDetailModal?.(); importOnce('./task_goals.js').then(m => m.openGoalOnBoard(project, id)); }, // the task's Goal line opens the goal on the Goals face (#7253)
-    'task-edit-cancel': () => window.cancelTaskEdit(),
-    'task-edit-save': el => withId(el.dataset.taskId, id => window.saveTaskEdit(id)),
-    'task-publish': el => withId(el.dataset.taskId, id => window.publishBoardTask(id)),
-    'task-complete': el => withId(el.dataset.taskId, id => (isPersonal(el) ? window.completeBoardTask(id, true) : window.completeBoardTask(id))),
-    'task-complete-back': el => withId(el.dataset.taskId, id => (isPersonal(el) ? window.showAgentTaskDetailModal(id) : window._restoreTaskFooter(id))),
-    'task-complete-do': el => withId(el.dataset.taskId, id => window._doCompleteTask(id, isPersonal(el))),
+    'task-complete': el => withId(el.dataset.taskId, id => window.completeAgentTask(id)),
+    'task-complete-back': el => withId(el.dataset.taskId, id => window.showAgentTaskDetailModal(id)),
+    'task-complete-do': el => withId(el.dataset.taskId, id => window._doCompleteAgentTask(id)),
     // A task's coral:// artifact opens in the preview (only an artifact URI; the link doesn't navigate).
     'task-artifact-open': (el, event) => {
         event.preventDefault();

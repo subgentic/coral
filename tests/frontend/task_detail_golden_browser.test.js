@@ -1,8 +1,9 @@
-// The task detail (#4702): _taskDetailHtml (tasks.js) is a 230-line function that writes the whole detail of a task, board or agent: its lifecycle, priority and result, the instruction revision and its
-// amendments, the description, the workflow (gates, results, inputs, completion candidate and its artifacts), who and when, what blocks it, its cost and its running cost. Splitting it must change nothing.
-// This opens the detail of a task of every shape (each status, a failed result, a review pending, a completion candidate with a released slot, amendments, a workflow with everything, every kind of
-// dependency, a cost over a dollar, a running cost, text with markup in it, and an agent's own task) and records the detail and its footer. Compared with fixtures/task_detail_golden.json (sha256 per task,
-// with the readable text). CORAL_UPDATE_GOLDEN=1 rewrites it. Dates are read in UTC and "(… ago)" is normalised. Drives Chrome over CDP through agent_view_harness.js against the isolated dev server.
+// The task detail (#4702; a board's task is the team page's task page since #7644): taskExtraHtml (task_detail_html.js) and the page's facts and bar write the whole detail of a task: its state, priority and result, the instruction
+// revision and its amendments, the description, the workflow (gates, results, inputs, completion candidate and its artifacts), who and when, what blocks it, its cost, and the buttons its state allows. An agent's own task is still the dialog's
+// detail (_taskDetailHtml). Splitting any of them must change nothing. This opens the page of a task of every shape (each status, a failed result, a review pending, a completion candidate with a released slot, amendments, a workflow
+// with everything, every kind of dependency, a cost over a dollar, text with markup in it) and an agent's own task, and records the detail and its bar. Compared with fixtures/task_detail_golden.json (sha256 per task, with the
+// readable text). CORAL_UPDATE_GOLDEN=1 rewrites it. The clock is frozen and dates are read in UTC.
+// Drives Chrome over CDP through agent_view_harness.js against the isolated dev server.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -47,6 +48,7 @@ const AGENT_TASK = { id: 40, title: 'My own task', agent_name: 'solo', started_a
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const { waitStable } = require('./helpers/wait').bind(ev);
     const out = {};
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -57,7 +59,7 @@ const AGENT_TASK = { id: 40, title: 'My own task', agent_name: 'solo', started_a
         await ev(`(async () => {
             const st = window.__coralStatic || '/static/';
             const T = window.T = { state: (await import(st + 'state.js')).state, tasks: await import(st + 'tasks.js') };
-            const FROZEN = Date.parse('2026-10-18T12:00:00Z'); Date.now = () => FROZEN; // the claimed-for time reads the clock: frozen, the trace does not drift with the hour
+            const FROZEN = Date.parse('2026-10-18T12:00:00Z'); Date.now = () => FROZEN; { const RD = Date; window.Date = class extends RD { constructor(...a) { if (a.length) super(...a); else super(FROZEN); } static now() { return FROZEN; } }; } // the times read the clock (whenText, claimed-for): frozen, the trace does not drift with the day
             T.state.currentSession = { name: 'solo', type: 'live', board_project: 'team-a', session_id: 'sid-solo' }; T.state.selectedTeam = null;
             window.__tasks = ${JSON.stringify(TASKS)}; window.__agentTask = ${JSON.stringify(AGENT_TASK)};
             const json = (b, status = 200) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { 'content-type': 'application/json' } }));
@@ -67,22 +69,25 @@ const AGENT_TASK = { id: 40, title: 'My own task', agent_name: 'solo', started_a
                 if (/\\/tasks\\/\\d+$/.test(p.pathname) || /\\/tasks$/.test(p.pathname) || /\\/subscribers$/.test(p.pathname)) return json(/\\/tasks$/.test(p.pathname) ? { tasks: T.state.currentBoardTasks } : (/\\/subscribers$/.test(p.pathname) ? [] : (T.state.currentBoardTasks.find(t => p.pathname.endsWith('/' + t.id)) || {})));
                 return real(u, o); };
             return true; })()`);
+        const PAGE_SNAP = `(() => { const norm = s => s.replace(/\\(\\d+[a-z]+(?: \\d+[a-z]+)? ago\\)/g, '(… ago)'); const h = document.getElementById('team-panel-item'), page = h.querySelector('.team-task-page');
+            const bar = [...h.querySelectorAll('.goals-pinbar .btn')].map(b => b.textContent);
+            return { title: h.querySelector('#team-task-title').textContent, html: norm(page.innerHTML), text: norm(page.textContent.replace(/\\s+/g, ' ').trim()), footer: bar.join(' | ') }; })()`;
         const SNAP = `(() => { const c = document.getElementById('task-detail-content'), f = document.getElementById('task-detail-modal-footer');
             const norm = s => s.replace(/\\(\\d+[a-z]+(?: \\d+[a-z]+)? ago\\)/g, '(… ago)');
             return { title: document.getElementById('task-detail-modal-title').textContent, html: norm(c.innerHTML), text: norm(c.textContent.replace(/\\s+/g, ' ').trim()), footer: f ? f.innerHTML.replace(/\\s+/g, ' ').trim() : null }; })()`;
         for (const [name, task] of Object.entries(TASKS)) {
-            if (task.id === 25) {
+            if (task.id === 25) { // the running cost is read by the list's poll; the page shows what the poll has read
                 await ev(`T.state.currentBoardTasks = [window.__tasks[${JSON.stringify(name)}]]; T.state.selectedTeam = 'team-a'; T.tasks.startBoardTaskPoll(); true`);
                 await waitFor(`!!document.querySelector('.board-task-cost-live')`, 'the live cost in the list', { timeout: 8000 });
                 await ev(`T.tasks.stopBoardTaskPoll(); T.state.selectedTeam = null; true`);
             }
-            await ev(`T.state.currentBoardTasks = [window.__tasks[${JSON.stringify(name)}]]; T.tasks.hideTaskDetailModal && T.tasks.hideTaskDetailModal(); true`);
-            await ev(`T.tasks.showTaskDetailModal(${task.id}); true`);
-            await waitFor(`document.getElementById('task-detail-content').textContent.includes(${JSON.stringify('#' + task.id)})`, name);
-            out[name] = await ev(SNAP);
+            await ev(`T.state.currentBoardTasks = [window.__tasks[${JSON.stringify(name)}]]; window.openTeamPage('team-a', { tab: 'tasks', item: ${task.id} }); true`);
+            await waitFor(`!!document.querySelector('#team-panel-item #team-task-title') && document.querySelector('#team-task-title').textContent.startsWith(${JSON.stringify('#' + task.id + ' ')})`, name, { timeout: 12000 });
+            await waitStable(`document.getElementById('team-panel-item').innerHTML`, 'the page of ' + name, 200);
+            out[name] = await ev(PAGE_SNAP);
         }
         assert.match(out['running, with a live cost'].text, /Running Cost/);
-        await ev(`T.state.currentAgentTasks = [window.__agentTask]; T.tasks.hideTaskDetailModal(); T.tasks.showAgentTaskDetailModal(40); true`);
+        await ev(`T.state.selectedTeam = null; T.state.currentAgentTasks = [window.__agentTask]; T.tasks.hideTaskDetailModal(); T.tasks.showAgentTaskDetailModal(40); true`);
         await waitFor(`document.getElementById('task-detail-content').textContent.includes('#40')`, 'the agent task');
         out['an agent task'] = await ev(SNAP);
         assert.match(out['an agent task'].text, /My own task/);

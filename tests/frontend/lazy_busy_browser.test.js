@@ -17,8 +17,8 @@ const SLOW = { offline: false, latency: 900, downloadThroughput: 200 * 1024, upl
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
         await ev(`window.__coralReady.then(() => true)`);
-        // a control that runs the task-open action, as a task row does, in a list that is on the page
-        await ev(`(() => { const row = document.createElement('div'); row.id = 'lb-row'; row.className = 'task-row'; row.dataset.onClick = 'task-open'; row.dataset.taskId = '1'; row.dataset.kind = 'board'; row.textContent = 'a task'; row.tabIndex = 0; document.body.appendChild(row);
+        // a control that runs the task-open action, as an agent's own task row does (its dialog is a lazy module; a board's task opens the team page, tested by team-name-open below), in a list that is on the page
+        await ev(`(() => { const row = document.createElement('div'); row.id = 'lb-row'; row.className = 'task-row'; row.dataset.onClick = 'task-open'; row.dataset.taskId = '1'; row.dataset.kind = 'agent'; row.textContent = 'a task'; row.tabIndex = 0; document.body.appendChild(row);
             window.__flicker = []; new MutationObserver(() => { const r = document.getElementById('lb-row'); window.__flicker.push(r.hasAttribute('aria-busy') ? 'busy' : 'idle'); }).observe(document.getElementById('lb-row'), { attributes: true, attributeFilter: ['aria-busy'] }); return true; })()`);
         const state = () => ev(`(() => { const r = document.getElementById('lb-row'); return { busy: r.getAttribute('aria-busy'), cls: r.classList.contains('lazy-loading'), cursor: getComputedStyle(r).cursor, opacity: getComputedStyle(r).opacity }; })()`);
 

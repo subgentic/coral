@@ -10,6 +10,7 @@ const { teamTable, rowButton, rowFocusTarget, stateChip, el } = await importOnce
 import { goalTitle, refreshGoalTitles, noGoalLabel } from './task_goals.js';
 import { taskStatusWord, statusClass } from './goal_words.js';
 import { state } from './state.js';
+import { showToast } from './utils.js';
 const { buildTaskBar } = await importOnce('./task_bar.js'); // the old tab's search, filters and sort on the shared list bar (lazy: its failure is retried)
 const TF = await importOnce('./task_filters.js');
 const { renderSafe } = await importOnce('./safe_markdown.js'); // the Inbox's renderer (DOM-built, no markup from text): a task reads the same on both pages
@@ -293,10 +294,11 @@ function fact(dl, label, value) {
     dl.append(dd);
 }
 
-/** Draw a task's page into `host`. ctx: { backLabel, onBack(), openGoal(id), project }. */
-export function renderTaskPage(host, task, ctx) {
+/** Draw a task's page into `host`. ctx: { backLabel, onBack(), openGoal(id), project }. mode: 'view', 'edit' (the form), 'complete' (the completion form) or 'cancel' (the bar asks). */
+export function renderTaskPage(host, task, ctx, mode = 'view') {
     host.replaceChildren();
     host.setAttribute('aria-label', `Task ${task.id}`);
+    const acts = { project: ctx.project, redraw: (t, m) => renderTaskPage(host, t || task, ctx, m), reload: (message) => reloadTask(host, task.id, ctx, message) };
     const back = el('button', 'goals-back'); back.type = 'button';
     const arrow = el('span', 'goals-back-arrow', '←'); arrow.setAttribute('aria-hidden', 'true');
     back.append(arrow, document.createTextNode(` ${ctx.backLabel}`));
@@ -305,6 +307,53 @@ export function renderTaskPage(host, task, ctx) {
     const h = el('h2', 'goals-detail-title', `#${task.id} ${task.title}`); h.tabIndex = -1; h.id = 'team-task-title';
     const word = taskStatusWord(task.status, task.review_requested || (task.workflow && task.workflow.completion_review));
     const line = el('div', 'goals-detail-line'); line.append(stateChip(word, statusClass(word)));
+    page.append(back, h, line);
+    const bar = el('div', 'goals-pinbar');
+    let focus = h;
+    if (mode === 'edit') {
+        const loading = el('p', 'goals-note', 'Loading the task’s form…'); page.append(loading, bar);
+        host.append(page);
+        bar.append(btn('btn', 'Cancel', () => acts.redraw(task, 'view')));
+        importOnce('./team_task_actions.js').then(async (A) => {
+            const form = await A.editForm(task, acts);
+            if (!loading.isConnected) return; // another page was shown meanwhile
+            loading.replaceWith(form.node); form.mount();
+            bar.append(btn('btn btn-primary', 'Save', () => form.save()));
+            form.node.querySelector('#task-edit-title')?.focus();
+        }).catch(() => { loading.textContent = 'The form could not be shown. Go back and try again.'; });
+        h.focus({ preventScroll: true });
+        return;
+    }
+    page.append(factsOf(task, ctx));
+    if (task.body) { const b = el('div', 'team-task-body'), doc = Object.assign(el('pre', 'team-task-text'), { textContent: task.body }); b.append(el('h3', 'goals-sub', 'Description'), doc); page.append(b); renderTaskText(doc, task.body); }
+    Promise.all([importOnce('./task_detail_html.js'), importOnce('./task_list.js')]).then(([m, list]) => { // the dialog's other sections, escaped as it escaped them
+        if (!page.isConnected) return;
+        const extra = el('div', 'team-task-extra'); extra.innerHTML = m.taskExtraHtml(task, task.status === 'in_progress' ? list._liveCosts[task.id] : null); // the running cost of a task in progress
+        if (extra.children.length) bar.before(extra);
+    }).catch(() => {});
+    const session = agentOf(ctx.project, task);
+    if (mode === 'cancel') {
+        page.append(bar);
+        importOnce('./team_task_actions.js').then(A => bar.append(A.cancelConfirm(task, acts)));
+    } else if (mode === 'complete') {
+        importOnce('./team_task_actions.js').then(A => {
+            const form = A.completeForm(task, acts);
+            bar.before(form.node); form.focus();
+            bar.append(btn('btn', 'Back', () => acts.redraw(task, 'view')), btn('btn btn-success', 'Complete', () => form.submit()));
+        });
+        page.append(bar);
+        focus = null;
+    } else {
+        if (session) bar.append(btn('btn', 'Open the agent', () => { window.switchNavTab?.('agents'); window.selectLiveSession?.(session.name, session.agent_type, session.session_id, session.server); })); // the agent that has the task, when it runs here
+        importOnce('./team_task_actions.js').then(A => { for (const b of A.taskButtons(task, acts)) bar.append(b); });
+        page.append(bar);
+    }
+    host.append(page);
+    if (focus) focus.focus({ preventScroll: true });
+}
+
+/** The facts of a task's page: who, goal, priority, who made it and when. (What the dialog showed beyond them is under them, taskExtraHtml.) */
+function factsOf(task, ctx) {
     const dl = el('dl', 'goals-facts');
     const who = agentOf(ctx.project, task); // the agent that has it, when it runs here: its name opens it (the old subagent row's "Launched by", for a board's tasks)
     fact(dl, 'Assigned to', who ? btn('team-link', task.assigned_to, () => { window.switchNavTab?.('agents'); window.selectLiveSession?.(who.name, who.agent_type, who.session_id, who.server); }) : (task.assigned_to || 'Nobody yet'));
@@ -312,25 +361,24 @@ export function renderTaskPage(host, task, ctx) {
         const g = btn('team-link', goalTitle(ctx.project, task.goal_id) || `Goal ${task.goal_id}`, () => ctx.openGoal(task.goal_id));
         fact(dl, 'Goal', g);
     } else fact(dl, 'Goal', noGoalLabel);
-    fact(dl, 'Priority', priorityWord(task.priority));
-    if (Array.isArray(task.blocked_by) && task.blocked_by.length) fact(dl, 'Blocked by', task.blocked_by.map(d => `#${d.task_id}${d.title ? ' ' + d.title : ''}${d.satisfied ? ' (done)' : ''}`).join('\n'));
-    if (Number.isFinite(task.cost_usd) && task.cost_usd > 0) fact(dl, 'Cost', `$${task.cost_usd.toFixed(2)}`);
+    const priority = el('span', null, priorityWord(task.priority)); priority.title = `Claim priority: ${task.priority || 'none'}`; // the dialog's name for it
+    fact(dl, 'Priority', priority);
     fact(dl, 'Created by', task.created_by);
     fact(dl, 'Created', whenText(task.created_at));
     if (task.claimed_at) fact(dl, 'Started', whenText(task.claimed_at));
     if (task.completed_at) fact(dl, 'Finished', whenText(task.completed_at));
+    if (task.completed_by) fact(dl, task.status === 'skipped' ? 'Cancelled by' : 'Finished by', task.completed_by);
+    if (task.workflow && task.workflow.outcome === 'failed') fact(dl, 'Outcome', 'Failed'); // the dialog's "Result: Failed"
     if (task.completion_message) fact(dl, 'Result', task.completion_message);
-    page.append(back, h, line, dl);
-    if (task.body) { const b = el('div', 'team-task-body'), doc = Object.assign(el('pre', 'team-task-text'), { textContent: task.body }); b.append(el('h3', 'goals-sub', 'Description'), doc); page.append(b); renderTaskText(doc, task.body); }
-    const bar = el('div', 'goals-pinbar');
-    const session = agentOf(ctx.project, task);
-    if (session) bar.append(btn('btn', 'Open the agent', () => { window.switchNavTab?.('agents'); window.selectLiveSession?.(session.name, session.agent_type, session.session_id, session.server); })); // the agent that has the task, when it runs here
-    bar.append(btn('btn', 'Task actions', () => {
-        const existing = state.currentBoardTasks || [];
-        if (!existing.find(t => t.id === task.id)) state.currentBoardTasks = [...existing, task]; // the task dialog reads the task from here (goals_view.js does the same)
-        window.showTaskDetailModal?.(task.id);
-    }));
-    page.append(bar);
-    host.append(page);
-    h.focus({ preventScroll: true });
+    else if (task.workflow && task.workflow.outcome === 'failed') fact(dl, 'Result details', 'No failure reason was provided.');
+    return dl;
+}
+
+/** After an action: the task is read again, the lists behind the page are refreshed, the page shows the new state, the toast says what was done. */
+async function reloadTask(host, id, ctx, message) {
+    const fresh = await readTask(ctx.project, id);
+    if (message) showToast(message);
+    loadTasks().catch(() => {});
+    importOnce('./task_list.js').then(m => m.loadBoardTasks(ctx.project)).catch(() => {}); // the agent panel's list
+    if (fresh && host.isConnected) renderTaskPage(host, fresh, ctx, 'view');
 }

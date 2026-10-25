@@ -78,7 +78,7 @@ const fixtures = async () => {
         else if(p==='/api/system/privacy')data={remote_access_enabled:false,telemetry_enabled:false};
         else if(p==='/api/agent/ui')data=[];
         else if(p.endsWith('/subscribers'))data=[{subscriber_id:'UI'},{subscriber_id:'Lead Developer'}];
-        else if(p.endsWith('/tasks'))data={tasks:[task]};
+        else if(p.endsWith('/tasks'))data=p.startsWith('/api/sessions/')?[task]:{tasks:[task]}; // an agent's own tasks are a bare list; the board's are {tasks}
         else if(p.endsWith('/artifacts'))data={project:'coral-task-workflows',session_id:s.currentSession?.session_id,artifacts:[]};
         else if(p.includes('/chat'))data={messages:[],total:0,has_more:false};
         else if(p.includes('/files'))data={files:[]};
@@ -106,7 +106,7 @@ const fixtures = async () => {
             mods.utils.showView('live-session-view');
             window.switchAgenticTab(name==='agent-ui'?'agent-ui':'tasks','top');
             if(name==='agent-ui')await mods.agent_ui.refreshAgentUI();
-            if(name==='tasks')mods.tasks.showTaskDetailModal(2505);
+            if(name==='tasks'){await mods.tasks.loadAgentTasks(s.currentSession.name,s.currentSession.session_id);await mods.tasks.showAgentTaskDetailModal(2505);} // the task dialog is an agent's own task and a subagent's since #7644 (a board's task is the team page's page): the shared dialog's chrome is what this scene pins
             if(name==='settings')await mods.modals.showSettingsModal('agents');
             if(name==='team-settings')mods.team_working_mode.showTeamWorkingMode('coral-task-workflows');
             if(name==='agent-ui'&&innerWidth<768)window.toggleAgenticPanel(true);
