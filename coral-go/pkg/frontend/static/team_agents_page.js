@@ -5,6 +5,7 @@
 import { importOnce } from './import_once.js';
 import { state } from './state.js';
 import { boardFetch, inTeam } from './server_base.js';
+import { pollEvery } from './overload.js';
 import { OPERATOR_ID } from './utils.js';
 import { refreshTeamAvailability, remindAgent, stopAgentReminder } from './team_availability.js';
 const { openRemindDialog, REPEATS } = await importOnce('./team_remind_dialog.js');
@@ -41,7 +42,7 @@ export function chipCounts(agents) {
 
 // ── the tab ──────────────────────────────────────────────────────────────
 
-async function load({ manual = false } = {}) {
+async function load() {
     const team = model.team; if (!team) return;
     if (!model.data) { model.loading = true; draw(); }
     try {
@@ -50,7 +51,6 @@ async function load({ manual = false } = {}) {
         if (!data || !Array.isArray(data.agents)) throw new Error('no answer');
         model.data = data; model.failed = '';
         hooks.onCount?.(data.agents.length);
-        if (manual) say(`Updated: ${data.agents.length} agent${data.agents.length === 1 ? '' : 's'}.`);
     } catch (e) {
         if (team !== model.team) return;
         model.failed = 'The agents could not be read.';
@@ -92,13 +92,19 @@ function remindButton(agent) {
     return b;
 }
 
-// The agents that need a person come first (the header's "N need attention" opens this tab): a waiting agent, then a queued one, then an offline one; the rest keep their order.
+// The Orchestrator first, then the agents that need a person (the header's "N need attention" opens this tab): a waiting agent, then a queued one, then an offline one; the rest in the sidebar's order.
 const NEEDS = ['waiting', 'needs_input', 'queued', 'offline'];
 const rank = (a) => { const i = NEEDS.indexOf(a.availability); return i < 0 ? NEEDS.length : i; };
+const isOrchestrator = (a) => /orchestrator/i.test(`${a.role || ''} ${a.name || ''}`);
+function sidebarIndex(a) {
+    const live = (state.liveSessions || []).filter(s => inTeam(s, model.team));
+    const i = live.findIndex(s => (a.session_id && s.session_id === a.session_id) || s.name === a.name);
+    return i < 0 ? live.length : i;
+}
 function visibleAgents() {
     const all = (model.data && model.data.agents) || [];
     const shown = model.filter === 'all' ? all : all.filter(a => (a.availability || 'unknown') === model.filter);
-    return [...shown].sort((x, y) => rank(x) - rank(y)); // a stable sort
+    return [...shown].sort((x, y) => (isOrchestrator(y) - isOrchestrator(x)) || (rank(x) - rank(y)) || (sidebarIndex(x) - sidebarIndex(y)));
 }
 
 function drawChips(host) {
@@ -115,12 +121,6 @@ function drawChips(host) {
     host.append(group);
 }
 
-function directoryLine(agents) {
-    const live = (state.liveSessions || []).filter(s => inTeam(s, model.team));
-    const dir = live.find(s => s.working_directory)?.working_directory || '', branch = live.find(s => s.branch)?.branch || '';
-    return `${agents.length} agent${agents.length === 1 ? '' : 's'}${branch ? ` on ${branch}` : ''}${dir ? ` in ${dir}` : ''}`;
-}
-
 function draw() {
     const body = root && root.querySelector('.team-agents-body'); if (!body) return;
     const a = document.activeElement;
@@ -131,9 +131,6 @@ function draw() {
     const data = model.data;
     if (!data) return;
     if (!data.agents.length) { body.append(el('div', 'goals-empty', 'No agents on this board yet.')); return; }
-    const top = el('div', 'team-agents-top');
-    top.append(el('p', 'goals-note team-count-line', directoryLine(data.agents)), btn('btn btn-small', 'Refresh', () => load({ manual: true })));
-    body.append(top);
     drawChips(body);
     const rows = visibleAgents();
     body.append(teamTable({
@@ -151,6 +148,20 @@ function draw() {
     if (held) { const sel = held.startsWith('row:') ? rowFocusTarget(body, held.slice(4)) : body.querySelector(`.team-chip[data-filter="${CSS.escape(held.slice(5))}"]`); sel?.focus({ preventScroll: true }); }
 }
 
+// The tab keeps itself current, as Tasks does: when the window comes back to the front, and every 15 s while the tab is on screen.
+let watching = false;
+function refresh() {
+    if (!root || !root.isConnected || root.closest('[hidden]') || document.hidden || model.loading) return;
+    load();
+}
+function watch() {
+    if (watching) return;
+    watching = true;
+    pollEvery(refresh, 15000);
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
+}
+
 /** Show the team's agents in `host`. hooks: onCount(n), openAgent(agent, opener). */
 export function showAgents(host, team, h = {}) {
     if (team !== model.team) Object.assign(model, { team, data: null, filter: 'all', failed: '', loading: false });
@@ -164,6 +175,7 @@ export function showAgents(host, team, h = {}) {
     }
     root = host.firstChild;
     draw();
+    watch();
     return load();
 }
 

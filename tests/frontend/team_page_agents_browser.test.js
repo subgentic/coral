@@ -31,6 +31,15 @@ const TEAM = `qa-agents-${Date.now() % 100000}`;
                 if (!mobile) assert.deepEqual(hd.slice(0, 5), ['Agent', 'Status', 'Doing', 'Provider', 'Remind'], 'the columns');
                 const rows = await ev(`window.__tp.rows()`); assert.ok(rows.some(r => /Orchestrator/.test(r)) && rows.some(r => /Backend Dev/.test(r)), `both agents are rows (${JSON.stringify(rows.map(r => r.slice(0, 30)))})`);
             });
+            await S.run(`${label}: no folder line and no Refresh button (the tab refreshes itself); the Orchestrator is the first row; Knowledge has no "0" badge`, async () => {
+                const page = await ev(`window.__na.text(window.__tp.page())`);
+                assert.equal(/ in \//.test(page) || /\b\d+ agents? (in|on) /.test(page), false, 'no "2 agents in /folder" line');
+                assert.equal(await ev(`!!window.__tp.find('button', /^Refresh$/i)`), false, 'no Refresh button');
+                const rows = await ev(`window.__tp.rows()`); assert.ok(/^Orchestrator/.test(rows[0]), `the Orchestrator is first (${JSON.stringify(rows.map(r => r.slice(0, 20)))})`);
+                await goTab(ev, settle, 'Knowledge'); await settle(500);
+                assert.equal(await ev(`(() => { const t = window.__tp.tabs().find(x => window.__tp.tabLabel(x) === 'Knowledge'); return t ? window.__na.name(t) : null; })()`), 'Knowledge', 'the tab carries no 0');
+                await goTab(ev, settle, 'Agents'); await settle(300);
+            });
             await S.run(`${label}: a group named "Show agents that are" holds the status chips with counts, All pressed`, async () => {
                 const c = await ev(`window.__tp.chips(/^Show agents that are$/i)`); assert.ok(c, 'a group named Show agents that are');
                 assert.match(c[0].name, /^All\s*\d+$/, 'All with its count'); assert.equal(c[0].pressed, 'true', 'All is pressed');

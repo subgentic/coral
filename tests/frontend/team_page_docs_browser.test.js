@@ -59,6 +59,10 @@ const TEAM = `qa-docs-${Date.now() % 100000}`;
                 if (!mobile) assert.deepEqual(hd.slice(0, 3), ['Entry', 'Updated', 'From'], 'the columns');
                 const rows = await ev(`window.__tp.rows()`); assert.ok(rows.some(r => /Backend Dev/.test(r)) && rows.some(r => /Orchestrator/.test(r)), `a row per agent's knowledge (${JSON.stringify(rows.map(r => r.slice(0, 40)))})`);
             });
+            await S.run(`${label}: Knowledge's Updated is relative words with the exact time on hover`, async () => {
+                const c = await ev(`(() => { const t = window.__tp.table(); const td = t && t.querySelector('tbody tr td:nth-child(2)'); const sp = td && td.querySelector('[title]'); return sp ? { text: sp.textContent, title: sp.title } : null; })()`);
+                assert.ok(c && c.title && !/^\s*$/.test(c.text), `the Updated cell has words and a title (${JSON.stringify(c)})`); assert.notEqual(c.text, c.title, 'the words are relative, the title is the exact time');
+            });
             await S.run(`${label}: a Knowledge row opens the pane with the entry's text`, async () => {
                 assert.ok(await ev(`(() => { const b = [...window.__tp.table().querySelectorAll('button')].find(x => /Backend Dev/.test(window.__na.name(x))); if (!b) return false; b.click(); return true; })()`), 'no row button for Backend Dev'); await settle(400);
                 assert.ok(await ev(`!!window.__tp.pane() && /Backend knowledge text\\./.test(window.__na.text(window.__tp.pane()))`), 'the pane shows the entry text');

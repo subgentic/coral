@@ -226,7 +226,7 @@ async function fillTab(tab, item = 0) {
         } else if (tab === 'knowledge') {
             const m = await importOnce('./team_knowledge_page.js');
             if (stale()) return;
-            await m.showKnowledge(host, team, { onCount: (n) => { S.counts.knowledge = n; drawCounts(); } });
+            await m.showKnowledge(host, team, { onCount: (n) => { S.counts.knowledge = n || null; drawCounts(); } });
         }
     } catch (e) { console.error('team page tab', tab, e); host.textContent = ''; host.append(el('p', 'goals-note', 'This tab could not be shown. Reload the page and try again.')); }
 }

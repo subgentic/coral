@@ -70,10 +70,11 @@ function draw() {
     else if (model.refused) body.append(el('div', 'goals-empty', 'This team’s knowledge is too large to show through Coral Hub; open it on the computer.'));
     else if (!entries.length) { if (!model.failed) body.append(el('div', 'goals-empty', 'No knowledge yet. Distill knowledge reads the team’s work and writes what each agent learned.')); }
     else {
-        const when = whenText(model.data.created_at);
+        const stamp = model.data.created_at, wordsWhen = whenText(stamp);
+        const when = () => { const t = el('span', null, wordsWhen); const d = new Date(stamp); if (!Number.isNaN(d.getTime())) t.title = d.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }); return t; }; // relative, with the exact time on hover
         body.append(teamTable({
             label: `Knowledge, ${entries.length}`, columns: ['Entry', 'Updated', 'From'],
-            rows: entries.map(e => ({ key: e.key, current: detailKey() === e.key, open: (tr) => openEntry(e, tr.querySelector('.team-row-btn')), cells: [rowButton(e.name), when, e.from] })),
+            rows: entries.map(e => ({ key: e.key, current: detailKey() === e.key, open: (tr) => openEntry(e, tr.querySelector('.team-row-btn')), cells: [rowButton(e.name), when(), e.from] })),
         }));
     }
     if (held) (held === '#distill' ? body.querySelector('.team-distill') : rowFocusTarget(body, held))?.focus({ preventScroll: true });
