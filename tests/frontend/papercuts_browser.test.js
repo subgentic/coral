@@ -140,7 +140,7 @@ const BASE = require('./test_base').BASE;
         // ── (13) The agent search placeholder fits the box at its narrowest.
         // measured at the box's real narrowest: forced to its minimum width, with whatever padding the container query then gives the input (a measure at the wide size read the wide size's padding)
         const fit = await ev(`(async () => { const i = document.getElementById('agent-search-input'); const box = i.closest('.sidebar-search'); const old = box.style.cssText; const min = parseFloat(getComputedStyle(box).minWidth);
-            box.style.cssText = old + ';flex:none;width:' + min + 'px'; await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+            box.style.cssText = old + ';flex:none;width:' + min + 'px'; await ${framesJs(2)};
             const cs = getComputedStyle(i); const c = document.createElement('canvas').getContext('2d'); c.font = cs.font; const text = c.measureText(i.placeholder).width;
             const r = { placeholder: i.placeholder, label: i.getAttribute('aria-label'), text, room: i.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) }; box.style.cssText = old; return r; })()`);
         assert.equal(fit.label, 'Search agents', 'the accessible name keeps saying what it searches');
