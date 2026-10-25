@@ -59,6 +59,7 @@ const A = 'a'.repeat(64), B = 'b'.repeat(64), C = 'c'.repeat(64);
         await S.run('Delete asks first, then removes the row and puts the focus on the next one', async () => {
             assert.ok(await ev(`(() => { const b = [...window.__tp.pane().querySelectorAll('button')].find(x => /^Delete$/.test(x.textContent.trim())); if (!b) return false; b.click(); return true; })()`), 'a Delete button');
             await waitFor(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'the confirmation', 4000);
+            assert.equal(await ev(`document.getElementById('confirm-modal-yes').textContent.trim()`), 'Delete', 'the confirming button names the action');
             assert.equal(await ev(`window.__deleted`), undefined, 'nothing is deleted before the answer');
             await ev(`document.getElementById('confirm-modal-yes').click(); true`); await settle(600);
             assert.equal(await ev(`window.__deleted`), `/api/artifacts/${B}`);
