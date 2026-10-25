@@ -506,6 +506,9 @@ func TestGoalsSchemaIsIdempotentAndUpgradesAnOldDatabase(t *testing.T) {
 		`DROP TRIGGER board_tasks_goal_seq_insert`, `DROP TRIGGER board_tasks_goal_seq_update`, `DROP TRIGGER board_tasks_goal_seq_delete`,
 		`DROP TRIGGER board_goals_seq_insert`, `DROP TRIGGER board_goals_seq_update`, `DROP TRIGGER board_goals_seq_delete`, `DROP TRIGGER board_goals_uid_immutable`, `DROP TRIGGER boards_board_uid_immutable`,
 		`DROP INDEX idx_board_tasks_goal`, `DROP INDEX idx_boards_board_uid`, `DROP INDEX idx_board_goals_uid`, `DROP INDEX idx_board_goals_board`,
+		// the goal-requests tables (#7361) are newer than this old database: it has none of them, and their triggers read board_goal_meta
+		`DROP TRIGGER board_goal_requests_out_seq_insert`, `DROP TRIGGER board_goal_requests_out_seq_update`, `DROP TABLE board_goal_requests_out`, `DROP TABLE board_goal_requests_in`,
+		`DROP INDEX idx_board_tasks_request`, `ALTER TABLE board_tasks DROP COLUMN remote_board_uid`, `ALTER TABLE board_tasks DROP COLUMN remote_goal_uid`, `ALTER TABLE board_tasks DROP COLUMN request_id`,
 		`DROP TABLE board_goals`, `DROP TABLE board_goal_meta`,
 		`ALTER TABLE board_tasks DROP COLUMN goal_id`, `ALTER TABLE boards DROP COLUMN board_uid`,
 	} {
@@ -513,6 +516,7 @@ func TestGoalsSchemaIsIdempotentAndUpgradesAnOldDatabase(t *testing.T) {
 		require.NoError(t, err, ddl)
 	}
 	require.NoError(t, s.ensureGoalsSchema(ctx))
+	require.NoError(t, s.ensureGoalRequestsSchema(ctx))
 	got, err := s.getTaskByID(ctx, "oldboard", task.ID)
 	require.NoError(t, err)
 	assert.Equal(t, "an old task", got.Title, "the old task is untouched")
