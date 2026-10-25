@@ -32,9 +32,9 @@ const TEAM = `qa-docs-${Date.now() % 100000}`;
             await seed(ev, TEAM); await stub();
             if (mobile) await ev(`window.syncMobileAgentList && window.syncMobileAgentList(); true`);
             await openTeam(ev, waitFor, TEAM).catch(() => {});
-            await S.run(`${label}: Artifacts has a box named "Search artifacts", the count in words, and a table Name, Type, Size, Task, Created`, async () => {
-                await goTab(ev, settle, 'Artifacts'); await settle(400);
-                assert.ok(await ev(`!!window.__tp.find('input', /^Search artifacts$/i)`), 'an input named Search artifacts');
+            await S.run(`${label}: Artifacts has a box named "Search team artifacts", the count in words, and a table Name, Type, Size, Task, Created`, async () => {
+                await goTab(ev, settle, 'Artifacts'); await waitFor(`!!window.__tp.rows() && window.__tp.rows().length >= 5`, 'the first page of artifacts in the table', 10000).catch(() => {}); // a cold start loads the page's modules first
+                assert.ok(await ev(`!!window.__tp.find('input', /^Search (team )?artifacts$/i)`), 'an input named Search team artifacts (the old tab\'s name stays)');
                 assert.ok(await ev(`/\\b\\d[\\d,]*\\s+artifacts\\b/i.test(window.__na.text(window.__tp.page()))`), 'the count as words ("<n> artifacts")');
                 const hd = await ev(`window.__tp.headers()`); assert.ok(hd, 'the Artifacts tab has a table');
                 if (!mobile) assert.deepEqual(hd.slice(0, 5), ['Name', 'Type', 'Size', 'Task', 'Created'], 'the columns');

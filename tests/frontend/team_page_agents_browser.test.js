@@ -1,5 +1,5 @@
 // The team page's Agents tab (#7453, stage 2; UI/UX's doc 7aa984fe item 4, #7416's design as a tab): a group of status chips named "Show agents that are" with counts, a table of everyone on the board (Agent, Status,
-// Doing, Provider, Remind) with a button "Remind <name>" on every row that always sends (no dialog first), a row opens the agent's own page (back link Agents, h2 with the name, Remind and Open chat in the bar);
+// Doing, Provider, Remind) with a button "Remind <name>" on every row that opens the Remind dialog (Message prefilled, Repeat, Remind focused; UI/UX and the Orchestrator, board 09:16Z: it posts the @mention message now and, with a repeat, also sets the repeating reminder), a row opens the agent's own page (back link Agents, h2 with the name, Remind and Open chat in the bar);
 // the health icon on the team's row opens this tab. Written failing-first by QA (#7499): by role and accessible name (helpers/team_page.js). Isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -42,11 +42,41 @@ const TEAM = `qa-agents-${Date.now() % 100000}`;
                     assert.ok(b, `a button named Remind ${n}`); assert.equal(b.disabled, false, `Remind ${n} is enabled`); if (mobile) assert.ok(b.h >= 44, `Remind ${n} is ${b.h} px high`);
                 }
             });
-            await S.run(`${label}: Remind always sends at once: one write that names the agent, no dialog opens`, async () => {
-                await ev(`window.__tp.record()`);
-                await ev(`(() => { const e = [...window.__tp.table().querySelectorAll('button')].find(x => window.__na.name(x) === 'Remind Backend Dev'); if (e) e.click(); return true; })()`); await settle(800);
-                const sent = await ev(`window.__writes`); assert.ok(sent.some(x => /Backend Dev|Backend%20Dev/.test(x.p + ' ' + x.b)), `a write names Backend Dev (${JSON.stringify(sent.map(x => x.m + ' ' + x.p))})`);
-                assert.equal(await ev(`[...document.querySelectorAll('[role=dialog]')].some(window.__na.vis)`), false, 'no dialog opened');
+            const dlg = n => `(() => { const d = [...document.querySelectorAll('[role=dialog]')].filter(window.__na.vis).find(x => window.__na.name(x).startsWith(${JSON.stringify('Remind ' + n)})); return d; })()`;
+            const inDlg = (n, sel, rx) => `(() => { const d = ${dlg(n)}; return d ? [...d.querySelectorAll(${JSON.stringify(sel)})].filter(window.__na.vis).find(e => ${rx}.test(window.__na.name(e))) : null; })()`;
+            const status = () => ev(`(() => { const e = [...document.querySelectorAll('[role=status]')].filter(window.__na.vis).map(x => window.__na.text(x).trim()).find(t => /^Reminded /.test(t)); return e || ''; })()`);
+            await S.run(`${label}: Remind <name> opens a dialog named "Remind <name>" with the Message prefilled, Repeat on "Don't repeat" (30 minutes, hour, 4 hours, day), and "Remind" focused`, async () => {
+                await ev(`(() => { const e = [...window.__tp.table().querySelectorAll('button')].find(x => window.__na.name(x) === 'Remind Backend Dev'); if (e) e.click(); return true; })()`); await settle(500);
+                assert.ok(await ev(`!!${dlg('Backend Dev')}`), 'a dialog named Remind Backend Dev opens');
+                const m = await ev(`(() => { const t = ${inDlg('Backend Dev', 'textarea', '/^Message$/i')}; return t ? t.value : null; })()`);
+                assert.equal(m, 'Check your tasks and the board, then carry on.', 'the Message is prefilled');
+                const rep = await ev(`(() => { const s = ${inDlg('Backend Dev', 'select', '/^Repeat$/i')}; return s ? { selected: s.options[s.selectedIndex].textContent.trim(), all: [...s.options].map(o => o.textContent.trim()) } : null; })()`);
+                assert.ok(rep, 'a select named Repeat'); assert.match(rep.selected, /^Don.t repeat/i, `Repeat starts on Don't repeat (got ${rep.selected})`);
+                for (const rx of [/30 min/i, /^(every )?(1 )?hour|every hour/i, /4 h/i, /day/i]) assert.ok(rep.all.some(x => rx.test(x)), `an option ${rx} in ${JSON.stringify(rep.all)}`);
+                assert.ok(await ev(`(() => { const b = ${inDlg('Backend Dev', 'button', '/^Remind$/i')}; return !!b && document.activeElement === b; })()`), 'the Remind button has the focus, so Enter sends');
+                assert.ok(await ev(`!!${inDlg('Backend Dev', 'button', '/^Cancel$/i')}`), 'a Cancel button');
+            });
+            await S.run(`${label}: Remind sends the message now as an @mention board message, the dialog closes and the status says "Reminded <name>." (no reminder is set)`, async () => {
+                await ev(`window.__tp.record(); ${inDlg('Backend Dev', 'button', '/^Remind$/i')}.click(); true`); await settle(900);
+                const sent = await ev(`window.__writes`);
+                assert.ok(sent.some(x => x.m === 'POST' && /^\/api\/board\/[^/]+\/messages$/.test(x.p) && /@Backend Dev/.test(x.b) && /Check your tasks and the board/.test(x.b)), `a board message that @mentions Backend Dev (${JSON.stringify(sent.map(x => x.m + ' ' + x.p))})`);
+                assert.ok(!sent.some(x => /\/reminder$/.test(x.p)), 'no repeating reminder is set when Repeat is Don\'t repeat');
+                assert.equal(await ev(`!!${dlg('Backend Dev')}`), false, 'the dialog closed');
+                assert.equal(await status(), 'Reminded Backend Dev.', 'a polite status says Reminded Backend Dev.');
+            });
+            await S.run(`${label}: with Repeat on every hour it also sets the repeating reminder (POST /api/board/<project>/reminder) and the status adds "and every hour"`, async () => {
+                await ev(`(() => { const e = [...window.__tp.table().querySelectorAll('button')].find(x => window.__na.name(x) === 'Remind Orchestrator'); if (e) e.click(); return true; })()`); await settle(500);
+                await ev(`(() => { const s = ${inDlg('Orchestrator', 'select', '/^Repeat$/i')}; const o = [...s.options].find(o => /^(every )?(1 )?hour|every hour/i.test(o.textContent.trim())); s.value = o.value; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+                await ev(`window.__writes.length = 0; ${inDlg('Orchestrator', 'button', '/^Remind$/i')}.click(); true`); await settle(900);
+                const sent = await ev(`window.__writes`);
+                assert.ok(sent.some(x => x.m === 'POST' && /^\/api\/board\/[^/]+\/messages$/.test(x.p) && /@Orchestrator/.test(x.b)), `the board message (${JSON.stringify(sent.map(x => x.m + ' ' + x.p))})`);
+                const rem = sent.find(x => /^\/api\/board\/[^/]+\/reminder$/.test(x.p)); assert.ok(rem, 'the repeating reminder is set'); assert.ok(/3600/.test(rem.b), `with an hour's interval (${rem.b})`);
+                assert.equal(await status(), 'Reminded Orchestrator and every hour.', 'the status says and every hour');
+            });
+            await S.run(`${label}: Cancel in the Remind dialog sends nothing`, async () => {
+                await ev(`window.__writes.length = 0; (() => { const e = [...window.__tp.table().querySelectorAll('button')].find(x => window.__na.name(x) === 'Remind Backend Dev'); if (e) e.click(); return true; })()`); await settle(500);
+                await ev(`${inDlg('Backend Dev', 'button', '/^Cancel$/i')}.click(); true`); await settle(400);
+                assert.equal((await ev(`window.__writes`)).length, 0, 'nothing was sent'); assert.equal(await ev(`!!${dlg('Backend Dev')}`), false, 'the dialog closed');
             });
             await S.run(`${label}: an agent's row opens its page: back link Agents, h2 with the name, buttons Remind and Open chat; Back puts the focus on the row`, async () => {
                 await ev(`(() => { const b = [...window.__tp.table().querySelectorAll('button, a')].find(x => window.__na.name(x) === 'Backend Dev'); if (b) b.click(); return true; })()`); await settle(400);
