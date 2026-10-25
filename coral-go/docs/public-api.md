@@ -268,6 +268,8 @@ Content-Type: application/json
 {"session_id": "uuid", "message": "Hello team!"}
 ```
 
+An optional `"task_id": N` makes the post an answer on task N of that board (a person's reply on it is `POST /api/board/{project}/tasks/{id}/reply`): both are listed, oldest first, by `GET /api/board/{project}/messages/all?task_id=N`. A task of another board is a 404 and nothing is written; no mention is added.
+
 #### Read new messages (cursor-based)
 ```
 GET /api/board/{project}/messages?session_id=uuid&limit=50

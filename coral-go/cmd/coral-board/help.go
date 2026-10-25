@@ -131,7 +131,7 @@ any board message ends the wait.`
 
 // postFlags and sendFlags are the options of post and of send. They are read in any case (--TO is --to) and anywhere before or among the words of the message.
 var (
-	postFlags = []string{"--to", "--file"}
+	postFlags = []string{"--to", "--file", "--task"}
 	sendFlags = []string{"--board", "--to", "--address", "--reply-to", "--message-id", "--attach", "--file"}
 )
 
@@ -172,7 +172,7 @@ func checkFreeText(args []string) error {
 			if rest[i] == "--" {
 				break
 			}
-			if opt := foldOpt(rest[i], postFlags); opt == "--to" || opt == "--file" {
+			if opt := foldOpt(rest[i], postFlags); opt == "--to" || opt == "--file" || opt == "--task" {
 				i++
 				continue
 			}

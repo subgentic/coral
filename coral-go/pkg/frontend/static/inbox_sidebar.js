@@ -245,7 +245,7 @@ function openTaskPage(project, id) {
     host.append(el('p', 'item-meta', [t.created_by ? `From ${t.created_by}` : '', t.board, (PRIORITY_WORDS[t.priority] || t.priority) + (high ? ' priority' : ''), stateOf(t), whenText(t.updated_at || t.created_at)].filter(Boolean).join(' · ')));
     const mount = el('div', 'inbox-task-mount');
     host.append(mount);
-    mountInbox(mount, coralInboxAdapter, { region: false, only: { project: t.project, id: t.id } }); // the component's own text and reply box, for this one task
+    mountInbox(mount, coralInboxAdapter, { region: false, only: { project: t.project, id: t.id }, poll: (fn, ms) => pollEvery(fn, ms) }); // the component's own text and reply box, for this one task
     setGroup('tasks');
     renderInboxNav(true);
     focusTitle(host);

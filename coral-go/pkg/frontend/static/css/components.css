@@ -3928,6 +3928,18 @@ body[data-saved-scope="all"][data-dock-page="other"] #panel-toggle-btn, body[dat
 .ibx-task-body[hidden], .ibx-saved-body[hidden] { display: none; }
 .ibx-saved { margin-top: 4px; }
 .ibx-saved-toggle { font-size: var(--fs-sm, 0.8125rem); }
+/* The task's conversation on its page (#7703, UI/UX's layout): a 14/600 heading with the count, entries oldest first with a hairline between, no bubbles, the box under it. */
+.ibx-thread { margin: 16px 0 12px; min-width: 0; }
+.ibx-thread-head { margin: 0 0 8px; font-size: 0.875rem; font-weight: 600; }
+.ibx-thread-none { margin: 0 0 8px; font-size: 0.875rem; font-weight: 400; color: var(--text-secondary); }
+.ibx-thread-list { list-style: none; margin: 0; padding: 0; }
+.ibx-thread-item { padding: 10px 0; border-top: 1px solid var(--border); min-width: 0; }
+.ibx-thread-who { margin: 0 0 4px; font-size: 0.75rem; color: var(--text-secondary); }
+.ibx-thread-mine .ibx-thread-who { color: var(--text-primary); }
+.ibx-thread-text .md { overflow-wrap: anywhere; line-height: 1.5; font-size: var(--fs-md, 0.875rem); color: var(--text-primary); }
+.ibx-thread-earlier, .ibx-thread-new { margin: 0 0 8px; }
+.ibx-thread-earlier[hidden], .ibx-thread-new[hidden] { display: none; }
+@media (pointer: coarse) { .ibx-thread-earlier, .ibx-thread-new { min-height: var(--control-touch-height, 44px); } }
 /* "Read the whole message" in a saved list: a quiet link, not a second row of bordered buttons above the card's real actions (Open, Done, Remove). */
 
 .ibx-task-facts { margin: 0; color: var(--text-secondary); font-size: var(--fs-sm, 0.8125rem); }

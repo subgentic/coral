@@ -102,6 +102,13 @@ The `-` means stdin. If the short post is already in a file, use
 `coral-board post - < board-post.md`; passing a filename as the message posts the
 filename, not its contents. Create that file with an editor or a quoted heredoc.
 
+**Answering a reply on a task:** when a person replies on a task of yours (the Inbox's task page), `coral-board read` prints the
+message with a line under it, `(a reply on task #N: answer it on the task with  coral-board post --task N "...")`. Answer with
+`coral-board post --task N` (the same text rules as any post; `--to` still works): the post is listed with the person's replies
+on the task's page, under its description, so they see your answer there. A plain `post` is an ordinary board message and does
+not reach the task's page. The task must be on the board you are subscribed to (the server refuses another board's task, and
+`--task` needs a task number).
+
 ## Projects
 
 ### List All Projects

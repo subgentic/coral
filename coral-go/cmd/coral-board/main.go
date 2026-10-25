@@ -131,7 +131,9 @@ Commands:
   post --file <path> [--to "a,b"]
                                Post the text of a UTF-8 file: the same in every
                                shell (PowerShell, cmd.exe and Bash)
-  post "<message>" [--to "a,b"] Post a short message (@mention agents);
+  post "<message>" [--to "a,b"] [--task N]
+                               Post a short message (@mention agents);
+                               --task N answers task N (a person's reply on it);
                                use -- before text that starts with '-'
   post - [--to "a,b"] <<'EOF'  Multi-line posts and anything with backticks:
                                Bash heredoc, literal stdin text; EOF closes on

@@ -28,6 +28,7 @@ const STUB = `(() => { const real = window.fetch; const J = (b, s) => Promise.re
     window.fetch = (u, o) => { const url = new URL(String(u && u.url || u), location.origin), p = url.pathname, m = (o && o.method) || 'GET';
         if (p === '/api/board/tasks' && m === 'GET') return J({ tasks: window.__tasks });
         let t = /^\\/api\\/board\\/([^/]+)\\/tasks\\/(\\d+)$/.exec(p); if (t && m === 'GET') return J({ body: 'Please check the plan and say what is missing.', created_by: 'Orchestrator', status: 'pending' });
+        if (/^\\/api\\/board\\/team-a\\/messages\\/all$/.test(p) && m === 'GET') return J([{ id: 1, subscriber_id: 'Operator', content: '@Orchestrator: Is the plan final?', created_at: new Date(Date.now() - 1800000).toISOString(), task_id: 11 }, { id: 2, subscriber_id: 'Orchestrator', content: 'Yes: **shipping Tuesday**, after the rollback step.', created_at: new Date(Date.now() - 900000).toISOString(), task_id: 11 }]);
         t = /^\\/api\\/saved\\/(\\d+)\\/message$/.exec(p); if (t) return J({ text: 'The whole message, in full: the plan needs a rollback step before Tuesday.', partial: false });
         t = /^\\/api\\/saved\\/(\\d+)$/.exec(p);
         if (t && m === 'PATCH') { const it = window.__saved.find(i => i.id === Number(t[1])); const body = JSON.parse(o.body); it.done_at = body.done ? new Date().toISOString() : null; return J({ ok: true }); }

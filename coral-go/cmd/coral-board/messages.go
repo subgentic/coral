@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -109,7 +110,7 @@ func cmdPost() {
 	}
 
 	// Parse --to flag and collect remaining args as the message
-	var toNames, filePath string
+	var toNames, filePath, taskArg string
 	var msgParts []string
 	literal := false
 	for i := 2; i < len(os.Args); i++ {
@@ -125,7 +126,10 @@ func cmdPost() {
 		} else if opt == "--file" && i+1 < len(os.Args) {
 			filePath = os.Args[i+1]
 			i++
-		} else if opt == "--to" || opt == "--file" {
+		} else if opt == "--task" && i+1 < len(os.Args) {
+			taskArg = os.Args[i+1]
+			i++
+		} else if opt == "--to" || opt == "--file" || opt == "--task" {
 			fmt.Fprintf(os.Stderr, "Error: %s needs a value\n", os.Args[i])
 			os.Exit(2)
 		} else {
@@ -170,10 +174,16 @@ func cmdPost() {
 
 	subscriberID := resolveSubscriberID()
 
-	result, status, err := apiCall("POST", "/"+url.PathEscape(st.Project)+"/messages", map[string]string{
-		"subscriber_id": subscriberID,
-		"content":       message,
-	})
+	body := map[string]any{"subscriber_id": subscriberID, "content": message}
+	if taskArg != "" { // --task N: an answer on task N, listed with the person's replies on its page (#7703)
+		n, convErr := strconv.ParseInt(taskArg, 10, 64)
+		if convErr != nil || n <= 0 {
+			fmt.Fprintf(os.Stderr, "Error: --task needs a task number (got %q)\n", taskArg)
+			os.Exit(2)
+		}
+		body["task_id"] = n
+	}
+	result, status, err := apiCall("POST", "/"+url.PathEscape(st.Project)+"/messages", body)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		clierr.Exit1()
@@ -332,6 +342,9 @@ func printMessages(messages []map[string]any) {
 		}
 		content, _ := m["content"].(string)
 		fmt.Printf("[%s] %s: %s\n", ts, role, content)
+		if n, ok := m["task_id"].(float64); ok && n > 0 { // a person's reply on a task (#7703): say how the answer reaches the person
+			fmt.Printf("  (a reply on task #%.0f: answer it on the task with  coral-board post --task %.0f \"...\")\n", n, n)
+		}
 	}
 }
 

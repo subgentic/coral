@@ -7,7 +7,8 @@
  *   replyToTask({ project, taskId, content })-> { ok, notified: [names], warnings: [codes] }                                             POST /api/board/{project}/tasks/{id}/reply, {content} only
  *   canReply()                               -> { ok: true } | { ok: false, reason }                                                     (e.g. a Coral Hub viewer at the View tier)
  *   readSavedMessage(item)                   -> { text, partial, reason }   reason: '' | 'gone' | 'not_reachable' | 'too_long'          GET /api/saved/{id}/message
- *   optional: contract (the INBOX_CONTRACT it was written for: a different one is refused), linkPolicy(url), prepareLinks(text) (async: the lookup for that text, returns the linkPolicy to use for it), openTask(task), openGoal(task) (the task's goal {id, title} opens: a task row with a goal shows 'Goal: <title>' only where this is given, #7302), taskHref(task) (a same-origin path), now()
+ *   optional: listTaskMessages(project, taskId) -> [{ id, from, mine, content, created_at }]  oldest first: the task's conversation, the person's replies and the agents' answers (#7703). Used only by the single-item page (options.only): a host that does not give it, or does not ask for the page (Coral Hub's pinned version), shows no thread;
+ *   contract (the INBOX_CONTRACT it was written for: a different one is refused), linkPolicy(url), prepareLinks(text) (async: the lookup for that text, returns the linkPolicy to use for it), openTask(task), openGoal(task) (the task's goal {id, title} opens: a task row with a goal shows 'Goal: <title>' only where this is given, #7302), taskHref(task) (a same-origin path), now()
  * Rules it keeps (Security's conditions on #5750): nothing here builds HTML from machine text: every title, name, count, error and reason is set with textContent, and the task and message text goes
  * through safe_markdown.js (the shared DOM-built renderer); it imports only same-origin modules and uses no eval or dynamic import; a path an adapter returns is used only if it is a same-origin path;
  * a reply draft is kept in memory only (never localStorage or sessionStorage) and dropped by clearInboxDrafts() (sign-out). inbox_no_html_census.test.js holds the first two to account. */
@@ -80,6 +81,7 @@ const SAVED_WORDS = {
  * options.load === false: do not read the tasks at once (the host calls refresh() when the list is shown).
  * options.onCount(n): told how many tasks the list holds after each read (the host shows it on its tab).
  * options.region === false: the root is a plain div, not a region named "Tasks for you" (the host's own panel is named already).
+ * options.poll(fn, ms) -> id: the host's poller for the single-item page's conversation (an interval id, cleared with clearInterval); options.threadPollMs: its period (default 10000). Without poll the conversation is read on open and after a reply.
  * options.only ({ project, id }, optional, #7472): the host shows ONE task as a page of its own. The list holds that task alone, open, without its own heading button (the host's page has the title and
  *   the link back), and onCount is not called (the host's count is of the whole list). Without it everything is as it always was; a host that never passes it (Coral Hub's pinned version) is unchanged.
  * @param {HTMLElement} host @param {object} adapter @param {{ load?: boolean, region?: boolean, onCount?: (n: number) => void, only?: { project: string, id: (string|number) } }} [options]
@@ -182,11 +184,75 @@ export function mountInbox(host, adapter, options) {
         if (metaRow.childNodes.length) out.push(metaRow);
         const text = full.body == null ? '' : String(full.body);
         out.push(inset(text ? await renderBody(text, adapter) : el('p', 'ibx-empty', 'This task has no text.')));
-        out.push(replyBox(task, from, reviewNote ? reviewNote.id : ''));
+        const thread = only && typeof adapter.listTaskMessages === 'function' ? threadSection(task, from) : null; // the conversation under the text, above the box (#7703)
+        if (thread) out.push(thread.node);
+        out.push(replyBox(task, from, reviewNote ? reviewNote.id : '', thread ? thread.refresh : null));
         return out;
     }
 
-    function replyBox(task, creator, describedBy) {
+    const THREAD_SHOWN = 5, THREAD_POLL_MS = options && options.threadPollMs > 0 ? options.threadPollMs : 10000; // (the option is for a host's own tests)
+    /** The task's conversation on its page (#7703, UI/UX's layout): a "Messages" heading with the count, each message a line "Name, time" (the person's own say You) over its text in the safe renderer, oldest first, the last five
+     *  with "Show earlier (N)" above; read again every ten seconds while the page is on screen and after a reply is sent. A message that arrives where the person is not looking says "N new" instead of moving the page. */
+    function threadSection(task, creator) {
+        const node = el('section', 'ibx-thread');
+        const headId = uid('ibx-thread-head');
+        node.setAttribute('aria-labelledby', headId);
+        const head = el('h3', 'ibx-thread-head', 'Messages'); head.id = headId;
+        const list = el('ol', 'ibx-thread-list');
+        const none = el('p', 'ibx-thread-none', 'No messages about this task yet.');
+        const earlier = el('button', 'btn btn-small ibx-thread-earlier'); earlier.type = 'button'; earlier.hidden = true;
+        const fresh = el('button', 'btn btn-small ibx-thread-new'); fresh.type = 'button'; fresh.hidden = true;
+        node.append(head, none, earlier, list, fresh);
+        let rows = [], showAll = false, sig = '', busy = false, timer = 0, lastId = null, newCount = 0;
+        const draw = async () => {
+            const hidden = showAll ? 0 : Math.max(0, rows.length - THREAD_SHOWN);
+            head.textContent = rows.length ? `Messages (${rows.length})` : 'Messages';
+            none.hidden = rows.length > 0;
+            earlier.hidden = hidden === 0; earlier.textContent = `Show earlier (${hidden})`;
+            const items = [];
+            for (const m of rows.slice(hidden)) {
+                const li = el('li', m.mine ? 'ibx-thread-item ibx-thread-mine' : 'ibx-thread-item');
+                const t = ago(m.created_at, adapter.now);
+                const who = el('p', 'ibx-thread-who', `${m.mine ? 'You' : (m.from || 'Someone')}, ${t}`);
+                if (m.created_at) { const d = new Date(m.created_at); if (!Number.isNaN(d.getTime())) who.title = d.toLocaleString(); } // the exact time under the relative one
+                let text = String(m.content == null ? '' : m.content);
+                const lead = creator ? `@${creator}: ` : ''; // the reply route starts a person's reply with a mention of the task's creator: the page does not repeat it
+                if (m.mine && lead && text.startsWith(lead) && text.length > lead.length) text = text.slice(lead.length);
+                const body = el('div', 'ibx-thread-text'); body.append(await renderBody(text, adapter));
+                li.append(who, body); items.push(li);
+            }
+            list.replaceChildren(...items);
+        };
+        async function refresh() {
+            if (busy) return;
+            busy = true;
+            try {
+                const got = await adapter.listTaskMessages(task.project, task.id);
+                if (gone || !Array.isArray(got)) return;
+                const next = got.map(m => ({ id: m.id, from: m.from, mine: !!m.mine, content: m.content, created_at: m.created_at }));
+                const nextSig = next.map(m => `${m.id}:${m.content}`).join('\u0000');
+                if (nextSig === sig) return;
+                const grew = lastId !== null ? next.filter(m => Number(m.id) > Number(lastId)) : [];
+                sig = nextSig; rows = next;
+                lastId = rows.length ? rows[rows.length - 1].id : lastId;
+                await draw();
+                const theirs = grew.filter(m => !m.mine);
+                if (theirs.length) {
+                    const end = list.lastElementChild;
+                    const seen = !end || end.getBoundingClientRect().top < (window.innerHeight || 0);
+                    if (seen) say(`${theirs.length} new message${theirs.length === 1 ? '' : 's'} on this task`);
+                    else { newCount += theirs.length; fresh.textContent = `${newCount} new`; fresh.hidden = false; }
+                }
+            } catch (e) { /* the thread keeps what it had; the next read tries again */ } finally { busy = false; }
+        }
+        earlier.addEventListener('click', () => { showAll = true; draw().then(() => list.firstElementChild?.querySelector('.ibx-thread-who')?.focus?.()); });
+        fresh.addEventListener('click', () => { fresh.hidden = true; newCount = 0; list.lastElementChild?.scrollIntoView({ block: 'nearest' }); });
+        if (typeof (options && options.poll) === 'function') timer = options.poll(() => { if (gone || !node.isConnected) { clearInterval(timer); return; } refresh(); }, THREAD_POLL_MS); // the host's poller (Coral's pollEvery: paused when the tab is hidden, slowed under load); a host that gives none reads the conversation on open and after a reply
+        refresh();
+        return { node, refresh };
+    }
+
+    function replyBox(task, creator, describedBy, afterSend) {
         const form = el('form', 'ibx-reply');
         form.noValidate = true;
         const key = draftKey(task.project, task.id);
@@ -231,6 +297,7 @@ export function mountInbox(host, adapter, options) {
                 ta.value = ''; grow();
                 status.textContent = text;
                 say(text);
+                if (afterSend) afterSend(); // the person's own reply joins the conversation now
                 ta.focus(); // the Send button is disabled now (nothing to send): focus goes to the empty box, not to the page
             } catch (err) {
                 status.textContent = err && err.message ? err.message : 'The reply was refused.';

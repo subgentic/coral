@@ -52,6 +52,10 @@ export const coralInboxAdapter = {
         const d = await json(await fetch(`/api/board/${encodeURIComponent(project)}/tasks/${pathId(taskId)}/reply`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content }) }));
         return { ok: !!d.ok, notified: d.notified || [], warnings: d.warnings || [] };
     },
+    async listTaskMessages(project, taskId) { // the task's conversation (#7703): the person's replies and the agents' answers posted with --task, oldest first
+        const d = await json(await fetch(`/api/board/${encodeURIComponent(project)}/messages/all?task_id=${pathId(taskId)}&limit=200`));
+        return (Array.isArray(d) ? d : []).map(m => ({ id: m.id, from: m.hub_user || m.subscriber_id || '', mine: m.subscriber_id === 'Operator', content: m.content, created_at: m.created_at }));
+    },
     canReply() { return { ok: true }; }, // the Operator of this computer; a Coral Hub viewer's adapter says why not
     async readSavedMessage(item) {
         // GET /api/saved/{id}/message (Backend, #5753): the redacted, capped text of the stored item's source; reason says why there is none (gone, not_reachable, too_long)

@@ -70,7 +70,20 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 	project := urlParam(r, "project")
 	var body postMessageBody
 	derr := decodeJSON(r, &body)
-	msg, warnings, ok := h.postMessageCore(w, r, project, derr, body, nil)
+	var answer *taskReply
+	if derr == nil && body.TaskID != nil {
+		if *body.TaskID <= 0 {
+			errBadRequest(w, "invalid task_id")
+			return
+		}
+		task, err := h.bs.GetTask(r.Context(), project, *body.TaskID) // the task is looked up by the URL's board first: a task of another board is a 404 before anything is written
+		if err != nil || task == nil {
+			errNotFound(w, "Task not found")
+			return
+		}
+		answer = &taskReply{taskID: task.ID} // no creator: no mention is added, and the post is stored with its task_id
+	}
+	msg, warnings, ok := h.postMessageCore(w, r, project, derr, body, answer)
 	if !ok {
 		return
 	}
@@ -91,6 +104,9 @@ type postMessageBody struct {
 	Content       string  `json:"content"`
 	TargetGroupID *string `json:"target_group_id,omitempty"`
 	As            string  `json:"as,omitempty"` // display name for auto-subscribe (e.g. "Operator")
+	// TaskID makes the post an answer on that task (#7703): the agent's reply to a person's reply, listed with it by GET .../messages?task_id=N. The task must be on this board;
+	// no mention is added (the person reads the task's page), the sender is the one the request proves, exactly as for any post.
+	TaskID *int64 `json:"task_id,omitempty"`
 }
 
 // taskReply makes a post a reply to a task (#5463): the task's id and creator in, and what the server did with the creator's mention out.
