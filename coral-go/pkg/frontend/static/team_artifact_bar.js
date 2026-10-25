@@ -4,7 +4,7 @@ import { EMPTY, KINDS, ORIGINS, SORTS, KIND_LABEL, ORIGIN_LABEL, SORT_LABEL, cle
 import { buildListBar } from './list_bar.js';
 
 // The same fields for the team's list and for one agent's list (#5283): only the words and the ids differ, so the two bars (one per panel, both in the page) never share an id.
-const specFor = (personal) => {
+const specFor = (personal, page = false) => {
     const idp = personal ? 'aa' : 'ta';
     return {
         idp,
@@ -14,7 +14,7 @@ const specFor = (personal) => {
         placeholder: 'Search artifacts',
         headerSlots: true, // the panel's title and its Refresh and Copy icons sit on the search row (#5315)
         collapsible: true, // the agents tab's pattern (#5293): one icon opens Filters and Sort; the second icon opens or closes every row's details
-        expandAll: { expand: 'Expand all details', collapse: 'Collapse all details' },
+        expandAll: page ? undefined : { expand: 'Expand all details', collapse: 'Collapse all details' }, // the team page shows details in its pane, not in the rows
         sorts: { values: SORTS, labels: SORT_LABEL, aria: 'Sort artifacts' },
         fields: [
             { type: 'select', key: 'kind', id: `${idp}-kind`, label: 'Type', values: KINDS, labels: KIND_LABEL, any: 'Any type' },
@@ -29,6 +29,6 @@ const specFor = (personal) => {
 };
 
 /** onChange(filters) is called with the new, clean filters when the person changes anything (typing after a short pause). personal: the bar of one agent's Artifacts tab. */
-export function buildBar(onChange, { personal = false, hooks = {} } = {}) {
-    return buildListBar(specFor(personal), onChange, hooks);
+export function buildBar(onChange, { personal = false, page = false, hooks = {} } = {}) {
+    return buildListBar(specFor(personal, page), onChange, hooks);
 }
