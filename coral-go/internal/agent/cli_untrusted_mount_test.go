@@ -81,8 +81,9 @@ func TestLaunchCLISaysWhenPathHoldsAnUntrustedMount(t *testing.T) {
 		t.Fatalf("got %v", err)
 	}
 	UntrustedMountDir = func(string) (string, bool) { return "", false }
-	if p, err := LaunchCLI(map[string]string{}, "codex"); err != nil || p != "" {
-		t.Fatalf("an ordinary missing CLI keeps the old answer: %q, %v", p, err)
+	var nf *CLINotFoundError
+	if p, err := LaunchCLI(map[string]string{}, "codex"); p != "" || !errors.As(err, &nf) || errors.As(err, &um) {
+		t.Fatalf("an ordinary missing CLI is cli_not_found, never an empty answer that types the bare name (#353): %q, %v", p, err)
 	}
 	// A configured path is honoured as it is (CheckRunnable and the rest), whatever PATH holds.
 	UntrustedMountDir = func(string) (string, bool) { return "X:\\Codex\\bin", true }

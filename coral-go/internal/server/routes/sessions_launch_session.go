@@ -104,7 +104,7 @@ func (h *SessionsHandler) launchSession(ctx context.Context, spec launchSpec) (_
 	if err != nil {
 		return nil, err
 	}
-	cliPath, err := resolveLaunchCLI(agentType, agent.ResolveCLIPath(userSettings, agentType))
+	cliPath, err := resolveLaunchCLIScreened(agentType, agent.ResolveCLIPath(userSettings, agentType), h.commonPlaceScreen(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -284,6 +284,16 @@ func probeSignInOnce(bin, dir string) {
 // found on PATH or, failing that, in the common install places. A CLI found nowhere is an error naming how to
 // install it. A plain terminal has none.
 func resolveLaunchCLI(agentType, cliPath string) (string, error) {
+	return resolveLaunchCLIScreened(agentType, cliPath, nil)
+}
+
+// commonPlaceScreen is the check the common install places get (agent.CommonPlaceCLI): a CLI in an agent's working folder or in Coral's data folder is not picked up (#353).
+func (h *SessionsHandler) commonPlaceScreen(ctx context.Context) func(string) string {
+	return func(p string) string { return untrustedLocationOf(ctx, h.cfg, h.ss, p) }
+}
+
+// resolveLaunchCLIScreened is resolveLaunchCLI with the screen for the common install places.
+func resolveLaunchCLIScreened(agentType, cliPath string, screen func(string) string) (string, error) {
 	if agentType == at.Terminal {
 		return cliPath, nil
 	}
@@ -307,7 +317,7 @@ func resolveLaunchCLI(agentType, cliPath string) (string, error) {
 		return cliPath, nil
 	}
 	// LookPath failed — try common install locations
-	if found := agent.FindCLIInCommonPaths(checkBin); found != "" {
+	if found := agent.CommonPlaceCLI(checkBin, screen); found != "" {
 		log.Printf("[launch] %s not on PATH, found at %s", logsafe.Path(checkBin), logsafe.Path(found))
 		return found, nil
 	}

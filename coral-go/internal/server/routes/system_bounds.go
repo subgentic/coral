@@ -16,8 +16,10 @@ import (
 	"strings"
 
 	"github.com/subgentic/coral/internal/agent"
+	"github.com/subgentic/coral/internal/config"
 	"github.com/subgentic/coral/internal/safefs"
 	"github.com/subgentic/coral/internal/secfile"
+	"github.com/subgentic/coral/internal/store"
 )
 
 // knownCLIBinaries are the CLI names Coral launches (claude, codex, agy, pi).
@@ -80,6 +82,11 @@ func (h *SystemHandler) cliCheckRefusal(ctx context.Context, binary, agentType s
 // untrustedLocation says whether p is inside a folder an agent can write to: Coral's data
 // folder, a live agent's working folder, or a temp folder.
 func (h *SystemHandler) untrustedLocation(ctx context.Context, p string) string {
+	return untrustedLocationOf(ctx, h.cfg, h.ss, p)
+}
+
+// untrustedLocationOf is untrustedLocation for a caller with the config and the sessions store but no SystemHandler (a launch, restart or wake looking for a CLI in the common install places, #353).
+func untrustedLocationOf(ctx context.Context, cfg *config.Config, ss *store.SessionStore, p string) string {
 	real := realOrSelf(p)
 	inside := func(dir string) bool {
 		if dir == "" {
@@ -88,7 +95,7 @@ func (h *SystemHandler) untrustedLocation(ctx context.Context, p string) string 
 		d := realOrSelf(dir)
 		return within(d, real) || within(dir, p)
 	}
-	if h.cfg != nil && inside(h.cfg.CoralDir()) {
+	if cfg != nil && inside(cfg.CoralDir()) {
 		return "in Coral's data folder"
 	}
 	for _, tmp := range cliTempDirs() {
@@ -96,8 +103,8 @@ func (h *SystemHandler) untrustedLocation(ctx context.Context, p string) string 
 			return "in a temporary folder"
 		}
 	}
-	if h.ss != nil {
-		if live, err := h.ss.GetAllLiveSessions(ctx); err == nil {
+	if ss != nil {
+		if live, err := ss.GetAllLiveSessions(ctx); err == nil {
 			for _, s := range live {
 				if inside(s.WorkingDir) {
 					return "in an agent's working folder"
