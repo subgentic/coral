@@ -53,3 +53,22 @@ func TestAPlainPostIsStillNotLinkedToAnyTask(t *testing.T) {
 	assert.NotContains(t, out, "task_id")
 	assert.Empty(t, e.messages("p", "?task_id="+itoa(id)))
 }
+
+// A task_id that is not a positive whole number is answered as that (#7703, Security's LOW), whatever else the body has: not as "content required".
+func TestABadTaskIdIsAnsweredAsInvalidTaskId(t *testing.T) {
+	e := newReplyEnv(t)
+	e.join("p", "Backend Dev")
+	hdr := map[string]string{"X-Test-Actor": "token:Backend Dev"}
+	for _, bad := range []string{`"x"`, `"7"`, `1.5`, `-3`, `0`, `true`, `[]`, `{}`} {
+		code, out, b := e.do("POST", "/api/board/p/messages", `{"subscriber_id":"Backend Dev","content":"hi","task_id":`+bad+`}`, hdr)
+		assert.Equal(t, 400, code, "task_id %s: %s", bad, string(b))
+		assert.Equal(t, "invalid task_id", out["error"], "task_id %s is said to be what it is: %s", bad, string(b))
+	}
+	code, out, _ := e.do("POST", "/api/board/p/messages", `{"subscriber_id":"Backend Dev","task_id":"x"}`, hdr)
+	assert.Equal(t, 400, code)
+	assert.Equal(t, "invalid task_id", out["error"], "a bad task_id and no content is still the task_id")
+	assert.Empty(t, e.messages("p", ""), "nothing was posted")
+	// null is no task_id at all: an ordinary post
+	code, _, b := e.do("POST", "/api/board/p/messages", `{"subscriber_id":"Backend Dev","content":"plain","task_id":null}`, hdr)
+	assert.Equal(t, 200, code, string(b))
+}
