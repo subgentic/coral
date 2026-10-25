@@ -243,3 +243,33 @@ func TestALinkIsFollowedOnlyToAFileInTheSameFolder(t *testing.T) {
 	require.Len(t, fs, 1)
 	assert.Equal(t, ProblemLink, fs[0].Problem, "the first hop is inside, the last leaves")
 }
+
+// Security's LOW on #7454: in a memory folder a followed link must lead to a .md file: x.md linking to notes.txt (or to a dot-file) is problem link, and x.md linking to y.md is followed.
+func TestInAMemoryFolderALinkIsFollowedOnlyToAMarkdownFile(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlinks need privileges on Windows")
+	}
+	r := newRig(t)
+	mem := filepath.Join(r.home, ".claude", "projects", transcriptlink.ClaudeProjectDirName(r.proj), "memory")
+	write(t, filepath.Join(mem, "y.md"), "markdown memory")
+	write(t, filepath.Join(mem, "notes.txt"), "SECRET not markdown")
+	write(t, filepath.Join(mem, ".hidden.md"), "SECRET dot-file")
+	require.NoError(t, os.Symlink("y.md", filepath.Join(mem, "ok.md")))
+	require.NoError(t, os.Symlink("notes.txt", filepath.Join(mem, "x.md")))
+	require.NoError(t, os.Symlink(".hidden.md", filepath.Join(mem, "z.md")))
+	byName := map[string]File{}
+	for _, f := range Discover("claude", r.proj, r.repo, r.home) {
+		byName[f.Name] = f
+	}
+	assert.Equal(t, "y.md", byName["ok.md"].LinkTo)
+	c, err := byName["ok.md"].Read()
+	require.NoError(t, err)
+	assert.Equal(t, "markdown memory", c.Text)
+	for _, n := range []string{"x.md", "z.md"} {
+		assert.Equal(t, ProblemLink, byName[n].Problem, n)
+		assert.Empty(t, byName[n].LinkTo, n)
+		c, err := byName[n].Read()
+		assert.Error(t, err, n)
+		assert.NotContains(t, c.Text, "SECRET", n)
+	}
+}
