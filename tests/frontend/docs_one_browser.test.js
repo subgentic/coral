@@ -81,6 +81,9 @@ const BASE = require('./test_base').BASE;
             // the tab opens on its first group's table
             await waitFor(`!!document.querySelector('#group-table-view table.group-table') && document.getElementById('group-table-view').checkVisibility()`, at + 'the first group as a table', 10000);
             assert.equal(await ev(`document.querySelector('#group-table-title').textContent`), 'Getting started', at + 'the first group is Getting started');
+            // UI/UX's #7588 item 8: the group head is one fixed row (36 px, 44 on a phone) with a header button or without, so the title is where every other tab has it
+            assert.equal(await ev(`(() => { const v = document.getElementById('group-table-view'), t = document.querySelector('#group-table-title').getBoundingClientRect(), h = document.querySelector('#group-table-view .group-table-head').getBoundingClientRect(); const m = innerWidth < 768 || matchMedia('(pointer: coarse)').matches ? 44 : 36;
+                return Math.round(h.height) === m && Math.abs(t.top - (v.getBoundingClientRect().top + parseFloat(getComputedStyle(v).paddingTop) + (m - t.height) / 2)) < 1.5; })()`), true, at + 'the title row is one fixed height');
             assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view th')].map(h => [h.textContent, h.getAttribute('scope')])`), [['Topic', 'col']], at + 'a one-column table of topics');
             assert.equal(await ev(`document.querySelectorAll('#group-table-view tbody tr').length`), counts[0], at + "one row per topic of the group");
             assert.deepEqual(await ev(`(() => { const t = getComputedStyle(document.querySelector('#group-table-title')), c = getComputedStyle(document.querySelector('#group-table-view .group-table-head .session-group-count')); return [t.fontSize, t.fontWeight, c.fontSize, c.fontWeight]; })()`), ['20px', '700', '11px', '600'], at + "the title is 20/700 and its count 11/600");
