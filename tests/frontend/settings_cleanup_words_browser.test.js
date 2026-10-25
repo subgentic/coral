@@ -20,6 +20,7 @@ const BASE = require('./test_base').BASE;
             const off = await ev(`(() => ({ status: document.getElementById('settings-retention-status').textContent.trim(), on: document.getElementById('settings-retention-enabled').checked, pairs: document.querySelectorAll('#settings-pane-cleanup [id$="-days"]:not(#settings-artifact-store-max)').length }))()`);
             assert.equal(off.on, false, `${tag}: the hourly prune starts off`);
             assert.match(off.status, /^Off\b/, `${tag}: off says Off: ` + JSON.stringify(off));
+            assert.equal(off.status, 'Off. Prunes what is older than the days above, once an hour.', `${tag}: off says what the switch does`);
             assert.equal(off.pairs, 1, `${tag}: one Older than field serves Prune and the hourly run`);
             await ev(`(() => { const d = document.getElementById('settings-prune-days'); d.value = '7'; const c = document.getElementById('settings-retention-enabled'); c.click(); return true; })()`);
             assert.ok(!/^Off\b/.test(await ev(`document.getElementById('settings-retention-status').textContent.trim()`)), `${tag}: on at 7 days is no longer "Off"`);

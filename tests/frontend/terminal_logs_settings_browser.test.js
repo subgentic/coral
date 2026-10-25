@@ -49,6 +49,7 @@ const MIB = 1024 ** 2;
         await shot('terminal-logs-desktop');
 
         console.log('2. The confirmation says what is lost and what is kept; Cancel deletes nothing');
+        assert.equal(await ev(`document.getElementById('settings-terminal-logs-delete').classList.contains('btn-danger')`), true, 'the delete button is in the danger style, like Prune (UI/UX, #7627 note)');
         await ev(`document.getElementById('settings-terminal-logs-delete').click(); true`);
         await waitFor(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'the confirmation', 8000);
         const ask = await ev(`({ title: document.getElementById('confirm-modal-title').textContent, message: document.getElementById('confirm-modal-message').textContent })`);
