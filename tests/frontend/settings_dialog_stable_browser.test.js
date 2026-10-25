@@ -23,7 +23,7 @@ const SCALE = new Set(['16/700', '17/700', '14/600', '14/400', '13/500', '13/400
         // the ring (quiet_focus.js, the same file as #7391's): Settings opened with no input at all (a script) shows it, as the browser would; opened a moment after a pointer press it shows none on what took the
         // focus, and the first key press brings it back
         const ringOf = () => ev(`({ marked: document.getElementById('settings-modal').hasAttribute('data-quiet-focus'), inDialog: document.getElementById('settings-modal').contains(document.activeElement), ring: (a => a ? getComputedStyle(a).outlineStyle + ' ' + getComputedStyle(a).outlineWidth : '')(document.activeElement) })`);
-        // the dialog moves focus in one frame after it shows (dialog_focus.js, requestAnimationFrame): wait for it, so a slow frame is not read as focus left outside (#7612)
+        // the dialog moves focus in one frame after it shows (dialog_focus.js): wait for it, so a slow frame is not read as focus left outside (#7612)
         await waitFor(`document.getElementById('settings-modal').contains(document.activeElement)`, 'Settings opened by a script: focus moves into it', 10000);
         const scripted = await ringOf();
         assert.ok(!scripted.marked && scripted.inDialog, 'Settings opened by a script (no input): focus is in it and the ring is not suppressed: ' + JSON.stringify(scripted));
