@@ -77,8 +77,8 @@ const RECORD = `(() => {
         await run('switching with a draft', `localStorage.setItem('coral-live-view-mode', 'chat'); ${add('a1')} ${add('a2', { board_project: 'team-a' })}`, [['select a1', sel('a1')], ['type a draft', `document.getElementById('command-input').value = 'half a thought';`], ['select a2', sel('a2')], ['back to a1', sel('a1')]]);
         await run('remote agent on a hub', `T.state.hub = true; T.state.servers = [{ id: 'local', label: 'here', status: 'online' }, { id: 'm1', label: 'box', status: 'online' }]; ${add('x1', { server: 'm1' })}`, [['select x1', sel('x1', 'm1')]]);
         await run('selection by id only', `${add('a1')}`, [['select a1 without a server', `await window.selectLiveSession('a1', 'claude', 'a1-id');`]]);
-        await run('leaving a team view that agrees', `${add('a1')} T.state.selectedTeam = 'team-z'; window.exitTeamContext = async () => { T.state.selectedTeam = null; return true; };`, [['select a1', sel('a1')]]);
-        await run('leaving a team view that declines', `${add('a1')} T.state.selectedTeam = 'team-z'; window.exitTeamContext = async () => false;`, [['select a1', sel('a1')]]);
+        await run('leaving a team view that agrees', `${add('a1')} T.state.selectedTeam = 'team-z'; window.exitTeamPage = async () => { T.state.selectedTeam = null; return true; };`, [['select a1', sel('a1')]]);
+        await run('leaving a team view that declines', `${add('a1')} T.state.selectedTeam = 'team-z'; window.exitTeamPage = async () => false;`, [['select a1', sel('a1')]]);
         await run('three quick switches', `${add('a1')} ${add('a2')} ${add('a3')}`, [['select a1, a2, a3 without waiting', `window.selectLiveSession('a1', 'claude', 'a1-id', 'local'); window.selectLiveSession('a2', 'claude', 'a2-id', 'local'); await window.selectLiveSession('a3', 'claude', 'a3-id', 'local');`]]);
         // The same twice.
         const first = JSON.stringify(trace['awake agent, chat view']);

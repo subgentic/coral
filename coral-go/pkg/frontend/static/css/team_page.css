@@ -1,6 +1,5 @@
 /* The team page (#7453, UI/UX's one team page): header, tab strip, the tab's table or an item's page, and the detail pane for documents on the right. The header and the tab strip are the same pixels on every tab and every item page. */
 #team-page-view { flex: 1; min-width: 0; min-height: 0; flex-direction: column; }
-#agentic-state[data-page="team"], body[data-dock-page="team"] #agentic-state { display: none !important; } /* the page has no right dock: its tabs and the detail pane replace it */
 
 .team-page-head { flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; padding: 12px 24px 0; min-height: 48px; box-sizing: border-box; }
 .team-page-title { margin: 0; font-size: 1.25rem; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; min-width: 0; }

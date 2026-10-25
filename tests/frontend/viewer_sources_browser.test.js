@@ -1,5 +1,5 @@
-// Isolated real-browser coverage of the four file/artifact sidebar tabs (Files, Browse, Artifacts,
-// Team Artifacts), previews in the preview pane, and lazy explorer scope.
+// Isolated real-browser coverage of the three file/artifact sidebar tabs (Files, Browse, Artifacts;
+// the team's artifacts and knowledge are the team page's, #7457), previews in the preview pane, and lazy explorer scope.
 const assert=require('node:assert/strict');
 const { safePaused } = require('./helpers/paused');
 const fs=require('node:fs');
@@ -54,7 +54,7 @@ const base=require('./test_base').BASE;
  return new Response(JSON.stringify({files:[]}));
  };f.initFileSearch();f.syncFilesViewerSession();
  })()`);
- assert.equal(await ev(`['files','browse','artifacts','team-artifacts'].every(n=>!!document.getElementById('agentic-tab-'+n))`),true);
+ assert.equal(await ev(`['files','browse','artifacts'].every(n=>!!document.getElementById('agentic-tab-'+n))`),true);
  assert.equal(await ev(`calls.filter(x=>x.includes('view=explorer')||x.includes('/artifacts?')).length`),0);
  await tab('browse');assert.equal(await ev(`calls.filter(x=>x.includes('view=explorer')).length`),1);
  assert.equal(await ev(`document.querySelector('.explorer-item').dataset.directory`),'true');assert.match(await tree(),/\.env/);
@@ -86,12 +86,10 @@ const base=require('./test_base').BASE;
  assert.equal(await ev('document.activeElement.dataset.parent'),'src');await shot('browse-desktop');
  await tab('artifacts');assert.match(await ev(`document.querySelector('#agentic-panel-artifacts-view').textContent`),/Personal a/);
  await click('.team-artifact-preview');assert.match(await ev(`document.getElementById('preview-body').textContent`),/Artifact body/);await ev('window.closeAllPreviewTabs()');await settle();assert.equal(await ev(`document.getElementById('agentic-tab-artifacts').classList.contains('active')`),true);
- await tab('team-artifacts');assert.match(await ev(`document.querySelector('#agentic-panel-team-artifacts-view').textContent`),/Team shared/);
- await tab('artifacts');assert.equal(await ev(`calls.filter(x=>x.includes('/artifacts?')).length`),2);
+ await tab('artifacts');assert.equal(await ev(`calls.filter(x=>x.includes('/artifacts?')).length`),1);
  await ev(`window.defer=true;document.querySelector('#agentic-panel-artifacts-view .team-artifacts-refresh').click()`);await settle();
  await ev(`window.defer=false;s.currentSession={...s.currentSession,session_id:'b',working_directory:'/repo-b/subdir'};f.syncFilesViewerSession();pending.splice(0).forEach(r=>r())`);await settle();
  assert.match(await ev(`document.querySelector('#agentic-panel-artifacts-view').textContent`),/Personal b/);assert.doesNotMatch(await ev(`document.querySelector('#agentic-panel-artifacts-view').textContent`),/Personal a/);
- await tab('team-artifacts');assert.equal(await ev(`calls.filter(x=>x.includes('/artifacts?')&&!x.includes('session_id')).length`),1,'same-team cache retained');
  await tab('browse');assert.doesNotMatch(await tree(),/main.go/);assert.match(await tree(),/repo-b/);
  await ev(`window.defer=true;document.querySelector('#file-explorer-view .explorer-heading button').click()`);await settle();await tab('files');
  await ev(`window.defer=false;s.currentSession={...s.currentSession,session_id:'c',working_directory:'/repo-c'};f.syncFilesViewerSession();pending.splice(0).forEach(r=>r())`);await settle();await tab('browse');assert.match(await tree(),/repo-c/);assert.doesNotMatch(await tree(),/repo-b/);

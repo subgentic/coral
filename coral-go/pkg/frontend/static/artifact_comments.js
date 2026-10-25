@@ -10,9 +10,9 @@ import { showToast } from './utils.js';
 import { scrollBehavior } from './motion.js';
 import { pushOverlay, popOverlay } from './overlay_history.js';
 import { state } from './state.js';
-import { boardOfPage } from './dock_page.js';
 import { boardKeyName, sessionTeamKey, contextServer, isCloud } from './server_base.js';
 import { browserLocal } from './safe_storage.js';
+import { boardOfPage } from './dock_page.js';
 
 const OPEN_KEY = 'coral-artifact-comments-open'; // explicit choice shared by the viewer and docked preview, at every width
 

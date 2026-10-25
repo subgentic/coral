@@ -29,17 +29,17 @@ const sample = fs.readFileSync(path.join(__dirname,'fixtures/verification_report
             const {state}=await import((window.__coralStatic||'/static/')+'state.js');const files=await import((window.__coralStatic||'/static/')+'changed_files.js');
             window.__files=files;window.__state=state;
             state.currentSession={type:'live',name:'UI',session_id:'report-test',board_project:'report-team'};
-            // Show the real live view: team artifacts list in the sidebar, previews in the bottom preview pane.
+            // Show the real live view: the agent's artifacts list in the sidebar, previews in the bottom preview pane.
             const {showView}=await import((window.__coralStatic||'/static/')+'utils.js');showView('live-session-view');
             const side=document.getElementById('agentic-state');side.classList.remove('collapsed');side.style.width='720px';
             window.__content=${JSON.stringify(sample)};window.__inline=true;window.__reads=0;
             window.fetch=async(url)=>{
                 const u=String(url);
-                if(u.includes('/artifacts?'))return new Response(JSON.stringify({project:'report-team',artifacts:[{name:'verification_report',media_type:'application/json',available:true,...(window.__inline?{inline:true,task_id:2254,content_url:'/api/board/report-team/tasks/2254/artifact-content?source=completion&index=0'}:{uri:'coral://artifacts/'+'e'.repeat(64)})}],has_more:false}));
+                if(u.includes('/artifacts?'))return new Response(JSON.stringify({session_id:'report-test',project:'report-team',artifacts:[{name:'verification_report',media_type:'application/json',available:true,...(window.__inline?{inline:true,task_id:2254,content_url:'/api/board/report-team/tasks/2254/artifact-content?source=completion&index=0'}:{uri:'coral://artifacts/'+'e'.repeat(64)})}],has_more:false}));
                 if(u.includes('/artifact-content?')||u.startsWith('/api/artifacts/')){window.__reads++;return new Response(window.__content,{headers:{'Content-Type':window.__inline?'text/plain':'application/json','Content-Disposition':'inline; filename="verification_report"'}});}
                 return new Response(JSON.stringify({files:[]}));
             };
-            files.initFileSearch();files.syncFilesViewerSession();document.getElementById('agentic-tab-team-artifacts').click();
+            files.initFileSearch();files.syncFilesViewerSession();document.getElementById('agentic-tab-artifacts').click();
         })()`);await settle();
         await ev(`document.querySelector('.team-artifact-preview').click()`);await settle();
         assert.equal(await ev(`document.querySelector('.artifact-report-title').textContent`),'Task #2254');
@@ -59,7 +59,7 @@ const sample = fs.readFileSync(path.join(__dirname,'fixtures/verification_report
         await ev(`document.querySelector('.artifact-report-controls button').click()`);
         assert.equal(await ev('window.__reads'),1,'toggle never refetches');
         // Managed application/json uses the same report renderer.
-        await ev(`window.closeAllPreviewTabs();window.__inline=false;document.querySelector('#agentic-panel-team-artifacts .team-artifacts-refresh').click()`);await settle();
+        await ev(`window.closeAllPreviewTabs();window.__inline=false;document.querySelector('#agentic-panel-artifacts .team-artifacts-refresh').click()`);await settle();
         await ev(`document.querySelector('.team-artifact-preview').click()`);await settle();
         assert.equal(await ev(`document.querySelector('.artifact-report-title').textContent`),'Task #2254');
         // Module-level adversarial and fallback checks run in the real browser.

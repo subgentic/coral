@@ -298,8 +298,8 @@ export async function selectLiveSession(name, agentType, sessionId, server) {
     // restore, toasts) omit `server` and it is resolved from the live list.
     const srv = normServer(server || serverForSession(name, sessionId));
     dbg('selectLiveSession', { name, agentType, sessionId, server: srv });
-    // Selecting an agent leaves the team view (declining to discard unsaved team settings cancels).
-    if (state.selectedTeam && window.exitTeamContext && await window.exitTeamContext({ goBack: false }) === false) return;
+    // Selecting an agent leaves the team page (declining to discard unsaved team settings cancels).
+    if (state.selectedTeam && window.exitTeamPage && await window.exitTeamPage() === false) return;
     showAgentsTab();
     const generation = ++switchGeneration;
     agentSwitchStarted(name, sessionId || null); // window.__coralReady.agentSelected (#3118)

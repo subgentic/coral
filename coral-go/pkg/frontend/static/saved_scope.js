@@ -4,15 +4,11 @@
 
 export const ALL = Object.freeze({ kind: 'all', server: null, label: 'all', key: 'all' });
 
-/** The scope of the page on screen. env: { dock: 'agent' | 'board' | 'chats' | 'other', team: {server, name} | null (the team opened in the agent page), boardPage: {server, name} | null,
+/** The scope of the page on screen. env: { dock: 'agent' | 'none' | 'chats' | 'other',
  *  session: the open agent or ended chat: { type: 'live' | 'history', name, display_name, session_id, server, board: {server, name} | null (its team), job_title (its name on that board) } | null }. */
 export function scopeOf(env) {
     const e = env || {};
-    const team = t => t && t.name ? { kind: 'team', server: t.server, team: t.name, label: t.name, key: `team:${t.server}:${t.name}` } : null;
-    if (e.dock === 'board') return team(e.boardPage) || ALL;
     if (e.dock === 'agent') {
-        const t = team(e.team);
-        if (t) return t;
         const s = e.session;
         if (s && s.type === 'live' && s.session_id) {
             const label = s.display_name || s.name || s.session_id;

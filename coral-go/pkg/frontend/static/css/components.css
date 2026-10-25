@@ -2893,49 +2893,6 @@ button.subscriber-history-link {
     body:not([data-dock-open="1"]) .mb-has-board .mb-more.open #mb-delete-btn:hover { background: var(--bg-hover); }
 }
 
-/* With the right sidebar open on a board (#4539) the board is narrower and the toolbar uses the same More menu a phone does (#4538, mobile.css): Select, Export, Pause
-   and Delete in a menu, the Subscribers list being in the sidebar. The rules repeat the phone's, behind the sidebar being open (body[data-dock-open], sidebar.js). */
-@media (min-width: 768px) and (min-height: 501px), (min-width: 768px) and (pointer: fine), (min-width: 951px) {
-    /* The title, its badge and More wrap onto lines of their own when the board is this narrow, instead of printing over each other. */
-    body[data-dock-page="board"][data-dock-open="1"] #messageboard-view .mb-view-header { flex-wrap: wrap; row-gap: 8px; }
-    body[data-dock-page="board"][data-dock-open="1"] #messageboard-view .mb-view-header-left { flex-wrap: wrap; min-width: 0; row-gap: 4px; }
-    body[data-dock-page="board"][data-dock-open="1"] #messageboard-view .mb-header-actions { margin-left: auto; }
-    body[data-dock-page="board"][data-dock-open="1"] #messageboard-view.mb-has-board .mb-more { display: inline-block; position: relative; }
-    body[data-dock-page="board"][data-dock-open="1"] #messageboard-view.mb-has-board .mb-more-btn { display: inline-flex; }
-    body[data-dock-page="board"][data-dock-open="1"] #messageboard-view .mb-more-menu {
-        display: none;
-        flex-direction: column;
-        position: absolute;
-        top: calc(100% + 6px);
-        right: 0;
-        min-width: 200px;
-        max-width: calc(100vw - 32px);
-        background: var(--bg-secondary);
-        border: 1px solid var(--border);
-        border-radius: var(--radius-lg);
-        padding: 4px 0;
-        box-shadow: 0 8px 24px rgba(var(--black-rgb), 0.3);
-        z-index: 1000;
-    }
-    body[data-dock-page="board"][data-dock-open="1"] #messageboard-view .mb-more.open .mb-more-menu { display: flex; }
-    body[data-dock-page="board"][data-dock-open="1"] #messageboard-view .mb-more-menu .mb-action-btn {
-        width: 100%;
-        min-height: 36px;
-        justify-content: flex-start;
-        padding: 8px 16px;
-        border: 0;
-        border-radius: 0;
-        background: none;
-        white-space: normal;
-        text-align: left;
-    }
-    body[data-dock-page="board"][data-dock-open="1"] #messageboard-view .mb-more-menu .mb-action-btn:hover,
-    body[data-dock-page="board"][data-dock-open="1"] #messageboard-view .mb-more-menu .mb-action-btn:focus-visible { background: var(--bg-hover); }
-    body[data-dock-page="board"][data-dock-open="1"] #messageboard-view .mb-more.open .mb-more-chevron { transform: rotate(180deg); }
-    body[data-dock-page="board"][data-dock-open="1"] #messageboard-view .mb-more-menu #mb-pause-btn.mb-action-danger,
-    body[data-dock-page="board"][data-dock-open="1"] #messageboard-view .mb-more-menu #mb-pause-btn.mb-action-danger:hover { color: var(--warning); opacity: 1; }
-}
-
 .mb-action-btn {
     display: inline-flex;
     align-items: center;
@@ -3275,11 +3232,6 @@ button.subscriber-history-link {
     .mb-post-card { padding: 3px 3px 3px 16px; align-items: center; }
     .mb-post-input { min-height: var(--control-touch-height, 44px); box-sizing: border-box; padding: 10px 0; }
     .mb-post-send-btn { width: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); }
-}
-
-.mb-subscribers-panel {
-    /* A tab of the right sidebar (#4539): the sidebar draws its own edge and scrolls this panel. */
-    padding: var(--space-lg) 24px;
 }
 
 .mb-subscribers-title {
@@ -3788,6 +3740,8 @@ button.terminal-gone-header { margin: 0 4px 0 0; font-size: 0.6875rem; line-heig
 .board-artifact-image { cursor: zoom-in; }
 /* The Subscribers button and sheet: only at phone width, where the column is hidden (#3610). */
 .mb-subscribers-btn { display: none; }
+#messageboard-view.mb-has-board .mb-subscribers-btn { display: inline-flex; }
+.mb-team-page-btn[hidden] { display: none; } /* the board's page has no side panel (#7457): Members is this sheet at every width */
 .mb-subscribers-sheet { align-items: flex-end; }
 .mb-subscribers-sheet-content {
     width: 100%;

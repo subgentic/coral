@@ -54,10 +54,10 @@ const BASE = require('./test_base').BASE;
             // 3. the Workflow switch
             await ev(`window.__m.add('p-bot', 'A', 4, { sleeping: false, board_project: ${JSON.stringify(team)} }); true`); await settle(600);
             await ev(`window.selectLiveSession('p-bot', 'claude', 'p-bot-id', 'local'); true`); await settle(900);
-            await ev(`(async () => { const m = await import(${S} + 'team_working_mode.js'); await m.showTeamWorkingMode(${JSON.stringify(team)}, { workspace: true }); window.switchAgenticTab('team-settings', 'top'); return true; })()`);
-            await waitFor(`!!document.querySelector('#agentic-panel-team-settings .working-mode-form input[name="dependency_guidance"]')`, `${w}: the Workflow panel`, 10000);
+            await ev(`(async () => { const m = await import(${S} + 'team_working_mode.js'); await m.showTeamWorkingMode(${JSON.stringify(team)}); return true; })()`);
+            await waitFor(`!!document.querySelector('#team-working-mode-dialog .working-mode-form input[name="dependency_guidance"]')`, `${w}: the Workflow panel`, 10000);
             if (w < 600) { await ev(`(() => { const p = document.getElementById('agentic-state'); if (p && p.getClientRects().length === 0) { const b = document.querySelector('button[title="Toggle side panel"]'); b && b.click(); } return true; })()`); await settle(500); }
-            const sw = await ev(`(() => { const i = document.querySelector('#agentic-panel-team-settings input[name="dependency_guidance"]'), l = i.closest('label'); const r = l.getBoundingClientRect(); return { label: Math.round(r.height), text: l.textContent.trim() }; })()`);
+            const sw = await ev(`(() => { const i = document.querySelector('#team-working-mode-dialog input[name="dependency_guidance"]'), l = i.closest('label'); const r = l.getBoundingClientRect(); return { label: Math.round(r.height), text: l.textContent.trim() }; })()`);
             check(`${w}: the Workflow switch's label row is at least 24 px tall at a phone's width (${JSON.stringify(sw)})`, w >= 600 || sw.label >= 24);
         }
         const failed = results.filter(r => !r).length;

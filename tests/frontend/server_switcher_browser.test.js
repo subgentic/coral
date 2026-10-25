@@ -137,7 +137,7 @@ const SETTINGS_PRELOAD = `(() => {
         // Team view from a prefixed row opens that server's team.
         await ev(`(() => { const l = [...document.querySelectorAll('#live-sessions-list li')].find(l => l.querySelector('.row-server-prefix') && l.textContent.includes('team-m2')); (l.matches('[data-on-click="team-name-open"]') ? l : l.querySelector('[data-on-click="team-name-open"]')).click(); return true; })()`);
         await waitFor(`T.state.selectedTeam === '@m2/team-m2'`, 'team view of @m2/team-m2', 3000, `T.state.selectedTeam`);
-        await ev(`window.exitTeamContext({ goBack: false, force: true }); true`);
+        await ev(`window.exitTeamPage({ force: true }); true`);
         console.log('   ✓ ungrouped: "workstation-team-m2", server in italics first, offline dimmed with tooltip + sr text, no dots; team view opens @m2/team-m2');
         // Group by server.
         await ev(`document.getElementById('display-group-by-server').click(); true`);

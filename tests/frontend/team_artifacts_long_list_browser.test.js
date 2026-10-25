@@ -10,14 +10,14 @@ const items = Array.from({ length: N }, (_, i) => ({ name: `report-${String(i).p
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const results = [];
     const check = (label, cond, detail) => { results.push(!!cond); console.log(`[${cond ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' — ' + detail : ''}`); };
-    const ROWS = `#agentic-panel-team-artifacts tr.team-artifact-row`;
+    const ROWS = `#agentic-panel-artifacts tr.team-artifact-row`;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
         await ev(`window.__coralReady.then(() => true)`);
         await ev(`(() => { const R = window.fetch; window.__items = ${JSON.stringify(items)};
-            window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin); if (/^\\/api\\/board\\/[^/]+\\/artifacts$/.test(url.pathname) && (o.method || 'GET') === 'GET') { const body = new Response(JSON.stringify({ project: ${JSON.stringify(TEAM)}, artifacts: window.__items, has_more: false, truncated: false }), { status: 200, headers: { 'content-type': 'application/json' } }); return window.__delay ? new Promise(r => setTimeout(() => r(body), window.__delay)) : Promise.resolve(body); } // __delay: a slow answer (a frame passes while it loads, #6509)
+            window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin); if (/^\\/api\\/board\\/[^/]+\\/artifacts$/.test(url.pathname) && (o.method || 'GET') === 'GET') { const body = new Response(JSON.stringify({ session_id: url.searchParams.get('session_id') || undefined, project: ${JSON.stringify(TEAM)}, artifacts: window.__items, has_more: false, truncated: false }), { status: 200, headers: { 'content-type': 'application/json' } }); return window.__delay ? new Promise(r => setTimeout(() => r(body), window.__delay)) : Promise.resolve(body); } // __delay: a slow answer (a frame passes while it loads, #6509)
                 if (url.pathname === '/api/system/artifact-store/kept') return Promise.resolve(new Response(JSON.stringify({ kept: [] }), { status: 200, headers: { 'content-type': 'application/json' } })); return R(u, o); };
             return true; })()`);
         await ev(`window.__m.add('ll-bot', 'A', 4, { sleeping: false, board_project: ${JSON.stringify(TEAM)} }); true`);
@@ -27,9 +27,9 @@ const items = Array.from({ length: N }, (_, i) => ({ name: `report-${String(i).p
 
         console.log('1. rows are added a bounded number at a time');
         // the row count at every animation frame while the list draws
-        const sample = `window.__counts = []; window.__mo && window.__mo.disconnect(); window.__mo = new MutationObserver(() => { const n = document.querySelectorAll('${ROWS}').length; if (!window.__counts.length || window.__counts[window.__counts.length - 1] !== n) window.__counts.push(n); }); window.__mo.observe(document.getElementById('agentic-panel-team-artifacts'), { childList: true, subtree: true }); true`;
+        const sample = `window.__counts = []; window.__mo && window.__mo.disconnect(); window.__mo = new MutationObserver(() => { const n = document.querySelectorAll('${ROWS}').length; if (!window.__counts.length || window.__counts[window.__counts.length - 1] !== n) window.__counts.push(n); }); window.__mo.observe(document.getElementById('agentic-panel-artifacts'), { childList: true, subtree: true }); true`;
         await ev(sample);
-        await ev(`window.switchAgenticTab('team-artifacts', 'top'); true`);
+        await ev(`window.switchAgenticTab('artifacts', 'top'); true`);
         await waitFor(`document.querySelectorAll('${ROWS}').length === ${N}`, 'all 300 rows', 15000);
         await ev(`${framesJs(3)}`);
         const counts = (await ev(`window.__counts`)).filter(n => n > 0);
@@ -48,14 +48,14 @@ const items = Array.from({ length: N }, (_, i) => ({ name: `report-${String(i).p
         check(`after two quick refreshes there are exactly ${N} rows, each once (${again.length}, ${new Set(again).size} distinct)`, again.length === N && new Set(again).size === N);
 
         console.log('2b. a redraw of a scrolled list keeps its place (QA, #5331)');
-        const topRow = () => ev(`(() => { const v = document.getElementById('agentic-panel-team-artifacts-view'); const top = v.getBoundingClientRect().top; const r = [...document.querySelectorAll('${ROWS}')].find(e => e.getBoundingClientRect().bottom > top + 40); return r ? r.querySelector('.team-artifact-name').textContent.trim() : null; })()`);
-        await ev(`(() => { const v = document.getElementById('agentic-panel-team-artifacts-view'); const row = document.querySelectorAll('${ROWS}')[150]; v.scrollTop += row.getBoundingClientRect().top - v.getBoundingClientRect().top; return v.scrollTop; })()`);
+        const topRow = () => ev(`(() => { const v = document.getElementById('agentic-panel-artifacts-view'); const top = v.getBoundingClientRect().top; const r = [...document.querySelectorAll('${ROWS}')].find(e => e.getBoundingClientRect().bottom > top + 40); return r ? r.querySelector('.team-artifact-name').textContent.trim() : null; })()`);
+        await ev(`(() => { const v = document.getElementById('agentic-panel-artifacts-view'); const row = document.querySelectorAll('${ROWS}')[150]; v.scrollTop += row.getBoundingClientRect().top - v.getBoundingClientRect().top; return v.scrollTop; })()`);
         await ev(`${framesJs(3)}`); // the scroll event of a scroll the person made has long been delivered when they press Refresh
-        const before = await topRow(), st0 = await ev(`document.getElementById('agentic-panel-team-artifacts-view').scrollTop`);
+        const before = await topRow(), st0 = await ev(`document.getElementById('agentic-panel-artifacts-view').scrollTop`);
         await ev(`window.__delay = 300; document.querySelector('.team-artifacts-refresh').click(); true`); // the answer takes 300 ms, so frames pass while the list loads (#6509: the refresh emptied the list, the box shrank and the browser clamped the scroll to 0)
-        await waitFor(`document.getElementById('agentic-panel-team-artifacts-view').getAttribute('aria-busy') === 'false' && document.querySelectorAll('${ROWS}').length === ${N}`, 'the redraw', 15000);
+        await waitFor(`document.getElementById('agentic-panel-artifacts-view').getAttribute('aria-busy') === 'false' && document.querySelectorAll('${ROWS}').length === ${N}`, 'the redraw', 15000);
         await ev(`${framesJs(4)}`);
-        const after = await topRow(), st1 = await ev(`document.getElementById('agentic-panel-team-artifacts-view').scrollTop`);
+        const after = await topRow(), st1 = await ev(`document.getElementById('agentic-panel-artifacts-view').scrollTop`);
         check(`scrolled to ${before} (scrollTop ${Math.round(st0)}), a refresh leaves ${after} on top (scrollTop ${Math.round(st1)})`, st0 > 1000 && before === after && Math.abs(st1 - st0) < 2);
         await ev(`window.__delay = 0; true`);
 

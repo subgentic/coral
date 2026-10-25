@@ -21,8 +21,11 @@ const BASE = require('./test_base').BASE;
         const g1 = await goal('Ship the new installer'), g2 = await goal('Fix the flaky suites');
         const t1 = (await api('POST', `/api/board/${B}/tasks`, { subscriber_id: 'Boss', title: 'Build the installer', priority: 'high', goal_id: g1 })); assert.equal(t1.status, 201, JSON.stringify(t1));
         const t2 = (await api('POST', `/api/board/${B}/tasks`, { subscriber_id: 'Boss', title: 'Write the docs', priority: 'low' })); assert.equal(t2.status, 201);
-        await Page.navigate({ url: `${BASE}/board/${B}` }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
-        await waitFor(`document.querySelectorAll('#mb-messages .mb-message, #mb-messages .mb-queue-run').length >= 1`, 'the board', 15000);
+        // the board's Tasks tab is an agent's on that board (the board's page has no side panel, #7457)
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await ev(`window.__m.add('goal-agent', 'G', 1, { sleeping: false, board_project: ${JSON.stringify(B)} }); true`);
+        await waitFor(`(window.__qaState.liveSessions || []).some(s => s.name === 'goal-agent')`, 'the agent', 8000);
+        await ev(`window.selectLiveSession('goal-agent', 'claude', 'goal-agent-id', 'local'); true`);
         await ev(`(() => { if (document.getElementById('agentic-state').getBoundingClientRect().width < 50) document.getElementById('panel-toggle-btn').click(); document.getElementById('agentic-tab-tasks').click(); return true; })()`);
         await waitFor(`document.querySelectorAll('#agentic-panel-tasks .board-task-item').length >= 2 && document.getElementById('agentic-panel-tasks').getBoundingClientRect().width > 50`, 'the tasks', 15000);
 

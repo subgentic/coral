@@ -7,7 +7,6 @@ import { browserLocal } from './safe_storage.js';
 import { dockKey, dockOpenByDefault, onDockPage } from './dock_page.js';
 import { machineState } from './launch_server.js';
 import { setText, setAttr, setHidden, setTitle, setData } from './dom_write.js';
-import { goalsLayoutOn, toggleGoalsAgents, toggleGoalsMembers } from './goals_layout.js';
 
 export function initSidebarResize() {
     const handle = document.getElementById("sidebar-resize-handle");
@@ -263,7 +262,6 @@ onDockPage(kind => {
 export function toggleAgenticPanel(forceState) {
     const panel = document.getElementById('agentic-state');
     if (!panel) return;
-    if (goalsLayoutOn() && typeof forceState !== 'boolean') { toggleGoalsMembers(); return; } // on the Goals face the button is Members: the person's own panel state is not written (#7404)
     if (isPhoneLayout()) {
         let isOverlay;
         if (typeof forceState === 'boolean') {
@@ -364,7 +362,6 @@ export function showSidebarPane(tab) {
 }
 
 export function toggleSidebarRail() {
-    if (goalsLayoutOn()) { toggleGoalsAgents(); return; } // on the Goals face the agent list's choice is Goals' own (#7404)
     const collapsed = !document.querySelector('.layout')?.classList.contains('sidebar-collapsed');
     try { browserLocal.set(railKey(currentPane), collapsed ? '1' : '0'); } catch { /* storage unavailable */ }
     applyRail(collapsed);

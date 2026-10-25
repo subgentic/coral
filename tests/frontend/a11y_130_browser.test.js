@@ -63,7 +63,7 @@ const FX = {
         // 1. the filter icon panels
         console.log('1. the filter icon panels');
         for (const k of ['tasks', 'artifacts']) {
-            const root = k === 'tasks' ? '#agentic-state' : '#agentic-panel-team-artifacts';
+            const root = k === 'tasks' ? '#agentic-state' : '#agentic-panel-artifacts';
             await PANELS.find(p => p.key === k).show(ctx, { w: 1280, theme: 'light', phone: false }); await settle(400);
             const t = await ev(`(() => { const b = document.querySelector('${root} .list-bar-toggle'), m = document.querySelector('${root} .list-bar-menu'); return { name: b.getAttribute('aria-label'), ctl: b.getAttribute('aria-controls'), menu: m.id, role: m.getAttribute('role'), label: m.getAttribute('aria-label') }; })()`);
             check(`${k}: the icon is named with its state, points at its panel, which is a labelled group (${JSON.stringify(t)})`, /^Filters and sort/.test(t.name) && t.ctl === t.menu && t.role === 'group' && /Filters and sort/.test(t.label));
@@ -111,9 +111,9 @@ const FX = {
         await load(1280, 'light'); await stubBoard();
         await ev(`window.__m.add('p-bot', 'A', 4, { sleeping: false, board_project: ${JSON.stringify(team)} }); true`); await settle(600);
         await ev(`window.selectLiveSession('p-bot', 'claude', 'p-bot-id', 'local'); true`); await settle(900);
-        await ev(`(async () => { const m = await import(${S} + 'team_working_mode.js'); await m.showTeamWorkingMode(${JSON.stringify(team)}, { workspace: true }); window.switchAgenticTab('team-settings', 'top'); return true; })()`);
-        await waitFor(`!!document.querySelector('#agentic-panel-team-settings .working-mode-form') && document.querySelector('#agentic-panel-team-settings .working-mode-form').dataset.initialState !== undefined`, 'the team settings', 10000); await settle(500);
-        const ref = await ev(`(() => { const n = document.querySelector('#team-settings-messaging .ct-unavailable'), i = document.querySelector('.prompt-inspection-content'); return { note: n && { role: n.getAttribute('role'), shown: !n.hidden && n.getClientRects().length > 0 }, inspection: i && i.getAttribute('aria-live'), switches: [...document.querySelectorAll('#agentic-panel-team-settings [name=cross_team_messaging], #agentic-panel-team-settings [name=cross_team_artifacts]')].map(e => e.disabled) }; })()`);
+        await ev(`(async () => { const m = await import(${S} + 'team_working_mode.js'); await m.showTeamWorkingMode(${JSON.stringify(team)}); return true; })()`);
+        await waitFor(`!!document.querySelector('#team-working-mode-dialog .working-mode-form') && document.querySelector('#team-working-mode-dialog .working-mode-form').dataset.initialState !== undefined`, 'the team settings', 10000); await settle(500);
+        const ref = await ev(`(() => { const n = document.querySelector('#team-settings-messaging .ct-unavailable'), i = document.querySelector('.prompt-inspection-content'); return { note: n && { role: n.getAttribute('role'), shown: !n.hidden && n.getClientRects().length > 0 }, inspection: i && i.getAttribute('aria-live'), switches: [...document.querySelectorAll('#team-working-mode-dialog [name=cross_team_messaging], #team-working-mode-dialog [name=cross_team_artifacts]')].map(e => e.disabled) }; })()`);
         check(`the refusal note (on the Messaging tab) and the Prompt inspection message are live regions, and there are no switches to change when the settings could not be read (${JSON.stringify(ref)})`, ref.note && ref.note.role === 'status' && ref.inspection === 'polite' && ref.switches.length === 0);
 
         // 5. the Updating badge

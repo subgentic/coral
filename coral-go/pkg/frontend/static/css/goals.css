@@ -147,8 +147,3 @@
 @container (max-width: 879px) { .goals-cols { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 767px) { .goals-page.goals-open .goals-chips-host { display: none; } } /* an open goal is a screen of its own: the filter row belongs to the list */
 
-/* Goals face, wide screens (#7404): the right panel is out of the way until Members brings it back (goals_layout.js); Members is drawn on this face only */
-.mb-members-btn { display: none; }
-body[data-goals-layout] .mb-members-btn { display: inline-flex; }
-body[data-goals-layout]:not([data-goals-members]) #agentic-state,
-body[data-goals-layout]:not([data-goals-members]) #task-bar-resize-handle { display: none; }

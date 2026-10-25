@@ -174,7 +174,7 @@ const VIEWS = [
                     check(`${tag}: nothing runs past the right edge, and no horizontal scroll`, m.overflowing.length === 0 && m.pageScroll <= 0 && m.messagesScroll <= 0, JSON.stringify(m));
                     if (v.name !== 'phone') {
                         const b = await ev(`(b => b ? getComputedStyle(b).display : 'none')(document.getElementById('mb-subscribers-btn'))`);
-                        check(`${tag}: the column shows, so the Subscribers button doesn't`, b === 'none', b);
+                        check(`${tag}: the board's page has no side panel, so Members is the button at every width`, b !== 'none', b);
                     }
                     if (shots) await save(`board-spacing-${phase}-${v.name}-${theme}.png`);
                     if (v.name === 'phone') await sheet(tag, v, phase === 'messages' && theme === 'light');

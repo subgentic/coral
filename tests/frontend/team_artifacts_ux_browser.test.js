@@ -30,7 +30,7 @@ const HEX = c => c.repeat(64);
         await ev(`(() => { const R = window.fetch; window.__mode = 'normal'; window.__items = ${JSON.stringify(ITEMS)}; window.__lists = 0; window.__deletes = []; window.__release = null;
             const json = (b, s = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } }));
             window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin); const m = (o.method || 'GET').toUpperCase(); const p = url.pathname;
-                if (p.startsWith('/api/board/') && p.endsWith('/artifacts')) { window.__lists++; const body = () => json({ project: decodeURIComponent(p.split('/')[3]), artifacts: window.__mode === 'empty' ? [] : window.__items, has_more: false, truncated: false });
+                if (p.startsWith('/api/board/') && p.endsWith('/artifacts')) { window.__lists++; const body = () => json({ session_id: new URL(String(u), location.origin).searchParams.get('session_id') || undefined, project: decodeURIComponent(p.split('/')[3]), artifacts: window.__mode === 'empty' ? [] : window.__items, has_more: false, truncated: false });
                     if (window.__mode === 'error') return json({}, 500); if (window.__mode === 'deferred') return new Promise(res => { window.__release = () => res(body()); }); return body(); }
                 if (p === '/api/system/artifact-store/kept') return json({ kept: [] });
                 { const d = /^\\/api\\/artifacts\\/([a-f0-9]{64})$/.exec(p); if (d && m === 'DELETE') { window.__deletes.push(d[1]); window.__items = window.__items.filter(i => !i.uri.endsWith(d[1])); return json({ deleted: true, bytes: 1 }); } }
@@ -40,7 +40,7 @@ const HEX = c => c.repeat(64);
             state.currentSession = { type: 'live', name: 'ux-ui', session_id: 'ux-a', board_project: ${JSON.stringify(team)} };
             const {showView} = await import((window.__coralStatic||'/static/')+'utils.js'); showView('live-session-view');
             const side = document.getElementById('agentic-state'); side.classList.remove('collapsed'); side.style.width = '680px'; files.initFileSearch(); files.syncFilesViewerSession(); return true; })()`);
-        await ev(`localStorage.removeItem('coral-agentic-tab-top'); document.getElementById('agentic-tab-team-artifacts').click(); true`);
+        await ev(`localStorage.removeItem('coral-agentic-tab-top'); document.getElementById('agentic-tab-artifacts').click(); true`);
         await waitFor(`document.querySelectorAll('tr.team-artifact-row').length === 3`, 'the three rows', 8000);
 
         console.log('1. Desktop: five icons fit their column and sit over nothing');
@@ -58,9 +58,9 @@ const HEX = c => c.repeat(64);
 
         console.log('2. A singular count, the live region and a dd gap');
         await ev(`window.__items = [window.__items[0]]; window.switchAgenticTab && 0; true`);
-        await ev(`document.querySelector('#agentic-panel-team-artifacts-view .team-artifacts-refresh').click(); true`);
-        await waitFor(`/^1 artifact$/.test((document.querySelector('#agentic-panel-team-artifacts-view .team-artifacts-status') || {}).textContent || '')`, '"1 artifact"', 8000);
-        await ev(`window.__items = ${JSON.stringify(ITEMS)}; document.querySelector('#agentic-panel-team-artifacts-view .team-artifacts-refresh').click(); true`);
+        await ev(`document.querySelector('#agentic-panel-artifacts-view .team-artifacts-refresh').click(); true`);
+        await waitFor(`/^1 artifact$/.test((document.querySelector('#agentic-panel-artifacts-view .team-artifacts-status') || {}).textContent || '')`, '"1 artifact"', 8000);
+        await ev(`window.__items = ${JSON.stringify(ITEMS)}; document.querySelector('#agentic-panel-artifacts-view .team-artifacts-refresh').click(); true`);
         await waitFor(`document.querySelectorAll('tr.team-artifact-row').length === 3`, 'three rows again', 8000);
         assert.equal(await ev(`(() => { const dl = document.createElement('dl'); const w = document.createElement('div'); w.className = 'team-artifact-details'; w.append(dl); for (const t of ['Also received from', 'a', 'b']) { const e = document.createElement(t === 'Also received from' ? 'dt' : 'dd'); e.textContent = t; dl.append(e); } document.body.append(w);
             const gap = parseFloat(getComputedStyle(dl.querySelectorAll('dd')[1]).marginTop); w.remove(); return gap > 0; })()`), true, 'the second sender line has a gap above it');
@@ -73,7 +73,7 @@ const HEX = c => c.repeat(64);
         await waitFor(`window.__deletes.length === 1 && document.querySelectorAll('tr.team-artifact-row').length === 2`, 'the middle row to go', 8000, `({ deletes: window.__deletes.length, rows: document.querySelectorAll('tr.team-artifact-row').length, confirm: getComputedStyle(document.getElementById('confirm-modal')).display, active: document.activeElement && (document.activeElement.id || document.activeElement.className), lists: window.__lists, toast: [...document.querySelectorAll('.toast')].map(t => t.textContent.trim().slice(0, 60)) })`);
         let a = await active();
         assert.equal(a.body, undefined, 'the focus is not on the page: ' + JSON.stringify(a)); assert.equal(a.row, 1, 'it is on the row that took the deleted one\'s place'); assert.equal(a.inModal, false);
-        assert.match(await ev(`document.querySelector('#agentic-panel-team-artifacts-live').textContent`), /^Deleted report-1\.txt\.$/, 'the live region says it');
+        assert.match(await ev(`document.querySelector('#agentic-panel-artifacts-live').textContent`), /^Deleted report-1\.txt\.$/, 'the live region says it');
         assert.equal(await ev(`document.querySelector('.team-artifacts-notice') && document.querySelector('.team-artifacts-notice').getAttribute('aria-hidden')`), 'true', 'the visible line is not read twice');
         await focusDelete(1); // the last row
         await deleteWithKeys();
@@ -88,9 +88,9 @@ const HEX = c => c.repeat(64);
         assert.equal(await ev(`!!document.querySelector('.team-artifacts-list')`), false, 'an empty list is its line, with no table header over nothing');
 
         console.log('4. An error is red, has no table, and Retry keeps the focus on the panel; Refresh keeps it while loading');
-        await ev(`window.__mode = 'error'; document.querySelector('#agentic-panel-team-artifacts-view .team-artifacts-refresh').click(); true`);
+        await ev(`window.__mode = 'error'; document.querySelector('#agentic-panel-artifacts-view .team-artifacts-refresh').click(); true`);
         await waitFor(`!!document.querySelector('.team-artifacts-retry')`, 'the error with Retry', 8000);
-        const err = await ev(`(() => { const s = document.querySelector('#agentic-panel-team-artifacts-view .team-artifacts-status'); const calm = document.createElement('div'); calm.className = 'team-artifacts-status'; document.querySelector('#agentic-panel-team-artifacts-view').append(calm); const c = getComputedStyle(calm).color; calm.remove();
+        const err = await ev(`(() => { const s = document.querySelector('#agentic-panel-artifacts-view .team-artifacts-status'); const calm = document.createElement('div'); calm.className = 'team-artifacts-status'; document.querySelector('#agentic-panel-artifacts-view').append(calm); const c = getComputedStyle(calm).color; calm.remove();
             return { state: s.dataset.state, color: getComputedStyle(s).color, calm: c, role: s.getAttribute('role'), table: !!document.querySelector('.team-artifacts-list') }; })()`);
         assert.equal(err.state, 'error'); assert.notEqual(err.color, err.calm, 'the error is not the grey of the other lines'); assert.equal(err.role, 'alert'); assert.equal(err.table, false);
         await shot('team-artifacts-ux-error');
@@ -100,7 +100,7 @@ const HEX = c => c.repeat(64);
         a = await active();
         assert.equal(a.body, undefined, 'after Retry the focus is on the panel: ' + JSON.stringify(a)); assert.equal(a.row, 0, 'on the first row\'s first control');
         // Refresh while the list loads: the focus stays on it, and a second press does not start a second load.
-        await ev(`window.__mode = 'deferred'; window.__lists = 0; document.querySelector('#agentic-panel-team-artifacts-view .team-artifacts-refresh').focus(); true`);
+        await ev(`window.__mode = 'deferred'; window.__lists = 0; document.querySelector('#agentic-panel-artifacts-view .team-artifacts-refresh').focus(); true`);
         await press('Enter', 'Enter', 13);
         await waitFor(`window.__lists === 1 && !!window.__release`, 'the load to start', 8000);
         a = await active();
@@ -109,7 +109,7 @@ const HEX = c => c.repeat(64);
         await press('Enter', 'Enter', 13); await sleep(200); // sleep-ok: shows that a second press does nothing
         assert.equal(await ev(`window.__lists`), 1, 'a second press starts no second load');
         await ev(`window.__release(); true`);
-        await waitFor(`document.querySelectorAll('tr.team-artifact-row').length === 3 && !document.querySelector('#agentic-panel-team-artifacts-view .team-artifacts-refresh').hasAttribute('aria-disabled')`, 'the load to end', 8000);
+        await waitFor(`document.querySelectorAll('tr.team-artifact-row').length === 3 && !document.querySelector('#agentic-panel-artifacts-view .team-artifacts-refresh').hasAttribute('aria-disabled')`, 'the load to end', 8000);
         await ev(`window.__mode = 'normal'; true`);
 
         console.log('5. A touch phone at 100% and 200% text: 44 px targets, icons wrapped, nothing over the name, one-line chip');
@@ -117,10 +117,10 @@ const HEX = c => c.repeat(64);
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
         await Emulation.setTouchEmulationEnabled({ enabled: true, maxTouchPoints: 5 });
         await ev(`(document.getElementById('popout-panel-toggle-btn') || document.getElementById('panel-toggle-btn')).click(); true`); await sleep(500); // sleep-ok: the drawer opens over frames
-        await ev(`window.switchAgenticTab('team-artifacts', 'top'); true`); await sleep(300); // sleep-ok: the tab shows over frames
+        await ev(`window.switchAgenticTab('artifacts', 'top'); true`); await sleep(300); // sleep-ok: the tab shows over frames
         for (const size of ['', '32px']) {
             await ev(`document.documentElement.style.fontSize = '${size}'; document.getElementById('agentic-state').style.width = ''; true`);
-            await ev(`document.querySelector('#agentic-panel-team-artifacts-view .team-artifacts-refresh').click(); true`);
+            await ev(`document.querySelector('#agentic-panel-artifacts-view .team-artifacts-refresh').click(); true`);
             await waitFor(`document.querySelectorAll('tr.team-artifact-row').length === 3`, 'the rows on the phone', 8000);
             await sleep(400); // sleep-ok: layout settles
             const m = await ev(`(() => { const hit = (a, b) => a.left < b.right - 1 && a.right > b.left + 1 && a.top < b.bottom - 1 && a.bottom > b.top + 1; const small = [], over = [];

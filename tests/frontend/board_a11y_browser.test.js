@@ -71,6 +71,13 @@ const BASE = require('./test_base').BASE;
             await setTheme(ev, theme);
             const h = await auditRegion(ev, ['.mb-view-header']);
             assert.ok(h.checked > 0 && !h.fails.length, `${theme}: the board header (Delete) holds 4.5:1: ` + JSON.stringify(h.fails).slice(0, 400));
+        }
+        // the board's tasks are the Tasks tab of an agent on the board (the board's page has no side panel, #7457)
+        await ev(`window.__m.add('a11y-agent', 'A', 1, { sleeping: false, board_project: ${JSON.stringify(B)} }); true`);
+        await waitFor(`(window.__qaState.liveSessions || []).some(s => s.name === 'a11y-agent')`, 'the agent', 8000);
+        await ev(`window.selectLiveSession('a11y-agent', 'claude', 'a11y-agent-id', 'local'); true`);
+        for (const theme of ['dark', 'light']) {
+            await setTheme(ev, theme);
             await ev(`(() => { if (document.getElementById('agentic-state').getBoundingClientRect().width < 50) document.getElementById('panel-toggle-btn').click(); return true; })()`);
             await ev(`document.getElementById('agentic-tab-tasks').click(); true`);
             await waitFor(`document.querySelectorAll('#agentic-panel-tasks .board-task-item').length >= 1 && document.getElementById('agentic-panel-tasks').getBoundingClientRect().width > 50`, 'the tasks', 15000);
@@ -97,25 +104,25 @@ const BASE = require('./test_base').BASE;
 
         console.log('5. the Team view: one status line, named Remind buttons, the Free badge in light');
         await ev(`(async () => {
-            document.body.innerHTML = '<main id="agentic-state" class="agentic-state"><div class="agentic-block"></div><div id="agentic-panel-team-view" class="agentic-panel active" style="display:flex;flex:1;min-height:0"></div></main>'; const st = document.getElementById('agentic-state'); st.style.cssText = 'display:flex!important;position:fixed;left:0;top:0;height:100vh;width:760px';
+            document.body.innerHTML = '<main id="agentic-state" class="agentic-state"><div class="agentic-block"></div></main>'; const st = document.getElementById('agentic-state'); st.style.cssText = 'display:flex!important;position:fixed;left:0;top:0;height:100vh;width:760px';
             const real = window.fetch; const agents = [
               { name: 'Frontend Developer', agent_type: 'codex', role: 'Frontend Developer', availability: 'busy', available: false, reason: 'Working through the task list', tasks: [{ scope: 'board', id: 11, status: 'in_progress', title: 'Build the queue view' }] },
               { name: 'QA Engineer', agent_type: 'claude', role: 'QA', availability: 'available', available: true, reason: 'Nothing assigned', tasks: [] }];
             window.fetch = (u, o) => String(u).includes('/status') ? Promise.resolve(new Response(JSON.stringify({ summary: { busy: 1, available: 1 }, observed_at: new Date().toISOString(), agents, unassigned_tasks: [], health_report: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } })) : real(u, o);
-            const m = await import((window.__coralStatic || '/static/') + 'team_availability.js'); await m.showTeamAvailability('qa-team', { workspace: true }); return true; })()`);
-        await waitFor(`document.querySelectorAll('#agentic-panel-team-view .availability-agent').length === 2`, 'the cards', 10000);
-        const tv = await ev(`(() => { const p = document.getElementById('agentic-panel-team-view'); return { liveOnContent: p.querySelector('.availability-content').hasAttribute('aria-live'), liveRegions: p.querySelectorAll('[aria-live], [role=status]').length, status: p.querySelector('.availability-status').getAttribute('role'), remind: [...p.querySelectorAll('.availability-agent > button')].map(b => b.getAttribute('aria-label')) }; })()`);
+            const m = await import((window.__coralStatic || '/static/') + 'team_availability.js'); await m.showTeamAvailability('qa-team'); return true; })()`);
+        await waitFor(`document.querySelectorAll('#team-availability-dialog .availability-agent').length === 2`, 'the cards', 10000);
+        const tv = await ev(`(() => { const p = document.getElementById('team-availability-dialog'); return { liveOnContent: p.querySelector('.availability-content').hasAttribute('aria-live'), liveRegions: p.querySelectorAll('[aria-live], [role=status]').length, status: p.querySelector('.availability-status').getAttribute('role'), remind: [...p.querySelectorAll('.availability-agent > button')].map(b => b.getAttribute('aria-label')) }; })()`);
         assert.equal(tv.liveOnContent, false, 'the whole view is not a live region');
         assert.equal(tv.liveRegions, 1, 'one status line is: ' + JSON.stringify(tv));
-        const names = await ev(`[...document.querySelectorAll('#agentic-panel-team-view .availability-agent')].map(c => { const id = c.getAttribute('aria-labelledby'); return [c.tagName, (document.getElementById(id) || {}).textContent]; })`);
+        const names = await ev(`[...document.querySelectorAll('#team-availability-dialog .availability-agent')].map(c => { const id = c.getAttribute('aria-labelledby'); return [c.tagName, (document.getElementById(id) || {}).textContent]; })`);
         assert.deepEqual(names, [['ARTICLE', 'Frontend Developer'], ['ARTICLE', 'QA Engineer']], 'each card is named by its agent');
         assert.deepEqual(tv.remind, ['Remind agent for Frontend Developer', 'Remind agent for QA Engineer']);
-        await ev(`document.querySelector('#agentic-panel-team-view .availability-toolbar button').click(); true`);
-        await waitFor(`/Team view updated: 2 agents, 1 free, 1 busy\\./.test(document.querySelector('#agentic-panel-team-view .availability-status').textContent)`, 'a Refresh says what changed', 8000);
+        await ev(`document.querySelector('#team-availability-dialog .availability-toolbar button').click(); true`);
+        await waitFor(`/Team view updated: 2 agents, 1 free, 1 busy\\./.test(document.querySelector('#team-availability-dialog .availability-status').textContent)`, 'a Refresh says what changed', 8000);
         await installAudit(ev);
         for (const theme of ['dark', 'light']) {
             await setTheme(ev, theme);
-            const a = await auditRegion(ev, ['#agentic-panel-team-view']);
+            const a = await auditRegion(ev, ['#team-availability-dialog']);
             assert.ok(a.checked > 0 && !a.fails.length, `${theme}: the Team view holds 4.5:1: ` + JSON.stringify(a.fails).slice(0, 400));
             await shot(`team-${theme}`);
         }

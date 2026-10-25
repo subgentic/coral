@@ -1,5 +1,5 @@
 // Team settings, step by step (#4653): showTeamWorkingMode (team_working_mode.js) is one 356-line function (the dialog, its tabs, the preset editor, the load and the save in one closure), and
-// splitting it must change nothing. This opens it as the sidebar's workspace and as a dialog, with every answer of its endpoints (all good; the working mode, the presets, the global settings, the
+// splitting it must change nothing. This opens it as a dialog (the sidebar's workspace mode went with the right dock, #7457), with every answer of its endpoints (all good; the working mode, the presets, the global settings, the
 // prompt inspection or the board settings failing), and does what a person does: the tabs by click and by Arrow, Home and End, the preset list, a new preset, Save preset and Reset, Save with a
 // change and with none, Enter in the preset name. After each step it records the dialog's markup (hashed), its status line, and the requests the step sent (method, address, body). The
 // whole trace is compared with fixtures/team_settings_trace.json (sha256 per step; the steps' readable lines are in the file too, so a change can be read). CORAL_UPDATE_GOLDEN=1 rewrites it.
@@ -23,9 +23,7 @@ const sha = t => require('node:crypto').createHash('sha256').update(t).digest('h
         await ev(`window.__trace = async (mode, answers, script) => {
             const st = window.__coralStatic || '/static/';
             const m = await import(st + 'team_working_mode.js');
-            document.getElementById('team-working-mode-dialog')?.remove(); document.getElementById('team-settings-workspace')?.remove();
-            let host = document.getElementById('agentic-panel-team-settings'); if (!host) { host = document.createElement('div'); host.id = 'agentic-panel-team-settings'; document.body.append(host); }
-            host.replaceChildren();
+            document.getElementById('team-working-mode-dialog')?.remove();
             const reqs = [];
             const preset = (id, o = {}) => ({ id, name: id === 'none' ? 'None' : id === 'worktrees' ? 'Worktrees' : id, instructions: undefined, default_instructions: 'Default for ' + id, builtin: ['none', 'worktrees', 'shared_checkout'].includes(id), overridden: false, ...o });
             const state = { wm: { mode: 'none', dependency_guidance: false, custom_instructions: '' }, presets: [preset('none'), preset('shared_checkout'), preset('worktrees', { overridden: true, instructions: 'Local worktrees text' })] };
@@ -44,7 +42,7 @@ const sha = t => require('node:crypto').createHash('sha256').update(t).digest('h
                 return real(u, o);
             };
             const q = (s, r = document) => r.querySelector(s);
-            const root = () => document.getElementById('team-settings-workspace') || document.getElementById('team-working-mode-dialog');
+            const root = () => document.getElementById('team-working-mode-dialog');
             const norm = t => t.replace(/custom-[0-9a-z]+/g, 'custom-X').replace(/board-rename-([a-z]+)-\\d+/g, 'board-rename-$1-N');
             const out = [];
             let seen = 0;
@@ -53,7 +51,7 @@ const sha = t => require('node:crypto').createHash('sha256').update(t).digest('h
             const flush = () => { seen = reqs.length; };
             const settle = () => new Promise(r => setTimeout(r, 120)); // sleep-ok: each step's fetches and redraws settle over frames; there is no completion event
             try {
-                await m.showTeamWorkingMode('team-x', { workspace: mode === 'workspace' });
+                await m.showTeamWorkingMode('team-x');
                 for (let i = 0; i < 100 && !(root() && q('[type=submit]', root()) && (!q('[type=submit]', root()).disabled || answers.wm === 500 || answers.presets === 500)); i++) await settle();
                 await settle();
                 record('opened and loaded'); flush();
@@ -89,18 +87,15 @@ const sha = t => require('node:crypto').createHash('sha256').update(t).digest('h
             nothing: `async ({ record }) => { record('nothing more'); }`,
         };
         const SCEN = [
-            ['workspace, all good, tabs', 'workspace', {}, 'tabs'],
             ['dialog, all good, tabs', 'dialog', {}, 'tabs'],
-            ['workspace, presets', 'workspace', {}, 'presets'],
             ['dialog, presets', 'dialog', {}, 'presets'],
-            ['workspace, save', 'workspace', {}, 'save'],
             ['dialog, save', 'dialog', {}, 'save'],
-            ['preset save fails', 'workspace', { presetSave: 500, reset: 500 }, 'presets'],
-            ['save fails (mode, board)', 'workspace', { wmSave: 500, boardSave: 500 }, 'save'],
-            ['all-Coral settings fail to load (Health check tab note)', 'workspace', { settings: 500 }, 'save'],
-            ['board settings missing', 'workspace', { board: 404 }, 'save'],
-            ['inspection fails', 'workspace', { inspect: 500 }, 'nothing'],
-            ['working mode fails to load', 'workspace', { wm: 500 }, 'nothing'],
+            ['preset save fails', 'dialog', { presetSave: 500, reset: 500 }, 'presets'],
+            ['save fails (mode, board)', 'dialog', { wmSave: 500, boardSave: 500 }, 'save'],
+            ['all-Coral settings fail to load (Health check tab note)', 'dialog', { settings: 500 }, 'save'],
+            ['board settings missing', 'dialog', { board: 404 }, 'save'],
+            ['inspection fails', 'dialog', { inspect: 500 }, 'nothing'],
+            ['working mode fails to load', 'dialog', { wm: 500 }, 'nothing'],
             ['presets fail to load', 'dialog', { presets: 500 }, 'nothing'],
         ];
         for (const [name, mode, answers, script] of SCEN) {
@@ -108,8 +103,8 @@ const sha = t => require('node:crypto').createHash('sha256').update(t).digest('h
             assert.ok(trace[name].length >= 1 && trace[name][0].html.length > 500, `${name}: the dialog drew`);
         }
         // The same twice: nothing in it depends on the clock.
-        const again = await ev(`window.__trace('workspace', {}, ${SCRIPTS.tabs})`);
-        const first = trace['workspace, all good, tabs'];
+        const again = await ev(`window.__trace('dialog', {}, ${SCRIPTS.tabs})`);
+        const first = trace['dialog, all good, tabs'];
         for (let i = 0; i < first.length; i++) for (const f of ['html', 'status', 'form', 'requests']) if (again[i][f] !== first[i][f]) { let j = 0; while (j < first[i][f].length && first[i][f][j] === again[i][f][j]) j++; assert.fail(`not the same twice: step ${first[i].step}, ${f}, at ${j}:\n  1: ${first[i][f].slice(Math.max(0, j - 60), j + 120)}\n  2: ${again[i][f].slice(Math.max(0, j - 60), j + 120)}`); }
         assert.equal(sha(JSON.stringify(again)), sha(JSON.stringify(first)), 'the same trace twice');
         const lines = {}; const hashes = {};
@@ -119,7 +114,7 @@ const sha = t => require('node:crypto').createHash('sha256').update(t).digest('h
         }
         if (process.env.CORAL_UPDATE_GOLDEN) {
             fs.mkdirSync(path.dirname(GOLDEN), { recursive: true });
-            fs.writeFileSync(GOLDEN, JSON.stringify({ about: 'what showTeamWorkingMode did, step by step, for team_settings_trace_browser.test.js: sha256 of each step (markup, status, form, requests) and its readable line', hashes, lines, sample: trace['workspace, all good, tabs'][0].html }, null, 1) + '\n');
+            fs.writeFileSync(GOLDEN, JSON.stringify({ about: 'what showTeamWorkingMode did, step by step, for team_settings_trace_browser.test.js: sha256 of each step (markup, status, form, requests) and its readable line', hashes, lines, sample: trace['dialog, all good, tabs'][0].html }, null, 1) + '\n');
             console.log('golden written: ' + Object.values(hashes).reduce((a, h) => a + h.length, 0) + ' steps');
             return;
         }

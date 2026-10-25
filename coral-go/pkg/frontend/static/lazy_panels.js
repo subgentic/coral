@@ -34,7 +34,6 @@ export const loadThemeConfig = panel('the theme editor', './theme_config.js');
 export const loadTemplateBrowser = panel('the template browser', './template_browser.js');
 export const loadChatSearch = panel('chat search', './chat_search.js');
 // The team view and the team's settings (with its Health check tab): opened from a team's button, not needed to start (#5364).
-export const loadTeamContext = panel('the team view', './team_context.js');
 // The team page (#7453): opened by a team's row, its Team view and Team settings items, its address.
 export const loadTeamPage = panel('the team page', './team_page.js');
 export const loadTeamSettings = panel('the team settings', './team_working_mode.js');

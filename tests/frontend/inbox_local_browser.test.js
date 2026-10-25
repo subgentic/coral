@@ -213,7 +213,7 @@ const hex = i => i.toString(16).padStart(20, '0');
         check('the dock\'s Saved tab on the same page is still the agent\'s: scoped, in the right sidebar', !s.inbox && s.uiIn === 'agentic-panel-saved' && s.dockShown && s.dockHeading === 'Saved: QA Alpha' && JSON.stringify(s.dockRows) === JSON.stringify(['qa-a chat', 'team-a board, by the QA Engineer']), JSON.stringify([s.inbox, s.uiIn, s.dockShown, s.dockHeading, s.dockRows]));
         check('its tab says 2, the top bar still 6, and the Inbox tab counts the agents waiting (1)', s.navBadge === '1' && (await ev(`document.getElementById('saved-tab-count').textContent`)) === '2' && (await badge()) === '6', JSON.stringify([s.navBadge, await badge()]));
         await shot('inbox-scoped-agent-desktop');
-        await ev(`Promise.resolve(window.enterTeamContext('team-a', { tab: 'team-view' })).then(() => true)`); // (the team view is a lazy module, #5364: the first call loads it, so wait for it)
+        await ev(`Promise.resolve(window.openTeamPage('team-a')).then(() => true)`); // (the team page is a lazy module: the first call loads it, so wait for it)
         await settle(`document.getElementById('saved-btn').getAttribute('aria-label') === 'Saved for later, 6 open'`, 'the count on the team page');
         check('on a team\'s page the top bar badge is the count of everything (6)', (await badge()) === '6', await badge());
         await ev(`document.getElementById('saved-btn').click(); true`);
@@ -222,11 +222,7 @@ const hex = i => i.toString(16).padStart(20, '0');
         check('a team\'s page: the bookmark opens the Inbox at everything too', s.inbox && s.uiIn === 'agentic-panel-saved' && s.heading === 'Saved' && s.rows.length === 6, JSON.stringify([s.inbox, s.uiIn, s.heading, s.rows.length]));
         await ev(`document.getElementById('saved-btn').click(); true`);
         await settle(`!document.getElementById('nav-tab-hub-inbox').classList.contains('active')`, 'back on the team page');
-        await openDockSaved();
-        await settle(`document.getElementById('saved-scope').textContent === 'Saved: team-a' && document.querySelectorAll('#saved-list > li').length > 0`, 'the team panel');
-        s = await state();
-        check('a team\'s page: the dock\'s Saved tab is the team\'s, scoped', !s.inbox && s.uiIn === 'agentic-panel-saved' && s.dockShown && s.dockRows.length === 4, JSON.stringify([s.inbox, s.uiIn, s.dockShown, s.dockRows.length]));
-        await ev(`window.exitTeamContext({ goBack: false, force: true }); window.selectLiveSession('', '', '', 'local'); true`);
+        await ev(`window.exitTeamPage({ force: true }); window.selectLiveSession('', '', '', 'local'); true`);
         // from the Inbox, then an agent: the list is in the sidebar again
         await ev(`document.getElementById('nav-tab-hub-inbox').click(); true`);
         await ev(tabBtn('saved'));

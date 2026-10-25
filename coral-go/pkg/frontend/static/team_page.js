@@ -10,7 +10,9 @@ import { keyRoute, TEAM_TABS } from './routes.js';
 import { importOnce } from './import_once.js';
 import { refreshTeamAvailability } from './team_availability.js';
 import { pollEvery } from './overload.js';
-import { onDockPage } from './dock_page.js';
+import { onViewShown } from './view_switch.js';
+import { setPreviewSession } from './preview_pane.js';
+import { renderLiveSessions } from './render.js';
 const { closeDetailPane } = await importOnce('./detail_pane.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried
 const { el } = await importOnce('./team_table.js');
 const { quietFocus } = await importOnce('./quiet_focus.js');
@@ -359,5 +361,20 @@ export function leaveTeamPage() {
     S.team = ''; S.item = null;
 }
 
-// Another kind of page on screen (an agent, Chats, Jobs): the team page lets go of what it borrowed.
-onDockPage((kind, previous) => { if (previous === 'team' && kind !== 'team') leaveTeamPage(); });
+// Another page on screen (an agent, Chats, Jobs): the team page lets go of what it borrowed.
+onViewShown(id => { if (id !== 'team-page-view' && S.team) leaveTeamPage(); });
+
+/** Leaving the team page for another page (an agent, a tab, a route): the team is no longer the one on screen. Resolves false when the person declines to discard unsaved settings,
+ *  and the page stays. (This was the legacy team context's exit, which the page's team shared: one place now.) */
+export async function exitTeamPage({ force = false } = {}) {
+    if (!state.selectedTeam) return true;
+    if (!force) {
+        const { hasUnsavedTeamSettings, confirmTeamWorkspaceChange } = await importOnce('./team_working_mode.js');
+        if (hasUnsavedTeamSettings() && !(await confirmTeamWorkspaceChange())) return false;
+    }
+    state.selectedTeam = null;
+    setPreviewSession(state.currentSession?.type === 'live' ? state.currentSession.session_id : null);
+    if (state.liveSessions?.length) renderLiveSessions(state.liveSessions); // the sidebar's team row is not marked any more
+    document.dispatchEvent(new CustomEvent('coral:route-changed')); // the Saved list and its count are of the agent or team shown (#4792)
+    return true;
+}

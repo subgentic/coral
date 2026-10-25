@@ -53,8 +53,8 @@ const BASE = require('./test_base').BASE;
         await ev(`document.querySelector('.team-availability-dialog, #team-working-mode-dialog')?.close?.(); true`);
 
         console.log('3. Customize tabs has its own icon');
-        const icons = await ev(`(() => { const t = id => document.querySelector('#' + id + ' .material-icons')?.textContent; return [t('agentic-tab-team-settings'), t('agentic-tab-customize')]; })()`);
-        assert.ok(icons[0] && icons[1] && icons[0] !== icons[1], 'Team Settings and Customize tabs have different icons: ' + JSON.stringify(icons));
+        const icons = await ev(`(() => { const t = id => document.querySelector('#' + id + ' .material-icons')?.textContent; return [t('agentic-tab-customize'), ...['files', 'browse', 'artifacts', 'tasks', 'notes', 'activity', 'agent-ui'].map(n => t('agentic-tab-' + n))]; })()`);
+        assert.ok(icons[0] && icons.slice(1).every(i => i && i !== icons[0]), 'the Customize tab has an icon of its own among the tabs: ' + JSON.stringify(icons));
 
         console.log('4. Team view: a card does not repeat the name or "No open assigned tasks"');
         for (const n of ['Lead Developer', 'QA Engineer']) await ev(`fetch('/api/board/${TEAM}/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: ${JSON.stringify(n)}, job_title: ${JSON.stringify(n)}, session_name: ${JSON.stringify(n.toLowerCase().replace(' ', '-'))} }) }).then(r => r.status)`);

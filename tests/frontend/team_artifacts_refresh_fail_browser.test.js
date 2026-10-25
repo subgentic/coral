@@ -10,14 +10,14 @@ const items = Array.from({ length: N }, (_, i) => ({ name: `report-${String(i).p
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const results = [];
     const check = (label, cond, detail) => { results.push(!!cond); console.log(`[${cond ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' — ' + detail : ''}`); };
-    const ROWS = `#agentic-panel-team-artifacts tr.team-artifact-row`;
+    const ROWS = `#agentic-panel-artifacts tr.team-artifact-row`;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
         await ev(`window.__coralReady.then(() => true)`);
         await ev(`(() => { const R = window.fetch; window.__items = ${JSON.stringify(items)};
-            window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin); if (/^\\/api\\/board\\/[^/]+\\/artifacts$/.test(url.pathname) && (o.method || 'GET') === 'GET') { const body = new Response(JSON.stringify({ project: ${JSON.stringify(TEAM)}, artifacts: window.__items, has_more: false, truncated: false }), { status: 200, headers: { 'content-type': 'application/json' } }); return window.__delay ? new Promise(r => setTimeout(() => r(body), window.__delay)) : Promise.resolve(body); } // __delay: a slow answer (a frame passes while it loads, #6509)
+            window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin); if (/^\\/api\\/board\\/[^/]+\\/artifacts$/.test(url.pathname) && (o.method || 'GET') === 'GET') { const body = new Response(JSON.stringify({ session_id: url.searchParams.get('session_id') || undefined, project: ${JSON.stringify(TEAM)}, artifacts: window.__items, has_more: false, truncated: false }), { status: 200, headers: { 'content-type': 'application/json' } }); return window.__delay ? new Promise(r => setTimeout(() => r(body), window.__delay)) : Promise.resolve(body); } // __delay: a slow answer (a frame passes while it loads, #6509)
                 if (url.pathname === '/api/system/artifact-store/kept') return Promise.resolve(new Response(JSON.stringify({ kept: [] }), { status: 200, headers: { 'content-type': 'application/json' } })); return R(u, o); };
             return true; })()`);
         await ev(`window.__m.add('ll-bot', 'A', 4, { sleeping: false, board_project: ${JSON.stringify(TEAM)} }); true`);
@@ -26,24 +26,24 @@ const items = Array.from({ length: N }, (_, i) => ({ name: `report-${String(i).p
         await ev(`${framesJs(4)}`);
 
         // a failing board route on top of the suite's stub
-        await ev(`(() => { const S = window.fetch; window.fetch = (u, o = {}) => { const p = new URL(String(u), location.origin).pathname; if (window.__fail && /^\\/api\\/board\\/[^/]+\\/artifacts$/.test(p)) return Promise.resolve(new Response('{}', { status: 500 })); if (/^\\/api\\/board\\/[^/]+\\/artifacts$/.test(p) && (o.method || 'GET') === 'GET') { const off = Number(new URL(String(u), location.origin).searchParams.get('offset') || 0); return Promise.resolve(new Response(JSON.stringify({ project: ${JSON.stringify(TEAM)}, artifacts: window.__items.slice(off), has_more: false, truncated: false }), { status: 200, headers: { 'content-type': 'application/json' } })); } return S(u, o); }; return true; })()`); // like the server: the page asked for starts at its offset
-        await ev(`window.switchAgenticTab('team-artifacts', 'top'); true`);
+        await ev(`(() => { const S = window.fetch; window.fetch = (u, o = {}) => { const p = new URL(String(u), location.origin).pathname; if (window.__fail && /^\\/api\\/board\\/[^/]+\\/artifacts$/.test(p)) return Promise.resolve(new Response('{}', { status: 500 })); if (/^\\/api\\/board\\/[^/]+\\/artifacts$/.test(p) && (o.method || 'GET') === 'GET') { const off = Number(new URL(String(u), location.origin).searchParams.get('offset') || 0); return Promise.resolve(new Response(JSON.stringify({ session_id: new URL(String(u), location.origin).searchParams.get('session_id') || undefined, project: ${JSON.stringify(TEAM)}, artifacts: window.__items.slice(off), has_more: false, truncated: false }), { status: 200, headers: { 'content-type': 'application/json' } })); } return S(u, o); }; return true; })()`); // like the server: the page asked for starts at its offset
+        await ev(`window.switchAgenticTab('artifacts', 'top'); true`);
         await waitFor(`document.querySelectorAll('${ROWS}').length === ${N}`, 'all 300 rows', 15000);
         await ev(`${framesJs(3)}`);
         const names = () => ev(`[...document.querySelectorAll('${ROWS} .team-artifact-name')].map(e => e.textContent.trim())`);
 
         console.log('1. a Refresh that fails keeps the rows and says so');
         await ev(`window.__fail = true; window.__delay = 150; document.querySelector('.team-artifacts-refresh').click(); true`);
-        await waitFor(`!!document.querySelector('#agentic-panel-team-artifacts-view .team-artifacts-status[data-state=error]')`, 'the error', 6000);
+        await waitFor(`!!document.querySelector('#agentic-panel-artifacts-view .team-artifacts-status[data-state=error]')`, 'the error', 6000);
         await ev(`${framesJs(3)}`);
         await waitFor(`document.querySelectorAll('${ROWS}').length === ${N}`, 'the rows drawn again', 6000).catch(() => {});
         const kept = await names();
-        check('the 300 rows are still there once each, with the error shown and a Retry', kept.length === N && new Set(kept).size === N && await ev(`!!document.querySelector('#agentic-panel-team-artifacts-view .team-artifacts-retry')`), `${kept.length} rows`);
+        check('the 300 rows are still there once each, with the error shown and a Retry', kept.length === N && new Set(kept).size === N && await ev(`!!document.querySelector('#agentic-panel-artifacts-view .team-artifacts-retry')`), `${kept.length} rows`);
 
         console.log('2. Retry asks for the first page again: the list becomes the new answer');
         // the board changed meanwhile: 5 fewer artifacts, one renamed
         await ev(`window.__fail = false; window.__items = window.__items.slice(0, ${N - 5}).map((x, i) => i === 0 ? { ...x, name: 'renamed-first.md' } : x); true`);
-        await ev(`document.querySelector('#agentic-panel-team-artifacts-view .team-artifacts-retry').click(); true`);
+        await ev(`document.querySelector('#agentic-panel-artifacts-view .team-artifacts-retry').click(); true`);
         await waitFor(`document.querySelectorAll('${ROWS}').length === ${N - 5}`, 'the new list', 6000).catch(() => {});
         await ev(`${framesJs(4)}`);
         const after = await names();

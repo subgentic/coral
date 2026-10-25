@@ -3,8 +3,9 @@
 import { OPERATOR_ID, isOperatorId, escapeHtml, escapeAttr, showView, getAgentColor, showToast, externalMessageBadge, hubUserBadge, renderBoardMessageBody, setBoardMentionNames, highlightMentionsIn, boardMessageColorStyle } from './utils.js';
 import { registerActions, withId, textOf } from './actions.js';
 import { scrollBehavior } from './motion.js';
-import { boardPageChanged } from './dock_page.js';
-import { emptyState } from './dom_write.js';
+import { emptyState, setHidden } from './dom_write.js';
+import { browserLocal } from './safe_storage.js';
+import { trackBoardGoals } from './goals_badge.js'; // the Goals switch's count and "waiting" (#7252)
 import { state } from './state.js';
 import { resolveBoardArtifacts } from './board_artifacts.js';
 import { messageAttachmentAttrs, messageAttachmentsHtml } from './board_attachments.js';
@@ -15,9 +16,6 @@ import { messageTimeHtml } from './message_time.js';
 import { paintPauseButton } from './board_pause_button.js';
 import { pathId, keyLabel, noteBoardLabel, hasBoardLabel, onBoardLabelsChanged, splitKey, boardFetch, teamFetch, isCloud, inTeam } from './server_base.js';
 import { importOnce } from './import_once.js';
-import { browserLocal } from './safe_storage.js';
-import { setGoalsLayout, toggleGoalsMembers } from './goals_layout.js'; // Goals uses the width (#7404)
-import { trackBoardGoals } from './goals_badge.js'; // the Goals switch's count and "waiting" (#7252)
 import './goals_adapter.js'; // the Goals view (goals_view.js) is lazy and imports only what loads at startup (import_hygiene): its two small helpers load here (#7113)
 import './goal_words.js';
 import { OUTCOME_UNKNOWN_LINE, isOutcomeUnknown } from './outcome_unknown.js';
@@ -98,7 +96,7 @@ onBoardLabelsChanged(() => {
 export function selectBoardProject(project, messageId = null) {
     setMoreOpen(false);
     currentProject = project;
-    state.boardPageProject = project; // the sidebar's Tasks and Team artifacts tabs read this board (#4539)
+    state.boardPageProject = project; // the board on screen: an artifact opened here asks its comments of this board
     clearNewPill();
     state.currentBoardServer = splitKey(project).server;
     pendingMessageId = messageId != null ? String(messageId) : null;
@@ -151,7 +149,7 @@ export function selectBoardProject(project, messageId = null) {
     loadBoardSubscribers(project);
     loadBoardProjects();
     startBoardPoll();
-    boardPageChanged(); // the sidebar's tabs read the board again
+    setHidden(document.getElementById('mb-team-page-btn'), false);
     applyBoardFace(project);
 }
 
@@ -184,7 +182,6 @@ export function showBoardInPage(project, host) {
     if (!again) { clearNewPill(); pendingMessageId = null; loadBoardMessages(project); }
     loadBoardSubscribers(project);
     startBoardPoll();
-    boardPageChanged();
 }
 
 /** On the team page the composer is "Message the team" and its button "Send" (UI/UX's design); on the board page they keep the names they have: they are put back when the column goes home. */
@@ -220,7 +217,6 @@ function applyBoardFace(project) {
     const face = has && browserLocal.get(FACE_KEY) === 'goals' ? 'goals' : 'messages';
     document.getElementById('mb-face-messages')?.setAttribute('aria-pressed', String(face === 'messages'));
     document.getElementById('mb-face-goals')?.setAttribute('aria-pressed', String(face === 'goals'));
-    setGoalsLayout(face === 'goals');
     if (face === 'goals') {
         board.style.display = 'none'; // display-ok: #mb-board is shown and hidden this way everywhere else in this file
         importOnce('./goals_view.js').then(m => m.showGoals(goals, project)).catch(() => {});
@@ -245,11 +241,11 @@ export function showMessageBoardProjects() {
 
     document.getElementById('mb-project-list').style.display = '';
     document.getElementById('mb-board').style.display = 'none';
+    setHidden(document.getElementById('mb-team-page-btn'), true);
     applyBoardFace(null);
     hideBoardSubscribers();
     for (const list of ['mb-subscribers-list', 'mb-subscribers-sheet-list']) { const el = document.getElementById(list); if (el) el.innerHTML = '<li class="mb-project-meta">Open a board to see who is subscribed.</li>'; }
     setMembersCount(0);
-    boardPageChanged();
     document.getElementById('messageboard-view').classList.remove('mb-has-board');
     const backBtn2 = document.getElementById('mb-back-btn');
     if (backBtn2) backBtn2.style.display = 'none';
@@ -1164,8 +1160,8 @@ document.addEventListener('click', (e) => {
 registerActions({
     'mb-project': el => { const p = textOf(el.dataset.project); if (p) selectBoardProject(p); },
     'mb-earlier': () => loadEarlierMessages(),
-    'mb-members': () => toggleGoalsMembers(),
     'mb-face': el => { browserLocal.set(FACE_KEY, el.dataset.face === 'goals' ? 'goals' : 'messages'); applyBoardFace(currentProject); },
+    'mb-team-page': () => { if (currentProject) window.openTeamPage?.(currentProject); }, // the board's page offers its team's page (#7457)
     'mb-more': (el, event) => toggleMoreMenu(event),
     'mb-jump-latest': () => jumpToLatest(),
     'mb-msg-select': el => withId(el.dataset.msgId, id => toggleMessageSelect(id, el.checked)),

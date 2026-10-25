@@ -1,8 +1,7 @@
 /* Customize the side panel's tab row (#4103, operator request): hide or show each tab and reorder
  * them, from a small popover opened by the tune button at the end of the row or a right-click on
  * the row (a bottom sheet on a phone). The choice is kept per user in this browser (safe_storage.js,
- * under the signed-in account's storeKey) as tab ids only, and applies to every agent; the agent's tabs and the team's tabs keep separate lists, since they
- * show in different contexts.
+ * under the signed-in account's storeKey) as tab ids only, and applies to every agent. It is the agent page's: the team's page has no side panel (#7457).
  *
  * The tab buttons stay the real ones (their counts and handlers move with them): a hidden tab only
  * gets .tab-hidden, and the order is the DOM order. What is read back is checked against the page's own
@@ -17,14 +16,14 @@ import { storeKey } from './local_store.js';
 
 const BASE_KEY = 'coral-agentic-tab-prefs'; // kept under storeKey(): on Coral Hub one browser serves several accounts
 const empty = () => ({ order: [], hidden: [] });
-let prefs = { agent: empty(), team: empty() };
+let prefs = { agent: empty() };
 let defaultOrder = null; // every customizable tab id in the page's own order: the ids a stored list may name
 let loadedKey = null;
 let dragId = null;
 
 const strip = () => document.querySelector('#agentic-block-top .agentic-state-tabs');
 const tabButtons = () => [...(strip()?.querySelectorAll('.agentic-tab[data-tab]') || [])];
-const contextOf = () => (document.getElementById('agentic-state')?.classList.contains('team-context') ? 'team' : 'agent');
+const contextOf = () => 'agent'; // the lists are kept by context (the agent's was one of two)
 
 /** A stored list as ids this page knows: strings only, the page's own tab ids, no duplicates. Anything else is dropped (a corrupt or
  *  hand-edited value can't name a tab that doesn't exist, and what is stored is ids, never a title or content). */
@@ -40,10 +39,10 @@ function ensureLoaded() {
     const key = storeKey(BASE_KEY);
     if (key === loadedKey) return;
     loadedKey = key;
-    prefs = { agent: empty(), team: empty() };
+    prefs = { agent: empty() };
     try {
         const p = JSON.parse(browserLocal.get(key) || 'null');
-        for (const ctx of ['agent', 'team']) {
+        for (const ctx of ['agent']) {
             const c = p && typeof p === 'object' ? p[ctx] : null;
             prefs[ctx] = { order: cleanIds(c?.order), hidden: cleanIds(c?.hidden) };
         }
@@ -53,18 +52,15 @@ function ensureLoaded() {
 /** Keep the choice; with nothing chosen the key is removed, so Reset leaves nothing behind. */
 function save() {
     const key = storeKey(BASE_KEY);
-    const chosen = ['agent', 'team'].some(ctx => prefs[ctx].order.length || prefs[ctx].hidden.length);
+    const chosen = ['agent'].some(ctx => prefs[ctx].order.length || prefs[ctx].hidden.length);
     if (chosen) browserLocal.set(key, JSON.stringify(prefs)); else browserLocal.remove(key);
 }
 
-/** The tabs the current context shows, in the page's own order: the agent's, or the team's. */
+/** The tabs the agent page shows, in the page's own order. */
 function available(ctx) {
     return tabButtons().filter(b => {
-        const scope = b.dataset.scope || '';
-        if (b.dataset.onlyPage) return false; // a tab of another kind of page (Subscribers, on a board) is not the agent page's to order or hide (#4539)
-        if (ctx === 'team' ? scope === 'agent' : scope === 'team') return false;
         if (b.hasAttribute('data-local-only') && document.body.classList.contains('cloud-mode')) return false; // hidden by the hosted hub's stylesheet (Saved): a row for it would tick a tab that never appears (#4741)
-        if (b.dataset.tab === 'board') return ctx === 'agent' && b.style.display !== 'none'; // a team has its chat in the centre
+        if (b.dataset.tab === 'board') return b.style.display !== 'none'; // the chat tab is there while the agent is on a board
         return true;
     });
 }

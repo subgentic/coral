@@ -7,7 +7,7 @@ import { importOnce } from './import_once.js';
 import { showToast, escapeAttr } from './utils.js';
 import { isCloud, sessionServer, normServer, splitKey, serverFetch, LOCAL_SERVER } from './server_base.js';
 import { onBuilt } from './lazy_dom.js';
-import { dockKind, boardOfPage, onDockPage } from './dock_page.js';
+import { dockKind, onDockPage } from './dock_page.js';
 import { scopeOf, withScope, ALL } from './saved_scope.js';
 import { setInboxCount } from './inbox_tab.js'; // the count on the Inbox's Saved tab
 
@@ -210,7 +210,7 @@ export function currentScope() {
     const session = s && (s.type === 'live' || s.type === 'history')
         ? { type: s.type, name: s.name, display_name: s.display_name, session_id: s.session_id, server: s.type === 'live' ? normServer(sessionServer(s)) : LOCAL_SERVER, board: s.board_project ? splitKey(s.board_project) : null, job_title: s.board_job_title || '' }
         : null;
-    return scopeOf({ dock, team: key(state.selectedTeam), boardPage: key(boardOfPage()), session }) || ALL;
+    return scopeOf({ dock, session }) || ALL;
 }
 let countScopeKey = ''; // the scope the count on screen is of
 const openOf = (servers, scope) => Promise.all(servers.map(id => serverFetch(id, '/api/saved' + withScope('?limit=0', scope)).then(r => (r.ok ? r.json() : null)).then(d => (d && d.open) || 0).catch(() => 0))).then(c => c.reduce((a, b) => a + b, 0));

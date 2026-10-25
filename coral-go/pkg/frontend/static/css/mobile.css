@@ -530,10 +530,6 @@
 
     /* Show Attach/Restart inside the overflow menu on mobile */
 
-    /* Message board adjustments: the Subscribers button opens the same list as a sheet (#3610); the side panel has it as a tab too (#4539). */
-    #messageboard-view.mb-has-board .mb-subscribers-btn {
-        display: inline-flex;
-    }
     /* At phone width the toolbar keeps Subscribers and a More menu with Select, Export, Pause and Delete (#4538, UX #4536:
        five buttons wrapped to three rows at 200% text). Wrapping stays as the last resort. */
     #messageboard-view .mb-header-actions {
@@ -1010,8 +1006,6 @@
         background: var(--bg-secondary);
     }
 
-    /* In a team's page the team chat (z-index 30, over the agent's chat) covered this overlay, so no tab of the side panel could be seen or touched on a phone: while the overlay is open the chat goes beneath it (#4792). */
-    body:has(.agentic-state.mobile-panel-overlay) .team-center-view { z-index: 18; }
 
     .agentic-state.mobile-panel-overlay .agentic-block {
         flex: 1;
@@ -1073,12 +1067,6 @@
         color: var(--text-on-accent); /* was var(--accent) on var(--accent-dim): 1.8:1 in the dark theme, 1.5:1 in the light one, so the open tab's icon was all but invisible on a phone (#4851) */
         background: var(--accent-dim);
     }
-
-    /* The rule above sets display: flex at a higher specificity than agentic.css's scope rules, so on a phone the team's
-       tabs (Team View, Team Settings, Team Artifacts, Knowledge) showed in an agent's row. Same scoping, one level up. */
-    .agentic-state.mobile-panel-overlay .agentic-tab[data-scope="team"] { display: none; }
-    .agentic-state.mobile-panel-overlay.team-context .agentic-tab[data-scope="team"] { display: flex; }
-    .agentic-state.mobile-panel-overlay.team-context .agentic-tab[data-scope="agent"] { display: none; }
 
     /* The close button leads the strip and stays put while the tabs scroll under it. At the end of the strip it
        covered the tabs it was stuck over (a half-hidden Tasks tab at 390px); on the left nothing is hidden at rest

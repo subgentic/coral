@@ -26,7 +26,7 @@ const HEX = c => c.repeat(64);
         await ev(`(() => { const R = window.fetch; window.__items = ${JSON.stringify(ITEMS)};
             const json = (b, s = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } }));
             window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin); const p = url.pathname;
-                if (p.startsWith('/api/board/') && p.endsWith('/artifacts')) return json({ project: decodeURIComponent(p.split('/')[3]), artifacts: window.__items, has_more: false, truncated: false });
+                if (p.startsWith('/api/board/') && p.endsWith('/artifacts')) return json({ session_id: new URL(String(u), location.origin).searchParams.get('session_id') || undefined, project: decodeURIComponent(p.split('/')[3]), artifacts: window.__items, has_more: false, truncated: false });
                 if (p === '/api/system/artifact-store/kept') return json({ kept: [] });
                 if (p.startsWith('/api/')) return json({}); return R(u, o); };
             return true; })()`);
@@ -34,7 +34,7 @@ const HEX = c => c.repeat(64);
             state.currentSession = { type: 'live', name: 'nm-ui', session_id: 'nm-a', board_project: ${JSON.stringify(team)} };
             const {showView} = await import((window.__coralStatic||'/static/')+'utils.js'); showView('live-session-view');
             const side = document.getElementById('agentic-state'); side.classList.remove('collapsed'); side.style.width = '680px'; files.initFileSearch(); files.syncFilesViewerSession(); return true; })()`);
-        await ev(`localStorage.removeItem('coral-agentic-tab-top'); document.getElementById('agentic-tab-team-artifacts').click(); true`);
+        await ev(`localStorage.removeItem('coral-agentic-tab-top'); document.getElementById('agentic-tab-artifacts').click(); true`);
         await waitFor(`document.querySelectorAll('tr.team-artifact-row').length === 3`, 'the three rows', 8000);
 
         for (const w of [1000, 800, 680, 560, 480]) {
@@ -57,7 +57,7 @@ const HEX = c => c.repeat(64);
 
         // a phone
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 2, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true }); await sleep(700); // sleep-ok: the viewport change reaches the page's layout
-        await ev(`(() => { const side = document.getElementById('agentic-state'); side.style.width = ''; if (!side.checkVisibility()) { const t = document.getElementById('panel-toggle-btn') || document.getElementById('popout-panel-toggle-btn'); t && t.click(); } document.getElementById('agentic-tab-team-artifacts').click(); return true; })()`);
+        await ev(`(() => { const side = document.getElementById('agentic-state'); side.style.width = ''; if (!side.checkVisibility()) { const t = document.getElementById('panel-toggle-btn') || document.getElementById('popout-panel-toggle-btn'); t && t.click(); } document.getElementById('agentic-tab-artifacts').click(); return true; })()`);
         await waitFor(`document.querySelectorAll('tr.team-artifact-row').length === 3 && document.querySelector('tr.team-artifact-row').getBoundingClientRect().width > 0`, 'the rows on a phone', 8000);
         const phone = await measure();
         for (const [i, r] of phone.entries()) {

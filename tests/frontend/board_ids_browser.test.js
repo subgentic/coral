@@ -149,18 +149,18 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         check('both boards are offered by label, with a short id', Array.isArray(opts) && opts.length === 2 && opts.every(t => t.startsWith(NAME + ' (b-')), JSON.stringify(opts));
 
         console.log('6. Rename in Team settings: the label only');
-        await ev(`window.enterTeamContext(${JSON.stringify(idB)}, { tab: 'team-settings' }); true`);
-        await until(`!!document.querySelector('#team-settings-workspace .board-rename-toggle')`, 'the rename control');
-        await ev(`document.querySelector('#team-settings-workspace .board-rename-toggle').click(); true`);
-        const prefilled = await ev(`document.querySelector('#team-settings-workspace .board-rename-form input').value`);
+        await ev(`window.openTeamPage(${JSON.stringify(idB)}, { tab: 'settings' }); true`);
+        await until(`!!document.querySelector('#team-panel-settings .board-rename-toggle')`, 'the rename control');
+        await ev(`document.querySelector('#team-panel-settings .board-rename-toggle').click(); true`);
+        const prefilled = await ev(`document.querySelector('#team-panel-settings .board-rename-form input').value`);
         check('the field holds the label (no short id)', prefilled === NAME, prefilled);
         let posted = 0;
         await ev(`(() => { const f = window.fetch; window.__patches = 0; window.fetch = (u, o) => { if (o && o.method === 'PATCH') window.__patches++; return f(u, o); }; return true; })()`);
-        await ev(`(() => { const i = document.querySelector('#team-settings-workspace .board-rename-form input'); i.value = 'bad name!'; i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); return true; })()`);
-        const bad = await ev(`({ err: document.querySelector('#team-settings-workspace .board-rename-error').textContent, invalid: document.querySelector('#team-settings-workspace .board-rename-form input').getAttribute('aria-invalid'), patches: window.__patches })`);
+        await ev(`(() => { const i = document.querySelector('#team-panel-settings .board-rename-form input'); i.value = 'bad name!'; i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); return true; })()`);
+        const bad = await ev(`({ err: document.querySelector('#team-panel-settings .board-rename-error').textContent, invalid: document.querySelector('#team-panel-settings .board-rename-form input').getAttribute('aria-invalid'), patches: window.__patches })`);
         check('a bad name is refused inline, with no request', /letters, digits/.test(bad.err) && bad.invalid === 'true' && bad.patches === 0, JSON.stringify(bad));
-        await ev(`(() => { const i = document.querySelector('#team-settings-workspace .board-rename-form input'); i.value = 'ids-renamed'; i.closest('.board-rename-form').querySelector('.btn-primary').click(); return true; })()`);
-        await until(`document.querySelector('#team-settings-workspace .working-mode-team').textContent === 'ids-renamed'`, 'the renamed heading');
+        await ev(`(() => { const i = document.querySelector('#team-panel-settings .board-rename-form input'); i.value = 'ids-renamed'; i.closest('.board-rename-form').querySelector('.btn-primary').click(); return true; })()`);
+        await until(`document.getElementById('team-page-title').textContent === 'ids-renamed'`, 'the renamed heading');
         const desc = await api('GET', `/api/board/${encodeURIComponent(idB)}`);
         check('the board is renamed; its id is the same', desc.status === 200 && desc.data && desc.data.board_label === 'ids-renamed' && desc.data.board_id === idB, JSON.stringify(desc));
         await until(`(${headerText(idB)} || '').startsWith('ids-renamed')`, 'the renamed group');
@@ -170,7 +170,7 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         check("its agent's board key is unchanged", !!still && still.board_project === idB, JSON.stringify(still && still.board_project));
         posted = await ev('window.__patches');
         check('one rename request', posted === 1, String(posted));
-        await ev(`window.exitTeamContext && window.exitTeamContext({ goBack: false, force: true }); true`);
+        await ev(`window.exitTeamPage && window.exitTeamPage({ force: true }); true`);
     } catch (e) {
         check('no error', false, e.message);
     } finally {

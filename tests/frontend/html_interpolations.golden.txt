@@ -325,7 +325,6 @@
 1	inbox_sidebar.js	escAttr(sessionServer(s))
 1	inbox_sidebar.js	escAttr(t.id)
 1	inbox_sidebar.js	escAttr(t.project)
-2	knowledge_fallback.js	label
 1	launch_core.js	failList
 1	launch_core.js	started
 1	list_card_parts.js	PIN_ICON
@@ -637,13 +636,6 @@
 1	task_list.js	typeCell
 1	task_verify_marks.js	v.icon
 1	task_verify_marks.js	v.state
-1	team_artifacts.js	_SPIN
-1	team_artifacts.js	agent
-1	team_artifacts.js	knowledgeFallbackHtml(text, slugToName)
-1	team_artifacts.js	pct
-1	team_artifacts.js	renderKnowledgeMD(content, agentNames)
-1	team_artifacts.js	renderKnowledgeMD(indexContent, agentNames)
-1	team_artifacts.js	sanitized
 1	team_artifacts_page.js	renderMarkdownStrict(content)
 1	team_availability.js	(data.health_report || []).map(item => `<li>${escapeHtml(item)}</li>`).join('')
 1	team_availability.js	Object.entries(labels).filter(([key]) => data.summary[key] || key === 'available').map(([key,label]) => `<div 

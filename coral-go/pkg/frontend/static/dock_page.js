@@ -1,5 +1,6 @@
 /* The right sidebar is part of the app layout (#4539), so it is on every page; each kind of page picks its tabs and keeps its own open or closed state, width and last tab.
- * The kinds: the agent's page (today's tabs), a board (Subscribers, Team artifacts, Tasks, Saved), Chats (Saved) and every other page (Saved). The tab sets are in
+ * The kinds: the agent's page (today's tabs), Chats (Saved), every other page (Saved), and "none": the board's page and the team's page have no right sidebar (#7457; the team page
+ * has its tabs and detail pane, the board's page a link to it). The tab sets are in
  * the markup (data-pages on a tab) and the CSS (#agentic-state[data-page]); this module knows the kind of the page on screen and tells the modules that own the layout
  * and the tabs (sidebar.js, agentic_state.js) when it changes. showView (utils.js) is the one caller of setDockPage. */
 import { browserLocal } from './safe_storage.js';
@@ -7,46 +8,29 @@ import { state } from './state.js';
 
 const KIND_OF_VIEW = {
     'live-session-view': 'agent',
-    'messageboard-view': 'board',
-    'team-page-view': 'team',
+    'messageboard-view': 'none',
+    'team-page-view': 'none',
     'history-session-view': 'chats',
     'chats-empty-view': 'chats',
 };
-/** Open on first use? The agent page has always shown its side column (a board does when the window is wide enough, dockOpenByDefault); the others start closed. */
-const OPEN_BY_DEFAULT = { agent: true, board: true, team: false, chats: false, other: false };
+/** Open on first use? The agent page has always shown its side column; the others start closed. */
+const OPEN_BY_DEFAULT = { agent: true, none: false, chats: false, other: false };
 /** The tab a kind of page opens on when it has no remembered one. */
-export const DEFAULT_TAB = { agent: 'files', board: 'subscribers', team: 'saved', chats: 'saved', other: 'saved' };
+export const DEFAULT_TAB = { agent: 'files', chats: 'saved', other: 'saved' };
 
 let kind = 'agent';
 const hooks = [];
 
 export const dockKind = () => kind;
-/** A board starts with its sidebar open only when the message column stays about 560 px wide beside it (the row is at least that and the sidebar's 420 px); a narrower window starts it closed. */
-const BOARD_ROW_MIN = 980;
-export function dockOpenByDefault(k = kind) {
-    if (k === 'board') {
-        const row = document.querySelector('.main-row');
-        return !!row && row.getBoundingClientRect().width >= BOARD_ROW_MIN;
-    }
-    return OPEN_BY_DEFAULT[k];
-}
+export function dockOpenByDefault(k = kind) { return OPEN_BY_DEFAULT[k]; }
 
 /** A storage key for the page on screen: the agent page keeps its original keys, the others add their kind; a popout window has its own (it must not overwrite the dashboard's sizes). */
 export function dockKey(base, k = kind) {
     return `${base}${k === 'agent' ? '' : ':' + k}${document.body.classList.contains('popout-mode') ? ':popout' : ''}`;
 }
 
-/** The board the board page shows (an identity key), or null on any other page: the Tasks and Team artifacts tabs read it there. */
-export function boardOfPage() { return kind === 'board' || kind === 'team' ? state.boardPageProject || null : null; }
-
-const boardHooks = [];
-/** fn() runs when the board the board page shows changes (or there is none): the tabs that read it read it again. */
-export function onBoardPage(fn) { boardHooks.push(fn); }
-export function boardPageChanged() {
-    for (const fn of boardHooks) {
-        try { fn(); } catch (e) { console.error('board page hook failed', e); }
-    }
-}
+/** The board the board's page or the team's page shows (an identity key), or null on any other page: an artifact opened there asks its comments of that board. */
+export function boardOfPage() { return kind === 'none' ? state.boardPageProject || null : null; }
 
 /** fn(kind, previous) runs when the kind of the page on screen changes (and once for the first page). */
 export function onDockPage(fn) { hooks.push(fn); }

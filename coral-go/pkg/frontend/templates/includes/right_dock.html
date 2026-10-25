@@ -8,10 +8,6 @@
             <!-- Top block: Files, Tasks, Stats, Transcript, Notes -->
             <div class="agentic-block" id="agentic-block-top">
                 <div class="agentic-state-tabs" role="tablist" aria-label="Session panels" data-on-contextmenu="tabs-customize-menu">
-                    <!-- The board's own column, as a tab of its page (#4539): the list is filled by message_board.js -->
-                    <button class="agentic-tab" data-on-click="agentic-tab" data-tab="subscribers" data-where="top" data-pages="board" data-only-page="board" id="agentic-tab-subscribers" title="Members: who is on this board" aria-label="Members in the side panel">
-                        <span class="material-icons" aria-hidden="true">group</span>
-                    </button>
                     <button class="agentic-tab" data-on-click="agentic-tab" data-tab="board" data-where="top" id="agentic-tab-board" title="Board Chat — team message board" aria-label="Board Chat" style="display:none">
                         <span class="material-icons" aria-hidden="true">forum</span>
                     </button>
@@ -25,19 +21,7 @@
                     <button class="agentic-tab" data-on-click="agentic-tab" data-tab="artifacts" data-where="top" data-scope="agent" id="agentic-tab-artifacts" title="Artifacts — this agent's artifacts" aria-label="Artifacts">
                         <span class="material-icons" aria-hidden="true">inventory_2</span>
                     </button>
-                    <button class="agentic-tab" data-scope="team" data-on-click="agentic-tab" data-tab="team-view" data-where="top" id="agentic-tab-team-view" title="Team View — agent availability and assigned work" aria-label="Team View">
-                        <span class="material-icons" aria-hidden="true">dashboard</span>
-                    </button>
-                    <button class="agentic-tab" data-scope="team" data-on-click="agentic-tab" data-tab="team-settings" data-where="top" id="agentic-tab-team-settings" title="Team Settings — workflow, working mode and prompts" aria-label="Team Settings">
-                        <span class="material-icons" aria-hidden="true">tune</span>
-                    </button>
-                    <button class="agentic-tab" data-on-click="agentic-tab" data-tab="team-artifacts" data-where="top" data-scope="team" data-pages="board" id="agentic-tab-team-artifacts" title="Team Artifacts — artifacts from the whole team" aria-label="Team Artifacts">
-                        <span class="material-icons" aria-hidden="true">inventory_2</span>
-                    </button>
-                    <button class="agentic-tab" data-on-click="agentic-tab" data-tab="knowledge" data-where="top" data-scope="team" id="agentic-tab-knowledge" title="Team Knowledge — distilled team knowledge" aria-label="Team Knowledge">
-                        <span class="material-icons" aria-hidden="true">psychology</span>
-                    </button>
-                    <button class="agentic-tab" data-on-click="agentic-tab" data-tab="tasks" data-where="top" data-pages="board" id="agentic-tab-tasks" title="Tasks — agent task list and progress" aria-label="Tasks">
+                    <button class="agentic-tab" data-on-click="agentic-tab" data-tab="tasks" data-where="top" id="agentic-tab-tasks" title="Tasks — agent task list and progress" aria-label="Tasks">
                         <span class="material-icons" aria-hidden="true">checklist</span>
                         <span class="agentic-tab-count" id="task-bar-count"></span>
                     </button>
@@ -52,7 +36,7 @@
                         <span class="material-icons" aria-hidden="true">widgets</span><span class="agentic-tab-count" id="agent-ui-count"></span>
                     </button>
                     <!-- Saved for later (#4510): the Operator's bookmarks, beside whatever the main view shows -->
-                    <button class="agentic-tab" data-on-click="agentic-tab" data-tab="saved" data-where="top" data-pages="board chats other" id="agentic-tab-saved" data-local-only title="Saved for later: messages you bookmarked" aria-label="Saved for later on this page">
+                    <button class="agentic-tab" data-on-click="agentic-tab" data-tab="saved" data-where="top" data-pages="chats other" id="agentic-tab-saved" data-local-only title="Saved for later: messages you bookmarked" aria-label="Saved for later on this page">
                         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2.5h8v11L8 10.5l-4 3z"/></svg><span class="agentic-tab-count" id="saved-tab-count"></span>
                     </button>
                     <!-- Custom view tabs (disabled for now) -->
@@ -85,11 +69,7 @@
                     </div>
                     <div id="file-explorer-view" class="file-explorer-view"></div>
                 </div>
-                <div id="agentic-panel-team-view" class="agentic-panel"></div>
-                <div id="agentic-panel-team-settings" class="agentic-panel"></div>
                 <div id="agentic-panel-artifacts" class="agentic-panel"><div id="agentic-panel-artifacts-view" class="team-artifacts-view"></div><div id="agentic-panel-artifacts-live" class="team-artifacts-live" role="status" aria-live="polite"></div></div>
-                <div id="agentic-panel-team-artifacts" class="agentic-panel"><div id="agentic-panel-team-artifacts-view" class="team-artifacts-view"></div><div id="agentic-panel-team-artifacts-live" class="team-artifacts-live" role="status" aria-live="polite"></div></div>
-                <div id="agentic-panel-knowledge" class="agentic-panel"><div id="team-knowledge-view" class="team-knowledge-view"></div></div>
                 <!-- Tasks tab -->
                 <div id="agentic-panel-tasks" class="agentic-panel">
                     <div id="board-tasks-section" class="board-tasks-section" style="display:none">
@@ -125,12 +105,6 @@
                 </div>
                 <!-- Custom view panels inserted here dynamically -->
                 <div id="agentic-panel-agent-ui" class="agentic-panel"></div>
-                <div id="agentic-panel-subscribers" class="agentic-panel">
-                    <div id="mb-subscribers-panel" class="mb-subscribers-panel">
-                        <h3 class="mb-subscribers-title">Members</h3>
-                        <ul id="mb-subscribers-list" class="mb-subscribers-list"></ul>
-                    </div>
-                </div>
                 <div id="agentic-panel-saved" class="agentic-panel" data-local-only>
                   <!-- The one Saved list (#4811): saved.js keeps it here for an agent's or a team's page, and moves it into #saved-view for the full-screen Saved page. -->
                   <div id="saved-ui" class="saved-pane">

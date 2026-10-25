@@ -1,6 +1,6 @@
-// The right sidebar on every page (#4539): it is part of the app layout, not of the agent page. Each kind of page picks its tabs (the agent page keeps today's set; a board has
-// Subscribers, Team artifacts, Tasks and Saved; Chats and every other page have none: Saved for everything is its own full-screen page, #4811) and keeps its own open or closed state, width and last tab, so a jump from Saved to a
-// board message or a chat leaves each page's sidebar as the person had it. On a phone the top bar's button opens the side panel overlay on every page.
+// The right sidebar (#4539, #7457): it is part of the app layout. The agent page keeps its set of tabs; Chats and every other page have none but Saved's page (Saved for everything is its own
+// full-screen page, #4811); the board's page and the team's page have none at all (the team's page has its tabs and its detail pane, the board's page a link to it). Each kind keeps its own open or
+// closed state, width and last tab. On a phone the top bar's button opens the side panel overlay on the agent page only.
 //
 // Drives Chrome over CDP through agent_view_harness.js; run_cdp_suites.mjs finds CDP suites by that name. The bookmarks, the board and its tasks are the real isolated server's.
 const assert = require('node:assert/strict');
@@ -42,52 +42,34 @@ const BASE = require('./test_base').BASE;
         assert.ok(made.status < 300, 'a board task: ' + JSON.stringify(made));
         await ev(`(() => { window.__m.add('dk-a', 'D', 30, { sleeping: false }); T.render.renderLiveSessions(T.state.liveSessions); })()`);
 
-        console.log('1. The agent page keeps today\'s tabs and opens on Files; there is no Subscribers tab there');
+        console.log('1. The agent page keeps its tabs and opens on Files; there is no Subscribers tab, and none of the team\'s tabs');
         await select('dk-a');
         await waitFor(`document.getElementById('agentic-state').dataset.page === 'agent'`, 'the agent page');
         let d = await dock();
         assert.equal(d.page, 'agent'); assert.ok(d.open, JSON.stringify(d));
         for (const t of ['files', 'browse', 'tasks', 'notes', 'activity', 'saved']) assert.ok(d.tabs.includes(t), `the agent page has ${t}: ` + JSON.stringify(d));
-        assert.ok(!d.tabs.includes('subscribers'), 'no Subscribers on the agent page: ' + JSON.stringify(d));
+        for (const t of ['subscribers', 'team-view', 'team-settings', 'team-artifacts', 'knowledge']) assert.ok(!d.tabs.includes(t), `no ${t} tab: ` + JSON.stringify(d));
+        assert.equal(await ev(`['agentic-tab-subscribers', 'agentic-tab-team-view', 'agentic-tab-team-settings', 'agentic-tab-team-artifacts', 'agentic-tab-knowledge', 'agentic-panel-team-view', 'agentic-panel-knowledge'].some(id => !!document.getElementById(id))`), false, 'the team\'s tabs and panels are not in the page at all');
         assert.equal(d.active, 'files');
 
-        console.log('2. A board: the sidebar is there with Subscribers, Team artifacts, Tasks and Saved, open on Subscribers, and the board has no column of its own');
+        console.log('2. A board\'s page: no side panel, no button for one, its Members are the sheet, and a link to its team\'s page');
         await ev(`window.selectBoardProject(${JSON.stringify(BOARD)}); true`);
         await waitFor(`document.querySelectorAll('#mb-messages .mb-message').length === 1`, 'the board rows', 8000);
         d = await dock();
-        assert.deepEqual({ page: d.page, open: d.open, tabs: d.tabs, active: d.active, panel: d.panel }, { page: 'board', open: true, tabs: ['subscribers', 'team-artifacts', 'tasks', 'saved'], active: 'subscribers', panel: ['subscribers'] });
-        assert.equal(await ev(`!!document.querySelector('#messageboard-view #mb-subscribers-panel')`), false, 'the column is gone from the board page');
-        assert.equal(await ev(`!!document.querySelector('#agentic-panel-subscribers #mb-subscribers-list')`), true);
-        await waitFor(`document.getElementById('mb-subscribers-list').textContent.includes('Developer')`, 'the subscribers', 6000);
-        await shot('dock-board-subscribers');
-
-        console.log('3. Subscribers: a name opens that agent\'s history (its action works from the sidebar)');
-        await ev(`window.__histOpened = null; window.selectHistorySession = id => { window.__histOpened = id; }; document.querySelector('#mb-subscribers-list .subscriber-history-link').click(); true`);
-        await waitFor(`window.__histOpened === 'aaaaaaaa-0000-0000-0000-000000000001'`, 'the subscriber\'s history to be opened', 6000, `String(window.__histOpened)`);
-
-        console.log('4. Tasks shows this board\'s tasks (and "+ Task" is there); Team artifacts shows its panel');
-        await ev(`window.selectBoardProject(${JSON.stringify(BOARD)}); true`);
-        await waitFor(`document.querySelectorAll('#mb-messages .mb-message').length === 1`, 'the board again', 8000);
-        await ev(`document.getElementById('agentic-tab-tasks').click(); true`);
-        await waitFor(`document.getElementById('board-task-list').textContent.includes('Dock task one')`, 'the board\'s task in the sidebar', 8000, `document.getElementById('board-task-list').textContent.slice(0, 200)`);
-        assert.equal(await ev(`getComputedStyle(document.querySelector('#agentic-panel-tasks .btn-create-task')).display !== 'none'`), true, '+ Task is reachable');
-        await shot('dock-board-tasks');
-        await ev(`document.getElementById('agentic-tab-team-artifacts').click(); true`);
+        assert.equal(d.page, 'none', JSON.stringify(d));
+        assert.equal(await ev(`getComputedStyle(document.getElementById('agentic-state')).display`), 'none', 'the sidebar is not shown on the board');
+        assert.equal(await ev(`getComputedStyle(document.getElementById('panel-toggle-btn')).display`), 'none', 'and its button is not either');
+        assert.equal(await ev(`!!document.querySelector('#messageboard-view #mb-subscribers-panel')`), false);
+        assert.equal(await ev(`getComputedStyle(document.getElementById('mb-subscribers-btn')).display !== 'none'`), true, 'Members is the sheet\'s button, at every width');
+        assert.equal(await ev(`getComputedStyle(document.getElementById('mb-team-page-btn')).display !== 'none' && !document.getElementById('mb-team-page-btn').hidden`), true, 'a link to the team\'s page');
+        await shot('dock-board-none');
+        await ev(`document.getElementById('mb-team-page-btn').click(); true`);
+        await waitFor(`document.getElementById('team-page-view') && getComputedStyle(document.getElementById('team-page-view')).display !== 'none'`, 'the team page', 8000);
         d = await dock();
-        assert.deepEqual(d.panel, ['team-artifacts'], JSON.stringify(d));
+        assert.equal(d.page, 'none', 'the team page has no side panel either: ' + JSON.stringify(d));
+        assert.equal(await ev(`getComputedStyle(document.getElementById('agentic-state')).display`), 'none');
 
-        console.log('5. Saved on the board: a message saved from its row is listed in the sidebar');
-        const rows = (await api('GET', `/api/board/${BOARD}/messages/all?limit=10`)).body;
-        const mid = (rows.messages || rows).find(m => m.content === 'a board message to save').id;
-        await ev(`document.querySelector('#mb-messages [data-message-id="${mid}"] .mb-save-btn').click(); true`);
-        await waitFor(`document.querySelector('#mb-messages [data-message-id="${mid}"] .mb-save-btn').getAttribute('aria-pressed') === 'true'`, 'saved', 6000);
-        await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'saved.js'); await m.openSaved(); return true; })()`); // the board's own Saved tab (the top bar's bookmark is the Inbox's, #4905)
-        await waitFor(`document.getElementById('agentic-panel-saved').classList.contains('active') && document.querySelectorAll('#saved-list .saved-item').length === 1`, 'the saved item in the board\'s sidebar', 8000);
-        d = await dock();
-        assert.deepEqual({ page: d.page, open: d.open, active: d.active }, { page: 'board', open: true, active: 'saved' });
-        await shot('dock-board-saved');
-
-        console.log('6. Chats (no chat open) and the other pages: no sidebar at all; Saved for everything is its own page, which the top bar bookmark opens');
+        console.log('3. Chats (no chat open) and the other pages: no sidebar at all; Saved for everything is its own page, which the top bar bookmark opens');
         await ev(`switchNavTab('history'); true`);
         await waitFor(`getComputedStyle(document.getElementById('chats-empty-view')).display !== 'none'`, 'Chats');
         d = await dock();
@@ -96,140 +78,84 @@ const BASE = require('./test_base').BASE;
         assert.equal(await ev(`getComputedStyle(document.getElementById('agentic-state')).display`), 'none', 'the sidebar is not shown on Chats');
         assert.equal(await ev(`getComputedStyle(document.getElementById('panel-toggle-btn')).display`), 'none', 'and its button is not either');
         await ev(`document.getElementById('saved-btn').click(); true`);
-        await waitFor(`(() => { const t = document.getElementById('group-table-view'); return t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved'; })() && true && document.querySelectorAll('#saved-list .saved-item').length === 1`, 'the Saved page', 8000);
+        await waitFor(`(() => { const t = document.getElementById('group-table-view'); return t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved'; })()`, 'the Saved page', 8000);
         assert.equal(await ev(`getComputedStyle(document.getElementById('agentic-state')).display`), 'none', 'the page has no sidebar beside it');
         await shot('saved-page-from-chats');
         await ev(`switchNavTab('history'); true`);
 
-        console.log('6b. A shut sidebar whose tab is Saved reads nothing; opening it with the panel button reads the list (on a board: its Saved is the board\'s)');
-        await ev(`window.selectBoardProject(${JSON.stringify(BOARD)}); true`);
-        await waitFor(`document.getElementById('agentic-state').dataset.page === 'board' && document.querySelectorAll('#mb-messages .mb-message').length === 1`, 'the board', 8000);
-        await ev(`window.toggleAgenticPanel(true); document.getElementById('agentic-tab-saved').click(); true`);
-        await waitFor(`document.querySelectorAll('#saved-list .saved-item').length === 1 && document.getElementById('agentic-panel-saved').classList.contains('active')`, 'the board\'s Saved', 8000);
-        await toggle(); // close it
-        await waitFor(`document.getElementById('agentic-state').classList.contains('collapsed')`, 'closed');
-        await ev(`document.getElementById('saved-list').replaceChildren(); true`);
-        await toggle(); // open it with the panel button, not the Saved button
-        await waitFor(`document.querySelectorAll('#saved-list .saved-item').length === 1`, 'the list read when the sidebar opened on Saved', 8000);
-
-        console.log('7. Each kind of page keeps its own state: closing it on the board leaves Chats and the agent page as they were; coming back finds the board as left');
-        await ev(`window.selectBoardProject(${JSON.stringify(BOARD)}); true`);
-        await waitFor(`document.querySelectorAll('#mb-messages .mb-message').length === 1`, 'the board', 8000);
-        // Coming back to the board draws it again (its messages, subscribers and tabs read the board again, boardPageChanged), so the sidebar's state is read once that has settled, not at the instant the first message is
-        // back: a condition wait, not a sample (#7190: the one flake of this line read the state between the page's own steps; 80 stressed runs at CPU x4 and x10 did not reproduce it).
-        await waitFor(`(() => { const a = document.getElementById('agentic-state'); const t = document.querySelector('#agentic-block-top .agentic-tab.active'); return !!a && !a.classList.contains('collapsed') && !!t && t.dataset.tab === 'saved'; })()`, 'the board\'s sidebar open on its last tab, Saved', 6000).catch(() => {});
-        d = await dock();
-        assert.ok(d.open && d.active === 'saved', 'the board kept its last tab, Saved: ' + JSON.stringify(d));
-        await toggle();
-        assert.equal((await dock()).open, false, 'closed on the board');
+        console.log('4. A shut sidebar whose tab is Saved reads nothing; opening it with the panel button reads the list');
         await select('dk-a');
         await waitFor(`document.getElementById('agentic-state').dataset.page === 'agent'`, 'the agent page again');
+        await ev(`window.__savedReads = 0; (() => { const f = window.fetch; window.fetch = (u, o) => { if (String(u).includes('/api/saved') && !String(u).includes('limit=0') && !(o && o.method && o.method !== 'GET')) window.__savedReads++; return f(u, o); }; })(); window.toggleAgenticPanel(true); document.getElementById('agentic-tab-saved').click(); true`);
+        await waitFor(`document.getElementById('agentic-panel-saved').classList.contains('active') && window.__savedReads > 0`, 'the agent\'s Saved read', 8000);
+        await toggle(); // close it
+        await waitFor(`document.getElementById('agentic-state').classList.contains('collapsed')`, 'closed');
+        await ev(`window.__savedReads = 0; true`);
+        await sleep(600); // sleep-ok: nothing is expected to happen: a shut sidebar reads nothing
+        assert.equal(await ev(`window.__savedReads`), 0, 'a shut sidebar on Saved read nothing');
+        await toggle(); // open it with the panel button, not the Saved button
+        await waitFor(`window.__savedReads > 0`, 'the list read when the sidebar opened on Saved', 8000);
+        await waitFor(`!document.getElementById('agentic-state').classList.contains('collapsed') && document.getElementById('agentic-state').getBoundingClientRect().width > 100`, 'the sidebar open');
+
+        console.log('5. Each kind of page keeps its own state: closing the sidebar on the agent page leaves Chats as it was');
         d = await dock();
-        assert.ok(d.open && d.active === 'files', 'the agent page is as it was: ' + JSON.stringify(d));
-        await ev(`window.selectBoardProject(${JSON.stringify(BOARD)}); true`);
-        await waitFor(`document.getElementById('agentic-state').dataset.page === 'board'`, 'the board');
-        assert.equal((await dock()).open, false, 'the board is still closed');
+        assert.ok(d.open && d.active === 'saved', 'the agent page kept its last tab, Saved: ' + JSON.stringify(d));
+        await toggle();
+        assert.equal((await dock()).open, false, 'closed on the agent page');
+        await ev(`switchNavTab('history'); true`);
+        await waitFor(`document.getElementById('agentic-state').dataset.page === 'chats'`, 'Chats');
+        await select('dk-a');
+        await waitFor(`document.getElementById('agentic-state').dataset.page === 'agent'`, 'the agent page again');
+        assert.equal((await dock()).open, false, 'the agent page is still closed');
         await toggle();
 
-        console.log('8. The width is the page kind\'s own');
-        await ev(`localStorage.setItem('coral-taskbar-width:board', '520'); true`);
-        await select('dk-a');
-        await waitFor(`document.getElementById('agentic-state').dataset.page === 'agent'`, 'the agent page');
-        const wAgent = (await dock()).w;
+        console.log('6. A jump from Saved lands on the board message: its page has no side panel, and the bar to come back is there');
         await ev(`window.selectBoardProject(${JSON.stringify(BOARD)}); true`);
-        await waitFor(`document.getElementById('agentic-state').dataset.page === 'board'`, 'the board');
-        const wBoard = (await dock()).w;
-        assert.ok(wBoard === 520 && wAgent !== 520, `board ${wBoard}, agent ${wAgent}`);
-
-        console.log('9. A jump from Saved leaves the sidebar of the page it lands on as that page had it, with the bar to come back');
-        await ev(`document.getElementById('agentic-tab-subscribers').click(); true`);
+        await waitFor(`document.querySelectorAll('#mb-messages .mb-message').length === 1`, 'the board', 8000);
+        const rows = (await api('GET', `/api/board/${BOARD}/messages/all?limit=10`)).body;
+        const mid = (rows.messages || rows).find(m => m.content === 'a board message to save').id;
+        await ev(`document.querySelector('#mb-messages [data-message-id="${mid}"] .mb-save-btn').click(); true`);
+        await waitFor(`document.querySelector('#mb-messages [data-message-id="${mid}"] .mb-save-btn').getAttribute('aria-pressed') === 'true'`, 'saved', 6000);
         await ev(`switchNavTab('history'); true`);
         await waitFor(`document.getElementById('agentic-state').dataset.page === 'chats'`, 'Chats');
         await ev(`document.getElementById('saved-btn').click(); true`); // from Chats: the Saved page
-        await waitFor(`(() => { const t = document.getElementById('group-table-view'); return t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved'; })() && document.querySelectorAll('#saved-list .saved-item').length === 1`, 'the item', 8000);
+        await waitFor(`(() => { const t = document.getElementById('group-table-view'); return t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved'; })() && document.querySelectorAll('#saved-list .saved-item').length === 1`, 'the Saved page with the item', 10000);
         await ev(`document.querySelector('#saved-list .saved-item .btn-primary, #saved-list .saved-item .saved-open').click(); true`);
-        await waitFor(`document.getElementById('agentic-state').dataset.page === 'board' && !!document.querySelector('#mb-messages .chat-search-target')`, 'the jump to the board message', 10000);
-        d = await dock();
-        assert.deepEqual({ open: d.open, active: d.active }, { open: true, active: 'subscribers' }, 'the board\'s sidebar is as the person left it: ' + JSON.stringify(d));
+        await waitFor(`document.getElementById('agentic-state').dataset.page === 'none' && !!document.querySelector('#mb-messages .chat-search-target')`, 'the jump to the board message', 10000);
+        assert.equal(await ev(`getComputedStyle(document.getElementById('agentic-state')).display`), 'none', 'the board\'s page has no sidebar');
         await waitFor(`!!document.getElementById('saved-jumpbar')`, 'the jump bar', 4000);
         await ev(`document.querySelector('#saved-jumpbar .btn').click(); true`);
-        await waitFor(`(() => { const t = document.getElementById('group-table-view'); return t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved'; })() && true`, 'Back to Saved: the page it started from', 6000);
+        await waitFor(`(() => { const t = document.getElementById('group-table-view'); return t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved'; })()`, 'Back to Saved: the page it started from', 6000);
 
-        console.log('10. A phone: the top bar button opens the side panel overlay on the board and in Chats, with that page\'s tabs, and X closes it; Chats has none');
+        console.log('7. A phone: neither the board\'s page nor Chats has a side panel or a button for one');
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
         await Emulation.setTouchEmulationEnabled({ enabled: true });
         await sleep(400); // sleep-ok: the layout settles over frames after a viewport change; there is no completion event
-        for (const [name, go, page, tabs] of [
-            ['the board', `window.selectBoardProject(${JSON.stringify(BOARD)})`, 'board', ['subscribers', 'team-artifacts', 'tasks', 'saved']],
-        ]) {
-            await ev(`switchNavTab('agents'); true`); // the Inbox (where Back to Saved left the page) is left the way a person leaves it
-            await waitFor(`!document.getElementById('nav-tab-hub-inbox').classList.contains('active')`, 'the Inbox left');
-            await ev(`${go}; true`);
-            await waitFor(`document.getElementById('agentic-state').dataset.page === '${page}'`, name);
-            assert.equal(await ev(`getComputedStyle(document.getElementById('panel-toggle-btn')).display !== 'none'`), true, `the side panel button is on ${name}`);
-            await ev(`document.getElementById('panel-toggle-btn').click(); true`);
-            await waitFor(`document.getElementById('agentic-state').classList.contains('mobile-panel-overlay') && getComputedStyle(document.getElementById('agentic-state')).display !== 'none'`, `the overlay on ${name}`);
-            d = await dock();
-            assert.deepEqual(d.tabs, tabs, `${name}: ` + JSON.stringify(d));
-            assert.ok(d.panel.length === 1, `${name} shows one panel: ` + JSON.stringify(d));
-            await shot('dock-phone-' + page);
-            await ev(`document.getElementById('agentic-mobile-close-btn').click(); true`);
-            await waitFor(`!document.getElementById('agentic-state').classList.contains('mobile-panel-overlay')`, `the overlay closed on ${name}`);
-        }
+        await ev(`switchNavTab('agents'); true`); // the Inbox (where Back to Saved left the page) is left the way a person leaves it
+        await waitFor(`!document.getElementById('nav-tab-hub-inbox').classList.contains('active')`, 'the Inbox left');
+        await ev(`window.selectBoardProject(${JSON.stringify(BOARD)}); true`);
+        await waitFor(`document.getElementById('agentic-state').dataset.page === 'none'`, 'the board on the phone');
+        assert.equal(await ev(`getComputedStyle(document.getElementById('panel-toggle-btn')).display`), 'none', 'the board has no side panel to open');
         await ev(`switchNavTab('history'); true`);
         await waitFor(`document.getElementById('agentic-state').dataset.page === 'chats'`, 'Chats on the phone');
         assert.equal(await ev(`getComputedStyle(document.getElementById('panel-toggle-btn')).display`), 'none', 'Chats has no side panel to open: Saved for everything is its own page');
         await Emulation.setTouchEmulationEnabled({ enabled: false });
 
-        console.log('11. A desktop board with the sidebar open uses the toolbar\'s More menu (Lead\'s #4538); closed, the buttons are inline');
-        await Emulation.setDeviceMetricsOverride({ width: 1024, height: 800, deviceScaleFactor: 1, mobile: false });
-        await ev(`window.selectBoardProject(${JSON.stringify(BOARD)}); true`);
-        await waitFor(`document.getElementById('agentic-state').dataset.page === 'board' && document.getElementById('mb-select-btn').style.display !== 'none'`, 'the board toolbar');
-        const bar = () => ev(`(() => { const shown = id => { const e = document.getElementById(id); return !!e && getComputedStyle(e).display !== 'none' && e.getClientRects().length > 0; };
-            const h = document.querySelector('#messageboard-view .mb-header-actions').getBoundingClientRect();
-            return { more: shown('mb-more-btn'), select: shown('mb-select-btn'), del: shown('mb-delete-btn'), open: document.body.dataset.dockOpen, rows: Math.round(h.height) }; })()`);
-        await waitFor(`document.body.dataset.dockOpen === '1' && getComputedStyle(document.getElementById('mb-more-btn')).display !== 'none'`, 'More with the sidebar open', 4000);
-        let b = await bar();
-        assert.deepEqual({ more: b.more, select: b.select, del: b.del }, { more: true, select: false, del: false }, 'open sidebar: only More: ' + JSON.stringify(b));
-        await ev(`document.getElementById('mb-more-btn').click(); true`);
-        await waitFor(`document.getElementById('mb-select-btn').getClientRects().length > 0`, 'the menu items');
-        assert.deepEqual(await ev(`[...document.querySelectorAll('#mb-more-menu .mb-action-btn')].filter(e => e.getClientRects().length).map(e => e.id)`), ['mb-select-btn', 'mb-export-btn', 'mb-pause-btn', 'mb-delete-btn'], 'Delete last');
-        await shot('dock-board-more');
-        await ev(`document.getElementById('mb-more-btn').click(); true`);
-        await toggle(); // close the sidebar
-        await waitFor(`document.body.dataset.dockOpen === '0' && getComputedStyle(document.getElementById('mb-select-btn')).display !== 'none' && getComputedStyle(document.getElementById('mb-more-menu')).display === 'contents'`, 'the buttons inline with the sidebar closed', 4000);
-        b = await bar();
-        assert.deepEqual({ more: b.more, select: b.select, del: b.del }, { more: true, select: true, del: false }, 'closed sidebar: Select, Export and Pause inline, Delete behind More (#6279): ' + JSON.stringify(b));
-
-        console.log('11b. The tab strip is keyboard-operable: Left and Right move the focus, Home and End go to the ends');
+        console.log('8. The tab strip is keyboard-operable: Left and Right move the focus, Home and End go to the ends');
         await Emulation.setDeviceMetricsOverride({ width: 1400, height: 800, deviceScaleFactor: 1, mobile: false });
-        await ev(`switchNavTab('history'); true`);
-        await waitFor(`document.getElementById('agentic-state').dataset.page === 'chats'`, 'Chats');
-        await ev(`window.selectBoardProject(${JSON.stringify(BOARD)}); true`);
-        await waitFor(`document.getElementById('agentic-state').dataset.page === 'board'`, 'the board');
+        await select('dk-a');
+        await waitFor(`document.getElementById('agentic-state').dataset.page === 'agent'`, 'the agent page');
         await ev(`window.toggleAgenticPanel(true); true`);
         await waitFor(`document.getElementById('agentic-state').getBoundingClientRect().width > 300`, 'the sidebar open');
         const press = k => ev(`(() => { const e = document.activeElement; e.dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(k)}, bubbles: true, cancelable: true })); return document.activeElement.dataset.tab || document.activeElement.id; })()`);
-        await waitFor(`getComputedStyle(document.getElementById('agentic-tab-saved')).display !== 'none'`, 'the board\'s Saved tab shown (the scope follows the page)', 4000);
-        await ev(`document.getElementById('agentic-tab-subscribers').focus(); true`);
-        assert.equal(await press('ArrowRight'), 'team-artifacts');
-        assert.equal(await press('End'), 'saved');
-        assert.equal(await press('ArrowRight'), 'subscribers', 'wraps around');
-        assert.equal(await press('ArrowLeft'), 'saved');
-        assert.equal(await press('Home'), 'subscribers');
-        console.log('   ✓');
-
-        console.log('12. A board starts with its sidebar open only when its messages keep room: closed at 1024 px, open at 1400 px (until the person chooses)');
-        await ev(`localStorage.removeItem('coral-agentic-collapsed:board'); true`);
-        for (const [width, open] of [[1024, false], [1400, true]]) {
-            await Emulation.setDeviceMetricsOverride({ width, height: 800, deviceScaleFactor: 1, mobile: false });
-            await ev(`switchNavTab('history'); true`);
-            await waitFor(`document.getElementById('agentic-state').dataset.page === 'chats'`, 'Chats');
-            await ev(`window.selectBoardProject(${JSON.stringify(BOARD)}); true`);
-            await waitFor(`document.getElementById('agentic-state').dataset.page === 'board' && document.body.dataset.dockOpen === '${open ? 1 : 0}'`, `the board's sidebar ${open ? 'open' : 'closed'} at ${width} px`, 4000, `JSON.stringify({ o: document.body.dataset.dockOpen, w: innerWidth })`);
-            assert.equal((await dock()).open, open, `at ${width} px`);
-            await ev(`localStorage.removeItem('coral-agentic-collapsed:board'); true`);
-        }
+        d = await dock();
+        const first = d.tabs[0], last = 'agentic-tab-customize'; // the strip ends with the Customize tabs button (the agent page's)
+        await ev(`document.getElementById('agentic-tab-${'${first}'}').focus(); true`.replace('${first}', first));
+        assert.equal(await press('ArrowRight'), d.tabs[1]);
+        assert.equal(await press('End'), last);
+        assert.equal(await press('ArrowRight'), first, 'wraps around');
+        assert.equal(await press('ArrowLeft'), last);
+        assert.equal(await press('Home'), first);
         console.log('   ✓');
     } finally {
         await require('./helpers/saved_cleanup').clearSaved(api).catch(() => {}); // the bookmarks this suite saved are taken off again (#4916)

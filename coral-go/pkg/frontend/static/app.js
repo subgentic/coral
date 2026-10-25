@@ -75,7 +75,7 @@ import { toggleAllGroupFolds, refreshGroupTable } from './sidebar_groups.js'; //
 import { toggleDisplayPanel, displayPanelKey } from './display_panel.js'; // the Display expander
 import { registerActions, tokenOf } from './actions.js'; // delegated data-on-* handlers, replacing inline ones (#3645)
 import { markReady } from './ready.js';
-import { lazyFns, lazyWindowFns, loadTeamContext, loadTeamPage, loadTeamSettings, loadWorkflows, loadCostDashboard, loadDocs, loadThemeConfig, loadModals, loadResumeDialog, loadDefaultPromptsDialog } from './lazy_panels.js';
+import { lazyFns, lazyWindowFns, loadTeamPage, loadTeamSettings, loadWorkflows, loadCostDashboard, loadDocs, loadThemeConfig, loadModals, loadResumeDialog, loadDefaultPromptsDialog } from './lazy_panels.js';
 
 // Panels off the landing view load on first use (#3083 phase 2, lazy_panels.js).
 const {
@@ -242,7 +242,7 @@ registerActions({
 // The live agent view's header, view toggle, side panel tabs and command row (#3645). Restart is
 // destructive (actions.js DESTRUCTIVE_ACTIONS: a popout hides it) and still asks first
 // (restartSession's own confirmation). A side panel tab must be one the panel has.
-const AGENTIC_TABS = new Set(['board', 'files', 'browse', 'artifacts', 'team-view', 'team-settings', 'team-artifacts', 'knowledge', 'tasks', 'notes', 'activity', 'agent-ui', 'saved', 'subscribers']);
+const AGENTIC_TABS = new Set(['board', 'files', 'browse', 'artifacts', 'tasks', 'notes', 'activity', 'agent-ui', 'saved']);
 registerActions({
     'mobile-back': () => window.mobileBack(),
     'goal-refresh': () => window.refreshGoal(),
@@ -301,8 +301,7 @@ registerActions({
 });
 // Runs on every tab switch: there is nothing to stop until the dashboard has loaded.
 // The team view and its settings (with the Health check tab) load the first time a team is opened (#5364): about 40 KB of source the page does not need to start.
-const { enterTeamContext, exitTeamContext, renderTeamSettingsTab } = lazyFns(loadTeamContext, ['enterTeamContext', 'exitTeamContext', 'renderTeamSettingsTab']);
-const { openTeamPage, applyTeamRoute } = lazyFns(loadTeamPage, ['openTeamPage', 'applyTeamRoute']);
+const { openTeamPage, applyTeamRoute, exitTeamPage } = lazyFns(loadTeamPage, ['openTeamPage', 'applyTeamRoute', 'exitTeamPage']);
 const { showTeamWorkingModeWorkspace } = lazyFns(loadTeamSettings, ['showTeamWorkingModeWorkspace']);
 const stopCostDashboard = () => { loadCostDashboard.module?.stopCostDashboard(); };
 const { showDocsTab, selectDoc } = lazyFns(loadDocs, ['showDocsTab', 'selectDoc']);
@@ -592,7 +591,7 @@ Object.assign(window, {
     copyFolderPath, killBoard, setBoardAccentColor, resetTeam,
     moveSessionUp, moveSessionDown,
     toggleTeamSleep, toggleAgentSleep, toggleAgentArchive, toggleArchivedSection,
-    enterTeamContext, exitTeamContext, renderTeamSettingsTab, openTeamPage,
+    exitTeamPage, openTeamPage,
     showTeamAvailabilityWorkspace, showTeamWorkingModeWorkspace,
     shareAgentTeam, saveTeamFromSidebar, showTeamTokenUsage, distillTeamKnowledge,
     showConfirmModal, hideConfirmModal, showPromptModal, hidePromptModal, showAlertModal, hideAlertModal,
@@ -677,7 +676,7 @@ function currentChatsQuery() {
 function registerRouteHandlers() {
     // Any view but a team leaves the team workspace (Back from a team to where the user was).
     const route = (view, fn) => onRoute(view, async (r, opts) => {
-        if (state.selectedTeam && await exitTeamContext({ goBack: false }) === false) {
+        if (state.selectedTeam && await exitTeamPage() === false) {
             note(keyRoute('team', state.selectedTeam), { replace: true }); // kept: unsaved team settings
             return;
         }
@@ -783,10 +782,6 @@ function registerRouteHandlers() {
         if (!btn) return;
         const tab = btn.id.replace('agentic-tab-', '');
         const cur = currentRoute();
-        if (cur && cur.view === 'team' && state.selectedTeam) {
-            if (tab === 'team-view' || tab === 'team-settings') note(keyRoute('team', state.selectedTeam, tab === 'team-settings' ? 'settings' : null), { replace: true });
-            return;
-        }
         const s = state.currentSession;
         if (cur && cur.view === 'agents' && cur.id && s && s.type === 'live' && AGENT_SUBTABS.includes(tab)) {
             note(liveRoute(sessionServer(s), s.session_id, tab), { replace: true });

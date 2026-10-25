@@ -117,19 +117,8 @@ const hex = i => i.toString(16).padStart(20, '0');
             check(`${dev}: a search inside the scope covers the scope (one match of two)`, s.rows.join() === 'team-b board, by the QA Engineer' && s.tabs[0] === '(2)', JSON.stringify([s.rows, s.tabs]));
             await ev(`document.querySelector('#saved-bar .list-bar-clear-q').click(); true`);
 
-            // a team
+            // home again (the team's page has no Saved panel since #7457, and an agent's page has no team opened over it: no "a team" scope is reachable)
             await toAgents();
-            await ev(`Promise.resolve(window.enterTeamContext('team-a', { tab: 'team-view' })).then(() => true)`); // (the team view is a lazy module, #5364: the first call loads it, so wait for it)
-            await openSaved(); // the team page opens on its own tab: the Saved tab is shown beside it // on a phone the panel is an overlay that gives way when another page is chosen: it is opened again
-            await rowsAre('Saved: team-a', ['fe-a chat', 'qa-a chat', 'team-a board, by the Orchestrator', 'team-a board, by the QA Engineer'], ['(4)', '(1)'], `${dev}: team-a: its board's messages and its agents' chats, nothing of team-b`);
-            await shotSaved(`saved-scope-team-${dev}`);
-            s = await snap();
-            check(`${dev}: the heading fits and the page does not scroll sideways`, s.headingFits && s.over <= 0, JSON.stringify([s.headingFits, s.over]));
-            check(`${dev}: in the team's page the Saved panel is what is on screen, not the team's chat over it`, await onTop());
-
-            // home again
-            await ev(`window.exitTeamContext({ goBack: false, force: true }); true`);
-            await settle(`!document.getElementById('agentic-state').classList.contains('team-context')`, 'left the team');
             await openSaved();
             await rowsAre('Saved: QA Beta', ['qa-b chat', 'team-b board, by the QA Engineer'], ['(2)', ''], `${dev}: leaving the team, the agent underneath is the scope again`);
             await ev(`window.selectLiveSession('', '', '', 'local'); true`).catch(() => {});

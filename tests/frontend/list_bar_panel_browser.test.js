@@ -24,7 +24,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         for (const key of ['tasks', 'artifacts']) {
             const panel = PANELS.find(p => p.key === key);
             await panel.prepare?.(ctx);
-            const root = key === 'tasks' ? '#board-task-bar' : '#agentic-panel-team-artifacts';
+            const root = key === 'tasks' ? '#board-task-bar' : '#agentic-panel-artifacts';
             const label = key === 'tasks' ? 'Tasks' : 'Team Artifacts';
             for (const view of [{ name: 'desktop', w: 1440, phone: false, theme: 'dark' }, { name: '390px', w: 390, phone: true, theme: 'light' }]) {
                 const tag = `${label}, ${view.name} ${view.theme}`; console.log(tag);
@@ -54,7 +54,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 check(`${tag}: a filter on, the panel shut by Escape (focus back on the icon): a dot, the name "Filters and sort, 1 on", and the chip stays visible (${JSON.stringify(on)})`, on.shut && on.back && on.dot && on.active && on.name === 'Filters and sort, 1 on' && on.chips >= 1 && /\d/.test(on.count));
                 await shot(`list-bar-panel-${key}-${view.name}-filtered`);
                 // the state is kept per board: open writes it, shut removes it
-                const kept = async () => ev(`Object.keys(localStorage).filter(k => k.startsWith('coral-list-bar-open:${key === 'tasks' ? 'tasks' : 'team-artifacts'}:'))`);
+                const kept = async () => ev(`Object.keys(localStorage).filter(k => k.startsWith('coral-list-bar-open:${key === 'tasks' ? 'tasks' : 'artifacts'}:'))`);
                 await ev(`document.querySelector('${root} .list-bar-toggle').click(); true`);
                 const k1 = await kept();
                 await ev(`document.querySelector('${root} .list-bar-toggle').click(); true`);

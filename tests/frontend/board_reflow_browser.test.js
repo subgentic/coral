@@ -101,7 +101,7 @@ const LONG = 'Senior Platform Reliability Developer With A Long Title';
                     w.remove(); return { feed: Math.round(fr.width), col: Math.round(col.width), rowRight: Math.round(rowRight), vw: document.documentElement.clientWidth }; })()`);
                 assert.ok(g.feed <= g.col && g.rowRight <= g.vw, `${v.name}: wide content does not widen the feed (${JSON.stringify(g)})`);
             }
-            if (v.width === 1400) assert.equal(m.feedWidth, m.colWidth, `${v.name}: the feed fills its column as before`);
+            if (v.width === 1400) assert.equal(m.feedWidth, Math.min(m.colWidth, 840), `${v.name}: the feed fills its column up to its 840 px maximum (the board's page has no side panel since #7457: the column is the page)`);
             if (v.width === 1920) {
                 assert.equal(m.feedWidth, 840, `${v.name}: the feed stays at its 840 px maximum`);
                 assert.ok(m.feedMargins[0] <= 1, `${v.name}: and starts at its column's left edge, as the search field does, not centred (#7315) (${m.feedMargins})`);

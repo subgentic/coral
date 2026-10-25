@@ -217,7 +217,7 @@ Status: `{team_name, status: "running"|"complete"|"failed", progress: {phase, ag
 
 A `complete` run can be partial. `failed_agents: [{agent, error}]` lists the agents whose knowledge could not be extracted (a Claude CLI call failed): each keeps its earlier knowledge file, if any, and is listed in the index only then; the error text never goes into any agent's document. `collaboration_error` is set when the cross-referencing pass failed, and the documents were built without it. When every agent's extraction fails, the run is `failed` and nothing is written, so the earlier knowledge stays as it was.
 
-The dashboard follows a run wherever it was started (#3325): leaving the Knowledge tab or the team doesn't lose it. The team's sidebar header shows "Distilling…" while it runs (a run started in another window, or before a reload, is found the first time the team is shown), and a toast says when the knowledge is ready or the run failed.
+The dashboard follows a run wherever it was started (#3325): leaving the team page's Knowledge tab or the team doesn't lose it. The team's row in the agent list shows "Distilling…" while it runs (a run started in another window, or before a reload, is found the first time the team is shown), and a toast says when the knowledge is ready or the run failed.
 
 ## Example: Full team lifecycle
 

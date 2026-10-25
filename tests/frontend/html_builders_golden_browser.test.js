@@ -39,7 +39,7 @@ const HEX = c => c.repeat(64);
             const json = (b, s = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } }));
             window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin); const m = (o.method || 'GET').toUpperCase(); const p = url.pathname, T = window.__ta;
                 if (p.startsWith('/api/board/') && p.endsWith('/artifacts') && m === 'GET') {
-                    const body = () => json({ project: decodeURIComponent(p.split('/')[3]), artifacts: T.items, ...T.extra });
+                    const body = () => json({ session_id: url.searchParams.get('session_id') || undefined, project: decodeURIComponent(p.split('/')[3]), artifacts: T.items, ...T.extra });
                     if (T.mode === 'error') return json({}, 500); if (T.mode === 'deferred') return new Promise(res => { T.release = () => res(body()); }); return body(); }
                 if (p === '/api/session-artifacts') { if (T.mode === 'error') return json({}, 500); return json({ session_id: url.searchParams.get('session_id'), artifacts: T.personal }); }
                 if (p === '/api/system/artifact-store/kept') return json({ kept: T.kept });
@@ -60,43 +60,42 @@ const HEX = c => c.repeat(64);
         const SESSION = { type: 'live', name: 'golden-agent', session_id: 'golden-sid', board_project: TEAM };
 
         // no team: the line says to pick one
-        await ev(`localStorage.removeItem('coral-agentic-tab-top'); window.TA.selectFilesSource('team-artifacts'); true`);
+        await ev(`localStorage.removeItem('coral-agentic-tab-top'); window.TA.selectFilesSource('artifacts'); true`);
         await teamState(null, null);
         await ev(`window.__RealDate = Date; { const RD = Date, FIXED = RD.parse('2026-10-10T12:00:00Z'); window.Date = class extends RD { constructor(...a) { if (a.length) super(...a); else super(FIXED); } static now() { return FIXED; } }; } true`); // the artifacts lists say "today" and "Oct 1" from the clock (#6751): fixed for these cases
-        cases['team artifacts: no team'] = await snap('team-artifacts');
         // a team, a list that is still loading, then the answer
         await teamState(TEAM, SESSION);
-        await settled('team-artifacts');
-        await ev(`window.__ta.mode = 'deferred'; true`); await refresh('team-artifacts');
-        await waitFor(`${ROOT('team-artifacts')}.getAttribute('aria-busy') === 'true'`, 'the loading state');
-        cases['team artifacts: loading'] = await snap('team-artifacts');
-        await ev(`window.__ta.release(); window.__ta.mode = 'normal'; true`); await settled('team-artifacts');
-        cases['team artifacts: empty'] = await snap('team-artifacts');
-        await ev(`window.__ta.mode = 'error'; true`); await refresh('team-artifacts'); await settled('team-artifacts');
-        cases['team artifacts: error'] = await snap('team-artifacts');
-        await ev(`window.__ta.mode = 'normal'; window.__ta.items = ${JSON.stringify(ITEMS)}; window.__ta.kept = []; true`); await refresh('team-artifacts'); await settled('team-artifacts');
-        cases['team artifacts: rows'] = await snap('team-artifacts');
-        await ev(`window.__ta.extra = { has_more: true, next_cursor: 'c2', total: 9, all: 40 }; true`); await refresh('team-artifacts'); await settled('team-artifacts');
-        cases['team artifacts: more rows to load, 9 of 40'] = await snap('team-artifacts');
+        await settled('artifacts');
+        await ev(`window.__ta.mode = 'deferred'; true`); await refresh('artifacts');
+        await waitFor(`${ROOT('artifacts')}.getAttribute('aria-busy') === 'true'`, 'the loading state');
+        cases['agent artifacts, on a team: loading'] = await snap('artifacts');
+        await ev(`window.__ta.release(); window.__ta.mode = 'normal'; true`); await settled('artifacts');
+        cases['agent artifacts, on a team: empty'] = await snap('artifacts');
+        await ev(`window.__ta.mode = 'error'; true`); await refresh('artifacts'); await settled('artifacts');
+        cases['agent artifacts, on a team: error'] = await snap('artifacts');
+        await ev(`window.__ta.mode = 'normal'; window.__ta.items = ${JSON.stringify(ITEMS)}; window.__ta.kept = []; true`); await refresh('artifacts'); await settled('artifacts');
+        cases['agent artifacts, on a team: rows'] = await snap('artifacts');
+        await ev(`window.__ta.extra = { has_more: true, next_cursor: 'c2', total: 9, all: 40 }; true`); await refresh('artifacts'); await settled('artifacts');
+        cases['agent artifacts, on a team: more rows to load, 9 of 40'] = await snap('artifacts');
         // a later page that fails keeps the rows already shown and says so, with Retry (UX's note on #4895: the Retry button is built from the rows it is given)
-        await ev(`window.__ta.mode = 'error'; ${ROOT('team-artifacts')}.querySelector('.team-artifacts-more').click(); true`);
-        await waitFor(`!!${ROOT('team-artifacts')}.querySelector('.team-artifacts-retry') && ${ROOT('team-artifacts')}.getAttribute('aria-busy') === 'false'`, 'the failed page and its Retry');
-        cases['team artifacts: a later page failed (the rows stay, with Retry)'] = await snap('team-artifacts');
+        await ev(`window.__ta.mode = 'error'; ${ROOT('artifacts')}.querySelector('.team-artifacts-more').click(); true`);
+        await waitFor(`!!${ROOT('artifacts')}.querySelector('.team-artifacts-retry') && ${ROOT('artifacts')}.getAttribute('aria-busy') === 'false'`, 'the failed page and its Retry');
+        cases['agent artifacts, on a team: a later page failed (the rows stay, with Retry)'] = await snap('artifacts');
         await ev(`window.__ta.mode = 'normal'; true`);
-        await ev(`window.__ta.extra = { truncated: true, total: 9, all: 9 }; true`); await refresh('team-artifacts'); await settled('team-artifacts');
-        cases['team artifacts: the server cut the list'] = await snap('team-artifacts');
-        await ev(`window.__ta.extra = {}; window.__ta.kept = [${JSON.stringify(HEX('a'))}]; true`); await refresh('team-artifacts'); await settled('team-artifacts');
-        cases['team artifacts: one artifact kept'] = await snap('team-artifacts');
-        await ev(`document.body.classList.add('popout-mode'); true`); await refresh('team-artifacts'); await settled('team-artifacts');
-        cases['team artifacts: pop-out (no Delete or Keep)'] = await snap('team-artifacts');
+        await ev(`window.__ta.extra = { truncated: true, total: 9, all: 9 }; true`); await refresh('artifacts'); await settled('artifacts');
+        cases['agent artifacts, on a team: the server cut the list'] = await snap('artifacts');
+        await ev(`window.__ta.extra = {}; window.__ta.kept = [${JSON.stringify(HEX('a'))}]; true`); await refresh('artifacts'); await settled('artifacts');
+        cases['agent artifacts, on a team: one artifact kept'] = await snap('artifacts');
+        await ev(`document.body.classList.add('popout-mode'); true`); await refresh('artifacts'); await settled('artifacts');
+        cases['agent artifacts, on a team: pop-out (no Delete or Keep)'] = await snap('artifacts');
         await ev(`document.body.classList.remove('popout-mode'); true`);
         // the outcome of a delete: the notice line and the live region
-        await ev(`window.__ta.items = ${JSON.stringify(ITEMS)}.slice(0, 2); true`); await refresh('team-artifacts'); await settled('team-artifacts');
-        await ev(`${ROOT('team-artifacts')}.querySelector('.team-artifact-delete').click(); true`);
+        await ev(`window.__ta.items = ${JSON.stringify(ITEMS)}.slice(0, 2); true`); await refresh('artifacts'); await settled('artifacts');
+        await ev(`${ROOT('artifacts')}.querySelector('.team-artifact-delete').click(); true`);
         await waitFor(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'the confirmation');
         await ev(`window.__ta.items = window.__ta.items.slice(1); document.getElementById('confirm-modal-yes').click(); true`);
-        await waitFor(`!!${ROOT('team-artifacts')}.querySelector('.team-artifacts-notice')`, 'the notice');
-        cases['team artifacts: after a delete'] = (await snap('team-artifacts')) + '\n' + await ev(`(document.getElementById('agentic-panel-team-artifacts-live') || {}).textContent`);
+        await waitFor(`!!${ROOT('artifacts')}.querySelector('.team-artifacts-notice')`, 'the notice');
+        cases['agent artifacts, on a team: after a delete'] = (await snap('artifacts')) + '\n' + await ev(`(document.getElementById('agentic-panel-artifacts-live') || {}).textContent`);
         // the personal list (a standalone agent: no team)
         await ev(`window.__ta.personal = ${JSON.stringify(ITEMS.slice(0, 3))}; window.__ta.mode = 'normal'; window.TA.selectFilesSource('artifacts'); true`);
         await teamState(null, { type: 'live', name: 'solo', session_id: 'solo-sid' });

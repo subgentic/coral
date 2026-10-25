@@ -112,7 +112,7 @@ const { settle } = require('./helpers/wait');
         ok('a hidden open tab (and a request for a hidden tab) falls back to the first tab');
 
         // The locked tab can't be hidden even by a stale saved list.
-        await ev(`localStorage.setItem('coral-agentic-tab-prefs', JSON.stringify({ agent: { order: [], hidden: [${JSON.stringify(first)}] }, team: { order: [], hidden: [] } })); true`);
+        await ev(`localStorage.setItem('coral-agentic-tab-prefs', JSON.stringify({ agent: { order: [], hidden: [${JSON.stringify(first)}] } })); true`);
         await close(); await load();
         assert.ok((await row()).includes(first), 'the first tab is shown despite a saved hide');
         ok('the first tab stays visible even if a saved list hides it');
@@ -135,8 +135,8 @@ const { settle } = require('./helpers/wait');
         assert.deepEqual(listed2, [first, 'notes', 'activity', ...def.filter(t => ![first, 'notes', 'activity'].includes(t))], 'the list agrees: every tab can be shown again, none vanished');
         await ev(`document.querySelector('#tab-customize .tc-check[data-tab="notes"]').click(); true`); // a change rewrites the key from the cleaned value
         const stored = JSON.parse(await ev(`localStorage.getItem('coral-agentic-tab-prefs')`));
-        const known = new Set(def.concat(['board', 'team-view', 'team-settings', 'team-artifacts', 'knowledge']));
-        assert.ok([...(stored.agent.order || []), ...(stored.agent.hidden || []), ...(stored.team.order || []), ...(stored.team.hidden || [])].every(id => known.has(id)), 'only known tab ids are stored: ' + JSON.stringify(stored));
+        const known = new Set(def.concat(['board']));
+        assert.ok([...(stored.agent.order || []), ...(stored.agent.hidden || [])].every(id => known.has(id)), 'only known tab ids are stored: ' + JSON.stringify(stored));
         await close();
         ok('stored lists are validated: unknown, repeated and non-string ids dropped, missing tabs last, the first tab first and shown');
 
@@ -161,7 +161,7 @@ const { settle } = require('./helpers/wait');
         const moved1 = await row();
         assert.equal(moved1.indexOf(first), 1, 'moved down one: ' + JSON.stringify(moved1));
         assert.equal(await ev(`document.querySelector('#tab-customize .tc-check[data-tab="' + ${JSON.stringify(first)} + '"]').disabled`), true, 'still locked on');
-        await ev(`localStorage.setItem('coral-agentic-tab-prefs', JSON.stringify({ agent: { order: ['notes', ${JSON.stringify(first)}], hidden: [${JSON.stringify(first)}] }, team: { order: [], hidden: [] } })); true`);
+        await ev(`localStorage.setItem('coral-agentic-tab-prefs', JSON.stringify({ agent: { order: ['notes', ${JSON.stringify(first)}], hidden: [${JSON.stringify(first)}] } })); true`);
         await close(); await load();
         const placed = await row();
         assert.deepEqual(placed.slice(0, 2), ['notes', first], 'the saved place is kept after a reload');
@@ -180,7 +180,7 @@ const { settle } = require('./helpers/wait');
         ok('Reset removes the stored key');
 
         // Reset to default; Escape closes and returns focus to the button; click-away closes.
-        await ev(`localStorage.setItem('coral-agentic-tab-prefs', JSON.stringify({ agent: { order: ['notes'], hidden: ['tasks'] }, team: { order: [], hidden: [] } })); true`);
+        await ev(`localStorage.setItem('coral-agentic-tab-prefs', JSON.stringify({ agent: { order: ['notes'], hidden: ['tasks'] } })); true`);
         await load();
         assert.ok(!(await row()).includes('tasks'));
         await open();
@@ -205,18 +205,6 @@ const { settle } = require('./helpers/wait');
         await close();
         ok('right-click on the row opens the popover');
 
-        // Team context keeps its own list.
-        await ev(`document.getElementById('agentic-state').classList.add('team-context'); true`);
-        await sleep(50); // sleep-ok: the observer applies on a microtask; give it a tick
-        await open();
-        const teamIds = await listed();
-        assert.ok(teamIds.includes('team-view') && !teamIds.includes('files'), JSON.stringify(teamIds));
-        await ev(`document.querySelector('#tab-customize .tc-check[data-tab="knowledge"]').click(); true`);
-        await close();
-        await ev(`document.getElementById('agentic-state').classList.remove('team-context'); true`);
-        await sleep(50); // sleep-ok: observer tick
-        assert.deepEqual(await row(), def, 'the agent row is untouched by a team-only change');
-        ok('team tabs have their own list; hiding one there leaves the agent row alone');
         await ev(`localStorage.removeItem('coral-agentic-tab-prefs'); true`);
 
         // Phone: a bottom sheet with 44px move buttons, no drag grip, inside the viewport; also at 200 percent text.

@@ -51,13 +51,13 @@ const SHOTS = process.env.CORAL_SCREENSHOT_DIR;
             const real = window.fetch;
             window.fetch = async (url, options) => {
                 const u = String(url);
-                if (u.includes('/api/board/') && u.includes('/artifacts?')) return new Response(JSON.stringify({ project: decodeURIComponent(u.split('/')[3]), artifacts: window.__items, has_more: false, truncated: false }), { headers: { 'Content-Type': 'application/json' } });
+                if (u.includes('/api/board/') && u.includes('/artifacts?')) return new Response(JSON.stringify({ session_id: new URL(String(u), location.origin).searchParams.get('session_id') || undefined, project: decodeURIComponent(u.split('/')[3]), artifacts: window.__items, has_more: false, truncated: false }), { headers: { 'Content-Type': 'application/json' } });
                 if (u.includes('/api/')) return new Response(JSON.stringify({ files: [] }), { headers: { 'Content-Type': 'application/json' } });
                 return real(url, options);
             };
             files.initFileSearch(); files.syncFilesViewerSession();
         })()`);
-        await ev(`localStorage.removeItem('coral-agentic-tab-top'); document.getElementById('agentic-tab-team-artifacts').click()`); await settle();
+        await ev(`localStorage.removeItem('coral-agentic-tab-top'); document.getElementById('agentic-tab-artifacts').click()`); await settle();
         assert.equal(await ev(`document.querySelectorAll('tr.team-artifact-row').length`), 7, 'every row is listed: the unverified one is not merged into the real row with the same id');
 
         console.log('1. An unverified row says so and offers nothing to open');
@@ -112,7 +112,7 @@ const SHOTS = process.env.CORAL_SCREENSHOT_DIR;
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
         await Emulation.setTouchEmulationEnabled({ enabled: true, maxTouchPoints: 5 });
         await ev(`document.getElementById('agentic-state').style.width = ''; document.documentElement.style.fontSize = '32px'; (document.getElementById('popout-panel-toggle-btn') || document.getElementById('panel-toggle-btn')).click(); true`); await settle();
-        await ev(`window.switchAgenticTab('team-artifacts', 'top'); true`); await settle();
+        await ev(`window.switchAgenticTab('artifacts', 'top'); true`); await settle();
         assert.ok(await ev(`[...document.querySelectorAll('.team-artifact-badge')].filter(b => b.getBoundingClientRect().width > 0).length`) >= 4, 'the badges are on screen on the phone (the drawer is open)');
         const fit = await ev(`(() => { const s = document.querySelector('.team-artifacts-scroll'); const sr = s.getBoundingClientRect(); const out = [...document.querySelectorAll('.team-artifact-badge')].filter(b => { const r = b.getBoundingClientRect(); return r.right > sr.right + 1 || r.left < sr.left - 1; }).length; return { fits: s.scrollWidth <= s.clientWidth + 1, docOver: document.documentElement.scrollWidth - innerWidth, out, badge: parseFloat(getComputedStyle(document.querySelector('.team-artifact-badge')).fontSize) }; })()`);
         assert.equal(fit.fits, true, 'no horizontal scroll in the table'); assert.ok(fit.docOver <= 0, 'no sideways scroll'); assert.equal(fit.out, 0, 'every badge stays inside the table');

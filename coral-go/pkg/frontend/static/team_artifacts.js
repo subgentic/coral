@@ -1,17 +1,12 @@
-/* Optional, lazy team artifact source for the existing Files viewer. */
+/* The agent's Files viewer sources: its changed files, the repository tree and its artifacts (the team's artifacts and knowledge are the team page's, #7457). */
 import { state } from './state.js';
 import { isOwnerLabelRefusal, OWNER_LABEL_TEXT } from './owner_label.js';
 import { inlineArtifactPath } from './artifact_paths.js';
-import { boardOfPage } from './dock_page.js';
-import { escapeHtml, escapeAttr, sanitizeHtml, refusedTooLarge } from './utils.js';
-import { knowledgeFallbackHtml } from './knowledge_fallback.js';
-import { registerActions, textOf } from './actions.js';
 import { bindDownload } from './artifact_download.js';
 import { readersAllowed, readersDisclosure } from './artifact_readers.js';
 import { appendRows, FIRST_ROWS, setIcon } from './chunked_rows.js';
 import { fileIconFor, mountExplorer, showExplorer, syncExplorerSession } from './file_explorer.js';
-import { boardFetch, teamFetch, serverUrl, splitKey, sessionTeamKey, sessionServer, artifactPath, isCloud, keyLabel } from './server_base.js';
-import { refreshDistill, startDistill, distillJob } from './knowledge_distill.js';
+import { boardFetch, serverUrl, splitKey, sessionTeamKey, sessionServer, artifactPath, isCloud, keyLabel } from './server_base.js';
 import { browserLocal } from './safe_storage.js';
 import { buildBar } from './team_artifact_bar.js';
 import { shortWhen } from './artifact_when.js';
@@ -24,15 +19,15 @@ let sessionID = null;
 let previewArtifact = null;
 let previewFile = null;
 const fresh = () => ({items:[], loaded:false, busy:false, error:'', hasMore:false, truncated:false, cursor:'', controller:null, generation:0, counts:null});
-const caches = {artifacts:fresh(), 'team-artifacts':fresh()};
+const caches = {artifacts:fresh()};
 let notice = ''; // the outcome of the last delete (#3553), shown once under the heading
 
 // The search box, filters and sort of the Team Artifacts list (#4573) and, the same component, of one agent's Artifacts tab (#5283): asked of the server (a search covers every artifact, not just the
 // loaded page), kept per board and, for an agent, per agent. Each panel has its own bar (built once: the list is rebuilt on every change, which would drop the keyboard focus out of a search box).
-const views = { artifacts: { filters: { ...EMPTY }, key: null, bar: null, panelKey: null }, 'team-artifacts': { filters: { ...EMPTY }, key: null, bar: null, panelKey: null } };
+const views = { artifacts: { filters: { ...EMPTY }, key: null, bar: null, panelKey: null } };
 const view = () => views[source];
 /** What the filters are kept under: the board, or for an agent's tab the board and the agent. null when there is nothing to filter (no team: a standalone agent's list has no search). */
-function filtersKey() { return source === 'artifacts' ? (team && sessionID ? `${team}::agent::${sessionID}` : null) : team; }
+function filtersKey() { return team && sessionID ? `${team}::agent::${sessionID}` : null; }
 function syncFilters() {
     const v = view(), key = filtersKey();
     if (key === v.key) return;
@@ -120,17 +115,12 @@ function deleteArtifact(hex, name, size) {
     // No default: focus starts on Cancel.
     requestAnimationFrame(() => document.querySelector('#confirm-modal .modal-actions .btn:not(#confirm-modal-yes)')?.focus());
 }
-const isArtifactSource = () => source === 'artifacts' || source === 'team-artifacts';
-const panels = {files:'agentic-panel-files', browse:'agentic-panel-browse', artifacts:'agentic-panel-artifacts', 'team-artifacts':'agentic-panel-team-artifacts', knowledge:'agentic-panel-knowledge'};
+const isArtifactSource = () => source === 'artifacts';
+const panels = {files:'agentic-panel-files', browse:'agentic-panel-browse', artifacts:'agentic-panel-artifacts'};
 function cancel(cache) { cache.controller?.abort(); ++cache.generation; cache.busy=false; }
 function clear(scope) { cancel(caches[scope]); caches[scope]=fresh(); }
 
 function currentTeam() {
-    // A board's page shows that board's artifacts (#4539).
-    const pageBoard = boardOfPage();
-    if (pageBoard) return pageBoard;
-    // A selected team (team context) wins over the selected agent's team.
-    if (state.selectedTeam) return state.selectedTeam;
     return state.currentSession?.type === 'live' ? sessionTeamKey(state.currentSession) || null : null;
 }
 
@@ -610,7 +600,6 @@ async function load(append = false, keep = false) {
 
 function activate() {
     if(source==='browse') showExplorer();
-    else if(source==='knowledge') loadKnowledgeTab();
     else if(isArtifactSource()) {render(); if(!caches[source].loaded && !caches[source].busy)load();}
 }
 
@@ -646,310 +635,7 @@ export function syncFilesSourceTeam() {
     const agentChanged=nextSession!==sessionID;
     syncExplorerSession();
     if(!teamChanged&&!agentChanged)return;
-    if(teamChanged) { clear('team-artifacts'); knowledgeLoaded=false; knowledgeLoading=false; }
     if(teamChanged||agentChanged)clear('artifacts');
     team=next;sessionID=nextSession;
     render();activate();
 }
-
- function selectKnowledgeSource() { window.switchAgenticTab?.('knowledge', 'top'); }
-
-// ── Knowledge tab ───────────────────────────────────────────────────────
-
-let knowledgeLoaded = false;
-let knowledgeLoading = false;
-let knowledgeData = null;
-let knowledgeMode = 'preview'; // 'preview' or 'edit'
-let knowledgeActiveTab = 'index';
-
-
-async function loadKnowledgeTab() {
-    const panel = document.getElementById('team-knowledge-view');
-    if (!panel) return;
-    const boardName = currentTeam();
-    if (!boardName) {
-        panel.innerHTML = '<div class="knowledge-empty">Select a team to view knowledge.</div>';
-        return;
-    }
-    // Loaded already, unless the panel was re-rendered empty meanwhile (#3325).
-    if (knowledgeLoaded && panel.childElementCount > 0) return;
-    if (knowledgeLoading) return;
-    knowledgeLoading = true;
-    knowledgeMode = 'preview';
-    knowledgeActiveTab = 'index';
-
-    panel.innerHTML = '<div class="knowledge-empty">Loading...</div>';
-
-    // A run in progress (started here earlier, in another window, or before a reload) is
-    // shown and followed; the bundle is loaded once there is none (#3325).
-    const job = await refreshDistill(boardName);
-    if (boardName !== currentTeam()) { knowledgeLoading = false; return; }
-    if (job.status === 'running') {
-        knowledgeLoading = false;
-        knowledgeLoaded = true;
-        renderDistillProgress(panel, job);
-        return;
-    }
-
-    let refused = false; // too large to check through Coral Hub (#3718): said, not "no knowledge yet"
-    const data = await teamFetch(boardName, n => `/api/teams/detail/${encodeURIComponent(n)}/knowledge`)
-        .then(async r => { if (r.ok) return r.json(); refused = await refusedTooLarge(r); return null; }).catch(() => null);
-
-    // If team changed while we were fetching, discard the result
-    if (boardName !== currentTeam()) { knowledgeLoading = false; return; }
-
-    knowledgeLoading = false;
-    knowledgeLoaded = true;
-
-    if (refused) {
-        panel.innerHTML = '<div class="knowledge-empty">This team\u2019s knowledge is too large to show through Coral Hub; open it on the computer.</div>';
-        return;
-    }
-    if (!data || !data.exists) {
-        if (job.status === 'failed') { renderDistillFailed(panel, boardName, job); return; }
-        panel.innerHTML = `<div class="knowledge-empty">
-            <div style="margin-bottom:12px">No distilled knowledge yet for this team.</div>
-            <button class="btn btn-primary" data-on-click="knowledge-distill" data-board="${escapeAttr(boardName)}">Distill Knowledge</button>
-        </div>`;
-        return;
-    }
-
-    knowledgeData = data;
-    renderKnowledgePanel(panel, boardName);
-    // The last run's outcome above the bundle: when it finished, or that it failed.
-    const viewer = panel.querySelector('.knowledge-viewer');
-    if (viewer && (job.status === 'complete' || job.status === 'failed')) {
-        const note = document.createElement('div');
-        note.className = 'knowledge-run-note' + (job.status === 'failed' ? ' is-failed' : '');
-        note.setAttribute('role', 'status');
-        note.textContent = job.status === 'failed'
-            ? `The last distillation failed${job.error ? ': ' + job.error : ''}. This is the knowledge from before it.`
-            : (job.finished_at ? `Updated ${_formatWhen(job.finished_at)}` : 'Updated') + _partialNote(job);
-        if (job.status === 'complete' && _partialNote(job)) note.classList.add('is-partial');
-        viewer.prepend(note);
-    }
-}
-
-/** A complete run can be partial: the agents it couldn't distill keep their earlier knowledge. */
-function _partialNote(job) {
-    const failed = Array.isArray(job.failed_agents) ? job.failed_agents : [];
-    let text = '';
-    if (failed.length) {
-        const list = failed.map(f => `${f.agent}${f.error ? ` (${f.error})` : ''}`).join('; ');
-        text += `. ${failed.length} agent${failed.length === 1 ? '' : 's'} couldn't be distilled: ${list}. ${failed.length === 1 ? 'It keeps its' : 'They keep their'} earlier knowledge, if any`;
-    }
-    if (job.collaboration_error) text += `. The collaboration pass failed (${job.collaboration_error}), so the documents were built without it`;
-    return text;
-}
-
-function _formatWhen(iso) {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return '';
-    return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-}
-
-const _SPIN = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="spin" style="margin-bottom:8px" aria-hidden="true"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>';
-const _PHASES = { starting: 'Starting knowledge distillation', extracting: 'Pass 1: Extracting knowledge', 'cross-referencing': 'Pass 2: Cross-referencing collaboration', formatting: 'Pass 3: Building OKF documents' };
-
-/** The run in progress, from its last status. */
-function renderDistillProgress(panel, job) {
-    const p = (job && job.progress) || {};
-    const pct = p.total > 0 ? Math.round((p.completed / p.total) * 100) : 0;
-    const phase = _PHASES[p.phase] || (p.phase ? String(p.phase) : _PHASES.starting);
-    const agent = p.agent ? ` — ${escapeHtml(p.agent)}` : '';
-    const counts = p.total > 0 ? `${Number(p.completed) || 0}/${Number(p.total) || 0} agents` : 'This reads all agent transcripts and runs 3 passes through Claude';
-    panel.innerHTML = `<div class="knowledge-empty knowledge-distilling" role="status">
-        ${_SPIN}
-        <div>${escapeHtml(phase)}${agent}</div>
-        <div class="knowledge-progress" aria-hidden="true"><div class="knowledge-progress-bar" style="width:${pct}%"></div></div>
-        <div style="font-size:0.75rem;margin-top:4px">${escapeHtml(counts)}</div>
-        <div style="font-size:0.75rem;margin-top:4px">You can leave this view: the run continues, and you'll be told when it's done.</div>
-    </div>`;
-}
-
-function renderDistillFailed(panel, boardName, job) {
-    panel.innerHTML = `<div class="knowledge-empty" style="color:var(--error-text)" role="alert">
-        Distillation failed: ${escapeHtml((job && job.error) || 'Unknown error')}
-        <div><button class="btn btn-sm" style="margin-top:12px" data-on-click="knowledge-distill" data-board="${escapeAttr(boardName)}">Retry</button></div>
-    </div>`;
-}
-
-// The Knowledge tab follows the team's run wherever it was started (#3325). The panel is
-// looked up on every change, so a re-rendered or re-opened view is updated too.
-document.addEventListener('coral:distill-status', e => {
-    const { team: t, job, prev } = e.detail || {};
-    // Finished while the tab was not on screen: the next visit loads the result.
-    if (t && t === currentTeam() && prev && prev.status === 'running' && job.status !== 'running') knowledgeLoaded = false;
-    if (!t || t !== currentTeam() || source !== 'knowledge') return;
-    const panel = document.getElementById('team-knowledge-view');
-    if (!panel) return;
-    if (job.status === 'running') { knowledgeLoaded = true; renderDistillProgress(panel, job); return; }
-    // Finished (or found finished): show the result.
-    if (prev && prev.status === 'running') { knowledgeLoaded = false; knowledgeLoading = false; loadKnowledgeTab(); }
-});
-
-function navigateKnowledge(panel, tabName) {
-    knowledgeActiveTab = tabName;
-    panel.querySelectorAll('.knowledge-pane').forEach(p => p.classList.toggle('active', p.dataset.kpanel === tabName));
-    const title = panel.querySelector('.knowledge-nav-title');
-    const homeBtn = panel.querySelector('.knowledge-home-btn');
-    if (tabName === 'index') {
-        if (title) title.textContent = 'Overview';
-        if (homeBtn) homeBtn.style.display = 'none';
-    } else {
-        if (title) title.textContent = tabName;
-        if (homeBtn) homeBtn.style.display = '';
-    }
-}
-
-function renderKnowledgePanel(panel, boardName) {
-    const data = knowledgeData;
-    const agents = data.agents || [];
-    const agentNames = agents.map(a => a.name);
-
-    let html = '<div class="knowledge-viewer">';
-
-    // Single toolbar: Home + title on left, actions on right
-    html += `<div class="knowledge-toolbar">
-        <div class="knowledge-toolbar-left">
-            <button class="inline-preview-mode-btn knowledge-home-btn" title="Back to overview" style="display:${knowledgeActiveTab === 'index' ? 'none' : ''}" aria-label="Back to overview"><span class="material-icons" aria-hidden="true">home</span></button>
-            <span class="knowledge-nav-title">${knowledgeActiveTab === 'index' ? 'Overview' : escapeHtml(knowledgeActiveTab)}</span>
-        </div>
-        <div class="knowledge-toolbar-actions">
-            <button class="inline-preview-mode-btn knowledge-redistill-btn" data-on-click="knowledge-distill" data-board="${escapeAttr(boardName)}" title="Re-distill" aria-label="Re-distill"><span class="material-icons" aria-hidden="true">refresh</span></button>
-            <button class="inline-preview-mode-btn${knowledgeMode === 'preview' ? ' active' : ''}" data-kmode="preview" title="Preview" aria-label="Preview"><span class="material-icons" aria-hidden="true">visibility</span></button>
-            <button class="inline-preview-mode-btn${knowledgeMode === 'edit' ? ' active' : ''}" data-kmode="edit" title="Edit" aria-label="Edit"><span class="material-icons" aria-hidden="true">edit</span></button>
-            <button class="inline-preview-save knowledge-save-btn" style="display:${knowledgeMode === 'edit' ? '' : 'none'}">Save</button>
-        </div>
-    </div>`;
-
-    // Content area
-    html += '<div class="knowledge-content-area">';
-
-    // Index/overview panel
-    const indexContent = data.index || '*No index available*';
-    html += `<div class="knowledge-pane${knowledgeActiveTab === 'index' ? ' active' : ''}" data-kpanel="index">`;
-    html += `<div class="knowledge-preview">${renderKnowledgeMD(indexContent, agentNames)}</div>`;
-    html += `<textarea class="knowledge-editor" style="display:none">${escapeHtml(indexContent)}</textarea>`;
-    html += '</div>';
-
-    // Agent panels
-    for (const a of agents) {
-        const content = a.content || '*No knowledge available*';
-        html += `<div class="knowledge-pane${knowledgeActiveTab === a.name ? ' active' : ''}" data-kpanel="${escapeAttr(a.name)}">`;
-        html += `<div class="knowledge-preview">${renderKnowledgeMD(content, agentNames)}</div>`;
-        html += `<textarea class="knowledge-editor" style="display:none">${escapeHtml(content)}</textarea>`;
-        html += '</div>';
-    }
-
-    html += '</div></div>';
-    panel.innerHTML = html;
-
-    applyKnowledgeMode(panel);
-
-    // Home button
-    panel.querySelector('.knowledge-home-btn').onclick = () => navigateKnowledge(panel, 'index');
-
-    // Mode switching
-    panel.querySelectorAll('[data-kmode]').forEach(btn => {
-        btn.onclick = () => {
-            knowledgeMode = btn.dataset.kmode;
-            panel.querySelectorAll('[data-kmode]').forEach(b => b.classList.toggle('active', b.dataset.kmode === knowledgeMode));
-            panel.querySelector('.knowledge-save-btn').style.display = knowledgeMode === 'edit' ? '' : 'none';
-            applyKnowledgeMode(panel);
-        };
-    });
-
-    // Save
-    panel.querySelector('.knowledge-save-btn').onclick = async () => {
-        const activePane = panel.querySelector(`.knowledge-pane[data-kpanel="${knowledgeActiveTab}"]`);
-        const editor = activePane?.querySelector('.knowledge-editor');
-        if (!editor || knowledgeActiveTab === 'index') return;
-        const saveBtn = panel.querySelector('.knowledge-save-btn');
-        saveBtn.textContent = 'Saving...'; saveBtn.disabled = true;
-        try {
-            const resp = await teamFetch(boardName, n => `/api/teams/detail/${encodeURIComponent(n)}/knowledge/${encodeURIComponent(knowledgeActiveTab)}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ content: editor.value }),
-            });
-            const result = await resp.json();
-            if (result.ok) {
-                const agentEntry = data.agents.find(a => a.name === knowledgeActiveTab);
-                if (agentEntry) agentEntry.content = editor.value;
-                const preview = activePane.querySelector('.knowledge-preview');
-                if (preview) preview.innerHTML = renderKnowledgeMD(editor.value, agentNames);
-                saveBtn.textContent = 'Saved!';
-                setTimeout(() => { saveBtn.textContent = 'Save'; }, 1500);
-            } else {
-                saveBtn.textContent = 'Error';
-                setTimeout(() => { saveBtn.textContent = 'Save'; }, 2000);
-            }
-        } catch {
-            saveBtn.textContent = 'Error';
-            setTimeout(() => { saveBtn.textContent = 'Save'; }, 2000);
-        } finally { saveBtn.disabled = false; }
-    };
-
-    // Inter-agent link navigation
-    panel.addEventListener('click', (e) => {
-        const link = e.target.closest('a[data-knowledge-link]');
-        if (!link) return;
-        e.preventDefault();
-        const target = link.dataset.knowledgeLink;
-        if (agentNames.includes(target)) navigateKnowledge(panel, target);
-    });
-}
-
-function applyKnowledgeMode(panel) {
-    panel.querySelectorAll('.knowledge-pane').forEach(pane => {
-        const preview = pane.querySelector('.knowledge-preview');
-        const editor = pane.querySelector('.knowledge-editor');
-        if (preview) preview.style.display = knowledgeMode === 'preview' ? '' : 'none';
-        if (editor) editor.style.display = knowledgeMode === 'edit' ? '' : 'none';
-    });
-}
-
-function renderKnowledgeMD(md, agentNames = []) {
-    const slugToName = {};
-    for (const name of agentNames) {
-        slugToName[name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9_-]/g, '')] = name;
-    }
-
-    // Use marked.js if available for better rendering
-    let text = md.replace(/^---[\s\S]*?^---\n*/m, '');
-
-    if (typeof marked === 'undefined') return `<div class="knowledge-md">${knowledgeFallbackHtml(text, slugToName)}</div>`; // escaped first (#7045)
-
-    // Rewrite internal links before marked processes them
-    text = text.replace(/\[([^\]]+)\]\(\.\/([^)]+)\.md\)/g, (_, label, slug) => {
-        const target = slugToName[slug];
-        if (target) return `<a href="#" class="knowledge-link" data-knowledge-link="${escapeAttr(target)}">${escapeHtml(label)}</a>`;
-        return `<span class="knowledge-link-dead">${escapeHtml(label)}</span>`;
-    });
-
-    const html = marked.parse(text);
-    const sanitized = sanitizeHtml(html, { ADD_ATTR: ['data-knowledge-link'] }, { links: 'board', knowledgeLinks: true }); // distilled from agents' text (#3542)
-    return `<div class="knowledge-md notes-rendered">${sanitized}</div>`;
-}
-
-export async function distillKnowledgeInTab(boardName) {
-    selectKnowledgeSource();
-    const panel = document.getElementById('team-knowledge-view');
-    if (!panel) return;
-    knowledgeLoaded = true;
-    renderDistillProgress(panel, distillJob(boardName).status === 'running' ? distillJob(boardName) : { progress: { phase: 'starting' } });
-    try {
-        // Starts a run, or joins the one already running (#3325). Progress, the result and a
-        // toast follow from knowledge_distill.js, wherever the user is by then.
-        await startDistill(boardName);
-    } catch (err) {
-        const p = document.getElementById('team-knowledge-view');
-        if (p && boardName === currentTeam()) p.innerHTML = `<div class="knowledge-empty" style="color:var(--error-text)">${escapeHtml(err.message)}</div>`;
-    }
-}
-
-// Distill / Retry / Re-distill in the team's knowledge panel (#3645).
-registerActions({
-    'knowledge-distill': el => { const b = textOf(el.dataset.board); if (b) window.distillTeamKnowledge(b); },
-});

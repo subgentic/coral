@@ -76,19 +76,14 @@ function renderInspection(data, workingMode) {
     return `<div class="prompt-inspection-bar"><label>Show the prompts for <select class="prompt-inspection-role">${options}</select></label><button type="button" class="btn btn-small prompt-inspection-copy">Copy</button></div>${cards}`;
 }
 
-// The empty team settings: a section for the sidebar or a dialog, with its three tabs and the form (filled by the load).
-function _teamSettingsShell(workspaceMode) {
-    document.getElementById(workspaceMode ? 'team-settings-workspace' : 'team-working-mode-dialog')?.remove();
-    const dialog = document.createElement(workspaceMode ? 'section' : 'dialog');
+// The empty team settings: a dialog, with its three tabs and the form (filled by the load).
+function _teamSettingsShell() {
+    document.getElementById('team-working-mode-dialog')?.remove();
+    const dialog = document.createElement('dialog');
     dialog.id = 'team-working-mode-dialog';
-    if (workspaceMode) {
-        dialog.id = 'team-settings-workspace';
-        dialog.className = 'team-settings-workspace';
-    } else dialog.className = 'team-availability-dialog';
+    dialog.className = 'team-availability-dialog';
     dialog.setAttribute('aria-labelledby', 'working-mode-title');
-    const workspaceActions = workspaceMode
-        ? ''  // sidebar panel: no close/back, the team context owns navigation
-        : `<button type="button" class="modal-close-btn" data-dialog-close aria-label="Close"><span class="material-icons" aria-hidden="true">close</span></button>`;
+    const workspaceActions = `<button type="button" class="modal-close-btn" data-dialog-close aria-label="Close"><span class="material-icons" aria-hidden="true">close</span></button>`;
     dialog.innerHTML = `<header><div><h2 id="working-mode-title">Team settings</h2><p class="working-mode-team"></p><p class="working-mode-note">Only the Operator on this computer can change these.</p></div>${workspaceActions}</header>
       <div class="working-mode-status" role="status" aria-live="polite"></div>
       <nav class="team-settings-tabs" aria-label="Team settings sections" role="tablist">
@@ -172,7 +167,7 @@ function _teamSettingsPageShell() {
 }
 
 // Puts the dialog on the page: the team's name and its rename control, the sidebar panel or a modal, and the link to the docs.
-function _mountTeamSettings(dialog, team, workspaceMode, pageHost = null) {
+function _mountTeamSettings(dialog, team, pageHost = null) {
     if (pageHost) { // the team page's Settings tab: the page replaces what the panel held, and the board's name is a row with its Rename button
         pageHost.replaceChildren(dialog);
         dialog.querySelector('.ts-rename').append(boardRenameControl(team, { onRenamed: () => { document.getElementById('team-page-title') && importOnce('./team_page.js').then(m => m.refreshTeamHeader?.()).catch(() => {}); importOnce('./render.js').then(m => m.scheduleLiveSessionsRender()); } }));
@@ -205,14 +200,9 @@ function _mountTeamSettings(dialog, team, workspaceMode, pageHost = null) {
             importOnce('./render.js').then(m => m.scheduleLiveSessionsRender()); // the board list follows on its next poll
         },
     }));
-    if (workspaceMode) {
-        // Rendered into the sidebar's Team Settings tab (see team_context.js).
-        document.getElementById('agentic-panel-team-settings')?.replaceChildren(dialog);
-    } else {
-        document.body.append(dialog);
-        bindNativeDialog(dialog); // Close (data-dialog-close), the backdrop, and removal on close
-        dialog.showModal();
-    }
+    document.body.append(dialog);
+    bindNativeDialog(dialog); // Close (data-dialog-close), the backdrop, and removal on close
+    dialog.showModal();
 
     bindInfo(dialog.querySelector('#team-settings-workflow fieldset')); // the (i) after Working mode, in the dialog and in the sidebar's tab alike (its own group: the other tabs bind their own, a second binding on the whole dialog would toggle twice)
     dialog.addEventListener('click', event => {
@@ -263,10 +253,9 @@ function _wireSettingsTabs(dialog, form) {
 
 export async function showTeamWorkingMode(team, options = {}) {
     const pageHost = options.page || null; // the team page's Settings tab: one page of sections and its own bar
-    const workspaceMode = Boolean(options.workspace) || Boolean(pageHost);
-    const dialog = pageHost ? _teamSettingsPageShell() : _teamSettingsShell(workspaceMode);
+    const dialog = pageHost ? _teamSettingsPageShell() : _teamSettingsShell();
     if (pageHost) dialog.dataset.team = team; // which team this page is for: the tab keeps a page with unsaved changes when it is opened again
-    _mountTeamSettings(dialog, team, workspaceMode, pageHost);
+    _mountTeamSettings(dialog, team, pageHost);
 
     const form = dialog.querySelector('form');
     const status = pageHost ? dialog.querySelector('.ts-status') : dialog.querySelector('[role=status]');

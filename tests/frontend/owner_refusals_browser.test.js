@@ -51,8 +51,8 @@ const CASES = [
         };
         const openTeam = async (ans, tab) => {
             await ev(`window.__ans = ${JSON.stringify(ans)}; true`);
-            await ev(`(async () => { const m = await import(${S} + 'team_working_mode.js'); await m.showTeamWorkingMode(${JSON.stringify(team)}, { workspace: true }); window.switchAgenticTab('team-settings', 'top'); return true; })()`);
-            await waitFor(`!!document.querySelector('#agentic-panel-team-settings .working-mode-form') && document.querySelector('#agentic-panel-team-settings .working-mode-form').dataset.initialState !== undefined`, 'the team settings', 8000);
+            await ev(`(async () => { const m = await import(${S} + 'team_working_mode.js'); await m.showTeamWorkingMode(${JSON.stringify(team)}); return true; })()`);
+            await waitFor(`!!document.querySelector('#team-working-mode-dialog .working-mode-form') && document.querySelector('#team-working-mode-dialog .working-mode-form').dataset.initialState !== undefined`, 'the team settings', 8000);
             await settle(300);
         };
 
@@ -68,16 +68,16 @@ const CASES = [
         console.log('2. the team settings that could not be read (Coral Hub refused them)');
         for (const [c, key] of [CASES[0], CASES[1], CASES[3], CASES[4], CASES[7], CASES[10], CASES[13]]) {
             await fresh(); await openTeam({ settings: c });
-            const note = await ev(`(() => { const n = document.querySelector('#agentic-panel-team-settings #team-settings-messaging .ct-unavailable'); return n ? { text: n.textContent, role: n.getAttribute('role'), tab: !!document.getElementById('team-settings-tab-health'), off: !document.querySelector('#agentic-panel-team-settings [name=cross_team_messaging]') } : null; })()`);
+            const note = await ev(`(() => { const n = document.querySelector('#team-working-mode-dialog #team-settings-messaging .ct-unavailable'); return n ? { text: n.textContent, role: n.getAttribute('role'), tab: !!document.getElementById('team-settings-tab-health'), off: !document.querySelector('#team-working-mode-dialog [name=cross_team_messaging]') } : null; })()`);
             check(`settings refused ${c.status} ${c.code || ''}: the Messaging tab says it in our words, there are no switches, no Health check tab (${note && note.text})`, note && note.text.startsWith('Messaging settings: ') && (key === 'unavailable' ? note.text.endsWith('Unavailable') : SENTENCE[key].test(note.text)) && !note.text.includes(LEAK) && note.role === 'status' && note.off && !note.tab);
         }
         await fresh(); await openTeam({});
-        check('nothing refused: no note, and the two switches are there', await ev(`!document.querySelector('#agentic-panel-team-settings #team-settings-messaging .ct-unavailable') && !!document.querySelector('#agentic-panel-team-settings [name=cross_team_messaging]') && !!document.querySelector('#agentic-panel-team-settings [name=cross_team_artifacts]')`));
+        check('nothing refused: no note, and the two switches are there', await ev(`!document.querySelector('#team-working-mode-dialog #team-settings-messaging .ct-unavailable') && !!document.querySelector('#team-working-mode-dialog [name=cross_team_messaging]') && !!document.querySelector('#team-working-mode-dialog [name=cross_team_artifacts]')`));
 
         console.log('3. the Prompt inspection');
         for (const [c, key] of [CASES[0], CASES[1], CASES[3], CASES[6], CASES[7], CASES[11], CASES[14]]) {
             await fresh(); await openTeam({ inspection: c });
-            const t = await ev(`document.querySelector('#agentic-panel-team-settings .prompt-inspection-content').textContent.trim()`);
+            const t = await ev(`document.querySelector('#team-working-mode-dialog .prompt-inspection-content').textContent.trim()`);
             check(`inspection refused ${c.status} ${c.code || ''}: "${t}"`, t.startsWith('Prompt inspection: ') && (key === 'unavailable' ? t.endsWith('Unavailable') : SENTENCE[key].test(t)) && !t.includes(LEAK));
         }
 

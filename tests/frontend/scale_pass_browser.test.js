@@ -20,23 +20,23 @@ const { connect } = require('./agent_view_harness');
         await ev(`(() => { const R = window.fetch; window.__servers = ${JSON.stringify(servers(3))};
             const json = (b, s = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } }));
             window.fetch = (u, o = {}) => { const p = new URL(String(u), location.origin).pathname;
-                if (p.startsWith('/api/board/') && p.endsWith('/artifacts')) return json({ project: ${JSON.stringify(BOARD)}, artifacts: ${JSON.stringify(items(3))}, has_more: true, truncated: true, total: 500, all: 500 });
+                if (p.startsWith('/api/board/') && p.endsWith('/artifacts')) return json({ session_id: new URL(String(u), location.origin).searchParams.get('session_id') || undefined, project: ${JSON.stringify(BOARD)}, artifacts: ${JSON.stringify(items(3))}, has_more: true, truncated: true, total: 500, all: 500 });
                 if (p === '/api/servers' && (o.method || 'GET') === 'GET') return json(window.__servers);
                 if (p === '/api/health') return json({ status: 'ok', hub: true, version: '1.4.92' });
                 if (p === '/api/system/artifact-store/kept') return json({ kept: [] });
                 return R(u, o); };
             return true; })()`);
 
-        console.log('1. Team Artifacts: the board by its name, and a list that is only the newest part says so');
+        console.log('1. The agent Artifacts tab: the agent by its name, and a list that is only the newest part says so');
         await ev(`(async () => { const base = (window.__coralStatic || '/static/'); const {state} = await import(base + 'state.js'); const sb = await import(base + 'server_base.js');
             sb.noteBoardLabels([{ board_id: ${JSON.stringify(BOARD)}, board_label: 'perf-board' }], 'board_id');
             state.currentSession = { type: 'live', name: 'ux-ui', session_id: 'ux-a', board_project: ${JSON.stringify(BOARD)} };
             const {showView} = await import(base + 'utils.js'); showView('live-session-view'); const files = await import(base + 'changed_files.js');
             const side = document.getElementById('agentic-state'); side.classList.remove('collapsed'); side.style.width = '680px'; files.initFileSearch(); files.syncFilesViewerSession(); return true; })()`);
-        await ev(`localStorage.removeItem('coral-agentic-tab-top'); document.getElementById('agentic-tab-team-artifacts').click(); true`);
+        await ev(`localStorage.removeItem('coral-agentic-tab-top'); document.getElementById('agentic-tab-artifacts').click(); true`);
         await waitFor(`document.querySelectorAll('tr.team-artifact-row').length === 3`, 'the three rows', 8000);
-        const v = '#agentic-panel-team-artifacts-view';
-        assert.equal(await ev(`document.querySelector('${v} .team-artifacts-title').textContent`), 'Team Artifacts · perf-board');
+        const v = '#agentic-panel-artifacts-view';
+        assert.equal(await ev(`document.querySelector('${v} .team-artifacts-title').textContent`), 'Artifacts · ux-ui');
         assert.equal(await ev(`document.querySelector('${v} .list-bar-count').textContent`), '500+ artifacts');
         assert.equal(await ev(`document.querySelector('${v} .team-artifacts-status').textContent`), 'Showing 3 of 500+');
 

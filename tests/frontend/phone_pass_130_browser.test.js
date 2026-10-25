@@ -71,9 +71,9 @@ const LONG_WAIT = "⏳ This agent hasn't done anything yet — check the termina
                 await view(w, theme); ctx.__phone = true;
                 await panel.show(ctx, { w, theme, phone: true });
                 await setTheme(ev, theme); await installAudit(ev); await settle(500);
-                await scene(`${key} with its filter panel open`, key === 'tasks' ? '#agentic-state' : '#agentic-panel-team-artifacts');
+                await scene(`${key} with its filter panel open`, key === 'tasks' ? '#agentic-state' : '#agentic-panel-artifacts');
                 if (key === 'artifacts') {
-                    const ic = await ev(`(() => { const rows = [...document.querySelectorAll('#agentic-panel-team-artifacts tr.team-artifact-row .team-artifact-name')]; return { n: rows.length, icons: rows.filter(r => { const i = r.querySelector('.explorer-file-icon'); return i && i.getAttribute('aria-hidden') === 'true' && Math.round(i.getBoundingClientRect().width) <= 20; }).length }; })()`);
+                    const ic = await ev(`(() => { const rows = [...document.querySelectorAll('#agentic-panel-artifacts tr.team-artifact-row .team-artifact-name')]; return { n: rows.length, icons: rows.filter(r => { const i = r.querySelector('.explorer-file-icon'); return i && i.getAttribute('aria-hidden') === 'true' && Math.round(i.getBoundingClientRect().width) <= 20; }).length }; })()`);
                     if (!ic.n || ic.icons !== ic.n) problems.push(`${tag} artifacts: every name starts with its small hidden file icon (${JSON.stringify(ic)})`);
                 }
             }
@@ -115,10 +115,10 @@ const LONG_WAIT = "⏳ This agent hasn't done anything yet — check the termina
                         return R0(u, o); }; return true; })()`);
                 await ev(`window.__m.add('p130-bot', 'A', 4, { sleeping: false, board_project: ${JSON.stringify(team)} }); true`); await settle(600);
                 await ev(`window.selectLiveSession('p130-bot', 'claude', 'p130-bot-id', 'local'); true`); await settle(900);
-                await ev(`(async () => { const m = await import(${S} + 'team_working_mode.js'); await m.showTeamWorkingMode(${JSON.stringify(team)}, { workspace: true }); window.switchAgenticTab('team-settings', 'top'); return true; })()`);
+                await ev(`(async () => { const m = await import(${S} + 'team_working_mode.js'); await m.showTeamWorkingMode(${JSON.stringify(team)}); return true; })()`);
                 await ev(`(() => { const side = document.getElementById('agentic-state'); if (side.getBoundingClientRect().width === 0) window.toggleAgenticPanel(true); return true; })()`); // a phone shows the side panel as a drawer
-                await waitFor(`document.getElementById('agentic-panel-team-settings').getClientRects().length > 0`, `${tag} the team settings are on screen`, 8000);
-                await waitFor(`!!document.querySelector('#agentic-panel-team-settings .working-mode-form') && document.querySelector('#agentic-panel-team-settings .working-mode-form').dataset.initialState !== undefined`, `${tag} the team settings`, 10000); await settle(500);
+                await waitFor(`document.getElementById('team-working-mode-dialog').getClientRects().length > 0`, `${tag} the team settings are on screen`, 8000);
+                await waitFor(`!!document.querySelector('#team-working-mode-dialog .working-mode-form') && document.querySelector('#team-working-mode-dialog .working-mode-form').dataset.initialState !== undefined`, `${tag} the team settings`, 10000); await settle(500);
                 if (label === 'Health check save') {
                     await ev(`document.getElementById('team-settings-tab-health').click(); true`);
                     await waitFor(`!!document.querySelector('#team-settings-health form')`, `${tag} the Health check form`, 8000);
@@ -126,9 +126,9 @@ const LONG_WAIT = "⏳ This agent hasn't done anything yet — check the termina
                     await ev(`document.querySelector('#team-settings-health form [type=submit]').click(); true`);
                     await waitFor(`document.querySelector('#team-settings-health .health-state').classList.contains('health-error')`, `${tag} the refusal`, 6000);
                 }
-                const said = await ev(`(() => { const e = document.querySelector(${JSON.stringify('#agentic-panel-team-settings ' + expect.replace('#team-settings-health', '#team-settings-health'))}) || document.querySelector(${JSON.stringify(expect)}); return e ? e.textContent.trim() : ''; })()`);
+                const said = await ev(`(() => { const e = document.querySelector(${JSON.stringify('#team-working-mode-dialog ' + expect.replace('#team-settings-health', '#team-settings-health'))}) || document.querySelector(${JSON.stringify(expect)}); return e ? e.textContent.trim() : ''; })()`);
                 if (!said || /undefined|\[object/.test(said)) problems.push(`${tag} ${label}: no refusal sentence shown (${JSON.stringify(said)})`);
-                await scene(`the owner refusal: ${label}`, '#agentic-panel-team-settings');
+                await scene(`the owner refusal: ${label}`, '#team-working-mode-dialog');
             }
         }
         if (process.env.PASS_REPORT) { fs.writeFileSync(process.env.PASS_REPORT, problems.join('\n') + '\n'); fs.writeFileSync(process.env.PASS_REPORT + '.info', info.join('\n') + '\n'); console.log(problems.length + ' problems'); }

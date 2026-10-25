@@ -1,12 +1,8 @@
-// Knowledge distillation survives leaving the view (#3325). The server runs a distillation in
-// the background; the dashboard used to follow it only from the Knowledge panel that started
-// it, so switching away lost it. Now:
-//   - start → leave the tab and the team → the team header says "Distilling…" → come back:
-//     the progress is shown, and no second run was started;
-//   - it completes while you are elsewhere: a toast says the knowledge is ready, the chip goes,
-//     and the tab shows the bundle with when it was updated;
-//   - a failure: with no knowledge yet, the error and Retry; with earlier knowledge, that
-//     knowledge with a note that the last run failed;
+// Knowledge distillation survives leaving the view (#3325), on the team page's Knowledge tab (#7457: the dock's panel and its progress and failure notes went). The server runs a
+// distillation in the background; the dashboard follows it from knowledge_distill.js, wherever the person is:
+//   - start → leave the team → the team header says "Distilling…" → come back: the button says Distilling… and is off, and no second run was started;
+//   - it completes while you are elsewhere: a toast says the knowledge is ready, the chip goes, and the tab lists the entries with their Updated column;
+//   - a partial run and a failure each have their toast; with no knowledge the page is the empty one and Distill starts a run again;
 //   - a run in progress is found after a reload, without opening the tab;
 //   - a run lost to a server restart (running → none) says so in a toast.
 // /api/teams/detail/alpha/distill-knowledge and /knowledge are scripted in the page.
@@ -76,22 +72,21 @@ const BUNDLE = { exists: true, index: '# Team alpha\\n\\nWhat the team knows.', 
         await ev(`(async () => {
             const { state } = await import(${S}+'state.js');
             const render = await import(${S}+'render.js');
-            const tc = await import(${S}+'team_context.js');
             const kd = await import(${S}+'knowledge_distill.js');
             kd.distillHooks.pollMs = 150;
-            window.__tc = tc; window.__render = render; window.__state = state; window.__kd = kd;
+            window.__render = render; window.__state = state; window.__kd = kd;
             // The app's own live list (re-renders, e.g. for the Distilling chip, redraw from it).
             window._coralSetLiveSessions([{ session_id: 'alpha-1', name: 'alpha-1', agent_type: 'claude', board_project: 'alpha', display_name: 'Alpha agent', working_directory: '/tmp/alpha' }]);
             return true;
         })()`);
     };
-    const panelText = () => ev(`(document.getElementById('team-knowledge-view') || {}).textContent || ''`);
+    const panelText = () => ev(`(document.getElementById('team-panel-knowledge') || {}).textContent || ''`);
     const chip = () => ev(`!!document.querySelector('.session-group-header .team-distill-chip')`);
     const toasts = () => ev(`[...document.querySelectorAll('.toast .toast-message')].map(t => t.textContent)`);
-    const openKnowledge = () => ev(`window.__tc.enterTeamContext('alpha', { tab: 'knowledge' }); true`);
+    const openKnowledge = () => ev(`window.openTeamPage('alpha', { tab: 'knowledge' }); true`);
     const leave = async () => {
-        await ev(`(() => { window.switchAgenticTab('tasks', 'top'); const c = document.querySelector('.team-center-close'); if (c) c.click(); return true; })()`);
-        await until(`!window.__state.selectedTeam`, 'the team view closed');
+        await ev(`window.exitTeamPage({ force: true }); true`);
+        await until(`!window.__state.selectedTeam`, 'the team page left');
     };
 
     try {
@@ -106,22 +101,20 @@ const BUNDLE = { exists: true, index: '# Team alpha\\n\\nWhat the team knows.', 
 
         // ── Start, leave, come back ──
         await openKnowledge();
-        await until(`/No distilled knowledge yet/.test((document.getElementById('team-knowledge-view') || {}).textContent || '')`, 'the empty knowledge view');
-        check('no knowledge yet: the empty view with Distill', /No distilled knowledge yet/.test(await panelText()));
-        await ev(`[...document.querySelectorAll('#team-knowledge-view button')].find(b => /Distill/.test(b.textContent)).click(); true`);
-        await until(`window.__posts === 1 && /Starting knowledge distillation/.test(document.getElementById('team-knowledge-view').textContent)`, 'the run started');
-        check('Distill starts one run and shows its progress', (await ev('window.__posts')) === 1 && /Starting knowledge distillation/.test(await panelText()));
+        await until(`/No knowledge yet/.test((document.getElementById('team-panel-knowledge') || {}).textContent || '')`, 'the empty knowledge view');
+        check('no knowledge yet: the empty view with Distill', /No knowledge yet/.test(await panelText()));
+        await ev(`document.querySelector('#team-panel-knowledge .team-distill').click(); true`);
+        await until(`window.__posts === 1 && /Distilling…/.test(document.getElementById('team-panel-knowledge').textContent)`, 'the run started');
+        check('Distill starts one run and the button says Distilling…, off', (await ev('window.__posts')) === 1 && /Distilling…/.test(await panelText()) && (await ev(`document.querySelector('#team-panel-knowledge .team-distill').disabled`)));
 
         await leave();
         await until(`!!document.querySelector('.session-group-header .team-distill-chip')`, 'the Distilling chip');
         check('away from the team: its header says Distilling…', await chip());
         await ev(`window.__distill.progress = { phase: 'extracting', agent: 'lead', total: 4, completed: 2 }; window.__bundleReads = 0; true`);
         await openKnowledge();
-        await until(`/Pass 1: Extracting knowledge/.test((document.getElementById('team-knowledge-view') || {}).textContent || '')`, 'the progress on return');
-        const back = await panelText();
-        check('back on the Knowledge tab: the run in progress is shown', /Pass 1: Extracting knowledge — lead/.test(back) && /2\/4 agents/.test(back), back.slice(0, 160));
+        await until(`/Distilling…/.test((document.getElementById('team-panel-knowledge') || {}).textContent || '')`, 'the run on return');
+        check('back on the Knowledge tab: the run in progress is shown (Distilling…, off)', /Distilling…/.test(await panelText()) && (await ev(`document.querySelector('#team-panel-knowledge .team-distill').disabled`)));
         check('coming back started no second run', (await ev('window.__posts')) === 1);
-        check('while it runs, the tab shows the run and does not load the old knowledge', (await ev('window.__bundleReads')) === 0, String(await ev('window.__bundleReads')));
 
         // ── It completes while you are elsewhere ──
         await leave();
@@ -131,43 +124,34 @@ const BUNDLE = { exists: true, index: '# Team alpha\\n\\nWhat the team knows.', 
         await until(`!document.querySelector('.session-group-header .team-distill-chip')`, 'the chip gone');
         check('the Distilling chip is gone', !(await chip()));
         await openKnowledge();
-        await until(`!!document.querySelector('#team-knowledge-view .knowledge-viewer')`, 'the bundle');
+        await until(`document.querySelectorAll('#team-panel-knowledge tbody tr').length > 0`, 'the entries');
         const done = await panelText();
-        check('the tab shows the knowledge, with when it was updated', /What the team knows/.test(done) && /Updated /.test(done), done.slice(0, 160));
+        check('the tab lists the knowledge: the team\'s index, with its Updated column', /Index/.test(done) && /Updated/.test(done), done.slice(0, 160));
 
         // ── A partial run (QA's #3325 note 2): complete, but some agents couldn't be distilled ──
         await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); true`);
-        await ev(`[...document.querySelectorAll('#team-knowledge-view button')].find(b => b.classList.contains('knowledge-redistill-btn')).click(); true`);
+        await ev(`document.querySelector('#team-panel-knowledge .team-distill').click(); true`);
         await until(`window.__posts === 2`, 'the partial re-distill');
         await ev(`window.__distill = { team_name: 'alpha', status: 'complete', finished_at: '2026-10-14T06:07:00Z', failed_agents: [{ agent: 'lead', error: 'claude CLI failed: exit status 1' }, { agent: 'qa', error: '' }], collaboration_error: 'claude CLI timed out after 2m0s' }; true`);
-        await until(`!!document.querySelector('#team-knowledge-view .knowledge-run-note.is-partial')`, 'the partial note');
-        const partial = await ev(`document.querySelector('#team-knowledge-view .knowledge-run-note').textContent`);
-        check('partial: the note names the agents that could not be distilled, and why',
-            /2 agents couldn't be distilled: lead \(claude CLI failed: exit status 1\); qa\. They keep their earlier knowledge, if any/.test(partial), partial);
-        check('partial: and the failed collaboration pass', /The collaboration pass failed \(claude CLI timed out after 2m0s\)/.test(partial), partial);
-        check('partial: the knowledge is still shown', /What the team knows/.test(await panelText()));
         await until(`[...document.querySelectorAll('.toast .toast-message')].some(t => /couldn't be distilled/.test(t.textContent))`, 'the partial toast');
         check('partial: the toast says it is ready, but 2 agents could not be distilled',
             (await toasts()).some(t => /Knowledge for alpha is ready, but 2 agents couldn't be distilled/.test(t)), JSON.stringify(await toasts()));
 
         // ── A failure with earlier knowledge: that knowledge, with a note ──
-        await ev(`[...document.querySelectorAll('#team-knowledge-view button')].find(b => b.classList.contains('knowledge-redistill-btn')).click(); true`);
+        await ev(`document.querySelector('#team-panel-knowledge .team-distill').click(); true`);
         await until(`window.__posts === 3`, 'the re-distill');
         await ev(`window.__distill = { team_name: 'alpha', status: 'failed', error: 'claude exited 1', finished_at: '2026-10-14T06:10:00Z' }; true`);
-        await until(`/The last distillation failed: claude exited 1/.test((document.getElementById('team-knowledge-view') || {}).textContent || '')`, 'the failure note');
-        const failedOld = await panelText();
-        check('failed with earlier knowledge: that knowledge, and a note that the last run failed', /What the team knows/.test(failedOld) && /The last distillation failed: claude exited 1/.test(failedOld), failedOld.slice(0, 200));
+        await until(`[...document.querySelectorAll('.toast .toast-message')].some(t => /Knowledge distillation for alpha failed: claude exited 1/.test(t.textContent))`, 'the failure toast');
         check('a failure toast too', (await toasts()).some(t => /Knowledge distillation for alpha failed: claude exited 1/.test(t)), JSON.stringify(await toasts()));
 
-        // ── A failure with no knowledge yet: the error and Retry ──
+        // ── A failure with no knowledge yet: the empty page and Distill again ──
         await ev(`window.__bundle = { exists: false }; true`);
         await leave();
         await openKnowledge();
-        await until(`/Distillation failed: claude exited 1/.test((document.getElementById('team-knowledge-view') || {}).textContent || '')`, 'the failure view');
-        check('failed with no knowledge: the error and Retry', /Distillation failed: claude exited 1/.test(await panelText()) && (await ev(`[...document.querySelectorAll('#team-knowledge-view button')].some(b => b.textContent.trim() === 'Retry')`)));
-        await ev(`[...document.querySelectorAll('#team-knowledge-view button')].find(b => b.textContent.trim() === 'Retry').click(); true`);
-        await until(`window.__posts === 4`, 'Retry starts a run');
-        check('Retry starts a run', (await ev('window.__posts')) === 4);
+        await until(`/No knowledge yet/.test((document.getElementById('team-panel-knowledge') || {}).textContent || '')`, 'the empty page');
+        await ev(`document.querySelector('#team-panel-knowledge .team-distill').click(); true`);
+        await until(`window.__posts === 4`, 'Distill starts a run again');
+        check('Distill starts a run again', (await ev('window.__posts')) === 4);
 
         // ── A run in progress is found after a reload, without opening the tab ──
         await ev(`window.__distill.progress = { phase: 'formatting', total: 4, completed: 4 }; window.__save(); true`);

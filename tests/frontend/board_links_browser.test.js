@@ -47,7 +47,7 @@ const HEX = 'c'.repeat(64);
         await l2;
         await coralReady();
         const POST = '#messageboard-view .mb-message-body';
-        await until(`document.querySelectorAll('${POST} a').length >= 3 && !!document.querySelector('#mb-subscribers-list .subscriber-history-link, .subscriber-history-link')`, 'the post and the subscriber');
+        await until(`document.querySelectorAll('${POST} a').length >= 3 && !!document.querySelector('#mb-subscribers-sheet-list .subscriber-history-link, .subscriber-history-link')`, 'the post and the subscriber');
 
         const themes = async theme => {
             await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'settings_core.js'); m.clearCustomThemeVars(); m.applyTheme('${theme}'); return true; })()`);
@@ -56,7 +56,7 @@ const HEX = 'c'.repeat(64);
                 const accent = getComputedStyle(document.documentElement).getPropertyValue('--link-text').trim(); // the light theme's link text is darker than its accent (#5273)
                 const h = accent.replace('#', ''); const want = 'rgb(' + [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16)).join(', ') + ')';
                 const links = [...document.querySelectorAll('${POST} a')].map(a => ({ text: a.textContent, color: getComputedStyle(a).color }));
-                const sub = document.querySelector('#mb-subscribers-list .subscriber-history-link');
+                const sub = document.querySelector('#mb-subscribers-sheet-list .subscriber-history-link');
                 return { want, links, sub: sub && { tag: sub.tagName, href: sub.getAttribute('href'), color: getComputedStyle(sub).color } };
             })()`);
         };
@@ -69,7 +69,7 @@ const HEX = 'c'.repeat(64);
                 await Emulation.setDeviceMetricsOverride({ width: 1280, height: 720, deviceScaleFactor: 2, mobile: false });
                 await ev(`new Promise(r => setTimeout(() => r(true), 250))`); // sleep-ok: layout after the resize
                 const clip = await ev(`(() => { const a = document.querySelector('${POST}').closest('.mb-message') || document.querySelector('${POST}');
-                    const s = document.querySelector('#mb-subscribers-list .subscriber-history-link').closest('li') || document.querySelector('#mb-subscribers-list .subscriber-history-link');
+                    const s = document.querySelector('#mb-subscribers-sheet-list .subscriber-history-link').closest('li') || document.querySelector('#mb-subscribers-sheet-list .subscriber-history-link');
                     const r1 = a.getBoundingClientRect(), r2 = s.getBoundingClientRect();
                     const x = Math.max(0, Math.min(r1.left, r2.left) - 8), y = Math.max(0, Math.min(r1.top, r2.top) - 8);
                     return { x, y, width: Math.min(innerWidth - x, Math.max(r1.right, r2.right) - x + 8), height: Math.max(r1.bottom, r2.bottom) - y + 8, scale: 1 }; })()`);
@@ -79,18 +79,18 @@ const HEX = 'c'.repeat(64);
             }
         }
 
-        const sub = await ev(`(() => { const b = document.querySelector('#mb-subscribers-list .subscriber-history-link'); return { tag: b.tagName, type: b.getAttribute('type'), href: b.getAttribute('href') }; })()`);
+        const sub = await ev(`(() => { const b = document.querySelector('#mb-subscribers-sheet-list .subscriber-history-link'); return { tag: b.tagName, type: b.getAttribute('type'), href: b.getAttribute('href') }; })()`);
         check("the subscriber's name is a button, with no javascript: href", sub.tag === 'BUTTON' && sub.type === 'button' && sub.href === null, JSON.stringify(sub));
 
         const hover = await ev(`(() => { const a = document.querySelector('${POST} a'); const st = document.createElement('style');
             return getComputedStyle(a).textDecorationLine; })()`);
         check('post links are not underlined until hovered', hover === 'none', hover);
 
-        // The Subscribers list is in the right sidebar, which a board opens only in a wide window (#4539): open it.
-        await ev(`window.toggleAgenticPanel(true); true`);
-        await until(`document.getElementById('agentic-state').getBoundingClientRect().width > 300`, 'the sidebar open');
+        // The Subscribers list is the Members sheet (the board's page has no side panel, #7457): open it.
+        await ev(`document.getElementById('mb-subscribers-btn').click(); true`);
+        await until(`getComputedStyle(document.getElementById('mb-subscribers-sheet')).display !== 'none' && document.querySelector('#mb-subscribers-sheet-list .subscriber-history-link').getClientRects().length > 0`, 'the Members sheet open');
         const focus = await ev(`(() => { const out = {};
-            for (const [k, sel] of [['link', '${POST} a'], ['subscriber', '#mb-subscribers-list .subscriber-history-link']]) {
+            for (const [k, sel] of [['link', '${POST} a'], ['subscriber', '#mb-subscribers-sheet-list .subscriber-history-link']]) {
                 const el = document.querySelector(sel); el.focus({ focusVisible: true });
                 const cs = getComputedStyle(el); out[k] = { focused: document.activeElement === el, outline: cs.outlineStyle, width: cs.outlineWidth };
             } return out; })()`);

@@ -102,32 +102,23 @@ export async function refreshTeamAvailabilityIfChanged(team) {
 // What "No signal yet" waits for (#6382); a remote agent's own reason (it is not observed here) is kept.
 const NO_SIGNAL_REASON = "Waiting for this agent's first message to Coral.";
 
-export function showTeamAvailability(team, options = {}) {
-    const workspaceMode = Boolean(options.workspace);
+export function showTeamAvailability(team) {
     document.getElementById('team-availability-dialog')?.close();
     document.getElementById('team-availability-dialog')?.remove();
-    document.getElementById('team-availability-workspace')?.remove();
-    const dialog = document.createElement(workspaceMode ? 'section' : 'dialog');
-    dialog.id = workspaceMode ? 'team-availability-workspace' : 'team-availability-dialog';
-    dialog.className = workspaceMode ? 'team-settings-workspace team-view-workspace' : 'team-availability-dialog';
+    const dialog = document.createElement('dialog');
+    dialog.id = 'team-availability-dialog';
+    dialog.className = 'team-availability-dialog';
     dialog.setAttribute('aria-labelledby', 'availability-title');
-    const actions = workspaceMode
-        ? ''  // sidebar panel: the team context owns navigation
-        : '<button type="button" data-dialog-close aria-label="Close team view">×</button>';
+    const actions = '<button type="button" data-dialog-close aria-label="Close team view">×</button>';
     dialog.innerHTML = `<header><div><h2 id="availability-title">Team view</h2><p>${escapeHtml(keyLabel(team))}</p></div>${actions}</header>
         <div class="availability-toolbar"><button type="button" class="btn btn-small">Refresh</button></div>
         <p class="sr-only availability-status" role="status"></p>
         <div class="availability-content"></div>`; // the live region is the one line above, not the whole view: a Refresh says what changed, it does not read every card again
-    if (workspaceMode) {
-        // Rendered into the sidebar's Team View tab (see team_context.js).
-        const host = document.getElementById('agentic-panel-team-view');
-        if (!host) return;
-        host.replaceChildren(dialog);
-    } else document.body.append(dialog);
+    document.body.append(dialog);
     const refresh = dialog.querySelector('.availability-toolbar button');
     const content = dialog.querySelector('.availability-content');
     const status = dialog.querySelector('.availability-status');
-    if (!workspaceMode) bindNativeDialog(dialog);
+    bindNativeDialog(dialog);
     async function load(manual = false) {
         const hadFocus = document.activeElement === refresh;   // a disabled button loses the keyboard focus: give it back afterwards
         refresh.disabled = true;
@@ -175,7 +166,7 @@ export function showTeamAvailability(team, options = {}) {
         }
     }
     refresh.onclick = () => load(true);
-    if (!workspaceMode) dialog.showModal();
+    dialog.showModal();
     load();
 }
 

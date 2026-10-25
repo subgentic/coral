@@ -190,7 +190,7 @@ PANELS.push({
     },
 });
 
-// ── Team Artifacts (a stand-in for the route, 14 artifacts; the menu open, an Origin chip) ──
+// ── The agent's Artifacts (a stand-in for the route, 14 artifacts; the menu open, an Origin chip) ──
 const HEX = n => n.toString(16).padStart(2, '0').repeat(32);
 const TA_DATA = (() => { const kinds = [['image/png', 'png'], ['application/pdf', 'pdf'], ['text/plain', 'txt'], ['application/zip', 'zip']]; const names = ['alpha', 'bravo', 'charlie', 'delta', 'echo', 'foxtrot', 'golf', 'hotel', 'india', 'juliet', 'kilo', 'lima', 'zebra-plan', 'mike'];
     return names.map((n, i) => { const [mt, ext] = kinds[i % 4]; const source = i % 5 === 3 ? 'received' : i % 5 === 4 ? 'shared' : 'task';
@@ -202,7 +202,7 @@ PANELS.push({
         await ctx.ev(`(() => { const R = window.fetch; window.__data = ${JSON.stringify(TA_DATA)}; const json = (b, s = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } }));
             window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin); const m = url.pathname.match(/^\\/api\\/board\\/([^/]+)\\/artifacts$/);
                 if (m && (o.method || 'GET').toUpperCase() === 'GET') { const q = url.searchParams; let items = window.__data.slice(); if (q.get('origin')) items = items.filter(i => i.source === q.get('origin')); if (q.get('q')) { const t = q.get('q').toLowerCase(); items = items.filter(i => i.name.includes(t)); }
-                    const page = items.slice(0, 5); const body = { project: decodeURIComponent(m[1]), artifacts: page, has_more: items.length > 5, truncated: false }; if (['q', 'kind', 'origin', 'by', 'kept', 'since', 'until', 'sort', 'cursor'].some(k => q.has(k))) { body.total = items.length; body.all = window.__data.length; } return json(body); }
+                    const page = items.slice(0, 5); const body = { session_id: q.get('session_id') || undefined, project: decodeURIComponent(m[1]), artifacts: page, has_more: items.length > 5, truncated: false }; if (['q', 'kind', 'origin', 'by', 'kept', 'since', 'until', 'sort', 'cursor'].some(k => q.has(k))) { body.total = items.length; body.all = window.__data.length; } return json(body); }
                 if (url.pathname === '/api/system/artifact-store/kept') return json({ kept: [] });
                 if (url.pathname.startsWith('/api/') && !url.pathname.startsWith('/api/saved') && /artifacts/.test(url.pathname)) return json({});
                 return R(u, o); }; return true; })()`);
@@ -210,13 +210,13 @@ PANELS.push({
             state.currentSession = { type: 'live', name: 'ta-ui', session_id: 'ta-a', board_project: 'themes-ta' }; const {showView} = await import((window.__coralStatic||'/static/')+'utils.js'); showView('live-session-view');
             const side = document.getElementById('agentic-state'); side.classList.remove('collapsed'); side.style.width = '680px'; files.initFileSearch(); files.syncFilesViewerSession(); return true; })()`);
         if (ctx.__phone) await ctx.ev(`window.toggleAgenticPanel(true); true`);
-        await ctx.ev(`document.getElementById('agentic-tab-team-artifacts').click(); true`);
-        await ctx.settle(`!!document.querySelector('#agentic-panel-team-artifacts .list-bar-search') && document.querySelectorAll('tr.team-artifact-row').length > 0`, 'the list and its search bar');
-        await openMenu(ctx, '#agentic-panel-team-artifacts');
-        await pick(ctx, '#ta-origin', 'received');
-        await ctx.settle(`!!document.querySelector('#agentic-panel-team-artifacts .list-bar-chip')`, 'a chip');
+        await ctx.ev(`document.getElementById('agentic-tab-artifacts').click(); true`);
+        await ctx.settle(`!!document.querySelector('#agentic-panel-artifacts .list-bar-search') && document.querySelectorAll('tr.team-artifact-row').length > 0`, 'the list and its search bar');
+        await openMenu(ctx, '#agentic-panel-artifacts');
+        await pick(ctx, '#aa-origin', 'received');
+        await ctx.settle(`!!document.querySelector('#agentic-panel-artifacts .list-bar-chip')`, 'a chip');
         await ctx.ev(`new Promise(r => setTimeout(r, 300))`);
-        return { roots: ['#agentic-panel-team-artifacts'], focus: ['#agentic-panel-team-artifacts .list-bar-search', '#agentic-panel-team-artifacts .list-bar-toggle'] };
+        return { roots: ['#agentic-panel-artifacts'], focus: ['#agentic-panel-artifacts .list-bar-search', '#agentic-panel-artifacts .list-bar-toggle'] };
     },
 });
 

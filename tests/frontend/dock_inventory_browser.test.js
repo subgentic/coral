@@ -1,5 +1,5 @@
 // The inventory of the right dock, from the running page (#7456: every feature of the dock moves to the team page, the agent page or the detail pane; the operator: nothing may be lost). For each page kind that
-// shows the dock (an agent's page, a board, a team's context) and for each tab it offers, it opens the tab on an isolated server with a seeded board (messages, tasks, subscribers) and a mock agent, and
+// shows the dock (an agent's page; the board's page and the team's page have none since #7457) and for each tab it offers, it opens the tab on an isolated server with a seeded board (messages, tasks, subscribers) and a mock agent, and
 // writes every control it shows (a button, link, field, select, summary, tab, menu item, switch) as one row: tab, page, role, name, id, the data-on-* actions. With DOCK_INVENTORY_OUT=<file> it writes the JSON that
 // tests/frontend/fixtures/dock_parity.json was made from; without it, it only checks that every tab opens and shows something, so it is cheap to leave in the run. Drives Chrome over CDP.
 const assert = require('node:assert/strict');
@@ -49,10 +49,11 @@ const BASE = require('./test_base').BASE;
         console.log('The dock, page by page');
         await select('inv-a'); await waitFor(`document.getElementById('agentic-state').dataset.page === 'agent'`, 'the agent page');
         await crawl('agent');
-        await ev(`window.selectBoardProject(${JSON.stringify(BOARD)}); true`); await waitFor(`document.getElementById('agentic-state').dataset.page === 'board' && document.querySelectorAll('#mb-messages .mb-message').length >= 1`, 'the board', 8000);
-        await crawl('board');
-        await ev(`import((window.__coralStatic || '/static/') + 'team_context.js').then(m => m.enterTeamContext(${JSON.stringify(BOARD)})); true`); await sleep(1500); // sleep-ok: the team context fills its panels from the board and the live list
-        const pageKind = await ev(`document.getElementById('agentic-state').dataset.page`); await crawl('team:' + pageKind);
+        // the board's page and the team's page have no dock any more (#7457): what is left of the dock is the agent page's
+        await ev(`window.selectBoardProject(${JSON.stringify(BOARD)}); true`); await waitFor(`document.getElementById('agentic-state').dataset.page === 'none' && document.querySelectorAll('#mb-messages .mb-message').length >= 1`, 'the board', 8000);
+        assert.equal(await ev(`getComputedStyle(document.getElementById('agentic-state')).display`), 'none', 'the board page has no dock');
+        await ev(`window.openTeamPage(${JSON.stringify(BOARD)}); true`); await waitFor(`document.getElementById('agentic-state').dataset.page === 'none' && !!document.getElementById('team-page-view') && getComputedStyle(document.getElementById('team-page-view')).display !== 'none'`, 'the team page', 8000);
+        assert.equal(await ev(`getComputedStyle(document.getElementById('agentic-state')).display`), 'none', 'the team page has no dock');
         for (const [p, v] of Object.entries(out.pages)) assert.ok(v.tabs.length > 0, `${p}: the dock offers tabs`);
         if (process.env.DOCK_INVENTORY_OUT) { fs.writeFileSync(process.env.DOCK_INVENTORY_OUT, JSON.stringify(out, null, 1)); console.log('wrote ' + process.env.DOCK_INVENTORY_OUT); }
         console.log('PASS the dock inventory: every tab of every page opens');

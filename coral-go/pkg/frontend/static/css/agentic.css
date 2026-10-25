@@ -301,30 +301,6 @@ body.panel-dragging .agentic-state {
 .team-settings-workspace > header h2 { margin: 0 0 4px; font-size: var(--type-page-size); }
 .team-settings-workspace > header p { margin: 0; color: var(--text-secondary); font-size: 0.75rem; }
 .team-settings-workspace .working-mode-form { flex: 1; }
-.team-view-workspace .availability-content { flex: 1; min-height: 0; overflow: auto; padding-right: 4px; }
-.team-view-workspace .availability-toolbar { flex-shrink: 0; }
-.team-view-workspace .availability-agents { container-type: inline-size; }
-
-/* Team view lives in a resizable pane, so row layout must respond to the
-   pane's width rather than the browser viewport. Keep names readable and
-   stack the reason/tasks when the pane cannot support three columns. */
-.team-view-workspace .availability-agent { grid-template-columns: minmax(240px, 1fr) minmax(220px, 2fr) auto; }
-.team-view-workspace .availability-agent-heading,
-.team-view-workspace .availability-agent-heading > div { min-width: 0; }
-.team-view-workspace .availability-agent-heading strong { display: block; overflow-wrap: break-word; word-break: normal; }
-.team-view-workspace .availability-agent-heading small { overflow-wrap: break-word; word-break: normal; }
-@container (max-width: 720px) {
-    .team-view-workspace .availability-agent { grid-template-columns: minmax(0, 1fr) auto; }
-    .team-view-workspace .availability-agent > p,
-    .team-view-workspace .availability-agent > ul,
-    .team-view-workspace .availability-agent > .btn { grid-column: 1 / -1; }
-}
-@container (max-width: 420px) {
-    .team-view-workspace .availability-agent { grid-template-columns: 1fr; }
-    .team-view-workspace .availability-agent-heading { align-items: flex-start; flex-direction: column; }
-    .team-view-workspace .availability-agent-heading .availability-badge { align-self: flex-start; }
-}
-
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
     .team-settings-workspace { padding: 14px; }
     .team-settings-workspace > header h2 { font-size: var(--type-page-size); }
@@ -2477,49 +2453,6 @@ button.team-artifact-name { cursor: pointer; }
     justify-content: space-between;
 }
 
-/* ── Team context ──────────────────────────────────────────── */
-
-/* Sidebar tabs are scoped: agent tabs belong to a selected agent, team tabs to a selected team. */
-.agentic-tab[data-scope="team"] { display: none; }
-.agentic-state.team-context .agentic-tab[data-scope="team"] { display: flex; }
-.agentic-state.team-context .agentic-tab[data-scope="agent"] { display: none !important; }
-.agentic-state.team-context #agentic-tab-board { display: none !important; }
-
-/* The team's group chat covers the center column; the agent's chat stays mounted underneath. */
-.team-center-view {
-    position: absolute;
-    inset: 0;
-    z-index: 30;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    background: var(--bg-primary);
-}
-.team-center-view[hidden] { display: none; }
-/* The board chat panel is moved in here while a team is selected. */
-.team-center-view > #agentic-panel-board { display: flex; flex: 1; min-height: 0; height: auto; }
-.team-center-close {
-    position: absolute;
-    top: 5px;
-    right: 8px;
-    z-index: 2;
-    background: none;
-    border: none;
-    color: var(--text-muted);
-    font-size: 1.125rem;
-    line-height: 1;
-    cursor: pointer;
-    border-radius: var(--radius-sm);
-    padding: 2px 7px;
-}
-.team-center-close:hover { color: var(--text-primary); background: var(--bg-hover); }
-.team-center-view .board-chat-header { padding-right: 40px; }
-
-#agentic-panel-team-view > .team-settings-workspace { overflow: hidden; padding: 14px; }
-
-/* Team settings as a sidebar panel rather than a full-pane workspace */
-#agentic-panel-team-settings > .team-settings-workspace { overflow: auto; padding: 14px; }
-
 /* The open team is the one whose row is in the accent colour (#6328): the row itself opens the team view (click, Enter), the chevron expands it; the (i) button that did the same is gone. */
 .board-card-header.team-selected { background: rgba(var(--accent-rgb), 0.14); border-radius: var(--radius-md); } /* the selected tile an agent row has, so the open team is not told by colour alone */
 .board-card-header.team-selected:hover { background: rgba(var(--accent-rgb), 0.17); }
@@ -2569,18 +2502,17 @@ button.team-artifact-name { cursor: pointer; }
 .diff-mode-select { max-width: 100%; }
 
 /* ── The right sidebar on every page (#4539) ─────────────────
-   Each kind of page shows the tabs that list it in data-pages; the agent page keeps today's set (its data-scope rules above). */
-#agentic-state[data-page="agent"] #agentic-tab-subscribers,
-#agentic-state[data-page="board"] .agentic-tab[data-tab]:not([data-pages~="board"]),
+   Each kind of page shows the tabs that list it in data-pages; the agent page keeps today's set (its data-scope rules above). The board's page and the team's page have none (#7457). */
 #agentic-state[data-page="chats"] .agentic-tab[data-tab]:not([data-pages~="chats"]),
 #agentic-state[data-page="other"] .agentic-tab[data-tab]:not([data-pages~="other"]) {
     display: none !important;
 }
-#agentic-state[data-page="board"] .agentic-tab[data-pages~="board"],
 #agentic-state[data-page="chats"] .agentic-tab[data-pages~="chats"],
 #agentic-state[data-page="other"] .agentic-tab[data-pages~="other"] {
     display: flex !important;
 }
+/* The board's page and the team's page have no right sidebar (#7457): their pages hold what its tabs held, and the top bar's button for it is not drawn. */
+#agentic-state[data-page="none"], body[data-dock-page="none"] #agentic-state, body[data-dock-page="none"] #panel-toggle-btn, body[data-dock-page="none"] #popout-panel-toggle-btn { display: none !important; }
 /* Customizing the tabs is the agent page's. */
 #agentic-state:not([data-page="agent"]) #agentic-tab-customize { display: none !important; }
 /* The sidebar is the whole height of the row; its tab strip and panels scroll inside it. */

@@ -103,8 +103,7 @@ const STUB = `(() => {
             await settled('artifacts');
 
             // ═══ Refresh is a reload icon, in both panels; Details is an (i) in the Actions column
-            for (const tab of ['artifacts', 'team-artifacts']) {
-                if (tab === 'team-artifacts') { await ev(`window.switchAgenticTab('team-artifacts', 'top'); true`); await settled('team-artifacts'); }
+            for (const tab of ['artifacts']) { // the team's artifacts are the team page's (#7457)
                 const sec = `${tab}: `;
                 // #5315 (operator): the list's header is ONE row: the title, then the search box taking what is left, the filter icons, and Refresh and Copy at the right; no separate heading above the bar
                 const row = await ev(`(() => { const p = document.querySelector('${panel(tab)}'); const g = s => { const e = p.querySelector(s); if (!e || !e.getClientRects().length) return null; const r = e.getBoundingClientRect(); return { l: Math.round(r.left), r: Math.round(r.right), t: Math.round(r.top), cy: Math.round(r.top + r.height / 2), w: Math.round(r.width) }; };

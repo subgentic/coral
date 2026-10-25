@@ -1,6 +1,5 @@
 /* The task list: polling, loading, filtering, sorting and drawing it (moved out of tasks.js, #5082; no behaviour change). */
 import { state } from './state.js';
-import { boardOfPage } from './dock_page.js';
 import { pollEvery, afterPause, isBusyStatus, busyRetryingText, machineOf } from './overload.js';
 import { platform } from './platform/detect.js';
 import { loadSubagents, _claimedFor, _subagentTooltip, subagentToTaskRow } from './subagents.js';
@@ -42,7 +41,7 @@ export let _liveCosts = {};
 export function startBoardTaskPoll() {
     stopBoardTaskPoll();
     // Load agent tasks + board tasks immediately, then poll board tasks every 10s
-    if (!state.selectedTeam && !boardOfPage() && state.currentSession && state.currentSession.type === 'live') {
+    if (!state.selectedTeam && state.currentSession && state.currentSession.type === 'live') {
         loadAgentTasks(state.currentSession.name, state.currentSession.session_id);
     }
     // Subagents are loaded by the poll below, every tick: their status and
@@ -70,13 +69,6 @@ export function stopBoardTaskPoll() {
 }
 
 async function _pollBoardTasksOnce() {
-    // The board page's sidebar shows that board's tasks (#4539).
-    const pageBoard = boardOfPage();
-    if (pageBoard) {
-        await loadBoardTasks(pageBoard);
-        await _fetchLiveCosts(pageBoard);
-        return;
-    }
     // A selected team shows that team's board tasks, even with no agent selected.
     if (state.selectedTeam) {
         await loadBoardTasks(state.selectedTeam);
@@ -216,7 +208,7 @@ async function _loadBoardTasksDefault(boardName) {
             try { machine = machineOf(new URL(refused.url).pathname); } catch { /* same server */ }
             afterPause(() => {
                 // Only for the board still shown, and only if no newer load has started.
-                if (seq === _boardTasksLoadSeq && (boardOfPage() || state.selectedTeam || _currentBoardKey()) === boardName) loadBoardTasks(boardName);
+                if (seq === _boardTasksLoadSeq && (state.selectedTeam || _currentBoardKey()) === boardName) loadBoardTasks(boardName);
             }, machine);
         }
         renderBoardTaskList();
@@ -453,11 +445,11 @@ function _filterAndSortTasks(allTasks, querying = false) {
 }
 
 /** Nothing to show: hide the section, or say so for a live agent or a team (and a busy board). */
-function _renderEmptyTaskList(container, section, onBoardPage) {
+function _renderEmptyTaskList(container, section) {
     // Drop the previous agent's rows too; hiding alone leaves them in the DOM.
     const countEl = document.getElementById('task-bar-count');
     if (countEl && countEl.textContent !== '') countEl.textContent = '';
-    const live = state.selectedTeam || onBoardPage || (state.currentSession && state.currentSession.type === 'live');
+    const live = state.selectedTeam || (state.currentSession && state.currentSession.type === 'live');
     if (!live) {
         if (section) section.style.display = 'none';
         container.innerHTML = '';
@@ -471,9 +463,7 @@ function _renderEmptyTaskList(container, section, onBoardPage) {
     if (toggle && toggle.firstChild) toggle.innerHTML = '';
     morphHtml(container, _boardList.busy
         ? `<div class="board-task-empty board-task-busy" role="status">${escapeHtml(_boardList.busy)}</div>`
-        : state.selectedTeam || onBoardPage
-            ? '<div class="board-task-empty">No tasks yet</div>'
-            : '<div class="board-task-empty">No tasks yet</div>');
+        : '<div class="board-task-empty">No tasks yet</div>');
     return;
 }
 
@@ -659,8 +649,7 @@ export function renderBoardTaskList() {
     const querying = _queryActive();
     const boardTasks = (querying ? _filteredList.rows : state.currentBoardTasks || []).map(t => ({ ...t, _source: 'board' }));
     const agentDisplayName = state.currentSession ? (state.currentSession.display_name || state.currentSession.name) : '';
-    const onBoardPage = !!boardOfPage(); // a board's page has no agent: its tasks are the board's
-    const agentTasks = (onBoardPage ? [] : state.currentAgentTasks || []).map(t => ({
+    const agentTasks = (state.currentAgentTasks || []).map(t => ({
         ...t,
         _source: 'agent',
         // Normalize agent task fields to match board task shape
@@ -670,7 +659,7 @@ export function renderBoardTaskList() {
         created_at: t.created_at,
     }));
 
-    const subagentTasks = (onBoardPage ? [] : state.currentSubagents || []).map(sa => subagentToTaskRow(sa, agentDisplayName));
+    const subagentTasks = (state.currentSubagents || []).map(sa => subagentToTaskRow(sa, agentDisplayName));
 
     const allTasks = querying ? boardTasks : [...boardTasks, ...agentTasks, ...subagentTasks]; // a search is about the board's tasks
     const isDone = t => t.status === 'completed' || t.status === 'skipped';
@@ -696,7 +685,7 @@ export function renderBoardTaskList() {
     }
     if (allTasks.length === 0) {
         _syncTaskBar(false);
-        _renderEmptyTaskList(container, section, onBoardPage);
+        _renderEmptyTaskList(container, section);
         return;
     }
     if (section) section.style.display = '';

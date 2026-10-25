@@ -22,21 +22,18 @@ const { pathToFileURL } = require('node:url');
     const nameless = m.scopeOf({ dock: 'agent', session: { ...live, job_title: '' } });
     assert.deepEqual(m.scopeParams(nameless), [['agent', 'sess-1']], 'without the name it writes under, the board is not asked for (the server needs both)');
     assert.equal(m.scopeOf({ dock: 'agent', session: { type: 'live', session_id: 'abc', server: 's1' } }).label, 'abc', 'the label falls back to the id');
-    // a team: the one opened in the agent page, or the board page's
-    const t = m.scopeOf({ dock: 'agent', team: { server: 'local', name: 'coral-go-team' }, session: live });
-    assert.deepEqual([t.kind, t.team, t.label], ['team', 'coral-go-team', 'coral-go-team'], 'a team opened beats the agent underneath');
+    // a team's scope (no page makes one since the team page has no side panel, #7457; the parameters and the heading are still the server's contract)
+    const t = { kind: 'team', server: 'local', team: 'coral-go-team', label: 'coral-go-team', key: 'team:local:coral-go-team' };
     assert.deepEqual(m.scopeParams(t), [['team', 'coral-go-team']]);
     assert.equal(m.scopeHeading(t), 'Saved: coral-go-team');
-    const b = m.scopeOf({ dock: 'board', boardPage: { server: 's1', name: 'hub-team' }, session: live });
-    assert.deepEqual([b.kind, b.server, b.team], ['team', 's1', 'hub-team'], 'the board page is its team');
-    assert.equal(m.scopeOf({ dock: 'board', boardPage: null }), m.ALL);
+    assert.equal(m.scopeOf({ dock: 'none', session: live }), m.ALL, 'the board page and the team page have no side panel: nothing of their own');
     // an ended agent's chat in Chats
     const h = m.scopeOf({ dock: 'chats', session: { type: 'history', name: 'sess-old', display_name: 'Old QA', server: 'local' } });
     assert.deepEqual([h.kind, h.agent, h.label], ['agent', 'sess-old', 'Old QA']);
     assert.deepEqual(m.scopeParams(h), [['agent', 'sess-old']]);
     // identity: a scope has a key that differs between agents, teams and servers
-    const keys = new Set([a.key, t.key, b.key, h.key, lone.key, m.ALL.key].map(String));
-    assert.equal(keys.size, 5, 'the agent with a board and the one without are one agent: the same key');
+    const keys = new Set([a.key, t.key, h.key, lone.key, m.ALL.key].map(String));
+    assert.equal(keys.size, 4, 'the agent with a board and the one without are one agent: the same key');
     assert.notEqual(m.scopeOf({ dock: 'agent', session: { ...live, server: 's2' } }).key, a.key);
     // the query string
     assert.equal(m.withScope('', m.ALL), '');

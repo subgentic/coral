@@ -12,8 +12,6 @@
                 <button type="button" class="mb-action-btn mb-face-btn" id="mb-face-messages" data-on-click="mb-face" data-face="messages" aria-pressed="true">Messages</button>
                 <button type="button" class="mb-action-btn mb-face-btn" id="mb-face-goals" data-on-click="mb-face" data-face="goals" aria-pressed="false" title="What this board is working toward">Goals</button>
             </div>
-            <!-- Goals uses the width (#7404): on the Goals face the right panel is out of the way and this brings it back (goals_layout.js); drawn on that face only -->
-            <button type="button" class="mb-action-btn mb-members-btn" id="mb-members-btn" data-on-click="mb-members" aria-expanded="false">Members</button>
             <!-- At phone width the sidebar is an overlay: this opens the same list as a sheet (#3610). -->
             <button type="button" class="mb-action-btn mb-subscribers-btn" id="mb-subscribers-btn" data-on-click="mb-subscribers" aria-haspopup="dialog" aria-controls="mb-subscribers-sheet" aria-expanded="false">Members</button>
             <!-- On a phone Select, Export, Pause and Delete sit in a More menu (#4538, UX #4536): the toolbar keeps one row at
@@ -21,6 +19,8 @@
             <div class="mb-more" id="mb-more">
             <button type="button" class="mb-action-btn mb-more-btn" id="mb-more-btn" data-on-click="mb-more" aria-haspopup="true" aria-expanded="false" aria-controls="mb-more-menu">More <svg class="mb-more-chevron" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 6 8 10 12 6"/></svg></button>
             <div class="mb-more-menu" id="mb-more-menu" aria-label="More board actions">
+            <!-- The board's page has no side panel: its team's page has the goals, tasks, artifacts, members and settings (#7457) -->
+            <button type="button" class="mb-action-btn mb-team-page-btn" id="mb-team-page-btn" data-on-click="mb-team-page" aria-label="Open the team page" title="Open the team page" hidden>Team page</button>
             <button class="mb-action-btn" id="mb-select-btn" style="display:none" data-on-click="mb-select-mode" title="Select messages to export">Select</button>
             <button class="mb-action-btn" id="mb-export-btn" style="display:none" data-on-click="mb-export" title="Export — download board messages as Markdown">Export</button>
             <button class="mb-action-btn" id="mb-pause-btn" style="display:none" data-on-click="mb-pause" title="Pause Board — stops agents from receiving new messages until resumed">Pause Board</button>

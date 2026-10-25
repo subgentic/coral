@@ -146,9 +146,8 @@ export async function showTeamTokenUsage(boardName) {
 }
 
 export async function distillTeamKnowledge(boardName) {
-    const oldContext = document.getElementById('team-center-view') && !document.getElementById('team-center-view').hidden; // the dock's team tabs (until #7457) keep their own Knowledge tab
-    if (oldContext && window.enterTeamContext) await window.enterTeamContext(boardName, { tab: 'knowledge' });
-    else if (window.openTeamPage) await window.openTeamPage(boardName, { tab: 'knowledge' });
-    const { distillKnowledgeInTab } = await importOnce('./team_artifacts.js');
-    distillKnowledgeInTab(boardName);
+    if (window.openTeamPage) await window.openTeamPage(boardName, { tab: 'knowledge' });
+    // Starts a run, or joins the one already running (#3325); the team page's Knowledge tab shows the progress and the result follows from knowledge_distill.js.
+    const { startDistill } = await importOnce('./knowledge_distill.js');
+    try { await startDistill(boardName); } catch (err) { const { showToast } = await importOnce('./notifications.js'); showToast(`Could not start: ${err && err.message ? err.message : 'no answer'}`, true); }
 }
