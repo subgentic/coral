@@ -68,6 +68,7 @@
 .goals-facts dt { color: var(--text-secondary); font-size: 0.75rem; font-weight: 500; padding-top: 2px; }
 .goals-facts dd { margin: 0; overflow-wrap: anywhere; white-space: pre-line; }
 .goals-tasks-head { margin: 8px 0 0; font-size: 0.9375rem; }
+.goals-updating { min-height: 1.2em; margin: 0; } /* its slot keeps its height whether or not it says Updating */
 .team-task-text { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: 0.875rem; margin: 0; max-width: 80ch; }
 .goals-pinbar { position: sticky; bottom: 0; margin-top: auto; display: flex; gap: 8px; justify-content: flex-end; padding: 12px 0; background: var(--bg-primary); border-top: 1px solid var(--border); z-index: 2; }
 .goals-pinbar .btn { min-height: 36px; }

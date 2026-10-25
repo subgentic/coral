@@ -383,13 +383,18 @@ function drawGoalPageRaw(col) {
     const tasks = model.tasks.get(g.id);
     const head = el('h3', 'goals-sub goals-tasks-head', total ? `Tasks, ${doneOf(g.rollup)} of ${total} done` : 'Tasks'); col.append(head);
     if (total) col.append(rollupBar(g.rollup));
+    // The rollup and the rows are read separately: while they disagree (the rollup is fresh, the rows are the last read) the table says it is updating, so two moments are never drawn as one (UI/UX, #7513)
+    const agrees = !tasks || tasks.rows === undefined || !!tasks.cursor || (tasks.rows.length === total && tasks.rows.filter(t => W.taskStateWord(t.state) === 'Done').length === g.rollup.done);
+    col.append(el('p', 'goals-note goals-updating', agrees ? '' : 'Updating…'));
     if (!tasks) col.append(el('p', 'goals-note', 'Loading tasks…'));
     else if (tasks.failed !== undefined) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, W.failedText(tasks.failed).replace('Goals', 'Tasks')), btn('btn btn-small', 'Try again', () => loadTasks(g.id))); col.append(f); }
     else if (!tasks.rows.length) col.append(el('p', 'goals-note', 'No tasks yet'));
     else {
         const live = tasks.rows.filter(t => W.taskStateWord(t.state) !== 'Done'), idle = live.filter(t => !agentFor(t));
         if (idle.length) col.append(el('p', 'goals-note goals-nobody', W.nobodyWorkingText(idle.length, live.length)));
-        col.append(teamTable({ label: `Tasks of ${g.title}`, columns: ['Task', 'State', 'Assigned to', 'Priority'], rows: taskTableRows(g, tasks) }));
+        const tbl = teamTable({ label: `Tasks of ${g.title}`, columns: ['Task', 'State', 'Assigned to', 'Priority'], rows: taskTableRows(g, tasks) });
+        if (!agrees) tbl.setAttribute('aria-busy', 'true');
+        col.append(tbl);
         const left = Math.max(tasks.rows.length - tasks.shown, 0) || (tasks.cursor ? Math.max(taskTotal(g, tasks) - tasks.shown, 1) : 0);
         if (left) col.append(btn('btn goals-more', W.showMoreText(left, PAGE), () => showMoreTasks(g.id)));
         if (tasks.moreFailed) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, tasks.moreFailed)); col.append(f); }
