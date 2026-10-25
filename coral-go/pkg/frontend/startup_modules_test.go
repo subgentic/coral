@@ -101,3 +101,48 @@ func TestShellRendersModulepreloadHintsFromPageData(t *testing.T) {
 		t.Error("the modulepreload hints must come after the stylesheet links")
 	}
 }
+
+// The release's static tree is minified (every file on one line, local names shortened): its startup graph, which feeds the shell's modulepreload links, is the source tree's. A scan that only sees the first
+// import of a line found 2 modules of 263 (#7185, QA's finding on #7366).
+func TestStartupGraphOfAMinifiedTreeIsTheSourcesGraph(t *testing.T) {
+	sub, err := fs.Sub(Static, "static")
+	if err != nil {
+		t.Fatal(err)
+	}
+	min := fstest.MapFS{}
+	_ = fs.WalkDir(sub, ".", func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return nil
+		}
+		data, _ := fs.ReadFile(sub, p)
+		if strings.HasSuffix(p, ".js") && !strings.HasPrefix(p, "vendor/") {
+			data = MinifyAsset(p, data)
+		}
+		min[p] = &fstest.MapFile{Data: data}
+		return nil
+	})
+	want, got := moduleGraph(sub, "app.js"), moduleGraph(min, "app.js")
+	if len(want) < 100 {
+		t.Fatalf("the source tree's startup graph has only %d modules: the scan is not reading it", len(want))
+	}
+	have := map[string]bool{}
+	for _, m := range got {
+		have[m] = true
+	}
+	var missing []string
+	for _, m := range want {
+		if !have[m] {
+			missing = append(missing, m)
+		}
+	}
+	if len(missing) > 0 {
+		t.Errorf("the minified tree's startup graph has %d modules, the source's %d; missing %d, e.g. %v", len(got), len(want), len(missing), missing[:min2(len(missing), 5)])
+	}
+}
+
+func min2(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
