@@ -87,6 +87,7 @@ func TestAnAgentsCodexLaunchOnABoardNeedsAMode(t *testing.T) {
 	assert.Contains(t, refusal["error"], "asks first")
 	assert.Contains(t, refusal["error"], "cannot reach Coral")
 	assert.Contains(t, refusal["error"], "ask the Operator")
+	assert.NotContains(t, refusal["error"], "default permission mode", "an ask-first default would start a Codex that cannot reach Coral either: the words say only to ask the Operator")
 	assert.Equal(t, sentBefore, func() int { rig.term.mu.Lock(); defer rig.term.mu.Unlock(); return len(rig.term.sent) }(), "nothing started")
 
 	// not on a board: unchanged (it is not a worker that has to reach a board)
