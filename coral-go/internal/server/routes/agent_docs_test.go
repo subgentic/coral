@@ -103,7 +103,11 @@ func TestTheDocsListUsesEachDocsOwnHeading(t *testing.T) {
 		}
 	}
 	assert.Equal(t, "Using the dashboard", byName["using-the-dashboard"])
-	assert.Equal(t, "Agent UI (POC)", byName["agent-ui"])
+	assert.Equal(t, "Agent UI", byName["agent-ui"])
+	assert.Equal(t, "Personal tasks", byName["agent-tasks"])
+	assert.Equal(t, "Team configuration", byName["team-config"])
+	assert.Equal(t, "Coordination efficiency reporting", byName["coordination-reporting"])
+	assert.Equal(t, "What Coral stores on this computer", byName["what-coral-stores"])
 	assert.Equal(t, "Coral API reference", byName["README"])
 	assert.NotContains(t, byName["settings-system"], "System", "sentence case")
 	// a doc with no heading falls back to its file name, readable
@@ -118,4 +122,28 @@ func TestTheDocsListUsesEachDocsOwnHeading(t *testing.T) {
 	}
 	assert.Equal(t, "No heading API", titles["no-heading-api"])
 	assert.Equal(t, "A real title here", titles["with"])
+}
+
+// UI/UX's rules on #7516: a list row is one short line: the heading up to its first colon or opening bracket, words added while the title is shorter than 32 characters (the crossing word stays).
+func TestListTitleIsOneShortLine(t *testing.T) {
+	for in, want := range map[string]string{
+		"Personal tasks: coral-agent CLI and API": "Personal tasks",
+		"Agent UI (POC)":                                           "Agent UI",
+		"Team configuration (agent.json)":                          "Team configuration",
+		"Coordination efficiency reporting & metrics architecture": "Coordination efficiency reporting",
+		"What Coral stores on this computer":                       "What Coral stores on this computer",
+		"Task workflows and completion artifacts":                  "Task workflows and completion artifacts",
+		"Using the dashboard":                                      "Using the dashboard",
+		"Settings & system API":                                    "Settings & system API",
+		"Cross-team messaging":                                     "Cross-team messaging",
+		"Multi-server Hub API":                                     "Multi-server Hub API",
+		"Coral API reference":                                      "Coral API reference",
+		"Recover a task awaiting completion review":                "Recover a task awaiting completion",
+		"A very long heading & more":                               "A very long heading & more",
+	} {
+		assert.Equal(t, want, listTitle(sentenceCase(in)), in)
+		assert.LessOrEqual(t, len(listTitle(sentenceCase(in))), 32+20, in)
+	}
+	assert.NotContains(t, listTitle("Words, and more words that go on and on and on, & more"), "&", "never ends on a bare ampersand")
+	assert.Equal(t, "MCP servers", sentenceCase("mcp Servers"))
 }
