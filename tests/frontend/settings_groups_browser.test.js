@@ -66,21 +66,21 @@ const GROUPS = {
         assert.deepEqual(await shownGroup(), ['files'], 'Settings reopens on the group last used');
         console.log('   ✓ keys and memory');
 
-        console.log('3. Explanations are behind (i) buttons: hidden, named, one tap opens them in place');
+        console.log('3. A short explanation is a visible hint line; a long one is behind its Learn more, which opens it in place (#7405: no (i))');
         await ev(`document.getElementById('settings-tab-cleanup').click(); true`);
-        const info = await ev(`(() => { const b = document.querySelector('#settings-pane-cleanup .settings-info-btn'); const t = document.getElementById(b.getAttribute('aria-controls')); return { name: b.getAttribute('aria-label'), exp: b.getAttribute('aria-expanded'), hidden: t.hidden, text: t.textContent.length, vis: t.getClientRects().length }; })()`);
-        assert.equal(info.exp, 'false'); assert.equal(info.hidden, true); assert.equal(info.vis, 0); assert.ok(info.text > 40, 'the explanation is there');
-        assert.match(info.name, /^About /, 'the button is named after its setting: ' + info.name);
-        await ev(`document.querySelector('#settings-pane-cleanup .settings-info-btn').click(); true`);
-        const opened = await ev(`(() => { const b = document.querySelector('#settings-pane-cleanup .settings-info-btn'); const t = document.getElementById(b.getAttribute('aria-controls')); return { exp: b.getAttribute('aria-expanded'), vis: t.getClientRects().length > 0 }; })()`);
-        assert.deepEqual(opened, { exp: 'true', vis: true });
-        await ev(`document.querySelector('#settings-pane-cleanup .settings-info-btn').click(); true`);
-        assert.equal(await ev(`document.querySelector('#settings-pane-cleanup .settings-info-btn').getAttribute('aria-expanded')`), 'false', 'a second tap closes it');
-        const loose = await ev(`[...document.querySelectorAll('#settings-modal dt .toggle-desc')].length`);
-        assert.equal(loose, 0, 'no explanation left in the open under a label');
-        const unnamed = await ev(`[...document.querySelectorAll('#settings-modal .settings-info-btn')].filter(b => !b.getAttribute('aria-label')).length`);
-        assert.equal(unnamed, 0);
-        console.log('   ✓ (i) buttons');
+        const info = await ev(`(() => { const b = document.querySelector('#settings-pane-cleanup .settings-learn'); const t = document.getElementById(b.getAttribute('aria-controls').split(' ')[0]); return { name: b.getAttribute('aria-label'), exp: b.getAttribute('aria-expanded'), clamped: t.classList.contains('settings-hint-clamp'), text: t.textContent.length, vis: t.getClientRects().length, infoBtn: document.querySelectorAll('#settings-pane-cleanup .settings-info-btn').length }; })()`);
+        assert.equal(info.exp, 'false'); assert.equal(info.clamped, true); assert.equal(info.vis, 0, 'a long hint is not on the page until its Learn more opens it'); assert.ok(info.text > 40, 'the explanation is there'); assert.equal(info.infoBtn, 0, 'no (i)');
+        assert.match(info.name, /^Learn more about /, 'the link is named after its setting: ' + info.name);
+        await ev(`document.querySelector('#settings-pane-cleanup .settings-learn').click(); true`);
+        const opened = await ev(`(() => { const b = document.querySelector('#settings-pane-cleanup .settings-learn'); const t = document.getElementById(b.getAttribute('aria-controls').split(' ')[0]); return { exp: b.getAttribute('aria-expanded'), open: !t.classList.contains('settings-hint-clamp') && t.getClientRects().length > 0 }; })()`);
+        assert.deepEqual(opened, { exp: 'true', open: true });
+        await ev(`document.querySelector('#settings-pane-cleanup .settings-learn').click(); true`);
+        assert.equal(await ev(`document.querySelector('#settings-pane-cleanup .settings-learn').getAttribute('aria-expanded')`), 'false', 'a second tap closes it');
+        const loose = await ev(`[...document.querySelectorAll('#settings-modal dt .toggle-desc:not(.settings-hint-line), #settings-modal [data-info]')].filter(e => !/^Now:/.test(e.textContent.trim())).map(e => (e.closest('.settings-row') || {}).id + ' ' + e.className + ' ' + e.textContent.slice(0, 30))`); // (a status line, "Now: Codex will ask", is not an explanation)
+        assert.deepEqual(loose, [], 'every explanation is a hint line under its label, none half-built');
+        const unnamed = await ev(`[...document.querySelectorAll('#settings-modal .settings-learn')].filter(b => !b.getAttribute('aria-label')).length`);
+        assert.equal(unnamed, 0, 'every Learn more is named after its setting');
+        console.log('   ✓ hint lines and Learn more');
 
         console.log('4. Wide: the list is on the left, no selector; rows are label and control side by side');
         const wide = await ev(`(() => { const r = e => e.getBoundingClientRect(); const m = r(document.querySelector('#settings-modal .settings-modal-content')); const nav = r(document.getElementById('settings-tabs')); const row = document.querySelector('#settings-pane-cleanup .settings-row'); const dt = r(row.querySelector('dt')), dd = r(row.querySelector('dd'));
@@ -91,14 +91,14 @@ const GROUPS = {
         for (const [label, w, h, mobile, font] of [['phone 390 px', 390, 844, true, ''], ['phone 390 px at 200% text', 390, 844, true, '32px'], ['desktop at 200% text', 1280, 800, false, '32px']]) {
             console.log(`5. ${label}: a selector replaces the list, rows stack, targets are 44 px, nothing overflows`);
             await open('agents', w, h, mobile);
-            if (font) { await ev(`document.documentElement.style.fontSize = ${JSON.stringify(font)}; true`); await waitFor(`document.querySelector('#settings-modal .settings-group-pick').getClientRects().length > 0`, 'the selector'); await waitFor(`document.querySelector('#settings-pane-agents .settings-info-btn').getBoundingClientRect().height >= 44`, 'buttons to finish their size transition'); }
-            const m = await ev(`(() => { const r = e => e.getBoundingClientRect(); const row = document.querySelector('#settings-pane-agents .settings-row'); const dt = r(row.querySelector('dt')), dd = r(row.querySelector('dd')); const pick = document.getElementById('settings-group-select'); const info = document.querySelector('#settings-pane-agents .settings-info-btn');
+            if (font) { await ev(`document.documentElement.style.fontSize = ${JSON.stringify(font)}; true`); await waitFor(`document.querySelector('#settings-modal .settings-group-pick').getClientRects().length > 0`, 'the selector'); if (mobile) await waitFor(`document.querySelector('#settings-pane-agents .settings-learn').getBoundingClientRect().height >= 44`, 'buttons to finish their size transition'); }
+            const m = await ev(`(() => { const r = e => e.getBoundingClientRect(); const row = document.querySelector('#settings-pane-agents .settings-row'); const dt = r(row.querySelector('dt')), dd = r(row.querySelector('dd')); const pick = document.getElementById('settings-group-select'); const info = document.querySelector('#settings-pane-agents .settings-learn');
                 return { tabsShown: document.getElementById('settings-tabs').getClientRects().length, pickH: Math.round(r(pick).height), stacked: dd.top >= dt.bottom - 2, infoH: info ? Math.round(r(info).height) : 0, over: document.documentElement.scrollWidth - document.documentElement.clientWidth, modalInside: r(document.querySelector('#settings-modal .settings-modal-content')).right <= innerWidth + 1 }; })()`);
-            assert.equal(m.tabsShown, 0, 'the list is gone'); assert.ok(m.pickH >= 44, 'selector height ' + m.pickH); assert.equal(m.stacked, true, 'label above its control'); assert.ok(m.infoH <= 24.5 * (font ? parseInt(font) / 16 : 1), 'info button is the 24 px circle, its 44 px target is the ::after (#6750) ' + m.infoH);
+            assert.equal(m.tabsShown, 0, 'the list is gone'); assert.ok(m.pickH >= 44, 'selector height ' + m.pickH); assert.equal(m.stacked, true, 'label above its control'); assert.ok(!mobile || m.infoH === 0 || m.infoH >= 44, 'a Learn more is a 44 px target on a phone ' + m.infoH);
             assert.equal(m.over, 0, 'no sideways scroll'); assert.equal(m.modalInside, true);
             await ev(`(() => { const p = document.getElementById('settings-group-select'); p.value = 'notifications'; p.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
             assert.deepEqual(await shownGroup(), ['notifications'], 'the selector changes the group');
-            const small = await ev(`[...document.querySelectorAll('#settings-pane-notifications select, #settings-pane-notifications input, #settings-pane-notifications button, #settings-pane-notifications .check-hit')].filter(e => e.getClientRects().length && !e.classList.contains('settings-info-btn')).map(e => Math.round((e.closest('label') || e).getBoundingClientRect().height)).filter(h => h < 44)`); // (the (i) is 24 px with a 44 px ::after target, #6750; info_buttons_browser checks it)
+            const small = await ev(`[...document.querySelectorAll('#settings-pane-notifications select, #settings-pane-notifications input, #settings-pane-notifications button, #settings-pane-notifications .check-hit')].filter(e => e.getClientRects().length && !e.classList.contains('settings-info-btn') && (${mobile} || !e.classList.contains('settings-learn'))).map(e => Math.round((e.closest('label') || e).getBoundingClientRect().height)).filter(h => h < 44)`); // (Learn more is a 44 px target on a phone and a text link on a desktop, #7405; info_buttons_browser checks it)
             assert.deepEqual(small, [], 'every control in a pane is 44 px tall: ' + small);
             console.log('   ✓');
         }

@@ -5,8 +5,8 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 
 // words a person can see in a group now, per the audit (artifact 141071b6); a group with no number has not been cut yet
-const TERMINAL_BUDGET = 60;
-const WITH_WARNING_BUDGET = 65; // 60 (+1 for the render engine's disclosure moved here from General, #7040), and the tools folder warning's label, line and button when that row shows // the same as settings_text_budget_browser's, now on a pty-only system // (Security: +3 for #6047's install ID row, "Install ID", "Copy" and its hint; "No prompts, transcripts, or secrets are sent." stays visible beside the Usage analytics switch: it is what a person reads where they decide) // (Storage: 47 on a fresh server; a server where an earlier suite turned automatic cleanup on shows its two status lines, up to 62)
+const TERMINAL_BUDGET = 64; // #7405: +1 for the visible hint lines (the (i) are gone), +3 for round 2's Fit pane width line
+const WITH_WARNING_BUDGET = 88; // 60 (+1 for the render engine's disclosure moved here from General, #7040), and the tools folder warning's label, line and button when that row shows // the same as settings_text_budget_browser's, now on a pty-only system // (Security: +3 for #6047's install ID row, "Install ID", "Copy" and its hint; "No prompts, transcripts, or secrets are sent." stays visible beside the Usage analytics switch: it is what a person reads where they decide) // (Storage: 47 on a fresh server; a server where an earlier suite turned automatic cleanup on shows its two status lines, up to 62)
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -21,7 +21,7 @@ const WITH_WARNING_BUDGET = 65; // 60 (+1 for the render engine's disclosure mov
         await ev(`window.showSettingsModal(); true`);
         await waitFor(`getComputedStyle(document.getElementById('settings-modal')).display !== 'none'`, 'the dialog open', 8000);
         await waitFor(`!!document.getElementById('settings-tab-network')`, 'the Settings dialog', 8000);
-        await waitFor(`document.querySelectorAll('#settings-modal .settings-info-btn').length > 5`, 'the (i) buttons', 8000);
+        await waitFor(`document.querySelectorAll('#settings-modal .settings-hint-line').length > 5`, 'the hint lines', 8000);
         await ev(`document.getElementById('settings-tab-terminal').click(); true`);
         await waitFor(`(() => { const p = document.querySelector('#settings-modal .settings-pane:not([hidden])'); return !!p && p.dataset.group === 'terminal' && !document.getElementById('settings-terminal-backend').hidden; })()`, 'the Terminal group, loaded', 8000);
         await ev(`(() => { const r = document.getElementById('settings-tools-folder-row'); if (r) r.hidden = true; return true; })()`); // the normal state has no warning row: a Windows runner shows it for real (its tools folder is a temp folder), and the 64-word state with it is checked on its own
