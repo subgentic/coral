@@ -72,7 +72,7 @@ const win = (version, over = {}, relaunch = {}) => ({ enabled: true, relaunch_av
             // the dialog, and what the click sends
             await ev(`document.getElementById('update-pill').click(); true`); await settle(300);
             let d = await dialog();
-            check(`${tag}: the dialog is about installing, says Windows asks for permission, and offers Install (${JSON.stringify(d && { t: d.title, go: d.go })})`, d && d.title === 'Install Coral 1.4.126?' && /Windows asks for your permission/.test(d.text) && /Install and restart 2 agents/.test(d.go) && !/relaunch\?/i.test(d.title));
+            check(`${tag}: the dialog is about installing, says Windows asks for permission, and offers Install (${JSON.stringify(d && { t: d.title, go: d.go })})`, d && d.title === 'Install update: Coral 1.4.126?' && /Windows asks for your permission/.test(d.text) && /Install update, restart 2 agents/.test(d.go) && !/relaunch\?/i.test(d.title));
             await ev(`document.querySelector('#update-confirm-modal .update-go').click(); true`); await settle(300);
             let c = await calls();
             check(`${tag}: the click sent POST /install with the version the dialog showed, and nothing to a relaunch route (${JSON.stringify(c)})`, c.length === 1 && c[0].method === 'POST' && c[0].path === '/install' && JSON.stringify(c[0].body) === '{"version":"1.4.126"}');
@@ -84,7 +84,7 @@ const win = (version, over = {}, relaunch = {}) => ({ enabled: true, relaunch_av
             await ev(`window.__upd.install = { status: 409, body: { code: 'stale_version' } }; document.getElementById('update-pill').click(); true`); await settle(300);
             await ev(`window.__upd.status = ${JSON.stringify(win('1.4.127'))}; document.querySelector('#update-confirm-modal .update-go').click(); true`); await settle(500);
             d = await dialog();
-            check(`${tag}: a stale answer redraws the dialog for 1.4.127, with the sentence, and installed nothing (${JSON.stringify(d && { t: d.title, said: /changed since this page showed it/.test(d.text) })})`, d && d.title === 'Install Coral 1.4.127?' && /changed since this page showed it/.test(d.text));
+            check(`${tag}: a stale answer redraws the dialog for 1.4.127, with the sentence, and installed nothing (${JSON.stringify(d && { t: d.title, said: /changed since this page showed it/.test(d.text) })})`, d && d.title === 'Install update: Coral 1.4.127?' && /changed since this page showed it/.test(d.text));
             await ev(`window.__upd.install = { status: 202, body: { ok: true } }; document.querySelector('#update-confirm-modal .update-go').click(); true`); await settle(300);
             c = await calls();
             check(`${tag}: the second click sent 1.4.127 (${JSON.stringify(c.map(x => x.body))})`, c.length === 2 && JSON.stringify(c[1].body) === '{"version":"1.4.127"}');
@@ -99,7 +99,7 @@ const win = (version, over = {}, relaunch = {}) => ({ enabled: true, relaunch_av
             await load(view, win('1.4.126', { local_install: undefined }, { reason: 'busy', restarts: [] }));
             p = await pill(); pn = await pane();
             check(`${tag}: busy: the control says why and is drawn unavailable (${p && p.name})`, p && !p.hidden && p.ariaDisabled === 'true' && /Not available right now: Another relaunch is already running\./.test(p.name));
-            check(`${tag}: busy: Settings has a disabled Relaunch to update, not an enabled primary (${JSON.stringify(pn.act)})`, pn.act && pn.act.text === 'Relaunch to update' && pn.act.disabled === true);
+            check(`${tag}: busy: Settings has a disabled Update and relaunch, not an enabled primary (${JSON.stringify(pn.act)})`, pn.act && pn.act.text === 'Update and relaunch' && pn.act.disabled === true);
             const look = await ev(`(() => { const b = document.querySelector('#update-pane-body .update-act'); const cs = getComputedStyle(b); return { opacity: Number(cs.opacity), cursor: cs.cursor }; })()`);
             check(`${tag}: busy: the disabled button looks disabled: faded, not-allowed cursor (${JSON.stringify(look)})`, look.opacity <= 0.6 && look.cursor === 'not-allowed');
             await shot(`${tag} settings disabled install`);
@@ -125,10 +125,10 @@ const win = (version, over = {}, relaunch = {}) => ({ enabled: true, relaunch_av
             }
             await ev(`window.hideSettingsModal(); true`);
 
-            // ═══ elsewhere nothing changed: a relaunch the server offers is still Relaunch to update
+            // ═══ elsewhere nothing changed: a relaunch the server offers is still Update and relaunch
             await load(view, win('1.4.126', { local_install: undefined }, { available: true, reason: '', ack: 'tok' }));
             p = await pill(); pn = await pane();
-            check(`${tag}: a relaunch the server offers is still "Relaunch to update", enabled (${p && p.text}; ${JSON.stringify(pn.act)})`, p && /^Relaunch to update/.test(p.text) && p.ariaDisabled === 'false' && pn.act && pn.act.text === 'Relaunch to update' && pn.act.disabled === false);
+            check(`${tag}: a relaunch the server offers is still "Update and relaunch", enabled (${p && p.text}; ${JSON.stringify(pn.act)})`, p && /^Update and relaunch/.test(p.text) && p.ariaDisabled === 'false' && pn.act && pn.act.text === 'Update and relaunch' && pn.act.disabled === false);
             await ev(`window.hideSettingsModal(); true`);
         }
         const failed = results.filter(r => !r).length;

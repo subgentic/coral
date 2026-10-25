@@ -4,7 +4,7 @@
 import { importOnce } from './import_once.js';
 import { copyText, showToast } from './utils.js';
 import { isCloud } from './server_base.js';
-const { ageTier, canStart, installsLocally, notAvailable, reasonText, notReadyText, fetchHubRelaunch, requestCheckNow, savePrefs, saveChannel, serverHas } = await importOnce('./update_api.js');
+const { actName, releaseNotesUrl, RELEASES_REPO, ageTier, canStart, installsLocally, notAvailable, reasonText, notReadyText, fetchHubRelaunch, requestCheckNow, savePrefs, saveChannel, serverHas } = await importOnce('./update_api.js');
 const { HUB_RELAUNCH_ON, HUB_RELAUNCH_OFF, HUB_RELAUNCH_WINDOWS } = await importOnce('./update_words.js');
 const { failureNotice, getUpdateStatus, refreshUpdateStatus, relaunchOffered } = await importOnce('./update_ui.js');
 
@@ -39,13 +39,15 @@ function card(s) {
     } else if (relaunchOffered(s)) {
         const days = s.staged.days, tier = ageTier(days);
         title.textContent = `Coral ${s.staged.version} is ready`;
-        sub.textContent = `Downloaded and its signature was checked ${days < 1 ? 'earlier today' : plural(days, 'day') + ' ago'}. Nothing is installed until you say yes.`;
+        sub.textContent = `Coral downloaded it and checked its signature ${days < 1 ? 'earlier today' : plural(days, 'day') + ' ago'}.`; // "Nothing is installed until you say yes" is in the ready notice and the dialog, not here too (#7360)
         dot.dataset.k = tier; c.dataset.k = tier;
-        act = mk('button', 'btn btn-primary update-act', installsLocally(s) ? 'Install update' : 'Relaunch to update'); act.type = 'button'; // Windows installs from this page (#7338)
+        act = mk('button', 'btn btn-primary update-act', actName(s)); act.type = 'button'; // Windows installs from this page (#7338)
         act.setAttribute('aria-haspopup', 'dialog');
         if (windowsInstall(s) && !s.localInstall) { act = null; sub.textContent += ` ${reasonText(s.relaunch.reason)}`; } // a request through Coral Hub: nobody there can install, so no button (#7338)
         else if (!canStart(s)) { act.disabled = true; sub.textContent += ` ${notAvailable(s.relaunch.reason)}`; } // a real disabled button, not a primary one that only says so to a screen reader (#7338)
         if (act) act.addEventListener('click', async () => { if (act.disabled) return; (await importOnce('./update_dialog.js')).openUpdateDialog(getUpdateStatus()); });
+        const notes = s.source === RELEASES_REPO ? releaseNotesUrl(s.staged.version) : ''; // what is in the update, on the one repository this page links to (#7360)
+        if (notes) { const na = mk('a', 'update-notes-link', `What is new in ${s.staged.version}`); na.href = notes; na.target = '_blank'; na.rel = 'noopener noreferrer'; sub.append(' ', na); }
     } else if (s.progress !== null) {
         title.textContent = `Downloading Coral${s.staged && s.staged.version ? ' ' + s.staged.version : ''}`; sub.textContent = `${s.progress} percent`; dot.dataset.k = 'ok'; c.dataset.k = 'ok';
         const bar = mk('div', 'update-bar'); bar.setAttribute('role', 'progressbar'); bar.setAttribute('aria-valuemin', '0'); bar.setAttribute('aria-valuemax', '100'); bar.setAttribute('aria-valuenow', String(s.progress)); bar.setAttribute('aria-label', 'Download');
@@ -79,7 +81,7 @@ function managed(s) {
         const copy = mk('button', 'btn', 'Copy'); copy.type = 'button';
         copy.addEventListener('click', async () => { showToast((await copyText(code.textContent)) ? 'Copied' : 'Could not copy', false); });
         cmd.append(code, copy); t.append(cmd);
-        t.append(mk('p', 'update-calm', 'Coral still tells you when a new version is out.'));
+        t.append(mk('p', 'update-calm', 'Homebrew updates Coral, not this page. Coral still shows a notice in this browser when a new version is out (Settings > General).'));
     } else {
         t.append(mk('b', null, 'This install cannot update itself'), mk('p', null, 'Coral can only update installs it can replace safely (the app, the installer or the archive from the releases page). Install the new release by hand.'));
         const a = mk('a', 'update-link', 'Open the releases page'); a.href = 'https://github.com/subgentic/coral/releases'; a.target = '_blank'; a.rel = 'noopener noreferrer'; t.append(a);

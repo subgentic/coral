@@ -76,7 +76,7 @@ const stagedFrom = (source, relaunch = {}) => { const st = staged('1.4.160', {},
             check(`${tag}: a verified update that can be applied is announced`, n && n.shown, n && n.text);
             check(`${tag}: it names the version, says it is downloaded and checked, and that nothing installs without a yes`, n && n.text.includes('Coral 1.4.160 is ready.') && n.text.includes('downloaded and checked') && n.text.includes('Nothing is installed until you say yes.'));
             check(`${tag}: it is a polite status, not an alert`, n && n.role === 'status');
-            check(`${tag}: Review and Later, inside the window, no sideways scroll`, n && n.buttons.map(b => b.text).join() === 'Review,Later' && n.inside && !n.hscroll);
+            check(`${tag}: Update and relaunch and Later, inside the window, no sideways scroll`, n && n.buttons.map(b => b.text).join() === 'Update and relaunch,Later' && n.inside && !n.hscroll);
             if (view.phone) check(`${tag}: both buttons are 44 px on a touch screen (${JSON.stringify(n.buttons)})`, n.buttons.every(b => b.h >= 44 && b.w >= 44));
             const au = await auditRegion(ev, ['#update-ready-notice']);
             check(`${tag}: 4.5:1 text contrast (${JSON.stringify((au.fails || []).slice(0, 2))})`, (au.fails || []).length === 0);
@@ -130,21 +130,21 @@ const stagedFrom = (source, relaunch = {}) => { const st = staged('1.4.160', {},
         };
         const agents3 = [{ session_id: 'a', name: 'api', state: 'working', resumes: true }, { session_id: 'b', name: 'docs', state: 'idle', resumes: true }, { session_id: 'c', name: 'new', state: 'idle', resumes: false }];
         let dw = await dialogWords(stagedFrom('subgentic/coral', { restarts: agents3 }));
-        check('title names the version and what happens', dw.title === 'Install Coral 1.4.160 and relaunch?', dw.title);
-        check('it says where the update comes from and that its signature was checked, and what you are on', dw.first === "Coral 1.4.160 comes from Coral's releases on GitHub (github.com/subgentic/coral). It was downloaded and its signature was checked. You are on 1.4.159.", dw.first);
-        check('its one link is this page\'s own constant, opening safely', dw.links.length === 1 && dw.links[0].href === RELEASES && dw.links[0].target === '_blank' && /noopener/.test(dw.links[0].rel), JSON.stringify(dw.links));
+        check('title names the version and what happens', dw.title === 'Update and relaunch: Coral 1.4.160?', dw.title);
+        check('it says where the update comes from and that its signature was checked, and what you are on', dw.first === "Coral 1.4.160 comes from Coral's releases on GitHub (github.com/subgentic/coral). Coral downloaded it and checked its signature. You are on 1.4.159.", dw.first);
+        check('its two links are this page\'s own constants (the releases page and this version\'s notes), opening safely', dw.links.length === 2 && dw.links[0].href === RELEASES && dw.links[1].href === RELEASES + '/releases/tag/v1.4.160' && dw.links.every(l => l.target === '_blank' && /noopener/.test(l.rel)), JSON.stringify(dw.links));
         check('the link sits inside its sentence: the paragraph is one block, the link inline (no line break around it)', await ev(`(() => { const p = document.querySelector('#update-confirm-modal .modal-body p'); const a = p.querySelector('a'); return getComputedStyle(a).display === 'inline' && p.getClientRects().length === 1; })()`));
         check('agents that restart: how many start again on their own and how many start a new conversation', /Relaunching restarts 3 agents that run in Coral's own terminal \(pty\)\. Their work in progress stops\. 2 start again on their own afterwards; 1 starts a new conversation\./.test(dw.warn), dw.warn);
         check('the consent line: nothing installs until Install, Later changes nothing', dw.later === 'Nothing is installed until you choose Install. Later changes nothing: the update stays ready and the button stays in the top bar.', dw.later);
-        check('the buttons are Later and Install and restart 3 agents', dw.buttons.join() === 'Later,Install and restart 3 agents', dw.buttons.join());
+        check('the buttons are Later and Update and relaunch, restart 3 agents', dw.buttons.join() === 'Later,Update and relaunch, restart 3 agents', dw.buttons.join());
         check('no claim that it installs at the next start, and none that the page comes back by itself', !/next time Coral starts|installs when|installed automatically|comes back by itself/i.test(dw.text));
         // a repository the status names that is not this page's: shown as text, never a link; a hostile or absent field is ignored
         dw = await dialogWords(stagedFrom('other/repo'));
-        check('another repository is not named at all: just GitHub, no address, no link', dw.links.length === 0 && dw.first === "Coral 1.4.160 comes from Coral's releases on GitHub. It was downloaded and its signature was checked. You are on 1.4.159." && !/other|repo/.test(dw.first), dw.first);
+        check('another repository is not named at all: just GitHub, no address, no link', dw.links.length === 0 && dw.first === "Coral 1.4.160 comes from Coral's releases on GitHub. Coral downloaded it and checked its signature. You are on 1.4.159." && !/other|repo/.test(dw.first), dw.first);
         dw = await dialogWords(stagedFrom('<img src=x onerror=window.__pwned=1>'));
         check('a hostile source is ignored: no link, no element, just GitHub', dw.links.length === 0 && dw.foreign === 0 && !/\(/.test(dw.first) && /releases on GitHub\./.test(dw.first) && (await ev('window.__pwned')) === undefined, dw.first);
         dw = await dialogWords(staged('1.4.160', {}, { restarts: [] }));
-        check('no source and no agents: the line still reads and the button is Install and relaunch', /Coral's releases on GitHub\. It was downloaded/.test(dw.first) && dw.buttons.join() === 'Later,Install and relaunch' && dw.warn === '', dw.buttons.join());
+        check('no source and no agents: the line still reads and the button is Update and relaunch', /Coral's releases on GitHub\. Coral downloaded it/.test(dw.first) && dw.buttons.join() === 'Later,Update and relaunch' && dw.warn === '', dw.buttons.join());
 
         console.log('\nSettings: the sentence under the Coral Hub relaunch switch');
         await load({ name: 'desktop', w: 1280, h: 900, phone: false, theme: 'dark' });

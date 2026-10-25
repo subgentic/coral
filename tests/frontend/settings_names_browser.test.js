@@ -38,6 +38,11 @@ const BASE = require('./test_base').BASE;
         assert.deepEqual(pw, { forId: 'x-pw', labelText: 'Current password', buttonInsideLabel: false, toggleLabel: 'Show current password' });
         await open('agents');
         assert.equal(await ev(`getComputedStyle(document.querySelector('.settings-cli-details > summary')).listStyleType`), 'none', 'the native marker is off: the one "▸" is the only marker');
+        console.log('6. General\'s update switch is told apart from Updates\' (#7360): the browser\'s notice, with a line that says where downloading and installing are');
+        await open('general');
+        const gen = await ev(`(() => { const i = document.getElementById('settings-check-updates'); const row = i.closest('.settings-row') || i.closest('dd') || i.parentElement.parentElement; return { label: i.closest('label') ? i.closest('label').textContent.replace(/\\s+/g, ' ').trim() : '', row: row.textContent.replace(/\\s+/g, ' ').trim() }; })()`);
+        assert.ok(gen.row.startsWith('Tell me when a new version is out'), 'the switch is named for what it does: ' + JSON.stringify(gen));
+        assert.ok(/A notice in this browser\. Downloading and installing are under Updates\./.test(gen.row), 'and says where the rest is: ' + JSON.stringify(gen));
         console.log('PASS Settings names and heading order');
     } finally { await client.close(); }
 })().catch(err => { console.error(err); process.exit(1); });

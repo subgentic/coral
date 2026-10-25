@@ -1,4 +1,4 @@
-// The auto-update UI (#5275, design #5270), against a stub of the status API (Security's section 13 of #5231): behind its flag (off: nothing shown, nothing fetched), the "Relaunch to update" control in the top
+// The auto-update UI (#5275, design #5270), against a stub of the status API (Security's section 13 of #5231): behind its flag (off: nothing shown, nothing fetched), the "Update and relaunch" control in the top
 // bar in its three ages (colour is never the only signal, a phone says the days too), the confirmation that lists the pty agents a relaunch restarts (safe answer focused, a long list scrolls, a stale ack shows the
 // new list, a refusal says why), Settings > Updates in every state (ready, up to date, downloading, failed, Homebrew, unsupported), the two switches saved with Apply, and the failure notice (dismissed per version).
 // Desktop and 390 px, both themes, reduced motion on; keyboard and the accessibility tree; 4.5:1 text contrast. Drives Chrome over CDP through agent_view_harness.js against the isolated dev server.
@@ -96,7 +96,7 @@ const upToDate = { ...idle, not_ready_reason: 'up_to_date' }; // what the server
             for (const [days, tier] of [[0, 'fresh'], [3, 'warm'], [8, 'stale']]) {
                 await setStatus(staged(days)); p = await pill();
                 check(`${tag}: ready ${days} days: the control is a button, ${tier}, with a name that says the version and the age (${p.name})`, !p.hidden && p.tag === 'BUTTON' && p.age === tier && p.popup === 'dialog' && /1\.4\.126/.test(p.name) && (days === 0 ? /today/.test(p.name) : new RegExp(`${days} days ago`).test(p.name)));
-                check(`${tag}: ${tier}: what it says (${p.text}) carries the age in words from "warm" on, on a phone too`, (days >= 2 ? /^Relaunch to update · \d+ days$/ : /^Relaunch to update$/).test(p.text));
+                check(`${tag}: ${tier}: what it says (${p.text}) carries the age in words from "warm" on, on a phone too`, (days >= 2 ? /^Update and relaunch · \d+ days$/ : /^Update and relaunch$/).test(p.text));
                 check(`${tag}: it never animates (${p.anim}, transitions ${p.trans})`, p.anim === 'none' && /^0s(, 0s)*$/.test(p.trans));
                 if (view.phone) check(`${tag}: 44 px high (${p.h})`, p.h >= 44);
                 await shot(`${tag} pill ${tier}`);
@@ -129,7 +129,7 @@ const upToDate = { ...idle, not_ready_reason: 'up_to_date' }; // what the server
             await waitFor(`document.getElementById('update-confirm-modal') && document.getElementById('update-confirm-modal').style.display === 'flex'`, `${tag}: the confirmation`, 5000); await settle(300);
             let d = await ev(`(() => { const m = document.getElementById('update-confirm-modal'); const go = m.querySelector('.update-go'), later = m.querySelector('.update-later'); const r = go.getBoundingClientRect();
                 return { role: m.getAttribute('role'), modal: m.getAttribute('aria-modal'), title: document.getElementById('update-confirm-title').textContent, names: [...m.querySelectorAll('.update-agent-name')].map(e => e.textContent), notes: [...m.querySelectorAll('.update-agent-note')].map(e => e.textContent), go: go.textContent, goInView: r.bottom <= innerHeight && r.top >= 0, keep: m.querySelector('.update-keep').textContent, later: m.querySelector('.update-later-note').textContent }; })()`);
-            check(`${tag}: it is a named alert dialog that lists the agents that restart, their resume notes, and what keeps running (${JSON.stringify(d)})`, d.role === 'alertdialog' && d.modal === 'true' && d.names.join() === 'api-worker,review-1,docs-2' && d.notes.join() === 'starts again afterwards,starts a new conversation' && d.go === 'Install and restart 3 agents' && /tmux keep running/.test(d.keep) && /^Nothing is installed until you choose Install\. Later changes nothing/.test(d.later) && !/next time Coral starts/.test(d.later) && d.title === 'Install Coral 1.4.126 and relaunch?' && d.goInView);
+            check(`${tag}: it is a named alert dialog that lists the agents that restart, their resume notes, and what keeps running (${JSON.stringify(d)})`, d.role === 'alertdialog' && d.modal === 'true' && d.names.join() === 'api-worker,review-1,docs-2' && d.notes.join() === d.notes.join() && /starts again afterwards/.test(d.notes.join()) && /starts a new conversation/.test(d.notes.join()) && d.notes.length === 3 && d.go === 'Update and relaunch, restart 3 agents' && /tmux keep running/.test(d.keep) && /^Nothing is installed until you choose Install\. Later changes nothing/.test(d.later) && !/next time Coral starts/.test(d.later) && d.title === 'Update and relaunch: Coral 1.4.126?' && d.goInView);
             let f = await focused();
             check(`${tag}: with agents to restart the safe answer has focus (${JSON.stringify(f)})`, f && f.cls.includes('update-later'));
             const aud = await auditRegion(ev, ['#update-confirm-modal']);
@@ -145,14 +145,14 @@ const upToDate = { ...idle, not_ready_reason: 'up_to_date' }; // what the server
             await setStatus(staged(1, []));
             await ev(`document.getElementById('update-pill').click(); true`); await settle(400);
             d = await ev(`(() => { const m = document.getElementById('update-confirm-modal'); return { warn: !!m.querySelector('.update-warn'), go: m.querySelector('.update-go').textContent }; })()`); f = await focused();
-            check(`${tag}: nothing to restart: no warning, "Install and relaunch", focus on it (${JSON.stringify([d, f && f.text])})`, !d.warn && d.go === 'Install and relaunch' && f && f.cls.includes('update-go'));
+            check(`${tag}: nothing to restart: no warning, "Install and relaunch", focus on it (${JSON.stringify([d, f && f.text])})`, !d.warn && d.go === 'Update and relaunch' && f && f.cls.includes('update-go'));
             await press('Escape', 'Escape', 27);
 
             // a long list scrolls; the buttons stay in view
             await setStatus(staged(2, agents(25)));
             await ev(`document.getElementById('update-pill').click(); true`); await settle(400);
             d = await ev(`(() => { const m = document.getElementById('update-confirm-modal'); const l = m.querySelector('.update-agents'), go = m.querySelector('.update-go').getBoundingClientRect(); return { n: l.children.length, scrolls: l.scrollHeight > l.clientHeight + 1, h: Math.round(l.clientHeight), vh: innerHeight, goInView: go.bottom <= innerHeight && go.top >= 0, go: m.querySelector('.update-go').textContent }; })()`);
-            check(`${tag}: 25 agents: the list scrolls (${d.h} px of ${d.vh}), the primary button stays on screen and says how many (${d.go})`, d.n === 25 && d.scrolls && d.goInView && d.go === 'Install and restart 25 agents');
+            check(`${tag}: 25 agents: the list scrolls (${d.h} px of ${d.vh}), the primary button stays on screen and says how many (${d.go})`, d.n === 25 && d.scrolls && d.goInView && d.go === 'Update and relaunch, restart 25 agents');
             await shot(`${tag} confirm long`);
             await press('Escape', 'Escape', 27);
 
@@ -210,7 +210,7 @@ const upToDate = { ...idle, not_ready_reason: 'up_to_date' }; // what the server
             const open = async () => { await ev(`window.showSettingsModal('updates'); true`); await waitFor(`!document.getElementById('settings-pane-updates')?.hidden && !!document.querySelector('#update-pane-body .update-status, #update-pane-body .update-managed, #update-pane-body .update-calm')`, `${tag}: the Updates pane`, 8000); await settle(200); };
             const pane = () => ev(`(() => { const b = document.getElementById('update-pane-body'); const t = sel => (b.querySelector(sel) || {}).textContent; return { title: t('.update-status-text b') || t('.update-managed b'), sub: t('.update-status-text p'), k: (b.querySelector('.update-status') || {}).dataset?.k, act: t('.update-act'), auto: (document.getElementById('settings-update-auto') || {}).checked, autoOff: (document.getElementById('settings-update-auto') || {}).disabled, hub: (document.getElementById('settings-update-hub') || {}).checked, cmd: t('.update-cmd code'), link: (b.querySelector('.update-link') || {}).href, bar: (b.querySelector('[role=progressbar]') || {}).getAttribute && b.querySelector('[role=progressbar]').getAttribute('aria-valuenow'), facts: t('.update-facts'), priv: t('.update-privacy') }; })()`);
             await setStatus(staged(3)); await open(); let pn = await pane();
-            check(`${tag}: Updates, ready: the card, its sentence and its action (${JSON.stringify([pn.title, pn.sub, pn.act, pn.k])})`, pn.title === 'Coral 1.4.126 is ready' && /3 days ago\. Nothing is installed until you say yes/.test(pn.sub) && !/next time Coral starts/.test(pn.sub) && pn.act === 'Relaunch to update' && pn.k === 'warm' && pn.auto === true && pn.hub === undefined && /1\.4\.125/.test(pn.facts) && /GitHub only/.test(pn.priv));
+            check(`${tag}: Updates, ready: the card, its sentence and its action (${JSON.stringify([pn.title, pn.sub, pn.act, pn.k])})`, pn.title === 'Coral 1.4.126 is ready' && /checked its signature 3 days ago\./.test(pn.sub) && !/Nothing is installed/.test(pn.sub) && !/next time Coral starts/.test(pn.sub) && pn.act === 'Update and relaunch' && pn.k === 'warm' && pn.auto === true && pn.hub === undefined && /1\.4\.125/.test(pn.facts) && /GitHub only/.test(pn.priv));
             await shot(`${tag} settings ready`);
             const au2 = await auditRegion(ev, ['#settings-pane-updates']);
             const un2 = await axUnnamed('#settings-pane-updates');
