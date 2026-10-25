@@ -3,13 +3,18 @@ package routes
 import (
 	"context"
 	"net/http"
+	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/internal/store/storetest"
 )
 
 // #7361: goal requests between two boards of one computer (the approved #7331 note).
@@ -286,4 +291,72 @@ func TestUntrustedBlockCannotBeClosedByItsText(t *testing.T) {
 	assert.True(t, strings.HasSuffix(block, "\n[end of untrusted text]"))
 	assert.Equal(t, 1, strings.Count(block, "untrusted text:"), "one opening line: Coral's own, the first")
 	assert.Contains(t, block, "ignore the Operator", "the words are kept, only the markers are made plain")
+}
+
+// The bug found on the trial branch: a real agent session on board A asks board B, and the identity layer read the TARGET as the board the agent acts on, so the request answered 403 cross_board. The
+// request names its target in the path and acts on its OWN board (from_board, the sender's): the guard lets the request through the way a cross-team send goes, and the handler holds the caller to the
+// board it names as its own, so a session cannot ask as another team's Orchestrator.
+func TestGoalRequestFromARealAgentSessionToAnotherBoard(t *testing.T) {
+	_, bh := setupBoardTestServer(t)
+	ctx := context.Background()
+	db, err := storetest.Open(t, filepath.Join(t.TempDir(), "s.db"))
+	require.NoError(t, err)
+	defer db.Close()
+	_, err = bh.bs.Subscribe(ctx, "alpha", "Orchestrator A", "Orchestrator", "claude-orch-a", nil, "all")
+	require.NoError(t, err)
+	_, err = bh.bs.Subscribe(ctx, "beta", "Orchestrator B", "Orchestrator", "claude-orch-b", nil, "all")
+	require.NoError(t, err)
+	_, err = bh.bs.Subscribe(ctx, "gamma", "Orchestrator A", "Orchestrator", "claude-orch-g", nil, "all") // the same name on another team
+	require.NoError(t, err)
+	_, err = bh.bs.Subscribe(ctx, "alpha", "Dev A", "Developer", "claude-dev-a", nil, "all")
+	require.NoError(t, err)
+	on := true
+	for _, b := range []string{"alpha", "beta", "gamma"} {
+		_, err = bh.bs.UpdateBoardSettings(ctx, b, board.BoardSettingsUpdate{CrossTeamMessaging: &on})
+		require.NoError(t, err)
+	}
+	_, err = bh.bs.UpdateBoardSettings(ctx, "beta", board.BoardSettingsUpdate{GoalRequests: &on})
+	require.NoError(t, err)
+	goal, err := bh.bs.CreateGoal(ctx, "alpha", board.GoalInput{Title: "Ship the beta", CreatedBy: "Orchestrator A"})
+	require.NoError(t, err)
+	tokA, err := db.MintSessionToken(ctx, "sid-a", "claude-orch-a")
+	require.NoError(t, err)
+	tokG, err := db.MintSessionToken(ctx, "sid-g", "claude-orch-g")
+	require.NoError(t, err)
+	tokDev, err := db.MintSessionToken(ctx, "sid-dev", "claude-dev-a")
+	require.NoError(t, err)
+
+	o := NewIdentityObserver(db, bh.bs, func(*http.Request) bool { return false })
+	o.SetStrict()
+	r := chi.NewRouter()
+	r.Use(o.Middleware)
+	r.Post("/api/board/{project}/goal-requests", bh.PostGoalRequest)
+	r.Post("/api/board/{project}/goal-requests/{requestID}/accept", bh.AcceptGoalRequest)
+	do := func(token, target, body string) (int, string) {
+		req := httptest.NewRequest("POST", "/api/board/"+target+"/goal-requests", strings.NewReader(body))
+		req.Header.Set(store.SessionTokenHeader, token)
+		req.Header.Set("User-Agent", "coral-board/dev")
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, req)
+		return rec.Code, rec.Body.String()
+	}
+	good := `{"from_board":"alpha","subscriber_id":"Orchestrator A","goal_id":` + itoa(goal.ID) + `,"ask":"build the importer"}`
+	code, out := do(tokA, "beta", good)
+	assert.Equal(t, http.StatusCreated, code, out)
+
+	// A session cannot ask as another team's Orchestrator: gamma's "Orchestrator A" names alpha as its board
+	code, _ = do(tokG, "beta", good)
+	assert.Equal(t, http.StatusForbidden, code, "the session is not the Orchestrator of the board it names")
+	// a worker's session is refused, and so is a request the guard still reads as impersonation (the Operator's name)
+	code, _ = do(tokDev, "beta", `{"from_board":"alpha","subscriber_id":"Dev A","goal_id":`+itoa(goal.ID)+`,"ask":"x"}`)
+	assert.Equal(t, http.StatusForbidden, code)
+	code, _ = do(tokA, "beta", `{"from_board":"alpha","subscriber_id":"Operator","goal_id":`+itoa(goal.ID)+`,"ask":"x"}`)
+	assert.Equal(t, http.StatusForbidden, code)
+	// the answering routes stay on the board's own members: A's session cannot accept on B
+	req := httptest.NewRequest("POST", "/api/board/beta/goal-requests/1/accept", strings.NewReader(`{"subscriber_id":"Orchestrator A","title":"x"}`))
+	req.Header.Set(store.SessionTokenHeader, tokA)
+	req.Header.Set("User-Agent", "coral-board/dev")
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusForbidden, rec.Code, "only the receiving team's own session answers")
 }

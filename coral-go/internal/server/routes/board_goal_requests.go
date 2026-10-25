@@ -103,6 +103,17 @@ func (h *BoardHandler) PostGoalRequest(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	// The identity layer lets this request through to a board its session is not on (the target is in the path, as for a cross-team send), so the caller is held to the board it names as its own here: a
+	// session that carries a token must BE the active Orchestrator of from_board, in its own session (the cross-team send's rule), not merely share a name with one.
+	if owner, ok := VerifiedSession(ctx); ok && owner != nil {
+		if _, _, refusal, err := h.checkCrossTeamSender(ctx, body.FromBoard, actor, owner.SessionName); err != nil {
+			errInternalServer(w, err.Error())
+			return
+		} else if refusal != senderAllowed {
+			errForbidden(w, fmt.Sprintf("only an active Orchestrator of %q, from its own session, or the Operator can send its goal requests", body.FromBoard))
+			return
+		}
+	}
 	recipients, refused := h.crossTeamRecipients(ctx, body.FromBoard, target, "")
 	if refused != nil {
 		refused(w)

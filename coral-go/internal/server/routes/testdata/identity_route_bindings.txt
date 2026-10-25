@@ -135,7 +135,7 @@ POST /api/board/{project}/cross-team/files/disable | board-claims | operator-onl
 POST /api/board/{project}/cross-team/files/enable | board-claims | operator-only
 POST /api/board/{project}/external-artifacts | board-claims
 POST /api/board/{project}/external-messages | board-claims +token-session
-POST /api/board/{project}/goal-requests | board-claims
+POST /api/board/{project}/goal-requests | board-claims +token-session
 POST /api/board/{project}/goal-requests/{requestID}/accept | board-claims
 POST /api/board/{project}/goal-requests/{requestID}/decline | board-claims
 POST /api/board/{project}/goals | board-claims
