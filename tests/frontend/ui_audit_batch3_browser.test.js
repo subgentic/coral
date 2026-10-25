@@ -26,25 +26,32 @@ const BASE = require('./test_base').BASE;
                 console.log(`1. (${w}) Terminal: one title each, the whole explanation under Learn more`);
                 await open('terminal');
                 await waitFor(`!document.getElementById('settings-terminal-backend').hidden && !document.getElementById('tb-choice').hidden`, 'the backend row', 10000);
-                const tb = await ev(`(() => { const vis = e => e.checkVisibility({ checkVisibilityCSS: true }); return [...document.querySelectorAll('#settings-terminal-backend .tb-opt')].map(l => ({ short: l.querySelector('.tb-t').textContent.trim(), shortLen: l.querySelector('.tb-t').textContent.trim().length, fullShown: vis(l.querySelector('.tb-d')), learn: l.querySelector('.tb-learn').textContent, expanded: l.querySelector('.tb-learn').getAttribute('aria-expanded'), full: l.querySelector('.tb-d').textContent.length })); })()`);
+                const tb = await ev(`(() => { const vis = e => e.checkVisibility({ checkVisibilityCSS: true }); return [...document.querySelectorAll('#settings-terminal-backend .tb-opt')].map(l => ({ short: l.querySelector('.tb-t').textContent.trim(), shortLen: l.querySelector('.tb-t').textContent.trim().length, fullShown: vis(l.querySelector('.tb-d')), full: l.querySelector('.tb-d').textContent.length })); })()`);
                 assert.equal(tb.length, 2);
-                for (const t of tb) { assert.ok(t.shortLen < 140 && !t.fullShown && t.learn === 'Learn more' && t.expanded === 'false' && t.full > 300, JSON.stringify(t)); }
+                for (const t of tb) { assert.ok(t.shortLen < 140 && !t.fullShown && t.full > 300, JSON.stringify(t)); }
                 assert.equal(tb[0].short, 'tmux'); assert.equal(tb[1].short, 'pty (default)'); // the card is its name and one line, no line repeats it (#6263, #7405)
                 assert.match(await ev(`document.getElementById('tb-d-tmux').textContent`), /any other program running as you, can find that socket/, 'the access warning moved into Learn more, whole');
                 const os = await ev(`[...document.querySelectorAll('#settings-terminal-backend .tb-opt .tb-d')].map(d => ({ os: (d.querySelector('.tb-d-os') || {}).textContent || '', shown: d.checkVisibility({ checkVisibilityCSS: true }) }))`);
-                assert.ok(os.length === 2 && os.every(o => !o.shown && o.os.length > 100), 'the operating system note ends each backend\'s Learn more, closed at first, said once (no third Learn more): ' + JSON.stringify(os));
-                assert.equal(await ev(`document.querySelectorAll('#settings-terminal-backend .tb-opt .tb-learn').length`), 2);
+                assert.ok(os.length === 2 && os.every(o => !o.shown && o.os.length > 100), 'the operating system note ends each backend\'s Learn more, closed at first, said once: ' + JSON.stringify(os));
+                assert.equal(await ev(`document.querySelectorAll('#settings-terminal-backend .tb-learn:not([hidden])').length`), 1, 'the backend card has one Learn more (#7636)');
+                assert.equal(await ev(`document.querySelectorAll('#settings-terminal-backend .tb-opt .tb-learn').length`), 0);
+                const wake = await ev(`(() => { const a = document.getElementById('tb-autowake'); if (!a || a.hidden) return null; const c = document.getElementById('tb-autowake-on').getBoundingClientRect(), r = a.getBoundingClientRect(); return { fromEdge: Math.round(r.right - c.right), first: document.querySelector('#tb-autowake label').firstElementChild.tagName }; })()`);
+                if (wake) assert.ok(wake.fromEdge < 12 && wake.first === 'SPAN', 'Wake agents after a restart: the label first, its switch at the far end like every other row (#7636): ' + JSON.stringify(wake));
                 await shot('terminal-short', w);
-                await ev(`document.querySelector('#tb-opt-pty').checked = false; document.querySelector('#settings-terminal-backend .tb-learn[aria-controls=tb-d-pty]').click(); true`);
-                const opened = await ev(`(() => { const d = document.getElementById('tb-d-pty'); return { shown: d.checkVisibility({ checkVisibilityCSS: true }), text: d.textContent, label: document.querySelector('.tb-learn[aria-controls=tb-d-pty]').textContent, expanded: document.querySelector('.tb-learn[aria-controls=tb-d-pty]').getAttribute('aria-expanded'), radioChanged: document.getElementById('tb-opt-pty').checked }; })()`);
+                await ev(`document.querySelector('#tb-opt-pty').checked = false; document.querySelector('#tb-learn-backends').click(); true`);
+                const opened = await ev(`(() => { const d = document.getElementById('tb-d-pty'); return { shown: d.checkVisibility({ checkVisibilityCSS: true }), text: d.textContent, label: document.querySelector('#tb-learn-backends').textContent, expanded: document.querySelector('#tb-learn-backends').getAttribute('aria-expanded'), radioChanged: document.getElementById('tb-opt-pty').checked }; })()`);
                 assert.ok(opened.shown && opened.label === 'Show less' && opened.expanded === 'true' && /puts them to sleep first when it stops cleanly/.test(opened.text), JSON.stringify(opened).slice(0, 200));
-                const learnName = await ev(`document.querySelector('.tb-learn[aria-controls=tb-d-pty]').getAttribute('aria-label')`);
-                assert.equal(learnName, 'Show less: pty', 'an open Learn more is named by its visible words and what it explains: ' + learnName);
+                const learnName = await ev(`document.querySelector('#tb-learn-backends').getAttribute('aria-label')`);
+                assert.equal(learnName, 'Show less: the terminal backends', 'an open Learn more is named by its visible words and what it explains: ' + learnName);
                 assert.equal(opened.radioChanged, false, 'Learn more does not choose the backend');
                 await shot('terminal-learn', w);
                 await ev(`window.hideSettingsModal(); true`);
             }
 
+            console.log(`1b. (${w}) Notifications: every hint is one sentence with a full stop`);
+            await open('notifications');
+            const hints = await ev(`[...document.querySelectorAll('#settings-pane-notifications .settings-hint, #settings-pane-notifications .toggle-desc')].filter(h => h.checkVisibility()).map(h => h.textContent.trim())`);
+            assert.ok(hints.length >= 2 && hints.every(h => /\.$/.test(h) && !/\.\s+\S/.test(h)), 'one sentence each, with a full stop (#7636): ' + JSON.stringify(hints));
             console.log(`2. (${w}) General: the machine health is part of About`);
             await open('general');
             assert.deepEqual(await ev(`(() => { const a = document.getElementById('about-section'); const h = document.getElementById('machine-health-local'); return { inAbout: a.contains(h), order: [...a.children].map(c => c.id || c.className.split(' ')[0]) }; })()`).then(r => r.inAbout), true);

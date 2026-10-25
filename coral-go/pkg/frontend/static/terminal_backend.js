@@ -105,11 +105,12 @@ export async function loadTerminalBackendRow() {
         b._tbWired = true;
         nameLearn(b);
         b.addEventListener('click', () => {
-            const target = document.getElementById(b.getAttribute('aria-controls'));
-            if (!target) return;
-            target.hidden = !target.hidden;
-            b.setAttribute('aria-expanded', String(!target.hidden));
-            b.textContent = target.hidden ? 'Learn more' : 'Show less';
+            const targets = b.getAttribute('aria-controls').split(/\s+/).map(id => document.getElementById(id)).filter(Boolean); // the card's one Learn more opens both backends' texts
+            if (!targets.length) return;
+            const open = targets[0].hidden;
+            for (const t of targets) t.hidden = !open;
+            b.setAttribute('aria-expanded', String(open));
+            b.textContent = open ? 'Show less' : 'Learn more';
             nameLearn(b);
         });
     }

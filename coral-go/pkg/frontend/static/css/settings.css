@@ -52,7 +52,7 @@
 /* Wake agents after a restart: a switch row of its own under the backend cards */
 #settings-modal .tb-autowake.settings-row-switch { margin: 12px 0 0; padding: 12px 0 0; border-top: 1px solid var(--border-subtle); display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
 #settings-modal .tb-autowake[hidden] { display: none; }
-#settings-modal .tb-autowake-on { display: flex; align-items: center; gap: 12px; font: var(--dlg-label); }
+#settings-modal .tb-autowake-on { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; font: var(--dlg-label); } /* the switch at the far end of its row, like every other (#7636) */
 #settings-modal .tb-autowake-on input[type="checkbox"] { appearance: none; -webkit-appearance: none; position: relative; width: 2.5rem; height: 1.4rem; margin: 0; flex: none; border-radius: 1rem; border: 1px solid var(--control-border); background: var(--bg-hover); cursor: pointer; }
 #settings-modal .tb-autowake-on input[type="checkbox"]::before { content: ""; position: absolute; top: 2px; left: 2px; width: calc(1.4rem - 8px); height: calc(1.4rem - 8px); border-radius: 50%; background: var(--text-secondary); transition: transform .12s; }
 #settings-modal .tb-autowake-on input[type="checkbox"]:checked { background: var(--accent-dim); border-color: var(--accent-dim); }
