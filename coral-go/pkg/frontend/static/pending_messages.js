@@ -141,10 +141,8 @@ export function appendCoralNotice(container, text, health = false) {
         badge.title = `${count} notices from Coral in a row`;
         return;
     }
-	// A notice after a folded reply (the previous turn's end) starts a group of its own, so each turn keeps its label.
-	const ended = tail && tail.classList.contains("work-group") && tail.querySelector(":scope > .work-group-body").lastElementChild?.classList.contains("folded-reply");
 	appendWork(container, makeBubble(`chat-system ${noticeClass}`,
-		`<span class="material-icons" aria-hidden="true">${health ? "health_and_safety" : "notifications"}</span><span class="chat-system-label">${health ? "Coral · Health check" : "Coral"}</span><span class="chat-system-text" title="${escapeHtml(text)}">${escapeHtml(text)}</span>`), { newGroup: !!ended });
+		`<span class="material-icons" aria-hidden="true">${health ? "health_and_safety" : "notifications"}</span><span class="chat-system-label">${health ? "Coral · Health check" : "Coral"}</span><span class="chat-system-text" title="${escapeHtml(text)}">${escapeHtml(text)}</span>`));
 }
 
 export function normalizeNudgeText(content) {

@@ -5,7 +5,8 @@ const { connect } = require('./agent_view_harness');
 
 const call = (id, label) => [{ type: 'assistant', text: '', tool_uses: [{ name: 'Bash', tool_use_id: id, input_summary: label, description: label }] }, { type: 'tool_result', tool_use_id: id, tool_name: 'Bash', content: 'ok' }];
 const NOTICE = "You have 2 unread messages on the message board. Run 'coral-board read' to see them.";
-const turn = (n, reply) => [{ type: 'user', content: NOTICE }, ...call('c' + n, 'Read ' + n), { type: 'assistant', text: reply }];
+// A turn is a notice, a one-line preamble and a step. Side-by-side groups no longer come from one render (a reply stays on the page and ends the run, #7419): they come from pages joined at a seam.
+const turn = (n, text) => [{ type: 'user', content: NOTICE }, { type: 'assistant', text, tool_uses: [{ name: 'Bash', tool_use_id: 'c' + n, input_summary: 'Read ' + n, description: 'Read ' + n }] }, { type: 'tool_result', tool_use_id: 'c' + n, tool_name: 'Bash', content: 'ok' }];
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -22,10 +23,13 @@ const turn = (n, reply) => [{ type: 'user', content: NOTICE }, ...call('c' + n, 
             box.className = 'chat-messages chat-prose'; box.style.cssText = 'position:absolute;left:0;top:0;width:860px;height:600px;overflow:auto;background:var(--bg-primary);z-index:99999;padding:12px';
             document.body.appendChild(box); return true; })()`);
         const render = (box, msgs) => ev(`window.__lc.renderTranscript(${JSON.stringify(msgs)}, document.getElementById(${JSON.stringify(box)}), 'claude')`);
+        // join: a page rendered apart and put after what the box holds, then the runs rolled up again (what a page joined at a seam gets).
+        const join = (box, msgs) => ev(`(async () => { const b = document.getElementById(${JSON.stringify(box)}); const tmp = document.createElement('div'); window.__lc.renderTranscript(${JSON.stringify(msgs)}, tmp, 'claude'); while (tmp.firstChild) b.appendChild(tmp.firstChild); (await import((window.__coralStatic || '/static/') + 'chat_content.js')).rollUpGroups(b); return true; })()`);
 
         // (1) Chat find (it also counts the group's own hidden summary, which repeats the reply's first sentence): a match inside a group folded under a closed bar opens the bar (and shows the match).
         await fresh('live-history-messages');
-        await render('live-history-messages', [{ type: 'user', content: 'Watch the batch' }, ...turn(1, 'First reply.'), ...turn(2, 'The zanzibar deploy key was rotated.'), ...turn(3, 'Third reply.')]);
+        await render('live-history-messages', [{ type: 'user', content: 'Watch the batch' }]);
+        for (const page of [turn(1, 'First reply.'), turn(2, 'The zanzibar deploy key was rotated.'), turn(3, 'Third reply.')]) await join('live-history-messages', page);
         assert.equal(await ev(`document.querySelectorAll('#live-history-messages > .work-rollup').length`), 1, 'one bar over the three groups');
         assert.equal(await vis('#live-history-messages > .work-rollup + .work-group'), false, 'the groups start hidden under the closed bar');
         await ev(`window.toggleChatFind()`);
@@ -44,18 +48,18 @@ const turn = (n, reply) => [{ type: 'user', content: NOTICE }, ...call('c' + n, 
         const bar = () => ev(`(() => { const b = document.querySelector('#ru-box > .work-rollup'); return b ? { open: b.open, hidden: [...document.querySelectorAll('#ru-box > .work-group')].map(g => g.hidden) } : null; })()`);
         assert.equal(await bar(), null, 'a lone group has no bar');
         await ev(`document.querySelector('#ru-box > .work-group').open = true`);
-        await render('ru-box', turn(5, 'Second.'));
+        await join('ru-box', turn(5, 'Second.'));
         assert.deepEqual(await bar(), { open: true, hidden: [false, false] }, 'the group the reader had open stays shown when the bar forms around it');
-        await render('ru-box', turn(6, 'Third.'));
+        await join('ru-box', turn(6, 'Third.'));
         assert.deepEqual(await bar(), { open: true, hidden: [false, false, false] }, 'and the bar stays open while the next group streams in');
         await fresh('ru-box');
         await render('ru-box', [{ type: 'user', content: 'Go' }, ...turn(7, 'Alone.')]);
         await ev(`(() => { const s = document.querySelector('#ru-box > .work-group > .work-group-summary'); s.tabIndex = 0; s.focus(); return document.activeElement === s; })()`);
-        await render('ru-box', turn(8, 'Second.'));
+        await join('ru-box', turn(8, 'Second.'));
         assert.deepEqual(await bar(), { open: true, hidden: [false, false] }, 'a group holding focus is not hidden when the bar forms');
         await fresh('ru-box');
         await render('ru-box', [{ type: 'user', content: 'Go' }, ...turn(9, 'Alone.')]);
-        await render('ru-box', turn(10, 'Second.'));
+        await join('ru-box', turn(10, 'Second.'));
         assert.deepEqual(await bar(), { open: false, hidden: [true, true] }, 'control: nothing open or focused, the bar is created closed');
         console.log('   ✓ a bar formed around an open or focused group is open');
 
@@ -63,7 +67,9 @@ const turn = (n, reply) => [{ type: 'user', content: NOTICE }, ...call('c' + n, 
         // What loadMoreHistory does with an older page: prepend it, stitch the seam, then roll the runs up again.
         // The newer page opens with a notice turn (its first group is the rest of the older page's tool run), then two more, so it opens with a bar.
         const out = await ev(`(async () => { const m = window.__lc; const box = document.createElement('div'); document.body.appendChild(box);
-            m.renderTranscript(${JSON.stringify([{ type: 'user', content: NOTICE }, ...call('n1', 'Step three'), ...call('n2', 'Step four'), { type: 'assistant', text: 'Fine.' }, ...turn(12, 'Fine again.'), ...turn(13, 'Fine once more.')])}, box, 'claude');
+            m.renderTranscript(${JSON.stringify([{ type: 'user', content: NOTICE }, ...call('n1', 'Step three'), ...call('n2', 'Step four')])}, box, 'claude');
+            for (const page of ${JSON.stringify([turn(12, 'Fine again.'), turn(13, 'Fine once more.')])}) { const t2 = document.createElement('div'); m.renderTranscript(page, t2, 'claude'); while (t2.firstChild) box.appendChild(t2.firstChild); }
+            (await import((window.__coralStatic || '/static/') + 'chat_content.js')).rollUpGroups(box); // the newer page opens with a notice turn's group, then two more: a bar
             const tmp = document.createElement('div');
             m.renderTranscript(${JSON.stringify([{ type: 'user', content: 'Go' }, ...call('o1', 'Step one'), ...call('o2', 'Step two')])}, tmp, 'claude');
             const lastOlder = tmp.lastElementChild; const firstNewer = box.firstChild;

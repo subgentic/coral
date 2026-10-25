@@ -6,8 +6,9 @@ const { connect } = require('./agent_view_harness');
 
 const call = (id, label) => [{ type: 'assistant', text: '', tool_uses: [{ name: 'Bash', tool_use_id: id, input_summary: label, description: label }] }, { type: 'tool_result', tool_use_id: id, tool_name: 'Bash', content: 'ok' }];
 const NOTICE = "You have 2 unread messages on the message board. Run 'coral-board read' to see them.";
-const turn = (n, label, reply) => [{ type: 'user', content: NOTICE }, ...call('c' + n, label), { type: 'assistant', text: reply }];
-const fixture = [{ type: 'user', content: 'Watch' }, ...turn(1, 'first-label', 'One.'), ...turn(2, 'second-label unique-xyzzy', 'Two.'), ...turn(3, 'third-label', 'Three.')];
+// A turn is a notice and its steps. Side-by-side groups no longer come from one render (a reply stays on the page and ends the run, #7419): they come from pages joined at a seam, which rollUpGroups folds into one bar.
+const turn = (n, label) => [{ type: 'user', content: NOTICE }, ...call('c' + n, label)];
+const pages = [turn(1, 'first-label'), turn(2, 'second-label unique-xyzzy'), turn(3, 'third-label')];
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, sleep, PRELOAD, install } = await connect();
@@ -23,7 +24,7 @@ const fixture = [{ type: 'user', content: 'Watch' }, ...turn(1, 'first-label', '
         await sleep(600); // sleep-ok: the first live list renders from several answers; no single completion event
         await ev(`window.selectLiveSession('ru-bot', 'claude', 'ru-bot-id', 'local'); true`);
         await waitFor(`(() => { const c = document.getElementById('live-history-messages'); return !!c && c.offsetParent !== null; })()`, 'the live chat', 10000);
-        await ev(`import((window.__coralStatic || '/static/') + 'live_chat.js').then(m => { window.__lc = m; const c = document.getElementById('live-history-messages'); c.innerHTML = ''; m.renderTranscript(${JSON.stringify(fixture)}, c, 'claude'); return true; })`);
+        await ev(`import((window.__coralStatic || '/static/') + 'live_chat.js').then(m => { window.__lc = m; window.__run = async (c, n) => { c.innerHTML = ''; m.renderTranscript([{ type: 'user', content: 'Watch' }], c, 'claude'); const cc = await import((window.__coralStatic || '/static/') + 'chat_content.js'); for (const page of window.__pages.slice(0, n)) { const tmp = document.createElement('div'); m.renderTranscript(page, tmp, 'claude'); while (tmp.firstChild) c.appendChild(tmp.firstChild); } cc.rollUpGroups(c); return true; }; const c = document.getElementById('live-history-messages'); window.__pages = ${JSON.stringify(pages)}; return window.__run(c, 3); })`);
         const C = '#live-history-messages';
 
         // 1. closed by the reader, with an inner group expanded: a streamed group does not reopen it
@@ -37,14 +38,14 @@ const fixture = [{ type: 'user', content: 'Watch' }, ...turn(1, 'first-label', '
         ok('a bar the reader closed stays closed when another group streams in, and counts it');
 
         // 2. a bar newly formed around a group the reader had open is still open (round 2's rule)
-        await ev(`(() => { const c = document.querySelector('${C}'); c.innerHTML = ''; window.__lc.renderTranscript(${JSON.stringify(fixture.slice(0, 5))}, c, 'claude'); const g = c.querySelector('.work-group'); g.open = true; g.querySelector('summary').focus(); return true; })()`);
+        await ev(`(async () => { const c = document.querySelector('${C}'); await window.__run(c, 1); const g = c.querySelector('.work-group'); g.open = true; g.querySelector('summary').focus(); return true; })()`);
         await ev(`import((window.__coralStatic || '/static/') + 'chat_content.js').then(m => { const c = document.querySelector('${C}'); const u = document.createElement('div'); u.className = 'chat-bubble human'; u.textContent = ${JSON.stringify(NOTICE)}; m.appendWork(c, u, { newGroup: true }); const d = document.createElement('div'); d.className = 'chat-bubble'; d.textContent = 'x'; m.appendWork(c, d); return true; })`);
         assert.equal(await ev(`document.querySelector('${C} .work-rollup').open`), true, 'a new bar around an open, focused group starts open');
         assert.equal(await ev(`document.activeElement === document.querySelector('${C} .work-group summary')`), true, 'focus kept');
         ok('a bar formed around an open, focused group starts open and keeps focus');
 
         // 3. find: one match is "1 of 1", the reveal shows it
-        await ev(`(() => { const c = document.querySelector('${C}'); c.innerHTML = ''; window.__lc.renderTranscript(${JSON.stringify(fixture)}, c, 'claude'); return true; })()`);
+        await ev(`(async () => { const c = document.querySelector('${C}'); await window.__run(c, 3); return true; })()`);
         await ev(`window.toggleChatFind(); true`);
         await ev(`(() => { const i = document.querySelector('.chat-find-input'); i.value = 'unique-xyzzy'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
         await waitFor(`/of/.test(document.querySelector('.chat-find-count').textContent)`, 'the count');
