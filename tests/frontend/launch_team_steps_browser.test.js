@@ -3,13 +3,14 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'settings');
         await ev(`(async () => { window.__teamLaunches = [];
             const real = window.fetch; const json = (b, status = 200) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { 'content-type': 'application/json' } }));
             window.fetch = (u, o = {}) => { const p = new URL(String(u), location.href), m = o.method || 'GET';

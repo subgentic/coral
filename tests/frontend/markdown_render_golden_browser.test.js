@@ -7,6 +7,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const GOLDEN = path.join(__dirname, 'fixtures', 'markdown_render_golden.json');
 
 const SAMPLES = {
@@ -34,7 +35,7 @@ const SAMPLES = {
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'settings');
         const html = await ev(`(async () => {
             const st = window.__coralStatic || '/static/';
             const v = await import(st + 'vendor_loader.js'); await v.loadHighlight();

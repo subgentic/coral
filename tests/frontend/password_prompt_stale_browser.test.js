@@ -4,6 +4,7 @@
 // /api/system/auth-status is stubbed on the page. Run against an isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -12,7 +13,7 @@ const { connect } = require('./agent_view_harness');
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`(() => { const R = window.fetch; window.__ps = false; window.__statusCalls = 0; window.__changed = 0;
             document.addEventListener('coral:password-changed', () => { window.__changed++; });
             window.fetch = (u, o = {}) => { if (String(u).startsWith('/api/system/auth-status')) { window.__statusCalls++; return Promise.resolve(new Response(JSON.stringify({ authenticated: true, method: 'session', password_set: window.__ps, local: true }), { status: 200 })); } return R(u, o); };

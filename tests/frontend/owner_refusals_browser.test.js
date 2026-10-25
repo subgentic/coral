@@ -33,7 +33,7 @@ const CASES = [
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         const fresh = async () => {
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await require('./helpers/wait').coralReady(ev);
             // what each owner-only route answers is set per scenario: window.__ans = { settings: {status, code}|null, inspection: ..., put: ..., get: ... }
             await ev(`(() => { const R = window.fetch; window.__ans = {};
                 const json = (b, s = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } }));

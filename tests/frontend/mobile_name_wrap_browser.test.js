@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, PRELOAD, install } = await connect();
@@ -10,7 +11,7 @@ const BASE = require('./test_base').BASE;
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
         await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'settings');
         await ev(`(async () => { const st = window.__coralStatic || '/static/'; const ws = await import(st + 'websocket.js'); const render = await import(st + 'render.js'); const { state } = await import(st + 'state.js');
             if (state.coralWs) { state.coralWs.onclose = null; state.coralWs.onmessage = null; try { state.coralWs.close(); } catch {} }
             const names = ['release-engineering-coordinator-4-9', 'backend-platform-reliability-engineer-4-7', 'qa', 'data-pipeline-quality-analyst-4-10'];

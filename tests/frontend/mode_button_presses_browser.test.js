@@ -3,6 +3,7 @@
 // The keys go through the page's own sendModeToggle; the route that takes them is stubbed and records what it is sent. Drives Chrome over CDP against the isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 const STUB = `(() => { const R = window.fetch; window.__keys = [];
     window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin);
@@ -15,7 +16,7 @@ const STUB = `(() => { const R = window.fetch; window.__keys = [];
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`localStorage.clear(); true`);
         await ev(STUB);
         await select('mp-claude');

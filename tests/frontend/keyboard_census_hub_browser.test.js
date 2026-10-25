@@ -6,6 +6,7 @@ const { connect } = require('./agent_view_harness');
 const { tap: tapSel, required } = require('./helpers/phone_targets');
 const kb = require('./helpers/keyboard_census');
 const { setupHubWorld, BASE } = require('./helpers/hub_world');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor } = await connect();
@@ -24,7 +25,7 @@ const { setupHubWorld, BASE } = require('./helpers/hub_world');
         await setupHubWorld({ client, Page, Emulation, width: 1280, height: 800, mobile: false });
         const run = async tag => {
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
-        await waitFor(`typeof window.switchNavTab==='function' && !!window.__coralReady`, 'dashboard'); await ev(`window.__coralReady.startup('liveList','settings')`);
+        await waitFor(`typeof window.switchNavTab==='function' && !!window.__coralReady`, 'dashboard'); await coralReady(ev, 'startup', 'liveList', 'settings');
                 const nav = async tab => { await ev(`window.switchNavTab('${tab}'); true`); };
         await sc(`${tag}: hub: home`, async () => { await waitFor(`document.querySelectorAll('button, a[href]').length > 5`, 'home'); });
         await sc(`${tag}: hub: chats list`, async () => { await nav('history'); await waitFor(`document.getElementById('history-sessions-list').textContent.includes('Laptop conversation')`, 'history'); });
@@ -58,7 +59,7 @@ const { setupHubWorld, BASE } = require('./helpers/hub_world');
         // no computer connected (#6351): the home is one "Connect your first computer" panel with its link
         const noComputers = await Page.addScriptToEvaluateOnNewDocument({ source: 'window.__noComputers = true;' });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
-        await waitFor(`typeof window.switchNavTab==='function' && !!window.__coralReady`, 'dashboard'); await ev(`window.__coralReady.startup('liveList','settings')`);
+        await waitFor(`typeof window.switchNavTab==='function' && !!window.__coralReady`, 'dashboard'); await coralReady(ev, 'startup', 'liveList', 'settings');
         await sc(`${tag}: hub: home, no computer connected`, async () => { await waitFor(`/Connect your first computer/.test(document.body.textContent) && !!document.querySelector('a[href="/machines/add"]')`, 'the connect panel', 10000); }, { expect: `[...document.querySelectorAll('a[href="/machines/add"]')].some(a => a.getClientRects().length > 0)` });
         await Page.removeScriptToEvaluateOnNewDocument({ identifier: noComputers.identifier });
         };

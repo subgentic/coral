@@ -9,6 +9,7 @@ const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const GOLDEN = path.join(__dirname, 'fixtures', 'live_list_golden.json');
 const sha = t => require('node:crypto').createHash('sha256').update(t).digest('hex');
+const { coralReady } = require('./helpers/wait');
 const SAMPLES = ['desktop: team first', 'desktop: hub, grouped by server'];
 
 const S = (n, o = {}) => ({ name: 'n-' + n, session_id: '0000000' + n + '-0000-4000-8000-00000000000' + n, agent_type: 'claude', server: 'local', status: 'working', summary: 'Task ' + n, display_name: 'Agent ' + n,
@@ -39,7 +40,7 @@ const SESSIONS = [
         const open = async (w, mobile) => {
             await Emulation.setDeviceMetricsOverride({ width: w, height: 900, deviceScaleFactor: 1, mobile });
             await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'settings');
         };
         const render = (settings, filter) => ev(`(async () => {
             const st = window.__coralStatic || '/static/';

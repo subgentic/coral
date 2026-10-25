@@ -5,6 +5,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -16,7 +17,7 @@ const BASE = require('./test_base').BASE;
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`(() => { T.state.liveSessions = []; window.__m.agents = {}; for (let i = 0; i < 48; i++) window.__m.add('agent-' + String(i).padStart(2, '0'), 'A', 3, { sleeping: false });
             T.state.liveSessions.forEach((s, i) => { s.board_name = 'team-' + Math.floor(i / 6); s.board_project = s.board_name; }); T.render.renderLiveSessions(T.state.liveSessions); return true; })()`);
         await waitFor(`document.querySelectorAll('#live-sessions-list > li').length >= 8`, 'the groups', 8000);

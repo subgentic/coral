@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const BUDGET = { chooser: 18, /* +1: the title "New agent or team" (#7064) */ agent: 16, more: 53 }; // more: 40 + one: counted with the agent choice built ("Agent:" and the four names, which replaced the form's own Agent Type label and select), the machine's "not installed" marks left out; agent: 12 + the new-account line under the folder ("Pick your project folder.", #6370 item 3: gone once a folder was used) // the phone's select shows one section name, so it is under these
 
@@ -20,7 +21,7 @@ const BUDGET = { chooser: 18, /* +1: the title "New agent or team" (#7064) */ ag
             const tag = `${w}px`;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             await ev(`(async () => { await window.showLaunchModal(); return true; })()`);
             await waitFor(`getComputedStyle(document.getElementById('launch-step-chooser')).display !== 'none'`, `${tag}: the chooser`, 8000);
             let n = await words();

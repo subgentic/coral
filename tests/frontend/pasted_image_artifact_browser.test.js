@@ -7,6 +7,7 @@ const { connect } = require('./agent_view_harness');
 const { launchStandIn } = require('./helpers/stand_in_agent');
 const { guardSettings } = require('./helpers/settings_guard');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 async function httpJson(method, p, body, headers = {}) {
     const r = await fetch(BASE + p, { method, headers: { 'Content-Type': 'application/json', ...headers }, body: body === undefined ? undefined : JSON.stringify(body) });
@@ -33,7 +34,7 @@ async function httpJson(method, p, body, headers = {}) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
             await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             // record the upload replies and what Send types into the agent (the send itself answers ok and goes nowhere); the Hub status is stubbed per test
             await ev(`(() => { const real = window.fetch; window.__rec = { uploads: [], sends: [], puts: [], deletes: [] }; window.__hub = { state: 'off' };
                 window.fetch = async (u, o = {}) => { const url = String(u), m = (o.method || 'GET').toUpperCase();

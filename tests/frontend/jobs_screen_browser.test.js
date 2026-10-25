@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const S = `(window.__coralStatic || '/static/')`;
 
 (async () => {
@@ -40,7 +41,7 @@ const S = `(window.__coralStatic || '/static/')`;
             const at = `${w}px`;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'settings');
             await ev(`window.switchNavTab('jobs'); true`);
             await waitFor(`document.querySelectorAll('#scheduled-jobs-list .sched-row').length === 3`, `${at}: the three jobs listed at once`, 8000);
 

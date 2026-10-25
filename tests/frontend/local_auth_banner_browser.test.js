@@ -6,6 +6,7 @@
 const assert = require('node:assert/strict');
 const { safePaused } = require('./helpers/paused');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 const TEXT = 'Local sign-in is OFF: any program on this computer can use Coral.';
 const FAKE = `(() => {
@@ -34,7 +35,7 @@ const FAKE = `(() => {
         await Page.addScriptToEvaluateOnNewDocument({ source: FAKE });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await load();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
 
         // off: shown at startup
         await waitFor(`!document.getElementById('local-auth-banner').hidden`, 'the banner at startup', 15000);
