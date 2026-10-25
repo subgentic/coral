@@ -93,7 +93,7 @@ export async function checkTmux(force = false) {
         if (!current(banner,controller)) return;
         if (data.tmux_available || data.tmux_required === false || data.effective_backend === 'pty') { banner.style.display='none'; return; }
         title.textContent = 'tmux is not installed.';
-        message.textContent = 'Install it to use tmux-backed agents.';
+        message.textContent = 'Coral needs it to run agents.';
         const install = data.tmux_install_command;
         command.hidden = !install;
         document.getElementById('tmux-missing-banner-cmd-text').textContent = install || '';

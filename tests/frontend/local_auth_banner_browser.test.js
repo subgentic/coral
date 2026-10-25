@@ -7,7 +7,7 @@ const assert = require('node:assert/strict');
 const { safePaused } = require('./helpers/paused');
 const { connect } = require('./agent_view_harness');
 
-const TEXT = 'Local sign-in is OFF: any program on this computer can use Coral.';
+const TEXT = 'Sign-in is off: any program on this computer can use Coral without a password.';
 const FAKE = `(() => {
     window.__auth = { strict_local_auth: false };
     const inner = window.fetch;
