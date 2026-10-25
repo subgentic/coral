@@ -20,16 +20,16 @@ const hex = i => i.toString(16).padStart(20, '0');
     const api = (method, path, body) => ev(`fetch(${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, headers: { 'Content-Type': 'application/json' }, body: ${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'} }).then(async r => ({ status: r.status, body: await r.json().catch(() => ({})) }))`);
     const settle = (cond, label) => waitFor(cond, label, 8000);
     // the sidebar slides open: a picture is taken once it has its width, with the Saved tab showing
-    const shotSaved = async name => { if (await ev(`(() => { const t = document.getElementById('group-table-view'); return t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved'; })()`)) return shot(name); await settle(`(() => { const ui = document.getElementById('saved-ui'); if (!ui || !ui.getClientRects().length) return false; const dock = document.getElementById('agentic-state'); if (dock && dock.contains(ui) && dock.getBoundingClientRect().width < Math.min(300, innerWidth - 40)) return false; const h = document.getElementById('saved-scope').getBoundingClientRect(), li = document.querySelector('#saved-list > li'); return (document.body.dataset.savedScope === 'all' || (h.width > 0 && h.top >= 0 && h.top < innerHeight / 2)) && !!li && li.getBoundingClientRect().top < innerHeight; })() /* in the Inbox the "All saved" heading is not drawn (the tab says it, #6300) */`, 'the Saved list on screen (the page on home, the sidebar for an agent or a team)'); await waitFor(`true`, 'a frame', 2000); await shot(name); };
+    const shotSaved = async name => { if (await ev(`(() => { const t = document.getElementById('group-table-view'); return t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved'; })()`)) return shot(name); await settle(`(() => { const ui = document.getElementById('saved-ui'); if (!ui || !ui.getClientRects().length) return false; const dock = document.getElementById('agentic-state'); if (dock && dock.contains(ui) && dock.getBoundingClientRect().width < Math.min(300, innerWidth - 40)) return false; const h = document.getElementById('saved-scope').getBoundingClientRect(), li = document.querySelector('#saved-table tbody tr, #saved-table .empty-line'); return (document.body.dataset.savedScope === 'all' || (h.width > 0 && h.top >= 0 && h.top < innerHeight / 2)) && !!li && li.getBoundingClientRect().top < innerHeight; })() /* in the Inbox the "All saved" heading is not drawn (the tab says it, #6300) */`, 'the Saved list on screen (the page on home, the sidebar for an agent or a team)'); await waitFor(`true`, 'a frame', 2000); await shot(name); };
     // what is on top at the middle of the heading is the Saved panel's own (a team's chat once covered the side panel on a phone)
     const onTop = () => ev(`(() => { const h = document.getElementById('saved-scope').getBoundingClientRect(); const e = document.elementFromPoint(h.left + Math.min(h.width, 40) / 2, h.top + h.height / 2); return !!e && !!e.closest('#agentic-panel-saved'); })()`);
     // Home is the Inbox's Saved table (everything's list: its title says Saved, its chips the counts); an agent's or a team's is the dock's list.
     const SNAP = `(() => { const t = document.getElementById('group-table-view'), inbox = !!t && t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved', n = c => c && c.textContent !== '0' ? '(' + c.textContent + ')' : '';
         return {
         heading: inbox ? 'All saved' : (document.getElementById('saved-scope') || {}).textContent,
-        rows: inbox ? [...t.querySelectorAll('tbody .group-table-link')].map(r => r.textContent.replace(/^[^,]*, /, '')).sort() : [...document.querySelectorAll('#saved-list > li:not(.saved-empty):not(.saved-note)')].map(r => (r.querySelector('.snip') || {}).textContent).sort(),
-        empty: (document.querySelector('#saved-list > .saved-empty') || {}).textContent || null,
-        tabs: inbox ? [...t.querySelectorAll('.group-chip .group-chip-count')].map(c => n(c)) : [document.getElementById('saved-count-open').textContent, document.getElementById('saved-count-done').textContent],
+        rows: inbox ? [...t.querySelectorAll('tbody .group-table-link')].map(r => r.textContent.replace(/^[^,]*, /, '')).sort() : [...document.querySelectorAll('#saved-table tbody .group-table-link')].map(r => r.textContent.replace(/^[^,]*, /, '')).sort(),
+        empty: (document.querySelector(inbox ? '#group-table-view .empty-line' : '#saved-table .empty-line') || {}).textContent || null,
+        tabs: inbox ? [...t.querySelectorAll('.group-chip .group-chip-count')].map(c => n(c)) : [...document.querySelectorAll('#saved-table .group-chip .group-chip-count')].map(c => n(c)),
         badge: (document.getElementById('saved-tab-count') || {}).textContent || '',
         over: document.documentElement.scrollWidth - document.documentElement.clientWidth,
         headingFits: (() => { const h = document.getElementById('saved-scope'); return h ? h.scrollWidth <= h.clientWidth + 1 : false; })(),
@@ -95,9 +95,9 @@ const hex = i => i.toString(16).padStart(20, '0');
             await openSaved();
             s = await rowsAre('Saved: QA Alpha', ['qa-a chat', 'team-a board, by the QA Engineer'], ['(2)', '(1)'], `${dev}: QA Alpha: its chat and the board message the QA Engineer wrote, not the Orchestrator's, FE Alpha's or team-b's namesake`);
             // the done one is its own
-            await ev(`document.getElementById('saved-tab-done').click(); true`);
+            await ev(`document.querySelectorAll('#saved-table .group-chip')[1].click(); true`);
             await rowsAre('Saved: QA Alpha', ['qa-a chat, done'], ['(2)', '(1)'], `${dev}: its Done tab has its one done message (counts of the scope: 2 open, 1 done)`);
-            await ev(`document.getElementById('saved-tab-open').click(); true`);
+            await ev(`document.querySelectorAll('#saved-table .group-chip')[0].click(); true`);
             await rowsAre('Saved: QA Alpha', ['qa-a chat', 'team-a board, by the QA Engineer'], ['(2)', '(1)'], `${dev}: back on Open`);
             await shotSaved(`saved-scope-agent-${dev}`);
 
@@ -112,7 +112,7 @@ const hex = i => i.toString(16).padStart(20, '0');
             // a search inside the scope, and an empty result
             await ev(`(() => { const e = document.getElementById('sv-search'); e.focus(); return true; })()`);
             await ev(`(() => { const e = document.getElementById('sv-search'); e.value = 'board'; e.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
-            await settle(`document.querySelectorAll('#saved-list > li:not(.saved-empty)').length === 1`, 'the search in the scope');
+            await settle(`document.querySelectorAll('#saved-table tbody tr').length === 1`, 'the search in the scope');
             s = await snap();
             check(`${dev}: a search inside the scope covers the scope (one match of two)`, s.rows.join() === 'team-b board, by the QA Engineer' && s.tabs[0] === '(2)', JSON.stringify([s.rows, s.tabs]));
             await ev(`document.querySelector('#saved-bar .list-bar-clear-q').click(); true`);
@@ -131,7 +131,7 @@ const hex = i => i.toString(16).padStart(20, '0');
         await ev(`window.__m.add('Lonely', 'L', 2, { sleeping: false, board_project: null, session_id: 'lonely-id' }); true`);
         await select({ name: 'Lonely', sid: 'lonely-id' });
         await openSaved();
-        await settle(`!!document.querySelector('#saved-list > .saved-empty')`, 'the empty line');
+        await settle(`!!document.querySelector('#saved-table .empty-line')`, 'the empty line');
         const s = await snap();
         check('an agent with nothing saved says whom it is empty for', s.heading === 'Saved: Lonely' && /Nothing saved from Lonely yet/.test(s.empty || ''), JSON.stringify([s.heading, s.empty]));
     } catch (e) {

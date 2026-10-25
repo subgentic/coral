@@ -119,8 +119,10 @@ const BASE = require('./test_base').BASE;
         await ev(`switchNavTab('history'); true`);
         await waitFor(`document.getElementById('agentic-state').dataset.page === 'chats'`, 'Chats');
         await ev(`document.getElementById('saved-btn').click(); true`); // from Chats: the Saved page
-        await waitFor(`(() => { const t = document.getElementById('group-table-view'); return t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved'; })() && document.querySelectorAll('#saved-list .saved-item').length === 1`, 'the Saved page with the item', 10000);
-        await ev(`document.querySelector('#saved-list .saved-item .btn-primary, #saved-list .saved-item .saved-open').click(); true`);
+        await waitFor(`(() => { const t = document.getElementById('group-table-view'); return t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved'; })() && document.querySelectorAll('#group-table-view tbody tr').length === 1`, 'the Saved page with the item', 10000);
+        await ev(`document.querySelector('#group-table-view tbody .group-table-link').click(); true`);
+        await waitFor(`!!document.querySelector('#inbox-page .item-bar .btn-primary:not([disabled])')`, 'the message page', 8000);
+        await ev(`document.querySelector('#inbox-page .item-bar .btn-primary').click(); true`);
         await waitFor(`document.getElementById('agentic-state').dataset.page === 'none' && !!document.querySelector('#mb-messages .chat-search-target')`, 'the jump to the board message', 10000);
         assert.equal(await ev(`getComputedStyle(document.getElementById('agentic-state')).display`), 'none', 'the board\'s page has no sidebar');
         await waitFor(`!!document.getElementById('saved-jumpbar')`, 'the jump bar', 4000);

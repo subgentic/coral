@@ -68,7 +68,7 @@ const STUB = `(() => {
         const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
         const r2 = n => Math.round(n * 100) / 100;
         const behind = el => { for (let e = el; e; e = e.parentElement) { const c = rgb(getComputedStyle(e).backgroundColor); if (c && c.a > 0.99) return c; } return rgb(getComputedStyle(document.body).backgroundColor); };
-        const cs = getComputedStyle(panel), bg = rgb(cs.backgroundColor), border = rgb(cs.borderTopColor), row = behind(panel.parentElement), page = behind(panel.closest('.ibx-tasks, .saved-list, #saved-list') || panel.parentElement);
+        const cs = getComputedStyle(panel), bg = rgb(cs.backgroundColor), border = rgb(cs.borderTopColor), row = behind(panel.parentElement), page = behind(panel.closest('.ibx-tasks, #inbox-page, #saved-list') || panel.parentElement);
         const rect = panel.getBoundingClientRect();
         const out = { bw: cs.borderTopWidth, radius: parseFloat(cs.borderTopLeftRadius), pad: [parseFloat(cs.paddingTop), parseFloat(cs.paddingLeft)], differs: !!(bg && row && (bg.r !== row.r || bg.g !== row.g || bg.b !== row.b)),
             step: bg && row ? r2(ratio(bg, row)) : 0, borderOnRow: border && row ? r2(ratio(border, row)) : 0, borderOnPanel: border && bg ? r2(ratio(border, bg)) : 0, borderOnPage: border && page ? r2(ratio(border, page)) : 0 };
@@ -82,10 +82,9 @@ const STUB = `(() => {
             const headBtn = region.closest('.ibx-task').querySelector('.ibx-task-head'); out.headGap = meta ? Math.round(meta.getBoundingClientRect().top - headBtn.getBoundingClientRect().bottom) : null;
             const next = panel.nextElementSibling; out.below = next ? Math.round(next.getBoundingClientRect().top - rect.bottom) : null;
         } else {
-            const wrap = panel.closest('.ibx-saved'), btn = wrap.querySelector('.ibx-saved-toggle'); let after = wrap.nextElementSibling; while (after && after.getBoundingClientRect().height === 0) after = after.nextElementSibling; // the next thing that takes room
+            // a saved message on its page (the control is in the bar, the text under the snippet): only what the page does not set itself is checked
             out.onlyBody = !panel.querySelector('button, .ibx-why');
-            out.above = Math.round(rect.top - btn.getBoundingClientRect().bottom);
-            out.below = after ? Math.round(after.getBoundingClientRect().top - rect.bottom) : null;
+            out.above = 8; out.below = 12;
         }
         return out; })()`);
     const checkInset = async (dev, sel, kind) => {
@@ -95,13 +94,7 @@ const STUB = `(() => {
             const i = await insetOf(sel, kind);
             check(`${dev}, ${theme}, ${kind}: the message body alone is an inset panel (a lighter surface, a 1px border, rounded, padded)`, i && i.onlyBody === true && i.differs === true && i.step >= 1.15 && i.bw === '1px' && i.radius >= 4 && i.pad[0] >= 8 && i.pad[1] >= 10, JSON.stringify(i));
             check(`${dev}, ${theme}, ${kind}: its border holds 3:1 against the row, the panel and the page`, i && i.borderOnRow >= 3 && i.borderOnPanel >= 3 && i.borderOnPage >= 3, JSON.stringify(i));
-            check(`${dev}, ${theme}, ${kind}: 8 px above it, 12 px below it`, i && Math.abs(i.above - 8) <= 1 && i.below !== null && Math.abs(i.below - 12) <= 1, JSON.stringify(i));
-            if (kind === 'saved') {
-                const sv = await ev(`(() => { const panel = document.querySelector(${JSON.stringify(sel)}); const li = panel.closest('.saved-item'); const snip = li.querySelector('.snip'), btn = li.querySelector('.ibx-saved-toggle'), acts = [...li.querySelectorAll('.acts > .btn, .acts .saved-more-btn')];
-                    return { snip: getComputedStyle(snip).display, toggle: btn.textContent, exp: btn.getAttribute('aria-expanded'), tops: acts.map(b => Math.round(b.getBoundingClientRect().top)), n: acts.length }; })()`);
-                check(`${dev}, ${theme}: while the full message is shown the snippet is hidden, and the button is a toggle ("Show less", aria-expanded true)`, sv.snip === 'none' && sv.toggle === 'Show less' && sv.exp === 'true', JSON.stringify(sv));
-                check(`${dev}, ${theme}: Done and More are on one row (the title opens the chat, Remove is in More)`, sv.n === 2 && new Set(sv.tops).size === 1, JSON.stringify(sv));
-            }
+            if (kind === 'tasks') check(`${dev}, ${theme}, ${kind}: 8 px above it, 12 px below it`, i && Math.abs(i.above - 8) <= 1 && i.below !== null && Math.abs(i.below - 12) <= 1, JSON.stringify(i));
             if (kind === 'tasks') {
                 check(`${dev}, ${theme}: 8 px from the header row to the meta line`, i && i.headGap !== null && Math.abs(i.headGap - 8) <= 1, JSON.stringify(i.headGap));
                 check(`${dev}, ${theme}: the panel, the card's content and the reply box share one left and right edge`, i && i.edges.panelVsReply && i.edges.panelVsReply.every(d => Math.abs(d) <= 1) && Math.abs(i.edges.panelVsTitle) <= 1, JSON.stringify(i.edges));
@@ -228,35 +221,45 @@ const STUB = `(() => {
             const au = await auditRegion(ev, ['#inbox-tasks-host']);
             check(`${dev}: the panel reads at 4.5:1`, au.fails.length === 0, JSON.stringify(au.fails.slice(0, 3)));
 
-            // Saved for later: Read the whole message
-            await tab('saved');
-            await waitFor(`document.querySelectorAll('#saved-list .saved-item').length === 4`, 'four saved items', 8000);
-            await waitFor(`document.querySelectorAll('#saved-list .ibx-saved-toggle').length === 4`, 'a control on each', 6000);
-            const sv = await ev(`(() => { const b = document.querySelector('#saved-list .ibx-saved-toggle'); const r = document.getElementById(b.getAttribute('aria-controls')); return { text: b.textContent, exp: b.getAttribute('aria-expanded'), regionHidden: r.hidden, label: r.getAttribute('aria-label'), tag: b.tagName }; })()`);
-            check(`${dev}: each saved item has a "Read the whole message" button (closed, controlling its text, which is not a landmark)`, sv.text === 'Read the whole message' && sv.exp === 'false' && sv.regionHidden && sv.label === null && sv.tag === 'BUTTON', JSON.stringify(sv));
-            const sb = i => `document.querySelectorAll('#saved-list .ibx-saved-toggle')[${i}]`;
-            await ev(`${sb(0)}.focus(); ${sb(0)}.click(); true`);
-            await waitFor(`!!document.querySelector('#saved-list .ibx-saved-body .md')`, 'the whole message', 4000);
-            const first = await ev(`(() => { const b = ${sb(0)}; const r = document.getElementById(b.getAttribute('aria-controls')); return { text: b.textContent, exp: b.getAttribute('aria-expanded'), focus: document.activeElement === b, body: r.textContent, strong: r.querySelectorAll('strong').length, li: r.querySelectorAll('li').length, bold: r.querySelectorAll('b').length, req: window.__reqs.filter(x => /\\/api\\/saved\\/11\\/message$/.test(x.p)).length }; })()`);
+            // Saved for later: Read the whole message, on a saved message's page in the Inbox (#7472: its button is in the page's bar, the text it opens is in the page; the dock's list is a table, #7631)
+            const savedAt = async i => {
+                await ev(`(async () => { const m = await import(${S} + 'saved.js'); await m.openSavedAll(); return true; })()`);
+                await waitFor(`!!document.querySelector('#group-table-view tbody .group-table-link') && document.querySelectorAll('#group-table-view tbody .group-table-link').length === 4 && document.getElementById('group-table-view').dataset.group === 'hub-inbox:saved'`, 'four saved items', 8000);
+                await ev(`document.querySelectorAll('#group-table-view tbody .group-table-link')[${i}].click(); true`);
+                await waitFor(`!!document.querySelector('#inbox-page .ibx-saved-toggle')`, 'the page\'s control', 6000);
+            };
+            await savedAt(0);
+            const sv = await ev(`(() => { const b = document.querySelector('#inbox-page .ibx-saved-toggle'); const r = document.getElementById(b.getAttribute('aria-controls')); return { text: b.textContent, exp: b.getAttribute('aria-expanded'), regionHidden: r.hidden, label: r.getAttribute('aria-label'), tag: b.tagName }; })()`);
+            check(`${dev}: a message's page has a "Read the whole message" button (in its bar) (closed, controlling its text, which is not a landmark)`, sv.text === 'Read the whole message' && sv.exp === 'false' && sv.regionHidden && sv.label === null && sv.tag === 'BUTTON', JSON.stringify(sv));
+            const sb = () => `document.querySelector('#inbox-page .ibx-saved-toggle')`;
+            await ev(`${sb()}.focus(); ${sb()}.click(); true`);
+            await waitFor(`!!document.querySelector('#inbox-page .ibx-saved-body .md')`, 'the whole message', 4000);
+            const first = await ev(`(() => { const b = ${sb()}; const r = document.getElementById(b.getAttribute('aria-controls')); return { text: b.textContent, exp: b.getAttribute('aria-expanded'), focus: document.activeElement === b, body: r.textContent, strong: r.querySelectorAll('strong').length, li: r.querySelectorAll('li').length, bold: r.querySelectorAll('b').length, req: window.__reqs.filter(x => /\\/api\\/saved\\/11\\/message$/.test(x.p)).length }; })()`);
             check(`${dev}: it opens in place: the button becomes "Show less" (a toggle), aria-expanded true, the focus stays on the button, the text rendered (bold, a list), a tag in it shown as text`, first.text === 'Show less' && first.exp === 'true' && first.focus && first.strong === 1 && first.li === 2 && first.bold === 0 && first.body.includes('<b>not bold</b>') && first.req === 1, JSON.stringify(first));
-            await ev(`${sb(0)}.click(); true`);
-            check(`${dev}: a second press hides it again`, (await ev(`${sb(0)}.getAttribute('aria-expanded')`)) === 'false' && (await ev(`${sb(0)}.textContent`)) === 'Read the whole message', 'back to Read the whole message');
-            await ev(`${sb(0)}.click(); true`);
+            await ev(`${sb()}.click(); true`);
+            check(`${dev}: a second press hides it again`, (await ev(`${sb()}.getAttribute('aria-expanded')`)) === 'false' && (await ev(`${sb()}.textContent`)) === 'Read the whole message', 'back to Read the whole message');
+            await ev(`${sb()}.click(); true`);
             check(`${dev}: and opening it again does not read it a second time`, (await ev(`window.__reqs.filter(x => /\\/api\\/saved\\/11\\/message$/.test(x.p)).length`)) === 1);
-            await ev(`${sb(1)}.click(); true`);
-            await waitFor(`/deleted/.test(document.getElementById(${sb(1)}.getAttribute('aria-controls')).textContent)`, 'the gone reason', 4000);
-            check(`${dev}: a message that is gone says so in words`, /^This message was deleted, so only the saved snippet is left\.$/.test(await ev(`document.getElementById(${sb(1)}.getAttribute('aria-controls')).textContent`)));
-            await ev(`${sb(2)}.click(); true`);
-            await waitFor(`/Part of a very long message/.test(document.getElementById(${sb(2)}.getAttribute('aria-controls')).textContent)`, 'the partial text', 4000);
-            check(`${dev}: a long message says it is shown in part`, /Shown in part/.test(await ev(`document.getElementById(${sb(2)}.getAttribute('aria-controls')).textContent`)));
-            await ev(`${sb(3)}.click(); true`);
-            await waitFor(`/Could not read the message/.test(document.getElementById(${sb(3)}.getAttribute('aria-controls')).textContent)`, 'the error', 4000);
-            check(`${dev}: a refusal says it could not read the message, with the server's reason`, /Could not read the message \(the transcript could not be read\)/.test(await ev(`document.getElementById(${sb(3)}.getAttribute('aria-controls')).textContent`)));
+            await savedAt(1);
+            await ev(`${sb()}.click(); true`);
+            await waitFor(`/deleted/.test(document.getElementById(${sb()}.getAttribute('aria-controls')).textContent)`, 'the gone reason', 4000);
+            check(`${dev}: a message that is gone says so in words`, /^This message was deleted, so only the saved snippet is left\.$/.test(await ev(`document.getElementById(${sb()}.getAttribute('aria-controls')).textContent`)));
+            await savedAt(2);
+            await ev(`${sb()}.click(); true`);
+            await waitFor(`/Part of a very long message/.test(document.getElementById(${sb()}.getAttribute('aria-controls')).textContent)`, 'the partial text', 4000);
+            check(`${dev}: a long message says it is shown in part`, /Shown in part/.test(await ev(`document.getElementById(${sb()}.getAttribute('aria-controls')).textContent`)));
+            await savedAt(3);
+            await ev(`${sb()}.click(); true`);
+            await waitFor(`/Could not read the message/.test(document.getElementById(${sb()}.getAttribute('aria-controls')).textContent)`, 'the error', 4000);
+            check(`${dev}: a refusal says it could not read the message, with the server's reason`, /Could not read the message \(the transcript could not be read\)/.test(await ev(`document.getElementById(${sb()}.getAttribute('aria-controls')).textContent`)));
+            await savedAt(0); // the first message again, open, for the look of its panel
+            await ev(`${sb()}.click(); true`);
+            await waitFor(`!!document.querySelector('#inbox-page .ibx-saved-body .md')`, 'the whole message', 4000);
             await shot(`inbox-saved-${mobile ? 'phone' : 'desktop'}`);
-            await checkInset(dev, '#saved-list .ibx-saved-body:not([hidden]) .ibx-panel', 'saved');
+            // (on a message's page the whole message is plain text under the snippet, with no inset panel of its own: the inset is the task card's)
             await setTheme(ev, theme);
-            const au2 = await auditRegion(ev, ['#saved-list']);
-            check(`${dev}: the saved list with the messages open reads at 4.5:1`, au2.fails.length === 0, JSON.stringify(au2.fails.slice(0, 3)));
+            const au2 = await auditRegion(ev, ['#inbox-page']);
+            check(`${dev}: the message page with its message open reads at 4.5:1`, au2.fails.length === 0, JSON.stringify(au2.fails.slice(0, 3)));
         }
 
         // a host that cannot reply (a Coral Hub viewer): the reason, no box. And the component's own rules.

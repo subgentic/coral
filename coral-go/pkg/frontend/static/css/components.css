@@ -2369,12 +2369,6 @@ button.subscriber-history-link {
     line-height: 1.4;
 }
 
-
-
-
-
-
-
 .acf-name,
 .acf-model,
 .acf-model-select,
@@ -2401,7 +2395,6 @@ button.subscriber-history-link {
 .persona-files > summary { cursor: pointer; width: fit-content; padding: 4px 0; font-size: var(--fs-sm); color: var(--text-secondary); }
 .persona-files-row { display: flex; gap: 8px; flex-wrap: wrap; padding: 4px 0; }
 #launch-agent-acf.has-agent-pick .acf-top-row > label:has(> .acf-agent-type) { display: none; }
-
 
 .acf-top-row {
     display: grid;
@@ -2431,7 +2424,6 @@ button.subscriber-history-link {
 
 /* Locked preset fields */
 
-
 .team-field-hint {
     margin: -4px 0 12px;
     font-size: 0.75rem;
@@ -2442,19 +2434,6 @@ button.subscriber-history-link {
 .team-field-hint.error {
     color: var(--error);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 .team-advanced {
     margin-top: 12px;
@@ -2648,19 +2627,9 @@ button.subscriber-history-link {
     flex-shrink: 0;
 }
 
-
-
 /* Collapsed card summary */
 
-
-
 /* Expandable edit form */
-
-
-
-
-
-
 
 .agent-preset-selector {
     display: flex;
@@ -2670,7 +2639,6 @@ button.subscriber-history-link {
     border-bottom: 1px solid var(--border-light);
     margin-bottom: 12px;
 }
-
 
 .btn-subtle {
     background: var(--bg-tertiary);
@@ -3013,11 +2981,6 @@ button.subscriber-history-link {
 }
 
 /* ── Team Agent Reorder ──────────────────────────────────── */
-
-
-
-
-
 
 /* The first card cannot move up and the last cannot move down (#3770). */
 
@@ -3416,7 +3379,6 @@ button.subscriber-history-link {
     overflow-y: auto;
     flex: 1;
 }
-
 
 /* Tmux missing banner — shown across the top when tmux can't be found.
    Agents need tmux to run, so we surface install instructions instead of
@@ -3827,7 +3789,6 @@ body[data-nav-tab]:not([data-nav-tab="agents"], [data-nav-tab="jobs"], [data-nav
 #settings-modal .tb-autowake input[type="number"] { width: 4.5em; min-height: 0; padding: 2px 6px; }
 @media (max-width: 767px), (pointer: coarse) { #settings-modal .tb-autowake label, #settings-modal .tb-autowake .tb-learn { min-height: var(--control-touch-height, 44px); } #settings-modal .tb-autowake input[type="number"] { min-height: var(--control-touch-height, 44px); } }
 
-
 /* ── Browser password (#3948): the set-password prompt and Settings > Browser sign-in ─────────────────────────── */
 .pw-lead { margin: 8px 0 14px; line-height: 1.5; color: var(--text-secondary); font-size: 0.875rem; }
 .pw-field { display: block; margin: 0 0 12px; font-size: 0.8125rem; }
@@ -3907,7 +3868,7 @@ body[data-nav-tab]:not([data-nav-tab="agents"], [data-nav-tab="jobs"], [data-nav
 @media (pointer: coarse), (max-width: 767px) { .acf-model-refresh { width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); } }
 
 /* Saved for later (#4510): the right sidebar's Saved tab, its list, the top bar's button with its count, and the jump. Theme tokens only. */
-.saved-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
 .saved-pane { display: flex; flex-direction: column; flex: 1; min-height: 0; min-width: 0; container-type: inline-size; }
 /* The dashboard's own Inbox (#4811), on every Coral but the hub's frame: Needs you, then Saved for later (the one Saved list, moved in by saved.js). The page scrolls as one. */
 .inbox-local { box-sizing: border-box; width: 100%; min-height: 100%; padding: 0; display: flex; flex-direction: column; }
@@ -3917,8 +3878,11 @@ body[data-saved-scope="all"] #agentic-state #agentic-tab-saved { display: none !
 body[data-saved-scope="all"] #agentic-state[data-page="other"], body[data-saved-scope="all"] #agentic-state[data-page="chats"] { display: none !important; }
 body[data-saved-scope="all"][data-dock-page="other"] #panel-toggle-btn, body[data-saved-scope="all"][data-dock-page="chats"] #panel-toggle-btn { display: none !important; }
 /* Which scope the list shows (#4792): "Saved: QA Engineer", "Saved: coral-go-team" or "All". */
+.saved-head { display: flex; align-items: center; gap: 8px; padding-right: 8px; flex: none; } /* the scope's name, and the way to shut the sidebar the Saved button opened */
+.saved-head .saved-scope { flex: 1 1 auto; min-width: 0; }
+.saved-table { padding: 8px 12px 12px; } /* the Inbox's Saved table, filtered to the page's scope (inbox_sidebar.js drawDockSaved) */
 .saved-scope { margin: 0; padding: 10px 12px 2px; font-size: 0.8125rem; font-weight: 600; color: var(--text-primary); flex: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.saved-tabs { display: flex; gap: 4px; padding: 0 12px; border-bottom: 1px solid var(--border); flex: none; align-items: center; }
+
 /* A visible way to shut the sidebar the Saved button opened (#4742): the dock's own edge chevron is easy to miss. A phone's overlay has its own close. */
 .saved-close { margin-left: auto; background: none; border: none; color: var(--text-secondary); cursor: pointer; border-radius: var(--radius-sm); width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; flex: none; }
 .saved-close:hover { color: var(--text-primary); background: var(--bg-tertiary); }
@@ -3926,12 +3890,10 @@ body[data-saved-scope="all"][data-dock-page="other"] #panel-toggle-btn, body[dat
 .saved-close .material-icons { font-size: 1.125rem; }
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .saved-close { display: none; } }
 @media (pointer: coarse) { .saved-close { width: 44px; height: 44px; } } /* a touch tablet wider than a phone: a 44px target */
-.saved-tab { background: none; border: none; border-bottom: 2px solid transparent; color: var(--text-secondary); font: inherit; font-size: 0.8125rem; font-weight: 600; padding: 8px 10px; cursor: pointer; min-height: 36px; }
-.saved-tab[aria-selected="true"] { color: var(--text-primary); border-bottom-color: var(--accent); }
-.saved-tab .n { color: var(--text-muted); font-weight: 500; margin-left: 4px; }
+
 .saved-panel { overflow-y: auto; min-height: 0; flex: 1; }
 .saved-panel:focus { outline: none; }
-.saved-list { list-style: none; margin: 0; padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 8px; }
+
 /* The shared Inbox component (inbox_panel.js, #5754): Tasks for you, and "Read the whole message" on a saved item. The rendered text (.md) comes from the shared renderer: classes md, md-h, md-plain, md-partial. */
 .ibx { display: flex; flex-direction: column; gap: var(--space-md); min-width: 0; }
 .ibx-live { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
@@ -3965,8 +3927,7 @@ body[data-saved-scope="all"][data-dock-page="other"] #panel-toggle-btn, body[dat
 .ibx-saved { margin-top: 4px; }
 .ibx-saved-toggle { font-size: var(--fs-sm, 0.8125rem); }
 /* "Read the whole message" in a saved list: a quiet link, not a second row of bordered buttons above the card's real actions (Open, Done, Remove). */
-.saved-list .ibx-saved-toggle { background: none; border-color: transparent; box-shadow: none; padding-left: 0; padding-right: 0; color: var(--link-text, var(--accent)); text-decoration: underline; text-underline-offset: 2px; }
-.saved-list .ibx-saved-toggle:hover { background: none; }
+
 .ibx-task-facts { margin: 0; color: var(--text-secondary); font-size: var(--fs-sm, 0.8125rem); }
 .ibx-loading, .ibx-why, .ibx-note, .ibx-empty { margin: 4px 0; color: var(--text-secondary); font-size: var(--fs-sm, 0.8125rem); }
 .ibx-error { margin: 4px 0; color: var(--error-text, var(--error)); font-size: var(--fs-sm, 0.8125rem); }
@@ -4003,57 +3964,16 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
     .ibx-task-metarow .ibx-open { min-height: 0; padding-block: 16px; margin-block: -16px; }
     .ibx-task-metarow { padding-block: 16px; } /* the link's padding is taken back by its margin: the row holds it, so it never reaches over the task's head at 200% text (#6580) */
 }
-.saved-item { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-ml); padding: 10px 12px; }
-.saved-item .top { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.saved-item .top .material-icons { font-size: 1rem; color: var(--text-muted); flex: none; }
-.saved-item .src { font-size: 0.8125rem; font-weight: 700; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.saved-item .kind { font-size: 0.6875rem; color: var(--text-secondary); border: 1px solid var(--border); border-radius: 9px; padding: 0 7px; line-height: 17px; flex: none; }
-.saved-item .kind.gone { color: var(--warning); border-color: var(--warning); }
-.saved-item .server { font-size: 0.6875rem; color: var(--text-muted); line-height: 17px; flex: none; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-left: auto; }
-/* In a narrow panel (a phone's overlay, a narrowed sidebar, large text) the name and the server wrap under the title instead of being cut (UX, #4551). */
-@container (max-width: 480px) {
-    .saved-item .top { flex-wrap: wrap; row-gap: 0.5rem; } /* rem, so it grows with the text: at 200% a fixed gap let the wrapped server name touch the chip */
-    .saved-item .kind, .saved-item .server { line-height: 1.4; }
-    .saved-item .src { white-space: normal; overflow-wrap: anywhere; flex: 1 1 8em; }
-    .saved-item .server { flex: 1 0 100%; max-width: 100%; margin-left: 0; white-space: normal; overflow-wrap: anywhere; }
-}
-/* A registered server that did not answer (hub mode): one line, not an error (#4551). */
-.saved-note { font-size: 0.75rem; color: var(--warning); border: 1px solid var(--warning); border-radius: var(--radius-md); padding: 6px 10px; }
-.saved-item .snip { margin: 6px 0 4px; font-size: 0.8125rem; line-height: 1.45; color: var(--text-primary); display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
-.saved-item .meta { font-size: 0.71875rem; color: var(--text-muted); display: flex; gap: 6px; flex-wrap: wrap; }
-.saved-item .acts { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
-.saved-item .acts .btn { margin: 0; padding: 3px 10px; min-height: 28px; font-size: 0.78125rem; display: inline-flex; align-items: center; gap: 4px; }
-.saved-item .acts .btn .material-icons { font-size: 0.9375rem; }
-.saved-item.gone { opacity: 0.92; border-style: dashed; }
-.saved-item.gone .snip, .saved-item.done .snip { color: var(--text-secondary); }
-.saved-item .why { font-size: 0.75rem; color: var(--warning); margin: 2px 0 0; display: flex; gap: 5px; align-items: flex-start; }
-.saved-item .why[hidden] { display: none; }
-.saved-item .why .material-icons { font-size: 0.9375rem; }
-.saved-empty { padding: 26px 16px; text-align: center; color: var(--text-secondary); font-size: 0.8125rem; }
+
+
 .saved-status { min-height: 1.25em; color: var(--text-secondary); font-size: 0.8125rem; padding: 0 12px 8px; flex: none; }
-@media (pointer: coarse) {
-    .saved-item .acts .btn, .saved-tab { min-height: 44px; min-width: 44px; }
-    .saved-item button.src { min-height: 44px; display: inline-flex; align-items: center; }
-    .saved-item .acts .btn { padding: 8px 14px; font-size: 0.875rem; }
-    .saved-item .acts { gap: 8px; }
-    .saved-item .snip, .saved-item .src { font-size: 0.9375rem; }
-    .saved-tab { font-size: 0.875rem; }
-}
+
 /* The title is the link that opens the saved message's source (#6580); More holds Remove. */
-.saved-item button.src { background: none; border: 0; padding: 0 0 3px; margin: 0; font: inherit; font-size: 0.8125rem; font-weight: 700; color: var(--text-primary); text-align: left; cursor: pointer; border-radius: var(--radius-sm); text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 2px; }
-.saved-item button.src:hover { text-decoration-thickness: 2px; }
-.saved-item button.src:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.saved-more { position: relative; margin-left: auto; }
-.saved-more-menu { position: absolute; right: 0; bottom: calc(100% + 4px); z-index: 5; min-width: max-content; background: var(--bg-secondary); border: 1px solid var(--control-border); border-radius: var(--radius-ml); padding: 4px; box-shadow: var(--shadow-md); }
-.saved-more-menu[hidden] { display: none; }
-.saved-item .acts .saved-more-menu .btn { width: 100%; justify-content: flex-start; }
+
 /* Phone: Done and More stay on one row at 390 px (a little less padding and gap); a narrower screen may wrap (#5882). */
-@media (max-width: 600px) {
-    .saved-item .acts { gap: 6px; }
-    .saved-item .acts .btn { padding-inline: 10px; }
-}
+
 /* While the full message is shown the snippet is not (it is the first lines of the same text); when only a reason is shown (deleted, too long) the snippet stays, it is what is left (#5882). */
-.saved-item:has(.ibx-saved-body:not([hidden]) .ibx-panel) .snip { display: none; }
+
 /* The top bar's Saved button: a bookmark with the number open. */
 .saved-top-btn { position: relative; }
 .saved-top-btn.on { color: var(--accent); }

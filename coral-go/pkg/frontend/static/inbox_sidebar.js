@@ -10,7 +10,7 @@ import { state } from './state.js';
 import { sessionServer, keyLabel, identityKey } from './server_base.js';
 import { escapeHtml as esc, escapeAttr as escAttr, showView } from './utils.js';
 import { registerActions, textOf } from './actions.js';
-import { registerGroupSource, groupHeaderHtml, isGroupFolded, syncPaneGroupToggle, refreshGroupTable, openGroupTable } from './sidebar_groups.js';
+import { tableMarkup, registerGroupSource, groupHeaderHtml, isGroupFolded, syncPaneGroupToggle, refreshGroupTable, openGroupTable } from './sidebar_groups.js';
 import { isPhoneLayout } from './phone_layout.js';
 import { browserLocal } from './safe_storage.js';
 import { resolveSessionIdentity, sessionStateInfo } from './session_state.js';
@@ -94,6 +94,32 @@ export function renderInboxNav(force = false) {
 }
 
 // ── The tables ───────────────────────────────────────────────────────────
+/** The Saved table's spec: the Inbox's group table, and the dock's Saved tab (`where: 'dock-tab'`: no title row, rows that open the message in the Inbox) are this one list drawn twice. */
+function savedTableSpec(where = '') {
+        const v = saved.savedView();
+        const rows = v.shown.map(saved.savedItemFacts);
+        const empty = v.loading ? 'Loading saved items' : v.error ? v.error : v.filtered ? 'No saved messages match this search.' : v.scoped || (v.tab === 'done' ? 'Nothing is marked done.' : 'Nothing is saved for later.'); // the first read says it is loading, not that nothing is saved; a failed one says so
+        const multi = rows.some(f => f.serverName); // on a hub the computer each message is on is a column
+    return { title: 'Saved', stack: true, headless: where === 'dock-tab', columns: multi ? ['Message', 'Computer', 'Saved', 'State', 'Action'] : ['Message', 'Saved', 'State', 'Action'], chipsLabel: 'Show',
+            chips: [{ action: 'inbox-saved-chip', data: { tab: 'open' }, label: 'Open', count: v.totals.open, pressed: v.tab === 'open' }, { action: 'inbox-saved-chip', data: { tab: 'done' }, label: 'Done', count: v.totals.done, pressed: v.tab === 'done' }],
+            empty: { line: empty, hint: v.loading || v.error || v.filtered || v.tab === 'done' ? '' : 'Save a message from a chat or a board with its bookmark.' },
+            note: [v.query ? 'The search covers every saved message, not only these.' : '', ...v.down.map(d => `${d.label || d.id} did not answer, so its saved messages are not shown.`)].filter(Boolean).join(' '),
+            rows: rows.map(f => ({ title: f.which, action: 'inbox-saved-open', data: where ? { id: f.id, where } : { id: f.id },
+                cells: [...(multi ? [f.serverName] : []), f.saved, f.state, f.gone ? '' : { action: 'inbox-saved-done', data: { id: f.id }, label: f.done ? 'Reopen' : 'Done', aria: `${f.done ? 'Reopen, move back to Open' : 'Mark done'}: ${f.which}` }] })) };
+
+}
+
+/** The dock's Saved tab (#saved-table, saved.js render): the same table for the page's scope, drawn into the dock; the keyboard stays on the control it was on when it is still there. */
+export function drawDockSaved(host) {
+    const held = host.contains(document.activeElement) ? document.activeElement : null;
+    const was = held && { cls: held.className, id: held.dataset.id || held.closest('tr')?.querySelector('.group-table-link')?.dataset.id || '', tab: held.dataset.tab || '' };
+    const html = tableMarkup(savedTableSpec('dock-tab'));
+    if (host.dataset.drawn !== html) { host.innerHTML = html; host.dataset.drawn = html; }
+    if (!was) return;
+    const same = [...host.querySelectorAll('.group-table-link, .group-table-cell-btn, .group-chip')].find(e => e.className === was.cls && (e.dataset.id || e.closest('tr')?.querySelector('.group-table-link')?.dataset.id || '') === was.id && (e.dataset.tab || '') === was.tab);
+    (same || host.querySelector('.group-chip, .group-table-link'))?.focus({ preventScroll: true }); // a row that went (Done, Reopen) leaves the focus on the table's first control, not on the page
+}
+
 registerGroupSource('hub-inbox', {
     keys: () => GROUPS.map(g => g.key),
     redraw: () => renderInboxNav(true),
@@ -112,17 +138,7 @@ registerGroupSource('hub-inbox', {
             return { title: 'Tasks', columns: ['Task', 'Priority', 'State', 'Team'], empty: { line: queries.tasks ? 'No task matches the search.' : 'No assigned tasks.' },
                 rows: taskRows().map(t => ({ title: t.title || '(no title)', action: 'inbox-task-open', data: { project: t.project, 'task-id': t.id }, cells: [PRIORITY_WORDS[t.priority] || t.priority || '', stateOf(t), t.board || ''] })) };
         }
-        if (key === 'saved') {
-            const v = saved.savedView();
-            const rows = v.shown.map(saved.savedItemFacts);
-            const empty = v.loading ? 'Loading saved items' : v.error ? v.error : v.filtered ? 'No saved messages match this search.' : v.tab === 'done' ? 'Nothing is marked done.' : 'Nothing is saved for later.'; // the first read says it is loading, not that nothing is saved; a failed one says so
-            return { title: 'Saved', stack: true, columns: ['Message', 'Saved', 'State', 'Action'], chipsLabel: 'Show',
-                chips: [{ action: 'inbox-saved-chip', data: { tab: 'open' }, label: 'Open', count: v.totals.open, pressed: v.tab === 'open' }, { action: 'inbox-saved-chip', data: { tab: 'done' }, label: 'Done', count: v.totals.done, pressed: v.tab === 'done' }],
-                empty: { line: empty, hint: v.loading || v.error || v.filtered || v.tab === 'done' ? '' : 'Save a message from a chat or a board with its bookmark.' },
-                note: [v.query ? 'The search covers every saved message, not only these.' : '', ...v.down.map(d => `${d.label || d.id} did not answer, so its saved messages are not shown.`)].filter(Boolean).join(' '),
-                rows: rows.map(f => ({ title: f.which, action: 'inbox-saved-open', data: { id: f.id },
-                    cells: [f.saved, f.state, f.gone ? '' : { action: 'inbox-saved-done', data: { id: f.id }, label: f.done ? 'Reopen' : 'Done', aria: `${f.done ? 'Reopen, move back to Open' : 'Mark done'}: ${f.which}` }] })) };
-        }
+        if (key === 'saved') return savedTableSpec();
         return null;
     },
     isEmpty: () => false, // the tab opens its group's table itself (showInbox)
@@ -311,7 +327,7 @@ registerActions({
         window.selectLiveSession?.(name, type, sid, server);
     },
     'inbox-task-open': el => { const p = textOf(el.dataset.project), id = textOf(el.dataset.taskId); if (p && id) openTaskPage(p, id); },
-    'inbox-saved-open': el => { const id = textOf(el.dataset.id); if (id) openSavedPage(id); },
+    'inbox-saved-open': el => { const id = textOf(el.dataset.id); if (!id) return; if (el.dataset.where === 'dock-tab') saved.openSavedAll().then(() => openSavedPage(id)); else openSavedPage(id); }, // the dock's rows open the message in the Inbox's page
     'inbox-saved-chip': el => { const t = textOf(el.dataset.tab); if (t) { saved.setSavedTab(t); sayLive(t === 'done' ? 'Showing the messages marked done' : 'Showing the open messages'); } },
     'inbox-saved-done': async el => {
         const it = saved.findSavedItem(textOf(el.dataset.id));

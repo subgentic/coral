@@ -81,12 +81,16 @@ const REMOTE = `(() => {
         fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true });
         fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));
     };
-    const items = () => ev(`[...document.querySelectorAll('#saved-list .saved-item')].map(li => ({ id: li.dataset.id, src: li.querySelector('.src').textContent, server: (li.querySelector('.server') || {}).textContent || null, kind: li.querySelector('.kind').textContent, hasOpen: !!li.querySelector('.saved-open') }))`);
+    // The dock's Saved tab is the Inbox's Saved table, filtered to the page's scope (#7631); on a hub its Computer column says which server a message is on. A row opens the message's page in the Inbox (Open on it jumps, More has Remove).
+    const items = () => ev(`[...document.querySelectorAll('#saved-table tbody tr')].map(tr => { const a = tr.querySelector('.group-table-link'); return { id: a.dataset.id, src: a.textContent.split(', ')[0], server: tr.cells.length > 4 ? tr.cells[1].textContent.trim() : null }; })`);
+    const INBOX_SAVED = `(() => { const t = document.getElementById('group-table-view'); return t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved'; })()`;
+    const pageOf = async id => { await ev(`document.querySelector('#saved-table .group-table-link[data-id="${id}"]').click(); true`); await waitFor(`!!document.querySelector('#inbox-page .item-bar')`, 'the message page of ' + id, 8000); };
+    const removeFromPage = async () => { await ev(`document.querySelector('#inbox-page .wf-more > .btn').click(); document.querySelector('#inbox-page .wf-more-menu .btn').click(); true`); await waitFor(INBOX_SAVED, 'back at the Saved table', 6000); };
     // The merged list is home's: the dock's Saved tab (the list the sidebar keeps for the scope on screen) is read here. The Inbox's own Saved table over the same list is inbox_one's and inbox_local's.
     const openSaved = async () => {
         if (await ev(`document.getElementById('nav-tab-hub-inbox').classList.contains('active')`)) { await ev(`window.switchNavTab('agents'); true`); await waitFor(`document.querySelector('.top-nav-tab.active').dataset.arg === 'agents'`, 'the page left', 4000); }
         await ev(`import((window.__coralStatic || '/static/') + 'saved.js').then(m => m.showSaved()).then(() => { window.toggleAgenticPanel(true); window.switchAgenticTab('saved', 'top'); return true; })`);
-        await waitFor(`document.getElementById('saved-ui').getClientRects().length > 0 && document.querySelectorAll('#saved-list .saved-item, #saved-list .saved-note, #saved-list .saved-empty').length > 0`, 'the Saved list', 8000);
+        await waitFor(`document.getElementById('saved-ui').getClientRects().length > 0 && document.querySelectorAll('#saved-table tbody tr, #saved-table .empty-line, #saved-table .group-table-note').length > 0`, 'the Saved list', 8000);
     };
     const refresh = async () => { await ev(`import((window.__coralStatic || '/static/') + 'saved.js').then(m => m.showSaved()).then(() => true)`); await sleep(300); }; // sleep-ok: item checks draw their chips as each answer arrives (the refresh reads the page on home, the sidebar's tab for an agent)
 
@@ -127,48 +131,51 @@ const REMOTE = `(() => {
         await ev(`window.__box.items.push({ id: 101, kind: 'board', ref: 'box-board', key: '7', agent_type: '', title: 'box-board', snippet: 'a board message on Box B', said_at: '', saved_at: new Date(Date.now() + 5000).toISOString(), done_at: null }); true`);
         await ev(`window.selectLiveSession('', '', '', 'local'); true`); // home: the list is of the agent or team on screen (#4792), and the merge across servers is home's
         await openSaved();
-        await waitFor(`document.querySelectorAll('#saved-list .saved-item').length === 3`, 'three items', 8000);
+        await waitFor(`document.querySelectorAll('#saved-table tbody tr').length === 3`, 'three items', 8000);
         const merged = await items();
         assert.deepEqual(merged.map(i => i.server).sort(), ['Box B', 'Box B', 'This computer']);
         assert.equal(merged[0].src, 'box-board', 'newest saved first: the board item saved last');
         assert.equal(await ev(`document.querySelector('#saved-btn .saved-count').textContent`), '3', 'the top bar counts both servers');
-        assert.equal(await ev(`document.getElementById('saved-count-open').textContent`), '(3)');
+        assert.equal(await ev(`document.querySelector('#saved-table .group-chip-count').textContent`), '3');
         await shot('saved-servers-merged');
 
         console.log('4. A server that does not answer is one line, not an error; this server\'s items stay');
         await ev(`window.__box.up = false; true`);
         await refresh();
-        await waitFor(`document.querySelectorAll('#saved-list .saved-note').length === 1`, 'the one-line notice', 6000);
-        const note = await ev(`document.querySelector('#saved-list .saved-note').textContent`);
+        await waitFor(`document.querySelectorAll('#saved-table .group-table-note').length === 1`, 'the one-line notice', 6000);
+        const note = await ev(`document.querySelector('#saved-table .group-table-note').textContent`);
         assert.ok(note.includes('Box B') && /did not answer/.test(note), note);
-        assert.equal(await ev(`document.querySelectorAll('#saved-list .saved-item').length`), 1, 'only this server\'s item');
+        assert.equal(await ev(`document.querySelectorAll('#saved-table tbody tr').length`), 1, 'only this server\'s item');
         assert.equal(await ev(`document.querySelector('.toast.error, .toast-error') ? 1 : 0`), 0, 'no error toast');
         await shot('saved-servers-down');
         await ev(`window.__box.up = true; true`);
         await refresh();
-        await waitFor(`document.querySelectorAll('#saved-list .saved-item').length === 3 && !document.querySelector('#saved-list .saved-note')`, 'back to three', 6000);
+        await waitFor(`document.querySelectorAll('#saved-table tbody tr').length === 3 && !document.querySelector('#saved-table .group-table-note')`, 'back to three', 6000);
 
         console.log('5. Done, Reopen and Remove go to the right server');
-        const boxItem = () => ev(`[...document.querySelectorAll('#saved-list .saved-item')].find(li => li.dataset.id === 'box-b:101')`);
+        const boxItem = () => ev(`!!document.querySelector('#saved-table .group-table-link[data-id="box-b:101"]')`);
         assert.ok(await boxItem(), 'the board item of Box B is listed by its own id');
-        await ev(`document.querySelector('#saved-list [data-id="box-b:101"] .saved-done').click(); true`);
+        await ev(`document.querySelector('#saved-table .group-table-link[data-id="box-b:101"]').closest('tr').querySelector('.group-table-cell-btn').click(); true`);
         await waitFor(`window.__box.items.find(i => i.id === 101).done_at !== null`, 'Done reached Box B', 6000);
         assert.equal((await api('GET', '/api/saved')).body.items.filter(i => i.done_at).length, 0, 'nothing of this server\'s was changed');
-        await ev(`document.getElementById('saved-tab-done').click(); true`);
-        await waitFor(`!!document.querySelector('#saved-list [data-id="box-b:101"]')`, 'it in the Done list', 6000);
-        await ev(`document.querySelector('#saved-list [data-id="box-b:101"] .saved-done').click(); true`);
+        await ev(`document.querySelectorAll('#saved-table .group-chip')[1].click(); true`);
+        await waitFor(`!!document.querySelector('#saved-table .group-table-link[data-id="box-b:101"]')`, 'it in the Done list', 6000);
+        await ev(`document.querySelector('#saved-table .group-table-link[data-id="box-b:101"]').closest('tr').querySelector('.group-table-cell-btn').click(); true`);
         await waitFor(`window.__box.items.find(i => i.id === 101).done_at === null`, 'Reopen reached Box B', 6000);
-        await ev(`document.getElementById('saved-tab-open').click(); true`);
-        await waitFor(`!!document.querySelector('#saved-list [data-id="box-b:101"] .saved-remove')`, 'it back in Open', 6000);
-        await ev(`document.querySelector('#saved-list [data-id="box-b:101"] .saved-remove').click(); true`);
+        await ev(`document.querySelectorAll('#saved-table .group-chip')[0].click(); true`);
+        await waitFor(`!!document.querySelector('#saved-table .group-table-link[data-id="box-b:101"]')`, 'it back in Open', 6000);
+        await pageOf('box-b:101');
+        await removeFromPage();
         await waitFor(`!window.__box.items.some(i => i.id === 101)`, 'Remove reached Box B', 6000);
         assert.equal((await api('GET', '/api/saved')).body.items.length, 1, 'this server\'s item is still there');
 
         console.log('6. A jump opens the remote agent at the message, and a remote board by its server key');
         await ev(`window.selectLiveSession('', '', '', 'local'); true`); // away from the remote agent, home: the merge across servers is home's (#4792)
         await openSaved();
-        await waitFor(`document.querySelectorAll('#saved-list .saved-item').length === 2`, 'two items', 8000);
-        await ev(`document.querySelector('#saved-list [data-id^="box-b:"] .saved-open').click(); true`);
+        await waitFor(`document.querySelectorAll('#saved-table tbody tr').length === 2`, 'two items', 8000);
+        await ev(`window.selectLiveSession('', '', '', 'local'); true`);
+        await pageOf(await ev(`document.querySelector('#saved-table .group-table-link[data-id^="box-b:"]').dataset.id`));
+        await ev(`document.querySelector('#inbox-page .item-bar .btn-primary').click(); true`);
         await waitFor(`T.state.currentSession && T.state.currentSession.session_id === 'rb-id' && !!${C}.querySelector('.chat-search-target')`, 'the remote agent open at the message', 12000);
         assert.equal(await ev(`T.state.currentSession.server`), 'box-b');
         assert.equal(await ev(`${C}.querySelector('.chat-search-target').dataset.msgKey`), hex(20));
@@ -176,8 +183,9 @@ const REMOTE = `(() => {
         await ev(`window.__box.items.push({ id: 102, kind: 'board', ref: 'box-board', key: '9', agent_type: '', title: 'box-board', snippet: 'another', said_at: '', saved_at: new Date().toISOString(), done_at: null }); window.__opened = null; window.selectBoardProject = (k, id) => { window.__opened = [k, id]; }; true`);
         await openSaved();
         await refresh();
-        await waitFor(`!!document.querySelector('#saved-list [data-id="box-b:102"] .saved-open')`, 'the board item', 6000);
-        await ev(`document.querySelector('#saved-list [data-id="box-b:102"] .saved-open').click(); true`);
+        await waitFor(`!!document.querySelector('#saved-table .group-table-link[data-id="box-b:102"]')`, 'the board item', 6000);
+        await pageOf('box-b:102');
+        await ev(`document.querySelector('#inbox-page .item-bar .btn-primary').click(); true`);
         await waitFor(`window.__opened !== null`, 'the board opened', 6000);
         assert.deepEqual(await ev(`window.__opened`), ['@box-b/box-board', 9]);
 
@@ -186,10 +194,10 @@ const REMOTE = `(() => {
             for (const id of ['../../../../servers/x', '%2e%2e/%2e%2e/%2e%2e/%2e%2e/servers/x', -5, 1.5, 0, '12', null]) window.__box.items.push({ id, kind: 'board', ref: 'evil-board', key: '5', agent_type: '', title: 'evil', snippet: 'hostile ' + String(id), said_at: '', saved_at: new Date().toISOString(), done_at: null });
             window.__box.items.push({ id: 110, kind: 'board', ref: 'fine-board', key: '5', agent_type: '', title: 'fine', snippet: 'a usable item', said_at: '', saved_at: new Date().toISOString(), done_at: null }); true`);
         await refresh();
-        await waitFor(`!!document.querySelector('#saved-list [data-id="box-b:110"]')`, 'the usable item', 6000);
-        const listed = await ev(`[...document.querySelectorAll('#saved-list .saved-item')].map(li => li.querySelector('.snip').textContent)`);
+        await waitFor(`!!document.querySelector('#saved-table .group-table-link[data-id="box-b:110"]')`, 'the usable item', 6000);
+        const listed = await ev(`[...document.querySelectorAll('#saved-table .group-table-link')].map(a => a.textContent)`);
         assert.ok(!listed.some(t => t.startsWith('hostile')), 'no hostile item is listed: ' + JSON.stringify(listed));
-        await ev(`document.querySelector('#saved-list [data-id="box-b:110"] .saved-done').click(); true`);
+        await ev(`document.querySelector('#saved-table .group-table-link[data-id="box-b:110"]').closest('tr').querySelector('.group-table-cell-btn').click(); true`);
         await waitFor(`window.__box.items.find(i => i.id === 110).done_at !== null`, 'Done on the usable item', 6000);
         const sent = await ev(`window.__fetched.filter(u => /\\.\\.|%2e|%252e|\\/servers\\//i.test(u))`);
         assert.deepEqual(sent, [], 'no request carried a hostile id');
@@ -198,24 +206,23 @@ const REMOTE = `(() => {
         await ev(`window.selectLiveSession('', '', '', 'local'); true`); // home: the server names are of the merged list (#4792)
         await ev(`document.getElementById('agentic-state').style.width = '300px'; true`);
         await refresh();
-        await waitFor(`!!document.querySelector('#saved-list .server')`, 'a server label');
-        const narrow = await ev(`(() => { const li = document.querySelector('#saved-list [data-id^="box-b:"]'); const s = li.querySelector('.server'), t = li.querySelector('.src'); const r = li.getBoundingClientRect();
-            return { title: s.title, text: s.textContent, under: s.getBoundingClientRect().top >= t.getBoundingClientRect().bottom - 1, inside: s.getBoundingClientRect().right <= r.right + 1 && t.getBoundingClientRect().right <= r.right + 1, clipped: s.scrollWidth > s.clientWidth + 1 }; })()`);
-        assert.deepEqual({ title: narrow.title === narrow.text && !!narrow.text, under: narrow.under, inside: narrow.inside, clipped: narrow.clipped }, { title: true, under: true, inside: true, clipped: false }, JSON.stringify(narrow));
+        await waitFor(`document.querySelectorAll('#saved-table tbody tr').length >= 2 && document.querySelector('#saved-table tbody tr').cells.length > 4`, 'a Computer column');
+        const narrow = await ev(`(() => { const t = document.getElementById('saved-table'), r = t.getBoundingClientRect(); const cells = [...t.querySelectorAll('tbody tr')].map(tr => { const c = tr.cells[1], cr = c.getBoundingClientRect(); return { text: c.textContent.trim(), inside: cr.left >= r.left - 1 && cr.right <= r.right + 1, clipped: c.scrollWidth > c.clientWidth + 1 }; });
+            return { over: t.scrollWidth > t.clientWidth + 1, cells }; })()`);
+        assert.ok(!narrow.over && narrow.cells.length >= 2 && narrow.cells.every(c => c.text && c.inside && !c.clipped), 'in a 300 px panel the rows stack and each computer\'s name is whole and inside: ' + JSON.stringify(narrow));
         await shot('saved-servers-narrow');
         await ev(`document.getElementById('agentic-state').style.width = ''; true`);
 
-        console.log('6c. A phone at 200% text: the wrapped server name does not touch the kind chip');
+        console.log('6c. A phone at 200% text: the stacked rows keep each computer name whole and inside the panel');
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
         await Emulation.setTouchEmulationEnabled({ enabled: true });
         await ev(`document.documentElement.style.fontSize = '32px'; document.getElementById('agentic-state').style.width = ''; true`);
         await sleep(400); // sleep-ok: the layout settles over frames after a viewport change; there is no completion event
         await ev(`window.toggleAgenticPanel(true); window.switchAgenticTab('saved', 'top'); true`);
         await refresh();
-        await waitFor(`document.querySelectorAll('#saved-list .saved-item .server').length >= 2`, 'items with server names', 6000);
-        const gap = await ev(`[...document.querySelectorAll('#saved-list .saved-item')].map(li => { const k = li.querySelector('.kind').getBoundingClientRect(), s = li.querySelector('.server').getBoundingClientRect();
-            const overlap = !(s.bottom <= k.top || s.top >= k.bottom || s.right <= k.left || s.left >= k.right); return { overlap, gap: Math.round(Math.max(s.top - k.bottom, k.top - s.bottom)), wrapped: s.top >= k.bottom - 1 }; })`);
-        assert.ok(gap.length >= 2 && gap.every(g => !g.overlap), 'the server name overlaps the kind chip: ' + JSON.stringify(gap));
+        await waitFor(`document.querySelectorAll('#saved-table tbody tr').length >= 2`, 'the rows', 6000);
+        const gap = await ev(`(() => { const t = document.getElementById('saved-table'), r = t.getBoundingClientRect(); return { over: t.scrollWidth > t.clientWidth + 1, cells: [...t.querySelectorAll('tbody tr')].map(tr => { const c = tr.cells[1], cr = c.getBoundingClientRect(); return cr.right <= r.right + 1 && cr.left >= r.left - 1 && c.scrollWidth <= c.clientWidth + 1; }) }; })()`);
+        assert.ok(!gap.over && gap.cells.length >= 2 && gap.cells.every(Boolean), 'at 200% text the computer names are whole and inside: ' + JSON.stringify(gap));
         await shot('saved-servers-phone-200');
         await ev(`document.documentElement.style.fontSize = ''; window.toggleAgenticPanel(false); true`);
         await Emulation.setTouchEmulationEnabled({ enabled: false });
@@ -226,9 +233,10 @@ const REMOTE = `(() => {
         await ev(`window.__box.boardGone.add('9'); window.__box.items.push({ id: 103, kind: 'agent', ref: 'ended-b', key: '${hex(3)}', agent_type: 'claude', title: 'old agent', snippet: 'from an agent that ended', said_at: '', saved_at: new Date().toISOString(), done_at: null }); true`);
         await openSaved();
         await refresh();
-        await waitFor(`!!document.querySelector('#saved-list [data-id="box-b:102"].gone') && !!document.querySelector('#saved-list [data-id="box-b:103"] .why:not([hidden])')`, 'Gone and the cannot-open line', 8000);
-        const ended = await ev(`(() => { const li = document.querySelector('#saved-list [data-id="box-b:103"]'); return { open: !!li.querySelector('.saved-open'), remove: !!li.querySelector('.saved-remove'), snippet: li.querySelector('.snip').textContent, why: li.querySelector('.why').textContent }; })()`);
-        assert.deepEqual({ open: ended.open, remove: ended.remove, snippet: ended.snippet }, { open: false, remove: true, snippet: 'from an agent that ended' });
+        await waitFor(`!!document.querySelector('#saved-table .group-table-link[data-id="box-b:102"]') && document.querySelector('#saved-table .group-table-link[data-id="box-b:102"]').closest('tr').cells[3].textContent.trim() === 'Gone'`, 'the deleted board message Gone', 8000);
+        await pageOf('box-b:103');
+        const ended = await ev(`(() => ({ openOff: document.querySelector('#inbox-page .item-bar .btn-primary').disabled, snippet: document.querySelector('#inbox-page .inbox-saved-snippet').textContent, why: (document.querySelector('#inbox-page .inbox-saved-why') || {}).textContent || '', remove: !!document.querySelector('#inbox-page .wf-more-menu .btn') }))()`);
+        assert.deepEqual({ open: ended.openOff, remove: ended.remove, snippet: ended.snippet }, { open: true, remove: true, snippet: 'from an agent that ended' });
         assert.ok(/Box B/.test(ended.why) && /cannot be opened/.test(ended.why), ended.why);
         console.log('   ✓');
     } finally {

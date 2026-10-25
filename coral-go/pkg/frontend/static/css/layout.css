@@ -961,6 +961,12 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
     .group-table-stack td { display: block; padding: 0; border: 0; }
     .group-table-stack td:first-child { flex: 1 1 100%; }
 }
+/* The same stacking in the dock's Saved tab at any width: the panel is a phone's width (#saved-table, #7631) */
+#saved-table .group-table-stack thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+#saved-table .group-table-stack, #saved-table .group-table-stack tbody { display: block; }
+#saved-table .group-table-stack tr { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; padding: var(--space-lg) 0; border-bottom: 1px solid var(--border); }
+#saved-table .group-table-stack td { display: block; padding: 0; border: 0; }
+#saved-table .group-table-stack td:first-child { flex: 1 1 100%; }
 @media (pointer: coarse) { .group-chip { min-height: 44px; } .group-table-cell-btn { min-height: 44px; min-width: 44px; } }
 /* An item's page in the Inbox (a task, a saved message): it fills the view, so its pinned bar is at the foot of the screen; the view's padding is taken back so nothing shows under the bar */
 .inbox-page { display: flex; flex-direction: column; flex: 1; box-sizing: border-box; padding: 20px 24px; }

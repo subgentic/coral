@@ -512,7 +512,6 @@
 1	sidebar_groups.js	ROW_ACTION_ATTR[r.action] || ''
 2	sidebar_groups.js	attrs
 1	sidebar_groups.js	c ? escapeHtml(c) : dash
-1	sidebar_groups.js	chipsHtml(t)
 1	sidebar_groups.js	dash
 2	sidebar_groups.js	dataAttrs(c.data)
 1	sidebar_groups.js	dataAttrs(r.data)

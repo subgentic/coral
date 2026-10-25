@@ -13,7 +13,6 @@ import { withScope, scopeHeading, scopeEmpty, ALL } from './saved_scope.js';
 import { effectiveLiveViewMode, setLiveViewMode, jumpToLiveMessage } from './live_chat.js';
 import { buildListBar } from './list_bar.js';
 import { importOnce } from './import_once.js';
-const { savedExpandFor } = await importOnce('./inbox_coral.js'); // "Read the whole message" on a saved item: the shared Inbox component
 import { selectInboxTab, rememberInboxGroup } from './inbox_tab.js';
 // This module is loaded lazily, so its own parts are loaded the same way (a static import of a module not loaded at startup could not be retried: import_hygiene).
 const { KINDS, KIND_LABEL, SORTS, SORT_LABEL, EMPTY: SAVED_EMPTY, makeModel: savedModel, clean: cleanSaved, isFiltered: savedFiltered, toQuery: savedQuery } = await importOnce('./saved_filters.js');
@@ -33,7 +32,6 @@ const convTitles = new Map(); // conversation reference -> its title, from every
 /** An item's identity across servers: ids are each server's own. */
 const uid = it => `${it.server}:${it.id}`;
 
-const ICON = { agent: 'smart_toy', board: 'forum', ended: 'history' };
 
 function when(iso) {
     return iso ? (whenText(iso) || String(iso)) : ''; // the one format of every list (when_text.js, #6961)
@@ -82,8 +80,6 @@ async function load() {
         .sort((a, b) => (filters.sort === 'oldest' ? -1 : 1) * (b.saved_at || '').localeCompare(a.saved_at || ''));
     for (const i of items) if (i.ref && !convTitles.has(i.ref)) convTitles.set(i.ref, i.title || i.ref);
     const open = answered.reduce((n, a) => n + (a.d.open || 0), 0), done = answered.reduce((n, a) => n + (a.d.done || 0), 0);
-    $('saved-count-open').textContent = open ? `(${open})` : '';
-    $('saved-count-done').textContent = done ? `(${done})` : '';
     totals = { open, done };
     if (scope.kind === 'all') { setSavedCount(open); setScopedCount(open); } else setScopedCount(open); // the top bar's number is everything's: an agent's or team's list moves only its own tab's
 }
@@ -132,107 +128,6 @@ function openLabel(it) {
     return { text: 'Open chat', name: `Open chat: ${srcLabel(it)}` };
 }
 
-function btn(cls, label, name, icon, onClick) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = `btn ${cls}`.trim();
-    b.setAttribute('aria-label', name);
-    const i = document.createElement('span'); i.className = 'material-icons'; i.setAttribute('aria-hidden', 'true'); i.textContent = icon;
-    b.append(i, document.createTextNode(label));
-    b.addEventListener('click', onClick);
-    return b;
-}
-
-// More (#6580): Remove, the one destructive action, behind a button named "More for <message>" that discloses a menu. It opens on a click or ArrowDown with its first item focused, Escape closes it and
-// returns to the button, and leaving it by Tab or a click elsewhere closes it.
-let openMore = null;
-function closeMore(focusToggle) {
-    const m = openMore; openMore = null;
-    if (!m) return;
-    m.menu.hidden = true; m.toggle.setAttribute('aria-expanded', 'false');
-    if (focusToggle) m.toggle.focus();
-}
-document.addEventListener('click', e => { if (openMore && !openMore.wrap.contains(e.target)) closeMore(false); });
-let moreSeq = 0;
-function moreMenu(it) {
-    const wrap = document.createElement('div'); wrap.className = 'saved-more';
-    const id = `saved-more-${++moreSeq}`;
-    const toggle = document.createElement('button'); toggle.type = 'button'; toggle.className = 'btn saved-more-btn';
-    toggle.textContent = 'More'; toggle.setAttribute('aria-label', `More for ${whichOne(it)}`);
-    toggle.setAttribute('aria-haspopup', 'menu'); toggle.setAttribute('aria-expanded', 'false'); toggle.setAttribute('aria-controls', id);
-    const menu = document.createElement('div'); menu.className = 'saved-more-menu'; menu.id = id; menu.setAttribute('role', 'menu'); menu.hidden = true;
-    const rm = document.createElement('button'); rm.type = 'button'; rm.className = 'btn saved-remove'; rm.setAttribute('role', 'menuitem'); rm.textContent = 'Remove from saved'; rm.setAttribute('aria-label', `Remove from saved: ${whichOne(it)}`);
-    rm.addEventListener('click', () => { closeMore(false); remove(it); });
-    menu.append(rm);
-    const open = () => { if (openMore && openMore.wrap !== wrap) closeMore(false); openMore = { wrap, menu, toggle }; menu.hidden = false; toggle.setAttribute('aria-expanded', 'true'); rm.focus(); };
-    toggle.addEventListener('click', () => { if (openMore && openMore.wrap === wrap) closeMore(true); else open(); });
-    wrap.addEventListener('keydown', e => {
-        const isOpen = !!openMore && openMore.wrap === wrap;
-        if (e.key === 'Escape' && isOpen) { e.preventDefault(); e.stopPropagation(); closeMore(true); }
-        else if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && e.target === toggle) { e.preventDefault(); if (!isOpen) open(); }
-        else if (isOpen && (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Home' || e.key === 'End') && e.target === rm) e.preventDefault(); // one item: the arrows stay on it
-    });
-    wrap.addEventListener('focusout', e => { if (openMore && openMore.wrap === wrap && !wrap.contains(e.relatedTarget)) closeMore(false); });
-    wrap.append(toggle, menu);
-    return wrap;
-}
-
-function itemNode(it, seenWhy = null) {
-    const done = !!it.done_at;
-    const chk = checks.get(uid(it));
-    const gone = chk && chk.state === 'gone';
-    const noopen = chk && chk.state === 'noopen'; // kept, but this hub cannot open it
-    const chip = chipFor(it);
-    const li = document.createElement('li');
-    li.className = `saved-item${gone ? ' gone' : ''}${done ? ' done' : ''}`;
-    li.dataset.id = uid(it);
-    const top = document.createElement('div'); top.className = 'top';
-    const ic = document.createElement('span'); ic.className = 'material-icons'; ic.setAttribute('aria-hidden', 'true');
-    ic.textContent = it.kind === 'board' ? ICON.board : (chip.cls === 'ended' ? ICON.ended : ICON.agent);
-    // The title is the one way in: the control that opens the source, named "Open chat: <title>" (there is no second Open button for the same action). An item this hub cannot open keeps a plain title.
-    let src;
-    if (gone || noopen) { src = document.createElement('span'); src.className = 'src'; }
-    else { src = document.createElement('button'); src.type = 'button'; src.className = 'src saved-open'; src.setAttribute('aria-label', openLabel(it).name + (openSuffix.get(uid(it)) || '')); src.addEventListener('click', () => openItem(it, li)); }
-    src.textContent = srcLabel(it); src.title = srcLabel(it);
-    top.append(ic, src);
-    if (chip.text) { const kind = document.createElement('span'); kind.className = `kind ${chip.cls}`.trim(); kind.textContent = chip.text; if ((gone || noopen) && chk.why) kind.title = chk.why; top.append(kind); }
-    if (multi) { const sv = document.createElement('span'); sv.className = 'server'; sv.textContent = serverName(it.server); sv.title = sv.textContent; top.append(sv); }
-    const snip = document.createElement('p'); snip.className = 'snip'; snip.textContent = it.snippet || '(no text)';
-    li.append(top, snip);
-    // The same reason is said once for a list (the first row that has it); the other rows keep their Gone chip, which carries the sentence as its tip (#7122).
-    const sayWhy = (gone || noopen) && (!seenWhy || !seenWhy.has(chk.why));
-    if (sayWhy && seenWhy) seenWhy.add(chk.why);
-    const why = document.createElement('p'); why.className = 'why'; why.setAttribute('role', 'status'); why.hidden = !sayWhy;
-    if (sayWhy) {
-        const w = document.createElement('span'); w.className = 'material-icons'; w.setAttribute('aria-hidden', 'true'); w.textContent = 'error_outline';
-        const t = document.createElement('span'); t.textContent = chk.why;
-        why.append(w, t);
-    }
-    li.append(why);
-    const meta = document.createElement('div'); meta.className = 'meta';
-    const said = document.createElement('span'); said.textContent = it.said_at ? `Said ${when(it.said_at)}` : '';
-    const saved = document.createElement('span'); saved.textContent = `Saved ${ago(it.saved_at)}`;
-    if (it.said_at) meta.append(said, Object.assign(document.createElement('span'), { textContent: '·' }), saved); else meta.append(saved);
-    meta.children[1]?.setAttribute('aria-hidden', 'true');
-    li.append(meta);
-    const acts = document.createElement('div'); acts.className = 'acts';
-    if (!gone) acts.append(btn('saved-done', done ? 'Reopen' : 'Done', `${done ? 'Reopen, move back to Open' : 'Mark done'}: ${whichOne(it)}`, done ? 'replay' : 'done', () => setDone(it, !done)));
-    acts.append(moreMenu(it));
-    li.append(acts);
-    // "Read the whole message": the shared Inbox component's control (inbox_panel.js), inline under the snippet; not for an item whose source is gone.
-    if (!gone) { const x = savedExpandFor(it, whichOne(it)); if (x && !x.root.hidden) li.insertBefore(x.root, why); }
-    return li;
-}
-
-/** One line for a server that did not answer: its items are left out, not an error. */
-function noticeNode(s) {
-    const li = document.createElement('li');
-    li.className = 'saved-note';
-    li.setAttribute('role', 'status');
-    li.textContent = `${serverName(s.id)} did not answer, so its saved messages are not shown.`;
-    return li;
-}
-
 const convLabel = ref => convTitles.get(ref) || ref;
 const savedSpec = () => ({
     idp: 'sv', noun: 'message', label: 'Search and filter saved messages', searchLabel: 'Search saved messages', placeholder: 'Search saved messages',
@@ -267,26 +162,19 @@ function syncOneBar(bar, shownCount) {
 }
 
 function render() {
-    const list = $('saved-list');
     const shown = items.filter(i => (tab === 'done') === !!i.done_at);
     syncBar(shown.length);
     verify(shown); // before the items are drawn: their chips and actions read the marks
     nameApart(shown);
-    const seenWhy = new Set();
-    list.replaceChildren(...down.map(noticeNode), ...shown.map(it => itemNode(it, seenWhy)));
-    if (!shown.length) {
-        const li = document.createElement('li');
-        li.className = 'saved-empty';
-        li.textContent = savedFiltered(filters) ? 'No saved messages match this search.' : scopeEmpty(scope, tab);
-        list.append(li);
-    }
-    for (const t of ['open', 'done']) {
-        const b = $(`saved-tab-${t}`);
-        b.setAttribute('aria-selected', String(t === tab));
-        b.tabIndex = t === tab ? 0 : -1;
-    }
-    $('saved-panel').setAttribute('aria-labelledby', `saved-tab-${tab}`);
+    drawDock();
     for (const fn of renderListeners) fn(); // the Inbox's Saved table (inbox_sidebar.js) follows the same list
+}
+
+/** The dock's Saved tab is the Inbox's Saved table (inbox_sidebar.js drawDockSaved), for the page's scope: one list, drawn in both places. */
+let _dockDrawn = Promise.resolve();
+function drawDock() {
+    const host = $('saved-table');
+    if (host) _dockDrawn = importOnce('./inbox_sidebar.js').then(m => m.drawDockSaved(host)).catch(() => {});
 }
 
 // What each shown item points at, read from the list's own answer (#5802): the server marks a bookmark whose message is deleted or whose transcript is not on its computer, so the
@@ -305,16 +193,6 @@ function verify(shown) {
             checks.set(uid(it), { state: 'noopen', why: `This agent has ended. Its history is on ${serverName(it.server)}, and Chats shows only this computer's, so the message cannot be opened from here. The saved text above is kept.` });
         }
     }
-}
-
-/** An item drawn again (its chip, its actions): the focus stays on the same button when it was inside, or moves to the item's first. */
-function swap(it) {
-    const li = $('saved-list').querySelector(`[data-id="${uid(it)}"]`);
-    if (!li) return;
-    const had = li.contains(document.activeElement) ? [...li.querySelectorAll('.btn')].indexOf(document.activeElement) : -2;
-    const next = itemNode(it);
-    li.replaceWith(next);
-    if (had !== -2) (next.querySelectorAll('.btn')[Math.max(had, 0)] || next.querySelector('.btn'))?.focus();
 }
 
 async function probe(it) {
@@ -339,12 +217,11 @@ async function probe(it) {
 let _drawn = false; // the list has been drawn once: a later read keeps what is on screen until the answer comes
 let _readError = ''; // why the last read failed, for the Inbox's Saved table (the dock says it in #saved-status)
 async function refresh() {
-    if (!_drawn) { // the first read: the bar is already there and one line says it is loading, so nothing moves when the list arrives (#7431)
+    if (!_drawn) { // the first read: the bar is already there and the table says it is loading, so nothing moves when the list arrives (#7431)
         syncBar(0);
-        const li = document.createElement('li'); li.className = 'saved-empty saved-loading'; li.setAttribute('role', 'status'); li.textContent = 'Loading saved items';
-        $('saved-list').replaceChildren(li);
+        drawDock();
     }
-    try { await load(); _readError = ''; render(); _drawn = true; } catch (e) { _readError = `Could not read the saved messages (${e.message}).`; $('saved-list').querySelector('.saved-loading')?.remove(); $('saved-status').textContent = _readError; for (const fn of renderListeners) fn(); } // the loading line goes: the screen must not say it is loading and that it failed
+    try { await load(); _readError = ''; render(); await _dockDrawn; _drawn = true; } catch (e) { _readError = `Could not read the saved messages (${e.message}).`; drawDock(); $('saved-status').textContent = _readError; for (const fn of renderListeners) fn(); } // the loading line goes: the screen must not say it is loading and that it failed
 }
 
 /** On a phone the side panel is an overlay over the chat: it gives way so the jump is seen (the tab is where it was when it is opened again). */
@@ -352,46 +229,12 @@ function closeOverlay() { if (isPhoneLayout()) window.toggleAgenticPanel?.(false
 
 function status(text) { $('saved-status').textContent = ''; requestAnimationFrame(() => { $('saved-status').textContent = text; }); }
 
-function neighbour(it) {
-    const li = $('saved-list').querySelector(`[data-id="${uid(it)}"]`);
-    return li?.nextElementSibling?.querySelector('.btn') || li?.previousElementSibling?.querySelector('.btn');
-}
-
-async function setDone(it, done) {
-    const next = neighbour(it);
-    const r = await serverFetch(it.server, `/api/saved/${it.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ done }) });
-    if (!r.ok) { showToast('Could not change the saved message', true); return; }
-    await refresh();
-    status(done ? 'Marked done' : 'Moved back to Open');
-    (next && next.isConnected ? next : $(`saved-tab-${tab}`)).focus();
-    savedChanged();
-}
-
-async function remove(it) {
-    const next = neighbour(it);
-    const r = await serverFetch(it.server, `/api/saved/${it.id}`, { method: 'DELETE' });
-    if (!r.ok && r.status !== 404) { showToast('Could not remove the saved message', true); return; }
-    await refresh();
-    status('Removed from saved');
-    (next && next.isConnected ? next : $(`saved-tab-${tab}`)).focus();
-    savedChanged();
-}
-
 let wired = false;
 function wire() {
     if (wired) return;
     wired = true;
     // Another agent or team on screen while the list is open: the list is theirs.
     document.addEventListener('coral:route-changed', () => { if (savedShowing() && currentScope().key !== scope.key) { checks.clear(); refresh(); } });
-    for (const t of ['open', 'done']) $(`saved-tab-${t}`).addEventListener('click', () => { tab = t; render(); });
-    // Arrow keys move between the two tabs.
-    $('saved-tab-open').parentElement.addEventListener('keydown', (e) => {
-        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-        tab = tab === 'open' ? 'done' : 'open';
-        render();
-        $(`saved-tab-${tab}`).focus();
-        e.preventDefault();
-    });
 }
 
 /** The Saved tab was shown (by a click on it, a key, or the top bar's button): read the list again. */
@@ -490,7 +333,7 @@ export async function openSaved({ toggle = false } = {}) {
     tab = 'open';
     wire();
     await showSaved();
-    ($('saved-list').querySelector('.btn') || $('saved-tab-open')).focus();
+    ($('saved-table').querySelector('.group-chip, .group-table-link') || $('saved-close')).focus();
 }
 
 // ── The Inbox's Saved group (#7472) ──────────────────────────────────
@@ -502,7 +345,7 @@ let inboxBar = null; // the Filters and Sort bar in the Inbox's Display options:
 export function onSavedRender(fn) { renderListeners.add(fn); }
 /** What the Inbox shows: the tab's items (Open or Done), both totals, the servers that did not answer, and whether a search or filter is on. */
 export function savedView() {
-    return { loading: !_drawn && !_readError, error: _readError, tab, totals: { ...totals }, shown: items.filter(i => (tab === 'done') === !!i.done_at), down: [...down], filtered: savedFiltered(filters), query: filters.q || '' };
+    return { loading: !_drawn && !_readError, error: _readError, scoped: scope.kind === 'all' ? '' : scopeEmpty(scope, tab), tab, totals: { ...totals }, shown: items.filter(i => (tab === 'done') === !!i.done_at), down: [...down], filtered: savedFiltered(filters), query: filters.q || '' };
 }
 /** One item's facts for a row or a page: its words, and what it can do. */
 export function savedItemFacts(it) {
@@ -584,15 +427,15 @@ export async function openSavedLink(it) {
         showToast(`Could not open the saved message: ${e.message}`, true);
         return false;
     }
-    await openItem(it, null);
+    await openItem(it);
     return true;
 }
 
-async function openItem(it, li) {
+async function openItem(it) {
     _jumpFrom = savedViewShowing() ? 'view' : 'sidebar';
     try {
         const found = await probe(it);
-        if (found && found.state === 'gone') { checks.set(uid(it), found); swap(it); $('saved-list').querySelector(`[data-id="${uid(it)}"] .saved-remove`)?.focus(); return; }
+        if (found && found.state === 'gone') { checks.set(uid(it), found); render(); return; }
         const leave = tab => { if (savedViewShowing()) window.switchNavTab?.(tab); }; // from the full-screen page: the tab of where the item is, so the page is left (and the list goes back to the sidebar)
         if (it.kind === 'board') {
             closeOverlay();
