@@ -9,6 +9,7 @@ const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
 const BASE = require('./test_base').BASE;
+const HOLD_MAX = 4500; // the latest end the 3 s Stop hold may have, in ms after the press: measured 3001 to 3027 ms in 30 readings (10 runs at a 4x CPU throttle, 5 without, two widths), #352
 
 const KEYS = [['Esc', 'Escape', 'Escape'], ['Tab', 'Tab', 'Tab'], ['Ctrl-C', 'C-c', 'Ctrl-C, interrupt'], ['←', 'Left', 'Left arrow'], ['↑', 'Up', 'Up arrow'], ['↓', 'Down', 'Down arrow'], ['→', 'Right', 'Right arrow'], ['Enter', 'Enter', 'Enter'], ['|', '|', 'Pipe'], ['~', '~', 'Tilde'], ['/', '/', 'Slash'], ['-', '-', 'Dash']];
 const STUB = `(() => { const real = window.fetch; window.__keys = [];
@@ -86,16 +87,17 @@ const STUB = `(() => { const real = window.fetch; window.__keys = [];
             assert.equal(await ev(`document.getElementById('mobile-send-btn').getAttribute('aria-label')`), 'Stop the agent', at + 'an empty box again: Stop');
             assert.equal(await status(), 'Stop is shown', at + 'with focus in the composer the swap is said once in the status region');
             // one press sends Escape once; a second is ignored while it is aria-disabled
-            const pressedAt = Date.now();
-            await ev(`window.__keys.length = 0; const b = document.getElementById('mobile-send-btn'); window.__pressedAt = performance.now(); b.click(); b.click(); true`); await sleep(400); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
+            // the end of the hold is recorded in the page, the moment aria-disabled goes (Security on #180)
+            await ev(`window.__keys.length = 0; const b = document.getElementById('mobile-send-btn'); window.__releasedAt = null; new MutationObserver((m, o) => { if (!b.hasAttribute('aria-disabled')) { window.__releasedAt = performance.now(); o.disconnect(); } }).observe(b, { attributes: true, attributeFilter: ['aria-disabled'] }); window.__pressedAt = performance.now(); b.click(); b.click(); true`); await sleep(400); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
             assert.deepEqual(await ev(`window.__keys`), [['Escape']], at + 'Stop sends one Escape (the CLI\'s interrupt), never two');
             assert.equal(await ev(`document.getElementById('mobile-send-btn').getAttribute('aria-disabled')`), 'true', at + 'Stop is aria-disabled after the press (still focusable)');
             assert.equal(await status(), 'Stopping the agent');
-            // the 3 s hold from both sides (#352): still held at 2.5 s, and allowed again by 6 s (a fixed 3.7 s sleep failed under a 4x CPU throttle, the app's timer and its work running past it)
-            await sleep(Math.max(0, pressedAt + 2500 - Date.now())); // sleep-ok: the hold is measured at a point in time
-            const held = await ev(`({ at: Math.round(performance.now() - window.__pressedAt), held: document.getElementById('mobile-send-btn').getAttribute('aria-disabled') === 'true' })`); // timed in the page: what the page saw, when
-            assert.ok(held.at < 3000 && held.held, at + `still held at 2.5 s (${JSON.stringify(held)}; a reading at 3 s or later is not inside the hold)`);
-            await waitFor(`!document.getElementById('mobile-send-btn').hasAttribute('aria-disabled')`, at + 'allowed again after the 3 s hold', Math.max(500, pressedAt + 6000 - Date.now()));
+            // the 3 s hold from both sides (#352): it ends no sooner than 2.5 s and no later than HOLD_MAX after the press, both times taken in the page (a fixed 3.7 s sleep failed under a 4x CPU throttle,
+            // the app's timer and its work running past it). waitFor's 6 s is only how long the suite waits to see it end.
+            await waitFor(`window.__releasedAt !== null`, at + 'allowed again after the 3 s hold', 6000);
+            const heldFor = await ev(`Math.round(window.__releasedAt - window.__pressedAt)`);
+            if (process.env.AGENT_KEYS_HOLD_LOG) require('node:fs').appendFileSync(process.env.AGENT_KEYS_HOLD_LOG, `${at}${heldFor}\n`);
+            assert.ok(heldFor >= 2500 && heldFor <= HOLD_MAX, at + `the hold ends between 2.5 s and ${HOLD_MAX / 1000} s after Stop (it ended at ${heldFor} ms)`);
             // a Stop that cannot be sent says so, and is pressable again at once (not left on "Stopping the agent")
             await ev(`window.__keysFail = true; document.getElementById('mobile-send-btn').click(); true`); await sleep(600); // sleep-ok: the refused answer comes back
             assert.match(await status(), /^Stop was not sent/, at + 'a refused Stop is said in the status: ' + await status());
