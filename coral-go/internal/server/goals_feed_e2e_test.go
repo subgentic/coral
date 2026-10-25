@@ -78,6 +78,18 @@ func TestTheLiveFeedCarriesTheGoalsBriefThroughTheRealRouter(t *testing.T) {
 	b2, _ := moved["team-a"].(map[string]any)
 	assert.EqualValues(t, 0, b2["open"])
 	assert.NotEqual(t, seq, b2["seq"], "the change counter moved")
+
+	// #7355: the frame also names what changed (the goal, a kind and the counter value), never text; the first frame names nothing; no gap while the window reaches back.
+	assert.NotContains(t, first, "goal_events", "a connection that starts gets none")
+	evs, _ := next["goal_events"].([]any)
+	require.Len(t, evs, 1, "one change, one event: %v", next["goal_events"])
+	ev, _ := evs[0].(map[string]any)
+	assert.Equal(t, "team-a", ev["board"])
+	assert.EqualValues(t, g.ID, ev["goal"])
+	assert.Equal(t, "goal_closed", ev["kind"])
+	assert.Equal(t, b2["seq"], ev["seq"], "the counter value the change gave")
+	assert.NotContains(t, next, "goal_events_gap")
+	assert.NotContains(t, string(mustJSON(t, next)), "Ship it", "no goal text in the events")
 }
 
 func mustJSON(t *testing.T, v any) []byte {
