@@ -57,6 +57,7 @@ window._verifyAllCLIs = async function() {
 function _showCLINotFoundModal(agentType, server = LOCAL_SERVER, { retry = null } = {}) {
     const info = CLI_INSTALL_INSTRUCTIONS[agentType] || { name: agentType, cmd: `Install ${agentType} CLI` };
     const name = escapeHtml(info.name); // an agent type the table does not know is shown as it came (#4853)
+    const label = escapeHtml(info.label || info.name); // the product's name, not the command's (#7450)
     const remote = normServer(server) !== LOCAL_SERVER;
     const where = remote ? `on ${escapeHtml(serverLabel(server, state.servers))}` : 'on this computer';
     const modal = document.createElement('div');
@@ -64,20 +65,20 @@ function _showCLINotFoundModal(agentType, server = LOCAL_SERVER, { retry = null 
     modal.style.display = 'flex';
     modal.innerHTML = `
         <div class="modal-content" style="width:480px">
-            <h3>${name} CLI Not Found</h3>
+            <h3>${label} is not installed</h3>
             <p style="color:var(--text-secondary);font-size:0.8125rem;line-height:1.5;margin:8px 0 12px">
-                Coral could not find the <code>${name}</code> command ${where}. Install it, then press Check again.
+                Coral starts ${label} for you, but it is not installed ${where}. Run this in a terminal, then press Check again.
             </p>
             <div style="background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;padding:10px 14px;font-family:var(--font-mono);font-size:0.8125rem;display:flex;align-items:center;gap:8px">
                 <code style="flex:1;user-select:all">${escapeHtml(info.cmd)}</code>
                 <button class="btn btn-small" data-on-click="info-copy" data-cmd="${escapeAttr(info.cmd)}">Copy</button>
             </div>
-            ${/^https:\/\/[^\s"'<>]+$/.test(info.url || '') ? `<p style="font-size:0.8125rem;margin:10px 0 0">Or follow the official install page:<br><a href="${escapeAttr(info.url)}" target="_blank" rel="noopener noreferrer" style="color:var(--link-text);overflow-wrap:anywhere">${escapeHtml(info.url.replace(/^https:\/\//, ''))}</a></p>` : ''}
+            ${/^https:\/\/[^\s"'<>]+$/.test(info.url || '') ? `<p style="font-size:0.8125rem;margin:10px 0 0">Or use the official install page:<br><a href="${escapeAttr(info.url)}" target="_blank" rel="noopener noreferrer" style="color:var(--link-text);overflow-wrap:anywhere">${escapeHtml(info.url.replace(/^https:\/\//, ''))}</a></p>` : ''}
             ${info.note ? `<p style="color:var(--text-secondary);font-size:0.75rem;line-height:1.5;margin:8px 0 0">${escapeHtml(info.note)}</p>` : ''}
             <p class="cli-recheck-status" role="status" aria-live="polite"></p>
             <div class="modal-actions" style="margin-top:16px">
-                ${remote ? '' : '<button class="btn" data-action="settings">Set CLI path</button>'}
-                <button class="btn" data-action="close">OK</button>
+                ${remote ? '' : '<button class="btn" data-action="settings">It is installed somewhere else</button>'}
+                <button class="btn" data-action="close">Got it</button>
                 <button class="btn btn-primary" data-action="recheck">Check again</button>
             </div>
         </div>
@@ -104,7 +105,7 @@ async function _recheckCLI(button, modal, agentType, server, close, retry) {
         if (resp.ok && data && data.found) {
             if (typeof retry === 'function') { close(); retry(); return; }
             status.textContent = 'Found it. Press Launch again.';
-        } else status.textContent = resp.ok ? 'Still not found. If you just installed it, restart Coral so it sees the new install, or use Set CLI path.' : 'Could not check just now. Try again.';
+        } else status.textContent = resp.ok ? 'Still not found. If you just installed it, restart Coral so it sees the new install, or say where it is installed.' : 'Could not check just now. Try again.';
     } catch { status.textContent = 'Could not check just now. Try again.'; }
     button.disabled = false; button.textContent = 'Check again';
     if (modal.isConnected && !modal.contains(document.activeElement)) button.focus(); // disabling the button while it looked dropped the keyboard's place
