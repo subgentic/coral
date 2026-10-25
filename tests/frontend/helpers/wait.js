@@ -81,6 +81,19 @@ async function coralReady(ev, step = null, ...args) {
         ` (parts: ${JSON.stringify(await ev(`window.__coralReady.parts || null`).catch(() => null))})`);
 }
 
+// Loads url in the suite's tab and resolves at its load event (#352). The listener is in place before Page.navigate is sent: `await Page.navigate(...); await Page.loadEventFired()`
+// listens only once navigate has answered, and a load event that arrives before that answer is missed: the suite waits for a second one that never comes until the runner kills it
+// at 120 s (the hangs in inbox_local, preview_pane_resize and board_page_card on Windows, #348, came at a page load). A navigation Chrome refuses, or a load that does not come within `timeout`, fails with the url.
+async function loadPage(Page, url, { timeout = 30000 } = {}) {
+    let timer;
+    const loaded = Page.loadEventFired();
+    try {
+        const nav = await Page.navigate({ url });
+        if (nav && nav.errorText) throw new Error(`loading ${url}: ${nav.errorText}`);
+        await Promise.race([loaded, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`timed out after ${timeout}ms waiting for ${url} to load`)), timeout); })]);
+    } finally { clearTimeout(timer); }
+}
+
 // Animation frames, bounded. A page that is not visible (document.visibilityState 'hidden') runs no
 // requestAnimationFrame callbacks: on the Mac, headless Chrome hides the page after a key event sent through
 // Input.dispatchKeyEvent, and a wait made of frames then never finishes (#3703, #3705). run_cdp_suites.mjs now
@@ -115,7 +128,7 @@ async function settle(ev, ms, quietMs = 120) {
 }
 
 module.exports = {
-    waitFor, waitStable, coralReady, nextFrame, framesJs, settle, isNavigationError,
+    waitFor, waitStable, coralReady, loadPage, nextFrame, framesJs, settle, isNavigationError,
     bind: ev => ({
         nextFrame: () => nextFrame(ev),
         waitFor: (expression, what, opts) => waitFor(ev, expression, what, opts),

@@ -11,7 +11,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { connect } = require('./agent_view_harness');
-const { framesJs } = require('./helpers/wait');
+const { framesJs, loadPage, coralReady } = require('./helpers/wait');
 const BASE = require('./test_base').BASE;
 
 (async () => {
@@ -29,10 +29,10 @@ const BASE = require('./test_base').BASE;
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         const open = async (w, h, saved) => {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile: w < 700 });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
+            await loadPage(Page, BASE + '/');
             await ev(`localStorage.clear(); localStorage.setItem('coral-preview-pane-dock', 'column'); ${saved === undefined ? '' : `localStorage.setItem('coral-preview-column-width', ${JSON.stringify(String(saved))});`} true`);
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await loadPage(Page, BASE + '/'); await install();
+            await coralReady(ev);
             await ev(`(async () => { const st = ${S}; const { state } = await import(st + 'state.js'); window.PP = await import(st + 'preview_pane.js'); const { showView } = await import(st + 'utils.js');
                 { const real = window.fetch; window.fetch = (u, o) => /\\/api\\/artifacts\\/a{64}/.test(String(u)) ? Promise.resolve(new Response('# Release notes\\n\\nThe preview shows a **markdown** artifact: a heading, a paragraph and a list.\\n\\n- one\\n- two\\n- three\\n', { status: 200, headers: { 'content-type': 'text/markdown' } })) : real(u, o); } // the artifact the pane shows
                 window.__m.add('pv-a', 'P', 4, { sleeping: false, session_id: 'pv-a-id' });
@@ -140,10 +140,10 @@ const BASE = require('./test_base').BASE;
         ];
         for (const [saved, w] of [[undefined, 1400], [99999, 1400], [1200, 1000], [700, 1900]]) for (const [label, call] of wayOut) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: 900, deviceScaleFactor: 1, mobile: false });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
+            await loadPage(Page, BASE + '/');
             await ev(`localStorage.clear(); localStorage.setItem('coral-preview-pane-dock', 'column'); ${saved === undefined ? '' : `localStorage.setItem('coral-preview-column-width', ${JSON.stringify(String(saved))});`} true`);
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await loadPage(Page, BASE + '/'); await install();
+            await coralReady(ev);
             await ev(`(async () => { const st = ${S}; const { state } = await import(st + 'state.js'); window.PP = await import(st + 'preview_pane.js'); const { showView } = await import(st + 'utils.js');
                 const png = await new Promise(r => { const c = document.createElement('canvas'); c.width = 4000; c.height = 2000; const x = c.getContext('2d'); x.fillStyle = '#39c'; x.fillRect(0, 0, 4000, 2000); c.toBlob(r, 'image/png'); });
                 const real = window.fetch; window.fetch = (u, o) => { const t = String(u);
