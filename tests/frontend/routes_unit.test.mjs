@@ -27,6 +27,11 @@ rt('/team/@m2/settings', { view: 'team', server: 'm2', id: 'settings', sub: null
 rt('/team/m2/settings', { view: 'team', server: null, id: 'm2', sub: 'settings' });
 rt('/team/%40m2/settings', { view: 'team', server: null, id: '@m2', sub: 'settings' });
 rt('/team/a%2Fb', { view: 'team', server: null, id: 'a/b', sub: null });
+// The team page's tabs and its item pages (#7453)
+for (const tab of ['goals', 'messages', 'tasks', 'agents', 'artifacts', 'knowledge', 'settings']) rt(`/team/qa/${tab}`, { view: 'team', server: null, id: 'qa', sub: tab });
+rt('/team/@m2/qa/goals/12', { view: 'team', server: 'm2', id: 'qa', sub: 'goals', item: 12 });
+rt('/team/qa/tasks/7', { view: 'team', server: null, id: 'qa', sub: 'tasks', item: 7 });
+for (const bad of ['/team/qa/goals/0', '/team/qa/goals/x', '/team/qa/goals/12/y', '/team/qa/settings/3', '/team/qa/agents/3', '/team/qa/files']) assert.equal(parse(bad), null, bad);
 rt('/board/@m2/qa', { view: 'board', server: 'm2', id: 'qa' });
 rt('/workflows', { view: 'workflows' });
 rt('/workflows/7', { view: 'workflows', id: 7 });
@@ -80,7 +85,7 @@ assert.deepEqual(fromLegacyHash(`#chat/${S}`), { view: 'agents', id: S });
 assert.deepEqual(fromLegacyHash(`#chat/m2/${S}`), { view: 'agents', server: 'm2', id: S });
 assert.deepEqual(fromLegacyHash(`#session/${S}`), { view: 'chats', id: S });
 assert.deepEqual(fromLegacyHash(`#history/${S}`), { view: 'chats', id: S });
-assert.deepEqual(fromLegacyHash('#team-view=%40m2%2Fcoral-go-team'), { view: 'team', server: 'm2', id: 'coral-go-team', sub: null });
+assert.deepEqual(fromLegacyHash('#team-view=%40m2%2Fcoral-go-team'), { view: 'team', server: 'm2', id: 'coral-go-team', sub: 'agents' }); // the Team view is the Agents tab (#7453)
 assert.deepEqual(fromLegacyHash('#team-settings=qa'), { view: 'team', server: null, id: 'qa', sub: 'settings' });
 assert.deepEqual(fromLegacyHash('#servers/m2'), { view: 'servers', id: 'm2' });
 assert.deepEqual(fromLegacyHash('#tokens'), { view: 'analytics' });
@@ -119,6 +124,8 @@ console.log('routes_unit: ok');
     assert.equal(build(keyRoute('team', '@m2/qa', 'settings')), '/team/@m2/qa/settings');
     assert.equal(build(keyRoute('board', '@odd')), '/board/%40odd');
     assert.equal(build(keyRoute('team', 'a/b')), '/team/a%2Fb');
+    assert.equal(build(keyRoute('team', 'qa', 'goals', 5)), '/team/qa/goals/5');
+    assert.equal(build(keyRoute('team', 'qa', 'settings', 5)), '/team/qa/settings', 'only goals and tasks have item pages');
     for (const k of ['qa', '@m2/qa', '@odd', 'a/b', '@m2/@x', '@x!/y']) {
         assert.equal(routeKey(normalize(keyRoute('board', k))), k, k);
         assert.equal(routeKey(normalize(keyRoute('team', k))), k, k);

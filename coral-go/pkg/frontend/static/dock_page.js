@@ -8,13 +8,14 @@ import { state } from './state.js';
 const KIND_OF_VIEW = {
     'live-session-view': 'agent',
     'messageboard-view': 'board',
+    'team-page-view': 'team',
     'history-session-view': 'chats',
     'chats-empty-view': 'chats',
 };
 /** Open on first use? The agent page has always shown its side column (a board does when the window is wide enough, dockOpenByDefault); the others start closed. */
-const OPEN_BY_DEFAULT = { agent: true, board: true, chats: false, other: false };
+const OPEN_BY_DEFAULT = { agent: true, board: true, team: false, chats: false, other: false };
 /** The tab a kind of page opens on when it has no remembered one. */
-export const DEFAULT_TAB = { agent: 'files', board: 'subscribers', chats: 'saved', other: 'saved' };
+export const DEFAULT_TAB = { agent: 'files', board: 'subscribers', team: 'saved', chats: 'saved', other: 'saved' };
 
 let kind = 'agent';
 const hooks = [];
@@ -36,7 +37,7 @@ export function dockKey(base, k = kind) {
 }
 
 /** The board the board page shows (an identity key), or null on any other page: the Tasks and Team artifacts tabs read it there. */
-export function boardOfPage() { return kind === 'board' ? state.boardPageProject || null : null; }
+export function boardOfPage() { return kind === 'board' || kind === 'team' ? state.boardPageProject || null : null; }
 
 const boardHooks = [];
 /** fn() runs when the board the board page shows changes (or there is none): the tabs that read it read it again. */

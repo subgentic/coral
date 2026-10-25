@@ -763,8 +763,8 @@ async function _openLaunchedTeam(server, boardName, goal, agents, seen, boardSet
     } catch { sent = false; }
     try {
         await loadLiveSessions();
-        const { enterTeamContext } = await importOnce('./team_context.js');
-        await enterTeamContext(key);
+        const { openTeamPage } = await importOnce('./team_page.js');
+        await openTeamPage(key);
     } catch { /* the toast and the row are still there */ }
     const input = document.getElementById('board-panel-input');
     if (!sent) {

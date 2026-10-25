@@ -154,6 +154,46 @@ export function selectBoardProject(project, messageId = null) {
     applyBoardFace(project);
 }
 
+/** The team page's Messages tab (#7453): the board's own column (#mb-board: the search bar, the messages, the composer) moved into `host`, and the board loaded and polled as on the board page. leaveBoardPage puts the column back and stops the poll. */
+let _boardHome = null;
+export function showBoardInPage(project, host) {
+    setMoreOpen(false);
+    const board = document.getElementById('mb-board');
+    if (!board || !host) return;
+    if (board.parentElement !== host) { _boardHome = { parent: board.parentElement, next: board.nextSibling }; host.append(board); }
+    const again = currentProject === project && _loadedProject === project;
+    currentProject = project;
+    state.boardPageProject = project;
+    state.currentBoardServer = splitKey(project).server;
+    board.style.display = 'flex'; // display-ok: #mb-board is shown and hidden this way everywhere else in this file
+    hideBoardSubscribers();
+    initGrowingTextarea(document.getElementById('mb-post-input'));
+    if (!hasBoardLabel(project)) {
+        boardFetch(project, '').then(r => (r.ok ? r.json() : null)).then(d => {
+            if (d && typeof d.board_label === 'string') noteBoardLabel(splitKey(project).server, splitKey(project).name, d.board_label);
+        }).catch(() => {});
+    }
+    mountBoardSearch(document.getElementById('mb-tools'), project, SEARCH_HOOKS);
+    subscribeDashboard(project);
+    loadPausedState(project);
+    loadSleepState(project);
+    syncBoardDeleteButton(project);
+    if (!again) { clearNewPill(); pendingMessageId = null; loadBoardMessages(project); }
+    loadBoardSubscribers(project);
+    startBoardPoll();
+    boardPageChanged();
+}
+
+export function leaveBoardPage() {
+    const board = document.getElementById('mb-board');
+    if (!board || !_boardHome) return;
+    stopBoardPoll();
+    currentProject = null;
+    board.style.display = 'none'; // display-ok: as above
+    if (_boardHome.parent && _boardHome.parent.isConnected) _boardHome.parent.insertBefore(board, _boardHome.next && _boardHome.next.parentElement === _boardHome.parent ? _boardHome.next : null);
+    _boardHome = null;
+}
+
 // Messages | Goals (#7113): the board's two faces. The Goals face is this computer's own (the Hub has its own goals page), so the switch is not drawn through the Hub; the choice is kept for this browser.
 const FACE_KEY = 'coral.board.face';
 let _tracked = ''; // the board whose goals the switch counts

@@ -10,12 +10,16 @@ import { onGoalsSeq } from './goals_feed.js';
 import { pollEvery } from './overload.js';
 import { whenText } from './when_text.js';
 import { toGoalList, mergeGoalLists, toTaskPage, toDrivers, createBody, errorOf, LIST_PATH } from './goals_adapter.js';
+import { importOnce } from './import_once.js';
+const { teamTable, rowButton, stateChip: tableStateChip } = await importOnce('./team_table.js'); // lazy: its failure is retried
 
 const PAGE = 50; // a goal's tasks are drawn this many at a time
 import * as W from './goal_words.js';
 
 const model = { project: '', sig: '', goals: [], requireGoal: false, noGoalOpen: null, filter: 'all', openId: 0, tasks: new Map(), loading: false, failed: '', asOf: '', creating: false };
 let root = null;
+let layout = 'cards'; // 'cards': the board's Goals face (cards and the goal beside them); 'page': the team page's Goals tab (a table, and a goal's own page, #7453)
+let hooks = {}; // the page's: openTask(task, goal), onCount(n)
 
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const btn = (cls, text, onClick) => { const b = el('button', cls, text); b.type = 'button'; if (onClick) b.addEventListener('click', onClick); return b; };
@@ -52,6 +56,7 @@ export async function loadGoals() {
         if (project !== model.project) return;
         const sig = JSON.stringify([list.goals, list.requireGoal, list.noGoalOpen]);
         same = !model.failed && !!model.goals.length && sig === model.sig; // nothing changed: the page is left as it is (a redraw would take the keyboard's place)
+        if (layout === 'page') hooks.onCount?.(list.goals.length, list.goals.filter(x => W.isOpenGoal(x)).length);
         model.sig = sig; model.goals = list.goals; model.requireGoal = list.requireGoal; model.noGoalOpen = list.noGoalOpen; model.failed = ''; model.asOf = clock();
         if (model.wantOpen) { const want = model.wantOpen; model.wantOpen = 0; if (model.goals.some(g => g.id === want)) { model.openId = want; same = false; focusOpened = true; } }
         if (model.openId && !model.goals.some(g => g.id === model.openId)) { model.openId = 0; same = false; }
@@ -280,15 +285,134 @@ function keepFocus(col, redraw) {
     redraw();
     if (!held) return;
     const all = [...col.querySelectorAll('button, [tabindex]')];
-    const same = held.filter ? col.querySelector(`.goals-chip[data-filter="${CSS.escape(held.filter)}"]`) : held.goal ? col.querySelector(`.goal-card[data-goal-id="${CSS.escape(held.goal)}"]`) : held.id ? col.querySelector(`#${CSS.escape(held.id)}`) : all.find(e => e.className === held.cls && e.textContent === held.text);
-    (same || col.querySelector('.goals-chip[aria-pressed="true"]') || (col.classList.contains('goals-detail-col') ? col : null))?.focus({ preventScroll: true }); // gone because it worked: the pressed chip in the list, the detail as a whole
+    const same = held.filter ? col.querySelector(`.goals-chip[data-filter="${CSS.escape(held.filter)}"]`) : held.goal ? col.querySelector(`[data-goal-id="${CSS.escape(held.goal)}"]`) : held.id ? col.querySelector(`#${CSS.escape(held.id)}`) : all.find(e => e.className === held.cls && e.textContent === held.text);
+    (same || col.querySelector('.goals-chip[aria-pressed="true"]') || (col.classList.contains('goals-detail-col') ? col : col.querySelector('#goals-detail-title')))?.focus({ preventScroll: true }); // gone because it worked: the pressed chip in the list, the goal's heading in the detail
 }
 
-const drawList = () => keepFocus(root, drawListRaw); // the chips are above the list column: the keyboard is looked for in both
-const drawDetail = () => keepFocus(root && root.querySelector('.goals-detail-col'), drawDetailRaw);
+const drawList = () => (layout === 'page' ? drawPage() : keepFocus(root, drawListRaw)); // the chips are above the list column: the keyboard is looked for in both
+const drawDetail = () => (layout === 'page' ? drawPage() : keepFocus(root && root.querySelector('.goals-detail-col'), drawDetailRaw));
+
+// ── the team page's Goals tab (#7453): a table of the goals; a goal's own page with its tasks as a table ────────────────
+
+const goalRowBtn = (g) => { const b = rowButton(g.title || `Goal ${g.id}`); b.dataset.goalId = String(g.id); return b; };
+const doneOf = (rollup) => rollup.done, totalOf = (rollup) => W.allTasksOf(rollup);
+const tasksCell = (rollup) => (totalOf(rollup) ? `${doneOf(rollup)} of ${totalOf(rollup)} done` : 'No tasks');
+
+function drawPage() {
+    const body = root && root.querySelector('.goals-body'); if (!body) return;
+    keepFocus(body, () => (model.openId && goalById(model.openId) ? drawGoalPageRaw(body) : drawTableRaw(body)));
+    root.classList.toggle('goals-open', !!model.openId && !!goalById(model.openId));
+}
+
+function drawTableRaw(col) {
+    col.replaceChildren();
+    const counts = W.filterCounts(model.goals);
+    const bar = el('div', 'goals-toolbar');
+    const chips = el('div', 'goals-chips'); chips.setAttribute('role', 'group'); chips.setAttribute('aria-label', 'Show goals that are');
+    for (const f of W.FILTERS) {
+        const c = btn('goals-chip', `${W.filterLabel(f)} ${counts[f]}`, () => { model.filter = f; say(W.filterAnnouncement(f, counts[f])); drawList(); });
+        c.setAttribute('aria-pressed', String(model.filter === f)); c.dataset.filter = f;
+        if (!counts[f] && f !== 'all') c.classList.add('goals-chip-zero');
+        chips.append(c);
+    }
+    bar.append(chips, btn('btn btn-primary goals-new', 'New goal', () => openCreate()));
+    col.append(bar);
+    if (model.requireGoal) col.append(Object.assign(el('p', 'goals-note goals-require'), { textContent: W.requireGoalNote }));
+    if (model.noGoalOpen > 0) col.append(el('p', 'goals-note goals-no-goal', W.noGoalTasksText(model.noGoalOpen)));
+    if (model.failed) {
+        const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert');
+        f.append(el('span', null, `${model.failed}${model.goals.length ? ` (${W.asOfText(model.asOf)})` : ''}`), btn('btn btn-small', 'Try again', loadGoals));
+        col.append(f);
+    }
+    if (model.loading) { col.append(el('p', 'goals-note', 'Loading goals…')); return; }
+    if (!model.goals.length) { if (!model.failed) { const e = el('div', 'goals-empty'); e.append(el('p', null, W.noGoalsText)); col.append(e); } return; }
+    const shown = visible();
+    if (!shown.length) {
+        const fe = W.filteredEmpty(model.filter, model.goals.length);
+        const e = el('div', 'goals-empty'); e.append(el('p', null, fe.text), btn('btn', fe.action, () => { model.filter = 'all'; say(W.filterAnnouncement('all', model.goals.length)); drawList(); }));
+        col.append(e);
+        return;
+    }
+    col.append(teamTable({
+        label: `Goals, ${shown.length}`, columns: ['Goal', 'State', 'Tasks', 'Updated'],
+        rows: shown.map(g => ({
+            key: g.id, current: g.id === model.openId,
+            open: () => openGoal(g.id, true),
+            cells: [goalRowBtn(g), tableStateChip(W.stateWord(g), `goal-state-${g.state || 'unknown'}`), tasksCell(g.rollup), whenText(g.updatedAt)],
+        })),
+    }));
+}
+
+function backButton(text, onClick) {
+    const b = btn('goals-back', null, onClick);
+    const arrow = el('span', 'goals-back-arrow', '←'); arrow.setAttribute('aria-hidden', 'true');
+    b.append(arrow, document.createTextNode(` ${text}`));
+    return b;
+}
+
+const priorityWord = (p) => { const s = String(p || '').trim(); return s ? s[0].toUpperCase() + s.slice(1).toLowerCase() : ''; };
+
+function taskTableRows(g, tasks) {
+    return tasks.rows.slice(0, tasks.shown).map(t => {
+        const b = rowButton(t.title, `Open task #${t.id}: ${t.title}`); b.dataset.taskId = String(t.id);
+        const first = el('span', 'team-row-cell');
+        first.append(b);
+        const sub = [`#${t.id}`, t.statusLine].filter(Boolean).join(' · ');
+        if (sub) first.append(el('span', 'team-row-sub', sub));
+        first.append(el('span', 'team-row-phone', [t.assignee || 'Nobody yet', priorityWord(t.raw && t.raw.priority)].filter(Boolean).join(' · ')));
+        const word = W.taskStatusWord(t.state, t.raw && t.raw.review_requested);
+        return {
+            key: `t${t.id}`, open: () => hooks.openTask?.(t, g),
+            cells: [first, tableStateChip(word, W.statusClass(word)), t.assignee || 'Nobody yet', priorityWord(t.raw && t.raw.priority)],
+        };
+    });
+}
+
+function drawGoalPageRaw(col) {
+    const keep = document.activeElement && document.activeElement.id === 'goals-detail-title';
+    col.replaceChildren();
+    const g = goalById(model.openId);
+    col.append(backButton('Goals', () => closeGoal()));
+    const h = el('h2', 'goals-detail-title', g.title); h.tabIndex = -1; h.id = 'goals-detail-title'; col.append(h);
+    const line = el('div', 'goals-detail-line'); line.append(stateChip(g));
+    const meta = W.driverLine(g.driver, whenText(g.updatedAt)); if (meta) line.append(el('span', 'goal-card-meta', meta));
+    col.append(line);
+    if (g.outcome || g.doneWhen) {
+        const dl = el('dl', 'goals-facts');
+        if (g.outcome) dl.append(el('dt', null, 'Outcome'), el('dd', null, g.outcome));
+        if (g.doneWhen) dl.append(el('dt', null, 'Done when'), el('dd', null, g.doneWhen));
+        col.append(dl);
+    }
+    const openLeft = g.rollup.active + g.rollup.blocked + g.rollup.queued;
+    if ((g.state === 'done' || g.state === 'dropped') && openLeft) col.append(el('p', 'goals-note goals-closed-open', W.closedWithOpenText(openLeft)));
+    if (W.readyToClose(g) && !isNotYet(g)) { col.append(allDoneStrip(g)); announceAllDone(g); }
+    const total = totalOf(g.rollup);
+    const tasks = model.tasks.get(g.id);
+    const head = el('h3', 'goals-sub goals-tasks-head', total ? `Tasks, ${doneOf(g.rollup)} of ${total} done` : 'Tasks'); col.append(head);
+    if (total) col.append(rollupBar(g.rollup));
+    if (!tasks) col.append(el('p', 'goals-note', 'Loading tasks…'));
+    else if (tasks.failed !== undefined) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, W.failedText(tasks.failed).replace('Goals', 'Tasks')), btn('btn btn-small', 'Try again', () => loadTasks(g.id))); col.append(f); }
+    else if (!tasks.rows.length) col.append(el('p', 'goals-note', 'No tasks yet'));
+    else {
+        const live = tasks.rows.filter(t => W.taskStateWord(t.state) !== 'Done'), idle = live.filter(t => !agentFor(t));
+        if (idle.length) col.append(el('p', 'goals-note goals-nobody', W.nobodyWorkingText(idle.length, live.length)));
+        col.append(teamTable({ label: `Tasks of ${g.title}`, columns: ['Task', 'State', 'Assigned to', 'Priority'], rows: taskTableRows(g, tasks) }));
+        const left = Math.max(tasks.rows.length - tasks.shown, 0) || (tasks.cursor ? Math.max(taskTotal(g, tasks) - tasks.shown, 1) : 0);
+        if (left) col.append(btn('btn goals-more', W.showMoreText(left, PAGE), () => showMoreTasks(g.id)));
+        if (tasks.moreFailed) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, tasks.moreFailed)); col.append(f); }
+    }
+    // The pinned bar: Add task and Close goal (Reopen for a closed one), always at the bottom of the page.
+    const bar = el('div', 'goals-pinbar');
+    bar.append(btn('btn goals-add-task', 'Add task', () => { (window.showCreateTaskModal || (() => {}))({ goal_id: g.id }); }));
+    if (W.isOpenGoal(g)) { const cb = btn('btn btn-primary goals-close', 'Close goal', () => openClose(g)); bar.append(cb); }
+    else if (W.isClosedGoal(g)) bar.append(btn('btn goals-reopen', 'Reopen', () => reopenGoal(g)));
+    col.append(bar);
+    if (keep) h.focus();
+}
 
 function draw() {
     if (!root) return;
+    if (layout === 'page') { drawPage(); return; }
     drawHead(); drawList(); drawDetail();
     root.classList.toggle('goals-open', !!model.openId && !!goalById(model.openId));
 }
@@ -303,17 +427,22 @@ export function openGoalWhenKnown(id) {
 
 export function openGoal(id, focus = false) {
     model.openId = id;
+    if (layout === 'page') hooks.onItem?.(id);
     draw();
     if (focus) focusDetail();
     if (!model.tasks.has(id) || model.tasks.get(id).failed !== undefined) loadTasks(id);
 }
 
-function closeGoal() {
+export function closeGoal() {
     const id = model.openId;
     model.openId = 0;
+    if (layout === 'page') hooks.onItem?.(0);
     draw();
-    root.querySelector(`.goal-card[data-goal-id="${id}"]`)?.focus();
+    (root.querySelector(`.goal-card[data-goal-id="${id}"]`) || root.querySelector(`.team-row-btn[data-goal-id="${id}"]`))?.focus();
 }
+
+/** The goal page's own id (0 on the list): the team page asks it to put the address and the Back button right. */
+export const openGoalId = () => model.openId;
 
 // ── New goal ─────────────────────────────────────────────────────────────
 
@@ -440,10 +569,19 @@ function openClose(g, preset) {
 // ── showing and hiding ───────────────────────────────────────────────────
 
 /** Show the board's goals in `host` (the page's #mb-goals) and read them. */
-export function showGoals(host, project) {
+export function showGoals(host, project, opts = {}) {
     if (project !== model.project) { Object.assign(model, { project, sig: '', goals: [], requireGoal: false, noGoalOpen: null, filter: 'all', openId: 0, tasks: new Map(), failed: '', asOf: '', loading: false }); }
-    if (!host.dataset.built) {
-        host.dataset.built = '1';
+    layout = opts.page ? 'page' : 'cards';
+    hooks = opts.page ? (opts.hooks || {}) : {};
+    const kind = opts.page ? 'page' : 'cards';
+    if (host.dataset.built !== kind) {
+        host.dataset.built = kind;
+        if (kind === 'page') { // the team page's Goals tab (#7453): the status line for a screen reader, and one body that is the table or a goal's page
+            const page = el('div', 'goals-page goals-table-page');
+            const status = el('div', 'goals-status sr-only'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
+            page.append(status, el('div', 'goals-body'));
+            host.replaceChildren(page);
+        } else {
         const page = el('div', 'goals-page');
         const status = el('div', 'goals-status sr-only'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
         const cols = el('div', 'goals-cols');
@@ -452,6 +590,7 @@ export function showGoals(host, project) {
         cols.append(listCol, detailCol);
         page.append(el('div', 'goals-head'), status, el('div', 'goals-chips-host'), cols);
         host.replaceChildren(page);
+        }
     }
     root = host.querySelector('.goals-page');
     host.hidden = false;

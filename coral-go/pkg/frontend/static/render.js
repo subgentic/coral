@@ -41,6 +41,7 @@ import { browserLocal } from './safe_storage.js';
 import { getTeamTokenUsage } from './token_usage_ui.js';
 import { _renderSidebarRail } from './sidebar_rail.js';
 import { _passesFilters, _pinMatchesFilter } from './list_filter_match.js';
+import { toggleGoalTasks } from './sidebar_goals.js';
 import { _renderGroups } from './group_cards.js';
 import { UPDOWN, W, agentArgs, dirOf, menu, withAgent, withBoard } from './action_helpers.js';
 export { KILL_LOG_NOTE, KILL_LOG_NOTE_MANY, attachDirect, killSessionDirect, restartDirect, showInfoDirect, toggleAgentArchive, toggleAgentSleep } from './agent_actions.js';
@@ -400,7 +401,10 @@ registerActions({
     'group-collapse': el => { const g = textOf(el.dataset.group); if (g) window.toggleGroupCollapse(g); },
     'group-header-key': (el, event) => window.groupHeaderKey(event, el),
     'team-header-key': (el, event) => window.teamHeaderKey(event, el),
-    'team-name-open': el => { const b = textOf(el.dataset.board); if (b) window.enterTeamContext(b); },
+    'goal-tree-toggle': el => { const b = textOf(el.dataset.board), id = idOf(el.dataset.goalId); if (b && id) toggleGoalTasks(b, id); },
+    'goal-tree-open': el => { const b = textOf(el.dataset.board), id = idOf(el.dataset.goalId); if (b && id) window.openTeamPage(b, { tab: 'goals', item: id }); },
+    'goal-tree-task': el => { const b = textOf(el.dataset.board), id = idOf(el.dataset.taskId); if (b && id) window.openTeamPage(b, { tab: 'tasks', item: id }); },
+    'team-name-open': el => { const b = textOf(el.dataset.board); if (b) window.openTeamPage(b); },
     'group-chevron': (el, event) => { event.stopPropagation(); const g = textOf(el.dataset.group); if (g) window.toggleGroupCollapse(g); },
     'group-sleeping-expand': el => { const g = textOf(el.dataset.group); if (g) window.expandSleepingGroup(g); },
     'archived-toggle': () => window.toggleArchivedSection(),
