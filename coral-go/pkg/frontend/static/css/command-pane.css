@@ -570,6 +570,7 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
 .model-chip-bar { position: relative; display: flex; align-items: center; flex-wrap: wrap; gap: 4px 6px; flex: 0 1 auto; min-width: 0; margin-left: 6px; }
 .model-chip-wrap { position: relative; display: inline-flex; min-width: 0; max-width: 100%; }
 .model-chip-wrap[hidden] { display: none; }
+.options-chip-wrap { display: none; } /* a phone's one Options button (#7623): the media query below shows it */
 .model-chip { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; min-height: 28px; padding: 2px 8px 2px 10px; border: 1px solid var(--border); border-radius: 999px;
     background: var(--bg-tertiary); color: var(--text-secondary); font: inherit; font-size: 0.75rem; cursor: pointer; }
 .model-chip:hover { color: var(--text-primary); border-color: var(--text-muted); }
@@ -617,6 +618,12 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
     .model-chip-item { min-height: 44px; }
     .model-chip-add-field input, .model-chip-add-actions .btn { min-height: 44px; }
     .model-chip { min-height: 44px; min-width: 44px; } /* a touch target (#4276) */
+    /* One Options button holds Model and Thinking (#7623): the two chips are not drawn, their wraps stay so each menu opens as the sheet it is, from the Options sheet's choice. Keys is only for the terminal view. */
+    .options-chip-wrap { display: inline-flex; }
+    .model-chip-bar .model-chip-wrap:not(.options-chip-wrap) { display: contents; }
+    .model-chip-bar .model-chip-wrap[hidden] { display: none; }
+    .model-chip-bar .model-chip-wrap:not(.options-chip-wrap) > .model-chip { display: none; }
+    #command-pane.chat-mode .keys-chip { display: none; }
     /* The toolbar is hidden on a phone except for the chip: it is the row under the input and the send buttons, the last row of the composer (it sat on the bottom edge of the screen, #5036; the command pane already adds the safe area). */
     .model-chip-bar { margin-left: 0; }
     .model-chip-note:not(:empty) { padding: 0 8px 8px; margin-top: -4px; }

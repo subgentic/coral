@@ -417,6 +417,13 @@
     .command-pane .command-pane-toolbar:not(:has(> .model-chip-bar:not([hidden]))) {
         display: none !important;
     }
+    /* One row (#7623): the box, Send and the Options button side by side, the pane about 70 px of the screen and not 190. The terminal view's Keys needs the room of a row under them. */
+    #command-pane { flex-direction: row; flex-wrap: wrap; }
+    #command-pane > .command-pane-body { flex: 1 1 0; min-width: 0; }
+    #command-pane > .command-pane-toolbar { flex: none; padding: 6px 8px 6px 0; align-self: flex-end; }
+    #command-pane > #agent-key-strip, #command-pane > #composer-error, #command-pane > #sleeping-composer, #command-pane > .model-chip-note:not(:empty) { flex: 0 0 100%; }
+    #command-pane:not(.chat-mode) > .command-pane-toolbar { flex: 0 0 100%; padding: 4px 8px 8px; }
+    @container command-pane (max-width: 18rem) { #command-pane > .command-pane-toolbar { flex: 0 0 100%; padding: 4px 8px 8px; } } /* at 200% text the pane is about 12 rem wide: the box keeps its width and Options goes under it, as it is not squeezed to a strip */
 
     /* Compact input body: single row with send button inline */
     .command-pane .command-pane-body {

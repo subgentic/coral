@@ -206,6 +206,11 @@
                             <div class="command-pane-toolbar" id="command-toolbar">
                                 <!-- The model it runs and the thinking level, each a chip with a menu to change it (model_chip.js, #4969, #5118): the toolbar's first item, which renderQuickActions keeps when it rebuilds the buttons. Typing is never held up by it. -->
                                 <div class="model-chip-bar" id="model-chip-bar" hidden>
+                                    <!-- A phone (#7623): one Options button holds Model and Thinking, so the composer is one row; its sheet lists them and each opens its own menu below (css hides this button on a larger screen) -->
+                                    <span class="model-chip-wrap options-chip-wrap" id="options-chip-wrap">
+                                        <button type="button" class="model-chip options-chip" id="options-chip" aria-haspopup="menu" aria-expanded="false" aria-controls="options-chip-menu">Options</button>
+                                        <div id="options-chip-menu" class="model-chip-menu" role="menu" aria-label="Options" hidden></div>
+                                    </span>
                                     <span class="model-chip-wrap" id="model-chip-wrap">
                                         <button type="button" class="model-chip" id="model-chip" aria-haspopup="menu" aria-expanded="false" aria-controls="model-chip-menu" aria-label="Model">
                                             <span class="model-chip-key" aria-hidden="true">Model: </span><span id="model-chip-text" class="model-chip-text"></span><span class="material-icons model-chip-caret" aria-hidden="true">expand_more</span>

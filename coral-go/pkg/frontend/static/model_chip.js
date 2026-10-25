@@ -30,7 +30,7 @@ const KINDS = ['model', 'thinking'];
 const chipId = k => (k === 'model' ? 'model-chip' : 'thinking-chip');
 
 function parts() {
-    const o = { bar: $('model-chip-bar'), note: $('model-chip-note') };
+    const o = { bar: $('model-chip-bar'), note: $('model-chip-note'), options: { chip: $('options-chip'), menu: $('options-chip-menu') } };
     for (const k of KINDS) o[k] = { chip: $(chipId(k)), text: $(chipId(k) + '-text'), menu: $(chipId(k) + '-menu'), wrap: $(chipId(k) + '-wrap') };
     return o;
 }
@@ -111,6 +111,7 @@ export function updateModelChip(session, server) {
     const st = v.model.state === 'failed' || v.thinking.state === 'failed' ? 'failed' : (v.thinking.state === 'requested' ? 'requested' : '');
     setData(p.note, 'state', st);
     if (_open) _renderMenu(_open);
+    if (_optionsOpen()) _renderOptions();
 }
 
 // ── The menu ─────────────────────────────────────────────────────────────
@@ -225,6 +226,44 @@ function _renderMenu(kind) {
     if (spot && spot.sel) { const el = menu.querySelector(spot.sel); if (el && !el.disabled) { el.focus(); try { el.setSelectionRange(spot.at, spot.at); } catch { /* not a text field */ } } }
 }
 
+// ── The phone's Options sheet (#7623) ─────────────────────────────────────
+// One Options button replaces the two chips there: its sheet says what each holds ("Model: CLI default", "Thinking: Default") and a choice opens that chip's own menu, which is not drawn as a chip.
+
+const _optionsMenu = () => parts().options.menu;
+const _optionsOpen = () => !!_optionsMenu() && !_optionsMenu().hidden;
+
+function _renderOptions() {
+    const p = parts(), menu = p.options.menu, s = _cur && _cur.session;
+    if (!menu || !s) return;
+    const v = chipView(s, _cur.server);
+    const row = (kind, word, text) => `<button type="button" role="menuitem" class="model-chip-item" data-options-open="${escapeAttr(kind)}"><span class="model-chip-item-label">${escapeHtml(word + ': ' + text)}</span></button>`;
+    const html = row('model', 'Model', v.model.text) + (p.thinking.wrap && !p.thinking.wrap.hidden ? row('thinking', 'Thinking', v.thinking.text) : '');
+    if (menu.dataset.sig === html) return;
+    menu.dataset.sig = html;
+    menu.innerHTML = html;
+}
+
+function _closeOptions() {
+    const { chip, menu } = parts().options;
+    if (menu) { menu.hidden = true; delete menu.dataset.sig; }
+    if (chip) chip.setAttribute('aria-expanded', 'false');
+}
+
+function _openOptions() {
+    const { chip, menu } = parts().options;
+    if (!chip || !menu || !_cur) return;
+    if (_open) _closeMenu();
+    menu.hidden = false; chip.setAttribute('aria-expanded', 'true');
+    _renderOptions();
+    menu.querySelector('.model-chip-item')?.focus();
+}
+
+/** Where the keyboard goes back to when a menu closes: the chip itself, or on a phone, where it is not drawn, the Options button. */
+function _chipFocus(kind) {
+    const c = parts()[kind] && parts()[kind].chip;
+    if (c && c.getClientRects().length) c.focus(); else parts().options.chip?.focus();
+}
+
 async function _openMenu(kind) {
     const p = parts();
     if (!p[kind].chip || !p[kind].menu || !_cur) return;
@@ -246,6 +285,7 @@ function menuHasFocus() {
 
 function _closeMenu() {
     const p = parts();
+    _closeOptions();
     _open = ''; _loading = false; _add = null; _addingFlag(false);
     for (const k of KINDS) {
         if (p[k].menu) { p[k].menu.hidden = true; delete p[k].menu.dataset.sig; }
@@ -260,7 +300,7 @@ async function _apply(change) {
     if (!s) return;
     const fromMenu = menuHasFocus();
     _closeMenu();
-    if (fromMenu) parts()[fromMenu].chip?.focus(); // the item that had the keyboard is gone with the menu: focus goes back to its own chip
+    if (fromMenu) _chipFocus(fromMenu); // the item that had the keyboard is gone with the menu: focus goes back to its own chip (the Options button on a phone)
     const name = s.name;
     if (!LIVE_SWITCH_TYPES.has(s.agent_type)) { _viaRestart(change); return; }
     const body = { session_id: s.session_id, agent_type: s.agent_type };
@@ -347,12 +387,28 @@ export function wireModelChip() {
             else if (b.dataset.level !== undefined) _apply({ thinking: b.dataset.level });
         });
     }
+    const o = p.options;
+    if (o.chip && o.menu) {
+        o.chip.addEventListener('click', () => { if (_optionsOpen()) _closeOptions(); else _openOptions(); });
+        o.menu.addEventListener('click', e => { const b = e.target.closest('[data-options-open]'); if (!b) return; const kind = b.dataset.optionsOpen; _closeOptions(); _openMenu(kind); });
+    }
     // The path as it was when the click started: a menu item that redraws the menu (Add a model…, Cancel) is no longer inside the bar by the time this runs, and that is not a click outside it
-    document.addEventListener('click', e => { if (_open && !e.composedPath().some(n => n && n.id === 'model-chip-bar')) _closeMenu(); });
+    document.addEventListener('click', e => { if ((_open || _optionsOpen()) && !e.composedPath().some(n => n && n.id === 'model-chip-bar')) _closeMenu(); });
     document.addEventListener('keydown', e => {
+        if (_optionsOpen()) { // the Options sheet: Escape closes it back to its button, the arrows move between its two rows, Tab leaves it
+            const items = [...o.menu.querySelectorAll('.model-chip-item')];
+            if (e.key === 'Escape') { _closeOptions(); o.chip.focus(); return; }
+            if (e.key === 'Tab' && o.menu.contains(document.activeElement)) { _closeOptions(); return; }
+            if (items.length && (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Home' || e.key === 'End')) {
+                const i = items.indexOf(document.activeElement);
+                items[e.key === 'Home' ? 0 : e.key === 'End' ? items.length - 1 : (i + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length].focus();
+                e.preventDefault();
+            }
+            return;
+        }
         if (!_open) return;
-        const { chip, menu } = p[_open];
-        if (e.key === 'Escape') { if (_add && !_add.busy) { _closeAdd(); return; } _closeMenu(); chip.focus(); return; } // inside the add form Escape first goes back to the list
+        const { menu } = p[_open];
+        if (e.key === 'Escape') { if (_add && !_add.busy) { _closeAdd(); return; } const was = _open; _closeMenu(); _chipFocus(was); return; } // inside the add form Escape first goes back to the list
         if (_add && menu.contains(document.activeElement)) return; // a form is a place to tab and type in: no menu keys while it is open
         if (e.key === 'Tab' && menu.contains(document.activeElement)) { _closeMenu(); return; } // the menu is not a place to tab through: it closes and focus goes on from where it was
         if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Home' || e.key === 'End') {

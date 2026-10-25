@@ -39,6 +39,10 @@ const STUB = `(() => { const real = window.fetch; window.__keys = [];
         for (const [w, h] of [[390, 844], [360, 800]]) {
             const at = `${w}px: `;
             await load(w, h, true);
+            // Keys is for the terminal view only (#7623): the chat view's composer is one row, with Options
+            assert.equal(await ev(q('#keys-chip')), null, at + 'the chat view has no Keys chip');
+            await ev(`document.querySelector('[aria-label="Terminal view"]').click(); true`);
+            await waitFor(`!document.getElementById('command-pane').classList.contains('chat-mode')`, 'the terminal view', 8000);
             // closed by default, the chip
             const chip = await ev(q('#keys-chip'));
             assert.ok(chip && chip.h >= 44, at + 'the Keys chip is a 44 px target: ' + JSON.stringify(chip));
