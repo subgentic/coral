@@ -37,6 +37,7 @@ const BENIGN = 'agent-one';
 
 // Spy on every function a handler could reach, including dangerous ones the app really defines.
 const called = [];
+const hooked = []; // the calls of the stubbed hooks (killBoard, toggleTeamSleep, ...): [name, ...args]
 const DANGEROUS = ['sendKeys', 'sendRawKeys', 'executeMacro', 'sendQuickCommand', 'killSession', 'restartSession', 'foo', 'PWNED'];
 for (const n of DANGEROUS) window[n] = globalThis[n] = (...a) => { called.push([n, ...a]); };
 // Every other hook a handler calls as window.name(...) is defined by app.js, which this test does not load: without it each fired action threw "window.x is not a function" into the log (700 lines, the
@@ -46,7 +47,7 @@ for (const f of readdirSync(STATIC).filter(f => f.endsWith('.js'))) {
     const names = [...src.matchAll(/\bwindow\.([A-Za-z_]\w*)\(/g)].map(m => m[1]);
     for (const m of src.matchAll(/\bW\(([^()]*)\)/g)) names.push(...[...m[1].matchAll(/'([A-Za-z_]\w*)'/g)].map(q => q[1])); // W('name') and W(cond ? 'a' : 'b'): action_helpers.js's call by name
     for (const m of src.matchAll(/\bwith[A-Z]\w*\('([A-Za-z_]\w*)'/g)) names.push(m[1]); // withBoard('killBoard'), withId(...): the helpers that call a hook by name
-    for (const n of names) if (typeof window[n] === 'undefined') window[n] = globalThis[n] = () => {};
+    for (const n of names) if (typeof window[n] === 'undefined') window[n] = globalThis[n] = (...a) => { hooked.push([n, ...a]); }; // a spy too: what a hook is called with is checked after each action
 }
 
 function snapshot(root = document.body) {
@@ -89,9 +90,13 @@ function scenario(label, setup, run, clear) {
         // Fire every delegated action through the real dispatcher (actions.js) as its event would.
         for (const a of now.actions) {
             if (pageEls.has(a.el)) continue;
-            called.length = 0;
+            called.length = 0; hooked.length = 0;
             a.el.dispatchEvent(new window.Event(a.name.slice('data-on-'.length), { bubbles: true, cancelable: true }));
             assert.deepStrictEqual(called, [], `${label}: action ${a.action} reached a dangerous function (payload ${JSON.stringify(p)}): ${JSON.stringify(called)}`);
+            // A hook an action calls (killBoard, toggleTeamSleep, ...) gets the payload as ONE whole data value, alone or inside a longer key ("@server/<payload>"), or not at all: an argument that holds a piece of the payload's code
+            // (a call, an event attribute) outside a whole payload means the payload was cut or run, not carried.
+            for (const [hook, ...args] of hooked) for (const x of args) assert.ok(typeof x !== 'string' || !/sendKeys|\bfoo\(|PWNED|onerror=|onload=|onmouseover=|<script|<img|<svg/.test(x.split(p).join('')), `${label}: action ${a.action} called ${hook} with a piece of the payload ${JSON.stringify(x).slice(0, 80)} (payload ${JSON.stringify(p)})`);
+            hooked.length = 0;
         }
         clear();
     }
