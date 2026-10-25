@@ -20,7 +20,7 @@ const STUB = `(() => {
     };
     // Layout shifts, and every change of a pill's hidden flag with its time.
     window.__cls = 0; window.__shifts = [];
-    new PerformanceObserver(l => { for (const e of l.getEntries()) if (!e.hadRecentInput) { window.__cls += e.value; window.__shifts.push({ v: e.value, nodes: (e.sources || []).map(x => { const n = x.node; if (!n) return '(gone)'; const el = n.nodeType === 1 ? n : n.parentElement; return (el.id ? '#' + el.id : '') + '.' + String(el.className).split(' ')[0] + ' in ' + (el.closest('#agent-list, .agent-list, .live-left-column, .session-list, aside, nav') || {className: '?'}).className; }) }); } }).observe({ type: 'layout-shift', buffered: true });
+    new PerformanceObserver(l => { for (const e of l.getEntries()) if (!e.hadRecentInput) { window.__cls += e.value; window.__shifts.push({ v: e.value, nodes: (e.sources || []).map(x => { const n = x.node; if (!n) return '(gone)'; const el = n.nodeType === 1 ? n : n.parentElement; const rr = r => r ? [r.x, r.y, r.width, r.height].map(v => Math.round(v * 100) / 100).join(',') : ''; return (el.id ? '#' + el.id : '') + '.' + String(el.className).split(' ')[0] + ' in ' + (el.closest('#agent-list, .agent-list, .live-left-column, .session-list, aside, nav') || {className: '?'}).className + ' [' + rr(x.previousRect) + ' -> ' + rr(x.currentRect) + ']'; }) }); } }).observe({ type: 'layout-shift', buffered: true });
     window.__flips = [];
     window.__watch = () => {
         for (const id of ['server-unreachable-banner', 'waiting-banner']) {

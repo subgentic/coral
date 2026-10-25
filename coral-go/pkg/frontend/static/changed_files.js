@@ -461,7 +461,7 @@ export async function refreshChangedFiles() {
     if (!list) return;
 
     if (_notGit) { // no comparison to choose and no count to give (#6072)
-        if (titleEl) titleEl.textContent = 'Not a git folder';
+        if (titleEl) { titleEl.textContent = 'Not a git folder'; titleEl._html = ''; }
         if (countEl) countEl.textContent = '';
         list.innerHTML = '<div class="file-empty">Changes show once the folder is a git repository.</div>';
         return;
@@ -482,9 +482,11 @@ export async function refreshChangedFiles() {
         const stats = files.length > 0
             ? `<span class="file-adds">+${totals.adds}</span><span class="file-dels">-${totals.dels}</span>`
             : '';
-        titleEl.innerHTML = `<span class="changed-files-count">${files.length} file${files.length !== 1 ? 's' : ''} changed</span>
+        const html = `<span class="changed-files-count">${files.length} file${files.length !== 1 ? 's' : ''} changed</span>
             ${stats}
             ${modeSelect}`;
+        // The list is redrawn on every poll: the header is written only when it says something new, so its select and counts are not replaced under a person's pointer or a layout pass (#7671).
+        if (titleEl._html !== html) { titleEl.innerHTML = html; titleEl._html = html; }
     }
     if (countEl) {
         countEl.textContent = files.length > 0 ? String(files.length) : '';
