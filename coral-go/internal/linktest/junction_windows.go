@@ -62,5 +62,17 @@ func JunctionsTraversable(t *testing.T) bool {
 	if probeErr != nil {
 		t.Fatalf("junction probe: %v", probeErr)
 	}
+	if err := refusedOnCI(os.Getenv("CI"), probeOK); err != nil {
+		t.Fatal(err)
+	}
 	return probeOK
+}
+
+// refusedOnCI is the error for a CI run (CI set) on a Windows that refuses to traverse junctions: the runner is meant to exercise Coral's own junction layer, and with the
+// system refusing first it no longer does, which a green run must not hide. Locally (CI empty) it is nil: the tests log which layer refused and assert that refusal.
+func refusedOnCI(ci string, traversable bool) error {
+	if ci != "" && !traversable {
+		return errors.New("CI no longer exercises Coral's junction layer: this Windows refuses to traverse a junction (untrusted mount point), so the system refuses before safefs does")
+	}
+	return nil
 }
