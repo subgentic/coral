@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 
-const BUDGET = { chooser: 18, /* +1: the title "New agent or team" (#7064) */ agent: 16, more: 53 }; // more: 40 + one: counted with the agent choice built ("Agent:" and the four names, which replaced the form's own Agent Type label and select), the machine's "not installed" marks left out; agent: 12 + the new-account line under the folder ("Pick your project folder.", #6370 item 3: gone once a folder was used) // the phone's select shows one section name, so it is under these
+const BUDGET = { chooser: 18, /* +1: the title "New agent or team" (#7064) */ folder: 40, persona: 81, agent: 59 }; // the three New Agent steps as the design words them (#7391): measured at 1280 px (the phone shows fewer). Step 1's 40 includes the design's 20-word "Next: who the agent is..." line, the step header, the screen-reader reason for Next and the Recent: label
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -30,14 +30,18 @@ const BUDGET = { chooser: 18, /* +1: the title "New agent or team" (#7064) */ ag
             await ev(`document.querySelector('#launch-step-chooser [data-arg="agent"]').click(); true`);
             await waitFor(`getComputedStyle(document.getElementById('launch-step-agent')).display !== 'none'`, `${tag}: the New Agent step`, 8000);
             n = await words();
-            assert.ok(n <= BUDGET.agent, `${tag}: New Agent step 1 (the folder) shows ${n} words, budget ${BUDGET.agent}`);
+            assert.ok(n <= BUDGET.folder, `${tag}: New Agent step 1 (the folder) shows ${n} words, budget ${BUDGET.folder}`);
             await ev(`document.getElementById('launch-dir').value = '/tmp'; document.getElementById('launch-agent-next').click(); true`);
-            await waitFor(`!document.getElementById('launch-agent-more').hidden`, `${tag}: More options open`, 8000);
+            await waitFor(`document.getElementById('launch-step-agent').dataset.stage === 'persona'`, `${tag}: step 2`, 8000);
+            n = await words();
+            assert.ok(n <= BUDGET.persona, `${tag}: New Agent step 2 (the persona) shows ${n} words, budget ${BUDGET.persona}`);
+            await ev(`document.getElementById('launch-agent-next').click(); true`);
+            await waitFor(`document.getElementById('launch-step-agent').dataset.stage === 'agent'`, `${tag}: step 3`, 8000);
             await waitFor(`document.getElementById('launch-agent-acf').classList.contains('has-agent-pick')`, `${tag}: the agent choice is built`, 8000); // counted with the agent choice in it, which the CLI probes build when they answer: a runner without the CLIs answers later than a laptop with them
             n = await words();
-            assert.ok(n <= BUDGET.more, `${tag}: New Agent with More options shows ${n} words, budget ${BUDGET.more}`);
-            const title = await ev(`getComputedStyle(document.querySelector('#launch-agent-more .settings-pane:not([hidden]) .settings-pane-title')).display`);
-            assert.equal(title, 'none', `${tag}: the open section's name is not repeated as a heading under its tab`);
+            assert.ok(n <= BUDGET.agent, `${tag}: New Agent step 3 (the agent) shows ${n} words, budget ${BUDGET.agent}`);
+            const title = await ev(`getComputedStyle(document.querySelector('#launch-agent-acf .settings-pane:not([hidden]) .settings-pane-title')).display`);
+            assert.notEqual(title, 'none', `${tag}: the open section is named by a heading beside its tabs (the design's)`);
             await ev(`window.hideLaunchModal(); true`);
         }
         console.log('PASS launch dialog text: within budget, the chooser fits its content, no repeated section heading');

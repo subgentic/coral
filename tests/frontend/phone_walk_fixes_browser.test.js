@@ -14,10 +14,10 @@ const BASE = require('./test_base').BASE;
     const open = async () => {
         await ev(`(async () => { await window.showLaunchModal(); document.querySelector('#launch-step-chooser [data-arg="agent"]').click(); return true; })()`);
         await waitFor(`getComputedStyle(document.getElementById('launch-step-agent')).display !== 'none' && !!document.getElementById('launch-agent-next')`, 'the folder step', 8000);
-        await ev(`(() => { const i = document.getElementById('launch-dir'); if (!i.value) i.value = '/tmp'; document.getElementById('launch-agent-next').click(); return true; })()`);
+        await ev(`(() => { const i = document.getElementById('launch-dir'); if (!i.value) i.value = '/tmp'; document.getElementById('launch-agent-next').click(); document.getElementById('launch-agent-next').click(); return true; })()`); // step 3 (#7391)
         await waitFor(`!document.getElementById('launch-agent-pick').hidden && getComputedStyle(document.getElementById('launch-agent-pick')).display !== 'none'`, 'the agent choice', 8000);
     };
-    const section = name => ev(`import(${S} + 'section_dialog.js').then(m => { const shell = document.querySelector('#launch-step-agent .settings-shell'); document.getElementById('launch-more-options').open = true; /* a phone keeps the sections under More options (#7066) */ m.showSection(shell, ${JSON.stringify(name)}); return true; })`);
+    const section = name => name === 'workspace' ? ev(`window._launchStage('persona'); true`) : ev(`import(${S} + 'section_dialog.js').then(m => { window._launchStage('agent'); const shell = document.querySelector('#launch-step-agent .settings-shell'); m.showSection(shell, ${JSON.stringify(name)}); return true; })`); // the persona is step 2, the sections are step 3 (#7391)
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, mobile] of [[1280, 800, false], [390, 844, true]]) {
@@ -38,12 +38,12 @@ const BASE = require('./test_base').BASE;
             check(`${tag}: choosing in the group still drives the hidden select`, (await ev(`document.querySelector('#launch-agent-acf .acf-agent-type').value`)) === 'codex');
 
             await section('workspace');
-            const on = await ev(`({ save: ${shown('#agent-save-persona-btn')}, exp: ${shown('.agent-persona-actions [data-on-click="m-export-personas"]')}, imp: ${shown('.agent-persona-actions [data-on-click="m-import-personas"]')} })`);
+            const on = await ev(`({ save: ${shown('#agent-save-persona-btn')}, exp: ${shown('#launch-persona-top [data-on-click="m-export-personas"]')}, imp: ${shown('#launch-persona-top [data-on-click="m-import-personas"]')} })`);
             check(`${tag}: Save Persona is the one persona button on show`, on.save && !on.exp && !on.imp, JSON.stringify(on));
-            const more = await ev(`(() => { const d = document.querySelector('.agent-persona-actions details'); const s = d && d.querySelector('summary'); return { has: !!d, text: s ? s.textContent.trim() : '', open: !!d && d.open }; })()`);
-            check(`${tag}: Export and Import are in a closed disclosure named for them ("Export or import")`, more.has && !more.open && /^export or import$/i.test(more.text), JSON.stringify(more));
-            await ev(`document.querySelector('.agent-persona-actions details summary').click(); true`);
-            check(`${tag}: opened, both buttons show`, await ev(shown('.agent-persona-actions [data-on-click="m-export-personas"]')) && await ev(shown('.agent-persona-actions [data-on-click="m-import-personas"]')));
+            const more = await ev(`(() => { const d = document.querySelector('#launch-persona-top details.persona-files'); const s = d && d.querySelector('summary'); return { has: !!d, text: s ? s.textContent.trim() : '', open: !!d && d.open }; })()`);
+            check(`${tag}: Export and Import are in a closed disclosure named for them ("Persona files")`, more.has && !more.open && /^persona files$/i.test(more.text), JSON.stringify(more));
+            await ev(`document.querySelector('#launch-persona-top details.persona-files summary').click(); true`);
+            check(`${tag}: opened, both buttons show`, await ev(shown('#launch-persona-top [data-on-click="m-export-personas"]')) && await ev(shown('#launch-persona-top [data-on-click="m-import-personas"]')));
             const fit = await ev(`(() => { const p = document.querySelector('#launch-step-agent'); return document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1; })()`);
             check(`${tag}: no sideways scroll on the page`, fit);
             await ev(`document.querySelector('#launch-agent-back, #launch-step-agent [data-on-click="launch-hide"]') && 0; true`);

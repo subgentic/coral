@@ -392,6 +392,7 @@ export function renderAgentConfigForm(containerId, opts = {}) {
     container.querySelector('.acf-agent-type')?.addEventListener('change', () => {
         const agentType = container.querySelector('.acf-agent-type')?.value || 'claude';
         _checkAgentCLI(agentType, cliWarningOf(container));
+        setThinking(container, undefined); // a provider has its own levels: the choice goes back to Default and is not sent (#7391; only a provider resets the Model and Thinking)
         // Still showing the default (nobody picked a mode here): it follows the agent type, Auto for Claude and the other CLIs' own default (#5836)
         syncDefaultPermissionMode(container.querySelector('.acf-permission-mode'), _settingsFor(_acfServer(container)), agentType);
         const permMode = container.querySelector('.acf-permission-mode')?.value || 'default';

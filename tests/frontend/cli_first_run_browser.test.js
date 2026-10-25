@@ -23,12 +23,12 @@ const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
                 return real(u, o); };
             return true; })()`);
 
-        console.log('1. the missing CLI is said under the folder, with More options closed');
-        await ev(`(async () => { await window.showLaunchModal(); window._selectLaunchType('agent'); return true; })()`);
-        await waitFor(`(() => { const s = document.getElementById('launch-cli-slot'); const w = s && s.querySelector('.acf-cli-warning'); return !!w && w.offsetParent !== null && /claude CLI was not found/.test(w.textContent); })()`, 'the line under the folder', 8000);
-        const line = await ev(`(() => { const s = document.getElementById('launch-cli-slot'); const w = s.querySelector('.acf-cli-warning'); const more = document.getElementById('launch-agent-more'); const dir = document.getElementById('launch-dir').getBoundingClientRect(), r = w.getBoundingClientRect();
-            return { moreHidden: more.hidden, below: r.top >= dir.bottom, button: [...w.querySelectorAll('button')].map(b => b.textContent), command: /npm install -g @anthropic-ai\\/claude-code/.test(w.textContent), role: w.getAttribute('role'), inForm: !!document.querySelector('#launch-agent-acf .acf-cli-warning') }; })()`);
-        assert.deepEqual(line, { moreHidden: true, below: true, button: ['Check again'], command: true, role: 'status', inForm: false });
+        console.log('1. the missing CLI is said on step 3, in the Agent tab beside Launch');
+        await ev(`(async () => { await window.showLaunchModal(); window._selectLaunchType('agent'); { const d = document.getElementById('launch-dir'); if (!d.value) d.value = '/tmp'; window._launchStage('agent'); } return true; })()`);
+        await waitFor(`(() => { const s = document.getElementById('launch-cli-slot'); const w = s && s.querySelector('.acf-cli-warning'); return !!w && w.offsetParent !== null && /claude CLI was not found/.test(w.textContent); })()`, 'the line on step 3', 8000);
+        const line = await ev(`(() => { const s = document.getElementById('launch-cli-slot'); const w = s.querySelector('.acf-cli-warning'); const r = w.getBoundingClientRect(); const go = document.getElementById('launch-agent-go');
+            return { stage: document.getElementById('launch-step-agent').dataset.stage, goShown: !go.hidden, button: [...w.querySelectorAll('button')].map(b => b.textContent), command: /npm install -g @anthropic-ai\\/claude-code/.test(w.textContent), role: w.getAttribute('role'), inForm: !!document.querySelector('#launch-agent-acf .acf-top-row ~ .acf-cli-warning') }; })()`);
+        assert.deepEqual(line, { stage: 'agent', goShown: true, button: ['Check again'], command: true, role: 'status', inForm: false });
 
         await installAudit(ev);
         for (const theme of ['dark', 'light']) {
@@ -45,7 +45,7 @@ const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
 
         console.log('3. while it is missing, Launch is off (no second dialog), the message is its reason, the vendor page comes before the command; found: Launch works');
         await ev(`window.__found = false; window.__launches.length = 0; document.getElementById('launch-dir').value = '/tmp'; true`);
-        await ev(`window._selectLaunchType('back'); window._selectLaunchType('agent'); document.getElementById('launch-dir').value = '/tmp'; true`);
+        await ev(`window._selectLaunchType('back'); window._selectLaunchType('agent'); { const d = document.getElementById('launch-dir'); if (!d.value) d.value = '/tmp'; window._launchStage('agent'); } true`);
         await ev(`window.__coral._checkAgentCLI('claude', document.querySelector('#launch-cli-slot .acf-cli-warning'), true); true`); // a fresh look: the last answer (found) is cached for 30 s
         await waitFor(`!!document.querySelector('#launch-cli-slot [data-blocks-launch]')`, 'the missing CLI blocks the launch', 8000);
         const off = await ev(`(() => { const go = document.getElementById('launch-agent-go'), w = document.querySelector('#launch-cli-slot [data-blocks-launch]'); const links = [...w.querySelectorAll('p')].map(p => p.textContent.slice(0, 12));
