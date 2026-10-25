@@ -534,6 +534,9 @@ func (h *SessionsHandler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 	}
 	h.notePendingToolEvent(body.SessionID, body.EventType, body.ToolUseID)
 	if hasToken {
+		h.kickFeedForRequestChange(body.SessionID, body.EventType)
+	}
+	if hasToken {
 		h.remindClaudeArtifact(r.Context(), owner, body.EventType, body.ToolName, body.ToolUseID, body.DetailJSON)
 	}
 	if hasToken && body.EventType == "session_end" {
