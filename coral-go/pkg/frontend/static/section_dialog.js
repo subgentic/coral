@@ -89,6 +89,7 @@ export function revealField(el) {
     if (pane && shell && pane.hidden) showSection(shell, pane.dataset.section);
     const options = el?.closest?.('#launch-more-options:not([open])'); if (options) options.open = true; // a field in the closed "More options" of a phone's New Agent (#7066)
     el?.closest?.('[data-sd-more][hidden]')?.dispatchEvent(new CustomEvent('sd-more-open', { bubbles: true })); // the sections sit behind a "More options" button (New Agent, #5595): it opens
+    el?.closest?.('.team-page[hidden]')?.dispatchEvent(new CustomEvent('team-page-open', { bubbles: true })); // a field on another page of New team (#7407): that step shows
 }
 
 export function markSectionError(shell, id, on) {

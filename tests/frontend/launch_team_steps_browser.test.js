@@ -1,11 +1,12 @@
-// Launch Agent Team in three steps, Team, Members, Start (#6397): the tabs and the step said once, a template picker that searches and scrolls, a members table with named Edit and Remove
-// and an Undo, the prompt opening inline, and Mode starting at Default. Drives Chrome over CDP through agent_view_harness.js against the isolated dev server.
+// Launch Agent Team's template search for long lists and the rules for a member's Mode and provider (#6397, #6412, #6425, #6440), on the three-step dialog (#7407): the steps, the Orchestrator gate, the member rows and
+// the dialogs are new_team_steps, new_team_members and new_team_keyboard (QA's #7415). Drives Chrome over CDP through agent_view_harness.js against the isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const guard = await require('./helpers/settings_guard').guardSettings(); // the saved templates this suite adds are put back in its finally (#4849)
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install();
@@ -16,129 +17,77 @@ const BASE = require('./test_base').BASE;
                 if (p.pathname === '/api/sessions/launch-team' && m === 'POST') { window.__teamLaunches.push(JSON.parse(o.body)); return json({ agents: [{ name: 'A', session_id: 's' }] }); }
                 if (p.pathname === '/api/board/projects') return json([]);
                 return real(u, o); };
-            await window.showLaunchModal(); window.hideLaunchModal(); return true; })()`);
+            await window.showLaunchModal(); window.hideLaunchModal(); { const m = await import((window.__coralStatic || '/static/') + 'team_dialogs.js'); window.__pickT = n => m._pickTeamTemplate(n); } return true; })()`);
         const open = async () => {
             await ev(`window.showLaunchModal(); window._selectLaunchType('team'); true`);
-            await waitFor(`getComputedStyle(document.getElementById('launch-step-team')).display !== 'none' && document.querySelectorAll('#team-template-list [role=option]').length > 0`, 'the team step');
+            await waitFor(`getComputedStyle(document.getElementById('launch-step-team')).display !== 'none' && document.querySelectorAll('#team-template-select option').length > 1`, 'the team step');
         };
-        const step = () => ev(`document.querySelector('#launch-step-team .team-step-tab[aria-selected=true]').dataset.step`);
-        const vis = sel => ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); return !!e && !e.hidden && e.getBoundingClientRect().height > 0; })()`);
-        const rows = () => ev(`[...document.querySelectorAll('#team-agents-list .team-agent-row .team-agent-role-name')].map(r => r.textContent)`);
+        const step = () => ev(`document.getElementById('launch-step-team').dataset.stage`);
         const click = sel => ev(`document.querySelector(${JSON.stringify(sel)}).click(); true`);
+        const dialogs = () => ev(`import((window.__coralStatic || '/static/') + 'team_dialogs.js')`); // (the module's exports are called below by name)
+        const pick = name => ev(`import((window.__coralStatic || '/static/') + 'team_dialogs.js').then(m => m._pickTeamTemplate(${JSON.stringify(name)})); true`);
+        const roleRow = name => `[...document.querySelectorAll('#team-agents-list .team-agent-row')].find(r => r.querySelector('.team-agent-role-name').textContent === ${JSON.stringify(name)})`;
+        const summary = name => ev(`${roleRow(name)}.querySelector('.team-agent-summary').textContent`);
 
-        console.log('Three steps, said once: tabs for Team, Members, Start; Step N of 3 is for screen readers only');
+        console.log('The template search appears for a long list, narrows the select, and an empty search lists every template again');
+        assert.equal(await ev(`document.getElementById('team-template-search').hidden`), true, 'no search with a handful of templates');
+        await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'persona_store.js'); await m._upsertSavedTeamTemplates([1, 2, 3, 4, 5, 6, 7].map(i => ({ name: 'Saved crew ' + i, agents: [{ name: 'Orchestrator', prompt: 'p' }], flags: '' }))); return true; })()`);
+        await ev(`window.hideLaunchModal(); true`); await open();
+        assert.equal(await ev(`document.getElementById('team-template-search').hidden`), false, 'the search is there once the list is long');
+        const optCount = () => ev(`document.querySelectorAll('#team-template-select option').length`);
+        const total = await optCount();
+        assert.ok(total >= 10, 'blank, the built-ins and the saved ones: ' + total);
+        await ev(`{ const s = document.getElementById('team-template-search'); s.value = 'saved crew 3'; s.dispatchEvent(new Event('input', { bubbles: true })); } true`);
+        assert.deepEqual(await ev(`[...document.querySelectorAll('#team-template-select option')].map(o => o.textContent)`), ['Blank team', 'Saved crew 3 (1 member, saved)']);
+        await ev(`{ const s = document.getElementById('team-template-search'); s.value = 'zzzz'; s.dispatchEvent(new Event('input', { bubbles: true })); } true`);
+        assert.equal(await optCount(), 1, 'no match: only Blank team is left');
+        await ev(`{ const s = document.getElementById('team-template-search'); s.value = ''; s.dispatchEvent(new Event('input', { bubbles: true })); } true`);
+        assert.equal(await optCount(), total, 'an empty search lists every template again');
+
+        console.log('A member added in the Add member dialog follows the default Mode, not Auto (#6412)');
         await open();
-        assert.deepEqual(await ev(`[...document.querySelectorAll('#launch-step-team .team-step-tab')].map(t => t.textContent)`), ['Team', 'Members', 'Start']);
-        assert.equal(await step(), 'team');
-        assert.equal(await ev(`document.getElementById('team-step-live').textContent`), 'Step 1 of 3');
-        assert.equal(await ev(`getComputedStyle(document.getElementById('team-step-live')).position`), 'absolute', 'the step number is not drawn');
-        assert.equal(await vis('#launch-team-next'), true); assert.equal(await vis('#launch-team-go'), false, 'Launch Team waits for the last step'); assert.equal(await vis('#launch-team-back'), false);
-
-        console.log('Next needs a name and a folder, and says which');
-        await click('#launch-team-next');
-        assert.equal(await step(), 'team', 'no name: stays');
-        assert.equal(await ev(`document.getElementById('team-board-name').getAttribute('aria-invalid')`), 'true');
-        await ev(`{ const i = document.getElementById('team-board-name'); i.value = 'crew-1'; i.dispatchEvent(new Event('input', { bubbles: true })); } true`);
-        await click('#launch-team-next');
-        assert.equal(await step(), 'team', 'no folder: stays');
-        assert.equal(await ev(`document.getElementById('launch-team-dir').getAttribute('aria-invalid')`), 'true');
-
-        console.log('The template picker searches, counts, and has an empty case');
-        const total = await ev(`document.querySelectorAll('#team-template-list [role=option]').length`);
-        assert.ok(total >= 3);
-        assert.equal(await ev(`document.getElementById('team-template-count').textContent`), '', 'no counter while nothing is typed');
-        await ev(`{ const s = document.getElementById('team-template-search'); s.value = 'team'; s.dispatchEvent(new Event('input', { bubbles: true })); } true`);
-        assert.equal(await ev(`document.getElementById('team-template-count').textContent`), `${await ev(`document.querySelectorAll('#team-template-list [role=option]').length`)} of ${total}`);
-        await ev(`{ const s = document.getElementById('team-template-search'); s.value = 'zzzz'; s.dispatchEvent(new Event('input', { bubbles: true })); } true`);
-        assert.equal(await ev(`document.querySelectorAll('#team-template-list [role=option]').length`), 0);
-        assert.match(await ev(`document.getElementById('team-template-none').textContent`), /^No template matches "zzzz"/);
-        await ev(`{ const s = document.getElementById('team-template-search'); s.value = 'dungeon'; s.dispatchEvent(new Event('input', { bubbles: true })); } true`);
-        await ev(`document.getElementById('team-template-search').focus(); true`);
-        await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
-        await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
-        await waitFor(`document.querySelectorAll('#team-agents-list .team-agent-row').length === 7`, 'Enter picks the highlighted template');
-        assert.equal(await ev(`document.querySelector('#team-template-list [aria-selected=true]').dataset.name`), 'Dungeon Master', 'the chosen one is marked');
-
-        console.log('Clearing the search brings every template back');
-        await ev(`{ const s = document.getElementById('team-template-search'); s.value = 'zzzz'; s.dispatchEvent(new Event('input', { bubbles: true })); } true`);
-        assert.equal(await ev(`document.querySelectorAll('#team-template-list [role=option]').length`), 0, 'no match: no rows');
-        await ev(`{ const s = document.getElementById('team-template-search'); s.value = ''; s.dispatchEvent(new Event('input', { bubbles: true })); } true`);
-        assert.ok(await ev(`document.querySelectorAll('#team-template-list [role=option]').length`) >= 3 && await ev(`document.getElementById('team-template-none').hidden`), 'an empty search lists every template again, and the no-match line is gone (textOf("") is null: the filter threw)');
-        console.log('The list scrolls after four rows');
-        await ev(`{ const s = document.getElementById('team-template-search'); s.value = ''; s.dispatchEvent(new Event('input', { bubbles: true })); } true`);
-        const list = await ev(`(() => { const l = document.getElementById('team-template-list'); return [l.clientHeight, l.scrollHeight, getComputedStyle(l).overflowY]; })()`);
-        assert.ok(list[0] <= 4 * 44 + 4 && (total <= 4 || (list[1] > list[0] && list[2] === 'auto')), JSON.stringify(list));
-
-        console.log('Members: a table with named Edit and Remove, an inline prompt, an Undo');
-        await ev(`{ const d = document.getElementById('launch-team-dir'); d.value = '/work/repo'; } true`);
-        await click('#launch-team-next');
-        assert.equal(await step(), 'members');
-        assert.equal(await ev(`document.getElementById('team-step-live').textContent`), 'Step 2 of 3');
-        assert.deepEqual(await ev(`[...document.querySelectorAll('.team-members-table th')].map(t => t.textContent.trim())`), ['Role', 'Provider', 'Model', 'Thinking', 'Mode', 'Actions']);
-        const first = await ev(`(() => { const r = document.querySelector('#team-agents-list .team-agent-row'); return [r.querySelector('.team-agent-edit-btn').getAttribute('aria-label'), r.querySelector('.team-agent-remove').getAttribute('aria-label'), r.querySelector('.team-agent-mode').textContent, r.querySelector('.team-agent-thinking').textContent, r.querySelector('.team-agent-model').textContent]; })()`);
-        // the cells show what will be used, with a mark where the member did not choose it: Mode is the team's, the model and level are the CLI's own
-        assert.deepEqual(first, ['Edit Dungeon Master', 'Remove Dungeon Master', 'Default team', 'CLI default', 'CLI default']);
-        assert.equal(await ev(`document.querySelector('#team-agents-list .team-agent-row .team-agent-mode .team-default-mark').textContent`), 'team');
-        assert.deepEqual(await ev(`[...document.querySelectorAll('#team-agents-list .team-agent-row:nth-child(2) .team-agent-reorder-btn')].map(b => b.getAttribute('aria-label'))`), ['Move Warrior up', 'Move Warrior down']);
-        assert.equal(await ev(`Math.round(document.querySelector('#team-agents-list .team-agent-reorder-btn').getBoundingClientRect().width)`), 32, 'the arrows are 32 px on a pointer screen (44 on touch)');
-        assert.equal(await vis('#team-agents-list .team-agent-prompt'), false);
-        await click('#team-agents-list .team-agent-row .team-agent-role-name');
-        assert.equal(await vis('#team-agents-list .team-agent-row .team-agent-prompt'), true, 'the prompt opens inline');
-        assert.equal(await ev(`document.querySelector('#team-agents-list .team-agent-role-name').getAttribute('aria-expanded')`), 'true');
-        assert.match(await ev(`document.querySelector('#team-agents-list .team-agent-prompt').textContent`), /Dungeon Master/);
-        await click('#team-agents-list .team-agent-row .team-agent-role-name');
-        assert.equal(await vis('#team-agents-list .team-agent-row .team-agent-prompt'), false, 'and closes');
-        await click('#team-agents-list .team-agent-row:nth-child(2) .team-agent-remove');
-        assert.equal((await rows()).length, 6);
-        assert.equal(await ev(`document.getElementById('team-undo').textContent`), 'Removed Warrior. Undo');
-        await click('#team-undo button');
-        assert.equal((await rows())[1], 'Warrior', 'Undo puts it back where it was');
-        assert.equal(await ev(`document.getElementById('team-undo').textContent`), '', 'the undo line says nothing again (it stays in the page, out of the layout)');
-
-        console.log('A member added in the Add member dialog follows the team Mode (Default), not Auto (#6412)');
+        await ev(`{ const n = document.getElementById('team-board-name'); n.value = 'crew-1'; n.dispatchEvent(new Event('input', { bubbles: true })); const d = document.getElementById('launch-team-dir'); d.value = '/work/repo'; d.dispatchEvent(new Event('input', { bubbles: true })); } true`);
+        await click('#launch-team-next'); assert.equal(await step(), 'members');
+        await pick('Coding Team');
         await ev(`window.showTeamAgentModal(); true`);
-        assert.equal(await ev(`document.querySelector('#team-agent-modal-acf .acf-permission-mode').value`), 'default', 'the new member starts at the team Mode');
+        assert.equal(await ev(`document.querySelector('#team-agent-modal-acf .acf-permission-mode').value`), 'default', 'the new member starts at the default Mode');
         await ev(`{ const n = document.querySelector('#team-agent-modal-acf .acf-name'); n.value = 'Scribe'; n.dispatchEvent(new Event('input', { bubbles: true })); window.saveTeamAgentFromModal(); } true`);
-        assert.equal(await ev(`[...document.querySelectorAll('#team-agents-list .team-agent-row')].pop().querySelector('.team-agent-mode').textContent`), 'Default team');
+        assert.match(await summary('Scribe'), /default mode$/, 'and its row says so');
         await ev(`document.getElementById('team-permission-mode').value = 'plan'; document.getElementById('team-permission-mode').dispatchEvent(new Event('change', { bubbles: true })); window.showTeamAgentModal(); true`);
-        assert.equal(await ev(`document.querySelector('#team-agent-modal-acf .acf-permission-mode').value`), 'plan', 'and follows a team Mode that was changed');
+        assert.equal(await ev(`document.querySelector('#team-agent-modal-acf .acf-permission-mode').value`), 'plan', 'and follows a default Mode that was changed');
         await ev(`window.hideTeamAgentModal(); document.getElementById('team-permission-mode').value = 'default'; document.getElementById('team-permission-mode').dataset.pickedByPerson = ''; true`);
-        await click('#team-agents-list .team-agent-row:last-child .team-agent-remove'); await ev(`document.getElementById('team-undo').textContent = ''; true`);
 
-        console.log('Start: Mode defaults to Default, Launch Team is here');
-        await click('#launch-team-next');
-        assert.equal(await step(), 'start');
-        assert.equal(await ev(`document.getElementById('team-step-live').textContent`), 'Step 3 of 3');
-        assert.equal(await ev(`document.getElementById('team-permission-mode').value`), 'default');
-        assert.equal(await vis('#launch-team-go'), true); assert.equal(await vis('#launch-team-next'), false); assert.equal(await vis('#launch-team-back'), true);
+        console.log('The launch carries the default Mode as the team flags: Default adds none');
+        await click('#launch-team-next'); assert.equal(await step(), 'start');
         await click('#launch-team-go');
         await waitFor(`window.__teamLaunches.length === 1`, 'the launch request');
         const sent = await ev(`window.__teamLaunches[0]`);
-        assert.equal(sent.board_name, 'crew-1'); assert.equal(sent.agents.length, 7); assert.deepEqual(sent.flags, [], 'Default mode adds no permission flag');
+        assert.equal(sent.board_name, 'crew-1'); assert.equal(sent.agents.length, 6); assert.deepEqual(sent.flags, [], 'Default mode adds no permission flag');
 
         console.log('The Mode a member shows is what launches (#6412): Claude and Codex');
         const launches = n => waitFor(`window.__teamLaunches.length === ${n}`, 'the launch request ' + n);
-        const modeOf = name => ev(`[...document.querySelectorAll('#team-agents-list .team-agent-row')].find(r => r.querySelector('.team-agent-role-name').textContent === ${JSON.stringify(name)}).querySelector('.team-agent-mode').textContent`);
+        const modeOf = name => ev(`${roleRow(name)}.querySelector('.team-agent-summary').lastElementChild.textContent`);
         await open();
         await ev(`document.getElementById('team-board-name').value = 'crew-2'; document.getElementById('launch-team-dir').value = '/work/repo'; true`);
         await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'team_dialogs.js');
             document.getElementById('team-agents-list').innerHTML = ''; document.getElementById('team-permission-mode').value = 'default';
+            m._addTeamAgent('Orchestrator', 'p', null, 'claude', '', '');
             m._addTeamAgent('Plain', 'p', null, 'claude', '', '');
             m._addTeamAgent('Planner', 'p', null, 'claude', '', '--permission-mode plan');
             m._addTeamAgent('Open', 'p', { allow: ['file_read', 'file_write', 'shell', 'git_write'] }, 'codex', '', '');
             m._addTeamAgent('Careful', 'p', { allow: ['file_read'] }, 'codex', '', '');
-            m._refreshTeamSummaries(); return true; })()`);
-        assert.equal(await modeOf('Plain'), 'Default team'); assert.equal(await modeOf('Planner'), 'Plan');
+            m._syncTeamMembers(); return true; })()`);
+        assert.equal(await modeOf('Plain'), 'default mode'); assert.equal(await modeOf('Planner'), 'Plan mode');
         // the rule (#6425): an explicit Mode (the member's own, else the team's) is applied and capabilities only narrow it; with no Mode the capabilities decide
         assert.equal(await modeOf('Open'), 'Sandboxed', 'team Mode Default: the capabilities decide, and four chips are no longer an unsandboxed agent');
         assert.equal(await modeOf('Careful'), 'Read-only sandbox');
-        const setTeamMode = v => ev(`(() => { const e = document.getElementById('team-permission-mode'); e.value = ${JSON.stringify(v)}; import((window.__coralStatic || '/static/') + 'team_dialogs.js').then(m => m._refreshTeamSummaries()); return true; })()`);
-        await setTeamMode('plan'); await waitFor(`[...document.querySelectorAll('#team-agents-list .team-agent-row')].find(r => r.querySelector('.team-agent-role-name').textContent === 'Open').querySelector('.team-agent-mode').textContent.startsWith('Plan')`, 'Plan');
-        assert.equal(await modeOf('Open'), 'Plan team', 'team Plan: four chips do not widen it');
-        await setTeamMode('bypassPermissions'); await waitFor(`[...document.querySelectorAll('#team-agents-list .team-agent-row')].find(r => r.querySelector('.team-agent-role-name').textContent === 'Open').querySelector('.team-agent-mode').textContent.startsWith('Bypass')`, 'Bypass');
-        assert.equal(await modeOf('Open'), 'Bypass Permissions team', 'team Bypass: Shell restricts nothing, the mode stands'); assert.equal(await ev(`[...document.querySelectorAll('#team-agents-list .team-agent-row')].find(r => r.querySelector('.team-agent-role-name').textContent === 'Open').querySelector('.team-agent-mode').classList.contains('team-mode-warn')`), true, 'and it is a warning');
+        const setTeamMode = v => ev(`(() => { const e = document.getElementById('team-permission-mode'); e.value = ${JSON.stringify(v)}; import((window.__coralStatic || '/static/') + 'team_dialogs.js').then(m => m._syncTeamMembers()); return true; })()`);
+        await setTeamMode('plan'); await waitFor(`${roleRow('Open')}.querySelector('.team-agent-summary').lastElementChild.textContent.startsWith('Plan')`, 'Plan');
+        assert.equal(await modeOf('Open'), 'Plan mode', 'team Plan: four chips do not widen it');
+        await setTeamMode('bypassPermissions'); await waitFor(`${roleRow('Open')}.querySelector('.team-agent-summary').lastElementChild.textContent.startsWith('Bypass')`, 'Bypass');
+        assert.equal(await modeOf('Open'), 'Bypass Permissions mode', 'team Bypass: Shell restricts nothing, the mode stands'); assert.equal(await ev(`${roleRow('Open')}.querySelector('.team-agent-summary').lastElementChild.classList.contains('team-mode-warn')`), true, 'and it is a warning');
         assert.equal(await modeOf('Careful'), 'Read-only sandbox', 'team Bypass: read-only chips narrow it');
-        await setTeamMode('default'); await waitFor(`[...document.querySelectorAll('#team-agents-list .team-agent-row')].find(r => r.querySelector('.team-agent-role-name').textContent === 'Open').querySelector('.team-agent-mode').textContent === 'Sandboxed'`, 'Default again');
+        await setTeamMode('default'); await waitFor(`${roleRow('Open')}.querySelector('.team-agent-summary').lastElementChild.textContent === 'Sandboxed'`, 'Default again');
         await ev(`window.launchTeam(); true`);
         await launches(2);
         const sent2 = await ev(`window.__teamLaunches[1]`);
@@ -167,7 +116,7 @@ const BASE = require('./test_base').BASE;
 
         console.log('A template launched under team Plan: no member carries a mode of its own, so every member follows the team (#6440)');
         await open();
-        await ev(`document.getElementById('team-board-name').value = 'crew-3'; document.getElementById('launch-team-dir').value = '/work/repo'; window._loadTeamTemplateFromSelect('Coding Team'); { const e = document.getElementById('team-permission-mode'); e.value = 'plan'; e.dispatchEvent(new Event('change', { bubbles: true })); } true`);
+        await ev(`document.getElementById('team-board-name').value = 'crew-3'; document.getElementById('launch-team-dir').value = '/work/repo'; window.__pickT('Coding Team'); { const e = document.getElementById('team-permission-mode'); e.value = 'plan'; e.dispatchEvent(new Event('change', { bubbles: true })); } true`);
         await ev(`window.launchTeam(); true`);
         await waitFor(`window.__teamLaunches.length === 3`, 'the template launch');
         const tmpl = await ev(`window.__teamLaunches[2]`);
@@ -192,31 +141,29 @@ const BASE = require('./test_base').BASE;
 
         console.log('The team Mode Default says what it does; a member with no provider of its own follows the team provider (#6440)');
         await open();
-        assert.equal(await ev(`document.querySelector('#team-panel-start .perm-mode-desc').textContent`), "Asks before acting (each CLI's normal mode)", 'Default is the CLI\'s confirm mode, not "reads only"');
-        await ev(`document.getElementById('team-board-name').value = 'crew-4'; document.getElementById('launch-team-dir').value = '/work/repo'; window._loadTeamTemplateFromSelect('Coding Team'); true`);
+        await ev(`document.getElementById('team-board-name').value = 'crew-4'; document.getElementById('launch-team-dir').value = '/work/repo'; window.__pickT('Coding Team'); true`);
         await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'team_dialogs.js'); m._addTeamAgent('Own', 'p', null, 'agy', '', ''); return true; })()`);
         const types = () => ev(`[...document.querySelectorAll('#team-agents-list .team-agent-row')].map(r => r.querySelector('.acf-agent-type').value)`);
         assert.deepEqual([...new Set((await types()).slice(0, 5))], ['claude'], 'the template rows start at the team provider');
         await ev(`{ const e = document.getElementById('team-agent-type'); e.value = 'codex'; e.dispatchEvent(new Event('change', { bubbles: true })); } true`);
         assert.deepEqual(await types(), ['codex', 'codex', 'codex', 'codex', 'codex', 'agy'], 'the team provider reaches every member that has none of its own; a member that has one keeps it');
-        await ev(`(async () => { (await import((window.__coralStatic || '/static/') + 'team_dialogs.js'))._refreshTeamSummaries(); return true; })()`);
-        assert.deepEqual(await ev(`[...document.querySelectorAll('#team-agents-list .team-agent-provider')].map(c => c.textContent)`), ['Codex', 'Codex', 'Codex', 'Codex', 'Codex', 'Antigravity'], 'and the table says so');
+        await ev(`(async () => { (await import((window.__coralStatic || '/static/') + 'team_dialogs.js'))._syncTeamMembers(); return true; })()`);
+        assert.deepEqual(await ev(`[...document.querySelectorAll('#team-agents-list .team-agent-summary')].map(c => c.firstElementChild.textContent)`), ['Codex', 'Codex', 'Codex', 'Codex', 'Codex', 'Antigravity'], 'and the rows say so');
         await ev(`window.launchTeam(); true`);
         await waitFor(`window.__teamLaunches.length === 4`, 'the launch');
         assert.deepEqual(await ev(`window.__teamLaunches[3].agents.map(a => a.agent_type)`), ['codex', 'codex', 'codex', 'codex', 'codex', 'agy']);
         await ev(`window.hideLaunchModal(); true`);
 
-        console.log('Phone width: the table stacks and the actions keep 44 px targets');
+        console.log('Phone width: a row and its actions button keep 44 px targets and nothing scrolls sideways');
         await ev(`window.hideLaunchModal(); true`);
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
         await open();
-        await ev(`window._loadTeamTemplateFromSelect('Coding Team'); document.getElementById('team-board-name').value = 'p'; document.getElementById('launch-team-dir').value = '/x'; true`);
-        await click('#launch-team-next'); await click('#launch-team-next'.replace('next', 'next'));
-        assert.equal(await step(), 'start');
-        await click('#launch-team-back');
-        const phone = await ev(`(() => { const b = document.querySelector('#team-agents-list .team-agent-remove').getBoundingClientRect(); return [b.height >= 43.5, document.documentElement.scrollWidth <= innerWidth]; })()`);
-        assert.deepEqual(phone, [true, true]);
+        await ev(`{ const n = document.getElementById('team-board-name'); n.value = 'p'; n.dispatchEvent(new Event('input', { bubbles: true })); const d = document.getElementById('launch-team-dir'); d.value = '/x'; d.dispatchEvent(new Event('input', { bubbles: true })); } true`);
+        await click('#launch-team-next'); assert.equal(await step(), 'members');
+        await pick('Coding Team');
+        const phone = await ev(`(() => { const o = document.querySelector('#team-agents-list .team-agent-open').getBoundingClientRect(), m = document.querySelector('#team-agents-list .team-agent-menu-btn').getBoundingClientRect(); return [o.height >= 43.5, m.height >= 43.5 && m.width >= 43.5, document.documentElement.scrollWidth <= innerWidth]; })()`);
+        assert.deepEqual(phone, [true, true, true]);
         await Emulation.clearDeviceMetricsOverride();
         console.log('launch_team_steps: ok');
-    } finally { try { await client.close(); } catch {} }
+    } finally { await guard.restore().catch(e => console.error('settings restore: ' + (e && e.message))); try { await client.close(); } catch {} }
 })().catch(e => { console.error(e); process.exit(1); });

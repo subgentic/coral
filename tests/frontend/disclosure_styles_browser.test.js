@@ -106,54 +106,6 @@ const EXPECTED = {
     "w": 199,
     "weight": "600"
   },
-  "more template options | coarse | closed": {
-    "color": "rgb(160, 160, 168)",
-    "cursor": "pointer",
-    "display": "flex",
-    "h": 44,
-    "margin": "0px 0px 0px 0px",
-    "minHeight": "44px",
-    "padding": "12px 8px 12px 0px",
-    "size": "13px",
-    "w": 163,
-    "weight": "600"
-  },
-  "more template options | coarse | open": {
-    "color": "rgb(160, 160, 168)",
-    "cursor": "pointer",
-    "display": "flex",
-    "h": 44,
-    "margin": "0px 0px 6.4px 0px",
-    "minHeight": "44px",
-    "padding": "12px 8px 12px 0px",
-    "size": "13px",
-    "w": 163,
-    "weight": "600"
-  },
-  "more template options | fine | closed": {
-    "color": "rgb(160, 160, 168)",
-    "cursor": "pointer",
-    "display": "list-item",
-    "h": 24,
-    "margin": "0px 0px 0px 0px",
-    "minHeight": "0px",
-    "padding": "4px 8px 4px 0px",
-    "size": "13px",
-    "w": 165,
-    "weight": "600"
-  },
-  "more template options | fine | open": {
-    "color": "rgb(160, 160, 168)",
-    "cursor": "pointer",
-    "display": "list-item",
-    "h": 24,
-    "margin": "0px 0px 6.4px 0px",
-    "minHeight": "0px",
-    "padding": "4px 8px 4px 0px",
-    "size": "13px",
-    "w": 165,
-    "weight": "600"
-  },
   "prompt text | coarse | closed": {
     "color": "rgb(160, 160, 168)",
     "cursor": "pointer",
@@ -238,17 +190,7 @@ const EXPECTED = {
                 }
             }
         }
-        await Emulation.setTouchEmulationEnabled({ enabled: false });
-        await ev(`document.getElementById('team-working-mode-dialog')?.close(); document.getElementById('team-working-mode-dialog')?.remove(); (async () => { await window.showLaunchModal(); window._selectLaunchType('team'); return true; })()`);
-        await waitFor(`getComputedStyle(document.getElementById('launch-step-team')).display !== 'none' && !!document.querySelector('.team-template-more > summary')`, 'the Agent Team dialog', 10000);
-        for (const [coarse] of [[false], [true]]) {
-            await Emulation.setTouchEmulationEnabled({ enabled: coarse });
-            for (const open of [false, true]) {
-                await ev(`document.querySelector('.team-template-more').open = ${open}; true`);
-                await new Promise(r => setTimeout(r, 60)); // sleep-ok: a style recalculation after a toggle; there is no event for it
-                out[`more template options | ${coarse ? 'coarse' : 'fine'} | ${open ? 'open' : 'closed'}`] = await ev(STYLE('.team-template-more > summary'));
-            }
-        }
+        // (the team dialog's "More template options" disclosure became a More menu in the three-step dialog, #7407: it is not a disclosure any more)
         await ev(`window.hideLaunchModal(); true`);
         if (process.env.CAPTURE) { console.log('CAPTURED ' + JSON.stringify(out)); throw new Error('captured'); }
         assert.ok(EXPECTED, 'EXPECTED is filled');
