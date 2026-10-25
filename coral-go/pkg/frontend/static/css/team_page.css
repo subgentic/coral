@@ -66,7 +66,7 @@
 /* a goal's page and a task's page: facts side by side, tasks as a table, the actions pinned at the bottom */
 .goals-facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 16px; margin: 0; font-size: 0.875rem; max-width: 70ch; }
 .goals-facts dt { color: var(--text-secondary); font-size: 0.75rem; font-weight: 500; padding-top: 2px; }
-.goals-facts dd { margin: 0; overflow-wrap: anywhere; }
+.goals-facts dd { margin: 0; overflow-wrap: anywhere; white-space: pre-line; }
 .goals-tasks-head { margin: 8px 0 0; font-size: 0.9375rem; }
 .team-task-text { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: 0.875rem; margin: 0; max-width: 80ch; }
 .goals-pinbar { position: sticky; bottom: 0; margin-top: auto; display: flex; gap: 8px; justify-content: flex-end; padding: 12px 0; background: var(--bg-primary); border-top: 1px solid var(--border); z-index: 2; }
