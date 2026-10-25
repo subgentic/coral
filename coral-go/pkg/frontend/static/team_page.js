@@ -3,7 +3,7 @@
  * This module is the shell: each tab's own panel is built the first time the tab is opened by its own module (goals_view.js, team_tasks_page.js, team_artifacts_page.js); Messages is the board's own column moved in (message_board.js),
  * and Agents, Knowledge and Settings are today's panels of the right dock moved in, until their own builds (stage 3 of #7453). Lazy: loaded by openTeamPage (lazy_panels.js). */
 import { state } from './state.js';
-import { keyLabel, splitKey, boardFetch, isCloud } from './server_base.js';
+import { keyLabel, splitKey, boardFetch, teamFetch, isCloud } from './server_base.js';
 import { showView } from './utils.js';
 import { note } from './nav.js';
 import { keyRoute, TEAM_TABS } from './routes.js';
@@ -35,6 +35,8 @@ function buildOnce() {
         b.addEventListener('click', () => { goTab(t, { focus: false, user: true }); });
         tabs.append(b);
     }
+    tabs.addEventListener('scroll', drawTabEdges, { passive: true });
+    window.addEventListener('resize', drawTabEdges);
     tabs.addEventListener('keydown', (e) => {
         const list = [...tabs.querySelectorAll('[role=tab]')], i = list.indexOf(document.activeElement);
         if (i < 0) return;
@@ -120,6 +122,7 @@ function drawStatus(data) {
 }
 
 function drawCounts() {
+    queueMicrotask(drawTabEdges); // the counts widen the tabs
     for (const t of TEAM_TABS) {
         const c = document.querySelector(`#team-tab-${t} .team-tab-count`); if (!c) continue;
         const n = S.counts[t];
@@ -136,10 +139,12 @@ function drawCounts() {
 async function readCounts() {
     const team = S.team, seq = ++S.countSeq;
     if (!team) return;
-    const [goals, tasks, avail] = await Promise.allSettled([
+    const knowledge = S.knowledgeFor === team ? null : (S.knowledgeFor = team, teamFetch(team, n => `/api/teams/detail/${encodeURIComponent(n)}/knowledge`).then(r => (r.ok ? r.json() : null)).catch(() => null)); // the Knowledge tab's count once per team, with the others (the notes are read again when the tab opens)
+    const [goals, tasks, avail, kn] = await Promise.allSettled([
         boardFetch(team, '/goals?state=proposed,active,blocked,done,dropped&limit=200').then(r => (r.ok ? r.json() : null)),
         boardFetch(team, '/tasks?limit=1').then(r => (r.ok ? r.json() : null)),
         refreshTeamAvailability(team, true),
+        knowledge,
     ]);
     if (seq !== S.countSeq || team !== S.team) return;
     refreshGoalsTree(team);
@@ -148,6 +153,8 @@ async function readCounts() {
     const t = tasks.value;
     if (t && Number.isFinite(t.total_open)) S.counts.tasks = t.total_open;
     if (avail.value && Array.isArray(avail.value.agents)) S.counts.agents = avail.value.agents.length;
+    const k = kn.value;
+    if (k && k.exists) S.counts.knowledge = ((k.index ? 1 : 0) + (Array.isArray(k.agents) ? k.agents.length : 0)) || null;
     drawStatus(avail.value);
     drawCounts();
 }
@@ -161,6 +168,14 @@ function startCounts() {
 
 const panel = (t) => $(`team-panel-${t}`);
 
+/** Which edges of the tab strip hide more tabs (it scrolls sideways when the tabs are wider than the window): the fade at that edge says so. */
+function drawTabEdges() {
+    const t = $('team-tabs'); if (!t) return;
+    const start = t.scrollLeft > 1, end = t.scrollLeft + t.clientWidth < t.scrollWidth - 1;
+    const v = start && end ? 'both' : start ? 'start' : end ? 'end' : '';
+    if (v) t.dataset.more = v; else delete t.dataset.more;
+}
+
 function markTab(tab) {
     for (const t of TEAM_TABS) {
         const b = $(`team-tab-${t}`), on = t === tab;
@@ -168,6 +183,8 @@ function markTab(tab) {
         panel(t).hidden = !on;
     }
     $('team-panel-item').hidden = true;
+    $(`team-tab-${tab}`)?.scrollIntoView({ inline: 'nearest', block: 'nearest' }); // the selected tab is in view inside the strip (on load and on change); the fade's room is the strip's scroll padding
+    drawTabEdges();
 }
 
 /** Choose a tab (the person pressed it, a key moved to it, or an address named it). */
@@ -304,7 +321,7 @@ export async function openTeamPage(team, opts = {}) {
     }
     const tab = TEAM_TABS.includes(opts.tab) ? opts.tab : 'goals';
     const changed = S.team !== team;
-    if (changed) { S.team = team; S.counts = {}; S.item = null; }
+    if (changed) { S.team = team; S.counts = {}; S.item = null; S.knowledgeFor = ''; }
     state.selectedTeam = team; // the team on screen (the sidebar marks its row; the panels moved in read it)
     state.boardPageProject = team;
     state.currentBoardServer = splitKey(team).server;

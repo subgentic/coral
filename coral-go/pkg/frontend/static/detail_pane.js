@@ -15,10 +15,12 @@ let gen = 0;
 let railed = false; // the left sidebar is drawn as its 56 px rail because the pane is open (and was not already)
 
 /** Below 1500 px the sidebar gives its width to the page as the 56 px rail while the pane is open, and comes back when it closes (not saved: the person's own choice stays). */
+// The pane is a sheet over the page, as on a phone, when the window holds fewer than 48 em (a phone, or a larger text size): beside the page it would leave neither of them room, and the sidebar is not squeezed to a rail.
+const asSheet = () => window.innerWidth <= 760 || window.innerWidth / (parseFloat(getComputedStyle(document.documentElement).fontSize) || 16) < 48;
 function rail(open) {
     const layout = document.querySelector('.layout');
     if (!layout) return;
-    if (open && !railed && window.innerWidth < 1500 && !layout.classList.contains('sidebar-collapsed')) { layout.classList.add('sidebar-collapsed'); railed = true; }
+    if (open && !railed && !asSheet() && window.innerWidth < 1500 && !layout.classList.contains('sidebar-collapsed')) { layout.classList.add('sidebar-collapsed'); railed = true; }
     else if (!open && railed) { layout.classList.remove('sidebar-collapsed'); railed = false; }
 }
 
@@ -77,6 +79,7 @@ export function openDetailPane({ key, title, sub = '', facts = [], body = null, 
     if (actions.length) aside.append(foot);
     aside.hidden = false;
     page()?.classList.add('detail-open');
+    page()?.classList.toggle('detail-sheet', asSheet());
     document.body.classList.add('team-detail-open');
     rail(true);
     if (body) { try { body(doc, { signal: abort.signal, isStale: () => current === null || current.gen !== mine }); } catch (e) { doc.textContent = 'This document could not be shown.'; } }
@@ -93,7 +96,7 @@ export function closeDetailPane({ restoreFocus = false } = {}) {
     abort.abort();
     aside.hidden = true;
     aside.replaceChildren();
-    page()?.classList.remove('detail-open');
+    page()?.classList.remove('detail-open', 'detail-sheet');
     document.body.classList.remove('team-detail-open');
     rail(false);
     if (onClose) { try { onClose(); } catch { /* the pane is closed either way */ } }
