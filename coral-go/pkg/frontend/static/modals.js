@@ -20,8 +20,7 @@ const personaIo = await importOnce('./persona_io.js');
 const boardLaunches = await importOnce('./board_launches.js');
 const launchDialog = await importOnce('./launch_dialog.js');
 const { _applyACFPresetFor, _moveTeamAgent } = teamDialogs;
-const { _renderTeamTemplateSelector, teamTemplateKey } = await importOnce('./team_templates_ui.js');
-const { showTeamStep, teamTabKey } = await importOnce('./team_steps.js');
+const { toggleMenu } = await importOnce('./menu_button.js');
 const { _reviewGeneratedTeam } = await importOnce('./team_wizard.js'); // loads the wizard and its window hooks (#5174)
 const { _selectAgentPreset } = personaIo;
 export const { showLaunchModal, launchSession } = launchDialog;
@@ -68,12 +67,10 @@ registerActions({
     'team-agent-move': (el, event) => { event.stopPropagation(); if (el.dataset.dir === 'up' || el.dataset.dir === 'down') _moveTeamAgent(el, el.dataset.dir === 'up' ? -1 : 1); },
     'team-agent-remove': (el, event) => { event.stopPropagation(); teamDialogs._removeTeamAgent(teamRow(el)); },
     'team-agent-undo': () => teamDialogs._undoTeamAgentRemoval(),
-    'team-agent-prompt': (el, event) => { event.stopPropagation(); teamDialogs._toggleTeamAgentPrompt(teamRow(el)); },
-    'team-step': el => { if (['team', 'members', 'start'].includes(el.dataset.step)) { if (el.dataset.step === 'members') teamDialogs._refreshTeamSummaries(); showTeamStep(el.dataset.step); } },
     'team-step-next': () => teamDialogs.teamStepMove(1),
     'team-step-back': () => teamDialogs.teamStepMove(-1),
-    'team-tab-key': (el, event) => { const to = teamTabKey(event); if (to) { event.preventDefault(); if (to === 'members') teamDialogs._refreshTeamSummaries(); showTeamStep(to, { focus: true }); } },
-    'team-template-pick': el => { const n = textOf(el.dataset.name, 200); if (n) window._loadTeamTemplateFromSelect(n); },
-    'team-template-filter': el => _renderTeamTemplateSelector(textOf(el.value, 200) || ''), // textOf('') is null: an emptied search box lists every template again (#6411)
-    'team-template-key': (el, event) => teamTemplateKey(event),
+    'team-menu': el => toggleMenu(el), // More (templates) and a member's actions (#7407)
+    'team-template-select': el => teamDialogs._pickTeamTemplate(textOf(el.value, 200) || ''), // textOf('') is null: Blank team
+    'team-set-all': el => teamDialogs._setAllWorkers(textOf(el.value, 40) || ''),
+    'team-add-orchestrator': () => teamDialogs._addOrchestrator(),
 });

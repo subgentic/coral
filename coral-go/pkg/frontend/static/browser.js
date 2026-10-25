@@ -187,7 +187,7 @@ export function browserNavigateUp() {
 
 // The folder browser's recent folders and its entries (#3645).
 registerActions({
-    'launch-dir-recent': el => { const d = textOf(el.dataset.dir, 4096), i = document.getElementById('launch-dir'); if (d && i) { i.value = d; i.dispatchEvent(new Event('input', { bubbles: true })); document.getElementById('launch-agent-next')?.focus(); } },
+    'launch-dir-recent': el => { const d = textOf(el.dataset.dir, 4096), team = el.dataset.team === '1', i = document.getElementById(team ? 'launch-team-dir' : 'launch-dir'); if (d && i) { i.value = d; i.dispatchEvent(new Event('input', { bubbles: true })); document.getElementById(team ? 'launch-team-next' : 'launch-agent-next')?.focus(); } }, // (a team's folder, #7407)
     'browser-recent': el => { const d = textOf(el.dataset.dir, 4096); if (d) window.browserSelectRecent(d); },
     'browser-nav': el => { const n = textOf(el.dataset.name, 1024); if (n) window.browserNavigateTo(n); },
 });

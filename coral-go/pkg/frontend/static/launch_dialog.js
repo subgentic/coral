@@ -76,6 +76,8 @@ function _selectLaunchType(type) {
         _checkTmuxHere(); // tmux missing: said once, Launch off (#6046)
         document.getElementById('launch-dir')?.focus(); // the one thing most launches need: the folder
     } else if (type === "team") {
+        launch.teamAddress = false;
+        _renderServerPicker(); // the Machine list, with its address entry for a team (#7407)
         _initTeamForm();
         _checkTmuxHere();
         document.getElementById('team-board-name')?.focus();
@@ -154,9 +156,21 @@ function _renderServerPicker() {
     if (!opts.some(o => o.id === current)) opts = [...opts, { id: current, label: current, disabled: false }];
     sel.innerHTML = opts.map(o =>
         `<option value="${escapeAttr(o.id)}"${o.disabled ? ' disabled' : ''}>${escapeHtml(o.label)}</option>`).join('');
-    sel.value = current;
+    // A team can also start on a computer that is not in the list: its last entry reveals the address field (#7407).
+    if (launch.mode === 'team' && !locked) sel.insertAdjacentHTML('beforeend', `<option value="${TEAM_ADDRESS}">Another computer's address\u2026</option>`);
+    sel.value = launch.mode === 'team' && launch.teamAddress ? TEAM_ADDRESS : current;
     sel.disabled = locked;
     row.style.display = 'flex';
+}
+
+const TEAM_ADDRESS = '__address__';
+/** Show the address field when the Machine is "Another computer's address..." (the field is in step 1, in its own slot); nothing typed there survives another choice. */
+function _syncTeamAddress(on) {
+    launch.teamAddress = !!on;
+    const slot = document.getElementById('team-address-slot'), input = document.getElementById('team-board-server');
+    if (slot) slot.hidden = !on;
+    if (input) { input.disabled = !on; if (!on) input.value = ''; }
+    if (on) input?.focus();
 }
 
 const _LAUNCH_DIR_IDS = ['launch-dir', 'launch-terminal-dir', 'launch-team-dir'];
@@ -176,6 +190,8 @@ function _resetLaunchDirs(server, opts) {
 
 /** Reload everything that depends on the launch server after the dropdown changes. */
 async function _onLaunchServerChange(value, { force = false } = {}) {
+    if (value === TEAM_ADDRESS) { _syncTeamAddress(true); return; } // the machine stays; the address is typed
+    if (launch.mode === 'team' && launch.teamAddress) _syncTeamAddress(false);
     const next = _effectiveServer(coerceSelection(value, isHub(), state.servers));
     if (next === launch.server && !force) return;
     const prev = launch.server;

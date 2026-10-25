@@ -2431,12 +2431,6 @@ button.subscriber-history-link {
 
 /* Locked preset fields */
 
-.team-agents-container {
-    border: 1px solid var(--border);
-    border-radius: var(--radius-ml);
-    padding: 12px;
-    background: var(--inset-fill);
-}
 
 
 .team-field-hint {
@@ -2450,45 +2444,15 @@ button.subscriber-history-link {
     color: var(--error);
 }
 
-.team-agents-footer {
-    margin-top: 8px;
-    display: flex;
-    justify-content: stretch;
-}
 
 
 
 
 
-.team-template-actions {
-    display: flex;
-    gap: 8px;
-    margin: 0 0 14px;
-    flex-wrap: wrap;
-    align-items: center;
-}
 
-.team-template-actions .btn-small {
-    margin: 0;
-}
 
-.team-template-actions .btn-subtle {
-    padding: 4px 10px;
-    border-radius: var(--radius-md); /* the shape of every other button (#6042); these were pills */
-    background: transparent;
-    border-color: var(--control-border);
-    color: var(--text-muted);
-}
 
-.team-template-actions .btn-subtle:hover {
-    color: var(--text-primary);
-    background: var(--bg-hover);
-    border-color: var(--accent);
-}
 
-.team-template-actions .btn:last-of-type {
-    color: var(--accent-light); /* 4.5:1 on the light panel (--accent was 4.14) */
-}
 
 .team-generate-ai-btn {
     border-color: rgba(var(--fx-indigo-rgb), 0.35) !important;
@@ -2501,17 +2465,6 @@ button.subscriber-history-link {
     border-color: var(--accent) !important;
 }
 
-.team-template-info {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    border-radius: 999px;
-    border: 1px solid var(--border);
-    color: var(--text-muted);
-    cursor: help;
-}
 
 .team-advanced {
     margin-top: 12px;
@@ -2706,30 +2659,11 @@ button.subscriber-history-link {
     flex-shrink: 0;
 }
 
-.team-agent-row {
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    margin-bottom: 8px;
-    position: relative;
-    overflow: hidden;
-}
 
-.team-agent-row:hover {
-    border-color: var(--border-light);
-}
 
 /* Collapsed card summary */
 
 
-.team-agent-role-name {
-    font-size: 0.8125rem;
-    font-weight: 600;
-    color: var(--text-primary);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
 
 
 
@@ -2738,30 +2672,12 @@ button.subscriber-history-link {
 
 
 /* Expandable edit form */
-.team-agent-form {
-    display: none;
-    padding: 0 12px 12px;
-}
 
 
 
 
-.team-agent-row label {
-    display: block;
-    margin-bottom: 6px;
-    font-size: 0.8125rem;
-}
 
-.team-agent-row input,
-.team-agent-row textarea {
-    width: 100%;
-    box-sizing: border-box;
-}
 
-.team-agent-row textarea {
-    resize: vertical;
-    min-height: 48px;
-}
 
 .agent-preset-selector {
     display: flex;
@@ -3158,46 +3074,12 @@ button.subscriber-history-link {
 
 /* ── Team Agent Reorder ──────────────────────────────────── */
 
-.team-agent-row {
-    cursor: grab;
-    transition: opacity 0.15s, transform 0.15s;
-}
 
-.team-agent-row.dragging {
-    opacity: 0.4;
-    cursor: grabbing;
-}
 
-.team-agent-row.drag-over {
-    border-top: 2px solid var(--accent);
-}
 
-.team-agent-reorder-btn {
-    background: none;
-    border: none;
-    color: var(--text-muted);
-    cursor: pointer;
-    padding: 2px;
-    border-radius: var(--radius-xs);
-    display: flex;
-    align-items: center;
-    opacity: 0.5;
-    transition: opacity 0.15s, color 0.15s;
-}
 
-.team-agent-reorder-btn:hover {
-    opacity: 1;
-    color: var(--text-primary);
-    background: var(--bg-tertiary);
-}
 
 /* The first card cannot move up and the last cannot move down (#3770). */
-.team-agent-reorder-btn:disabled {
-    opacity: 0.2;
-    cursor: default;
-    background: none;
-    color: var(--text-muted);
-}
 
 /* ── CLI Check Warning ───────────────────────────────────── */
 
@@ -4385,19 +4267,19 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .settings-info-text > * + * { margin-top: .4rem; }
 .settings-pane > .settings-theme-btn, .settings-pane > .settings-prompts-btn { margin-top: 1rem; }
 /* The on/off boxes are switches; they stay native checkboxes (the keyboard, the screen reader and the touch target are unchanged). */
-#settings-modal .settings-row .check-hit input[type="checkbox"],
+:is(#settings-modal .settings-row .check-hit, #launch-step-team .settings-pane :is(.check-hit, .health-rule-head)) input[type="checkbox"],
 #settings-modal .settings-hub-mode-toggle > input[type="checkbox"] { appearance: none; -webkit-appearance: none; position: relative; width: 2.5rem; height: 1.4rem; margin: 0; flex: none; border-radius: 1rem; border: 1px solid var(--control-border); background: var(--bg-hover); cursor: pointer; }
-#settings-modal .settings-row .check-hit input[type="checkbox"]::before,
+:is(#settings-modal .settings-row .check-hit, #launch-step-team .settings-pane :is(.check-hit, .health-rule-head)) input[type="checkbox"]::before,
 #settings-modal .settings-hub-mode-toggle > input[type="checkbox"]::before { content: ""; position: absolute; top: 2px; left: 2px; width: calc(1.4rem - 8px); height: calc(1.4rem - 8px); border-radius: 50%; background: var(--text-secondary); transition: transform .12s; }
-#settings-modal .settings-row .check-hit input[type="checkbox"]:checked,
+:is(#settings-modal .settings-row .check-hit, #launch-step-team .settings-pane :is(.check-hit, .health-rule-head)) input[type="checkbox"]:checked,
 #settings-modal .settings-hub-mode-toggle > input[type="checkbox"]:checked { background: var(--accent-dim); border-color: var(--accent-dim); }
-#settings-modal .settings-row .check-hit input[type="checkbox"]:checked::before,
+:is(#settings-modal .settings-row .check-hit, #launch-step-team .settings-pane :is(.check-hit, .health-rule-head)) input[type="checkbox"]:checked::before,
 #settings-modal .settings-hub-mode-toggle > input[type="checkbox"]:checked::before { background: #fff; transform: translateX(1.1rem); }
-#settings-modal .settings-row .check-hit input[type="checkbox"]:focus-visible,
+:is(#settings-modal .settings-row .check-hit, #launch-step-team .settings-pane :is(.check-hit, .health-rule-head)) input[type="checkbox"]:focus-visible,
 #settings-modal .settings-hub-mode-toggle > input[type="checkbox"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-#settings-modal .settings-row .check-hit input[type="checkbox"]:disabled,
+:is(#settings-modal .settings-row .check-hit, #launch-step-team .settings-pane :is(.check-hit, .health-rule-head)) input[type="checkbox"]:disabled,
 #settings-modal .settings-hub-mode-toggle > input[type="checkbox"]:disabled { opacity: .5; cursor: not-allowed; }
-@media (prefers-reduced-motion: reduce) { #settings-modal .settings-row .check-hit input[type="checkbox"]::before { transition: none; } }
+@media (prefers-reduced-motion: reduce) { :is(#settings-modal .settings-row .check-hit, #launch-step-team .settings-pane :is(.check-hit, .health-rule-head)) input[type="checkbox"]::before { transition: none; } }
 @container settingspane (max-width: 40rem) {
     .settings-row { grid-template-columns: minmax(0, 1fr); gap: .5rem; }
     .settings-row:has(> dd > .check-hit) { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
@@ -4557,7 +4439,6 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 }
 /* Agent Team (UI audit #5589, findings 5 and 6): the team name, which every launch needs, is above the sections; the template tools are one disclosure after the picker, so the members come first. */
 .modal-content:has(.settings-shell) #launch-step-team .settings-modal-body { flex-direction: column; }
-.team-template-more { margin: 0 0 .75rem; --dz-color: var(--text-secondary); --dz-size: .8125rem; }
 /* Folded section: one summary style. A user sets only the --dz-* variables that differ. */
 .disclosure > summary { cursor: pointer; width: var(--dz-width, fit-content); padding: var(--dz-pad, .25rem .5rem .25rem 0); color: var(--dz-color, inherit); font-size: var(--dz-size, var(--fs-md)); font-weight: 600; }
 .disclosure[open] > summary { margin-bottom: var(--dz-gap, .4rem); }
@@ -4566,7 +4447,6 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 #launch-step-team .sd-essentials { padding-bottom: .3rem; }
 #launch-step-team .sd-name-grid { display: grid; grid-template-columns: max-content minmax(0, 38rem); gap: .6rem; align-items: start; }
 #launch-step-team .sd-name-grid > label { margin: 0; padding-top: .6rem; }
-#launch-step-team .sd-name-field .team-field-hint { margin: .25rem 0 0; }
 #launch-step-team .sd-name-field #team-board-name { width: 100%; }
 @container sd (max-width: 40rem) { #launch-step-team .sd-name-grid { grid-template-columns: minmax(0, 1fr); gap: .3rem; } #launch-step-team .sd-name-grid > label { padding-top: 0; } }
 .launch-type-glyph { font-size: 2rem; } /* the agent card draws the same robot as the start page */
@@ -4671,59 +4551,9 @@ dialog.reminder-dialog::backdrop { background: rgba(var(--black-rgb), 0.5); }
 @media (pointer: coarse), (max-width: 767px) { .reminder-form input, .reminder-form .btn { min-height: var(--control-touch-height, 44px); } }
 
 /* Launch Agent Team: three steps, Team, Members, Start (#6397). */
-.team-steps { display: flex; gap: 4px; padding: 8px 24px 0; border-bottom: 1px solid var(--border); flex: none; }
-.team-step-tab { background: none; border: 0; border-bottom: 2px solid transparent; padding: 8px 14px; font: inherit; font-weight: 600; color: var(--text-secondary); cursor: pointer; margin-bottom: -1px; }
-.team-step-tab[aria-selected="true"] { color: var(--text-primary); border-bottom-color: var(--accent); }
-.team-step-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: var(--radius-sm); }
-#launch-step-team .team-steps-body { overflow-y: auto; padding: 0; gap: 0; flex: 1; min-height: 0; }
-#launch-step-team .team-step-panel { padding: 0 1.6rem 1rem; }
-#launch-step-team .team-step-panel > .sd-essentials { padding-left: 0; padding-right: 0; }
-.team-step-panel[hidden] { display: none; }
-.team-template-picker { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
-.team-template-count:empty { display: none; }
-.team-template-count { margin: 0; }
-.team-template-list { list-style: none; margin: 0; padding: 0; max-height: calc(4 * 44px + 2px); overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-ml); }
-.team-template-list:empty { display: none; }
-.team-template-option { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 44px; box-sizing: border-box; padding: 0 12px; cursor: pointer; border-bottom: 1px solid var(--border); }
-.team-template-option:last-child { border-bottom: 0; }
-.team-template-option:hover, .team-template-option.active { background: var(--bg-tertiary); }
-.team-template-option[aria-selected="true"] { box-shadow: inset 3px 0 0 var(--accent); font-weight: 600; }
-.team-template-size { color: var(--text-secondary); font-size: var(--fs-base); font-weight: 400; white-space: nowrap; }
-.team-template-none { margin: 0; color: var(--text-secondary); font-size: var(--fs-base); }
-.team-members-table { width: 100%; border-collapse: collapse; font-size: .8125rem; }
-.team-members-table th { text-align: left; font-weight: 600; color: var(--text-secondary); padding: 4px 8px; border-bottom: 1px solid var(--border); }
-.team-members-table td { padding: 8px; vertical-align: top; border-bottom: 1px solid var(--border); }
-.team-agent-row { cursor: default; }
-.team-agent-role-name { background: none; border: 0; padding: 0; font: inherit; font-weight: 600; color: var(--text-primary); cursor: pointer; text-align: left; white-space: normal; text-decoration: underline dotted; text-underline-offset: 3px; }
-.team-agent-role-name:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
-.team-agent-prompt { margin-top: 6px; color: var(--text-secondary); line-height: 1.4; white-space: pre-wrap; max-height: 12em; overflow-y: auto; }
-.team-agent-summary-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px; } /* wraps rather than pushing Remove past the screen at 200% text (#6411); each button keeps its own label on one line (min-width: max-content below) */
-.team-agent-actions-cell { width: 1%; }
-.team-agent-summary-actions .btn { padding-inline: 12px; flex: none; width: auto; min-width: max-content; }
 .team-undo { margin: 8px 0 0; color: var(--text-secondary); }
 .team-undo:empty { position: absolute; width: 1px; height: 1px; margin: 0; padding: 0; border: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } /* in the page with nothing to say: out of the layout (no room, no flex gap), still a live region (#6679) */ /* in the page with nothing to say: no room, still a live region */
 .team-undo .btn-link { background: none; border: 0; padding: 0 2px; font: inherit; color: var(--accent); text-decoration: underline; cursor: pointer; }
-.team-start-more { margin-top: 12px; }
-@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
-    .team-steps { padding-left: 16px; padding-right: 16px; }
-    #launch-step-team .team-step-panel { padding: 0 1rem 1rem; }
-    .team-steps { gap: 0; flex-wrap: wrap; }
-    .team-step-tab { flex: 1 1 auto; min-height: var(--control-touch-height, 44px); padding: 8px 6px; overflow-wrap: anywhere; }
-    .team-members-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
-    .team-members-table, .team-members-table tbody, .team-members-table tr, .team-members-table td { display: block; }
-    .team-members-table tr { padding: 8px 0; border-bottom: 1px solid var(--border); }
-    .team-members-table td { border: 0; padding: 2px 0; }
-    .team-members-table td[data-label]:not(.team-agent-role)::before { content: attr(data-label) ": "; color: var(--text-secondary); }
-    .team-agent-summary-actions { justify-content: flex-start; padding-top: 6px; }
-    #team-panel-members .team-agents-container { border: 0; padding: 0; background: none; }
-    .team-agent-summary-actions > button { min-width: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); display: inline-flex; align-items: center; justify-content: center; }
-    .team-agent-role-name { min-height: var(--control-touch-height, 44px); }
-}
-.team-default-mark { color: var(--text-secondary); font-size: .6875rem; font-weight: 400; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0 4px; white-space: nowrap; }
-.team-agent-summary-actions .team-agent-reorder-btn { opacity: 1; color: var(--text-secondary); width: 32px; height: 32px; justify-content: center; border: 1px solid var(--border); border-radius: var(--radius-sm); flex: none; }
-.team-agent-summary-actions .team-agent-reorder-btn:hover:not(:disabled) { color: var(--text-primary); background: var(--bg-tertiary); }
-.team-agent-summary-actions .team-agent-reorder-btn:disabled { opacity: .45; }
-@media (pointer: coarse), (max-width: 767px) { .team-agent-summary-actions .team-agent-reorder-btn { width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); } }
 .team-mode-warn { color: var(--warning); font-weight: 600; }
 /* New Agent's second step as compact rows, like the members table (#6457): the value that will be used, a Change that opens its section. */
 
@@ -4771,7 +4601,7 @@ body:has(#nav-tab-hub-inbox.active) #saved-btn .saved-count { display: none; }
    Step 1 the folder (and, above, the machine), step 2 the persona page, step 3 the tabs Agent, Permissions and Advanced. The dialog has ONE size for every step and
    tab (the smaller of 640 px and the window minus 32 px; a full-height sheet on a phone): the body scrolls inside it, the header, the recap and the footer stay put, and
    the notes a provider adds sit in a slot already as tall as the longest one, so nothing moves when a note comes or goes. Cancel is leftmost on every step. */
-#launch-modal .modal-content.launch-wizard-content, #restart-modal .modal-content.restart-wizard-content { width: min(60rem, 94vw); height: min(640px, calc(100dvh - 32px)); max-height: none; min-height: 0; }
+#launch-modal .modal-content.launch-wizard-content, #restart-modal .modal-content.restart-wizard-content, #team-agent-modal .modal-content.restart-wizard-content { width: min(60rem, 94vw); height: min(640px, calc(100dvh - 32px)); max-height: none; min-height: 0; }
 .launch-wizard .settings-modal-body { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0; overflow: auto; }
 .launch-page-folder { flex: none; padding: 20px 24px; }
 .launch-page-agent { flex: 1; min-height: 0; display: flex; flex-direction: column; }
@@ -4833,9 +4663,9 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .acf-tools-details > summary { cursor: pointer; font-weight: 600; min-height: 32px; }
 .acf-tools-details .acf-perms-summary { font-weight: 400; margin-left: 6px; }
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
-    #launch-modal .modal-content.launch-wizard-content, #restart-modal .modal-content.restart-wizard-content { width: 100vw; max-width: none; height: 100dvh; max-height: none; border-radius: 0; padding: 0 !important; } /* (!important: mobile.css's tighter padding is one too) */
-    #restart-modal .restart-wizard-content > .modal-header { margin: 0 !important; padding: 16px 16px 10px; }
-    #restart-modal .restart-wizard-content > .modal-footer { margin: 0 !important; padding: 10px 16px 14px !important; }
+    #launch-modal .modal-content.launch-wizard-content, #restart-modal .modal-content.restart-wizard-content, #team-agent-modal .modal-content.restart-wizard-content { width: 100vw; max-width: none; height: 100dvh; max-height: none; border-radius: 0; padding: 0 !important; } /* (!important: mobile.css's tighter padding is one too) */
+    #team-agent-modal .restart-wizard-content > .modal-header, #restart-modal .restart-wizard-content > .modal-header { margin: 0 !important; padding: 16px 16px 10px; }
+    #team-agent-modal .restart-wizard-content > .modal-footer, #restart-modal .restart-wizard-content > .modal-footer { margin: 0 !important; padding: 10px 16px 14px !important; }
     .launch-page-folder, .launch-wizard .settings-panes { padding: 16px; }
     .launch-recap { padding: 10px 16px 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; } /* two lines at most, so large text leaves the body room */
     .sd-modal-content .launch-wizard > .modal-actions, .sd-modal-content.launch-wizard > .modal-actions { padding: 10px 16px 14px; }
@@ -4864,7 +4694,7 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .launch-wizard .launch-cli-slot .acf-cli-warning { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 
 /* Restart on the same shell (#7391): the provider line has a slot of its own so the tabs do not move when it appears. */
-.restart-wizard-content > .modal-actions #restart-cancel { margin-right: auto; }
+.restart-wizard-content > .modal-actions #restart-cancel, .restart-wizard-content > .modal-actions #team-agent-cancel { margin-right: auto; }
 .restart-wizard-content > .modal-actions { display: flex; align-items: center; gap: 8px; }
 .acf-restart-name { margin: 0 0 16px; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-secondary); color: var(--text-primary); overflow-wrap: anywhere; }
 .acf-provider-label { display: block; margin: 0 0 14px; }
@@ -4902,3 +4732,70 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 
 @container (max-width: 40em) { .launch-note-slot { min-height: 3.8em; } }
 @container (max-width: 17em) { .launch-note-slot { min-height: 5.6em; } }
+/* ── New team, three steps (#7407): the New Agent shell with the team's own pages ─────────────────────────────────────────────────────────────── */
+.team-wizard[data-stage="team"] .team-page:not(.team-page-team), .team-wizard[data-stage="members"] .team-page:not(.team-page-members), .team-wizard[data-stage="start"] .team-page:not(.team-page-start) { display: none; }
+.team-wizard .team-page { padding: 20px 24px; }
+.team-wizard .team-page-start { flex: 1; min-height: 0; display: flex; padding: 0; }
+.team-wizard .team-page-start.team-page { display: flex; }
+.team-wizard[data-stage="team"] .team-page-start, .team-wizard[data-stage="members"] .team-page-start { display: none; }
+.team-page-start .launch-shell { flex: 1; min-height: 0; }
+.team-page-team .launch-field-folder, .team-page-team .team-address-slot { margin: 0 0 16px; }
+.team-page-team .launch-field-folder input[type="text"], .team-address-slot input { width: 100%; box-sizing: border-box; }
+.team-page-team .dir-input-row input { flex: 1; }
+.team-address-slot[hidden] { display: none; }
+.team-worktree-slot { min-height: 7.5rem; } /* the worktree choice and its branch live in a slot as tall as both: ticking it moves nothing */
+.team-field-hint { min-height: 1.1em; }
+.launch-wizard > .modal-actions #launch-team-cancel { margin-right: auto; }
+.launch-wizard > .modal-actions .btn[aria-disabled="true"] { opacity: .55; cursor: not-allowed; }
+#launch-modal[data-team-stage="members"] .launch-server-row, #launch-modal[data-team-stage="start"] .launch-server-row { display: none !important; } /* the machine is a step 1 choice */
+.launch-recap.launch-recap-warn { color: var(--warning-text, var(--warning)); }
+#team-recap:empty { display: none; }
+.team-template-row { display: flex; align-items: flex-end; gap: 8px; margin: 0 0 14px; }
+.team-template-pick { flex: 1; min-width: 0; }
+.team-template-pick select { width: 100%; }
+.team-more-wrap, .team-agent-more { position: relative; flex: none; }
+.team-allworkers { margin: 0 0 14px; }
+.team-allworkers[hidden] { display: none; }
+.team-allworkers select { min-width: 12rem; }
+.team-agents-count { margin: 0 0 6px; color: var(--text-secondary); font-size: var(--fs-sm); }
+.team-agents-count:empty { display: none; }
+.team-agents-list { display: flex; flex-direction: column; }
+.team-agent-row { display: flex; align-items: center; gap: 6px; border-bottom: 1px solid var(--border-light); }
+.team-agent-row.drag-over { background: var(--bg-hover); }
+.team-agent-open { flex: 1; min-width: 0; display: grid; grid-template-columns: minmax(8rem, 16rem) 1fr auto; align-items: center; gap: 12px; min-height: 44px; padding: 8px 6px; background: none; border: 0; border-radius: var(--radius-md); color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.team-agent-open:hover { background: var(--bg-hover); }
+.team-agent-open:focus-visible, .team-agent-menu-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.team-agent-role-name { font-size: var(--fs-md); font-weight: 500; color: var(--text-primary); overflow-wrap: anywhere; }
+.team-agent-badge { margin-left: 8px; padding: 1px 8px; border: 1px solid var(--accent); border-radius: var(--radius-lg); color: var(--link-text); font-size: .6875rem; white-space: nowrap; }
+.team-agent-badge[hidden] { display: none; }
+.team-agent-summary { color: var(--text-secondary); font-size: var(--fs-sm); overflow-wrap: anywhere; }
+.team-agent-summary b { color: var(--text-primary); font-weight: 600; }
+.team-agent-chev { color: var(--text-secondary); font-size: 1.25rem; }
+.team-agent-menu-btn { display: inline-grid; place-items: center; width: 36px; height: 36px; background: var(--bg-primary); border: 1px solid var(--control-border); border-radius: var(--radius-md); color: var(--text-primary); cursor: pointer; }
+.team-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 6; min-width: 12rem; padding: 4px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: 0 6px 20px rgba(0, 0, 0, .35); }
+.team-menu[hidden] { display: none; }
+.team-menu.team-menu-up { top: auto; bottom: calc(100% + 4px); }
+.team-menu-item { display: block; width: 100%; min-height: 36px; padding: 6px 12px; background: none; border: 0; border-radius: var(--radius-sm); color: var(--text-primary); font: inherit; text-align: left; cursor: pointer; }
+.team-menu-item:hover, .team-menu-item:focus-visible { background: var(--bg-hover); outline: none; }
+.team-menu-item[disabled] { color: var(--text-muted); cursor: default; }
+.team-menu-item[hidden] { display: none; }
+.team-agents-empty { margin: 8px 0; color: var(--text-secondary); font-size: var(--fs-sm); }
+.team-agents-empty[hidden] { display: none; }
+.team-orchestrator-line { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 12px 0; padding: 10px 12px; border: 1px solid var(--warning); border-radius: var(--radius-md); font-size: var(--fs-sm); }
+.team-orchestrator-line p { margin: 0; }
+.team-orchestrator-line[hidden] { display: none; }
+.team-agents-footer { margin-top: 10px; }
+@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
+    .team-wizard .team-page { padding: 16px; }
+    .team-wizard .team-page-start { padding: 0; }
+    .team-agent-open { grid-template-columns: 1fr auto; row-gap: 2px; }
+    .team-agent-summary { grid-column: 1 / -1; order: 3; }
+    .team-agent-badge { display: block; width: max-content; margin: 4px 0 0; }
+    .team-agent-menu-btn { width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); }
+    .team-menu-item { min-height: var(--control-touch-height, 44px); }
+    .team-orchestrator-line { flex-direction: column; align-items: stretch; }
+    .team-template-row .btn, .team-template-pick select, .team-allworkers select { min-height: var(--control-touch-height, 44px); }
+}
+#launch-step-team .settings-pane label:has(> input[type="checkbox"]) { display: flex; flex-direction: row; align-items: flex-start; gap: 10px; margin: 4px 0; }
+#launch-step-team .settings-pane .health-form .health-line { align-items: flex-start; }
+#launch-step-team .settings-pane .settings-hint { margin: 2px 0 12px; }

@@ -218,34 +218,31 @@
                 </div>
             </div>
 
-            <!-- Step 2c: Agent Team form -->
-            <div id="launch-step-team" class="launch-modal-step" style="display:none">
+            <!-- Step 2c: Agent Team form (#7407): three steps in the one fixed-size dialog: 1 Name and where it launches, 2 Members, 3 Start and team settings (tabs Start, Workflow, Health check, Messaging) -->
+            <div id="launch-step-team" class="launch-modal-step launch-wizard team-wizard" style="display:none" data-stage="team">
                 <div class="sd-step-header">
                     <h3 id="launch-team-title">
                         <button class="launch-back-btn" data-on-click="m-select-launch-type" data-arg="back" title="Back" aria-label="Back to the choices">&larr;</button>
-                        New team
+                        <span id="launch-team-title-text">New team</span>
                     </h3>
-                </div>
-                <div class="team-steps" role="tablist" aria-label="Team steps" data-on-keydown="team-tab-key">
-                    <button type="button" role="tab" class="team-step-tab" id="team-tab-team" aria-controls="team-panel-team" aria-selected="true" data-on-click="team-step" data-step="team">Team</button>
-                    <button type="button" role="tab" class="team-step-tab" id="team-tab-members" aria-controls="team-panel-members" aria-selected="false" tabindex="-1" data-on-click="team-step" data-step="members">Members</button>
-                    <button type="button" role="tab" class="team-step-tab" id="team-tab-start" aria-controls="team-panel-start" aria-selected="false" tabindex="-1" data-on-click="team-step" data-step="start">Start</button>
+                    <p id="team-stage-sub" class="sd-sub launch-stage-sub">Step 1 of 3: Name and where it launches</p>
                 </div>
                 <p class="sr-only" id="team-step-live" role="status">Step 1 of 3</p>
                 <div class="settings-modal-body team-steps-body">
-                    <section class="team-step-panel" id="team-panel-team" role="tabpanel" aria-labelledby="team-tab-team">
-                        <div class="sd-essentials sd-name-grid">
-                            <label for="team-board-name">Team name <span class="req-mark">(required)</span></label>
-                            <div class="sd-name-field">
-                                <input type="text" id="team-board-name" placeholder="e.g. auth-feature, sprint-42" maxlength="64" data-on-input="m-validate-team-name" aria-describedby="team-board-name-hint">
-                                <div id="team-board-name-hint" class="team-field-hint"></div>
-                            </div>
-                            <label for="launch-team-dir">Folder <span class="req-mark">(required)</span></label>
-                            <div class="sd-name-field">
-                                <div class="dir-input-row">
-                                <input type="text" id="launch-team-dir" placeholder="/path/to/project" data-coral-root="{{ .CoralRoot }}" required aria-required="true">
+                    <section class="launch-page team-page team-page-team" id="team-panel-team" data-page="team" aria-label="Name and where it launches">
+                        <div class="launch-field-folder">
+                            <div class="launch-field-head"><label for="team-board-name">Team name</label> <span class="launch-required">Required</span></div>
+                            <input type="text" id="team-board-name" placeholder="e.g. auth-feature, sprint-42" maxlength="64" data-on-input="m-validate-team-name" aria-required="true" aria-describedby="team-board-name-help team-board-name-hint">
+                            <p id="team-board-name-help" class="settings-hint">Letters, digits, - and _. This is the name of the team's message board.</p>
+                            <div id="team-board-name-hint" class="team-field-hint"></div>
+                        </div>
+                        <div class="launch-field-folder">
+                            <div class="launch-field-head"><label for="launch-team-dir">Folder</label> <span class="launch-required">Required</span></div>
+                            <div class="dir-input-row">
+                                <input type="text" id="launch-team-dir" placeholder="Choose a folder" data-coral-root="{{ .CoralRoot }}" required aria-required="true">
                                 <button class="btn" id="btn-browse-team" data-on-click="m-toggle-browser" data-browser="launch-team-dir dir-browser-team browser-list-team browser-current-path-team">Browse</button>
                             </div>
+                            <div id="launch-team-dir-recents" class="launch-dir-recents" role="group" aria-label="Recent folders"></div>
                             <div id="dir-browser-team" class="dir-browser" style="display:none">
                                 <div class="dir-browser-header">
                                     <button class="btn btn-small dir-browser-up" data-on-click="m-browser-navigate-up" title="Go up">..</button>
@@ -256,103 +253,102 @@
                                     <li class="empty-state">Loading...</li>
                                 </ul>
                             </div>
+                        </div>
+                        <div class="team-address-slot" id="team-address-slot" hidden>
+                            <label for="team-board-server">Another computer's address <span class="launch-optional">optional</span></label>
+                            <input type="text" id="team-board-server" placeholder="e.g. http://remote-machine:8420" disabled>
+                        </div>
+                        <div class="team-worktree-slot" id="team-worktree-slot">
+                            <div id="team-worktree-option" style="display:none">
+                                <label class="settings-toggle team-settings-toggle">
+                                    <input type="checkbox" id="launch-team-worktree" data-on-change="m-team-worktree">
+                                    <span>
+                                        <strong>Launch in a git worktree</strong>
+                                        <div class="team-settings-note">The team works on its own branch in an isolated copy of the repository.</div>
+                                    </span>
+                                </label>
+                                <div id="team-worktree-branch-row" style="display:none">
+                                    <label for="launch-team-base-branch">Base branch</label>
+                                    <input type="text" id="launch-team-base-branch" placeholder="the repo's current branch" value="">
+                                </div>
                             </div>
                         </div>
-                        <div class="team-template-picker">
-                            <label for="team-template-search">Start from a template <span class="text-muted-sm">(optional)</span></label>
-                            <input type="search" id="team-template-search" role="combobox" aria-expanded="true" aria-controls="team-template-list" aria-autocomplete="list" autocomplete="off" placeholder="Search templates" data-on-input="team-template-filter" data-on-keydown="team-template-key">
-                            <p class="team-field-hint team-template-count" id="team-template-count" role="status"></p>
-                            <ul id="team-template-list" class="team-template-list" role="listbox" aria-label="Team templates"></ul>
-                            <p class="team-template-none" id="team-template-none" hidden></p>
-                            <details class="disclosure team-template-more">
-                                        <summary>More template options</summary>
-                                        <div class="team-template-actions">
-                                            <button class="btn btn-small btn-subtle team-generate-ai-btn" data-on-click="m-show-team-wizard-modal" title="Generate a team with AI"><span class="material-icons icon-btn-inline" aria-hidden="true">auto_awesome</span> Generate with AI</button>
-                                            <button class="btn btn-small btn-subtle" data-on-click="m-import-team-templates" title="Import team templates from file">Import Template</button>
-                                            <button class="btn btn-small btn-subtle" data-on-click="m-import-team-from-folder" title="Import team from a folder with .md agent files">Import from Folder</button>
-                                            <button class="btn btn-small btn-subtle" data-on-click="m-save-team-template" title="Save team configuration as reusable template">Save as Template</button>
-                                            <span class="team-template-info info-tooltip" title="Folder structure:&#10;&#10;my-team/&#10;  SKILL.md → Orchestrator prompt&#10;  agents/&#10;    role-name.md → Agent prompt&#10;&#10;Each .md file uses YAML frontmatter:&#10;---&#10;name: role-name&#10;description: What this agent does&#10;---&#10;Prompt body below...">&#9432;</span>
-                                            <input type="file" id="team-folder-input" webkitdirectory directory multiple style="display:none" data-on-change="m-handle-team-folder-import">
-                                        </div>
-                                    </details>
-                        </div>
                     </section>
-                    <section class="team-step-panel" id="team-panel-members" role="tabpanel" aria-labelledby="team-tab-members" hidden>
+                    <section class="launch-page team-page team-page-members" id="team-panel-members" data-page="members" aria-label="Members">
+                        <div class="team-template-row">
+                            <div class="team-template-pick">
+                                <div class="launch-field-head"><label for="team-template-select">Start from a template</label> <span class="launch-optional">optional</span></div>
+                                <select id="team-template-select" data-on-change="team-template-select"></select>
+                            </div>
+                            <div class="team-more-wrap">
+                                <button type="button" class="btn" id="team-template-more" aria-haspopup="menu" aria-expanded="false" aria-controls="team-template-menu" data-on-click="team-menu">More</button>
+                                <div class="team-menu" id="team-template-menu" role="menu" aria-label="Template options" hidden>
+                                    <button type="button" role="menuitem" class="team-menu-item" data-on-click="m-show-team-wizard-modal">Generate with AI</button>
+                                    <button type="button" role="menuitem" class="team-menu-item" data-on-click="m-import-team-templates">Import a template</button>
+                                    <button type="button" role="menuitem" class="team-menu-item" data-on-click="m-import-team-from-folder" title="A folder with SKILL.md (the Orchestrator's prompt) and agents/role-name.md (one agent each)">Import from a folder</button>
+                                    <button type="button" role="menuitem" class="team-menu-item" data-on-click="m-save-team-template">Save this team as a template</button>
+                                </div>
+                                <input type="file" id="team-folder-input" webkitdirectory directory multiple style="display:none" data-on-change="m-handle-team-folder-import">
+                            </div>
+                        </div>
+                        <div class="team-allworkers" id="team-allworkers" hidden>
+                            <div class="launch-field-head"><label for="team-set-all">Set all workers to</label></div>
+                            <select id="team-set-all" data-on-change="team-set-all" aria-describedby="team-set-all-hint">
+                                <option value="">Choose a provider</option>
+                                <option value="claude">Claude</option>
+                                <option value="agy">Antigravity</option>
+                                <option value="codex">Codex</option>
+                                <option value="pi">Pi</option>
+                            </select>
+                            <p class="settings-hint" id="team-set-all-hint">Not the Orchestrator, which keeps its own. Sets the provider only; each worker's model and thinking go back to their defaults.</p>
+                        </div>
+                        <p class="team-agents-count" id="team-agents-count" aria-live="polite"></p>
                         <div class="team-agents-container">
-                            <table class="team-members-table">
-                                <caption class="sr-only">Team members</caption>
-                                <thead><tr><th scope="col">Role</th><th scope="col">Provider</th><th scope="col">Model</th><th scope="col">Thinking</th><th scope="col">Mode</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
-                                <tbody id="team-agents-list"></tbody>
-                            </table>
-                            <p class="team-agents-empty">No members yet. Go back to pick a template, or add members one by one.</p>
+                            <div id="team-agents-list" class="team-agents-list" role="list" aria-label="Team members"></div>
+                            <p class="team-agents-empty">No members yet. Pick a template above, or add members one by one.</p>
+                            <div class="team-orchestrator-line" id="team-orchestrator-line" hidden>
+                                <p><b>Add an Orchestrator.</b> It plans tasks, runs reviews and receives other teams' requests. A member counts as the Orchestrator only when its role is exactly "Orchestrator".</p>
+                                <button type="button" class="btn" id="team-add-orchestrator" data-on-click="team-add-orchestrator">Add Orchestrator</button>
+                            </div>
                             <p class="team-undo" id="team-undo" role="status"></p>
                             <div class="team-agents-footer">
                                 <button class="btn team-add-agent-btn" data-on-click="m-show-team-agent-modal">+ Add member</button>
                             </div>
                         </div>
                     </section>
-                    <section class="team-step-panel" id="team-panel-start" role="tabpanel" aria-labelledby="team-tab-start" hidden>
-                        <div class="sd-essentials sd-name-grid">
-                            <label for="team-goal">First task <span class="req-mark">(optional)</span></label>
-                            <div class="sd-name-field">
-                                <textarea id="team-goal" rows="2" maxlength="2000" placeholder="What should the team work on? Sent to the Orchestrator"></textarea>
+                    <section class="launch-page team-page team-page-start" id="team-panel-start" data-page="start" aria-label="Start and team settings">
+                        <div class="settings-shell launch-shell team-shell">
+                            <nav class="settings-nav" aria-label="Team settings sections">
+                                <div class="settings-group-pick"><select class="settings-select" aria-label="Team settings section"></select></div>
+                                <div class="settings-tabs" role="tablist" aria-orientation="vertical" aria-label="Team settings sections"></div>
+                            </nav>
+                            <div class="settings-panes" id="team-settings-panes">
+                                <section class="settings-pane" data-section="start" data-title="Start" data-icon="play_arrow" data-desc="" hidden>
+                                    <label class="launch-prompt-field"><span class="launch-field-head">First task <span class="launch-optional">optional</span></span>
+                                        <textarea id="team-goal" rows="4" maxlength="2000" placeholder="What should the team work on? It goes to the Orchestrator."></textarea></label>
+                                    <label class="launch-prompt-field"><span class="launch-field-head">Additional instructions <span class="launch-optional">optional</span></span>
+                                        <textarea id="team-custom-instructions" rows="4" placeholder="Team-specific conventions"></textarea></label>
+                                </section>
+                                <section class="settings-pane" data-section="workflow" data-title="Workflow" data-icon="account_tree" data-desc="" hidden id="team-pane-workflow"></section>
+                                <section class="settings-pane" data-section="health" data-title="Health check" data-icon="health_and_safety" data-desc="" hidden id="team-pane-health"></section>
+                                <section class="settings-pane" data-section="messaging" data-title="Messaging" data-icon="forum" data-desc="" hidden id="team-pane-messaging"></section>
                             </div>
                         </div>
-                        <label>Mode:
-                            <select id="team-permission-mode" class="settings-select" data-on-change="m-perm-mode-describe">
-                                <option value="default" selected>Default</option>
-                                <option value="plan">Plan</option>
-                                <option value="acceptEdits">Accept Edits</option>
-                                <option value="auto">Auto</option>
-                                <option value="bypassPermissions">Bypass Permissions</option>
-                                <option value="dontAsk">Don't Ask</option>
-                            </select>
-                            <span class="settings-hint perm-mode-desc">Asks before acting (each CLI&#39;s normal mode)</span>
-                        </label>
-                        <details class="disclosure team-start-more">
-                            <summary>More options</summary>
-                            <div id="team-worktree-option" style="display:none">
-                                <label class="settings-toggle team-settings-toggle">
-                                    <input type="checkbox" id="launch-team-worktree" data-on-change="m-team-worktree">
-                                    <span>
-                                        <strong>Launch in Git Worktree</strong>
-                                        <div class="team-settings-note">Create an isolated git worktree so the team works on a separate branch.</div>
-                                    </span>
-                                </label>
-                                <div id="team-worktree-branch-row" style="display:none">
-                                    <label>Base Branch:
-                                        <input type="text" id="launch-team-base-branch" placeholder="the repo's current branch" value="">
-                                    </label>
-                                </div>
-                            </div>
-                            <div class="team-launch-type-row">
-                                <label>Provider:
-                                    <select id="team-agent-type">
-                                        <option value="claude">Claude</option>
-                                        <option value="agy">Antigravity (agy)</option>
-                                        <option value="codex">Codex</option>
-                                        <option value="pi">Pi</option>
-                                    </select>
-                                </label>
-                            </div>
-                            <label style="display:none">Backend:
-                                <select id="team-backend">
-                                    <option value="tmux">tmux</option>
-                                    <option value="pty">PTY</option>
-                                </select>
-                            </label>
-                            <label>Another computer's address <span class="text-muted-sm">(optional)</span>:
-                                <input type="text" id="team-board-server" placeholder="e.g. http://remote-machine:8420">
-                            </label>
-                        </details>
                     </section>
                 </div>
+                <div hidden aria-hidden="true">
+                    <select id="team-agent-type"><option value="claude">Claude</option><option value="agy">Antigravity (agy)</option><option value="codex">Codex</option><option value="pi">Pi</option></select>
+                    <select id="team-backend"><option value="tmux">tmux</option><option value="pty">PTY</option></select>
+                    <select id="team-permission-mode"><option value="default" selected>Default</option><option value="plan">Plan</option><option value="acceptEdits">Accept Edits</option><option value="auto">Auto</option><option value="bypassPermissions">Bypass Permissions</option><option value="dontAsk">Don't Ask</option></select>
+                    <span class="perm-mode-desc"></span>
+                </div>
                 <div id="team-tmux-slot" class="launch-cli-slot"></div>
+                <p id="team-recap" class="launch-recap" role="status" aria-live="polite"></p>
                 <div class="modal-actions">
-                    <button class="btn" data-on-click="m-hide-launch-modal">Cancel</button>
+                    <button class="btn" id="launch-team-cancel" data-on-click="m-hide-launch-modal">Cancel</button>
                     <button class="btn" id="launch-team-back" data-on-click="team-step-back" hidden>Back</button>
                     <button class="btn btn-primary" id="launch-team-next" data-on-click="team-step-next">Next</button>
-                    <button class="btn btn-primary" id="launch-team-go" data-on-click="m-launch-team" hidden>Launch Team</button>
+                    <button class="btn btn-primary" id="launch-team-go" data-on-click="m-launch-team" hidden>Launch team</button>
                 </div>
             </div>
         </div>
@@ -388,7 +384,7 @@
     </div>
 
     <div id="team-agent-modal" class="modal" role="dialog" aria-labelledby="team-agent-modal-title" aria-modal="true" style="display:none">
-        <div class="modal-content sd-modal-content">
+        <div class="modal-content sd-modal-content launch-wizard restart-wizard-content">
             <div class="modal-header">
                 <h3 id="team-agent-modal-title">Add Team Agent</h3>
                 <p id="team-agent-modal-subtitle" class="sd-sub" hidden></p>
@@ -403,8 +399,8 @@
                 </div>
             </div>
             <div class="modal-actions modal-footer">
-                <button class="btn" data-on-click="m-hide-team-agent-modal">Cancel</button>
-                <button class="btn btn-primary" data-on-click="m-save-team-agent-from-modal">Save Agent</button>
+                <button class="btn" id="team-agent-cancel" data-on-click="m-hide-team-agent-modal">Cancel</button>
+                <button class="btn btn-primary" id="team-agent-modal-save" data-on-click="m-save-team-agent-from-modal">Save member</button>
             </div>
         </div>
     </div>
