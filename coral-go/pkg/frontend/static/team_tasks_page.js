@@ -12,6 +12,8 @@ import { taskStatusWord, statusClass } from './goal_words.js';
 import { state } from './state.js';
 const { buildTaskBar } = await importOnce('./task_bar.js'); // the old tab's search, filters and sort on the shared list bar (lazy: its failure is retried)
 const TF = await importOnce('./task_filters.js');
+const { renderSafe } = await importOnce('./safe_markdown.js'); // the Inbox's renderer (DOM-built, no markup from text): a task reads the same on both pages
+const { loadSafeMarkdown } = await importOnce('./vendor_loader.js');
 
 const PAGE = 50;
 const FILTERS = [['open', 'Open'], ['all', 'All'], ['queued', 'Queued'], ['active', 'In progress'], ['blocked', 'Blocked'], ['review', 'In review'], ['done', 'Done']];
@@ -31,6 +33,19 @@ async function readJson(path) {
     const r = await boardFetch(model.project, path);
     if (!r.ok) throw new Error(`${r.status}`);
     return r.json();
+}
+
+/** The description as the Inbox shows it (Markdown: bullets, not raw hyphens). The text is on screen as plain text first; the rendered DOM replaces it when the renderer is there, with the Inbox's link policy
+ *  (an artifact link only when this server has it). A failure leaves the plain text, never markup. */
+async function renderTaskText(host, text) {
+    try {
+        await loadSafeMarkdown().catch(() => {});
+        let opts;
+        try { const { artifactLinkPolicy } = await importOnce('./inbox_coral.js'); const policy = await artifactLinkPolicy(text); if (typeof policy === 'function') opts = { linkPolicy: policy }; } catch { /* links stay as the renderer's default has them */ }
+        const { node, partial } = renderSafe(text, opts);
+        if (partial || !host.isConnected) return; // the renderer did not load: the plain text stays; or the page was left
+        node.classList.add('team-task-md'); host.replaceWith(node);
+    } catch { /* the plain text stays */ }
 }
 
 /** Read the first page: every open task and the first of the done ones; "Load more" continues the done ones. */
@@ -306,7 +321,7 @@ export function renderTaskPage(host, task, ctx) {
     if (task.completed_at) fact(dl, 'Finished', whenText(task.completed_at));
     if (task.completion_message) fact(dl, 'Result', task.completion_message);
     page.append(back, h, line, dl);
-    if (task.body) { const b = el('div', 'team-task-body'); b.append(el('h3', 'goals-sub', 'Description'), Object.assign(el('pre', 'team-task-text'), { textContent: task.body })); page.append(b); }
+    if (task.body) { const b = el('div', 'team-task-body'), doc = Object.assign(el('pre', 'team-task-text'), { textContent: task.body }); b.append(el('h3', 'goals-sub', 'Description'), doc); page.append(b); renderTaskText(doc, task.body); }
     const bar = el('div', 'goals-pinbar');
     const session = agentOf(ctx.project, task);
     if (session) bar.append(btn('btn', 'Open the agent', () => { window.switchNavTab?.('agents'); window.selectLiveSession?.(session.name, session.agent_type, session.session_id, session.server); })); // the agent that has the task, when it runs here

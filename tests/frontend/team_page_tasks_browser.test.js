@@ -13,7 +13,7 @@ const TEAM = `qa-tasks-${Date.now() % 100000}`;
     const S = scenarios();
     const stub = () => ev(`(() => { const R = window.fetch.bind(window); window.__q = [];
         const T = (id, title, status, extra = {}) => ({ id, title, status, priority: 'high', created_by: 'Orchestrator', assigned_to: 'Backend Dev', created_at: '2026-10-25T06:00:00Z', ...extra });
-        const ALL = [T(1, 'Fix the login bug', 'in_progress'), T(2, 'Fix the logout bug', 'pending'), T(3, 'Write docs', 'pending', { blocked_by: [{ task_id: 1, title: 'Fix the login bug', satisfied: false }], cost_usd: 1.5 })];
+        const ALL = [T(1, 'Fix the login bug', 'in_progress'), T(2, 'Fix the logout bug', 'pending'), T(3, 'Write docs', 'pending', { blocked_by: [{ task_id: 1, title: 'Fix the login bug', satisfied: false }], cost_usd: 1.5, body: '- first point\\n- second point\\n\\n<img src=x onerror="window.__pwn=1"> <script>window.__pwn=2</script>' })];
         const j = (b, s = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: s, headers: { 'Content-Type': 'application/json' } }));
         window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin);
             if (url.pathname === '/api/board/tasks') { window.__q.push(url.search); const q = (url.searchParams.get('q') || '').toLowerCase(); const hit = ALL.filter(t => !q || t.title.toLowerCase().includes(q)); if (url.searchParams.getAll('status').includes('completed')) return j({ tasks: [], next_cursor: '', total: 0, truncated: false }); // the done phase has none
@@ -67,6 +67,13 @@ const TEAM = `qa-tasks-${Date.now() % 100000}`;
             await ev(`(() => { const b = [...document.querySelectorAll('#team-panel-tasks .team-row-btn')].find(x => /Write docs/.test(x.textContent)); b.click(); return true; })()`); await settle(600);
             const t = await ev(`window.__na.text(document.getElementById('team-panel-item'))`);
             assert.ok(/Blocked by\s*#1 Fix the login bug/.test(t), `Blocked by names the task: ${t.slice(0, 300)}`); assert.ok(/Cost\s*\$1\.50/.test(t), 'Cost');
+        });
+        await S.run("the description reads as the Inbox's does: Markdown bullets, and text from an agent is never markup (no script, no image, nothing runs)", async () => {
+            await waitFor(`!!document.querySelector('#team-panel-item .team-task-md')`, 'the description is rendered', 4000);
+            const d = await ev(`(() => { const item = document.getElementById('team-panel-item'), md = item.querySelector('.team-task-md'); return { items: [...md.querySelectorAll('li')].map(l => l.textContent.trim()), raw: /^\\s*-\\s/.test(md.textContent), live: item.querySelectorAll('script, img, [onerror]').length, pwn: window.__pwn === undefined, text: md.textContent }; })()`);
+            assert.deepEqual(d.items, ['first point', 'second point'], `the bullets are a list: ${JSON.stringify(d)}`);
+            assert.equal(d.raw, false, 'no raw hyphen starts the text'); assert.equal(d.live, 0, 'no script or image element came out of the text'); assert.equal(d.pwn, true, 'nothing ran');
+            assert.ok(/<img src=x/.test(d.text) || /onerror/.test(d.text) || d.text.length > 0, 'the markup is shown as text or dropped, never as an element');
         });
         await removeBoards(ev, [TEAM]); S.finish();
     } finally { await removeBoards(ev, [TEAM]); await client.close(); }
