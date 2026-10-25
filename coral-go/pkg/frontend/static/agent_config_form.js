@@ -1,7 +1,7 @@
 /* Moved out of modals.js as it was (#3844): no behaviour change. */
 import { importOnce } from './import_once.js';
 const { ALL_CAPABILITIES } = await importOnce('./agent_presets.js');
-const { PERMISSION_MODE_DESCRIPTIONS, defaultPermissionMode, syncDefaultPermissionMode, trackPermissionPick, _hasPermFlag, _normalizePermFlagsForAgent, _permissionModeFromFlags, _stripPermFlags, _syncACFAutoPermissions } = await importOnce('./permission_flags.js');
+const { PERMISSION_MODE_DESCRIPTIONS, CODEX_AUTO_DESCRIPTION, _updatePermModeDescription, defaultPermissionMode, syncDefaultPermissionMode, trackPermissionPick, _hasPermFlag, _normalizePermFlagsForAgent, _permissionModeFromFlags, _stripPermFlags, _syncACFAutoPermissions } = await importOnce('./permission_flags.js');
 const { _acfServer, _fillModelDatalist, _getAgentModels, _getDefaultModels, _settingsFor } = await importOnce('./launch_models.js');
 const { _checkAgentCLI } = await importOnce('./cli_check.js');
 const { _classifyLoadedACFModel } = await importOnce('./acf_models.js');
@@ -26,7 +26,7 @@ const CAPABILITY_LABELS = {
 // What a capability does beyond its name, per CLI (#4545, Security's D: for Codex, Git Write is what turns
 // off its sandbox).
 const CAPABILITY_TITLES = {
-    git_write: 'Claude: pre-approves git push, commit, branch, merge and rebase. Codex: Git Write does not change its sandbox; with Shell it can write the working folder and never asks.',
+    git_write: 'Claude: pre-approves git push, commit, branch, merge and rebase. Codex: Git Write does not change its sandbox; with Shell it can change files in its folder, use the network and never asks.',
 };
 
 export function _togglePermissions(containerId) {
@@ -82,6 +82,28 @@ export function _togglePermChip(btn) {
     _syncEnforcement(btn.closest('[data-acf-uid]'));
 }
 
+// The line says what the CLI enforces; an advanced step (the flag that turns Codex's network off) is behind Learn more, named for what it explains, one short line visible (UI/UX's #7492 note).
+let _enforcedMoreSeq = 0;
+function _renderEnforcedLine(line, e, container) {
+    if (!e.more) { line.textContent = e.text; return; }
+    const id = `acf-net-more-${container.dataset.acfUid || ''}-${line.dataset.acfEnforcedFor ? 'm' : 'f'}-${++_enforcedMoreSeq}`;
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'tb-learn acf-learn'; btn.textContent = 'Learn more';
+    btn.setAttribute('aria-expanded', 'false'); btn.setAttribute('aria-controls', id);
+    btn.setAttribute('aria-label', 'Learn more about the network');
+    const more = document.createElement('span');
+    more.id = id; more.hidden = true;
+    const code = document.createElement('code'); code.textContent = e.more;
+    more.append(' To turn the network off, add ', code, ' to Flags.');
+    btn.addEventListener('click', () => {
+        more.hidden = !more.hidden;
+        btn.setAttribute('aria-expanded', String(!more.hidden));
+        btn.textContent = more.hidden ? 'Learn more' : 'Show less';
+        btn.setAttribute('aria-label', more.hidden ? 'Learn more about the network' : 'Show less about the network');
+    });
+    line.replaceChildren(e.text, ' ', btn, more);
+}
+
 // _syncEnforcement says under Permissions what the chosen agent CLI enforces for these permissions
 // (#4545, Security's #4550): Codex keeps only a sandbox and an approval mode and Antigravity only a mode, so
 // for them a new Deny entry can't be added (an existing one can be removed: it still changes the mode, shown
@@ -95,6 +117,8 @@ function _syncEnforcement(container) {
     const caps = _getPermissions(`${uid}-perms`) || {};
     const e = presetEnforcement(agentType, caps, permMode);
     // Codex and Antigravity keep only a sandbox and an approval mode: an explicit Mode is applied and the capabilities may only narrow it; with no Mode the capabilities decide (#6425). Say so beside the Mode.
+    const modeSelect = container.querySelector('.acf-permission-mode');
+    if (modeSelect) _updatePermModeDescription(modeSelect); // Codex's Auto has its own words
     const override = container.querySelector('.acf-mode-override');
     if (override) {
         const lm = launchedMode(agentType, permMode, caps);
@@ -107,7 +131,7 @@ function _syncEnforcement(container) {
         ...(container.id ? document.querySelectorAll(`[data-acf-enforced-for="${CSS.escape(container.id)}"]`) : [])];
     for (const line of lines) {
         if (!line) continue;
-        line.textContent = e.text;
+        _renderEnforcedLine(line, e, container);
         line.hidden = !e.text || (e.quiet && line !== container.querySelector('.acf-perms-enforced')); // the plain Bypass line is said once, on Permissions (#5595)
     }
     // Claude in Bypass Permissions mode never asks, so Allow pre-approves nothing: the row is not shown (its
@@ -232,7 +256,7 @@ export function renderAgentConfigForm(containerId, opts = {}) {
         const permModeVal = autoPermsVal
             ? (typeof autoPermsVal === 'string' ? autoPermsVal : (_permissionModeFromFlags(flagsVal) || defaultMode))
             : 'default';
-        const permModeDesc = PERMISSION_MODE_DESCRIPTIONS[permModeVal] || '';
+        const permModeDesc = v.agentType === 'codex' && permModeVal === 'auto' ? CODEX_AUTO_DESCRIPTION : PERMISSION_MODE_DESCRIPTIONS[permModeVal] || '';
         autoPermissionsHTML = `
             <label>Permission Mode:
                 <select class="acf-permission-mode" data-on-change="perm-mode-describe">

@@ -44,12 +44,12 @@ assert.equal(pe.agyEnforced({ allow: ['shell', 'file_write'], deny: ['file_write
 
 const fe = AGENT_PRESETS.find(p => p.name === 'Frontend Dev').capabilities;
 let e = pe.presetEnforcement('codex', fe, 'bypassPermissions');
-assert.match(e.text, /only a sandbox and an approval mode: a sandbox that can write the working folder, and it asks only when the model requests it/);
+assert.match(e.text, /only a sandbox and an approval mode: a sandbox that can change files in its folder, with no network, and it asks only when the model requests it/);
 assert.match(e.text, /Deny entries and shell patterns are not enforced/);
 assert.equal(e.denyEnforced, false);
 assert.equal(e.patternsEnforced, false);
 e = pe.presetEnforcement('codex', AGENT_PRESETS.find(p => p.name === 'Lead Developer').capabilities, 'default');
-assert.match(e.text, /a sandbox that can write the working folder, and it never asks/, 'Codex git_write is no sandbox-free choice (#6422): four chips are workspace-write, never');
+assert.match(e.text, /a sandbox that can change files in its folder and use the network, and it never asks/, 'Codex git_write is no sandbox-free choice (#6422): four chips are workspace-write, never');
 assert.doesNotMatch(e.text, /without a sandbox/, 'no sandbox is only an explicit choice');
 for (const t of ['agy', 'gemini', 'antigravity']) {
     e = pe.presetEnforcement(t, AGENT_PRESETS.find(p => p.name === 'Security Reviewer').capabilities, 'default');
@@ -100,3 +100,13 @@ assert.equal(sel.value, 'acceptEdits', 'a saved default is the default');
 pe.syncDefaultPermissionMode(null, {}, 'claude'); // no select: nothing
 
 console.log(`preset_enforcement: ok (${checked} presets)`);
+
+// the network sentences only where the network is on: workspace-write that never asks
+const lead = pe.presetEnforcement('codex', AGENT_PRESETS.find(p => p.name === 'Lead Developer').capabilities, 'default');
+assert.equal(lead.more, pe.NETWORK_OFF_FLAG);
+assert.match(lead.text, /Leaving out Web Access does not turn the network off\./);
+const onRequest = pe.presetEnforcement('codex', AGENT_PRESETS.find(p => p.name === 'Frontend Dev').capabilities, 'default');
+assert.equal(onRequest.more, undefined, 'on-request has no network to turn off');
+assert.doesNotMatch(onRequest.text, /use the network|Leaving out Web Access/);
+for (const mode of ['acceptEdits', 'default', 'plan']) assert.equal(pe.presetEnforcement('codex', null, mode).more, undefined, `no chips under ${mode}: nothing to turn off`);
+for (const mode of ['auto', 'dontAsk']) assert.equal(pe.presetEnforcement('codex', null, mode).more, pe.NETWORK_OFF_FLAG, `no chips under ${mode}: the network is on`);

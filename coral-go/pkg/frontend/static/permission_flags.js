@@ -26,9 +26,14 @@ export const PERMISSION_MODE_DESCRIPTIONS = {
     bypassPermissions: 'Everything except protected paths — isolated containers and VMs only',
 };
 
+// Codex's Auto is a workspace sandbox with the network on (Security's #7483): a board member needs it to reach Coral
+export const CODEX_AUTO_DESCRIPTION = 'Workspace sandbox, with the network on so it can reach Coral.';
+
 export function _updatePermModeDescription(selectEl) {
     const hint = selectEl.parentElement?.querySelector('.perm-mode-desc');
-    if (hint) hint.textContent = PERMISSION_MODE_DESCRIPTIONS[selectEl.value] || '';
+    if (!hint) return;
+    const codex = selectEl.closest('[data-acf-uid]')?.querySelector('.acf-agent-type')?.value === 'codex';
+    hint.textContent = codex && selectEl.value === 'auto' ? CODEX_AUTO_DESCRIPTION : PERMISSION_MODE_DESCRIPTIONS[selectEl.value] || '';
 }
 
 export function _getPermissionFlagsForAgentMode(agentType, mode) {

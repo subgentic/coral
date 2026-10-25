@@ -17,13 +17,16 @@ assert.deepEqual(t('codex', 'bypassPermissions', null), { narrowed: false, warn:
 assert.deepEqual(t('codex', 'bypassPermissions', readOnly), { narrowed: true, text: 'Read-only sandbox' }, 'Bypass + read-only chips: read-only');
 assert.deepEqual(t('codex', 'auto', readOnly), { narrowed: true, text: 'Read-only sandbox' }, 'Auto + read-only chips: read-only');
 assert.deepEqual(t('codex', 'plan', readOnly), { narrowed: false }, 'Plan is already read-only');
-assert.deepEqual(t('codex', 'auto', { allow: ['file_read', 'file_write'] }), { narrowed: true, text: 'Sandboxed, asks first' }, 'Auto + Read and Write: it asks, the mode did not');
+assert.deepEqual(t('codex', 'auto', { allow: ['file_read', 'file_write'] }), { narrowed: true, text: 'Sandboxed, asks first: can change files in its folder, no network' }, 'Auto + Read and Write: it asks, the mode did not');
 assert.deepEqual(t('codex', 'acceptEdits', null), { narrowed: false }, 'a mode with no chips');
 // Codex: no explicit mode, the chips decide
-assert.deepEqual(t('codex', 'default', four), { narrowed: true, text: 'Sandboxed' });
+assert.deepEqual(t('codex', 'default', four), { narrowed: true, text: 'Sandboxed: can change files in its folder and use the network' });
 assert.deepEqual(t('codex', 'default', readOnly), { narrowed: true, text: 'Read-only sandbox' });
 assert.deepEqual(t('codex', 'default', null), { narrowed: false });
-assert.deepEqual(t('codex', '', { allow: ['file_read', 'file_write'] }), { narrowed: true, text: 'Sandboxed' });
+assert.deepEqual(t('codex', '', { allow: ['file_read', 'file_write'] }), { narrowed: true, text: 'Sandboxed, asks first: can change files in its folder, no network' });
+// the network wording follows the pair: only workspace-write that never asks has the network on (Security's #7503)
+assert.deepEqual(t('codex', 'default', { allow: ['shell'] }), { narrowed: true, text: 'Sandboxed: can change files in its folder and use the network' }, 'Shell with no Deny never asks: the network is on');
+assert.deepEqual(t('codex', 'default', { allow: ['shell'], deny: ['web_access'] }), { narrowed: true, text: 'Sandboxed, asks first: can change files in its folder, no network' }, 'Shell with a Deny asks: no network');
 // Claude: the mode only
 assert.deepEqual(t('claude', 'plan', four), { narrowed: false });
 assert.deepEqual(t('claude', 'default', four), { narrowed: false });
