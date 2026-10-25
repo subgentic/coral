@@ -59,6 +59,8 @@ func TestOperatorOnlyRoutes(t *testing.T) {
 		r.Get("/api/workflows", ok)
 		r.Get("/api/worktrees", ok)
 		r.Post("/api/worktrees/remove", ok)
+		r.Get("/api/sessions/live/{name}/memory", ok)
+		r.Get("/api/sessions/live/{name}/memory/{id}", ok)
 		do := func(method, path string, hdr map[string]string) *httptest.ResponseRecorder {
 			req := httptest.NewRequest(method, path, strings.NewReader("{}"))
 			for k, v := range hdr {
@@ -93,6 +95,8 @@ func TestOperatorOnlyRoutes(t *testing.T) {
 			{"PUT", "/api/settings/git-diff-mode"},
 			// #6736: the kept worktrees, and removing one, are the Operator's
 			{"GET", "/api/worktrees"}, {"POST", "/api/worktrees/remove"},
+			// #7454: the files an agent's CLI reads (instructions and memory) are the Operator's to read
+			{"GET", "/api/sessions/live/abc/memory"}, {"GET", "/api/sessions/live/abc/memory/0123456789abcdef0123456789abcdef"},
 		}
 		for _, wr := range writes {
 			rec := do(wr.method, wr.path, agent)

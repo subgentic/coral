@@ -95,6 +95,8 @@ GET /api/sessions/live/{name}/git | unbound
 GET /api/sessions/live/{name}/history/context | token-bound
 GET /api/sessions/live/{name}/history/search | token-bound
 GET /api/sessions/live/{name}/info | unbound
+GET /api/sessions/live/{name}/memory | unbound | operator-only
+GET /api/sessions/live/{name}/memory/{id} | unbound | operator-only
 GET /api/sessions/live/{name}/notes | unbound
 GET /api/sessions/live/{name}/poll | unbound
 GET /api/sessions/live/{name}/resolve-path | unbound

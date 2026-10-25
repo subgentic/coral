@@ -152,6 +152,8 @@ c GET /api/sessions/live/{name}/git
 c GET /api/sessions/live/{name}/history/context
 c GET /api/sessions/live/{name}/history/search
 c GET /api/sessions/live/{name}/info
+b GET /api/sessions/live/{name}/memory
+b GET /api/sessions/live/{name}/memory/{id}
 a GET /api/sessions/live/{name}/notes
 c GET /api/sessions/live/{name}/poll
 c GET /api/sessions/live/{name}/resolve-path
