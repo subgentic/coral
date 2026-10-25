@@ -30,6 +30,14 @@ const TEAM = `qa-consist-${Date.now() % 100000}`;
         await S.run('a waiting agent is "needs attention", not "All well"', async () => {
             assert.equal(await status(), '1 needs attention', `got ${JSON.stringify(await status())}`);
         });
+        await S.run('with agents needing attention the status is a button named "Team health: 1 needs attention" that opens the Agents tab', async () => {
+            const b = await ev(`(() => { const e = document.getElementById('team-page-health'); const r = e.getBoundingClientRect(); const reg = document.getElementById('team-page-status'); return { shown: !e.hidden && r.width > 0, name: e.getAttribute('aria-label'), text: e.textContent.trim(), role: e.tagName, regionHidden: getComputedStyle(reg).position === 'absolute', insideRegion: reg.contains(e) }; })()`);
+            assert.deepEqual([b.shown, b.name, b.text, b.role, b.insideRegion], [true, 'Team health: 1 needs attention', '1 needs attention', 'BUTTON', false], JSON.stringify(b));
+            assert.equal(b.regionHidden, true, 'the live region is for the screen reader, not drawn twice');
+            await ev(`document.getElementById('team-page-health').click(); true`); await settle(500);
+            assert.equal(await ev(`document.querySelector('#team-tabs [aria-selected=true]').id`), 'team-tab-agents', 'it opens the Agents tab');
+            await ev(`document.getElementById('team-tab-goals').click(); true`); await settle(300);
+        });
         await S.run('with nobody waiting, offline or queued the status is "All well"', async () => {
             await ev(`window.__avail = 'available'; true`);
             await ev(`window.dispatchEvent(new Event('focus')); import((window.__coralStatic || '/static/') + 'team_page.js').then(m => m.goTab('goals', {})); true`);
@@ -37,6 +45,8 @@ const TEAM = `qa-consist-${Date.now() % 100000}`;
             await ev(`document.dispatchEvent(new Event('visibilitychange')); true`);
             await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'team_page.js'); await m.openTeamPage(${JSON.stringify(TEAM)}, { silent: true }); return true; })()`); await settle(700);
             assert.equal(await status(), 'All well');
+            assert.equal(await ev(`document.getElementById('team-page-health').hidden`), true, 'All well is plain text, not a button');
+            assert.equal(await ev(`getComputedStyle(document.getElementById('team-page-status')).position !== 'absolute'`), true, 'and it is drawn');
         });
         await S.run('the rollup and the rows are never drawn as two moments: Updating… and aria-busy until the rows arrive', async () => {
             await ev(`window.__tp.find('button, a, [role=row], tr', /Ship it/).click(); true`); await settle(600);
