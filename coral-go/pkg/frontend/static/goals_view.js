@@ -12,6 +12,7 @@ import { whenText } from './when_text.js';
 import { toGoalList, mergeGoalLists, toTaskPage, toDrivers, createBody, errorOf, LIST_PATH } from './goals_adapter.js';
 import { importOnce } from './import_once.js';
 const { teamTable, rowButton, stateChip: tableStateChip } = await importOnce('./team_table.js'); // lazy: its failure is retried
+const { attachDockResize } = await importOnce('./dock_resize.js');
 
 const PAGE = 50; // a goal's tasks are drawn this many at a time
 import * as W from './goal_words.js';
@@ -487,7 +488,9 @@ function drawGoalPageRaw(col) {
     col.replaceChildren();
     const split = el('div', 'goal-split'); split.dataset.goal = String(g.id); split.dataset.task = String(model.taskId); split.classList.toggle('goal-split-column', model.screen === 'column');
     const main = el('div', 'goal-main'), side = el('aside', 'goal-side'); side.setAttribute('aria-label', `Tasks of ${g.title}`);
-    split.append(main, side); col.append(split);
+    const grip = el('div', 'goal-side-grip'); grip.setAttribute('role', 'separator'); grip.setAttribute('aria-orientation', 'vertical'); grip.setAttribute('aria-label', 'Resize the task list'); grip.tabIndex = 0; grip.title = 'Drag to resize, double click to reset';
+    split.append(main, side, grip); col.append(split);
+    attachDockResize(grip, { panel: side, row: split, key: 'coral-goal-side-width', apply: (w) => split.style.setProperty('--goal-side-w', w ? `${w}px` : '') }).restore();
     drawGoalSide(side, g);
     if (model.taskId) { showTaskInMain(main, g); return; }
     const h = drawGoalMain(main, g);

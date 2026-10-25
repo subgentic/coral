@@ -3,6 +3,7 @@
 import { isPhoneLayout } from './phone_layout.js';
 import { fitTerminal } from './xterm_renderer.js';
 import { makeDraggable } from './draggable.js';
+import { DOCK_MIN_WIDTH, dockMaxWidth } from './dock_resize.js';
 import { browserLocal } from './safe_storage.js';
 import { dockKey, dockOpenByDefault, onDockPage } from './dock_page.js';
 import { machineState } from './launch_server.js';
@@ -28,14 +29,8 @@ export function initSidebarResize() {
 
 /* Task bar drag-to-resize functionality */
 
-const AGENTIC_MIN_WIDTH = 280;
-const LEFT_COLUMN_MIN_WIDTH = 240;
-
-function maxAgenticWidth(row) {
-    const measured = row ? row.getBoundingClientRect().width : 0;
-    const available = measured > 0 ? measured : window.innerWidth;
-    return Math.max(AGENTIC_MIN_WIDTH, available - LEFT_COLUMN_MIN_WIDTH);
-}
+const AGENTIC_MIN_WIDTH = DOCK_MIN_WIDTH;
+const maxAgenticWidth = dockMaxWidth; // the limits are shared with a goal page's task column (dock_resize.js)
 
 export function initTaskBarResize() {
     const handle = document.getElementById("task-bar-resize-handle");
