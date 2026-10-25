@@ -9,6 +9,7 @@ import { loadLiveSessions } from './api.js';
 import { isHub, normServer, LOCAL_SERVER, noteBoardLabels } from './server_base.js';
 import { chooseBoard, retryPayload, isBoardNameExists } from './board_choice.js';
 import { serverLabel, launchBlockReason, postLaunch, waitForLaunched } from './launch_server.js';
+import { launchFlags } from './launch_flags.js';
 const { _loadServerSettings } = await importOnce('./launch_models.js');
 const { _showCLINotFoundModal } = await importOnce('./cli_dialogs.js');
 const { revealField } = await importOnce('./section_dialog.js');
@@ -22,25 +23,34 @@ function _syncMobileLaunchSections(step) {
     });
 }
 
-/** New Agent opens on the folder alone; the name, persona, agent, prompt, permissions and board sit behind "More options" (#5595). */
-export function setLaunchMore(open) {
-    const more = document.getElementById("launch-agent-more");
-    if (!more) return;
-    more.hidden = !open;
-    const options = document.getElementById("launch-more-options");
-    if (options && open) options.open = !isPhoneLayout(); // the persona and the sections are one closed "More options" on a phone (#7066); a wide window shows them as it always did
-    // New Agent is two steps (#6333): the folder, then everything else (the sections, always open there). CSS shows what belongs to the stage in data-stage.
+/** New Agent's three steps (#7391, UI/UX's v4): the folder (and the machine), the persona, the agent. `data-stage` on the step says which one, and CSS shows what belongs to it; the machine row above the dialog is only for the first. */
+export const LAUNCH_STAGES = ['folder', 'persona', 'agent'];
+const STAGE_NAMES = { folder: 'Where it launches', persona: 'Persona', agent: 'The agent' };
+export function setLaunchStage(stage) {
+    if (!LAUNCH_STAGES.includes(stage)) stage = 'folder';
     const step = document.getElementById("launch-step-agent");
-    if (step) step.dataset.stage = open ? "details" : "folder";
+    if (!step) return;
+    step.dataset.stage = stage;
+    const modal = document.getElementById("launch-modal");
+    if (modal) modal.dataset.agentStage = stage;
+    const n = LAUNCH_STAGES.indexOf(stage) + 1, dir = (document.getElementById("launch-dir")?.value || '').trim();
+    const sub = `Step ${n} of 3: ${STAGE_NAMES[stage]}${stage !== 'folder' && dir ? '. In ' + dir : ''}`;
+    const subEl = document.getElementById("launch-stage-sub");
+    if (subEl) { subEl.textContent = ''; if (stage !== 'folder' && dir) { subEl.append(`Step ${n} of 3: ${STAGE_NAMES[stage]}. In `); const b = document.createElement('b'); b.textContent = dir; subEl.append(b); } else subEl.textContent = sub; }
+    const back = document.getElementById("launch-agent-back"), next = document.getElementById("launch-agent-next"), go = document.getElementById("launch-agent-go");
+    if (back) back.hidden = stage === 'folder';
+    if (next) next.hidden = stage === 'agent';
+    if (go) go.hidden = !(stage === 'agent' || launchFlags.launchFromAnyStep);
+    const recap = document.getElementById("launch-recap");
+    if (recap) recap.hidden = stage === 'folder';
     const live = document.getElementById("launch-stage-live");
-    if (live && !open) live.textContent = ""; // closed or reopened on the folder: no stale "Step 2 of 2" from the last launch (#6376; _launchStage says the step it goes to after this)
-    const dir = document.getElementById("launch-dir"), shown = document.getElementById("launch-dir-summary-path");
-    if (open && dir && shown) shown.textContent = dir.value.trim();
-    const content = document.querySelector("#launch-modal .modal-content");
-    if (content) content.classList.toggle("launch-simple", !open && document.getElementById("launch-step-agent").style.display !== "none");
+    if (live) live.textContent = '';
+    return sub;
 }
-// A field that is about to take the focus (a rejected board name, say) opens "More options" when it sits inside (section_dialog.js revealField).
-document.addEventListener("sd-more-open", e => { if (e.target.id === "launch-agent-more") setLaunchMore(true); });
+/** The old name for "go to the agent's sections (true) or back to the folder (false)": a field that needs a section revealed opens step 3 (a rejected board name, a flag). */
+export function setLaunchMore(open) { setLaunchStage(open ? 'agent' : 'folder'); }
+// A field that is about to take the focus (a rejected board name, say) opens step 3 when it sits inside (section_dialog.js revealField).
+document.addEventListener("sd-more-open", e => { if (e.target.closest && e.target.closest("#launch-step-agent")) setLaunchStage('agent'); });
 
 function _showLaunchStep(step) {
     document.getElementById("launch-step-chooser").style.display = step === "chooser" ? "flex" : "none";
@@ -55,7 +65,7 @@ function _showLaunchStep(step) {
         content.classList.toggle("sd-modal-content", sectioned);
         content.classList.toggle("modal-content-wide", !sectioned);
         content.classList.toggle("launch-choosing", step === "chooser"); // four choices in a row (#3630)
-        content.classList.toggle("launch-simple", step === "agent" && document.getElementById("launch-agent-more")?.hidden === true);
+        content.classList.toggle("launch-wizard-content", step === "agent"); // one size for every step and tab of New Agent (#7391)
     }
     _syncMobileLaunchSections(step);
 }

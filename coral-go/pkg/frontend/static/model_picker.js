@@ -193,9 +193,10 @@ const LEVEL_NAMES = { low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Extra 
 
 /** The markup of the Thinking select (after the Model label's row). */
 export function thinkingPickerHtml() {
-    return `<label class="acf-thinking-wrap" hidden>Thinking <span style="color:var(--text-muted);font-weight:normal">(optional)</span>:`
+    // A div, not a label: New Agent draws the levels as a segmented control beside the select (segmented.js), buttons that a label would swallow (#7391).
+    return `<div class="acf-thinking-wrap" hidden><span class="acf-thinking-label" id="acf-thinking-label">Thinking <span style="color:var(--text-muted);font-weight:normal">(optional)</span></span>`
         + `<select class="acf-thinking" aria-label="Thinking level"></select>`
-        + `<span class="acf-thinking-note" role="status"></span><span class="acf-thinking-ran" role="status"></span></label>`;
+        + `<span class="acf-thinking-note" role="status"></span><span class="acf-thinking-ran" role="status"></span></div>`;
 }
 
 function thinkingParts(container) {

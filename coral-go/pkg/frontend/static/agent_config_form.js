@@ -9,6 +9,8 @@ const { modelPickerHtml, loadModelPicker, wireModelPicker, syncModelPicker, thin
 const { _renderPresetButtons } = await importOnce('./persona_store.js');
 const { presetEnforcement, launchedMode } = await importOnce('./preset_enforcement.js');
 const { initSectionDialog } = await importOnce('./section_dialog.js');
+const { segmentSelect } = await importOnce('./segmented.js');
+const { launchFlags } = await importOnce('./launch_flags.js');
 import { escapeHtml, escapeAttr } from './utils.js';
 
 // ── Permissions Editor ─────────────────────────────────────────────────
@@ -122,6 +124,11 @@ function _syncEnforcement(container) {
     if (denyNote) denyNote.textContent = e.denyEnforced ? '' : 'Not enforced by this agent';
     const patternsNote = container.querySelector('.perms-patterns-note');
     if (patternsNote) patternsNote.textContent = e.patternsEnforced ? '' : 'Not enforced by this agent';
+    if (container.querySelector('.acf-tools-details')) { // New Agent's closed disclosure says what is set inside it (#7391)
+        const n = type => container.querySelectorAll(`#${CSS.escape(uid)}-perms-${type} .perm-chip.active`).length;
+        const sum = container.querySelector('.acf-perms-summary');
+        if (sum) sum.textContent = `${n('allow')} allowed, ${n('deny')} denied`;
+    }
 }
 
 function _agentFamilyIsClaude(agentType) {
@@ -283,14 +290,23 @@ export function renderAgentConfigForm(containerId, opts = {}) {
         // Whatever the dialog asked to sit in a pane (opts.adopt: { paneId: element id }) is parked beside the container while the panes are rebuilt.
         const adopted = Object.entries(opts.adopt || {}).map(([paneId, id]) => [paneId, document.getElementById(id)]).filter(([, el]) => el);
         for (const [, el] of adopted) container.after(el);
-        container.innerHTML = [
+        if (opts.wizard) {
+            // New Agent's three steps (#7391): step 2 is the persona page (the prompt here, the persona and name adopted above it), step 3 is these three panes: the provider group adopted into Agent, the Mode as cards, the tool chips in a closed disclosure.
+            const toolsHTML = `<details class="acf-tools-details"><summary>Tool permissions <span class="acf-perms-summary settings-hint"></span></summary>${permEditorHTML(true)}</details>`;
+            container.innerHTML = [
+                `<div class="acf-persona-page" data-adopt="persona"><label class="launch-prompt-field"><span class="launch-field-head">Behavior prompt</span><textarea class="acf-prompt" rows="8" placeholder="Describe the agent's role and behavior...">${escapeHtml(promptVal)}</textarea></label></div>`,
+                pane('agent', 'Agent', 'smart_toy', '', topHTML),
+                pane('permissions', 'Permissions', 'lock', '', `${autoPermissionsHTML}${toolsHTML}`),
+                pane('advanced', 'Advanced', 'tune', '', `<label>Flags <span style="color:var(--text-muted);font-weight:normal">(optional)</span>:${flagsInput}</label>`),
+            ].join('');
+        } else container.innerHTML = [
             (showPreset || showName) ? pane('role', 'Role', 'badge', '', `${presetHTML}${nameHTML}`) : '',
             pane('agent', 'Agent', 'smart_toy', '', topHTML),
             pane('prompt', 'Prompt', 'description', '', `<textarea class="acf-prompt" rows="14" aria-label="Behavior prompt" placeholder="Describe the agent's role and behavior...">${escapeHtml(promptVal)}</textarea>`),
             pane('permissions', 'Permissions', 'lock', '', `${autoPermissionsHTML}${permEditorHTML(true)}`),
             pane('advanced', 'Advanced', 'tune', '', `<label>Flags <span style="color:var(--text-muted);font-weight:normal">(optional)</span>:${flagsInput}</label>`),
         ].join('');
-        for (const [paneId, el] of adopted) container.querySelector(`[data-section="${CSS.escape(paneId)}"]`)?.prepend(el);
+        for (const [paneId, el] of adopted) container.querySelector(`[data-section="${CSS.escape(paneId)}"], [data-adopt="${CSS.escape(paneId)}"]`)?.prepend(el);
     } else container.innerHTML = `
         ${presetHTML}
         ${nameHTML}
@@ -370,6 +386,13 @@ export function renderAgentConfigForm(containerId, opts = {}) {
         _syncACFModelField(container);
         _syncEnforcement(container);
     });
+    if (opts.wizard) { // the controls drawn over the selects (#7391): the thinking levels as segments, the Mode as cards (or the select, launch_flags.js)
+        const thinking = container.querySelector('.acf-thinking');
+        if (thinking) segmentSelect(thinking, { labelledby: 'acf-thinking-label' });
+        const mode = container.querySelector('.acf-permission-mode');
+        if (mode && launchFlags.modeCards) segmentSelect(mode, { label: 'Permission mode', cards: true, className: 'seg-modes' });
+        _syncEnforcement(container);
+    }
     if (opts.sections) { const shell = container.closest('.settings-shell'); if (shell) initSectionDialog(shell); } // the panes are in: build the section list
 }
 

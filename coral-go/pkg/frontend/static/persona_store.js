@@ -41,8 +41,11 @@ export function _renderPresetButtons(containerId, kind, opts = {}) {
     // The select names what a choice does (preset-pick, by kind): the agent dialog's preset, or an
     // agent config form's (with its target), never a function name in the markup.
     if (!PRESET_KINDS.has(kind)) throw new Error('unknown preset kind ' + kind);
-    let html = `<select class="agent-preset-select" data-on-change="preset-pick" data-kind="${escapeAttr(kind)}" data-target="${escapeAttr(target || '')}">`;
-    html += `<option value="" disabled selected>Choose a preset or custom...</option>`;
+    // New Agent's step 2 starts from a persona (#7391): Blank first, then the personas, and the select keeps showing the one chosen (data-keep).
+    const blank = !!opts.blankFirst;
+    const keepOpt = blank && container.querySelector('.agent-preset-select')?.value || '__blank__'; // a re-render (a persona was saved) keeps the choice
+    let html = `<select class="agent-preset-select"${opts.selectId ? ` id="${escapeAttr(opts.selectId)}"` : ''}${blank ? ' data-keep="1"' : ''} data-on-change="preset-pick" data-kind="${escapeAttr(kind)}" data-target="${escapeAttr(target || '')}">`;
+    html += blank ? `<option value="__blank__">Blank: no persona</option>` : `<option value="" disabled selected>Choose a preset or custom...</option>`;
     html += `<optgroup label="Built-in">`;
     for (const preset of AGENT_PRESETS) {
         html += `<option value="${escapeAttr(preset.name)}">${escapeHtml(preset.name)}</option>`;
@@ -55,9 +58,10 @@ export function _renderPresetButtons(containerId, kind, opts = {}) {
         }
         html += `</optgroup>`;
     }
-    html += `<option value="">Custom</option>`;
+    if (!blank) html += `<option value="">Custom</option>`;
     html += `</select>`;
     container.innerHTML = html;
+    if (blank) { const sel = container.querySelector('.agent-preset-select'); if ([...sel.options].some(o => o.value === keepOpt)) sel.value = keepOpt; }
 }
 
 /** Find a persona by name in built-in + saved lists. */

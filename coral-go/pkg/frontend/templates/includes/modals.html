@@ -74,25 +74,25 @@
                 </div>
             </div>
 
-            <!-- Step 2a: Agent form -->
-            <div id="launch-step-agent" class="launch-modal-step" style="display:none" data-stage="folder">
+            <!-- Step 2a: Agent form (#7391): three steps in one dialog that keeps its size: 1 Where it launches (the folder), 2 Persona, 3 The agent (tabs Agent, Permissions, Advanced) -->
+            <div id="launch-step-agent" class="launch-modal-step launch-wizard" style="display:none" data-stage="folder">
                 <div class="sd-step-header">
                     <h3 id="launch-agent-title">
                         <button class="launch-back-btn" data-on-click="m-select-launch-type" data-arg="back" title="Back" aria-label="Back to the choices">&larr;</button>
                         New agent
                     </h3>
+                    <p id="launch-stage-sub" class="sd-sub launch-stage-sub">Step 1 of 3: Where it launches</p>
                 </div>
                 <div class="settings-modal-body">
-                    <div class="sd-essentials">
-                    <label class="launch-dir-field">Working Directory:
-                        <div class="dir-input-row">
-                            <input type="text" id="launch-dir" placeholder="Choose a folder" data-coral-root="{{ .CoralRoot }}" value="">
-                            <button class="btn" id="btn-browse" data-on-click="m-toggle-browser" data-browser="launch-dir dir-browser browser-list browser-current-path">Browse</button>
-                        </div>
-                    </label>
-                    <div id="launch-dir-recents" class="launch-dir-recents"></div>
+                    <div class="launch-page launch-page-folder">
+                    <div class="launch-field-folder">
+                    <div class="launch-field-head"><label for="launch-dir" id="launch-dir-label">Folder</label> <span class="launch-required" id="launch-dir-required">Required</span></div>
+                    <div class="dir-input-row">
+                        <input type="text" id="launch-dir" placeholder="Choose a folder" aria-required="true" data-coral-root="{{ .CoralRoot }}" value="">
+                        <button class="btn" id="btn-browse" data-on-click="m-toggle-browser" data-browser="launch-dir dir-browser browser-list browser-current-path">Browse</button>
+                    </div>
+                    <div id="launch-dir-recents" class="launch-dir-recents" role="group" aria-label="Recent folders"></div>
                     <p id="launch-dir-hint" class="settings-hint launch-dir-hint" hidden></p>
-                    <div id="launch-dir-summary" class="launch-dir-summary"><span class="launch-dir-summary-label">Folder</span><code id="launch-dir-summary-path"></code><button type="button" class="btn btn-small btn-subtle" data-on-click="m-agent-step" data-arg="folder">Change</button></div>
                     <p id="launch-dir-note" class="settings-hint launch-dir-note" hidden>This is your home folder: the agent can change any file in it.</p>
                     <div id="dir-browser" class="dir-browser" style="display:none">
                         <div class="dir-browser-header">
@@ -104,81 +104,79 @@
                             <li class="empty-state">Loading...</li>
                         </ul>
                     </div>
-                    <table id="launch-agent-summary" class="launch-agent-summary" aria-label="What this agent will use">
-                        <tbody>
-                            <tr data-row="provider"><th scope="row">Provider</th><td class="las-value" colspan="2"><div id="launch-agent-pick" class="launch-agent-pick" role="radiogroup" aria-labelledby="launch-agent-pick-label" hidden><span id="launch-agent-pick-label" class="launch-agent-pick-label sr-only">Agent:</span></div></td></tr>
-                            <tr data-row="model"><th scope="row">Model</th><td class="las-value"></td><td class="las-act"><button type="button" class="btn btn-small btn-subtle las-change" data-on-click="launch-agent-section" data-arg="Agent" aria-label="Change the model">Change</button></td></tr>
-                            <tr data-row="thinking"><th scope="row">Thinking</th><td class="las-value"></td><td class="las-act"><button type="button" class="btn btn-small btn-subtle las-change" data-on-click="launch-agent-section" data-arg="Agent" aria-label="Change the thinking level">Change</button></td></tr>
-                            <tr data-row="mode"><th scope="row">Mode</th><td class="las-value"></td><td class="las-act"><button type="button" class="btn btn-small btn-subtle las-change" data-on-click="launch-agent-section" data-arg="Permissions" aria-label="Change the mode">Change</button></td></tr>
-                        </tbody>
-                    </table>
-                    <p id="launch-codex-note" class="settings-hint launch-codex-note" hidden>Codex will ask you to trust Coral's hooks on this computer. Answer it in the chat.</p>
                     </div>
-                    <div id="launch-cli-slot" class="launch-cli-slot"></div>
-                    <div id="launch-tmux-slot" class="launch-cli-slot"></div>
-                    <div class="sd-essentials launch-agent-name">
-                <label>Name / Role <span class="text-muted-sm">(optional)</span>:
-                    <input type="text" id="launch-agent-name-input" placeholder="e.g. QA Engineer, Frontend Dev">
-                </label>
+                    <p class="settings-hint launch-next-line">Next: who the agent is, then which model and how much it may do. Everything after the folder has a default.</p>
                     </div>
-                    <div id="launch-agent-more" class="sd-more" data-sd-more hidden>
-                    <details id="launch-more-options" class="launch-more-options" open><summary>More options</summary>
-                    <div class="settings-shell">
-                        <nav class="settings-nav" aria-label="New agent sections">
-                            <div class="settings-group-pick"><select class="settings-select" aria-label="New agent section"></select></div>
-                            <div class="settings-tabs" role="tablist" aria-orientation="vertical" aria-label="New agent sections"></div>
-                        </nav>
-                        <div class="settings-panes">
-                        <section class="settings-pane" data-section="workspace" data-title="Persona" data-icon="badge" hidden>
-                <label>Persona <span class="text-muted-sm">(optional)</span>:
-                    <div id="agent-preset-selector" class="agent-preset-selector"></div>
-                </label>
-                        <div class="import-export-row agent-persona-actions">
-                            <button class="btn btn-small btn-subtle" id="agent-save-persona-btn" data-on-click="m-save-current-persona" title="Save as reusable persona">Save Persona</button>
+                    <div class="launch-page-agent">
+                    <div id="launch-persona-top" class="launch-persona-top">
+                        <div class="launch-field-head"><label for="launch-persona-select">Start from a persona</label> <span class="launch-optional">optional</span></div>
+                        <div class="launch-persona-row">
+                            <div id="agent-preset-selector" class="agent-preset-selector"></div>
+                            <button class="btn" id="agent-save-persona-btn" data-on-click="m-save-current-persona" title="Save what is on this page as a reusable persona">Save as persona</button>
                             <details class="persona-files">
-                                <summary>Export or import</summary>
+                                <summary class="btn">Persona files</summary>
                                 <div class="persona-files-row">
                                     <button class="btn btn-small btn-subtle" data-on-click="m-export-personas" title="Export saved personas">Export</button>
                                     <button class="btn btn-small btn-subtle" data-on-click="m-import-personas" title="Import personas from file">Import</button>
                                 </div>
                             </details>
                         </div>
-                        </section>
-                        <div id="launch-agent-acf" class="sd-acf"></div>
-                        <div id="launch-advanced-extra" class="sd-extra">
-                        <label>Message Board <span class="text-muted-sm">(optional)</span>:
-                            <select id="launch-board-select" data-on-change="m-on-agent-board-change">
-                                <option value="">None</option>
-                                <option value="__new__">Create new board...</option>
-                            </select>
-                        </label>
-                        <div id="launch-new-board-row" style="display:none">
-                            <label>Board Name:
-                                <input type="text" id="launch-board-name" placeholder="e.g. auth-feature, sprint-42" maxlength="64" pattern="[A-Za-z0-9][A-Za-z0-9_\-]{0,63}" title="Letters, digits, - and _">
-                            </label>
-                        </div>
-                        <div id="launch-board-server-row" style="display:none">
-                            <label>Remote Server <span class="text-muted-sm">(optional)</span>:
-                                <input type="text" id="launch-board-server" placeholder="e.g. http://remote-machine:8420">
-                            </label>
-                        </div>
-                        <label style="display:none">Backend:
-                            <select id="launch-backend">
-                                <option value="tmux">tmux</option>
-                                <option value="pty">PTY</option>
-                            </select>
-                        </label>
-                        </div>
+                        <p class="settings-hint">A persona fills the name and the prompt below, and may set the provider, model and permissions on the next step.</p>
+                        <div class="launch-field-head"><label for="launch-agent-name-input">Name</label> <span class="launch-optional">optional</span></div>
+                        <input type="text" id="launch-agent-name-input" placeholder="e.g. QA Engineer, Frontend Dev" aria-describedby="launch-name-help">
+                        <p class="settings-hint" id="launch-name-help">Choose a persona above and its name goes here, or type your own.</p>
+                    </div>
+                    <div id="launch-agent-provider" class="launch-agent-provider">
+                        <div class="launch-field-head"><span id="launch-agent-pick-label">Provider</span></div>
+                        <div id="launch-agent-pick" class="launch-agent-pick" role="radiogroup" aria-labelledby="launch-agent-pick-label" hidden></div>
+                        <div class="launch-note-slot" id="launch-note-slot">
+                            <p id="launch-codex-note" class="settings-hint launch-codex-note" hidden>Codex will ask you to trust Coral's hooks on this computer. Answer it in the chat.</p>
+                            <div id="launch-cli-slot" class="launch-cli-slot"></div>
+                            <div id="launch-tmux-slot" class="launch-cli-slot"></div>
                         </div>
                     </div>
-                    </details>
+                    <div class="settings-shell launch-shell">
+                        <nav class="settings-nav" aria-label="New agent sections">
+                            <div class="settings-group-pick"><select class="settings-select" aria-label="New agent section"></select></div>
+                            <div class="settings-tabs" role="tablist" aria-orientation="vertical" aria-label="New agent sections"></div>
+                        </nav>
+                        <div class="settings-panes">
+                            <div id="launch-agent-acf" class="sd-acf"></div>
+                            <div id="launch-advanced-extra" class="sd-extra">
+                            <label>Message Board <span class="text-muted-sm">(optional)</span>:
+                                <select id="launch-board-select" data-on-change="m-on-agent-board-change">
+                                    <option value="">None</option>
+                                    <option value="__new__">Create new board...</option>
+                                </select>
+                            </label>
+                            <div id="launch-new-board-row" style="display:none">
+                                <label>Board Name:
+                                    <input type="text" id="launch-board-name" placeholder="e.g. auth-feature, sprint-42" maxlength="64" pattern="[A-Za-z0-9][A-Za-z0-9_\-]{0,63}" title="Letters, digits, - and _">
+                                </label>
+                            </div>
+                            <div id="launch-board-server-row" style="display:none">
+                                <label>Remote Server <span class="text-muted-sm">(optional)</span>:
+                                    <input type="text" id="launch-board-server" placeholder="e.g. http://remote-machine:8420">
+                                </label>
+                            </div>
+                            <label style="display:none">Backend:
+                                <select id="launch-backend">
+                                    <option value="tmux">tmux</option>
+                                    <option value="pty">PTY</option>
+                                </select>
+                            </label>
+                            </div>
+                        </div>
+                    </div>
                     </div>
                 </div>
+                <p id="launch-recap" class="launch-recap" role="region" aria-label="What this agent will use"></p>
                 <div class="modal-actions">
-                    <button class="btn" id="launch-agent-back" data-on-click="m-agent-step" data-arg="folder">Back</button>
                     <button class="btn" id="launch-agent-cancel" data-on-click="m-hide-launch-modal">Cancel</button>
-                    <button class="btn btn-primary" id="launch-agent-next" data-on-click="m-agent-step" data-arg="details">Next</button>
+                    <button class="btn" id="launch-agent-back" data-on-click="m-agent-step" data-arg="back">Back</button>
+                    <button class="btn btn-primary" id="launch-agent-next" data-on-click="m-agent-step" data-arg="next">Next</button>
                     <button class="btn btn-primary" id="launch-agent-go" data-on-click="m-launch-session">Launch</button>
+                    <span id="launch-folder-reason" class="sr-only">Choose a folder first</span>
                     <p id="launch-stage-live" class="sr-only" role="status"></p>
                 </div>
             </div>
