@@ -1,10 +1,11 @@
-/* "Coral now requires sign-in" (#3939). With strict local auth a dashboard tab with no sign-in session (an old tab, a bookmark opened before the
- * switch, a session that ended) gets 401 from /api. Instead of broken views and silent failures, the page shows one modal panel that
- * says how to get in, and every poller and the live feed wait until a call succeeds. A 401 that is not "signed out" (an agent-only route, an identity
+/* A dashboard tab with no sign-in session (#3939). With strict local auth an old tab, a bookmark opened before the switch or a session that ended
+ * gets 401 from /api. Instead of broken views and silent failures, every poller and the live feed stop and the page goes to the /auth sign-in page,
+ * which returns here once signed in (#7398; it was a "Coral now requires sign-in" dialog). A 401 that is not "signed out" (an agent-only route, an identity
  * refusal) is not handled here: see isSignedOut401 in auth_redirect.js. The Coral Hub has its own sign-in (cloud.js). */
 
 import { state } from './state.js';
 import { setSignedOut, isSignedOut } from './overload.js';
+import { showToast } from './notifications.js';
 
 /** The /auth URL for the current page: return_to is this page's own path (same origin). */
 export function authUrlFor(loc) {
@@ -12,73 +13,44 @@ export function authUrlFor(loc) {
     return '/auth?return_to=' + encodeURIComponent(back.startsWith('/') && !back.startsWith('//') ? back : '/');
 }
 
-let _dialog = null;
 let _checking = false;
+let _waiting = null; // the toast that says nothing answers, while that is so
+let _retry = 0;
 
-function el(tag, props = {}, ...kids) {
-    const n = document.createElement(tag);
-    for (const [k, v] of Object.entries(props)) { if (k === 'text') n.textContent = v; else n.setAttribute(k, v); }
-    n.append(...kids);
-    return n;
-}
-
-/** One call to an authenticated route: signed in again when it answers 2xx. */
-async function stillSignedOut() {
+/** One call to an authenticated route: 'out' when it answers 401, 'in' when it answers anything else, 'unreachable' when nothing answers. */
+async function probeSession() {
     try {
         const r = await fetch('/api/settings', { cache: 'no-store', credentials: 'same-origin' });
-        return r.status === 401;
-    } catch { return true; } // unreachable: not signed in, as far as this page can tell
+        return r.status === 401 ? 'out' : 'in';
+    } catch { return 'unreachable'; }
 }
 
-/** Try again (the button, or the tab coming back to the front after the sign-in): signed in -> reload the page, which restores the view. */
-async function retrySignIn({ quiet = false } = {}) {
+/** Decide what the 401 meant: no session -> the sign-in page, which returns here after sign-in; a false 401 (the session is fine) -> reload the page, which restores the view (#6233);
+ *  no answer at all -> stay paused, say so in a line, and ask again every few seconds. */
+async function settle(win) {
     if (_checking || !isSignedOut()) return false;
     _checking = true;
-    const status = _dialog && _dialog.querySelector('#signed-out-status');
-    if (status && !quiet) status.textContent = 'Checking…';
     try {
-        if (await stillSignedOut()) {
-            if (status && !quiet) status.textContent = 'Still not signed in.';
+        const seen = await probeSession();
+        if (seen === 'unreachable') {
+            if (!_waiting || !_waiting.isConnected) _waiting = showToast('Coral is not answering. Trying again…', true, Infinity);
+            if (!_retry) _retry = setTimeout(() => { _retry = 0; settle(win); }, 3000);
             return false;
         }
-        location.reload();
+        if (_waiting) _waiting.remove();
+        if (seen === 'out') win.location.replace(authUrlFor(win.location));
+        else win.location.reload();
         return true;
     } finally { _checking = false; }
 }
 
-export function recheckSignedOut() { return retrySignIn({ quiet: true }); }
+export function recheckSignedOut(win = window) { return settle(win); }
 
-function show() {
-    if (_dialog) return;
-    const dlg = el('dialog', { id: 'signed-out-panel', class: 'signed-out-panel', 'aria-labelledby': 'signed-out-title', 'aria-describedby': 'signed-out-text' },
-        el('h2', { id: 'signed-out-title', text: 'Coral now requires sign-in' }),
-        el('p', { id: 'signed-out-text' }, 'This page has no sign-in session, so it cannot load your agents. Open Coral from the Coral app or the tray menu (they sign you in), or run ',
-            el('code', { text: 'coral open' }), ' in a terminal on this computer, then press Try again.'),
-        el('p', { class: 'signed-out-note', text: 'The agent list and the other views are paused until you are signed in.' }),
-        el('div', { class: 'signed-out-actions' },
-            el('button', { type: 'button', id: 'signed-out-retry', class: 'btn btn-primary', text: 'Try again' }),
-            el('a', { id: 'signed-out-help', class: 'btn', href: authUrlFor(location), text: 'How to sign in' })),
-        el('p', { id: 'signed-out-status', class: 'signed-out-status', role: 'status' }));
-    // Not dismissable: there is nothing to do on the page until the sign-in is back.
-    dlg.addEventListener('cancel', e => e.preventDefault());
-    dlg.querySelector('#signed-out-retry').addEventListener('click', () => retrySignIn());
-    document.body.appendChild(dlg);
-    _dialog = dlg;
-    try { dlg.showModal(); } catch { dlg.setAttribute('open', ''); }
-    dlg.querySelector('#signed-out-retry').focus();
-}
-
-/** The page is signed out: show the panel once and pause the pollers and the live feed. */
+/** The page is signed out: pause the pollers and the live feed, then go to the sign-in page (no dialog in between, #7398). */
 export function enterSignedOut(win = window) {
     if (isSignedOut() || win.location.pathname.startsWith('/auth')) return;
     setSignedOut(true);
     document.dispatchEvent(new CustomEvent('coral:signed-out')); // the terminal socket closes itself
     try { if (state.coralWs) state.coralWs.close(); } catch { /* already closed */ }
-    show();
-}
-
-// Coming back to this tab after running `coral open` or signing in elsewhere: check quietly, and reload if it worked.
-if (typeof document !== 'undefined') {
-    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') retrySignIn({ quiet: true }); });
-    window.addEventListener('focus', () => { retrySignIn({ quiet: true }); });
+    settle(win);
 }

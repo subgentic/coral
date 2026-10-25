@@ -1,8 +1,7 @@
-// A dashboard with no sign-in session (#3418, #3939; strict mode): an /api call answering 401 dashboard_auth_required shows the
-// "Coral now requires sign-in" panel (a modal dialog: how to get in, a link to the /auth explanation, Try again), once, and every poller
-// and the live feed wait until a call succeeds. Try again while still refused keeps the panel; once signed in it reloads the page and
-// the view is back. A 401 that is not "signed out" (an agent-only route's session_token_required) and a 401 from another origin change
-// nothing.
+// A dashboard with no sign-in session (#3418, #3939; strict mode): an /api call answering 401 dashboard_auth_required stops every poller and the live feed
+// and goes to the /auth sign-in page, keeping the page it was on so sign-in returns there (#7398: it was a "Coral now requires sign-in" dialog). A 401 that
+// is not "signed out" (an agent-only route's session_token_required) and a 401 from another origin change nothing, and a false 401 (the session is fine)
+// reloads the page instead.
 //
 // Expects CORAL_TEST_URL + CDP_PORT from the runner. Drives Chrome over CDP (chrome-remote-interface). Exit 0 / 1.
 const assert = require('node:assert/strict');
@@ -22,7 +21,7 @@ const BASE = require('./test_base').BASE;
     try {
         await Promise.all([Page.enable(), Runtime.enable()]);
         // /api/qa-locked answers like strict mode; /api/qa-agent-only is an agent-only route's own 401; while sessionStorage 'qa-locked' is '1',
-        // the authenticated probe /api/settings is refused too (sessionStorage so the state survives the reload the panel does).
+        // the authenticated probe /api/settings is refused too (sessionStorage so the state survives the navigation).
         await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { const real = window.fetch.bind(window);
             const json = (b, s) => Promise.resolve(new Response(JSON.stringify(b), { status: s, headers: { 'Content-Type': 'application/json' } }));
             window.__api = 0; window.__inflight = 0;
@@ -34,6 +33,7 @@ const BASE = require('./test_base').BASE;
             window.fetch = (u, o) => {
                 const s = String(u);
                 if (s.includes('/api/qa-locked')) return json({ error: 'sign in', code: 'dashboard_auth_required' }, 401);
+                if (s.includes('/api/settings') && sessionStorage.getItem('qa-offline') === '1') return Promise.reject(new TypeError('offline'));
                 if (s.includes('/api/qa-agent-only')) return json({ error: 'session_token_required', message: 'agents only' }, 401);
                 if (s.includes('/api/') && sessionStorage.getItem('qa-locked') === '1' && s.includes('/api/settings')) return json({ error: 'sign in', code: 'dashboard_auth_required' }, 401);
                 if (s.startsWith('/api/') || s.startsWith(location.origin + '/api/')) {
@@ -61,25 +61,18 @@ const BASE = require('./test_base').BASE;
         assert.equal(await ev(`!!document.getElementById('signed-out-panel')`), false, 'no panel for a 401 that is not signed out');
         console.log('   ✓ no panel');
 
-        console.log('2. A signed-out 401 shows the panel once, as a modal, and says how to get in');
-        await ev(`sessionStorage.setItem('qa-locked', '1'); fetch('/api/qa-locked'); fetch('/api/qa-locked'); true`);
-        await waitFor(`!!document.getElementById('signed-out-panel') && document.getElementById('signed-out-panel').open`, 'the sign-in panel', { timeout: 8000 });
-        assert.equal(await ev(`document.querySelectorAll('#signed-out-panel').length`), 1, 'one panel for several 401s');
-        const p = await ev(`(() => { const d = document.getElementById('signed-out-panel'); return { modal: d.matches(':modal'), title: d.querySelector('#signed-out-title').textContent, text: d.querySelector('#signed-out-text').textContent,
-            help: d.querySelector('#signed-out-help').getAttribute('href'), focus: document.activeElement && document.activeElement.id, labelled: d.getAttribute('aria-labelledby') }; })()`);
-        assert.equal(p.title, 'Coral now requires sign-in');
-        assert.match(p.text, /coral open/); assert.match(p.text, /app or the tray/);
-        assert.equal(p.help, '/auth?return_to=' + encodeURIComponent(here), 'the help link is the /auth explanation, returning to this page');
-        assert.equal(p.modal, true, 'a modal dialog (the page behind it cannot be used)'); assert.equal(p.focus, 'signed-out-retry', 'focus on Try again');
-        assert.equal(await ev(`window.location.pathname`), '/chats', 'no redirect: the page stays where it is');
-        console.log('   ✓ modal panel, focus on Try again, help link ' + p.help);
-
+        console.log('2. A signed-out 401 stops the page; when nothing answers the check, it stays where it is and waits');
+        // The check asks /api/settings whether the session is really gone; here it gets no answer (sessionStorage 'qa-offline'), so the page neither guesses nor leaves.
+        await ev(`sessionStorage.setItem('qa-offline', '1'); window.__marker = 'here'; fetch('/api/qa-locked'); fetch('/api/qa-locked'); true`);
+        await waitFor(`(async () => (await import(${S} + 'overload.js')).isSignedOut())()`, 'the page signed out', { timeout: 8000 });
+        assert.equal(await ev(`!!document.getElementById('signed-out-panel') || !!document.querySelector('dialog[open]')`), false, 'no dialog');
+        await waitFor(`[...document.querySelectorAll('.toast')].some(t => t.textContent.includes('Coral is not answering. Trying again'))`, 'the line that says nothing answers', { timeout: 8000 });
+        assert.equal(await ev(`document.querySelectorAll('.toast').length`), 1, 'one such line, however many times the check is asked');
         console.log('3. Every poller and the live feed wait');
         // Wait until no /api request is in flight before taking the baseline, so a poll already
-        // dispatched when the panel opened doesn't land mid-measurement (#3939 flake: 23 vs 22).
+        // dispatched when the page stopped doesn't land mid-measurement (#3939 flake: 23 vs 22).
         await waitFor(`(window.__inflight || 0) === 0`, 'no /api request in flight before the baseline', { timeout: 5000 });
         const ticks = await ev(`window.__ticks`);
-        const feed = await ev(`(() => { const T = window.T; return null; })()`);
         const sock = await ev(`(async () => { const st = (await import(${S} + 'state.js')).state; window.__sock = st.coralWs; return st.coralWs ? st.coralWs.readyState : -1; })()`);
         await sleep(2500); // sleep-ok: proves a negative, the 100 ms poller does not tick while signed out
         assert.equal(await ev(`window.__ticks`), ticks, 'a poller (100 ms) did not tick for 2.5 s while signed out');
@@ -95,24 +88,38 @@ const BASE = require('./test_base').BASE;
         assert.equal(await ev(`window.__termWs`), term, 'no new terminal socket while signed out');
         assert.equal(await ev(`window.connectTerminalWs('qa-term', 'terminal', 'qa-term-sid', 'local') === undefined && window.__termWs`), term, 'and a new connect call does nothing');
         console.log(`   ✓ ${term} terminal sockets before, none after`);
+        assert.equal(await ev(`window.__marker + ' ' + location.pathname + location.search`), 'here /chats?q=battle', 'and the page never left while nothing answered the check');
 
-        console.log('4. Try again while still refused keeps the panel and says so');
-        await ev(`document.getElementById('signed-out-retry').click(); true`);
-        await waitFor(`document.getElementById('signed-out-status').textContent === 'Still not signed in.'`, 'the still-refused message', { timeout: 5000 });
-        assert.equal(await ev(`document.getElementById('signed-out-panel').open`), true);
-        console.log('   ✓ panel stays: "Still not signed in."');
+        console.log('3c. When Coral answers again, the check is asked again by itself: the sign-in page, and the line is gone');
+        await ev(`sessionStorage.removeItem('qa-offline'); sessionStorage.setItem('qa-locked', '1'); true`);
+        await waitFor(`location.pathname === '/auth' && document.readyState === 'complete' && document.documentElement.dataset.authReady === 'true'`, 'the sign-in page once Coral answers', { timeout: 15000 });
+        console.log('   ✓ asked again, landed on ' + (await ev(`location.pathname`)));
 
-        console.log('5. Signed in again: Try again reloads the page and the view is back, no panel, pollers running');
+        console.log('4. For real: a signed-out 401 lands on the sign-in page, which returns to the page it came from');
+        await ev(`sessionStorage.removeItem('qa-offline'); sessionStorage.removeItem('qa-locked'); true`);
+        await Page.navigate({ url: BASE + '/chats?q=other#top' }); await Page.loadEventFired(); await coralReady();
+        const authNavs = []; client.Page.frameNavigated(e => { if (!e.frame.parentId && new URL(e.frame.url).pathname === '/auth') authNavs.push(e.frame.url); });
+        const placeBefore = await ev(`location.pathname + location.search + location.hash`); // the page's own place when the 401 comes (its router may tidy the address)
+        await ev(`sessionStorage.setItem('qa-locked', '1'); fetch('/api/qa-locked'); fetch('/api/qa-locked'); true`);
+        await waitFor(`location.pathname === '/auth' && document.readyState === 'complete' && document.documentElement.dataset.authReady === 'true'`, 'the sign-in page', { timeout: 15000 });
+        const auth = await ev(`({ href: location.pathname + location.search, form: !!document.getElementById('submit'), dialog: !!document.querySelector('dialog[open], #signed-out-panel'), text: document.body.innerText })`);
+        assert.equal(auth.href, '/auth?return_to=' + encodeURIComponent(placeBefore), 'the sign-in page, returning to the page and its place');
+        assert.equal(auth.form, true, 'it is the sign-in (or create-password) form'); assert.equal(auth.dialog, false, 'no dialog over it');
+        assert.match(auth.text, /Sign in|Create a password/, 'a page with a way in (the strict page also says the app, the tray and coral open sign in by themselves: internal/auth\'s signin golden)');
+        await sleep(1500); // sleep-ok: proves a negative, two 401s and the live feed's retries land on the sign-in page once
+        assert.equal(authNavs.length, 1, 'one navigation to the sign-in page: ' + JSON.stringify(authNavs));
+        console.log('   ✓ ' + auth.href);
+
+        console.log('5. A false 401 (the session is fine) reloads the page instead');
         await ev(`sessionStorage.removeItem('qa-locked'); true`);
-        const reloaded = Page.loadEventFired();
-        await ev(`document.getElementById('signed-out-retry').click(); true`);
-        await reloaded;
+        await Page.navigate({ url: BASE + '/chats?q=battle' }); await Page.loadEventFired(); await coralReady();
+        await ev(`window.__marker = 1; fetch('/api/qa-locked'); true`);
+        await waitFor(`window.__marker !== 1`, 'the page reloading', { timeout: 15000 });
         await coralReady();
-        assert.equal(await ev(`!!document.getElementById('signed-out-panel')`), false, 'no panel after the reload');
-        assert.equal(await ev(`location.pathname + location.search`), '/chats?q=battle', 'the same page');
+        assert.equal(await ev(`location.pathname + location.search`), '/chats?q=battle', 'the same page, not the sign-in page');
         assert.equal(await ev(`(async () => { const o = await import(${S} + 'overload.js'); return o.isSignedOut(); })()`), false, 'pollers are not paused');
-        console.log('   ✓ reloaded on the same page, no panel');
-        console.log('\nAll sign-in panel checks passed');
+        console.log('   ✓ reloaded on the same page');
+        console.log('\nAll sign-in redirect checks passed');
     } finally {
         await client.close();
     }

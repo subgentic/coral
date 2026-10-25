@@ -31,20 +31,17 @@ const BASE = require('./test_base').BASE;
         assert.ok(await ev('window.__wsTries >= 3'), 'the feed was attempted three times: two thrown, one connected');
         await Page.removeScriptToEvaluateOnNewDocument({ identifier: wsBreak.identifier });
 
-        console.log('C. a false sign-out recovers on the retry tick; a real one keeps the panel');
+        console.log('C. a false sign-out reloads the page; a real one goes to the sign-in page');
         await load();
         await waitFor(feedReady, 'the feed ready');
         await ev(`window.__marker = 1; import((window.__coralStatic || '/static/') + 'signed_out.js').then(m => m.enterSignedOut()); true`);
-        await waitFor(`!!document.getElementById('signed-out-panel')`, 'the signed-out panel');
         await waitFor('window.__marker !== 1', 'the page to reload once the sign-in is found to be fine', 15000);
         await waitFor(feedReady, 'the feed ready again', 15000);
 
         await ev(`window.__marker = 1; const real = window.fetch; window.fetch = (u, o) => String(u).includes('/api/settings') ? Promise.resolve(new Response('{}', { status: 401 })) : real(u, o);
             import((window.__coralStatic || '/static/') + 'signed_out.js').then(m => m.enterSignedOut()); true`);
-        await waitFor(`!!document.getElementById('signed-out-panel')`, 'the signed-out panel (a real sign-out)');
-        await sleep(7000); // sleep-ok: absence has no event to wait for: a real sign-out must NOT reload the page, so the test waits past the early live-feed retry ticks and then checks nothing happened
-        assert.equal(await ev('window.__marker'), 1, 'a real sign-out does not reload the page');
-        assert.ok(await ev(`!!document.getElementById('signed-out-panel')`), 'and keeps its panel');
+        await waitFor(`location.pathname === '/auth' && document.readyState === 'complete'`, 'the sign-in page (a real sign-out)', 15000);
+        assert.ok(await ev(`window.__marker !== 1 && location.search.startsWith('?return_to=')`), 'a real sign-out leaves the page for the sign-in page, which returns to it');
         console.log('PASS the live feed always starts and retries');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
