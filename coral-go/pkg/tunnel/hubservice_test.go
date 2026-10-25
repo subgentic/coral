@@ -31,8 +31,10 @@ func TestTheServiceRouteIsExactlyTheGoalLinksRead(t *testing.T) {
 		assert.Equal(t, tc.want, IsServiceRoute(tc.method, tc.path), "%s %s", tc.method, tc.path)
 	}
 	assert.False(t, IsOwnerRoute(http.MethodGet, "/api/goal-links"), "a service route is not an owner route: it never gets the owner marker")
-	tier := Classify(http.MethodGet, "/api/goal-links", "")
-	assert.NotEqual(t, TierNever, tier, "the connector forwards it; the machine decides who may read")
+	assert.Equal(t, TierNever, Classify(http.MethodGet, "/api/goal-links", ""), "a user is never classified onto it: the census says never, at every tier (#7411)")
+	assert.Equal(t, TierView, ClassifyService(http.MethodGet, "/api/goal-links", "request_id=a"), "the Hub's own service stream has the table's tier and query rules")
+	assert.Equal(t, TierNever, ClassifyService(http.MethodGet, "/api/goal-links", "request_id=a&x=1"), "and not a query the route does not read")
+	assert.Equal(t, TierNever, ClassifyService(http.MethodGet, "/api/health", ""), "a service stream is classified on a service route and nowhere else")
 }
 
 func TestStampServiceOnlyForAServiceStreamOnTheServiceRoute(t *testing.T) {

@@ -62,8 +62,8 @@ func TestAcceptEncodingIsDroppedOnEveryRoute(t *testing.T) {
 	gzipOnly := http.Header{"Accept-Encoding": {"gzip, deflate, br"}}
 	checked := 0
 	for _, r := range routeTable {
-		if r.tier == TierNever {
-			continue
+		if r.tier == TierNever || r.service {
+			continue // a service route takes only the Hub service's stream (hubservice_test.go and goal_links_connector_test.go drive it)
 		}
 		path := concretePath(r.pattern)
 		key := r.method + " " + path

@@ -636,7 +636,28 @@ func Classify(method, decodedPath, rawQuery string) Tier {
 	}
 	for _, r := range routeTable {
 		if methodMatches(r.method, method) && matchSegments(r.pattern, segs) {
-			if r.tier == TierNever || !queryOK(r, rawQuery) {
+			if r.service || r.tier == TierNever || !queryOK(r, rawQuery) {
+				return TierNever // a service route is never a user's, at any tier (hubservice.go): ClassifyService is the Hub's own service stream's
+			}
+			return r.tier
+		}
+	}
+	return TierNever
+}
+
+// ClassifyService is Classify for the Hub's own service stream (hubservice.go): the tier of a service route, and TierNever for any other route or a query the route's table refuses. It is
+// only ever asked for a stream that carries the service stamp; a user is never classified by it.
+func ClassifyService(method, decodedPath, rawQuery string) Tier {
+	if method == http.MethodHead {
+		method = http.MethodGet
+	}
+	segs, ok := splitSegments(decodedPath)
+	if !ok {
+		return TierNever
+	}
+	for _, r := range routeTable {
+		if methodMatches(r.method, method) && matchSegments(r.pattern, segs) {
+			if !r.service || r.tier == TierNever || !queryOK(r, rawQuery) {
 				return TierNever
 			}
 			return r.tier

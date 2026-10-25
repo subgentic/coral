@@ -11,5 +11,6 @@ var shapeSegment = strings.Repeat("0", 64)
 // writes routes_query.go. The generator lists query parameters only for such routes, so the
 // table holds no entry for a route the tunnel refuses (#3942).
 func ShapeAllowed(method, shape string) bool {
-	return Classify(method, strings.ReplaceAll(shape, "{}", shapeSegment), "") != TierNever
+	path := strings.ReplaceAll(shape, "{}", shapeSegment)
+	return Classify(method, path, "") != TierNever || ClassifyService(method, path, "") != TierNever // a service route (hubservice.go) is the Hub service's: it keeps its query parameters in the table
 }
