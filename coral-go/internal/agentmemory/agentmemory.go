@@ -54,7 +54,11 @@ type File struct {
 	Modified time.Time
 	Size     int64
 	Problem  string
-	dir      string // the folder, resolved
+	// LinkTo is the file a link in the folder points at ("CLAUDE.md" for an AGENTS.md that is a link to it, a path below the folder): set only for a link whose target is inside the same folder. The row then
+	// shows that file's size and time, and reading it reads that file.
+	LinkTo string
+	dir    string // the folder, resolved
+	rel    string // what is read, below dir: Name, or LinkTo for a followed link
 }
 
 // Content is a file read as text.
@@ -217,14 +221,40 @@ func stat(dir, name, kind, level, home string) (File, bool) {
 	if err != nil {
 		return File{}, false
 	}
-	f := File{Name: name, Kind: kind, Level: level, Where: where(root.Dir(), home), dir: root.Dir(), Modified: fi.ModTime().UTC(), Size: fi.Size()}
-	switch {
-	case fi.Mode()&os.ModeSymlink != 0:
-		f.Problem = ProblemLink
-	case !fi.Mode().IsRegular():
+	f := File{Name: name, Kind: kind, Level: level, Where: where(root.Dir(), home), dir: root.Dir(), rel: name, Modified: fi.ModTime().UTC(), Size: fi.Size()}
+	if fi.Mode()&os.ModeSymlink != 0 {
+		// A link is followed only when its target resolves to a regular file inside this same folder (AGENTS.md pointing at CLAUDE.md is the usual one); a dangling link, one that leaves the folder and
+		// one that points at a folder or a pipe stay listed with their problem and are never read.
+		rel, ok := linkTarget(root.Dir(), name)
+		if !ok {
+			f.Problem = ProblemLink
+			return f, true
+		}
+		tfi, err := root.Lstat(rel)
+		if err != nil || !tfi.Mode().IsRegular() {
+			f.Problem = ProblemLink
+			return f, true
+		}
+		f.LinkTo, f.rel, f.Modified, f.Size = filepath.ToSlash(rel), rel, tfi.ModTime().UTC(), tfi.Size()
+		return f, true
+	}
+	if !fi.Mode().IsRegular() {
 		f.Problem = ProblemNotRegular
 	}
 	return f, true
+}
+
+// linkTarget is where the link dir/name leads, as a path below dir, when every link on the way resolves inside dir: false for a dangling link and for one that ends outside it.
+func linkTarget(dir, name string) (string, bool) {
+	real, err := filepath.EvalSymlinks(filepath.Join(dir, name))
+	if err != nil {
+		return "", false
+	}
+	rel, err := filepath.Rel(dir, real)
+	if err != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
+		return "", false
+	}
+	return rel, true
 }
 
 // Read reads f as text: at most MaxRead bytes (a bigger file is cut and says so), a regular file opened through its folder held open and never through a link. A file with a NUL byte or that is not UTF-8
@@ -235,7 +265,7 @@ func (f File) Read() (Content, error) {
 		return Content{}, ErrGone
 	}
 	defer root.Close()
-	h, fi, err := root.Open(f.Name)
+	h, fi, err := root.Open(f.rel)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return Content{}, ErrGone

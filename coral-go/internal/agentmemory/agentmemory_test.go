@@ -185,3 +185,74 @@ func TestReadGivesTextCutsALargeFileOnACharacterAndCallsBinaryBinary(t *testing.
 	_, err = f.Read()
 	assert.ErrorIs(t, err, ErrGone)
 }
+
+// #7454 (the Orchestrator's decision): a link is followed only when its target is a regular file inside the SAME folder (AGENTS.md pointing at CLAUDE.md); it is then shown with that file's text and says what
+// it links to. A link that leaves the folder, a dangling one, one to a folder and one to a pipe stay listed with their problem and are never read.
+func TestALinkIsFollowedOnlyToAFileInTheSameFolder(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlinks need privileges on Windows")
+	}
+	r := newRig(t)
+	outside := filepath.Join(r.home, ".ssh", "id_secret")
+	write(t, outside, "PRIVATE KEY MATERIAL")
+	write(t, filepath.Join(r.proj, "CLAUDE.md"), "the real instructions")
+	write(t, filepath.Join(r.proj, "docs", "rules.md"), "rules in a subfolder")
+	require.NoError(t, os.Symlink("CLAUDE.md", filepath.Join(r.proj, "AGENTS.md")))
+	got := func(agent string) []File { return Discover(agent, r.proj, r.repo, r.home) }
+
+	// Codex lists AGENTS.md, which is a link to CLAUDE.md in the same folder: followed, said, and read as that file.
+	fs := got("codex")
+	require.Len(t, fs, 1)
+	assert.Equal(t, "AGENTS.md", fs[0].Name)
+	assert.Equal(t, "CLAUDE.md", fs[0].LinkTo)
+	assert.Empty(t, fs[0].Problem)
+	assert.EqualValues(t, len("the real instructions"), fs[0].Size)
+	c, err := fs[0].Read()
+	require.NoError(t, err)
+	assert.Equal(t, "the real instructions", c.Text)
+
+	// a link to a file in a subfolder of the same folder is inside it too
+	require.NoError(t, os.Remove(filepath.Join(r.proj, "AGENTS.md")))
+	require.NoError(t, os.Symlink(filepath.Join("docs", "rules.md"), filepath.Join(r.proj, "AGENTS.md")))
+	fs = got("codex")
+	require.Len(t, fs, 1)
+	assert.Equal(t, "docs/rules.md", fs[0].LinkTo)
+	c, err = fs[0].Read()
+	require.NoError(t, err)
+	assert.Equal(t, "rules in a subfolder", c.Text)
+
+	for name, target := range map[string]string{
+		"out of the folder":        outside,
+		"a relative way out":       filepath.Join("..", "..", "..", "..", ".ssh", "id_secret"),
+		"a folder":                 "docs",
+		"nothing there (dangling)": "gone.md",
+	} {
+		require.NoError(t, os.Remove(filepath.Join(r.proj, "AGENTS.md")))
+		require.NoError(t, os.Symlink(target, filepath.Join(r.proj, "AGENTS.md")))
+		fs = got("codex")
+		require.Len(t, fs, 1, name)
+		assert.Equal(t, ProblemLink, fs[0].Problem, name)
+		assert.Empty(t, fs[0].LinkTo, name)
+		c, err = fs[0].Read()
+		assert.Error(t, err, name)
+		assert.NotContains(t, c.Text, "PRIVATE", name)
+	}
+
+	// a link to a link that ends outside the folder is not followed either
+	require.NoError(t, os.Remove(filepath.Join(r.proj, "AGENTS.md")))
+	require.NoError(t, os.Symlink(outside, filepath.Join(r.proj, "hop.md")))
+	require.NoError(t, os.Symlink("hop.md", filepath.Join(r.proj, "AGENTS.md")))
+	fs = got("codex")
+	require.Len(t, fs, 1)
+	assert.Equal(t, ProblemLink, fs[0].Problem, "the first hop is inside, the last leaves")
+
+	// a link to a pipe
+	require.NoError(t, os.Remove(filepath.Join(r.proj, "AGENTS.md")))
+	require.NoError(t, syscall.Mkfifo(filepath.Join(r.proj, "pipe.md"), 0o644))
+	require.NoError(t, os.Symlink("pipe.md", filepath.Join(r.proj, "AGENTS.md")))
+	fs = got("codex")
+	require.Len(t, fs, 1)
+	assert.Equal(t, ProblemLink, fs[0].Problem)
+	_, err = fs[0].Read()
+	assert.Error(t, err)
+}

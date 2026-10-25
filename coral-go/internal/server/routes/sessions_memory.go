@@ -94,10 +94,11 @@ type memoryRow struct {
 	Modified string `json:"modified"`
 	Size     int64  `json:"size"`
 	Problem  string `json:"problem,omitempty"`
+	LinkTo   string `json:"link_to,omitempty"` // a link in the folder to a file in the same folder: the file it is a link to (its text, size and time are that file's)
 }
 
 func rowOf(id string, f agentmemory.File) memoryRow {
-	return memoryRow{ID: id, File: f.Name, Kind: f.Kind, Level: f.Level, Where: f.Where, Modified: f.Modified.UTC().Format(time.RFC3339), Size: f.Size, Problem: f.Problem}
+	return memoryRow{ID: id, File: f.Name, Kind: f.Kind, Level: f.Level, Where: f.Where, Modified: f.Modified.UTC().Format(time.RFC3339), Size: f.Size, Problem: f.Problem, LinkTo: f.LinkTo}
 }
 
 // memorySession is the live session a memory request is about (session_id is required: the id of an agent), with its agent type and working folder.
@@ -153,6 +154,9 @@ func (h *SessionsHandler) ReadMemory(w http.ResponseWriter, r *http.Request) {
 	}
 	row := rowOf(chi.URLParam(r, "id"), f)
 	out := map[string]any{"id": row.ID, "file": row.File, "kind": row.Kind, "level": row.Level, "where": row.Where, "modified": row.Modified, "size": row.Size}
+	if row.LinkTo != "" {
+		out["link_to"] = row.LinkTo
+	}
 	c, err := f.Read()
 	switch {
 	case errors.Is(err, agentmemory.ErrGone):
