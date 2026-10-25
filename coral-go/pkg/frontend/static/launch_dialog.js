@@ -157,7 +157,7 @@ function _renderServerPicker() {
     sel.innerHTML = opts.map(o =>
         `<option value="${escapeAttr(o.id)}"${o.disabled ? ' disabled' : ''}>${escapeHtml(o.label)}</option>`).join('');
     // A team can also start on a computer that is not in the list: its last entry reveals the address field (#7407).
-    if (launch.mode === 'team' && !locked) sel.insertAdjacentHTML('beforeend', `<option value="${TEAM_ADDRESS}">Another computer's address\u2026</option>`);
+    if (launch.mode === 'team' && !locked) sel.insertAdjacentHTML('beforeend', `<option value="${escapeAttr(TEAM_ADDRESS)}">Another computer's address\u2026</option>`);
     sel.value = launch.mode === 'team' && launch.teamAddress ? TEAM_ADDRESS : current;
     sel.disabled = locked;
     row.style.display = 'flex';

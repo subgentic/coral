@@ -652,6 +652,10 @@
 1	team_health_settings.js	switchRow({ label: 'Post when all is well', name: 'all_clear', checked: h.all_clear, labelClass: 'health-rule-
 1	team_health_settings.js	switchRow({ label: 'Send health check', name: 'on', checked: h.on, labelClass: 'health-rule-head', labelId: 'h
 1	team_health_settings.js	switchRow({ label: title, name: `${key}_on`, checked: on, labelClass: 'health-rule-head', labelId: `hr-${key}-
+1	team_launch_settings.js	switchRow({ label: 'Include dependent-queue guidance', name: 'dependency_guidance', attrs: ' id="team-wm-dep"'
+1	team_launch_settings.js	switchRow({ label: 'Message teams on other computers', name: 'cross_team_messaging', attrs: ' id="team-xt-msg"
+1	team_launch_settings.js	switchRow({ label: 'Require a goal', name: 'require_goal', attrs: ' id="team-wm-goal"', labelClass: 'check-hit
+1	team_launch_settings.js	switchRow({ label: 'Share files with teams on other computers', name: 'cross_team_artifacts', attrs: ' id="tea
 1	team_working_mode.js	applicability
 1	team_working_mode.js	body
 1	team_working_mode.js	cards
