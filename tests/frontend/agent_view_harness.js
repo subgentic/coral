@@ -62,10 +62,10 @@ async function connect(opts = {}) {
             requests: [],        // every mocked request, in order
             wakeDelay: 0,
             wakeResult: 'ok',    // 'ok' | 'notok' | 'network'
-            add(name, prefix, n, { sleeping = true, archived = false, server = 'local', agent_type = 'claude', session_id = null, board_project = null, workflow_name = null, sleep_reason = null, board_is_orchestrator = true, board_subscriber_id = null, display_name = null } = {}) {
+            add(name, prefix, n, { sleeping = true, archived = false, server = 'local', agent_type = 'claude', session_id = null, board_project = null, workflow_name = null, sleep_reason = null, board_is_orchestrator = true, board_subscriber_id = null, display_name = null, start_failure = null, start_failure_text = null } = {}) {
                 const msgs = [];
                 for (let i = 0; i < n; i++) msgs.push(make(prefix, i));
-                const a = { name, session_id: session_id || name + '-id', prefix, msgs, sleeping: sleeping || archived, archived, server, agent_type, board_project, workflow_name, sleep_reason, board_is_orchestrator, board_subscriber_id, display_name };
+                const a = { name, session_id: session_id || name + '-id', prefix, msgs, sleeping: sleeping || archived, archived, server, agent_type, board_project, workflow_name, sleep_reason, board_is_orchestrator, board_subscriber_id, display_name, start_failure, start_failure_text };
                 this.agents[a.session_id] = a;
                 if (window.__qaState) window.__qaState.liveSessions = (window.__qaState.liveSessions || []).filter(s => s.session_id !== a.session_id).concat([this.entry(a)]);
                 return a;
@@ -74,6 +74,7 @@ async function connect(opts = {}) {
                 return { session_id: a.session_id, name: a.name, display_name: a.display_name || a.name, agent_type: a.agent_type,
                     working_directory: '/tmp/' + a.name, server: a.server, sleeping: a.sleeping, archived: !!a.archived, board_project: a.board_project || null, board_is_orchestrator: a.board_project ? a.board_is_orchestrator : null, board_subscriber_id: a.board_subscriber_id || a.name, workflow_name: a.workflow_name || null,
                     ...(a.sleep_reason ? { sleep_reason: a.sleep_reason } : {}),
+                    ...(a.start_failure ? { start_failure: a.start_failure, start_failure_text: a.start_failure_text } : {}),
                     status: a.sleeping ? 'sleeping' : 'idle' };
             },
             byPathSeg(seg) {
