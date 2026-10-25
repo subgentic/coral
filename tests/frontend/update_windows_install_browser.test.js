@@ -72,7 +72,7 @@ const win = (version, over = {}, relaunch = {}) => ({ enabled: true, relaunch_av
             // the dialog, and what the click sends
             await ev(`document.getElementById('update-pill').click(); true`); await settle(300);
             let d = await dialog();
-            check(`${tag}: the dialog is about installing, says Windows asks for permission, and offers Install (${JSON.stringify(d && { t: d.title, go: d.go })})`, d && d.title === 'Install update: Coral 1.4.126?' && /Windows asks for your permission/.test(d.text) && /Install update, restart 2 agents/.test(d.go) && !/relaunch\?/i.test(d.title));
+            check(`${tag}: the dialog is about installing, says Windows asks for permission, and offers Install (${JSON.stringify(d && { t: d.title, go: d.go })})`, d && d.title === 'Install Coral 1.4.126?' && /Windows asks for your permission/.test(d.text) && /Install update, restart 2 agents/.test(d.go) && !/relaunch\?/i.test(d.title));
             await ev(`document.querySelector('#update-confirm-modal .update-go').click(); true`); await settle(300);
             let c = await calls();
             check(`${tag}: the click sent POST /install with the version the dialog showed, and nothing to a relaunch route (${JSON.stringify(c)})`, c.length === 1 && c[0].method === 'POST' && c[0].path === '/install' && JSON.stringify(c[0].body) === '{"version":"1.4.126"}');
@@ -84,7 +84,7 @@ const win = (version, over = {}, relaunch = {}) => ({ enabled: true, relaunch_av
             await ev(`window.__upd.install = { status: 409, body: { code: 'stale_version' } }; document.getElementById('update-pill').click(); true`); await settle(300);
             await ev(`window.__upd.status = ${JSON.stringify(win('1.4.127'))}; document.querySelector('#update-confirm-modal .update-go').click(); true`); await settle(500);
             d = await dialog();
-            check(`${tag}: a stale answer redraws the dialog for 1.4.127, with the sentence, and installed nothing (${JSON.stringify(d && { t: d.title, said: /changed since this page showed it/.test(d.text) })})`, d && d.title === 'Install update: Coral 1.4.127?' && /changed since this page showed it/.test(d.text));
+            check(`${tag}: a stale answer redraws the dialog for 1.4.127, with the sentence, and installed nothing (${JSON.stringify(d && { t: d.title, said: /changed since this page showed it/.test(d.text) })})`, d && d.title === 'Install Coral 1.4.127?' && /changed since this page showed it/.test(d.text));
             await ev(`window.__upd.install = { status: 202, body: { ok: true } }; document.querySelector('#update-confirm-modal .update-go').click(); true`); await settle(300);
             c = await calls();
             check(`${tag}: the second click sent 1.4.127 (${JSON.stringify(c.map(x => x.body))})`, c.length === 2 && JSON.stringify(c[1].body) === '{"version":"1.4.127"}');

@@ -45,7 +45,7 @@ function draw(note) {
     dialog.replaceChildren();
     const content = mk('div', 'modal-content modal-md update-confirm');
     const win = installsLocally(s); // Windows installs from here with Windows's own permission prompt, not a relaunch (#7338)
-    const head = mk('div', 'modal-header'); const h = mk('h3', null, win ? `${ACT_INSTALL}: Coral ${s.staged.version}?` : `${ACT_RELAUNCH}: Coral ${s.staged.version}?`); h.id = 'update-confirm-title'; head.append(h);
+    const head = mk('div', 'modal-header'); const h = mk('h3', null, win ? `Install Coral ${s.staged.version}?` : `Update to Coral ${s.staged.version} and relaunch?`); h.id = 'update-confirm-title'; head.append(h);
     const body = mk('div', 'modal-body'); body.id = 'update-confirm-body';
     const days = s.staged.days;
     // Where it comes from: Coral's releases on the one pinned repository. The status says the repository only after verification; the words and the link are this page's (RELEASES_URL), never built from the status's text.
@@ -79,7 +79,7 @@ function draw(note) {
         warn.append(icon, inner); body.append(warn);
     }
     if (win) body.append(mk('p', 'update-uac', 'Coral quits to hand over to the installer, and Windows asks for your permission (the usual admin prompt). Coral starts again when the installer is done.'));
-    body.append(mk('p', 'update-later-note', 'Nothing is installed until you choose Install. Later changes nothing: the update stays ready and the button stays in the top bar.'));
+    body.append(mk('p', 'update-later-note', `Nothing is installed until you choose ${win ? ACT_INSTALL : ACT_RELAUNCH}. Later changes nothing: the update stays ready and the button stays in the top bar.`));
     const acts = mk('div', 'modal-actions modal-footer');
     const later = mk('button', 'btn update-later', 'Later'); later.type = 'button';
     later.addEventListener('click', close);
