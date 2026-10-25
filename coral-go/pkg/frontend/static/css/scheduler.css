@@ -171,7 +171,7 @@ div.job-field#sched-label { margin-bottom: 6px; }
     justify-content: flex-end;
     gap: 8px;
     margin-top: var(--space-2xl);
-    padding: var(--space-lg) 0;
+    padding: var(--space-lg) 0 calc(var(--space-lg) + env(safe-area-inset-bottom, 0px)); /* room under the last row of buttons, and the phone's safe area: Run is never on the screen edge */
     border-top: 1px solid var(--border);
     background: var(--bg-primary);
 }

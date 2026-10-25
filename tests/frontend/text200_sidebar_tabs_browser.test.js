@@ -43,6 +43,8 @@ const BROKEN = `(() => { const c = document.createElement('canvas').getContext('
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: STUB });
         for (const theme of ['dark', 'light']) for (const [label, w, h, mobile, font] of VIEWS) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
+            let safe = 0; // a phone's safe area under the page (the home bar): emulated where Chrome can, the bar must leave it free
+            try { await Emulation.setSafeAreaInsetsOverride({ insets: { bottom: mobile ? 34 : 0 } }); safe = mobile ? 34 : 0; } catch { safe = 0; }
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
             await setTheme(ev, theme);
             await ev(`document.documentElement.style.fontSize = '${font}px'; true`);
@@ -59,6 +61,14 @@ const BROKEN = `(() => { const c = document.createElement('canvas').getContext('
                     if (mobile && r.nSmall) problems.push(`${where}: smaller than 44 px ${r.small.slice(0, 4).join('; ')}`);
                     const off = await ev(`[...document.querySelectorAll('#scheduler-detail .item-bar > *, .wf-page .item-bar > *, #history-session-view > .item-bar > *')].filter(e => e.getClientRects().length && (e.getBoundingClientRect().left < -1 || e.getBoundingClientRect().right > innerWidth + 1)).map(e => (e.className || e.tagName).toString().slice(0, 24))`);
                     if (off.length) problems.push(`${where}: a control of the page's bar is off the screen ${off.join('; ')}`);
+                    if (!mobile && name === 'Chats') { // the header's search box, its display options and the rest are one row, the hide button too (UI/UX's #7562 point)
+                        const rows = await ev(`(() => { const h = document.querySelector('.sidebar-header[data-header="history"]'); if (!h) return null; const tops = [...h.querySelectorAll(':scope > *, :scope > .sidebar-search')].filter(e => e.getClientRects().length).map(e => Math.round(e.getBoundingClientRect().top)); return { n: tops.length, spread: Math.max(...tops) - Math.min(...tops) }; })()`);
+                        if (rows && rows.spread > 6) problems.push(`${where}: the sidebar header wraps onto a second row (tops differ by ${rows.spread} px)`);
+                    }
+                    if (mobile && /one (workflow|job) open/.test(name)) { // the pinned bar's last row is not on the screen edge once the page is scrolled to its end (the bar's bottom padding and the safe area)
+                        const gap = await ev(`(() => { const bs = [...document.querySelectorAll('.wf-detail-actions .btn, #scheduler-detail .item-bar .btn')].filter(e => e.getClientRects().length); if (!bs.length) return null; const last = bs[bs.length - 1]; for (let p = last.parentElement; p && p !== document.body; p = p.parentElement) if (/(auto|scroll)/.test(getComputedStyle(p).overflowY) && p.scrollHeight > p.clientHeight) p.scrollTop = p.scrollHeight; const b = last.getBoundingClientRect(); return Math.round(innerHeight - b.bottom); })()`); // the page scrolled to its very end
+                        if (gap !== null && gap < Math.max(8, safe)) problems.push(`${where}: the last row of the page's bar is ${gap} px from the screen's bottom edge (it must clear 8 px and the ${safe} px safe area)`);
+                    }
                     if (broken.length) problems.push(`${where}: words broken across lines ${broken.join('; ')}`);
                     if (SHOTS) { const s = await Page.captureScreenshot({ format: 'png' }); require('fs').writeFileSync(`${SHOTS}/sidebar-${name.replace(/[^a-z0-9]+/gi, '_')}-${label.replace(/[^a-z0-9]+/gi, '_')}-${theme}.png`, Buffer.from(s.data, 'base64')); }
                 } catch (e) { problems.push(`${where}: the probe failed: ${String(e.message).slice(0, 240)}`); }
