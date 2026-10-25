@@ -3,6 +3,7 @@
 // and Launch Team (its request, a board that exists, an agent that failed). They are blocks of modals.js; this pins what they do before they move into their own module. Drives Chrome over CDP
 // through agent_view_harness.js against the isolated dev server; every request is answered by the test.
 const assert = require('node:assert/strict');
+const { removeBoards } = require('./helpers/board_cleanup');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 
@@ -180,6 +181,7 @@ const BASE = require('./test_base').BASE;
         assert.equal(await ev(`document.querySelector('.team-wizard-success p').textContent`), '1 agents created for "Polled"');
         console.log('PASS team dialogs');
     } finally {
+      await removeBoards(ev, ['crew-1', 'crew-1-2', 'crew-2']);
       await guard.restore().catch(e => console.error('settings restore: ' + (e && e.message)));
       await client.close();
     }

@@ -4,6 +4,7 @@
 // Agent Team dialog has the option, unchecked, with the same sentence, and sends it only when it is checked. 44 px on a phone. Run against an
 // isolated dev server; set HEALTH_SHOT_DIR to save screenshots.
 const assert = require('node:assert/strict');
+const { removeBoards } = require('./helpers/board_cleanup');
 const { connect } = require('./agent_view_harness');
 const { setTheme } = require('./helpers/contrast');
 
@@ -150,5 +151,5 @@ const { setTheme } = require('./helpers/contrast');
         assert.equal('health_monitor' in await launchTeam('hl-launch', false), false, 'not sent while the switch is off: the team gets the default (off)');
         assert.equal((await launchTeam('hl-launch-2', true)).health_monitor, true, 'sent as true when the switch is on');
         console.log('PASS team health monitor: off by default, the icon (dimmed off, accent on, 44 px on a phone, none through the Hub), it opens the setting, a switch in the launch dialog sent only when on');
-    } finally { await ev(`fetch('/api/board/${TEAM}', { method: 'DELETE' }).then(r => r.status)`).catch(() => {}); await client.close(); } // the suite's board goes (the runner's end-check names one left)
+    } finally { await removeBoards(ev, [TEAM, 'hl-launch', 'hl-launch-2']); await client.close(); } // the suite's board goes (the runner's end-check names one left)
 })().catch(e => { console.error(e); process.exitCode = 1; });

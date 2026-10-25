@@ -1,6 +1,7 @@
 // Launch Agent Team's template search for long lists and the rules for a member's Mode and provider (#6397, #6412, #6425, #6440), on the three-step dialog (#7407): the steps, the Orchestrator gate, the member rows and
 // the dialogs are new_team_steps, new_team_members and new_team_keyboard (QA's #7415). Drives Chrome over CDP through agent_view_harness.js against the isolated dev server.
 const assert = require('node:assert/strict');
+const { removeBoards } = require('./helpers/board_cleanup');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 
@@ -165,5 +166,5 @@ const BASE = require('./test_base').BASE;
         assert.deepEqual(phone, [true, true, true]);
         await Emulation.clearDeviceMetricsOverride();
         console.log('launch_team_steps: ok');
-    } finally { await guard.restore().catch(e => console.error('settings restore: ' + (e && e.message))); try { await client.close(); } catch {} }
+    } finally { await removeBoards(ev, ['crew-1', 'crew-2', 'crew-3', 'crew-4', 'p']); await guard.restore().catch(e => console.error('settings restore: ' + (e && e.message))); try { await client.close(); } catch {} }
 })().catch(e => { console.error(e); process.exit(1); });

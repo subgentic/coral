@@ -3,6 +3,7 @@
 // request itself, and compares the bodies with fixtures/dialog_requests_golden.json (recorded on the old, one-form dialogs). CORAL_UPDATE_GOLDEN=1 rewrites it.
 // Fields are set through their elements, whichever section holds them: reaching them by clicking through the sections is in dialog_sections_browser.
 const assert = require('node:assert/strict');
+const { removeBoards } = require('./helpers/board_cleanup');
 const fs = require('node:fs');
 const path = require('node:path');
 const { connect } = require('./agent_view_harness');
@@ -155,5 +156,8 @@ const GOLDEN = path.join(__dirname, 'fixtures', 'dialog_requests_golden.json');
         if (process.env.CORAL_UPDATE_GOLDEN) { fs.writeFileSync(GOLDEN, JSON.stringify(out, null, 2) + '\n'); console.log('golden written'); }
         else assert.deepEqual(out, JSON.parse(fs.readFileSync(GOLDEN, 'utf8')), 'the dialogs send what they sent before');
         console.log('PASS dialog request bodies');
-    } finally { await client.close(); }
+    } finally { // the stubbed launch still opens the team, and the open page keeps joining its board: a fresh page that does not know the team goes first, then the board (the runner's end-check names one left)
+        try { await Page.navigate({ url: BASE }); await Page.loadEventFired(); } catch {}
+        await removeBoards(ev, ['alpha-team']); await client.close();
+    }
 })().catch(e => { console.error(e); process.exit(1); });
