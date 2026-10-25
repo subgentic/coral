@@ -217,7 +217,7 @@
 
 .cost-card {
     flex: 1;
-    min-width: 100px; /* seven tiles share a row beside the sidebar at 1280 */
+    min-width: 7rem; /* seven tiles share a row beside the sidebar at 1280; the width follows the text size, so at 200% they wrap instead of clipping */
     background: var(--bg-secondary);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
@@ -236,6 +236,7 @@
 }
 
 .cost-card-value {
+    overflow-wrap: anywhere;
     font-size: 1.25rem;
     font-weight: 700;
     color: var(--text-primary);
@@ -617,5 +618,4 @@
 }
 
 /* The views list: one line per view, a 44 px row on a phone with its text in the middle of it (#7473) */
-#cost-nav-list > li { min-height: var(--control-touch-height, 44px); }
 #cost-nav-list > li > .row-btn { align-items: center; justify-content: flex-start; }
