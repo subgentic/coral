@@ -124,7 +124,7 @@ func TestTheDocsListUsesEachDocsOwnHeading(t *testing.T) {
 	assert.Equal(t, "A real title here", titles["with"])
 }
 
-// UI/UX's rules on #7516: a list row is one short line: the heading up to its first colon or opening bracket, words added while the title is shorter than 32 characters (the crossing word stays).
+// UI/UX's rules on #7516: a list row is one short line: the heading up to its first colon or opening bracket, words added while the title is shorter than 36 characters (the crossing word stays).
 func TestListTitleIsOneShortLine(t *testing.T) {
 	for in, want := range map[string]string{
 		"Personal tasks: coral-agent CLI and API": "Personal tasks",
@@ -138,7 +138,7 @@ func TestListTitleIsOneShortLine(t *testing.T) {
 		"Cross-team messaging":                                     "Cross-team messaging",
 		"Multi-server Hub API":                                     "Multi-server Hub API",
 		"Coral API reference":                                      "Coral API reference",
-		"Recover a task awaiting completion review":                "Recover a task awaiting completion",
+		"Recover a task awaiting completion review":                "Recover a task awaiting completion review",
 		"A very long heading & more":                               "A very long heading & more",
 	} {
 		assert.Equal(t, want, listTitle(sentenceCase(in)), in)
