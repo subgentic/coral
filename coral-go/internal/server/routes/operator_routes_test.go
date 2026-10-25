@@ -58,6 +58,7 @@ func TestOperatorOnlyRoutes(t *testing.T) {
 		r.Post("/api/board/{project}/messages", ok)
 		r.Get("/api/workflows", ok)
 		r.Get("/api/worktrees", ok)
+		r.Get("/api/board/{project}/spend", ok)
 		r.Post("/api/worktrees/remove", ok)
 		do := func(method, path string, hdr map[string]string) *httptest.ResponseRecorder {
 			req := httptest.NewRequest(method, path, strings.NewReader("{}"))
@@ -93,6 +94,8 @@ func TestOperatorOnlyRoutes(t *testing.T) {
 			{"PUT", "/api/settings/git-diff-mode"},
 			// #6736: the kept worktrees, and removing one, are the Operator's
 			{"GET", "/api/worktrees"}, {"POST", "/api/worktrees/remove"},
+			// #7525 (Security): the Analytics spend read names every member and their work: the Operator's, not an agent token's
+			{"GET", "/api/board/coral-go-team/spend"},
 		}
 		for _, wr := range writes {
 			rec := do(wr.method, wr.path, agent)

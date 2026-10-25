@@ -4,6 +4,8 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -130,4 +132,68 @@ func TestARefThatIsNotABranchNameIsRefusedAndTheCacheKeepsAnswersForAMinute(t *t
 	now = now.Add(CacheTTL + time.Second)
 	got, _, _ = c.Read(context.Background(), root, "main", since, until)
 	assert.Len(t, got, 2, "after it, git is asked again")
+}
+
+// Security's pins on #7525: a branch name that is an option, has a space or is a revision expression is refused and nothing is run or written; a hostile origin/HEAD is ignored; the log's arguments end with
+// "--"; a burst makes one git read per repository.
+func TestAHostileBranchNameIsRefusedAndWritesNothing(t *testing.T) {
+	root := newRepo(t, "main")
+	commit(t, root, "Backend Dev", "2026-10-20T10:00:00Z", "a.txt")
+	out := filepath.Join(t.TempDir(), "x")
+	for _, bad := range []string{"--output=" + out, "-n", "a b", "main~1", "main..main", "main^", "a@{1}", "a:b", "x.lock", "main.", "/main", "main/", "a//b", ".hidden", "@", "a*", "a?", "a[1]"} {
+		_, _, err := Read(context.Background(), root, bad, time.Unix(0, 0), time.Now())
+		assert.Error(t, err, "branch %q", bad)
+		assert.False(t, validBranch(bad), "branch %q", bad)
+	}
+	_, err := os.Stat(out)
+	assert.True(t, os.IsNotExist(err), "the option never reached git: nothing was written")
+	for _, good := range []string{"main", "master", "feature/x-1", "release-1.2", "trunk_2"} {
+		assert.True(t, validBranch(good), good)
+	}
+}
+
+func TestADefaultBranchIsNeverTakenFromAHostileOriginHEAD(t *testing.T) {
+	ctx := context.Background()
+	root := newRepo(t, "main")
+	commit(t, root, "Backend Dev", "2026-10-20T10:00:00Z", "a.txt")
+	commit(t, root, "Backend Dev", "2026-10-21T10:00:00Z", "b.txt")
+	git(t, root, "x", "2026-10-21T11:00:00Z", "update-ref", "refs/remotes/origin/main", "HEAD")
+	// a repository's own origin/HEAD file names main~1: an existing commit, not a branch
+	require.NoError(t, os.MkdirAll(filepath.Join(root, ".git", "refs", "remotes", "origin"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(root, ".git", "refs", "remotes", "origin", "HEAD"), []byte("ref: refs/remotes/origin/main~1\n"), 0o644))
+	assert.Equal(t, "main", DefaultBranch(ctx, root), "the hostile target is ignored and main is used")
+}
+
+func TestTheLogArgumentsEndWithTheTerminatorAndTheRefIsNeverAnOption(t *testing.T) {
+	args := logArgs("refs/heads/main", time.Unix(0, 0), time.Unix(100, 0))
+	assert.Equal(t, "--", args[len(args)-1])
+	assert.Equal(t, "refs/heads/main", args[1])
+	assert.Equal(t, "log", args[0])
+}
+
+func TestABurstOfReadsMakesOneGitReadPerRepository(t *testing.T) {
+	root := newRepo(t, "main")
+	commit(t, root, "Backend Dev", "2026-10-20T10:00:00Z", "a.txt")
+	var calls atomic.Int64
+	old := readFn
+	t.Cleanup(func() { readFn = old })
+	readFn = func(ctx context.Context, root, branch string, since, until time.Time) ([]Commit, bool, error) {
+		calls.Add(1)
+		time.Sleep(150 * time.Millisecond) // a slow read: the rest of the burst waits for it
+		return []Commit{{Hash: "h", Author: "A", At: "2026-10-20T10:00:00Z"}}, false, nil
+	}
+	c := &Cache{}
+	var wg sync.WaitGroup
+	since, until := time.Date(2026, 10, 20, 0, 0, 0, 0, time.UTC), time.Date(2026, 10, 21, 0, 0, 0, 0, time.UTC)
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			got, _, err := c.Read(context.Background(), root, "main", since, until)
+			assert.NoError(t, err)
+			assert.Len(t, got, 1)
+		}()
+	}
+	wg.Wait()
+	assert.EqualValues(t, 1, calls.Load(), "eight requests, one git read")
 }
