@@ -16,7 +16,7 @@ const SOURCE = `(() => {
 })()`;
 const install = async ev => { await na.install(ev); return ev(SOURCE); };
 const N = {
-    team: /^New team$/i, member: /^Edit member/i,
+    team: /^New team$/i, member: /^(Edit|Add) member/i,
     teamName: /^Team name/i, folder: /^Folder/i, recents: /^Recent folders$/i, machine: /^Machine$/i, address: /^Another computer's address$/i,
     template: /template/i, bulk: /^Set all workers to/i, section: /section$/i,
     cancel: /^Cancel$/i, back: /^Back$/i, next: /^Next$/i, launch: /^Launch team$/i, save: /^Save member$/i, addMember: /^\+?\s*Add member$/i, addOrch: /^Add Orchestrator$/i,
@@ -36,10 +36,10 @@ const T = (ev, waitFor) => {
         has: (sel, rx, within = N.team) => ev(`!!window.__nt.find(window.__nt.dlg(${within}), ${JSON.stringify(sel)}, ${rx})`),
         pick: (rx, text, within = N.team) => ev(`(() => { const s = window.__nt.find(window.__nt.dlg(${within}), 'select', ${rx}); if (!s) return false; const o = [...s.options].find(o => ${text}.test(o.textContent)); if (!o) return false; s.value = o.value; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`),
         step: n => waitFor(`/^Step ${n} of 3/.test((() => { const d = window.__nt.dlg(${N.team}); return d ? [...d.querySelectorAll('*')].filter(window.__na.vis).map(e => window.__na.text(e)).filter(x => /^Step \\d of 3: /.test(x)).sort((a, b) => a.length - b.length)[0] || '' : ''; })())`, `step ${n} of 3`, 5000),
-        to: async (n, { name = 'alpha', folder = '/work/payments-app', template = /Coding/ } = {}) => {
+        to: async (n, { name = 'alpha', folder = '/work/payments-app', template } = {}) => {
             await t.type('input', N.teamName, name); await t.type('input', N.folder, folder);
-            if (n >= 2) { await t.click('button', N.next); await t.step(2); }
-            if (n >= 3) { if (template) await t.pick(N.template, template); await t.click('button', N.next); await t.step(3); }
+            if (n >= 2) { await t.click('button', N.next); await t.step(2); if (n === 2 && template) await t.pick(N.template, template); }
+            if (n >= 3) { const tpl = template === undefined ? /Coding/ : template; if (tpl) await t.pick(N.template, tpl); await t.click('button', N.next); await t.step(3); }
         },
         rect: () => ev(`(() => { const p = window.__nt.panel(window.__nt.dlg(${N.team})); return p ? window.__na.box(p) : null; })()`),
     };
