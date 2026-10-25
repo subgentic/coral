@@ -299,6 +299,16 @@ export function renderAgentConfigForm(containerId, opts = {}) {
                 pane('permissions', 'Permissions', 'lock', '', `${autoPermissionsHTML}${toolsHTML}`),
                 pane('advanced', 'Advanced', 'tune', '', `<label>Flags <span style="color:var(--text-muted);font-weight:normal">(optional)</span>:${flagsInput}</label>`),
             ].join('');
+        } else if (opts.restart) {
+            // Restart (#7391): the same shell as New Agent. Agent (Provider, Model, Thinking), Persona (the name, read-only, and the prompt), Permissions, Advanced.
+            const toolsHTML = `<details class="acf-tools-details"><summary>Tool permissions <span class="acf-perms-summary settings-hint"></span></summary>${permEditorHTML(true)}</details>`;
+            const agentHTML = topHTML.replace('<label>Agent Type:', '<label class="acf-provider-label"><span class="acf-provider-head">Provider</span>');
+            container.innerHTML = [
+                pane('agent', 'Agent', 'smart_toy', '', `${agentHTML}<p class="settings-hint acf-provider-change" role="status" hidden></p>`),
+                pane('persona', 'Persona', 'badge', '', `<p class="launch-field-head"><span>Name</span></p><p class="acf-restart-name"></p><label class="launch-prompt-field"><span class="launch-field-head">Behavior prompt</span><textarea class="acf-prompt" rows="8" placeholder="Describe the agent's role and behavior...">${escapeHtml(promptVal)}</textarea></label>`),
+                pane('permissions', 'Permissions', 'lock', '', `${autoPermissionsHTML}${toolsHTML}`),
+                pane('advanced', 'Advanced', 'tune', '', `<label>Flags <span style="color:var(--text-muted);font-weight:normal">(optional)</span>:${flagsInput}</label>`),
+            ].join('');
         } else container.innerHTML = [
             (showPreset || showName) ? pane('role', 'Role', 'badge', '', `${presetHTML}${nameHTML}`) : '',
             pane('agent', 'Agent', 'smart_toy', '', topHTML),
@@ -386,7 +396,21 @@ export function renderAgentConfigForm(containerId, opts = {}) {
         _syncACFModelField(container);
         _syncEnforcement(container);
     });
-    if (opts.wizard) { // the controls drawn over the selects (#7391): the thinking levels as segments, the Mode as cards (or the select, launch_flags.js)
+    if (opts.restart) { // Restart's controls (#7391): the provider as segments, a line when it differs from the running agent's, the name read-only
+        const type = container.querySelector('.acf-agent-type');
+        const first = type.value;
+        if (launchFlags.restartProvider) segmentSelect(type, { label: 'Provider' }); else type.disabled = true;
+        const note = container.querySelector('.acf-provider-change');
+        container.querySelector('.acf-provider-label')?.after(note); // under the Provider, in its own slot
+        const sync = () => {
+            const differs = type.value !== first;
+            note.hidden = !differs;
+            note.textContent = differs ? `Restarting as ${type.options[type.selectedIndex].textContent.trim()} instead of ${[...type.options].find(o => o.value === first)?.textContent.trim() || first}.` : '';
+        };
+        type.addEventListener('change', sync);
+        const nm = container.querySelector('.acf-restart-name'); if (nm) nm.textContent = opts.restartName || '';
+    }
+    if (opts.wizard || opts.restart) { // the controls drawn over the selects (#7391): the thinking levels as segments, the Mode as cards (or the select, launch_flags.js)
         const thinking = container.querySelector('.acf-thinking');
         if (thinking) segmentSelect(thinking, { labelledby: 'acf-thinking-label' });
         const mode = container.querySelector('.acf-permission-mode');
