@@ -26,3 +26,21 @@ func TestWindowsHasAProcessListWithThisProcessInIt(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, strings.ToLower(out), strings.ToLower(filepath.Base(exe)), "the list names this test binary")
 }
+
+// With SystemRoot unset, the path still comes from the system API and is absolute: nothing relative is ever run from the current folder.
+func TestWindowsPowerShellPathDoesNotDependOnTheEnvironment(t *testing.T) {
+	t.Setenv("SystemRoot", "")
+	t.Setenv("windir", "")
+	ps, err := systemPowerShell()
+	require.NoError(t, err)
+	assert.True(t, filepath.IsAbs(ps), ps)
+	assert.True(t, strings.HasSuffix(strings.ToLower(ps), strings.ToLower(filepath.Join("system32", "windowspowershell", "v1.0", "powershell.exe"))), ps)
+	_, serr := os.Stat(ps)
+	assert.NoError(t, serr, "it is the real Windows PowerShell")
+	// Windows PowerShell itself may refuse to start without SystemRoot: then the answer is an error and the sweep keeps every file. What must never happen is a relative program being run.
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	if out, err := runningCommandLines(ctx); err == nil {
+		assert.NotEmpty(t, strings.TrimSpace(out))
+	}
+}

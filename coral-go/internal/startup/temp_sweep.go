@@ -69,6 +69,7 @@ func setupLaunchTempDir(db *store.DB, dataDir string) <-chan struct{} {
 				MinAge:  staleTempAge,
 				Live:    func(id string) bool { return live[id] },
 				Running: func() (string, error) { return listRunningCommandLines(ctx) },
+				Ctx:     ctx, // the sweep's minute bounds the per-file checks too
 			}
 			if dir == os.TempDir() {
 				// The shared temp folder (also when <data dir>/tmp couldn't be made): only files
