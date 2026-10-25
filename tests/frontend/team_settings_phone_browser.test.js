@@ -84,14 +84,15 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await reach('light');
         console.log('   ✓ light: the team menu → Team settings');
 
-        // Team view stays the team's chat; the panel stays shut
+        // The team's row opens the team page (its Goals tab, #7453); the side panel stays shut
         await load('dark');
         assert.equal(await scene(), 2);
         await waitFor(`!!document.querySelector(${JSON.stringify(HEADER + ' .group-name-text')})`, 'the team card', 6000);
         await tap(HEADER + ' .group-name-text');
-        const view = await ev(`(() => { const a = document.getElementById('agentic-state'); return { open: a.classList.contains('mobile-panel-overlay'), chat: !!document.getElementById('team-center-view') && !document.getElementById('team-center-view').hidden }; })()`);
-        assert.deepEqual(view, { open: false, chat: true }, 'Opening the team (its row) shows the team chat with the side panel shut');
-        console.log('   ✓ opening the team still shows the chat, panel shut');
+        await waitFor(`!!document.getElementById('team-page-view') && getComputedStyle(document.getElementById('team-page-view')).display !== 'none'`, 'the team page', 6000);
+        const view = await ev(`(() => { const a = document.getElementById('agentic-state'); return { open: a.classList.contains('mobile-panel-overlay'), page: getComputedStyle(document.getElementById('team-page-view')).display !== 'none', tab: document.querySelector('#team-tabs [aria-selected=true]')?.textContent.trim().replace(/\\s*\\d+$/, '') }; })()`);
+        assert.deepEqual(view, { open: false, page: true, tab: 'Goals' }, 'Opening the team (its row) shows the team page on Goals with the side panel shut');
+        console.log('   ✓ opening the team shows its page, panel shut');
         console.log('team_settings_phone: ok');
         await removeBoards(ev, [TEAM]); await client.close(); process.exit(0);
     } catch (e) {

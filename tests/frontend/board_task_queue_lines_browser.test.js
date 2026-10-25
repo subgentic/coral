@@ -111,7 +111,7 @@ const BASE = require('./test_base').BASE;
         await ev(`(async () => {
             const render = await import(${S}+'render.js');
             render.renderLiveSessions([{ session_id: 'beta-1', name: 'beta-1', agent_type: 'claude', board_project: 'beta', display_name: 'Beta agent', working_directory: '/tmp/beta' }]);
-            document.querySelector('.board-card-header[data-on-click="team-name-open"]').click();
+            (await import(${S}+'team_context.js')).enterTeamContext('beta'); // the dock's team chat (the row opens the team page now)
             return true;
         })()`);
         await waitFor(`!!document.querySelector('#board-panel-msgs .mb-queue-run')`, 'the team chat with collapsed task-queue rows');

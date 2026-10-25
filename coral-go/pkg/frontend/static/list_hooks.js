@@ -4,9 +4,14 @@
 import { state } from './state.js';
 
 let _render = null;
+let _again = null;
 
 /** render.js registers the function that draws the agent list from a sessions array. */
 export function registerLiveListRenderer(fn) { _render = fn; }
+
+/** render.js registers a function that draws the list again from the sessions it drew last (a section that changes only its own part of the list asks for it: the sessions are the ones on screen, not state.liveSessions). */
+export function registerLastRedraw(fn) { _again = fn; }
+export function redrawLast() { if (_again) _again(); }
 
 /** Redraw the agent list from the current sessions (nothing happens before render.js has registered). */
 export function redrawLiveList() {

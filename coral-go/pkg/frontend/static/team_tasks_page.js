@@ -151,6 +151,15 @@ export async function readTask(project, id) {
     return have || null;
 }
 
+/** The live agent on this computer that has a task (its session, else its assignee's name on this board), or null: the page then has no Open the agent. */
+function agentOf(project, task) {
+    const live = state.liveSessions || [];
+    if (task.session_id) { const bySession = live.find(s => s && s.session_id === task.session_id); if (bySession) return bySession; }
+    const name = task.assigned_to;
+    if (!name) return null;
+    return live.find(s => s && (s.board_project === project || !s.board_project) && (s.display_name === name || s.name === name)) || null;
+}
+
 // ── a task's page ────────────────────────────────────────────────────────
 
 function fact(dl, label, value) {
@@ -187,6 +196,8 @@ export function renderTaskPage(host, task, ctx) {
     page.append(back, h, line, dl);
     if (task.body) { const b = el('div', 'team-task-body'); b.append(el('h3', 'goals-sub', 'Description'), Object.assign(el('pre', 'team-task-text'), { textContent: task.body })); page.append(b); }
     const bar = el('div', 'goals-pinbar');
+    const session = agentOf(ctx.project, task);
+    if (session) bar.append(btn('btn', 'Open the agent', () => { window.switchNavTab?.('agents'); window.selectLiveSession?.(session.name, session.agent_type, session.session_id, session.server); })); // the agent that has the task, when it runs here
     bar.append(btn('btn', 'Task actions', () => {
         const existing = state.currentBoardTasks || [];
         if (!existing.find(t => t.id === task.id)) state.currentBoardTasks = [...existing, task]; // the task dialog reads the task from here (goals_view.js does the same)

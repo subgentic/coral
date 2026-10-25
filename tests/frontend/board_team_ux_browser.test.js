@@ -167,7 +167,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         // so wait for the condition with headroom rather than the 5 s default (#4868).
         // A sidebar re-render can still replace the button between the focus and the key (the keystroke then lands on nothing), so the keyboard check is a real Enter on the
         // focused button, tried again (re-queried and re-focused) while the team view has not opened: a few tries of a few seconds, not one long wait for a key that was lost.
-        const inTeam = `window.__state.selectedTeam === 'alpha' && !document.getElementById('team-center-view').hidden`;
+        const inTeam = `window.__state.selectedTeam === 'alpha' && getComputedStyle(document.getElementById('team-page-view')).display !== 'none'`; // the row opens the team page (#7453)
         let entered = false;
         for (let tries = 0; tries < 4 && !entered; tries++) {
             await ev(`document.querySelector('.board-card-header[data-on-click="team-name-open"]')?.focus(); true`);
@@ -175,6 +175,8 @@ const { removeBoards } = require('./helpers/board_cleanup');
             entered = await waitFor(inTeam, 'the team view after Enter', { timeout: 4000, soft: true });
         }
         assert.ok(entered, 'the team view opens from the keyboard (Enter on the focused team row), in up to four tries');
+        await ev(`window.__tc.enterTeamContext('alpha'); true`); // the checks below are of the dock's team context (its chat, its tabs), which stays until the dock goes (#7457)
+        await waitFor(`!document.getElementById('team-center-view').hidden`, 'the dock team context');
         await ev(`window.__render.renderLiveSessions([{ session_id: 'alpha-1', name: 'alpha-1', agent_type: 'claude', board_project: 'alpha', display_name: 'Alpha agent', working_directory: '/tmp/alpha' }]); true`); // this page's list is drawn from an array, not state.liveSessions, so it does not follow the selection by itself
         await waitFor(`document.querySelector('.board-card-header[data-on-click="team-name-open"]')?.getAttribute('aria-current') === 'true'`, 'the open team marked on its row (aria-current, and the name in the accent colour, #6328)');
         assert.ok(await ev(`document.querySelector('.board-card-header[data-on-click="team-name-open"]').classList.contains('team-selected')`), 'the open team row carries team-selected');
@@ -226,7 +228,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await ev(`(async () => {
             window.__state.currentSession = { type: 'live', name: 'alpha-1', session_id: 'alpha-1', agent_type: 'claude', board_project: 'alpha' };
             window.__render.showBoardChatTab('alpha'); window.switchAgenticTab('board', 'top'); return true; })()`);
-        await ev(`document.querySelector('.board-card-header[data-on-click="team-name-open"]').click(); true`);
+        await ev(`window.__tc.enterTeamContext('alpha'); true`); // the dock's team context (the row opens the team page now, #7453)
         await waitFor(`window.__state.selectedTeam === 'alpha' && !document.getElementById('team-center-view').hidden`, 'the team view');
         await ev(`window.switchAgenticTab('tasks', 'top'); true`);
         await ev(`document.querySelector('.team-center-close').click(); true`);

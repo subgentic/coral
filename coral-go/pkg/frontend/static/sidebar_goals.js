@@ -4,7 +4,7 @@
 import { boardFetch, splitKey, LOCAL_SERVER } from './server_base.js';
 import { toGoalList, toTaskPage } from './goals_adapter.js';
 import { onGoalsSeq } from './goals_feed.js';
-import { redrawLiveList } from './list_hooks.js';
+import { redrawLast } from './list_hooks.js';
 import { escapeAttr, escapeHtml } from './utils.js';
 import { allTasksOf, isOpenGoal, taskStatusWord } from './goal_words.js';
 
@@ -25,7 +25,7 @@ async function readGoals(team) {
         const changed = JSON.stringify(next) !== JSON.stringify(b.goals);
         b.goals = next;
         for (const id of b.open) if (!next.some(g => g.id === id)) b.open.delete(id);
-        if (changed) redrawLiveList();
+        if (changed) redrawLast();
     } catch { if (!b.goals) b.goals = []; } finally { b.reading = false; }
     for (const id of b.open) readTasks(team, id);
 }
@@ -36,8 +36,8 @@ async function readTasks(team, id) {
         const r = await boardFetch(team, `/tasks?goal=${encodeURIComponent(id)}`);
         if (!r.ok) throw new Error(String(r.status));
         const rows = toTaskPage(await r.json()).rows.filter(t => taskStatusWord(t.state) !== 'Done').map(t => ({ id: t.id, title: t.title }));
-        if (JSON.stringify(rows) !== JSON.stringify(b.tasks.get(id))) { b.tasks.set(id, rows); redrawLiveList(); }
-    } catch { if (!b.tasks.has(id)) { b.tasks.set(id, []); redrawLiveList(); } }
+        if (JSON.stringify(rows) !== JSON.stringify(b.tasks.get(id))) { b.tasks.set(id, rows); redrawLast(); }
+    } catch { if (!b.tasks.has(id)) { b.tasks.set(id, []); redrawLast(); } }
 }
 
 /** Read a team's goals again (the team page does when it opens and every 30 s, the goals feed when they change). */
@@ -47,7 +47,7 @@ export function refreshGoalsTree(team) { if (local(team)) readGoals(team); }
 export function toggleGoalTasks(team, id) {
     const b = entry(team);
     if (b.open.has(id)) b.open.delete(id); else { b.open.add(id); if (!b.tasks.has(id)) readTasks(team, id); }
-    redrawLiveList();
+    redrawLast();
 }
 
 const bareOf = (team) => { const k = splitKey(team); return k.server === LOCAL_SERVER ? k.name : ''; };
