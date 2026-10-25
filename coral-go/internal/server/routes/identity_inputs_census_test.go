@@ -340,6 +340,7 @@ var queryIdentityReads = map[string]string{
 	"agent_ui_request.go session_id":       queryLookup,
 	"helpers.go session_id":                queryLookup,
 	"sessions_chat.go session_id":          queryLookup,
+	"sessions_memory.go session_id":        queryLookup, // GET live/{name}/memory[/{id}]?session_id=: the agent whose files are listed; the Operator's route, an agent's token is refused (#7454)
 	"sessions_attachment.go session_id":    queryLookup,
 	"sessions_files.go session_id":         queryLookup,
 	"subagents.go session_id":              queryLookup,

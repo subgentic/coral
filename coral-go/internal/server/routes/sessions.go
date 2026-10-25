@@ -141,6 +141,7 @@ type SessionsHandler struct {
 	wsKick wsKicker    // prompt /ws/coral rebuilds after state changes (ws_kick.go)
 	// openRequests: the sessions whose own hook opened a request to the user and none has closed it yet, so the event that closes it kicks the feed (#7420, event_feed_kick.go).
 	openRequests sync.Map
+	memoryIDs    memoryIDs // the ids the memory list issued (sessions_memory.go, #7454)
 
 	// captureCache keeps each session's last poll capture with the backend's output stamp
 	// (#3439): while the pane has printed nothing, the poll reuses it instead of capture-pane.
