@@ -84,6 +84,7 @@ a GET /api/board/{project}/messages/all
 a GET /api/board/{project}/messages/check
 c GET /api/board/{project}/messages/search
 c GET /api/board/{project}/paused
+c GET /api/board/{project}/spend
 a GET /api/board/{project}/peek
 a GET /api/board/{project}/queue
 b GET /api/board/{project}/reminder

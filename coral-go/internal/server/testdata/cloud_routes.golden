@@ -83,6 +83,7 @@ GET /api/board/{project}/relay-targets never
 GET /api/board/{project}/reminder never
 GET /api/board/{project}/settings view
 GET /api/board/{project}/settings/log never
+GET /api/board/{project}/spend never
 GET /api/board/{project}/status view
 GET /api/board/{project}/subscribers view
 GET /api/board/{project}/tasks view

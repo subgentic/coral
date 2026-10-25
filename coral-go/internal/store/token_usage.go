@@ -395,6 +395,11 @@ func (s *TokenUsageStore) GetUsageSummaryByModel(ctx context.Context, since stri
 
 // GetUsageSummaryByAgent returns per-agent (session) usage aggregates since a given time.
 func (s *TokenUsageStore) GetUsageSummaryByAgent(ctx context.Context, since string) ([]AgentUsageSummary, error) {
+	return s.GetUsageSummaryByAgentBoard(ctx, since, "")
+}
+
+// GetUsageSummaryByAgentBoard is GetUsageSummaryByAgent for one board (the board a row was recorded on, else the session's own); board "" is every board (#7525).
+func (s *TokenUsageStore) GetUsageSummaryByAgentBoard(ctx context.Context, since, board string) ([]AgentUsageSummary, error) {
 	var summaries []AgentUsageSummary
 	rel, args := usageRelation(ctx, s.db.Reader(), since)
 	// Prefer the session's current display name so renames show; unnamed
@@ -419,6 +424,10 @@ func (s *TokenUsageStore) GetUsageSummaryByAgent(ctx context.Context, since stri
 	   FROM ` + rel + ` t
 	   LEFT JOIN live_sessions ls ON ls.session_id = t.session_id
 	   WHERE ` + usageDedup("t.")
+	if board != "" {
+		query += ` AND COALESCE(NULLIF(t.board_name, ''), ls.board_name) = ?`
+		args = append(args, board)
+	}
 	query += ` GROUP BY t.session_id ORDER BY cost_usd DESC`
 	err := s.db.Reader().SelectContext(ctx, &summaries, query, args...)
 	return summaries, err
@@ -566,6 +575,11 @@ type TimeSeriesBucket struct {
 // GetUsageTimeSeries returns cost data bucketed by time interval.
 // The interval parameter controls bucket size: "5m", "1h", "1d".
 func (s *TokenUsageStore) GetUsageTimeSeries(ctx context.Context, since string, interval string) ([]TimeSeriesBucket, error) {
+	return s.GetUsageTimeSeriesBoard(ctx, since, interval, "")
+}
+
+// GetUsageTimeSeriesBoard is GetUsageTimeSeries for one board (the board each row was recorded on); board "" is every board (#7525).
+func (s *TokenUsageStore) GetUsageTimeSeriesBoard(ctx context.Context, since string, interval string, board string) ([]TimeSeriesBucket, error) {
 	// Map interval to SQLite strftime format
 	var bucketExpr string
 	switch interval {
@@ -596,6 +610,10 @@ func (s *TokenUsageStore) GetUsageTimeSeries(ctx context.Context, since string, 
 	          COALESCE(SUM(cache_write_tokens), 0) as cache_write_tokens,
 	          SUM(n_rows) as num_requests
 	   FROM ` + rel + ` u WHERE ` + usageDedup("u.")
+	if board != "" {
+		query += ` AND u.board_name = ?`
+		args = append(args, board)
+	}
 	query += ` GROUP BY bucket ORDER BY bucket ASC`
 
 	var buckets []TimeSeriesBucket

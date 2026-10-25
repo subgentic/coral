@@ -54,6 +54,7 @@ GET /api/board/{project}/relay-targets | board-claims
 GET /api/board/{project}/reminder | board-claims | operator-only
 GET /api/board/{project}/settings | board-claims
 GET /api/board/{project}/settings/log | board-claims +token-session | operator-only
+GET /api/board/{project}/spend | board-claims
 GET /api/board/{project}/status | board-claims
 GET /api/board/{project}/subscribers | board-claims
 GET /api/board/{project}/tasks | board-claims
