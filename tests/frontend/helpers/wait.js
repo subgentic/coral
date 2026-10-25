@@ -81,9 +81,10 @@ async function coralReady(ev, step = null, ...args) {
         ` (parts: ${JSON.stringify(await ev(`window.__coralReady.parts || null`).catch(() => null))})`);
 }
 
-// Loads url in the suite's tab and resolves at its load event (#352). The listener is in place before Page.navigate is sent: `await Page.navigate(...); await Page.loadEventFired()`
-// listens only once navigate has answered, and a load event that arrives before that answer is missed: the suite waits for a second one that never comes until the runner kills it
-// at 120 s (the hangs in inbox_local, preview_pane_resize and board_page_card on Windows, #348, came at a page load). A navigation Chrome refuses, or a load that does not come within `timeout`, fails with the url.
+// Loads url in the suite's tab and resolves at its load event, or fails with the url (#352). The listener is in place before Page.navigate is sent: `await Page.navigate(...); await
+// Page.loadEventFired()` listens only once navigate has answered. Under the runner, helpers/keep_page_visible.js (#6195) already hands such a wait a load that came up to a second early;
+// loadPage needs no such window, and adds what the bare pair lacks: a navigation Chrome refuses fails with Chrome's error, and a load that does not come within `timeout` fails naming the url
+// instead of running to the runner's 120 s limit (inbox_local, preview_pane_resize and board_page_card each hit that limit once on Windows near a page load, #348; the cause is not known).
 async function loadPage(Page, url, { timeout = 30000 } = {}) {
     let timer;
     const loaded = Page.loadEventFired();
