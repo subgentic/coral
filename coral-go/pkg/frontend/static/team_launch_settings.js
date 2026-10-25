@@ -39,6 +39,10 @@ export function mountTeamLaunchSettings() {
     wf.innerHTML = workflowHTML();
     hc.innerHTML = healthPanelHTML(HEALTH_DEFAULTS, []);
     hc.querySelector('.health-actions')?.remove(); // the dialog's Launch team saves it: no Save and Reset of its own
+    // Who gets the check is the Orchestrator at launch (a list of one is noise): the select stays, hidden, with its default, and the switch's line says where it goes. Another recipient is in Team settings once the team exists.
+    const rcpt = hc.querySelector('select[name="recipient"]');
+    if (rcpt) { rcpt.value = ''; const label = rcpt.closest('label'); if (label) label.hidden = true; }
+    const why = hc.querySelector('#hc-on-h'); if (why) why.textContent = 'Checks in on the team every few minutes. Sent to the Orchestrator. Uses tokens each time.';
     bindInfo(hc);
     wireHealthForm(hc.querySelector('form'));
     ms.innerHTML = messagingHTML();

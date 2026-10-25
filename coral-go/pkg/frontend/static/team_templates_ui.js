@@ -57,11 +57,15 @@ let _chosenTemplate = '';
 
 function _allTemplates() { return [...BUILTIN_TEAM_TEMPLATES, ..._getSavedTeamTemplates()]; }
 
-function _renderTeamTemplateSelector() {
+const SEARCH_FROM = 9; // the search is there once there are more templates than a list is quick to read
+
+function _renderTeamTemplateSelector(query = '') {
     const sel = document.getElementById('team-template-select');
     if (!sel) return;
+    const all = _allTemplates(), q = String(query || '').trim().toLowerCase();
+    const search = document.getElementById('team-template-search'); if (search) search.hidden = all.length < SEARCH_FROM;
     sel.replaceChildren(new Option('Blank team', ''));
-    for (const t of _allTemplates()) {
+    for (const t of all.filter(x => !q || x.name.toLowerCase().includes(q) || x.name === _chosenTemplate)) {
         const members = t.agents.length === 1 ? '1 member' : `${t.agents.length} members`;
         sel.append(new Option(`${t.name} (${members}${t.builtin ? '' : ', saved'})`, t.name));
     }
@@ -76,6 +80,7 @@ function markTeamTemplate(name) {
 
 function resetTeamTemplatePicker() {
     _chosenTemplate = '';
+    const search = document.getElementById('team-template-search'); if (search) search.value = '';
     _renderTeamTemplateSelector();
 }
 
