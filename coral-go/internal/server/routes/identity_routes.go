@@ -42,6 +42,8 @@ var operatorOnlyRoutes = map[string]string{
 	"GET /api/system/hooks-status":                      "see which agents run an older hook set",
 	"POST /api/sessions/live/{sessionID}/refresh-hooks": "resume an agent on the current hook set",
 	"GET /api/worktrees":                                "list the worktrees Coral kept",
+	"GET /api/sessions/live/{name}/memory":              "list an agent's instruction and memory files",
+	"GET /api/sessions/live/{name}/memory/{id}":         "read one of an agent's instruction or memory files",
 	"POST /api/worktrees/remove":                        "remove a kept worktree",
 	"POST /api/workflows":                               "create a workflow",
 	"PUT /api/workflows/{workflowID}":                   "change a workflow",

@@ -311,6 +311,10 @@ Get git diff for a specific file.
 }
 ```
 
+### GET `/api/sessions/live/{name}/memory` and `/memory/{id}`
+
+The files the agent's CLI reads as instructions (CLAUDE.md for Claude, AGENTS.md for Codex and Pi, GEMINI.md for Gemini and agy, in the agent's folder and the folders above it up to the git root, then the person's own file under `~/.claude`, `~/.codex`, `~/.gemini`) and its own memory (Claude's `~/.claude/projects/<project>/memory/*.md`, Codex's `~/.codex/memories/*.md`), nearest first. **The Operator's alone** (an agent's token is refused) and **never through Coral Hub**. `session_id` is required. Each row has an opaque `id` the list issues; the read route takes only such an id: no path from the caller, a link is never followed (its row says `problem: "link"`), a pipe or folder is `not_regular`, and nothing is read outside the folders above. A file is read as text, at most 256 KiB (a bigger one is cut and says `truncated`), and a file with a NUL byte or invalid UTF-8 says `binary` and gives no text. An id that is unknown, expired, another agent's or not an id is 404.
+
 ### GET `/api/sessions/live/{name}/search-files`
 
 Fuzzy file search or directory browsing within the agent's working directory.

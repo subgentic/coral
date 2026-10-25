@@ -153,6 +153,13 @@ GET /api/sessions/live/{name}/diff?session_id=uuid
 GET /api/sessions/live/{name}/search-files?q=query&session_id=uuid
 ```
 
+#### An agent's instruction and memory files (Operator only; not through Coral Hub)
+```
+GET /api/sessions/live/{name}/memory?session_id=uuid
+GET /api/sessions/live/{name}/memory/{id}?session_id=uuid
+```
+The list answers `{"files": [{id, file, kind (instructions|memory), level (project|parent|user), where, modified, size, problem?}]}`, nearest first; the read takes only an `id` the list issued (random, bound to that session, forgotten after an hour) and answers the file as text (`text`, `truncated`, `binary`, or a `problem`).
+
 #### Set display name (Operator only)
 ```
 PUT /api/sessions/live/{name}/display-name

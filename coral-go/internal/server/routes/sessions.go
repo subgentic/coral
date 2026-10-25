@@ -137,8 +137,9 @@ type SessionsHandler struct {
 	// onAutoEnableDeciding (tests only) runs after an enable passed its checks and before its write, the window the order closes.
 	onAutoEnableDeciding func()
 
-	wsList wsTickCache // one /ws/coral build shared by all clients (ws_shared_list.go)
-	wsKick wsKicker    // prompt /ws/coral rebuilds after state changes (ws_kick.go)
+	wsList    wsTickCache // one /ws/coral build shared by all clients (ws_shared_list.go)
+	wsKick    wsKicker    // prompt /ws/coral rebuilds after state changes (ws_kick.go)
+	memoryIDs memoryIDs   // the ids the memory list issued (sessions_memory.go, #7454)
 
 	// captureCache keeps each session's last poll capture with the backend's output stamp
 	// (#3439): while the pane has printed nothing, the poll reuses it instead of capture-pane.
