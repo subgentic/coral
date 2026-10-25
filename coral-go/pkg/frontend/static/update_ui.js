@@ -1,4 +1,4 @@
-/* The auto-update UI (#5275, design #5270): the "Relaunch to update" control in the top bar, the failure notice, and the status both read. Hidden and silent while the flag is off (update_flag.js):
+/* The auto-update UI (#5275, design #5270): the "Update and relaunch" control in the top bar, the failure notice, and the status both read. Hidden and silent while the flag is off (update_flag.js):
  * nothing is fetched. The status comes from update_api.js; this module keeps the last one, asks again every ten minutes and when the tab is shown (the Settings pane reads it with getUpdateStatus).
  * The control never animates: its state is a colour, a word and a number of days (colour is not the only signal: from "warm" on the age is written, on a phone too). */
 import { PHONE_QUERY } from './phone_layout.js';

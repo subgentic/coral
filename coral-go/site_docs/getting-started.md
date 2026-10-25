@@ -69,7 +69,7 @@ Add that `PATH` line to your shell's startup file for later terminals. There is 
 
 ## Updates
 
-Coral on a Mac, on Windows and on Linux keeps itself up to date. In the background it looks for the newest promoted release on GitHub, downloads it and checks it (the Sigstore signature, the checksum and the Apple Developer ID team of the new app). It never installs on its own: when an update is ready the dashboard and the tray offer a button (Relaunch to update on a Mac and on Linux, Install update on Windows), and only then does Coral install it and start again. On a Mac it swaps in the new app, and puts the old one back if the new one does not stay up. On Windows it runs the new MSI as an upgrade, and Windows asks you to allow it.
+Coral on a Mac, on Windows and on Linux keeps itself up to date. In the background it looks for the newest promoted release on GitHub, downloads it and checks it (the Sigstore signature, the checksum and the Apple Developer ID team of the new app). It never installs on its own: when an update is ready the dashboard and the tray offer a button (Update and relaunch on a Mac and on Linux, Install update on Windows), and only then does Coral install it and start again. On a Mac it swaps in the new app, and puts the old one back if the new one does not stay up. On Windows it runs the new MSI as an upgrade, and Windows asks you to allow it.
 
 - **Turn it off:** the automatic-updates switch in Settings, or start Coral with `CORAL_AUTO_UPDATE=off`.
 - **Homebrew installs** are never updated by Coral: run `brew upgrade --cask coral`.
