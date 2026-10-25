@@ -59,6 +59,16 @@ func Middleware(ks *KeyStore) func(http.Handler) http.Handler {
 			// header is still validated against DNS rebinding.
 			if IsDirectLocalPeer(r) {
 				if isValidLocalhostHost(r.Host) {
+					// A browser that opens a link with the key gets a session here as it does from anywhere else (#7399): the pass below does not ask for the key, but strict local
+					// auth wants a credential on every call, and a page opened with ?api_key= and no session loaded and then answered 401 to everything it asked. Only a valid key
+					// counts, only for a navigation that holds no live session, and a wrong key here is no attempt at signing in (it is not counted against the address).
+					if key := r.URL.Query().Get("api_key"); key != "" && ks.ValidateKey(key) && wantsSessionCookie(ks, r) {
+						if token, err := ks.NewSessionRotating(r, SessionByKey, false); err != nil {
+							log.Printf("[auth] failed to create session: %v", err)
+						} else {
+							ks.setSessionCookie(w, r, token, false)
+						}
+					}
 					next.ServeHTTP(w, withMethod(r, MethodLoopback))
 					return
 				}
