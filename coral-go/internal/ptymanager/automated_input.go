@@ -104,6 +104,8 @@ type AutomatedInput struct {
 	// heldReportedPrompt: it was reported as held by a prompt (prompt=true). A send
 	// first reported as an input-box hold is reported again once a prompt holds it.
 	heldReportedPrompt bool
+	// force: Send now (#7579): the Operator chose to send, so the checks that keep a paste waiting for the agent's input box are not made (held_force.go); a real prompt or a draft still refuses.
+	force bool
 	// gen is the session's DropHeld generation when the send reached the gate: a send
 	// in flight while DropHeld ran (a turn that takes it off the queue and holds it
 	// again) is never held again for the new process (#3468 v2).

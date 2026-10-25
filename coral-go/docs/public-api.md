@@ -117,7 +117,8 @@ it, since when and why it waits; never the text; `reason` is one of `turn`, `pro
 the agent may be in the middle of a turn, and the text goes into its input box. The answer is
 `{"ok": true, "sent": n, "held_again": n, "dropped": n, "left": n}`; a message goes once, so a second call finds
 nothing, and one the normal release took first is not typed again. A prompt or menu that is open on the
-agent's terminal holds everything (`"prompt_open": true`, nothing typed). Both routes are the Operator's:
+agent's terminal holds everything (`"prompt_open": true`, nothing typed), and so does text in the agent's input box that is not
+Coral's, a draft (`"draft_in_box": true`). Nothing else holds it: it is typed even when Coral cannot see the input box. Both routes are the Operator's:
 an agent's token gets 403 `forbidden_for_agent`, and they are never reachable through Coral Hub. The same from
 the command line: `coral-board held "<agent>"` and `coral-board held send "<agent>" [--id ID]`.
 

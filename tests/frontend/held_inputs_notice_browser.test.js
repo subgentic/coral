@@ -64,6 +64,9 @@ const BASE = require('./test_base').BASE;
             const sent = await ev('window.__sent');
             check(`${tag}: Send now posts to this agent's held/send route with its type and session id, for all`, sent.length === 1 && /\/api\/sessions\/live\/held-agent\/held\/send/.test(sent[0].u) && JSON.parse(sent[0].body).session_id === 'held-agent-id' && JSON.parse(sent[0].body).agent_type === 'claude' && JSON.parse(sent[0].body).id === '', JSON.stringify(sent));
             await ev(`window.fetch = window.__realFetch; true`);
+            // 7579: what is said after a press: sent, or not sent and why, in one line
+            const said = await ev(`import(${S} + 'held_send_now.js').then(m => ({ sent: m.sendNowToast({ sent: 2 }), one: m.sendNowToast({ sent: 1 }), none: m.sendNowToast({ sent: 0 }), prompt: m.sendNowToast({ sent: 0, prompt_open: true }), draft: m.sendNowToast({ sent: 0, draft_in_box: true }) }))`);
+            check(`${tag}: after a press it says what was sent, or why nothing was (a prompt, a draft)`, said.sent === 'Sent 2 messages now.' && said.one === 'Sent 1 message now.' && /nothing was sent into it/.test(said.prompt) && /draft in the agent's input box: nothing was sent/.test(said.draft) && /Nothing was held/.test(said.none), JSON.stringify(said));
             await feed(2);
             sv = await sendView();
             check(`${tag}: several held: "Send all now"`, sv.shown && sv.label === 'Send all now', JSON.stringify(sv));
