@@ -8,6 +8,8 @@
 //     text can only ever be a data-* VALUE.
 //   node renderer_payloads.test.mjs
 import assert from 'node:assert';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { installDom, importUi, STATIC } from './helpers/jsdom_env.mjs';
 
 installDom({ mode: 'cloud' });
@@ -37,6 +39,15 @@ const BENIGN = 'agent-one';
 const called = [];
 const DANGEROUS = ['sendKeys', 'sendRawKeys', 'executeMacro', 'sendQuickCommand', 'killSession', 'restartSession', 'foo', 'PWNED'];
 for (const n of DANGEROUS) window[n] = globalThis[n] = (...a) => { called.push([n, ...a]); };
+// Every other hook a handler calls as window.name(...) is defined by app.js, which this test does not load: without it each fired action threw "window.x is not a function" into the log (700 lines, the
+// session-tag-remove one among them) and proved less than it said. A no-op stands in, so the action runs its real path up to the hook; a hook the code calls as window.name?.() is left absent, as there.
+for (const f of readdirSync(STATIC).filter(f => f.endsWith('.js'))) {
+    const src = readFileSync(join(STATIC, f), 'utf8');
+    const names = [...src.matchAll(/\bwindow\.([A-Za-z_]\w*)\(/g)].map(m => m[1]);
+    for (const m of src.matchAll(/\bW\(([^()]*)\)/g)) names.push(...[...m[1].matchAll(/'([A-Za-z_]\w*)'/g)].map(q => q[1])); // W('name') and W(cond ? 'a' : 'b'): action_helpers.js's call by name
+    for (const m of src.matchAll(/\bwith[A-Z]\w*\('([A-Za-z_]\w*)'/g)) names.push(m[1]); // withBoard('killBoard'), withId(...): the helpers that call a hook by name
+    for (const n of names) if (typeof window[n] === 'undefined') window[n] = globalThis[n] = () => {};
+}
 
 function snapshot(root = document.body) {
     const attrs = new Set(), tagsSeen = new Set(), handlers = [], actions = [];
