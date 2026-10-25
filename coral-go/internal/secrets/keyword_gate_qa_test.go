@@ -31,6 +31,7 @@ func TestKeywordGateKeepsWhatTheRulesFindInOddText(t *testing.T) {
 
 // Random text built from the pieces the rules read, with the odd ones (long blanks, long names, two letters that fold, form feeds) the gate's own test leaves out.
 func TestKeywordGateOnOddRandomText(t *testing.T) {
+	t.Parallel() // pure and read-only on the redactor: runs after the timing tests, together (#354)
 	pieces := []string{"api_key", "token", "TOKEN", "x-api-key", "password", "PASSWORD", "secret", "DB_PASSWORD", "PGPASSWORD", "STRIPE_KEY", "key", "sig", "auth",
 		"Authorization", "Cookie", "Set-Cookie", "curl", "-u", "--user", "mysql", "mysqldump", "-p", "sshpass", "--password", "--token", "--api-key", "--", "-",
 		"bearer", "=", ":", "\uFF1D", "%3D", "%253D", "%3F", "%3A", "%253A", "%20", "+", "&quot;", "&#34;", "&#x22;", "&apos;", "&#39;", "&amp;", "&", "?", ";", " ", "  ", "\t", "\n", "\r\n", "\f", "\u00a0", `"`, "'", `\"`, `\\`, "<", ">", "%", "_", ".",

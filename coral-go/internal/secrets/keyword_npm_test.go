@@ -12,6 +12,7 @@ import (
 
 // Round five (#5242): the entity-encoded equals and colon, npm and yarn config set, an .npmrc line, and a "pwd" name: 2000 random values each, none may come back, as text and as a JSON reply.
 func TestRoundFiveShapesAreRedacted(t *testing.T) {
+	t.Parallel() // pure and read-only on the redactor: runs after the timing tests, together (#354)
 	require.NoError(t, Init())
 	shapes := []struct {
 		name   string

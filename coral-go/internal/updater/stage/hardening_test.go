@@ -2,6 +2,7 @@ package stage
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -22,45 +23,55 @@ import (
 // lock and creates its own, another (still holding the stale judgement) removes THAT one and creates its own: two holders at once. The takeover
 // renames the lock away and checks what it moved, so only one check ever holds it.
 func TestChecksOverOneStaleLockNeverHoldItTogether(t *testing.T) {
-	dir := t.TempDir()
 	now := time.Now()
 	stale, _ := json.Marshal(lockBody{PID: 2147483646, Taken: now.Unix()})
 	var violations atomic.Int32
 	var won atomic.Int32
-	for round := 0; round < 500; round++ {
-		require.NoError(t, os.WriteFile(filepath.Join(dir, CheckLockFile), stale, 0o600))
-		var holders atomic.Int32
-		var ready, start, done sync.WaitGroup
-		start.Add(1)
-		for i := 0; i < 12; i++ {
-			ready.Add(1)
-			done.Add(1)
-			go func() {
-				defer done.Done()
-				ready.Done()
-				start.Wait()
-				release, err := takeLock(dir, CheckLockFile, now)
-				if err != nil {
-					return
+	// 500 rounds, in 10 groups that run together (#354: one after another they were 75 s). Each group has a folder and a lock of its own, so the rounds of two groups never touch each
+	// other; inside a round the 12 checks race for the one lock as before.
+	const groups, perGroup = 10, 50
+	t.Run("rounds", func(t *testing.T) { // returns when every group has finished
+		for g := 0; g < groups; g++ {
+			t.Run(fmt.Sprintf("group %d", g), func(t *testing.T) {
+				t.Parallel()
+				dir := t.TempDir()
+				for round := 0; round < perGroup; round++ {
+					require.NoError(t, os.WriteFile(filepath.Join(dir, CheckLockFile), stale, 0o600))
+					var holders atomic.Int32
+					var ready, start, done sync.WaitGroup
+					start.Add(1)
+					for i := 0; i < 12; i++ {
+						ready.Add(1)
+						done.Add(1)
+						go func() {
+							defer done.Done()
+							ready.Done()
+							start.Wait()
+							release, err := takeLock(dir, CheckLockFile, now)
+							if err != nil {
+								return
+							}
+							won.Add(1)
+							if holders.Add(1) > 1 {
+								violations.Add(1)
+							}
+							time.Sleep(3 * time.Millisecond)
+							holders.Add(-1)
+							release()
+						}()
+					}
+					ready.Wait()
+					start.Done()
+					done.Wait()
+					_ = os.Remove(filepath.Join(dir, CheckLockFile))
 				}
-				won.Add(1)
-				if holders.Add(1) > 1 {
-					violations.Add(1)
-				}
-				time.Sleep(3 * time.Millisecond)
-				holders.Add(-1)
-				release()
-			}()
+				entries, _ := os.ReadDir(dir)
+				assert.Empty(t, entries, "no moved-away lock or temp file is left behind")
+			})
 		}
-		ready.Wait()
-		start.Done()
-		done.Wait()
-		_ = os.Remove(filepath.Join(dir, CheckLockFile))
-	}
+	})
 	assert.Zero(t, violations.Load(), "two checks held the lock at the same time")
-	assert.GreaterOrEqual(t, int(won.Load()), 500, "someone took the stale lock every round")
-	entries, _ := os.ReadDir(dir)
-	assert.Empty(t, entries, "no moved-away lock or temp file is left behind")
+	assert.GreaterOrEqual(t, int(won.Load()), groups*perGroup, "someone took the stale lock every round")
 }
 
 // The same race, made certain: check B reads the stale lock and stops; check A takes over and holds the lock; then B goes on with what it read.
