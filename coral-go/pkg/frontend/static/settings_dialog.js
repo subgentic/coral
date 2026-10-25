@@ -685,6 +685,9 @@ function _fillDefaults(s) {
     if (permModeSelect) {
         permModeSelect.value = currentPermMode;
         _updatePermModeDescription(permModeSelect, !s.default_permission_mode);
+        // A pick is a choice even when it is the mode the field showed (nothing saved shows Auto): it is saved, so a person who picks Auto and saves has Auto saved (#7620)
+        permModeSelect.dataset.edited = '';
+        if (!permModeSelect.dataset.watched) { permModeSelect.dataset.watched = '1'; permModeSelect.addEventListener('change', () => { permModeSelect.dataset.edited = '1'; }); }
     }
 
     // Default Working Directory
@@ -1023,7 +1026,7 @@ function readSettingsForm() {
 
     // Only what the person changed since the dialog opened: a field this dialog never touched (a CLI path another
     // tab saved meanwhile) is not written back with the value this page opened with.
-    payload = changedSettings(dropUnfilledCLIPaths(payload), _settingsAtOpen, themeValue, editedCLIPathKeys(), defaultThemeChoice());
+    payload = changedSettings(dropUnfilledCLIPaths(payload), _settingsAtOpen, themeValue, [...editedCLIPathKeys(), ...(document.getElementById('settings-permission-mode')?.dataset.edited === '1' ? ['default_permission_mode'] : [])], defaultThemeChoice());
     // The hub accepts only the per-user keys (anything else refuses the whole request); the machine ones are hidden.
     if (isCloud()) payload = filterSettingsPayload(payload).kept;
 

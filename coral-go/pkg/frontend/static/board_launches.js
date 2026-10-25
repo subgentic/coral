@@ -60,7 +60,7 @@ export async function launchAgentToBoard() {
 
     // Permission flag check
     let flagsStr = config.flags;
-    const permResult = await _checkPermissionFlag(flagsStr, config.agentType, server);
+    const permResult = await _checkPermissionFlag(flagsStr, config.agentType, server, config.permissionMode);
     if (permResult === null) return;
     if (permResult === 'enable') {
         const mode = defaultPermissionMode(_settingsFor(server), config.agentType);

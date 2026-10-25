@@ -324,7 +324,7 @@ function _wireDirNote() {
 
 
 export async function launchSession() {
-    let dir, type, agentName, flagsStr, backend;
+    let dir, type, agentName, flagsStr, backend, permPick;
     if (launch.mode !== 'terminal' && _cliBlock()) return; // the CLI it needs is missing: the message under the folder says so
 
     if (launch.mode === "terminal") {
@@ -339,6 +339,7 @@ export async function launchSession() {
         type = config.agentType || 'claude';
         agentName = document.getElementById("launch-agent-name-input")?.value.trim() || config.name;
         flagsStr = config.flags;
+        permPick = config.permissionMode;
         backend = document.getElementById("launch-backend")?.value;
     }
 
@@ -355,7 +356,7 @@ export async function launchSession() {
 
     // Permission flag check (skip for terminals)
     if (launch.mode !== "terminal") {
-        const permResult = await _checkPermissionFlag(flagsStr, type, server);
+        const permResult = await _checkPermissionFlag(flagsStr, type, server, permPick);
         if (permResult === null) return;
         if (permResult === 'enable') {
             const mode = defaultPermissionMode(_settingsFor(server), type);

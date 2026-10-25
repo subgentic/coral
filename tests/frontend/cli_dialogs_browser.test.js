@@ -51,6 +51,13 @@ const BASE = require('./test_base').BASE;
         await click('cancel'); await ev(`new Promise(r => setTimeout(r, 300))`); // sleep-ok: a launch, if one were sent, would be sent within this
         assert.equal(await ev(`window.__launches.length`), 0, 'Cancel sends nothing'); assert.deepEqual(await modals(), []);
 
+        console.log('Codex on Default launches without the question (its Default is the launch its Auto is, #7620); Claude on Default still asks');
+        const before = await ev(`window.__launches.length`);
+        await ev(`window.showLaunchModal(); window._selectLaunchType('agent'); { const t = document.querySelector('#launch-agent-acf .acf-agent-type'); t.value = 'codex'; t.dispatchEvent(new Event('change', { bubbles: true })); const sel = document.querySelector('#launch-agent-acf .acf-permission-mode'); sel.value = 'default'; } document.getElementById('launch-dir').value = '/work/project'; document.querySelector('#launch-step-agent [data-on-click="m-launch-session"]').click(); true`);
+        await waitFor(`window.__launches.length === ${before + 1}`, 'the Codex launch, with no question first');
+        assert.deepEqual(await modals(), [], 'no Permission Prompt Warning for Codex on Default'); assert.equal(await ev(`window.__launches[window.__launches.length - 1].agent_type`), 'codex');
+        await ev(`window.__launches.length = 0; true`); // the scenarios below count their own launches
+
         console.log('Launch Without sends no permission flag; Enable & Launch adds it');
         await startLaunch(); await waitFor(`!!document.querySelector('body > .modal:not([id]) [data-action="skip"]')`, 'the question');
         await click('skip'); await waitFor(`window.__launches.length === 1`, 'the launch');

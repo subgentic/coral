@@ -517,6 +517,7 @@ export function getAgentConfig(containerId) {
         thinking: agentType === 'terminal' ? undefined : thinkingValue(container), // undefined: not chosen, so a launch uses the default and a restart keeps the agent's level (#4969)
         prompt: container.querySelector('.acf-prompt')?.value.trim() || '',
         flags,
+        permissionMode: permMode, // what the form's select says: a launch on Default asks nothing about skipping prompts (#7620)
         capabilities: uid ? _getPermissions(`${uid}-perms`) : null,
     };
 }

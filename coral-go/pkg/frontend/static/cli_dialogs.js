@@ -111,7 +111,10 @@ async function _recheckCLI(button, modal, agentType, server, close, retry) {
     if (modal.isConnected && !modal.contains(document.activeElement)) button.focus(); // disabling the button while it looked dropped the keyboard's place
 }
 
-function _checkPermissionFlag(flagsStr, agentType, server = LOCAL_SERVER) {
+// picked: the mode the launch form's select says. Codex's Default already is the launch that never asks (workspace-write, #7527), the one its Auto is: there is no flag to offer, so no warning (#7620).
+// Claude's Default asks before it acts, which is not the saved default's launch: that one keeps its question.
+function _checkPermissionFlag(flagsStr, agentType, server = LOCAL_SERVER, picked = '') {
+    if (picked === 'default' && agentType === 'codex') return Promise.resolve('skip');
     const mode = defaultPermissionMode(_settingsFor(server), agentType);
     const permFlag = _getPermissionFlagsForAgentMode(agentType, mode);
     if (!permFlag) return Promise.resolve('skip');
