@@ -34,6 +34,14 @@ const S = `(window.__coralStatic || '/static/')`;
         assert.equal(after, 'Restarting agent-7...', 'after the card is dismissed the next restart starts a new one at one');
         const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', '..', 'coral-go', 'pkg', 'frontend', 'static', 'controls.js'), 'utf8');
         assert.ok(src.includes("group: { key: 'restarting', text: n => `Restarting ${n} agents` }"), 'Restart sends its toast as the "restarting" group: ' + src.length);
+        // an error is never covered by a later ordinary toast: a failed save is not read as "Saved" (QA Reviewer 2, #7690)
+        await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); import(${S} + 'notifications.js').then(n => { n.showToast('Could not save: the disk is full', true, 600000); n.showToast('Saved', false, 600000); return true; })`);
+        await waitFor(`document.querySelectorAll('.toast.toast-front').length === 1`, 'one toast in front', 3000);
+        const front = () => ev(`[...document.querySelectorAll('.toast')].filter(t => t.getClientRects().length > 0).map(t => t.querySelector('.toast-message').textContent)`);
+        assert.deepEqual(await front(), ['Could not save: the disk is full'], 'the error stays drawn over the later "Saved"');
+        await ev(`document.querySelector('.toast.error .toast-close').click(); true`);
+        await waitFor(`document.querySelectorAll('.toast.toast-front').length === 1`, 'the next toast in front', 3000);
+        assert.deepEqual(await front(), ['Saved'], 'and "Saved" is drawn once the error is dismissed');
         console.log('PASS toast fold');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

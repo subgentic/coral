@@ -1470,8 +1470,8 @@ button.subscriber-history-link {
     #warning-toasts > .update-toast.expanded .update-toast-current { display: inline; }
     #toast-host { max-width: none; align-items: flex-start; } /* just under the app bar, one compact card (UI/UX 170 consistency pass 2, item 4): not a stack of full-width cards over the header */
     #toast-host > .toast { max-width: 100%; padding: 2px 4px 2px 14px; gap: 4px; }
-    #toast-host > .toast:not(:last-child) { display: none; } /* one at a time: the newest, and the one before it when that is dismissed */
-    #notices:has(#warning-toasts > *) #toast-host { display: none; } /* a warning or the update notice replaces an ordinary toast while it is shown */
+    #toast-host > .toast:not(.toast-front) { display: none; } /* one at a time: the newest, or the newest error while there is one (notifications.js); the others return as it is dismissed */
+    #warning-toasts:not(:empty) ~ #toast-host { display: none; } /* a warning or the update notice replaces an ordinary toast while it is shown */
     /* A toast is one line (the desktop's text size), a tap shows the rest. */
     #toast-host > .toast .toast-message { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; line-clamp: 1; overflow: hidden; }
     #toast-host > .toast.error .toast-message { -webkit-line-clamp: 4; line-clamp: 4; } /* an error says what went wrong and what to do: four lines before the cut (#6727) */

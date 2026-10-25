@@ -110,6 +110,8 @@ export function noticeColumn() {
         const loud = document.createElement("div");
         loud.id = "notice-alert"; loud.className = "sr-only"; loud.setAttribute("role", "alert");
         col.append(warnings, toasts);
+        // One short toast is drawn on a phone (css): the newest, but an error is never covered by a later ordinary toast, so a failed save is not read as "Saved" (QA Reviewer 2, #7690).
+        new MutationObserver(() => { const all = [...toasts.children], front = [...all].reverse().find(t => t.classList.contains("error")) || all[all.length - 1]; for (const t of all) t.classList.toggle("toast-front", t === front); }).observe(toasts, { childList: true });
         // Outside the column: the column is not drawn while it holds no notice (no empty landmark), and a region inside a hidden column is not announced by a browser.
         const announcer = document.createElement("div");
         announcer.id = "notice-announcer"; announcer.className = "sr-only";
