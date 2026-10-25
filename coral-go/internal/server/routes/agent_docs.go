@@ -168,9 +168,33 @@ func (h *AgentDocsHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 // "Using The Dashboard" and "Agent Ui".
 func docTitle(docs fs.FS, file, name string) string {
 	if h := firstHeading(docs, file); h != "" {
-		return sentenceCase(h)
+		return listTitle(sentenceCase(h))
 	}
-	return sentenceCase(strings.ReplaceAll(name, "-", " "))
+	return listTitle(sentenceCase(strings.ReplaceAll(name, "-", " ")))
+}
+
+// docTitleSoftCap: a list row is one short line. A title is taken up to its first colon or opening bracket, then words are added while it is shorter than this many characters, so the word that crosses it
+// stays (the sidebar can wrap one more word) and nothing is cut mid-word or ends in an ellipsis. The topic page still shows the full heading as the document's own h1.
+const docTitleSoftCap = 32
+
+// listTitle shortens a sentence-case heading for the Docs list (UI/UX's rules on #7516).
+func listTitle(h string) string {
+	if i := strings.IndexAny(h, ":("); i > 0 {
+		h = strings.TrimSpace(h[:i])
+	}
+	var out []string
+	n := 0
+	for _, w := range strings.Fields(h) {
+		if n >= docTitleSoftCap {
+			break
+		}
+		out = append(out, w)
+		n += len(w) + 1
+	}
+	for len(out) > 1 && strings.Trim(out[len(out)-1], "&,;-") == "" { // never end on a bare "&" or dash
+		out = out[:len(out)-1]
+	}
+	return strings.Join(out, " ")
 }
 
 // firstHeading is the text of the first "# " line in the first 4 KiB of a doc, or "".
@@ -193,7 +217,7 @@ func firstHeading(docs fs.FS, file string) string {
 // docProperNouns are words kept capitalised in a sentence-case title; docAcronyms are kept (or made) upper case.
 var (
 	docProperNouns = map[string]string{"coral": "Coral", "claude": "Claude", "codex": "Codex", "gemini": "Gemini", "hub": "Hub", "windows": "Windows", "linux": "Linux", "macos": "macOS", "github": "GitHub"}
-	docAcronyms    = map[string]string{"ui": "UI", "api": "API", "cli": "CLI", "json": "JSON", "url": "URL", "id": "ID", "poc": "POC", "http": "HTTP", "tls": "TLS", "html": "HTML", "ai": "AI"}
+	docAcronyms    = map[string]string{"ui": "UI", "api": "API", "cli": "CLI", "json": "JSON", "url": "URL", "id": "ID", "mcp": "MCP", "poc": "POC", "http": "HTTP", "tls": "TLS", "html": "HTML", "ai": "AI"}
 )
 
 // sentenceCase writes a heading in sentence case: the first word capitalised, every other word lower case, except proper nouns (Coral, Hub), acronyms (API, UI, CLI) and words that are already
