@@ -121,6 +121,60 @@ func TestProxyUploadStallTimeout(t *testing.T) {
 	})
 }
 
+// The 30 s wait for the machine's reply starts when the browser's body has ended, not when the request started; a machine that never sends headers is answered 502 and its
+// request is cancelled. For a chunked upload, a request with no body and an event-stream request. Fake time (testing/synctest) with a Target that reads the body and then waits.
+func TestProxyHeaderTimeoutAfterBody(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		body bool
+		sse  bool
+	}{
+		{name: "chunked upload", body: true},
+		{name: "no body"},
+		{name: "event stream", sse: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				var bodyEnded time.Time
+				upstreamCancelled := false
+				var body *pacedUpload
+				var reqBody io.Reader
+				if tc.body {
+					body = &pacedUpload{remaining: 4 * 32 * 1024, interval: 500 * time.Millisecond, cancel: func() {}}
+					reqBody = body
+				}
+				target := uploadTimeoutTarget{roundTrip: func(r *http.Request) (*http.Response, error) {
+					if body != nil {
+						body.ctx = r.Context()
+					}
+					if _, err := io.Copy(io.Discard, r.Body); err != nil {
+						return nil, err
+					}
+					bodyEnded = time.Now()
+					<-r.Context().Done() // The machine never sends response headers.
+					upstreamCancelled = true
+					return nil, r.Context().Err()
+				}}
+				req := httptest.NewRequest(http.MethodPost, "/api/remote/a/api/upload", reqBody)
+				if tc.body {
+					req.ContentLength = -1
+				}
+				if tc.sse {
+					req.Header.Set("Accept", "text/event-stream")
+				}
+				recorder := httptest.NewRecorder()
+				(&Handler{}).proxyHTTP(recorder, req, "a", target, "/api/upload", "/api/upload")
+				answered := time.Now()
+				require.Equal(t, http.StatusBadGateway, recorder.Code, recorder.Body.String())
+				elapsed := answered.Sub(bodyEnded)
+				require.GreaterOrEqual(t, elapsed, 29*time.Second, "30 s starts after the body, not at request start")
+				require.Less(t, elapsed, 35*time.Second)
+				require.True(t, upstreamCancelled, "upstream context was not canceled")
+			})
+		})
+	}
+}
+
 // The one stall test that keeps real sockets and the real 30 s (#6190): a browser upload through the hub to a loopback machine that stops for 31 s. The bubble tests above
 // check the handler's logic; this one checks that the bound reaches the actual connection and body read (a deadline on the wrong object, a client without a timeout).
 // It is t.Parallel(), so its 30 s overlaps the rest of the package.
