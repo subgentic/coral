@@ -20,7 +20,7 @@ const A = 'a'.repeat(64), B = 'b'.repeat(64), C = 'c'.repeat(64);
           { id: '${C}', name: 'ghost.md', media_type: '', size: null, task_id: 0, created_at: '2026-10-23T06:00:00Z', uri: 'coral://artifacts/${C}', available: false, provenance: 'unverified', source: 'uploaded' }];
         const j = (b, s = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: s, headers: { 'Content-Type': 'application/json' } }));
         window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin), m = (o.method || 'GET').toUpperCase();
-            if (/^\\/api\\/board\\/[^/]+\\/artifacts$/.test(url.pathname)) { window.__req.push(url.search); const q = (url.searchParams.get('q') || '').toLowerCase(); const rows = ALL.filter(a => !q || a.name.toLowerCase().includes(q)); return j({ project: ${JSON.stringify(TEAM)}, artifacts: rows, has_more: false, total: rows.length, all: ALL.length }); }
+            if (/^\\/api\\/board\\/[^/]+\\/artifacts$/.test(url.pathname)) { window.__req.push(url.search); const q = (url.searchParams.get('q') || '').toLowerCase(); const rows = ALL.filter(a => !q || a.name.toLowerCase().includes(q)); if (window.__paged) { const more = url.searchParams.get('cursor') !== 'c1'; return j({ project: ${JSON.stringify(TEAM)}, artifacts: more ? ALL.slice(0, 2) : ALL.slice(2), has_more: more, next_cursor: more ? 'c1' : '', total: 3, all: 3 }); } return j({ project: ${JSON.stringify(TEAM)}, artifacts: rows, has_more: false, total: rows.length, all: ALL.length }); }
             if (url.pathname === '/api/system/artifact-store/kept') return j({ kept: [] });
             if (/^\\/api\\/artifacts\\/[a-f0-9]{64}\\/keep$/.test(url.pathname)) { window.__kept.push(m); return j({ ok: true }); }
             if (/^\\/api\\/artifacts\\/[a-f0-9]{64}$/.test(url.pathname) && m === 'DELETE') { window.__deleted = url.pathname; return j({ ok: true }); }
@@ -71,6 +71,17 @@ const A = 'a'.repeat(64), B = 'b'.repeat(64), C = 'c'.repeat(64);
             const before = (await ev(`window.__req`)).length;
             assert.ok(await click('#team-panel-artifacts button', /^Refresh$/), 'a Refresh button'); await settle(500);
             assert.ok((await ev(`window.__req`)).length > before, 'a new request');
+        });
+        // The panel is rebuilt on every change, which once dropped the keyboard focus (team_artifacts.js keeps it): a guard the old keyboard suite held, now for the team page (#7457).
+        await S.run('Refresh and Load more keep the keyboard focus in the list, not on the page', async () => {
+            const inList = `!!document.activeElement && document.activeElement !== document.body && !!document.activeElement.closest('#team-panel-artifacts')`;
+            await ev(`window.__paged = true; true`);
+            await ev(`(() => { const b = [...document.querySelectorAll('#team-panel-artifacts button')].find(x => /^Refresh$/.test(window.__na.name(x))); b.focus(); b.click(); return true; })()`);
+            await waitFor(`!![...document.querySelectorAll('#team-panel-artifacts button')].find(x => /^Load more$/.test(window.__na.name(x)))`, 'Load more after the refreshed first page', 6000);
+            assert.ok(await ev(inList), 'after Refresh the focus is still in the list');
+            await ev(`(() => { const b = [...document.querySelectorAll('#team-panel-artifacts button')].find(x => /^Load more$/.test(window.__na.name(x))); b.focus(); b.click(); return true; })()`);
+            await waitFor(`document.querySelectorAll('#team-panel-artifacts tbody tr').length === 3`, 'the next page', 6000);
+            await waitFor(inList, 'the focus back in the list after Load more', 3000).catch(async e => { throw new Error(e.message + ' (focus is on ' + JSON.stringify(await ev(`(() => { const a = document.activeElement; return a ? a.tagName + '.' + a.className + ' ' + (a.textContent || '').slice(0, 30) : null; })()`)) + ')'); });
         });
         await S.run("a linked computer's team: Keep and Delete are not offered (they would act on THIS computer's store), Open and Copy link are; a deletion message about another server leaves the list alone", async () => {
             await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'team_artifacts_page.js'); const host = document.createElement('div'); host.id = 'qa-remote-host'; document.body.append(host);
