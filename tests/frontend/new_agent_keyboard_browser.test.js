@@ -92,9 +92,13 @@ const BASE = require('./test_base').BASE;
             for (let i = 0; i < 40; i++) { await key('Tab'); assert.ok((await active()).inside, `Tab ${i + 1}: focus left the dialog (on ${(await active()).name})`); }
             for (let i = 0; i < 40; i++) { await key('Tab', 8); assert.ok((await active()).inside, `Shift+Tab ${i + 1}: focus left the dialog`); }
         });
-        await S.run('Escape closes the dialog and the focus is back on the page, not lost on the body', async () => {
+        await S.run('Escape closes the dialog and the focus goes back to the button that opened it (a real opener: the New agent button)', async () => {
+            await ev(`window.hideLaunchModal && window.hideLaunchModal(); true`); await settle(200);
+            const opened = await ev(`(() => { const b = [...document.querySelectorAll('button, a')].filter(e => e.getClientRects().length > 0).find(e => /^\\+?\\s*New agent$/i.test((e.getAttribute('aria-label') || e.textContent || '').replace(/\\s+/g, ' ').trim())); if (!b) return false; window.__qaOpener = b; b.focus(); b.click(); return true; })()`);
+            assert.ok(opened, 'a visible New agent button to open the dialog with');
+            await waitFor(`!!window.__na.dialog()`, 'the dialog opens from the button', 6000);
             await key('Escape'); await waitFor(`!window.__na.dialog()`, 'Escape closes New agent', 4000);
-            assert.ok(await ev(`document.activeElement && document.activeElement !== document.body`), 'focus returns to a control (the opener), not the body');
+            assert.ok(await ev(`document.activeElement === window.__qaOpener`), 'focus is back on the New agent button');
         });
         await S.run('Restart Session: modal and named, opens on the Agent tab, the same tab keys and radiogroup keys work, Escape closes it', async () => {
             await ev(`window.__m.add('qa-agent', 'A', 3, { sleeping: false }); T.render.renderLiveSessions(T.state.liveSessions); true`);
