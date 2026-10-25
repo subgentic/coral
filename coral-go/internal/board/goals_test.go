@@ -503,10 +503,10 @@ func TestGoalsSchemaIsIdempotentAndUpgradesAnOldDatabase(t *testing.T) {
 	task, err := s.CreateTask(ctx, "oldboard", "an old task", "", "medium", "Lead")
 	require.NoError(t, err)
 	for _, ddl := range []string{
-		`DROP TRIGGER board_tasks_goal_seq_insert`, `DROP TRIGGER board_tasks_goal_seq_update`, `DROP TRIGGER board_tasks_goal_seq_delete`,
-		`DROP TRIGGER board_goals_seq_insert`, `DROP TRIGGER board_goals_seq_update`, `DROP TRIGGER board_goals_seq_delete`, `DROP TRIGGER board_goals_uid_immutable`, `DROP TRIGGER boards_board_uid_immutable`,
-		`DROP INDEX idx_board_tasks_goal`, `DROP INDEX idx_boards_board_uid`, `DROP INDEX idx_board_goals_uid`, `DROP INDEX idx_board_goals_board`,
-		`DROP TABLE board_goals`, `DROP TABLE board_goal_meta`,
+		`DROP TRIGGER board_tasks_goal_seq_insert`, `DROP TRIGGER board_tasks_goal_seq_state`, `DROP TRIGGER board_tasks_goal_seq_move`, `DROP TRIGGER board_tasks_goal_seq_delete`, // the task triggers, as #7355 split the update one
+		`DROP TRIGGER board_goals_seq_insert`, `DROP TRIGGER board_goals_seq_update`, `DROP TRIGGER board_goals_seq_closed`, `DROP TRIGGER board_goals_seq_reopened`, `DROP TRIGGER board_goals_seq_delete`, `DROP TRIGGER board_goals_uid_immutable`, `DROP TRIGGER boards_board_uid_immutable`,
+		`DROP INDEX idx_board_tasks_goal`, `DROP INDEX idx_boards_board_uid`, `DROP INDEX idx_board_goals_uid`, `DROP INDEX idx_board_goals_board`, `DROP INDEX idx_board_goal_events_board`,
+		`DROP TABLE board_goals`, `DROP TABLE board_goal_meta`, `DROP TABLE board_goal_events`,
 		`ALTER TABLE board_tasks DROP COLUMN goal_id`, `ALTER TABLE boards DROP COLUMN board_uid`,
 	} {
 		_, err := s.db.Exec(ddl)
