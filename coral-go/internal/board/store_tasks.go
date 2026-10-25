@@ -118,22 +118,22 @@ func (s *Store) CreateTaskWithOpts(ctx context.Context, project, title, body, pr
 		}
 	}
 
-	var remoteBoard, remoteGoal, requestID *string
+	var remoteBoard, remoteGoal, requestID, requestServer, requestBoard *string
 	if opts != nil && opts.remote != nil {
 		// A task made for another team's request has no goal of its own board's: a task has a local goal or a remote one, never both.
 		if goalID != nil {
 			return nil, ErrGoalRequestAnswered
 		}
 		r := opts.remote
-		remoteGoal, requestID = &r.GoalUID, &r.RequestID
+		remoteGoal, requestID, requestServer, requestBoard = &r.GoalUID, &r.RequestID, &r.Server, &r.Board
 		if r.BoardUID != "" {
 			remoteBoard = &r.BoardUID
 		}
 	}
 	result, err := s.db.ExecContext(ctx,
-		`INSERT INTO board_tasks (board_id, title, body, status, priority, created_by, assigned_to, created_at, goal_id, remote_board_uid, remote_goal_uid, request_id)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		project, title, bodyPtr, initialStatus, priority, createdBy, assignPtr, now, goalID, remoteBoard, remoteGoal, requestID)
+		`INSERT INTO board_tasks (board_id, title, body, status, priority, created_by, assigned_to, created_at, goal_id, remote_board_uid, remote_goal_uid, request_id, request_server, request_board)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		project, title, bodyPtr, initialStatus, priority, createdBy, assignPtr, now, goalID, remoteBoard, remoteGoal, requestID, requestServer, requestBoard)
 	if err != nil {
 		return nil, err
 	}
