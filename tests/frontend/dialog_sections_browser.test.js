@@ -119,80 +119,7 @@ const BASE = require('./test_base').BASE;
         const click = sel => ev(`document.querySelector(${JSON.stringify(sel)}).click(); true`);
         const fillId = (id, v) => ev(`(() => { const e = document.getElementById(${JSON.stringify(id)}); e.value = ${JSON.stringify(v)}; e.dispatchEvent(new Event('input', { bubbles: true })); e.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
 
-        console.log('New Agent: the folder alone first (the keyboard in it), the rest of the form in its sections behind More options, a problem opens its section');
-        await open(1440, false);
-        await openAgent();
-        const NA = '#launch-step-agent';
-        const moreState = () => ev(`(() => ({ hidden: document.getElementById('launch-agent-more').hidden, simple: document.querySelector('#launch-modal .modal-content').classList.contains('launch-simple') }))()`);
-        assert.deepEqual(await moreState(), { hidden: true, simple: true }, 'New Agent opens on the folder alone (step 1): the sections are step 2');
-        assert.equal(await ev(`document.activeElement.id`), 'launch-dir', 'the keyboard starts in the folder');
-        assert.ok(await ev(vis('#launch-dir')) && await ev(vis('#launch-agent-next')), 'the folder and Next are in view');
-        assert.equal(await ev(`[...document.querySelectorAll('#launch-agent-more input, #launch-agent-more select')].some(e => e.getClientRects().length)`), false, 'no other field is shown');
-        assert.ok(await ev(`document.querySelector('#launch-modal .modal-content').getBoundingClientRect().height < 400`), 'the dialog is as tall as its folder row');
-        await shot('new-agent-closed-desktop');
-        await fillId('launch-dir', '/work/repo'); await click('#launch-agent-next');
-        assert.deepEqual(await moreState(), { hidden: false, simple: false }, 'Next opens the sections (step 2)');
-        assert.deepEqual(await names(NA), [['Persona', 'badge'], ['Agent', 'smart_toy'], ['Prompt', 'description'], ['Permissions', 'lock'], ['Advanced', 'tune']]);
-        v = await view(NA); assert.deepEqual([v.open, v.title], ['workspace', 'Persona']); assert.equal(v.desc, '', 'the pane has no sub-title (#6012)');
-        assert.ok(v.footBottom <= v.contentBottom, 'Launch is in the fixed footer, in view');
-        await ev(`{ const m = document.querySelector('#launch-agent-acf .acf-permission-mode'); m.value = 'bypassPermissions'; m.dispatchEvent(new Event('change', { bubbles: true })); } true`); // a Claude agent now starts in Auto (#5836): this suite is about the Bypass line, so it picks Bypass
-        assert.equal(await ev(`!!document.querySelector('[data-acf-enforced-for]')`), false, 'the Bypass line is said on Permissions only: there is no copy under the persona (#6012)');
-        assert.ok(await ev(`!document.querySelector('#launch-agent-title').closest('.launch-modal-step').querySelector('[data-on-click="m-select-launch-type"]').hidden`), 'the way back to the choices is in the header');
-        await shot('new-agent-workspace-desktop');
-        // the agent is named once, by the radio group of step 2 (#6407): the form's own select follows it and is not on screen, so Agent reaches the group, once it is built (the CLI probes answer when they do)
-        await waitFor(`document.getElementById('launch-agent-acf').classList.contains('has-agent-pick')`, 'the agent choice is built', 8000);
-        for (const [id, sel] of [['workspace', '#launch-agent-name-input'], ['agent', '#launch-agent-pick input[type=radio]:checked'], ['agent', '#launch-agent-acf .acf-model-wrap'], ['prompt', '#launch-agent-acf .acf-prompt'], ['permissions', '#launch-agent-acf .acf-permission-mode'], ['permissions', '#launch-agent-acf [data-type="allow"][data-cap="shell"]'], ['advanced', '#launch-board-select'], ['advanced', '#launch-agent-acf .acf-flags']]) {
-            await go(NA, id);
-            // The Allow row is not shown in Claude's Bypass Permissions mode (it pre-approves nothing, #5589): any other mode shows it.
-            if (sel.includes('[data-type="allow"]')) await ev(`{ const m = document.querySelector('#launch-agent-acf .acf-permission-mode'); m.value = 'default'; m.dispatchEvent(new Event('change', { bubbles: true })); } true`);
-            assert.ok(await ev(vis(sel)), `${sel} is reached in ${id}`);
-        }
-        await ev(`{ const m = document.querySelector('#launch-agent-acf .acf-permission-mode'); m.value = 'bypassPermissions'; m.dispatchEvent(new Event('change', { bubbles: true })); } true`); // the mode this suite started with
-        await go(NA, 'advanced'); await shot('new-agent-advanced-desktop');
-        await fillId('launch-board-select', '__new__'); assert.ok(await ev(vis('#launch-board-name')), 'a new board asks for its name in Advanced');
-        await fillId('launch-board-name', 'bad name!');
-        await fillId('launch-dir', '/work/repo');
-        await go(NA, 'prompt'); await ev(`{ const p = document.querySelector('#launch-agent-acf .acf-prompt'); p.value = 'Kept'; p.dispatchEvent(new Event('input', { bubbles: true })); } true`);
-        const nBefore = await ev(`window.__reqs.length`);
-        await click('#launch-step-agent [data-on-click="m-launch-session"]');
-        await waitFor(`!!document.querySelector('#launch-board-name[aria-invalid="true"]')`, 'the bad board name flagged');
-        v = await view(NA); assert.equal(v.open, 'advanced', 'Launch opens the section with the problem');
-        assert.equal(await ev(`document.activeElement.id`), 'launch-board-name', 'and focuses the field');
-        assert.equal(await dot(NA, 'Advanced'), true, 'and marks it in the list'); assert.equal(await dot(NA, 'Persona'), false);
-        assert.equal(await ev(`window.__reqs.length`), nBefore, 'nothing was sent');
-        await fillId('launch-board-name', 'good-name'); assert.equal(await dot(NA, 'Advanced'), false, 'the mark goes when the field is edited');
-        await fillId('launch-dir', '');
-        await go(NA, 'prompt'); assert.equal(await ev(`document.querySelector('#launch-agent-acf .acf-prompt').value`), 'Kept', 'values stay across the sections');
-        await click('#launch-step-agent [data-on-click="m-launch-session"]'); // a cleared folder: Launch takes the person back to step 1 and flags it
-        await waitFor(`document.activeElement.id === 'launch-dir'`, 'the missing folder focused');
-        assert.equal(await ev(`document.getElementById('launch-dir').getAttribute('aria-invalid')`), 'true', 'a missing folder is flagged on the folder field, which is never behind More options');
-        await ev(`window.hideLaunchModal(); true`);
-
-        console.log('A problem in a section opens More options');
-        await openAgent();
-        assert.equal((await moreState()).hidden, true, 'closed again for each New Agent');
-        await fillId('launch-dir', '/work/repo'); await fillId('launch-board-select', '__new__'); await fillId('launch-board-name', 'bad name!');
-        await click('#launch-step-agent [data-on-click="m-launch-session"]');
-        await waitFor(`!!document.querySelector('#launch-board-name[aria-invalid="true"]')`, 'the bad board name flagged');
-        assert.equal((await moreState()).hidden, false, 'Launch opens More options on the field with the problem');
-        assert.equal(await ev(`document.activeElement.id`), 'launch-board-name', 'and focuses it');
-        await ev(`window.hideLaunchModal(); true`);
-
-        console.log('New Agent on a phone');
-        await open(390, true);
-        await openAgent();
-        assert.equal(await ev(`[...document.querySelectorAll('#launch-step-agent .modal-actions .btn, #launch-dir, #btn-browse')].filter(e => e.getClientRects().length).every(e => e.getBoundingClientRect().height >= 44)`), true, 'targets of 44 px on the first screen');
-        v = await view(NA); assert.equal(v.overflow, 0); assert.ok(v.footShown && v.footBottom <= v.contentBottom, 'the footer is in view');
-        await shot('new-agent-closed-phone');
-        await fillId('launch-dir', '/work/repo'); await click('#launch-agent-next');
-        v = await view(NA); assert.ok(v.pickShown && !v.listShown, 'the selector at the top'); assert.equal(v.overflow, 0);
-        assert.equal(await ev(`[...document.querySelectorAll('#launch-step-agent .settings-group-pick select, #launch-step-agent .modal-actions .btn, #launch-dir, #launch-agent-name-input')].filter(e => e.getClientRects().length).every(e => e.getBoundingClientRect().height >= 44)`), true, 'targets of 44 px');
-        assert.ok(v.footShown && v.footBottom <= v.contentBottom, 'the footer is in view');
-        await shot('new-agent-workspace-phone');
-        await go(NA, 'advanced'); await shot('new-agent-advanced-phone');
-        assert.equal((await view(NA)).overflow, 0);
-        await ev(`window.hideLaunchModal(); true`);
-
+        // New Agent's steps, tabs, keys and independence are new_agent_steps, new_agent_dialog_size, new_agent_keyboard and new_agent_independence (#7391, #7392); what stays here is Restart's tabs and the Agent Team dialogs.
         console.log('Agent Team: three steps, Team, Members, Start (#6397); the agent dialog is the sectioned shell');
         await open(1440, false);
         await ev(`window.showLaunchModal(); window._selectLaunchType('team'); true`);
@@ -246,6 +173,6 @@ const BASE = require('./test_base').BASE;
         v = await view(TA); assert.equal(v.open, 'persona', 'Save without a name opens Persona'); assert.equal(await dot(TA, 'Persona'), true);
         await shot('team-agent-role-desktop');
         await ev(`window.hideTeamAgentModal(); window.hideLaunchModal(); true`);
-        console.log('PASS dialog sections: Restart, New Agent, Agent Team');
+        console.log('PASS dialog sections: Restart, Agent Team');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

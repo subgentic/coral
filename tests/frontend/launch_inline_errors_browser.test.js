@@ -46,7 +46,7 @@ const BASE = require('./test_base').BASE;
         let f = await inline('launch-dir');
         assert.match(f.text, /Choose a folder.*Browse/, JSON.stringify(f)); assert.ok(f.described && f.visible && f.invalid === 'true', JSON.stringify(f));
         assert.ok(!(await ev(`[...document.querySelectorAll('.toast')].some(t => /Choose a folder/.test(t.textContent))`)), 'said once: no toast repeats the line under the field (#6029)');
-        assert.deepEqual(await ev(`(() => { const f = document.getElementById('launch-dir'), e = document.getElementById('launch-dir-error'); return { inLabel: f.closest('label').contains(e), nameHasError: f.closest('label').textContent.includes(e.textContent), after: f.closest('label').nextElementSibling === e }; })()`), { inLabel: false, nameHasError: false, after: true }, 'the line is after the label, so it is not part of the field name');
+        assert.deepEqual(await ev(`(() => { const f = document.getElementById('launch-dir'), e = document.getElementById('launch-dir-error'); const l = document.querySelector('label[for="launch-dir"]'), row = f.closest('.dir-input-row'); return { inLabel: l.contains(e), nameHasError: l.textContent.includes(e.textContent), after: row.nextElementSibling === e }; })()`), { inLabel: false, nameHasError: false, after: true }, 'the line is after the label, so it is not part of the field name');
         await ev(`document.getElementById('launch-dir').value = '/x'; document.getElementById('launch-dir').dispatchEvent(new Event('input', { bubbles: true })); true`);
         f = await inline('launch-dir'); assert.equal(f.text, null, 'cleared by the edit'); assert.equal(f.invalid, null);
         assert.equal(await ev(`document.getElementById('launch-dir').getAttribute('aria-describedby')`), null, 'and the description with it');
@@ -83,7 +83,7 @@ const BASE = require('./test_base').BASE;
         await ev(`window.hideLaunchModal(); true`);
 
         console.log('4b. A new agent starts in Auto for Claude and as before for the others; a mode the person picked is kept (#5836)');
-        await ev(`window.showLaunchModal(); window._selectLaunchType('agent'); document.getElementById('launch-agent-more').dispatchEvent(new CustomEvent('sd-more-open', { bubbles: true })); true`);
+        await ev(`window.showLaunchModal(); window._selectLaunchType('agent'); { const d = document.getElementById('launch-dir'); if (!d.value) d.value = '/tmp'; window._launchStage('agent'); } true`);
         await waitFor(`getComputedStyle(document.getElementById('launch-step-agent')).display !== 'none'`, 'the agent step');
         const pm = `document.getElementById('launch-agent-acf').querySelector('.acf-permission-mode')`;
         const setType = t => ev(`(() => { const s = document.getElementById('launch-agent-acf').querySelector('.acf-agent-type'); s.value = ${JSON.stringify(t)}; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
@@ -100,7 +100,7 @@ const BASE = require('./test_base').BASE;
         console.log('   \u2713');
 
         console.log('5. Bypass Permissions: no Allow row; the chips say pressed or not, in named groups');
-        await ev(`window.showLaunchModal(); window._selectLaunchType('agent'); document.getElementById('launch-agent-more').dispatchEvent(new CustomEvent('sd-more-open', { bubbles: true })); true`); // New Agent opens on the folder: its sections are behind More options
+        await ev(`window.showLaunchModal(); window._selectLaunchType('agent'); { const d = document.getElementById('launch-dir'); if (!d.value) d.value = '/tmp'; window._launchStage('agent'); } true`); // New Agent opens on the folder: its sections are behind More options
         await waitFor(`getComputedStyle(document.getElementById('launch-step-agent')).display !== 'none'`, 'the agent step');
         const acf = `document.getElementById('launch-agent-acf')`;
         await ev(`(() => { const sel = ${acf}.querySelector('.acf-permission-mode'); sel.value = 'bypassPermissions'; sel.dispatchEvent(new Event('change', { bubbles: true })); ${acf}.querySelector('.acf-agent-type').value = 'claude'; ${acf}.querySelector('.acf-agent-type').dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);

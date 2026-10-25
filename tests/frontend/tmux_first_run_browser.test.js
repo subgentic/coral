@@ -24,18 +24,18 @@ const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
                 if (p.pathname === '/api/board/projects') return json([]);
                 return real(u, o); };
             return true; })()`);
-        const open = `(async () => { await window.showLaunchModal(); window._selectLaunchType('agent'); document.getElementById('launch-dir').value = '/tmp'; return true; })()`;
+        const open = `(async () => { await window.showLaunchModal(); window._selectLaunchType('agent'); { const d = document.getElementById('launch-dir'); if (!d.value) d.value = '/tmp'; window._launchStage('agent'); } return true; })()`;
         const slot = `document.getElementById('launch-tmux-slot')`;
 
-        console.log('1. tmux missing: the line is under the folder with the one command and Check again; Launch is off and the line is its reason');
+        console.log('1. tmux missing: the line is on step 3 with the one command and Check again; Launch is off and the line is its reason');
         await new Promise(r => setTimeout(r, 5200)); // sleep-ok: the status answer is shared for 5 s
         await ev(`document.getElementById('tmux-missing-banner').style.display = ''; true`); // the app-wide banner is showing
         await ev(open);
         await waitFor(`(() => { const s = ${slot}; return !!s && s.offsetParent !== null && /tmux is not installed/.test(s.textContent); })()`, 'the tmux line', 8000);
-        const line = await ev(`(() => { const s = ${slot}, go = document.getElementById('launch-agent-go'), dir = document.getElementById('launch-dir').getBoundingClientRect();
-            return { below: s.getBoundingClientRect().top >= dir.bottom, command: s.querySelector('code').textContent, buttons: [...s.querySelectorAll('button')].map(b => b.textContent), role: s.getAttribute('role'),
-                disabled: go.disabled, describedBy: go.getAttribute('aria-describedby') === s.id, blocks: s.dataset.blocksLaunch, moreHidden: document.getElementById('launch-agent-more').hidden }; })()`);
-        assert.deepEqual(line, { below: true, command: 'brew install tmux', buttons: ['Check again'], role: 'status', disabled: true, describedBy: true, blocks: '1', moreHidden: true });
+        const line = await ev(`(() => { const s = ${slot}, go = document.getElementById('launch-agent-go');
+            return { command: s.querySelector('code').textContent, buttons: [...s.querySelectorAll('button')].map(b => b.textContent), role: s.getAttribute('role'),
+                disabled: go.disabled, describedBy: go.getAttribute('aria-describedby') === s.id, blocks: s.dataset.blocksLaunch, stage: document.getElementById('launch-step-agent').dataset.stage }; })()`);
+        assert.deepEqual(line, { command: 'brew install tmux', buttons: ['Check again'], role: 'status', disabled: true, describedBy: true, blocks: '1', stage: 'agent' });
         assert.equal(await ev(`getComputedStyle(document.getElementById('tmux-missing-banner')).display`), 'none', 'said once: the app-wide banner steps aside while the dialog has the line');
         await ev(`window.launchSession(); true`);
         assert.equal(await ev(`window.__launches.length`), 0, 'a launch is not sent while tmux is missing');
@@ -65,14 +65,14 @@ const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
         console.log('4. the pty backend does not need tmux: nothing is said, Launch is on');
         await ev(`window.__tmux = { tmux_available: false, tmux_required: false, effective_backend: 'pty', tmux_install_command: 'brew install tmux' }; window._selectLaunchType('back'); true`);
         await ev(`window.__status.length = 0; true`);
-        await ev(`window._selectLaunchType('agent'); true`);
+        await ev(`window._selectLaunchType('agent'); { const d = document.getElementById('launch-dir'); if (!d.value) d.value = '/tmp'; window._launchStage('agent'); } true`);
         await waitFor(`window.__status.length > 0 && !!document.getElementById('launch-agent-go')`, 'the status read');
         await new Promise(r => setTimeout(r, 400)); // sleep-ok: nothing is said: there is no event to wait for
         assert.deepEqual(await ev(`({ shown: ${slot}.offsetParent !== null, blocks: ${slot}.dataset.blocksLaunch || '', disabled: document.getElementById('launch-agent-go').disabled })`), { shown: false, blocks: '', disabled: false });
 
         await new Promise(r => setTimeout(r, 5200)); // sleep-ok: the status answer is shared for 5 s
         console.log('5. a status that cannot be read says nothing about tmux and does not hold the launch');
-        await ev(`window.__tmux = { tmux_available: 'unknown' }; window._selectLaunchType('back'); window._selectLaunchType('agent'); true`);
+        await ev(`window.__tmux = { tmux_available: 'unknown' }; window._selectLaunchType('back'); window._selectLaunchType('agent'); { const d = document.getElementById('launch-dir'); if (!d.value) d.value = '/tmp'; window._launchStage('agent'); } true`);
         await new Promise(r => setTimeout(r, 600)); // sleep-ok: nothing is said: there is no event to wait for
         assert.deepEqual(await ev(`({ shown: ${slot}.offsetParent !== null, disabled: document.getElementById('launch-agent-go').disabled })`), { shown: false, disabled: false });
         await new Promise(r => setTimeout(r, 5200)); // sleep-ok: the status answer is shared for 5 s
@@ -87,7 +87,7 @@ const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
         await ev(`window.hideLaunchModal(); true`);
         assert.notEqual(await ev(`getComputedStyle(document.getElementById('tmux-missing-banner')).display`), 'none', 'the banner is back once the dialog is closed');
         console.log('7. a launch on another server (a local multi-server hub) skips this computer\'s tmux check: no line, no block, no status request; coming back to this computer shows it again');
-        await ev(`window.__tmux = { tmux_available: false, tmux_required: true, effective_backend: 'tmux', tmux_install_command: 'brew install tmux' }; window._selectLaunchType('back'); window._selectLaunchType('agent'); true`);
+        await ev(`window.__tmux = { tmux_available: false, tmux_required: true, effective_backend: 'tmux', tmux_install_command: 'brew install tmux' }; window._selectLaunchType('back'); window._selectLaunchType('agent'); { const d = document.getElementById('launch-dir'); if (!d.value) d.value = '/tmp'; window._launchStage('agent'); } true`);
         await waitFor(`/tmux is not installed/.test(${slot}.textContent) && document.getElementById('launch-agent-go').disabled`, 'the line on this computer', 8000);
         await ev(`window.__status.length = 0; window.__remote = true; import((window.__coralStatic || '/static/') + 'prerequisites.js').then(m => m.checkTmuxForLaunch(${slot}, { isLocal: () => !window.__remote })); true`);
         await waitFor(`!document.getElementById('launch-agent-go').disabled`, 'Launch on for a remote server', 8000);

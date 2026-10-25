@@ -21,6 +21,7 @@ export function segmentSelect(select, { label = '', labelledby = '', cards = fal
     const draw = () => {
         if (rebuilding) return;
         rebuilding = true;
+        const keep = group.contains(document.activeElement) ? document.activeElement.dataset.value : null; // a rebuild must not drop the focus
         group.replaceChildren();
         const cur = select.value;
         for (const o of options()) {
@@ -36,6 +37,7 @@ export function segmentSelect(select, { label = '', labelledby = '', cards = fal
         }
         if (!group.querySelector('[tabindex="0"]')) group.querySelector('.seg-btn')?.setAttribute('tabindex', '0');
         rebuilding = false;
+        if (keep !== null) group.querySelector(`[data-value="${CSS.escape(keep)}"]`)?.focus();
     };
     const choose = (value) => {
         if (select.value === value) return;

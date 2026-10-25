@@ -1,6 +1,7 @@
-// One size rule for every dialog (UI audit #1): the Launch dialog (agent, team, terminal), Create Agent, Settings and Team
+// One size rule for every dialog (UI audit #1): the Launch dialog (team, terminal), Create Agent, Settings and Team
 // settings are as high as their content up to 90% of the window (never a fixed 576 or 736 px that cuts content off while the
 // screen is empty), as wide as clamp(360px, 92vw, 960px), scroll in ONE place (the pane) with the footer always in view.
+// New Agent is not measured here: it has one fixed size on every step and tab (new_agent_dialog_size_browser, #7391).
 // Measured at 1280x800, 1440x900, 1920x1080, 2560x1440 and 390x844. CORAL_MEASURE_OUT=<file> also writes every number as JSON
 // (the before/after table of the task). Drives Chrome over CDP against the isolated dev server.
 const assert = require('node:assert/strict');
@@ -51,9 +52,6 @@ const SIZES = [[1280, 800, false], [1440, 900, false], [1920, 1080, false], [256
         assert.ok(sub < 300, 'a team to open the settings of: ' + sub);
 
         const screens = {
-            // New Agent opens on the folder alone (a small form, like the terminal); "More options" opens its sections: the sectioned dialog the rule is about.
-            'Launch agent (closed)': { small: true, open: `(async () => { await window.showLaunchModal(); window._selectLaunchType('agent'); return true; })()`, ready: `getComputedStyle(document.getElementById('launch-step-agent')).display !== 'none'`, box: `document.querySelector('#launch-modal .modal-content')`, footer: '.modal-actions', close: `window.hideLaunchModal(); true` },
-            'Launch agent': { open: `(async () => { await window.showLaunchModal(); window._selectLaunchType('agent'); document.getElementById('launch-agent-more').dispatchEvent(new CustomEvent('sd-more-open', { bubbles: true })); return true; })()`, ready: `getComputedStyle(document.getElementById('launch-step-agent')).display !== 'none'`, box: `document.querySelector('#launch-modal .modal-content')`, footer: '.modal-actions', close: `window.hideLaunchModal(); true` },
             'Launch team': { open: `(async () => { await window.showLaunchModal(); window._selectLaunchType('team'); return true; })()`, ready: `getComputedStyle(document.getElementById('launch-step-team')).display !== 'none'`, box: `document.querySelector('#launch-modal .modal-content')`, footer: '.modal-actions', close: `window.hideLaunchModal(); true` },
             'Launch terminal': { open: `(async () => { await window.showLaunchModal(); window._selectLaunchType('terminal'); return true; })()`, ready: `getComputedStyle(document.getElementById('launch-step-terminal')).display !== 'none'`, box: `document.querySelector('#launch-modal .modal-content')`, footer: '.modal-actions', close: `window.hideLaunchModal(); true` },
             'Settings': { open: `(async () => { await window.showSettingsModal(); return true; })()`, ready: `getComputedStyle(document.getElementById('settings-modal')).display !== 'none' && !!document.querySelector('#settings-modal .settings-pane:not([hidden])')`, box: `document.querySelector('#settings-modal .modal-content')`, footer: '.modal-footer', close: `window.hideSettingsModal(); true` },
