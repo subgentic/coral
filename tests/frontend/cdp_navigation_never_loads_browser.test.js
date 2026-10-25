@@ -34,6 +34,13 @@ const heard = (p, ms) => Promise.race([p.then(() => true), sleep(ms).then(() => 
         const next = Page.loadEventFired(); // asked before its navigate, straight after a load that was heard: it is for the page that follows
         await heard(Page.navigate({ url: STALL + '?4' }), 5000);
         check('a wait made before its navigate is not answered by the load the last wait heard', !(await heard(next, 3000)));
+
+        // 4. a wait for a load that never comes is not open-ended (#352): it rejects at the limit, naming the page. With the preload's limit taken out it waits for good, and this check fails
+        require('./helpers/keep_page_visible').loadLimit(2000, 'this suite waits on purpose for a page that never loads');
+        await heard(Page.navigate({ url: STALL + '?5' }), 5000);
+        const t0 = Date.now();
+        const end = await Promise.race([Page.loadEventFired().then(() => 'a load came', e => e.message), sleep(6000).then(() => 'still waiting after 6 s')]);
+        check('a wait for a page that never loads rejects at the limit, naming the page', /^\[cdp\] load timeout: no load event for http:\/\/127\.0\.0\.1:\d+\/\?5 within 2000 ms/.test(end) && Date.now() - t0 >= 1900, end);
     } finally { await client.close(); for (const s of sockets) s.destroy(); stall.close(); }
     if (results.some(r => !r)) { console.error(`${results.filter(r => !r).length} of ${results.length} failed`); process.exit(1); }
     console.log(`\nAll ${results.length} never-loads checks passed`);

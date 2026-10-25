@@ -19,6 +19,19 @@ const Module = require('node:module');
 // A load heard this long ago is the one the suite meant to wait for (the gap between two awaited calls is a few milliseconds); an older one was not asked for, and a later wait is for another load.
 const LATE_MS = 1000;
 
+// A wait for a load is not open-ended (#352): loadEventFired() rejects when no load comes within the limit, naming the page it was waiting for, and says so on stderr ("[cdp] load timeout"), so a
+// suite fails at that step instead of running to the runner's 120 s, and a full run's logs say which step it was (three suites hit the 120 s limit near a page load on Windows, #348; the cause is
+// not known). A ceiling, not a sleep: a load that comes sooner answers at once. A suite whose page takes longer gives its own limit, with the reason, through loadLimit(ms, why); the default is not
+// raised for everyone. CDP_KEEP_VISIBLE=0 (this preload off) turns the limit off too.
+const LOAD_LIMIT_MS = 30000;
+let loadLimitMs = LOAD_LIMIT_MS;
+/** This suite's limit for a page load: loadLimit(60000, 'the page builds 5,000 rows before it loads'). The reason is required, and printed. */
+function loadLimit(ms, why) {
+    if (!(ms > 0) || typeof why !== 'string' || !why.trim()) throw new Error('loadLimit(ms, why): a positive limit and the reason for it');
+    console.error(`[cdp] this suite's page-load limit is ${ms} ms (default ${LOAD_LIMIT_MS}): ${why}`);
+    loadLimitMs = ms;
+}
+
 function rememberLoads(client) {
     const Page = client.Page;
     if (!Page || typeof Page.navigate !== 'function' || typeof Page.loadEventFired !== 'function') return;
@@ -26,12 +39,13 @@ function rememberLoads(client) {
     let loadAt = 0;   // when the last one came
     let mark = null;  // loads when the last navigate was made; null once its load was handed out or a newer load cycle started
     let waiting = 0;  // loadEventFired() waits asked and not yet answered: a load that comes while one is waiting was heard (a wait made before its navigate: `const loaded = Page.loadEventFired(); await Page.navigate(...); await loaded;`)
+    let page = 'the page'; // what the last navigate or reload asked for, for the timeout's message
     client.on('Page.loadEventFired', () => { loads++; loadAt = Date.now(); if (waiting > 0) mark = null; }); // so it is not kept for the next wait: servers_table's about:blank load answered the wait for the page after it (#6195 follow-up)
     client.on('Page.frameStartedLoading', () => { if (mark !== null && loads > mark) mark = null; }); // the navigate's load came and nobody asked: this is another load, and that is the one to wait for
     const navigate = Page.navigate, load = Page.loadEventFired;
-    Page.navigate = function (...args) { mark = loads; return navigate.apply(this, args); };
+    Page.navigate = function (...args) { mark = loads; page = String((args[0] && args[0].url) || 'the page'); return navigate.apply(this, args); };
     // A reload is a navigation too (eight suites write `await Page.reload(); await Page.loadEventFired();`): its load, heard late, is kept the same way.
-    if (typeof Page.reload === 'function') { const reload = Page.reload; Page.reload = function (...args) { mark = loads; return reload.apply(this, args); }; }
+    if (typeof Page.reload === 'function') { const reload = Page.reload; Page.reload = function (...args) { mark = loads; page = `a reload of ${page}`; return reload.apply(this, args); }; }
     Page.loadEventFired = function (...args) {
         if (args.length === 0 && mark !== null && loads > mark && Date.now() - loadAt <= LATE_MS) { mark = null; return Promise.resolve({ timestamp: Date.now() / 1000 }); }
         if (args.length === 0) mark = null;
@@ -39,7 +53,17 @@ function rememberLoads(client) {
         const p = load.apply(this, args);
         const done = () => { waiting--; };
         p.then(done, done);
-        return p;
+        if (args.length > 0) return p; // the callback form is the caller's own
+        const ms = loadLimitMs, what = page, since = new Date().toISOString();
+        return new Promise((resolve, reject) => {
+            const timer = setTimeout(() => {
+                const msg = `[cdp] load timeout: no load event for ${what} within ${ms} ms (waiting since ${since})`;
+                console.error(msg);
+                reject(new Error(msg));
+            }, ms);
+            timer.unref(); // a wait the suite gave up on (a race it already settled) does not keep its process alive
+            p.then(v => { clearTimeout(timer); resolve(v); }, e => { clearTimeout(timer); reject(e); });
+        });
     };
 }
 
@@ -80,3 +104,5 @@ if (process.env.CDP_KEEP_VISIBLE !== '0') {
         return wrapped;
     };
 }
+
+module.exports = { loadLimit };
