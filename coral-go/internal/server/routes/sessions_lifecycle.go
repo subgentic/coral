@@ -641,6 +641,12 @@ func (p *restartPlan) restartSettings() {
 			p.permMode = perm
 		}
 	}
+	// The extra CLI flags and the tools list an agent was started with belong to its provider: a restart as another provider carries only what the person typed in the form (the permission mode is worked
+	// out above and its flags are made for the new provider below), never a flag or a tool of the old CLI that the new one may refuse to start with (#7377). A restart as the same provider keeps them.
+	if p.stored != nil && p.stored.AgentType != "" && p.stored.AgentType != p.agentType {
+		storedFlags = nil
+		p.tools, p.toolsJSON = nil, nil
+	}
 	cleanFlags := restartFlags(storedFlags, p.model, p.req.ExtraFlags)
 	if carried, _ := agent.SplitPermissionFlags(storedFlags); p.caps.IsEmpty() && len(carried) > 0 {
 		cleanFlags = append(cleanFlags, carried...) // what the agent was started with, as it was (#6423)

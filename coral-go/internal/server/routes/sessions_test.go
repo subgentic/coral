@@ -2065,6 +2065,73 @@ func TestSessionsRestart_ProviderSwitchWithExplicitEmptyModelSucceeds(t *testing
 	assert.Empty(t, ptr.Value(ls.Model))
 }
 
+// #7377 (the provider-switch restart): the extra CLI flags and the tools list an agent was started with belong to its provider. Restarting it as another provider carries only what the person
+// typed in the form; restarting it as the same provider carries them as before.
+func TestSessionsRestart_ProviderSwitchDropsTheStoredFlagsAndTools(t *testing.T) {
+	server, _, term, ss := setupSessionsTestServer(t)
+	ctx := context.Background()
+	ss.RegisterLiveSession(ctx, &store.LiveSession{
+		AgentName: "claude-switch", AgentType: "claude", WorkingDir: t.TempDir(), SessionID: "claude-switch-7377",
+		Flags: store.MarshalFlags([]string{"--only-claude-flag", "kept-value"}), Tools: store.MarshalFlags([]string{"OnlyClaudeTool"}),
+	})
+	require.NoError(t, ss.SetSessionSleeping(ctx, "claude-switch-7377", true))
+	resp, err := http.Post(server.URL+"/api/sessions/live/claude-switch/restart", "application/json",
+		bytes.NewBufferString(`{"session_id":"claude-switch-7377","agent_type":"codex","model":"","extra_flags":"--typed-in-the-form"}`))
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var body struct {
+		SessionID   string `json:"session_id"`
+		SessionName string `json:"session_name"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+	term.mu.Lock()
+	sent := term.sent[body.SessionName+".0"]
+	term.mu.Unlock()
+	require.Len(t, sent, 1)
+	assert.Contains(t, sent[0], "codex")
+	assert.Contains(t, sent[0], "--typed-in-the-form", "what the person typed is carried")
+	assert.NotContains(t, sent[0], "--only-claude-flag", "the old provider's stored flag does not reach the new CLI")
+	assert.NotContains(t, sent[0], "OnlyClaudeTool")
+	ls, err := ss.GetLiveSession(ctx, body.SessionID)
+	require.NoError(t, err)
+	require.NotNil(t, ls)
+	assert.NotContains(t, ptr.Value(ls.Flags), "--only-claude-flag", "and is not stored on the new session")
+	assert.Contains(t, ptr.Value(ls.Flags), "--typed-in-the-form")
+	assert.NotContains(t, ptr.Value(ls.Tools), "OnlyClaudeTool")
+}
+
+func TestSessionsRestart_SameProviderKeepsTheStoredFlagsAndTools(t *testing.T) {
+	server, _, term, ss := setupSessionsTestServer(t)
+	ctx := context.Background()
+	ss.RegisterLiveSession(ctx, &store.LiveSession{
+		AgentName: "claude-same", AgentType: "claude", WorkingDir: t.TempDir(), SessionID: "claude-same-7377",
+		Flags: store.MarshalFlags([]string{"--only-claude-flag", "kept-value"}), Tools: store.MarshalFlags([]string{"OnlyClaudeTool"}),
+	})
+	require.NoError(t, ss.SetSessionSleeping(ctx, "claude-same-7377", true))
+	resp, err := http.Post(server.URL+"/api/sessions/live/claude-same/restart", "application/json",
+		bytes.NewBufferString(`{"session_id":"claude-same-7377","agent_type":"claude","extra_flags":"--typed-in-the-form"}`))
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var body struct {
+		SessionID   string `json:"session_id"`
+		SessionName string `json:"session_name"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+	term.mu.Lock()
+	sent := term.sent[body.SessionName+".0"]
+	term.mu.Unlock()
+	require.Len(t, sent, 1)
+	assert.Contains(t, sent[0], "--only-claude-flag", "a restart as the same provider carries its flags as before")
+	assert.Contains(t, sent[0], "--typed-in-the-form")
+	ls, err := ss.GetLiveSession(ctx, body.SessionID)
+	require.NoError(t, err)
+	require.NotNil(t, ls)
+	assert.Contains(t, ptr.Value(ls.Flags), "--only-claude-flag")
+	assert.Contains(t, ptr.Value(ls.Tools), "OnlyClaudeTool")
+}
+
 func TestSessionsRawImage(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")

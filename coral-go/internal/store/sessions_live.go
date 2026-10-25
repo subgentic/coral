@@ -393,7 +393,7 @@ func (s *SessionStore) ReplaceLiveSession(ctx context.Context, oldSessionID stri
 			if newSession.Model == nil && newSession.ContextWindow == 0 && sameProvider {
 				newSession.ContextWindow = old.ContextWindow
 			}
-			if newSession.Tools == nil {
+			if newSession.Tools == nil && sameProvider { // the tools list belongs to the provider it was made for (#7377)
 				newSession.Tools = old.Tools
 			}
 			if newSession.Backend == nil {
