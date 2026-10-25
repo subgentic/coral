@@ -47,25 +47,27 @@ const (
 // completion message or workflow text. Outcome and ReviewRequested are the two workflow
 // facts a row displays.
 type TaskListItem struct {
-	ID              int64     `db:"id" json:"id"`
-	Revision        int       `db:"revision" json:"revision"`
-	BoardID         string    `db:"board_id" json:"board_id"`
-	Title           string    `db:"title" json:"title"`
-	BodyPreview     string    `db:"body_preview" json:"body_preview,omitempty"`
-	Status          string    `db:"status" json:"status"`
-	Priority        string    `db:"priority" json:"priority"`
-	CreatedBy       string    `db:"created_by" json:"created_by"`
-	AssignedTo      *string   `db:"assigned_to" json:"assigned_to"`
-	CompletedBy     *string   `db:"completed_by" json:"completed_by,omitempty"`
-	CreatedAt       string    `db:"created_at" json:"created_at"`
-	ClaimedAt       *string   `db:"claimed_at" json:"claimed_at,omitempty"`
-	CompletedAt     *string   `db:"completed_at" json:"completed_at,omitempty"`
-	SessionID       *string   `db:"session_id" json:"session_id,omitempty"`
-	GoalID          *int64    `db:"goal_id" json:"goal_id,omitempty"`
-	CostUSD         *float64  `db:"cost_usd" json:"cost_usd,omitempty"`
-	Outcome         string    `db:"outcome" json:"outcome,omitempty"`
-	ReviewRequested bool      `db:"review_requested" json:"review_requested,omitempty"`
-	BlockedBy       []TaskDep `db:"-" json:"blocked_by,omitempty"`
+	ID              int64    `db:"id" json:"id"`
+	Revision        int      `db:"revision" json:"revision"`
+	BoardID         string   `db:"board_id" json:"board_id"`
+	Title           string   `db:"title" json:"title"`
+	BodyPreview     string   `db:"body_preview" json:"body_preview,omitempty"`
+	Status          string   `db:"status" json:"status"`
+	Priority        string   `db:"priority" json:"priority"`
+	CreatedBy       string   `db:"created_by" json:"created_by"`
+	AssignedTo      *string  `db:"assigned_to" json:"assigned_to"`
+	CompletedBy     *string  `db:"completed_by" json:"completed_by,omitempty"`
+	CreatedAt       string   `db:"created_at" json:"created_at"`
+	ClaimedAt       *string  `db:"claimed_at" json:"claimed_at,omitempty"`
+	CompletedAt     *string  `db:"completed_at" json:"completed_at,omitempty"`
+	SessionID       *string  `db:"session_id" json:"session_id,omitempty"`
+	GoalID          *int64   `db:"goal_id" json:"goal_id,omitempty"`
+	CostUSD         *float64 `db:"cost_usd" json:"cost_usd,omitempty"`
+	Outcome         string   `db:"outcome" json:"outcome,omitempty"`
+	ReviewRequested bool     `db:"review_requested" json:"review_requested,omitempty"`
+	// WorkedBy: who did the work, as Task.WorkedBy says it (the author a review took the task from, else who completed it, else the assignee).
+	WorkedBy  string    `db:"worked_by" json:"worked_by,omitempty"`
+	BlockedBy []TaskDep `db:"-" json:"blocked_by,omitempty"`
 }
 
 // TaskListPage is one page of the task list.
@@ -92,7 +94,10 @@ const taskListColumns = `t.id, t.revision, t.board_id, t.title,
 	t.status, t.priority, t.created_by, t.assigned_to, t.completed_by, t.created_at, t.claimed_at,
 	t.completed_at, t.session_id, t.goal_id, t.cost_usd,
 	COALESCE(json_extract(w.data, '$.outcome'), '') AS outcome,
-	COALESCE(json_type(w.data, '$.completion_review') = 'object', 0) AS review_requested
+	COALESCE(json_type(w.data, '$.completion_review') = 'object', 0) AS review_requested,
+	CASE WHEN COALESCE(json_extract(w.data, '$.original_author'), '') != '' THEN json_extract(w.data, '$.original_author')
+	     WHEN t.status = 'completed' AND COALESCE(t.completed_by, '') != '' THEN t.completed_by
+	     ELSE COALESCE(t.assigned_to, '') END AS worked_by
 	FROM board_tasks t LEFT JOIN task_workflows w ON w.task_id = t.id`
 
 // ListTaskPage returns a page of the board's task list. Each page costs O(limit) rows:

@@ -244,3 +244,35 @@
 .team-task-extra .task-detail-label { text-transform: none; letter-spacing: 0; font-size: 0.875rem; font-weight: 600; }
 .team-task-extra summary { font-size: 0.875rem; font-weight: 600; }
 .team-task-extra .task-dep-status { text-transform: capitalize; } /* the pill reads Unmet, not UNMET (UI/UX, #7644) */
+
+/* a goal's page (#7665): its details beside its tasks. The main pane is the goal or the picked task's page; the column is the shared sidebar's look */
+.goal-split { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 24px; align-items: stretch; flex: 1 1 auto; min-height: 0; } /* the main pane runs the page's height, so its bar is pinned at the foot */
+.goal-main { min-width: 0; display: flex; flex-direction: column; }
+.goal-side { align-self: start; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-secondary); position: sticky; top: 8px; max-height: calc(100vh - 140px); overflow-y: auto; }
+.goal-side-head { display: flex; align-items: baseline; gap: 8px; padding: 12px 12px 8px; font-size: 0.875rem; }
+.goal-side-counts { color: var(--text-secondary); font-size: 0.75rem; font-weight: 500; }
+.goal-side-search { display: block; width: calc(100% - 24px); box-sizing: border-box; margin: 0 12px 10px; padding: 6px 10px; font: inherit; font-size: 0.8125rem; color: var(--text-primary); background: var(--bg-primary); border: 1px solid var(--control-border, var(--border)); border-radius: var(--radius-md); }
+.goal-side-search::placeholder { color: var(--text-secondary); opacity: 1; }
+.goal-side-list { border-top: 1px solid var(--border); }
+.goal-side-group { margin: 0; padding: 10px 12px 4px; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); }
+.goal-side-ul { list-style: none; margin: 0; padding: 0; }
+.goal-side-row { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; width: 100%; text-align: left; padding: 8px 12px; background: none; border: 0; border-radius: 0; color: var(--text-primary); font: inherit; cursor: pointer; }
+.goal-side-row:hover, .goal-side-row[aria-current="true"] { background: var(--bg-hover); }
+.goal-side-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.goal-side-title { font-size: 0.8125rem; font-weight: 600; overflow-wrap: anywhere; }
+.goal-side-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 0.75rem; color: var(--text-secondary); }
+.goal-side-who { overflow-wrap: anywhere; }
+.goal-side .goals-note, .goal-side .goals-failed, .goal-side .goals-more { margin: 10px 12px; }
+.goals-table-page .goal-side-back, .goal-tasks-open { display: none; }
+.goal-main > .goals-table-page { padding: 0; } /* the task page in the main pane sits where the goal's details sat */
+.goals-progress { margin: 14px 0 6px; font-weight: 600; font-size: 0.875rem; }
+@media (max-width: 760px) {
+    .goal-split { display: flex; flex-direction: column; }
+    .goal-main { flex: 1; }
+    .goal-split-column .goal-main, .goal-split:not(.goal-split-column) .goal-side { display: none; } /* the list is a screen of its own: the goal or a task is the other */
+    .goal-side { position: static; max-height: none; border: 0; background: none; }
+    .goals-table-page .goal-side-back { display: inline-flex; margin: 0 0 8px; }
+    .goal-tasks-open { display: inline-flex; align-self: flex-start; min-height: 44px; margin-top: 12px; }
+    .goal-side-row { min-height: 44px; padding: 10px 12px; }
+    .goal-side-search { min-height: 44px; }
+}

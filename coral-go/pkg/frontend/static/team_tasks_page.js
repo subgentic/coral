@@ -215,6 +215,10 @@ function draw() {
     }
 }
 
+/** Who did the work (the server's worked_by: the author of a reviewed task, not the orchestrator it was handed to), and for a done task that it is who did it. */
+const isDoneTask = (t) => t.status === 'completed';
+const doerOf = (t) => t.worked_by || (isDoneTask(t) ? t.completed_by : '') || t.assigned_to; // an older server has no worked_by: who completed a done task, else its assignee
+const whoText = (t) => { const w = doerOf(t); return isDoneTask(t) ? (w ? `Done by ${w}` : 'Done') : (w || 'Nobody yet'); };
 const priorityWord = (p) => { const s = String(p || '').trim(); return s ? s[0].toUpperCase() + s.slice(1).toLowerCase() : ''; };
 
 function rowOf(t) {
@@ -222,13 +226,13 @@ function rowOf(t) {
     const first = el('span', 'team-row-cell'); first.append(b, el('span', 'team-row-sub', `#${t.id}`));
     const word = taskStatusWord(t.status, t.review_requested);
     const goalName = t.goal_id ? (goalTitle(model.project, t.goal_id) || `Goal ${t.goal_id}`) : '';
-    first.append(el('span', 'team-row-phone', [t.assigned_to || 'Nobody yet', goalName].filter(Boolean).join(' · '))); // a phone's table folds who and which goal under the title
+    first.append(el('span', 'team-row-phone', [whoText(t), goalName].filter(Boolean).join(' · '))); // a phone's table folds who and which goal under the title
     let goal = el('span', 'team-muted', noGoalLabel);
     if (t.goal_id) {
         const title = goalTitle(model.project, t.goal_id) || `Goal ${t.goal_id}`;
         goal = btn('team-link', title, () => hooks.openGoal?.(t.goal_id)); goal.dataset.goalLink = String(t.goal_id);
     }
-    return { key: `t${t.id}`, open: () => hooks.openTask?.(t), cells: [first, stateChip(word, statusClass(word)), t.assigned_to || 'Nobody yet', goal, priorityWord(t.priority)] };
+    return { key: `t${t.id}`, open: () => hooks.openTask?.(t), cells: [first, stateChip(word, statusClass(word)), whoText(t), goal, priorityWord(t.priority)] };
 }
 
 /** Show the board's tasks in `host`. hooks: openTask(task), openGoal(id), onCount(openCount). */
@@ -356,9 +360,10 @@ export function renderTaskPage(host, task, ctx, mode = 'view') {
 function factsOf(task, ctx) {
     const dl = el('dl', 'goals-facts');
     const who = agentOf(ctx.project, task); // the agent that has it, when it runs here: its name opens it (the old subagent row's "Launched by", for a board's tasks)
-    fact(dl, 'Assigned to', who ? btn('team-link', task.assigned_to, () => { window.switchNavTab?.('agents'); window.selectLiveSession?.(who.name, who.agent_type, who.session_id, who.server); }) : (task.assigned_to || 'Nobody yet'));
+    const doer = doerOf(task); // who did the work: for a done task the one who built it (the server's worked_by)
+    fact(dl, isDoneTask(task) ? 'Done by' : 'Assigned to', who && !isDoneTask(task) && doer === task.assigned_to ? btn('team-link', doer, () => { window.switchNavTab?.('agents'); window.selectLiveSession?.(who.name, who.agent_type, who.session_id, who.server); }) : (doer || (isDoneTask(task) ? 'Nobody recorded' : 'Nobody yet')));
     if (task.goal_id) {
-        const g = btn('team-link', goalTitle(ctx.project, task.goal_id) || `Goal ${task.goal_id}`, () => ctx.openGoal(task.goal_id));
+        const g = btn('team-link', (ctx.goalTitleOf && ctx.goalTitleOf(task.goal_id)) || goalTitle(ctx.project, task.goal_id) || `Goal ${task.goal_id}`, () => ctx.openGoal(task.goal_id)); // a goal's page already knows the titles
         fact(dl, 'Goal', g);
     } else fact(dl, 'Goal', noGoalLabel);
     const priority = el('span', null, priorityWord(task.priority)); priority.title = `Claim priority: ${task.priority || 'none'}`; // the dialog's name for it
@@ -379,6 +384,7 @@ async function reloadTask(host, id, ctx, message) {
     const fresh = await readTask(ctx.project, id);
     if (message) showToast(message);
     loadTasks().catch(() => {});
+    if (ctx.onChanged) ctx.onChanged(); // a page in another view (a goal's) reads its own lists again
     importOnce('./task_list.js').then(m => m.loadBoardTasks(ctx.project)).catch(() => {}); // the agent panel's list
     if (fresh && host.isConnected) renderTaskPage(host, fresh, ctx, 'view');
 }
