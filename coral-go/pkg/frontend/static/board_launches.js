@@ -31,6 +31,7 @@ export function showAddAgentToBoard(boardName, workDir) {
         renderAgentConfigForm('add-agent-board-acf', {
             showPreset: true,
             showName: true,
+            nameLabel: 'Role', // as in Edit member
             sections: true, // the same panes as New Agent's step 3 and Edit member (#7407)
             value: { agentType: _settingsFor(server).default_agent_type || 'claude' },
         });
