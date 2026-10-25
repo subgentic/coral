@@ -2,7 +2,6 @@ package routes
 
 import (
 	"runtime"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -61,9 +60,14 @@ func TestShellRiskInlineCodeRulesLeaveOrdinaryCommandsAlone(t *testing.T) {
 // hyphen for a cmdlet (Verb-Noun), and one whose verb is not a reading one asks: the safe side, and the words say why. This pins both, so the list above stays one that passes everywhere.
 func TestShellRiskHyphenatedProgramNames(t *testing.T) {
 	dir := t.TempDir()
-	for _, c := range []string{`ssh-keygen -l -f key`, `ssh-add -l`, `ts-node x.ts`} {
+	// On Windows the reason is the cmdlet rule's own words: -f reads as -Force, and a word with no path in it is "not known to only read".
+	for c, windowsReason := range map[string]string{
+		`ssh-keygen -l -f key`: "it runs ssh-keygen with -Recurse or -Force",
+		`ssh-add -l`:           "it runs ssh-add, which is not known to only read",
+		`ts-node x.ts`:         "it runs ts-node, which is not known to only read",
+	} {
 		if runtime.GOOS == "windows" {
-			assert.Equal(t, "it runs "+strings.Fields(c)[0]+", which is not known to only read", shellRisk(c, dir), "asks on Windows: %s", c)
+			assert.Equal(t, windowsReason, shellRisk(c, dir), "asks on Windows: %s", c)
 		} else {
 			assert.Empty(t, shellRisk(c, dir), "must pass: %s", c)
 		}
