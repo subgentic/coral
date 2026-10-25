@@ -4817,7 +4817,7 @@ body:has(#nav-tab-hub-inbox.active) #saved-btn .saved-count { display: none; }
 #launch-agent-pick .launch-agent-opt:has(input:checked) .launch-agent-missing { color: inherit; }
 #launch-agent-pick .launch-agent-opt input { position: absolute; opacity: 0; width: 1px; height: 1px; }
 #launch-agent-pick .launch-agent-opt:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
-.launch-note-slot { min-height: 3.6em; margin: 0; }
+.launch-note-slot { display: flow-root; min-height: 5.6em; margin: 0; } /* flow-root: a note's or an empty slot's margin stays inside it, so nothing moves when a note comes */
 .launch-note-slot .settings-hint, .launch-note-slot .launch-cli-slot:empty { margin: 0 0 6px; }
 /* Segmented controls and cards drawn over a select (segmented.js). */
 select.seg-source { display: none; } /* (.modal-content select is display: block, one class more specific than the class alone) */
@@ -4833,7 +4833,9 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .acf-tools-details > summary { cursor: pointer; font-weight: 600; min-height: 32px; }
 .acf-tools-details .acf-perms-summary { font-weight: 400; margin-left: 6px; }
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
-    #launch-modal .modal-content.launch-wizard-content, #restart-modal .modal-content.restart-wizard-content { width: 100vw; max-width: none; height: 100dvh; max-height: none; border-radius: 0; }
+    #launch-modal .modal-content.launch-wizard-content, #restart-modal .modal-content.restart-wizard-content { width: 100vw; max-width: none; height: 100dvh; max-height: none; border-radius: 0; padding: 0 !important; } /* (!important: mobile.css's tighter padding is one too) */
+    #restart-modal .restart-wizard-content > .modal-header { margin: 0 !important; padding: 16px 16px 10px; }
+    #restart-modal .restart-wizard-content > .modal-footer { margin: 0 !important; padding: 10px 16px 14px !important; }
     .launch-page-folder, .launch-wizard .settings-panes { padding: 16px; }
     .launch-recap { padding: 10px 16px 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; } /* two lines at most, so large text leaves the body room */
     .sd-modal-content .launch-wizard > .modal-actions, .sd-modal-content.launch-wizard > .modal-actions { padding: 10px 16px 14px; }

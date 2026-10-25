@@ -53,6 +53,7 @@ export function setLaunchMore(open) { setLaunchStage(open ? 'agent' : 'folder');
 document.addEventListener("sd-more-open", e => { if (e.target.closest && e.target.closest("#launch-step-agent")) setLaunchStage('agent'); });
 
 function _showLaunchStep(step) {
+    document.getElementById("launch-modal")?.setAttribute('aria-labelledby', step === 'agent' ? 'launch-agent-title-text' : 'launch-title'); // the three steps are "New agent"; the chooser keeps its own title
     document.getElementById("launch-step-chooser").style.display = step === "chooser" ? "flex" : "none";
     document.getElementById("launch-step-agent").style.display = step === "agent" ? "flex" : "none";
     document.getElementById("launch-step-terminal").style.display = step === "terminal" ? "flex" : "none";

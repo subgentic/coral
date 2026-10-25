@@ -38,11 +38,11 @@ const fs = require('node:fs');
             assert.deepEqual(await ev(`[...document.querySelectorAll('#launch-dir-recents button')].map(b => b.textContent + '|' + b.title)`), ['four|/work/four', 'three|/work/three', 'two|/work/two'], `${at}: the three most recent, newest first, named by the folder`);
             if (mobile) assert.deepEqual(await ev(`[...document.querySelectorAll('#launch-dir-recents button')].filter(b => b.getBoundingClientRect().height < 44).length`), 0, `${at}: 44 px targets`);
             await shot(Page, `folder-recents-${w}`);
-            await ev(`document.querySelector('#launch-dir-recents button:nth-child(2)').click(); true`);
+            await ev(`document.querySelector('#launch-dir-recents button:nth-of-type(2)').click(); true`);
             assert.equal(await ev(`document.getElementById('launch-dir').value`), '/work/three', `${at}: a button fills the folder`);
             assert.equal(await ev(`document.getElementById('launch-step-agent').dataset.stage`), 'folder', `${at}: and stays on step 1 (Next is the person's)`);
             await ev(`document.getElementById('launch-agent-next').click(); true`);
-            await waitFor(`document.getElementById('launch-step-agent').dataset.stage === 'details'`, `${at}: Next`, 4000);
+            await waitFor(`document.getElementById('launch-step-agent').dataset.stage === 'persona'`, `${at}: Next`, 4000);
             assert.equal(await ev(vis('#launch-dir-recents')), false, `${at}: the buttons are not in step 2`);
             await ev(`window.hideLaunchModal(); true`);
         }
