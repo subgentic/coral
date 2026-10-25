@@ -5,7 +5,7 @@ import { attachDialogFocus } from './dialog_focus.js';
 import { browserSession } from './safe_storage.js';
 import { importOnce } from './import_once.js';
 
-const { RESUME_KEY, RELEASES_REPO, RELEASES_URL, installsLocally, reasonText, requestInstall, requestRelaunch } = await importOnce('./update_api.js');
+const { RESUME_KEY, RELEASES_REPO, RELEASES_URL, ACT_INSTALL, ACT_RELAUNCH, releaseNotesUrl, installsLocally, reasonText, requestInstall, requestRelaunch } = await importOnce('./update_api.js');
 
 // What happens after Relaunch, by how this Coral was installed (the docs' per-platform table): none of it promises that this page comes back by itself
 const AFTER = {
@@ -45,7 +45,7 @@ function draw(note) {
     dialog.replaceChildren();
     const content = mk('div', 'modal-content modal-md update-confirm');
     const win = installsLocally(s); // Windows installs from here with Windows's own permission prompt, not a relaunch (#7338)
-    const head = mk('div', 'modal-header'); const h = mk('h3', null, win ? `Install Coral ${s.staged.version}?` : `Install Coral ${s.staged.version} and relaunch?`); h.id = 'update-confirm-title'; head.append(h);
+    const head = mk('div', 'modal-header'); const h = mk('h3', null, win ? `${ACT_INSTALL}: Coral ${s.staged.version}?` : `${ACT_RELAUNCH}: Coral ${s.staged.version}?`); h.id = 'update-confirm-title'; head.append(h);
     const body = mk('div', 'modal-body'); body.id = 'update-confirm-body';
     const days = s.staged.days;
     // Where it comes from: Coral's releases on the one pinned repository. The status says the repository only after verification; the words and the link are this page's (RELEASES_URL), never built from the status's text.
@@ -56,8 +56,10 @@ function draw(note) {
         const a = mk('a', 'update-source-link', RELEASES_URL.replace('https://', '')); a.href = RELEASES_URL; a.target = '_blank'; a.rel = 'noopener noreferrer'; from.append(a);
         from.append(document.createTextNode(')'));
     }
-    from.append(document.createTextNode(`. It was downloaded and its signature was checked${days >= 1 ? ` (ready for ${plural(days, 'day')})` : ''}. You are on ${s.installed}.`));
+    from.append(document.createTextNode(`. Coral downloaded it and checked its signature${days >= 1 ? ` (ready for ${plural(days, 'day')})` : ''}. You are on ${s.installed}.`));
     body.append(from);
+    const notes = s.source === RELEASES_REPO ? releaseNotesUrl(s.staged.version) : ''; // what is in the update: this release's notes on the one repository the page knows (#7360)
+    if (notes) { const np = mk('p'); const na = mk('a', 'update-notes-link', `What is new in ${s.staged.version}`); na.href = notes; na.target = '_blank'; na.rel = 'noopener noreferrer'; np.append(na); body.append(np); }
     if (note) { const p = mk('p', 'update-note', note); p.setAttribute('role', 'status'); body.append(p); }
     if (n > 0) {
         const warn = mk('div', 'update-warn');
@@ -70,6 +72,7 @@ function draw(note) {
             const li = mk('li'); li.append(mk('span', 'update-agent-name', a.name || a.sessionId), ' ', mk('span', 'update-agent-state', STATE_WORDS[a.state] || a.state)); // spaces between the parts: the row's text reads as words wherever it is read from (#6315)
             if (a.resumes === true) li.append(' ', mk('span', 'update-agent-note', 'starts again afterwards'));
             else if (a.resumes === false) li.append(' ', mk('span', 'update-agent-note', 'starts a new conversation'));
+            else li.append(' ', mk('span', 'update-agent-note', 'not known whether it starts again')); // never an agent left unexplained (#7360)
             list.append(li);
         }
         inner.append(lead, list, mk('p', 'update-keep', r.tmuxRestart ? 'Agents in tmux restart too: the bundled tmux changed.' : 'Agents in tmux keep running and reattach.'));
@@ -80,7 +83,7 @@ function draw(note) {
     const acts = mk('div', 'modal-actions modal-footer');
     const later = mk('button', 'btn update-later', 'Later'); later.type = 'button';
     later.addEventListener('click', close);
-    const go = mk('button', 'btn btn-primary update-go', n > 0 ? `Install and restart ${plural(n, 'agent')}` : win ? 'Install update' : 'Install and relaunch'); go.type = 'button';
+    const go = mk('button', 'btn btn-primary update-go', n > 0 ? `${win ? ACT_INSTALL : ACT_RELAUNCH}, restart ${plural(n, 'agent')}` : win ? ACT_INSTALL : ACT_RELAUNCH); go.type = 'button';
     go.addEventListener('click', () => sendRelaunch(go, later));
     // the safe answer starts with focus when something would restart; with nothing to lose the action itself does
     (n > 0 ? later : go).setAttribute('data-initial-focus', '');

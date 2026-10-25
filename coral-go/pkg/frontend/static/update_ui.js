@@ -5,7 +5,7 @@ import { PHONE_QUERY } from './phone_layout.js';
 import { importOnce } from './import_once.js';
 import { browserLocal, browserSession } from './safe_storage.js';
 import { pollEvery } from './overload.js';
-const { RESUME_KEY, ageTier, canStart, fetchUpdateStatus, installsLocally, notAvailable, requestCheckNow, rollbackText, serverHas } = await importOnce('./update_api.js'); // lazy modules load the others they need through importOnce, so a failed load is retried
+const { RESUME_KEY, actName, ageTier, canStart, fetchUpdateStatus, installsLocally, notAvailable, requestCheckNow, rollbackText, serverHas } = await importOnce('./update_api.js'); // lazy modules load the others they need through importOnce, so a failed load is retried
 import { updatesUiOn } from './update_flag.js';
 
 const POLL_MS = 10 * 60 * 1000;
@@ -31,8 +31,8 @@ export function pillWords(s) {
     const ago = days < 1 ? 'earlier today' : `${plural(days, 'day')} ago`;
     return {
         tier, age,
-        verb: installsLocally(s) ? 'Install update' : 'Relaunch to update', // Windows installs from this page (#7338): no relaunch is offered there
-        name: `${installsLocally(s) ? 'Install update' : 'Relaunch to update'} to version ${s.staged.version}. Downloaded ${ago}.${canStart(s) ? '' : ` ${notAvailable(s.relaunch.reason)}`}`,
+        verb: actName(s), // Windows installs from this page (#7338): no relaunch is offered there
+        name: `${actName(s)} to version ${s.staged.version}. Downloaded ${ago}.${canStart(s) ? '' : ` ${notAvailable(s.relaunch.reason)}`}`,
     };
 }
 

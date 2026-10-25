@@ -40,6 +40,13 @@ const SOURCE_RE = /^[A-Za-z0-9._-]{1,100}\/[A-Za-z0-9._-]{1,100}$/;
 export const RELEASES_REPO = 'subgentic/coral';
 export const RELEASES_URL = `https://github.com/${RELEASES_REPO}`;
 
+/** The one action's two names (#7360): "Update and relaunch" on macOS and Linux, "Install update" on Windows (it installs from this page and does not relaunch). Every button, control and title says one of them. */
+export const ACT_RELAUNCH = 'Update and relaunch';
+export const ACT_INSTALL = 'Install update';
+export const actName = (s) => (installsLocally(s) ? ACT_INSTALL : ACT_RELAUNCH);
+/** The release notes of a version on the one repository this page links to (a constant of this page; the version is checked to be a plain version word); '' when the word is not one. */
+export function releaseNotesUrl(version) { return /^[0-9][0-9A-Za-z.+-]{0,40}$/.test(String(version || '')) ? `${RELEASES_URL}/releases/tag/v${version}` : ''; }
+
 
 /** The status with every field present and of its type (an older or newer server never throws in the UI). */
 export function normalizeStatus(raw) {
