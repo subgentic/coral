@@ -95,6 +95,10 @@ type Hello struct {
 // half-working goal buttons. Later goal features have their own flags.
 const CapGoals = "goals/1"
 
+// CapGoalLinks is "goal_links/1" (#7411): this Coral answers the Hub service's GET /api/goal-links (the accepted requests of one request id, with the tasks made, the frozen reply of the note), refuses it
+// from any user stream at every tier, and sends goal events additively in the feed. Coral Hub reads the read only from a Coral that says so.
+const CapGoalLinks = "goal_links/1"
+
 // CapCrossTeamAllowlist is this Coral's list-of-senders capability, version 1 (see Hello.Capabilities).
 const CapCrossTeamAllowlist = "cross_team_allowlist/1"
 
