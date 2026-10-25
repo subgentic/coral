@@ -112,6 +112,37 @@ func staticBuildVersion(fsys fs.FS) (string, error) {
 	return hex.EncodeToString(h.Sum(nil)[:6]), nil
 }
 
+// The embedded tree, the shell template and the bundler are the same for every server of a process, so what registerStatic derives from them (the tree's version,
+// and the bundle esbuild makes) is computed once and shared. In production a process starts one server and nothing changes; a test binary that starts hundreds
+// no longer runs esbuild and hashes every static file for each (a profile of this package: esbuild alone was a quarter of its CPU, and each build lstat'd the working
+// directory's parents again, which the go tool re-checks on every cached run). A caller that passes another tree (the tests of the version and the bundle) calls
+// staticBuildVersion and frontend.BuildBundle directly.
+var (
+	embeddedVersionOnce sync.Once
+	embeddedVersion     struct {
+		v   string
+		err error
+	}
+	embeddedBundleOnce sync.Once
+	embeddedBundle     struct {
+		b   *frontend.Bundle
+		how string
+		err error
+	}
+)
+
+// embeddedStaticVersion is staticBuildVersion of the embedded static tree, computed once per process.
+func embeddedStaticVersion(staticSub fs.FS) (string, error) {
+	embeddedVersionOnce.Do(func() { embeddedVersion.v, embeddedVersion.err = staticBuildVersion(staticSub) })
+	return embeddedVersion.v, embeddedVersion.err
+}
+
+// embeddedBundleSource is frontend.PrebuiltOrBuild of the embedded static tree and shell template, done once per process: the bundleSource of a running Coral. The Bundle is read-only to its users.
+func embeddedBundleSource(staticSub fs.FS, index []byte) (*frontend.Bundle, string, error) {
+	embeddedBundleOnce.Do(func() { embeddedBundle.b, embeddedBundle.how, embeddedBundle.err = frontend.PrebuiltOrBuild(staticSub, index) })
+	return embeddedBundle.b, embeddedBundle.how, embeddedBundle.err
+}
+
 // bundleVersion is the version of the bundled family (/static/bb/<ver>/): a hash of the bytes it
 // serves, not of the sources it was built from. The build's output also depends on the bundler and
 // its options and on the stylesheet order in the shell, none of which are in the static tree, so

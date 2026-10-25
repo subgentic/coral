@@ -14,7 +14,7 @@ import (
 var (
 	freeOSMemory = debug.FreeOSMemory
 	releaseDelay = 2 * time.Second
-	bundleSource = frontend.PrebuiltOrBuild // the embedded prebuilt family when it is of this tree, else a build (#8760)
+	bundleSource = embeddedBundleSource // the embedded prebuilt family when it is of this tree, else a build (#8760); done once per process
 )
 
 // buildBundleFamily builds the bundled family (#4228: app.js's module graph, the lazy modules and the shell's stylesheets as a few files, next to the unchanged files) from the
