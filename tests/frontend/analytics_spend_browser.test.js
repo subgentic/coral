@@ -7,11 +7,15 @@ const BASE = require('./test_base').BASE;
 const TEAM = 'coral-go-team';
 const FIX = { board: TEAM, range_hours: 24, generated_at: '2026-10-25T10:00:00Z',
     tokens: { window: { input: 2000000, output: 1100000, cache_read: 61000000, cache_write: null }, usual: { input: 6000000, output: 3000000, cache_read: 90000000, cache_write: null } },
-    commits: { window: 6, usual: 25, unattributed: 1 }, tool_calls: { window: 420, usual: 1500, measured_agents: 3, of_agents: 4 },
-    per_day: [0, 1, 2, 3, 4, 5, 6].map(i => ({ day: `2026-10-${19 + i}`, tokens: i === 6 ? 3100000 : 1200000 + i * 20000, commits: i === 6 ? 6 : 3 })),
-    agents: [{ name: 'Frontend Dev', role: 'Developer', tokens: 800000, share: 0.26, commits: 2, cache_reads: 14000000, tool_calls: 120, measured: true },
-        { name: 'Orchestrator', role: 'Orchestrator', tokens: 600000, share: 0.19, commits: null, cache_reads: 12000000, tool_calls: 90, measured: true },
-        { name: 'Gemini Dev', role: 'Developer', tokens: null, share: null, commits: 2, cache_reads: null, tool_calls: null, measured: false },
+    commits: { available: true, repo: 'coral', branch: 'main', window: 6, usual: 25, unattributed: 1, capped: false, queue_landed: {} }, tool_calls: { window: 420, usual: 1500, measured_agents: 3, of_agents: 4 },
+    per_day: [0, 1, 2, 3, 4, 5, 6].map(i => ({ day: `2026-10-${19 + i}`, tokens: i === 6 ? 3100000 : 1200000 + i * 20000, commits: i === 2 ? 0 : (i === 6 ? 6 : 3), tool_calls: i === 6 ? 420 : 200 })),
+    per_hour: Array.from({ length: 24 }, (_, h) => ({ hour: `2026-10-25T${String(h).padStart(2, '0')}:00:00Z`, tokens: 100000, commits: h % 4 === 0 ? 1 : 0, tool_calls: 30 })),
+    task_time: { window: { done: 14, median_s: 2280, p90_s: 7500, wait_median_s: 720, review_median_s: 2820, rounds_mean: 1.6, sent_back: 3 }, usual: { done: 77, median_s: 1860, p90_s: 6000 },
+        per_day: [3, 2, 0, 1, 4, 2, 14].map((n, i) => ({ day: `2026-10-${19 + i}`, done: n })), per_hour: Array.from({ length: 24 }, (_, h) => ({ hour: `2026-10-25T${String(h).padStart(2, '0')}:00:00Z`, done: h % 3 === 0 ? 1 : 0 })),
+        agents: [{ name: 'Frontend Dev', done: 5, median_s: 3120, sent_back: 2 }, { name: 'Backend Dev', done: 3, median_s: 2040, sent_back: 0 }] },
+    agents: [{ name: 'Frontend Dev', role: 'Developer', tokens: 800000, share: 0.26, commits: 2, cache_reads: 14000000, tool_calls: 120, tool_calls_measured: true, measured: true },
+        { name: 'Orchestrator', role: 'Orchestrator', orchestrator: true, tokens: 600000, share: 0.19, commits: 0, cache_reads: 12000000, tool_calls: 90, tool_calls_measured: true, measured: true },
+        { name: 'Gemini Dev', role: 'Developer', tokens: null, share: null, commits: 2, cache_reads: null, tool_calls: null, tool_calls_measured: false, measured: false },
         { name: 'Unattributed', role: '', tokens: null, share: null, commits: 1, cache_reads: null, tool_calls: null, measured: false }], measured_agents: 3, of_agents: 4 };
 
 (async () => {
@@ -33,19 +37,58 @@ const FIX = { board: TEAM, range_hours: 24, generated_at: '2026-10-25T10:00:00Z'
         await run('the headline and the numbers: tokens per commit, usual, commits, cache reads (not in the total), tool calls', async () => {
             assert.equal(await text('#cost-spend .spend-headline'), '517 K tokens per commit, usual 360 K, 44% above.');
             const cards = await ev(`[...document.querySelectorAll('#cost-spend .spend-card')].map(c => c.textContent.replace(/\\s+/g, ' ').trim())`);
-            assert.ok(/^517 K\s*tokens per landed commit, 24 h/.test(cards[0]), cards[0]); assert.ok(/^360 K\s*usual/.test(cards[1]), cards[1]); assert.ok(/^6\s*commits landed on main\s*1 unattributed/.test(cards[2]), cards[2]);
-            assert.ok(/^61 M\s*cache reads, not in the total/.test(cards[3]), cards[3]); assert.ok(/^70\s*tool calls per landed commit.*3 of 4 agents measured/.test(cards[4]), cards[4]);
+            assert.ok(/^517 K\s*tokens per landed commit, 24 h/.test(cards[0]), cards[0]); assert.ok(/^70\s*tool calls per landed commit.*3 of 4 agents measured/.test(cards[1]), cards[1]); assert.ok(/^360 K\s*usual/.test(cards[2]), cards[2]); assert.ok(/^6\s*commits landed on main\s*1 unattributed/.test(cards[3]), cards[3]);
+            assert.ok(/^61 M\s*cache reads, not in the total/.test(cards[4]), cards[4]);
             assert.match(await text('#cost-spend .spend-sub'), /Team coral-go-team · last 24 h against the 7 days before/);
         });
         await run('one bar a day, today amber when 30% above usual, the usual line', async () => {
             const b = await ev(`(() => ({ bars: document.querySelectorAll('#cost-spend .spend-bar').length, high: [...document.querySelectorAll('#cost-spend .spend-bar')].map(x => x.classList.contains('spend-bar-high')), usual: !!document.querySelector('#cost-spend .spend-usual'), label: document.querySelector('#cost-spend .spend-bars').getAttribute('aria-label') }))()`);
-            assert.equal(b.bars, 7); assert.deepEqual(b.high, [false, false, false, false, false, false, true]); assert.equal(b.usual, true); assert.match(b.label, /usual 360 K/);
+            assert.equal(b.bars, 6, 'a day with no commit has no bar, not a stub'); assert.deepEqual(b.high, [false, false, false, false, false, true]); assert.equal(b.usual, true); assert.match(b.label, /usual 360 K/);
         });
         await run('who spends: a merged Not measured cell, team for the Orchestrator, an Unattributed row', async () => {
             const t = await ev(`[...document.querySelectorAll('#cost-spend .spend-table tbody tr')].map(r => [...r.children].map(c => c.textContent.trim() + (c.colSpan > 1 ? '[x' + c.colSpan + ']' : '')))`);
             assert.deepEqual(t[0], ['Frontend Dev', '800 K', '26%', '2', '14 M', '120']); assert.deepEqual(t[1], ['Orchestrator', '600 K', '19%', 'team', '12 M', '90']);
-            assert.deepEqual(t[2], ['Gemini Dev', 'Not measured[x5]']); assert.deepEqual(t[3], ['Unattributed', '—', '—', '1', '—', '—']);
+            assert.deepEqual(t[2], ['Gemini Dev', 'Not measured[x5]']); assert.deepEqual(t[3], ['Unattributed', 'Commits whose author matches no agent[x5]']);
             assert.ok(await ev(`!!document.querySelector('#cost-spend .spend-how')`), 'How it is counted');
+        });
+        await run('commits that could not be read are said with their reason, not as zero', async () => {
+            await ev(`window.__spend = { ...window.__spend, commits: { available: false, reason: 'no repository found for this team', window: null, usual: null, unattributed: 0 } }; true`);
+            await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard(); return true; })()`);
+            await waitFor(`/Commits could not be read/.test((document.querySelector('#cost-spend .spend-headline') || {}).textContent || '')`, 'the reason', 6000);
+            assert.equal(await text('#cost-spend .spend-headline'), 'Commits could not be read: no repository found for this team. 3.1 M tokens were spent.');
+            await ev(`window.__spend = ${JSON.stringify(FIX)}; true`);
+            await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard(); return true; })()`);
+            await waitFor(`/517 K tokens per commit/.test((document.querySelector('#cost-spend .spend-headline') || {}).textContent || '')`, 'back to normal', 6000);
+        });
+        await run('the trend toggles: Tool calls changes the chart and its name, Hourly draws 24 hours', async () => {
+            const pick = (group, key) => ev(`document.querySelector('#cost-spend .spend-toggle[aria-label="${group}"] [data-key="${key}"]').click(); true`);
+            await pick('Trend shows', 'tools');
+            assert.match(await text('#cost-spend .spend-chart-head h4'), /Tool calls per commit, each day/);
+            assert.match(await ev(`document.querySelector('#cost-spend .spend-bars').getAttribute('aria-label')`), /Tool calls per commit each day/);
+            await pick('Trend by', 'hour');
+            assert.match(await text('#cost-spend .spend-chart-head h4'), /Tool calls per commit, each hour/);
+            assert.equal(await ev(`document.querySelectorAll('#cost-spend .spend-bar-col').length`), 24, '24 hours');
+            assert.equal(await ev(`document.querySelectorAll('#cost-spend .spend-bar').length`), 6, 'only the hours with a commit have a bar');
+            await pick('Trend shows', 'tokens'); await pick('Trend by', 'day');
+            assert.match(await text('#cost-spend .spend-chart-head h4'), /Tokens per commit, each day/);
+        });
+        await run('Task time: six tiles, tasks done with Daily and Hourly, by agent; a measure the endpoint does not return is left out', async () => {
+            const cards = await ev(`[...document.querySelectorAll('#cost-task-time .spend-card')].map(c => c.textContent.replace(/\\s+/g, ' ').trim())`);
+            assert.equal(cards.length, 6, JSON.stringify(cards));
+            assert.ok(/^14\s*tasks done, last 24 h\s*usual 11 a day/.test(cards[0]), cards[0]); assert.ok(/^38 min\s*median, claimed to done\s*usual 31 min/.test(cards[1]), cards[1]);
+            assert.ok(/^2 h 05 min\s*slowest 1 in 10\s*usual 1 h 40 min/.test(cards[2]), cards[2]); assert.ok(/^12 min\s*median wait before claimed/.test(cards[3]), cards[3]);
+            assert.ok(/^47 min\s*Median review time \(assignment to approval\)/.test(cards[4]), cards[4]); assert.ok(/^3 of 14\s*sent back 2 or more times\s*1\.6 rounds on average/.test(cards[5]), cards[5]);
+            assert.equal(await ev(`document.querySelectorAll('#cost-task-time .spend-bar').length`), 6, 'the day with no task done has no bar');
+            await ev(`document.querySelector('#cost-task-time .spend-toggle [data-key="hour"]').click(); true`);
+            assert.equal(await ev(`document.querySelectorAll('#cost-task-time .spend-bar-col').length`), 24);
+            await ev(`document.querySelector('#cost-task-time .spend-toggle [data-key="day"]').click(); true`);
+            const rows = await ev(`[...document.querySelectorAll('#cost-task-time .spend-table tbody tr')].map(r => [...r.children].map(c => c.textContent.trim()))`);
+            assert.deepEqual(rows, [['Frontend Dev', '5', '52 min', '2'], ['Backend Dev', '3', '34 min', '0']]);
+            await ev(`delete window.__spend.task_time.window.p90_s; delete window.__spend.task_time.window.wait_median_s; true`);
+            await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard(); return true; })()`);
+            await waitFor(`document.querySelectorAll('#cost-task-time .spend-card').length === 4`, 'two measures left out', 6000);
+            assert.ok(!(await ev(`document.getElementById('cost-task-time').textContent`)).match(/slowest|wait before/), 'no slowest and no wait tile, and no 0 or dash in their place');
+            await ev(`window.__spend = ${JSON.stringify(FIX)}; true`);
         });
         await run('no commit landed is said, not divided by zero', async () => {
             await ev(`window.__spend = { ...window.__spend, commits: { window: 0, usual: 25, unattributed: 0 } }; true`); await ev(`window._refreshCostDashboard ? window._refreshCostDashboard() : 0; true`);
