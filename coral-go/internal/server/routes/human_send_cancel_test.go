@@ -111,7 +111,7 @@ func TestCancelDropsAHeldMessageAndItIsNeverTyped(t *testing.T) {
 	}
 	assert.Nil(t, r.rows(), "gone from the row")
 	r.answered()
-	time.Sleep(6 * personHoldSettle)
+	time.Sleep(6 * personHoldSettle.Load())
 	assert.Empty(t, r.typed(), "a cancelled message is never typed")
 	assert.Equal(t, http.StatusNotFound, r.cancel(id).Code, "and cancelling it again finds nothing")
 }
@@ -136,7 +136,7 @@ func TestCancelTheOneWaitingItsTurnLetsTheNextGoOut(t *testing.T) {
 	r.box("permission")
 	head, settled := r.hold("head")
 	_, _ = r.hold("next")
-	time.Sleep(3 * personHoldPoll) // the head is being waited for
+	time.Sleep(3 * personHoldPoll.Load()) // the head is being waited for
 	require.Equal(t, http.StatusOK, r.cancel(head).Code)
 	assert.Equal(t, errSendCancelled, <-settled)
 	r.answered()
