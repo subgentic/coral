@@ -221,19 +221,21 @@ const STUB = `(() => {
             const au = await auditRegion(ev, ['#inbox-tasks-host']);
             check(`${dev}: the panel reads at 4.5:1`, au.fails.length === 0, JSON.stringify(au.fails.slice(0, 3)));
 
-            // Saved for later: Read the whole message, on a saved message's page in the Inbox (#7472: its button is in the page's bar, the text it opens is in the page; the dock's list is a table, #7631)
+            // Saved for later: the component's own "Read the whole message" (the mount without a mode, which is what Coral Hub's pinned version calls), mounted on a host of its own; then Coral's page, which reads the whole text at once and has no button (#7660)
             const savedAt = async i => {
                 await ev(`(async () => { const m = await import(${S} + 'saved.js'); await m.openSavedAll(); return true; })()`);
-                await waitFor(`!!document.querySelector('#group-table-view tbody .group-table-link') && document.querySelectorAll('#group-table-view tbody .group-table-link').length === 4 && document.getElementById('group-table-view').dataset.group === 'hub-inbox:saved'`, 'four saved items', 8000);
-                await ev(`document.querySelectorAll('#group-table-view tbody .group-table-link')[${i}].click(); true`);
-                await waitFor(`!!document.querySelector('#inbox-page .ibx-saved-toggle')`, 'the page\'s control', 6000);
+                await waitFor(`document.querySelectorAll('#group-table-view tbody .group-table-link').length === 4 && document.getElementById('group-table-view').dataset.group === 'hub-inbox:saved'`, 'four saved items', 8000);
+                await ev(`(async () => { document.getElementById('qa-old-host')?.remove(); const h = document.createElement('div'); h.id = 'qa-old-host'; document.body.append(h);
+                    const sv = await import(${S} + 'saved.js'), ic = await import(${S} + 'inbox_coral.js'), pm = await import(${S} + 'inbox_panel.js');
+                    const inbox = pm.mountInbox(h, ic.coralInboxAdapter, { load: false, region: false }); const x = inbox.savedExpand(sv.savedView().shown[${i}]); h.append(x.root); return true; })()`);
+                await waitFor(`!!document.querySelector('#qa-old-host .ibx-saved-toggle')`, 'the component\'s control', 6000);
             };
             await savedAt(0);
-            const sv = await ev(`(() => { const b = document.querySelector('#inbox-page .ibx-saved-toggle'); const r = document.getElementById(b.getAttribute('aria-controls')); return { text: b.textContent, exp: b.getAttribute('aria-expanded'), regionHidden: r.hidden, label: r.getAttribute('aria-label'), tag: b.tagName }; })()`);
-            check(`${dev}: a message's page has a "Read the whole message" button (in its bar) (closed, controlling its text, which is not a landmark)`, sv.text === 'Read the whole message' && sv.exp === 'false' && sv.regionHidden && sv.label === null && sv.tag === 'BUTTON', JSON.stringify(sv));
-            const sb = () => `document.querySelector('#inbox-page .ibx-saved-toggle')`;
+            const sv = await ev(`(() => { const b = document.querySelector('#qa-old-host .ibx-saved-toggle'); const r = document.getElementById(b.getAttribute('aria-controls')); return { text: b.textContent, exp: b.getAttribute('aria-expanded'), regionHidden: r.hidden, label: r.getAttribute('aria-label'), tag: b.tagName }; })()`);
+            check(`${dev}: the component without a mode has a "Read the whole message" button (closed, controlling its text, which is not a landmark)`, sv.text === 'Read the whole message' && sv.exp === 'false' && sv.regionHidden && sv.label === null && sv.tag === 'BUTTON', JSON.stringify(sv));
+            const sb = () => `document.querySelector('#qa-old-host .ibx-saved-toggle')`;
             await ev(`${sb()}.focus(); ${sb()}.click(); true`);
-            await waitFor(`!!document.querySelector('#inbox-page .ibx-saved-body .md')`, 'the whole message', 4000);
+            await waitFor(`!!document.querySelector('#qa-old-host .ibx-saved-body .md')`, 'the whole message', 4000);
             const first = await ev(`(() => { const b = ${sb()}; const r = document.getElementById(b.getAttribute('aria-controls')); return { text: b.textContent, exp: b.getAttribute('aria-expanded'), focus: document.activeElement === b, body: r.textContent, strong: r.querySelectorAll('strong').length, li: r.querySelectorAll('li').length, bold: r.querySelectorAll('b').length, req: window.__reqs.filter(x => /\\/api\\/saved\\/11\\/message$/.test(x.p)).length }; })()`);
             check(`${dev}: it opens in place: the button becomes "Show less" (a toggle), aria-expanded true, the focus stays on the button, the text rendered (bold, a list), a tag in it shown as text`, first.text === 'Show less' && first.exp === 'true' && first.focus && first.strong === 1 && first.li === 2 && first.bold === 0 && first.body.includes('<b>not bold</b>') && first.req === 1, JSON.stringify(first));
             await ev(`${sb()}.click(); true`);
@@ -252,11 +254,15 @@ const STUB = `(() => {
             await ev(`${sb()}.click(); true`);
             await waitFor(`/Could not read the message/.test(document.getElementById(${sb()}.getAttribute('aria-controls')).textContent)`, 'the error', 4000);
             check(`${dev}: a refusal says it could not read the message, with the server's reason`, /Could not read the message \(the transcript could not be read\)/.test(await ev(`document.getElementById(${sb()}.getAttribute('aria-controls')).textContent`)));
-            await savedAt(0); // the first message again, open, for the look of its panel
-            await ev(`${sb()}.click(); true`);
-            await waitFor(`!!document.querySelector('#inbox-page .ibx-saved-body .md')`, 'the whole message', 4000);
+            await ev(`document.getElementById('qa-old-host')?.remove(); true`);
+            // Coral's page (#7660): the whole text at once, no button, the snippet gives way, a long one is not cut
+            const reads0 = await ev(`window.__reqs.filter(x => /\\/api\\/saved\\/11\\/message$/.test(x.p)).length`);
+            await ev(`document.querySelectorAll('#group-table-view tbody .group-table-link')[0].click(); true`);
+            await waitFor(`!!document.querySelector('#inbox-page .ibx-saved-body .md')`, 'the whole message, shown at once', 6000);
+            const pg = await ev(`(() => { const p = document.getElementById('inbox-page'); const r = p.querySelector('.ibx-saved-body'); const sn = p.querySelector('.inbox-saved-snippet'); return { button: !!p.querySelector('.ibx-saved-toggle'), hidden: r.hidden, snippetHidden: sn.hidden, capped: getComputedStyle(r).maxHeight, clipped: r.scrollHeight > r.clientHeight + 1, bar: [...p.querySelectorAll('.item-bar > .btn, .item-bar > .wf-more > .btn')].map(b => b.textContent.trim()) }; })()`);
+            check(`${dev}: Coral's message page shows the whole text at once: no button, the region open, the snippet gone, nothing cut, More and Open in the bar`, !pg.button && !pg.hidden && pg.snippetHidden && pg.capped === 'none' && !pg.clipped && /^More,Open/.test(pg.bar.join()), JSON.stringify(pg));
+            check(`${dev}: it read the message once for the page`, (await ev(`window.__reqs.filter(x => /\\/api\\/saved\\/11\\/message$/.test(x.p)).length`)) === reads0 + 1);
             await shot(`inbox-saved-${mobile ? 'phone' : 'desktop'}`);
-            // (on a message's page the whole message is plain text under the snippet, with no inset panel of its own: the inset is the task card's)
             await setTheme(ev, theme);
             const au2 = await auditRegion(ev, ['#inbox-page']);
             check(`${dev}: the message page with its message open reads at 4.5:1`, au2.fails.length === 0, JSON.stringify(au2.fails.slice(0, 3)));

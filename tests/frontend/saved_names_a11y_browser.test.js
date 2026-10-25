@@ -1,4 +1,4 @@
-// The saved messages' buttons for a person using a screen reader (#6541, #7472): every saved item has a row link, a "Done" button (the table) and, on its page, "Read the whole message" and "Remove", and four items read as the same names four times,
+// The saved messages' buttons for a person using a screen reader (#6541, #7472): every saved item has a row link, a "Done" button (the table) and, on its page, "More" and "Open", and four items read as the same names four times,
 // so a person moving through them by button cannot tell which message a press would act on. Each button now says which message it is for (the source and the start of its text), and the name still
 // contains the words on the button (a person speaking "Done" to a voice control is understood). Desktop and a 390 px phone. Drives Chrome over CDP through agent_view_harness.js with the Inbox's
 // stand-in routes (helpers/inbox_world.js).
@@ -27,14 +27,11 @@ const BASE = require('./test_base').BASE;
                 for (const b of rows.flat()) assert.ok(b.name.toLowerCase().includes(b.visible.toLowerCase()), `${tag}, ${when}: "${b.name}" contains its visible words "${b.visible}"`);
             };
             check(await names(), 'closed');
-            // a message's page: Read the whole message and Remove name the message too, and the toggle's words change ("Show less") with its name
+            // a message's page: More and Open name the message too (the whole text is on the page, #7660)
             await ev(`document.querySelector('#group-table-view .group-table-link').click(); true`);
-            await waitFor(`!!document.querySelector('#inbox-page .ibx-saved-toggle')`, `${tag}: the message page`, 8000);
+            await waitFor(`!!document.querySelector('#inbox-page .ibx-saved-body .md, #inbox-page .ibx-saved-body .ibx-why')`, `${tag}: the message page with its text`, 8000);
             const page = async () => [await btnNames('#inbox-page .item-bar button, #inbox-page .item-bar .btn')];
-            check(await page(), 'a message page, closed');
-            await ev(`document.querySelector('#inbox-page .ibx-saved-toggle').click(); true`);
-            await waitFor(`document.querySelector('#inbox-page .ibx-saved-toggle').getAttribute('aria-expanded') === 'true'`, `${tag}: the message opens`, 5000);
-            check(await page(), 'a message page, open');
+            check(await page(), 'a message page');
             await ev(`document.querySelector('#inbox-page .group-back:not(.inbox-phone-back)').click(); true`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 4`, `${tag}: back at the table`, 8000);
             // two items from one source that start alike are named apart, and a cut at 40 characters never leaves half an emoji

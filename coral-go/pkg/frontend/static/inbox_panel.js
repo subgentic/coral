@@ -75,7 +75,7 @@ const SAVED_WORDS = {
 /**
  * Mount the Inbox panel into `host`. Returns { refresh, savedExpand, destroy }.
  *   refresh()            reads the tasks again
- *   savedExpand(item, which)    the "Read the whole message" control for one saved item: { root, button, region } (the host puts `root` in the item)
+ *   savedExpand(item, which, mode)    the "Read the whole message" control for one saved item: { root, button, region } (the host puts `root` in the item). mode.auto (#7660): no button, the whole text is read and shown at once (button is null); mode.onText(has) says whether the text came. Without mode it is as it always was, which is what Coral Hub's pinned version calls.
  *   destroy()            removes what was mounted and forgets the drafts
  * options.load === false: do not read the tasks at once (the host calls refresh() when the list is shown).
  * options.onCount(n): told how many tasks the list holds after each read (the host shows it on its tab).
@@ -263,7 +263,8 @@ export function mountInbox(host, adapter, options) {
         }
     }
 
-    function savedExpand(item, givenWhich) {
+    function savedExpand(item, givenWhich, mode) {
+        const auto = !!(mode && mode.auto);
         const wrap = el('div', 'ibx-saved');
         const regionId = uid('ibx-saved-body');
         const button = el('button', 'btn ibx-saved-toggle', SAVED_OPEN_LABEL);
@@ -275,16 +276,12 @@ export function mountInbox(host, adapter, options) {
         nameIt(SAVED_OPEN_LABEL);
         const region = el('div', 'ibx-saved-body');
         region.id = regionId;
-        region.hidden = true;
-        wrap.append(button, region);
-        if (!adapter || typeof adapter.readSavedMessage !== 'function') { wrap.hidden = true; return { root: wrap, button, region }; }
+        region.hidden = !auto;
+        if (auto) wrap.append(region); else wrap.append(button, region);
+        if (!adapter || typeof adapter.readSavedMessage !== 'function') { wrap.hidden = true; return { root: wrap, button: auto ? null : button, region }; }
         let loaded = false, loading = false;
-        button.addEventListener('click', async () => {
-            const open = button.getAttribute('aria-expanded') === 'true';
-            button.setAttribute('aria-expanded', String(!open));
-            button.textContent = open ? SAVED_OPEN_LABEL : SAVED_CLOSE_LABEL; nameIt(open ? SAVED_OPEN_LABEL : SAVED_CLOSE_LABEL); // a toggle: the words say what the next press does (#5882, the Operator's choice over a label that stays); aria-expanded still says which state it is in
-            region.hidden = open;
-            if (open || loaded || loading) return;
+        const read = async () => {
+            if (loaded || loading) return;
             loading = true;
             region.setAttribute('aria-busy', 'true');
             say('Reading the message…');
@@ -299,14 +296,23 @@ export function mountInbox(host, adapter, options) {
                 if (!parts.length) parts.push(el('p', 'ibx-why', 'There is no more text than the snippet.'));
                 region.replaceChildren(...parts);
                 loaded = !reason || !!res.text;
+                if (mode && typeof mode.onText === 'function') mode.onText(!!res.text);
                 say(reason || 'The message is open.');
             } catch (e) {
                 const msg = `Could not read the message (${e && e.message ? e.message : 'no answer'}).`;
                 region.replaceChildren(el('p', 'ibx-error', msg));
                 say(msg);
             } finally { loading = false; region.removeAttribute('aria-busy'); }
+        };
+        button.addEventListener('click', async () => {
+            const open = button.getAttribute('aria-expanded') === 'true';
+            button.setAttribute('aria-expanded', String(!open));
+            button.textContent = open ? SAVED_OPEN_LABEL : SAVED_CLOSE_LABEL; nameIt(open ? SAVED_OPEN_LABEL : SAVED_CLOSE_LABEL); // a toggle: the words say what the next press does (#5882, the Operator's choice over a label that stays); aria-expanded still says which state it is in
+            region.hidden = open;
+            if (!open) read();
         });
-        return { root: wrap, button, region };
+        if (auto) read();
+        return { root: wrap, button: auto ? null : button, region };
     }
 
     function destroy() { gone = true; for (const t of root.querySelectorAll('textarea')) _boxes.delete(t); root.remove(); clearInboxDrafts(); }

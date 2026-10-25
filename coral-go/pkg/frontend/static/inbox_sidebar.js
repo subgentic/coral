@@ -116,7 +116,8 @@ async function openDockSavedSheet(id, opener) {
     if (!it) return;
     const f = saved.savedItemFacts(it);
     const { openDetailPane, closeDetailPane } = await importOnce('./detail_pane.js');
-    const x = f.gone ? null : savedExpandFor(it, f.which);
+    let snippetEl = null; // the saved snippet gives way to the whole text once it has come (#7660)
+    const x = f.gone ? null : savedExpandFor(it, f.which, { auto: true, onText: has => { if (snippetEl) snippetEl.hidden = has; } });
     const back = () => closeDetailPane({ restoreFocus: true });
     const cannotOpen = f.gone || f.noopen;
     const actions = [];
@@ -128,9 +129,10 @@ async function openDockSavedSheet(id, opener) {
         host: $('agentic-saved-detail-pane'), opener, actions,
         body: doc => {
             const link = el('button', 'group-back', '\u2190 Saved'); link.type = 'button'; link.addEventListener('click', back);
-            doc.append(link, el('p', 'inbox-saved-snippet', f.snippet || '(no text)'));
+            snippetEl = el('p', 'inbox-saved-snippet', f.snippet || '(no text)');
+            doc.append(link, snippetEl);
             if (cannotOpen && f.why) doc.append(el('p', 'inbox-saved-why', f.why));
-            if (x && !x.root.hidden) { x.button.classList.add('btn-small'); doc.append(x.button, x.region); }
+            if (x && !x.root.hidden) doc.append(x.region); // the whole text, read at once; a long one scrolls in the sheet
         },
         onClose: () => {
             dockSheetId = '';
@@ -262,11 +264,12 @@ function openSavedPage(id) {
     host.dataset.saved = id;
     host.append(el('h2', 'wf-item-title', f.title));
     host.append(el('p', 'item-meta', [f.said ? `Said ${f.said}` : '', `Saved ${f.saved}`, f.state, f.serverName].filter(Boolean).join(' · ')));
-    host.append(el('p', 'inbox-saved-snippet', f.snippet || '(no text)'));
+    const snippetEl = el('p', 'inbox-saved-snippet', f.snippet || '(no text)'); // the snippet gives way to the whole text once it has come (#7660)
+    host.append(snippetEl);
     if ((f.gone || f.noopen) && f.why) host.append(Object.assign(el('p', 'inbox-saved-why', f.why), {}));
     const bar = el('div', 'item-bar inbox-saved-actions');
-    const x = f.gone ? null : savedExpandFor(it, f.which); // the shared component's "Read the whole message": its button is in the bar, the text it opens is in the page
-    if (x && !x.root.hidden) { host.append(x.region); x.button.classList.add('btn-small'); bar.append(x.button); }
+    const x = f.gone ? null : savedExpandFor(it, f.which, { auto: true, onText: has => { snippetEl.hidden = has; } }); // the shared component, in its read-at-once mode: the whole text is in the page, no button
+    if (x && !x.root.hidden) host.append(x.region);
     const wrap = el('div', 'wf-more'), toggle = el('button', 'btn btn-small', 'More'), menu = el('div', 'wf-more-menu'), rm = el('button', 'btn btn-small btn-warning', 'Remove from saved');
     toggle.type = 'button'; toggle.setAttribute('aria-haspopup', 'menu'); toggle.setAttribute('aria-expanded', 'false'); toggle.setAttribute('aria-label', `More for ${f.which}`);
     menu.hidden = true; menu.id = 'inbox-saved-more'; menu.setAttribute('role', 'menu'); toggle.setAttribute('aria-controls', menu.id); rm.setAttribute('role', 'menuitem'); rm.type = 'button'; rm.setAttribute('aria-label', `Remove from saved: ${f.which}`);

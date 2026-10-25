@@ -2,7 +2,7 @@
 // their rows and Saved its header; one search box that names the group on screen and searches it, Display options (Saved's Filters and Sort) for Saved only; a group's name opens a table at 20/700 with its count
 // (Needs you: Item, Team, When, and Folder, Asks and Goal columns when a row has one; Tasks: Task, Priority, State, Team; Saved: Message, Saved, State, Action, with Open and Done as chips with counts and one Done or Reopen
 // button per row); a task's page mounts the shared component for the one task (its text and reply box, no second heading) under a "← Tasks" link and a 17/700 title; a saved message's page has its own link
-// back, a bar pinned at the foot (Read the whole message, More with Remove, Open as the primary); one empty line per group; both themes and 200% text; a phone's list is the page and an item the screen after
+// back, a bar pinned at the foot (More with Remove, Open as the primary; the whole message is in the page, #7660); one empty line per group; both themes and 200% text; a phone's list is the page and an item the screen after
 // it. Drives Chrome over CDP through agent_view_harness.js with the tasks, the saved list and the waiting agents stubbed.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -180,11 +180,11 @@ const AGENTS = (waiting) => waiting ? [
             assert.equal(await ev(`document.querySelector('#inbox-page > .group-back').textContent`), '← Saved', at + 'back names Saved');
             assert.deepEqual(await ev(`(() => { const t = getComputedStyle(document.querySelector('#inbox-page .wf-item-title')); return [t.fontSize, t.fontWeight]; })()`), ['17px', '700'], at + 'the title is 17/700');
             assert.match(await ev(`document.querySelector('#inbox-page .inbox-saved-snippet').textContent`), /rollback step|Tuesday/, at + 'the message is on the page');
-            assert.deepEqual(await ev(`[...document.querySelectorAll('#inbox-page .item-bar > .btn, #inbox-page .item-bar > .wf-more > .btn')].filter(b => b.getClientRects().length).map(b => b.textContent.trim() + (b.classList.contains('btn-primary') ? '*' : ''))`), ['Read the whole message', 'More', 'Open in Chats*'], at + 'the bar: Read the whole message, More, Open, the primary last');
+            assert.deepEqual(await ev(`[...document.querySelectorAll('#inbox-page .item-bar > .btn, #inbox-page .item-bar > .wf-more > .btn')].filter(b => b.getClientRects().length).map(b => b.textContent.trim() + (b.classList.contains('btn-primary') ? '*' : ''))`), ['More', 'Open in Chats*'], at + 'the bar: More, Open, the primary last (no Read the whole message: the text is on the page)');
             assert.equal(await ev(`(() => { const r = document.querySelector('#inbox-page .item-bar').getBoundingClientRect(); return r.bottom <= innerHeight + 1 && r.bottom >= innerHeight - 40; })()`), true, at + 'the bar is at the foot of the screen');
             assert.deepEqual(await ev(`(${ON_SCALE})(document.getElementById('inbox-page'), ${SCALE})`), [], at + "every text of the message's page is on the scale");
-            await ev(`document.querySelector('#inbox-page .ibx-saved-toggle').click(); true`);
-            await waitFor(`/whole message, in full/.test(document.querySelector('#inbox-page .ibx-saved-body').textContent)`, at + 'Read the whole message shows the rest', 8000);
+            await waitFor(`/whole message, in full/.test(document.querySelector('#inbox-page .ibx-saved-body').textContent)`, at + 'the whole message is shown at once', 8000);
+            assert.equal(await ev(`!!document.querySelector('#inbox-page .ibx-saved-toggle')`), false, at + 'there is no Read the whole message button');
             await shot(`inbox-one-message-${w}`);
             // Remove is behind More
             assert.equal(await ev(`[...document.querySelectorAll('#inbox-page .wf-more-menu button')].some(b => b.getClientRects().length > 0)`), false, at + 'Remove is not on the page until More opens');
