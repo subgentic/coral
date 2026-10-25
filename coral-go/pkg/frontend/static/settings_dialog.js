@@ -325,7 +325,7 @@ function showRetentionStatus(ret) {
     const waiting = days > 0 && enabled && !(acked && acked >= enabled) && Date.now() - enabled < 24 * 3600e3;
     review.hidden = !waiting;
     const lines = [];
-    if (!days) lines.push('Off. Prunes what is older than the days above, once an hour.');
+    if (!days) lines.push('Prunes what is older than the days above, once an hour.');
     else if (waiting) lines.push(`On (${days} days), waiting: review what it would do to start now, or it starts on ${new Date(enabled.getTime() + 24 * 3600e3).toLocaleString()}.`);
     else if (days && !enabled) lines.push(`On (${days} days): its first check is within the hour; it then waits for your review.`);
     else lines.push(`On (${days} days).`);
