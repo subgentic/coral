@@ -1,5 +1,5 @@
 // A task's actions are on its page (#7644): Edit, Complete, Cancel, Publish, Nudge, Remind and the dependencies were the task dialog's. Against a real board on the isolated dev server (the board is removed again):
-// the pinned bar has the buttons the task's state allows (an open task: Edit, Nudge, Remind, Stop reminders, Complete and the danger Cancel task; a draft: Publish, no Complete; a finished one: none); Edit turns the page into its
+// the pinned bar has the buttons the task's state allows (an open task: the danger Cancel task first, then Edit, Nudge, Remind, Stop reminders and Complete last; a draft: Publish, no Complete; a finished one: none); Edit turns the page into its
 // form (Save and Cancel in the bar), changes the title and priority, needs a reason for a changed description and writes it, and keeps what the person typed on a refusal; Complete asks for a message and the required outputs
 // and finishes the task; Cancel asks in the bar ("Keep task" returns, "Cancel task" cancels); a dependency is chosen in the form and shows under "Blocked by"; the dock's task name opens the page, not the dialog.
 // Drives Chrome over CDP through agent_view_harness.js.
@@ -40,7 +40,7 @@ const BASE = require('./test_base').BASE;
         await open(open1);
         await shot('task-page-view');
         const bar = await barButtons();
-        check('an open task: Edit, Nudge, Remind, Stop reminders, Complete, and the danger Cancel task last', bar[bar.length - 1] === 'Cancel task' && ['Edit', 'Nudge', 'Remind', 'Stop reminders', 'Complete'].every(t => bar.includes(t)), JSON.stringify(bar));
+        check('an open task: the danger Cancel task first, alone at the left, then Edit, Nudge, Remind, Stop reminders, and Complete last (the one pinned-bar rule, #7684)', bar[0] === 'Cancel task' && bar[bar.length - 1] === 'Complete' && ['Edit', 'Nudge', 'Remind', 'Stop reminders', 'Complete'].every(t => bar.includes(t)), JSON.stringify(bar));
         check('Cancel task is a danger button', await ev(`[...document.querySelectorAll('#team-panel-item .goals-pinbar .btn')].find(b => b.textContent === 'Cancel task').classList.contains('btn-danger')`));
         await open(draft);
         const dbar = await barButtons();
