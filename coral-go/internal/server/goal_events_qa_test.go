@@ -156,6 +156,12 @@ func sp(s string) *string { return &s }
 // pause is a delay between the writes inside the transaction, to show that.
 func (e *qaEnv) burst(id int64, n int, pause time.Duration) {
 	e.t.Helper()
+	e.burstKeep(id, n, pause, 0)
+}
+
+// burstKeep is burst, and when keep > 0 it also prunes the board's goal events to the newest keep in the same transaction (what PruneGoalEvents does).
+func (e *qaEnv) burstKeep(id int64, n int, pause time.Duration, keep int) {
+	e.t.Helper()
 	var err error
 	for try := 0; try < 50; try++ { // the server's own writer may hold the database for a moment
 		var tx *sql.Tx
@@ -168,6 +174,10 @@ func (e *qaEnv) burst(id int64, n int, pause time.Duration) {
 			if pause > 0 {
 				time.Sleep(pause)
 			}
+		}
+		if err == nil && keep > 0 {
+			_, err = tx.Exec(`DELETE FROM board_goal_events WHERE id IN (
+				SELECT id FROM (SELECT id, ROW_NUMBER() OVER (PARTITION BY board_id ORDER BY id DESC) AS rn FROM board_goal_events) WHERE rn > ?)`, keep)
 		}
 		if err == nil {
 			err = tx.Commit()
@@ -223,18 +233,13 @@ func TestQA7355MoreThanFiftyIsAGap(t *testing.T) {
 // 3: a connection that is behind a pruned window is told it missed some.
 func TestQA7355PrunedPastIsAGap(t *testing.T) {
 	e := newQAEnv(t)
-	ctx := context.Background()
 	g := e.goal("team-a", "base")
 	c := e.operator()
 	c.first()
 	c.drain(1500 * time.Millisecond)
-	for i := 0; i < 8; i++ {
-		_, err := e.srv.boardStore.UpdateGoal(ctx, "team-a", g.ID, board.GoalUpdate{Title: sp(fmt.Sprintf("t%d", i))})
-		require.NoError(t, err)
-	}
-	n, err := e.srv.boardStore.PruneGoalEvents(ctx, 3)
-	require.NoError(t, err)
-	t.Logf("pruned %d rows before the tick", n)
+	// the eight changes and the prune to 3 are one transaction: no feed tick can see a half-written or an unpruned state (eight separate writes and a prune straddled a tick on a slow runner, and the
+	// tick that saw them all left nothing to prune past: no gap, #7646)
+	e.burstKeep(g.ID, 8, 0, 3)
 	evs, gaps, _ := c.drain(3 * time.Second)
 	t.Logf("after prune to 3: %d events, %d gap frames", len(evs), gaps)
 	assert.GreaterOrEqual(t, gaps, 1, "the window does not reach back to what the connection saw")
