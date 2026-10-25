@@ -38,7 +38,13 @@ const BOX = `window.__tp.find('textarea, input[type=text], [role=textbox]', /^Me
             await S.run(`${label}: a message typed and sent appears in the list and the box is emptied`, async () => {
                 await ev(`(() => { const t = ${BOX}; t.focus(); t.value = 'Hello from the Messages tab'; t.dispatchEvent(new Event('input', { bubbles: true })); window.__tp.find('button', /^Send$/i).click(); return true; })()`);
                 await waitFor(`/Hello from the Messages tab/.test(window.__na.text(window.__tp.page()))`, 'the sent message in the list', 6000);
-                assert.equal(await ev(`${BOX}.value`), '', 'the box is emptied');
+                await waitFor(`${BOX}.value === ''`, 'the box emptied once the post is answered', 6000); // the list can show the message (a poll) a moment before the post's answer empties the box (#7569)
+            });
+            await S.run(`${label}: with the post's answer held, a poll shows the message and the box still holds the text until the answer comes, then it is emptied`, async () => {
+                await ev(`(() => { if (!window.__heldPost) { window.__heldPost = true; const R = window.fetch.bind(window); window.fetch = async (u, o = {}) => { const resp = await R(u, o); if (String((o && o.method) || 'GET').toUpperCase() === 'POST' && /\\/messages$/.test(new URL(String(u), location.origin).pathname)) { window.__postServed = true; await new Promise(r => setTimeout(r, 1500)); } return resp; }; } const t = ${BOX}; t.focus(); t.value = 'Second from the Messages tab'; t.dispatchEvent(new Event('input', { bubbles: true })); window.__tp.find('button', /^Send$/i).click(); return true; })()`); // sleep-ok: the held answer is the point of this scenario: the post is answered 1.5 s late so a poll shows the message first
+                await waitFor(`window.__postServed === true`, 'the server to have the post (its answer is held)', 6000); await ev(`window.__coral.pollBoardNow()`);
+                await waitFor(`/Second from the Messages tab/.test(window.__na.text(window.__tp.page()))`, 'the second message shown by a poll', 6000);
+                await waitFor(`${BOX}.value === ''`, 'the box emptied once the post is answered', 6000); // the list can show the message (a poll) a moment before the post's answer empties the box (#7569)
             });
         }
         await removeBoards(ev, [TEAM]); S.finish(); // finish() exits the process, so the board goes first
