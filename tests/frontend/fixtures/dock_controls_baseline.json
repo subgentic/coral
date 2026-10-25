@@ -1,0 +1,952 @@
+{
+ "generated": "2026-10-25T06:49:43.413Z",
+ "pages": {
+  "agent": {
+   "tabs": [
+    {
+     "tab": "files",
+     "label": "Files",
+     "badge": "description"
+    },
+    {
+     "tab": "browse",
+     "label": "Browse",
+     "badge": "folder_open"
+    },
+    {
+     "tab": "artifacts",
+     "label": "Artifacts",
+     "badge": "inventory_2"
+    },
+    {
+     "tab": "tasks",
+     "label": "Tasks",
+     "badge": "checklist"
+    },
+    {
+     "tab": "notes",
+     "label": "Notes",
+     "badge": "edit_note"
+    },
+    {
+     "tab": "activity",
+     "label": "Activity",
+     "badge": "timeline"
+    },
+    {
+     "tab": "agent-ui",
+     "label": "Agent UI",
+     "badge": "widgets"
+    },
+    {
+     "tab": "saved",
+     "label": "Saved for later on this page",
+     "badge": ""
+    }
+   ],
+   "controls": {
+    "files": [
+     {
+      "role": "combobox",
+      "name": "Diff comparison mode",
+      "id": "",
+      "actions": "change:diff-mode",
+      "disabled": false
+     },
+     {
+      "role": "button",
+      "name": "Refresh file changes",
+      "id": "",
+      "actions": "click:files-refresh",
+      "disabled": false
+     }
+    ],
+    "browse": [
+     {
+      "role": "textbox",
+      "name": "Search files",
+      "id": "files-search-input",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "button",
+      "name": "Refresh",
+      "id": "",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "button",
+      "name": "Collapse all",
+      "id": "",
+      "actions": "",
+      "disabled": true
+     },
+     {
+      "role": "button",
+      "name": "Retry root directory",
+      "id": "",
+      "actions": "",
+      "disabled": false
+     }
+    ],
+    "artifacts": [
+     {
+      "role": "button",
+      "name": "Refresh",
+      "id": "",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "button",
+      "name": "Copy instructions for agents on how to publish an artifact",
+      "id": "",
+      "actions": "",
+      "disabled": false
+     }
+    ],
+    "tasks": [
+     {
+      "role": "button",
+      "name": "Create Task",
+      "id": "",
+      "actions": "click:task-create-show",
+      "disabled": false
+     }
+    ],
+    "notes": [
+     {
+      "role": "button",
+      "name": "Edit notes",
+      "id": "note-md-rendered",
+      "actions": "",
+      "disabled": false
+     }
+    ],
+    "activity": [
+     {
+      "role": "textbox",
+      "name": "Search activity",
+      "id": "ev-search",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "button",
+      "name": "Filters",
+      "id": "",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "combobox",
+      "name": "Sort activity",
+      "id": "ev-sort",
+      "actions": "",
+      "disabled": false
+     }
+    ],
+    "agent-ui": [],
+    "saved": [
+     {
+      "role": "tab",
+      "name": "Open",
+      "id": "saved-tab-open",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "tab",
+      "name": "Done",
+      "id": "saved-tab-done",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "button",
+      "name": "Close Saved for later",
+      "id": "saved-close",
+      "actions": "click:saved-close",
+      "disabled": false
+     },
+     {
+      "role": "textbox",
+      "name": "Search saved messages",
+      "id": "sv-search",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "button",
+      "name": "Filters",
+      "id": "",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "combobox",
+      "name": "Sort saved messages",
+      "id": "sv-sort",
+      "actions": "",
+      "disabled": false
+     }
+    ]
+   },
+   "chrome": [
+    {
+     "role": "button",
+     "name": "Files",
+     "id": "agentic-tab-files",
+     "actions": "click:agentic-tab",
+     "disabled": false
+    },
+    {
+     "role": "button",
+     "name": "Browse",
+     "id": "agentic-tab-browse",
+     "actions": "click:agentic-tab",
+     "disabled": false
+    },
+    {
+     "role": "button",
+     "name": "Artifacts",
+     "id": "agentic-tab-artifacts",
+     "actions": "click:agentic-tab",
+     "disabled": false
+    },
+    {
+     "role": "button",
+     "name": "Tasks",
+     "id": "agentic-tab-tasks",
+     "actions": "click:agentic-tab",
+     "disabled": false
+    },
+    {
+     "role": "button",
+     "name": "Notes",
+     "id": "agentic-tab-notes",
+     "actions": "click:agentic-tab",
+     "disabled": false
+    },
+    {
+     "role": "button",
+     "name": "Activity",
+     "id": "agentic-tab-activity",
+     "actions": "click:agentic-tab",
+     "disabled": false
+    },
+    {
+     "role": "button",
+     "name": "Agent UI",
+     "id": "agentic-tab-agent-ui",
+     "actions": "click:agentic-tab",
+     "disabled": false
+    },
+    {
+     "role": "button",
+     "name": "Saved for later on this page",
+     "id": "agentic-tab-saved",
+     "actions": "click:agentic-tab",
+     "disabled": false
+    },
+    {
+     "role": "button",
+     "name": "Customize tabs",
+     "id": "agentic-tab-customize",
+     "actions": "click:tabs-customize",
+     "disabled": false
+    },
+    {
+     "role": "tab",
+     "name": "Open",
+     "id": "saved-tab-open",
+     "actions": "",
+     "disabled": false
+    },
+    {
+     "role": "tab",
+     "name": "Done",
+     "id": "saved-tab-done",
+     "actions": "",
+     "disabled": false
+    },
+    {
+     "role": "button",
+     "name": "Close Saved for later",
+     "id": "saved-close",
+     "actions": "click:saved-close",
+     "disabled": false
+    }
+   ]
+  },
+  "board": {
+   "tabs": [
+    {
+     "tab": "subscribers",
+     "label": "Subscribers in the side panel",
+     "badge": "group"
+    },
+    {
+     "tab": "team-artifacts",
+     "label": "Team Artifacts",
+     "badge": "inventory_2"
+    },
+    {
+     "tab": "tasks",
+     "label": "Tasks",
+     "badge": "checklist"
+    },
+    {
+     "tab": "saved",
+     "label": "Saved for later on this page",
+     "badge": ""
+    }
+   ],
+   "controls": {
+    "subscribers": [
+     {
+      "role": "button",
+      "name": "View chat history",
+      "id": "",
+      "actions": "click:mb-subscriber-history",
+      "disabled": false
+     }
+    ],
+    "team-artifacts": [
+     {
+      "role": "textbox",
+      "name": "Search team artifacts",
+      "id": "ta-search",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "button",
+      "name": "Filters and sort",
+      "id": "ta-toggle",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "button",
+      "name": "Expand all details",
+      "id": "",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "button",
+      "name": "Refresh",
+      "id": "",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "button",
+      "name": "Copy instructions for agents on how to publish an artifact",
+      "id": "",
+      "actions": "",
+      "disabled": false
+     }
+    ],
+    "tasks": [
+     {
+      "role": "button",
+      "name": "Create Task",
+      "id": "",
+      "actions": "click:task-create-show",
+      "disabled": false
+     },
+     {
+      "role": "textbox",
+      "name": "Search tasks",
+      "id": "tk-search",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "button",
+      "name": "Filters and sort",
+      "id": "tk-toggle",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "button",
+      "name": "ID",
+      "id": "",
+      "actions": "click:task-sort",
+      "disabled": false
+     },
+     {
+      "role": "button",
+      "name": "Priority",
+      "id": "",
+      "actions": "click:task-sort",
+      "disabled": false
+     },
+     {
+      "role": "button",
+      "name": "Agent",
+      "id": "",
+      "actions": "click:task-sort",
+      "disabled": false
+     },
+     {
+      "role": "button",
+      "name": "Open task #3: High task, Open",
+      "id": "",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "button",
+      "name": "Open task #2: Another task, Open",
+      "id": "",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "button",
+      "name": "Open task #1: Queued task, Open",
+      "id": "",
+      "actions": "",
+      "disabled": false
+     }
+    ],
+    "saved": [
+     {
+      "role": "tab",
+      "name": "Open",
+      "id": "saved-tab-open",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "tab",
+      "name": "Done",
+      "id": "saved-tab-done",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "button",
+      "name": "Close Saved for later",
+      "id": "saved-close",
+      "actions": "click:saved-close",
+      "disabled": false
+     },
+     {
+      "role": "textbox",
+      "name": "Search saved messages",
+      "id": "sv-search",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "button",
+      "name": "Filters",
+      "id": "",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "combobox",
+      "name": "Sort saved messages",
+      "id": "sv-sort",
+      "actions": "",
+      "disabled": false
+     }
+    ]
+   },
+   "chrome": [
+    {
+     "role": "button",
+     "name": "Subscribers in the side panel",
+     "id": "agentic-tab-subscribers",
+     "actions": "click:agentic-tab",
+     "disabled": false
+    },
+    {
+     "role": "button",
+     "name": "Team Artifacts",
+     "id": "agentic-tab-team-artifacts",
+     "actions": "click:agentic-tab",
+     "disabled": false
+    },
+    {
+     "role": "button",
+     "name": "Tasks, 0 of 3 done",
+     "id": "agentic-tab-tasks",
+     "actions": "click:agentic-tab",
+     "disabled": false
+    },
+    {
+     "role": "button",
+     "name": "Saved for later on this page",
+     "id": "agentic-tab-saved",
+     "actions": "click:agentic-tab",
+     "disabled": false
+    },
+    {
+     "role": "tab",
+     "name": "Open",
+     "id": "saved-tab-open",
+     "actions": "",
+     "disabled": false
+    },
+    {
+     "role": "tab",
+     "name": "Done",
+     "id": "saved-tab-done",
+     "actions": "",
+     "disabled": false
+    },
+    {
+     "role": "button",
+     "name": "Close Saved for later",
+     "id": "saved-close",
+     "actions": "click:saved-close",
+     "disabled": false
+    }
+   ]
+  },
+  "team:agent": {
+   "tabs": [
+    {
+     "tab": "team-view",
+     "label": "Team View",
+     "badge": "dashboard"
+    },
+    {
+     "tab": "team-settings",
+     "label": "Team Settings",
+     "badge": "tune"
+    },
+    {
+     "tab": "team-artifacts",
+     "label": "Team Artifacts",
+     "badge": "inventory_2"
+    },
+    {
+     "tab": "knowledge",
+     "label": "Team Knowledge",
+     "badge": "psychology"
+    },
+    {
+     "tab": "tasks",
+     "label": "Tasks, 0 of 3 done",
+     "badge": "checklist 0/3"
+    },
+    {
+     "tab": "notes",
+     "label": "Notes",
+     "badge": "edit_note"
+    },
+    {
+     "tab": "saved",
+     "label": "Saved for later on this page",
+     "badge": ""
+    }
+   ],
+   "controls": {
+    "team-view": [
+     {
+      "role": "button",
+      "name": "Refresh",
+      "id": "",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "summary",
+      "name": "What these counts mean",
+      "id": "",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "button",
+      "name": "Remind agent for Inv One",
+      "id": "",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "button",
+      "name": "Remind agent for Inv Two",
+      "id": "",
+      "actions": "",
+      "disabled": false
+     }
+    ],
+    "team-settings": [
+     {
+      "role": "button",
+      "name": "Rename board",
+      "id": "",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "tab",
+      "name": "Workflow",
+      "id": "team-settings-tab-workflow",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "tab",
+      "name": "Prompt inspection",
+      "id": "team-settings-tab-prompts",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "tab",
+      "name": "Health check",
+      "id": "team-settings-tab-health",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "tab",
+      "name": "Messaging",
+      "id": "team-settings-tab-messaging",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "tabpanel",
+      "name": "Working modeNoneShared checkoutWorktreesMerge queueinfo Working mode instruction",
+      "id": "team-settings-workflow",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "combobox",
+      "name": "NoneShared checkoutWorktreesMerge queue",
+      "id": "",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "button",
+      "name": "About working modes",
+      "id": "",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "checkbox",
+      "name": "",
+      "id": "",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "textbox",
+      "name": "Team-specific conventions",
+      "id": "",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "summary",
+      "name": "Edit presets",
+      "id": "",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "combobox",
+      "name": "None \u00b7 built inShared checkout \u00b7 built inWorktrees \u00b7 built inMerge queue \u00b7 built",
+      "id": "",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "button",
+      "name": "New preset",
+      "id": "",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "textbox",
+      "name": "",
+      "id": "",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "textbox",
+      "name": "Instructions agents should follow",
+      "id": "",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "button",
+      "name": "Save built-in override",
+      "id": "",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "button",
+      "name": "Save settings",
+      "id": "",
+      "actions": "",
+      "disabled": false
+     }
+    ],
+    "team-artifacts": [
+     {
+      "role": "textbox",
+      "name": "Search team artifacts",
+      "id": "ta-search",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "button",
+      "name": "Filters and sort",
+      "id": "ta-toggle",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "button",
+      "name": "Expand all details",
+      "id": "",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "button",
+      "name": "Refresh",
+      "id": "",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "button",
+      "name": "Copy instructions for agents on how to publish an artifact",
+      "id": "",
+      "actions": "",
+      "disabled": false
+     }
+    ],
+    "knowledge": [
+     {
+      "role": "button",
+      "name": "Distill Knowledge",
+      "id": "",
+      "actions": "click:knowledge-distill",
+      "disabled": false
+     }
+    ],
+    "tasks": [
+     {
+      "role": "button",
+      "name": "Create Task",
+      "id": "",
+      "actions": "click:task-create-show",
+      "disabled": false
+     },
+     {
+      "role": "textbox",
+      "name": "Search tasks",
+      "id": "tk-search",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "button",
+      "name": "Filters and sort",
+      "id": "tk-toggle",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "button",
+      "name": "ID",
+      "id": "",
+      "actions": "click:task-sort",
+      "disabled": false
+     },
+     {
+      "role": "button",
+      "name": "Priority",
+      "id": "",
+      "actions": "click:task-sort",
+      "disabled": false
+     },
+     {
+      "role": "button",
+      "name": "Agent",
+      "id": "",
+      "actions": "click:task-sort",
+      "disabled": false
+     },
+     {
+      "role": "button",
+      "name": "Open task #3: High task, Open",
+      "id": "",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "button",
+      "name": "Open task #2: Another task, Open",
+      "id": "",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "button",
+      "name": "Open task #1: Queued task, Open",
+      "id": "",
+      "actions": "",
+      "disabled": false
+     }
+    ],
+    "notes": [
+     {
+      "role": "button",
+      "name": "Edit notes",
+      "id": "note-md-rendered",
+      "actions": "",
+      "disabled": false
+     }
+    ],
+    "saved": [
+     {
+      "role": "tab",
+      "name": "Open",
+      "id": "saved-tab-open",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "tab",
+      "name": "Done",
+      "id": "saved-tab-done",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "button",
+      "name": "Close Saved for later",
+      "id": "saved-close",
+      "actions": "click:saved-close",
+      "disabled": false
+     },
+     {
+      "role": "textbox",
+      "name": "Search saved messages",
+      "id": "sv-search",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "button",
+      "name": "Filters",
+      "id": "",
+      "actions": "",
+      "disabled": false
+     },
+     {
+      "role": "combobox",
+      "name": "Sort saved messages",
+      "id": "sv-sort",
+      "actions": "",
+      "disabled": false
+     }
+    ]
+   },
+   "chrome": [
+    {
+     "role": "button",
+     "name": "Team View",
+     "id": "agentic-tab-team-view",
+     "actions": "click:agentic-tab",
+     "disabled": false
+    },
+    {
+     "role": "button",
+     "name": "Team Settings",
+     "id": "agentic-tab-team-settings",
+     "actions": "click:agentic-tab",
+     "disabled": false
+    },
+    {
+     "role": "button",
+     "name": "Team Artifacts",
+     "id": "agentic-tab-team-artifacts",
+     "actions": "click:agentic-tab",
+     "disabled": false
+    },
+    {
+     "role": "button",
+     "name": "Team Knowledge",
+     "id": "agentic-tab-knowledge",
+     "actions": "click:agentic-tab",
+     "disabled": false
+    },
+    {
+     "role": "button",
+     "name": "Tasks, 0 of 3 done",
+     "id": "agentic-tab-tasks",
+     "actions": "click:agentic-tab",
+     "disabled": false
+    },
+    {
+     "role": "button",
+     "name": "Notes",
+     "id": "agentic-tab-notes",
+     "actions": "click:agentic-tab",
+     "disabled": false
+    },
+    {
+     "role": "button",
+     "name": "Saved for later on this page",
+     "id": "agentic-tab-saved",
+     "actions": "click:agentic-tab",
+     "disabled": false
+    },
+    {
+     "role": "button",
+     "name": "Customize tabs",
+     "id": "agentic-tab-customize",
+     "actions": "click:tabs-customize",
+     "disabled": false
+    },
+    {
+     "role": "tab",
+     "name": "Open",
+     "id": "saved-tab-open",
+     "actions": "",
+     "disabled": false
+    },
+    {
+     "role": "tab",
+     "name": "Done",
+     "id": "saved-tab-done",
+     "actions": "",
+     "disabled": false
+    },
+    {
+     "role": "button",
+     "name": "Close Saved for later",
+     "id": "saved-close",
+     "actions": "click:saved-close",
+     "disabled": false
+    }
+   ]
+  }
+ }
+}

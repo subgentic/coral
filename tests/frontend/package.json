@@ -10,7 +10,8 @@
     "test:cdp:stress": "node run_cdp_suites.mjs --stress",
     "test:cdp:cloud": "node run_cdp_suites.mjs --only cloud_csp_browser,fetch_metadata_browser",
     "lint:undef": "cd ../../coral-go/pkg/frontend && node ../../../tests/frontend/node_modules/eslint/bin/eslint.js -c ../../../tests/frontend/eslint.config.mjs --no-warn-ignored static",
-    "test:runner-folder-loss": "node run_runner_folder_loss.mjs"
+    "test:runner-folder-loss": "node run_runner_folder_loss.mjs",
+    "check:dock-parity": "node dock_parity.mjs"
   },
   "dependencies": {
     "chrome-remote-interface": "^0.33.0"
