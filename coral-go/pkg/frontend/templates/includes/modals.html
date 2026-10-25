@@ -983,37 +983,24 @@
                 <div class="settings-row settings-row-wide">
                 <dt class="toggle-dt">
                     <label for="settings-prune-days">Free space</label>
-                    <span class="toggle-desc">Shrink rewrites saved diffs of finished tasks without secrets, dot-files, binaries and big files (the code changes stay). Prune deletes saved diffs of finished tasks and stopped sessions, and artifacts nothing links, older than the days you choose. Kept artifacts and anything still linked are never touched. Each shows what it would do first.</span>
+                    <span class="toggle-desc">Shrink rewrites saved diffs of finished tasks without secrets, dot-files, binaries and big files (the code changes stay). Prune deletes saved diffs of finished tasks and stopped sessions, and artifacts nothing links, older than the days you choose. Kept artifacts and anything still linked are never touched. Each shows what it would do first. "Prune every hour" does the same by itself: after you turn it on, nothing is removed until you review what it would do, or 24 hours later; each run frees at most 2 GiB.</span>
                 </dt>
                 <dd>
                     <div class="settings-controls-row">
-                    <label class="settings-inline">Older than <span class="settings-unit-field"><input type="number" id="settings-prune-days" aria-label="Older than, in days, free space" min="1" max="3650" step="1" value="14" inputmode="numeric"> <span class="settings-field-unit">days</span></span></label>
+                    <label class="settings-inline">Older than <span class="settings-unit-field"><input type="number" id="settings-prune-days" aria-label="Older than, in days" min="1" max="3650" step="1" value="14" inputmode="numeric"> <span class="settings-field-unit">days</span></span></label>
                     <label class="settings-inline">What to prune
-                    <select id="settings-prune-kind" aria-label="What to prune, free space">
+                    <select id="settings-prune-kind" aria-label="What to prune">
                         <option value="diffs">Saved diffs</option>
                         <option value="objects">Unlinked artifacts</option>
                         <option value="all">Both</option>
                     </select></label>
-                    <button class="btn btn-small" type="button" id="settings-storage-shrink">Shrink…</button>
-                    <button class="btn btn-small" type="button" id="settings-storage-prune">Prune…</button>
+                    <button class="btn" type="button" id="settings-storage-shrink">Shrink…</button>
+                    <button class="btn btn-danger" type="button" id="settings-storage-prune">Prune…</button>
                     </div>
                     <div id="settings-storage-result" class="settings-hint" role="status"></div>
-                </dd>
-                </div>
-                <div class="settings-row settings-row-wide">
-                <dt class="toggle-dt">
-                    <label for="settings-retention-days">Automatic cleanup</label>
-                    <span class="toggle-desc">Prune what is older than this every hour. 0 means off (the default). After you turn it on, nothing is removed until you review what it would do, or 24 hours later; each run frees at most 2 GiB.</span>
-                </dt>
-                <dd>
-                    <div class="settings-controls-row">
-                    <div class="settings-field"><label class="settings-inline" for="settings-retention-days">Older than</label><span class="settings-unit-field"><input type="number" id="settings-retention-days" aria-label="Older than, in days, automatic cleanup" min="0" max="3650" step="1" inputmode="numeric" aria-describedby="settings-retention-status settings-retention-days-unit"><span class="settings-field-unit" id="settings-retention-days-unit">days</span></span></div>
-                    <label class="settings-inline">What to prune
-                    <select id="settings-retention-kind" aria-label="What to prune, automatic cleanup">
-                        <option value="diffs">Saved diffs</option>
-                        <option value="objects">Unlinked artifacts</option>
-                        <option value="all">Both</option>
-                    </select></label>
+                    <div class="settings-retention-switch">
+                        <label for="settings-retention-enabled">Prune every hour</label>
+                        <label class="check-hit"><input type="checkbox" id="settings-retention-enabled" aria-describedby="settings-retention-status"></label>
                     </div>
                     <div id="settings-retention-status" class="settings-hint" role="status"></div>
                     <button class="btn btn-small" type="button" id="settings-retention-review" hidden>Review and start…</button>
@@ -1076,7 +1063,7 @@
                     <button type="button" class="btn btn-small settings-editions-btn" data-editions="open">Connect to Coral Hub…</button>
                 </div>
                 </section>
-                <section class="settings-row settings-row-wide net-group" id="net-group-hub" aria-labelledby="net-hub-title">
+                <section class="settings-row settings-row-wide net-group" id="net-group-hub" data-learn-after="#settings-cloud-status" aria-labelledby="net-hub-title">
                 <div class="net-group-head"><h5 id="net-hub-title" class="net-group-title">Coral Hub</h5></div>
                 <div class="net-body" id="settings-cloud">
                     <div class="settings-cloud-head">
@@ -1152,7 +1139,7 @@
                     <div class="settings-hint" data-info>The hub can read everything you view through it. This is the most Coral Hub can ever do here: its owner can limit it further for each server but never raise it, and only you can change it, here. Interact lets a hub user type into running agents, which can run commands; Launch also lets them start, stop, sleep, wake and restart agents. Disconnect removes the token from this computer; revoke the server on the hub's Servers page to cut it off from there.</div>
                 </div>
                 </section>
-                <section class="settings-row settings-row-hub net-group" id="net-group-manage" aria-labelledby="settings-hub-mode-label">
+                <section class="settings-row settings-row-hub net-group" id="net-group-manage" data-learn-after="#settings-hub-mode-line" aria-labelledby="settings-hub-mode-label">
                 <!-- Manage other computers from this one (#3460, hub_mode_setting.js): saved at once, applied at the next start -->
                 <div class="net-group-head"><h5 id="settings-hub-mode-label" class="net-group-title">Manage other computers from this one</h5><label class="settings-hub-mode-toggle"><input type="checkbox" id="settings-hub-mode-enabled" aria-labelledby="settings-hub-mode-label" aria-describedby="settings-hub-mode-line settings-hub-mode-desc settings-hub-mode-status"></label></div>
                 <div class="net-body" id="settings-hub-mode">

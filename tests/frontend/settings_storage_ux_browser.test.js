@@ -107,6 +107,9 @@ const GIB = 1024 ** 3;
         const row = await ev(`(() => { const t = id => Math.round(document.getElementById(id).getBoundingClientRect().top); const h = id => Math.round(document.getElementById(id).getBoundingClientRect().height); const lab = document.querySelector('.settings-controls-row .settings-inline').getBoundingClientRect(); const inp = document.getElementById('settings-prune-days').getBoundingClientRect();
             return { shrink: t('settings-storage-shrink'), prune: t('settings-storage-prune'), kind: t('settings-prune-kind'), labelH: Math.round(lab.height), inputInLabel: inp.right <= lab.right + 1 }; })()`);
         assert.ok(Math.abs(row.shrink - row.prune) <= 2, 'Shrink and Prune side by side: ' + JSON.stringify(row)); assert.ok(row.labelH < 90 && row.inputInLabel, '"Older than" is a labelled field: the label over its input and "days" (#7405 round 2), not a sentence: ' + JSON.stringify(row));
+        const feel = await ev(`(() => { const b = id => document.getElementById(id); const bot = id => Math.round(b(id).getBoundingClientRect().bottom); return { pruneDanger: b('settings-storage-prune').classList.contains('btn-danger'), shrinkDanger: b('settings-storage-shrink').classList.contains('btn-danger'), small: b('settings-storage-prune').classList.contains('btn-small') || b('settings-storage-shrink').classList.contains('btn-small'), pruneBottom: bot('settings-storage-prune'), shrinkBottom: bot('settings-storage-shrink'), fieldBottom: bot('settings-prune-kind'), pairs: document.querySelectorAll('#settings-pane-cleanup select[id$="-kind"]').length }; })()`);
+        assert.deepEqual([feel.pruneDanger, feel.shrinkDanger, feel.small, feel.pairs], [true, false, false, 1], 'Prune is the danger button, Shrink is not, both the normal size, and there is one What to prune: ' + JSON.stringify(feel));
+        assert.ok(Math.abs(feel.pruneBottom - feel.fieldBottom) <= 3 && Math.abs(feel.shrinkBottom - feel.fieldBottom) <= 3, 'the buttons are in line with their fields: ' + JSON.stringify(feel));
         await shot('storage-ux-controls');
 
         console.log('5. Prune and Shrink by keyboard: the page\'s words, and the focus comes back to the button that asked');
@@ -119,6 +122,7 @@ const GIB = 1024 ** 3;
         const ask = await ev(`document.getElementById('confirm-modal-message').textContent`);
         assert.match(ask, /^Prune 14 saved diffs \(0\.4 GiB\), 3 unlinked artifacts \(0\.8 GiB\), 2 stored diff copies \(10 MiB\), freeing about 1\.3 GiB\./);
         assert.doesNotMatch(ask, /(^|, |Prune )(diffs|objects|diff-objects) \(/, "never the server's kind names");
+        assert.equal(await ev(`document.getElementById('confirm-modal-yes').textContent.trim()`), 'Prune', 'the confirming button says Prune, not Yes');
         await yesWithKeys();
         await waitFor(`/^Freed 1\\.3 GiB from 19 items; 1 left alone because it changed\\.$/.test((document.getElementById('settings-storage-result')?.textContent ?? ''))`, 'the result', 8000);
         assert.equal(await ev(`document.activeElement.id`), 'settings-storage-prune', 'the focus is back on Prune, not the page');

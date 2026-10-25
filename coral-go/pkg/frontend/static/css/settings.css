@@ -48,8 +48,7 @@
 #settings-modal .settings-row-details { grid-column: 1 / -1; }
 /* the cleanup rows: labelled fields in a row on their own line, not a sentence */
 #settings-modal .settings-controls-row { align-items: flex-end; gap: 12px 20px; }
-#settings-modal .settings-controls-row :is(.settings-inline, .settings-field) { display: flex; flex-direction: column; align-items: flex-start; flex-wrap: nowrap; gap: 4px; font: var(--dlg-label); }
-#settings-modal .settings-field > label { font: var(--dlg-label); }
+#settings-modal .settings-controls-row .settings-inline { display: flex; flex-direction: column; align-items: flex-start; flex-wrap: nowrap; gap: 4px; font: var(--dlg-label); }
 /* Wake agents after a restart: a switch row of its own under the backend cards */
 #settings-modal .tb-autowake.settings-row-switch { margin: 12px 0 0; padding: 12px 0 0; border-top: 1px solid var(--border-subtle); display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
 #settings-modal .tb-autowake[hidden] { display: none; }

@@ -13,7 +13,7 @@ const GROUPS = {
     terminal: ['settings-terminal-font-size', 'settings-terminal-scrollback', 'settings-fit-pane-width', 'settings-terminal-backend', 'settings-renderer-select'],
     notifications: ['settings-notify-needs-input', 'settings-desktop-notify'],
     files: ['settings-file-search-mode', 'settings-file-search-limit', 'settings-git-diff-mode', 'settings-git-poll-interval'],
-    cleanup: ['settings-artifact-store-max', 'settings-received-max', 'settings-prune-days', 'settings-retention-days', 'settings-terminal-logs-delete'],
+    cleanup: ['settings-artifact-store-max', 'settings-received-max', 'settings-prune-days', 'settings-retention-enabled', 'settings-terminal-logs-delete'],
     network: ['settings-remote-access-enabled', 'settings-cloud', 'settings-hub-mode-enabled', 'app-version-label', 'machine-health-local'],
     security: ['settings-api-key', 'settings-security', 'settings-database-encryption', 'settings-telemetry-enabled', 'settings-debug-input-log'],
 };

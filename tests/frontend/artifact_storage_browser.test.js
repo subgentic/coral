@@ -61,8 +61,8 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         const put = await ev(`fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ artifact_retention_days: 30, artifact_retention_kinds: 'diffs' }) }).then(r => r.status)`);
         await ev(`window.showSettingsModal(); true`);
         await until(`!document.getElementById('settings-retention-review').hidden`, 'the Review button');
-        const waiting = await ev(`({ status: document.getElementById('settings-retention-status').innerText, days: document.getElementById('settings-retention-days').value, review: !document.getElementById('settings-retention-review').hidden })`);
-        check('turned on (30 days), it says it waits for a review and offers one', put === 200 && waiting.days === '30' && waiting.review && /waiting: review what it would do/.test(waiting.status), JSON.stringify(waiting));
+        const waiting = await ev(`({ status: document.getElementById('settings-retention-status').innerText, days: document.getElementById('settings-prune-days').value, on: document.getElementById('settings-retention-enabled').checked, review: !document.getElementById('settings-retention-review').hidden })`);
+        check('turned on (30 days), it says it waits for a review and offers one', put === 200 && waiting.days === '30' && waiting.on && waiting.review && /waiting: review what it would do/.test(waiting.status), JSON.stringify(waiting));
         await ev(`document.getElementById('settings-retention-review').click(); true`);
         await until(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'the review');
         await until(`document.activeElement && document.activeElement.closest('#confirm-modal') && document.activeElement.id !== 'confirm-modal-yes'`, 'focus on Cancel');

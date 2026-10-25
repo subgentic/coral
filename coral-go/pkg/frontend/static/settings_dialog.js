@@ -273,9 +273,10 @@ function _lines(el, lines) {
 /** The store's breakdown (by age, by board, kept) and automatic cleanup's state. */
 async function loadStorageDetail(fileCount = null) {
     const out = document.getElementById('settings-storage-detail');
-    const days = document.getElementById('settings-retention-days');
-    const kind = document.getElementById('settings-retention-kind');
-    if (!out || !days) return;
+    const days = document.getElementById('settings-prune-days');
+    const kind = document.getElementById('settings-prune-kind');
+    const on = document.getElementById('settings-retention-enabled');
+    if (!out || !days || !on) return;
     try {
         const d = (await requestJson('GET', '/api/system/artifact-store?detail=1')).detail;
         if (!d) throw new Error('no detail');
@@ -291,22 +292,27 @@ async function loadStorageDetail(fileCount = null) {
         if (d.kept?.count) lines.push(`Kept: ${d.kept.count} artifact${d.kept.count === 1 ? '' : 's'}, ${_gib(d.kept.bytes)}`);
         _lines(out, lines);
         const ret = d.retention || {};
-        days.value = String(Number(ret.days) || 0);
-        days.dataset.loaded = '1';
-        kind.value = ['diffs', 'objects', 'all'].includes(ret.kinds) ? ret.kinds : 'diffs';
+        const saved = Number(ret.days) || 0;
+        on.checked = saved > 0;
+        if (saved > 0) days.value = String(saved); // off: the field keeps its default for Prune now
+        kind.value = ['diffs', 'objects', 'all'].includes(ret.kinds) ? ret.kinds : 'diffs'; // what the hourly run prunes is what Save keeps, on or off
+        on.dataset.loaded = '1';
         showRetentionStatus(ret);
-        syncRetentionKind();
-        if (!days.dataset.wired) { days.dataset.wired = '1'; days.addEventListener('input', () => { syncRetentionKind(); const n = Number(days.value) > 0 ? Math.floor(Number(days.value)) : 0; if (!n) showRetentionStatus({ days: 0, last: ret.last }); else if (n !== (Number(ret.days) || 0)) _lines(document.getElementById('settings-retention-status'), [`Turns on at ${n} days when you save.`]); else showRetentionStatus(ret); }); }
+        if (!on.dataset.wired) {
+            on.dataset.wired = '1';
+            // One pair of fields serves Prune now and the hourly run: the switch says whether the hourly run is on, and the days it uses are the field's.
+            const changed = () => {
+                const n = on.checked ? Math.max(1, Math.floor(Number(days.value) || 0)) : 0;
+                if (!n) showRetentionStatus({ days: 0, last: ret.last });
+                else if (n !== saved) _lines(document.getElementById('settings-retention-status'), [`Turns on at ${n} days when you save.`]);
+                else showRetentionStatus(ret);
+            };
+            on.addEventListener('change', changed);
+            days.addEventListener('input', () => { if (on.checked) changed(); });
+        }
     } catch {
         out.textContent = '';
     }
-}
-
-/** 0 days is off, and the select that says what it prunes is off with it (#7041): it looked live while it did nothing. */
-function syncRetentionKind() {
-    const days = document.getElementById('settings-retention-days');
-    const kind = document.getElementById('settings-retention-kind');
-    if (days && kind) kind.disabled = !(Number(days.value) > 0);
 }
 
 function showRetentionStatus(ret) {
@@ -329,10 +335,11 @@ function showRetentionStatus(ret) {
 
 /** Settings' value for automatic cleanup ({} when not read from Coral). */
 function retentionSettings() {
-    const days = document.getElementById('settings-retention-days');
-    const kind = document.getElementById('settings-retention-kind');
-    if (!days || isCloud() || days.dataset.loaded !== '1') return {};
-    const n = Math.max(0, Math.min(3650, Math.floor(Number(days.value) || 0)));
+    const days = document.getElementById('settings-prune-days');
+    const kind = document.getElementById('settings-prune-kind');
+    const on = document.getElementById('settings-retention-enabled');
+    if (!days || !on || isCloud() || on.dataset.loaded !== '1') return {};
+    const n = on.checked ? Math.max(1, Math.min(3650, Math.floor(Number(days.value) || 0))) : 0;
     return { artifact_retention_days: String(n), artifact_retention_kinds: kind?.value || 'diffs' };
 }
 
@@ -379,7 +386,7 @@ async function previewAndRun(body, verb) {
             result.textContent = `Couldn't finish: ${e.message}`;
         }
         asker?.focus(); // Yes closed the confirmation: the focus goes back to the button that asked, not to the page (#4469, UX's #4456 SHOULD 10)
-    });
+    }, undefined, { label: verb }); // the button says what it does: Prune or Shrink, not Yes
     // No default: focus starts on Cancel.
     requestAnimationFrame(() => document.querySelector('#confirm-modal .modal-actions .btn:not(#confirm-modal-yes)')?.focus());
 }
@@ -396,8 +403,8 @@ function wireStorageActions() {
     });
     document.getElementById('settings-retention-review')?.addEventListener('click', async () => {
         const status = document.getElementById('settings-retention-status');
-        const days = Number(document.getElementById('settings-retention-days').value) || 0;
-        const kind = document.getElementById('settings-retention-kind').value;
+        const days = Number(document.getElementById('settings-prune-days').value) || 0;
+        const kind = document.getElementById('settings-prune-kind').value;
         if (!days) return;
         let dry;
         try {

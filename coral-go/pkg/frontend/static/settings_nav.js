@@ -82,7 +82,12 @@ function buildInfoButtons(root) {
         const label = dt.querySelector('label, .net-group-title, [id$="-label"]') || dt; // a label span that names its control counts too (Default permission mode)
         const name = (label.textContent || '').trim();
         let holder = dt; // a group's head is a row (title, switch): its hints go in a line of their own under it
-        if (dt.classList.contains('net-group-head')) { holder = document.createElement('div'); holder.className = 'settings-hint-wrap'; dt.after(holder); }
+        if (dt.classList.contains('net-group-head')) {
+            holder = document.createElement('div'); holder.className = 'settings-hint-wrap';
+            const lead = row.dataset.learnAfter && row.querySelector(row.dataset.learnAfter); // a group whose short line is in its body (Coral Hub's status, Manage's line): Learn more comes after that line, not before it (#7626, UI/UX)
+            const anchor = lead && lead.closest('.net-body > *');
+            if (anchor) anchor.after(holder); else dt.after(holder);
+        }
         const all = [];
         for (const t of texts) {
             t.removeAttribute('data-info');

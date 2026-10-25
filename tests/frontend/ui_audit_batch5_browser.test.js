@@ -31,9 +31,9 @@ const BASE = require('./test_base').BASE;
 
             console.log(`2. (${w}) Storage: the unit beside its field, read with it`);
             await open('cleanup');
-            const st = await ev(`['settings-artifact-store-max', 'settings-received-max', 'settings-retention-days'].map(id => { const i = document.getElementById(id); const u = document.getElementById(id + '-unit'); const l = document.querySelector('label[for=' + id + ']').textContent.trim(); const ir = i.getBoundingClientRect(), ur = u.getBoundingClientRect();
+            const st = await ev(`['settings-artifact-store-max', 'settings-received-max'].map(id => { const i = document.getElementById(id); const u = document.getElementById(id + '-unit'); const l = document.querySelector('label[for=' + id + ']').textContent.trim(); const ir = i.getBoundingClientRect(), ur = u.getBoundingClientRect();
                 return { id, label: l, unit: u.textContent, described: (i.getAttribute('aria-describedby') || '').split(' ').includes(id + '-unit'), beside: ur.left >= ir.right - 1 && Math.abs((ur.top + ur.height / 2) - (ir.top + ir.height / 2)) < 20, w: Math.round(ir.width) }; })`);
-            assert.deepEqual(st.map(x => [x.label, x.unit]), [['Artifact store limit', 'GiB'], ['Received files limit', 'GiB'], ['Automatic cleanup', 'days']], JSON.stringify(st));
+            assert.deepEqual(st.map(x => [x.label, x.unit]), [['Artifact store limit', 'GiB'], ['Received files limit', 'GiB']], JSON.stringify(st));
             assert.ok(st.every(x => x.described && x.beside && x.w <= 120), 'unit described, beside, field not full width: ' + JSON.stringify(st));
             await shot('storage-units', w);
             await ev(`window.hideSettingsModal(); true`);

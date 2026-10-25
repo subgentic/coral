@@ -15,21 +15,22 @@ const BASE = require('./test_base').BASE;
             await ev(`window.__coralReady.then(() => true)`);
             await ev(`window.showSettingsModal('cleanup').then(() => true)`); // the dialog is shown at the end of this, after awaited requests: the retention field's loaded flag can come first, and its labels have no boxes until the dialog is shown (Windows CI, #7282)
             await waitFor(`document.getElementById('settings-modal').getClientRects().length > 0`, 'the settings dialog shown', 10000);
-            await waitFor(`document.getElementById('settings-retention-days') && document.getElementById('settings-retention-days').dataset.loaded === '1'`, 'automatic cleanup loaded', 10000);
+            await waitFor(`document.getElementById('settings-retention-enabled') && document.getElementById('settings-retention-enabled').dataset.loaded === '1'`, 'automatic cleanup loaded', 10000);
             const tag = `${w} px`;
-            const off = await ev(`(() => ({ status: document.getElementById('settings-retention-status').textContent.trim(), kindDisabled: document.getElementById('settings-retention-kind').disabled, days: document.getElementById('settings-retention-days').value }))()`);
-            assert.equal(off.days, '0', `${tag}: automatic cleanup starts off`);
-            assert.match(off.status, /^Off\b/, `${tag}: 0 days says Off: ` + JSON.stringify(off));
-            assert.equal(off.kindDisabled, true, `${tag}: the kind select is off with it`);
-            await ev(`(() => { const d = document.getElementById('settings-retention-days'); d.value = '7'; d.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
-            await waitFor(`!document.getElementById('settings-retention-kind').disabled`, 'the kind select on', 3000);
-            assert.ok(!/^Off\b/.test(await ev(`document.getElementById('settings-retention-status').textContent.trim()`)), `${tag}: 7 days is no longer "Off"`);
+            const off = await ev(`(() => ({ status: document.getElementById('settings-retention-status').textContent.trim(), on: document.getElementById('settings-retention-enabled').checked, pairs: document.querySelectorAll('#settings-pane-cleanup [id$="-days"]:not(#settings-artifact-store-max)').length }))()`);
+            assert.equal(off.on, false, `${tag}: the hourly prune starts off`);
+            assert.match(off.status, /^Off\b/, `${tag}: off says Off: ` + JSON.stringify(off));
+            assert.equal(off.pairs, 1, `${tag}: one Older than field serves Prune and the hourly run`);
+            await ev(`(() => { const d = document.getElementById('settings-prune-days'); d.value = '7'; const c = document.getElementById('settings-retention-enabled'); c.click(); return true; })()`);
+            assert.ok(!/^Off\b/.test(await ev(`document.getElementById('settings-retention-status').textContent.trim()`)), `${tag}: on at 7 days is no longer "Off"`);
+            assert.match(await ev(`document.getElementById('settings-retention-status').textContent.trim()`), /7 days/, `${tag}: it says the days`);
             // each control says what it is where a person can see it
-            for (const id of ['settings-prune-days', 'settings-prune-kind', 'settings-retention-days', 'settings-retention-kind']) {
+            for (const id of ['settings-prune-days', 'settings-prune-kind', 'settings-retention-enabled']) {
                 const labelled = await ev(`(() => { const c = document.getElementById('${id}'); return [...c.labels].filter(l => l.getClientRects().length && l.textContent.trim()).map(l => l.textContent.trim().replace(/\\s+/g, ' ')); })()`);
                 assert.ok(labelled.length > 0, `${tag}: #${id} has a visible label: ` + JSON.stringify(labelled));
-                if (id === 'settings-retention-days') assert.ok(labelled.some(t => /older than/i.test(t)), `${tag}: the cleanup's days say "Older than": ` + JSON.stringify(labelled));
+                if (id === 'settings-prune-days') assert.ok(labelled.some(t => /older than/i.test(t)), `${tag}: the days say "Older than": ` + JSON.stringify(labelled));
                 if (id.endsWith('-kind')) assert.ok(labelled.some(t => /what to prune/i.test(t)), `${tag}: #${id} is labelled "What to prune": ` + JSON.stringify(labelled));
+                if (id === 'settings-retention-enabled') assert.ok(labelled.some(t => /every hour/i.test(t)), `${tag}: the switch says every hour: ` + JSON.stringify(labelled));
             }
         }
         console.log('PASS settings cleanup words');

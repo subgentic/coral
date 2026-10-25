@@ -63,6 +63,9 @@ const BASE = require('./test_base').BASE;
             assert.ok(/Unknown|OK|Busy|Stalled/.test(rows.aboutWords) && /(not connected|waiting|Waiting|reading)/i.test(rows.aboutWords), at + 'the machine state is in words, and an unknown one says why: ' + rows.aboutWords.replace(/\s+/g, ' '));
             if (!mobile) assert.ok(rows.level.select.left > rows.level.label.right - 4, at + 'the level select sits at the right of its question ' + JSON.stringify(rows.level));
             else assert.ok(rows.level.select.top >= rows.level.label.bottom - 2, at + 'on a phone the select is under its question');
+            // 1c. Learn more comes after the short line in the Coral Hub and Manage groups (#7626, UI/UX)
+            const learn = await ev(`(() => { const t = (g, sel) => document.querySelector('#' + g + ' ' + sel).getBoundingClientRect().top; return { hub: t('net-group-hub', '.settings-learn') > t('net-group-hub', '#settings-cloud-status'), manage: t('net-group-manage', '.settings-learn') > t('net-group-manage', '#settings-hub-mode-line') }; })()`);
+            assert.deepEqual(learn, { hub: true, manage: true }, at + 'Learn more is under the short line');
             // 2. Manage other computers: its wording
             assert.equal(await text('#settings-hub-mode-line'), 'Adds a Servers tab, with full control of those computers.', at + 'a hub has full control of what it manages, said where the switch is');
             assert.equal(await ev(`document.getElementById('settings-hub-mode-enabled').getAttribute('aria-labelledby')`), 'settings-hub-mode-label');

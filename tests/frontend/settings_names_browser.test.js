@@ -16,10 +16,10 @@ const BASE = require('./test_base').BASE;
     };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        console.log('1. Storage and cleanup: the two selects and number fields have different names');
+        console.log('1. Storage and cleanup: the one pair of fields and the hourly switch are named');
         await open('storage');
-        const names = await ev(`['settings-prune-kind', 'settings-retention-kind', 'settings-prune-days', 'settings-retention-days'].map(id => document.getElementById(id).getAttribute('aria-label'))`);
-        assert.deepEqual(names, ['What to prune, free space', 'What to prune, automatic cleanup', 'Older than, in days, free space', 'Older than, in days, automatic cleanup']);
+        const names = await ev(`['settings-prune-kind', 'settings-prune-days'].map(id => document.getElementById(id).getAttribute('aria-label'))`);
+        assert.deepEqual(names, ['What to prune', 'Older than, in days']);
         console.log('2. Agents: Default thinking says which CLI');
         await open('agents');
         assert.equal(await ev(`document.getElementById('settings-default-thinking-claude').getAttribute('aria-label')`), 'Claude default thinking');

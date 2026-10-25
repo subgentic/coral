@@ -4711,3 +4711,8 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .mention-option.active, .mention-option:hover { background: var(--bg-hover); }
 .mention-note { font-size: 0.75rem; color: var(--text-secondary); }
 @media (max-width: 767px), (pointer: coarse) { .mention-option { min-height: var(--control-touch-height, 44px); align-items: center; } }
+
+/* Storage and cleanup (#7627): one pair of fields for Prune now and the hourly run; the hourly run is a switch row under them. */
+.settings-retention-switch { width: 100%; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--border); }
+.settings-retention-switch > label:first-child { font: var(--dlg-label); color: var(--text-primary); margin: 0; }
+#settings-modal .settings-controls-row > label.settings-inline { margin-bottom: 0; padding-bottom: 0; } /* the dialog's generic label leaves 12 px under itself: the buttons beside Older than and What to prune sit level with their fields (#7627) */
