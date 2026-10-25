@@ -57,6 +57,7 @@ const A = 'a'.repeat(64), B = 'b'.repeat(64), C = 'c'.repeat(64);
             assert.deepEqual(await ev(`window.__kept`), ['PUT', 'DELETE'], 'PUT then DELETE');
         });
         await S.run('Delete asks first, then removes the row and puts the focus on the next one', async () => {
+            assert.deepEqual(await ev(`(() => { const b = [...window.__tp.pane().querySelectorAll('button')].find(x => /^Delete$/.test(x.textContent.trim())); const c = getComputedStyle(b), n = getComputedStyle([...window.__tp.pane().querySelectorAll('button')].find(x => /^Open$|^Keep$/.test(x.textContent.trim()))); return [b.classList.contains('btn-danger'), c.borderTopWidth, c.borderTopColor === c.color || c.borderTopColor !== n.borderTopColor, c.backgroundColor === 'rgba(0, 0, 0, 0)', c.height === n.height]; })()`), [true, '1px', true, true, true], 'Delete is a danger button: the confirmation\'s class, a 1 px error edge, no fill, the height of the other buttons');
             assert.ok(await ev(`(() => { const b = [...window.__tp.pane().querySelectorAll('button')].find(x => /^Delete$/.test(x.textContent.trim())); if (!b) return false; b.click(); return true; })()`), 'a Delete button');
             await waitFor(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'the confirmation', 4000);
             assert.equal(await ev(`document.getElementById('confirm-modal-yes').textContent.trim()`), 'Delete', 'the confirming button names the action');

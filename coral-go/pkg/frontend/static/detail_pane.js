@@ -70,7 +70,7 @@ export function openDetailPane({ key, title, sub = '', facts = [], body = null, 
         if (a.ariaLabel) b.setAttribute('aria-label', a.ariaLabel);
         if (a.title) b.title = a.title;
         if (a.pressed !== undefined) b.setAttribute('aria-pressed', String(a.pressed)); // a toggle (Keep)
-        if (a.danger) b.classList.add('btn-danger-text');
+        if (a.danger) b.classList.add('btn-danger'); // a destructive button in a bar is a button with an edge, the delete confirmation's class (UI/UX), never bare text
         foot.append(b);
     }
     aside.append(head, main);

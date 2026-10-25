@@ -96,7 +96,7 @@
 .detail-doc pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 .detail-foot { flex: none; display: flex; gap: 8px; flex-wrap: wrap; padding: 12px 18px; border-top: 1px solid var(--border); }
 .detail-foot .btn { min-height: 36px; }
-.detail-foot .btn-danger-text { color: var(--error-text); margin-left: auto; }
+.detail-foot .btn-danger { color: var(--error-text); border-color: var(--error); background: transparent; margin-left: auto; } /* one danger button: error-colour text with a 1 px error-colour edge, no fill, the size of the other buttons (UI/UX) */
 .detail-foot a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 #team-panel-messages { padding: 0 16px; }
 .team-row-phone { display: none; font-size: 0.75rem; color: var(--text-secondary); }
