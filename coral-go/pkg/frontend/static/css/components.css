@@ -4773,3 +4773,9 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 #launch-step-team .settings-pane label:has(> input[type="checkbox"]) { display: flex; flex-direction: row; align-items: flex-start; gap: 10px; margin: 4px 0; }
 #launch-step-team .settings-pane .health-form .health-line { align-items: flex-start; }
 #launch-step-team .settings-pane .settings-hint { margin: 2px 0 12px; }
+
+/* New team and its Edit member dialog are 720 high (UI/UX's team design); the width and the phone sheet are the shared shell's. */
+#launch-modal .modal-content.launch-wizard-content.launch-team-content, #team-agent-modal .modal-content.restart-wizard-content { height: min(720px, calc(100dvh - 32px)); }
+@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
+    #launch-modal .modal-content.launch-wizard-content.launch-team-content, #team-agent-modal .modal-content.restart-wizard-content { height: 100dvh; }
+}

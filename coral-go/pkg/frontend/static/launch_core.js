@@ -68,6 +68,7 @@ function _showLaunchStep(step) {
         content.classList.toggle("modal-content-wide", !sectioned);
         content.classList.toggle("launch-choosing", step === "chooser"); // four choices in a row (#3630)
         content.classList.toggle("launch-wizard-content", step === "agent" || step === "team"); // one size for every step and tab of New Agent and New team (#7391, #7407)
+        content.classList.toggle("launch-team-content", step === "team"); // the team dialog is 720 high, New Agent 640 (UI/UX)
     }
     _syncMobileLaunchSections(step);
 }
