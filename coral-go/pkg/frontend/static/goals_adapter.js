@@ -41,6 +41,7 @@ export function toTask(t) {
         id: Number(t && t.id) || 0,
         title: text(t && t.title),
         assignee: text(t && (t.assigned_to ?? t.assignee)),
+        workedBy: text(t && t.worked_by), // who did the work (the server's field): the author of a reviewed task, not the orchestrator it was handed to
         state: text(t && (t.status ?? t.state)).toLowerCase(),
         statusLine: text(t && (t.status_line ?? t.statusLine)), // the task row has none today (#7087): empty, and the view draws nothing
         sessionId: text(t && (t.session_id ?? t.sessionId)), // the agent session that claimed it, when there is one

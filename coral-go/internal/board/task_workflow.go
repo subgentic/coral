@@ -424,6 +424,21 @@ func finishWorkflow(t *Task, w TaskWorkflow) {
 	}
 	t.Workflow = w
 	t.Verification = verificationOf(t)
+	t.WorkedBy = workedBy(t, w)
+}
+
+// workedBy is who did a task's work: the author a review took it from, else (for a finished task) who completed it, else its assignee. A cancelled task has no completer's work to name: the assignee, as nobody finished it.
+func workedBy(t *Task, w TaskWorkflow) string {
+	if w.OriginalAuthor != "" {
+		return w.OriginalAuthor
+	}
+	if t.Status == "completed" && t.CompletedBy != nil && *t.CompletedBy != "" {
+		return *t.CompletedBy
+	}
+	if t.AssignedTo != nil {
+		return *t.AssignedTo
+	}
+	return ""
 }
 
 // dependencyInputRow is one upstream of a downstream task, for dependencyInputs.

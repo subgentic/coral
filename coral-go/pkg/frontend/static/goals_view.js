@@ -16,7 +16,8 @@ const { teamTable, rowButton, stateChip: tableStateChip } = await importOnce('./
 const PAGE = 50; // a goal's tasks are drawn this many at a time
 import * as W from './goal_words.js';
 
-const model = { project: '', sig: '', goals: [], requireGoal: false, noGoalOpen: null, filter: 'all', openId: 0, tasks: new Map(), loading: false, failed: '', asOf: '', creating: false };
+const model = { project: '', sig: '', goals: [], requireGoal: false, noGoalOpen: null, filter: 'all', openId: 0, tasks: new Map(), loading: false, failed: '', asOf: '', creating: false, taskId: 0, taskSearch: '', screen: 'goal' };
+const PHONE = matchMedia('(max-width: 760px)'); // the team page's phone layout (team_page.css): a goal, its task list and a task are three screens
 let root = null;
 let layout = 'cards'; // 'cards': the board's Goals face (cards and the goal beside them); 'page': the team page's Goals tab (a table, and a goal's own page, #7453)
 let hooks = {}; // the page's: openTask(task, goal), onCount(n)
@@ -59,7 +60,7 @@ export async function loadGoals() {
         if (layout === 'page') hooks.onCount?.(list.goals.length, list.goals.filter(x => W.isOpenGoal(x)).length);
         model.sig = sig; model.goals = list.goals; model.requireGoal = list.requireGoal; model.noGoalOpen = list.noGoalOpen; model.failed = ''; model.asOf = clock();
         if (model.wantOpen) { const want = model.wantOpen; model.wantOpen = 0; if (model.goals.some(g => g.id === want)) { model.openId = want; same = false; focusOpened = true; } }
-        if (model.openId && !model.goals.some(g => g.id === model.openId)) { model.openId = 0; same = false; }
+        if (model.openId && !model.goals.some(g => g.id === model.openId)) { model.openId = 0; model.taskId = 0; same = false; }
     } catch (e) {
         if (project !== model.project) return;
         model.failed = W.failedText(e && e.message); model.sig = '';
@@ -346,68 +347,150 @@ function backButton(text, onClick) {
     return b;
 }
 
-const priorityWord = (p) => { const s = String(p || '').trim(); return s ? s[0].toUpperCase() + s.slice(1).toLowerCase() : ''; };
+// ── a goal's page: its details beside its tasks (#7665) ──────────────────────────────────────────────────────────────────
+// The goal's details are the main pane; its tasks are a column of their own at the right (search, Open then Done, a state chip and who did the work on each row); a task picked from the column is the #7644 task page in the
+// main pane, with a way back to the goal. On a phone the goal, its list and a task are three screens (model.screen).
 
-function taskTableRows(g, tasks) {
-    return tasks.rows.slice(0, tasks.shown).map(t => {
-        const b = rowButton(t.title, `Open task #${t.id}: ${t.title}`); b.dataset.taskId = String(t.id);
-        const first = el('span', 'team-row-cell');
-        first.append(b);
-        const sub = [`#${t.id}`, t.statusLine].filter(Boolean).join(' · ');
-        if (sub) first.append(el('span', 'team-row-sub', sub));
-        first.append(el('span', 'team-row-phone', [t.assignee || 'Nobody yet', priorityWord(t.raw && t.raw.priority)].filter(Boolean).join(' · ')));
-        const word = W.taskStatusWord(t.state, t.raw && t.raw.review_requested);
-        return {
-            key: `t${t.id}`, open: () => hooks.openTask?.(t, g),
-            cells: [first, tableStateChip(word, W.statusClass(word)), t.assignee || 'Nobody yet', priorityWord(t.raw && t.raw.priority)],
-        };
-    });
+const whoOf = (t) => t.workedBy || (isDone(t) && t.raw && t.raw.completed_by) || t.assignee; // who did the work: the author of a reviewed task, not the orchestrator it was handed to
+const isDone = (t) => W.taskStateWord(t.state) === 'Done';
+const whoText = (t) => { const w = whoOf(t); return isDone(t) ? (w ? `Done by ${w}` : 'Done') : (w || 'Nobody yet'); };
+
+/** The rollup and the rows are read separately: while they disagree (the rollup is fresh, the rows are the last read) the page says it is updating, so two moments are never drawn as one (UI/UX, #7513). */
+function rowsAgree(g) {
+    const tasks = model.tasks.get(g.id), total = totalOf(g.rollup);
+    return !tasks || tasks.rows === undefined || !!tasks.cursor || (tasks.rows.length === total && tasks.rows.filter(isDone).length === g.rollup.done);
 }
 
-function drawGoalPageRaw(col) {
-    const keep = document.activeElement && document.activeElement.id === 'goals-detail-title';
-    col.replaceChildren();
-    const g = goalById(model.openId);
-    col.append(backButton('Goals', () => closeGoal()));
-    const h = el('h2', 'goals-detail-title', g.title); h.tabIndex = -1; h.id = 'goals-detail-title'; col.append(h);
+function drawGoalMain(main, g) {
+    main.append(backButton('Goals', () => closeGoal()));
+    const h = el('h2', 'goals-detail-title', g.title); h.tabIndex = -1; h.id = 'goals-detail-title'; main.append(h);
     const line = el('div', 'goals-detail-line'); line.append(stateChip(g));
     const meta = W.driverLine(g.driver, whenText(g.updatedAt)); if (meta) line.append(el('span', 'goal-card-meta', meta));
-    col.append(line);
+    main.append(line);
     if (g.outcome || g.doneWhen) {
         const dl = el('dl', 'goals-facts');
         if (g.outcome) dl.append(el('dt', null, 'Outcome'), el('dd', null, g.outcome));
         if (g.doneWhen) dl.append(el('dt', null, 'Done when'), el('dd', null, g.doneWhen));
-        col.append(dl);
+        main.append(dl);
     }
     const openLeft = g.rollup.active + g.rollup.blocked + g.rollup.queued;
-    if ((g.state === 'done' || g.state === 'dropped') && openLeft) col.append(el('p', 'goals-note goals-closed-open', W.closedWithOpenText(openLeft)));
-    if (W.readyToClose(g) && !isNotYet(g)) { col.append(allDoneStrip(g)); announceAllDone(g); }
+    if ((g.state === 'done' || g.state === 'dropped') && openLeft) main.append(el('p', 'goals-note goals-closed-open', W.closedWithOpenText(openLeft)));
+    if (W.readyToClose(g) && !isNotYet(g)) { main.append(allDoneStrip(g)); announceAllDone(g); }
     const total = totalOf(g.rollup);
+    main.append(el('p', 'goals-tasks-head goals-progress', total ? `${doneOf(g.rollup)} of ${total} tasks done` : 'No tasks yet'));
+    if (total) main.append(rollupBar(g.rollup));
+    main.append(el('p', 'goals-note goals-updating', rowsAgree(g) ? '' : 'Updating…')); // the column says it too, and is aria-busy
     const tasks = model.tasks.get(g.id);
-    const head = el('h3', 'goals-sub goals-tasks-head', total ? `Tasks, ${doneOf(g.rollup)} of ${total} done` : 'Tasks'); col.append(head);
-    if (total) col.append(rollupBar(g.rollup));
-    // The rollup and the rows are read separately: while they disagree (the rollup is fresh, the rows are the last read) the table says it is updating, so two moments are never drawn as one (UI/UX, #7513)
-    const agrees = !tasks || tasks.rows === undefined || !!tasks.cursor || (tasks.rows.length === total && tasks.rows.filter(t => W.taskStateWord(t.state) === 'Done').length === g.rollup.done);
-    col.append(el('p', 'goals-note goals-updating', agrees ? '' : 'Updating…'));
-    if (!tasks) col.append(el('p', 'goals-note', 'Loading tasks…'));
-    else if (tasks.failed !== undefined) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, W.failedText(tasks.failed).replace('Goals', 'Tasks')), btn('btn btn-small', 'Try again', () => loadTasks(g.id))); col.append(f); }
-    else if (!tasks.rows.length) col.append(el('p', 'goals-note', 'No tasks yet'));
-    else {
-        const live = tasks.rows.filter(t => W.taskStateWord(t.state) !== 'Done'), idle = live.filter(t => !agentFor(t));
-        if (idle.length) col.append(el('p', 'goals-note goals-nobody', W.nobodyWorkingText(idle.length, live.length)));
-        const tbl = teamTable({ label: `Tasks of ${g.title}`, columns: ['Task', 'State', 'Assigned to', 'Priority'], rows: taskTableRows(g, tasks) });
-        if (!agrees) tbl.querySelector('table').setAttribute('aria-busy', 'true');
-        col.append(tbl);
-        const left = Math.max(tasks.rows.length - tasks.shown, 0) || (tasks.cursor ? Math.max(taskTotal(g, tasks) - tasks.shown, 1) : 0);
-        if (left) col.append(btn('btn goals-more', W.showMoreText(left, PAGE), () => showMoreTasks(g.id)));
-        if (tasks.moreFailed) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, tasks.moreFailed)); col.append(f); }
+    if (tasks && tasks.rows) { // on a phone the list is the next screen: its way in
+        const go = btn('btn goal-tasks-open', `Tasks, ${openLeft} open, ${g.rollup.done} done`, () => { model.screen = 'column'; drawPage(); focusHeading('.goal-side-back'); });
+        main.append(go);
     }
     // The pinned bar: Add task and Close goal (Reopen for a closed one), always at the bottom of the page.
     const bar = el('div', 'goals-pinbar');
     bar.append(btn('btn goals-add-task', 'Add task', () => { (window.showCreateTaskModal || (() => {}))({ goal_id: g.id }); }));
     if (W.isOpenGoal(g)) { const cb = btn('btn btn-primary goals-close', 'Close goal', () => openClose(g)); bar.append(cb); }
     else if (W.isClosedGoal(g)) bar.append(btn('btn goals-reopen', 'Reopen', () => reopenGoal(g)));
-    col.append(bar);
+    main.append(bar);
+    return h;
+}
+
+const focusHeading = (sel) => requestAnimationFrame(() => root && root.querySelector(sel)?.focus({ preventScroll: true }));
+
+/** The task column: header with the counts, search, Open then Done, each row a button that opens the task in the main pane. */
+function drawGoalSide(side, g) {
+    side.replaceChildren();
+    const r = g.rollup, openN = r.active + r.blocked + r.queued;
+    const back = backButton(`Goal: ${g.title}`, () => { model.screen = 'goal'; drawPage(); focusHeading('.goal-tasks-open'); }); back.classList.add('goal-side-back'); // a phone's way back from the list to the goal
+    const head = el('div', 'goal-side-head'); head.append(el('strong', null, 'Tasks'), el('span', 'goal-side-counts', `${openN} open, ${r.done} done`));
+    const search = el('input', 'goal-side-search'); search.type = 'search'; search.placeholder = 'Search tasks'; search.autocomplete = 'off'; search.maxLength = 100;
+    search.setAttribute('aria-label', `Search the tasks of ${g.title}`); search.value = model.taskSearch;
+    const list = el('div', 'goal-side-list');
+    if (!rowsAgree(g)) list.setAttribute('aria-busy', 'true');
+    side.append(back, head, search, list);
+    const tasks = model.tasks.get(g.id);
+    const fill = () => {
+        list.replaceChildren();
+        if (!tasks) { list.append(el('p', 'goals-note', 'Loading tasks…')); return; }
+        if (tasks.failed !== undefined) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, W.failedText(tasks.failed).replace('Goals', 'Tasks')), btn('btn btn-small', 'Try again', () => loadTasks(g.id))); list.append(f); return; }
+        if (!tasks.rows.length) { list.append(el('p', 'goals-note', 'No tasks yet')); return; }
+        const q = model.taskSearch.trim().toLowerCase();
+        const shown = tasks.rows.slice(0, tasks.shown).filter(t => !q || `#${t.id} ${t.title} ${whoOf(t)}`.toLowerCase().includes(q));
+        if (!shown.length) { list.append(el('p', 'goals-note', `No task matches "${model.taskSearch.trim()}"`)); }
+        const groups = [['Open', shown.filter(t => !isDone(t))], ['Done', shown.filter(isDone).sort((a, b) => b.id - a.id)]]; // the newest done task first
+        for (const [name, rows] of groups) {
+            if (!rows.length) continue;
+            const head = el('h3', 'goal-side-group', `${name} ${rows.length}`);
+            const ul = el('ul', 'goal-side-ul'); ul.setAttribute('aria-label', `${name} tasks of ${g.title}`);
+            for (const t of rows) ul.append(sideRow(g, t));
+            list.append(head, ul);
+        }
+        const total = taskTotal(g, tasks), left = Math.max(tasks.rows.length - tasks.shown, 0) || (tasks.cursor ? Math.max(total - tasks.shown, 1) : 0);
+        if (left) list.append(btn('btn goals-more', W.showMoreText(left, PAGE), () => showMoreTasks(g.id)));
+        if (tasks.moreFailed) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, tasks.moreFailed)); list.append(f); }
+    };
+    fill();
+    search.addEventListener('input', () => { model.taskSearch = search.value; fill(); });
+}
+
+function sideRow(g, t) {
+    const li = el('li', 'goal-side-item');
+    const b = el('button', 'goal-side-row'); b.type = 'button'; b.dataset.taskId = String(t.id);
+    b.setAttribute('aria-label', `Open task #${t.id}: ${t.title}`);
+    if (model.taskId === t.id) b.setAttribute('aria-current', 'true');
+    const word = W.taskStatusWord(t.state, t.raw && t.raw.review_requested);
+    const meta = el('span', 'goal-side-meta'); meta.append(tableStateChip(word, W.statusClass(word)), el('span', 'goal-side-who', whoText(t)));
+    b.append(el('span', 'goal-side-title', `#${t.id} ${t.title}`), meta);
+    b.addEventListener('click', () => openGoalTask(g, t));
+    li.append(b);
+    return li;
+}
+
+function openGoalTask(g, t) {
+    model.taskId = t.id; model.screen = 'task';
+    drawPage();
+    root.querySelector('#team-task-title')?.focus({ preventScroll: true });
+}
+
+function closeGoalTask() {
+    const id = model.taskId;
+    model.taskId = 0; model.screen = PHONE.matches ? 'column' : 'goal';
+    drawPage();
+    (root.querySelector(`.goal-side-row[data-task-id="${id}"]`) || root.querySelector('#goals-detail-title'))?.focus({ preventScroll: true });
+}
+
+/** The picked task, as the task page (#7644), in the main pane; the column beside it stays. */
+async function showTaskInMain(main, g) {
+    const id = model.taskId;
+    main.replaceChildren(el('p', 'goals-note', 'Loading the task…'));
+    const m = await importOnce('./team_tasks_page.js');
+    const row = (model.tasks.get(g.id)?.rows || []).find(t => t.id === id);
+    const full = (await m.readTask(model.project, id)) || (row && row.raw);
+    if (model.taskId !== id || !main.isConnected) return; // another task, or another page, was chosen while it was read
+    if (!full) { main.replaceChildren(el('p', 'goals-note', 'This task could not be read.'), backButton(`Goal: ${g.title}`, () => closeGoalTask())); return; }
+    m.renderTaskPage(main, full, {
+        project: model.project, backLabel: PHONE.matches ? 'Tasks' : `Goal: ${g.title}`, goalTitleOf: (gid) => (goalById(gid) || {}).title,
+        openGoal: (gid) => { if (gid === g.id) closeGoalTask(); else hooks.openGoal?.(gid); },
+        onBack: () => closeGoalTask(),
+        onChanged: () => { loadTasks(g.id); loadGoals(); },
+    });
+}
+
+function drawGoalPageRaw(col) {
+    const g = goalById(model.openId);
+    const same = col.querySelector('.goal-split');
+    if (model.taskId && same && same.dataset.goal === String(g.id) && same.dataset.task === String(model.taskId)) { // a task is open and being read or edited in the main pane: only the column is drawn again
+        same.classList.toggle('goal-split-column', model.screen === 'column');
+        drawGoalSide(same.querySelector('.goal-side'), g);
+        return;
+    }
+    const keep = document.activeElement && document.activeElement.id === 'goals-detail-title';
+    col.replaceChildren();
+    const split = el('div', 'goal-split'); split.dataset.goal = String(g.id); split.dataset.task = String(model.taskId); split.classList.toggle('goal-split-column', model.screen === 'column');
+    const main = el('div', 'goal-main'), side = el('aside', 'goal-side'); side.setAttribute('aria-label', `Tasks of ${g.title}`);
+    split.append(main, side); col.append(split);
+    drawGoalSide(side, g);
+    if (model.taskId) { showTaskInMain(main, g); return; }
+    const h = drawGoalMain(main, g);
     if (keep) h.focus();
 }
 
@@ -427,7 +510,8 @@ export function openGoalWhenKnown(id) {
 }
 
 export function openGoal(id, focus = false) {
-    model.openId = id;
+    if (model.openId !== id) { model.taskId = 0; model.taskSearch = ''; }
+    model.openId = id; model.screen = 'goal';
     if (layout === 'page') hooks.onItem?.(id);
     draw();
     if (focus) focusDetail();
@@ -436,7 +520,7 @@ export function openGoal(id, focus = false) {
 
 export function closeGoal() {
     const id = model.openId;
-    model.openId = 0;
+    model.openId = 0; model.taskId = 0; model.screen = 'goal';
     if (layout === 'page') hooks.onItem?.(0);
     draw();
     (root.querySelector(`.goal-card[data-goal-id="${id}"]`) || root.querySelector(`.team-row-btn[data-goal-id="${id}"]`))?.focus();
@@ -571,7 +655,7 @@ function openClose(g, preset) {
 
 /** Show the board's goals in `host` (the page's #mb-goals) and read them. */
 export function showGoals(host, project, opts = {}) {
-    if (project !== model.project) { Object.assign(model, { project, sig: '', goals: [], requireGoal: false, noGoalOpen: null, filter: 'all', openId: 0, tasks: new Map(), failed: '', asOf: '', loading: false }); }
+    if (project !== model.project) { Object.assign(model, { project, sig: '', goals: [], requireGoal: false, noGoalOpen: null, filter: 'all', openId: 0, tasks: new Map(), failed: '', asOf: '', loading: false, taskId: 0, taskSearch: '', screen: 'goal' }); }
     layout = opts.page ? 'page' : 'cards';
     hooks = opts.page ? (opts.hooks || {}) : {};
     const kind = opts.page ? 'page' : 'cards';
