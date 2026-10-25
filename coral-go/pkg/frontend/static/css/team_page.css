@@ -153,11 +153,11 @@
 /* The Settings tab (stage 3): one page of four sections, rows with the label and hint at the left and the control at the right, and a bar pinned under it (the status line, Cancel at the left, Save settings at the right). */
 .team-settings-page { flex: 1; min-height: 0; display: flex; flex-direction: column; container-type: inline-size; }
 .ts-label { overflow-wrap: break-word; }
-.team-settings-page .ts-scroll { flex: 1; min-height: 0; overflow: auto; }
-.team-settings-page .ts-body { max-width: 860px; padding: 16px 24px 24px; box-sizing: border-box; }
-.ts-lead { margin: 0 0 4px; font-size: 0.75rem; color: var(--text-secondary); }
-.ts-section { margin-top: 20px; }
-.ts-h { margin: 0 0 4px; font-size: 0.875rem; font-weight: 600; color: var(--text-primary); }
+.team-settings-page .ts-shell { flex: 1; min-height: 0; } /* the main Settings' shell (components.css): the list of groups at the left, the open group's pane at the right (#7663) */
+.team-settings-page .settings-panes { container: settingspane / inline-size; }
+.team-settings-page .settings-panes > .settings-pane { max-width: 860px; }
+.ts-lead { margin: 0 0 .8rem; font-size: 0.75rem; color: var(--text-secondary); }
+.team-settings-page .settings-pane-sub:empty { display: none; }
 .ts-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(12rem, 22rem); gap: 4px 24px; align-items: start; padding: 10px 0; border-top: 1px solid var(--border-subtle, var(--border)); }
 .ts-row-wide { grid-template-columns: minmax(0, 1fr); }
 .ts-row-wide .ts-control textarea { width: 100%; box-sizing: border-box; }
@@ -182,7 +182,6 @@
 .health-embedded .health-actions [type="submit"], .health-embedded .health-state, .xt-embedded .xt-save { display: none; }
 .health-embedded .health-actions { margin-top: 8px; }
 @media (max-width: 760px) {
-    .team-settings-page .ts-body { padding: 12px 16px 16px; }
     .ts-row { grid-template-columns: minmax(0, 1fr); }
     .ts-row-switch { grid-template-columns: minmax(0, 1fr) auto; align-items: center; } /* a switch stays at the right of its words on a phone, as on a desktop */
     .team-table-agents th, .team-table-agents td { padding-left: 8px; padding-right: 8px; }
@@ -206,8 +205,8 @@
 .team-page.detail-sheet .goals-facts, .team-page.detail-sheet .detail-facts { grid-template-columns: minmax(0, 1fr); gap: 0; }
 .team-page.detail-sheet .goals-facts dd, .team-page.detail-sheet .detail-facts dd { margin-bottom: 8px; }
 
-/* narrow, in rem so a larger text size stacks sooner: the label and its hint above the control, the control at the left; no word is broken */
-@container (max-width: 56rem) { .ts-row { grid-template-columns: minmax(0, 1fr); } .ts-row:not(.ts-row-switch) .ts-control { justify-content: flex-start; } .ts-mode-control .working-mode-desc { text-align: left; } }
+/* narrow (the open group's pane is what is measured, #7663), in rem so a larger text size stacks sooner: the label and its hint above the control, the control at the left; no word is broken */
+@container (max-width: 40rem) { .ts-row { grid-template-columns: minmax(0, 1fr); } .ts-row:not(.ts-row-switch) .ts-control { justify-content: flex-start; } .ts-mode-control .working-mode-desc { text-align: left; } }
 
 /* the agent's Artifacts tab (the dock panel): the team's table in a narrow panel, and the document as a sheet over the panel itself (the chat beside it stays) */
 #agentic-panel-artifacts, #agentic-panel-saved { position: relative; } /* the document is a sheet over the panel (the Saved tab's message as well) */
@@ -275,4 +274,12 @@
     .goal-tasks-open { display: inline-flex; align-self: flex-start; min-height: 44px; margin-top: 12px; }
     .goal-side-row { min-height: 44px; padding: 10px 12px; }
     .goal-side-search { min-height: 44px; }
+/* narrow, in rem as the main Settings' (components.css): the groups become a selector at the top of the page */
+@container (max-width: 50rem) {
+    .team-settings-page .settings-nav { width: auto; flex: none; border-right: 0; border-bottom: 1px solid var(--border); padding: .6rem 1rem; overflow: visible; }
+    .team-settings-page .settings-shell { flex-direction: column; }
+    .team-settings-page .settings-tabs { display: none; }
+    .team-settings-page .settings-nav .settings-group-pick { display: block; }
+    .team-settings-page .settings-group-pick select { width: 100%; min-height: var(--control-touch-height, 44px); }
+    .team-settings-page .settings-panes { padding: .8rem 1rem 1.2rem; }
 }

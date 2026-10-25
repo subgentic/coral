@@ -53,12 +53,13 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await waitFor(`!!document.querySelector('#team-settings-workspace #team-settings-health form')`, 'the Health check section', 15000);
             await settle(300);
             insideScreen(await rect('#team-settings-workspace'), `${theme}: the Team settings page`);
-            // one page of four sections (the style guide's settings panel): each heading is reached by scrolling and is on the screen, and nothing scrolls sideways
-            for (const id of ['workflow', 'health', 'messaging', 'prompts']) {
-                await ev(`document.querySelector('#ts-h-${id}').scrollIntoView({ block: 'start' }); true`); await settle(300);
-                insideScreen(await rect(`#team-settings-workspace #ts-h-${id}`), `${theme}: the ${id} heading`);
+            // the main Settings' groups (#7663): on a phone a selector at the top (44 px) opens one group's pane at a time; each heading is on the screen, and nothing scrolls sideways
+            const pick = await rect('#team-settings-workspace .settings-group-pick select'); assert.ok(pick && pick.h >= 44, `${theme}: the group selector is a 44 px target (${pick && pick.h})`);
+            for (const [id, name] of [['workflow', 'Workflow'], ['health', 'Health check'], ['messaging', 'Messaging'], ['prompts', 'Prompts']]) {
+                await ev(`(() => { const s = document.querySelector('#team-settings-workspace .settings-group-pick select'); s.value = [...s.options].find(o => o.textContent === ${JSON.stringify(name)}).value; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); await settle(300);
+                insideScreen(await rect('#team-settings-workspace .settings-pane:not([hidden]) .settings-pane-title'), `${theme}: the ${id} heading`);
             }
-            assert.equal(await ev(`document.querySelector('#team-settings-workspace .ts-scroll').scrollWidth - document.querySelector('#team-settings-workspace .ts-scroll').clientWidth`), 0, `${theme}: nothing scrolls sideways`);
+            assert.equal(await ev(`document.querySelector('#team-settings-workspace .settings-panes').scrollWidth - document.querySelector('#team-settings-workspace .settings-panes').clientWidth`), 0, `${theme}: nothing scrolls sideways`);
             for (const sel of ['.ts-cancel', '.ts-save']) { const r = await rect(`#team-settings-workspace ${sel}`); assert.ok(r && r.h >= 44, `${theme}: ${sel} is 44 px tall (${r && r.h})`); }
             const audit = await auditRegion(ev, ['#team-settings-workspace']);
             assert.deepEqual(audit.fails, [], `${theme}: contrast of the Team settings page: ` + JSON.stringify(audit.fails.slice(0, 3)));
@@ -66,7 +67,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
 
         await open();
         await reach('dark');
-        console.log('   ✓ dark: the team menu → Team settings opens the page, and the four sections are reached by scrolling');
+        console.log('   ✓ dark: the team menu → Team settings opens the page, and the four groups are reached by the selector');
 
         // the page's own link: a reload on /team/<name>/settings opens the settings, in the light theme
         await load('light', '/team/' + TEAM + '/settings');

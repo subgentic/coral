@@ -8,8 +8,10 @@ const { infoButton, infoBox, bindInfo } = await importOnce('./info_toggle.js');
 const { refusalOf, answeredLocally } = await importOnce('./owner_refusal.js');
 const { requireGoalSentence } = await importOnce('./task_goals.js');
 const { pageRow, pageSwitch } = await importOnce('./team_settings_rows.js');
+const { initSectionDialog, showSection } = await importOnce('./section_dialog.js'); // the main Settings' list of groups on the left, a selector on a phone: one builder for every sectioned dialog (#7663)
 import { changedFields, rebaseChanges, NOTHING_TO_SAVE } from './settings_diff.js';
 
+let _lastSection = 'workflow'; // the group the team's Settings tab shows, kept when the page is drawn again (Cancel)
 const PRESET_NAMES = { none: 'None', shared_checkout: 'Shared checkout', worktrees: 'Worktrees', merge_queue: 'Merge queue' };
 
 function settingsFormSnapshot(form) {
@@ -131,11 +133,11 @@ function _teamSettingsPageShell() {
     page.id = 'team-settings-workspace';
     page.className = 'team-settings-workspace team-settings-page';
     page.setAttribute('aria-label', 'Team settings');
-    page.innerHTML = `<div class="ts-scroll">
-      <div class="ts-body">
+    page.innerHTML = `<div class="settings-shell ts-shell">
+      <nav class="settings-nav" aria-label="Team settings sections"><div class="settings-group-pick"><select class="settings-select" aria-label="Team settings group"></select></div><div class="settings-tabs" role="tablist" aria-orientation="vertical" aria-label="Team settings sections"></div></nav>
+      <div class="settings-panes">
       <p class="ts-lead">Only the Operator on this computer can change these.</p>
-      <section class="ts-section" aria-labelledby="ts-h-workflow">
-      <h2 class="ts-h" id="ts-h-workflow">Workflow</h2>
+      <section class="settings-pane" data-section="workflow" data-title="Workflow" data-icon="account_tree" data-desc="How agents work on this team.">
       <div class="ts-row ts-name-row"><div class="ts-text"><span class="ts-label">Board name</span><p class="ts-hint">Only the label changes: its agents, tasks and history stay.</p></div><div class="ts-control ts-rename"></div></div>
       <form class="working-mode-form ts-main" autocomplete="off">
         <div class="ts-row"><div class="ts-text"><span class="ts-label" id="tsr-mode-l">Working mode</span><p class="ts-hint" id="tsr-mode-h">Instructions are saved with each task when it is first claimed. <button type="button" class="tb-learn ts-learn" aria-expanded="false" aria-controls="tsr-mode-more" aria-label="Learn more about working modes">Learn more</button><span id="tsr-mode-more" hidden> Tasks already claimed keep their instructions. This setting gives guidance; it does not create worktrees by itself. <a href="#" class="working-mode-docs-link" data-doc="teams">Team working modes</a></span></p></div><div class="ts-control ts-mode-control"><select name="mode" aria-labelledby="tsr-mode-l" aria-describedby="tsr-mode-h working-mode-desc"><option value="none">None</option><option value="shared_checkout">Shared checkout</option><option value="worktrees">Worktrees</option></select><p class="ts-hint working-mode-desc" id="working-mode-desc"></p></div></div>
@@ -154,10 +156,9 @@ function _teamSettingsPageShell() {
       </details>
       </form>
       </section>
-      <section class="ts-section" aria-labelledby="ts-h-health"><h2 class="ts-h" id="ts-h-health">Health check</h2><div id="team-settings-health"><p class="ts-hint ct-loading" role="status">Loading…</p></div></section>
-      <section class="ts-section" aria-labelledby="ts-h-messaging"><h2 class="ts-h" id="ts-h-messaging">Messaging</h2><div id="team-settings-messaging"><p class="ts-hint ct-loading" role="status">Loading…</p></div></section>
-      <section class="ts-section" aria-labelledby="ts-h-prompts"><h2 class="ts-h" id="ts-h-prompts">Prompts</h2>
-        <p class="ts-hint">Read-only preview of the prompts agents get.</p>
+      <section class="settings-pane" data-section="health" data-title="Health check" data-icon="notifications" data-desc="When an agent that stopped working is noticed." hidden><div id="team-settings-health"><p class="ts-hint ct-loading" role="status">Loading…</p></div></section>
+      <section class="settings-pane" data-section="messaging" data-title="Messaging" data-icon="chat" data-desc="How the team's messages reach its agents." hidden><div id="team-settings-messaging"><p class="ts-hint ct-loading" role="status">Loading…</p></div></section>
+      <section class="settings-pane" data-section="prompts" data-title="Prompts" data-icon="description" data-desc="Read-only preview of the prompts agents get." hidden>
         <div class="prompt-inspection-content" aria-live="polite">Loading prompt inspection…</div>
       </section>
       </div>
@@ -172,6 +173,10 @@ function _mountTeamSettings(dialog, team, pageHost = null) {
         pageHost.replaceChildren(dialog);
         dialog.querySelector('.ts-rename').append(boardRenameControl(team, { onRenamed: () => { document.getElementById('team-page-title') && importOnce('./team_page.js').then(m => m.refreshTeamHeader?.()).catch(() => {}); importOnce('./render.js').then(m => m.scheduleLiveSessionsRender()); } }));
         bindInfo(dialog.querySelector('.ts-main'));
+        const shell = dialog.querySelector('.settings-shell'); initSectionDialog(shell);
+        showSection(shell, _lastSection);
+        shell.addEventListener('click', () => queueMicrotask(() => { _lastSection = shell.querySelector('.settings-tab[aria-selected="true"]')?.dataset.section || _lastSection; }));
+        shell.querySelector('.settings-group-pick select')?.addEventListener('change', e => { _lastSection = e.target.value; });
         dialog.addEventListener('click', event => { // a Learn more opens its text under the hint
             const learn = event.target.closest('.ts-learn');
             if (!learn) return;
@@ -581,7 +586,7 @@ export async function showTeamWorkingMode(team, options = {}) {
         // Cancel puts every part back as it was read: the page is drawn again from the server.
         cancel.addEventListener('click', async () => {
             await showTeamWorkingMode(team, options);
-            const h = pageHost.querySelector('.ts-h'); if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); } // the button that had the focus is gone: it goes to the page's first heading
+            const h = pageHost.querySelector('.settings-pane:not([hidden]) .settings-pane-title'); if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); } // the button that had the focus is gone: it goes to the open group's heading
         });
     }
     load();
