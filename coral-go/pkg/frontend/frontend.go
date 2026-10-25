@@ -64,6 +64,7 @@ var IndexTemplateFiles = []string{
 	"templates/includes/views/live_session.html",
 	"templates/includes/views/history_session.html",
 	"templates/includes/views/message_board.html",
+	"templates/includes/views/team_page.html",
 	"templates/includes/views/workflows.html",
 	"templates/includes/views/docs.html",
 	"templates/includes/views/servers.html",

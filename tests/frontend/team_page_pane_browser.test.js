@@ -46,19 +46,24 @@ const HEX = 'a'.repeat(64);
                 for (const n of ['Close details', 'Open', 'Download', 'Copy link']) assert.ok(p.names.some(x => x === n || x.startsWith(n)), `a control named ${n} (got ${JSON.stringify(p.names)})`);
                 assert.ok(await ev(`/The settings audit text\\./.test(window.__na.text(window.__tp.pane()))`), 'the pane shows the artifact text');
             });
-            await S.run(`${label}: the pane is ${mobile ? 'a sheet over the page' : (w >= 1500 ? '460 px wide' : 'beside a 56 px rail of the table')}`, async () => {
+            await S.run(`${label}: the pane is ${mobile ? 'a sheet over the page' : (w >= 1500 ? '460 px wide' : 'beside the sidebar as a 56 px rail')}`, async () => {
                 const b = await paneBox(); assert.ok(b, 'the pane is open');
                 if (mobile) assert.ok(b.w >= w - 2 && b.h >= h * 0.6, `a sheet over a phone (pane ${b.w}x${b.h} in ${w}x${h})`);
                 else if (w >= 1500) assert.ok(Math.abs(b.w - 460) <= 1, `460 px wide (got ${b.w})`);
                 else {
-                    const rail = await ev(`(() => { const t = [...window.__tp.page().querySelectorAll('table, [role=table], [role=grid]')].find(x => x.getClientRects().length); return t ? Math.round(t.getBoundingClientRect().width) : null; })()`);
-                    assert.ok(rail !== null && rail <= 56 + 2 && rail >= 54, `the table is a 56 px rail (got ${rail})`);
+                    // UI/UX's doc: below 1500 px the LEFT SIDEBAR is the 56 px rail while the pane is open, and the page keeps the rest of the width (the table is not the rail).
+                    const sb = await ev(`(() => { const a = window.__tp.sidebar(); return a ? Math.round(a.getBoundingClientRect().width) : null; })()`);
+                    assert.ok(sb !== null && sb <= 58 && sb >= 54, `the sidebar is a 56 px rail (got ${sb})`);
+                    const tw = await ev(`(() => { const t = [...window.__tp.page().querySelectorAll('table, [role=table], [role=grid]')].find(x => x.getClientRects().length); return t ? Math.round(t.getBoundingClientRect().width) : null; })()`);
+                    assert.ok(tw !== null && tw > 300, `the table keeps the page's width beside the pane (got ${tw})`);
                 }
             });
             await S.run(`${label}: the row is marked selected while the pane is open, and the header and the tab strip have not moved`, async () => {
                 assert.equal(await ev(`(() => { const e = ${row('/' + ART + '/')}; return e ? (e.getAttribute('aria-selected') || e.getAttribute('aria-current') || '') : 'no row'; })()`), 'true', 'the row has aria-selected or aria-current true');
                 const open = await rect(ev); await closeRow(); const closed = await rect(ev);
-                for (const part of ['h1', 'tabs']) for (const k of ['x', 'y', 'w', 'h']) assert.ok(Math.abs(open[part][k] - closed[part][k]) <= 0.5, `the ${part} ${k} moved when the pane closed (${open[part][k]} to ${closed[part][k]})`);
+                // Below 1500 px the sidebar is the 56 px rail while the pane is open, so the page's left edge and width change with it; the header and the tab strip do not move up or down or change height.
+                const keys = w >= 1500 ? ['x', 'y', 'w', 'h'] : ['y', 'h'];
+                for (const part of ['h1', 'tabs']) for (const k of keys) assert.ok(Math.abs(open[part][k] - closed[part][k]) <= 0.5, `the ${part} ${k} moved when the pane closed (${open[part][k]} to ${closed[part][k]})`);
                 await openRow();
             });
             await S.run(`${label}: Escape closes the pane and the focus returns to the row; Close details does the same`, async () => {

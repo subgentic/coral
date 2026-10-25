@@ -179,9 +179,9 @@ export function showTeamAvailability(team, options = {}) {
     load();
 }
 
-/** Open the team: Team view in the center and the team tabs in the sidebar. */
+/** Open the team page on its Agents tab (the Team view, #7453). */
 export function showTeamAvailabilityWorkspace(team, options = {}) {
-    return importOnce('./team_context.js').then(m => m.enterTeamContext(team, { restore: options.restore }));
+    return importOnce('./team_page.js').then(m => m.openTeamPage(team, { tab: 'agents', replace: !!options.restore }));
 }
 
 const remindAgent = async (team, subscriber, existing = null, onChanged = null) => {

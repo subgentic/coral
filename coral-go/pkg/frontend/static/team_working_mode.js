@@ -39,9 +39,9 @@ export function showTeamHealthSettings(team) {
     return showTeamWorkingModeWorkspace(team);
 }
 
-/** Open the team: team view in the center, team tabs (settings first) in the sidebar. */
+/** Open the team page on its Settings tab (#7453). */
 export function showTeamWorkingModeWorkspace(team, options = {}) {
-    return importOnce('./team_context.js').then(m => m.enterTeamContext(team, { tab: 'team-settings', restore: options.restore }));
+    return importOnce('./team_page.js').then(m => m.openTeamPage(team, { tab: 'settings', replace: !!options.restore }));
 }
 
 function jsonError(response, fallback) {

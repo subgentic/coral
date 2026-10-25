@@ -32,6 +32,19 @@ export const taskStateWord = (state) => {
     return word(s.replace(/_/g, ' '));
 };
 
+/** A task's state as the team page's tables say it (#7453): Queued, In progress, In review, Blocked, Done; `review` is a task with its completion review pending. */
+export function taskStatusWord(status, review) {
+    const s = String(status || '').toLowerCase();
+    if (['completed', 'skipped'].includes(s)) return 'Done';
+    if (review || s === 'review_pending') return 'In review';
+    if (s === 'in_progress') return 'In progress';
+    if (['blocked', 'parked'].includes(s)) return 'Blocked';
+    if (['pending', 'draft'].includes(s)) return 'Queued';
+    return word(s.replace(/_/g, ' '));
+}
+/** The class that colours a state's dot (the goal chips' classes, shared). */
+export const statusClass = (w) => `goal-state-task-${({ 'In progress': 'active', 'In review': 'active' }[w] || w).toLowerCase()}`;
+
 /** "9 tasks: 5 done, 2 active, 1 blocked, 1 queued"; "1 task: 1 done"; "No tasks yet". Zero counts are left out. `rollup` is {done, active, blocked, queued}. */
 export function rollupSentence(rollup) {
     const r = rollup || {};

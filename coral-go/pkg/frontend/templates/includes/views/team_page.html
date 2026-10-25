@@ -1,0 +1,28 @@
+{{ define "includes/views/team_page.html" }}
+<!-- The team page (#7453, UI/UX's one team page): the team's name and one status, seven tabs that never move, the tab's table or an item's page under them, and the detail pane for documents on the right.
+     team_page.js fills it; every tab's own panel is built the first time the tab is opened. -->
+<div id="team-page-view" class="team-page" style="display:none">
+    <header class="team-page-head" id="team-page-head">
+        <h1 id="team-page-title" class="team-page-title" tabindex="-1"></h1>
+        <span class="team-page-status" id="team-page-status" role="status"></span>
+        <div class="team-page-actions" id="team-page-actions">
+            <button type="button" class="btn team-page-add" id="team-page-add-agent">Add agent</button>
+        </div>
+    </header>
+    <div class="team-tabs" id="team-tabs" role="tablist" aria-label="Team"></div>
+    <div class="team-page-row" id="team-page-row">
+        <div class="team-page-scroll" id="team-page-scroll">
+            <section class="team-panel" id="team-panel-goals" role="tabpanel" aria-label="Goals" hidden></section>
+            <section class="team-panel" id="team-panel-messages" role="tabpanel" aria-label="Messages" hidden></section>
+            <section class="team-panel" id="team-panel-tasks" role="tabpanel" aria-label="Tasks" hidden></section>
+            <section class="team-panel" id="team-panel-agents" role="tabpanel" aria-label="Agents" hidden></section>
+            <section class="team-panel" id="team-panel-artifacts" role="tabpanel" aria-label="Artifacts" hidden></section>
+            <section class="team-panel" id="team-panel-knowledge" role="tabpanel" aria-label="Knowledge" hidden></section>
+            <section class="team-panel" id="team-panel-settings" role="tabpanel" aria-label="Settings" hidden></section>
+            <section class="team-panel team-item" id="team-panel-item" aria-label="Task" hidden></section>
+        </div>
+        <aside class="detail-pane" id="detail-pane" aria-label="Details" hidden></aside>
+    </div>
+    <div class="sr-only" id="team-page-live" role="status" aria-live="polite"></div>
+</div>
+{{ end }}
