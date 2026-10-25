@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -34,11 +35,11 @@ func TestFilesInAFolderThatIsNotAGitRepositorySaysSo(t *testing.T) {
 	terminal.addSession(name, plain)
 	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: name, WorkingDir: plain}))
 
-	for _, tc := range []struct{ method, path string }{
-		{http.MethodGet, "/api/sessions/live/" + name + "/files?session_id=" + sid},
-		{http.MethodPost, "/api/sessions/live/" + name + "/files/refresh"},
+	for _, tc := range []struct{ method, path, body string }{
+		{http.MethodGet, "/api/sessions/live/" + name + "/files?session_id=" + sid, ""},
+		{http.MethodPost, "/api/sessions/live/" + name + "/files/refresh", `{"session_id":"` + sid + `"}`}, // a caller that is not the dashboard names its session (#7565)
 	} {
-		req, err := http.NewRequest(tc.method, server.URL+tc.path, nil)
+		req, err := http.NewRequest(tc.method, server.URL+tc.path, strings.NewReader(tc.body))
 		require.NoError(t, err)
 		resp, err := http.DefaultClient.Do(req)
 		require.NoError(t, err)

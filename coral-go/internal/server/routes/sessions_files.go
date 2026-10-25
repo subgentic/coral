@@ -11,6 +11,9 @@ import (
 
 // resolveWorkdir determines the working directory for an agent session.
 func (h *SessionsHandler) resolveWorkdir(ctx context.Context, name, agentType, sessionID string) string {
+	if strictIdentity(ctx) {
+		return h.strictSessionWorkdir(ctx, name, sessionID) // a bounded caller: the session's own folder, never the name or a snapshot (#7565)
+	}
 	pane, _ := h.terminal.FindSession(ctx, name, agentType, sessionID)
 	if pane != nil {
 		if pane.CurrentPath != "" {

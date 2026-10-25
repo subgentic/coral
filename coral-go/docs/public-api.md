@@ -172,6 +172,13 @@ GET /api/sessions/live/{name}/diff?session_id=uuid
 GET /api/sessions/live/{name}/search-files?q=query&session_id=uuid
 ```
 
+**Which agent a file or diff read is about.** `file-content`, `file-original`, `diff`, `changes.diff`, `files`, `files/refresh`,
+`search-files` and `resolve-path` (and a file save) take the agent from its `session_id`, and only from it, for every caller
+except the local dashboard in a browser: the Coral Hub, an API-key script and the command line. The session must be live and
+must belong to the agent called `{name}` (its agent name or its terminal session name). With no `session_id`, an unknown or
+stale one (a session that has ended), or another agent's, the answer is 404 `live session not found`; the name is never used
+to find a folder, and neither are the git snapshots, which outlive their session.
+
 #### An agent's instruction and memory files (Operator only; not through Coral Hub)
 ```
 GET /api/sessions/live/{name}/memory?session_id=uuid

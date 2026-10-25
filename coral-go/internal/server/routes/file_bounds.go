@@ -453,7 +453,7 @@ func listingVisible(dir, name string) bool { return !sensitivePath(filepath.Join
 // session's git root and working directory.
 func (h *SessionsHandler) sessionFileRoots(r *http.Request, name, sessionID string) []string {
 	var roots []string
-	for _, d := range []string{h.resolveGitRoot(r.Context(), name, "", sessionID), h.resolveWorkdir(r.Context(), name, "", sessionID)} {
+	for _, d := range []string{h.resolveGitRoot(agentCtx(r), name, "", sessionID), h.resolveWorkdir(agentCtx(r), name, "", sessionID)} {
 		if real := realPath(d); rootAllowed(real) {
 			roots = append(roots, real)
 		}
