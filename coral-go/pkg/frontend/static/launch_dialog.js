@@ -17,6 +17,7 @@ const { _syncACFModelField, getAgentConfig, renderAgentConfigForm, cliWarningOf 
 const { _checkPermissionFlag } = await importOnce('./cli_dialogs.js');
 const { _checkTeamGitDir, _initTeamForm, _loadExistingTeamBoards } = await importOnce('./team_dialogs.js');
 const { _initAgentPresets } = await importOnce('./persona_io.js');
+const { quietFocus } = await importOnce('./quiet_focus.js');
 const { markFieldInvalid, _launchBlocked, _launchOn, _refreshAfterLaunch, _resetDirInputs, _showLaunchStep, _syncMobileLaunchSections, hideLaunchModal, setLaunchMore, setLaunchStage, LAUNCH_STAGES } = await importOnce('./launch_core.js');
 const { wireRecap, syncRecap } = await importOnce('./launch_recap.js');
 
@@ -38,6 +39,7 @@ function _launchStage(arg) {
     const live = document.getElementById('launch-stage-live');
     if (live) live.textContent = sub || '';
     const first = to === 'folder' ? input : to === 'persona' ? document.querySelector('#launch-step-agent .agent-preset-select') : document.querySelector('#launch-step-agent .settings-tab[aria-selected="true"]');
+    if (to === 'agent') quietFocus(document.getElementById('launch-modal')); // the selected tab takes the focus: no ring until a key is pressed (#7391)
     first?.focus();
 }
 window._launchStage = _launchStage;
