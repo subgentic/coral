@@ -190,8 +190,10 @@ function statusLine() {
     return c && c.matched > model.items.length ? `Showing ${model.items.length} of ${c.matched}${model.truncated ? '+' : ''}` : `${model.items.length} artifact${model.items.length === 1 ? '' : 's'}`;
 }
 
+let drawnRows = 0; // the rows of the last drawing: the first new row is the one after them
 function draw() {
     const body = root && root.querySelector('.team-artifacts-body'); if (!body) return;
+    const rowsBefore = drawnRows;
     ensureBar();
     const a = document.activeElement;
     const held = a && body.contains(a) && !bar.node.contains(a) ? (a.dataset.artifactId || (a.classList.contains('goals-more') ? '#load-more' : '')) : '';
@@ -221,7 +223,10 @@ function draw() {
     if (model.truncated) body.append(el('p', 'goals-note', 'Some older artifacts are not included in this list.'));
     bar.names([...new Set(model.items.flatMap(i => [i.produced_by, i.sent_by]).filter(n => typeof n === 'string' && n))].sort().slice(0, 50)); // the names on screen, offered in the Uploaded by field
     bar.set(model.filters, model.counts ? model.counts : model.items.length || !model.loading ? { matched: model.items.length, all: model.items.length } : null);
-    if (held) (held === '#load-more' ? body.querySelector('.goals-more') : body.querySelector(`[data-artifact-id="${CSS.escape(held)}"]`))?.focus({ preventScroll: true });
+    drawnRows = model.items.length;
+    // Load more: the button again, or, when the last page came and the button is gone, the first new row (the keyboard stays in the list, not on the page)
+    if (held === '#load-more') (body.querySelector('.goals-more') || body.querySelectorAll('[data-artifact-id]')[Math.min(rowsBefore, model.items.length - 1)])?.focus({ preventScroll: true });
+    else if (held) body.querySelector(`[data-artifact-id="${CSS.escape(held)}"]`)?.focus({ preventScroll: true });
 }
 
 /** The artifact's text: Markdown through the strict renderer (raw HTML shown as text, then the sanitizer), anything else as plain text. */
