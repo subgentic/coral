@@ -13,6 +13,8 @@ on:
       - "tests/release/gate_check_test.py"
       - "tests/release/release_provenance.py"
       - "tests/release/release_provenance_test.py"
+      - "tests/release/go_test_shard_test.py"
+      - "tools/go_test_shard.py"
       - ".github/gate.json"
   pull_request:
     paths:
@@ -23,6 +25,8 @@ on:
       - "tests/release/gate_check_test.py"
       - "tests/release/release_provenance.py"
       - "tests/release/release_provenance_test.py"
+      - "tests/release/go_test_shard_test.py"
+      - "tools/go_test_shard.py"
       - ".github/gate.json"
   workflow_dispatch:
 
@@ -55,3 +59,5 @@ jobs:
         run: python3 -I tests/release/gate_check_test.py
       - name: the release provenance record (tests/release/release_provenance.py, #5550) against a fake GitHub
         run: python3 -I tests/release/release_provenance_test.py
+      - name: the test-shard runner (tools/go_test_shard.py, #350): the split is the whole package, the exactly-once check
+        run: python3 -I tests/release/go_test_shard_test.py
