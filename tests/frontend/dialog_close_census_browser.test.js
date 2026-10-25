@@ -56,9 +56,9 @@ const REAL = {
         await ev(`window.__coralReady.startup('liveList', 'settings')`);
         await ev(`(() => { window.__M = f => import((window.__coralStatic || '/static/') + f); const t = document.createElement('button'); t.id = 'opener'; /* z-index 5: above the sidebar's pinned New Agent footer (2) that sits in this corner (#6159) */ t.textContent = 'opener'; t.style.cssText = 'position:fixed;left:4px;bottom:4px;z-index:5'; document.body.append(t); })(); true`);
     };
-    // The control a person would press to close it: a visible button named Close, Cancel, Done or ×, or the close button class.
+    // The control a person would press to close it: a visible button named Close, Cancel, Done, Got it (the notice's own dismiss) or ×, or the close button class.
     const CLOSER = root => `(() => { const m = document.querySelector('${root}'); const vis = e => e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden';
-        const bs = [...m.querySelectorAll('button')].filter(vis); return bs.find(b => b.classList.contains('modal-close-btn')) || bs.find(b => /^(close|cancel|done|ok|×|✕)$/i.test((b.textContent || b.getAttribute('aria-label') || '').trim())) || null; })()`;
+        const bs = [...m.querySelectorAll('button')].filter(vis); return bs.find(b => b.classList.contains('modal-close-btn')) || bs.find(b => /^(close|cancel|done|ok|got it|×|✕)$/i.test((b.textContent || b.getAttribute('aria-label') || '').trim())) || null; })()`;
     const rows = []; let failed = 0;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
