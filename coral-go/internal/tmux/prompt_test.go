@@ -38,7 +38,25 @@ exit 0
 `
 	bin := filepath.Join(dir, "tmux")
 	require.NoError(t, os.WriteFile(bin, []byte(script), 0o755))
+	settleExec(t, bin, log)
 	return &Client{TmuxBin: bin, sessionSockets: map[string]string{}}, dir
+}
+
+// settleExec runs a script this test has just written once, retrying while the system says "text file busy" (ETXTBSY: another goroutine forked while
+// the file was open for writing, and until that child has exec'd the kernel refuses to execute the file). The code under test does not retry an exec, so
+// without it a send to the fake tmux could find no pane in a busy parallel run and fail with "pane not found" (the gate's
+// TestAutomatedMultiLineTextOfOnlyControlCharactersIsRefusedOnTmux, 170 gate #3). The fake logs every call, so the warm-up's own line is removed.
+func settleExec(t *testing.T, bin, log string) {
+	t.Helper()
+	var err error
+	for i := 0; i < 200; i++ {
+		if err = exec.Command(bin, "-V").Run(); err == nil || !strings.Contains(err.Error(), "text file busy") {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	require.NoError(t, err, "the fake tmux must be runnable")
+	require.NoError(t, os.Remove(log))
 }
 
 func readCalls(t *testing.T, dir string) []string {
