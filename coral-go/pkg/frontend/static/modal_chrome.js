@@ -123,18 +123,20 @@ document.addEventListener("keydown", (e) => {
     if (e.key === "Tab") {
         for (const modal of modalsTopFirst()) {
             if (modal.style.display !== 'none' && modal.getClientRects().length > 0) {
-                const focusable = Array.from(modal.querySelectorAll(
-                    'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), a[href], summary, [tabindex]:not([tabindex="-1"])' // summary: a disclosure that is the last control (the artifact viewer's "Who can read this") is not skipped by the wrap
-                )).filter(el => el.getClientRects().length > 0 && el.tabIndex >= 0); // a roving-tabindex tab (-1) is not a stop: the first and last are the first and last the Tab key reaches (#7407)
-                if (focusable.length === 0) return;
-                const first = focusable[0];
-                const last = focusable[focusable.length - 1];
+                const all = Array.from(modal.querySelectorAll(
+                    'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), a[href], summary, [tabindex]:not([tabindex="-1"])' // summary: a disclosure that is the last control (
+                )).filter(el => el.getClientRects().length > 0);
+                const stops = all.filter(el => el.tabIndex >= 0); // the ones the Tab key reaches: a roving-tabindex tab (-1) is not a stop (#7407)
+                if (stops.length === 0) return;
+                const first = stops[0];
+                const last = stops[stops.length - 1];
+                const active = document.activeElement;
                 // Focus outside the modal (left on the control that opened it) comes in too.
-                const outside = !modal.contains(document.activeElement);
-                if (e.shiftKey && (outside || document.activeElement === first)) {
+                const outside = !modal.contains(active);
+                if (e.shiftKey && (outside || active === first || active === all[0])) { // (the first of all, a tab that was clicked or focused by script, wraps too)
                     e.preventDefault();
                     last.focus();
-                } else if (!e.shiftKey && (outside || document.activeElement === last)) {
+                } else if (!e.shiftKey && (outside || active === last || active === all[all.length - 1])) {
                     e.preventDefault();
                     first.focus();
                 }
