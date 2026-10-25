@@ -77,6 +77,23 @@ const TEAM = `qa-settings-${Date.now() % 100000}`;
                 const open = await ev(`(() => { const m = document.getElementById('tsr-mode-more'); const a = m && m.querySelector('a'); return { shown: !!m && !m.hidden, text: m ? window.__na.text(m).trim() : '', link: a ? window.__na.text(a).trim() : null }; })()`);
                 assert.equal(open.shown, true); assert.match(open.text, /Tasks already claimed keep their instructions\. This setting gives guidance; it does not create worktrees by itself\./); assert.equal(open.link, 'Team working modes');
             });
+            // The leave question moved here from team_settings_keyboard when the right dock went (#7457): leaving the team page for another page with an unsaved change asks; Escape stays and keeps the change; Leave goes.
+            if (!mobile) await S.run(`${label}: leaving the team page with an unsaved change asks first; Escape stays on the page with the change kept, and Leave goes`, async () => {
+                const shown = `(() => { const m = document.getElementById('confirm-modal'); return !!m && getComputedStyle(m).display !== 'none' && m.getClientRects().length > 0; })()`;
+                const was = await state('Require a goal');
+                await ev(`${sw('Require a goal')}.click(); true`); await settle(250);
+                const go = () => ev(`(() => { const r = document.querySelector('#live-sessions-list li[data-session-id]'); if (!r) return false; r.click(); return true; })()`);
+                assert.ok(await go(), 'a row in the sidebar to leave for');
+                await waitFor(shown, 'the unsaved-settings question', 5000);
+                assert.match(await ev(`document.getElementById('confirm-modal').innerText`), /Team settings have unsaved changes\. Leave without saving\?/, 'the question is the unsaved-settings one');
+                await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`);
+                await waitFor(`!(${shown})`, 'the question closed by Escape', 5000);
+                assert.ok(await ev(`window.__tp.tablist() !== null`), 'Escape stayed on the team page');
+                assert.notEqual(await state('Require a goal'), was, 'and the change is kept');
+                assert.ok(await go(), 'leave again'); await waitFor(shown, 'the question again', 5000);
+                await ev(`document.getElementById('confirm-modal-yes').click(); true`);
+                await waitFor(`window.__tp.tablist() === null`, 'the team page is left after Leave', 5000);
+            });
         }
         await removeBoards(ev, [TEAM]); S.finish(); // finish() exits the process, so the board goes first
     } finally { await removeBoards(ev, [TEAM]); await client.close(); }
