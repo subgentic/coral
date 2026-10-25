@@ -1,7 +1,7 @@
 /* Moved out of modals.js as it was (#3844): no behaviour change. */
 import { importOnce } from './import_once.js';
 const { ALL_CAPABILITIES } = await importOnce('./agent_presets.js');
-const { PERMISSION_MODE_DESCRIPTIONS, defaultPermissionMode, syncDefaultPermissionMode, trackPermissionPick, _hasPermFlag, _normalizePermFlagsForAgent, _permissionModeFromFlags, _stripPermFlags, _syncACFAutoPermissions } = await importOnce('./permission_flags.js');
+const { permissionModeDescription, defaultPermissionMode, syncDefaultPermissionMode, trackPermissionPick, _hasPermFlag, _normalizePermFlagsForAgent, _permissionModeFromFlags, _stripPermFlags, _syncACFAutoPermissions } = await importOnce('./permission_flags.js');
 const { _acfServer, _fillModelDatalist, _getAgentModels, _getDefaultModels, _settingsFor } = await importOnce('./launch_models.js');
 const { _checkAgentCLI } = await importOnce('./cli_check.js');
 const { _classifyLoadedACFModel } = await importOnce('./acf_models.js');
@@ -215,7 +215,7 @@ export function renderAgentConfigForm(containerId, opts = {}) {
 
     let presetHTML = '';
     if (showPreset) {
-        presetHTML = `<div id="${escapeAttr(uid)}-presets" class="agent-preset-selector" style="margin-bottom:8px"></div>`;
+        presetHTML = `${opts.sections ? `<div class="launch-field-head"><label for="${escapeAttr(uid)}-preset">Start from a persona</label> <span class="launch-optional">optional</span></div>` : ''}<div id="${escapeAttr(uid)}-presets" class="agent-preset-selector" style="margin-bottom:8px"></div>`;
     }
 
     let nameHTML = '';
@@ -232,7 +232,7 @@ export function renderAgentConfigForm(containerId, opts = {}) {
         const permModeVal = autoPermsVal
             ? (typeof autoPermsVal === 'string' ? autoPermsVal : (_permissionModeFromFlags(flagsVal) || defaultMode))
             : 'default';
-        const permModeDesc = PERMISSION_MODE_DESCRIPTIONS[permModeVal] || '';
+        const permModeDesc = permissionModeDescription(permModeVal, agentTypeVal || 'claude');
         autoPermissionsHTML = `
             <label>Permission Mode:
                 <select class="acf-permission-mode" data-on-change="perm-mode-describe">
@@ -358,7 +358,7 @@ export function renderAgentConfigForm(containerId, opts = {}) {
 
     // Render presets if enabled — pass containerId so the preset handler knows which ACF to update
     if (showPreset) {
-        _renderPresetButtons(`${uid}-presets`, 'acf', { target: containerId });
+        _renderPresetButtons(`${uid}-presets`, 'acf', { target: containerId, selectId: opts.sections ? `${uid}-preset` : undefined });
     }
 
     // Loaded values are classified against the provider's known defaults and
@@ -395,6 +395,7 @@ export function renderAgentConfigForm(containerId, opts = {}) {
         setThinking(container, undefined); // a provider has its own levels: the choice goes back to Default and is not sent (#7391; only a provider resets the Model and Thinking)
         // Still showing the default (nobody picked a mode here): it follows the agent type, Auto for Claude and the other CLIs' own default (#5836)
         syncDefaultPermissionMode(container.querySelector('.acf-permission-mode'), _settingsFor(_acfServer(container)), agentType);
+        const modeSel = container.querySelector('.acf-permission-mode'); const modeHint = modeSel?.parentElement?.querySelector('.perm-mode-desc'); if (modeHint) modeHint.textContent = permissionModeDescription(modeSel.value, agentType); // Codex's Auto has its own line
         const permMode = container.querySelector('.acf-permission-mode')?.value || 'default';
         const flagsEl = container.querySelector('.acf-flags');
         if (flagsEl) flagsEl.value = _stripPermFlags(_normalizePermFlagsForAgent(flagsEl.value, agentType, permMode));

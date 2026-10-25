@@ -4596,8 +4596,9 @@ body:has(#nav-tab-hub-inbox.active) #saved-btn .saved-count { display: none; }
 .launch-wizard .acf-persona-page { padding: 0; }
 .launch-wizard .settings-panes { padding: 20px 24px; overflow: auto; }
 #launch-modal[data-agent-stage="persona"] .launch-server-row, #launch-modal[data-agent-stage="agent"] .launch-server-row { display: none !important; } /* the machine is a step 1 choice; its row is set by style where it is drawn (launch_dialog.js) */
-.launch-field-head { display: flex; align-items: baseline; gap: 8px; margin: 0 0 6px; font-size: .875rem; font-weight: 600; }
-.launch-field-head label, .launch-field-head span:first-child { margin: 0; }
+.launch-field-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; margin: 0 0 6px; font-size: .875rem; font-weight: 600; }
+.launch-field-head label, .launch-field-head span:first-child { margin: 0; flex: none; } /* the label stays on one line; "optional" wraps under it at 200% text (UI/UX, #7407) */
+.sd-modal-content.restart-wizard-content .settings-pane textarea.acf-prompt { font-family: inherit; font-size: var(--fs-md, .875rem); } /* the prompt is the person's writing: the product font, not mono */
 .launch-required { color: var(--warning-text, var(--warning)); font-size: .6875rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
 .launch-optional { color: var(--text-secondary); font-size: .75rem; font-weight: 400; }
 .launch-recent-label { align-self: center; color: var(--text-secondary); font-size: .8125rem; }
@@ -4789,12 +4790,14 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
     #launch-modal .modal-content.launch-wizard-content.launch-team-content, #team-agent-modal .modal-content.restart-wizard-content { height: 100dvh; }
 }
 
-.team-launch-health { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; } /* the health panel's layout in the launch dialog (the Team settings form's class is not used here) */
+.team-launch-health { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.team-launch-health [hidden] { display: none !important; } /* the rows that only matter while the health check is on */
+#launch-step-team .settings-pane .health-line { border: 0; padding: 0; background: none; box-shadow: none; } /* the Workflow tab's row pattern: no card */
+#launch-step-team .settings-pane fieldset.team-settings-section { border: 0; padding: 0; margin: 0; min-width: 0; } /* the health panel's layout in the launch dialog (the Team settings form's class is not used here) */
 
 /* New team on a phone and at large text: nothing wider than the screen (the census), and the health panel's (i) on its label's first line. */
 .team-allworkers select { min-width: 0; max-width: 100%; width: min(12em, 100%); }
 .team-menu { min-width: min(12rem, calc(100vw - 32px)); max-width: calc(100vw - 32px); }
 .team-menu-item { white-space: normal; }
 #launch-step-team .settings-pane .health-line > label.health-rule-head:has(> input[type="checkbox"]) { margin: 0; }
-#launch-step-team .settings-pane .health-line > .settings-info-btn { align-self: flex-start; margin-top: calc((1.4rem - 1.5rem) / 2); } /* the (i) sits on the switch's line: the switch is 1.4rem, the (i) 1.5rem */
 .team-agent-role-name, .team-agent-summary { min-width: 0; }

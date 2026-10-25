@@ -17,7 +17,7 @@ const PERM_FLAGS = {
 
 export { defaultPermissionMode, syncDefaultPermissionMode, trackPermissionPick }; // pure, in preset_enforcement.js (node-tested)
 
-export const PERMISSION_MODE_DESCRIPTIONS = {
+const PERMISSION_MODE_DESCRIPTIONS = {
     default: "Asks before acting (each CLI's normal mode)",
     acceptEdits: 'Reads, file edits, and common filesystem commands (mkdir, touch, mv, cp, etc.) — best for iterating on code you\'re reviewing',
     plan: 'Reads only — best for exploring a codebase before changing it',
@@ -26,9 +26,15 @@ export const PERMISSION_MODE_DESCRIPTIONS = {
     bypassPermissions: 'Everything except protected paths — isolated containers and VMs only',
 };
 
+/** Codex's Auto is the workspace sandbox with Coral's network on (Security's ask on #7483): its line says so; every other mode keeps its own. */
+export const CODEX_AUTO_DESCRIPTION = 'Workspace sandbox, with the network on so it can reach Coral.';
+export const permissionModeDescription = (mode, agentType) => (mode === 'auto' && agentType === 'codex' ? CODEX_AUTO_DESCRIPTION : PERMISSION_MODE_DESCRIPTIONS[mode] || '');
+
 export function _updatePermModeDescription(selectEl) {
     const hint = selectEl.parentElement?.querySelector('.perm-mode-desc');
-    if (hint) hint.textContent = PERMISSION_MODE_DESCRIPTIONS[selectEl.value] || '';
+    let scope = selectEl.parentElement, typeSel = null; // the provider of the form this mode is in
+    while (scope && !(typeSel = scope.querySelector('.acf-agent-type'))) scope = scope.parentElement;
+    if (hint) hint.textContent = permissionModeDescription(selectEl.value, typeSel ? typeSel.value : '');
 }
 
 export function _getPermissionFlagsForAgentMode(agentType, mode) {
