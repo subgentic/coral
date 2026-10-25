@@ -68,6 +68,9 @@ export function openDetailPane({ key, title, sub = '', facts = [], body = null, 
         if (a.onclick) b.addEventListener('click', a.onclick);
         if (a.run) b.addEventListener('click', () => a.run(b));
         if (a.ariaLabel) b.setAttribute('aria-label', a.ariaLabel);
+        if (a.title) b.title = a.title;
+        if (a.pressed !== undefined) b.setAttribute('aria-pressed', String(a.pressed)); // a toggle (Keep)
+        if (a.danger) b.classList.add('btn-danger-text');
         foot.append(b);
     }
     aside.append(head, main);
