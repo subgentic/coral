@@ -4793,3 +4793,12 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .team-menu-item { white-space: normal; }
 #launch-step-team .settings-pane .health-line > label.health-rule-head:has(> input[type="checkbox"]) { margin: 0; }
 .team-agent-role-name, .team-agent-summary { min-width: 0; }
+
+/* The composer's @ mention list (#7549): above the box, rows of 44 px on a touch screen */
+.mb-post-card { position: relative; }
+.mention-list { position: absolute; left: 0; right: 0; bottom: calc(100% + 4px); z-index: 20; max-height: 14rem; overflow-y: auto; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-md); padding: 4px; }
+.mention-list[hidden] { display: none; }
+.mention-option { display: flex; align-items: baseline; gap: 8px; padding: 6px 10px; border-radius: var(--radius-md); font-size: 0.875rem; color: var(--text-primary); cursor: pointer; }
+.mention-option.active, .mention-option:hover { background: var(--bg-hover); }
+.mention-note { font-size: 0.75rem; color: var(--text-secondary); }
+@media (max-width: 767px), (pointer: coarse) { .mention-option { min-height: var(--control-touch-height, 44px); align-items: center; } }

@@ -128,6 +128,7 @@ export function selectBoardProject(project, messageId = null) {
     badge.style.display = '';
     document.querySelector('#messageboard-view .mb-view-header')?.classList.add('mb-has-board');
     initGrowingTextarea(document.getElementById('mb-post-input'));
+    attachMentionList();
     // A board opened before its label is known (a /board/<id> page, a board with no agents)
     // asks for it; the header follows when it, or any list, brings it (#3536).
     if (!hasBoardLabel(project)) {
@@ -168,6 +169,7 @@ export function showBoardInPage(project, host) {
     board.style.display = 'flex'; // display-ok: #mb-board is shown and hidden this way everywhere else in this file
     hideBoardSubscribers();
     initGrowingTextarea(document.getElementById('mb-post-input'));
+    attachMentionList();
     if (!hasBoardLabel(project)) {
         boardFetch(project, '').then(r => (r.ok ? r.json() : null)).then(d => {
             if (d && typeof d.board_label === 'string') noteBoardLabel(splitKey(project).server, splitKey(project).name, d.board_label);
@@ -745,9 +747,15 @@ function formatTime(iso) {
 /** One word for the right panel, with how many are in it: the header's Members button (the desktop's, which brings the panel back on the Goals face, and the phone's, which opens its sheet). */
 function setMembersCount(n) { for (const id of ['mb-members-btn', 'mb-subscribers-btn']) { const b = document.getElementById(id); if (b) b.textContent = n ? `Members ${n}` : 'Members'; } }
 
+// The team's names for the composer's @ picker (the job title, else the id): refreshed with the members list.
+let mentionNames = [];
+function attachMentionList() {
+    importOnce('./mention_picker.js').then(m => m.attachMentionPicker(document.getElementById('mb-post-input'), () => mentionNames)).catch(() => {}); // the box works without the list
+}
 async function loadBoardSubscribers(project) {
     try {
         const subs = await fetchSubscribers(project);
+        mentionNames = [...new Set(subs.filter(s => !isOperatorId(s.subscriber_id)).map(s => s.job_title || s.subscriber_id).filter(n => typeof n === 'string' && n))];
         setBoardMembers([...new Set(subs.map(s => s.job_title || s.subscriber_id).filter(n => typeof n === 'string' && n))].sort().slice(0, 50)); // the From field's names
         // @mentions of these members are highlighted; the bodies on screen are marked in place
         if (setBoardMentionNames(subs.flatMap(s => [s.job_title, s.subscriber_id]))) highlightMentionsIn(document.getElementById('mb-messages')); // in place: no message is redrawn, so a jump's outline and focus stay
