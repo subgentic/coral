@@ -151,6 +151,37 @@ func (e *qaEnv) goal(boardID, title string) *board.Goal {
 
 func sp(s string) *string { return &s }
 
+// burst changes goal id's title n times in ONE transaction on the board's database: the triggers write each change's event inside it, so every event becomes visible together at the commit and one
+// feed tick sees all n, however slow the machine writing them is (n separate UpdateGoal calls spread over several ticks on a slow runner, and each tick's frame then held 50 or fewer: no gap, #7551).
+// pause is a delay between the writes inside the transaction, to show that.
+func (e *qaEnv) burst(id int64, n int, pause time.Duration) {
+	e.t.Helper()
+	var err error
+	for try := 0; try < 50; try++ { // the server's own writer may hold the database for a moment
+		var tx *sql.Tx
+		if tx, err = e.raw.Begin(); err != nil {
+			time.Sleep(20 * time.Millisecond)
+			continue
+		}
+		for i := 0; i < n && err == nil; i++ {
+			_, err = tx.Exec(`UPDATE board_goals SET title = ? WHERE board_id = 'team-a' AND id = ?`, fmt.Sprintf("t%d", i), id)
+			if pause > 0 {
+				time.Sleep(pause)
+			}
+		}
+		if err == nil {
+			err = tx.Commit()
+		} else {
+			_ = tx.Rollback()
+		}
+		if err == nil {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	require.NoError(e.t, err)
+}
+
 // 1: many changes inside one tick come as that many events, in order, no gap.
 func TestQA7355ManyChangesInOneTick(t *testing.T) {
 	e := newQAEnv(t)
@@ -175,15 +206,11 @@ func TestQA7355ManyChangesInOneTick(t *testing.T) {
 // 2: more than 50 changes: gap, at most 50 events, and the next tick repeats nothing.
 func TestQA7355MoreThanFiftyIsAGap(t *testing.T) {
 	e := newQAEnv(t)
-	ctx := context.Background()
 	g := e.goal("team-a", "base")
 	c := e.operator()
 	c.first()
 	c.drain(1500 * time.Millisecond)
-	for i := 0; i < 70; i++ {
-		_, err := e.srv.boardStore.UpdateGoal(ctx, "team-a", g.ID, board.GoalUpdate{Title: sp(fmt.Sprintf("t%d", i))})
-		require.NoError(t, err)
-	}
+	e.burst(g.ID, 70, 0)
 	evs, gaps, _ := c.drain(3 * time.Second)
 	t.Logf("70 changes: %d events, %d gap frames", len(evs), gaps)
 	assert.GreaterOrEqual(t, gaps, 1, "more than a frame can hold says gap")
