@@ -47,7 +47,8 @@
 // --stress runs the selected suites --runs N times (default 3) on --shards shards (default 3 in this
 // mode) with every page's CPU throttled --cpu-throttle X times (default 4) through CDP
 // Emulation.setCPUThrottlingRate, without retries, and prints each suite's pass count (e.g. 2/3) so the
-// flaky list is measurable. Exit status 1 unless every suite passed every run.
+// flaky list is measurable. Exit status 1 unless every suite passed every run. A suite sees the rate as
+// CDP_CPU_THROTTLE (1 without --stress), for a wall-clock budget that should grow with it (comments_scale).
 //
 // Shared server state (#4830): the suites of a shard share one Coral server, so a setting or a saved item one leaves is read by the next (show_session_server left False by server_switcher
 // changed live_list_golden; terminal_switch's stand-ins left a deleted script as cli_path_claude, which settings_modal_trace showed). Before and after each suite attempt the runner takes
@@ -604,7 +605,7 @@ async function startShard(n, gen = 0, strict = false, backend = MAIN_BACKEND) {
   // CORAL_TEST_TMUX_SOCKET: this shard's own tmux socket (<data>/tmux.sock), for suites that compare
   // the pane with the dashboard (#3422). CORAL_TEST_LOG: this shard's Coral log, which a suite reads
   // only to explain its own failure (helpers/stand_in_agent.js, #3502).
-  return { n, gen, log, coral, chrome, throttler, strict, backend, data, tmuxSock, serverEnv, pprofPort, env: { ...testEnv, CORAL_TEST_URL: `http://127.0.0.1:${port}`, CDP_PORT: String(cdp), CORAL_CDP_PORT: String(cdp),
+  return { n, gen, log, coral, chrome, throttler, strict, backend, data, tmuxSock, serverEnv, pprofPort, env: { ...testEnv, CORAL_TEST_URL: `http://127.0.0.1:${port}`, CDP_PORT: String(cdp), CORAL_CDP_PORT: String(cdp), CDP_CPU_THROTTLE: String(throttle),
     CORAL_TEST_TMUX_SOCKET: path.join(data, 'tmux.sock'), CORAL_TEST_LOG: log, CORAL_TEST_DATA_DIR: data, CORAL_TEST_BIN: bin /* the built coral, for a suite that starts a server of its own (first_run_browser) */, /* helpers/settings_guard.js restores the shard's settings exactly through this */ ...(strict ? { CORAL_TEST_STRICT: '1' } : {}) } };
 }
 
