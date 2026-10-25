@@ -228,7 +228,7 @@ function draw() {
     const held = a && body.contains(a) && !bar.node.contains(a) ? (a.dataset.artifactId || (a.classList.contains('goals-more') ? '#load-more' : a.classList.contains('team-artifacts-retry') ? '#retry' : '')) : '';
     for (const c of [...body.children]) if (c !== bar.node) c.remove();
     if (bar.node.parentElement !== body) body.prepend(bar.node);
-    const status = el('p', `goals-note team-count-line${model.error ? ' team-artifacts-error' : ''}`, statusLine());
+    const status = el('p', `goals-note team-count-line${model.error ? ' team-artifacts-error' : !model.loading && !model.items.length ? ' team-empty-line' : ''}`, statusLine());
     status.setAttribute('role', model.error ? 'alert' : 'status');
     body.append(status);
     if (model.error) body.append(btn('btn btn-small team-artifacts-retry', 'Retry', () => loadArtifacts({ append: model.items.length > 0 && !!model.cursor, keep: true })));

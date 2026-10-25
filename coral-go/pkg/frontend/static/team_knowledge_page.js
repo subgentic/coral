@@ -95,6 +95,9 @@ async function distill() {
     draw();
 }
 
+/** The tabs' one empty line: the sentence, and an optional hint under it. */
+function emptyLine(text, hint) { const e = el('div', 'team-empty'); e.append(el('p', 'team-empty-line', text)); if (hint) e.append(el('p', 'team-empty-hint', hint)); return e; }
+
 function draw() {
     const body = root && root.querySelector('.team-knowledge-body'); if (!body) return;
     const a = document.activeElement;
@@ -110,8 +113,8 @@ function draw() {
     body.append(bar);
     if (model.failed) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, model.failed), btn('btn btn-small', 'Try again', () => load())); body.append(f); }
     if (model.loading) body.append(el('p', 'goals-note', 'Loading knowledge…'));
-    else if (model.refused) body.append(el('div', 'goals-empty', 'This team’s knowledge is too large to show through Coral Hub; open it on the computer.'));
-    else if (!entries.length) { if (!model.failed) body.append(el('div', 'goals-empty', 'No knowledge yet. Distill knowledge reads the team’s work and writes what each agent learned.')); }
+    else if (model.refused) body.append(emptyLine('This team’s knowledge is too large to show through Coral Hub; open it on the computer.'));
+    else if (!entries.length) { if (!model.failed) body.append(emptyLine('No knowledge yet.', 'Distill knowledge reads the team’s work and writes what each agent learned.')); }
     else {
         const stamp = model.data.created_at, wordsWhen = whenText(stamp);
         const when = () => { const t = el('span', null, wordsWhen); const d = new Date(stamp); if (!Number.isNaN(d.getTime())) t.title = d.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }); return t; }; // relative, with the exact time on hover

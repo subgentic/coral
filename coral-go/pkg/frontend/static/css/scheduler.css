@@ -343,5 +343,5 @@ div.job-field#sched-label { margin-bottom: 6px; }
 #job-modal label.job-cleanup-option { display: flex; flex-direction: row; align-items: center; gap: 8px; }
 .sched-back { display: none; }
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
-    .sched-back { display: flex; align-items: center; min-height: var(--control-touch-height, 44px); padding: 0; margin: 0 0 4px; background: none; border: 0; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; text-align: left; }
+    .sched-back { display: flex; align-items: center; min-height: var(--control-touch-height, 44px); padding: 0; margin: 0 0 4px; background: none; border: 0; color: var(--link-text, var(--accent)); font: 500 var(--fs-md)/1.4 var(--font-sans); cursor: pointer; text-align: left; }
 }
