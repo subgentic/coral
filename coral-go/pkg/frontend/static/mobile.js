@@ -157,7 +157,7 @@ function restoreSidebarList() {
 // Moving it preserves search/filter listeners, current values, results and pagination.
 let _historyHome = null;
 function syncMobileHistoryList() {
-    const section = document.querySelector('[data-section="history"]');
+    const section = document.querySelector('[data-pane="history"]'); // the pane: its header (search, Display options) goes with its list (#7443)
     const host = document.getElementById('mobile-history-list');
     if (!section || !host) return;
     if (isMobile()) {
@@ -173,7 +173,7 @@ function syncMobileHistoryList() {
 // The Jobs list: on a phone the sidebar is not shown, so the section moves into the Jobs page (the same move as History's), above the job's detail; a wide screen puts it back (#6139).
 let _jobsHome = null;
 function syncMobileJobsList() {
-    const section = document.querySelector('[data-section="jobs"]');
+    const section = document.querySelector('[data-pane="jobs"]');
     const host = document.getElementById('mobile-jobs-list');
     if (!section || !host) return;
     if (isMobile()) {
@@ -183,6 +183,54 @@ function syncMobileJobsList() {
         const { parent, next } = _jobsHome;
         parent.insertBefore(section, next?.parentNode === parent ? next : null);
         _jobsHome = null;
+    }
+}
+
+// The Workflows list: the same move (#7471).
+let _workflowsHome = null;
+function syncMobileWorkflowsList() {
+    const section = document.querySelector('[data-pane="workflows"]');
+    const host = document.getElementById('mobile-workflows-list');
+    if (!section || !host) return;
+    if (isMobile()) {
+        if (!_workflowsHome) _workflowsHome = { parent: section.parentElement, next: section.nextSibling };
+        if (section.parentElement !== host) host.appendChild(section);
+    } else if (_workflowsHome) {
+        const { parent, next } = _workflowsHome;
+        parent.insertBefore(section, next?.parentNode === parent ? next : null);
+        _workflowsHome = null;
+    }
+}
+
+// The Analytics views: the same move (#7473).
+let _analyticsHome = null;
+function syncMobileAnalyticsList() {
+    const section = document.querySelector('[data-pane="tokens"]');
+    const host = document.getElementById('mobile-analytics-list');
+    if (!section || !host) return;
+    if (isMobile()) {
+        if (!_analyticsHome) _analyticsHome = { parent: section.parentElement, next: section.nextSibling };
+        if (section.parentElement !== host) host.appendChild(section);
+    } else if (_analyticsHome) {
+        const { parent, next } = _analyticsHome;
+        parent.insertBefore(section, next?.parentNode === parent ? next : null);
+        _analyticsHome = null;
+    }
+}
+
+// The Docs topics: the same move (#7443): on a phone the pane is the page's own list, a wide screen puts it back.
+let _docsHome = null;
+function syncMobileDocsList() {
+    const section = document.querySelector('[data-pane="docs"]');
+    const host = document.getElementById('mobile-docs-list');
+    if (!section || !host) return;
+    if (isMobile()) {
+        if (!_docsHome) _docsHome = { parent: section.parentElement, next: section.nextSibling };
+        if (section.parentElement !== host) host.appendChild(section);
+    } else if (_docsHome) {
+        const { parent, next } = _docsHome;
+        parent.insertBefore(section, next?.parentNode === parent ? next : null);
+        _docsHome = null;
     }
 }
 
@@ -437,6 +485,9 @@ export function initMobile() {
     }
     syncMobileHistoryList();
     syncMobileJobsList();
+    syncMobileDocsList();
+    syncMobileWorkflowsList();
+    syncMobileAnalyticsList();
     // Set default tab
     if (isMobile()) {
         switchMobileTab('agents');
@@ -459,6 +510,9 @@ export function initMobile() {
         if (mobile !== wasMobile) {
             syncMobileHistoryList();
             syncMobileJobsList();
+            syncMobileDocsList();
+            syncMobileWorkflowsList();
+            syncMobileAnalyticsList();
             const list = document.getElementById('mobile-agent-list');
             const welcome = document.getElementById('welcome-screen');
             if (mobile) {

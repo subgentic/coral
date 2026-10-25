@@ -1,0 +1,81 @@
+/* The Analytics tab's list of views (#7473, UI/UX's part-2 audit): the sidebar lists the views (Overview, one per table, the two per-team ones) and the page shows the one chosen, so the
+ * page is one view at a time under a 20/700 title: its name, the time range and the live mark under it. Every section of the page carries data-cview, and the page's data-view
+ * says which one is on screen (cost_dashboard.css shows only that one). The time range is in the sidebar's Display options. On a phone the list is the page and a view is the screen after it. */
+import { escapeHtml, escapeAttr } from './utils.js';
+import { isPhoneLayout } from './phone_layout.js';
+import { setText } from './dom_write.js';
+
+export const VIEWS = [
+    { key: 'overview', label: 'Overview' },
+    { key: 'provider', label: 'By provider' },
+    { key: 'model', label: 'By model' },
+    { key: 'thinking', label: 'By thinking level' },
+    { key: 'team', label: 'By team' },
+    { key: 'agent', label: 'By agent' },
+    { key: 'branch', label: 'By branch' },
+    { key: 'task', label: 'By task' },
+    { key: 'calls', label: 'Tool and API calls' },
+    { key: 'per-commit', label: 'Tokens per commit' },
+    { key: 'task-time', label: 'Task time' },
+];
+
+let current = 'overview';
+let query = '';
+
+const page = () => document.getElementById('cost-dashboard-view');
+
+function shown() {
+    const q = query.trim().toLowerCase();
+    return q ? VIEWS.filter(v => v.label.toLowerCase().includes(q)) : VIEWS;
+}
+
+/** The sidebar's list: one button per view, the open one marked. */
+export function drawViews() {
+    const list = document.getElementById('cost-nav-list');
+    if (!list) return;
+    const rows = shown();
+    list.innerHTML = rows.map(v => `<li class="session-list-item${escapeAttr(v.key === current ? ' active' : '')}"><button type="button" class="row-btn"${v.key === current ? ' aria-current="true"' : ''} data-on-click="analytics-view" data-view="${escapeAttr(v.key)}">${escapeHtml(v.label)}</button></li>`).join('')
+        || '<li class="empty-state">No view matches the search.</li>';
+}
+
+export function filterViews(text) { query = String(text || ''); drawViews(); }
+
+/** The time range as the page says it under the title ("Last 24 hours"), from the sidebar's select. */
+export function syncRangeLine() {
+    const sel = document.getElementById('cost-time-range');
+    const opt = sel && sel.options[sel.selectedIndex];
+    if (opt) setText(document.getElementById('cost-range-text'), opt.textContent);
+}
+
+/** Shows a view: the page's data-view, its title and the list's marks; on a phone it is the screen after the list. */
+export function selectView(key, { focus = false } = {}) {
+    const v = VIEWS.find(x => x.key === key) || VIEWS[0];
+    current = v.key;
+    const el = page();
+    if (el) {
+        el.dataset.view = v.key;
+        if (isPhoneLayout()) el.setAttribute('data-phone-item', ''); else el.removeAttribute('data-phone-item');
+    }
+    for (const sec of document.querySelectorAll('#cost-dashboard-view [data-cview]')) sec.hidden = sec.dataset.cview !== v.key;
+    setText(document.getElementById('cost-view-title'), v.label);
+    syncRangeLine();
+    drawViews();
+    const status = document.getElementById('cost-status');
+    if (status && focus) setText(status, `Showing ${v.label}`);
+    if (focus && isPhoneLayout()) document.getElementById('cost-view-title')?.focus({ preventScroll: true });
+}
+
+/** On a phone: back from a view to the list. */
+export function phoneBack() {
+    page()?.removeAttribute('data-phone-item');
+    drawViews();
+    document.querySelector('#cost-nav-list .row-btn[aria-current="true"], #cost-nav-list .row-btn')?.focus({ preventScroll: true });
+}
+
+/** The tab was opened: the list is drawn, the view that was open stays (a phone starts at the list). */
+export function showViews() {
+    const el = page();
+    if (el && isPhoneLayout()) el.removeAttribute('data-phone-item');
+    selectView(current);
+    if (el && isPhoneLayout()) el.removeAttribute('data-phone-item');
+}

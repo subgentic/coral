@@ -8,9 +8,33 @@ const CDP = require('chrome-remote-interface');
 const root = path.resolve(__dirname, '../../coral-go/pkg/frontend');
 const baseline = process.env.CORAL_UI_BASELINE;
 const shots = process.env.CORAL_SCREENSHOT_DIR;
+// The sidebar's shared header is a Go template called with a kind ({{ template "includes/sidebar_header" "history" }}): its body is chosen with if / else if / else / end on eq and ne of that kind.
+// This evaluates just those forms, so the page this test builds has each tab's header as the server draws it.
+function expandKind(body, kind) {
+    const out = [], stack = [];   // stack: { live, taken, parent }
+    let live = true;
+    for (const part of body.split(/({{[^}]*}})/)) {
+        const m = /^{{\s*(.*?)\s*}}$/.exec(part);
+        if (!m) { if (live) out.push(part); continue; }
+        const act = m[1];
+        let c;
+        if ((c = /^if (eq|ne) \. "([^"]+)"$/.exec(act))) { const yes = (c[1] === 'eq') === (kind === c[2]); stack.push({ taken: yes, parent: live }); live = live && yes; }
+        else if ((c = /^else if (eq|ne) \. "([^"]+)"$/.exec(act))) { const top = stack[stack.length - 1], yes = (c[1] === 'eq') === (kind === c[2]) && !top.taken; top.taken = top.taken || yes; live = top.parent && yes; }
+        else if (act === 'else') { const top = stack[stack.length - 1]; live = top.parent && !top.taken; top.taken = true; }
+        else if (act === 'end') { live = stack.pop().parent; }
+        else if (act === '.') { if (live) out.push(kind); }
+        else if (live) out.push(part);
+    }
+    return out.join('');
+}
 function template(name) {
     const old = baseline && path.join(baseline, 'templates', name);
-    return fs.readFileSync(old && fs.existsSync(old) ? old : path.join(root, 'templates', name), 'utf8')
+    let text = fs.readFileSync(old && fs.existsSync(old) ? old : path.join(root, 'templates', name), 'utf8');
+    const def = /{{\s*define "includes\/sidebar_header"\s*}}([\s\S]*?)\n{{\s*end\s*}}/.exec(text);
+    if (def) {
+        text = text.replace(def[0], '').replace(/{{\s*template "includes\/sidebar_header" "([^"]+)"\s*}}/g, (_, kind) => expandKind(def[1], kind));
+    }
+    return text
         .replace(/{{\s*template "([^"]+)" \.\s*}}/g, (_, file) => template(file))
         .replace(/{{\s*\$base\s*}}/g, '/static/')
         .replace(/{{[^}]+}}/g, '');
@@ -88,7 +112,7 @@ const fixtures = async () => {
             if(name==='agent-ui'&&innerWidth<768)window.toggleAgenticPanel(true);
         } else if(name==='workflows'){mods.workflows.showWorkflowsTab();await new Promise(r=>setTimeout(r,30));await mods.workflows.selectWorkflow(1)}
         else if(name==='docs'){await mods.docs.showDocsTab();await mods.docs.selectDoc('README')}
-        else if(name==='analytics'){await mods.cost_dashboard.showCostDashboard();mods.cost_dashboard.stopCostDashboard()}
+        else if(name==='analytics'){await mods.cost_dashboard.showCostDashboard();(await import((window.__coralStatic||'/static/')+'analytics_views.js')).selectView('overview');mods.cost_dashboard.stopCostDashboard()} // a phone's list is the page: the view is the screen after it (#7473)
         else if(name==='board')mods.message_board.selectBoardProject('coral-task-workflows');
         else if(name==='scheduler'){mods.scheduler.initScheduler();await new Promise(r=>setTimeout(r,30));await mods.scheduler.selectScheduledJob(1)}
     };
@@ -136,7 +160,7 @@ const fixtures = async () => {
                     const modal=view==='tasks'?'task-detail-modal':'settings-modal';
                     assert.ok(await ev(`(()=>{const r=document.getElementById('${modal}').querySelector('.modal-content').getBoundingClientRect();return r.width>0&&r.height>0&&r.left>=-1&&r.right<=innerWidth+1&&r.bottom<=innerHeight+1})()`),`${view} fits ${device}`);
                 }
-                const required={workspace:'.chat-bubble.assistant .message-text',tasks:'#task-detail-content',settings:'#settings-working-dir','team-settings':'.working-mode-form',board:'.mb-message-body','agent-ui':'.agent-ui-request',workflows:'.wf-step-item',scheduler:'.sched-header',docs:'#docs-content h1',analytics:'.cost-card-value'};
+                const required={workspace:'.chat-bubble.assistant .message-text',tasks:'#task-detail-content',settings:'#settings-working-dir','team-settings':'.working-mode-form',board:'.mb-message-body','agent-ui':'.agent-ui-request',workflows:'.wf-steps-table',scheduler:'.sched-header',docs:'#docs-content h1',analytics:'.cost-card-value'};
                 assert.ok(await ev(`Array.from(document.querySelectorAll('${required[view]}')).some(node=>node.getBoundingClientRect().width>0)`),`${view} renderer produced visible content`);
                 if(!baseline && view==='team-settings') {
                     assert.equal(await ev(`document.querySelector('.team-settings-actions [type=submit]').disabled`),false);

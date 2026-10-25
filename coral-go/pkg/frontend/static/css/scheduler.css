@@ -152,12 +152,27 @@ div.job-field#sched-label { margin-bottom: 6px; }
 
 .sched-header h2 {
     margin: 0;
-    font-size: var(--type-page-size);
+    font-size: 1.0625rem; /* an item's page title: 17/700 (#7443) */
+    font-weight: 700;
 }
 
-.sched-actions {
+/* The job's page fills the view, so its bar is at the foot of the screen and, on a long page, stays there; the view's padding is taken back so the page does not show under it */
+@media (min-width: 768px) and (min-height: 501px), (min-width: 951px) {
+    #scheduler-detail:has(> .item-bar) { display: flex; flex-direction: column; min-height: calc(100% - 16px); } /* less the hidden header's margin */
+}
+.scheduler-view .item-bar { margin-top: auto; bottom: -20px; margin-bottom: -20px; padding-bottom: calc(var(--space-lg) + 20px); }
+/* The page's actions are its pinned bar, primary last (#7443) */
+.item-bar {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
     display: flex;
-    gap: 6px;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: var(--space-2xl);
+    padding: var(--space-lg) 0;
+    border-top: 1px solid var(--border);
+    background: var(--bg-primary);
 }
 
 .sched-desc {
@@ -173,6 +188,8 @@ div.job-field#sched-label { margin-bottom: 6px; }
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     padding: 12px;
+    margin: 0;
+    font-family: var(--font-sans); /* a prompt is the person's writing: the product font, not the code font (#7443) */
     font-size: 0.8125rem;
     white-space: pre-wrap;
     word-break: break-word;
@@ -194,8 +211,7 @@ div.job-field#sched-label { margin-bottom: 6px; }
 
 .sched-runs-table th {
     font-size: var(--fs-base);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    font-weight: 500;
     color: var(--text-secondary);
 }
 
@@ -223,8 +239,10 @@ div.job-field#sched-label { margin-bottom: 6px; }
 }
 
 .sched-runs-section h3,
+.sched-prompt-shown h3,
 .sched-prompt-section > summary {
-    font-size: var(--fs-xl);
+    font-size: var(--fs-lg); /* a section heading: 14/600 */
+    font-weight: 600;
     margin-bottom: 8px;
 }
 
@@ -285,20 +303,19 @@ div.job-field#sched-label { margin-bottom: 6px; }
 .sched-chip { border: 1px solid var(--border); border-radius: 999px; padding: 0 8px; font-size: .75rem; color: var(--text-secondary); white-space: nowrap; }
 .sched-header { flex-wrap: wrap; gap: 8px; }
 .sched-header h2 { margin-right: auto; overflow-wrap: anywhere; min-width: 0; }
-.sched-facts { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 8px 0 12px; font-size: .875rem; }
-.sched-facts dt { color: var(--text-secondary); }
+.sched-facts { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 8px 0 12px; font-size: .8125rem; font-weight: 400; } /* labels 13/500, values 13/400 */
+.sched-facts dt { color: var(--text-secondary); font-weight: 500; }
 .sched-facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 .sched-path { font-family: var(--font-mono, monospace); font-size: .8125rem; }
 .sched-link { color: var(--accent); }
 .sched-settings { margin: 6px 0 12px; }
-.sched-settings > summary { cursor: pointer; color: var(--text-secondary); min-height: 28px; }
+.sched-settings > summary { cursor: pointer; color: var(--text-secondary); min-height: 28px; font-size: .8125rem; font-weight: 500; }
 .sched-more { position: relative; }
 .sched-more-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 5; min-width: 120px; padding: 6px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: var(--shadow-md); }
 .sched-more-menu[hidden] { display: none; }
 .sched-more-menu .btn { width: 100%; margin: 0; }
-.sched-actions .btn { margin: 0; }
+.item-bar .btn { margin: 0; } /* the bar's gap is the bar's own */
 @media (pointer: coarse), (max-width: 767px) {
-    .sched-actions { flex: 1 0 100%; }
     .sched-actions .btn, .sched-more-menu .btn { min-height: var(--control-touch-height, 44px); }
     #scheduled-jobs-list .sched-row { min-height: var(--control-touch-height, 44px); padding-inline: 0; }
     #scheduled-jobs-list { padding-inline: 0; } /* the rows start where the page heading does */
@@ -316,7 +333,6 @@ div.job-field#sched-label { margin-bottom: 6px; }
 }
 .sched-status.status-none { color: var(--text-secondary); }
 .sched-status-note { display: block; font-size: var(--fs-sm); color: var(--text-secondary); font-weight: 400; }
-.sched-empty-hint { margin: 24px 16px; color: var(--text-secondary); }
 
 /* The Jobs fixes of #7121: a run's When is the link into the run; the checkbox of an agent job sits beside its label (a phone rule had made the label a block); a phone's job has a back row to the list. */
 .sched-runs-table .row-open-btn { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }

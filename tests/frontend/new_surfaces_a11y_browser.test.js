@@ -143,6 +143,7 @@ const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
 
             console.log(`${L}: 5. the Cost by-thinking table`);
             await ev(`window.switchNavTab('tokens'); true`);
+            await ev(`import(${MOD} + 'analytics_views.js').then(m => { m.selectView('thinking'); return true; })`); // the page shows one view at a time (#7473)
             await waitFor(`document.querySelectorAll('#cost-by-thinking tbody tr').length === 2`, 'the thinking table', 8000);
             const ths = await ev(`[...document.querySelectorAll('#cost-by-thinking th')].map(t => ({ sort: t.getAttribute('aria-sort'), btn: !!t.querySelector('button.cost-sort-btn'), filter: [...t.querySelectorAll('button.cost-col-filter')].map(b => b.getAttribute('aria-label')) }))`);
             assert.ok(ths.length === 11 && ths.every(t => t.btn && ['none', 'ascending', 'descending'].includes(t.sort)), 'every column header is a sort button with aria-sort: ' + JSON.stringify(ths));
@@ -250,7 +251,7 @@ const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
             assert.deepEqual(r.fails, [], `${theme}: the sectioned dialog's list (with a problem dot) reaches contrast: ` + JSON.stringify(r.fails));
         }
         await ev(`document.querySelector('#restart-acf .acf-prompt').removeAttribute('aria-invalid'); window.hideRestartModal && window.hideRestartModal(); true`);
-        await ev(`window.switchNavTab('tokens'); true`); await waitFor(`document.querySelectorAll('#cost-by-thinking tbody tr').length === 2`, 'cost table', 8000);
+        await ev(`window.switchNavTab('tokens'); true`); await ev(`import(${MOD} + 'analytics_views.js').then(m => { m.selectView('thinking'); return true; })`); await waitFor(`document.querySelectorAll('#cost-by-thinking tbody tr').length === 2`, 'cost table', 8000);
         for (const theme of ['light', 'dark']) {
             await setTheme(ev, theme);
             const r = await auditRegion(ev, ['#cost-by-thinking'], { focus: ['#cost-by-thinking button.cost-sort-btn'] });

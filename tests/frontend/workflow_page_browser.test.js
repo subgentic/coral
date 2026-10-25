@@ -26,18 +26,18 @@ const BASE = require('./test_base').BASE;
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await ev(`window.__coralReady.startup('liveList', 'settings')`);
             await ev(`window.switchNavTab('workflows'); true`);
-            await waitFor(`document.querySelectorAll('#wf-list .wf-card').length === 1`, 'the workflow card', 8000).catch(async e => { throw new Error(e.message + ' at ' + w + ': ' + await ev(`JSON.stringify([document.getElementById('workflows-view')?.style.display, document.getElementById('workflows-view')?.innerText.slice(0, 200), location.hash])`)); });
-            await ev(`document.querySelector('#wf-list .wf-card').click(); true`);
+            await waitFor(`document.querySelectorAll('#wf-nav-list .row-btn').length === 1`, 'the workflow row', 8000).catch(async e => { throw new Error(e.message + ' at ' + w + ': ' + await ev(`JSON.stringify([document.getElementById('workflows-view')?.style.display, document.getElementById('workflows-view')?.innerText.slice(0, 200), location.hash])`)); });
+            await ev(`document.querySelector('#wf-nav-list .row-btn').click(); true`);
             await waitFor(`document.querySelectorAll('#wf-detail .wf-runs-table tbody tr').length === 3`, 'the runs', 8000);
             const at = `at ${w}px: `;
-            const page = await ev(`(() => { const t = document.getElementById('workflows-view').innerText; return { text: t, count: t.split('nightly-build').length - 1, badge: getComputedStyle(document.getElementById('wf-count-badge')).display,
-                steps: [...document.querySelectorAll('.wf-step-item')].map(e => [e.querySelector('.wf-step-index').textContent, e.querySelector('.wf-step-what')?.textContent]),
+            const page = await ev(`(() => { const t = document.getElementById('workflows-view').innerText; return { text: t, count: t.split('nightly-build').length - 1, badge: document.getElementById('wf-count-badge') === null ? 'none' : 'drawn',
+                steps: [...document.querySelectorAll('.wf-steps-table tbody tr')].map(r => [r.querySelector('.sr-only').textContent.replace(/\\D/g, ''), r.querySelector('.wf-step-what')?.textContent]),
                 head: [...document.querySelectorAll('.wf-runs-table th')].map(e => e.textContent), rows: [...document.querySelectorAll('.wf-runs-table tbody tr')].map(r => r.innerText.replace(/\\s+/g, ' ').trim()),
                 last: document.querySelector('.wf-last-failed')?.innerText.replace(/\\s+/g, ' ').trim(), wide: document.documentElement.scrollWidth > innerWidth }; })()`);
             assert.equal(page.count, 1, at + 'the name once: ' + page.text);
             assert.equal(page.badge, 'none', at + 'no count badge on a workflow page');
             assert.deepEqual(page.steps, [['1', 'npm ci'], ['2', 'npm test -- --ci']], at + 'steps from 1 with their commands');
-            assert.deepEqual(page.head, ['When', 'Result', 'Took', 'Started by'], at);
+            assert.deepEqual(page.head, ['Started', 'Result', 'Duration', 'Trigger'], at);
             assert.match(page.rows[0], /Failed: step 2 \(Test\).*exit code 3.*1m 40s/, at + page.rows[0]);
             assert.match(page.rows[1], /Passed.*10s?.*manual/, at + page.rows[1]);
             assert.match(page.rows[2], /Passed.*under 1s.*api/, at + 'a run under a second says so, not 0s: ' + page.rows[2]);

@@ -127,12 +127,6 @@ export function filterLiveAgents(value) {
     redrawLiveList();
 }
 
-export function focusAgentSearch() {
-    if (document.querySelector('.layout')?.classList.contains('sidebar-collapsed')) window.toggleSidebarRail?.();
-    const input = document.getElementById('agent-search-input');
-    if (input) { input.focus(); input.select(); }
-}
-
 /** Enter opens the first match; Escape clears the search. */
 export function agentSearchKey(e) {
     if (e.key === 'Escape') {

@@ -13,7 +13,7 @@ const { setTheme } = require('./helpers/contrast');
     const clear = async () => {
         await ev(`document.querySelector('.hf-clear-btn').click();true`);
         await waitFor(restored,'Clear restores history list');
-        assert.ok(await ev(`!document.getElementById('history-search').value && !new URL(location.href).searchParams.get('q') && document.querySelector('[data-chat-type="all"]').classList.contains('active') && document.getElementById('hf-active-count').style.display==='none'`),'query, chat type and badge reset');
+        assert.ok(await ev(`!document.getElementById('history-search').value && !new URL(location.href).searchParams.get('q') && document.querySelector('[data-chat-type="all"]').classList.contains('active') && document.getElementById('hf-active-count').hidden`),'query, chat type and badge reset');
     };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD});
@@ -36,7 +36,7 @@ const { setTheme } = require('./helpers/contrast');
             await Emulation.setDeviceMetricsOverride({width,height:900,deviceScaleFactor:1,mobile:width<=767});
             await Page.navigate({url:BASE+'/chats'});await Page.loadEventFired();await install();await ev(`window.__coralReady.then(()=>true)`);await setTheme(ev,theme);
             await waitFor(`document.getElementById('history-sessions-list').checkVisibility() && document.getElementById('history-sessions-list').textContent.includes('Restored history row')`,'initial history list');
-            await ev(`document.getElementById('hf-adv-toggle').click();document.querySelector('[data-chat-type="agent"]').click();true`);
+            await ev(`(() => { const b = document.querySelector('[data-pane="history"] [data-display-button]'); if (b.getAttribute('aria-expanded') !== 'true') b.click(); })();document.querySelector('[data-chat-type="agent"]').click();true`);
             await input('needle');await waitFor(`document.querySelector('.chat-search-hit')?.checkVisibility()`,'search result');await shot(`${width}-${theme}-search`);
             // The exact reported steps, using the actual Clear filters button.
             await clear();await waitFor(`document.getElementById('history-sessions-list').textContent.includes('Restored history row')`,'restored row');await shot(`${width}-${theme}-cleared`);

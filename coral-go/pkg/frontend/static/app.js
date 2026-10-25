@@ -23,7 +23,7 @@ import { deserializeFromUrl, urlSearchFor } from './search_filters.js';
 import { connectCoralWs } from './websocket.js';
 import { addMacro, hideMacroModal, restartSession, hideRestartModal, confirmRestart, editGoal, refreshGoal, requestGoal } from './controls.js';
 import { selectLiveSession, selectHistorySession, editAndResubmit, renameAgent, setAgentIcon } from './sessions.js';
-import { KILL_LOG_NOTE_MANY, toggleGroupCollapse, killGroup, killBoard, toggleTeamSleep, toggleAgentSleep, toggleAgentArchive, toggleArchivedSection, shareAgentTeam, saveTeamFromSidebar, killSessionDirect, showInfoDirect, attachDirect, restartDirect, showConfirmModal, hideConfirmModal, showPromptModal, hidePromptModal, showAlertModal, hideAlertModal, copyFolderPath, moveGroupUp, moveGroupDown, toggleGroupByTeam, expandSleepingGroup, setBoardAccentColor, moveSessionUp, moveSessionDown, showTeamTokenUsage, distillTeamKnowledge, toggleSessionSummary, applySessionSummaryPref, filterLiveAgents, focusAgentSearch, agentSearchKey, toggleShowServer, toggleShowBranches, toggleShowProvider, toggleShowModel, toggleShowThinking, toggleGroupByServer, groupHeaderKey, teamHeaderKey } from './render.js';
+import { KILL_LOG_NOTE_MANY, toggleGroupCollapse, killGroup, killBoard, toggleTeamSleep, toggleAgentSleep, toggleAgentArchive, toggleArchivedSection, shareAgentTeam, saveTeamFromSidebar, killSessionDirect, showInfoDirect, attachDirect, restartDirect, showConfirmModal, hideConfirmModal, showPromptModal, hidePromptModal, showAlertModal, hideAlertModal, copyFolderPath, moveGroupUp, moveGroupDown, toggleGroupByTeam, expandSleepingGroup, setBoardAccentColor, moveSessionUp, moveSessionDown, showTeamTokenUsage, distillTeamKnowledge, toggleSessionSummary, applySessionSummaryPref, filterLiveAgents, agentSearchKey, toggleShowServer, toggleShowBranches, toggleShowProvider, toggleShowModel, toggleShowThinking, toggleGroupByServer, groupHeaderKey, teamHeaderKey } from './render.js';
 import './capture.js';
 import { loadSettings } from './settings_core.js';
 import { initEditions } from './editions.js';
@@ -33,7 +33,7 @@ import { attachAllDialogFocus } from './dialog_focus.js';
 import './board_choice.js'; // the duplicate-name choice used by the lazy modals.js (#3538): loaded at startup so a launch never fails on it
 import './dialog_focus.js'; // focus into a dialog and back to its opener (accessibility pass); used by lazy modals.js
 import { toggleBrowser, browserNavigateTo, browserNavigateUp, browserSelectRecent, browserUse } from './browser.js';
-import { toggleAgenticPanel, toggleSidebarRail } from './sidebar.js';
+import { toggleAgenticPanel, toggleSidebarRail, showSidebarPane, focusSidebarSearch } from './sidebar.js';
 import { connectTerminalWs, disconnectTerminalWs } from './xterm_renderer.js';
 import { saveNotes, generateSummary, toggleNotesEdit, cancelNotesEdit, switchHistoryTab } from './notes.js';
 import { addTagToSession, removeTagFromSession, showTagDropdown, hideTagDropdown, createTag } from './tags.js';
@@ -71,6 +71,7 @@ import { initHubIndicator } from './hub_indicator.js';
 import './servers_tab.js'; // Servers tab: chip clicks and deep links (#3070)
 import './inbox_tab.js'; // Inbox tab (hub only): its visibility and badge (#4718)
 import { toggleAllGroups } from './group_collapse.js'; // the list header's one Collapse / Expand toggle
+import { toggleAllGroupFolds, refreshGroupTable } from './sidebar_groups.js'; // the other tabs' groups, and the table a group's name opens (#7443)
 import { toggleDisplayPanel, displayPanelKey } from './display_panel.js'; // the Display expander
 import { registerActions, tokenOf } from './actions.js'; // delegated data-on-* handlers, replacing inline ones (#3645)
 import { markReady } from './ready.js';
@@ -194,7 +195,8 @@ registerActions({
 // the empty state and the mobile tabs. A literal argument comes from data-arg and must be one
 // the markup uses.
 registerActions({
-    'docs-topics': () => { importOnce('./docs.js').then(m => m.openTopics()).catch(() => {}); }, // the Topics button is in the Docs page from the start (a census sees it before docs.js loads): registered here, the sheet is in docs.js (#7162)
+    'docs-search-filter': el => { const v = el.value; importOnce('./docs.js').then(m => m.filterDocs(v)).catch(() => {}); }, // the Docs sidebar's search box is in the page from the start; docs.js loads with the Docs tab
+    'docs-phone-back': () => { importOnce('./docs.js').then(m => m.docsPhoneBack()).catch(() => {}); },
     'docs-copy-agent-line': () => { importOnce('./docs.js').then(m => m.copyDocsLine()).catch(() => {}); }, // the Docs page's button, in the page from the start; docs.js loads with the Docs tab
     'm-close-top-bar-settings-then-check-for-updates': () => { window.__coral.closeTopBarSettings(); window.checkForUpdates(true); },
     'm-close-top-bar-settings-then-show-saved': () => { window.__coral.closeTopBarSettings(); importOnce('./saved.js').then(m => m.openSavedAll()).catch(() => {}); },
@@ -222,12 +224,12 @@ registerActions({
 // The sidebar's own controls (#3645): rail, search, launch, display toggles, the Jobs subtabs.
 registerActions({
     'sidebar-rail-toggle': () => window.toggleSidebarRail(),
-    'agent-search-focus': () => window.focusAgentSearch(),
+    'sidebar-search-focus': () => focusSidebarSearch(),
     'launch-show': () => window.showLaunchModal(),
     'agent-search-filter': el => window.filterLiveAgents(el.value),
     'agent-search-key': (el, event) => window.agentSearchKey(event),
     'toggle-session-summary': () => window.toggleSessionSummary(),
-    'groups-toggle-all': () => toggleAllGroups(),
+    'groups-toggle-all': el => { const kind = el.closest('.sidebar-pane')?.dataset.pane; if (kind && kind !== 'agents') toggleAllGroupFolds(kind); else toggleAllGroups(); }, // each tab's header folds its own groups (#7443)
     'display-panel-toggle': el => toggleDisplayPanel(el),
     'display-panel-key': (el, event) => displayPanelKey(event),
     'toggle-show-server': () => window.toggleShowServer(),
@@ -277,7 +279,11 @@ registerActions({
 // The Workflows view's own buttons and create dialog (#3645); its generated markup's actions
 // register with its module.
 registerActions({
-    'wf-back': () => workflowsBackToList(),
+    'analytics-search-filter': el => { const v = el.value; importOnce('./analytics_views.js').then(m => m.filterViews(v)).catch(() => {}); }, // the Analytics sidebar's search box is in the page from the start; the views module loads with the tab
+    'analytics-view': el => { const key = el.dataset.view; importOnce('./analytics_views.js').then(m => m.selectView(key, { focus: true })).catch(() => {}); },
+    'analytics-phone-back': () => { importOnce('./analytics_views.js').then(m => m.phoneBack()).catch(() => {}); },
+    'workflows-search-filter': el => { const v = el.value; importOnce('./workflows.js').then(m => m.filterWorkflows(v)).catch(() => {}); }, // the Workflows sidebar's search box is in the page from the start; workflows.js loads with the tab
+    'wf-phone-back': () => { importOnce('./workflows.js').then(m => m.workflowsPhoneBack()).catch(() => {}); },
     'wf-build-agent': () => launchWorkflowAgent(),
     'wf-create': () => showWorkflowCreateModal(),
     'job-create-workflow': () => { hideJobModal(); showWorkflowCreateModal(); }, // New job with no workflow to run
@@ -460,7 +466,7 @@ function switchNavTab(tab, opts = {}) {
     }
 
     // Toggle sidebar visibility — full-width views hide the sidebar
-    const fullWidthTabs = new Set(['tokens', 'workflows', 'servers', 'hub-inbox', 'artifacts']);
+    const fullWidthTabs = new Set(['servers', 'hub-inbox', 'artifacts']); // Workflows and Analytics have their sidebars (#7471, #7473)
     const layout = document.querySelector('.layout');
     if (layout) layout.classList.toggle('sidebar-hidden', fullWidthTabs.has(tab));
 
@@ -470,25 +476,14 @@ function switchNavTab(tab, opts = {}) {
     const activeTab = document.getElementById(`nav-tab-${tab}`);
     if (activeTab) { activeTab.classList.add('active'); activeTab.setAttribute('aria-current', 'page'); }
 
-    // Show/hide sidebar sections based on tab
-    const liveSection = document.querySelector('[data-section="live-sessions"]');
-    const historySection = document.querySelector('[data-section="history"]');
-    const jobsSection = document.querySelector('[data-section="jobs"]');
-    const docsSection = document.querySelector('[data-section="docs"]');
-    const sidebarFooter = document.querySelector('.sidebar-footer');
-    const sidebarHeader = document.querySelector('.sidebar-header');
-
-    if (liveSection) liveSection.style.display = tab === 'agents' ? '' : 'none';
-    if (jobsSection) jobsSection.style.display = tab === 'jobs' ? '' : 'none';
-    if (historySection) historySection.style.display = tab === 'history' ? '' : 'none';
-    if (docsSection) docsSection.style.display = tab === 'docs' ? '' : 'none';
-    if (sidebarFooter) sidebarFooter.style.display = tab === 'agents' ? '' : 'none';
-    if (sidebarHeader) sidebarHeader.style.display = tab === 'agents' ? '' : 'none';
+    // The sidebar shows the pane of the tab (its header, list and pinned action: sidebar.js)
+    showSidebarPane(tab);
 
     // Switch main view based on tab
     if (tab === 'board') {
         showMessageBoardProjects();
     } else if (tab === 'jobs') {
+        document.getElementById('scheduler-view')?.removeAttribute('data-phone-item'); // a phone opens Jobs on its list
         showView('scheduler-view');
     } else if (tab === 'workflows') {
         showWhenLoaded(loadWorkflows, 'showWorkflowsTab');
@@ -529,6 +524,8 @@ function switchNavTab(tab, opts = {}) {
             showView('welcome-screen');
         }
     }
+    // A tab with groups that shows its empty page opens on its first group's table (sidebar_groups.js)
+    if (tab === 'jobs' || tab === 'history') refreshGroupTable(tab);
 }
 
 /** The route a top tab shows: the Agents tab its open team or selected agent (on a desktop, where
@@ -589,7 +586,7 @@ document.addEventListener('focusout', e => {
 Object.assign(window, {
     toggleSidebarKebab, closeSidebarKebabs,
     // render (sidebar actions)
-    filterLiveAgents, focusAgentSearch, agentSearchKey, toggleSessionSummary, applySessionSummaryPref,
+    filterLiveAgents, agentSearchKey, toggleSessionSummary, applySessionSummaryPref,
     toggleShowServer, toggleGroupByServer, toggleShowBranches, toggleShowProvider, toggleShowModel, toggleShowThinking,
     toggleGroupCollapse, groupHeaderKey, teamHeaderKey, killGroup, moveGroupUp, moveGroupDown,
     copyFolderPath, killBoard, setBoardAccentColor, resetTeam,

@@ -3,157 +3,36 @@
    ============================================================ */
 
 .workflows-view {
-    padding: 20px 24px;
     overflow-y: auto;
     height: 100%;
 }
 
-/* ── Header ───────────────────────────────────────────────── */
+/* The page: it fills the view, so a workflow's or a run's pinned bar is at the foot of the screen (the padding is taken back below so nothing shows under the bar) */
+.wf-page { display: flex; flex-direction: column; min-height: 100%; box-sizing: border-box; padding: 20px 24px; }
+#wf-detail-container:not([style*="none"]), #wf-run-detail-container:not([style*="none"]), .wf-list-container:not([style*="none"]) { flex: 1; display: flex; flex-direction: column; }
+#wf-detail, #wf-run-detail { flex: 1; display: flex; flex-direction: column; }
+#wf-detail > *, #wf-run-detail > * { flex-shrink: 0; } /* a section keeps its height: a column that shrank them would let their content spill under the bar */
+.wf-page .item-bar { margin-top: auto; bottom: -20px; margin-bottom: -20px; padding-bottom: calc(var(--space-lg) + 20px); }
+.wf-page > .wf-list-container > .empty-pane { padding: var(--space-lg) 0; }
+.wf-empty-actions { margin-top: var(--space-md); }
+.wf-empty-actions .btn { display: inline-flex; align-items: center; gap: 6px; margin: 0; }
 
-.wf-header {
-    display: flex;
-    flex-wrap: wrap; /* #4344: at large text the title and its buttons wrap instead of the buttons running off the right edge */
-    gap: 8px;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 16px;
-}
-
-.wf-header-left {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.wf-header h2 {
-    margin: 0;
-    font-size: var(--type-page-size);
-}
-
-.wf-count-badge:empty { display: none; } /* no count, no badge: an empty pill after "Workflows" says nothing */
-.wf-count-badge {
+/* An item's page: its link back, its name at 17/700 and one facts line under it (#7471) */
+.wf-item-title { margin: 0; font-size: 1.0625rem; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
+.wf-facts-line { margin-bottom: var(--space-lg); overflow-wrap: anywhere; }
+.wf-desc { margin: 0 0 var(--space-lg); font-size: 0.8125rem; color: var(--text-secondary); }
+.wf-phone-back { display: none; }
+/* The sidebar's rows: the workflow's name, and its steps and last run under it */
+.wf-nav-row .row-btn { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.wf-nav-name { display: block; font-size: var(--fs-md); font-weight: 600; overflow-wrap: anywhere; }
+.wf-nav-meta { display: block; font-size: var(--fs-base); font-weight: 400; color: var(--text-secondary); overflow-wrap: anywhere; }
+.group-table-cell-btn { margin: 0; }/* no count {
     font-size: 0.6875rem;
     background: var(--bg-tertiary);
     color: var(--text-secondary);
     padding: 2px 8px;
     border-radius: var(--radius-ml);
-}
-
-.wf-header-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-}
-
-/* ── Empty state ──────────────────────────────────────────── */
-
-.wf-empty {
-    text-align: center;
-    padding: 60px 20px;
-    color: var(--text-secondary);
-}
-
-.wf-empty-icon {
-    font-size: 3rem;
-    opacity: 0.3;
-    margin-bottom: 12px;
-}
-
-.wf-empty p {
-    margin: 8px 0 4px;
-    font-size: 0.9375rem;
-    color: var(--text-primary);
-}
-
-.wf-empty-hint {
-    font-size: 0.8125rem;
-}
-
-/* ── Workflow list ────────────────────────────────────────── */
-
-.wf-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-/* Run on a card (#7219): beside the card, not inside it; the card keeps room for it */
-.wf-card-wrap { position: relative; }
-.wf-card-wrap > .wf-card { padding-right: calc(4.5rem + 20px); } /* rem: the room grows with the text size, as the button does */
-.wf-card-wrap .wf-card-top { flex-wrap: wrap; gap: 4px 8px; } /* the name and the badges wrap in the room Run leaves (large text) instead of running under it */
-.wf-card-wrap .wf-card-badges { flex-wrap: wrap; }
-.wf-card-run { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); margin: 0; display: inline-flex; align-items: center; gap: 4px; min-height: var(--control-touch-height, 44px); }
-.wf-card-run .material-icons { font-size: 0.875rem; }
-
-.wf-card {
-    background: var(--bg-secondary);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: 14px 16px;
-    cursor: pointer;
-    transition: border-color 0.15s, background 0.15s;
-}
-
-.wf-card:hover {
-    border-color: var(--accent);
-    background: var(--bg-tertiary);
-}
-
-.wf-card-top {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 6px;
-}
-
-.wf-card-name {
-    font-weight: 600;
-    font-size: var(--fs-lg);
-    color: var(--text-primary);
-}
-
-.wf-card-badges {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-}
-
-.wf-badge {
-    font-size: 0.6875rem;
-    padding: 2px 8px;
-    border-radius: var(--radius-ml);
-    font-weight: 500;
-}
-
-.wf-badge-disabled {
-    background: rgba(var(--fx-slate-rgb), 0.15);
-    color: var(--text-secondary);
-}
-
-.wf-badge-steps {
-    background: var(--bg-tertiary);
-    color: var(--text-secondary);
-}
-
-.wf-card-desc {
-    font-size: var(--fs-lg);
-    color: var(--text-secondary);
-    margin-bottom: 8px;
-}
-
-.wf-card-footer {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    font-size: 0.75rem;
-    color: var(--text-muted);
-}
-
-.wf-last-run-status {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-}
+}/* Run on a card (#7219): beside the card { position: relative; }/* rem: the room grows with the text size { flex-wrap: wrap; gap: 4px 8px; }
 
 .wf-status-dot {
     width: 8px;
@@ -173,45 +52,10 @@
     50% { opacity: 0.4; }
 }
 
-/* ── Workflow detail ──────────────────────────────────────── */
-
-.wf-detail-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 16px;
-    flex-wrap: wrap;
-    gap: var(--space-lg);
-}
-
-.wf-detail-header > div:first-child { flex: 1 1 240px; min-width: 0; overflow-wrap: anywhere; }
-
 .wf-detail-actions {
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-md);
-}
-
-.wf-detail-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 16px;
-    font-size: var(--fs-base);
-    color: var(--text-secondary);
-    margin-bottom: 16px;
-    padding-bottom: 12px;
-    border-bottom: 1px solid var(--border);
-}
-
-.wf-detail-meta span {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-
-.wf-detail-meta .material-icons {
-    font-size: var(--icon-inline-size);
-    color: var(--text-muted);
 }
 
 /* ── Steps list ───────────────────────────────────────────── */
@@ -221,52 +65,14 @@
 }
 
 .wf-steps-section h3 {
-    font-size: var(--fs-xl);
-    margin: 0 0 8px;
-    color: var(--text-secondary);
-}
-
-.wf-step-list {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.wf-step-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 12px;
-    background: var(--bg-tertiary);
-    border-radius: var(--radius-md);
-    font-size: 0.8125rem;
-}
-
-.wf-step-index {
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.6875rem;
+    font-size: var(--fs-lg); /* a section heading: 14/600 */
     font-weight: 600;
-    color: var(--text-secondary);
-    flex-shrink: 0;
-}
-
-.wf-step-name {
-    font-weight: 500;
+    margin: 0 0 8px;
     color: var(--text-primary);
 }
-
-.wf-step-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
-.wf-step-what { font-size: 0.75rem; color: var(--text-secondary); white-space: pre-wrap; overflow-wrap: anywhere; background: none; padding: 0; }
-.wf-step-item { align-items: flex-start; }
+.wf-step-what { font-size: 0.8125rem; color: var(--text-primary); white-space: pre-wrap; overflow-wrap: anywhere; background: none; padding: 0; }
 .wf-run-reason { font-size: 0.75rem; color: var(--text-secondary); overflow-wrap: anywhere; }
-.wf-last-failed { margin: 6px 0 0; font-size: 0.8125rem; color: var(--error-text); overflow-wrap: anywhere; }
+.wf-last-failed { margin: 6px 0 var(--space-xl); font-size: 0.8125rem; color: var(--error-text); overflow-wrap: anywhere; }
 .wf-last-failed button { background: none; border: 0; padding: 0; font: inherit; color: var(--accent); text-decoration: underline; cursor: pointer; }
 @media (max-width: 768px) { .wf-last-failed button { min-height: var(--control-touch-height, 44px); } }
 
@@ -282,17 +88,19 @@
 /* ── Runs table ───────────────────────────────────────────── */
 
 .wf-runs-section h3 {
-    font-size: var(--fs-xl);
+    font-size: var(--fs-lg);
+    font-weight: 600;
     margin: 0 0 8px;
-    color: var(--text-secondary);
+    color: var(--text-primary);
 }
 
-.wf-runs-table {
+.wf-steps-table, .wf-runs-table {
     width: 100%;
     border-collapse: collapse;
     font-size: 0.8125rem;
 }
 
+.wf-steps-table th, .wf-steps-table td,
 .wf-runs-table th,
 .wf-runs-table td {
     padding: 8px 10px;
@@ -300,8 +108,9 @@
     border-bottom: 1px solid var(--border);
 }
 
+.wf-steps-table th,
 .wf-runs-table th {
-    font-weight: 600;
+    font-weight: 500; /* a table's header is 12/500 */
     color: var(--text-secondary);
     font-size: 0.75rem;
 }
@@ -349,20 +158,7 @@
     white-space: nowrap;
 }
 
-/* ── Run detail ───────────────────────────────────────────── */
-
-.wf-run-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 16px;
-}
-
-.wf-run-title {
-    font-size: var(--fs-lg);
-    font-weight: 600;
-    margin: 0;
-}
+.wf-run-title { margin-bottom: var(--space-lg); } /* the size is the item title's (.wf-item-title) */
 
 .wf-run-meta {
     display: flex;
@@ -780,14 +576,7 @@
 .wf-status-badge.running { background: rgba(var(--accent-rgb), 0.15); color: var(--accent); }
 .wf-status-badge.failed { background: rgba(var(--fx-red-rgb), 0.15); color: var(--error-text); }
 .wf-status-badge.killed { background: rgba(var(--fx-amber-rgb), 0.15); color: var(--warning); }
-.wf-status-badge.pending { background: rgba(var(--fx-slate-rgb), 0.15); color: var(--text-secondary); }
-
-/* One short line each about the two ways to make a workflow and what starts one (#6988): muted text above the list, never hover-only */
-.wf-hints { margin: 0 0 12px; }
-.wf-hints > summary { color: var(--text-secondary); }
-.wf-hints[open] { display: flex; flex-direction: column; gap: 2px; }
-.wf-hints p { margin: 0; font-size: var(--fs-md); line-height: 1.45; color: var(--text-secondary); }
-.wf-hints strong { color: var(--text-primary); font-weight: 600; }
+.wf-status-badge.pending { background: rgba(var(--fx-slate-rgb), 0.15); color: var(--text-secondary); }/* One short line each about the two ways to make a workflow and what starts one (#6988): muted text above the list { margin: 0 0 12px; }
 /* The workflow pages (#7156): a closed step shows the first line of its output, the file chips are behind Files, Delete is behind More, and on a phone the steps come before the meta line. */
 .wf-run-step-peek { color: var(--text-secondary); font-family: var(--font-mono); font-size: var(--fs-base); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1 1 auto; margin-left: 6px; }
 .wf-run-step-output-toggle[aria-expanded="true"] .wf-run-step-peek { display: none; }
@@ -800,8 +589,20 @@
 .wf-more-menu[hidden] { display: none; }
 .wf-more-menu .btn { width: 100%; margin: 0; }
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
-    #wf-detail { display: flex; flex-direction: column; }
-    #wf-detail .wf-detail-meta { order: 3; }
-    #wf-detail .wf-runs-section { order: 4; }
     .wf-more-menu .btn, .wf-more-btn, .wf-step-files-more > summary { min-height: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); display: flex; align-items: center; }
+}
+
+/* Workflows on a phone (#7471): the pane is the page's list; a workflow or a run is the screen after it, with a way back to the list */
+#mobile-workflows-list { display: none; }
+@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
+    #mobile-workflows-list { display: block; }
+    #workflows-view:not([data-phone-item]) .wf-page { display: none; }
+    #workflows-view[data-phone-item] #mobile-workflows-list { display: none; }
+    #workflows-view[data-phone-empty]:not([data-phone-item]) .wf-page { display: flex; }
+    #workflows-view .wf-phone-back { display: inline-flex; align-items: center; min-height: var(--control-touch-height, 44px); }
+    #wf-back-btn { display: none; } /* a phone has its own back, to the list */
+    #mobile-workflows-list .sidebar-hide-btn { display: none; } /* the page is the whole screen: there is no column to hide */
+    #mobile-workflows-list .sidebar-header { padding: 12px; }
+    .wf-page { padding: 12px; }
+    .wf-page .item-bar { position: static; margin-bottom: 0; padding-bottom: var(--space-lg); } /* in the flow, after the page's content: a sticky bar pinned to a container that is not the screen would land over a long page */
 }

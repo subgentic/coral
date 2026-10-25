@@ -9,6 +9,9 @@ import { emptyState } from './dom_write.js';
 import { pollEvery } from './overload.js';
 import { keyLabel } from './server_base.js';
 import { formatTokens, formatDuration, formatCost } from './format.js';
+import { importOnce } from './import_once.js';
+const { showViews, syncRangeLine } = await importOnce('./analytics_views.js'); // the sidebar's list of views and the page's title (#7473)
+const { showSpend } = await importOnce('./analytics_spend.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried
 
 // What an empty table says: where the numbers come from and what to try (#6975), not just that there are none.
 const NO_DATA = 'No data in this range yet. It appears once an agent has used tokens; try a longer range.';
@@ -411,6 +414,7 @@ function _watchScrollCues() {
 
 export async function showCostDashboard() {
     showView('cost-dashboard-view');
+    showViews();
     _watchScrollCues();
     await _refreshCostDashboard();
     await _refreshCallMetrics();
@@ -485,6 +489,7 @@ export async function _refreshCostDashboard() {
 
     // Flash live indicator
     _flashLiveIndicator();
+    showSpend(document.getElementById('cost-spend'), period, document.getElementById('cost-task-time')); // tokens per commit and task time, one team (#7526, #7530): its own read, its own errors
 
     try {
         const [summaryResp, taskResp, tsResp, teamResp, branchResp] = await Promise.all([
@@ -599,6 +604,7 @@ export async function _refreshCostDashboard() {
 }
 
 export function _costTimeRangeChanged() {
+    syncRangeLine();
     _refreshCostDashboard();
 }
 

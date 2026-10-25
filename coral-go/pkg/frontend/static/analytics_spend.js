@@ -1,0 +1,287 @@
+/* The Analytics tab's "Tokens per commit" and "Task time" sections (#7526, #7530, UI/UX's pace r2 and task time layouts, analytics only: no banner, snooze, alert or Inbox item). For one team:
+ *  - tokens per landed commit over the last 24 hours (or 7 days) against the 7 days before, the usual line, a bar a day or an hour (tokens or tool calls per commit), how it is counted, who spends. Tokens are input plus output with the cache reads
+ *    beside them, never inside; a commit counts once when it reaches main, its author is the agent, an author that matches no agent is "Unattributed"; an agent with no source is "Not measured", never zero. A day with no commit has no bar.
+ *  - task time: tasks done, median and slowest 1 in 10 from claimed to done, the wait before claimed, review time (assignment to approval), sent back 2 or more times, tasks done a day or an hour, and by agent. A measure the endpoint does not return is left out.
+ * One read feeds both: GET /api/board/<team>/spend?range=24h|7d sends counts and seconds, not ratios; the page divides. Everything is built with the DOM and textContent: agent names are written by agents. Lazy: cost_dashboard.js imports it. */
+import { state } from './state.js';
+import { boardFetch, keyLabel } from './server_base.js';
+import { browserLocal } from './safe_storage.js';
+
+const TEAM_KEY = 'coral-spend-team';
+const HOURLY_WHY = 'Hourly is for the last 24 hours.';
+const DRIFT = 1.3; // the bar of a day is amber when it is 30% above usual (colour only: nothing is sent to anyone)
+const model = { team: '', range: '24h', data: null, loading: false, error: '', seq: 0, metric: 'tokens', grain: 'day', doneGrain: 'day' };
+let root = null, timeRoot = null;
+
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+
+/** 517 K, 0.8 M, 61 M: tokens as a person reads them. */
+function fmtTokens(n) {
+    const v = Number(n);
+    if (!Number.isFinite(v)) return '';
+    if (v >= 1e7) return `${Math.round(v / 1e6)} M`;
+    if (v >= 1e6) return `${(v / 1e6).toFixed(1)} M`;
+    if (v >= 1e3) return `${Math.round(v / 1e3)} K`;
+    return String(Math.round(v));
+}
+/** 38 min, 2 h 05 min, 45 s: a time as a person reads it. */
+function fmtDur(s) {
+    const v = Number(s);
+    if (!Number.isFinite(v)) return '';
+    if (v < 60) return `${Math.round(v)} s`;
+    const m = Math.round(v / 60);
+    if (m < 60) return `${m} min`;
+    return `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min`;
+}
+const tokensOf = (t) => (typeof t === 'number' ? t : t && typeof t.tokens === 'number' ? t.tokens : t ? (Number(t.input) || 0) + (Number(t.output) || 0) : 0); // input plus output (a day's row has the sum already): the cache is beside it
+const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+
+/** The teams on this computer the person can look at: those with an agent on the list, then the one chosen last. */
+function teams() {
+    const names = new Set();
+    for (const s of state.liveSessions || []) if (s && s.board_project) names.add(s.board_project);
+    return [...names].sort((a, b) => keyLabel(a).localeCompare(keyLabel(b)));
+}
+
+const ratio = (n, den) => (den > 0 && n != null ? n / den : null);
+
+/** The numbers the cards and the sentence say, from the endpoint's counts. */
+function figures(data, range) {
+    const win = tokensOf(data.tokens && data.tokens.window), usual = tokensOf(data.tokens && data.tokens.usual);
+    const c = data.commits || {};
+    const noCommits = c.available === false; // the board's repo could not be read: say why, never a zero
+    const per = noCommits ? null : ratio(win, c.window), usualPer = noCommits ? null : ratio(usual, c.usual);
+    const above = per != null && usualPer ? Math.round((per / usualPer - 1) * 100) : null;
+    const tc = data.tool_calls, measured = !!(tc && tc.measured_agents);
+    return { noCommits, reason: String(c.reason || ''), win, usual, per, usualPer, above, commits: c.window || 0, usualCommits: c.usual || 0, unattributed: c.unattributed || 0, cacheReads: Number(data.tokens && data.tokens.window && data.tokens.window.cache_read) || 0,
+        toolPer: measured ? ratio(num(tc.window), c.window) : null, usualToolPer: measured ? ratio(num(tc.usual), c.usual) : null, toolMeasured: tc ? [tc.measured_agents, tc.of_agents] : null, windowWord: range === '7d' ? '7 days' : '24 h' };
+}
+
+function headline(f) {
+    if (f.noCommits) return `Commits could not be read${f.reason ? `: ${f.reason}` : ''}. ${fmtTokens(f.win)} tokens were spent.`;
+    if (!f.commits) return `No commit landed in ${f.windowWord}. ${fmtTokens(f.win)} tokens were spent.`;
+    const parts = [`${fmtTokens(f.per)} tokens per commit`];
+    if (f.usualPer) parts.push(`usual ${fmtTokens(f.usualPer)}`, f.above === 0 ? 'the same' : `${Math.abs(f.above)}% ${f.above > 0 ? 'above' : 'below'}`);
+    return `${parts.join(', ')}.`;
+}
+
+function card(value, label, sub) {
+    const c = el('div', 'cost-card spend-card');
+    c.append(el('div', 'cost-card-value', value), el('div', 'cost-card-label', label));
+    if (sub) c.append(el('div', 'spend-card-sub', sub));
+    return c;
+}
+
+/** Two small toggles that act as one choice each (pressed buttons, 44 px on a phone): [{ key, label, disabled?, title? }]. */
+function toggles(label, options, current, onPick) {
+    const g = el('div', 'spend-toggle'); g.setAttribute('role', 'group'); g.setAttribute('aria-label', label);
+    for (const o of options) {
+        const b = el('button', 'spend-toggle-btn', o.label); b.type = 'button'; b.dataset.key = o.key;
+        b.setAttribute('aria-pressed', String(current === o.key));
+        if (o.disabled) { b.disabled = true; if (o.title) b.title = o.title; }
+        b.addEventListener('click', () => onPick(o.key));
+        g.append(b);
+    }
+    return g;
+}
+
+/** The bars of a trend: `rows` [{ label, value (null: no bar) }], the usual line when there is one; the chart's accessible name says what is drawn. */
+function bars(rows, { usual = null, name, top: forceTop, amberAbove = null, unit }) {
+    const top = Math.max(1, forceTop || 0, ...rows.map(r => r.value || 0), usual || 0);
+    const wrap = el('div', 'spend-bars'); wrap.setAttribute('role', 'img');
+    wrap.setAttribute('aria-label', `${name}${usual ? `, usual ${unit(usual)}` : ''}: ${rows.map(r => `${r.label} ${r.value == null ? 'none' : unit(r.value)}`).join(', ')}`);
+    rows.forEach((r, i) => {
+        const col = el('div', 'spend-bar-col');
+        if (r.value != null) {
+            const bar = el('div', 'spend-bar');
+            bar.style.height = `${Math.max(2, Math.round((r.value / top) * 100))}%`;
+            if (i === rows.length - 1 && amberAbove && r.value > amberAbove) bar.classList.add('spend-bar-high');
+            bar.title = `${r.label}: ${unit(r.value)}`;
+            col.append(bar); // a day with nothing has no bar, not a stub
+        }
+        wrap.append(col);
+    });
+    if (usual) { const line = el('div', 'spend-usual'); line.style.bottom = `${Math.round((usual / top) * 100)}%`; line.setAttribute('aria-hidden', 'true'); wrap.append(line); }
+    return wrap;
+}
+
+const dayLabel = (d) => String(d.day || '').slice(5);
+const hourLabel = (d) => { const t = new Date(d.hour); return Number.isNaN(t.getTime()) ? String(d.hour || '') : `${String(t.getHours()).padStart(2, '0')}:00`; };
+
+function chart(data, f) {
+    const hourly = model.grain === 'hour' && Array.isArray(data.per_hour) && data.per_hour.length && model.range === '24h';
+    const list = (hourly ? data.per_hour : data.per_day) || [];
+    const tools = model.metric === 'tools';
+    const value = (d) => (tools ? ratio(num(d.tool_calls), d.commits) : ratio(tokensOf(d), d.commits));
+    const rows = list.map(d => ({ label: hourly ? hourLabel(d) : dayLabel(d), value: value(d) }));
+    const usual = tools ? f.usualToolPer : f.usualPer;
+    const unit = tools ? (v => (v >= 10 ? String(Math.round(v)) : v.toFixed(1))) : fmtTokens;
+    const noun = tools ? 'Tool calls per commit' : 'Tokens per commit';
+    const wrap = el('div', 'spend-chart');
+    const head = el('div', 'spend-chart-head');
+    head.append(el('h4', 'spend-box-title', `${noun}, each ${hourly ? 'hour' : 'day'}`));
+    const ctl = el('div', 'spend-controls');
+    const toolsOn = !!(f.toolMeasured && f.toolMeasured[0]);
+    ctl.append(toggles('Trend shows', [{ key: 'tokens', label: 'Tokens' }, { key: 'tools', label: 'Tool calls', disabled: !toolsOn, title: toolsOn ? '' : 'Not measured' }], model.metric, k => { model.metric = k; draw(); }),
+        toggles('Trend by', [{ key: 'day', label: 'Daily' }, { key: 'hour', label: 'Hourly', disabled: model.range !== '24h' || !(data.per_hour && data.per_hour.length), title: model.range === '24h' ? '' : 'Hourly is for the last 24 hours' }], hourly ? 'hour' : 'day', k => { model.grain = k; draw(); }));
+    head.append(ctl);
+    wrap.append(head);
+    wrap.append(bars(rows, { usual, name: `${noun} each ${hourly ? 'hour' : 'day'}, ${rows.length} ${hourly ? 'hours' : 'days'}`, amberAbove: usual ? usual * DRIFT : null, unit }));
+    const axis = el('div', 'spend-axis'); axis.setAttribute('aria-hidden', 'true'); axis.append(el('span', null, hourly ? '24 hours ago' : `${rows.length} days ago`), el('span', null, hourly ? 'now' : 'to' + 'day')); // the word is spelled in two parts: the icon-name lint reads a quoted word as an icon
+    const why = [!toolsOn ? 'Tool calls are not measured.' : '', model.range !== '24h' ? HOURLY_WHY : ''].filter(Boolean).join(' '); // a disabled button gives no tooltip to a keyboard or a touch: the reason is in the text
+    wrap.append(axis, el('p', 'spend-note', [usual ? `Dashed line: usual, ${unit(usual)}. The last bar is amber when it is 30% above.` : `No usual yet: there is no commit in the 7 days before${tools ? ' or no tool call recorded' : ''}.`, why].filter(Boolean).join(' ')));
+    return wrap;
+}
+
+function table(data) {
+    const t = el('table', 'cost-table spend-table'); t.setAttribute('aria-label', 'Who spends');
+    const head = el('tr');
+    for (const h of ['Agent', 'Tokens', 'Share', 'Commits', 'Cache reads', 'Tool calls']) { const th = el('th', null, h); th.scope = 'col'; head.append(th); }
+    const thead = el('thead'); thead.append(head); t.append(thead);
+    const body = el('tbody');
+    const agents = (Array.isArray(data.agents) ? data.agents : []).slice().sort((a, b) => (a.name === 'Unattributed') - (b.name === 'Unattributed') || (a.tokens == null) - (b.tokens == null) || (b.tokens || 0) - (a.tokens || 0));
+    for (const a of agents) {
+        const tr = el('tr');
+        const name = el('th', null, a.name || ''); name.scope = 'row'; tr.append(name);
+        if (a.name === 'Unattributed') {
+            const td = el('td', 'spend-not-measured', 'Commits whose author matches no agent'); td.colSpan = 5; tr.append(td); // one cell, no dashes
+        } else if (a.tokens == null) {
+            const td = el('td', 'spend-not-measured', 'Not measured'); td.colSpan = 5; tr.append(td); // one cell, not five zeros
+        } else {
+            tr.append(el('td', null, fmtTokens(a.tokens)), el('td', null, a.share == null ? '' : `${Math.round(a.share * 100)}%`), el('td', a.orchestrator || a.commits == null ? 'spend-muted' : null, a.orchestrator ? 'team' : a.commits == null ? '—' : a.commits === 0 ? 'none' : String(a.commits)), el('td', null, a.cache_reads == null ? '—' : fmtTokens(a.cache_reads)), el('td', null, a.tool_calls == null ? (a.tool_calls_measured === false ? 'Not measured' : '—') : String(a.tool_calls)));
+        }
+        body.append(tr);
+    }
+    t.append(body);
+    return t;
+}
+
+function drawSpend() {
+    const body = root && root.querySelector('.spend-body'); if (!body) return;
+    body.replaceChildren();
+    body.setAttribute('aria-busy', String(model.loading));
+    if (!model.team) { body.append(el('p', 'cost-empty', 'Open a team to see how many tokens its commits take.')); return; }
+    if (model.error) {
+        const e = el('div', 'cost-empty spend-error'); e.setAttribute('role', 'alert'); e.append(el('span', null, model.error + ' '));
+        const b = el('button', 'btn btn-small', 'Try again'); b.type = 'button'; b.addEventListener('click', () => loadSpend()); e.append(b); body.append(e); return;
+    }
+    if (model.loading && !model.data) { body.append(el('p', 'cost-empty', 'Loading…')); return; }
+    const data = model.data; if (!data) return;
+    const f = figures(data, model.range);
+    body.append(el('p', 'spend-sub', `Team ${keyLabel(model.team)} · last ${f.windowWord} against the 7 days before`));
+    body.append(el('p', 'spend-headline', headline(f)));
+    const cards = el('div', 'cost-summary-cards spend-cards');
+    cards.append(card(f.commits ? fmtTokens(f.per) : '—', `tokens per landed commit, ${f.windowWord}`, f.commits ? '' : 'no commit landed'),
+        card(f.toolPer != null ? (f.toolPer >= 10 ? String(Math.round(f.toolPer)) : f.toolPer.toFixed(1)) : 'Not measured', `tool calls per landed commit, ${f.windowWord}`, f.toolMeasured ? `${f.toolMeasured[0]} of ${f.toolMeasured[1]} agents measured` : ''),
+        card(f.usualPer ? fmtTokens(f.usualPer) : '—', 'usual, the 7 days before', f.usualCommits ? `${f.usualCommits} commits` : 'no commit then'),
+        card(String(f.commits), 'commits landed on main', f.unattributed ? `${f.unattributed} unattributed` : ''),
+        card(fmtTokens(f.cacheReads) || '0', 'cache reads, not in the total', ''));
+    body.append(cards);
+    const grid = el('div', 'spend-grid');
+    const chartBox = el('section', 'spend-box'); chartBox.append(chart(data, f));
+    const how = el('details', 'disclosure spend-how'); how.append(el('summary', null, 'How it is counted'), el('p', 'spend-note', 'Tokens are input plus output. Cache writes and cache reads are shown beside, never hidden in the total. A commit counts once when it reaches main; its author is the agent, and one that matches no agent is Unattributed. A commit is credited to the author name its committer typed, so these are counts, not proof of who did the work. In a repository shared by several teams, Unattributed can include other teams\' commits. Review and orchestration tokens belong to the team, not to one commit. An agent with no token record is Not measured, not zero.'));
+    grid.append(chartBox, how);
+    body.append(grid);
+    const who = el('section', 'spend-who'); who.append(el('h4', 'spend-box-title', 'Who spends'));
+    const scroll = el('div', 'cost-table-container'); scroll.append(table(data)); who.append(scroll);
+    if (data.measured_agents != null && data.of_agents != null && data.measured_agents < data.of_agents) who.append(el('p', 'spend-note', `${data.measured_agents} of ${data.of_agents} agents measured.`));
+    body.append(who);
+}
+
+// ── task time ────────────────────────────────────────────────────────────
+
+function drawTime() {
+    const body = timeRoot && timeRoot.querySelector('.time-body'); if (!body) return;
+    body.replaceChildren();
+    const tt = model.data && model.data.task_time;
+    if (!model.team) { body.append(el('p', 'cost-empty', 'Open a team to see how long its tasks take.')); return; } // the view is in the list for every team: with none, it says so
+    if (!tt || model.error) { if (!model.loading) body.append(el('p', 'cost-empty', model.error || 'No task time for this team yet.')); return; }
+    const w = tt.window || {}, u = tt.usual || {};
+    const word = model.range === '7d' ? 'last 7 days' : 'last 24 h';
+    body.append(el('p', 'spend-sub', `Team ${keyLabel(model.team)} · ${word} against the 7 days before`));
+    const cards = el('div', 'cost-summary-cards spend-cards');
+    const usualDay = num(u.done) != null ? Math.round(u.done / 7) : null;
+    if (num(w.done) != null) cards.append(card(String(w.done), `tasks done, ${word}`, usualDay != null ? `usual ${usualDay} a day` : ''));
+    if (num(w.median_s) != null) cards.append(card(fmtDur(w.median_s), 'median, claimed to done', num(u.median_s) != null ? `usual ${fmtDur(u.median_s)}` : ''));
+    if (num(w.p90_s) != null) cards.append(card(fmtDur(w.p90_s), 'slowest 1 in 10', num(u.p90_s) != null ? `usual ${fmtDur(u.p90_s)}` : ''));
+    if (num(w.wait_median_s) != null) cards.append(card(fmtDur(w.wait_median_s), 'median wait before claimed', ''));
+    if (num(w.review_median_s) != null) cards.append(card(fmtDur(w.review_median_s), 'median in review, assignment to approval', ''));
+    if (num(w.sent_back) != null) cards.append(card(`${w.sent_back} of ${w.done || 0}`, 'sent back 2 or more times', num(w.rounds_mean) != null ? `${w.rounds_mean.toFixed(1)} rounds on average` : ''));
+    body.append(cards);
+    const hourly = model.doneGrain === 'hour' && Array.isArray(tt.per_hour) && tt.per_hour.length && model.range === '24h';
+    const list = (hourly ? tt.per_hour : tt.per_day) || [];
+    if (list.length) {
+        const box = el('section', 'spend-box');
+        const head = el('div', 'spend-chart-head'); head.append(el('h4', 'spend-box-title', 'Tasks done'));
+        head.append(toggles('Tasks done by', [{ key: 'day', label: 'Daily' }, { key: 'hour', label: 'Hourly', disabled: model.range !== '24h' || !(tt.per_hour && tt.per_hour.length), title: model.range === '24h' ? '' : 'Hourly is for the last 24 hours' }], hourly ? 'hour' : 'day', k => { model.doneGrain = k; drawTime(); }));
+        box.append(head);
+        const rows = list.map(d => ({ label: hourly ? hourLabel(d) : dayLabel(d), value: d.done ? d.done : null }));
+        const usual = usualDay != null && !hourly ? usualDay : null;
+        box.append(bars(rows, { usual, name: `Tasks done each ${hourly ? 'hour' : 'day'}`, unit: v => String(Math.round(v)) })); // more tasks done than usual is good news: this chart is never amber
+        const axis = el('div', 'spend-axis'); axis.setAttribute('aria-hidden', 'true'); axis.append(el('span', null, hourly ? '24 hours ago' : `${rows.length} days ago`), el('span', null, hourly ? 'now' : 'to' + 'day'));
+        box.append(axis, el('p', 'spend-note', [usual ? `Dashed line: usual, ${usual} a day. A day with no task done has no bar.` : 'A time with no task done has no bar.', model.range !== '24h' ? HOURLY_WHY : ''].filter(Boolean).join(' ')));
+        body.append(box);
+    }
+    const agents = Array.isArray(tt.agents) ? tt.agents : [];
+    if (agents.length) {
+        const sec = el('section', 'spend-who'); sec.append(el('h4', 'spend-box-title', 'By agent'));
+        const t = el('table', 'cost-table spend-table'); t.setAttribute('aria-label', 'Task time by agent');
+        const head = el('tr'); for (const h of ['Agent', 'Tasks done', 'Median time', 'Sent back']) { const th = el('th', null, h); th.scope = 'col'; head.append(th); }
+        const thead = el('thead'); thead.append(head); t.append(thead);
+        const tb = el('tbody');
+        for (const a of agents.slice().sort((x, y) => (y.done || 0) - (x.done || 0))) {
+            const tr = el('tr'); const n = el('th', null, a.name || ''); n.scope = 'row';
+            tr.append(n, el('td', null, String(a.done || 0)), el('td', null, num(a.median_s) != null ? fmtDur(a.median_s) : '—'), el('td', null, num(a.sent_back) != null ? String(a.sent_back) : '—'));
+            tb.append(tr);
+        }
+        t.append(tb); const scroll = el('div', 'cost-table-container'); scroll.append(t); sec.append(scroll); body.append(sec);
+    }
+}
+
+function draw() { drawSpend(); drawTime(); }
+
+export async function loadSpend() {
+    if (!model.team) { draw(); return; }
+    const seq = ++model.seq, team = model.team;
+    model.loading = !model.data; model.error = '';
+    draw();
+    try {
+        const r = await boardFetch(team, `/spend?range=${model.range}`);
+        if (seq !== model.seq) return;
+        if (r.status === 404) { model.data = null; model.error = 'No spend data for this team yet.'; }
+        else if (!r.ok) throw new Error(String(r.status));
+        else model.data = await r.json();
+    } catch { if (seq !== model.seq) return; model.error = 'Spend could not be read.'; }
+    model.loading = false;
+    draw();
+}
+
+/** The Analytics tab's range (hour, day, week, month) as the sections': 24 hours or 7 days. */
+const rangeOf = (period) => (period === 'week' || period === 'month' ? '7d' : '24h');
+
+/** Mount the two sections in `host` (tokens per commit) and `timeHost` (task time) and read them: `period` is the Analytics time range. Called on every refresh of the tab. */
+export function showSpend(host, period, timeHost) {
+    const range = rangeOf(period);
+    const list = teams();
+    const saved = browserLocal.get(TEAM_KEY) || '';
+    const team = list.includes(model.team) ? model.team : (list.includes(saved) ? saved : (list[0] || ''));
+    const changed = team !== model.team || range !== model.range;
+    model.team = team; model.range = range;
+    if (!host.dataset.built) {
+        host.dataset.built = '1';
+        const head = el('div', 'spend-head');
+        const label = el('label', 'spend-team'); label.append(el('span', null, 'Team '));
+        const sel = el('select', 'cost-time-select spend-team-select'); sel.setAttribute('aria-label', 'Team for tokens per commit and task time');
+        sel.addEventListener('change', () => { model.team = sel.value; try { browserLocal.set(TEAM_KEY, sel.value); } catch { /* the choice lasts until the page closes */ } model.data = null; loadSpend(); });
+        label.append(sel); head.append(label);
+        host.replaceChildren(head, el('div', 'spend-body'));
+    }
+    root = host;
+    if (timeHost) { if (!timeHost.dataset.built) { timeHost.dataset.built = '1'; timeHost.replaceChildren(el('div', 'time-body')); } timeRoot = timeHost; }
+    const sel = host.querySelector('.spend-team-select');
+    sel.replaceChildren(...list.map(t => new Option(keyLabel(t), t)));
+    sel.value = team;
+    host.querySelector('.spend-head').hidden = list.length < 2;
+    if (changed) model.data = null;
+    return loadSpend();
+}

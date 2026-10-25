@@ -1,4 +1,4 @@
-// The Docs page for a person using only the keyboard or a screen reader (#6586): the topics are a list box (the open one selected) and one Tab stop (the open one, or the first), and Up, Down, Home and End move between them, so the page's
+// The Docs page for a person using only the keyboard or a screen reader (#6586): the topics are a named list of buttons (the open one aria-current) and one Tab stop (the open one, or the first), and Up, Down, Home and End move between them, so the page's
 // text is not 37 Tab presses away; opening a topic with Enter leaves focus on that topic (the list is drawn again, and focus used to fall to the page); and a polite status says which topic is showing
 // ("Showing <title>"), since the text changes silently under a reader. Drives Chrome over CDP through agent_view_harness.js against the isolated dev server.
 const assert = require('node:assert/strict');
@@ -14,13 +14,15 @@ const BASE = require('./test_base').BASE;
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
         await ev(`window.switchNavTab('docs'); true`);
-        await waitFor(`document.querySelectorAll('#docs-nav-list [data-doc]').length >= 5 && document.querySelectorAll('#docs-content h1, #docs-content h2').length >= 1`, 'the topics and the first one', 15000);
+        await waitFor(`document.querySelectorAll('#docs-nav-list [data-doc]').length >= 5`, 'the topics', 15000);
+        await ev(`window.selectDoc('README'); true`); // the tab opens on its first group's table (#7443): the first topic is opened from it
+        await waitFor(`document.querySelectorAll('#docs-content h1, #docs-content h2').length >= 1`, 'the first topic', 15000);
         const n = await ev(`document.querySelectorAll('#docs-nav-list [data-doc]').length`);
         const stops = () => ev(`[...document.querySelectorAll('#docs-nav-list [data-doc]')].filter(e => e.tabIndex === 0).map(e => e.dataset.doc)`);
-        assert.equal(await ev(`(() => { const l = document.getElementById('docs-nav-list'); return l.getAttribute('role') + ':' + l.getAttribute('aria-label'); })()`), 'listbox:Docs topics', 'the topics are a named list box');
+        assert.equal(await ev(`(() => { const l = document.getElementById('docs-nav-list'); const g = l.closest('[role=group]'); return g && g.getAttribute('aria-label'); })()`), 'Docs topics', 'the topics are a named group of buttons');
         let s = await stops();
         assert.equal(s.length, 1, 'the topics are one Tab stop (' + s.length + ' of ' + n + ')');
-        assert.equal(await ev(`document.querySelector('#docs-nav-list [data-doc][tabindex="0"]').getAttribute('aria-selected')`), 'true', 'and it is the open topic');
+        assert.equal(await ev(`document.querySelector('#docs-nav-list [data-doc][tabindex="0"]').getAttribute('aria-current')`), 'true', 'and it is the open topic');
         await ev(`document.querySelector('#docs-nav-list [data-doc][tabindex="0"]').focus(); true`);
         const start = await at();
         await key('ArrowDown', 40); assert.equal(await at(), (start + 1) % n, 'Down moves to the next topic');
@@ -33,7 +35,7 @@ const BASE = require('./test_base').BASE;
         const want = await ev(`document.activeElement.dataset.doc`);
         const title = await ev(`document.activeElement.textContent.trim()`);
         await key('Enter', 13);
-        await waitFor(`document.querySelector('#docs-nav-list [data-doc][aria-selected="true"]') && document.querySelector('#docs-nav-list [data-doc][aria-selected="true"]').dataset.doc === ${JSON.stringify(want)}`, 'the topic opens', 8000);
+        await waitFor(`document.querySelector('#docs-nav-list [data-doc][aria-current="true"]') && document.querySelector('#docs-nav-list [data-doc][aria-current="true"]').dataset.doc === ${JSON.stringify(want)}`, 'the topic opens', 8000);
         await new Promise(r => setTimeout(r, 400)); // sleep-ok: the page draws after the fetch
         const f = await ev(`(() => { const a = document.activeElement; return { doc: a && a.dataset && a.dataset.doc, inList: !!(a && a.closest && a.closest('#docs-nav-list')) }; })()`);
         assert.ok(f.inList && f.doc === want, 'after Enter focus is still on the topic that was opened (' + JSON.stringify(f) + ')');

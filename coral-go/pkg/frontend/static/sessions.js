@@ -395,6 +395,8 @@ export async function selectLiveSession(name, agentType, sessionId, server) {
 }
 
 import { historyServer, historyRoute } from './history_source.js';
+import { describeChat } from './history_list.js';
+import { setBackLink } from './sidebar_groups.js';
 
 export async function selectHistorySession(sessionId, locator = null) {
     const source = historyServer();
@@ -426,6 +428,10 @@ export async function selectHistorySession(sessionId, locator = null) {
 
     const openedEntry = state.historySessionsList.find(x => x.session_id === sessionId);
     document.getElementById("history-session-title").textContent = historyLabel(openedEntry); // the chat's title; its id is behind Details (#6200)
+    const described = describeChat(openedEntry); // the way back to its group's table, and who, when and how long under the title (#7443)
+    setBackLink('history-back', 'history', described.group);
+    const metaEl = document.getElementById('history-session-meta');
+    if (metaEl) { metaEl.textContent = described.meta; metaEl.hidden = !described.meta; }
     document.getElementById("history-session-id").textContent = sessionId;
     const idEl = document.getElementById("history-session-id"), detailsBtn = document.getElementById("history-session-details");
     idEl.hidden = true; if (detailsBtn) { detailsBtn.setAttribute("aria-expanded", "false"); detailsBtn.textContent = "Details"; }

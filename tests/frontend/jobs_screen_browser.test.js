@@ -47,7 +47,7 @@ const S = `(window.__coralStatic || '/static/')`;
             console.log(`${at}: one list, every job, in words`);
             assert.equal(await ev(`document.querySelectorAll('.sidebar-subtab').length`), 0, `${at}: no Active / Scheduled tabs`);
             assert.equal(await ev(`/No active jobs/.test(document.querySelector('[data-section="jobs"]').textContent)`), false, `${at}: nothing says "No active jobs" over jobs that exist`);
-            assert.equal(await text('#jobs-count'), '3', `${at}: the count is the jobs`);
+            assert.equal(await ev(`[...document.querySelectorAll('[data-pane="jobs"] .session-group-count')].reduce((n, c) => n + Number(c.textContent), 0)`), 3, `${at}: the groups' counts are the jobs`);
             const rows = await ev(`[...document.querySelectorAll('#scheduled-jobs-list .sched-row')].map(r => [r.querySelector('.sched-row-name').textContent.trim() + (r.querySelector('.sched-chip') ? ' ' + r.querySelector('.sched-chip').textContent.trim() : ''), r.querySelector('.sched-row-meta').textContent.replace(/\\s+/g, ' ').trim()])`);
             assert.equal(rows[0][0], 'nightly-build-job');
             assert.match(rows[0][1], /^Every day at 02:00 \(UTC\) · last run failed · next /);
@@ -57,7 +57,7 @@ const S = `(window.__coralStatic || '/static/')`;
             await ev(`import(${S} + 'live_jobs.js').then(m => m.renderLiveJobs([{ id: 99, job_name: 'summarize-the-day', status: 'running', started_at: new Date().toISOString(), session_id: 'abc', agent_type: 'claude', trigger_type: 'cron' }])).then(() => true)`);
             assert.equal(await ev(vis('#live-jobs-group')), true, `${at}: "Running now" while one runs`);
             assert.match(await text('#live-jobs-group'), /Running now/);
-            assert.equal(await text('#jobs-count'), '3', `${at}: a running job is one of the jobs, not another`);
+            assert.equal(await ev(`[...document.querySelectorAll('[data-pane="jobs"] .session-group-count')].reduce((n, c) => n + Number(c.textContent), 0)`), 3, `${at}: a running job is one of the jobs, not another`);
             assert.equal(await text('#live-jobs-status'), '1 job running now', `${at}: said once, politely`);
             await ev(`import(${S} + 'live_jobs.js').then(m => m.renderLiveJobs([])).then(() => true)`);
             assert.equal(await ev(vis('#live-jobs-group')), false);
@@ -72,7 +72,7 @@ const S = `(window.__coralStatic || '/static/')`;
             console.log(`${at}: the job page, failure first`);
             await ev(`document.querySelector('#scheduled-jobs-list .sched-row').click(); true`);
             await waitFor(vis('#scheduler-detail .sched-fail-banner'), `${at}: the job page`, 8000);
-            const order = await ev(`[...document.querySelectorAll('#scheduler-detail > *:not(.sched-back)')].map(e => e.className.split(' ')[0])`); // the phone's back row (#7121) is not content
+            const order = await ev(`[...document.querySelectorAll('#scheduler-detail > *:not(.sched-back):not(.group-back)')].map(e => e.className.split(' ')[0])`); // the phone's back row (#7121) is not content
             assert.equal(order[0], 'sched-fail-banner', `${at}: the failure is the first thing on the page: ${JSON.stringify(order)}`);
             assert.match(await text('#scheduler-detail .sched-fail-banner'), /The last run failed.*step 2 \(Test\) exited with 3/s);
             assert.equal(await ev(`/\\benabled\\b/i.test(document.querySelector('#scheduler-detail .sched-header').textContent)`), false, `${at}: no "enabled" pill`);
@@ -92,7 +92,7 @@ const S = `(window.__coralStatic || '/static/')`;
             await ev(`document.querySelector('#scheduler-detail .sched-settings > summary').click(); true`);
             assert.match(await text('#scheduler-detail .sched-settings'), /Time limit\s*1 hour/);
             assert.match(await text('#scheduler-detail .sched-settings'), /Folder\s*\/work\/project/);
-            assert.deepEqual(await ev(`[...document.querySelectorAll('#scheduler-detail .sched-runs-table th')].map(t => t.textContent.trim())`), ['When', 'Result', 'Took']);
+            assert.deepEqual(await ev(`[...document.querySelectorAll('#scheduler-detail .sched-runs-table th')].map(t => t.textContent.trim())`), ['Started', 'Result', 'Duration']);
             assert.match(await ev(`document.querySelector('#scheduler-detail .sched-runs-table tbody tr').textContent.replace(/\\s+/g, ' ')`), /Failed: step 2 \(Test\) exited with 3/);
             assert.match(await ev(`document.querySelectorAll('#scheduler-detail .sched-runs-table tbody tr')[1].textContent.replace(/\\s+/g, ' ')`), /Passed/);
 

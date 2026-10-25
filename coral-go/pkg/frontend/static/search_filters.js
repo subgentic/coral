@@ -103,16 +103,6 @@ export function resetFilters() {
     filterState.maxDurationSec = null;
 }
 
-export function hasActiveFilters() {
-    return (filterState.chatType && filterState.chatType !== 'all')
-        || filterState.tagIds.length > 0
-        || filterState.sourceTypes.length > 0
-        || !!filterState.dateFrom
-        || !!filterState.dateTo
-        || filterState.minDurationSec != null
-        || filterState.maxDurationSec != null;
-}
-
 export function countActiveFilters() {
     let n = 0;
     if (filterState.chatType && filterState.chatType !== 'all') n++;

@@ -385,6 +385,7 @@
 1	sandbox_frame.js	DOC_CSP
 1	sandbox_frame.js	content
 2	saved_marks.js	BOOKMARK_SVG
+1	scheduler.js	backLinkHtml('jobs', group.key, group.label)
 1	scheduler.js	cls
 1	scheduler.js	doesHtml
 1	scheduler.js	dot
@@ -394,6 +395,7 @@
 1	scheduler.js	fails === 1 ? 'The last run failed' : `The last ${fails} runs failed`
 1	scheduler.js	k
 1	scheduler.js	paused
+1	scheduler.js	promptHtml
 2	scheduler.js	resultCell(r)
 1	scheduler.js	runFailureTag(r)
 1	scheduler.js	runs.map(r => `<tr data-on-click="job-run" data-run-id="${Number(r.id)}" style="cursor:pointer"> <td><button t
@@ -483,6 +485,18 @@
 1	sessions.js	filtered.map(e => `<button class="emoji-picker-btn" data-emoji="${escapeAttr(e)}">${e}</button>`).join("")
 1	settings_dialog.js	label
 1	settings_nav.js	p.dataset.icon
+1	sidebar_groups.js	CELL_ACTION_ATTR[c.action]
+1	sidebar_groups.js	CHEVRON
+1	sidebar_groups.js	EXTRA_ACTION_ATTR[x.action]
+1	sidebar_groups.js	ROW_ACTION_ATTR[r.action] || ''
+2	sidebar_groups.js	attrs
+1	sidebar_groups.js	c ? escapeHtml(c) : dash
+1	sidebar_groups.js	dash
+1	sidebar_groups.js	dataAttrs(c.data)
+1	sidebar_groups.js	dataAttrs(r.data)
+1	sidebar_groups.js	extraHtml(t.extra)
+1	sidebar_groups.js	head
+1	sidebar_groups.js	rows
 1	sidebar_rail.js	_RAIL_ICONS[g.kind]
 1	sidebar_rail.js	_railRoleIcon(s)
 1	sidebar_rail.js	badge
@@ -698,18 +712,19 @@
 1	view_sandbox.js	prelude(ctx)
 1	workflows.js	agentHtml
 1	workflows.js	autoExpand
+1	workflows.js	backHtml
+1	workflows.js	backLinkHtml('workflows', group.key, group.label, 'wf-back-btn')
 1	workflows.js	completedCount
 1	workflows.js	durationHtml
 1	workflows.js	ecClass
-1	workflows.js	enabledBadge
 1	workflows.js	escAttr('Files of ' + (s.name || 'step ' + (i + 1)))
 1	workflows.js	escAttr('Output of ' + (s.name || 'step ' + (i + 1)))
 1	workflows.js	escAttr('View agent of ' + (s.name || 'step ' + (i + 1)))
 1	workflows.js	escAttr(STEP_WORDS[s.status] || 'Waiting')
 1	workflows.js	escAttr(isFailed)
 1	workflows.js	escAttr(name)
+1	workflows.js	escAttr(open ? ' active' : '')
 2	workflows.js	escAttr(outputId)
-1	workflows.js	escAttr(runLabel)
 1	workflows.js	escAttr(s.session_name || s.session_id)
 2	workflows.js	escAttr(wf.name)
 1	workflows.js	exitCodeHtml
@@ -720,15 +735,12 @@
 1	workflows.js	formatDuration(elapsed)
 1	workflows.js	formatTime(run.finished_at)
 1	workflows.js	formatTime(run.started_at)
-1	workflows.js	formatTime(wf.created_at)
-3	workflows.js	i + 1
+2	workflows.js	i + 1
 1	workflows.js	icon
 2	workflows.js	iconClass
 1	workflows.js	killBtn
+1	workflows.js	killBtn || retriggerBtn ? `<div class="item-bar wf-run-actions">${killBtn}${retriggerBtn}</div>` : ''
 1	workflows.js	lastHtml
-1	workflows.js	lastRunHtml
-1	workflows.js	limitWords(wf.max_duration_s || 3600)
-1	workflows.js	lr.started_at ? '&middot; ' + formatTime(lr.started_at) : ''
 1	workflows.js	outputHtml
 1	workflows.js	peek
 1	workflows.js	progressBarHtml
@@ -738,14 +750,13 @@
 1	workflows.js	run.finished_at ? `<span><span class="material-icons" aria-hidden="true">check_circle</span> ${formatTime(run.
 1	workflows.js	run.id
 1	workflows.js	run.started_at ? `<span><span class="material-icons" aria-hidden="true">schedule</span> ${formatTime(run.start
-1	workflows.js	runFailureTag(lr)
 1	workflows.js	runResult(r)
 1	workflows.js	runsHtml
 1	workflows.js	s.exit_code
 1	workflows.js	signInFailure
 1	workflows.js	signInFailure ? `<span class="wf-run-error" style="color:var(--error-text)"><span class="material-icons" aria-
 1	workflows.js	statusIconHtml(r.status)
-1	workflows.js	stepCount
+1	workflows.js	steps.map((s, i) => { const stepType = s.type || 'shell'; const what = stepType === 'shell' ? s.command : s.pr
 2	workflows.js	stepsHtml
 1	workflows.js	timingHtml
 1	workflows.js	totalSteps

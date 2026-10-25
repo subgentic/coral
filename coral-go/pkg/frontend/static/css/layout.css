@@ -210,6 +210,7 @@
     background: var(--bg-secondary);
     border-right: none;
     overflow-y: auto;
+    scrollbar-gutter: stable; /* a list that scrolls does not move the header's parts left of where a short one has them (#7443) */
     /* The pinned New Agent footer covers the bottom of the scroll area: a row the keyboard focuses at that edge is scrolled clear of it (#6159). */
     scroll-padding-bottom: 5rem;
     display: flex;
@@ -229,6 +230,7 @@ body.panel-dragging .sidebar {
     flex-shrink: 0;
     /* The search box, the server button and the icon buttons share one height (#4062). */
     --ctl-h: 36px;
+    /* The header row is 57 px from the top of the column to its rule (10 + 36 + 10 + the 1 px rule) on every tab: one component, one height (UI/UX's spec said 53; #7443). A tab without Display options is the same height, its search is wider. */
 }
 
 .sidebar-footer {
@@ -243,6 +245,11 @@ body.panel-dragging .sidebar {
     z-index: 2;
     background: var(--bg-secondary);
 }
+
+/* One pane per tab (#7443): the shared header, the tab's list and its pinned action. It fills the column, so the pinned action sits at the foot of a short list too. */
+.sidebar-pane { display: flex; flex-direction: column; flex: 1 0 auto; min-height: 0; }
+.sidebar-pane[hidden] { display: none; }
+.sidebar-collapse-btn[hidden], .sidebar-rail-btn[hidden] { display: none; }
 
 .sidebar-search {
     flex: 1;
@@ -387,6 +394,9 @@ body.panel-dragging .sidebar {
     .rail-tile-unread { background: var(--rail-badge-unread); }
     .rail-tile-done { background: var(--rail-badge-done); font-size: 0.625rem; line-height: 11px; }
     .rail-tile-dot { bottom: -3px; right: -3px; width: 9px; height: 9px; }
+    /* The rail's agent tiles are the Agents tab's; the other tabs' rail is the three buttons */
+    .layout:not([data-sidebar-pane="agents"]) .sidebar-rail-list { display: none; }
+    .layout:not([data-sidebar-pane="agents"]) #sidebar-rail-new { margin-top: auto; }
     .sidebar-rail-btn:last-child { border: 1px dashed var(--border); border-radius: var(--radius-lg); width: 40px; height: 32px; }
     .sidebar-rail-group {
         display: flex;
@@ -463,29 +473,6 @@ body.panel-dragging .sidebar {
     display: none;
 }
 
-.sidebar-section-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 12px 8px 12px;
-    cursor: pointer;
-    user-select: none;
-}
-
-.sidebar-section-header:hover {
-    background: rgba(var(--white-rgb), 0.02);
-}
-
-.sidebar-section-header h2 {
-    padding: 0;
-}
-
-.sidebar-section-title {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
 .section-count-badge {
     font-size: var(--fs-sm);
     font-weight: 600;
@@ -536,72 +523,7 @@ body.panel-dragging .sidebar {
     padding: 0 16px 8px;
 }
 
-.sidebar-section .sidebar-section-header h2 {
-    font-size: 0.875rem;
-    text-transform: none;
-    letter-spacing: normal;
-    color: var(--text-primary);
-    padding: 0;
-}
-
-/* ── History Search & Filters ──────────────────────────────── */
-
-.history-filters {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    padding: 0 12px 8px;
-}
-
-.history-filters input[type="search"] {
-    width: 100%;
-    padding: 5px 10px;
-    background: var(--bg-primary);
-    border: 1px solid var(--control-border);
-    border-radius: var(--radius-lg);
-    color: var(--text-primary);
-    font-size: 0.75rem;
-    outline: none;
-}
-
-.history-filters input[type="search"]:focus {
-    border-color: var(--accent);
-}
-
-/* ── Advanced Filter Panel ─────────────────────────────────── */
-
-.hf-search-row {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-}
-
-.hf-search-row input[type="search"] {
-    flex: 1;
-    min-width: 0;
-}
-
-.hf-adv-btn {
-    flex-shrink: 0;
-    position: relative;
-    padding: 5px 8px;
-}
-
-.hf-active-badge {
-    position: absolute;
-    top: -4px;
-    right: -4px;
-    background: var(--accent);
-    color: var(--bg-primary);
-    border-radius: var(--radius-ml);
-    font-size: var(--fs-sm);
-    font-weight: 700;
-    min-width: 14px;
-    height: 14px;
-    line-height: 14px;
-    text-align: center;
-    padding: 0 2px;
-}
+/* ── Advanced Filter Panel (in the Chats Display options, #7443) ─────────────────────────────────── */
 
 .hf-advanced {
     display: flex;
@@ -983,3 +905,34 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 /* Through the Coral Hub, a launch the machine's access level refuses says so as the form opens (#4586). */
 .launch-access-note { margin: 0 0 12px; padding: 8px 10px; border-radius: var(--radius-md); border: 1px solid var(--warning, var(--fx-amber)); background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.8125rem; line-height: 1.4; }
 .launch-access-note:empty { position: absolute; width: 1px; height: 1px; margin: 0; padding: 0; border: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } /* in the page with nothing to say: out of the layout (no room, no flex gap), still a live region (#6679) */ /* in the page with nothing to say: no room, still a live region */
+
+/* ── A sidebar group opened as a table in the centre (sidebar_groups.js, #7443) ── */
+.group-table-view { flex: 1; min-width: 0; padding: var(--space-2xl); overflow: auto; }
+.group-table-head { display: flex; align-items: center; gap: var(--space-md); margin-bottom: var(--space-xl); }
+.group-table-head h2 { margin: 0; font-size: 1.25rem; font-weight: 700; line-height: 1.3; color: var(--text-primary); } /* a group's table is titled at the page-title size, with its count (#7443) */
+.group-table-head .session-group-count { font-weight: 600; }
+.group-table-head .group-table-extra { display: inline-flex; align-items: center; gap: 6px; margin: 0 0 0 auto; }
+.group-table-head .group-table-extra .material-icons { font-size: 1rem; }
+/* One empty line on every tab: 14/400 in the primary colour, with an optional 12/400 hint under it; what to do is the sidebar's pinned action */
+.empty-pane { display: flex; flex-direction: column; gap: var(--space-xs); padding: var(--space-2xl); }
+.welcome > .empty-pane { margin: 0; align-self: stretch; }
+.empty-pane .empty-line { margin: 0; font-size: var(--fs-lg); font-weight: 400; line-height: 1.5; color: var(--text-primary); }
+.empty-pane .empty-hint { margin: 0; font-size: var(--fs-base); font-weight: 400; line-height: 1.4; color: var(--text-secondary); }
+.runs-empty-line { margin: 0; font-size: var(--fs-lg); font-weight: 400; line-height: 1.5; color: var(--text-primary); }
+/* The line under an item page's title: who, when, how long */
+.item-meta { margin: 2px 0 0; font-size: var(--fs-base); font-weight: 400; line-height: 1.4; color: var(--text-secondary); }
+.group-table-scroll { max-width: 100%; overflow-x: auto; }
+.group-table { width: 100%; border-collapse: collapse; }
+.group-table th, .group-table td { padding: var(--space-lg); text-align: left; border-bottom: 1px solid var(--border); font-size: var(--fs-base); line-height: 1.4; color: var(--text-secondary); }
+.group-table th { font-weight: 500; color: var(--text-secondary); }
+.group-table td:first-child { font-size: var(--fs-md); }
+.group-table-link { padding: 0; border: 0; background: none; color: var(--text-primary); font: 600 var(--fs-md)/1.4 var(--font-sans); text-align: left; cursor: pointer; }
+.group-table-link:hover { color: var(--accent); text-decoration: underline; }
+.group-table-back { margin-bottom: var(--space-lg); }
+.group-back { display: inline-flex; align-items: center; align-self: flex-start; min-height: 32px; margin: 0 0 var(--space-xs); padding: 4px 0; border: 1px solid transparent; border-radius: var(--radius-md); background: none; color: var(--text-secondary); font: 500 var(--fs-md)/1.4 var(--font-sans); cursor: pointer; }
+.group-back[hidden] { display: none; }
+.group-back:hover { color: var(--text-primary); text-decoration: underline; }
+/* A group header of a tab's list: the name opens the table, so it reads as a link on hover */
+.session-list .sgroup-header { align-items: center; } /* the list's own rule starts the items at the top: a header's chevron sits level with its name */
+.sgroup-header .group-chevron { margin-left: -6px; }
+@media (pointer: coarse) { .group-table-link, .group-back { min-height: 44px; } }

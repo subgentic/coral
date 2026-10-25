@@ -6,34 +6,132 @@
                 <button class="sidebar-rail-btn" type="button" data-on-click="sidebar-rail-toggle" title="Expand sidebar" aria-label="Expand sidebar">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M13 9l3 3-3 3"/></svg>
                 </button>
-                <button class="sidebar-rail-btn" type="button" data-on-click="agent-search-focus" title="Search agents" aria-label="Search agents">
+                <button class="sidebar-rail-btn" id="sidebar-rail-search" type="button" data-on-click="sidebar-search-focus" title="Search agents" aria-label="Search agents">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
                 </button>
                 <div class="sidebar-rail-list" id="sidebar-rail-list"></div>
-                <button class="sidebar-rail-btn" type="button" data-on-click="launch-show" title="New agent" aria-label="New agent">
+                <button class="sidebar-rail-btn" id="sidebar-rail-new" type="button" data-on-click="launch-show" title="New agent" aria-label="New agent">
                     <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
                 </button>
             </div>
-            <div class="sidebar-header">
-                <div class="sidebar-search">
-                    <svg class="sidebar-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-                    <input type="search" id="agent-search-input" class="sidebar-search-input" placeholder="Search" autocomplete="off" aria-label="Search agents" data-on-input="agent-search-filter" data-on-keydown="agent-search-key">
+
+            <!-- One pane per tab (#7443): each holds the shared header, its list and its pinned action, so a phone's page can take the whole pane. The header's parts keep one place on every tab. -->
+            <div class="sidebar-pane" data-pane="agents">
+                {{ template "includes/sidebar_header" "agents" }}
+                <section class="sidebar-section" data-section="live-sessions">
+                    <div class="sidebar-section-body">
+                        <ul id="live-sessions-list" class="session-list">
+                            <li class="empty-state">No live sessions</li>
+                        </ul>
+                    </div>
+                </section>
+                <div class="sidebar-footer">
+                    <button class="btn btn-primary sidebar-new-btn-full" data-on-click="launch-show">+ New agent</button>
                 </div>
-                <!-- List display options (#3085): the ☰ button opens a panel in place with the list's filters and sort (#4947), summaries, server name and grouping by server; the one toggle beside it collapses or expands every group -->
-                <button class="sidebar-collapse-btn" id="sidebar-summary-btn" type="button" data-display-button data-on-click="display-panel-toggle" aria-expanded="false" aria-controls="display-panel" title="Display options" aria-label="Display options">
-                    <span class="material-icons" style="font-size:1.125rem" aria-hidden="true">notes</span><span class="display-badge" data-display-badge hidden></span>
-                </button>
-                <button class="sidebar-collapse-btn group-toggle-btn" type="button" data-group-toggle data-next="collapse" data-on-click="groups-toggle-all" title="Collapse all groups" aria-label="Collapse all groups" hidden>
-                    <svg class="group-toggle-collapse" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 9l5-5 5 5M7 15l5 5 5-5"/></svg>
-                    <svg class="group-toggle-expand" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4l5 5 5-5M7 20l5-5 5 5"/></svg>
-                </button>
-                <!-- last in the row: the collapsed rail has its own way back (Expand sidebar) -->
-                <button class="sidebar-collapse-btn" id="sidebar-collapse-btn" type="button" data-on-click="sidebar-rail-toggle" title="Collapse sidebar" aria-label="Collapse sidebar">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M16 9l-3 3 3 3"/></svg>
-                </button>
-                <span class="sr-only" role="status" aria-live="polite" data-agent-list-live></span>
-                <div class="list-display-panel" id="display-panel" data-display-panel role="group" aria-label="Display options" data-on-keydown="display-panel-key" hidden>
-                    <div class="agent-list-bar" id="agent-list-bar" hidden></div>
+            </div>
+            <div class="sidebar-pane" data-pane="history" hidden>
+                {{ template "includes/sidebar_header" "history" }}
+                <label id="history-computer-row" class="history-computer-row" hidden><span class="sr-only">Computer</span>
+                    <select id="history-computer" aria-label="Computer for chat history" data-on-change="history-computer"></select>
+                </label>
+                <section class="sidebar-section" data-section="history">
+                    <div class="sidebar-section-body">
+                        <div id="chat-search-status" class="sr-only" role="status"></div>
+                        <div id="chat-search-results" class="chat-search-results" hidden></div>
+                        <ul id="history-sessions-list" class="session-list">
+                            <li class="empty-state">Loading...</li>
+                        </ul>
+                    </div>
+                </section>
+            </div>
+            <div class="sidebar-pane" data-pane="jobs" hidden>
+                {{ template "includes/sidebar_header" "jobs" }}
+                <section class="sidebar-section" data-section="jobs">
+                    <div class="sidebar-section-body">
+                    <p id="live-jobs-status" class="sr-only" role="status" aria-live="polite"></p>
+                    <div id="live-jobs-group" class="sidebar-jobs-group" hidden>
+                        <h3 class="sidebar-jobs-heading">Running now</h3>
+                        <ul id="live-jobs-list" class="session-list"></ul>
+                    </div>
+                    <div id="jobs-live" class="sr-only" role="status"></div><!-- always in the page: scheduler.js says in it that a job's last run failed (#6707) -->
+                    <ul id="scheduled-jobs-list" class="session-list">
+                        <li class="empty-state">No jobs yet. New job schedules one.</li>
+                    </ul>
+                    </div>
+                </section>
+                <div class="sidebar-footer">
+                    <button class="btn btn-primary sidebar-new-btn-full" data-on-click="job-new">+ New job</button>
+                </div>
+            </div>
+            <div class="sidebar-pane" data-pane="workflows" hidden>
+                {{ template "includes/sidebar_header" "workflows" }}
+                <section class="sidebar-section" data-section="workflows">
+                    <div class="sidebar-section-body">
+                        <ul id="wf-nav-list" class="session-list"></ul>
+                    </div>
+                </section>
+                <div class="sidebar-footer">
+                    <button class="btn btn-primary sidebar-new-btn-full" id="wf-create-btn" data-on-click="wf-create">+ New workflow</button>
+                </div>
+            </div>
+            <div class="sidebar-pane" data-pane="tokens" hidden>
+                {{ template "includes/sidebar_header" "tokens" }}
+                <section class="sidebar-section" data-section="analytics">
+                    <div class="sidebar-section-body">
+                        <ul id="cost-nav-list" class="session-list"></ul>
+                    </div>
+                </section>
+            </div>
+            <div class="sidebar-pane" data-pane="docs" hidden>
+                {{ template "includes/sidebar_header" "docs" }}
+                <section class="sidebar-section" data-section="docs">
+                    <div class="sidebar-section-body">
+                        <p id="docs-nav-status" class="sr-only" role="status" aria-live="polite"></p>
+                        <div role="group" aria-label="Docs topics"><!-- the topics are one Tab stop and the arrows move between them (#6586) -->
+                            <ul id="docs-nav-list" class="session-list"></ul>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </aside>
+
+{{ end }}
+
+{{ define "includes/sidebar_header" }}
+                <div class="sidebar-header" data-header="{{ . }}">
+                    <div class="sidebar-search">
+                        <svg class="sidebar-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+                        {{ if eq . "agents" }}<input type="search" id="agent-search-input" class="sidebar-search-input" placeholder="Search" autocomplete="off" aria-label="Search agents" data-on-input="agent-search-filter" data-on-keydown="agent-search-key">
+                        {{ else if eq . "history" }}<input type="search" id="history-search" class="sidebar-search-input" placeholder="Search" autocomplete="off" aria-label="Search chats">
+                        {{ else if eq . "jobs" }}<input type="search" id="jobs-search" class="sidebar-search-input" placeholder="Search" autocomplete="off" aria-label="Search jobs" data-on-input="jobs-search-filter">
+                        {{ else if eq . "tokens" }}<input type="search" id="analytics-search" class="sidebar-search-input" placeholder="Search" autocomplete="off" aria-label="Search views" data-on-input="analytics-search-filter">
+                        {{ else if eq . "workflows" }}<input type="search" id="workflows-search" class="sidebar-search-input" placeholder="Search" autocomplete="off" aria-label="Search workflows" data-on-input="workflows-search-filter">
+                        {{ else }}<input type="search" id="docs-search" class="sidebar-search-input" placeholder="Search" autocomplete="off" aria-label="Search docs" data-on-input="docs-search-filter">{{ end }}
+                    </div>
+                    {{ if ne . "jobs" }}{{ if ne . "docs" }}{{ if ne . "workflows" }}<!-- Display options (#3085): the button opens a panel in place with the tab's filters and what a row shows; absent on a tab that has none -->
+                    <button class="sidebar-collapse-btn" {{ if eq . "agents" }}id="sidebar-summary-btn" {{ end }}type="button" data-display-button data-on-click="display-panel-toggle" aria-expanded="false" aria-controls="{{ if eq . "agents" }}display-panel{{ else }}display-panel-{{ . }}{{ end }}" title="Display options" aria-label="Display options">
+                        <span class="material-icons" style="font-size:1.125rem" aria-hidden="true">notes</span><span class="display-badge" {{ if eq . "history" }}id="hf-active-count"{{ else }}data-display-badge{{ end }} hidden></span>
+                    </button>{{ end }}{{ end }}{{ end }}
+                    <button class="sidebar-collapse-btn group-toggle-btn" type="button" data-group-toggle data-next="collapse" data-on-click="groups-toggle-all" title="Collapse all groups" aria-label="Collapse all groups" hidden>
+                        <svg class="group-toggle-collapse" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 9l5-5 5 5M7 15l5 5 5-5"/></svg>
+                        <svg class="group-toggle-expand" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4l5 5 5-5M7 20l5-5 5 5"/></svg>
+                    </button>
+                    <!-- last in the row: the collapsed rail has its own way back (Expand sidebar) -->
+                    <button class="sidebar-collapse-btn sidebar-hide-btn" {{ if eq . "agents" }}id="sidebar-collapse-btn" {{ end }}type="button" data-on-click="sidebar-rail-toggle" title="Collapse sidebar" aria-label="Collapse sidebar">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M16 9l-3 3 3 3"/></svg>
+                    </button>
+                    {{ if eq . "agents" }}<span class="sr-only" role="status" aria-live="polite" data-agent-list-live></span>{{ end }}
+                    {{ if ne . "jobs" }}{{ if ne . "docs" }}{{ if ne . "workflows" }}<div class="list-display-panel" id="{{ if eq . "agents" }}display-panel{{ else }}display-panel-{{ . }}{{ end }}" data-display-panel role="group" aria-label="Display options" data-on-keydown="display-panel-key" hidden>
+                        {{ if eq . "tokens" }}<div class="hf-row">
+                            <label class="hf-label" for="cost-time-range">Time range</label>
+                            <select id="cost-time-range" class="cost-time-select" data-on-change="cost-time-range">
+                                <option value="hour">Last hour</option>
+                                <option value="day" selected>Last 24 hours</option>
+                                <option value="week">Last 7 days</option>
+                                <option value="month">Last 30 days</option>
+                            </select>
+                        </div>
+                        {{ else if eq . "agents" }}<div class="agent-list-bar" id="agent-list-bar" hidden></div>
                     <div class="list-display-options">
                         <label class="list-display-option"><input type="checkbox" id="display-show-summary" data-display-input="summary" data-on-change="toggle-session-summary"> Show summaries</label>
                         <label class="list-display-option" id="display-show-server-row" data-display-row="server" hidden><input type="checkbox" id="display-show-server" data-display-input="server" data-on-change="toggle-show-server"> Show server</label>
@@ -44,155 +142,84 @@
                         <label class="list-display-option" data-display-row="thinking"><input type="checkbox" id="display-show-thinking" data-display-input="thinking" data-on-change="toggle-show-thinking"> Show thinking level</label>
                     </div>
                     <p class="list-display-hint" data-display-hint role="status" hidden></p>
-                </div>
-            </div>
-            <section class="sidebar-section" data-section="live-sessions">
-                <div class="sidebar-section-body">
-                    <ul id="live-sessions-list" class="session-list">
-                        <li class="empty-state">No live sessions</li>
-                    </ul>
-                </div>
-            </section>
-            <section class="sidebar-section" data-section="jobs" style="display:none">
-                <div class="sidebar-section-header">
-                    <div class="sidebar-section-title">
-                        <h2>Jobs</h2>
-                        <span class="section-count-badge" id="jobs-count">0</span>
-                    </div>
-                </div>
-                <div class="sidebar-section-body">
-                    <p id="live-jobs-status" class="sr-only" role="status" aria-live="polite"></p>
-                    <div id="live-jobs-group" class="sidebar-jobs-group" hidden>
-                        <h3 class="sidebar-jobs-heading">Running now</h3>
-                        <ul id="live-jobs-list" class="session-list"></ul>
-                    </div>
-                    <div id="jobs-live" class="sr-only" role="status"></div><!-- always in the page: scheduler.js says in it that a job's last run failed (#6707) -->
-                    <ul id="scheduled-jobs-list" class="session-list">
-                        <li class="empty-state">No jobs yet. New job schedules one.</li>
-                    </ul>
-                </div>
-            </section>
-            <section class="sidebar-section" data-section="docs" style="display:none">
-                <div class="sidebar-section-header">
-                    <div class="sidebar-section-title">
-                        <h2>Documentation</h2>
-                    </div>
-                </div>
-                <div class="sidebar-section-body">
-                    <ul id="docs-nav-list" class="session-list" role="listbox" aria-label="Docs topics"></ul>
-                </div>
-            </section>
-            <section class="sidebar-section" data-section="history">
-                <div class="sidebar-section-header">
-                    <div class="sidebar-section-title">
-                        <h2>Chats</h2>
-                        <span class="section-count-badge" id="history-count">0</span>
-                    </div>
-                </div>
-                <div class="sidebar-section-body">
-                    <div class="history-filters">
-                        <label id="history-computer-row" class="history-computer-row" hidden>Computer
-                            <select id="history-computer" aria-label="Computer for chat history" data-on-change="history-computer"></select>
-                        </label>
-                        <!-- Row 1: Text search + advanced toggle -->
-                        <div class="hf-search-row">
-                            <input id="history-search" type="search" placeholder="Search chats..." aria-label="Search chat history">
-                            <button id="hf-adv-toggle" class="btn btn-small hf-adv-btn"
-                                    title="Advanced filters" aria-label="Toggle advanced filters">
-                                <svg width="12" height="12" viewBox="0 0 16 16" fill="none"
-                                     stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-                                    <line x1="2" y1="4" x2="14" y2="4"/>
-                                    <line x1="4" y1="8" x2="12" y2="8"/>
-                                    <line x1="6" y1="12" x2="10" y2="12"/>
-                                </svg>
-                                <span id="hf-active-count" class="hf-active-badge"
-                                      style="display:none">0</span>
-                            </button>
+                        {{ else }}<div class="hf-row">
+                            <label class="hf-label">Group by</label>
+                            <div class="hf-toggle-group" role="group" aria-label="Group chats by">
+                                <button type="button" class="hf-toggle active" data-chat-group="day" aria-pressed="true">Day</button>
+                                <button type="button" class="hf-toggle" data-chat-group="agent" aria-pressed="false">Agent</button>
+                            </div>
+                        </div>
+                        <div id="hf-advanced" class="hf-advanced">
+                        <!-- FTS mode (shown only when search box has text) -->
+                        <div class="hf-row" id="hf-fts-mode-row" style="display:none">
+                            <label class="hf-label">Match</label>
+                            <div class="hf-toggle-group" role="group" aria-label="Match words">
+                                <button class="hf-toggle" data-mode="phrase">Phrase</button>
+                                <button class="hf-toggle" data-mode="and">All words</button>
+                                <button class="hf-toggle active" data-mode="or">Any word</button>
+                            </div>
                         </div>
 
-                        <!-- Advanced panel (collapsed by default) -->
-                        <div id="hf-advanced" class="hf-advanced" style="display:none">
-
-                            <!-- FTS mode (shown only when search box has text) -->
-                            <div class="hf-row" id="hf-fts-mode-row" style="display:none">
-                                <label class="hf-label">Match</label>
-                                <div class="hf-toggle-group" role="group" aria-label="Match words">
-                                    <button class="hf-toggle" data-mode="phrase">Phrase</button>
-                                    <button class="hf-toggle" data-mode="and">All words</button>
-                                    <button class="hf-toggle active" data-mode="or">Any word</button>
-                                </div>
+                        <!-- Type filter -->
+                        <div class="hf-row">
+                            <label class="hf-label">Type</label>
+                            <div class="hf-toggle-group" role="group" aria-label="Chat type">
+                                <button class="hf-toggle active" data-chat-type="all">All</button>
+                                <button class="hf-toggle" data-chat-type="agent">Agents</button>
+                                <button class="hf-toggle" data-chat-type="group">Group chats</button>
                             </div>
-
-                            <!-- Type filter -->
-                            <div class="hf-row">
-                                <label class="hf-label">Type</label>
-                                <div class="hf-toggle-group" role="group" aria-label="Chat type">
-                                    <button class="hf-toggle active" data-chat-type="all">All</button>
-                                    <button class="hf-toggle" data-chat-type="agent">Agents</button>
-                                    <button class="hf-toggle" data-chat-type="group">Group chats</button>
-                                </div>
-                            </div>
-
-                            <!-- Source multi-select -->
-                            <div class="hf-row">
-                                <label class="hf-label">Source</label>
-                                <div class="hf-toggle-group" role="group" aria-label="Chat source">
-                                    <button class="hf-toggle active" data-source="all">Any</button>
-                                    <button class="hf-toggle" data-source="claude">Claude</button>
-                                    <button class="hf-toggle" data-source="agy">Antigravity</button>
-                                </div>
-                            </div>
-
-                            <!-- Tag multi-filter -->
-                            <div class="hf-row">
-                                <label class="hf-label">Tags</label>
-                                <div class="hf-tag-filter" id="hf-tag-pills"></div>
-                                <select id="hf-tag-add" class="hf-tag-add-select" aria-label="Add a tag filter">
-                                    <option value="">+ tag</option>
-                                </select>
-                            </div>
-                            <div class="hf-row" id="hf-tag-logic-row" style="display:none">
-                                <label class="hf-label">Tag logic</label>
-                                <div class="hf-toggle-group" role="group" aria-label="Tag logic">
-                                    <button class="hf-toggle active" data-logic="AND">AND</button>
-                                    <button class="hf-toggle" data-logic="OR">OR</button>
-                                </div>
-                            </div>
-
-                            <!-- Date range -->
-                            <div class="hf-row">
-                                <label class="hf-label" for="hf-date-from">From</label>
-                                <input type="date" id="hf-date-from" class="hf-date">
-                            </div>
-                            <div class="hf-row">
-                                <label class="hf-label" for="hf-date-to">To</label>
-                                <input type="date" id="hf-date-to" class="hf-date">
-                            </div>
-
-                            <!-- Duration range (in minutes for usability) -->
-                            <div class="hf-row">
-                                <label class="hf-label">Duration</label>
-                                <input type="number" id="hf-dur-min" class="hf-dur-input" aria-label="Shortest chat, in minutes"
-                                       placeholder="min" min="0" step="1">
-                                <span class="hf-dur-sep">&ndash;</span>
-                                <input type="number" id="hf-dur-max" class="hf-dur-input" aria-label="Longest chat, in minutes"
-                                       placeholder="max" min="0" step="1">
-                                <span class="hf-dur-unit">min</span>
-                            </div>
-
-                            <button class="btn btn-small hf-clear-btn">Clear filters</button>
                         </div>
-                    </div>
-                    <div id="chat-search-status" class="sr-only" role="status"></div>
-                    <div id="chat-search-results" class="chat-search-results" hidden></div>
-                    <ul id="history-sessions-list" class="session-list">
-                        <li class="empty-state">Loading...</li>
-                    </ul>
-                </div>
-            </section>
-            <div class="sidebar-footer">
-                <button class="btn btn-primary sidebar-new-btn-full" data-on-click="launch-show">+ New agent</button>
-            </div>
-        </aside>
 
+                        <!-- Source multi-select -->
+                        <div class="hf-row">
+                            <label class="hf-label">Source</label>
+                            <div class="hf-toggle-group" role="group" aria-label="Chat source">
+                                <button class="hf-toggle active" data-source="all">Any</button>
+                                <button class="hf-toggle" data-source="claude">Claude</button>
+                                <button class="hf-toggle" data-source="agy">Antigravity</button>
+                            </div>
+                        </div>
+
+                        <!-- Tag multi-filter -->
+                        <div class="hf-row">
+                            <label class="hf-label">Tags</label>
+                            <div class="hf-tag-filter" id="hf-tag-pills"></div>
+                            <select id="hf-tag-add" class="hf-tag-add-select" aria-label="Add a tag filter">
+                                <option value="">+ tag</option>
+                            </select>
+                        </div>
+                        <div class="hf-row" id="hf-tag-logic-row" style="display:none">
+                            <label class="hf-label">Tag logic</label>
+                            <div class="hf-toggle-group" role="group" aria-label="Tag logic">
+                                <button class="hf-toggle active" data-logic="AND">AND</button>
+                                <button class="hf-toggle" data-logic="OR">OR</button>
+                            </div>
+                        </div>
+
+                        <!-- Date range -->
+                        <div class="hf-row">
+                            <label class="hf-label" for="hf-date-from">From</label>
+                            <input type="date" id="hf-date-from" class="hf-date">
+                        </div>
+                        <div class="hf-row">
+                            <label class="hf-label" for="hf-date-to">To</label>
+                            <input type="date" id="hf-date-to" class="hf-date">
+                        </div>
+
+                        <!-- Duration range (in minutes for usability) -->
+                        <div class="hf-row">
+                            <label class="hf-label">Duration</label>
+                            <input type="number" id="hf-dur-min" class="hf-dur-input" aria-label="Shortest chat, in minutes"
+                                   placeholder="min" min="0" step="1">
+                            <span class="hf-dur-sep">&ndash;</span>
+                            <input type="number" id="hf-dur-max" class="hf-dur-input" aria-label="Longest chat, in minutes"
+                                   placeholder="max" min="0" step="1">
+                            <span class="hf-dur-unit">min</span>
+                        </div>
+
+                        <button class="btn btn-small hf-clear-btn">Clear filters</button>
+                        </div>
+                        {{ end }}
+                    </div>{{ end }}{{ end }}{{ end }}
+                </div>
 {{ end }}

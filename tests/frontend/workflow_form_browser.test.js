@@ -24,6 +24,7 @@ const STUB = `(() => {
     const click = sel => ev(`document.querySelector(${JSON.stringify(sel)}).click(); true`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { const R = window.fetch; window.fetch = (u, o) => { const url = String(u && u.url || u); if (new URL(url, location.origin).pathname === '/api/workflows' && (!o || !o.method || o.method === 'GET')) return Promise.resolve(new Response(JSON.stringify({ workflows: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } })); return R(u, o); }; })();` }); // no workflow: the page is its one empty line (a shared server may hold workflows other suites made)
         for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) {
             const at = `at ${w}px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
@@ -114,10 +115,10 @@ const STUB = `(() => {
             assert.equal(await ev(`document.querySelectorAll('#wf-steps-editor .wf-step-editor-item').length`), 1);
             assert.equal(await ev(`document.querySelectorAll('#wf-create-modal [aria-invalid]').length`), 0, at + 'no mark is left over');
         }
-        // the Workflows page behind the dialog: no count, no empty pill after the title
+        // the Workflows page behind the dialog: with no workflow, one empty line and no count pill (the page has no header of its own, #7471)
         await ev(`document.querySelector('#wf-create-modal .modal-close-btn').click(); window.switchNavTab('workflows'); true`);
-        await waitFor(`document.getElementById('wf-title').textContent === 'Workflows'`, 'the Workflows page', 8000);
-        assert.equal(await ev(`(() => { const b = document.getElementById('wf-count-badge'); return !b.textContent.trim() && !b.checkVisibility(); })()`), true, 'with no count the badge is not drawn');
+        await waitFor(`!!document.querySelector('#wf-list-empty .empty-line') && document.querySelector('#wf-list-empty .empty-line').checkVisibility()`, 'the Workflows page', 8000);
+        assert.equal(await ev(`document.getElementById('wf-count-badge')`), null, 'the page draws no count badge');
         console.log('PASS workflow form: Name, Steps first, the rest behind More options; errors in words');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

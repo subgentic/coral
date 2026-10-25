@@ -33,7 +33,8 @@ const STUB = `(() => {
             await tap(ev, '#scheduled-jobs-list [data-on-click="job-select"]');
             await waitFor(`/Hourly job/.test(document.getElementById('scheduler-detail').textContent) && !!document.querySelector('#scheduler-detail [data-on-click="job-edit"]')`, 'the job detail', 10000);
             const detail = await ev(`(() => { const d = document.getElementById('scheduler-detail').getBoundingClientRect(); return { top: Math.round(d.top), vh: innerHeight }; })()`);
-            assert.ok(detail.top < detail.vh * 0.5, `phone: the picked job's detail is brought into view (${JSON.stringify(detail)})`);
+            assert.ok(detail.top < detail.vh - 250, // the list above it holds the shared header and its group headers (#7443): enough of the job is on screen to read it
+                 `phone: the picked job's detail is brought into view (${JSON.stringify(detail)})`);
             await tap(ev, '#scheduler-detail [data-on-click="job-edit"]');
             await waitFor(`[...document.querySelectorAll('.modal, dialog')].some(m => m.getClientRects().length > 0 && /cron|schedule/i.test(m.textContent))`, 'the job editor', 10000);
             console.log('ok phone');

@@ -340,10 +340,9 @@
             <!-- Chats tab with no chat open (#3152): not the Agents home -->
             <div id="chats-empty-view" class="welcome" style="display:none">
                 <div id="mobile-history-list"></div>
-                <div class="welcome-shell">
-                    <header class="welcome-header">
-                        <h1>Open a chat to read it</h1>
-                    </header>
+                <div class="empty-pane">
+                    <p class="empty-line">No chats yet.</p>
+                    <p class="empty-hint">A chat is listed here once an agent has talked.</p>
                 </div>
             </div>
 
@@ -351,16 +350,16 @@
 
             {{ template "includes/views/history_session.html" . }}
 
+            <!-- A sidebar group opened as a table (sidebar_groups.js, #7443) -->
+            <div id="group-table-view" style="display:none" class="group-table-view"></div>
+
             <!-- Scheduler Job Detail View -->
             <div id="scheduler-view" style="display:none" class="scheduler-view">
                 <div class="sched-view-header" id="sched-view-header">
                     <h2>Jobs</h2>
-                    <button class="btn btn-sm btn-primary" data-on-click="job-new">
-                        <span class="material-icons" style="font-size:1rem" aria-hidden="true">add</span> New Job
-                    </button>
                 </div>
                 <div id="mobile-jobs-list"></div>
-                <div id="scheduler-detail"><p class="sched-empty-hint">Choose a job in the list to see what it does and how its runs went.</p></div>
+                <div id="scheduler-detail"><div class="empty-pane sched-empty-hint"><p class="empty-line">Choose a job in the list.</p><p class="empty-hint">It shows what the job does and how its runs went.</p></div></div>
             </div>
 
             {{ template "includes/views/message_board.html" . }}

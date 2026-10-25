@@ -23,7 +23,8 @@ const RUN_AGENT = { id: 32, workflow_id: 7, workflow_name: 'Nightly', status: 'r
 const JOB = { id: 5, name: 'Hourly "job"', cron_expr: '0 * * * *', enabled: true, workflow_id: 7, workflow_name: 'Nightly', consecutive_failures: 0,
     workflow_runs: [{ id: 31, status: 'completed', current_step: 0, started_at: '2026-10-15T10:00:00Z', finished_at: '2026-10-15T10:01:00Z' }] };
 // An agent job: its runs table links each run's session.
-const AGENT_JOB = { id: 6, name: 'Agent job', cron_expr: '0 * * * *', enabled: true, agent_type: 'claude', prompt: 'p', repo_path: '/tmp', consecutive_failures: 0 };
+const LONG_PROMPT = 'p'.repeat(700); // a short prompt is shown on the job's page; only a long one is folded (#7443)
+const AGENT_JOB = { id: 6, name: 'Agent job', cron_expr: '0 * * * *', enabled: true, agent_type: 'claude', prompt: LONG_PROMPT, repo_path: '/tmp', consecutive_failures: 0 };
 const JOB_RUNS = { runs: [{ id: 44, status: 'completed', scheduled_at: '2026-10-15T10:00:00Z', started_at: '2026-10-15T10:00:00Z', finished_at: '2026-10-15T10:01:00Z', session_id: SID }] };
 
 (async () => {
@@ -70,10 +71,10 @@ const JOB_RUNS = { runs: [{ id: 44, status: 'completed', scheduled_at: '2026-10-
 
         // ── Workflows ──────────────────────────────────────────────────────
         await ev(`window.switchNavTab('workflows'); true`);
-        await until(`!!document.querySelector('#wf-list-container .wf-card[data-on-click="wf-select"]')`, 'the workflow list');
+        await until(`!!document.querySelector('#wf-nav-list .row-btn[data-on-click="wf-select"]')`, 'the workflow list');
         await clear();
-        await click('.wf-card[data-on-click="wf-select"]');
-        check('a workflow card opens the workflow', await sent('GET /api/workflows/7', 'the workflow') && await ev(`document.getElementById('wf-detail-container').style.display !== 'none'`));
+        await click('#wf-nav-list .row-btn[data-on-click="wf-select"]');
+        check('a workflow row opens the workflow', await sent('GET /api/workflows/7', 'the workflow') && await ev(`document.getElementById('wf-detail-container').style.display !== 'none'`));
         await until(`!!document.querySelector('#wf-detail-container tr[data-on-click="wf-run"]')`, 'its runs');
 
         await clear();
@@ -138,8 +139,10 @@ const JOB_RUNS = { runs: [{ id: 44, status: 'completed', scheduled_at: '2026-10-
         await until(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'the confirm dialog again');
         await click('#confirm-modal-yes');
         check('Yes kills the run', await sent('POST /api/workflows/runs/31/kill', 'the kill'));
-        await click('[data-on-click="wf-back"]');
-        check('Back returns to the list', await ev(`document.getElementById('wf-list-container').style.display !== 'none'`));
+        await click('#wf-run-back'); // a run's way back is its workflow; the workflow's is its group's table (#7471)
+        await until(`!!document.getElementById('wf-back-btn')`, 'the workflow page');
+        await click('#wf-back-btn');
+        check('Back returns to the list (the group table)', await ev(`document.getElementById('group-table-view').style.display !== 'none'`));
         // A run whose agent step is running: Kill says what happens to the agent's terminal log (Security's #4371 table, #4399).
         await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'workflows.js'); await m.selectWorkflowRun(32, { workflowId: 7 }); return true; })()`);
         await until(`!!document.querySelector('#wf-run-detail-container [data-on-click="wf-kill-run"]')`, 'the run with a running agent step');
@@ -178,11 +181,11 @@ const JOB_RUNS = { runs: [{ id: 44, status: 'completed', scheduled_at: '2026-10-
         await ev(`window.__hist = []; window.selectHistorySession = id => window.__hist.push(id); true`);
         await click('#scheduled-jobs-list [data-on-click="job-select"][data-job-id="6"]');
         await until(`!!document.querySelector('#scheduler-view [data-on-click="job-run-session"]')`, 'the agent job\'s runs', 5000);
-        check('the full job prompt starts folded', await ev(`(() => { const d=document.querySelector('.sched-prompt-section');return !d.open && !d.querySelector('pre').checkVisibility() && d.querySelector('pre').textContent==='p'; })()`));
+        check('the full job prompt starts folded', await ev(`(() => { const d=document.querySelector('.sched-prompt-section');return !d.open && !d.querySelector('pre').checkVisibility() && d.querySelector('pre').textContent==='${LONG_PROMPT}'; })()`));
         await ev(`document.querySelector('.sched-prompt-section > summary').focus();true`);
         await Input.dispatchKeyEvent({type:'keyDown',key:' ',code:'Space',windowsVirtualKeyCode:32,text:' '});
         await Input.dispatchKeyEvent({type:'keyUp',key:' ',code:'Space',windowsVirtualKeyCode:32});
-        check('Space opens the complete prompt in a bounded scroll region', await ev(`(() => { const d=document.querySelector('.sched-prompt-section'),p=d.querySelector('pre');return d.open && p.checkVisibility() && p.textContent==='p' && getComputedStyle(p).overflowY==='auto' && parseFloat(getComputedStyle(p).maxHeight)<=innerHeight*0.4+1; })()`));
+        check('Space opens the complete prompt in a bounded scroll region', await ev(`(() => { const d=document.querySelector('.sched-prompt-section'),p=d.querySelector('pre');return d.open && p.checkVisibility() && p.textContent==='${LONG_PROMPT}' && getComputedStyle(p).overflowY==='auto' && parseFloat(getComputedStyle(p).maxHeight)<=innerHeight*0.4+1; })()`));
         await click('#scheduler-view [data-on-click="job-run-session"]');
         check('a run\'s session link opens that session\'s history', JSON.stringify(await ev(`window.__hist`)) === JSON.stringify([SID]), JSON.stringify(await ev(`window.__hist`)));
         await ev(`(() => { const b = document.createElement('a'); b.setAttribute('data-on-click', 'job-run-session'); b.dataset.sessionId = '../../etc'; document.body.appendChild(b); b.click(); b.remove(); return true; })()`);
@@ -203,7 +206,7 @@ const JOB_RUNS = { runs: [{ id: 44, status: 'completed', scheduled_at: '2026-10-
         await click('#scheduler-view [data-on-click="job-edit"]');
         check('Edit opens the job dialog', await until(`(() => { const m = document.getElementById('job-modal'); return !!m && getComputedStyle(m).display !== 'none'; })()`, 'the job dialog', 5000).then(() => ev(`(() => { const m = document.getElementById('job-modal'); return !!m && getComputedStyle(m).display !== 'none'; })()`)));
         await ev(`window.hideJobModal && window.hideJobModal(); true`);
-        await click('#scheduler-view [data-on-click="job-new"]');
+        await click('.sidebar-pane[data-pane="jobs"] [data-on-click="job-new"]'); // New job is the Jobs sidebar's pinned action (#7443)
         check('New job opens an empty job dialog', await until(`(() => { const m = document.getElementById('job-modal'); return !!m && getComputedStyle(m).display !== 'none'; })()`, 'the new job dialog', 5000).then(() => ev(`(() => { const m = document.getElementById('job-modal'); return !!m && getComputedStyle(m).display !== 'none'; })()`)));
         await ev(`window.hideJobModal && window.hideJobModal(); true`);
 

@@ -52,8 +52,8 @@ const S = `(window.__coralStatic || '/static/')`;
         await ev(`window.switchNavTab('history'); (async () => { const m = await import(${S} + 'history_list.js'); window.__st = (await import(${S} + 'state.js')).state; window.__ctl = await import(${S} + 'controls.js');
             const rows = [1, 2, 3].map(i => ({ session_id: 'aaaaaa' + i, summary_title: 'Chat ' + i, source_type: 'claude', display_name: 'Ada', last_timestamp: new Date().toISOString() })).concat([{ type: 'group', session_id: 'board:team-a', title: 'team-a', updated_at: new Date().toISOString(), message_count: 2, subscriber_count: 1 }]);
             m.renderHistorySessions(rows, rows.length, 1, 50); return true; })()`);
-        await waitFor(`document.querySelectorAll('#history-sessions-list li').length === 4`, 'four chat rows', 8000);
-        const chat = await ev(`[...document.querySelectorAll('#history-sessions-list li')].map(li => ({ role: li.getAttribute('role'), tab: li.getAttribute('tabindex'), buttons: li.querySelectorAll('button.row-btn').length }))`);
+        await waitFor(`document.querySelectorAll('#history-sessions-list li:not(.session-group-header)').length === 4`, 'four chat rows', 8000);
+        const chat = await ev(`[...document.querySelectorAll('#history-sessions-list li:not(.session-group-header)')].map(li => ({ role: li.getAttribute('role'), tab: li.getAttribute('tabindex'), buttons: li.querySelectorAll('button.row-btn').length }))`);
         assert.deepEqual(chat, Array(4).fill({ role: null, tab: null, buttons: 1 }), 'a chat row is an li holding one real button: ' + JSON.stringify(chat));
         const curChat = () => ev(`[...document.querySelectorAll('#history-sessions-list [aria-current="true"]')].map(e => e.closest('li').dataset.sessionId)`);
         await ev(`window.__st.currentSession = { type: 'history', name: 'aaaaaa2' }; window.__ctl.updateSidebarActive(); true`);
@@ -62,12 +62,12 @@ const S = `(window.__coralStatic || '/static/')`;
         assert.deepEqual(await curChat(), ['aaaaaa3'], 'aria-current moved with the open chat');
         await ev(`window.__st.currentSession = null; window.__ctl.updateSidebarActive(); true`);
         assert.deepEqual(await curChat(), [], 'no chat is current when none is open');
-        // Workflows: a card is a button too
+        // Workflows: a row of the sidebar is a real button too (the cards became rows and a table in #7471)
         await ev(`window.switchNavTab('workflows'); true`);
-        await waitFor(`document.querySelectorAll('.wf-card').length === 2`, 'two workflow cards', 8000);
-        const card = await ev(`(() => { const c = document.querySelector('.wf-card'); return { role: c.getAttribute('role'), tab: c.tabIndex }; })()`);
-        assert.deepEqual(card, { role: 'button', tab: 0 }, 'a workflow card is a button with one Tab stop');
-        await ev(`document.querySelector('.wf-card').focus(); true`);
+        await waitFor(`document.querySelectorAll('#wf-nav-list .row-btn').length === 2`, 'two workflow rows', 8000);
+        const card = await ev(`(() => { const c = document.querySelector('#wf-nav-list .row-btn'); return { tag: c.tagName, tab: c.tabIndex }; })()`);
+        assert.deepEqual(card, { tag: 'BUTTON', tab: 0 }, 'a workflow row is a button');
+        await ev(`document.querySelector('#wf-nav-list .row-btn').focus(); true`);
         await key(' ', 32, ' ');
         await waitFor(`!!document.querySelector('.wf-detail, #workflow-detail, .wf-runs-table, .wf-steps') || /build/.test((document.getElementById('workflow-detail') || document.body).textContent)`, 'the workflow opened by Space', 6000);
         console.log('PASS list rows keyboard');

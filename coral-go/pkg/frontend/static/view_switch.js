@@ -11,6 +11,7 @@ const VIEW_IDS = [
     "live-session-view",
     "history-session-view",
     "scheduler-view",
+    "group-table-view",
     "messageboard-view",
     "workflows-view",
     "cost-dashboard-view",
@@ -29,6 +30,7 @@ const VIEW_DISPLAY = {
     "live-session-view": "flex",
     "history-session-view": "flex",
     "scheduler-view": "block",
+    "group-table-view": "block",
     "messageboard-view": "flex",
     "workflows-view": "block",
     "cost-dashboard-view": "flex",
@@ -41,16 +43,18 @@ const VIEW_DISPLAY = {
 };
 
 const FULL_WIDTH_VIEWS = new Set([
-    "cost-dashboard-view",
     "timeline-view",
     "kanban-view",
-    "workflows-view",
     "servers-view",
     "inbox-view",
     "artifacts-view",
 ]);
 
 let _viewChanges = 0;
+const shownHooks = [];
+
+/** fn(viewId) runs after every showView. */
+export function onViewShown(fn) { shownHooks.push(fn); }
 
 /** How many times showView has run: a view that loads asynchronously compares it to tell whether another view was shown meanwhile. */
 export function viewChanges() { return _viewChanges; }
@@ -82,5 +86,6 @@ export function showView(activeId) {
     const cli = !open || open.type !== 'live' || !open.agent_type ? '' : (isCloud() || normServer(open.server) !== LOCAL_SERVER) ? 'remote' : open.agent_type;
     if ((document.body.getAttribute('data-agent-cli') || '') !== cli) document.body.setAttribute('data-agent-cli', cli); // (written only when it changes: the startup sequence does not gain a write)
     setDockPage(activeId); // the right sidebar follows the kind of page: its tabs and its own open state (#4539)
+    for (const fn of shownHooks) fn(activeId); // the way back from an item to its group's table follows the view (sidebar_groups.js, #7443)
     checkAgentView(); // the agent's pollers and terminal socket follow whether its page is on screen (#3719)
 }

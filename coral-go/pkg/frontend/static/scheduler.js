@@ -12,6 +12,7 @@ import { runFailure, runFailureTag } from './run_failure.js';
 import { cronWords, atWords, awayWords, whenWords, resultWords, reasonWords, lastWords, limitWords, exitNote, resultLine } from './job_words.js';
 import { updateJobsSectionCount } from './live_jobs.js';
 import { limitSeconds, limitParts } from './time_limit.js';
+import { registerGroupSource, groupHeaderHtml, isGroupFolded, syncPaneGroupToggle, refreshGroupTable, backLinkHtml } from './sidebar_groups.js';
 
 let scheduledJobs = [];
 let selectedJobId = null;
@@ -63,43 +64,77 @@ async function fetchJobRuns(jobId) {
 
 // ── Sidebar rendering ────────────────────────────────────────────────────
 
+// ── Groups (#7443): Active and Paused; a group's name opens it as a table in the centre ──
+
+let jobsQuery = ''; // the search box's text, lower case
+const matchesQuery = job => !jobsQuery || String(job.name || '').toLowerCase().includes(jobsQuery);
+export function filterJobs(value) { jobsQuery = String(value || '').trim().toLowerCase(); renderJobsSidebar(); }
+
+const JOB_GROUPS = [{ key: 'active', label: 'Active', has: job => job.enabled }, { key: 'paused', label: 'Paused', has: job => !job.enabled }];
+const jobGroups = () => JOB_GROUPS.map(g => ({ ...g, jobs: scheduledJobs.filter(matchesQuery).filter(g.has) })).filter(g => g.jobs.length);
+
+function jobTableRow(job) {
+    return { title: job.name, action: 'job-select', data: { 'job-id': Number(job.id) }, cells: [cronWords(job.cron_expr) + (job.timezone ? ` (${job.timezone})` : ''), job.last_run ? lastWords(job.last_run) : '', job.enabled && job.next_fire_at ? awayWords(job.next_fire_at) : ''] };
+}
+
+registerGroupSource('jobs', {
+    keys: () => jobGroups().map(g => g.key),
+    redraw: () => renderJobsSidebar(),
+    table: key => { const g = jobGroups().find(x => x.key === key); return g ? { title: g.label, columns: ['Job', 'Schedule', 'Last run', 'Next'], rows: g.jobs.map(jobTableRow) } : null; },
+    isEmpty: () => document.getElementById('scheduler-view')?.style.display === 'block' && !!document.querySelector('#scheduler-detail > .sched-empty-hint') && document.body.getAttribute('data-nav-tab') === 'jobs',
+    showList: () => window.switchNavTab?.('jobs'),
+    empty: () => window.switchNavTab?.('jobs'),
+});
+
+/** One job's row in the list. */
+function jobRowHtml(job) {
+    const active = selectedJobId === job.id ? 'active' : '';
+    const lastStatus = job.last_run ? job.last_run.status : '';
+    const unseenRun = lastStatus === 'completed' && job.last_run.exit_reason === 'ended_while_coral_was_down'; // done, but Coral did not see the result: not the green of a pass (#6907)
+    const dot = unseenRun ? 'none' : lastStatus === 'completed' ? 'ok'
+        : lastStatus === 'running' ? 'run'
+        : lastStatus === 'failed' || lastStatus === 'killed' ? 'bad'
+        : 'none';
+    const dotWords = unseenRun ? 'Last run completed, result not seen' : lastStatus ? `Last run ${{ completed: 'passed', killed: 'stopped' }[lastStatus] || lastStatus}` : 'Not run yet'; // the words the row's text uses (passed, not completed) // the dot is a coloured circle: its words say what it means
+    const paused = job.enabled ? '' : `<span class="sched-chip">${job.paused_reason ? 'paused: failing' : 'paused'}</span>`;
+    // A job whose scheduling works but whose every run fails otherwise looks identical to a healthy one here.
+    const fails = job.consecutive_failures || 0;
+    const failBadge = fails >= 2
+        ? `<span class="sched-fail-badge" title="The last ${escapeAttr(fails)} runs failed">${fails} failed</span>`
+        : '';
+    const meta = [cronWords(job.cron_expr) + (job.timezone ? ` (${job.timezone})` : ''), lastWords(job.last_run), job.enabled && job.next_fire_at ? `next ${awayWords(job.next_fire_at)}` : ''].filter(Boolean).join(' · ');
+    // A run that failed for its folder or branch says so on the row, in the server's plain sentence (error_code names those), not "never run" with the cause out of sight (#6707).
+    const problem = job.last_run && job.last_run.status === 'failed' ? (job.last_run.error_code ? runError(job.last_run) : reasonWords(job.last_run)) : ''; // any failed run says why (#6956): the server's plain sentence for a coded one, the run's own error for the rest
+    const note = exitNote(job.last_run); // what the last run's exit_reason adds to its status (#6907): on the row as text, not only on hover
+    const nextTitle = job.enabled && job.next_fire_at ? `Next run ${atWords(job.next_fire_at)} your time` : '';
+    return `<li class="session-list-item sched-row ${escapeAttr(active)}" data-on-click="job-select" data-job-id="${Number(job.id)}" title="${escapeAttr(nextTitle)}"><button type="button" class="row-btn"${active ? ' aria-current="true"' : ''}>
+        <span class="sched-row-head"><span class="sched-dot sched-dot-${dot}" role="img" aria-label="${escapeAttr(dotWords)}" title="${escapeAttr(dotWords)}"></span> <span class="sched-row-name">${escapeHtml(job.name)}</span> ${paused} ${failBadge}</span>
+        <span class="sched-row-meta">${escapeHtml(meta)}</span>
+        ${problem ? `<span class="sched-row-problem">${escapeHtml(problem)}</span>` : note && !problem ? `<span class="sched-row-note">${escapeHtml(note)}</span>` : ''}
+    </button></li>`;
+}
+
 function renderJobsSidebar() {
     const list = document.getElementById('scheduled-jobs-list');
     if (!list) return;
     const hint = document.querySelector('#scheduler-detail > .sched-empty-hint'); // the empty pane says what to do (#6956)
-    if (hint) hint.textContent = scheduledJobs.length ? 'Choose a job in the list to see what it does and how its runs went.' : 'No jobs yet. New job schedules one.';
-    if (!scheduledJobs.length) {
-        list.innerHTML = '<li class="empty-state">No jobs yet. New job schedules one.</li>';
+    if (hint) {
+        const line = hint.querySelector('.empty-line'), more = hint.querySelector('.empty-hint');
+        if (line) line.textContent = scheduledJobs.length ? 'Choose a job in the list.' : 'No jobs yet.';
+        if (more) more.textContent = scheduledJobs.length ? 'It shows what the job does and how its runs went.' : 'New job, in the sidebar, schedules one.';
+    }
+    const groups = jobGroups();
+    if (!groups.length) {
+        list.innerHTML = scheduledJobs.length ? '<li class="empty-state">No job matches the search.</li>' : '<li class="empty-state">No jobs yet. New job schedules one.</li>';
+        syncPaneGroupToggle('jobs');
+        refreshGroupTable('jobs');
         updateJobsSectionCount();
         return;
     }
-    // One list of every job (#6521): its schedule, its last result and its next run in words.
-    list.innerHTML = scheduledJobs.map(job => {
-        const active = selectedJobId === job.id ? 'active' : '';
-        const lastStatus = job.last_run ? job.last_run.status : '';
-        const unseenRun = lastStatus === 'completed' && job.last_run.exit_reason === 'ended_while_coral_was_down'; // done, but Coral did not see the result: not the green of a pass (#6907)
-        const dot = unseenRun ? 'none' : lastStatus === 'completed' ? 'ok'
-            : lastStatus === 'running' ? 'run'
-            : lastStatus === 'failed' || lastStatus === 'killed' ? 'bad'
-            : 'none';
-        const dotWords = unseenRun ? 'Last run completed, result not seen' : lastStatus ? `Last run ${{ completed: 'passed', killed: 'stopped' }[lastStatus] || lastStatus}` : 'Not run yet'; // the words the row's text uses (passed, not completed) // the dot is a coloured circle: its words say what it means
-        const paused = job.enabled ? '' : `<span class="sched-chip">${job.paused_reason ? 'paused: failing' : 'paused'}</span>`;
-        // A job whose scheduling works but whose every run fails otherwise looks identical to a healthy one here.
-        const fails = job.consecutive_failures || 0;
-        const failBadge = fails >= 2
-            ? `<span class="sched-fail-badge" title="The last ${escapeAttr(fails)} runs failed">${fails} failed</span>`
-            : '';
-        const meta = [cronWords(job.cron_expr) + (job.timezone ? ` (${job.timezone})` : ''), lastWords(job.last_run), job.enabled && job.next_fire_at ? `next ${awayWords(job.next_fire_at)}` : ''].filter(Boolean).join(' · ');
-        // A run that failed for its folder or branch says so on the row, in the server's plain sentence (error_code names those), not "never run" with the cause out of sight (#6707).
-        const problem = job.last_run && job.last_run.status === 'failed' ? (job.last_run.error_code ? runError(job.last_run) : reasonWords(job.last_run)) : ''; // any failed run says why (#6956): the server's plain sentence for a coded one, the run's own error for the rest
-        const note = exitNote(job.last_run); // what the last run's exit_reason adds to its status (#6907): on the row as text, not only on hover
-        const nextTitle = job.enabled && job.next_fire_at ? `Next run ${atWords(job.next_fire_at)} your time` : '';
-        return `<li class="session-list-item sched-row ${escapeAttr(active)}" data-on-click="job-select" data-job-id="${Number(job.id)}" title="${escapeAttr(nextTitle)}"><button type="button" class="row-btn"${active ? ' aria-current="true"' : ''}>
-            <span class="sched-row-head"><span class="sched-dot sched-dot-${dot}" role="img" aria-label="${escapeAttr(dotWords)}" title="${escapeAttr(dotWords)}"></span> <span class="sched-row-name">${escapeHtml(job.name)}</span> ${paused} ${failBadge}</span>
-            <span class="sched-row-meta">${escapeHtml(meta)}</span>
-            ${problem ? `<span class="sched-row-problem">${escapeHtml(problem)}</span>` : note && !problem ? `<span class="sched-row-note">${escapeHtml(note)}</span>` : ''}
-        </button></li>`;
-    }).join('');
+    // Every job (#6521): its schedule, its last result and its next run in words, under its state's group.
+    list.innerHTML = groups.map(g => groupHeaderHtml('jobs', g.key, g.label, g.jobs.length) + (isGroupFolded('jobs', g.key) ? '' : g.jobs.map(jobRowHtml).join(''))).join('');
+    syncPaneGroupToggle('jobs');
+    refreshGroupTable('jobs');
     updateJobsSectionCount();
 }
 
@@ -134,7 +169,7 @@ export async function selectScheduledJob(jobId) {
 
     const [runs] = await Promise.all([fetchJobRuns(jobId), job.workflow_id ? loadWorkflowsById() : null]);
     renderJobDetail(job, runs);
-    if (isPhoneLayout()) document.getElementById('scheduler-detail')?.scrollIntoView({ block: 'start' }); // the list is above it on a phone: show the job that was picked (#6139)
+    if (isPhoneLayout()) { document.getElementById('scheduler-view')?.setAttribute('data-phone-item', ''); document.getElementById('scheduler-detail')?.scrollIntoView({ block: 'start' }); } // a phone shows the job's page as its own screen (#7443); the list is the screen before it (#6139)
 }
 
 function renderJobDetail(job, runs) {
@@ -155,7 +190,7 @@ function renderJobDetail(job, runs) {
     } else if (runs.length) {
         runsHtml = renderRunsTable(runs);
     } else {
-        runsHtml = '<p class="empty-state">No runs yet</p>';
+        runsHtml = '<p class="runs-empty-line">No runs yet.</p>';
     }
 
     // The failure comes first (#6521): a job that fires on schedule and fails every time otherwise looks fine until the run history is opened.
@@ -185,23 +220,23 @@ function renderJobDetail(job, runs) {
     ].filter(Boolean);
 
     const moreId = `sched-more-${Number(job.id)}`;
+    const group = JOB_GROUPS.find(g => g.has(job));
+    const status = [job.enabled ? 'Active' : (job.paused_reason ? 'Paused: failing' : 'Paused'), lastWords(job.last_run), job.enabled && job.next_fire_at ? `next ${awayWords(job.next_fire_at)}` : ''].filter(Boolean).join(' \u00b7 ');
+    // A short prompt is shown; a long one is folded (it would push the runs off the page)
+    const longPrompt = (job.prompt || '').length > 600 || (job.prompt || '').split('\n').length > 10;
+    const promptHtml = !isWorkflow && job.prompt
+        ? (longPrompt
+            ? `<details class="disclosure sched-prompt-section"><summary>Prompt</summary><pre class="sched-prompt">${escapeHtml(job.prompt)}</pre></details>`
+            : `<section class="sched-prompt-section sched-prompt-shown"><h3>Prompt</h3><pre class="sched-prompt">${escapeHtml(job.prompt)}</pre></section>`)
+        : '';
     container.innerHTML = `
-        <button type="button" class="sched-back" data-on-click="job-back">&lsaquo; Jobs</button>
+        ${backLinkHtml('jobs', group.key, group.label)}
+        <button type="button" class="sched-back" data-on-click="job-back">&larr; Back to the list</button>
         ${failBanner}
         <div class="sched-header">
             <h2>${escapeHtml(job.name)}</h2>
-            ${job.enabled ? '' : '<span class="sched-chip">paused</span>'}
-            <div class="sched-actions">
-                <button class="btn btn-small" data-on-click="job-edit" data-job-id="${Number(job.id)}">Edit</button>
-                <button class="btn btn-small" data-on-click="job-toggle" data-job-id="${Number(job.id)}">${job.enabled ? 'Pause' : 'Enable'}</button>
-                <div class="sched-more">
-                    <button class="btn btn-small sched-more-btn" type="button" data-on-click="job-more" aria-expanded="false" aria-controls="${escapeAttr(moreId)}" aria-label="More for ${escapeAttr(job.name)}">More</button>
-                    <div class="sched-more-menu" id="${escapeAttr(moreId)}" hidden>
-                        <button class="btn btn-small btn-warning sched-delete" type="button" data-on-click="job-delete" data-job-id="${Number(job.id)}" aria-label="Delete ${escapeAttr(job.name)}">Delete</button>
-                    </div>
-                </div>
-            </div>
         </div>
+        <p class="item-meta sched-status-line">${escapeHtml(status)}</p>
         ${job.description ? `<p class="sched-desc">${escapeHtml(job.description)}</p>` : ''}
         <dl class="sched-facts">
             <dt>Schedule</dt><dd title="${escapeAttr(job.cron_expr)}">${escapeHtml(cronWords(job.cron_expr))}${job.timezone ? ` (${escapeHtml(job.timezone)})` : ''}</dd>
@@ -210,17 +245,24 @@ function renderJobDetail(job, runs) {
                 : `<dt>Paused</dt><dd>${job.paused_reason ? `${escapeHtml(job.paused_reason)}. Fix the cause, then Enable to resume.` : 'Enable it to run on schedule.'}</dd>`}
             <dt>Does</dt><dd>${doesHtml}</dd>
         </dl>
+        ${promptHtml}
         <details class="disclosure sched-settings">
             <summary>Settings: ${isWorkflow ? 'folder, time limit' : 'folder, branch, time limit'}</summary>
             <dl class="sched-facts">${settingsRows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>
         </details>
-        ${!isWorkflow && job.prompt ? `<details class="disclosure sched-prompt-section">
-            <summary>Prompt</summary>
-            <pre class="sched-prompt">${escapeHtml(job.prompt)}</pre>
-        </details>` : ''}
         <div class="sched-runs-section">
             <h3>Runs</h3>
             ${runsHtml}
+        </div>
+        <div class="item-bar sched-actions">
+            <div class="sched-more">
+                <button class="btn btn-small sched-more-btn" type="button" data-on-click="job-more" aria-expanded="false" aria-controls="${escapeAttr(moreId)}" aria-label="More for ${escapeAttr(job.name)}">More</button>
+                <div class="sched-more-menu" id="${escapeAttr(moreId)}" hidden>
+                    <button class="btn btn-small btn-warning sched-delete" type="button" data-on-click="job-delete" data-job-id="${Number(job.id)}" aria-label="Delete ${escapeAttr(job.name)}">Delete</button>
+                </div>
+            </div>
+            <button class="btn btn-small" data-on-click="job-edit" data-job-id="${Number(job.id)}">Edit</button>
+            <button class="btn btn-small btn-primary" data-on-click="job-toggle" data-job-id="${Number(job.id)}">${job.enabled ? 'Pause' : 'Enable'}</button>
         </div>
     `;
 }
@@ -238,7 +280,7 @@ const tookOf = (r) => (r.started_at && r.finished_at ? formatDuration(new Date(r
 // The runs of a job, one table for both kinds (#6521): when, what came of it in words, how long it took.
 function renderWorkflowRunsTable(runs) {
     return `<table class="sched-runs-table">
-        <thead><tr><th>When</th><th>Result</th><th>Took</th></tr></thead>
+        <thead><tr><th scope="col">Started</th><th scope="col">Result</th><th scope="col">Duration</th></tr></thead>
         <tbody>${runs.map(r => `<tr data-on-click="job-run" data-run-id="${Number(r.id)}" style="cursor:pointer">
                 <td><button type="button" class="row-open-btn" data-on-click="job-run" data-run-id="${Number(r.id)}">${escapeHtml(whenWords(r.started_at || r.created_at) || '-')}</button></td>
                 <td>${resultCell(r)}</td>
@@ -249,7 +291,7 @@ function renderWorkflowRunsTable(runs) {
 
 function renderRunsTable(runs) {
     return `<table class="sched-runs-table">
-        <thead><tr><th>When</th><th>Result</th><th>Took</th></tr></thead>
+        <thead><tr><th scope="col">Started</th><th scope="col">Result</th><th scope="col">Duration</th></tr></thead>
         <tbody>${runs.map(r => {
             const sessionLink = r.session_id
                 ? ` <a href="#" class="run-session-link" title="Open the conversation" data-on-click="job-run-session" data-session-id="${escapeAttr(r.session_id)}">Open the conversation</a>`
@@ -636,9 +678,10 @@ export function initScheduler() {
 // Ids are checked (idOf, uuidOf) before use: a bad one does nothing. Deleting still asks first.
 registerActions({
     'job-new': () => showJobModal(),
+    'jobs-search-filter': el => filterJobs(el.value),
     'job-limit-check': () => checkLimit(),
     'job-select': el => withId(el.dataset.jobId, selectScheduledJob),
-    'job-back': () => { const list = document.getElementById('scheduled-jobs-list'); const open = list && (list.querySelector('[aria-current="true"] .row-btn') || list.querySelector('.row-btn')); if (list) list.scrollIntoView({ block: 'start' }); if (open) open.focus({ preventScroll: true }); }, // a phone: the job's page is under the list; back to the list with the open job focused (#7121)
+    'job-back': () => { document.getElementById('scheduler-view')?.removeAttribute('data-phone-item'); const list = document.getElementById('scheduled-jobs-list'); const open = list && (list.querySelector('[aria-current="true"] .row-btn') || list.querySelector('.row-btn')); if (open) open.focus({ preventScroll: true }); }, // a phone: the job's page is under the list; back to the list with the open job focused (#7121)
     'job-edit': el => withId(el.dataset.jobId, editScheduledJob),
     'job-toggle': el => withId(el.dataset.jobId, toggleScheduledJob),
     'job-delete': el => withId(el.dataset.jobId, deleteScheduledJob),

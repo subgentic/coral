@@ -2,6 +2,7 @@
             <!-- History Session View -->
             <div id="history-session-view" class="session-view" style="display:none">
                 <div class="session-header">
+                    <button type="button" id="history-back" class="group-back" data-on-click="sgroup-open" data-kind="history" data-group="" hidden></button>
                     <div class="history-title-row">
                         <button type="button" class="btn btn-small mobile-history-back" data-on-click="history-list" aria-label="Back to chats">Chats</button>
                         <h2 id="history-session-title">Session History</h2>
@@ -9,29 +10,12 @@
                             <span class="branch-icon">&#x2387;</span> <span class="branch-text" tabindex="0" role="button" aria-expanded="false"></span>
                             <button class="copy-branch-btn" data-on-click="copy-branch" title="Copy branch name" aria-label="Copy branch name"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M5 11H3.5A1.5 1.5 0 0 1 2 9.5V3.5A1.5 1.5 0 0 1 3.5 2h6A1.5 1.5 0 0 1 11 3.5V5"/></svg></button>
                         </span>
-                        <button type="button" id="history-session-details" class="btn btn-small" data-on-click="history-details" aria-expanded="false" aria-controls="history-session-id" title="Show this chat's id">Details</button>
                         <span id="history-session-id" class="session-id-label" hidden></span>
                         <span id="history-session-source" class="session-id-label" hidden></span>
                         <a id="history-session-board-link" href="javascript:void(0)" class="badge board-badge" style="display:none;cursor:pointer;text-decoration:none" title="View Group Chat"></a>
                         <div id="history-session-tags" class="tag-list"></div>
-                        <button class="btn btn-small" data-history-local-only data-on-click="tag-dropdown-show" title="Add tag">+ Tag</button>
-                        <button data-history-local-only id="btn-resume-session" class="btn btn-small"
-                          data-on-click="resume-show" title="Resume this session in a live agent"
-                          style="display:none">Resume</button>
                     </div>
-                    <!-- Tag Dropdown -->
-                    <div id="tag-dropdown" class="tag-dropdown" style="display:none">
-                        <div class="tag-dropdown-header">
-                            <span>Add Tag</span>
-                            <button class="btn btn-small" data-on-click="tag-dropdown-hide">Close</button>
-                        </div>
-                        <div class="tag-dropdown-list" id="tag-dropdown-list"></div>
-                        <div class="tag-dropdown-create">
-                            <input type="text" id="new-tag-name" placeholder="New tag name...">
-                            <input type="color" id="new-tag-color" value="#58a6ff">
-                            <button class="btn btn-small btn-primary" data-on-click="tag-create">Add</button>
-                        </div>
-                    </div>
+                    <p id="history-session-meta" class="item-meta" hidden></p>
                 </div>
                 <!-- Token Usage Summary -->
                 <div id="history-token-usage" class="history-token-usage" style="display:none">
@@ -113,6 +97,26 @@
                         <a id="history-changes-download" class="btn btn-small" href="#" download="changes.diff">Download</a>
                     </div>
                     <pre id="history-changes-content" class="history-changes-content"></pre>
+                </div>
+                <!-- The page's actions are its pinned bar, the primary last (#7443); the tag dropdown opens in the bar -->
+                <div class="item-bar history-item-bar">
+                    <div id="tag-dropdown" class="tag-dropdown" style="display:none">
+                        <div class="tag-dropdown-header">
+                            <span>Add Tag</span>
+                            <button class="btn btn-small" data-on-click="tag-dropdown-hide">Close</button>
+                        </div>
+                        <div class="tag-dropdown-list" id="tag-dropdown-list"></div>
+                        <div class="tag-dropdown-create">
+                            <input type="text" id="new-tag-name" placeholder="New tag name...">
+                            <input type="color" id="new-tag-color" value="#58a6ff">
+                            <button class="btn btn-small btn-primary" data-on-click="tag-create">Add</button>
+                        </div>
+                    </div>
+                    <button type="button" id="history-session-details" class="btn btn-small" data-on-click="history-details" aria-expanded="false" aria-controls="history-session-id" title="Show this chat's id">Details</button>
+                    <button class="btn btn-small" data-history-local-only data-on-click="tag-dropdown-show" title="Add tag">+ Tag</button>
+                    <button data-history-local-only id="btn-resume-session" class="btn btn-small"
+                      data-on-click="resume-show" title="Resume this session in a live agent"
+                      style="display:none">Resume</button>
                 </div>
             </div>
 

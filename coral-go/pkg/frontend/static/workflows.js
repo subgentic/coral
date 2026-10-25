@@ -11,20 +11,80 @@ import { formatDuration as fmtDuration } from './format.js';
 import { runFailureHtml, runFailureTag } from './run_failure.js';
 import { whenWords, resultWords, limitWords, stepWords } from './job_words.js'; // the Jobs pages' words: one set for both
 import { limitSeconds, limitParts } from './time_limit.js';
+import { registerGroupSource, groupHeaderHtml, isGroupFolded, syncPaneGroupToggle, refreshGroupTable, openFirstGroupTable, backLinkHtml } from './sidebar_groups.js';
+import { onViewShown } from './view_switch.js';
+import { isPhoneLayout } from './phone_layout.js';
 
 let workflows = [];
 let selectedWorkflowId = null;
 let currentRunPollTimer = null;
 let editingWorkflowId = null; // non-null when editing
 let shownRun = null; // the run renderRunDetail last drew, for the Kill confirmation's wording
+let wfQuery = '';    // the sidebar search's text, lower case
+
+// ── Groups (#7471): Active and Paused (a workflow that is switched off: it is finished, not a draft) ─────────
+const WF_GROUPS = [{ key: 'active', label: 'Active', has: w => w.enabled }, { key: 'wf-paused', label: 'Paused', has: w => !w.enabled }];
+const stepsOf = w => w.step_count || (w.steps ? w.steps.length : 0);
+const wfMatches = w => !wfQuery || String(w.name || '').toLowerCase().includes(wfQuery) || String(w.description || '').toLowerCase().includes(wfQuery);
+const wfGroups = () => WF_GROUPS.map(g => ({ ...g, items: workflows.filter(wfMatches).filter(g.has) })).filter(g => g.items.length);
+const groupOfWorkflow = w => WF_GROUPS.find(g => g.has(w)) || WF_GROUPS[0];
+export function filterWorkflows(value) { wfQuery = String(value || '').trim().toLowerCase(); renderWorkflowList(); }
+
+/** What a workflow's last run was, in words, for the table and the sidebar row: "Passed", "Failed: step 2 (Test)", or "" when it never ran. */
+function lastResult(lr) {
+    if (!lr) return '';
+    if (lr.status === 'failed' || lr.status === 'killed') { const fs = lr.failed_step; return lr.status === 'killed' ? 'Stopped' : fs ? `Failed: step ${Number(fs.number)} (${fs.name})` : 'Failed'; }
+    return resultWords(lr);
+}
+
+registerGroupSource('workflows', {
+    keys: () => wfGroups().map(g => g.key),
+    redraw: () => renderWorkflowList(),
+    table: key => {
+        const g = wfGroups().find(x => x.key === key);
+        if (!g) return null;
+        return { title: g.label, columns: ['Workflow', 'Steps', 'Last run', 'Result', 'Run'],
+            rows: g.items.map(w => ({ title: w.name, action: 'wf-select', data: { 'workflow-id': Number(w.id) },
+                cells: [String(stepsOf(w)), w.last_run && w.last_run.started_at ? whenWords(w.last_run.started_at) : '', lastResult(w.last_run), { action: 'wf-trigger', data: { 'workflow-id': Number(w.id) }, label: 'Run', aria: `Run ${w.name}` }] })),
+            extra: { action: 'wf-build-agent', label: 'Build with Agent', icon: 'smart_toy', title: 'Starts an agent that builds the workflow with you' } };
+    },
+    isEmpty: () => false, // the tab opens its first table itself (fetchWorkflows)
+    showList: () => workflowsBackToList(),
+    empty: () => workflowsBackToList(),
+});
+
+// A group's table on screen is the page: no workflow or run is open (the sidebar's open row clears).
+onViewShown(id => { if (id === 'group-table-view' && document.body.getAttribute('data-nav-tab') === 'workflows' && (selectedWorkflowId || openRunId)) { selectedWorkflowId = null; openRunId = null; stopRunPolling(); renderWorkflowList(); } });
+let openRunId = null;
+
+/** On a phone the list is the page and an open workflow or run is the screen after it (data-phone-item, workflows.css). */
+function syncPhonePage() {
+    const view = document.getElementById('workflows-view');
+    if (!view) return;
+    if (isPhoneLayout() && (selectedWorkflowId || openRunId)) view.setAttribute('data-phone-item', ''); else view.removeAttribute('data-phone-item');
+    // With no workflow on a phone the empty page (its hint and Build with Agent) is shown under the list, or Build with Agent could not be reached
+    if (isPhoneLayout() && !workflows.length && !selectedWorkflowId && !openRunId) view.setAttribute('data-phone-empty', ''); else view.removeAttribute('data-phone-empty');
+}
+export function workflowsPhoneBack() {
+    selectedWorkflowId = null; openRunId = null; stopRunPolling();
+    syncPhonePage();
+    renderWorkflowList();
+    document.querySelector('#wf-nav-list .row-btn')?.focus({ preventScroll: true });
+}
 
 // ── API helpers ────────────────────────────────────────────────────────
 
-async function fetchWorkflows() {
+async function fetchWorkflows({ openFirst = false } = {}) {
     try {
         const data = await apiFetch('/api/workflows');
         workflows = data.workflows || [];
         renderWorkflowList();
+        // The tab opens on its first group's table (a phone shows the list); with no workflow the page says so
+        if (openFirst && !selectedWorkflowId && !openRunId) {
+            showListPage();
+            if (workflows.length && !isPhoneLayout()) openFirstGroupTable('workflows');
+        }
+        syncPhonePage();
     } catch (e) {
         console.error('Failed to fetch workflows:', e);
     }
@@ -62,7 +122,16 @@ async function fetchRunDetail(runId) {
 
 export function showWorkflowsTab() {
     showView('workflows-view');
-    fetchWorkflows();
+    if (selectedWorkflowId || openRunId) { syncPhonePage(); fetchWorkflows(); return; } // a workflow or a run is open: the tab returns to it
+    showListPage();
+    fetchWorkflows({ openFirst: true });
+}
+
+/** The page of no open workflow or run: only the empty line is in it (the table is its own view). */
+function showListPage() {
+    document.getElementById('wf-list-container').style.display = workflows.length ? 'none' : '';
+    document.getElementById('wf-detail-container').style.display = 'none';
+    document.getElementById('wf-run-detail-container').style.display = 'none';
 }
 
 // ── Build with Agent ──────────────────────────────────────────────────
@@ -72,7 +141,7 @@ export function showWorkflowsTab() {
 // root. They intentionally do not use the multi-server launch picker.
 
 export async function launchWorkflowAgent() {
-    const btn = document.getElementById('wf-build-agent-btn');
+    const btn = document.activeElement?.closest?.('[data-on-click="wf-build-agent"]') || document.getElementById('wf-build-agent-btn'); // the empty page's button or the table head's
     if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-icons" style="font-size:1rem" aria-hidden="true">hourglass_top</span> Launching\u2026'; }
 
     try {
@@ -186,54 +255,23 @@ ${wfJSON}
 // ── Workflow list ──────────────────────────────────────────────────────
 
 function renderWorkflowList() {
-    const list = document.getElementById('wf-list');
-    const empty = document.getElementById('wf-list-empty');
-    const badge = document.getElementById('wf-count-badge');
+    const list = document.getElementById('wf-nav-list');
     if (!list) return;
-
-    if (badge) badge.textContent = workflows.length ? `${workflows.length}` : '';
-    // the lines that say how Build with Agent and New Workflow differ and what starts a workflow are on the page while there are no workflows to look at; once there are, they are one closed disclosure (#7001)
-    const hints = document.getElementById('wf-hints');
-    if (hints) { const emptyNow = workflows.length === 0; if (hints.dataset.empty !== String(emptyNow)) { hints.dataset.empty = String(emptyNow); hints.open = emptyNow; } }
-
-    if (!workflows.length) {
-        empty.style.display = '';
-        list.innerHTML = '';
-        return;
-    }
-    empty.style.display = 'none';
-
-    list.innerHTML = workflows.map(wf => {
-        // only a workflow that is off says so (#6515): "enabled" on every card was noise
-        const enabledBadge = wf.enabled ? '' : '<span class="wf-badge wf-badge-disabled">disabled</span>';
-        const stepCount = wf.step_count || (wf.steps ? wf.steps.length : 0);
-
-        let lastRunHtml = '';
-        if (wf.last_run) {
-            const lr = wf.last_run;
-            lastRunHtml = `<span class="wf-last-run-status">
-                <span class="wf-status-dot ${esc(lr.status)}"></span> ${esc(lr.status)}${runFailureTag(lr)}
-                ${lr.started_at ? '&middot; ' + formatTime(lr.started_at) : ''}
-            </span>`;
-        } else {
-            lastRunHtml = '<span style="color:var(--text-muted)">Never run</span>';
-        }
-
-        const runLabel = 'Run ' + wf.name; // names the card's button
-        // The card is the button that opens the workflow; Run is its sibling, not inside it (a button in a button is not one control), one click, named for its card (#7219)
-        return `<div class="wf-card-wrap"><div class="wf-card" data-on-click="wf-select" role="button" tabindex="0" data-key-click data-workflow-id="${Number(wf.id)}">
-            <div class="wf-card-top">
-                <span class="wf-card-name">${esc(wf.name)}</span>
-                <span class="wf-card-badges">
-                    <span class="wf-badge wf-badge-steps">${stepCount} step${stepCount !== 1 ? 's' : ''}</span>
-                    ${enabledBadge}
-                </span>
-            </div>
-            ${wf.description ? `<div class="wf-card-desc">${esc(wf.description)}</div>` : ''}
-            <div class="wf-card-footer">${lastRunHtml}</div>
-        </div>
-        <button type="button" class="btn btn-sm btn-primary wf-card-run" data-on-click="wf-trigger" data-workflow-id="${Number(wf.id)}" aria-label="${escAttr(runLabel)}"><span class="material-icons" aria-hidden="true">play_arrow</span> Run</button></div>`;
-    }).join('');
+    // The workflows by group in the sidebar: a row is its name and one muted line (its steps and how its last run went).
+    const groups = wfGroups();
+    const row = w => {
+        const last = w.last_run ? [lastResult(w.last_run), w.last_run.started_at ? whenWords(w.last_run.started_at) : ''].filter(Boolean).join(' ') : 'never run';
+        const n = stepsOf(w);
+        const open = Number(selectedWorkflowId) === Number(w.id);
+        return `<li class="session-list-item wf-nav-row${escAttr(open ? ' active' : '')}"><button type="button" class="row-btn"${open ? ' aria-current="true"' : ''} data-on-click="wf-select" data-workflow-id="${Number(w.id)}"><span class="wf-nav-name">${esc(w.name)}</span><span class="wf-nav-meta">${esc(`${n} step${n !== 1 ? 's' : ''} \u00b7 ${last}`)}</span></button></li>`;
+    };
+    list.innerHTML = groups.map(g => groupHeaderHtml('workflows', g.key, g.label, g.items.length) + (isGroupFolded('workflows', g.key) ? '' : g.items.map(row).join(''))).join('')
+        || (workflows.length ? '<li class="empty-state">No workflow matches the search.</li>' : '<li class="empty-state">No workflows yet.</li>');
+    // No workflow at all: the page says so (once there are some, the first group's table is the page)
+    const empty = document.getElementById('wf-list-container');
+    if (empty && !selectedWorkflowId && !openRunId) empty.style.display = workflows.length ? 'none' : '';
+    syncPaneGroupToggle('workflows');
+    refreshGroupTable('workflows');
 }
 
 // ── Workflow detail ────────────────────────────────────────────────────
@@ -244,22 +282,20 @@ function noteWorkflows(route) {
 }
 
 export async function selectWorkflow(id) {
-    selectedWorkflowId = id;
+    selectedWorkflowId = id; openRunId = null;
     stopRunPolling();
 
     const wf = await fetchWorkflowDetail(id);
     if (!wf) return false;
     noteWorkflows({ view: 'workflows', id: Number(id) });
 
-    // Show detail, hide list
+    // The workflow is the page now (a group's table may be on screen)
+    showView('workflows-view');
     document.getElementById('wf-list-container').style.display = 'none';
     document.getElementById('wf-run-detail-container').style.display = 'none';
     document.getElementById('wf-detail-container').style.display = '';
-    document.getElementById('wf-back-btn').style.display = '';
-    document.getElementById('wf-create-btn').style.display = 'none';
-    document.getElementById('wf-build-agent-btn').style.display = 'none';
-    document.getElementById('wf-title').textContent = wf.name;
-    document.getElementById('wf-count-badge').hidden = true;
+    syncPhonePage();
+    renderWorkflowList(); // the open row says so
 
     const runs = await fetchWorkflowRuns(id, 10);
     renderWorkflowDetail(wf, runs);
@@ -282,18 +318,15 @@ function renderWorkflowDetail(wf, runs) {
     if (!container) return;
 
     const steps = wf.steps || [];
-    const stepsHtml = steps.map((s, i) => {
-        const stepType = s.type || 'shell';
-        const what = stepType === 'shell' ? s.command : s.prompt;
-        return `<div class="wf-step-item">
-            <span class="wf-step-index" aria-hidden="true">${i + 1}</span>
-            <div class="wf-step-text">
-                <span class="wf-step-name"><span class="sr-only">Step ${i + 1}: </span>${esc(s.name)}</span>
-                ${what ? `<code class="wf-step-what">${esc(String(what).slice(0, 300))}</code>` : ''}
-            </div>
-            <span class="wf-step-type">${esc(stepType)}</span>
-        </div>`;
-    }).join('');
+    // The steps are a table (Step, Type, Command): a command is code, so it is the one cell in the code font
+    const stepsHtml = steps.length ? `<table class="wf-steps-table">
+        <thead><tr><th scope="col">Step</th><th scope="col">Type</th><th scope="col">Command</th></tr></thead>
+        <tbody>${steps.map((s, i) => {
+            const stepType = s.type || 'shell';
+            const what = stepType === 'shell' ? s.command : s.prompt;
+            return `<tr><td><span class="sr-only">Step ${i + 1}: </span>${esc(s.name)}</td><td>${esc(stepType)}</td><td>${what ? `<code class="wf-step-what">${esc(String(what).slice(0, 300))}</code>` : '\u2014'}</td></tr>`;
+        }).join('')}</tbody>
+    </table>` : '<p class="runs-empty-line">No steps yet.</p>';
 
     const last = runs[0];
     const lastHtml = last && (last.status === 'failed' || last.status === 'killed') ? `<p class="wf-last-failed" role="status">
@@ -303,54 +336,51 @@ function renderWorkflowDetail(wf, runs) {
     let runsHtml = '';
     if (runs.length) {
         const rowsHtml = runs.map(r => `<tr data-on-click="wf-run" data-run-id="${Number(r.id)}">
-                <td><button type="button" class="row-open-btn" data-on-click="wf-run" data-run-id="${Number(r.id)}">${r.started_at ? esc(whenWords(r.started_at)) : '—'}</button></td>
+                <td><button type="button" class="row-open-btn" data-on-click="wf-run" data-run-id="${Number(r.id)}">${r.started_at ? esc(whenWords(r.started_at)) : '\u2014'}</button></td>
                 <td>${statusIconHtml(r.status)} ${runResult(r)}</td>
-                <td>${r.duration_seconds != null ? (r.duration_seconds < 1 ? 'under 1s' : esc(formatDuration(Math.round(r.duration_seconds)))) : '—'}</td>
+                <td>${r.duration_seconds != null ? (r.duration_seconds < 1 ? 'under 1s' : esc(formatDuration(Math.round(r.duration_seconds)))) : '\u2014'}</td>
                 <td>${esc(r.trigger_type || '')}</td>
             </tr>`).join('');
         runsHtml = `<table class="wf-runs-table">
-            <thead><tr><th>When</th><th>Result</th><th>Took</th><th>Started by</th></tr></thead>
+            <thead><tr><th scope="col">Started</th><th scope="col">Result</th><th scope="col">Duration</th><th scope="col">Trigger</th></tr></thead>
             <tbody>${rowsHtml}</tbody>
         </table>`;
     } else {
-        runsHtml = '<p style="color:var(--text-muted);font-size:0.8125rem">No runs yet.</p>';
+        runsHtml = '<p class="runs-empty-line">No runs yet.</p>';
     }
 
+    const group = groupOfWorkflow(wf);
+    // One facts line under the name (folder, time limit, when it was made, and that it is off)
+    const facts = [`Folder ${wf.repo_path || 'not set'}`, `Time limit ${limitWords(wf.max_duration_s || 3600)}`, wf.created_at ? `Created ${formatTime(wf.created_at)}` : '', wf.enabled ? '' : 'Disabled'].filter(Boolean).join(' \u00b7 ');
     container.innerHTML = `
-        <div class="wf-detail-header">
-            <div>
-                ${wf.description ? `<div style="color:var(--text-secondary);font-size:0.8125rem">${esc(wf.description)}</div>` : ''}
-                ${lastHtml}
-            </div>
-            <div class="wf-detail-actions">
-                <button class="btn btn-sm btn-primary" data-on-click="wf-trigger" data-workflow-id="${Number(wf.id)}">
-                    <span class="material-icons" style="font-size:0.875rem" aria-hidden="true">play_arrow</span> Run
-                </button>
-                <button class="btn btn-sm" data-on-click="wf-edit" data-workflow-id="${Number(wf.id)}">Edit</button>
-                <button class="btn btn-sm" data-on-click="wf-edit-agent" data-workflow-id="${Number(wf.id)}">
-                    <span class="material-icons" style="font-size:0.875rem" aria-hidden="true">smart_toy</span> Edit with Agent
-                </button>
-                <div class="wf-more">
-                    <button class="btn btn-sm wf-more-btn" type="button" data-on-click="wf-more" aria-expanded="false" aria-controls="wf-more-menu-${Number(wf.id)}" aria-label="More for ${escAttr(wf.name)}">More</button>
-                    <div class="wf-more-menu" id="wf-more-menu-${Number(wf.id)}" hidden>
-                        <button class="btn btn-sm" style="color:var(--error-text)" data-on-click="wf-delete" data-workflow-id="${Number(wf.id)}" data-name="${escAttr(wf.name)}">Delete</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="wf-detail-meta">
-            <span><span class="material-icons" aria-hidden="true">folder</span> Folder: ${esc(wf.repo_path || 'not set')}</span>
-            <span><span class="material-icons" aria-hidden="true">timer</span> Time limit ${limitWords(wf.max_duration_s || 3600)}</span>
-            <span><span class="material-icons" aria-hidden="true">schedule</span> Created ${formatTime(wf.created_at)}</span>
-            ${wf.enabled ? '' : '<span style="color:var(--warning)"><span class="material-icons" aria-hidden="true">pause_circle</span> Disabled</span>'}
-        </div>
+        ${backLinkHtml('workflows', group.key, group.label, 'wf-back-btn')}
+        <button type="button" class="group-back wf-phone-back" data-on-click="wf-phone-back">&larr; Back to the list</button>
+        <h2 class="wf-item-title" id="wf-title">${esc(wf.name)}</h2>
+        <p class="item-meta wf-facts-line">${esc(facts)}</p>
+        ${wf.description ? `<p class="wf-desc">${esc(wf.description)}</p>` : ''}
+        ${lastHtml}
         <div class="wf-steps-section">
             <h3>Steps (${steps.length})</h3>
-            <div class="wf-step-list">${stepsHtml}</div>
+            ${stepsHtml}
         </div>
         <div class="wf-runs-section">
             <h3>Runs</h3>
             ${runsHtml}
+        </div>
+        <div class="item-bar wf-detail-actions">
+            <div class="wf-more">
+                <button class="btn btn-sm wf-more-btn" type="button" data-on-click="wf-more" aria-expanded="false" aria-controls="wf-more-menu-${Number(wf.id)}" aria-label="More for ${escAttr(wf.name)}">More</button>
+                <div class="wf-more-menu" id="wf-more-menu-${Number(wf.id)}" hidden>
+                    <button class="btn btn-sm btn-warning" data-on-click="wf-delete" data-workflow-id="${Number(wf.id)}" data-name="${escAttr(wf.name)}">Delete</button>
+                </div>
+            </div>
+            <button class="btn btn-sm" data-on-click="wf-edit-agent" data-workflow-id="${Number(wf.id)}">
+                <span class="material-icons" style="font-size:0.875rem" aria-hidden="true">smart_toy</span> Edit with Agent
+            </button>
+            <button class="btn btn-sm" data-on-click="wf-edit" data-workflow-id="${Number(wf.id)}">Edit</button>
+            <button class="btn btn-sm btn-primary" data-on-click="wf-trigger" data-workflow-id="${Number(wf.id)}">
+                <span class="material-icons" style="font-size:0.875rem" aria-hidden="true">play_arrow</span> Run
+            </button>
         </div>
     `;
 }
@@ -365,12 +395,14 @@ export async function selectWorkflowRun(runId, { workflowId } = {}) {
     const wfId = Number(run.workflow_id || workflowId || selectedWorkflowId);
     if (wfId) noteWorkflows({ view: 'workflows', id: wfId, run: Number(runId) });
 
+    // The run is the page now (a group's table may be on screen)
+    openRunId = Number(runId); selectedWorkflowId = wfId || selectedWorkflowId;
+    showView('workflows-view');
     document.getElementById('wf-list-container').style.display = 'none';
     document.getElementById('wf-detail-container').style.display = 'none';
     document.getElementById('wf-run-detail-container').style.display = '';
-    document.getElementById('wf-back-btn').style.display = '';
-    document.getElementById('wf-create-btn').style.display = 'none';
-    document.getElementById('wf-build-agent-btn').style.display = 'none';
+    syncPhonePage();
+    renderWorkflowList();
 
     renderRunDetail(run);
 
@@ -514,7 +546,7 @@ function renderRunDetail(run) {
         : '';
 
     const retriggerBtn = !isActive && run.workflow_id
-        ? `<button class="btn btn-sm" data-on-click="wf-trigger" data-workflow-id="${Number(run.workflow_id)}">
+        ? `<button class="btn btn-sm btn-primary" data-on-click="wf-trigger" data-workflow-id="${Number(run.workflow_id)}">
             <span class="material-icons" style="font-size:0.875rem" aria-hidden="true">replay</span> Re-run
           </button>`
         : '';
@@ -522,11 +554,15 @@ function renderRunDetail(run) {
     // A run that is still going is drawn again every few seconds (#6639): what the person opened stays open and the control they were on keeps focus.
     const wasOpen = new Map([...container.querySelectorAll('.wf-run-step-output-toggle')].map(b => [b.getAttribute('aria-controls'), b.getAttribute('aria-expanded') === 'true']));
     const focusKey = document.activeElement && container.contains(document.activeElement) ? (document.activeElement.getAttribute('aria-controls') ? `c:${document.activeElement.getAttribute('aria-controls')}` : `a:${document.activeElement.dataset.onClick || ''}:${document.activeElement.dataset.session || document.activeElement.dataset.runId || ''}`) : '';
+    // The run's own page: a link back to its workflow, its title, and its actions in the pinned bar (Re-run is the primary; Kill is all there is while it runs)
+    const backHtml = run.workflow_id
+        ? `<button type="button" class="group-back" id="wf-run-back" data-on-click="wf-select" data-workflow-id="${Number(run.workflow_id)}">\u2190 ${esc(run.workflow_name || 'Workflow')}</button>`
+        : '';
     container.innerHTML = `
-        <div class="wf-run-header">
-            <h3 class="wf-run-title">Run #${run.id}</h3>
-            <div style="display:flex;gap:6px">${retriggerBtn}${killBtn}</div>
-        </div>
+        ${backHtml}
+        <button type="button" class="group-back wf-phone-back" data-on-click="wf-phone-back">&larr; Back to the list</button>
+        <h2 class="wf-item-title wf-run-title">Run #${run.id}</h2>
+        ${startedNote && startedNote.runId === Number(run.id) ? `<p class="item-meta wf-started-line">${esc(startedNote.text)}</p>` : ''}
         <div class="wf-run-meta">
             <span><span class="wf-status-badge ${esc(run.status)}">${esc(run.status)}</span></span>
             <span><span class="material-icons" aria-hidden="true">bolt</span> ${esc(run.trigger_type || 'api')}</span>
@@ -537,6 +573,7 @@ function renderRunDetail(run) {
         </div>
         ${progressBarHtml}
         <div class="wf-run-steps wf-timeline">${stepsHtml}</div>
+        ${killBtn || retriggerBtn ? `<div class="item-bar wf-run-actions">${killBtn}${retriggerBtn}</div>` : ''}
     `;
     for (const b of container.querySelectorAll('.wf-run-step-output-toggle')) {
         const id = b.getAttribute('aria-controls');
@@ -553,20 +590,32 @@ function renderRunDetail(run) {
 
 // ── Trigger ────────────────────────────────────────────────────────────
 
-export async function triggerWorkflow(id) {
+export async function triggerWorkflow(id, btn) {
+    // The button says it is working and is off until the run exists (a second click would start a second run); a status line then says what started (#7471)
+    const idle = btn ? btn.innerHTML : '';
+    if (btn) { btn.disabled = true; btn.textContent = 'Starting\u2026'; }
     try {
         const result = await apiFetch(`/api/workflows/${id}/trigger`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ trigger_type: 'ui' }),
         });
-        showToast(`Workflow triggered — run #${result.run_id}`);
+        const wf = workflows.find(w => Number(w.id) === Number(id));
+        const name = wf ? wf.name : (shownRun && shownRun.workflow_name) || `workflow ${id}`;
+        startedNote = { runId: Number(result.run_id), text: `Started ${name}` };
+        sayStarted(startedNote.text);
+        showToast(`Workflow triggered \u2014 run #${result.run_id}`);
         // Navigate to the run detail
-        selectWorkflowRun(result.run_id);
+        await selectWorkflowRun(result.run_id);
     } catch (e) {
         showToast('Failed to trigger workflow: ' + e.message, true);
+    } finally {
+        if (btn && btn.isConnected) { btn.disabled = false; btn.innerHTML = idle; }
     }
 }
+
+let startedNote = null; // { runId, text }: "Started <name>", shown on the run's page it opened
+function sayStarted(text) { const s = document.getElementById('wf-status'); if (s) s.textContent = text; }
 
 // ── Kill ───────────────────────────────────────────────────────────────
 
@@ -802,16 +851,11 @@ export async function saveWorkflow() {
 export function workflowsBackToList() {
     noteWorkflows({ view: 'workflows' });
     stopRunPolling();
-    selectedWorkflowId = null;
-    document.getElementById('wf-list-container').style.display = '';
-    document.getElementById('wf-detail-container').style.display = 'none';
-    document.getElementById('wf-run-detail-container').style.display = 'none';
-    document.getElementById('wf-back-btn').style.display = 'none';
-    document.getElementById('wf-create-btn').style.display = '';
-    document.getElementById('wf-build-agent-btn').style.display = '';
-    document.getElementById('wf-title').textContent = 'Workflows';
-    document.getElementById('wf-count-badge').hidden = false;
-    fetchWorkflows();
+    selectedWorkflowId = null; openRunId = null;
+    showView('workflows-view');
+    showListPage();
+    syncPhonePage();
+    fetchWorkflows({ openFirst: true });
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────
@@ -878,7 +922,7 @@ document.addEventListener('focusin', e => { if (document.querySelector('.wf-more
 registerActions({
     'wf-select': el => withId(el.dataset.workflowId, selectWorkflow),
     'wf-run': el => withId(el.dataset.runId, selectWorkflowRun),
-    'wf-trigger': el => withId(el.dataset.workflowId, triggerWorkflow),
+    'wf-trigger': el => withId(el.dataset.workflowId, id => triggerWorkflow(id, el)),
     'wf-edit': el => withId(el.dataset.workflowId, editWorkflow),
     'wf-edit-agent': el => withId(el.dataset.workflowId, editWorkflowWithAgent),
     // Deleting still asks first (deleteWorkflow's confirmation dialog); the name is only shown in it.

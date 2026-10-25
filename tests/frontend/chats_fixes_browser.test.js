@@ -1,5 +1,5 @@
 // Chats (#7157, UI/UX's #7148 findings 7 to 9): Resume is a quiet button, primary only on the person's last (newest) chat; the copy-branch icon is a 44 px target on a phone; the empty pane's hint is a small
-// grey line, not the page's biggest heading; and at 390 px a long chat title wraps to two lines with the provider badge under it instead of being cut with an ellipsis. Drives Chrome over CDP through
+// plain line (14/400, the page's text colour), not the page's biggest heading; and at 390 px a long chat title wraps to two lines with the provider badge under it instead of being cut with an ellipsis. Drives Chrome over CDP through
 // agent_view_harness.js with the history list and two chats answered at the page's fetch.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -32,9 +32,14 @@ const S = `(window.__coralStatic || '/static/')`;
             await ev(`window.switchNavTab('history'); true`); await sleep(800); // sleep-ok: the list draws after the tab opens
             await ev(`(async () => { const m = await import(${S} + 'history_list.js'); if (m.loadHistorySessions) await m.loadHistorySessions(); return true; })().catch(() => true)`);
             await waitFor(`document.querySelectorAll('#history-sessions-list li[data-session-id]').length === 3`, 'three chats', 10000);
+            // On a wide screen the tab opens on its first group's table (#7443): the empty pane is what shows with no chat and no group, so it is put on screen here to be measured
+            if (!mobile) {
+                assert.ok(await ev(`document.getElementById('group-table-view').checkVisibility() && !!document.querySelector('#group-table-view table.group-table')`), `${tag}: the Chats tab opens on its first group's table`);
+                await ev(`(async () => { const u = await import(${S} + 'utils.js'); u.showView('chats-empty-view'); return true; })()`);
+            }
             // the empty pane
-            const empty = await ev(`(() => { const v = document.getElementById('chats-empty-view'); const h = v && v.querySelector('h1'); if (!h || !h.getClientRects().length) return null; const root = parseFloat(getComputedStyle(document.documentElement).fontSize); return { ratio: parseFloat(getComputedStyle(h).fontSize) / root, color: getComputedStyle(h).color, primary: getComputedStyle(document.body).color }; })()`);
-            if (!mobile) { assert.ok(empty && empty.ratio <= 1.25 && empty.color !== empty.primary, `${tag}: the empty pane's hint is a small grey line: ` + JSON.stringify(empty)); }
+            const empty = await ev(`(() => { const v = document.getElementById('chats-empty-view'); const h = v && v.querySelector('.empty-line'); if (!h || !h.getClientRects().length) return null; const c = getComputedStyle(h); return { text: h.textContent, size: c.fontSize, weight: c.fontWeight, color: c.color, primary: getComputedStyle(document.body).color }; })()`);
+            if (!mobile) { assert.ok(empty && empty.text === 'No chats yet.' && empty.size === '14px' && empty.weight === '400' && empty.color === empty.primary, `${tag}: the empty pane is one 14/400 line in the primary colour: ` + JSON.stringify(empty)); }
             // the long title wraps with the badge below it (a phone)
             if (mobile) {
                 const row = await ev(`(() => { const li = document.querySelector('#history-sessions-list li[data-session-id="eeeeee1"]'); const l = li.querySelector('.session-label'), b = li.querySelector('.badge'); const lr = l.getBoundingClientRect(), br = b.getBoundingClientRect(); const lh = parseFloat(getComputedStyle(l).lineHeight) || parseFloat(getComputedStyle(l).fontSize) * 1.3; return { lines: Math.round(lr.height / lh), cut: getComputedStyle(l).textOverflow === 'ellipsis' && l.scrollWidth > l.clientWidth + 1, badgeBelow: br.top >= lr.bottom - 2 }; })()`);

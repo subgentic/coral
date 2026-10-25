@@ -1,21 +1,20 @@
 {{ define "includes/views/docs.html" }}
 <!-- Documentation View -->
 <div id="docs-view" class="docs-view" style="display:none">
-    <div class="docs-toolbar">
-        <!-- On a phone the sidebar (and its list of topics) is not on screen: this opens the same topics as a sheet (#7162) -->
-        <button type="button" class="btn btn-small docs-topics-btn" id="docs-topics-btn" data-on-click="docs-topics" aria-haspopup="dialog">Topics</button>
-        <button type="button" class="btn btn-small" id="docs-copy-agent-line" data-on-click="docs-copy-agent-line" title="Copies one line you can paste to an agent so it can read these docs">
-            <span class="material-icons" aria-hidden="true">content_copy</span> Copy docs line for agents
-        </button>
-        <span class="docs-toolbar-hint">Paste it to an agent: it reads these docs with <code>coral-agent docs</code>.</span>
-    </div>
-    <p id="docs-status" class="sr-only" role="status" aria-live="polite"></p>
-    <article class="docs-content" id="docs-content">
-        <div class="docs-empty">
-            <span class="material-icons" style="font-size:2.5rem;opacity:0.3" aria-hidden="true">menu_book</span>
-            <p>Select a topic from the sidebar</p>
+    <!-- On a phone the sidebar's pane is the page's list, here (mobile.js), and the document is the screen after it (#7443) -->
+    <div id="mobile-docs-list"></div>
+    <div class="docs-page" id="docs-page">
+        <div class="docs-toolbar">
+            <button type="button" id="docs-back" class="group-back" data-on-click="sgroup-open" data-kind="docs" data-group="" hidden></button>
+            <button type="button" id="docs-phone-back" class="group-back docs-phone-back" data-on-click="docs-phone-back">&larr; Back to the list</button>
+            <button type="button" class="btn btn-small" id="docs-copy-agent-line" data-on-click="docs-copy-agent-line" title="Copies one line you can paste to an agent so it can read these docs">
+                <span class="material-icons" aria-hidden="true">content_copy</span> Copy docs line for agents
+            </button>
         </div>
-    </article>
+        <p class="docs-toolbar-hint">Paste it to an agent: it reads these docs with <code>coral-agent docs</code>.</p>
+        <p id="docs-status" class="sr-only" role="status" aria-live="polite"></p>
+        <article class="docs-content" id="docs-content"></article>
+    </div>
 </div>
 
 {{ end }}
