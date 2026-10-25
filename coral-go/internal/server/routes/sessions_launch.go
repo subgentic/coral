@@ -130,9 +130,15 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 	// An agent never starts a less-restricted agent (#4032).
 	if agentCaller(r) {
 		body.Flags, body.Capabilities, body.Tools, body.Hooks = limitAgentLaunch("launch", body.Flags, body.Capabilities, body.Tools, body.Hooks)
-		// ... and a Codex it starts on a board needs a mode: with none it would ask first and could not reach Coral (#7552); refused before anything is made.
-		if body.BoardName != "" || body.BoardID != "" {
-			if userSettings, err := h.launchSettings(r.Context()); err == nil && agentLaunchNeedsMode(body.AgentType, body.Flags, true, userSettings) {
+		// ... and it never starts in the Operator's saved default when that skips the prompts (Security's #7576 finding), and a Codex it starts on a board needs a mode: with none it
+		// would ask first and could not reach Coral (#7552). Both are refused before anything is made.
+		if userSettings, err := h.launchSettings(r.Context()); err == nil {
+			if mode, inherits := agentLaunchInheritsSkippingDefault(body.AgentType, body.Flags, userSettings); inherits {
+				attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
+				writeError(w, http.StatusForbidden, agentLaunchNeedsModeCode, agentLaunchInheritsSkippingDefaultMessage(body.AgentType, mode))
+				return
+			}
+			if (body.BoardName != "" || body.BoardID != "") && agentLaunchNeedsMode(body.AgentType, body.Flags, true, userSettings) {
 				attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
 				writeError(w, http.StatusForbidden, agentLaunchNeedsModeCode, agentLaunchNeedsModeMessage)
 				return

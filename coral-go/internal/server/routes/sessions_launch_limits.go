@@ -207,3 +207,24 @@ func agentLaunchNeedsMode(agentType string, flags []string, onBoard bool, userSe
 }
 
 const agentLaunchNeedsModeMessage = "an agent's Codex launch with no permission mode asks first, and a Codex that asks first cannot reach Coral from its sandbox: ask the Operator to start it, or to set a default permission mode in Settings"
+
+// agentLaunchInheritsSkippingDefault says whether an agent's launch of agentType would start in the Operator's saved default permission mode and that mode skips the prompts
+// (Auto, Don't ask, Bypass Permissions, and for Claude also Plan and Accept edits: SkipsPermissionPrompts reads the mode as the --permission-mode flag Coral translates per type).
+// launchSession takes the mode from the flags, else the saved default (#6423); limitAgentLaunch holds an agent to its flags and never saw that default applied later, so a saved Auto
+// reached an agent's Codex as "-a never" with the whole network (Security's #7576 finding). The flags an agent keeps are --model only, so when it names no mode the saved default is
+// the mode. An unsaved default is not a way round: AutoByDefault is false for an agent. (Pi never reaches here: agentLaunchUnsupervised refused it.)
+func agentLaunchInheritsSkippingDefault(agentType string, flags []string, userSettings map[string]string) (mode string, inherits bool) {
+	if carried, _ := agent.SplitPermissionFlags(flags); len(carried) > 0 || agent.PermissionModeFromFlags(flags) != "" {
+		return "", false // a mode in the flags is what limitAgentLaunch already held it to
+	}
+	saved := setreg.Enum(userSettings, "default_permission_mode")
+	if saved == "" || !agent.ValidPermissionMode(saved) {
+		return "", false
+	}
+	return saved, agent.SkipsPermissionPrompts(agentType, []string{"--permission-mode", saved})
+}
+
+// agentLaunchInheritsSkippingDefaultMessage is the refusal's words: the Operator's saved default is not an agent's to use.
+func agentLaunchInheritsSkippingDefaultMessage(agentType, mode string) string {
+	return "an agent cannot start a " + agentType + " agent in the Operator's saved default permission mode (" + mode + "): it skips the permission prompts, and an agent never starts a less-restricted agent; ask the Operator to start it"
+}
