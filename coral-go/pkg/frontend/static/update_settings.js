@@ -81,7 +81,7 @@ function managed(s) {
         const copy = mk('button', 'btn', 'Copy'); copy.type = 'button';
         copy.addEventListener('click', async () => { showToast((await copyText(code.textContent)) ? 'Copied' : 'Could not copy', false); });
         cmd.append(code, copy); t.append(cmd);
-        t.append(mk('p', 'update-calm', 'Homebrew updates Coral, not this page. Coral still shows a notice in this browser when a new version is out (Settings > General).'));
+        t.append(mk('p', 'update-calm', 'Homebrew updates Coral; Coral does not update itself. Coral still shows a notice in this browser when a new version is out (Settings > General).'));
     } else {
         t.append(mk('b', null, 'This install cannot update itself'), mk('p', null, 'Coral can only update installs it can replace safely (the app, the installer or the archive from the releases page). Install the new release by hand.'));
         const a = mk('a', 'update-link', 'Open the releases page'); a.href = 'https://github.com/subgentic/coral/releases'; a.target = '_blank'; a.rel = 'noopener noreferrer'; t.append(a);

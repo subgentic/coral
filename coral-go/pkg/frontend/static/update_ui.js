@@ -112,6 +112,7 @@ function renderReadyNotice() {
     box.dataset.key = n.key;
     box.querySelector('.update-ready-lead').textContent = n.lead;
     box.querySelector('.update-ready-rest').textContent = n.rest;
+    box.querySelector('.update-ready-review').textContent = actName(status); // Windows installs from this page and does not relaunch: the notice says what the control says (#7360)
     box.querySelector('.update-ready-acts').hidden = false; // its buttons come with the words
 }
 /** The notice says nothing and takes no room: its status stays in the page, only its words go (and the buttons with them). */

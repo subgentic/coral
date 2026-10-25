@@ -56,6 +56,7 @@ const stagedFrom = (source, relaunch = {}) => { const st = staged('1.4.160', {},
     };
     const notice = () => ev(`(() => { const b = document.getElementById('update-ready-notice'); if (!b) return null; const r = b.getBoundingClientRect(); const bt = [...b.querySelectorAll('button')].map(x => { const q = x.getBoundingClientRect(); return { text: x.textContent.trim(), w: Math.round(q.width), h: Math.round(q.height) }; });
         return { shown: b.querySelector('.update-ready-lead').textContent !== '' && r.width > 0, text: b.textContent.replace(/\\s+/g, ' ').trim(), role: b.querySelector('[role=status]') && b.querySelector('[role=status]').getAttribute('role'), buttons: bt, inside: r.left >= -1 && r.right <= innerWidth + 1, hscroll: document.documentElement.scrollWidth > innerWidth + 1 }; })()`);
+    const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const calls = () => ev(`window.__upd.calls.map(c => c.method + ' ' + c.url)`);
     const pillShown = () => ev(`(() => { const p = document.getElementById('update-pill'); return !!p && !p.hidden && p.getBoundingClientRect().width > 0; })()`);
 
@@ -71,6 +72,7 @@ const stagedFrom = (source, relaunch = {}) => { const st = staged('1.4.160', {},
             await load(view);
             await setStatus(staged());
             let n = await notice();
+            await shot(`notice-${tag.replace(/ /g, '-')}`);
             check(`${tag}: a verified update that can be applied is announced`, n && n.shown, n && n.text);
             check(`${tag}: it names the version, says it is downloaded and checked, and that nothing installs without a yes`, n && n.text.includes('Coral 1.4.160 is ready.') && n.text.includes('downloaded and checked') && n.text.includes('Nothing is installed until you say yes.'));
             check(`${tag}: it is a polite status, not an alert`, n && n.role === 'status');
@@ -119,21 +121,23 @@ const stagedFrom = (source, relaunch = {}) => { const st = staged('1.4.160', {},
 
         console.log('\nthe confirmation says what is installed, from where, what restarts and that nothing installs without a yes');
         const RELEASES = 'https://github.com/subgentic/coral';
+        let dlgN = 0;
         const dialogWords = async (st) => {
             await load({ name: 'desktop', w: 1280, h: 900, phone: false, theme: 'dark' });
             await setStatus(st);
             await ev(`document.getElementById('update-pill').click(); true`); await settle(300);
+            await shot(`dialog-${++dlgN}`);
             return ev(`(() => { const m = document.getElementById('update-confirm-modal'); const p = m.querySelector('.modal-body p'); const a = [...m.querySelectorAll('a')];
                 return { title: m.querySelector('h3').textContent, first: p.textContent, links: a.map(x => ({ href: x.getAttribute('href'), target: x.target, rel: x.rel })), warn: (m.querySelector('.update-warn-body p') || {}).textContent || '', later: m.querySelector('.update-later-note').textContent, buttons: [...m.querySelectorAll('.modal-footer button')].map(b => b.textContent), foreign: m.querySelectorAll('img, script, iframe').length, text: m.textContent.replace(/\\s+/g, ' ') }; })()`);
         };
         const agents3 = [{ session_id: 'a', name: 'api', state: 'working', resumes: true }, { session_id: 'b', name: 'docs', state: 'idle', resumes: true }, { session_id: 'c', name: 'new', state: 'idle', resumes: false }];
         let dw = await dialogWords(stagedFrom('subgentic/coral', { restarts: agents3 }));
-        check('title names the version and what happens', dw.title === 'Update and relaunch: Coral 1.4.160?', dw.title);
+        check('title names the version and what happens', dw.title === 'Update to Coral 1.4.160 and relaunch?', dw.title);
         check('it says where the update comes from and that its signature was checked, and what you are on', dw.first === "Coral 1.4.160 comes from Coral's releases on GitHub (github.com/subgentic/coral). Coral downloaded it and checked its signature. You are on 1.4.159.", dw.first);
         check('its two links are this page\'s own constants (the releases page and this version\'s notes), opening safely', dw.links.length === 2 && dw.links[0].href === RELEASES && dw.links[1].href === RELEASES + '/releases/tag/v1.4.160' && dw.links.every(l => l.target === '_blank' && /noopener/.test(l.rel)), JSON.stringify(dw.links));
         check('the link sits inside its sentence: the paragraph is one block, the link inline (no line break around it)', await ev(`(() => { const p = document.querySelector('#update-confirm-modal .modal-body p'); const a = p.querySelector('a'); return getComputedStyle(a).display === 'inline' && p.getClientRects().length === 1; })()`));
         check('agents that restart: how many start again on their own and how many start a new conversation', /Relaunching restarts 3 agents that run in Coral's own terminal \(pty\)\. Their work in progress stops\. 2 start again on their own afterwards; 1 starts a new conversation\./.test(dw.warn), dw.warn);
-        check('the consent line: nothing installs until Install, Later changes nothing', dw.later === 'Nothing is installed until you choose Install. Later changes nothing: the update stays ready and the button stays in the top bar.', dw.later);
+        check('the consent line: nothing installs until Install, Later changes nothing', dw.later === 'Nothing is installed until you choose Update and relaunch. Later changes nothing: the update stays ready and the button stays in the top bar.', dw.later);
         check('the buttons are Later and Update and relaunch, restart 3 agents', dw.buttons.join() === 'Later,Update and relaunch, restart 3 agents', dw.buttons.join());
         check('no claim that it installs at the next start, and none that the page comes back by itself', !/next time Coral starts|installs when|installed automatically|comes back by itself/i.test(dw.text));
         // a repository the status names that is not this page's: shown as text, never a link; a hostile or absent field is ignored
@@ -143,6 +147,12 @@ const stagedFrom = (source, relaunch = {}) => { const st = staged('1.4.160', {},
         check('a hostile source is ignored: no link, no element, just GitHub', dw.links.length === 0 && dw.foreign === 0 && !/\(/.test(dw.first) && /releases on GitHub\./.test(dw.first) && (await ev('window.__pwned')) === undefined, dw.first);
         dw = await dialogWords(staged('1.4.160', {}, { restarts: [] }));
         check('no source and no agents: the line still reads and the button is Update and relaunch', /Coral's releases on GitHub\. Coral downloaded it/.test(dw.first) && dw.buttons.join() === 'Later,Update and relaunch' && dw.warn === '', dw.buttons.join());
+        console.log('\nWindows: the notice says what the control says (#7360)');
+        await load(VIEWS[0]);
+        await setStatus({ ...staged('1.4.160', {}, { available: false, reason: 'local_approval_needed' }), local_install: true, install_kind: 'msi' });
+        const wn = await notice();
+        await shot('notice-windows');
+        check('Windows: the notice button is Install update (nothing relaunches there), then Later', wn && wn.shown && wn.buttons.map(b => b.text).join() === 'Install update,Later', JSON.stringify(wn && wn.buttons));
 
         console.log('\nSettings: the sentence under the Coral Hub relaunch switch');
         await load({ name: 'desktop', w: 1280, h: 900, phone: false, theme: 'dark' });
