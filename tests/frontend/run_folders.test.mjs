@@ -6,6 +6,8 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import { pruneOldRunFolders, stripOldRunFolders, liveRunFolders, KEEP_RUNS, KEEP_HOURS, BINARY_HOURS } from './helpers/run_folders.mjs';
 
+// A junction on Windows: a symlink there needs a privilege a developer's account usually lacks (EPERM), and Node reports a junction as a symbolic link, as the runner's check expects
+const LINK_TYPE = process.platform === 'win32' ? 'junction' : 'dir';
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rf-test-'));
 try {
   const NOW = Date.UTC(2026, 9, 24, 12, 0, 0), H = 3600 * 1000;
@@ -16,7 +18,7 @@ try {
   const own = make('coral-cdp-ownRun', 200), liveF = make('coral-cdp-liveRn', 300);
   const other = make('some-other-dir', 400), wrongLen = make('coral-cdp-toolongname', 400);
   fs.writeFileSync(path.join(root, 'coral-cdp-file01'), 'a file with a runner-folder name');
-  const target = path.join(root, 'target-dir'); fs.mkdirSync(target); fs.symlinkSync(target, path.join(root, 'coral-cdp-linkxx'));
+  const target = path.join(root, 'target-dir'); fs.mkdirSync(target); fs.symlinkSync(target, path.join(root, 'coral-cdp-linkxx'), LINK_TYPE);
   fs.writeFileSync(path.join(root, 'coral-cdp-runner-4242.json'), JSON.stringify([{ tmp: liveF }]));
   fs.writeFileSync(path.join(root, 'coral-cdp-runner-4343.json'), JSON.stringify([{ tmp: own }])); // a dead runner's file names nothing alive
   const live = liveRunFolders(root, pid => pid === 4242);
@@ -52,5 +54,21 @@ try {
     assert.ok(fs.existsSync(path.join(empty, 'results.json')), 'a folder with nothing big is left alone');
     assert.deepEqual(stripOldRunFolders(root3, { own: mine, live: new Set([path.resolve(liveR)]), now: NOW }), [], 'a second pass frees nothing');
   } finally { fs.rmSync(root3, { recursive: true, force: true }); }
+  // A link with a runner-folder name is kept by the link check alone: the link and its target are dated far older than the cutoff, and keep 0 with 0 hours would remove any real folder. Its target
+  // stays untouched. Whether Windows lets a program through the junction differs by build (newer ones refuse an "untrusted mount point"), so that is printed, not asserted.
+  const root4 = fs.mkdtempSync(path.join(os.tmpdir(), 'rf-test4-'));
+  let through;
+  try {
+    const target4 = path.join(root4, 'target-dir'); fs.mkdirSync(target4); fs.writeFileSync(path.join(target4, 'keep.txt'), 'x');
+    const link = path.join(root4, 'coral-cdp-linkyy'); fs.symlinkSync(target4, link, LINK_TYPE);
+    const OLD = new Date(NOW - 1000 * H); fs.utimesSync(target4, OLD, OLD); fs.lutimesSync(link, OLD, OLD); // the target too: a pruner that follows the link sees an old folder
+    assert.ok(fs.lstatSync(link).isSymbolicLink() && fs.lstatSync(link).mtimeMs < NOW - H, `the link itself is dated before the cutoff (lstat mtime ${fs.lstatSync(link).mtime.toISOString()})`);
+    try { fs.readdirSync(link); through = 'allowed'; } catch (e) { through = `refused (${e.code})`; }
+    const gone = pruneOldRunFolders(root4, { keep: 0, hours: 0, now: NOW }).map(p => path.basename(p));
+    assert.ok(!gone.includes('coral-cdp-linkyy'), `the pruner removed the link: ${gone}`);
+    assert.ok(fs.lstatSync(link).isSymbolicLink(), 'the link itself is still there');
+    assert.ok(fs.existsSync(path.join(target4, 'keep.txt')), "the link's target is untouched");
+  } finally { fs.rmSync(root4, { recursive: true, force: true }); }
+  console.log(`run_folders: an old ${LINK_TYPE} with a runner-folder name stays with keep 0 and 0 hours (going through it: ${through})`);
   console.log('run_folders: ok (the newest 10 and the last 24 h stay; own, live, symlink, file and other names are never touched)');
 } finally { fs.rmSync(root, { recursive: true, force: true }); }
