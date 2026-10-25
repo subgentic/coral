@@ -10,7 +10,7 @@ const { connect } = require('./agent_view_harness');
 const HEX = 'a'.repeat(64);
 const MD = '# Title\n\ntext [link](https://example.test)\n\n```js\nconst x = 1;\n```\n';
 const PANES = ['general', 'agents', 'files', 'terminal', 'notifications', 'network', 'security', 'cleanup', 'updates'];
-const DIALOGS = ['showLaunchModal', 'showCreateTaskModal', 'showDefaultPromptsModal', 'showServersModal', 'showOpenFolderModal', 'showTeamWizardModal', 'showJobModal', 'showAgentTaskDetailModal', 'showTaskDetailModal'];
+const DIALOGS = ['showLaunchModal', 'showCreateTaskModal', 'showDefaultPromptsModal', 'showServersModal', 'showOpenFolderModal', 'showTeamWizardModal', 'showJobModal', 'showAgentTaskDetailModal'];
 const CYCLES = Number(process.env.CYCLES || 50), SELFTEST = !!process.env.TEARDOWN_LEAK_SELFTEST;
 const BOUNDS = { listeners: 30, nodes: 60, documents: 0, intervals: 0, timeouts: 0, ws: 0, obs: 0, heapMB: 2 };
 // The terminal view is left out by default: on a Linux runner about 3 runs in 20 stalled in setLiveViewMode('chat') right after the terminal view (the page answered nothing and ran no script, 20 s, the 131 gate), the

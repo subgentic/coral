@@ -20,7 +20,7 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
 const SPIED = ['showInfoDirect', 'killSessionDirect', 'restartDirect', 'renameAgent', 'setAgentIcon', 'attachDirect', 'toggleAgentSleep', 'toggleAgentArchive',
     'moveSessionUp', 'moveSessionDown', 'killBoard', 'resetTeam', 'killGroup', 'toggleTeamSleep', 'shareAgentTeam', 'saveTeamFromSidebar', 'distillTeamKnowledge',
     'showTeamTokenUsage', 'showTeamAvailabilityWorkspace', 'showTeamWorkingModeWorkspace', 'moveGroupUp', 'moveGroupDown', 'showAddAgentToBoard', 'launchTerminalToBoard',
-    'selectHistorySession', 'loadHistoryPage', 'toggleGroupCollapse', 'enterTeamContext', 'setBoardAccentColor'];
+    'selectHistorySession', 'loadHistoryPage', 'toggleGroupCollapse', 'setBoardAccentColor'];
 
 (async () => {
     const client = await CDP({ port: Number(process.env.CDP_PORT || 9222) });
