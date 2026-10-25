@@ -149,3 +149,49 @@ func TestQueryKeyMintsASessionOnlyForANavigationThatHoldsNone(t *testing.T) {
 	})
 	assert.Equal(t, 2, count(), "a framed navigation gets none")
 }
+
+// #7399 (Codex Test's #7395 finding): a browser that opens a link with ?api_key= on THIS computer (a direct loopback request) got no session, because the loopback pass returned before the
+// session was made: the page loaded and every call it made answered 401. It gets one now, by the same rule as anywhere else: a valid key, a navigation that holds none, once.
+func TestQueryKeyOnDirectLoopbackMintsASessionForANavigation(t *testing.T) {
+	ks := newTestKeyStore(t)
+	var method Method
+	h := Middleware(ks)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		method = MethodFrom(r.Context())
+		w.WriteHeader(http.StatusOK)
+	}))
+	count := func() int {
+		list, err := ks.backend().ListSessions(t.Context())
+		require.NoError(t, err)
+		return len(list)
+	}
+	get := func(key, host string, setup func(*http.Request)) *httptest.ResponseRecorder {
+		r := httptest.NewRequest("GET", "/?api_key="+key, nil)
+		r.RemoteAddr, r.Host = "127.0.0.1:54321", host
+		setup(r)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		return w
+	}
+	nav := func(r *http.Request) { r.Header.Set("Sec-Fetch-Mode", "navigate") }
+
+	for i := 0; i < 50; i++ { // a script polling with the key on this computer, and a wrong key in a browser: no session
+		get(ks.Key(), "localhost:8420", func(r *http.Request) { r.Header.Set("Sec-Fetch-Mode", "cors") })
+		get("not-the-key", "localhost:8420", nav)
+	}
+	assert.Equal(t, 0, count(), "no session for a script, and none for a key that is not the key")
+
+	w := get(ks.Key(), "localhost:8420", nav)
+	require.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, MethodLoopback, method, "the request is still this computer's, as before")
+	cookie := sessionCookie(t, w)
+	assert.Equal(t, 1, count(), "a navigation with the key on this computer gets a session")
+	for i := 0; i < 20; i++ {
+		get(ks.Key(), "localhost:8420", func(r *http.Request) { nav(r); r.AddCookie(cookie) })
+	}
+	assert.Equal(t, 1, count(), "a navigation that already holds one reuses it")
+
+	// the Host check still comes first: a rebinding attempt gets 403 and no session
+	w = get(ks.Key(), "evil.example:8420", nav)
+	assert.Equal(t, http.StatusForbidden, w.Code)
+	assert.Equal(t, 1, count())
+}
