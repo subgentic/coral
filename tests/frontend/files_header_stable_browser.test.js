@@ -10,7 +10,11 @@ const { connect } = require('./agent_view_harness');
     try {
         await Page.enable();
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { const inner = window.fetch; window.__files = false; window.fetch = (u, o = {}) => { if (/\\/files(\\?|\\/refresh|$)/.test(String(u))) return Promise.resolve(new Response(JSON.stringify({ files: window.__files ? [{ filepath: 'src/a.go', status: 'M', additions: 4, deletions: 1 }, { filepath: 'src/b.go', status: 'A', additions: 20, deletions: 0 }] : [], diff_mode: 'previous_commit' }), { headers: { 'content-type': 'application/json' } })); return inner(u, o); }; })();` });
+        // The files answers are held back until the test lets them go, so the first measurement is the page as it ships (before any list has been drawn).
+        await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { const inner = window.fetch; window.__held = []; window.__hold = true;
+            const answer = () => new Response(JSON.stringify({ files: [{ filepath: 'src/a.go', status: 'M', additions: 4, deletions: 1 }, { filepath: 'src/b.go', status: 'A', additions: 20, deletions: 0 }], diff_mode: 'previous_commit' }), { headers: { 'content-type': 'application/json' } });
+            window.__release = () => { window.__hold = false; for (const r of window.__held.splice(0)) r(answer()); };
+            window.fetch = (u, o = {}) => { if (/\\/files(\\?|\\/refresh|$)/.test(String(u))) return window.__hold ? new Promise(r => window.__held.push(r)) : Promise.resolve(answer()); return inner(u, o); }; })();` });
         for (const [w, h, mobile, zoom] of [[1280, 900, false, ''], [390, 844, true, ''], [390, 844, true, '32px']]) {
             const at = `at ${w}px${zoom ? ' at 200% text' : ''}: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
@@ -24,7 +28,8 @@ const { connect } = require('./agent_view_harness');
             await ev(`window.switchAgenticTab && window.switchAgenticTab('files', 'top'); window.toggleAgenticPanel && window.toggleAgenticPanel(true); true`);
             await waitFor(`document.getElementById('changed-files-title').getClientRects().length > 0`, 'the Files header on screen', 8000);
             const before = await rect();
-            await ev(`window.__files = true; (async () => { const m = await import(${S} + 'changed_files.js'); await m.loadChangedFiles('hdr-bot', 'hdr-bot-id'); return true; })()`);
+            assert.ok((await ev(`document.getElementById('changed-files-title').textContent`)).trim().startsWith('0 files changed'), at + 'the first measurement is the page as shipped, no list drawn');
+            await ev(`window.__release(); true`);
             await waitFor(`document.getElementById('changed-files-title').textContent.includes('2 files changed')`, 'the first list', 8000);
             const after = await rect();
             const slack = zoom ? 2.5 : 0.5; // at 200% text the +N -N chips, which the page has not drawn yet, are 2 px taller than the words beside them
