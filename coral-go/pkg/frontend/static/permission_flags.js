@@ -27,8 +27,8 @@ export const PERMISSION_MODE_DESCRIPTIONS = {
 };
 
 // Codex's Auto is a workspace sandbox with the network on (Security's #7483): a board member needs it to reach Coral
-// Codex launches both of these as workspace-write that never asks, which has the network on (Security's #7503)
-export const CODEX_NETWORK_MODES = ['auto', 'dontAsk'];
+// Codex launches these as workspace-write that never asks, which has the network on (Security's #7503); so does Codex with no mode: its Default is the same launch (codex.go, #7527)
+export const CODEX_NETWORK_MODES = ['default', 'auto', 'dontAsk'];
 export const CODEX_AUTO_DESCRIPTION = 'Workspace sandbox, with the network on so it can reach Coral.';
 
 export function _updatePermModeDescription(selectEl) {
