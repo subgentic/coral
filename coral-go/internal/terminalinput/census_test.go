@@ -322,6 +322,7 @@ var reviewedOrigins = map[string]bool{
 	"internal/background/runtime_tmux.go	TmuxRuntime.SendPrompt	SendPrompt	o":                                        true,
 	"internal/background/runtime_tmux.go	TmuxRuntime.SpawnAgent	SendKeysToTarget	Internal":                           true,
 	"internal/background/workflow_steps.go	WorkflowRunner.executeAgentInteractive	SendPrompt	?":                      true, // AgentLauncher.SendPrompt, a method of its own that hands the prompt to the automated-input gate (Coral's text)
+	"internal/ptymanager/held_force.go	inputGate.forcePaste	SendPrompt	Coral":                                        true, // Send now (#7579): Coral's text, the Operator's choice
 	"internal/ptymanager/automated_input_deliver.go	inputGate.pasteAndEnter	SendPrompt	Coral":                        true,
 	"internal/ptymanager/manager.go	PTYBackend.SendHumanInput	SendInput	Person":                                      true,
 	"internal/ptymanager/manager.go	PTYBackend.SendLine	SendLineCtx	o":                                               true,
