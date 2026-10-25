@@ -70,40 +70,9 @@ func goalRequestError(w http.ResponseWriter, err error) bool {
 	return true
 }
 
-// goalRequestSender is who sends a goal request: the name the request claims, as the identity layer verified it, and the Operator or an active registered Orchestrator of the board it sends from. Its refusal is
-// the send's own sentence (the goal routes' "create or change goals" is about writing a goal, and the job title is a literal word a worker does not have).
+// goalRequestSender is who sends a goal request: the shared planner check for the board it sends from, with the send's own sentence (it says the job title must be the word Orchestrator).
 func (h *BoardHandler) goalRequestSender(w http.ResponseWriter, r *http.Request, from, claim string) (string, bool) {
-	who, ok := attributedTo(w, r, claim)
-	if !ok {
-		return "", false
-	}
-	actor := strings.TrimSpace(claim)
-	if identityActorEnforced() {
-		actor = who
-	}
-	if actor == "" {
-		errBadRequest(w, "subscriber_id required")
-		return "", false
-	}
-	refuse := func() {
-		errForbidden(w, fmt.Sprintf("only the Operator or an active Orchestrator of %q can send its goal requests: the member's job title must be the word Orchestrator (a Developer or any other title is refused)", from))
-	}
-	switch {
-	case callerActor(r).IsOperator():
-		return actor, true
-	case actor == "Operator":
-		if identityActorEnforced() {
-			refuse()
-			return "", false
-		}
-		noteEnforceDiffers("goal-request-sender", r)
-		return actor, true
-	}
-	if err := h.bs.RequireTaskReviewer(r.Context(), from, actor); err != nil {
-		refuse()
-		return "", false
-	}
-	return actor, true
+	return h.plannerActor(w, r, from, claim, goalRequestSendWords(from))
 }
 
 // PostGoalRequest: POST /api/board/{target}/goal-requests
