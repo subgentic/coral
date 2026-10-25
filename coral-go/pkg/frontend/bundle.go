@@ -71,6 +71,37 @@ var StartupLazyModules = []string{"terminal_backend.js", "received_cap_notice.js
 
 var importOnceSpec = regexp.MustCompile(`importOnce\(\s*['"]\./([^'"?]+)['"]`)
 
+// importOnceBinding finds the import of import_once.js, whose braces name the local binding of importOnce: the name itself in the source, a short one ("import{importOnce as e}") in a tree whose local names
+// were shortened (MinifyAsset, #7185), where a call reads e("./x.js").
+var importOnceBinding = regexp.MustCompile(`import\s*\{([^}]*)\}\s*from\s*['"][./]*import_once\.js['"]`)
+
+// importOnceCalls is the set of './path' specifiers a file passes to importOnce, by its own name or by the local name it imports it as.
+func importOnceCalls(data []byte) []string {
+	var out []string
+	for _, m := range importOnceSpec.FindAllSubmatch(data, -1) {
+		out = append(out, string(m[1]))
+	}
+	for _, b := range importOnceBinding.FindAllSubmatch(data, -1) {
+		for _, part := range strings.Split(string(b[1]), ",") {
+			f := strings.Fields(strings.TrimSpace(part))
+			local := ""
+			switch {
+			case len(f) == 1 && f[0] == "importOnce":
+				continue // the source's own name: importOnceSpec has it
+			case len(f) == 3 && f[0] == "importOnce" && f[1] == "as":
+				local = f[2]
+			default:
+				continue
+			}
+			call := regexp.MustCompile(`(?:^|[^\w$.])` + regexp.QuoteMeta(local) + `\(\s*['"]\./([^'"?]+)['"]`)
+			for _, m := range call.FindAllSubmatch(data, -1) {
+				out = append(out, string(m[1]))
+			}
+		}
+	}
+	return out
+}
+
 // importOnceSpecs is the set of modules (paths under static/) that some file imports with importOnce('./path').
 func importOnceSpecs(static fs.FS) map[string]bool {
 	out := map[string]bool{}
@@ -79,8 +110,8 @@ func importOnceSpecs(static fs.FS) map[string]bool {
 			return nil
 		}
 		if data, err := fs.ReadFile(static, p); err == nil {
-			for _, m := range importOnceSpec.FindAllSubmatch(data, -1) {
-				out[string(m[1])] = true
+			for _, m := range importOnceCalls(data) {
+				out[m] = true
 			}
 		}
 		return nil
