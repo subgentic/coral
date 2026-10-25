@@ -63,6 +63,8 @@ type BoardSettings struct {
 	Health HealthSettings `json:"health"`
 	// RequireGoal: every new task of this board needs a goal, and none is moved to no goal (#7116). Off by default; only the Operator on this computer may change it, never through Coral Hub.
 	RequireGoal bool `json:"require_goal"`
+	// GoalRequests: other teams may ask this one to create a task for one of their goals (#7361, the goal-requests note). Off by default, even with a team link: a link grants messaging, and being asked to create work is a separate grant. The Operator on this computer or the Hub owner sets it, never an agent.
+	GoalRequests bool `json:"goal_requests"`
 	// MessagingStored and ArtifactsStored say that the owner set the switch (to either value), as against the default.
 	MessagingStored bool `json:"-"`
 	ArtifactsStored bool `json:"-"`
@@ -87,6 +89,8 @@ type BoardSettingsUpdate struct {
 	Health *HealthSettings `json:"health"`
 	// RequireGoal turns the board's require-a-goal rule on or off (#7116).
 	RequireGoal *bool `json:"require_goal"`
+	// GoalRequests turns taking goal requests from other teams on or off (#7361).
+	GoalRequests *bool `json:"goal_requests"`
 }
 
 const (
@@ -213,6 +217,8 @@ func (s *Store) GetBoardSettings(ctx context.Context, project string) (BoardSett
 			_ = json.Unmarshal([]byte(r.Value), &out.CrossTeamAllowed)
 		case settingRequireGoal:
 			out.RequireGoal = r.Value == "true"
+		case settingGoalRequests:
+			out.GoalRequests = r.Value == "true"
 		}
 	}
 	out.Health = s.GetHealthSettings(ctx, project)
@@ -276,6 +282,11 @@ func (s *Store) UpdateBoardSettings(ctx context.Context, project string, u Board
 	}
 	if u.RequireGoal != nil {
 		if err := upsert(tx, settingRequireGoal, fmt.Sprint(*u.RequireGoal)); err != nil {
+			return BoardSettings{}, err
+		}
+	}
+	if u.GoalRequests != nil {
+		if err := upsert(tx, settingGoalRequests, fmt.Sprint(*u.GoalRequests)); err != nil {
 			return BoardSettings{}, err
 		}
 	}
@@ -606,6 +617,15 @@ func (s *Store) RelayedOrigin(ctx context.Context, project string, id int64) (Me
 
 // zeroWidthSpace is invisible when rendered but breaks every mention pattern.
 const zeroWidthSpace = "\u200b"
+
+// BoardMentionNames are the names (subscriber ids and job titles) DefuseMentions guards on board: what a server post that quotes another team's text defuses against.
+func (s *Store) BoardMentionNames(ctx context.Context, project string) []string {
+	names, err := s.boardMentionNames(ctx, project)
+	if err != nil {
+		return nil // the "@" forms are defused all the same; only the "Name:" forms need names
+	}
+	return names
+}
 
 // DefuseMentions makes text unable to mention anyone on a board while it
 // reads the same: a cross-team message may only wake the recipients the

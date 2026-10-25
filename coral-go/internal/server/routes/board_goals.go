@@ -47,28 +47,49 @@ func goalError(w http.ResponseWriter, err error) bool {
 	return true
 }
 
-// requireGoalPlanner is requireTaskPlanner for a goal write, in a goal's words: the Operator, or an active registered orchestrator.
-func (h *BoardHandler) requireGoalPlanner(w http.ResponseWriter, r *http.Request, project, actor string) bool {
+// plannerWords are the words of a refused planner check and the name its log-only count goes under: the check is one (who may plan a board's goals and send its goal requests: the Operator, or an active registered
+// orchestrator), and the goal write and the request send give it their own sentences (#7389; #7382 had the send in a copy).
+type plannerWords struct {
+	counter      string // the name a log-only difference is counted under
+	operatorOnly string // refused under enforced identity: the name "Operator" with no verified Operator behind it
+	notPlanner   string // refused: not an active registered orchestrator of the board
+}
+
+// goalWriteWords is what the goal write says.
+var goalWriteWords = plannerWords{
+	counter:      "goal-planner",
+	operatorOnly: "only the Operator or an active registered orchestrator may create or change goals",
+	notPlanner:   "only Operator or an active registered orchestrator may create or change goals; coordinate with your orchestrator",
+}
+
+// goalRequestSendWords is what the request send says for the board it sends from: its sentence names the job title, which is a literal word a worker does not have.
+func goalRequestSendWords(from string) plannerWords {
+	msg := fmt.Sprintf("only the Operator or an active Orchestrator of %q can send its goal requests: the member's job title must be the word Orchestrator (a Developer or any other title is refused)", from)
+	return plannerWords{counter: "goal-request-sender", operatorOnly: msg, notPlanner: msg}
+}
+
+// requirePlanner is the check: the Operator (as the identity layer verified it), or an active registered orchestrator of project. It answers the refusal itself, in words.
+func (h *BoardHandler) requirePlanner(w http.ResponseWriter, r *http.Request, project, actor string, words plannerWords) bool {
 	if callerActor(r).IsOperator() {
 		return true
 	}
 	if actor == "Operator" {
 		if identityActorEnforced() {
-			errForbidden(w, "only the Operator or an active registered orchestrator may create or change goals")
+			errForbidden(w, words.operatorOnly)
 			return false
 		}
-		noteEnforceDiffers("goal-planner", r)
+		noteEnforceDiffers(words.counter, r)
 		return true
 	}
 	if err := h.bs.RequireTaskReviewer(r.Context(), project, actor); err != nil {
-		errForbidden(w, "only Operator or an active registered orchestrator may create or change goals; coordinate with your orchestrator")
+		errForbidden(w, words.notPlanner)
 		return false
 	}
 	return true
 }
 
-// goalActor is who writes a goal: the name the request claims, as the identity layer verified it, and allowed to plan the board. It answers the refusal itself.
-func (h *BoardHandler) goalActor(w http.ResponseWriter, r *http.Request, project, claim string) (string, bool) {
+// plannerActor is who acts: the name the request claims, as the identity layer verified it, and allowed to plan the board. It answers the refusal itself.
+func (h *BoardHandler) plannerActor(w http.ResponseWriter, r *http.Request, project, claim string, words plannerWords) (string, bool) {
 	who, ok := attributedTo(w, r, claim)
 	if !ok {
 		return "", false
@@ -81,10 +102,20 @@ func (h *BoardHandler) goalActor(w http.ResponseWriter, r *http.Request, project
 		errBadRequest(w, "subscriber_id required")
 		return "", false
 	}
-	if !h.requireGoalPlanner(w, r, project, actor) {
+	if !h.requirePlanner(w, r, project, actor, words) {
 		return "", false
 	}
 	return actor, true
+}
+
+// requireGoalPlanner is requireTaskPlanner for a goal write, in a goal's words.
+func (h *BoardHandler) requireGoalPlanner(w http.ResponseWriter, r *http.Request, project, actor string) bool {
+	return h.requirePlanner(w, r, project, actor, goalWriteWords)
+}
+
+// goalActor is who writes a goal. It answers the refusal itself.
+func (h *BoardHandler) goalActor(w http.ResponseWriter, r *http.Request, project, claim string) (string, bool) {
+	return h.plannerActor(w, r, project, claim, goalWriteWords)
 }
 
 func goalID(w http.ResponseWriter, r *http.Request) (int64, bool) {
@@ -264,14 +295,25 @@ func (h *BoardHandler) GetGoal(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	g, err := h.bs.GetGoal(r.Context(), urlParam(r, "project"), id)
+	project := urlParam(r, "project")
+	g, err := h.bs.GetGoal(r.Context(), project, id)
 	if err != nil {
 		if !goalError(w, err) {
 			errInternalServer(w, err.Error())
 		}
 		return
 	}
-	writeJSON(w, http.StatusOK, g)
+	// The requests this goal sent that were accepted (#7361): where it asked, never what the other team made of it (no task, count or title). The cap is 20; the total says how many more.
+	refs, total, err := h.bs.AcceptedGoalRequests(r.Context(), project, id)
+	if err != nil {
+		errInternalServer(w, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, struct {
+		*board.Goal
+		AcceptedRequests      []board.AcceptedRequestRef `json:"accepted_requests"`
+		AcceptedRequestsTotal int                        `json:"accepted_requests_total"`
+	}{g, refs, total})
 }
 
 // UpdateGoal: PATCH /api/board/{project}/goals/{goalID}. Only the fields the body names change; "driver": "" clears the driver.

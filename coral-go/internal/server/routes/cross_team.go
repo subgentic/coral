@@ -227,7 +227,7 @@ func (h *BoardHandler) UpdateBoardSettings(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	viaHub := cloud.Tunneled(r)
-	touchesCrossTeam := body.CrossTeamMessaging != nil || body.CrossTeamServers != nil || body.CrossTeamArtifacts != nil || body.CrossTeamAllowed != nil || body.RequireGoal != nil // whether a board requires a goal is the owner's through Coral Hub too (the operator, 2026-10-24, #7329)
+	touchesCrossTeam := body.CrossTeamMessaging != nil || body.CrossTeamServers != nil || body.CrossTeamArtifacts != nil || body.CrossTeamAllowed != nil || body.RequireGoal != nil || body.GoalRequests != nil // whether a board requires a goal is the owner's through Coral Hub too (the operator, 2026-10-24, #7329)
 	var hubID callerIdentity
 	if viaHub {
 		if touchesCrossTeam {
@@ -296,7 +296,7 @@ func (h *BoardHandler) UpdateBoardSettings(w http.ResponseWriter, r *http.Reques
 		before, _ = h.bs.GetBoardSettings(r.Context(), project)
 	}
 	var beforeRequire board.BoardSettings
-	if body.RequireGoal != nil {
+	if body.RequireGoal != nil || body.GoalRequests != nil {
 		beforeRequire, _ = h.bs.GetBoardSettings(r.Context(), project)
 	}
 	var beforeSwitches board.BoardSettings
@@ -329,6 +329,15 @@ func (h *BoardHandler) UpdateBoardSettings(w http.ResponseWriter, r *http.Reques
 		}
 		if err := h.bs.AppendEditLog(context.WithoutCancel(r.Context()), project, actor, "require_goal", fmt.Sprint(beforeRequire.RequireGoal), fmt.Sprint(*body.RequireGoal)); err != nil {
 			slog.Warn("goals: could not log a require_goal change", "board", project, "error", err)
+		}
+	}
+	if body.GoalRequests != nil && *body.GoalRequests != beforeRequire.GoalRequests && !viaHub { // through Coral Hub the record names the hub user (recordHubSettings)
+		actor := callerActor(r).Name
+		if actor == "" {
+			actor = crossTeamOperatorID
+		}
+		if err := h.bs.AppendEditLog(context.WithoutCancel(r.Context()), project, actor, "goal_requests", fmt.Sprint(beforeRequire.GoalRequests), fmt.Sprint(*body.GoalRequests)); err != nil {
+			slog.Warn("goals: could not log a goal_requests change", "board", project, "error", err)
 		}
 	}
 	if touchesSwitch && !viaHub {
@@ -755,6 +764,9 @@ func (h *BoardHandler) recordHubSettings(w http.ResponseWriter, r *http.Request,
 	if u.RequireGoal != nil && before.RequireGoal != *u.RequireGoal {
 		edits = append(edits, board.HubSettingsEdit{Field: "require_goal", Old: fmt.Sprint(before.RequireGoal), New: fmt.Sprint(*u.RequireGoal)})
 	}
+	if u.GoalRequests != nil && before.GoalRequests != *u.GoalRequests {
+		edits = append(edits, board.HubSettingsEdit{Field: "goal_requests", Old: fmt.Sprint(before.GoalRequests), New: fmt.Sprint(*u.GoalRequests)})
+	}
 	if u.CrossTeamAllowed != nil && allowedForLog(before.CrossTeamAllowed) != allowedForLog(after.CrossTeamAllowed) {
 		edits = append(edits, board.HubSettingsEdit{Field: "cross_team_allowed", Old: allowedForLog(before.CrossTeamAllowed), New: allowedForLog(after.CrossTeamAllowed)})
 	}
@@ -780,6 +792,9 @@ func (h *BoardHandler) recordHubSettings(w http.ResponseWriter, r *http.Request,
 		if u.RequireGoal != nil {
 			undo.RequireGoal = &before.RequireGoal
 		}
+		if u.GoalRequests != nil {
+			undo.GoalRequests = &before.GoalRequests
+		}
 		if u.Health != nil { // the health setup sent in the same body was applied with the rest: it is undone with it (QA's #7329 finding)
 			undo.Health = &before.Health
 		}
@@ -800,6 +815,8 @@ func (h *BoardHandler) recordHubSettings(w http.ResponseWriter, r *http.Request,
 			what = "who may message it (the allow-list)"
 		case "require_goal":
 			what = "whether it requires a goal for every task"
+		case "goal_requests":
+			what = "whether other teams may ask it to create a task for a goal"
 		}
 		notices = append(notices, textHubSettingsNotice(id.pseudo, what))
 	}

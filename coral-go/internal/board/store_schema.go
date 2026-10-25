@@ -251,6 +251,9 @@ func (s *Store) ensureSchema(ctx context.Context) error {
 	if err := s.ensureGoalsSchema(ctx); err != nil {
 		return err
 	}
+	if err := s.ensureGoalRequestsSchema(ctx); err != nil {
+		return err
+	}
 	// The mention index and its backfill (#4465). A failure here only means ReadMessages reads as it did.
 	if err := s.ensureMentionIndexSchema(ctx); err != nil {
 		log.Printf("[board] mention index: %v", err)

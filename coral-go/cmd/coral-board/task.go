@@ -180,6 +180,7 @@ func cmdTaskAdd(st *boardState, args []string) {
 	parent := fs.Int64("parent", 0, "Parent task ID")
 	retryOf := fs.Int64("retry-of", 0, "Finished task ID this new task retries")
 	goal := fs.Int64("goal", 0, "The goal of this board the task serves")
+	goalFrom := fs.Int64("goal-from", 0, "Accept this goal request another team sent: the task is made already linked to its goal (write your own title and body; the request text is not copied)")
 	clihelp.ParseFlags(fs, reordered, func() string { return commandUsage(os.Args[1], os.Args[2:]) })
 	goalGiven := false
 	fs.Visit(func(f *flag.Flag) { goalGiven = goalGiven || f.Name == "goal" })
@@ -201,6 +202,10 @@ func cmdTaskAdd(st *boardState, args []string) {
 	}
 	if *assignee != "" {
 		reqBody["assigned_to"] = *assignee
+	}
+	if *goalFrom > 0 {
+		cmdTaskAddFromRequest(st, *goalFrom, title, *taskBody, *priority, *assignee, subscriberID, goalGiven || *blockedBy != "" || *workflow != "" || *outputs != "" || *reviewers != "" || *remindAt != "" || *parent != 0 || *retryOf != 0 || *completionGates != "" || *stage != "" || *instructions != "")
+		return
 	}
 	if goalGiven && *goal <= 0 { // --goal 0 is a goal that does not exist, as the API says (#7239), not "no goal"
 		fmt.Fprintf(os.Stderr, "--goal needs a goal ID, a whole number of 1 or more (got %d)\n", *goal)
@@ -960,4 +965,34 @@ func lastSeenRound(project string, id int64) int {
 // or none was recorded. An approval names it; the server refuses one that names an older revision.
 func lastSeenRevision(project string, id int64) int {
 	return loadSeenRounds()[fmt.Sprintf("%s/%d#revision", project, id)]
+}
+
+// cmdTaskAddFromRequest is task add --goal-from <request>: it accepts a goal request another team sent this board, in one step (#7361). The title and body are the caller's own words; the request's
+// text is never copied into the task. A request's task has no goal of this board's and takes none of the options that set one up (a goal, dependencies, a workflow, a reminder).
+func cmdTaskAddFromRequest(st *boardState, request int64, title, body, priority, assignee, subscriberID string, other bool) {
+	if other {
+		fmt.Fprintln(os.Stderr, "--goal-from takes only a title, --body, --priority and --assignee: the task is made for the other team's goal and has no goal, dependencies, workflow or reminder of its own here")
+		clierr.Exit1()
+	}
+	reqBody := map[string]any{"subscriber_id": subscriberID, "title": title, "priority": priority}
+	if body != "" {
+		reqBody["body"] = body
+	}
+	if assignee != "" {
+		reqBody["assigned_to"] = assignee
+	}
+	data, status, err := apiCallRaw("POST", "/"+url.PathEscape(st.Project)+"/goal-requests/"+strconv.FormatInt(request, 10)+"/accept", reqBody)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		clierr.Exit1()
+	}
+	if status != http.StatusCreated && status != http.StatusOK { // as task add: the answer is the created task
+		fmt.Fprintf(os.Stderr, "Error accepting goal request #%d: %s\n", request, clierr.Describe(nil, status, data))
+		clierr.Exit1()
+	}
+	var out struct {
+		Task map[string]any `json:"task"`
+	}
+	_ = json.Unmarshal(data, &out)
+	fmt.Printf("Created Task #%.0f: %s (for goal request #%d; the asking team is told it was accepted)\n", out.Task["id"], title, request)
 }
