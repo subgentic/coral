@@ -1595,8 +1595,7 @@ body.panel-dragging .agentic-state {
 .refresh-files-btn:hover { color: var(--text-primary); }
 
 .refresh-files-btn.refreshing {
-    animation: spin 1s linear infinite;
-    display: inline-block;
+    animation: spin 1s linear infinite; /* a transform only: the button keeps its display (inline-block here shifted the title by a sub-pixel while it spun) */
 }
 
 .changed-files-title {
