@@ -189,35 +189,42 @@ const teamHooks = () => ({
 
 async function fillTab(tab, item = 0) {
     const team = S.team, host = panel(tab);
+    const stale = () => S.tab !== tab || S.team !== team; // another tab was pressed (or another team opened) while a loader was awaited: this one draws nothing, or its panel would show above the tab now chosen
     try {
         if (tab === 'goals') {
             const m = await importOnce('./goals_view.js');
+            if (stale()) return;
             m.showGoals(host, team, { page: true, hooks: { ...teamHooks(), onCount: (n) => { S.counts.goals = n; drawCounts(); } } });
             if (item) m.openGoalWhenKnown(item); else if (m.openGoalId()) { S.quiet = true; m.closeGoal(); S.quiet = false; }
         } else if (tab === 'tasks') {
             const m = await importOnce('./team_tasks_page.js');
+            if (stale()) return;
             await m.showTasks(host, team, { ...teamHooks(), onCount: (n) => { S.counts.tasks = n; drawCounts(); } });
+            if (stale()) return;
             if (item) openTaskById(item, { kind: 'tasks' });
         } else if (tab === 'artifacts') {
             const m = await importOnce('./team_artifacts_page.js');
+            if (stale()) return;
             m.showArtifacts(host, team, { onCount: (n, more) => { S.counts.artifacts = more ? `${n}+` : n; drawCounts(); } });
         } else if (tab === 'messages') {
             const m = await importOnce('./message_board.js');
+            if (stale()) return;
             m.showBoardInPage(team, host);
             adoptBoardActions();
         } else if (tab === 'agents') {
-            await moveIn(host, 'agentic-panel-team-view', async () => (await importOnce('./team_availability.js')).showTeamAvailability(team, { workspace: true }));
+            await moveIn(host, 'agentic-panel-team-view', async () => { const m = await importOnce('./team_availability.js'); if (!stale()) m.showTeamAvailability(team, { workspace: true }); }, stale);
         } else if (tab === 'settings') {
-            await moveIn(host, 'agentic-panel-team-settings', async () => { (await importOnce('./team_working_mode.js')).showTeamWorkingMode(team, { workspace: true }); });
+            await moveIn(host, 'agentic-panel-team-settings', async () => { const m = await importOnce('./team_working_mode.js'); if (!stale()) m.showTeamWorkingMode(team, { workspace: true }); }, stale);
         } else if (tab === 'knowledge') {
-            await moveIn(host, 'agentic-panel-knowledge', async () => { const m = await importOnce('./team_artifacts.js'); await m.showKnowledgeInPage(team); });
+            await moveIn(host, 'agentic-panel-knowledge', async () => { const m = await importOnce('./team_artifacts.js'); if (!stale()) await m.showKnowledgeInPage(team); }, stale);
         }
     } catch (e) { console.error('team page tab', tab, e); host.textContent = ''; host.append(el('p', 'goals-note', 'This tab could not be shown. Reload the page and try again.')); }
 }
 
 // A panel of the right dock moved into the page, until its own build.
-async function moveIn(host, panelId, render) {
+async function moveIn(host, panelId, render, stale) {
     const p = $(panelId);
+    if (stale()) return;
     if (p && p.parentElement !== host) { host.replaceChildren(p); p.classList.add('active', 'team-moved-panel'); }
     await render();
 }
