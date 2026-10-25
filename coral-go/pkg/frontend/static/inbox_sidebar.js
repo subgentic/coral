@@ -337,6 +337,7 @@ export async function showInbox() {
     saved.loadSaved(); // everything's list (the Inbox is the all scope), read for the table and the count
     if (page) { if (isPhoneLayout()) $('inbox-view')?.setAttribute('data-phone-item', ''); return; } // a task or a message is open: the tab returns to it
     $('inbox-view')?.removeAttribute('data-phone-item');
+    if (document.body.getAttribute('data-nav-tab') !== 'hub-inbox') return; // the module arrived after the person had moved on (a notification's click, a chosen agent): its table must not cover that
     if (!isPhoneLayout()) openGroupTable('hub-inbox', group);
 }
 
