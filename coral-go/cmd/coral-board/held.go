@@ -64,11 +64,15 @@ func cmdHeld() {
 		Dropped    int  `json:"dropped"`
 		Left       int  `json:"left"`
 		PromptOpen bool `json:"prompt_open"`
+		DraftInBox bool `json:"draft_in_box"`
 	}
 	heldCall(http.MethodPost, base+"/send", map[string]string{"agent_type": agentType, "session_id": sessionID, "id": id}, &out)
 	fmt.Printf("Sent %d now (the agent may have been in the middle of a turn). Still held: %d.\n", out.Sent, out.Left)
 	if out.PromptOpen {
 		fmt.Println("A prompt or menu is open on the agent's terminal: nothing was typed into it. Answer it first.")
+	}
+	if out.DraftInBox {
+		fmt.Println("There is a draft in the agent's input box: nothing was sent. Send or clear it first.")
 	}
 	if out.HeldAgain > 0 {
 		fmt.Println("A prompt opened before the Enter of one: it stays held.")
