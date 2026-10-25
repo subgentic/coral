@@ -65,6 +65,14 @@ function headline(f) {
     return `${parts.join(', ')}.`;
 }
 
+/** Both views are one page shape (#7688): the team and window line, a one-sentence summary, the tiles, the chart beside "How it is counted", then the table under a title with the same gap. */
+const SHAPE_HOW = (text) => { const how = el('details', 'disclosure spend-how'); how.append(el('summary', null, 'How it is counted'), el('p', 'spend-note', text)); return how; };
+function shape(body, { sub, headline, cards, chart, how, table }) {
+    body.append(el('p', 'spend-sub', sub), el('p', 'spend-headline', headline), cards);
+    const grid = el('div', 'spend-grid'); if (chart) grid.append(chart); grid.append(how); body.append(grid);
+    if (table) body.append(table);
+}
+
 function card(value, label, sub) {
     const c = el('div', 'cost-card spend-card');
     c.append(el('div', 'cost-card-value', value), el('div', 'cost-card-label', label));
@@ -168,27 +176,31 @@ function drawSpend() {
     if (model.loading && !model.data) { body.append(el('p', 'cost-empty', 'Loading…')); return; }
     const data = model.data; if (!data) return;
     const f = figures(data, model.range);
-    body.append(el('p', 'spend-sub', `Team ${keyLabel(model.team)} · last ${f.windowWord} against the 7 days before`));
-    body.append(el('p', 'spend-headline', headline(f)));
     const cards = el('div', 'cost-summary-cards spend-cards');
     cards.append(card(f.commits ? fmtTokens(f.per) : '—', `tokens per landed commit, ${f.windowWord}`, f.commits ? '' : 'no commit landed'),
         card(f.toolPer != null ? (f.toolPer >= 10 ? String(Math.round(f.toolPer)) : f.toolPer.toFixed(1)) : 'Not measured', `tool calls per landed commit, ${f.windowWord}`, f.toolMeasured ? `${f.toolMeasured[0]} of ${f.toolMeasured[1]} agents measured` : ''),
         card(f.usualPer ? fmtTokens(f.usualPer) : '—', 'usual, the 7 days before', f.usualCommits ? `${f.usualCommits} commits` : 'no commit then'),
         card(String(f.commits), 'commits landed on main', f.unattributed ? `${f.unattributed} unattributed` : ''),
         card(fmtTokens(f.cacheReads) || '0', 'cache reads, not in the total', ''));
-    body.append(cards);
-    const grid = el('div', 'spend-grid');
     const chartBox = el('section', 'spend-box'); chartBox.append(chart(data, f));
-    const how = el('details', 'disclosure spend-how'); how.append(el('summary', null, 'How it is counted'), el('p', 'spend-note', 'Tokens are input plus output. Cache writes and cache reads are shown beside, never hidden in the total. A commit counts once when it reaches main; its author is the agent, and one that matches no agent is Unattributed. A commit is credited to the author name its committer typed, so these are counts, not proof of who did the work. In a repository shared by several teams, Unattributed can include other teams\' commits. Review and orchestration tokens belong to the team, not to one commit. An agent with no token record is Not measured, not zero.'));
-    grid.append(chartBox, how);
-    body.append(grid);
+    const how = SHAPE_HOW('Tokens are input plus output. Cache writes and cache reads are shown beside, never hidden in the total. A commit counts once when it reaches main; its author is the agent, and one that matches no agent is Unattributed. A commit is credited to the author name its committer typed, so these are counts, not proof of who did the work. In a repository shared by several teams, Unattributed can include other teams\' commits. Review and orchestration tokens belong to the team, not to one commit. An agent with no token record is Not measured, not zero.');
     const who = el('section', 'spend-who'); who.append(el('h4', 'spend-box-title', 'Who spends'));
     const scroll = el('div', 'cost-table-container'); scroll.append(table(data)); who.append(scroll);
     if (data.measured_agents != null && data.of_agents != null && data.measured_agents < data.of_agents) who.append(el('p', 'spend-note', `${data.measured_agents} of ${data.of_agents} agents measured.`));
-    body.append(who);
+    shape(body, { sub: `Team ${keyLabel(model.team)} · last ${f.windowWord} against the 7 days before`, headline: headline(f), cards, chart: chartBox, how, table: who });
 }
 
 // ── task time ────────────────────────────────────────────────────────────
+
+const TIME_HOW = 'Time is counted from the moment a task is claimed to the moment it is done, for the tasks that were done in the window. Wait is from the task being made to its being claimed. Review time is from the task being assigned for review to its approval, since the time it was submitted is not stored. A task is counted as sent back when its review sent it back to its author twice or more. Usual is the 7 days before the window. A figure no task could answer is not shown, never zero.';
+
+/** The one-sentence summary of task time, as Tokens per commit has one. */
+function timeHeadline(w, u, word) {
+    if (num(w.done) == null || !w.done) return `No task was done in the ${word}.`;
+    const parts = [`${w.done} ${w.done === 1 ? 'task' : 'tasks'} done`];
+    if (num(w.median_s) != null) { parts.push(`median ${fmtDur(w.median_s)}`); if (num(u.median_s) != null) parts.push(`usual ${fmtDur(u.median_s)}`); }
+    return `${parts.join(', ')}.`;
+}
 
 function drawTime() {
     const body = timeRoot && timeRoot.querySelector('.time-body'); if (!body) return;
@@ -198,7 +210,6 @@ function drawTime() {
     if (!tt || model.error) { if (!model.loading) body.append(el('p', 'cost-empty', model.error || 'No task time for this team yet.')); return; }
     const w = tt.window || {}, u = tt.usual || {};
     const word = model.range === '7d' ? 'last 7 days' : 'last 24 h';
-    body.append(el('p', 'spend-sub', `Team ${keyLabel(model.team)} · ${word} against the 7 days before`));
     const cards = el('div', 'cost-summary-cards spend-cards');
     const usualDay = num(u.done) != null ? Math.round(u.done / 7) : null;
     if (num(w.done) != null) cards.append(card(String(w.done), `tasks done, ${word}`, usualDay != null ? `usual ${usualDay} a day` : ''));
@@ -207,11 +218,11 @@ function drawTime() {
     if (num(w.wait_median_s) != null) cards.append(card(fmtDur(w.wait_median_s), 'median wait before claimed', ''));
     if (num(w.review_median_s) != null) cards.append(card(fmtDur(w.review_median_s), 'median in review, assignment to approval', ''));
     if (num(w.sent_back) != null) cards.append(card(`${w.sent_back} of ${w.done || 0}`, 'sent back 2 or more times', num(w.rounds_mean) != null ? `${w.rounds_mean.toFixed(1)} rounds on average` : ''));
-    body.append(cards);
     const hourly = model.doneGrain === 'hour' && Array.isArray(tt.per_hour) && tt.per_hour.length && model.range === '24h';
     const list = (hourly ? tt.per_hour : tt.per_day) || [];
+    let box = null, sec = null;
     if (list.length) {
-        const box = el('section', 'spend-box');
+        box = el('section', 'spend-box');
         const head = el('div', 'spend-chart-head'); head.append(el('h4', 'spend-box-title', 'Tasks done'));
         head.append(toggles('Tasks done by', [{ key: 'day', label: 'Daily' }, { key: 'hour', label: 'Hourly', disabled: model.range !== '24h' || !(tt.per_hour && tt.per_hour.length), title: model.range === '24h' ? '' : 'Hourly is for the last 24 hours' }], hourly ? 'hour' : 'day', k => { model.doneGrain = k; drawTime(); }));
         box.append(head);
@@ -220,11 +231,10 @@ function drawTime() {
         box.append(bars(rows, { usual, name: `Tasks done each ${hourly ? 'hour' : 'day'}`, unit: v => String(Math.round(v)) })); // more tasks done than usual is good news: this chart is never amber
         const axis = el('div', 'spend-axis'); axis.setAttribute('aria-hidden', 'true'); axis.append(el('span', null, hourly ? '24 hours ago' : `${rows.length} days ago`), el('span', null, hourly ? 'now' : 'to' + 'day'));
         box.append(axis, el('p', 'spend-note', [usual ? `Dashed line: usual, ${usual} a day. A day with no task done has no bar.` : 'A time with no task done has no bar.', model.range !== '24h' ? HOURLY_WHY : ''].filter(Boolean).join(' ')));
-        body.append(box);
     }
     const agents = Array.isArray(tt.agents) ? tt.agents : [];
     if (agents.length) {
-        const sec = el('section', 'spend-who'); sec.append(el('h4', 'spend-box-title', 'By agent'));
+        sec = el('section', 'spend-who'); sec.append(el('h4', 'spend-box-title', 'By agent'));
         const t = el('table', 'cost-table spend-table'); t.setAttribute('aria-label', 'Task time by agent');
         const head = el('tr'); for (const h of ['Agent', 'Tasks done', 'Median time', 'Sent back']) { const th = el('th', null, h); th.scope = 'col'; head.append(th); }
         const thead = el('thead'); thead.append(head); t.append(thead);
@@ -234,8 +244,9 @@ function drawTime() {
             tr.append(n, el('td', null, String(a.done || 0)), el('td', null, num(a.median_s) != null ? fmtDur(a.median_s) : '—'), el('td', null, num(a.sent_back) != null ? String(a.sent_back) : '—'));
             tb.append(tr);
         }
-        t.append(tb); const scroll = el('div', 'cost-table-container'); scroll.append(t); sec.append(scroll); body.append(sec);
+        t.append(tb); const scroll = el('div', 'cost-table-container'); scroll.append(t); sec.append(scroll);
     }
+    shape(body, { sub: `Team ${keyLabel(model.team)} · ${word} against the 7 days before`, headline: timeHeadline(w, u, word), cards, chart: box, how: SHAPE_HOW(TIME_HOW), table: sec });
 }
 
 function draw() { drawSpend(); drawTime(); }
