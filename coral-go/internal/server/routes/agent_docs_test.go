@@ -128,8 +128,8 @@ func TestTheDocsListUsesEachDocsOwnHeading(t *testing.T) {
 func TestListTitleIsOneShortLine(t *testing.T) {
 	for in, want := range map[string]string{
 		"Personal tasks: coral-agent CLI and API": "Personal tasks",
-		"Agent UI (POC)":                                           "Agent UI",
-		"Team configuration (agent.json)":                          "Team configuration",
+		"Agent UI (POC)":                  "Agent UI",
+		"Team configuration (agent.json)": "Team configuration",
 		"Coordination efficiency reporting & metrics architecture": "Coordination efficiency reporting",
 		"What Coral stores on this computer":                       "What Coral stores on this computer",
 		"Task workflows and completion artifacts":                  "Task workflows and completion artifacts",
