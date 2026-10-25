@@ -233,7 +233,7 @@
                         <div class="launch-field-folder">
                             <div class="launch-field-head"><label for="team-board-name">Team name</label> <span class="launch-required">Required</span></div>
                             <input type="text" id="team-board-name" placeholder="e.g. auth-feature, sprint-42" maxlength="64" data-on-input="m-validate-team-name" aria-required="true" aria-describedby="team-board-name-help team-board-name-hint">
-                            <p id="team-board-name-help" class="settings-hint">Letters, digits, - and _. This is the name of the team's message board.</p>
+                            <p id="team-board-name-help" class="settings-hint">Letters, digits, - and _. It names the team's board.</p>
                             <div id="team-board-name-hint" class="team-field-hint"></div>
                         </div>
                         <div class="launch-field-folder">
@@ -301,7 +301,7 @@
                                 <option value="codex">Codex</option>
                                 <option value="pi">Pi</option>
                             </select>
-                            <p class="settings-hint" id="team-set-all-hint">Not the Orchestrator, which keeps its own. Sets the provider only; each worker's model and thinking go back to their defaults.</p>
+                            <p class="settings-hint" id="team-set-all-hint">Skips the Orchestrator. Resets each worker's model.</p>
                         </div>
                         <p class="team-agents-count" id="team-agents-count" aria-live="polite"></p>
                         <div class="team-agents-container">
