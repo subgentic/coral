@@ -348,7 +348,8 @@ function _initKeyboardDetection() {
             document.documentElement.style.removeProperty('--visual-viewport-height');
             return;
         }
-        document.documentElement.style.setProperty('--visual-viewport-height', `${visibleHeight()}px`);
+        const px = `${visibleHeight()}px`;
+        if (document.documentElement.style.getPropertyValue('--visual-viewport-height') !== px) document.documentElement.style.setProperty('--visual-viewport-height', px); // not rewritten each frame while it is read again
     };
 
     // Track the initial viewport height to detect keyboard open/close
@@ -391,7 +392,14 @@ function _initKeyboardDetection() {
 
     // Safari reports a height that is still the old one right after a rotation, after the keyboard is dismissed (no resize event comes), when a page comes back from the back-forward cache and when the
     // tab is shown again: read it again at each, now and a little later, so a stale height does not stay (#7326).
-    const reread = () => { updateViewportHeight(); for (const ms of [150, 500, 1000]) setTimeout(updateViewportHeight, ms); };
+    // Read at once and then on each frame for a second: Safari's first answer is the old one, and the right one comes a few frames later. Frames, not timers: a timer set by a focusout during start-up (the page moves
+    // the focus as it builds) landed in the start-up handler on a machine whose window has focus and not on one without, so the start-up golden differed by machine (Windows CI, #7326).
+    const reread = () => {
+        updateViewportHeight();
+        const until = performance.now() + 1000;
+        const tick = () => { updateViewportHeight(); if (performance.now() < until) requestAnimationFrame(tick); };
+        requestAnimationFrame(tick);
+    };
     window.addEventListener('orientationchange', reread);
     window.addEventListener('pageshow', reread);
     window.addEventListener('focusout', reread);
