@@ -1,20 +1,19 @@
 {{ define "includes/views/cost_dashboard.html" }}
 <!-- Token Usage Dashboard View -->
 <div id="cost-dashboard-view" class="cost-dashboard-view" style="display:none">
+    <!-- On a phone the sidebar's pane is the page's list, here (mobile.js), and a view is the screen after it (#7473) -->
+    <div id="mobile-analytics-list"></div>
+    <div class="cost-page" id="cost-page">
+    <p id="cost-status" class="sr-only" role="status" aria-live="polite"></p><!-- said when a view is chosen -->
     <div class="cost-header">
         <div class="cost-header-left">
-            <h2>Analytics</h2>
-            <span class="cost-live-indicator" id="cost-live-indicator">
-                <span class="cost-live-dot"></span> Live
-            </span>
+            <button type="button" class="group-back cost-phone-back" data-on-click="analytics-phone-back">&larr; Back to the list</button>
+            <div class="cost-title-block">
+                <h2 id="cost-view-title" tabindex="-1">Overview</h2>
+                <p class="cost-range-line" id="cost-range-line"><span id="cost-range-text">Last 24 hours</span> <span class="cost-live-indicator" id="cost-live-indicator"><span class="cost-live-dot" aria-hidden="true"></span> Live</span></p>
+            </div>
         </div>
         <div class="cost-header-actions">
-            <select id="cost-time-range" class="cost-time-select" aria-label="Time range" data-on-change="cost-time-range">
-                <option value="hour">Last hour</option>
-                <option value="day" selected>Last 24 hours</option>
-                <option value="week">Last 7 days</option>
-                <option value="month">Last 30 days</option>
-            </select>
             <button class="btn btn-sm" data-on-click="cost-refresh">
                 <span class="material-icons" style="font-size:1rem" aria-hidden="true">refresh</span> Refresh
             </button>
@@ -22,7 +21,7 @@
     </div>
 
     <!-- Summary Cards -->
-    <div class="cost-summary-cards" id="cost-summary-cards">
+    <div class="cost-summary-cards" id="cost-summary-cards" data-cview="overview">
         <div class="cost-card">
             <div class="cost-card-label">Input Tokens</div>
             <div class="cost-card-value" id="cost-input-tokens">0</div>
@@ -59,26 +58,26 @@
         </div>
     </div>
 
-    <details class="disclosure cost-help" id="cost-help">
+    <details class="disclosure cost-help" id="cost-help" data-cview="overview">
         <summary>What these numbers mean</summary>
         <p class="cost-note" id="cost-note">Every figure is for the time range chosen above. Cache read is tokens read back from the provider's cache, billed at a lower rate; cache write is tokens stored in it. Burn rate is the total cost divided by the hours the range's data covers (at least one).</p>
     </details>
     <p class="cost-scroll-hint" id="cost-scroll-hint" hidden>Some tables have more columns to the right: scroll them sideways.</p>
 
     <!-- Tokens per commit, one team (analytics_spend.js, #7526) -->
-    <section class="cost-section" id="cost-spend-section" aria-labelledby="cost-spend-title">
+    <section class="cost-section" id="cost-spend-section" data-cview="per-commit" aria-labelledby="cost-spend-title">
         <h3 class="cost-section-title" id="cost-spend-title">Tokens per commit</h3>
         <div id="cost-spend"></div>
     </section>
 
     <!-- Task time, one team (analytics_spend.js, #7530) -->
-    <section class="cost-section" id="cost-task-time-section" aria-labelledby="cost-task-time-title" hidden>
+    <section class="cost-section" id="cost-task-time-section" data-cview="task-time" aria-labelledby="cost-task-time-title">
         <h3 class="cost-section-title" id="cost-task-time-title">Task time</h3>
         <div id="cost-task-time"></div>
     </section>
 
     <!-- Cumulative Spend Chart -->
-    <div class="cost-section">
+    <div class="cost-section" data-cview="overview">
         <h3 class="cost-section-title">Cumulative Spend</h3>
         <div id="cost-spend-chart" class="cost-chart-container">
             <div class="cost-empty">Loading chart data...</div>
@@ -86,7 +85,7 @@
     </div>
 
     <!-- By Provider (#5120) -->
-    <div class="cost-section">
+    <div class="cost-section" data-cview="provider">
         <h3 class="cost-section-title">By Provider</h3>
         <div id="cost-by-provider" class="cost-table-container">
             <div class="cost-empty">No data in this range yet. It appears once an agent has used tokens; try a longer range.</div>
@@ -94,7 +93,7 @@
     </div>
 
     <!-- By Model -->
-    <div class="cost-section">
+    <div class="cost-section" data-cview="model">
         <h3 class="cost-section-title">By Model</h3>
         <div id="cost-by-model" class="cost-table-container">
             <div class="cost-empty">No data in this range yet. It appears once an agent has used tokens; try a longer range.</div>
@@ -102,7 +101,7 @@
     </div>
 
     <!-- By Thinking Level (#4969) -->
-    <div class="cost-section">
+    <div class="cost-section" data-cview="thinking">
         <h3 class="cost-section-title">By Thinking Level</h3>
         <div id="cost-by-thinking" class="cost-table-container">
             <div class="cost-empty">No data in this range yet. It appears once an agent has used tokens; try a longer range.</div>
@@ -110,19 +109,19 @@
     </div>
 
     <!-- By Team -->
-    <div class="cost-section">
+    <div class="cost-section" data-cview="team">
         <h3 class="cost-section-title">By Team</h3>
         <div id="cost-by-team" class="cost-table-container">
             <div class="cost-empty">No data in this range yet. It appears once an agent has used tokens; try a longer range.</div>
         </div>
     </div>
-    <div class="cost-section">
+    <div class="cost-section" data-cview="calls">
         <h3 class="cost-section-title">Tool &amp; API Calls</h3>
         <div id="call-metrics-summary" class="cost-table-container"><div class="cost-empty">No tool calls in the last 24 hours yet. They appear once an agent has used a tool.</div></div>
     </div>
 
     <!-- By Branch -->
-    <div class="cost-section">
+    <div class="cost-section" data-cview="branch">
         <h3 class="cost-section-title">By Branch</h3>
         <div id="cost-by-branch" class="cost-table-container">
             <div class="cost-empty">No data in this range yet. It appears once an agent has used tokens; try a longer range.</div>
@@ -130,7 +129,7 @@
     </div>
 
     <!-- By Agent -->
-    <div class="cost-section">
+    <div class="cost-section" data-cview="agent">
         <h3 class="cost-section-title">By Agent</h3>
         <div id="cost-by-agent" class="cost-table-container">
             <div class="cost-empty">No data in this range yet. It appears once an agent has used tokens; try a longer range.</div>
@@ -138,12 +137,13 @@
     </div>
 
     <!-- By Task -->
-    <div class="cost-section">
+    <div class="cost-section" data-cview="task">
         <h3 class="cost-section-title">By Task</h3>
         <div id="cost-by-task" class="cost-table-container">
             <div class="cost-empty">No task costs in this range yet. They appear once an agent has worked on a board task.</div>
         </div>
     </div>
 
+    </div><!-- /cost-page -->
 </div>
 {{ end }}

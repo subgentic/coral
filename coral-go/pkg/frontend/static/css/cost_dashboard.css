@@ -157,8 +157,12 @@
     display: flex;
     flex-direction: column;
     overflow-y: auto;
-    padding: 24px 32px;
 }
+
+/* The page is one view at a time (#7473): its title, then that view's sections. The sidebar lists the views. */
+.cost-page { display: flex; flex-direction: column; min-width: 0; padding: 24px 32px; }
+.cost-phone-back { display: none; }
+#mobile-analytics-list { display: none; }
 
 .cost-header {
     display: flex;
@@ -172,9 +176,14 @@
 
 .cost-header h2 {
     font-size: var(--type-page-size);
-    font-weight: 600;
+    font-weight: 700;
+    line-height: 1.3;
     margin: 0;
+    color: var(--text-primary);
 }
+.cost-title-block { min-width: 0; }
+.cost-header h2:focus { outline: none; } /* a phone's screen change puts the focus on the title: it is a place to start reading, not a control */
+.cost-range-line { margin: 2px 0 0; font-size: var(--fs-md); color: var(--text-secondary); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
 .cost-header-actions {
     display: flex;
@@ -208,7 +217,7 @@
 
 .cost-card {
     flex: 1;
-    min-width: 120px;
+    min-width: 100px; /* seven tiles share a row beside the sidebar at 1280 */
     background: var(--bg-secondary);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
@@ -220,7 +229,7 @@
 
 .cost-card-label {
     font-size: var(--fs-base);
-    font-weight: 600;
+    font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.4px;
     color: var(--text-secondary);
@@ -239,11 +248,14 @@
 }
 
 .cost-section-title {
-    font-size: var(--fs-xl);
+    font-size: var(--fs-lg);
     font-weight: 600;
     color: var(--text-secondary);
     margin-bottom: 8px;
 }
+/* A view with one section is titled by the page's own title: its section heading stays for a reader (and names the table) but is not drawn twice */
+#cost-dashboard-view:not([data-view="overview"]) > .cost-page > .cost-section > .cost-section-title { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+[data-cview][hidden] { display: none !important; }
 
 .cost-table-container {
     border: 1px solid var(--border);
@@ -392,9 +404,7 @@
     align-items: center;
     gap: 5px;
     font-size: var(--fs-base);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    font-weight: 500;
     color: var(--success);
     opacity: 0.7;
     transition: opacity 0.3s;
@@ -430,11 +440,11 @@
 }
 
 .cost-card-highlight .cost-card-value {
-    font-size: 1.375rem; /* the figure the page is opened for is larger; it is not drawn as a selected or clickable card (#6975: no card here is interactive) */
+    font-size: 1.25rem; /* one tile size (#7473): the figure the page is opened for is not drawn larger, or as a selected or clickable card (#6975: no card here is interactive) */
 }
 
 .cost-card-burn .cost-card-value {
-    font-size: 1rem;
+    font-size: 1.25rem;
     color: var(--warning);
 }
 
@@ -594,3 +604,14 @@
 @media (max-width: 760px) { .spend-toggle-btn { min-height: 44px; } }
 .spend-bar-col { position: relative; }
 .cost-section[hidden] { display: none; }
+
+/* Analytics on a phone (#7473): the pane is the page's list; a view is the screen after it, with a way back to the list */
+@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
+    #mobile-analytics-list { display: block; }
+    #cost-dashboard-view:not([data-phone-item]) .cost-page { display: none; }
+    #cost-dashboard-view[data-phone-item] #mobile-analytics-list { display: none; }
+    #cost-dashboard-view .cost-phone-back { display: inline-flex; align-items: center; min-height: var(--control-touch-height, 44px); }
+    #mobile-analytics-list .sidebar-hide-btn { display: none; } /* the page is the whole screen: there is no column to hide */
+    #mobile-analytics-list .sidebar-header { padding: 12px; }
+    .cost-page { padding: 12px; }
+}

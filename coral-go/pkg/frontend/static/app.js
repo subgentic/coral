@@ -279,6 +279,9 @@ registerActions({
 // The Workflows view's own buttons and create dialog (#3645); its generated markup's actions
 // register with its module.
 registerActions({
+    'analytics-search-filter': el => { const v = el.value; importOnce('./analytics_views.js').then(m => m.filterViews(v)).catch(() => {}); }, // the Analytics sidebar's search box is in the page from the start; the views module loads with the tab
+    'analytics-view': el => { const key = el.dataset.view; importOnce('./analytics_views.js').then(m => m.selectView(key, { focus: true })).catch(() => {}); },
+    'analytics-phone-back': () => { importOnce('./analytics_views.js').then(m => m.phoneBack()).catch(() => {}); },
     'workflows-search-filter': el => { const v = el.value; importOnce('./workflows.js').then(m => m.filterWorkflows(v)).catch(() => {}); }, // the Workflows sidebar's search box is in the page from the start; workflows.js loads with the tab
     'wf-phone-back': () => { importOnce('./workflows.js').then(m => m.workflowsPhoneBack()).catch(() => {}); },
     'wf-build-agent': () => launchWorkflowAgent(),
@@ -463,7 +466,7 @@ function switchNavTab(tab, opts = {}) {
     }
 
     // Toggle sidebar visibility — full-width views hide the sidebar
-    const fullWidthTabs = new Set(['tokens', 'servers', 'hub-inbox', 'artifacts']); // Workflows has its sidebar (#7471)
+    const fullWidthTabs = new Set(['servers', 'hub-inbox', 'artifacts']); // Workflows and Analytics have their sidebars (#7471, #7473)
     const layout = document.querySelector('.layout');
     if (layout) layout.classList.toggle('sidebar-hidden', fullWidthTabs.has(tab));
 

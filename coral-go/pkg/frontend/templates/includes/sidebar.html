@@ -74,6 +74,14 @@
                     <button class="btn btn-primary sidebar-new-btn-full" id="wf-create-btn" data-on-click="wf-create">+ New workflow</button>
                 </div>
             </div>
+            <div class="sidebar-pane" data-pane="tokens" hidden>
+                {{ template "includes/sidebar_header" "tokens" }}
+                <section class="sidebar-section" data-section="analytics">
+                    <div class="sidebar-section-body">
+                        <ul id="cost-nav-list" class="session-list"></ul>
+                    </div>
+                </section>
+            </div>
             <div class="sidebar-pane" data-pane="docs" hidden>
                 {{ template "includes/sidebar_header" "docs" }}
                 <section class="sidebar-section" data-section="docs">
@@ -96,6 +104,7 @@
                         {{ if eq . "agents" }}<input type="search" id="agent-search-input" class="sidebar-search-input" placeholder="Search" autocomplete="off" aria-label="Search agents" data-on-input="agent-search-filter" data-on-keydown="agent-search-key">
                         {{ else if eq . "history" }}<input type="search" id="history-search" class="sidebar-search-input" placeholder="Search" autocomplete="off" aria-label="Search chats">
                         {{ else if eq . "jobs" }}<input type="search" id="jobs-search" class="sidebar-search-input" placeholder="Search" autocomplete="off" aria-label="Search jobs" data-on-input="jobs-search-filter">
+                        {{ else if eq . "tokens" }}<input type="search" id="analytics-search" class="sidebar-search-input" placeholder="Search" autocomplete="off" aria-label="Search views" data-on-input="analytics-search-filter">
                         {{ else if eq . "workflows" }}<input type="search" id="workflows-search" class="sidebar-search-input" placeholder="Search" autocomplete="off" aria-label="Search workflows" data-on-input="workflows-search-filter">
                         {{ else }}<input type="search" id="docs-search" class="sidebar-search-input" placeholder="Search" autocomplete="off" aria-label="Search docs" data-on-input="docs-search-filter">{{ end }}
                     </div>
@@ -113,7 +122,16 @@
                     </button>
                     {{ if eq . "agents" }}<span class="sr-only" role="status" aria-live="polite" data-agent-list-live></span>{{ end }}
                     {{ if ne . "jobs" }}{{ if ne . "docs" }}{{ if ne . "workflows" }}<div class="list-display-panel" id="{{ if eq . "agents" }}display-panel{{ else }}display-panel-{{ . }}{{ end }}" data-display-panel role="group" aria-label="Display options" data-on-keydown="display-panel-key" hidden>
-                        {{ if eq . "agents" }}<div class="agent-list-bar" id="agent-list-bar" hidden></div>
+                        {{ if eq . "tokens" }}<div class="hf-row">
+                            <label class="hf-label" for="cost-time-range">Time range</label>
+                            <select id="cost-time-range" class="cost-time-select" data-on-change="cost-time-range">
+                                <option value="hour">Last hour</option>
+                                <option value="day" selected>Last 24 hours</option>
+                                <option value="week">Last 7 days</option>
+                                <option value="month">Last 30 days</option>
+                            </select>
+                        </div>
+                        {{ else if eq . "agents" }}<div class="agent-list-bar" id="agent-list-bar" hidden></div>
                     <div class="list-display-options">
                         <label class="list-display-option"><input type="checkbox" id="display-show-summary" data-display-input="summary" data-on-change="toggle-session-summary"> Show summaries</label>
                         <label class="list-display-option" id="display-show-server-row" data-display-row="server" hidden><input type="checkbox" id="display-show-server" data-display-input="server" data-on-change="toggle-show-server"> Show server</label>

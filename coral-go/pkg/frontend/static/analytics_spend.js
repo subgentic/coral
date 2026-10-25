@@ -192,11 +192,10 @@ function drawSpend() {
 
 function drawTime() {
     const body = timeRoot && timeRoot.querySelector('.time-body'); if (!body) return;
-    const section = document.getElementById('cost-task-time-section');
     body.replaceChildren();
     const tt = model.data && model.data.task_time;
-    if (section) section.hidden = !model.team;
-    if (!model.team || !tt || model.error) { if (model.team && !model.loading) body.append(el('p', 'cost-empty', model.error || 'No task time for this team yet.')); return; }
+    if (!model.team) { body.append(el('p', 'cost-empty', 'Open a team to see how long its tasks take.')); return; } // the view is in the list for every team: with none, it says so
+    if (!tt || model.error) { if (!model.loading) body.append(el('p', 'cost-empty', model.error || 'No task time for this team yet.')); return; }
     const w = tt.window || {}, u = tt.usual || {};
     const word = model.range === '7d' ? 'last 7 days' : 'last 24 h';
     body.append(el('p', 'spend-sub', `Team ${keyLabel(model.team)} · ${word} against the 7 days before`));

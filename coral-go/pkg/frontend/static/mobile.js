@@ -202,6 +202,22 @@ function syncMobileWorkflowsList() {
     }
 }
 
+// The Analytics views: the same move (#7473).
+let _analyticsHome = null;
+function syncMobileAnalyticsList() {
+    const section = document.querySelector('[data-pane="tokens"]');
+    const host = document.getElementById('mobile-analytics-list');
+    if (!section || !host) return;
+    if (isMobile()) {
+        if (!_analyticsHome) _analyticsHome = { parent: section.parentElement, next: section.nextSibling };
+        if (section.parentElement !== host) host.appendChild(section);
+    } else if (_analyticsHome) {
+        const { parent, next } = _analyticsHome;
+        parent.insertBefore(section, next?.parentNode === parent ? next : null);
+        _analyticsHome = null;
+    }
+}
+
 // The Docs topics: the same move (#7443): on a phone the pane is the page's own list, a wide screen puts it back.
 let _docsHome = null;
 function syncMobileDocsList() {
@@ -471,6 +487,7 @@ export function initMobile() {
     syncMobileJobsList();
     syncMobileDocsList();
     syncMobileWorkflowsList();
+    syncMobileAnalyticsList();
     // Set default tab
     if (isMobile()) {
         switchMobileTab('agents');
@@ -495,6 +512,7 @@ export function initMobile() {
             syncMobileJobsList();
             syncMobileDocsList();
             syncMobileWorkflowsList();
+            syncMobileAnalyticsList();
             const list = document.getElementById('mobile-agent-list');
             const welcome = document.getElementById('welcome-screen');
             if (mobile) {

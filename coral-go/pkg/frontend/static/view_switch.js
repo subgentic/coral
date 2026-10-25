@@ -43,7 +43,6 @@ const VIEW_DISPLAY = {
 };
 
 const FULL_WIDTH_VIEWS = new Set([
-    "cost-dashboard-view",
     "timeline-view",
     "kanban-view",
     "servers-view",

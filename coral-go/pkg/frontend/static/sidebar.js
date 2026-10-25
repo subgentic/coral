@@ -319,6 +319,7 @@ export const SIDEBAR_PANES = {
     history: { search: 'Search chats', action: null },
     jobs: { search: 'Search jobs', action: { name: 'job-new', label: 'New job' } },
     workflows: { search: 'Search workflows', action: { name: 'wf-create', label: 'New workflow' } },
+    tokens: { search: 'Search views', action: null }, // Analytics: the tab's name is tokens
     docs: { search: 'Search docs', action: null },
 };
 
