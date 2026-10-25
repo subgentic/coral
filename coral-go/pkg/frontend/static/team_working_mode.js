@@ -143,7 +143,7 @@ function _teamSettingsPageShell() {
       <h2 class="ts-h" id="ts-h-workflow">Workflow</h2>
       <div class="ts-row ts-name-row"><div class="ts-text"><span class="ts-label">Board name</span><p class="ts-hint">Only the label changes: its agents, tasks and history stay.</p></div><div class="ts-control ts-rename"></div></div>
       <form class="working-mode-form ts-main" autocomplete="off">
-        <div class="ts-row"><div class="ts-text"><span class="ts-label" id="tsr-mode-l">Working mode</span><p class="ts-hint working-mode-desc" id="working-mode-desc"></p></div><div class="ts-control"><select name="mode" aria-labelledby="tsr-mode-l" aria-describedby="working-mode-desc"><option value="none">None</option><option value="shared_checkout">Shared checkout</option><option value="worktrees">Worktrees</option></select></div></div>
+        <div class="ts-row"><div class="ts-text"><span class="ts-label" id="tsr-mode-l">Working mode</span><p class="ts-hint" id="tsr-mode-h">Instructions are saved with each task when it is first claimed. <button type="button" class="tb-learn ts-learn" aria-expanded="false" aria-controls="tsr-mode-more" aria-label="Learn more about working modes">Learn more</button><span id="tsr-mode-more" hidden> Tasks already claimed keep their instructions. This setting gives guidance; it does not create worktrees by itself. <a href="#" class="working-mode-docs-link" data-doc="teams">Team working modes</a></span></p></div><div class="ts-control ts-mode-control"><select name="mode" aria-labelledby="tsr-mode-l" aria-describedby="tsr-mode-h working-mode-desc"><option value="none">None</option><option value="shared_checkout">Shared checkout</option><option value="worktrees">Worktrees</option></select><p class="ts-hint working-mode-desc" id="working-mode-desc"></p></div></div>
         ${pageSwitch('dependency_guidance', 'Include dependent-queue guidance', 'Tells agents how to work when a task waits on another.')}
         ${pageSwitch('require_goal', 'Require a goal', requireGoalSentence)}
         ${pageRow({ id: 'tsr-instr', label: 'Additional instructions', hint: 'Team-specific conventions, given to agents with each task.', wide: true, control: '<textarea name="custom_instructions" rows="4" aria-labelledby="tsr-instr-l" aria-describedby="tsr-instr-h" placeholder="Team-specific conventions"></textarea>' })}
@@ -177,6 +177,15 @@ function _mountTeamSettings(dialog, team, workspaceMode, pageHost = null) {
         pageHost.replaceChildren(dialog);
         dialog.querySelector('.ts-rename').append(boardRenameControl(team, { onRenamed: () => { document.getElementById('team-page-title') && importOnce('./team_page.js').then(m => m.refreshTeamHeader?.()).catch(() => {}); importOnce('./render.js').then(m => m.scheduleLiveSessionsRender()); } }));
         bindInfo(dialog.querySelector('.ts-main'));
+        dialog.addEventListener('click', event => { // a Learn more opens its text under the hint
+            const learn = event.target.closest('.ts-learn');
+            if (!learn) return;
+            const more = document.getElementById(learn.getAttribute('aria-controls'));
+            more.hidden = !more.hidden;
+            learn.setAttribute('aria-expanded', String(!more.hidden));
+            learn.textContent = more.hidden ? 'Learn more' : 'Show less';
+            learn.setAttribute('aria-label', `${more.hidden ? 'Learn more' : 'Show less'} about working modes`);
+        });
         dialog.addEventListener('click', event => {
             const docLink = event.target.closest('.working-mode-docs-link');
             if (!docLink) return;

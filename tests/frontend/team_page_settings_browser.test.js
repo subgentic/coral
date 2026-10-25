@@ -15,7 +15,7 @@ const TEAM = `qa-settings-${Date.now() % 100000}`;
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const { settle } = require('./helpers/wait').bind(ev);
     const S = scenarios();
-    const bar = () => ev(`(() => { const save = window.__tp.find('button', /^Save settings$/i), cancel = window.__tp.find('button', /^Cancel$/i); const st = [...window.__tp.page().querySelectorAll('[role=status], output, p, div')].filter(window.__na.vis).map(e => window.__na.text(e)).find(t => /No changes to save|Unsaved|changes? (to|not)|Saved|Could not save/i.test(t) && t.length < 80) || ''; return { save: save ? { disabled: save.disabled || save.getAttribute('aria-disabled') === 'true', ...window.__na.box(save) } : null, cancel: cancel ? window.__na.box(cancel) : null, status: st.trim(), vh: innerHeight }; })()`);
+    const bar = () => ev(`(() => { const save = window.__tp.find('button', /^Save settings$/i), cancel = window.__tp.find('button', /^Cancel$/i); const st = [...window.__tp.page().querySelectorAll('[role=status], output, p, div')].filter(window.__na.vis).map(e => window.__na.text(e)).find(t => /^(No changes to save|You have unsaved changes|Saved\.|Could not save)/.test(t.trim()) && t.length < 80) || ''; return { save: save ? { disabled: save.disabled || save.getAttribute('aria-disabled') === 'true', ...window.__na.box(save) } : null, cancel: cancel ? window.__na.box(cancel) : null, status: st.trim(), vh: innerHeight }; })()`);
     const sw = n => `(() => { const e = [...window.__tp.page().querySelectorAll('[role=switch], input[type=checkbox]')].filter(window.__na.vis).find(x => window.__na.name(x) === ${JSON.stringify(n)}); return e; })()`;
     const state = n => ev(`(() => { const e = ${sw(n)}; return e ? (e.getAttribute('aria-checked') || String(e.checked)) : null; })()`);
     try {
@@ -68,9 +68,14 @@ const TEAM = `qa-settings-${Date.now() % 100000}`;
                 await ev(`window.__tp.find('button', /^Save settings$/i).click(); true`); await settle(900);
                 const b = await bar(); assert.match(b.status, /^Could not save: /, `the status says it could not save and why (got ${JSON.stringify(b.status)})`); assert.equal(b.save.disabled, false, 'Save settings is on again');
             });
-            await S.run(`${label}: the Working mode row says what the mode means as its own hint, and the select is described by it`, async () => {
-                const r = await ev(`(() => { const sel = window.__tp.find('select', /^Working mode$/i); if (!sel) return null; const h = document.getElementById(sel.getAttribute('aria-describedby') || ''); const row = sel.closest('.ts-row'); return { text: h ? window.__na.text(h).trim() : null, inRow: !!(h && row && row.contains(h)) }; })()`);
-                assert.ok(r, 'a select named Working mode'); assert.equal(r.text, 'No extra guidance.'); assert.equal(r.inRow, true, 'the hint is in the Working mode row');
+            await S.run(`${label}: the Working mode row has one hint line with a Learn more (the old "About working modes"), and the mode's own description stays under the select`, async () => {
+                const r = await ev(`(() => { const sel = window.__tp.find('select', /^Working mode$/i); if (!sel) return null; const ids = (sel.getAttribute('aria-describedby') || '').split(/\\s+/); const row = sel.closest('.ts-row'); const h = document.getElementById(ids[0]); const more = h && h.querySelector('[aria-controls]'); const d = document.getElementById(ids[1] || ''); return { hint: h ? window.__na.text(h).replace(/Learn more/, '').trim().split(/\\s{2,}|\\n/)[0] : null, inRow: !!(h && row && row.contains(h)), learn: more ? { name: window.__na.name(more), expanded: more.getAttribute('aria-expanded') } : null, desc: d ? window.__na.text(d).trim() : null, descUnder: !!(d && sel.compareDocumentPosition(d) & Node.DOCUMENT_POSITION_FOLLOWING) }; })()`);
+                assert.ok(r, 'a select named Working mode'); assert.match(r.hint, /^Instructions are saved with each task when it is first claimed\./); assert.equal(r.inRow, true, 'the hint is in the Working mode row');
+                assert.deepEqual(r.learn, { name: 'Learn more about working modes', expanded: 'false' }, 'a Learn more, closed');
+                assert.equal(r.desc, 'No extra guidance.'); assert.equal(r.descUnder, true, 'the mode description is under the select');
+                await ev(`window.__tp.find('button', /^Learn more about working modes$/i).click(); true`); await settle(200);
+                const open = await ev(`(() => { const m = document.getElementById('tsr-mode-more'); const a = m && m.querySelector('a'); return { shown: !!m && !m.hidden, text: m ? window.__na.text(m).trim() : '', link: a ? window.__na.text(a).trim() : null }; })()`);
+                assert.equal(open.shown, true); assert.match(open.text, /Tasks already claimed keep their instructions\. This setting gives guidance; it does not create worktrees by itself\./); assert.equal(open.link, 'Team working modes');
             });
         }
         await removeBoards(ev, [TEAM]); S.finish(); // finish() exits the process, so the board goes first
