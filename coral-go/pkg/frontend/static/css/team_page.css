@@ -238,6 +238,7 @@
 }
 @media (max-width: 760px) {
     #agentic-panel-artifacts-view .team-row-btn { min-height: 44px; display: inline-flex; align-items: center; } /* a 44 px target on a touch screen */
+    #agentic-panel-artifacts-view td:last-child { vertical-align: middle; } /* Created on the line of the name, whose button is 44 px tall */
     #agentic-panel-artifacts-view .team-table th:nth-child(5), #agentic-panel-artifacts-view .team-table td:nth-child(5) { display: table-cell; } /* the page's phone table is Name and State; here Created stays beside the name, as in any narrow panel */
 }
 .detail-readers:not(:empty) { margin-bottom: 12px; }
