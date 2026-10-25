@@ -31,7 +31,12 @@ export const PERMISSION_MODE_DESCRIPTIONS = {
 export const CODEX_NETWORK_MODES = ['default', 'auto', 'dontAsk'];
 export const CODEX_AUTO_DESCRIPTION = 'Workspace sandbox, with the network on so it can reach Coral.';
 
+// The modes in which an agent's launch of a worker is refused: they never stop to ask (Security's #7578)
+const SKIPS_PROMPTS = ['auto', 'dontAsk', 'bypassPermissions'];
+
 export function _updatePermModeDescription(selectEl) {
+    const warn = selectEl.closest('.settings-row')?.querySelector('.perm-mode-warn'); // only the Settings row has it
+    if (warn) warn.hidden = !SKIPS_PROMPTS.includes(selectEl.value);
     const hint = selectEl.parentElement?.querySelector('.perm-mode-desc');
     if (!hint) return;
     const codex = selectEl.closest('[data-acf-uid]')?.querySelector('.acf-agent-type')?.value === 'codex';

@@ -78,7 +78,7 @@ function buildInfoButtons(root) {
         const texts = [...row.querySelectorAll('dt .toggle-desc, [data-info]')];
         if (!dt || !texts.length || row.dataset.hinted) continue;
         row.dataset.hinted = '1';
-        const label = dt.querySelector('label, .net-group-title') || dt;
+        const label = dt.querySelector('label, .net-group-title, [id$="-label"]') || dt; // a label span that names its control counts too (Default permission mode)
         const name = (label.textContent || '').trim();
         let holder = dt; // a group's head is a row (title, switch): its hints go in a line of their own under it
         if (dt.classList.contains('net-group-head')) { holder = document.createElement('div'); holder.className = 'settings-hint-wrap'; dt.after(holder); }
