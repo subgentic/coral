@@ -36,6 +36,7 @@ const BASE = require('./test_base').BASE;
         const rs = await rows();
         check('each row: the title with its number, a state chip, and who', rs.length === 3 && rs[0].title === '#' + second + ' Second open task' && rs[0].chip === 'Queued' && rs[0].who === 'Nobody yet', JSON.stringify(rs));
         check('a done task says who built it, not the orchestrator who completed it ("Done by dev")', rs[2].title === '#' + built + ' Build the column' && rs[2].who === 'Done by dev' && rs[2].chip === 'Done', JSON.stringify(rs[2]));
+        check('the title has a gap under its back link', await ev(`(() => { const b = document.querySelector('.goal-main .goals-back').getBoundingClientRect(), t = document.getElementById('goals-detail-title').getBoundingClientRect(); return t.top - b.bottom >= 8; })()`));
         await shot('goal-column-desktop');
 
         console.log('2. Search');
@@ -72,6 +73,7 @@ const BASE = require('./test_base').BASE;
         await ev(`document.querySelector('.goal-tasks-open').click(); true`);
         await waitFor(`document.querySelector('.goal-side').getClientRects().length > 0`, 'the list screen');
         check('the list is the next screen: the column, a way back to the goal, no main pane; rows are 44 px', await vis('.goal-side-back') && !(await vis('.goal-main')) && await ev(`[...document.querySelectorAll('.goal-side-row')].every(b => b.getBoundingClientRect().height >= 43.5)`));
+        check('the list screen runs the page\'s whole width', await ev(`(() => { const s = document.querySelector('.goal-side').getBoundingClientRect(), p = document.querySelector('.goal-split').getBoundingClientRect(); return Math.abs(s.width - p.width) <= 1; })()`));
         await shot('goal-phone-list');
         await ev(`document.querySelector('.goal-side-row[data-task-id="${third}"]').click(); true`);
         await waitFor(`!!document.querySelector('.goal-main #team-task-title') && document.querySelector('.goal-main').getClientRects().length > 0`, 'the task screen');
