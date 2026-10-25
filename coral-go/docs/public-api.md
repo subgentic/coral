@@ -102,6 +102,25 @@ Content-Type: application/json
 {"input": "your command here"}
 ```
 
+#### Held messages, and Send now
+```
+GET /api/sessions/live/{name}/held?agent_type=claude&session_id=uuid
+POST /api/sessions/live/{name}/held/send
+Content-Type: application/json
+
+{"agent_type": "claude", "session_id": "uuid", "id": ""}
+```
+Coral holds an agent's automated messages (board nudges and messages) while it judges the agent busy,
+asking or drafting. The GET lists what is held: `{"held": [{"id", "what", "since", "reason"}]}` (who sent
+it, since when and why it waits; never the text; `reason` is one of `turn`, `prompt`, `dialog`, `draft`,
+`box`, `other`). The POST types the held message named by `id`, or all of them when `id` is empty, at once:
+the agent may be in the middle of a turn, and the text goes into its input box. The answer is
+`{"ok": true, "sent": n, "held_again": n, "dropped": n, "left": n}`; a message goes once, so a second call finds
+nothing, and one the normal release took first is not typed again. A prompt or menu that is open on the
+agent's terminal holds everything (`"prompt_open": true`, nothing typed). Both routes are the Operator's:
+an agent's token gets 403 `forbidden_for_agent`, and they are never reachable through Coral Hub. The same from
+the command line: `coral-board held "<agent>"` and `coral-board held send "<agent>" [--id ID]`.
+
 #### Kill a session
 ```
 POST /api/sessions/live/{name}/kill
