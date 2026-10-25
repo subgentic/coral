@@ -138,9 +138,11 @@ const BASE = require('./test_base').BASE;
         console.log('PASS (12) API key: masked full width, Show/Hide, Copy enabled; a 401 says to sign in');
 
         // ── (13) The agent search placeholder fits the box at its narrowest.
-        const fit = await ev(`(() => { const i = document.getElementById('agent-search-input'); const cs = getComputedStyle(i); const box = i.closest('.sidebar-search'); const min = parseFloat(getComputedStyle(box).minWidth);
-            const c = document.createElement('canvas').getContext('2d'); c.font = cs.font; const text = c.measureText(i.placeholder).width;
-            return { placeholder: i.placeholder, label: i.getAttribute('aria-label'), text, room: min - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - parseFloat(cs.borderLeftWidth) - parseFloat(cs.borderRightWidth) }; })()`);
+        // measured at the box's real narrowest: forced to its minimum width, with whatever padding the container query then gives the input (a measure at the wide size read the wide size's padding)
+        const fit = await ev(`(async () => { const i = document.getElementById('agent-search-input'); const box = i.closest('.sidebar-search'); const old = box.style.cssText; const min = parseFloat(getComputedStyle(box).minWidth);
+            box.style.cssText = old + ';flex:none;width:' + min + 'px'; await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+            const cs = getComputedStyle(i); const c = document.createElement('canvas').getContext('2d'); c.font = cs.font; const text = c.measureText(i.placeholder).width;
+            const r = { placeholder: i.placeholder, label: i.getAttribute('aria-label'), text, room: i.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) }; box.style.cssText = old; return r; })()`);
         assert.equal(fit.label, 'Search agents', 'the accessible name keeps saying what it searches');
         assert.ok(fit.text <= fit.room, `placeholder "${fit.placeholder}" (${fit.text.toFixed(1)}px) fits the box's minimum width (${fit.room.toFixed(1)}px)`);
         console.log(`PASS (13) search placeholder "${fit.placeholder}" fits at the minimum width`);
