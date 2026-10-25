@@ -706,8 +706,16 @@ func appendCodexPermissionMode(parts []string, bypassSandbox bool, mode string) 
 // it is not a localhost-only firewall. Keep explicit flags/config authoritative:
 // this default is inserted before the user's -c overrides. Restrictive capability
 // presets and the other permission modes do not acquire network access here.
+//
+// A member of a board whose chips come out as workspace-write with no approvals (Shell with no deny: the
+// built-in Coding Team's) is the second case (#7483): that pair has no network, so its coral-board calls
+// could not reach Coral and it could neither read nor post on its board. It gets the same switch, whatever
+// the mode. Chips that keep approvals (on-request) and the modes that ask do not: the person who chose to be
+// asked is asked.
 func codexCoralSandboxNetwork(parts []string, params LaunchParams) []string {
-	if !params.Capabilities.IsEmpty() || (params.PermissionMode != "auto" && params.PermissionMode != "dontAsk") {
+	defaultMode := params.Capabilities.IsEmpty() && (params.PermissionMode == "auto" || params.PermissionMode == "dontAsk")
+	boardMember := params.BoardName != ""
+	if !defaultMode && !boardMember {
 		return parts
 	}
 	sandbox, approval := "", ""
