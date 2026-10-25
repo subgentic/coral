@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -261,4 +262,96 @@ func TestGoalRequestsSchemaIsIdempotent(t *testing.T) {
 	s, ctx, _ := requestEnv(t)
 	require.NoError(t, s.ensureGoalRequestsSchema(ctx))
 	require.NoError(t, s.ensureGoalRequestsSchema(ctx))
+}
+
+// Security's #7361 MUST 1: a list read between accept's task insert and its mark must not undo the accept. One accept against four readers, many rounds: it succeeds every time, the request is
+// accepted with a task that exists, and the asker's row can be answered.
+func TestAcceptSurvivesConcurrentReads(t *testing.T) {
+	s, ctx, _ := requestEnv(t)
+	for round := 0; round < 25; round++ {
+		g := newGoal(t, s, "alpha", fmt.Sprintf("race %d", round))
+		_, in, err := s.SendGoalRequest(ctx, "alpha", g.ID, "beta", "x", "Lead", nil)
+		require.NoError(t, err)
+		stop := make(chan struct{})
+		var wg sync.WaitGroup
+		for r := 0; r < 4; r++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for {
+					select {
+					case <-stop:
+						return
+					default:
+						_, _ = s.ListGoalRequestsIn(ctx, "beta", "", 50)
+						_, _ = s.GetGoalRequestIn(ctx, "beta", in.ID)
+					}
+				}
+			}()
+		}
+		task, after, err := s.AcceptGoalRequest(ctx, "beta", in.ID, fmt.Sprintf("task %d", round), "", "medium", "Orch B", "")
+		close(stop)
+		wg.Wait()
+		require.NoError(t, err, "round %d", round)
+		assert.Equal(t, GoalRequestAccepted, after.Status)
+		assert.Equal(t, "Orch B", after.DecidedBy, "who accepted is kept even when a read marked it first")
+		require.NotNil(t, after.TaskID)
+		assert.Equal(t, task.ID, *after.TaskID)
+		var n int
+		require.NoError(t, s.db.QueryRowxContext(ctx, `SELECT COUNT(*) FROM board_tasks WHERE id = ?`, task.ID).Scan(&n))
+		assert.Equal(t, 1, n, "the task is still there, round %d", round)
+	}
+}
+
+// Security's #7361 MUST 2: the request tables go with a board that is deleted, either side, and follow a board that is re-keyed; a board made again under the name inherits nothing.
+func TestGoalRequestsGoWithEitherBoardWhenDeleted(t *testing.T) {
+	s, ctx, g := requestEnv(t)
+	g2 := newGoal(t, s, "gamma", "Other")
+	_, _, err := s.SendGoalRequest(ctx, "alpha", g.ID, "beta", "ask text of alpha", "Lead", nil)
+	require.NoError(t, err)
+	_, _, err = s.SendGoalRequest(ctx, "gamma", g2.ID, "delta", "ask text of gamma", "Lead", nil)
+	require.NoError(t, err)
+	count := func(table string) int {
+		var n int
+		require.NoError(t, s.db.QueryRowxContext(ctx, `SELECT COUNT(*) FROM `+table).Scan(&n))
+		return n
+	}
+	require.Equal(t, 2, count("board_goal_requests_in"))
+	require.Equal(t, 2, count("board_goal_requests_out"))
+
+	// the RECEIVER goes: its pending row goes, and the asker's row that names it
+	require.NoError(t, s.DeleteProject(ctx, "beta"))
+	assert.Equal(t, 1, count("board_goal_requests_in"), "beta's received request is gone")
+	assert.Equal(t, 1, count("board_goal_requests_out"), "alpha's request to beta is gone with it")
+	// a board made again under the name inherits nothing and its caps start empty
+	list, err := s.ListGoalRequestsIn(ctx, "beta", "", 10)
+	require.NoError(t, err)
+	assert.Empty(t, list)
+
+	// the ASKER goes: the receiver's copy of its text goes with it
+	require.NoError(t, s.DeleteProject(ctx, "gamma"))
+	assert.Equal(t, 0, count("board_goal_requests_in"), "another team's ask text does not outlive the team that wrote it")
+	assert.Equal(t, 0, count("board_goal_requests_out"))
+}
+
+func TestGoalRequestTablesAreInTheRekeyList(t *testing.T) {
+	have := map[string]bool{}
+	for _, tc := range boardKeyColumns {
+		have[tc[0]+"."+tc[1]] = true
+	}
+	for _, want := range []string{"board_goal_requests_in.board_id", "board_goal_requests_in.from_board", "board_goal_requests_out.board_id", "board_goal_requests_out.to_board"} {
+		assert.True(t, have[want], "%s follows a board that is re-keyed", want)
+	}
+	// and a re-key of the asking board keeps its requests (the receiver's copy names the board it came from)
+	s, ctx, _ := requestEnv(t)
+	g := newGoal(t, s, ".", "Odd name")
+	_, _, err := s.SendGoalRequest(ctx, ".", g.ID, "beta", "x", "Lead", nil)
+	require.NoError(t, err)
+	require.NoError(t, s.rekeyBoard(ctx, "."))
+	var from string
+	require.NoError(t, s.db.QueryRowxContext(ctx, `SELECT from_board FROM board_goal_requests_in WHERE board_id = 'beta'`).Scan(&from))
+	assert.NotEqual(t, ".", from, "the receiver's row names the new key")
+	var stale int
+	require.NoError(t, s.db.QueryRowxContext(ctx, `SELECT COUNT(*) FROM board_goal_requests_out WHERE board_id = '.'`).Scan(&stale))
+	assert.Zero(t, stale)
 }

@@ -368,14 +368,17 @@ func (s *Store) AcceptGoalRequest(ctx context.Context, board string, id int64, t
 		}
 		return nil, nil, err
 	}
-	res, err := s.db.ExecContext(ctx, `UPDATE board_goal_requests_in SET status = 'accepted', task_id = ?, decided_by = ?, answered_at = ? WHERE board_id = ? AND id = ? AND status = 'pending'`, task.ID, actor, nowUTC(), board, id)
+	// The mark is idempotent for THIS task: a read that reconciled the request between the task's insert and this write (reconcileAcceptedRequests) has already set status and task_id, and this
+	// write only adds who accepted. A request answered by anything else (a decline, an expiry, another task) takes the task back.
+	res, err := s.db.ExecContext(ctx, `UPDATE board_goal_requests_in SET status = 'accepted', task_id = ?, decided_by = ?, answered_at = COALESCE(answered_at, ?)
+		WHERE board_id = ? AND id = ? AND (status = 'pending' OR (status = 'accepted' AND task_id = ?))`, task.ID, actor, nowUTC(), board, id, task.ID)
 	if err == nil {
 		if n, _ := res.RowsAffected(); n == 0 {
 			err = ErrGoalRequestAnswered
 		}
 	}
 	if err != nil {
-		// Answered meanwhile: the task made for it is taken back, so the request has none.
+		// Answered meanwhile by something else: the task made for it is taken back, so the request has none.
 		_, _ = s.db.ExecContext(ctx, `DELETE FROM task_workflows WHERE task_id = ?`, task.ID)
 		_, _ = s.db.ExecContext(ctx, `DELETE FROM board_tasks WHERE id = ? AND board_id = ?`, task.ID, board)
 		return nil, nil, err

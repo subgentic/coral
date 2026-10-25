@@ -201,7 +201,8 @@ func (s *Store) deleteProject(ctx context.Context, project string, onlyIfUnused 
 	defer tx.Rollback()
 	if onlyIfUnused {
 		for _, table := range []struct{ name, col string }{{"board_messages", "project"}, {"board_tasks", "board_id"}, {"board_subscribers", "project"}, {"board_groups", "project"},
-			{"board_reminders", "project"}, {"board_waits", "project"}, {"board_goals", "board_id"}} {
+			{"board_reminders", "project"}, {"board_waits", "project"}, {"board_goals", "board_id"},
+			{"board_goal_requests_in", "board_id"}, {"board_goal_requests_out", "board_id"}} {
 			var n int
 			if err := tx.GetContext(ctx, &n, "SELECT COUNT(*) FROM "+table.name+" WHERE "+table.col+" = ?", project); err != nil {
 				return false, err
@@ -226,6 +227,9 @@ func (s *Store) deleteProject(ctx context.Context, project string, onlyIfUnused 
 		{"DELETE FROM board_tasks WHERE board_id = ?", 1},
 		{"DELETE FROM board_goals WHERE board_id = ?", 1},
 		{"DELETE FROM board_goal_meta WHERE board_id = ?", 1},
+		// A goal request holds another team's text and names both teams: it goes with either of them, so a board made again under the name inherits none (the same class as #7357's events).
+		{"DELETE FROM board_goal_requests_in WHERE board_id = ? OR (from_server = '' AND from_board = ?)", 2},
+		{"DELETE FROM board_goal_requests_out WHERE board_id = ? OR (to_server = '' AND to_board = ?)", 2},
 		{"DELETE FROM board_messages WHERE project = ?", 1},
 		{"DELETE FROM board_subscribers WHERE project = ?", 1},
 		{"DELETE FROM board_reminders WHERE project = ?", 1},
