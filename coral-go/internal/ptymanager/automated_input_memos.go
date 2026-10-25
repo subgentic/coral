@@ -77,6 +77,56 @@ func HeldSince(name string) time.Time {
 	return oldest
 }
 
+// The words of HeldReason, a closed list (#7433): why the oldest held send is held. The dashboard says a different true thing for each; it must never call a normal long turn "Coral can't see the input
+// box".
+const (
+	HeldTurn   = "turn"   // the agent is in a turn: its sends go when the turn ends (a mention goes at once)
+	HeldPrompt = "prompt" // a request to the user is open (a question, a permission, a trust screen)
+	HeldDialog = "dialog" // a dialog is drawn over the input box
+	HeldDraft  = "draft"  // someone's own text is in the input box
+	HeldBox    = "box"    // the input box is not on the screen
+	HeldOther  = "other"  // anything else (the agent is starting, its state is unknown)
+)
+
+// HeldReasons are the words HeldReason may answer, for the tests and the docs.
+var HeldReasons = []string{HeldTurn, HeldPrompt, HeldDialog, HeldDraft, HeldBox, HeldOther}
+
+// heldReasonOf names the reason of one hold: what the gate decided (why, a sentence for the log) and its kind (a request to the user, "" otherwise).
+func heldReasonOf(why, kind string) string {
+	switch {
+	case kind == KindDialog:
+		return HeldDialog
+	case kind != "":
+		return HeldPrompt
+	case why == whyDraft:
+		return HeldDraft
+	case strings.Contains(why, "input box isn't on screen"):
+		return HeldBox
+	case why == "signals: in turn" || strings.HasPrefix(why, busyWhy):
+		return HeldTurn
+	case why == "state: needs input" || strings.HasPrefix(why, "selection menu") || strings.HasPrefix(why, "prompt question:"):
+		return HeldPrompt
+	}
+	return HeldOther
+}
+
+// HeldReason is why the oldest automated send held for a session is held, one of HeldReasons, or "" when none is held. The send being tried now counts as the oldest; a send queued behind an earlier
+// one is held for what holds the head, so the head's reason is the session's.
+func HeldReason(name string) string {
+	gate.mu.Lock()
+	defer gate.mu.Unlock()
+	var head *heldInput
+	if in := gate.inflight[name]; in != nil {
+		head = in
+	} else if q := gate.held[name]; len(q) > 0 {
+		head = q[0]
+	}
+	if head == nil {
+		return ""
+	}
+	return heldReasonOf(head.why, head.kind)
+}
+
 // deliveredKeysPerSession bounds LastDelivered's record for one session.
 const deliveredKeysPerSession = 64
 

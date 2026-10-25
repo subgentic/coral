@@ -226,3 +226,21 @@ func TestUnnumberedMenusAndStyledText(t *testing.T) {
 	assert.True(t, open)
 	assert.True(t, strings.HasPrefix(why, busyWhy), "styled per character, still busy: %s", why)
 }
+
+// #7433: Claude Code draws "✔ Update installed · Restart to update" as the LAST line, under its status line. It was the first suspect of "Coral can't see the input box"; the reader finds the box
+// and no prompt with it, idle or busy and whichever way the marker is spelled, so the words came from a normal long turn (held_reason, held_reason_test.go). Kept so the claim stays tested.
+func TestAClaudeUpdateLineUnderTheStatusLineKeepsTheInputBox(t *testing.T) {
+	rule := strings.Repeat("─", 120)
+	update := "  ✔ Update installed · Restart to update\n"
+	for name, screen := range map[string]string{
+		"idle":              rule + "\n❯ \n" + rule + "\n  ⏸ manual mode on · ? for shortcuts\n" + update,
+		"idle, a nbsp mark": rule + "\n❯ \n" + rule + "\n  ⏵⏵ bypass permissions on (shift+tab to cycle)\n  Opus | ctx 12% | main\n" + update,
+		"busy":              "✻ Honking… (5m 1s · esc to interrupt)\n\n" + rule + "\n❯ \n" + rule + "\n  ⏸ manual mode on\n" + update,
+		"plain marker":      rule + "\n> \n" + rule + "\n  ? for shortcuts\n" + update,
+		"a draft":           rule + "\n❯ half a sentence\n" + rule + "\n  ? for shortcuts\n" + update,
+	} {
+		assert.True(t, InputBoxOnScreen(screen), name+": the box is found")
+		open, why := PromptOnScreen(screen)
+		assert.False(t, open, "%s: no prompt is open (%s)", name, why)
+	}
+}

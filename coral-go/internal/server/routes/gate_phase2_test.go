@@ -144,6 +144,9 @@ func TestHeldSinceInTheLiveListAndTheFeed(t *testing.T) {
 	assert.Nil(t, r["held_since"], "nothing held: null, and the key is there")
 	_, has := r["held_since"]
 	assert.True(t, has, "the field is always in the row")
+	assert.Nil(t, r["held_reason"], "nothing held: no reason (#7433), and the key is there")
+	_, has = r["held_reason"]
+	assert.True(t, has, "the reason is always in the row")
 
 	before := time.Now().UTC().Add(-2 * time.Second)
 	hold("first")
@@ -152,6 +155,7 @@ func TestHeldSinceInTheLiveListAndTheFeed(t *testing.T) {
 	require.NoError(t, err, "RFC 3339")
 	assert.True(t, first.After(before) && !first.After(time.Now().UTC().Add(2*time.Second)), "the time it was first held: %s", first)
 	assert.Equal(t, "UTC", first.Location().String())
+	assert.Equal(t, "turn", r["held_reason"], "held because the agent is in a turn: the row says so, not that the input box is missing (#7433)")
 
 	time.Sleep(1100 * time.Millisecond)
 	hold("second")
@@ -164,6 +168,7 @@ func TestHeldSinceInTheLiveListAndTheFeed(t *testing.T) {
 	for _, s := range wsList {
 		if s["session_id"] == sid {
 			assert.Equal(t, first.Format(time.RFC3339), s["held_since"], "the feed carries it too")
+			assert.Equal(t, "turn", s["held_reason"], "and its reason")
 		}
 	}
 
@@ -171,6 +176,7 @@ func TestHeldSinceInTheLiveListAndTheFeed(t *testing.T) {
 	r = row()
 	assert.Equal(t, 0.0, r["held_inputs"])
 	assert.Nil(t, r["held_since"], "reset at 0")
+	assert.Nil(t, r["held_reason"], "and no reason")
 	hold("third")
 	later, err := time.Parse(time.RFC3339, row()["held_since"].(string))
 	require.NoError(t, err)

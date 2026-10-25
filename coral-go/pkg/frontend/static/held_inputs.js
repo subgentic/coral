@@ -13,6 +13,17 @@ export function heldCount(row) {
     return Number.isFinite(n) && n > 0 ? Math.min(Math.floor(n), 999) : 0;
 }
 
+/** What is said of why the messages wait, by the row's held_reason (#7433). Only "box" says Coral cannot see the input box: a long turn, an open question, a dialog and a draft each have their own words. A row
+ * with no reason, or a word this page does not know, says only that they wait. */
+const WHY = {
+    turn: n => `${n} message${n === 1 ? '' : 's'} will arrive when this agent's turn ends`,
+    prompt: n => `${n} message${n === 1 ? '' : 's'} waiting: this agent is asking for an answer`,
+    dialog: n => `${n} message${n === 1 ? '' : 's'} waiting: a dialog is open in its terminal`,
+    draft: n => `${n} message${n === 1 ? '' : 's'} waiting: there is a draft in its input box`,
+    box: n => `${n} message${n === 1 ? '' : 's'} waiting: Coral can't see the input box`,
+};
+const heldText = (n, reason) => (Object.hasOwn(WHY, reason) ? WHY[reason] : n2 => `${n2} message${n2 === 1 ? '' : 's'} waiting to be delivered`)(n);
+
 /** { n, text } when the agent has held input for more than a minute, else null. */
 export function heldNotice(row, now = Date.now()) {
     const id = row && row.session_id;
@@ -21,7 +32,7 @@ export function heldNotice(row, now = Date.now()) {
     let since = Date.parse(row.held_since || '');
     if (!Number.isFinite(since)) { if (!firstHeld.has(id)) firstHeld.set(id, now); since = firstHeld.get(id); }
     if (now - since <= afterMs()) return null;
-    return { n, text: `${n} message${n === 1 ? '' : 's'} waiting: Coral can't see the input box` };
+    return { n, text: heldText(n, row.held_reason) };
 }
 
 /** The agent view's line: the words and a Show terminal button, while the open agent holds; hidden otherwise. */

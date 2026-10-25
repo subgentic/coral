@@ -24,7 +24,7 @@ const BASE = require('./test_base').BASE;
             await sleep(600); // sleep-ok: the first live list renders from several answers; no single completion event
             await ev(`window.selectLiveSession('held-agent', 'claude', 'held-agent-id', 'local'); true`);
             await sleep(500); // sleep-ok: a selection settles over frames
-            const feed = (held, since) => ev(`(() => { const rows = window._coralGetLiveSessions().map(r => r.session_id === 'held-agent-id' ? { ...r, held_inputs: ${held}, held_since: ${since === undefined ? 'null' : JSON.stringify(since)} } : r); window._coralSetLiveSessions(rows);
+            const feed = (held, since, reason = 'box') => ev(`(() => { const rows = window._coralGetLiveSessions().map(r => r.session_id === 'held-agent-id' ? { ...r, held_inputs: ${held}, held_reason: ${JSON.stringify(reason)}, held_since: ${since === undefined ? 'null' : JSON.stringify(since)} } : r); window._coralSetLiveSessions(rows);
                 return import(${S} + 'render.js').then(m => { m.updateWaitingIndicator(rows.find(r => r.session_id === 'held-agent-id')); return true; }); })()`);
             const view = () => ev(`(() => { const n = document.getElementById('composer-held-notice'), b = n && n.querySelector('button');
                 const row = document.querySelector('[data-session-id="held-agent-id"] .session-held-line, .session-item[data-name="held-agent"] .session-held-line, .session-held-line');
@@ -53,6 +53,13 @@ const BASE = require('./test_base').BASE;
             await ev(`document.querySelector('#composer-held-notice button').click(); true`);
             check(`${tag}: Show terminal opens the terminal view`, await ev('window.__shown'));
             await ev(`document.querySelector('#composer-held-notice button').dispatchEvent(new Event('x')); true`);
+
+            // 7433: each reason has its own true words; only "box" says Coral cannot see the input box
+            const words = await ev(`import(${S} + 'held_inputs.js').then(m => Object.fromEntries(['turn', 'prompt', 'dialog', 'draft', 'box', 'other', undefined, 'unknown-word', '__proto__'].map(r => [String(r), (m.heldNotice({ session_id: 'w-' + r, held_inputs: 2, held_since: '2020-01-01T00:00:00Z', held_reason: r }) || {}).text])))`);
+            check(`${tag}: a turn's messages "will arrive when this agent's turn ends" and never say the input box is missing`, words.turn === "2 messages will arrive when this agent's turn ends", JSON.stringify(words.turn));
+            check(`${tag}: a question, a dialog and a draft each say what it is`, /asking for an answer/.test(words.prompt) && /dialog is open/.test(words.dialog) && /draft in its input box/.test(words.draft), JSON.stringify([words.prompt, words.dialog, words.draft]));
+            check(`${tag}: only "box" says Coral can't see the input box`, Object.entries(words).every(([k, w]) => (k === 'box') === /can't see the input box/.test(w)), JSON.stringify(words));
+            check(`${tag}: no reason, "other" and an unknown word only say they wait`, [words.other, words.undefined, words['unknown-word'], words.__proto__].every(w => w === '2 messages waiting to be delivered'), JSON.stringify(words));
 
             await feed(0);
             v = await view();
