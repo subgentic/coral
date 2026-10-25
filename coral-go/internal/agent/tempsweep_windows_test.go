@@ -3,6 +3,7 @@
 package agent
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -180,4 +181,18 @@ func TestWindowsSweepKeepsAJunctionWithACoralName(t *testing.T) {
 	b, err := os.ReadFile(precious)
 	require.NoError(t, err)
 	assert.Equal(t, "precious", string(b), "what it leads to is untouched")
+}
+
+// A sweep whose context has ended looks at nothing more and removes nothing: a huge folder can't keep it running past its time.
+func TestWindowsSweepStopsWhenItsContextEnds(t *testing.T) {
+	dir := t.TempDir()
+	p := agedFile(t, dir, "coral_prompt_"+winDeadSID+"_123.txt")
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	opt := sweepOpts()
+	opt.Ctx = ctx
+	assert.Empty(t, SweepStaleTempFiles(dir, opt))
+	assert.True(t, present(p), "nothing was looked at or removed")
+	opt.Ctx = context.Background()
+	assert.Len(t, SweepStaleTempFiles(dir, opt), 1, "with time left it is removed")
 }
