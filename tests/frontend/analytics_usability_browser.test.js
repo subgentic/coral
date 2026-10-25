@@ -28,6 +28,7 @@ const BRANCHES = [{ repo_name: 'coral', branch: 'main', board_name: 'coral-go-te
     const stub = full => ev(`(() => { const R = window.fetch; const json = b => Promise.resolve(new Response(JSON.stringify(b), { headers: { 'content-type': 'application/json' } }));
         window.fetch = (u, o) => { const url = String(u && u.url || u);
             if (url.includes('/api/token-usage/summary')) return json(${full ? `{ totals: { input_tokens: 10, output_tokens: 20, cost_usd: 4 }, by_model: ${JSON.stringify(MODEL)}, by_thinking: ${JSON.stringify(THINKING)}, by_agent_type: ${JSON.stringify(PROVIDER)}, by_agent: ${JSON.stringify(AGENT)} }` : `{ totals: {}, by_model: [], by_thinking: [], by_agent_type: [], by_agent: [] }`});
+            if (url.includes('/api/call-metrics/summary')) return json({ rows: [] }); // the server is shared by the suites of a run: its own call metrics are other suites' calls
             if (url.includes('/api/token-usage/by-team')) return json({ teams: ${full ? JSON.stringify(TEAMS) : '[]'} });
             if (url.includes('/api/token-usage/by-branch')) return json({ branches: ${full ? JSON.stringify(BRANCHES) : '[]'} });
             if (url.includes('/api/token-usage/')) return json({});
@@ -73,6 +74,7 @@ const BRANCHES = [{ repo_name: 'coral', branch: 'main', board_name: 'coral-go-te
         await stub(false);
         await ev(`window.switchNavTab('tokens'); true`);
         await waitFor(`[...document.querySelectorAll('#cost-dashboard-view .cost-empty')].some(e => /No data in this range yet/.test(e.textContent))`, 'an empty table', 15000);
+        await waitFor(`!!document.querySelector('#cost-by-task .cost-empty') && !!document.querySelector('#call-metrics-summary .cost-empty')`, 'the task and tool-call tables, which are read after the token tables', 15000);
         check('an empty token table says where data comes from and what to try (a longer range), not just "No data"; By Task and Tool & API Calls have their own words (not the tokens sentence)', /No task costs in this range yet\. They appear once an agent has worked on a board task\./.test(await ev(`document.querySelector('#cost-by-task .cost-empty').textContent`)) && /No tool calls in the last 24 hours yet\. They appear once an agent has used a tool\./.test(await ev(`document.querySelector('#call-metrics-summary .cost-empty').textContent`)) && await ev(`[...document.querySelectorAll('#cost-by-provider .cost-empty, #cost-by-model .cost-empty, #cost-by-thinking .cost-empty')].every(e => /No data in this range yet\. It appears once an agent has used tokens; try a longer range\./.test(e.textContent))`));
     } finally { await client.close(); }
     if (results.some(r => !r)) { console.error(`${results.filter(r => !r).length} of ${results.length} failed`); process.exit(1); }
