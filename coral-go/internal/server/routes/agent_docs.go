@@ -173,9 +173,9 @@ func docTitle(docs fs.FS, file, name string) string {
 	return listTitle(sentenceCase(strings.ReplaceAll(name, "-", " ")))
 }
 
-// docTitleSoftCap: a list row is one short line. A title is taken up to its first colon or opening bracket, then words are added while it is shorter than this many characters, so the word that crosses it
+// docTitleSoftCap: a list row is one short line. A title is taken up to its first colon or opening bracket, then words are added while it is shorter than this many characters (36: "Recover a task awaiting completion review" stays whole, "Coordination efficiency reporting & metrics architecture" is cut), so the word that crosses it
 // stays (the sidebar can wrap one more word) and nothing is cut mid-word or ends in an ellipsis. The topic page still shows the full heading as the document's own h1.
-const docTitleSoftCap = 32
+const docTitleSoftCap = 36
 
 // listTitle shortens a sentence-case heading for the Docs list (UI/UX's rules on #7516).
 func listTitle(h string) string {
