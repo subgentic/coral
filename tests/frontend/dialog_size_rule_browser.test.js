@@ -34,7 +34,8 @@ const SIZES = [[1280, 800, false], [1440, 900, false], [1920, 1080, false], [256
         if (wide && small) assert.ok(m.w <= want + 1.5, `${label}: a small form is no wider than the rule: ${m.w}`);
         else if (wide) assert.ok(Math.abs(m.w - want) <= 1.5, `${label}: width ${m.w} is clamp(360px, 92vw, 960px) = ${Math.round(want)} at ${m.vw}`);
         else assert.ok(m.w <= m.vw && m.w >= 0.9 * m.vw - 2, `${label}: a phone dialog fills the window: ${m.w} of ${m.vw}`);
-        assert.ok(m.h <= 0.9 * m.vh + 1.5, `${label}: height ${m.h} is at most 90% of ${m.vh}`);
+        const screenSheet = !wide && /^Settings/.test(label); // #7405: Settings on a phone is the whole screen on every section
+        assert.ok(m.h <= (screenSheet ? m.vh : 0.9 * m.vh) + 1.5, `${label}: height ${m.h} is at most ${screenSheet ? 'the whole of' : '90% of'} ${m.vh}`);
         // The terminal form (a small form) scrolls its step by the 24px its sticky header and footer overhang; that is padding, not content.
         if (small) m.scrollers = m.scrollers.filter(x => x.total - x.visible > 30);
         if (m.scrollers.length) assert.ok(m.h >= 0.9 * m.vh - 3, `${label}: it scrolls, so it must first use its room: ${m.h} of ${m.vh} (${JSON.stringify(m.scrollers)})`);

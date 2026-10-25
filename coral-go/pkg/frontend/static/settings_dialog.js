@@ -855,6 +855,7 @@ export async function refreshUnsavedNote() {
 export async function showSettingsModal(group) {
     // Focus moves in on open, Tab stays inside, and focus comes back on close (accessibility pass).
     attachDialogFocus(document.getElementById('settings-modal'));
+    importOnce('./quiet_focus.js').then(m => m.quietFocus(document.getElementById('settings-modal')), () => {}); // the open tab takes the focus by script: no ring for a pointer's start, the ring for a key press (#7405, as #7391's New Agent)
 
     importOnce('./terminal_backend.js').then(m => m.loadTerminalBackendRow()).catch(() => {}); // #3634
     importOnce('./worktrees_panel.js').then(m => m.loadWorktrees()).catch(() => {}); // the kept worktrees, in Storage and cleanup (#6743)

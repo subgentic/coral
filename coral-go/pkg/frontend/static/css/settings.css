@@ -1,0 +1,64 @@
+/* The Settings dialog: one size that never moves, one type scale (#7405, UI/UX's Settings proposal). Every rule is under #settings-modal; the other sectioned dialogs share the shell's classes and are not touched.
+   SIZE: 960 x 720 on a desktop on every tab (a smaller window gets 92% x 90% of it); the header, the tab list and the footer stay where they are and the pane is the one place that scrolls.
+   TYPE: Plus Jakarta Sans only, in eight sizes and weights: dialog title 16/700, pane title 17/700, section heading 14/600, tab 14/400 (selected 14/600), row label 13/500, control 13/400, button 13/500,
+   hint 12/400, badge 11/600. A text outside that list fails settings_dialog_stable_browser. */
+@media (min-width: 768px) {
+    #settings-modal .modal-content.settings-modal-content { width: min(960px, 92vw); height: min(720px, 90dvh); max-height: none; min-height: 0; }
+}
+
+/* the type scale */
+#settings-modal :is(button, input, select, textarea, code, kbd, samp, summary, pre) { font-family: var(--font-sans); }
+#settings-modal .modal-header h3 { font: var(--dlg-title); }
+#settings-modal .settings-pane-title { font: var(--dlg-pane); }
+#settings-modal :is(.settings-subhead, .settings-about-title, .tb-t) { font: var(--dlg-section); }
+#settings-modal .tb-default { font-weight: 400; }
+#settings-modal .settings-tab { font: 400 0.875rem/1.35 var(--font-sans); }
+#settings-modal .settings-tab[aria-selected="true"] { font-weight: 600; }
+#settings-modal .settings-tab, #settings-modal .settings-tab[aria-selected="true"] { transition: none; }
+#settings-modal :is(dt, dt label, .toggle-dt label, .settings-cli-label, .tb-label, label.tb-opt, .tb-opt strong, summary) { font: var(--dlg-label); }
+#settings-modal :is(input, select, textarea, .tb-opt, .tb-autowake label) { font: var(--dlg-control); }
+#settings-modal .btn, #settings-modal :is(.pw-toggle, .tb-learn) { font: var(--dlg-button); }
+#settings-modal :is(.settings-hint, .toggle-desc, .tb-now, .tb-now b, .machine-health-note, .machine-health-status, .tb-note, .tb-d) { font: var(--dlg-hint); }
+#settings-modal .badge { font: var(--dlg-badge); }
+
+/* footer: Cancel at the left, Save at the right, as in New agent and New team (the note between them) */
+#settings-modal .modal-footer { justify-content: space-between; align-items: center; gap: 12px; }
+#settings-modal .modal-footer .settings-unsaved { margin: 0 auto; }
+
+/* a row: its label and its hint (always visible) at the left, its control at the right in a fixed column; a row marked wide puts the control on its own line under them */
+#settings-modal .settings-hint-line { display: block; margin: 2px 0 0; color: var(--text-secondary); }
+#settings-modal .settings-hint-clamp { display: none; } /* a long hint is behind its Learn more */
+#settings-modal .settings-learn { background: none; border: 0; padding: 2px 0; margin-top: 2px; font: var(--dlg-button); color: var(--link-text, var(--accent)); text-decoration: underline; cursor: pointer; }
+#settings-modal .settings-learn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@container settingspane (min-width: 40.01rem) { #settings-modal .settings-row { grid-template-columns: minmax(0, 1fr) 340px; } } /* (the pane stacks a row under 40rem of its own width: components.css) */
+#settings-modal .settings-row.settings-row-wide, #settings-modal .net-groups > .net-group { grid-template-columns: minmax(0, 1fr); }
+#settings-modal .info-grid.settings-grid .settings-row > dt, #settings-modal .info-grid.settings-grid .settings-row > dt.toggle-dt { flex-direction: column; flex-wrap: nowrap; align-items: flex-start; gap: 0; }
+#settings-modal .settings-hint-wrap { grid-column: 1 / -1; display: flex; flex-direction: column; align-items: flex-start; }
+@media (max-width: 767px), (pointer: coarse) { #settings-modal .settings-learn { min-height: var(--control-touch-height, 44px); display: inline-flex; align-items: center; } }
+/* a phone: the dialog is the screen on every section (the tab list is the Section selector) */
+@media (max-width: 767px) { #settings-modal .modal-content.settings-modal-content { width: 100vw; max-width: none; height: 100dvh; max-height: none; min-height: 0; border-radius: 0; margin: 0; } }
+/* Terminal backend: two cards, a name and one line each (as Mode in New agent) */
+#settings-modal .tb-line { font: var(--dlg-hint); color: var(--text-secondary); }
+#settings-modal .tb-opt > span { gap: 2px; }
+
+/* round 2 (UI/UX's #7405 notes) */
+[data-quiet-focus] :focus-visible { outline: 0 !important; box-shadow: none !important; } /* a dialog opened by a pointer: no ring on what the script focused (quiet_focus.js; the ring comes with the first key) */
+#settings-modal .settings-pane-title { margin-bottom: 8px; }
+#settings-modal .settings-subsection:first-of-type .settings-subhead { margin-top: 10px; }
+#settings-modal .settings-row-details { grid-column: 1 / -1; }
+/* the cleanup rows: labelled fields in a row on their own line, not a sentence */
+#settings-modal .settings-controls-row { align-items: flex-end; gap: 12px 20px; }
+#settings-modal .settings-controls-row :is(.settings-inline, .settings-field) { display: flex; flex-direction: column; align-items: flex-start; flex-wrap: nowrap; gap: 4px; font: var(--dlg-label); }
+#settings-modal .settings-field > label { font: var(--dlg-label); }
+/* Wake agents after a restart: a switch row of its own under the backend cards */
+#settings-modal .tb-autowake.settings-row-switch { margin: 12px 0 0; padding: 12px 0 0; border-top: 1px solid var(--border-subtle); display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+#settings-modal .tb-autowake[hidden] { display: none; }
+#settings-modal .tb-autowake-on { display: flex; align-items: center; gap: 12px; font: var(--dlg-label); }
+#settings-modal .tb-autowake-on input[type="checkbox"] { appearance: none; -webkit-appearance: none; position: relative; width: 2.5rem; height: 1.4rem; margin: 0; flex: none; border-radius: 1rem; border: 1px solid var(--control-border); background: var(--bg-hover); cursor: pointer; }
+#settings-modal .tb-autowake-on input[type="checkbox"]::before { content: ""; position: absolute; top: 2px; left: 2px; width: calc(1.4rem - 8px); height: calc(1.4rem - 8px); border-radius: 50%; background: var(--text-secondary); transition: transform .12s; }
+#settings-modal .tb-autowake-on input[type="checkbox"]:checked { background: var(--accent-dim); border-color: var(--accent-dim); }
+#settings-modal .tb-autowake-on input[type="checkbox"]:checked::before { background: var(--text-on-accent); transform: translateX(1.1rem); }
+#settings-modal .tb-autowake-on input[type="checkbox"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#settings-modal .tb-autowake-on input[type="checkbox"]:disabled { opacity: .5; cursor: not-allowed; }
+@media (prefers-reduced-motion: reduce) { #settings-modal .tb-autowake-on input[type="checkbox"]::before { transition: none; } }
+#settings-modal .settings-field-unit { font: var(--dlg-control); color: var(--text-secondary); }

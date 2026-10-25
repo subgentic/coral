@@ -106,7 +106,7 @@ const GIB = 1024 ** 3;
         await ev(`document.getElementById('settings-storage-prune').scrollIntoView({ block: 'center' }); true`); await sleep(300); // sleep-ok: the scroll settles
         const row = await ev(`(() => { const t = id => Math.round(document.getElementById(id).getBoundingClientRect().top); const h = id => Math.round(document.getElementById(id).getBoundingClientRect().height); const lab = document.querySelector('.settings-controls-row .settings-inline').getBoundingClientRect(); const inp = document.getElementById('settings-prune-days').getBoundingClientRect();
             return { shrink: t('settings-storage-shrink'), prune: t('settings-storage-prune'), kind: t('settings-prune-kind'), labelH: Math.round(lab.height), inputInLabel: inp.right <= lab.right + 1 }; })()`);
-        assert.ok(Math.abs(row.shrink - row.prune) <= 2, 'Shrink and Prune side by side: ' + JSON.stringify(row)); assert.ok(row.labelH < 50, '"Older than [14] days" is one line: ' + JSON.stringify(row));
+        assert.ok(Math.abs(row.shrink - row.prune) <= 2, 'Shrink and Prune side by side: ' + JSON.stringify(row)); assert.ok(row.labelH < 90 && row.inputInLabel, '"Older than" is a labelled field: the label over its input and "days" (#7405 round 2), not a sentence: ' + JSON.stringify(row));
         await shot('storage-ux-controls');
 
         console.log('5. Prune and Shrink by keyboard: the page\'s words, and the focus comes back to the button that asked');

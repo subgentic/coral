@@ -60,33 +60,54 @@ export function refreshSettingsGroups() {
     if (!cur || cur.dataset.empty) showSettingsGroup(FIRST, { remember: false });
 }
 
-/** An (i) button after each label whose explanation is long: the text sits under the row and opens in place. */
+/** The explanation of a row is its hint line, under the label, always visible (#7405: the (i) tooltips are gone): one short line, about ten words. A longer one is not shown; the row has a "Learn more" link that opens it in place (UI/UX's rule). */
+const LONG_HINT = 60; // characters: about ten words
+// A row whose label alone does not say what it does keeps one short line beside its Learn more (UI/UX's #7405 round 1: Default thinking, Default models, Fit pane width, Free space, Automatic cleanup); a row whose label says it needs no line. By the row's label.
+const SHORT_HINTS = {
+    'Default thinking': 'How much Claude thinks before it answers.',
+    'Default models': 'Used when an agent starts with no model of its own.',
+    'Fit pane width': 'Sizes the terminal to this window (tmux).',
+    'Artifact store limit': "Above it, agents' new uploads are refused.",
+    'Received files limit': 'Above it, new received files are refused.',
+    'Free space': 'Shrink or prune old saved diffs and artifacts.',
+    'Automatic cleanup': 'Prunes what is older than this, every hour. 0 is off.',
+};
 function buildInfoButtons(root) {
     for (const row of root.querySelectorAll('.settings-row')) {
         const dt = row.querySelector(':scope > dt, :scope > .net-group-head');
         const texts = [...row.querySelectorAll('dt .toggle-desc, [data-info]')];
-        if (!dt || !texts.length || dt.querySelector('.settings-info-btn')) continue;
+        if (!dt || !texts.length || row.dataset.hinted) continue;
+        row.dataset.hinted = '1';
         const label = dt.querySelector('label, .net-group-title') || dt;
         const name = (label.textContent || '').trim();
-        const box = document.createElement('div');
-        box.className = 'settings-info-text';
-        box.id = `settings-info-${++infoSeq}`;
-        box.hidden = true;
-        for (const t of texts) { t.classList.remove('toggle-desc'); t.removeAttribute('data-info'); box.append(t); }
+        let holder = dt; // a group's head is a row (title, switch): its hints go in a line of their own under it
+        if (dt.classList.contains('net-group-head')) { holder = document.createElement('div'); holder.className = 'settings-hint-wrap'; dt.after(holder); }
+        const all = [];
+        for (const t of texts) {
+            t.removeAttribute('data-info');
+            if (!t.classList.contains('settings-hint') && !t.classList.contains('toggle-desc')) t.classList.add('settings-hint');
+            t.classList.add('settings-hint-line');
+            if (holder !== dt || (t.parentElement !== dt && !dt.contains(t))) holder.append(t); // under the label, where the eye is, not under the control
+            all.push(t);
+        }
+        const long = all.filter(t => (t.textContent || '').trim().length > LONG_HINT);
+        if (!long.length) continue;
+        for (const t of long) t.classList.add('settings-hint-clamp');
+        if (!long[0].id) long[0].id = `settings-hint-${++infoSeq}`;
+        if (SHORT_HINTS[name] && !all.some(t => !long.includes(t))) { const line = document.createElement('span'); line.className = 'settings-hint settings-hint-line settings-hint-short'; line.textContent = SHORT_HINTS[name]; holder.append(line); }
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = 'settings-info-btn';
+        btn.className = 'settings-learn';
+        btn.textContent = 'Learn more';
         btn.setAttribute('aria-expanded', 'false');
-        btn.setAttribute('aria-controls', box.id);
-        btn.setAttribute('aria-label', `About ${name}`);
-        btn.innerHTML = '<span class="material-icons" aria-hidden="true">info</span>';
-        btn.addEventListener('click', () => { const open = box.hidden; box.hidden = !open; btn.setAttribute('aria-expanded', String(open)); });
-        if (label.classList && label.classList.contains('net-group-title')) label.after(btn); else dt.append(btn); // a group's title: the (i) is beside it, before the switch
-        row.append(box);
+        btn.setAttribute('aria-controls', long.map((t, i) => t.id || (t.id = `${long[0].id}-${i}`)).join(' '));
+        btn.setAttribute('aria-label', `Learn more about ${name}`);
+        btn.addEventListener('click', () => { const open = btn.getAttribute('aria-expanded') !== 'true'; for (const t of long) t.classList.toggle('settings-hint-clamp', !open); btn.setAttribute('aria-expanded', String(open)); btn.textContent = open ? 'Show less' : 'Learn more'; });
+        holder.append(btn);
     }
 }
 
-/** The Hub rows nested in the Coral Hub row (Hub access, the switches under it): the same (i) after the label, the explanation closed under it (#5985). */
+/** The Hub rows nested in the Coral Hub row (Hub access, the switches under it): their explanation is a visible hint line under the label too, with "Learn more" when it is long (#7405). */
 function buildCloudInfoButtons(root) {
     const rows = [
         ...[...root.querySelectorAll('.settings-cloud-switch-row')].map(r => ({ row: r, label: r.querySelector('.settings-cloud-switch-label'), texts: [r.querySelector('.settings-cloud-switch-text > .settings-hint')] })),
@@ -94,25 +115,21 @@ function buildCloudInfoButtons(root) {
     ];
     for (const { row, label, texts } of rows) {
         const list = texts.filter(Boolean);
-        if (!label || !list.length || label.parentElement.classList.contains('settings-cloud-head')) continue; // (the mode row holds the switch rows: look at its own label only)
-        const box = document.createElement('div');
-        box.className = 'settings-info-text';
-        box.id = `settings-info-${++infoSeq}`;
-        box.hidden = true;
-        for (const t of list) box.append(t); // the switch stays described by it (aria-describedby points at its id); a closed box still counts
+        if (!label || !list.length || row.dataset.hinted) continue;
+        row.dataset.hinted = '1';
+        for (const t of list) { t.classList.add('settings-hint-line'); t.hidden = false; }
+        const long = list.filter(t => (t.textContent || '').trim().length > LONG_HINT);
+        if (!long.length) continue;
+        for (const t of long) { t.classList.add('settings-hint-clamp'); if (!t.id) t.id = `settings-hint-${++infoSeq}`; }
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = 'settings-info-btn';
+        btn.className = 'settings-learn';
+        btn.textContent = 'Learn more';
         btn.setAttribute('aria-expanded', 'false');
-        btn.setAttribute('aria-controls', box.id);
-        btn.setAttribute('aria-label', `About ${(label.textContent || '').trim()}`);
-        btn.innerHTML = '<span class="material-icons" aria-hidden="true">info</span>';
-        btn.addEventListener('click', () => { const open = box.hidden; box.hidden = !open; btn.setAttribute('aria-expanded', String(open)); });
-        const head = document.createElement('div'); // the label and its (i) on one line
-        head.className = 'settings-cloud-head';
-        const host = label.parentElement;
-        label.replaceWith(head); head.append(label, btn);
-        host.append(box);
+        btn.setAttribute('aria-controls', long.map(t => t.id).join(' '));
+        btn.setAttribute('aria-label', `Learn more about ${(label.textContent || '').trim()}`);
+        btn.addEventListener('click', () => { const open = btn.getAttribute('aria-expanded') !== 'true'; for (const t of long) t.classList.toggle('settings-hint-clamp', !open); btn.setAttribute('aria-expanded', String(open)); btn.textContent = open ? 'Show less' : 'Learn more'; });
+        long[long.length - 1].after(btn);
     }
 }
 

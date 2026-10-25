@@ -85,7 +85,7 @@ const idle = (over = {}) => ({ enabled: true, relaunch_available: true, installe
         // the command is one line on a phone (it scrolls sideways, it does not wrap)
         await setStatus(idle({ install_kind: 'homebrew', upgrade_command: 'brew upgrade --cask coral', relaunch: { available: false, reason: 'unsupported_install', restarts: [], ack: '' } }));
         await Emulation.setDeviceMetricsOverride({ width: 320, height: 700, deviceScaleFactor: 1, mobile: true }); await pane();
-        const cmdBox = await ev(`(() => { const c = document.querySelector('#update-pane-body .update-cmd code'); const cs = getComputedStyle(c); const lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.4; return { ws: cs.whiteSpace, ox: cs.overflowX, oneLine: c.getBoundingClientRect().height < lh * 1.6, fits: c.getBoundingClientRect().right <= innerWidth }; })()`);
+        const cmdBox = await ev(`(() => { const c = document.querySelector('#update-pane-body .update-cmd code'); const cs = getComputedStyle(c); const lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.4; return { ws: cs.whiteSpace, ox: cs.overflowX, oneLine: c.getBoundingClientRect().height < lh * 2, /* (one line plus its padding, in any family; two lines are 2 lh and more) */ fits: c.getBoundingClientRect().right <= innerWidth }; })()`);
         check(`the brew command stays on one line at 320 px and scrolls sideways if it must (${JSON.stringify(cmdBox)})`, cmdBox.ws === 'nowrap' && cmdBox.ox === 'auto' && cmdBox.oneLine && cmdBox.fits);
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
 

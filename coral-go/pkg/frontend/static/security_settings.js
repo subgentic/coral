@@ -48,13 +48,9 @@ function render(root, st, sessions) {
     root.replaceChildren();
     const head = el('div', 'tb-head');
     const label = el('span', 'tb-label', 'Browser sign-in'); label.id = 'sec-label';
-    // The one sentence that explains the row is behind an (i): a button that says it is about this row, closed at first, the text in the page.
-    const why = el('button', 'settings-info-btn', ''); why.type = 'button'; why.id = 'sec-why';
-    why.setAttribute('aria-expanded', 'false'); why.setAttribute('aria-controls', 'sec-why-text'); why.setAttribute('aria-label', 'About browser sign-in');
-    const icon = el('span', 'material-icons', 'info'); icon.setAttribute('aria-hidden', 'true'); why.append(icon);
-    const whyText = el('p', 'settings-info-text', 'Browsers ask for this password. The Coral app, the tray and coral open sign in by themselves.'); whyText.id = 'sec-why-text'; whyText.hidden = true;
-    why.addEventListener('click', () => { whyText.hidden = !whyText.hidden; why.setAttribute('aria-expanded', String(!whyText.hidden)); });
-    head.append(label, why, el('span', 'tb-now', st.password_set ? 'password set' : 'no password'));
+    // The one sentence that explains the row is its hint line, under the label (#7405: no (i)).
+    const whyText = el('p', 'settings-hint settings-hint-line', 'Browsers ask for this password. The Coral app, the tray and coral open sign in by themselves.'); whyText.id = 'sec-why-text';
+    head.append(label, el('span', 'tb-now', st.password_set ? 'password set' : 'no password'));
     root.setAttribute('aria-labelledby', 'sec-label');
     root.append(head, whyText);
     if (!st.password_set) {

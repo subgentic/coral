@@ -6,7 +6,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 
 // words a person can see in a group now, per the audit (artifact 141071b6); a group with no number has not been cut yet
-const BUDGET = { 'Network and Hub': 104, 'Agents': 70, 'Storage and cleanup': 65, 'Terminal': 53, 'General': 22, 'Notifications': 7, 'Files and Git': 16, 'Security and privacy': 43 }; // (Network and Hub: +13, the About block and Connect to Coral Hub moved here from General (#7040)) // (Agents: +6 for the four subheads Defaults, Behaviour, Team and board, Tools (#7040)) // (Security: +3 for #6047's install ID row, "Install ID", "Copy" and its hint; "No prompts, transcripts, or secrets are sent." stays visible beside the Usage analytics switch: it is what a person reads where they decide) // (Storage: 47 on a fresh server; a server where an earlier suite turned automatic cleanup on shows its two status lines, up to 62) // (Agents: +3 for #6583's switch "Coral artifact reminders": the group was already at its 61 words without the row, so any visible label raises it; the help is behind the (i) and is not counted) // (Network and Hub: 80 + 11: the Coral Hub card's level sentence and the Operator's state (#6579 part 1), and "Manage other computers from this one" with Security's line "Adds a Servers tab, with full control of those computers." (#6579 part 2))
+const BUDGET = { 'Network and Hub': 163, 'Agents': 137, 'Storage and cleanup': 105, 'Terminal': 70, 'General': 32, 'Notifications': 16, 'Files and Git': 40, 'Security and privacy': 58 }; // #7405: a row's hint is one short line (about ten words) under its label, and a longer one is behind its Learn more (UI/UX's rule: a tab about 120 words, Agents about 150; Network and Hub is its Hub status lines too, which are data); round 2: each Learn more-only row gets its one line (Agents +18, Storage +19 and +14 for the two limits' lines, Terminal +14); before #7405: Network and Hub 104, Agents 70, Storage and cleanup 65, Terminal 53, General 22, Notifications 7, Files and Git 16, Security and privacy 43
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -21,7 +21,7 @@ const BUDGET = { 'Network and Hub': 104, 'Agents': 70, 'Storage and cleanup': 65
         await ev(`window.showSettingsModal(); true`);
         await waitFor(`getComputedStyle(document.getElementById('settings-modal')).display !== 'none'`, 'the dialog open', 8000);
         await waitFor(`!!document.getElementById('settings-tab-network')`, 'the Settings dialog', 8000);
-        await waitFor(`document.querySelectorAll('#settings-modal .settings-info-btn').length > 5`, 'the (i) buttons', 8000);
+        await waitFor(`document.querySelectorAll('#settings-modal .settings-hint-line').length > 5`, 'the hint lines', 8000);
         // General opens on what people change first: Theme, then the default agent. The render engine is engine jargon (#6383 rank 12): it is behind a disclosure of its own.
         await ev(`document.getElementById('settings-tab-general').click(); true`);
         await waitFor(`!!document.querySelector('#settings-pane-general:not([hidden])')`, 'General open', 6000);
@@ -49,22 +49,24 @@ const BUDGET = { 'Network and Hub': 104, 'Agents': 70, 'Storage and cleanup': 65
                 return n; })()`);
             (global.__tb = global.__tb || []).push(`${g.name}: ${words}`);
             const seenText = words > (BUDGET[g.name] ?? Infinity) ? await ev(`(() => { const pane = document.querySelector('#settings-modal .settings-pane:not([hidden])'); const out = []; const shown = e => { for (let p = e; p; p = p.parentElement) { const s = getComputedStyle(p); if (s.display === 'none' || s.visibility === 'hidden' || p.hidden) return false; const d = p.parentElement; if (d && d.tagName === 'DETAILS' && !d.open && p.tagName !== 'SUMMARY') return false; } return true; }; const w = document.createTreeWalker(pane, NodeFilter.SHOW_TEXT); for (let t = w.nextNode(); t; t = w.nextNode()) { const e = t.parentElement; if (!e || e.closest('select, option, script, style, .material-icons') || !shown(e)) continue; const v = t.nodeValue.trim(); if (v) out.push(v.slice(0, 80)); } return out; })()`) : null;
-            if (BUDGET[g.name] !== undefined) assert.ok(words <= BUDGET[g.name], `${g.name} shows ${words} words, budget ${BUDGET[g.name]}: ${JSON.stringify(seenText)}`);
+            if (!process.env.TB_DUMP && BUDGET[g.name] !== undefined) assert.ok(words <= BUDGET[g.name], `${g.name} shows ${words} words, budget ${BUDGET[g.name]}: ${JSON.stringify(seenText)}`);
         }
 
         if (process.env.TB_DUMP) assert.fail('TABLE ' + global.__tb.join(' | '));
-        // the (i) of every Hub row: a button that controls its text, closed at first, the text describing the control, opens by keyboard
+        // every Hub row has its explanation as a visible hint line under its label (#7405: the (i) buttons are gone), the control still described by it; a long one shows a first line and a Learn more that opens the rest, by keyboard too
         await ev(`document.getElementById('settings-tab-network').click(); true`);
-        const rows = await ev(`[...document.querySelectorAll('#settings-cloud .settings-cloud-switch-row:not([hidden]), #settings-cloud .settings-cloud-mode:not([hidden])')].map(r => { const b = r.querySelector('.settings-info-btn'); const box = b && document.getElementById(b.getAttribute('aria-controls')); const input = r.querySelector('input[type=checkbox], select'); const d = input && input.getAttribute('aria-describedby'); return { id: r.id, btn: !!b, name: b && b.getAttribute('aria-label'), expanded: b && b.getAttribute('aria-expanded'), boxHidden: box && box.hidden, words: box ? box.textContent.trim().split(/\\s+/).length : 0, describes: !!(d && box && d.split(' ').some(x => box.querySelector('#' + x) || box.id === x)) || !input || input.tagName === 'SELECT' }; })`);
+        const rows = await ev(`[...document.querySelectorAll('#settings-cloud .settings-cloud-switch-row:not([hidden]), #settings-cloud .settings-cloud-mode:not([hidden])')].map(r => { const h = r.matches('.settings-cloud-mode') ? r.querySelector('#settings-cloud-mode-levels') : r.querySelector('.settings-hint-line'); const input = r.querySelector('input[type=checkbox], select'); const d = ((input && input.getAttribute('aria-describedby')) || '').split(' '); return { id: r.id, hint: !!h, info: !!r.querySelector('.settings-info-btn'), words: h ? h.textContent.trim().split(/\\s+/).length : 0, describes: !!h && d.some(x => x && (h.id === x || !!h.querySelector('#' + CSS.escape(x)))) }; })`);
         assert.ok(rows.length >= 5, 'the Hub rows are shown: ' + JSON.stringify(rows.map(r => r.id)));
         for (const r of rows) {
-            assert.equal(r.btn, true, `${r.id}: has an (i)`); assert.equal(r.expanded, 'false'); assert.equal(r.boxHidden, true, `${r.id}: its text is closed`); assert.match(r.name, /^About /); assert.ok(r.words > 3);
+            assert.equal(r.hint, true, `${r.id}: has its hint line`); assert.equal(r.info, false, `${r.id}: no (i)`); assert.ok(r.words > 3);
             assert.ok(r.describes, `${r.id}: the control is still described by the text`);
         }
         await ev(`document.querySelectorAll('#settings-cloud details.settings-cloud-more').forEach(d => { d.hidden = false; d.open = true; }); true`); // the permissions are behind the closed "More Coral Hub permissions" (#6579)
-        await ev(`document.querySelector('#settings-cloud-redact-row .settings-info-btn').focus(); true`);
+        const learn = `#settings-cloud-redact-row .settings-learn`;
+        assert.equal(await ev(`!!document.querySelector('${learn}') && document.querySelector('${learn}').getAttribute('aria-expanded')`), 'false', 'a long hint is clamped to a line with a Learn more');
+        await ev(`document.querySelector('${learn}').focus(); true`);
         await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
-        await waitFor(`document.querySelector('#settings-cloud-redact-row .settings-info-btn').getAttribute('aria-expanded') === 'true' && !document.getElementById(document.querySelector('#settings-cloud-redact-row .settings-info-btn').getAttribute('aria-controls')).hidden`, 'the redaction text open by keyboard', 3000);
-        console.log('PASS Settings shows little text up front, with the rest behind each row\'s (i)');
+        await waitFor(`document.querySelector('${learn}').getAttribute('aria-expanded') === 'true' && !document.getElementById(document.querySelector('${learn}').getAttribute('aria-controls').split(' ')[0]).classList.contains('settings-hint-clamp')`, 'the redaction text open by keyboard', 3000);
+        console.log('PASS Settings shows its hints, the long ones behind Learn more');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

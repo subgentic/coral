@@ -37,28 +37,22 @@ const MEASURE = `(() => {
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await ev(`window.__coralReady.then(() => true)`);
             await ev(`window.showSettingsModal('general'); true`);
-            await waitFor(`!!document.querySelector('#settings-modal .settings-info-btn')`, 'the Settings dialog', 8000);
+            await waitFor(`!!document.querySelector('#settings-modal .settings-hint-line')`, 'the Settings dialog', 8000);
             const groups = await ev(`[...document.querySelectorAll('#settings-modal .settings-group-pick option, #settings-modal [role=tab][data-group]')].map(o => o.value || o.dataset.group).filter(Boolean).filter((v, i, a) => a.indexOf(v) === i)`);
-            const seen = [];
+            const infos = [], learns = [];
             for (const g of groups) {
                 await ev(`window.showSettingsModal(${JSON.stringify(g)}); true`);
                 await sleep(400); // sleep-ok: the pane draws and its rows load
-                const m = await ev(MEASURE);
-                for (const x of m) seen.push({ g, ...x });
+                infos.push(...await ev(`[...document.querySelectorAll('#settings-modal .settings-pane:not([hidden]) .settings-info-btn')].filter(b => b.getClientRects().length).map(b => (b.getAttribute('aria-label') || '').slice(0, 40))`));
+                for (const x of await ev(`[...document.querySelectorAll('#settings-modal .settings-pane:not([hidden]) .settings-learn')].filter(b => b.getClientRects().length).map(b => ({ name: (b.getAttribute('aria-label') || '').slice(0, 40), h: Math.round(b.getBoundingClientRect().height) }))`)) learns.push({ g, ...x });
                 if (g === 'general' || g === 'agents') await shot(`info-${g}-${w}`);
             }
-            check(`${tag}: found the (i) buttons of ${groups.length} Settings groups`, seen.length >= 10, `${seen.length} buttons in ${groups.join(', ')}`);
-            const big = seen.filter(x => x.w > 24.5 || x.h > 24.5);
-            check(`${tag}: every (i) is a circle of at most 24 px`, big.length === 0, JSON.stringify(big.slice(0, 4)));
-            const off = seen.filter(x => x.first && Math.abs(x.cy - x.first.cy) > 5);
-            check(`${tag}: every (i) is centred on its label's first line (within 5 px)`, off.length === 0, JSON.stringify(off.slice(0, 4).map(x => [x.g, x.about, Math.round(x.cy - x.first.cy)])));
-            const far = seen.filter(x => x.gap !== null && x.gap > 20);
-            check(`${tag}: every (i) comes right after its label text (within 20 px), not at the row's far edge`, far.length === 0, JSON.stringify(far.slice(0, 4).map(x => [x.g, x.about, x.gap])));
-            const sw = seen.filter(x => x.tog !== null && Math.abs(x.tog) > 3);
-            check(`${tag}: every switch is centred on its label's first line (within 3 px)`, sw.length === 0, JSON.stringify(sw.slice(0, 4).map(x => [x.g, x.about, x.tog])));
+            // #7405: the (i) buttons are gone from Settings: each row's explanation is a visible hint line, and a long one has a Learn more link (a real target: 44 px high on a phone)
+            check(`${tag}: no (i) button in any of the ${groups.length} Settings groups`, infos.length === 0, JSON.stringify(infos.slice(0, 4)));
+            check(`${tag}: the long hints have a Learn more`, learns.length >= 5, `${learns.length} in ${groups.join(', ')}`);
             if (mobile) {
-                const small = seen.filter(x => !x.hit || x.hit.w < 43.5 || x.hit.h < 43.5);
-                check(`${tag}: every (i) has an invisible touch target of 44 px or more around it`, small.length === 0, JSON.stringify(small.slice(0, 4).map(x => [x.g, x.about, x.hit])));
+                const small = learns.filter(x => x.h < 44);
+                check(`${tag}: every Learn more is 44 px high or more`, small.length === 0, JSON.stringify(small.slice(0, 4)));
             }
         }
         // Team settings: the same (i) in its Workflow, Prompt inspection and Health check pages
