@@ -33,7 +33,7 @@ const SIGNED_OUT = `(() => { const R = window.fetch; window.fetch = async functi
             assert.ok(s.lines <= (pct === 100 ? 1 : 2), `${pct}%: the note takes ${pct === 100 ? 'one line' : 'at most two lines'} (${s.lines} lines, ${s.h} px)`);
             await ev(`document.getElementById('signin-line-btn').click(); true`);
             const hint = await ev(`(() => { const h = document.getElementById('signin-line-hint'); return { shown: !h.hidden, text: h.innerText.replace(/\\s+/g, ' ').trim() }; })()`);
-            assert.ok(hint.shown && /scheduled jobs and workflows that use it are waiting/i.test(hint.text) && /Sign in with claude in a terminal/.test(hint.text), `${pct}%: its button opens what is waiting and what to do (${hint.text})`);
+            assert.ok(hint.shown && /scheduled jobs and workflows that use it are waiting/i.test(hint.text) && /Open a terminal, run claude, and follow the steps/.test(hint.text), `${pct}%: its button opens what is waiting and what to do (${hint.text})`);
             await ev(`document.getElementById('signin-line-btn').click(); true`);
         }
         await ev(`document.documentElement.style.fontSize = '16px'; true`); await sleep(300); // sleep-ok: layout settles after the text size changes
