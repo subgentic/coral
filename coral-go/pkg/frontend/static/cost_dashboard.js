@@ -487,7 +487,7 @@ export async function _refreshCostDashboard() {
 
     // Flash live indicator
     _flashLiveIndicator();
-    showSpend(document.getElementById('cost-spend'), period); // tokens per commit, one team (#7526): its own read, its own errors
+    showSpend(document.getElementById('cost-spend'), period, document.getElementById('cost-task-time')); // tokens per commit and task time, one team (#7526, #7530): its own read, its own errors
 
     try {
         const [summaryResp, taskResp, tsResp, teamResp, branchResp] = await Promise.all([
