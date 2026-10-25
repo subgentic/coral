@@ -92,7 +92,7 @@ export async function launchAgentToBoard() {
             _refreshAfterLaunch(server, { sessionName: result.session_name, sessionId: result.session_id });
         }
     } catch (e) {
-        showToast("Failed to launch agent", "error");
+        showToast("Could not start the agent. Check that the folder exists and that the agent is installed, then try again.", "error");
     } finally {
         if (launchBtn) { launchBtn.disabled = false; launchBtn.textContent = 'Launch'; }
     }
@@ -117,7 +117,7 @@ export async function launchTerminalToBoard(boardName, workDir) {
             _refreshAfterLaunch(server, { sessionName: result.session_name, sessionId: result.session_id });
         }
     } catch (e) {
-        showToast("Failed to launch terminal", "error");
+        showToast("Could not start the terminal. Check that the folder exists, then try again.", "error");
     }
 }
 
@@ -152,7 +152,7 @@ export async function launchDefaultAgent(workDir, server) {
             _refreshAfterLaunch(server, { sessionName: result.session_name, sessionId: result.session_id });
         }
     } catch (e) {
-        showToast('Failed to launch agent', 'error');
+        showToast('Could not start the agent. Check that the folder exists and that the agent is installed, then try again.', 'error');
     }
 }
 
@@ -208,6 +208,6 @@ export async function launchStandaloneTerminal(workDir, server) {
             _refreshAfterLaunch(server, { sessionName: result.session_name, sessionId: result.session_id });
         }
     } catch (e) {
-        showToast('Failed to launch terminal', 'error');
+        showToast('Could not start the terminal. Check that the folder exists, then try again.', 'error');
     }
 }

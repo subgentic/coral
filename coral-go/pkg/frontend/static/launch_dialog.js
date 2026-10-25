@@ -403,7 +403,7 @@ export async function launchSession() {
             if (normServer(server) === LOCAL_SERVER) _openLaunched(result, type);
         }
     } catch (e) {
-        showToast("Failed to launch session", true);
+        showToast("Could not start the agent. Check that the folder exists and that the agent is installed, then try again.", true);
     } finally {
         if (launchBtn) { launchBtn.disabled = false; launchBtn.textContent = 'Launch'; }
         if (launch.mode !== 'terminal') _syncLaunchBlock();
