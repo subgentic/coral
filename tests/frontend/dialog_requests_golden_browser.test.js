@@ -139,7 +139,7 @@ const GOLDEN = path.join(__dirname, 'fixtures', 'dialog_requests_golden.json');
         await fill('team-board-server', 'http://remote:8420');
         await fill('team-agent-type', 'codex');
         await fill('team-permission-mode', 'plan');
-        await addAgent({ name: 'Lead', prompt: 'Lead the team.', type: 'claude', model: 'claude-opus-4', mode: 'bypassPermissions', flags: '--verbose', chips: [['allow', 'shell'], ['deny', 'web_access']] });
+        await addAgent({ name: 'Orchestrator', prompt: 'Lead the team.', type: 'claude', model: 'claude-opus-4', mode: 'bypassPermissions', flags: '--verbose', chips: [['allow', 'shell'], ['deny', 'web_access']] });
         await addAgent({ name: 'Dev', prompt: 'Write the code.\nCarefully.', type: 'codex', model: 'gpt-x', chips: [['deny', 'git_write']] });
         // edit the second: the dialog opens with its values and saves them back
         await ev(`window.showTeamAgentModal([...document.querySelectorAll('#team-agents-list .team-agent-row')].find(r => r.querySelector('.team-agent-role-name').textContent === 'Dev')); true`);
