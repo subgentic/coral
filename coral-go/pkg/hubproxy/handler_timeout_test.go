@@ -72,32 +72,40 @@ func TestProxyHeaderTimeoutSlowUpload(t *testing.T) {
 	})
 }
 
+// stalledUpload sends a few bytes at once and then, after 31 s, a few more: a browser upload that stops for longer than the 30 s stall limit.
+type stalledUpload struct {
+	ctx  context.Context
+	sent bool
+}
+
+func (b *stalledUpload) Read(p []byte) (int, error) {
+	if !b.sent {
+		b.sent = true
+		return copy(p, "upload started"), nil
+	}
+	pause := time.NewTimer(31 * time.Second)
+	defer pause.Stop()
+	select {
+	case <-b.ctx.Done():
+		return 0, b.ctx.Err()
+	case <-pause.C:
+		return copy(p, "too late"), nil
+	}
+}
+
 // An upload that stops for 30 s is cut with the stall code, not reported as an outage of the machine, and the target's reader is released.
 func TestProxyUploadStallTimeout(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		res := &fakeResolver{targets: map[string]HTTPTarget{}, errs: map[string]error{}}
+		body := &stalledUpload{}
 		remoteDone := make(chan struct{})
 		target := uploadTimeoutTarget{roundTrip: func(r *http.Request) (*http.Response, error) {
 			defer close(remoteDone)
+			body.ctx = r.Context()
 			_, err := io.Copy(io.Discard, r.Body)
 			return nil, err
 		}}
-		ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
-		defer cancel()
-		reader, writer := io.Pipe()
-		defer reader.Close()
-		defer writer.Close()
-		go func() {
-			_, _ = writer.Write([]byte("upload started"))
-			pause := time.NewTimer(31 * time.Second)
-			defer pause.Stop()
-			select {
-			case <-ctx.Done():
-			case <-pause.C:
-				_, _ = writer.Write([]byte("too late"))
-			}
-		}()
-		req := httptest.NewRequestWithContext(ctx, http.MethodPost, "/api/remote/a/api/upload", reader)
+		req := httptest.NewRequest(http.MethodPost, "/api/remote/a/api/upload", body)
 		req.ContentLength = -1
 		recorder := httptest.NewRecorder()
 		started := time.Now()
