@@ -31,12 +31,16 @@ export const PERMISSION_MODE_DESCRIPTIONS = {
 export const CODEX_NETWORK_MODES = ['default', 'auto', 'dontAsk'];
 export const CODEX_AUTO_DESCRIPTION = 'Workspace sandbox, with the network on so it can reach Coral.';
 
-// The modes in which an agent's launch of a worker is refused: they never stop to ask (Security's #7578)
-const SKIPS_PROMPTS = ['auto', 'dontAsk', 'bypassPermissions'];
+// The modes in which an agent's launch of a worker is refused: agent.SkipsPermissionPrompts keeps only Default as asking (Plan too, for the CLIs other than Claude, #5894)
+const WORKERS_REFUSED = { plan: 'Claude agents cannot start workers in this mode.' };
+const WORKERS_REFUSED_ANY = 'Agents cannot start workers in this mode.';
 
 export function _updatePermModeDescription(selectEl) {
     const warn = selectEl.closest('.settings-row')?.querySelector('.perm-mode-warn'); // only the Settings row has it
-    if (warn) warn.hidden = !SKIPS_PROMPTS.includes(selectEl.value);
+    if (warn) {
+        warn.textContent = WORKERS_REFUSED[selectEl.value] || WORKERS_REFUSED_ANY;
+        warn.hidden = selectEl.value === 'default';
+    }
     const hint = selectEl.parentElement?.querySelector('.perm-mode-desc');
     if (!hint) return;
     const codex = selectEl.closest('[data-acf-uid]')?.querySelector('.acf-agent-type')?.value === 'codex';
