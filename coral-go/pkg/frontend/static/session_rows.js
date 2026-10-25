@@ -266,7 +266,7 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
     const ctxPill = waitingBadge ? '' : _renderCtxPill(s);
     const ctxHigh = s.context_pct !== null && s.context_pct !== undefined && s.context_pct >= 80;
     const isTerminal = s.agent_type === "terminal";
-    const sid = s.session_id ? escapeAttr(s.session_id) : "";
+    const sid = s.session_id || ""; // raw: every use below escapes it (it was escaped here too, and a second time at each use: an id with a quote or an ampersand reached the click handlers as "&#39;")
     // Goal line is rendered on every row (not just the active one):
     // summary -> first user prompt -> inline "No goal yet" + generate button.
     const goalText = sessionGoalText(s);
