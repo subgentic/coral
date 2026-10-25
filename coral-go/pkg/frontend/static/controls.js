@@ -589,9 +589,9 @@ async function showRestartModal() {
 }
 
 const RESTART_STAGES = ['persona', 'agent'];
-const RESTART_STAGE_NAMES = { persona: 'Persona', agent: 'The agent' };
+const RESTART_STAGE_NAMES = { persona: 'Persona', agent: 'Settings' };
 
-/** Restart's two steps, New Agent's without its first (the agent is fixed): the persona page, then the agent's tabs (Model, Permissions, Advanced). Restart is in the footer of both: a restart that changes nothing needs no walk through the steps. `arg` is a stage name, "next" or "back". */
+/** Restart's two steps, New Agent's without its first (the agent is fixed): the persona page, then the settings tabs (Model, Permissions, Advanced). Restart is in the footer of both: a restart that changes nothing needs no walk through the steps. `arg` is a stage name, "next" or "back". */
 export function restartStage(arg) {
     const wiz = document.getElementById('restart-wizard');
     if (!wiz) return;

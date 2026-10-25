@@ -62,7 +62,7 @@ const BASE = require('./test_base').BASE;
         await ev(`{ const p = document.querySelector('#restart-acf .acf-prompt'); p.value = 'Edited prompt'; p.dispatchEvent(new Event('input', { bubbles: true })); } true`);
         await step('next');
         st = await stage();
-        assert.deepEqual(st, { stage: 'agent', sub: 'Step 2 of 2: The agent', back: true, next: false, go: true });
+        assert.deepEqual(st, { stage: 'agent', sub: 'Step 2 of 2: Settings', back: true, next: false, go: true });
         let v = await view('#restart-modal');
         assert.deepEqual(v.tabs.map(t => [t.name, t.icon]), [['Model', 'smart_toy'], ['Permissions', 'lock'], ['Advanced', 'tune']], 'the agent is fixed: no Agent step, the tabs are Model, Permissions, Advanced');
         assert.equal(v.open, 'agent'); assert.equal(v.panesVisible, 1, 'one section at a time'); assert.equal(v.title, 'Model'); assert.equal(v.desc, '', 'no pane sub-title (#6012)');

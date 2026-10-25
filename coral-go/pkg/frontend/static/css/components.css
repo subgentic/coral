@@ -4546,7 +4546,7 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .seg-cards .seg-btn { border: 1px solid var(--control-border); border-radius: var(--radius-md); text-align: left; min-height: 44px; }
 .seg-cards .seg-btn[data-value="bypassPermissions"] { color: var(--warning-text, var(--warning)); }
 .seg-cards .seg-btn[data-value="bypassPermissions"][aria-checked="true"] { color: var(--text-on-accent); }
-.acf-tools-details > summary { cursor: pointer; font-weight: 600; min-height: 32px; }
+.acf-tools-details > summary { cursor: pointer; font-size: .875rem; font-weight: 600; min-height: 32px; } /* 14/600 like the other headings of a pane (UI/UX, #7640) */
 .acf-tools-details .acf-perms-summary { font-weight: 400; margin-left: 6px; }
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
     #launch-modal .modal-content.launch-wizard-content, #restart-modal .modal-content.restart-wizard-content, #team-agent-modal .modal-content.restart-wizard-content, #add-agent-board-modal .modal-content.restart-wizard-content { width: 100vw; max-width: none; height: 100dvh; max-height: none; border-radius: 0; padding: 0 !important; } /* (!important: mobile.css's tighter padding is one too) */
