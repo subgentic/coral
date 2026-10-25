@@ -43,7 +43,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await waitFor(`!!document.querySelector('#inbox-page .ibx-reply-label')`, 'the reply box', 8000);
         const reply = await ev(`(() => { const o = document.querySelector('#inbox-page .ibx-open'); return { label: document.querySelector('#inbox-page .ibx-reply-label').textContent, oldNote: !!document.querySelector('#inbox-page .ibx-note'), openTag: o && o.tagName, openBtn: o && o.classList.contains('btn'), openH: o && Math.round(o.getBoundingClientRect().height) }; })()`);
         assert.ok(/task stays open/.test(reply.label) && !reply.oldNote, 'the reply box says the task stays open (once): ' + JSON.stringify(reply));
-        assert.ok(reply.openBtn && reply.openH >= 30, 'Open the task is drawn as a button: ' + JSON.stringify(reply));
+        assert.ok(!reply.openBtn && reply.openH >= 24, 'on a task page Open the task is a plain link under the title line, 24 px or more to hit (#7572; a list keeps the button: inbox_open_link): ' + JSON.stringify(reply));
         // Saved: a message whose transcript is gone says Gone in the table (one word, not a sentence on every row) and says why once, on its own page
         await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('saved')); true`);
         await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 3`, 'three saved', 10000);

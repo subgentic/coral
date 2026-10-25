@@ -166,9 +166,11 @@ export function mountInbox(host, adapter, options) {
         const reviewNote = review ? el('p', 'ibx-task-facts', 'To approve or reject, open the task') : null;
         if (reviewNote) { reviewNote.id = uid('ibx-review-note'); metaRow.append(reviewNote); }
         const href = typeof adapter.taskHref === 'function' ? safePath(adapter.taskHref(task)) : '';
-        if (href) { const a = el('a', 'btn btn-small ibx-open', 'Open the task'); a.setAttribute('href', safePath(href)); metaRow.append(a); }
+        // One task as a page of its own (options.only): "Open the task" is a plain link under the title line, not a box of its own; a list keeps the small button, and so does every mount that does not ask for the page (a host at an older version).
+        const openClass = only ? 'ibx-open ibx-open-link' : 'btn btn-small ibx-open';
+        if (href) { const a = el('a', openClass, 'Open the task'); a.setAttribute('href', safePath(href)); metaRow.append(a); }
         else if (typeof adapter.openTask === 'function') {
-            const b = el('button', 'btn btn-small ibx-open', 'Open the task'); b.type = 'button';
+            const b = el('button', openClass, 'Open the task'); b.type = 'button';
             b.addEventListener('click', () => adapter.openTask(task));
             metaRow.append(b);
         }
