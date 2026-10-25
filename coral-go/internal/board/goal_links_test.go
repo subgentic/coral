@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -142,13 +143,15 @@ func TestGoalLinksTitlesAreRedactedBoundedAndTheRowIsExactlyTheseFields(t *testi
 	assert.Equal(t, GoalLinksTitleMax, len([]rune(reply.Accepted[0].Title)))
 	assert.Equal(t, GoalLinksAssigneeMax, len([]rune(reply.Accepted[0].Assignee)))
 
-	// a full page of the largest rows is far under the one reply cap
-	row := reply.Accepted[0]
-	row.Board = strings.Repeat("b", 120)
-	row.Title = strings.Repeat("\u00e9", GoalLinksTitleMax)
+	// four-byte characters are cut to the byte bound too, and a full page of the largest rows (a 128-byte board name, four-byte characters everywhere) is under the one reply cap
+	wide := string([]rune(strings.Repeat("\U0001D4B3", 300)))
+	assert.LessOrEqual(t, len(boundText(wide, GoalLinksTitleMax, GoalLinksTitleBytes)), GoalLinksTitleBytes)
+	assert.True(t, utf8.ValidString(boundText(wide, GoalLinksTitleMax, GoalLinksTitleBytes)), "cut on a character boundary")
+	row := GoalLinkRow{RequestID: strings.Repeat("f", 32), Board: strings.Repeat("b", 128), GoalUID: strings.Repeat("g", 36), TaskID: 1 << 40, TaskStatus: "in_progress", RequestState: "accepted",
+		AcceptedAt: "2030-01-01T00:00:00Z", Title: boundText(wide, GoalLinksTitleMax, GoalLinksTitleBytes), Assignee: boundText(wide, GoalLinksAssigneeMax, GoalLinksAssigneeBytes), UpdatedAt: "2030-01-01T00:00:00Z"}
 	one, err := json.Marshal(row)
 	require.NoError(t, err)
-	assert.Less(t, len(one)*GoalLinksMaxLimit, GoalLinksReplyMaxBytes)
+	assert.Less(t, len(one)*GoalLinksMaxLimit, GoalLinksReplyMaxBytes, "100 rows of %d bytes", len(one))
 }
 
 // Paged: a limit (default 50, at most 100), stable order (accepted_at, task_id), a cursor bound to the request and the asker, each row once, an exact total. The unique indexes that make it one task per
