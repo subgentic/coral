@@ -143,8 +143,7 @@ function _teamSettingsPageShell() {
       <h2 class="ts-h" id="ts-h-workflow">Workflow</h2>
       <div class="ts-row ts-name-row"><div class="ts-text"><span class="ts-label">Board name</span><p class="ts-hint">Only the label changes: its agents, tasks and history stay.</p></div><div class="ts-control ts-rename"></div></div>
       <form class="working-mode-form ts-main" autocomplete="off">
-        ${pageRow({ id: 'tsr-mode', label: 'Working mode', hint: '', control: '<select name="mode" aria-labelledby="tsr-mode-l" aria-describedby="working-mode-desc"><option value="none">None</option><option value="shared_checkout">Shared checkout</option><option value="worktrees">Worktrees</option></select>' })}
-        <p class="ts-hint ts-mode-desc working-mode-desc" id="working-mode-desc"></p>
+        <div class="ts-row"><div class="ts-text"><span class="ts-label" id="tsr-mode-l">Working mode</span><p class="ts-hint working-mode-desc" id="working-mode-desc"></p></div><div class="ts-control"><select name="mode" aria-labelledby="tsr-mode-l" aria-describedby="working-mode-desc"><option value="none">None</option><option value="shared_checkout">Shared checkout</option><option value="worktrees">Worktrees</option></select></div></div>
         ${pageSwitch('dependency_guidance', 'Include dependent-queue guidance', 'Tells agents how to work when a task waits on another.')}
         ${pageSwitch('require_goal', 'Require a goal', requireGoalSentence)}
         ${pageRow({ id: 'tsr-instr', label: 'Additional instructions', hint: 'Team-specific conventions, given to agents with each task.', wide: true, control: '<textarea name="custom_instructions" rows="4" aria-labelledby="tsr-instr-l" aria-describedby="tsr-instr-h" placeholder="Team-specific conventions"></textarea>' })}

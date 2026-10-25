@@ -171,7 +171,6 @@
 .ts-control { min-width: 0; display: flex; justify-content: flex-end; align-items: center; }
 .ts-control select { max-width: 100%; min-width: 12rem; }
 .ts-control .check-hit { justify-content: flex-end; }
-.ts-mode-desc { padding: 0 0 8px; }
 .ts-inline { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8125rem; color: var(--text-secondary); }
 .ts-inline input { width: 5em; }
 .ts-presets { margin-top: 8px; }
@@ -192,3 +191,8 @@
     .ts-bar .btn { min-height: 44px; }
     .team-settings-page select, .team-settings-page input:not([type="checkbox"]), .team-settings-page .btn { min-height: var(--control-touch-height, 44px); } /* every control of the page is a touch target (the prompt role list too) */
 }
+
+/* Knowledge: an entry's notes as a text box in the documents pane */
+.knowledge-editor { width: 100%; box-sizing: border-box; min-height: 14rem; font: inherit; font-size: 0.8125rem; resize: vertical; }
+.knowledge-edit-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+@media (max-width: 760px) { .knowledge-edit-actions .btn { min-height: var(--control-touch-height, 44px); } }

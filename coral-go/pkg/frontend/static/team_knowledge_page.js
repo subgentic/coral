@@ -38,9 +38,39 @@ async function load() {
 
 function openEntry(entry, opener) {
     const when = model.data && model.data.created_at;
+    const editable = entry.key !== 'index'; // the team's index is written by the distillation; an agent's notes can be changed by hand
+    let bodyHost = null;
+    const showText = () => { bodyHost.replaceChildren(Object.assign(el('pre', 'team-task-text knowledge-text'), { textContent: entry.text || 'Nothing written yet.' })); };
+    // Edit: the text becomes a text box with Save and Cancel; Escape cancels the edit (it does not close the pane with the words unsaved).
+    function startEdit(editButton) {
+        const box = el('textarea', 'knowledge-editor'); box.value = entry.text || ''; box.setAttribute('aria-label', `Notes of ${entry.name}`); box.rows = 16;
+        const status = el('p', 'ts-hint knowledge-edit-status'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
+        const save = btn('btn btn-primary', 'Save', null), cancel = btn('btn', 'Cancel', null);
+        const leave = () => { showText(); editButton.disabled = false; editButton.focus({ preventScroll: true }); };
+        cancel.addEventListener('click', leave);
+        box.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); leave(); } });
+        save.addEventListener('click', async () => {
+            save.disabled = true; cancel.disabled = true; status.textContent = 'Saving…';
+            try {
+                const r = await teamFetch(model.team, n => `/api/teams/detail/${encodeURIComponent(n)}/knowledge/${encodeURIComponent(entry.name)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: box.value }) });
+                const b = await r.json().catch(() => ({}));
+                if (!r.ok || !b.ok) { status.textContent = `Could not save: ${(b && b.error) || `HTTP ${r.status}`}`; save.disabled = false; cancel.disabled = false; return; }
+                entry.text = box.value;
+                const a = model.data && model.data.agents.find(x => x.name === entry.name); if (a) a.content = box.value;
+                showText(); editButton.disabled = false;
+                const done = el('p', 'ts-hint', b.redacted ? 'Saved. A secret in the text was replaced before it was saved.' : 'Saved.'); done.setAttribute('role', 'status'); bodyHost.append(done);
+                editButton.focus({ preventScroll: true });
+            } catch (e) { status.textContent = `Could not save: ${e && e.message ? e.message : 'no answer'}`; save.disabled = false; cancel.disabled = false; }
+        });
+        const row = el('div', 'knowledge-edit-actions'); row.append(cancel, save);
+        bodyHost.replaceChildren(box, status, row);
+        editButton.disabled = true;
+        box.focus();
+    }
     openDetailPane({
         key: entry.key, opener, title: entry.name, sub: [whenText(when), entry.from].filter(Boolean).join(' · '),
-        body: (host) => { host.replaceChildren(Object.assign(el('pre', 'team-task-text knowledge-text'), { textContent: entry.text || 'Nothing written yet.' })); },
+        body: (host) => { bodyHost = host; showText(); },
+        actions: editable ? [{ label: 'Edit', run: (b) => startEdit(b) }] : [],
         onClose: () => { root?.querySelectorAll('tr[aria-current="true"]').forEach(r => r.removeAttribute('aria-current')); },
     });
     root?.querySelectorAll('tr[data-key]').forEach(r => { if (r.dataset.key === entry.key) r.setAttribute('aria-current', 'true'); else r.removeAttribute('aria-current'); });

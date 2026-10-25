@@ -68,6 +68,10 @@ const TEAM = `qa-settings-${Date.now() % 100000}`;
                 await ev(`window.__tp.find('button', /^Save settings$/i).click(); true`); await settle(900);
                 const b = await bar(); assert.match(b.status, /^Could not save: /, `the status says it could not save and why (got ${JSON.stringify(b.status)})`); assert.equal(b.save.disabled, false, 'Save settings is on again');
             });
+            await S.run(`${label}: the Working mode row says what the mode means as its own hint, and the select is described by it`, async () => {
+                const r = await ev(`(() => { const sel = window.__tp.find('select', /^Working mode$/i); if (!sel) return null; const h = document.getElementById(sel.getAttribute('aria-describedby') || ''); const row = sel.closest('.ts-row'); return { text: h ? window.__na.text(h).trim() : null, inRow: !!(h && row && row.contains(h)) }; })()`);
+                assert.ok(r, 'a select named Working mode'); assert.equal(r.text, 'No extra guidance.'); assert.equal(r.inRow, true, 'the hint is in the Working mode row');
+            });
         }
         await removeBoards(ev, [TEAM]); S.finish(); // finish() exits the process, so the board goes first
     } finally { await removeBoards(ev, [TEAM]); await client.close(); }

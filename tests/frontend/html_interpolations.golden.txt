@@ -688,7 +688,6 @@
 2	team_working_mode.js	label
 1	team_working_mode.js	options
 1	team_working_mode.js	pageRow({ id: 'tsr-instr', label: 'Additional instructions', hint: 'Team-specific conventions, given to agents
-1	team_working_mode.js	pageRow({ id: 'tsr-mode', label: 'Working mode', hint: '', control: '<select name="mode" aria-labelledby="tsr-
 1	team_working_mode.js	pageSwitch('dependency_guidance', 'Include dependent-queue guidance', 'Tells agents how to work when a task wa
 1	team_working_mode.js	pageSwitch('require_goal', 'Require a goal', requireGoalSentence)
 1	team_working_mode.js	switchRow({ label: 'Include dependent-queue guidance', name: 'dependency_guidance', labelClass: 'check-hit' })

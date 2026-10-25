@@ -67,6 +67,23 @@ const TEAM = `qa-docs-${Date.now() % 100000}`;
                 assert.ok(await ev(`(() => { const b = [...window.__tp.table().querySelectorAll('button')].find(x => /Backend Dev/.test(window.__na.name(x))); if (!b) return false; b.click(); return true; })()`), 'no row button for Backend Dev'); await settle(400);
                 assert.ok(await ev(`!!window.__tp.pane() && /Backend knowledge text\\./.test(window.__na.text(window.__tp.pane()))`), 'the pane shows the entry text');
             });
+            await S.run(`${label}: Edit on an agent's entry makes the text a box; Escape puts it back; Save sends the text and says Saved.; a refusal says Could not save: <reason>`, async () => {
+                const pane = `window.__tp.pane()`;
+                const btnIn = (rx) => `(() => { const p = ${pane}; return p ? [...p.querySelectorAll('button')].filter(window.__na.vis).find(b => ${rx}.test(window.__na.name(b))) : null; })()`;
+                assert.ok(await ev(`!!${btnIn('/^Edit$/')}`), 'the pane has an Edit button');
+                await ev(`${btnIn('/^Edit$/')}.click(); true`); await settle(250);
+                assert.equal(await ev(`(() => { const t = ${pane}.querySelector('textarea'); return t ? t.value : null; })()`), 'Backend knowledge text.', 'the text is in a box');
+                await ev(`${pane}.querySelector('textarea').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); true`); await settle(250);
+                assert.equal(await ev(`!!${pane} && !${pane}.querySelector('textarea')`), true, 'Escape leaves the edit and the pane stays open');
+                await ev(`(() => { window.__puts = []; window.__putAnswer = 200; const R = window.fetch.bind(window); window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin); if (String((o && o.method) || 'GET').toUpperCase() === 'PUT' && /\\/knowledge\\//.test(url.pathname)) { window.__puts.push({ p: url.pathname, b: String(o.body || '') }); return Promise.resolve(new Response(JSON.stringify(window.__putAnswer === 200 ? { ok: true } : { error: 'disk full' }), { status: window.__putAnswer, headers: { 'Content-Type': 'application/json' } })); } return R(u, o); }; return true; })()`);
+                await ev(`${btnIn('/^Edit$/')}.click(); true`); await settle(250);
+                await ev(`(() => { const t = ${pane}.querySelector('textarea'); t.value = 'New notes.'; t.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+                await ev(`window.__putAnswer = 500; ${btnIn('/^Save$/')}.click(); true`); await settle(500);
+                assert.match(await ev(`window.__na.text(${pane})`), /Could not save: disk full/, 'a refusal is said with its reason'); assert.ok(await ev(`!!${pane}.querySelector('textarea')`), 'the edit stays open');
+                await ev(`window.__putAnswer = 200; ${btnIn('/^Save$/')}.click(); true`); await settle(500);
+                const puts = await ev(`window.__puts`); assert.ok(puts.some(x => /Backend%20Dev|Backend Dev/.test(x.p) && /New notes\./.test(x.b)), `a PUT with the text (${JSON.stringify(puts.map(x => x.p))})`);
+                assert.match(await ev(`window.__na.text(${pane})`), /Saved\./); assert.match(await ev(`window.__na.text(${pane})`), /New notes\./, 'the pane shows the new text');
+            });
         }
         await removeBoards(ev, [TEAM]); S.finish(); // finish() exits the process, so the board goes first
     } finally { await removeBoards(ev, [TEAM]); await client.close(); }
