@@ -63,7 +63,27 @@ function problems(scene, allEntries, { forbid = [], allow = KNOWN_SILENT } = {})
 /** The announcements of `entries` whose text matches `re` (a scene's "must say"). */
 const said = (entries, re) => entries.filter(e => !e.silent && re.test(e.text));
 
+// Waiting for announcements, not for a fixed time (#352): a fixed wait long enough on a quiet machine missed them under load (an error toast, a computer coming back, at cpu-throttle 4), and an
+// announcement that came late was then counted in the next scene. QUIET_MS is the census's own window for words said twice (problems() above): a scene ends only when nothing has been said for that
+// long, so a repeat or chatter is still in its log.
+const QUIET_MS = 2000;
+const reSrc = re => `new RegExp(${JSON.stringify(re.source)}, ${JSON.stringify(re.flags)})`;
+/** Waits until `re` has been announced in this scene's log (at least `count` times), up to `ms`; returns whether it was. */
+async function until(ev, re, ms = 15000, count = 1) {
+    return ev(`(async () => { const re = ${reSrc(re)}; const end = performance.now() + ${ms};
+        for (;;) { if (window.__ann.log.filter(e => !e.silent && re.test(e.text)).length >= ${count}) return true; if (performance.now() > end) return false;
+            await new Promise(r => setTimeout(r, 50)); } })()`); // sleep-ok: a poll interval in the page, not a wait for a guessed time
+}
+/** The end of a scene: each of `must` ([re, label, count]) said at least its count (up to `ms`; one never said is reported by the scene), then no new entry for QUIET_MS (at most `ms` more). */
+async function settle(ev, must = [], ms = 15000) {
+    for (const [re, , count = 1] of must) await until(ev, re, ms, count);
+    await ev(`(async () => { const end = performance.now() + ${ms}; let n = window.__ann.log.length, since = performance.now();
+        while (performance.now() < end) { await new Promise(r => setTimeout(r, 50)); // sleep-ok: a poll interval in the page, not a wait for a guessed time
+            if (window.__ann.log.length !== n) { n = window.__ann.log.length; since = performance.now(); } else if (performance.now() - since >= ${QUIET_MS}) return true; }
+        return false; })()`);
+}
+
 // Regions known to be shown and filled in one turn: the lint's own list (helpers/live_region_known.js, one copy), by id. A new one in a scene fails the scene; a listed one that is fixed leaves the list in the lint, and so here.
 const KNOWN_SILENT = Object.keys(KNOWN).map(k => '#' + k.split(':')[1]);
 
-module.exports = { watch, clear, log, problems, said, KNOWN_SILENT };
+module.exports = { watch, clear, log, problems, said, until, settle, QUIET_MS, KNOWN_SILENT };

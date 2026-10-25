@@ -3,7 +3,7 @@
 // the Notifications column. helpers/announce_census.js records every live region's visible changes; ANNOUNCE_REPORT=<file> writes every scene's log to the file instead of failing.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
-const { watch, clear, log, problems, said } = require('./helpers/announce_census');
+const { watch, clear, log, problems, said, until, settle } = require('./helpers/announce_census');
 const { setupHubWorld, BASE } = require('./helpers/hub_world');
 const S = `(window.__coralStatic || '/static/')`;
 
@@ -14,7 +14,7 @@ const S = `(window.__coralStatic || '/static/')`;
     const scene = async (name, run, { must = [], forbid = [] } = {}) => {
         await clear(ev);
         try { await run(); } catch (e) { scenes.push({ name, entries: [] }); found.push(`${name}: the scene did not run (${String(e && e.message || e).slice(0, 160)})`); return; }
-        await wait(600); // sleep-ok: the last announcement lands
+        await settle(ev, must); // what the scene must say, then nothing new for the duplicate window (#352)
         const entries = await log(ev);
         scenes.push({ name, entries });
         found.push(...problems(name, entries, { forbid }));
@@ -33,10 +33,10 @@ const S = `(window.__coralStatic || '/static/')`;
                 const typed = text => ev(`(() => { const i = document.getElementById('history-search'); i.focus(); i.value = ${JSON.stringify(text)}; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
                 await typed('needle');
                 await waitFor(`document.querySelectorAll('#chat-search-results .chat-search-hit').length >= 1`, 'hits', 10000);
-                await wait(800); // sleep-ok: an announcement is timed; there is no event to wait for
+                await until(ev, /chats? match/); // said before the next search replaces it
                 await typed('zzz');
                 await waitFor(`/No matching chats/.test(document.getElementById('chat-search-results').textContent)`, 'no results', 10000);
-                await wait(800); // sleep-ok: an announcement is timed; there is no event to wait for
+                await until(ev, /No matching chats/);
                 await typed('');
             }, { must: [[/chats? match/, 'the number of chats that match'], [/No matching chats/, 'nothing matched']], forbid: [/needle from/] });
             await scene(`${tag}: hub: a chat is opened`, async () => {
@@ -51,9 +51,9 @@ const S = `(window.__coralStatic || '/static/')`;
                 await wait(300); // sleep-ok: the list settles before the status changes
                 await clear(ev);
                 await ev(`window.__computers[0].online = false; window.__computers[0].status = 'offline'; true`);
-                await wait(6000); // sleep-ok: the list asks again every 5 s
+                await until(ev, /Laptop is offline/); // the list asks again every 5 s: said at its next answer
                 await ev(`window.__computers[0].online = true; window.__computers[0].status = 'online'; true`);
-                await wait(6000); // sleep-ok: the list asks again every 5 s
+                await until(ev, /Laptop is online/);
             }, { must: [[/Laptop is offline/, 'Laptop going offline'], [/Laptop is online/, 'Laptop coming back']] });
             await scene(`${tag}: hub: the Artifacts tab is opened`, async () => {
                 await ev(`window.switchNavTab('artifacts'); true`);
@@ -61,7 +61,6 @@ const S = `(window.__coralStatic || '/static/')`;
             }, { forbid: [/./] }); // the tab says nothing of its own: the hub's page in the frame is its own document
             await scene(`${tag}: hub: toasts`, async () => {
                 await ev(`(async () => { const n = await import(${S} + 'notifications.js'); n.showToast('Saved to the board.'); n.showToast('Could not reach the computer.', true); return true; })()`);
-                await wait(1500); // sleep-ok: the two are said one after the other
             }, { must: [[/Saved to the board/, 'a toast'], [/Could not reach the computer/, 'an error toast']] });
         };
         await run('desktop');

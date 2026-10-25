@@ -4,7 +4,7 @@
 // Drives Chrome over CDP through agent_view_harness.js with its mocked agents, against the isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
-const { watch, clear, log, problems, said } = require('./helpers/announce_census');
+const { watch, clear, log, problems, said, until, settle } = require('./helpers/announce_census');
 const { openBoardComposer } = require('./helpers/phone_targets');
 const VERSIONS = require('./helpers/artifact_versions_stub');
 const BASE = require('./test_base').BASE;
@@ -17,7 +17,7 @@ const S = `(window.__coralStatic || '/static/')`;
     const scene = async (name, run, { must = [], forbid = [] } = {}) => {
         await clear(ev);
         try { await run(); } catch (e) { scenes.push({ name, entries: [] }); found.push(`${name}: the scene did not run (${String(e && e.message || e).slice(0, 160)})`); return; }
-        await wait(600); // sleep-ok: the last announcement lands
+        await settle(ev, must); // what the scene must say, then nothing new for the duplicate window (#352)
         const entries = await log(ev);
         scenes.push({ name, entries });
         found.push(...problems(name, entries, { forbid }));
@@ -38,47 +38,42 @@ const S = `(window.__coralStatic || '/static/')`;
             // a turn: the agent works, says four things (tool-step chatter between them), then stops
             await scene(`${tag}: an agent's turn of four replies`, async () => {
                 await row(`r.working = true`);
-                for (let i = 0; i < 4; i++) { await ev(`window.__m.agents['rep-id'].msgs.push({ type: 'assistant', text: 'Step ${i + 1}: I read the file and changed the second function so the build is green again.' }); true`); await wait(1200); } // sleep-ok: an announcement is timed; there is no event to wait for
+                for (let i = 0; i < 4; i++) { await ev(`window.__m.agents['rep-id'].msgs.push({ type: 'assistant', text: 'Step ${i + 1}: I read the file and changed the second function so the build is green again.' }); true`); await wait(1200); } // sleep-ok: the scenario's own pace (replies and states come over time), not a wait for an announcement (#352)
                 await row(`r.working = false`);
-                await wait(2500); // sleep-ok: an announcement is timed; there is no event to wait for
             }, { must: [[/replied:/, 'the reply'], [/Working/i, 'Working', 1]] });
             // the same words said again are another turn
             await scene(`${tag}: a second turn`, async () => {
-                await row(`r.working = true`); await wait(1200); // sleep-ok: an announcement is timed; there is no event to wait for
-                await ev(`window.__m.agents['rep-id'].msgs.push({ type: 'assistant', text: 'Done: the build is green.' }); true`); await wait(1200); // sleep-ok: an announcement is timed; there is no event to wait for
-                await row(`r.working = false`); await wait(2500); // sleep-ok: an announcement is timed; there is no event to wait for
+                await row(`r.working = true`); await wait(1200); // sleep-ok: the scenario's own pace (replies and states come over time), not a wait for an announcement (#352)
+                await ev(`window.__m.agents['rep-id'].msgs.push({ type: 'assistant', text: 'Done: the build is green.' }); true`); await wait(1200); // sleep-ok: the scenario's own pace (replies and states come over time), not a wait for an announcement (#352)
+                await row(`r.working = false`);
             }, { must: [[/replied: Done/, 'the second reply']] });
             // a send
             await scene(`${tag}: a message is sent`, async () => {
                 await ev(`(() => { const i = document.getElementById('command-input'); i.focus(); i.value = 'Is the build green?'; i.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('[data-on-click="cmd-send"]').click(); return true; })()`);
-                await wait(1500); // sleep-ok: an announcement is timed; there is no event to wait for
             }, { must: [[/Sending message/i, 'Sending message'], [/Message sent/i, 'Message sent']] });
             // a send that fails
             await scene(`${tag}: a message fails to send`, async () => {
                 await ev(`(() => { const real = window.fetch; window.fetch = (u, o = {}) => /\\/send$/.test(String(u)) && (o.method || '').toUpperCase() === 'POST' ? Promise.resolve(new Response(JSON.stringify({ error: 'The agent is busy.', code: 'agent_busy' }), { status: 409, headers: { 'content-type': 'application/json' } })) : real(u, o); window.__realFetch = real; return true; })()`);
                 await ev(`(() => { const i = document.getElementById('command-input'); i.focus(); i.value = 'Again please'; i.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('[data-on-click="cmd-send"]').click(); return true; })()`);
-                await wait(1500); // sleep-ok: an announcement is timed; there is no event to wait for
+                await until(ev, /not sent|busy/i); // the failed send has been answered before the real fetch is put back
                 await ev(`window.fetch = window.__realFetch; true`);
             }, { must: [[/not sent|busy/i, 'the failure']] });
             // asleep, then woken
             await scene(`${tag}: the agent falls asleep and is woken`, async () => {
                 const feed = sleeping => ev(`(() => { window.__m.agents['rep-id'].sleeping = ${sleeping}; window.T.ws.handleCoralMessage({ type: 'coral_diff', changed: [{ ...window.__m.entry(window.__m.agents['rep-id']), session_id: 'rep-id' }] }); return true; })()`);
-                await feed(true); await wait(2500); // sleep-ok: an announcement is timed; there is no event to wait for
-                await feed(false); await wait(2500); // sleep-ok: an announcement is timed; there is no event to wait for
+                await feed(true); await wait(2500); // sleep-ok: the scenario's own pace (replies and states come over time), not a wait for an announcement (#352)
+                await feed(false); await wait(2500); // sleep-ok: the scenario's own pace (replies and states come over time), not a wait for an announcement (#352)
             });
             // notices
             await scene(`${tag}: warnings and the update notice`, async () => {
                 await ev(`(async () => { const u = await import(${S} + 'update_check.js'); u.showSecurityWarning('The data folder can be read by Users: move it to one only you can read.'); u.showFirewallWarning('Windows Firewall lets other computers reach Coral on every port.'); return true; })()`);
-                await wait(800); // sleep-ok: an announcement is timed; there is no event to wait for
             }, { must: [[/data folder can be read/, 'the security warning'], [/Windows Firewall lets/, 'the firewall warning']] });
             // a notice with no toast on screen: the Notifications column is not drawn then (no empty landmark), and its words must still be said (#6226: they were not, the regions sat inside it)
             await scene(`${tag}: a notice with no toast`, async () => {
                 await ev(`document.querySelectorAll('.toast, .update-toast').forEach(e => e.remove()); import(${S} + 'notifications.js').then(n => n.announceNotice('A computer came back online.')); true`);
-                await wait(1200); // sleep-ok: an announcement is timed; there is no event to wait for
             }, { must: [[/came back online/, 'a notice with no toast']] });
             await scene(`${tag}: toasts and notices`, async () => {
                 await ev(`(async () => { const n = await import(${S} + 'notifications.js'); n.showToast('Saved to the board.'); n.showToast('Could not reach the agent.', true); return true; })()`);
-                await wait(800); // sleep-ok: an announcement is timed; there is no event to wait for
             }, { must: [[/Saved to the board/, 'a toast'], [/Could not reach the agent/, 'an error toast']] });
             // the team's message box (#6239): a send is said once, and a send that fails says so and gives the words back
             await ev(`window.__m.add('board-agent', 'B', 3, { sleeping: false, board_project: 'ann-team' }); window.selectLiveSession('board-agent', 'claude', 'board-agent-id', 'local'); true`);
@@ -89,7 +84,7 @@ const S = `(window.__coralStatic || '/static/')`;
             await ev(`(() => { const inner = window.fetch; window.__boardPost = 201; window.fetch = (u, o = {}) => { const url = String(u && u.url || u); if ((o.method || 'GET').toUpperCase() === 'POST' && /\\/api\\/board\\/[^/]+\\/messages(\\?|$)/.test(url)) return Promise.resolve(new Response(JSON.stringify({ id: 1 }), { status: window.__boardPost, headers: { 'content-type': 'application/json' } })); return inner(u, o); }; return true; })()`);
             const boardSend = async text => {
                 await ev(`(() => { const i = document.getElementById('board-panel-input'); i.focus(); i.value = ${JSON.stringify(text)}; i.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('#board-chat-input-pane .btn-send').click(); return true; })()`);
-                await wait(1200); // sleep-ok: an announcement is timed; there is no event to wait for
+                await until(ev, /Message sent|Could not send/i); // the send has been answered
             };
             await scene(`${tag}: a board message is sent`, async () => { await boardSend('Ship it when green.'); }, { must: [[/Message sent/i, 'Message sent']] });
             await scene(`${tag}: a board message fails to send`, async () => {
