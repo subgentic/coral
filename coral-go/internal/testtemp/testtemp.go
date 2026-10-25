@@ -21,7 +21,32 @@ import (
 
 // Use points TMPDIR, TMP, TEMP, HOME, USERPROFILE and CORAL_DATA_DIR at a new folder for the rest of the process and returns the func that removes it. A test that sets one of them
 // itself (t.Setenv) still can. If the folder can't be made it changes nothing.
+//
+// It acts only in the process `go test` started (or a runner that passes the same flag, tools/go_test_shard.py): a test that re-runs its own binary as a helper child (51 test files do:
+// coral-board's runBoardInput, the fake CLIs, the hook echoes) hands that child exactly the environment it means it to have, and the child's own TestMain must not replace it. `go test`
+// always gives the test binary -test.paniconexit0; a helper child started with just -test.run=... does not (QA, #177).
 func Use() (cleanup func()) {
+	if !startedByGoTest(os.Args) || os.Getenv(Marker) != "" {
+		return func() {}
+	}
+	return setup()
+}
+
+// Marker is set (to the private folder) by the process that made the private world. A child that inherits it, whatever its arguments, changes nothing. Its name starts with none of the
+// prefixes a helper strips from the environment it hands its child (CORAL_, TMUX, HOME).
+const Marker = "TESTTEMP_ACTIVE"
+
+// startedByGoTest reports whether args are those `go test` gives a test binary (it always adds -test.paniconexit0).
+func startedByGoTest(args []string) bool {
+	for _, a := range args {
+		if a == "-test.paniconexit0" {
+			return true
+		}
+	}
+	return false
+}
+
+func setup() (cleanup func()) {
 	pinGoTool()
 	dir, err := os.MkdirTemp("", "ct-")
 	if err != nil {
@@ -34,10 +59,11 @@ func Use() (cleanup func()) {
 			return func() {}
 		}
 	}
+	os.Setenv(Marker, dir)
 	for k, v := range map[string]string{"TMPDIR": tmp, "TMP": tmp, "TEMP": tmp, "HOME": home, "USERPROFILE": home, "CORAL_DATA_DIR": data} {
 		os.Setenv(k, v)
 	}
-	return func() { os.RemoveAll(dir) }
+	return func() { os.Unsetenv(Marker); os.RemoveAll(dir) }
 }
 
 // Run is a TestMain body: the package's tests in a private world, whose exit code it returns (os.Exit(testtemp.Run(m))).

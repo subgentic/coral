@@ -1,6 +1,7 @@
 package testtemp
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -21,7 +22,7 @@ func TestUsePointsTheTempFolderAtANewFolderAndRemovesIt(t *testing.T) {
 			os.Setenv(k, v)
 		}
 	})
-	cleanup := Use()
+	cleanup := setup()
 	dir := os.TempDir()
 	require.NotEqual(t, before["TMP"], os.Getenv("TMP"))
 	dir = filepath.Clean(dir)
@@ -50,4 +51,57 @@ func TestUsePointsTheTempFolderAtANewFolderAndRemovesIt(t *testing.T) {
 	cleanup()
 	_, err = os.Stat(root)
 	assert.True(t, os.IsNotExist(err), "the folder is removed")
+}
+
+// A helper child (the test binary re-run with just -test.run=...) is not the process `go test` started: it keeps the environment its parent gave it.
+func TestOnlyTheProcessGoTestStartedGetsAPrivateWorld(t *testing.T) {
+	assert.True(t, startedByGoTest([]string{"x.test.exe", "-test.paniconexit0", "-test.timeout=10m0s", "-test.count=1"}))
+	assert.False(t, startedByGoTest([]string{"x.test.exe", "-test.run=^TestHelperRunBoard$"}), "a helper child")
+	assert.False(t, startedByGoTest([]string{"x.test.exe"}))
+	assert.False(t, startedByGoTest(nil))
+}
+
+// TestHelperUse is the child: it calls Use the way a generated TestMain does and says what environment it ends up with.
+func TestHelperUse(t *testing.T) {
+	if os.Getenv("TESTTEMP_HELPER") != "1" {
+		t.Skip("run by TestAHelperChildKeepsTheEnvironmentItsParentGaveIt")
+	}
+	cleanup := Use()
+	defer cleanup()
+	fmt.Printf("RESULT data=%s home=%s\n", os.Getenv("CORAL_DATA_DIR"), os.Getenv("HOME"))
+}
+
+// The way coral-board's runBoardInput runs its helper: the test binary again, with only -test.run, an environment filtered of CORAL_*, TMUX* and HOME and then given explicit values.
+// The child's Use must leave those values alone (QA's cause of #177's failures); the same child started with go test's flag and no marker would be changed.
+func TestAHelperChildKeepsTheEnvironmentItsParentGaveIt(t *testing.T) {
+	data, home := t.TempDir(), t.TempDir()
+	run := func(extraArg string, env ...string) string {
+		args := []string{"-test.run=^TestHelperUse$", "-test.v"}
+		if extraArg != "" {
+			args = append(args, extraArg)
+		}
+		cmd := exec.Command(os.Args[0], args...)
+		for _, kv := range os.Environ() {
+			if !strings.HasPrefix(kv, "CORAL_") && !strings.HasPrefix(kv, "TMUX") && !strings.HasPrefix(kv, "HOME=") {
+				cmd.Env = append(cmd.Env, kv)
+			}
+		}
+		cmd.Env = append(cmd.Env, "TESTTEMP_HELPER=1", "CORAL_DATA_DIR="+data, "HOME="+home)
+		cmd.Env = append(cmd.Env, env...)
+		out, err := cmd.CombinedOutput()
+		require.NoError(t, err, string(out))
+		for _, l := range strings.Split(string(out), "\n") {
+			if strings.HasPrefix(l, "RESULT ") {
+				return strings.TrimSpace(l)
+			}
+		}
+		t.Fatalf("no result in %s", out)
+		return ""
+	}
+	want := fmt.Sprintf("RESULT data=%s home=%s", data, home)
+	assert.Equal(t, want, run(""), "a helper child, as runBoardInput starts it, keeps what its parent passed")
+	// Even a child that has go test's flag keeps it when the marker came through.
+	assert.Equal(t, want, run("-test.paniconexit0", Marker+"=/somewhere"), "the marker stops a second private world")
+	// Without the marker, a process go test started does make its own: the values differ.
+	assert.NotEqual(t, want, run("-test.paniconexit0"), "a top-level test process gets its own")
 }

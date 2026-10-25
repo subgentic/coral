@@ -304,7 +304,7 @@ func TestSubprocess_EndpointInitialization(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd := exec.Command(os.Args[0], "-test.run=^TestSubprocess_EndpointInitialization$")
+			cmd := exec.CommandContext(helperCtx(t), os.Args[0], "-test.run=^TestSubprocess_EndpointInitialization$")
 			cmd.Env = append(os.Environ(),
 				"TEST_SUBPROCESS_ENDPOINT=1",
 				"CORAL_DATA_DIR="+t.TempDir(), "CORAL_DIR=", // an empty data folder: the running Coral's lock file is not read

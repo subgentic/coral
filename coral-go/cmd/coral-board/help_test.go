@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"github.com/stretchr/testify/assert"
@@ -14,6 +15,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 // TestHelperRunBoard runs main() with the arguments in CORAL_BOARD_ARGS when
@@ -59,7 +61,7 @@ func runBoardEnv(t *testing.T, serverURL, dataDir string, env []string, args ...
 func runBoardInput(t *testing.T, serverURL, dataDir string, stdin io.Reader, args ...string) boardRun {
 	t.Helper()
 	encoded, _ := json.Marshal(args)
-	cmd := exec.Command(os.Args[0], "-test.run=^TestHelperRunBoard$")
+	cmd := exec.CommandContext(helperCtx(t), os.Args[0], "-test.run=^TestHelperRunBoard$")
 	for _, kv := range os.Environ() {
 		if !strings.HasPrefix(kv, "CORAL_") && !strings.HasPrefix(kv, "TMUX") && !strings.HasPrefix(kv, "HOME=") {
 			cmd.Env = append(cmd.Env, kv)
@@ -285,4 +287,13 @@ func TestHelpIsOrganisedForAnAgent(t *testing.T) {
 	topic := runBoard(t, srv.URL, dataDir, "help", "timeouts").stdout
 	assert.NotContains(t, topic, "task complete", "an example that changes a task is not copied")
 	assert.Contains(t, topic, "check the result")
+}
+
+// helperCtx is the deadline of a helper child (the test binary re-run): a child that never exits fails the test at 60 s and is killed with its context, instead of holding the package to the
+// 45-minute limit (#177: TestExitCodesByFailure waited in cmd.Run for ever).
+func helperCtx(t *testing.T) context.Context {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	t.Cleanup(cancel)
+	return ctx
 }
