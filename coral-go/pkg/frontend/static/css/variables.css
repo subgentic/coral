@@ -94,6 +94,7 @@
     --sh-decorator: #c678dd;
 
     /* Diff */
+    --diff-view-alpha: 0.24; /* how strong the file viewer's added and removed blocks are (the light theme softens them) */
     --diff-add-bg:    rgba(74, 186, 96, 0.15);
     --diff-add-color: #4aba60;
     --diff-del-bg:    rgba(224, 85, 69, 0.15);
@@ -282,6 +283,7 @@
     --sh-decorator: #8250df;
 
     /* Diff */
+    --diff-view-alpha: 0.14;
     --diff-add-bg:    rgba(26, 127, 55, 0.12);
     --diff-add-color: #1a7f37;
     --diff-del-bg:    rgba(207, 34, 46, 0.12);

@@ -4,6 +4,7 @@
 import { state } from './state.js';
 import { showToast, sanitizeMarkdown } from './utils.js';
 import { serverFetch, serverForSession } from './server_base.js';
+import { whenText } from './when_text.js';
 import { currentServer, pathId } from './server_base.js';
 
 let _notes = [];      // { id, content, created_at, updated_at }, newest first (the server's order)
@@ -43,10 +44,11 @@ function showCount() {
 
 function when(note) {
     const d = new Date(note.created_at);
-    const at = Number.isNaN(d.getTime()) ? '' : d.toLocaleString();
+    const ok = !Number.isNaN(d.getTime());
     const u = new Date(note.updated_at);
-    const edited = !Number.isNaN(u.getTime()) && !Number.isNaN(d.getTime()) && u - d >= 2000;
-    return { text: at ? `${at}${edited ? ' · edited' : ''}` : 'Note', title: at };
+    const edited = ok && !Number.isNaN(u.getTime()) && u - d >= 2000;
+    // The page's one way of saying when ("2 min ago", "today 2:32 PM"), the exact time as the title (#7653).
+    return { text: ok ? `${whenText(note.created_at)}${edited ? ' · edited' : ''}` : 'Note', title: ok ? d.toLocaleString() : '' };
 }
 
 function renderNotes() {
@@ -58,7 +60,7 @@ function renderNotes() {
     editor.style.display = 'none';
     if (editor.parentElement !== list.parentElement) list.after(editor);
     const items = [];
-    const add = el('button', 'note-add', _notes.length ? 'Add a note' : 'Add notes');
+    const add = el('button', _notes.length ? 'btn btn-small note-add-small' : 'note-add', _notes.length ? 'Add a note' : 'Add notes'); // with a note on the page, the normal small button
     add.type = 'button'; add.setAttribute('aria-label', 'Add a note');
     add.addEventListener('click', () => startEdit('new'));
     items.push(add);

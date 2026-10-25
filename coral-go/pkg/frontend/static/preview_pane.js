@@ -736,13 +736,18 @@ function _cmHost(body) {
     return mount;
 }
 
+/** The editor's colours follow the page's theme (#7654): CodeMirror's own light look in the light theme, One Dark only in the dark one. Taken when the editor is made, as each file or tab opens it afresh. */
+function _cmTheme(cm) {
+    return document.documentElement.getAttribute('data-theme') === 'light' ? [] : [cm.oneDark];
+}
+
 function _mountEditor(tab, body) {
     const cm = getCm();
     if (cm) {
         try {
             const host = _cmHost(body);
             const extensions = [
-                cm.basicSetup, cm.oneDark, cm.search(), cm.EditorView.lineWrapping,
+                cm.basicSetup, ..._cmTheme(cm), cm.search(), cm.EditorView.lineWrapping,
                 cm.EditorView.theme({ '&': { height: '100%' }, '.cm-scroller': { overflow: 'auto' } }),
                 cm.EditorView.updateListener.of(u => {
                     if (!u.docChanged) return;
@@ -795,7 +800,7 @@ async function _mountDiff(tab, body, current) {
         try {
             const host = _cmHost(body);
             const extensions = [
-                cm.basicSetup, cm.oneDark, cm.EditorView.lineWrapping,
+                cm.basicSetup, ..._cmTheme(cm), cm.EditorView.lineWrapping,
                 cm.EditorView.editable.of(false), cm.EditorState.readOnly.of(true),
                 cm.EditorView.theme({ '&': { height: '100%' }, '.cm-scroller': { overflow: 'auto' } }),
                 // diffConfig: the merge view's own scanLimit would otherwise return one chunk.

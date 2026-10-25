@@ -1876,11 +1876,11 @@ body.panel-dragging .agentic-state {
    Used by the preview pane's Diff mode. */
 .inline-preview-cm .cm-merge-b .cm-changedLine,
 .inline-preview-cm .cm-inlineChangedLine {
-    background-color: rgba(var(--fx-green-rgb), 0.24) !important;
+    background-color: rgba(var(--fx-green-rgb), var(--diff-view-alpha, 0.24)) !important;
 }
 
 .inline-preview-cm .cm-deletedChunk {
-    background-color: rgba(var(--fx-red-rgb), 0.24) !important;
+    background-color: rgba(var(--fx-red-rgb), var(--diff-view-alpha, 0.24)) !important;
 }
 
 .inline-preview-cm .cm-changedText,
@@ -2021,6 +2021,7 @@ body.panel-dragging .agentic-state {
 .note-md-rendered:focus-visible, .note-add:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .note-add { align-self: flex-start; padding: var(--space-xs) var(--space-md); min-height: 32px; border: 1px dashed var(--control-border); border-radius: var(--radius-md); background: none; color: var(--text-secondary); font: 500 var(--fs-md)/1.4 var(--font-sans); cursor: pointer; }
 .note-add:hover { color: var(--text-primary); background: var(--bg-hover); }
+.note-add-small { align-self: flex-start; }
 @media (pointer: coarse) { .note-add { min-height: var(--control-touch-height, 44px); } }
 
 .note-md-editor {
@@ -2478,6 +2479,9 @@ body.panel-dragging .agentic-state {
 .list-bar-menu-inline:has(> .list-bar-group) { flex-direction: row; flex-wrap: wrap; align-items: center; column-gap: 8px; }
 .list-bar-menu-inline:has(> .list-bar-group) > :not(.list-bar-group) { flex: 0 0 100%; }
 .list-bar-menu-inline > .list-bar-group { flex: 0 0 calc(50% - 4px); min-width: 0; }
+.list-bar-menu-inline .list-bar-group { flex-wrap: nowrap; }
+.list-bar-menu-inline .list-bar-group > .list-bar-field-label { flex: 1 1 auto; min-width: 0; }
+.list-bar-menu-inline .list-bar-group > :last-child:not(.list-bar-field-label) { flex: none; width: auto; } /* the box beside its words, not a column of its own */
 .list-bar-expand-all[hidden] { display: none; }
 @media (pointer: coarse) { .list-bar-toggle, .list-bar-expand-all { min-width: 44px; min-height: 44px; } }
 

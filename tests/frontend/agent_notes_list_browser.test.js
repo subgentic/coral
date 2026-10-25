@@ -7,7 +7,7 @@ const { connect } = require('./agent_view_harness');
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const S = `(window.__coralStatic || '/static/')`;
-    const cards = () => ev(`[...document.querySelectorAll('#note-md-rendered .note-card')].map(c => ({ time: c.querySelector('.note-card-time').textContent, text: c.querySelector('.note-card-body').textContent.trim() }))`);
+    const cards = () => ev(`[...document.querySelectorAll('#note-md-rendered .note-card')].map(c => ({ time: c.querySelector('.note-card-time').textContent, title: c.querySelector('.note-card-time').title, text: c.querySelector('.note-card-body').textContent.trim() }))`);
     const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const count = () => ev(`document.getElementById('note-bar-count').textContent`);
     try {
@@ -29,7 +29,8 @@ const { connect } = require('./agent_view_harness');
         await waitFor(`document.querySelectorAll('#note-md-rendered .note-card').length === 3`, 'three cards', 5000);
         let c = await cards();
         assert.deepEqual(c.map(x => x.text), ['third note', 'second note', 'first note'], 'every note, newest first');
-        assert.ok(c.every(x => /\d/.test(x.time)), 'each shows its time: ' + JSON.stringify(c));
+        assert.ok(c.every(x => /^(just now|\d+ min ago|today |yesterday )/.test(x.time) && /\d/.test(x.title)), 'each shows when in the page\'s words, the exact time as its title: ' + JSON.stringify(c));
+        assert.equal(await ev(`document.querySelector('#note-md-rendered .note-add-small').classList.contains('btn-small')`), true, 'with notes, Add a note is the normal small button');
         assert.equal(await count(), '3', 'the badge counts them');
         console.log('   ✓ three notes listed newest first with their times, badge 3');
         await shot('notes-list');
@@ -45,7 +46,7 @@ const { connect } = require('./agent_view_harness');
         console.log('   ✓ a note edits in its own card and saves');
 
         // add another
-        await ev(`document.querySelector('#note-md-rendered .note-add').click(); true`);
+        await ev(`document.querySelector('#note-md-rendered .note-add-small').click(); true`);
         await waitFor(`document.activeElement === document.getElementById('note-md-editor')`, 'the editor for a new note', 4000);
         await ev(`(() => { const e = document.getElementById('note-md-editor'); e.value = 'fourth note'; e.blur(); return true; })()`);
         await waitFor(`document.querySelectorAll('#note-md-rendered .note-card').length === 4`, 'four cards', 5000);

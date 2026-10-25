@@ -7,11 +7,11 @@
 
 .cm-merge-b .cm-changedLine,
 .cm-inlineChangedLine {
-    background-color: rgba(var(--fx-green-rgb), 0.24) !important;
+    background-color: rgba(var(--fx-green-rgb), var(--diff-view-alpha, 0.24)) !important;
 }
 
 .cm-deletedChunk {
-    background-color: rgba(var(--fx-red-rgb), 0.24) !important;
+    background-color: rgba(var(--fx-red-rgb), var(--diff-view-alpha, 0.24)) !important;
 }
 
 .cm-changedText,
