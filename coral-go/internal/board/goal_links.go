@@ -150,10 +150,12 @@ func (s *Store) GoalLinks(ctx context.Context, requestID, server, boardID, curso
 		reply.NextCursor = &c
 	}
 	for _, r := range rows {
-		title := boundText(r.Title, GoalLinksTitleMax, GoalLinksTitleBytes)
+		// Redact the WHOLE title first, then cut: cutting first could leave the front of a secret that straddles the bound, which no rule would then recognise (#7464).
+		title := r.Title
 		if redact != nil {
-			title = boundText(redact(title), GoalLinksTitleMax, GoalLinksTitleBytes)
+			title = redact(title)
 		}
+		title = boundText(title, GoalLinksTitleMax, GoalLinksTitleBytes)
 		reply.Accepted = append(reply.Accepted, GoalLinkRow{
 			RequestID: requestID, Board: r.Board, GoalUID: r.GoalUID, TaskID: r.TaskID, TaskStatus: r.TaskStatus, RequestState: GoalRequestAccepted,
 			AcceptedAt: rfc3339UTC(r.AcceptedAt), Title: title, Assignee: boundText(r.Assignee, GoalLinksAssigneeMax, GoalLinksAssigneeBytes), UpdatedAt: rfc3339UTC(r.UpdatedAt),
