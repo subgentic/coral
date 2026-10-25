@@ -629,7 +629,7 @@ func (o *IdentityObserver) AgentOperatorAction(r *http.Request, action string) b
 
 // acrossBoards: the requests an agent may make on a board its session isn't subscribed on
 // (#3869): joining it, and a cross-team send to it (whose handler checks that the sender is
-// an active Orchestrator of the board it sends from, in its own session).
+// an active Orchestrator of the board it sends from, in its own session), and a goal request to another team (#7361: the same, the handler holds the caller to the board it names as its own).
 func acrossBoards(method, tail string) bool {
-	return method == http.MethodPost && (tail == "subscribe" || tail == "external-messages")
+	return method == http.MethodPost && (tail == "subscribe" || tail == "external-messages" || tail == "goal-requests")
 }
