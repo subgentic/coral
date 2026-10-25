@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -48,27 +49,47 @@ func TestNoReleasedProgramLinksTheRehearsalOrAFakeSigstore(t *testing.T) {
 	}
 	root := goRoot(t)
 	banned := []string{"/internal/updater/testrig", "github.com/sigstore/sigstore-go/pkg/testing"}
-	checked := 0
+	programs := releasedPrograms(t)
+	// Every go list is independent of the others: they run together, a few at a time (#354: 36 of them one after another were 55 s), and are judged in order afterwards.
+	type job struct{ goos, tags, prog string }
+	var jobs []job
 	for _, goos := range []string{"linux", "darwin", "windows"} {
 		for _, tags := range []string{"fts5", "fts5,dev", "fts5,beta", "fts5,dropboxers"} {
-			for _, prog := range releasedPrograms(t) {
-				dir := filepath.Join(root, "cmd", prog)
-				if _, err := os.Stat(dir); err != nil {
+			for _, prog := range programs {
+				if _, err := os.Stat(filepath.Join(root, "cmd", prog)); err != nil {
 					continue
 				}
-				cmd := exec.Command("go", "list", "-deps", "-tags", tags, "-f", "{{.ImportPath}}", "./cmd/"+prog)
-				cmd.Dir = root
-				cmd.Env = append(os.Environ(), "GOOS="+goos, "GOARCH=amd64", "CGO_ENABLED=0")
-				out, err := cmd.CombinedOutput()
-				if err != nil {
-					continue // a program that does not build without cgo on this platform (the GUI ones) is checked where it does
-				}
-				checked++
-				for _, imp := range strings.Fields(string(out)) {
-					for _, b := range banned {
-						assert.False(t, strings.Contains(imp, b), "%s (%s, %s) links %s", prog, goos, tags, imp)
-					}
-				}
+				jobs = append(jobs, job{goos, tags, prog})
+			}
+		}
+	}
+	outs := make([]string, len(jobs))
+	oks := make([]bool, len(jobs))
+	sem := make(chan struct{}, 6)
+	var wg sync.WaitGroup
+	for k, j := range jobs {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func() {
+			defer wg.Done()
+			defer func() { <-sem }()
+			cmd := exec.Command("go", "list", "-deps", "-tags", j.tags, "-f", "{{.ImportPath}}", "./cmd/"+j.prog)
+			cmd.Dir = root
+			cmd.Env = append(os.Environ(), "GOOS="+j.goos, "GOARCH=amd64", "CGO_ENABLED=0")
+			out, err := cmd.CombinedOutput()
+			outs[k], oks[k] = string(out), err == nil // an error: a program that does not build without cgo on this platform (the GUI ones) is checked where it does
+		}()
+	}
+	wg.Wait()
+	checked := 0
+	for k, j := range jobs {
+		if !oks[k] {
+			continue
+		}
+		checked++
+		for _, imp := range strings.Fields(outs[k]) {
+			for _, b := range banned {
+				assert.False(t, strings.Contains(imp, b), "%s (%s, %s) links %s", j.prog, j.goos, j.tags, imp)
 			}
 		}
 	}
