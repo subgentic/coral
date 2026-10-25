@@ -3,7 +3,7 @@
 // name, the dialog is modal and named, and each step is said once in a polite status. Controls by role and name (helpers/new_agent.js). 1280 px, isolated dev server; the phone and 200% views are in new_agent_dialog_size.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
-const { install: installNA, N, openNewAgent, scenarios } = require('./helpers/new_agent');
+const { install: installNA, N, openNewAgent, scenarios, stubModels } = require('./helpers/new_agent');
 const BASE = require('./test_base').BASE;
 
 (async () => {
@@ -24,6 +24,7 @@ const BASE = require('./test_base').BASE;
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installNA(ev);
+        await stubModels(ev); // the account's own list (the real server's is the built-in one, which the Thinking control waits out: only Default is offered until the list is known, #7476)
         await openNewAgent(ev, waitFor).catch(() => {});
 
         await S.run('the dialog is modal and named: role=dialog, aria-modal=true, name "New agent", and the keyboard starts inside it', async () => {

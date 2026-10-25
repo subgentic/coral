@@ -11,8 +11,7 @@ const { _acfServer } = await importOnce('./launch_models.js');
 
 const OTHER = '__other';
 const ADD = '__add';
-const POLL_MS = 3000;
-const POLL_MAX = 5;
+export const pollHooks = { ms: 3000, max: 5, fetchMs: 20000 }; // polling while the CLI refreshes the list; how long one answer may take (a suite shortens them)
 
 const models_has = (container, v) => (container._modelList || []).some(m => m.value === v.trim());   // a value the list already names
 
@@ -86,7 +85,10 @@ export function syncModelPicker(container, fromCode = true) {
 async function fetchList(container, agentType, { refresh = false } = {}) {
     const server = _acfServer(container);
     const url = `/api/agents/models${refresh ? '/refresh' : ''}?type=${encodeURIComponent(agentType)}`;
-    const resp = await serverFetch(server, url, refresh ? { method: 'POST' } : undefined);
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), pollHooks.fetchMs); // an answer that never comes ends the wait (#7476)
+    let resp;
+    try { resp = await serverFetch(server, url, { ...(refresh ? { method: 'POST' } : {}), signal: ctrl.signal }); } finally { clearTimeout(timer); }
     if (refresh && resp.status === 429) { showToast('The list was just refreshed. Try again in 30 seconds.', true); return null; }
     if (refresh && (resp.status === 401 || resp.status === 403)) { showToast('Only the operator can refresh the model list.', true); return null; }
     if (!resp.ok) return null;
@@ -114,13 +116,22 @@ export async function loadModelPicker(container, agentType) {
     if (cached) fill(container, agentType, cached); else { wrap.hidden = true; if (input) input.hidden = false; }
     const server = _acfServer(container); // #5996: a hub grantee cannot add models
     if (familyOf(agentType)) probeCanAdd(server, () => { if (container._modelToken === token && container.isConnected) select.querySelector(`option[value="${ADD}"]`)?.remove(); });
-    for (let i = 0; i <= POLL_MAX; i++) {
+    for (let i = 0; i <= pollHooks.max; i++) {
         let refreshing = false;
         try { refreshing = applyAnswer(container, agentType, await fetchList(container, agentType)); } catch { /* keep what is shown */ }
-        if (!refreshing || container._modelToken !== token || !container.isConnected) return;
-        await new Promise(r => setTimeout(r, POLL_MS));
+        if (container._modelToken !== token || !container.isConnected) return;
+        if (!refreshing) { if (container._thinkingPending) endPending(container); return; }
+        await new Promise(r => setTimeout(r, pollHooks.ms));
         if (container._modelToken !== token || !container.isConnected) return;
     }
+    endPending(container); // the CLI never said the list was its own: stop waiting
+}
+
+/** The wait for the account's models is over without an answer: draw the levels the built-in list has, less the ones only some models take (Minimal), so the control is never left empty (#7476). */
+function endPending(container) {
+    container._thinkingPending = false;
+    container._thinkingLevels = (container._thinkingLevels || []).filter(l => l !== 'minimal');
+    syncThinking(container);
 }
 
 /** "Add a model…": the small form under the list (shared with the model chip's menu, custom_model_add.js). A new model goes in the operator's custom models and is chosen for this form. */
@@ -228,10 +239,8 @@ export function syncThinking(container) {
     const efforts = hit && hit.custom === true ? (Array.isArray(hit.efforts) ? hit.efforts : []) : (hit && Array.isArray(hit.efforts) && hit.efforts.length ? hit.efforts : null);
     const allowed = efforts ? typeLevels.filter(l => efforts.includes(l)) : typeLevels;
     if (!allowed.length) { wrap.hidden = true; if (note) note.textContent = ''; container.dispatchEvent(new Event('acf-synced', { bubbles: true })); return; } // (a summary of the form follows it showing or hiding)
-    // While the model list is still the built-in one no level is offered, not even for a frame: a level the account's models lack (Minimal) would show and then vanish. The control keeps its place, empty and disabled (#7476).
-    select.disabled = !!container._thinkingPending;
-    wrap.classList.toggle('acf-thinking-pending', !!container._thinkingPending);
-    if (container._thinkingPending) { select.innerHTML = ''; wrap.hidden = false; if (note) note.textContent = ''; container.dispatchEvent(new Event('acf-synced', { bubbles: true })); return; }
+    // While the model list is still the built-in one only Default is offered, with "Checking levels…" beside it: a level the account's models lack (Minimal) would show and then vanish, not even for a frame (#7476).
+    if (container._thinkingPending) { select.innerHTML = '<option value="">Default</option>'; select.value = ''; wrap.hidden = false; if (note) note.textContent = 'Checking levels…'; container.dispatchEvent(new Event('acf-synced', { bubbles: true })); return; }
     const wanted = container._thinkingWanted !== undefined ? container._thinkingWanted : select.value;
     select.innerHTML = `<option value="">Default</option>` + allowed.map(l => `<option value="${escapeAttr(l)}">${escapeHtml(LEVEL_NAMES[l] || l)}</option>`).join('');
     const keep = wanted === '' || allowed.includes(wanted);
