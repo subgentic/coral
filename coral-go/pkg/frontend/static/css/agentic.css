@@ -1635,10 +1635,8 @@ body.panel-dragging .agentic-state {
 
 .changed-files-title {
     font-size: 0.75rem;
-    font-weight: 600;
+    font-weight: 500; /* sentence case at 12/500, as the tab labels (UI/UX #7621): "0 files changed", not capitals */
     color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
 }
 
 .diff-mode-select {
