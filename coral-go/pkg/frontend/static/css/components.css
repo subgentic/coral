@@ -4788,3 +4788,5 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
     #launch-modal .modal-content.launch-wizard-content.launch-team-content, #team-agent-modal .modal-content.restart-wizard-content { height: 100dvh; }
 }
+
+.team-launch-health { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; } /* the health panel's layout in the launch dialog (the Team settings form's class is not used here) */

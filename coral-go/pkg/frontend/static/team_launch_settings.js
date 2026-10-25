@@ -32,6 +32,9 @@ function messagingHTML() {
 const pane = name => document.querySelector(`#team-settings-panes [data-section="${name}"]`);
 const healthForm = () => pane('health')?.querySelector('form');
 
+// A closed dialog holds no health form: other dialogs' scripts and tests look for a form by its class, and a hidden copy would be found first.
+document.addEventListener('launch-modal-hidden', () => { for (const name of ['workflow', 'health', 'messaging']) { const p = pane(name); if (p) p.replaceChildren(); } });
+
 /** Draw the three tabs with their defaults (every time the team dialog opens: nothing from the last team stays) and build the section list once. */
 export function mountTeamLaunchSettings() {
     const wf = pane('workflow'), hc = pane('health'), ms = pane('messaging');
@@ -44,7 +47,10 @@ export function mountTeamLaunchSettings() {
     if (rcpt) { rcpt.value = ''; const label = rcpt.closest('label'); if (label) label.hidden = true; }
     const why = hc.querySelector('#hc-on-h'); if (why) why.textContent = 'Checks in on the team every few minutes. Sent to the Orchestrator. Uses tokens each time.';
     bindInfo(hc);
-    wireHealthForm(hc.querySelector('form'));
+    const hform = hc.querySelector('form');
+    hform.classList.remove('working-mode-form'); hform.classList.add('team-launch-health'); // not the Team settings dialog's form: that name is looked up page-wide
+    hform.addEventListener('submit', e => e.preventDefault()); // there is no Save here: Launch team saves it
+    wireHealthForm(hform);
     ms.innerHTML = messagingHTML();
     for (const id of ['team-goal', 'team-custom-instructions']) { const el = document.getElementById(id); if (el) el.value = ''; }
     const shell = document.querySelector('#launch-step-team .settings-shell');
