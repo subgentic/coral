@@ -4831,6 +4831,7 @@ body:has(#nav-tab-hub-inbox.active) #saved-btn .saved-count { display: none; }
 /* Segmented controls and cards drawn over a select (segmented.js). */
 select.seg-source { display: none; } /* (.modal-content select is display: block, one class more specific than the class alone) */
 .seg-group { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--control-border); border-radius: var(--radius-md); overflow: hidden; margin: 2px 0 8px; }
+.acf-thinking-pending .seg-group { min-height: 38px; min-width: 120px; } /* the levels are not drawn until the model list is known; the control keeps its place (#7476) */
 .seg-btn { min-height: 36px; padding: 6px 16px; background: var(--bg-primary); color: var(--text-primary); border: 0; border-right: 1px solid var(--control-border); font: inherit; font-size: var(--fs-md); font-weight: 500; cursor: pointer; }
 .seg-btn:last-child { border-right: 0; }
 .seg-btn[aria-checked="true"] { background: var(--accent-dim); color: var(--text-on-accent); font-weight: 600; }

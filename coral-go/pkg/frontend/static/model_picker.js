@@ -39,18 +39,18 @@ export function modelPickerHtml() {
 function fill(container, agentType, data) {
     const { input, wrap, select, id, note } = parts(container);
     container._thinkingLevels = data && Array.isArray(data.thinking) ? data.thinking : [];   // the levels the server passes this type's CLI (#4969)
-    syncThinking(container);
+    container._thinkingPending = !!(data && data.refreshing); // the list is the built-in one until the CLI answers: its levels may not be the account's (#7476)
     if (!input || !wrap || !select) return;
     const models = (data && Array.isArray(data.models) ? data.models : []).filter(m => m && typeof m.value === 'string' && m.value);
     container._modelList = models;
-    if (!models.length) { wrap.hidden = true; input.hidden = false; return; }   // no list: the text box, as before
+    if (!models.length) { wrap.hidden = true; input.hidden = false; syncThinking(container); return; }   // no list: the text box, as before
     select.innerHTML = `<option value="">Default</option>`
         + models.map(m => `<option value="${escapeAttr(m.value)}">${escapeHtml((m.display_name || m.value) + (m.custom === true ? ' (custom)' : ''))}</option>`).join('')
         + `<option value="${escapeAttr(OTHER)}">Other…</option>`
         + (familyOf(agentType) && peekCanAdd(_acfServer(container)) !== false ? `<option value="${escapeAttr(ADD)}">Add a model…</option>` : '');
     wrap.hidden = false;
     if (note) note.textContent = data && data.error ? data.error : (data && data.refreshing ? 'Updating the list…' : '');
-    syncModelPicker(container);
+    syncModelPicker(container); // (it ends with syncThinking)
     if (id) id.hidden = false;
 }
 
@@ -228,6 +228,10 @@ export function syncThinking(container) {
     const efforts = hit && hit.custom === true ? (Array.isArray(hit.efforts) ? hit.efforts : []) : (hit && Array.isArray(hit.efforts) && hit.efforts.length ? hit.efforts : null);
     const allowed = efforts ? typeLevels.filter(l => efforts.includes(l)) : typeLevels;
     if (!allowed.length) { wrap.hidden = true; if (note) note.textContent = ''; container.dispatchEvent(new Event('acf-synced', { bubbles: true })); return; } // (a summary of the form follows it showing or hiding)
+    // While the model list is still the built-in one no level is offered, not even for a frame: a level the account's models lack (Minimal) would show and then vanish. The control keeps its place, empty and disabled (#7476).
+    select.disabled = !!container._thinkingPending;
+    wrap.classList.toggle('acf-thinking-pending', !!container._thinkingPending);
+    if (container._thinkingPending) { select.innerHTML = ''; wrap.hidden = false; if (note) note.textContent = ''; container.dispatchEvent(new Event('acf-synced', { bubbles: true })); return; }
     const wanted = container._thinkingWanted !== undefined ? container._thinkingWanted : select.value;
     select.innerHTML = `<option value="">Default</option>` + allowed.map(l => `<option value="${escapeAttr(l)}">${escapeHtml(LEVEL_NAMES[l] || l)}</option>`).join('');
     const keep = wanted === '' || allowed.includes(wanted);
@@ -241,6 +245,7 @@ export function syncThinking(container) {
 export function thinkingValue(container) {
     const { wrap, select } = thinkingParts(container);
     if (!wrap || !select || wrap.hidden || container.dataset.acfThinkingSet !== 'true') return undefined;
+    if (container._thinkingPending) return container._thinkingWanted; // the select is empty until the list is known; the level chosen or given stands
     return select.value;
 }
 
