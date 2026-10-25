@@ -17,7 +17,8 @@ assert.deepEqual(merged.goals.map(x => x.id), [2, 1], 'two pages as one list, ne
 assert.equal(toGoalList({ goals: [], no_goal_open: 3 }).noGoalOpen, 3, 'the open tasks that serve no goal'); assert.equal(toGoalList({ goals: [], no_goal_open: 0 }).noGoalOpen, 0); assert.equal(toGoalList({ goals: [] }).noGoalOpen, null, 'null while the route does not say');
 
 const t = toTask({ id: 7, title: 'Do it', assigned_to: 'goal-qa', status: 'in_progress', status_line: 'signing' });
-assert.deepEqual({ ...t, raw: undefined }, { id: 7, title: 'Do it', assignee: 'goal-qa', state: 'in_progress', statusLine: 'signing', sessionId: '', raw: undefined });
+assert.deepEqual({ ...t, raw: undefined }, { id: 7, title: 'Do it', assignee: 'goal-qa', workedBy: '', state: 'in_progress', statusLine: 'signing', sessionId: '', raw: undefined });
+assert.equal(toTask({ id: 8, title: 'Reviewed', assigned_to: 'Orchestrator', worked_by: 'Frontend Dev', status: 'completed' }).workedBy, 'Frontend Dev', 'who did the work is the server\'s worked_by, not the assignee (#7665)');
 assert.equal(toTask({ id: 8, assigned_to: null, status: 'pending', session_id: 'abc', goal_id: 4 }).sessionId, 'abc', 'the claiming session; a null assignee is empty');
 assert.equal(toTask({ id: 8, assigned_to: null }).assignee, '');
 assert.deepEqual(toTaskList({ tasks: [{ id: 9 }, { id: 3 }], next_cursor: '', totals: {} }).map(x => x.id), [3, 9], 'the page shape: tasks, sorted by number');

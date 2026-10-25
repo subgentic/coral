@@ -67,6 +67,9 @@ type Task struct {
 	GoalTitle string       `db:"-" json:"goal_title,omitempty"`
 	BlockedBy []TaskDep    `db:"-" json:"blocked_by,omitempty"`
 	Workflow  TaskWorkflow `db:"-" json:"workflow"`
+	// WorkedBy: who did the task's work, set where the workflow is read (finishWorkflow): the author a reviewed task was handed on from (a reviewed task is assigned to the orchestrator, #3725),
+	// else who completed it, else its assignee. Empty for a task nobody has. The views show it where they say who has a task or who did it.
+	WorkedBy string `db:"-" json:"worked_by,omitempty"`
 	// Verification: whether a completed task's "done" is backed by an independent check (#4563); set when the workflow is
 	// attached, for a completed task with outcome success only.
 	Verification *Verification `db:"-" json:"verification,omitempty"`
