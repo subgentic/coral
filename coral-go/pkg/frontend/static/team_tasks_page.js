@@ -1,17 +1,21 @@
 /* The team page's Tasks tab and a task's page (#7453): the right panel's Tasks tab moves here. The tab is a table of the whole team's tasks (Task, State, Assigned to, Goal, Priority) under filter chips with counts; a row's title opens the
  * task's own page (state, who, goal as a link, priority, description, when it started and ended), with a back link to the list (or to the goal it was opened from) and a pinned bar. Everything drawn is built with the DOM and
  * textContent: titles, bodies and names are written by agents. The task's own actions (Edit, Complete, Cancel, Publish, Nudge) stay in the task dialog for now ("Task actions"): they move onto this page with the Tasks build. Lazy: team_page.js imports it. */
-import { boardFetch, pathId } from './server_base.js';
+import { boardFetch, pathId, serverUrl, splitKey } from './server_base.js';
+import { browserLocal } from './safe_storage.js';
 import { whenText } from './when_text.js';
 import { importOnce } from './import_once.js';
 const { teamTable, rowButton, rowFocusTarget, stateChip, el } = await importOnce('./team_table.js'); // lazy: its failure is retried
 import { goalTitle, refreshGoalTitles, noGoalLabel } from './task_goals.js';
 import { taskStatusWord, statusClass } from './goal_words.js';
 import { state } from './state.js';
+const { buildTaskBar } = await importOnce('./task_bar.js'); // the old tab's search, filters and sort on the shared list bar (lazy: its failure is retried)
+const TF = await importOnce('./task_filters.js');
 
 const PAGE = 50;
 const FILTERS = [['all', 'All'], ['queued', 'Queued'], ['active', 'In progress'], ['blocked', 'Blocked'], ['review', 'In review'], ['done', 'Done']];
-const model = { project: '', moreLoaded: false, rows: [], cursor: '', totalOpen: null, totalDone: null, filter: 'all', loading: false, failed: '', loadingMore: false, moreFailed: '' };
+const emptyQuery = () => ({ rows: [], phase: 0, cursor: '', total: null, doneTotal: 0, truncated: false, busy: false, error: '' });
+const model = { project: '', filters: { ...TF.EMPTY }, q: emptyQuery(), seq: 0, moreLoaded: false, rows: [], cursor: '', totalOpen: null, totalDone: null, filter: 'all', loading: false, failed: '', loadingMore: false, moreFailed: '' };
 let root = null, hooks = {};
 const say = (t) => { const s = root && root.querySelector('.team-tasks-status'); if (s) { s.textContent = ''; s.textContent = t; } };
 const bucket = (t) => { const w = taskStatusWord(t.status, t.review_requested); return { 'Queued': 'queued', 'In progress': 'active', 'Blocked': 'blocked', 'In review': 'review', 'Done': 'done' }[w] || 'queued'; };
@@ -26,6 +30,7 @@ async function readJson(path) {
 /** Read the first page: every open task and the first of the done ones; "Load more" continues the done ones. */
 export async function loadTasks() {
     const project = model.project; if (!project) return;
+    if (TF.isQuery(model.filters)) return loadQuery(); // a search, a filter or an order the default list does not have: the task query
     model.loading = !model.rows.length;
     if (model.loading) draw();
     try {
@@ -50,6 +55,7 @@ export async function loadTasks() {
 }
 
 async function loadMore() {
+    if (TF.isQuery(model.filters)) return loadQuery({ append: true });
     if (!model.cursor || model.loadingMore) return;
     model.loadingMore = true; model.moreFailed = '';
     const before = model.rows.length;
@@ -67,19 +73,86 @@ async function loadMore() {
     first?.querySelector('.team-row-btn')?.focus();
 }
 
+// ── search, filters and sort (#4744): with one on, the tasks come from the task query (the server matches every task of the board, not the loaded page); "Open first" is the open tasks, then the done ones ──
+
+async function queryFetch(pairs) {
+    const { server, name } = splitKey(model.project);
+    const qs = new URLSearchParams(pairs.map(([k, v]) => [k, k === 'board' ? name : v])).toString();
+    const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), 20000);
+    try {
+        const r = await fetch(serverUrl(`/api/board/tasks?${qs}`, server), { signal: ctrl.signal });
+        if (!r.ok) { const err = new Error(`task search failed: ${r.status}`); err.status = r.status; throw err; }
+        return await r.json();
+    } finally { clearTimeout(timer); }
+}
+
+async function loadQuery({ append = false } = {}) {
+    const project = model.project, f = model.filters, ph = TF.phases(f), seq = ++model.seq;
+    if (!append) model.q = Object.assign(emptyQuery(), { busy: true }); else model.q.busy = true;
+    model.q.error = ''; model.loading = !append; model.loadingMore = append;
+    draw();
+    const L = model.q;
+    try {
+        if (append) {
+            let phase = L.phase;
+            if (ph && phase === 0 && !L.cursor) phase = 1;
+            const pairs = TF.toParams(f, project, { statuses: ph ? ph[phase] : null });
+            if (phase === L.phase && L.cursor) pairs.push(['cursor', L.cursor]);
+            const data = await queryFetch(pairs);
+            if (seq !== model.seq) return;
+            const seen = new Set(L.rows.map(t => t.id));
+            L.rows = L.rows.concat((data.tasks || []).filter(t => !seen.has(t.id))); L.cursor = data.next_cursor || ''; L.phase = phase; L.truncated = L.truncated || !!data.truncated;
+        } else if (ph) {
+            const [open, done] = await Promise.all([queryFetch(TF.toParams(f, project, { statuses: ph[0] })), queryFetch(TF.toParams(f, project, { statuses: ph[1], limit: 1 }))]);
+            if (seq !== model.seq) return;
+            L.rows = open.tasks || []; L.cursor = open.next_cursor || ''; L.phase = 0; L.doneTotal = done.total ?? 0; L.total = (open.total ?? L.rows.length) + L.doneTotal; L.truncated = !!(open.truncated || done.truncated);
+        } else {
+            const data = await queryFetch(TF.toParams(f, project));
+            if (seq !== model.seq) return;
+            L.rows = data.tasks || []; L.cursor = data.next_cursor || ''; L.total = data.total ?? L.rows.length; L.truncated = !!data.truncated; L.phase = 0;
+        }
+        await refreshGoalTitles(project).catch(() => {});
+    } catch (e) {
+        if (seq !== model.seq) return;
+        L.error = e && e.status === 400 ? 'This search can not be run. Change it and try again.' : 'Could not search the tasks. Try again.';
+    } finally {
+        if (seq === model.seq) { L.busy = false; model.loading = false; model.loadingMore = false; draw(); }
+    }
+}
+const queryHasMore = () => !!model.q.cursor || (!!TF.phases(model.filters) && model.q.phase === 0 && model.q.doneTotal > 0);
+
+let bar = null, barKey = '';
+function setFilters(next) {
+    model.filters = next;
+    TF.saveFilters(model.project, next, browserLocal);
+    loadTasks();
+}
+function ensureBar() {
+    if (bar && barKey === model.project) return;
+    barKey = model.project;
+    bar = buildTaskBar(setFilters, { onPanel: open => { try { browserLocal.set(`coral-list-bar-open:team-tasks:${model.project}`, open ? '1' : ''); } catch { /* the panel is shut next time */ } } });
+    bar.setOpen(browserLocal.get(`coral-list-bar-open:team-tasks:${model.project}`) === '1');
+}
+const rowsNow = () => (TF.isQuery(model.filters) ? model.q.rows : model.rows);
+
 const counts = () => {
     const c = { all: 0, queued: 0, active: 0, blocked: 0, review: 0, done: 0 };
-    for (const t of model.rows) { c.all++; c[bucket(t)]++; }
-    if (model.totalOpen != null && model.totalDone != null) c.all = model.totalOpen + model.totalDone;
-    if (model.totalDone != null) c.done = model.totalDone;
+    for (const t of rowsNow()) { c.all++; c[bucket(t)]++; }
+    if (!TF.isQuery(model.filters)) {
+        if (model.totalOpen != null && model.totalDone != null) c.all = model.totalOpen + model.totalDone;
+        if (model.totalDone != null) c.done = model.totalDone;
+    }
     return c;
 };
 
 function draw() {
     const body = root && root.querySelector('.team-tasks-body'); if (!body) return;
+    ensureBar();
     const a = document.activeElement;
-    const held = a && body.contains(a) ? { filter: a.dataset.filter, task: a.dataset.taskId, cls: a.className, text: a.textContent } : null;
-    body.replaceChildren();
+    const held = a && body.contains(a) && !bar.node.contains(a) ? { filter: a.dataset.filter, task: a.dataset.taskId, cls: a.className, text: a.textContent } : null;
+    for (const c of [...body.children]) if (c !== bar.node) c.remove();
+    if (bar.node.parentElement !== body) body.prepend(bar.node);
+    const query = TF.isQuery(model.filters), L = model.q, all = rowsNow(), failed = query ? L.error : model.failed;
     const c = counts();
     const chips = el('div', 'goals-chips goals-chips-row'); chips.setAttribute('role', 'group'); chips.setAttribute('aria-label', 'Show tasks that are');
     for (const [key, label] of FILTERS) {
@@ -88,21 +161,25 @@ function draw() {
         if (!c[key] && key !== 'all') b.classList.add('goals-chip-zero');
         chips.append(b);
     }
-    const bar = el('div', 'goals-toolbar'); bar.append(chips); body.append(bar);
+    const tools = el('div', 'goals-toolbar'); tools.append(chips, btn('btn btn-primary goals-new', 'New task', () => { (window.showCreateTaskModal || (() => {}))(); })); body.append(tools);
     chips.querySelector('[aria-pressed="true"]')?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
-    if (model.failed) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, model.failed), btn('btn btn-small', 'Try again', loadTasks)); body.append(f); }
+    const count = query && L.total != null && L.total > all.length ? `Showing ${all.length} of ${L.total}${L.truncated ? '+' : ''}` : `${all.length} task${all.length === 1 ? '' : 's'}`;
+    if (all.length && !model.loading) body.append(el('p', 'goals-note team-count-line', count));
+    if (failed) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, failed), btn('btn btn-small', 'Try again', loadTasks)); body.append(f); }
     if (model.loading) body.append(el('p', 'goals-note', 'Loading tasks…'));
-    else if (!model.rows.length) { if (!model.failed) { const e = el('div', 'goals-empty'); e.append(el('p', null, 'No tasks yet')); body.append(e); } }
+    else if (!all.length) { if (!failed) { const e = el('div', 'goals-empty'); e.append(el('p', null, query && TF.isFiltered(model.filters) ? 'No tasks match this search.' : 'No tasks yet')); body.append(e); } }
     else {
-        const shown = model.rows.filter(t => model.filter === 'all' || bucket(t) === model.filter);
+        const shown = all.filter(t => model.filter === 'all' || bucket(t) === model.filter);
         if (!shown.length) {
             const e = el('div', 'goals-empty'); e.append(el('p', null, 'No tasks match this filter.'), btn('btn', 'Show all', () => { model.filter = 'all'; draw(); })); body.append(e);
         } else {
             body.append(teamTable({ label: `Tasks, ${shown.length}`, columns: ['Task', 'State', 'Assigned to', 'Goal', 'Priority'], rows: shown.map(rowOf) }));
         }
-        if (model.cursor && (model.filter === 'all' || model.filter === 'done')) body.append(btn('btn goals-more', model.loadingMore ? 'Loading…' : 'Load more done tasks', loadMore));
+        if (query ? queryHasMore() : (model.cursor && (model.filter === 'all' || model.filter === 'done'))) body.append(btn('btn goals-more', model.loadingMore ? 'Loading…' : (query ? 'Load more' : 'Load more done tasks'), loadMore));
         if (model.moreFailed) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, model.moreFailed)); body.append(f); }
     }
+    bar.names([...new Set(all.map(t => t.assigned_to).filter(n => typeof n === 'string' && n))].sort().slice(0, 50)); // the names on screen, offered in the Agent field
+    bar.set(model.filters, query ? { matched: L.total ?? all.length, all: L.total ?? all.length } : null);
     if (held) {
         const again = held.filter ? body.querySelector(`.goals-chip[data-filter="${CSS.escape(held.filter)}"]`) : held.task ? body.querySelector(`[data-task-id="${CSS.escape(held.task)}"]`) : [...body.querySelectorAll('button')].find(b => b.className === held.cls && b.textContent === held.text);
         (again || body.querySelector('.goals-chip[aria-pressed="true"]'))?.focus({ preventScroll: true });
@@ -127,7 +204,7 @@ function rowOf(t) {
 
 /** Show the board's tasks in `host`. hooks: openTask(task), openGoal(id), onCount(openCount). */
 export function showTasks(host, project, h = {}) {
-    if (project !== model.project) Object.assign(model, { project, rows: [], cursor: '', moreLoaded: false, totalOpen: null, totalDone: null, filter: 'all', loading: false, failed: '', loadingMore: false, moreFailed: '' });
+    if (project !== model.project) { bar = null; Object.assign(model, { project, filters: TF.loadFilters(project, browserLocal), q: emptyQuery(), rows: [], cursor: '', moreLoaded: false, totalOpen: null, totalDone: null, filter: 'all', loading: false, failed: '', loadingMore: false, moreFailed: '' }); }
     hooks = h;
     if (!host.dataset.built) {
         host.dataset.built = '1';
@@ -189,6 +266,8 @@ export function renderTaskPage(host, task, ctx) {
         fact(dl, 'Goal', g);
     } else fact(dl, 'Goal', noGoalLabel);
     fact(dl, 'Priority', priorityWord(task.priority));
+    if (Array.isArray(task.blocked_by) && task.blocked_by.length) fact(dl, 'Blocked by', task.blocked_by.map(d => `#${d.task_id}${d.title ? ' ' + d.title : ''}${d.satisfied ? ' (done)' : ''}`).join('\n'));
+    if (Number.isFinite(task.cost_usd) && task.cost_usd > 0) fact(dl, 'Cost', `$${task.cost_usd.toFixed(2)}`);
     fact(dl, 'Created by', task.created_by);
     fact(dl, 'Created', whenText(task.created_at));
     if (task.claimed_at) fact(dl, 'Started', whenText(task.claimed_at));
