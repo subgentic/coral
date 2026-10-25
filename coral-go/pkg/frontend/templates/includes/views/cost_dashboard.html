@@ -14,6 +14,12 @@
             </div>
         </div>
         <div class="cost-header-actions">
+            <select id="cost-time-range" class="cost-time-select" aria-label="Time range" data-on-change="cost-time-range"><!-- the one Time range control, in the page header beside Refresh (#7666) -->
+                <option value="hour">Last hour</option>
+                <option value="day" selected>Last 24 hours</option>
+                <option value="week">Last 7 days</option>
+                <option value="month">Last 30 days</option>
+            </select>
             <button class="btn btn-sm" data-on-click="cost-refresh">
                 <span class="material-icons" style="font-size:1rem" aria-hidden="true">refresh</span> Refresh
             </button>
