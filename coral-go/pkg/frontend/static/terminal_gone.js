@@ -98,15 +98,16 @@ export const TERMINAL_GONE_TEXT = TERMINAL_GONE_MESSAGE;
 let _composerGone = false;
 let _hooksReview = false; // the error under the composer is Codex's hooks question: answering it clears the error and says to send again (#6200)
 
-/** Say a send error under the composer. restart: offer Restart (the terminal is gone). */
+/** Say a send error under the composer. restart: offer Restart (the terminal is gone). Returns whether it was shown (there is no box in a page without the composer). */
 export function showComposerError(message, { restart = false } = {}) {
     const box = document.getElementById('composer-error');
-    if (!box) return;
+    if (!box) return false;
     box.querySelector('.composer-error-text').textContent = message;
     _hooksReview = false; // reportSendError sets it again for the hooks question
     box.querySelector('.composer-error-restart').hidden = !restart || isPopout(); // no destructive actions in the popout
     box.hidden = false;
     _composerGone = restart;
+    return true;
 }
 
 export function clearComposerError() {
@@ -123,22 +124,22 @@ export function noteHooksAnswered() {
     showToast('Answered. Your message is still in the box: send it again.');
 }
 
-/** A failed send for `session`: inline under the composer; a gone terminal also marks the agent. */
+/** A failed send for `session`: inline under the composer; a gone terminal also marks the agent. Returns whether the error was shown. */
 export function reportSendError(session, message, code, exited = false) {
     // The message did not go because the agent's CLI has exited and the server has just marked it Ended (#6058): say who stopped, keep the draft, offer Restart, and read the row again now.
     if (exited) {
         const who = (session && (session.display_name || session.name)) || 'The agent';
-        showComposerError(`${who} stopped before answering. Your message is kept below; Restart the agent to send it.`, { restart: true });
+        const shown = showComposerError(`${who} stopped before answering. Your message is kept below; Restart the agent to send it.`, { restart: true });
         importOnce('./api.js').then(m => m.loadLiveSessions()).catch(() => {}); // loaded when it is needed: a static import pulls api.js's tabs into the startup sequence
-        return;
+        return shown;
     }
     if (code === 'terminal_gone') {
         markTerminalGone(session);
-        showComposerError(TERMINAL_GONE_TEXT, { restart: true });
-        return;
+        return showComposerError(TERMINAL_GONE_TEXT, { restart: true });
     }
-    showComposerError(message);
+    const shown = showComposerError(message);
     _hooksReview = code === 'codex_hooks_review_pending'; // set after the error is shown (showing it keeps the flag as it was)
+    return shown;
 }
 
 document.addEventListener('click', e => {

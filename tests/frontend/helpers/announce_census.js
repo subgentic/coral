@@ -74,9 +74,10 @@ async function until(ev, re, ms = 15000, count = 1) {
         for (;;) { if (window.__ann.log.filter(e => !e.silent && re.test(e.text)).length >= ${count}) return true; if (performance.now() > end) return false;
             await new Promise(r => setTimeout(r, 50)); } })()`); // sleep-ok: a poll interval in the page, not a wait for a guessed time
 }
-/** The end of a scene: each of `must` ([re, label, count]) said at least its count (up to `ms`; one never said is reported by the scene), then no new entry for QUIET_MS (at most `ms` more). */
+/** The end of a scene: each of `must` ([re, label, count]) said at least its count (all within `ms`; one never said is reported by the scene), then no new entry for QUIET_MS (at most `ms` more). */
 async function settle(ev, must = [], ms = 15000) {
-    for (const [re, , count = 1] of must) await until(ev, re, ms, count);
+    const end = Date.now() + ms; // one deadline for all of them: a scene missing two announcements does not wait twice
+    for (const [re, , count = 1] of must) await until(ev, re, Math.max(0, end - Date.now()), count);
     await ev(`(async () => { const end = performance.now() + ${ms}; let n = window.__ann.log.length, since = performance.now();
         while (performance.now() < end) { await new Promise(r => setTimeout(r, 50)); // sleep-ok: a poll interval in the page, not a wait for a guessed time
             if (window.__ann.log.length !== n) { n = window.__ann.log.length; since = performance.now(); } else if (performance.now() - since >= ${QUIET_MS}) return true; }

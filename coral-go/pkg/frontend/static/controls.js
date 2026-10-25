@@ -12,7 +12,7 @@ import { escapeHtml, escapeAttr, showToast, showView, setRowCurrent } from './ut
 import { registerActions, idOf } from './actions.js';
 import { renderLiveSessions, KILL_LOG_NOTE } from './render.js';
 import { loadAgentEvents, renderEventTimeline } from './agentic_state.js';
-import { addPendingMessage, confirmPendingMessage, removePendingMessage, resetLiveHistory, effectiveLiveViewMode } from './live_chat.js';
+import { addPendingMessage, confirmPendingMessage, removePendingMessage, announceNotSent, resetLiveHistory, effectiveLiveViewMode } from './live_chat.js';
 import { serverFetch, currentServer, serverForSession, sessionServer } from './server_base.js';
 import { applySleepingView } from './sleeping_view.js';
 import { hubBlocked, blockedReason } from './hub_access.js';
@@ -170,7 +170,7 @@ export async function sendCommand({ nudge = false } = {}) {
         addPendingMessage(sentSessionId, command, sentAt, { sending: true });
         input.value = "";
         const notSent = () => {
-            removePendingMessage(sentSessionId, sentAt, { announce: false }); // each refusal below shows the error under the composer, which says why (#352)
+            removePendingMessage(sentSessionId, sentAt, { announce: false }); // each refusal below shows the error under the composer, which says why, or says it was not sent when there is no box (#352)
             // The typed text only: the attachments stay attached until a send of them succeeds.
             if (!input.value && state.currentSession && state.currentSession.session_id === sentSessionId) input.value = textPart;
         };
@@ -185,7 +185,7 @@ export async function sendCommand({ nudge = false } = {}) {
                 // Plain text naming the server; never the raw response (#3151). The draft stays.
                 // Said under the composer (#3218); a gone terminal also marks the agent and offers Restart.
                 const { text, code, exited } = await responseError(resp, sessionServer(targetSession), `The message was not sent (HTTP ${resp.status}).`);
-                reportSendError(targetSession, text, code, exited);
+                if (!reportSendError(targetSession, text, code, exited)) announceNotSent(sentSessionId);
                 console.error("Send failed:", resp.status);
                 return;
             }
@@ -200,7 +200,7 @@ export async function sendCommand({ nudge = false } = {}) {
                 showToast(result.note || "Held until the agent's question is answered.");
             } else if (result.error) {
                 notSent();
-                showComposerError(result.error);
+                if (!showComposerError(result.error)) announceNotSent(sentSessionId);
                 console.error("Send error:", result.error);
             } else {
                 clearComposerError();
@@ -213,7 +213,7 @@ export async function sendCommand({ nudge = false } = {}) {
             }
         } catch (e) {
             notSent();
-            showComposerError("The message was not sent. Check the connection and try again.");
+            if (!showComposerError("The message was not sent. Check the connection and try again.")) announceNotSent(sentSessionId);
             console.error("Send exception:", e);
         }
     } finally {
