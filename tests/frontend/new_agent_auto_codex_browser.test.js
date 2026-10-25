@@ -27,12 +27,21 @@ const BASE = require('./test_base').BASE;
             await tab('Permissions'); await radio(N.mode, /^Auto$/i);
             assert.equal(await line(), 'Workspace sandbox, with the network on so it can reach Coral.');
         });
+        await S.run('Codex with Default says the same: it never asks, so the card must not say it asks (#7527)', async () => {
+            await radio(N.mode, /^Default$/i);
+            assert.equal(await line(), 'Workspace sandbox, with the network on so it can reach Coral.');
+        });
         await S.run('another mode of Codex has its own line, and the size does not change', async () => {
             const before = await size();
             await radio(N.mode, /^Plan$/i);
             assert.match(await line(), /^Reads only/);
             await radio(N.mode, /^Auto$/i);
             assert.deepEqual(await size(), before, 'the dialog keeps its size');
+        });
+        await S.run('Claude with Default keeps "Asks before acting"', async () => {
+            await tab('Agent'); await radio(N.provider, /^Claude$/i);
+            await tab('Permissions'); await radio(N.mode, /^Default$/i);
+            assert.match(await line(), /^Asks before acting/);
         });
         await S.run('Claude with Auto keeps its own line', async () => {
             await tab('Agent'); await radio(N.provider, /^Claude$/i);

@@ -86,7 +86,7 @@ const BASE = require('./test_base').BASE;
         assert.deepEqual(more, { label: 'Learn more about the network', expanded: 'false', hidden: true, code: '-c sandbox_workspace_write.network_access=false' }, 'the flag instruction is behind Learn more, in a code span');
         await ev(`document.querySelector('#fixture .acf-perms-enforced button').click(); true`);
         assert.deepEqual(await ev(`(() => { const b = document.querySelector('#fixture .acf-perms-enforced button'); return [b.getAttribute('aria-expanded'), document.getElementById(b.getAttribute('aria-controls')).hidden]; })()`), ['true', false], 'Learn more opens it');
-        for (const mode of ['auto', 'dontAsk', 'acceptEdits']) {
+        for (const mode of ['default', 'auto', 'dontAsk', 'acceptEdits']) { // Codex on Default is the same launch as Auto: it never asks (#7527)
             assert.equal(await ev(`(() => { const sel = document.querySelector('#fixture .acf-permission-mode'); if (!sel) return 'no select'; sel.value = '${mode}'; sel.dispatchEvent(new Event('change', { bubbles: true })); return document.querySelector('#fixture .perm-mode-desc').textContent; })()`) === 'Workspace sandbox, with the network on so it can reach Coral.', mode !== 'acceptEdits', `${mode}: Codex says the network is on only where it never asks`);
         }
         assert.match(await ev(`document.querySelector('#fixture [data-type="allow"][data-cap="git_write"]').title`), /Codex: Git Write does not change its sandbox/);
