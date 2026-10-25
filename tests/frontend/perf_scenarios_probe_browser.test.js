@@ -3,7 +3,7 @@
 //   firstPaint  navigation to the first agent list drawn (and the browser's first contentful paint)
 //   agentSwitch select the next agent, to the chat settled (coral:agent-view-ready, then two frames)
 //   openBoard   the Message Board page opened on the 2,000-message board, to its first messages drawn and two frames
-//   artifactsTab the Team Artifacts tab opened for a team's agent, to its rows drawn and two frames
+//   artifactsTab the team page's Artifacts tab opened for a team, to its rows drawn and two frames
 //   PERF_PROBE=1 PERF_THROTTLE=4 PERF_OUT=/tmp/x.json node run_cdp_suites.mjs --only perf_scenarios_probe --shards 1 --retries 0
 // PERF_PROFILE=1 adds a sampling profile of each scenario (top self-time functions; CORAL_NO_BUNDLE=1 keeps their names readable). RUNS=n changes the 10.
 const fs = require('node:fs');
@@ -98,13 +98,13 @@ if (!process.env.PERF_PROBE) { console.log('perf_scenarios_probe: skipped (set P
             await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await ev(STUB_ART); // a fresh page each run: the list is drawn for the first time (a list shown before is redrawn whole)
             await ev(`window.selectLiveSession('agent-0', 'claude', 'sid-0', ''); window.switchAgenticTab('files', 'top'); true`);
             await ev(`${framesJs(3)}`);
-            const m = await metrics(); await ev(`window.__ltBefore = window.__longtasks.length; window.__a0 = performance.now(); window.switchAgenticTab('team-artifacts', 'top'); true`);
-            await waitFor(`document.querySelectorAll('#agentic-panel-team-artifacts tr.team-artifact-row').length > 10`, 'the artifact rows', 20000);
+            const m = await metrics(); await ev(`window.__ltBefore = window.__longtasks.length; window.__a0 = performance.now(); window.openTeamPage(${JSON.stringify(BOARD)}, { tab: 'artifacts' }); true`);
+            await waitFor(`document.querySelectorAll('#team-panel-artifacts tbody tr[data-key]').length > 10`, 'the artifact rows', 20000);
             await ev(`${framesJs(2)}`); const t = await ev(`performance.now() - window.__a0`); // to the first frames painted with rows in
-            await waitFor(`document.querySelectorAll('#agentic-panel-team-artifacts tr.team-artifact-row').length === ${ARTIFACTS}`, 'every artifact row', 20000);
+            await waitFor(`document.querySelectorAll('#team-panel-artifacts tbody tr[data-key]').length === ${ARTIFACTS}`, 'every artifact row', 20000);
             allRows.push(await ev(`performance.now() - window.__a0`));
             const m2 = await metrics(); rows.push({ wall: t, lt: await ev(`window.__longtasks.length - window.__ltBefore`), ...delta(m, m2) });
-            out.artifactRowsDrawn = await ev(`document.querySelectorAll('#agentic-panel-team-artifacts tr.team-artifact-row').length`);
+            out.artifactRowsDrawn = await ev(`document.querySelectorAll('#team-panel-artifacts tbody tr[data-key]').length`);
         }
         await profStop('artifactsTab'); out.artifactsTab = { ...stats(rows), allRowsMs: median(allRows) };
         // ---- 5. Browse: a directory of 300 entries; 6. changed files: 300 files (stubbed routes)
@@ -116,7 +116,7 @@ if (!process.env.PERF_PROBE) { console.log('perf_scenarios_probe: skipped (set P
             rows = []; const allRows2 = []; await profStart();
             for (let r = 0; r < RUNS; r++) {
                 await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await ev(STUB_FILES);
-                await ev(`window.selectLiveSession('agent-0', 'claude', 'sid-0', ''); window.switchAgenticTab('team-artifacts', 'top'); true`); await ev(`${framesJs(3)}`);
+                await ev(`window.selectLiveSession('agent-0', 'claude', 'sid-0', ''); window.switchAgenticTab('${tab === 'files' ? 'browse' : 'files'}', 'top'); true`); await ev(`${framesJs(3)}`);
                 const m = await metrics(); await ev(`window.__ltBefore = window.__longtasks.length; window.__f0 = performance.now(); window.switchAgenticTab('${tab}', 'top'); true`);
                 await waitFor(`document.querySelectorAll('${sel}').length > 10`, '${name} rows', 20000);
                 await ev(`${framesJs(2)}`); const t = await ev(`performance.now() - window.__f0`); // to the first rows painted
