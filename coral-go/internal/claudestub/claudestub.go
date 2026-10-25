@@ -69,8 +69,8 @@ if [ "$print" = 1 ]; then
         # the model list is asked as an initialize control request on stream-json (agentmodels.fetchClaude): the real claude answers it at once and goes on reading, so the stub does too
         case " $* " in *" --input-format stream-json "*)
           IFS= read -r _req
-          echo '{"type":"control_response","response":{"subtype":"success","request_id":"coral-models","response":{"models":[{"value":"stub-model","displayName":"Stub model","description":"the stand-in model","supportedEffortLevels":["low","high"]}]}}}'
-          : > "$D/answered";; # a marker a test can time the caller against: how long after the reply it let go of the process (#5591, #7163)
+          : > "$D/answered" # made BEFORE the reply is written: a caller that lets go of the process the moment it reads the reply kills the script, and a marker made after the reply was then never written (#7163)
+          echo '{"type":"control_response","response":{"subtype":"success","request_id":"coral-models","response":{"models":[{"value":"stub-model","displayName":"Stub model","description":"the stand-in model","supportedEffortLevels":["low","high"]}]}}}';;
         esac
         cat > /dev/null
       fi
@@ -138,7 +138,7 @@ func NoSlower(t testing.TB, what string, baseline, subject func(), slack time.Du
 	}
 }
 
-// AnsweredMarker is the file the signed-in stand-in makes the moment it has written its answer to an initialize request (and before it goes on reading stdin).
+// AnsweredMarker is the file the signed-in stand-in makes just BEFORE it writes its answer to an initialize request (and before it goes on reading stdin): it is there whenever the reply can be read, so a test can time how long after the reply a caller let go of the process.
 func (s *Stub) AnsweredMarker() string { return filepath.Join(s.dir, "answered") }
 
 // Path is the stub's program: what a test gives as the CLI path.

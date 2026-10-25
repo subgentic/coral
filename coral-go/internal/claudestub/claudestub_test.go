@@ -251,3 +251,28 @@ func TestRealCLIReachableSeesTheCommonInstallLocations(t *testing.T) {
 	findCLIInCommonPaths = func(bin string) string { return "/opt/homebrew/bin/" + bin }
 	assert.Equal(t, "/opt/homebrew/bin/claude", RealCLIReachable(), "a claude in a common install folder is reachable")
 }
+
+// #7163 (a CI flake of the signed-in model-list test: "the stand-in answered the initialize request"): the answered marker must already be there when the reply can be read. A caller that
+// lets go of the process the moment it reads the reply (agentmodels does, #5591) kills the script, and a marker made AFTER the reply was never written when the kill came first.
+func TestTheAnsweredMarkerIsThereWhenTheReplyCanBeRead(t *testing.T) {
+	Isolate(t)
+	s := New(t, SignedIn)
+	for i := 0; i < 60; i++ {
+		os.Remove(s.AnsweredMarker())
+		cmd := exec.Command(s.Path(), "-p", "--input-format", "stream-json", "--output-format", "stream-json")
+		in, err := cmd.StdinPipe()
+		require.NoError(t, err)
+		out, err := cmd.StdoutPipe()
+		require.NoError(t, err)
+		require.NoError(t, cmd.Start())
+		_, err = in.Write([]byte(`{"type":"control_request","request_id":"coral-models","request":{"subtype":"initialize"}}` + "\n"))
+		require.NoError(t, err)
+		buf := make([]byte, 1)
+		_, err = out.Read(buf) // the first byte of the reply
+		require.NoError(t, err, "round %d", i)
+		_, statErr := os.Stat(s.AnsweredMarker()) // looked for at once, as a caller that let go at the reply would
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+		require.NoError(t, statErr, "round %d: the reply was readable and the marker was not there", i)
+	}
+}
