@@ -210,3 +210,22 @@ func TestMemoryOfAnAgentWithNoFilesIsAnEmptyList(t *testing.T) {
 	assert.Equal(t, http.StatusOK, code)
 	assert.JSONEq(t, `{"files":[]}`, mustJSON(t, out))
 }
+
+func TestMemoryFollowsALinkInTheSameFolderAndSaysSo(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlinks need privileges on Windows")
+	}
+	m := newMemRig(t)
+	writeMem(t, filepath.Join(m.proj, "CLAUDE.md"), "the real text")
+	require.NoError(t, os.Symlink("CLAUDE.md", filepath.Join(m.proj, "CLAUDE.local.md")))
+	rows := m.list(t, m.sid)
+	require.Len(t, rows, 2)
+	assert.Equal(t, "CLAUDE.local.md", rows[1]["file"])
+	assert.Equal(t, "CLAUDE.md", rows[1]["link_to"])
+	assert.NotContains(t, rows[1], "problem")
+	assert.NotContains(t, rows[0], "link_to")
+	code, out := m.get(t, "/api/sessions/live/alpha/memory/"+rows[1]["id"].(string)+"?session_id="+m.sid)
+	require.Equal(t, http.StatusOK, code)
+	assert.Equal(t, "the real text", out["text"])
+	assert.Equal(t, "CLAUDE.md", out["link_to"])
+}
