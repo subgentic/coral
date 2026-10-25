@@ -3,6 +3,7 @@
 // ("Folder: not set"); Delete is behind More; and at 390 px and 200% text the meta is one wrapping line and Steps come before it, right after the buttons. Drives Chrome over CDP through agent_view_harness.js.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { assertPinnedBar } = require('./helpers/pinned_bar');
 const BASE = require('./test_base').BASE;
 
 (async () => {
@@ -41,6 +42,7 @@ const BASE = require('./test_base').BASE;
                 assert.ok(order.metaTop < order.stepsTop && order.over <= 1, `${tag}: the facts line is above the Steps and nothing scrolls sideways: ` + JSON.stringify(order));
             }
             // the More menu closes on Escape (focus back to More) and when focus leaves it (UI Accessibility's note on #7156)
+            await assertPinnedBar(ev, '.wf-detail-actions', `${tag}: the workflow page`);
             await ev(`document.querySelector('.wf-more-btn').click(); true`);
             assert.equal(await ev(`document.querySelector('.wf-more-menu').hidden`), false, `${tag}: More opens its menu`);
             await ev(`document.querySelector('.wf-more-menu button').focus(); true`);

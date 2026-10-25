@@ -7,6 +7,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { connect } = require('./agent_view_harness');
+const { assertPinnedBar } = require('./helpers/pinned_bar');
 const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
 
 const HEX = n => n.toString(16).padStart(2, '0').repeat(32);
@@ -112,6 +113,7 @@ const STUB = `(() => {
             await waitFor(`!document.getElementById('agentic-detail-pane').hidden`, 'the sheet opens');
             const sheet = await ev(`(() => { const a = document.getElementById('agentic-detail-pane'), p = document.querySelector('${panel}'); const ar = a.getBoundingClientRect(), pr = p.getBoundingClientRect(); const foot = [...a.querySelectorAll('.detail-foot .btn')]; const d = foot.find(b => b.textContent === 'Delete'); return { inside: p.contains(a), covers: Math.abs(ar.left - pr.left) <= 1 && Math.abs(ar.width - pr.width) <= 1 && Math.abs(ar.top - pr.top) <= 1, noPageClass: !document.body.classList.contains('team-detail-open'), foot: foot.map(b => b.textContent), danger: !!d && d.classList.contains('btn-danger'), title: (a.querySelector('.detail-title') || {}).textContent, focus: document.activeElement === a.querySelector('.detail-title'), chat: !!document.querySelector('#live-session-view') && document.querySelector('#live-session-view').getClientRects().length > 0 }; })()`);
             check(`${tag}: the document is a sheet over the panel itself, the actions pinned, Delete a danger button, the title focused (${JSON.stringify(sheet)})`, sheet.inside && sheet.covers && sheet.noPageClass && ['Open', 'Download', 'Copy link', 'Keep', 'Delete'].every(t => sheet.foot.includes(t)) && sheet.danger && sheet.focus && sheet.chat);
+            await assertPinnedBar(ev, '#agentic-detail-pane .detail-foot', `${tag}: the Artifacts sheet`);
             await shot(`sheet-${view.name}-${view.theme}`);
             await press('Escape', 'Escape', 27);
             const back = await ev(`(() => ({ hidden: document.getElementById('agentic-detail-pane').hidden, onRow: document.activeElement === document.querySelector('${panel} tbody tr .team-row-btn') }))()`);

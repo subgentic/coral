@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { connect } = require('./agent_view_harness');
+const { assertPinnedBar } = require('./helpers/pinned_bar');
 const BASE = require('./test_base').BASE;
 const S = `(window.__coralStatic || '/static/')`;
 
@@ -100,6 +101,7 @@ const S = `(window.__coralStatic || '/static/')`;
             assert.match(await ev(`document.querySelector('#scheduler-detail .sched-runs-table tbody tr').textContent.replace(/\\s+/g, ' ')`), /Failed: step 2 \(Test\) exited with 3/);
             assert.match(await ev(`document.querySelectorAll('#scheduler-detail .sched-runs-table tbody tr')[1].textContent.replace(/\\s+/g, ' ')`), /Passed/);
 
+            await assertPinnedBar(ev, '#scheduler-detail .item-bar', `${at}: the job page`);
             console.log(`${at}: Delete is behind More`);
             assert.equal(await ev(vis('#scheduler-detail .sched-delete')), false, `${at}: Delete is not on the page until More opens`);
             await ev(`document.querySelector('#scheduler-detail .sched-more-btn').click(); true`);

@@ -7,6 +7,7 @@ const { connect } = require('./agent_view_harness');
 const { install: installTP, seed, openTeam, goTab, scenarios } = require('./helpers/team_page');
 const BASE = require('./test_base').BASE;
 const { removeBoards } = require('./helpers/board_cleanup');
+const { assertPinnedBar } = require('./helpers/pinned_bar');
 
 const VIEWS = [['1280x800', 1280, 800, false], ['390x844', 390, 844, true]];
 const TEAM = `qa-goals-${Date.now() % 100000}`;
@@ -58,6 +59,7 @@ const GOAL = 'Explore goals with two teams';
                 else { assert.ok(col.onPhone, 'on a phone the goal is the first screen and its task list the next'); await click('button', /^Tasks, 3 open, 0 done$/i, 'button'); assert.equal(await ev(`window.__tp.page().querySelectorAll('.goal-side-row').length`), 3, 'three tasks belong to the goal'); await click('button, a', /^(\u2190\s*)?Goal: /, 'back link'); }
                 assert.ok(await ev(`!!window.__tp.find('button', /^Add task$/i)`), 'Add task');
                 assert.ok(await ev(`!!window.__tp.find('button', /^Close goal$/i)`), 'Close goal');
+                if (!mobile) { const bar = await assertPinnedBar(ev, '#team-panel-goals .goals-pinbar, .goals-table-page .goals-pinbar, .goals-pinbar', "a goal's page"); assert.equal(bar.names.at(-1), 'Close goal', 'Close goal is the primary, last'); }
                 const pinned = await ev(`(() => { const b = window.__tp.find('button', /^Close goal$/i); const r = b.getBoundingClientRect(); return { bottom: Math.round(innerHeight - r.bottom), pos: getComputedStyle(b.closest('[class*=bar], footer, [role=toolbar]') || b.parentElement).position }; })()`);
                 assert.ok(pinned.bottom <= 24, `the bar is pinned at the bottom of the screen (its buttons are ${pinned.bottom} px above it)`);
             });

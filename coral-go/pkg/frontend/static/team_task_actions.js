@@ -29,6 +29,8 @@ export function taskButtons(task, ctx) {
     const out = [];
     const canComplete = task.status !== 'blocked' && task.status !== 'draft';
     const canNudge = (task.status === 'pending' || task.status === 'in_progress') && !!task.assigned_to;
+    const cancel = btn('btn btn-danger', 'Cancel task', () => ctx.redraw(task, 'cancel')); cancel.classList.add('team-task-cancel'); // one danger button, alone at the left edge of the bar, first (#7684)
+    out.push(cancel);
     out.push(btn('btn', 'Edit', () => ctx.redraw(task, 'edit')));
     if (task.status === 'draft') out.push(btn('btn btn-primary', 'Publish', () => publish(task, ctx)));
     if (canNudge) {
@@ -38,8 +40,6 @@ export function taskButtons(task, ctx) {
         out.push(nudge, remind, stop);
     }
     if (canComplete) out.push(btn('btn btn-success', 'Complete', () => ctx.redraw(task, 'complete')));
-    const cancel = btn('btn btn-danger', 'Cancel task', () => ctx.redraw(task, 'cancel')); cancel.classList.add('team-task-cancel'); // one danger button, at the end of the bar
-    out.push(cancel);
     return out;
 }
 

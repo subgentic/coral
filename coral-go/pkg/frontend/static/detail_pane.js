@@ -64,7 +64,8 @@ export function openDetailPane({ key, title, sub = '', facts = [], body = null, 
     const doc = el('div', 'detail-doc');
     main.append(doc);
     const foot = el('div', 'detail-foot');
-    for (const a of actions) {
+    const rank = a => (a.danger ? 0 : a.primary ? 2 : 1); // the bar's one order: a danger button first (at the left edge), the primary last (#7684)
+    for (const a of [...actions].sort((x, y) => rank(x) - rank(y))) {
         let b;
         if (a.href) { b = el('a', `btn${a.primary ? ' btn-primary' : ''}`, a.label); b.href = a.href; b.target = '_blank'; b.rel = 'noopener noreferrer'; if (a.download) b.setAttribute('download', ''); }
         else { b = el('button', `btn${a.primary ? ' btn-primary' : ''}`, a.label); b.type = 'button'; }

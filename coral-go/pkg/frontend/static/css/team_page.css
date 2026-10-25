@@ -98,9 +98,9 @@
 .detail-facts dd { margin: 0; overflow-wrap: anywhere; }
 .detail-doc { min-width: 0; }
 .detail-doc pre { white-space: pre-wrap; overflow-wrap: anywhere; }
-.detail-foot { flex: none; display: flex; gap: 8px; flex-wrap: wrap; padding: 12px 18px; border-top: 1px solid var(--border); }
+.detail-foot { flex: none; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; padding: 12px 18px; border-top: 1px solid var(--border); } /* the one rule of every pinned bar (#7684): right-aligned, secondary buttons, the primary last, a danger button alone at the left edge (the same as .item-bar and .goals-pinbar) */
 .detail-foot .btn { min-height: 36px; }
-.detail-foot .btn-danger { color: var(--error-text); border-color: var(--error); background: transparent; margin-left: auto; } /* one danger button: error-colour text with a 1 px error-colour edge, no fill, the size of the other buttons (UI/UX) */
+.detail-foot .btn-danger { color: var(--error-text); border-color: var(--error); background: transparent; margin-right: auto; } /* one danger button, at the left edge: error-colour text with a 1 px error-colour edge, no fill, the size of the other buttons (UI/UX) */
 .team-table-scroll { overflow-x: auto; max-width: 100%; }
 .detail-foot a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 #team-panel-messages { padding: 20px 24px 0; } /* the same top as the other tabs, and the search row's left edge where theirs is (the messages themselves stay on the tables' edge) */
@@ -238,7 +238,7 @@
 .team-task-form .task-edit-revision { margin: 0 0 12px; }
 .team-task-extra { max-width: 760px; margin-top: 16px; }
 .team-task-extra .task-detail-section { margin-top: 12px; }
-.team-task-cancel { margin-left: auto; } /* the danger button at the far end of the bar */
+.goals-pinbar .btn-danger, .item-bar .btn-danger { margin-right: auto; } /* a danger button is alone at the left edge of every pinned bar, first in the order too (#7684) */
 /* the dialog's sections under a task's facts read like the page's other labels: sentence case, 14/600 (UI/UX, #7644) */
 .team-task-extra .task-detail-label { text-transform: none; letter-spacing: 0; font-size: 0.875rem; font-weight: 600; }
 .team-task-extra summary { font-size: 0.875rem; font-weight: 600; }

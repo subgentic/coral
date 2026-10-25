@@ -349,7 +349,7 @@ export function renderTaskPage(host, task, ctx, mode = 'view') {
         focus = null;
     } else {
         if (session) bar.append(btn('btn', 'Open the agent', () => { window.switchNavTab?.('agents'); window.selectLiveSession?.(session.name, session.agent_type, session.session_id, session.server); })); // the agent that has the task, when it runs here
-        importOnce('./team_task_actions.js').then(A => { for (const b of A.taskButtons(task, acts)) bar.append(b); });
+        importOnce('./team_task_actions.js').then(A => { for (const b of A.taskButtons(task, acts)) bar.append(b); const danger = bar.querySelector('.btn-danger'); if (danger) bar.prepend(danger); }); // the bar's one order (#7684): a danger button first, alone at the left edge, the primary last
         page.append(bar);
     }
     host.append(page);

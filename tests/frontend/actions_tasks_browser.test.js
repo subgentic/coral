@@ -26,6 +26,7 @@ const BOARD = 'tasks-3645';
     };
     const { waitFor, coralReady } = require('./helpers/wait').bind(ev);
 const { removeBoards } = require('./helpers/board_cleanup');
+const { pinnedBarProbe } = require('./helpers/pinned_bar');
     const until = (expr, what, ms = 8000) => waitFor(expr, what, { timeout: ms, soft: true });
     const MODS = `const tasks = await import((window.__coralStatic||'/static/')+'tasks.js'); const { state } = await import((window.__coralStatic||'/static/')+'state.js');`;
     try {
@@ -99,6 +100,10 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await until(`!!document.querySelector('#team-panel-item .task-dep-link[data-on-click="task-open"]')`, 'the dependency link');
         await ev(`document.querySelector('#team-panel-item .task-dep-link[data-on-click="task-open"]').click(); true`);
         check('a dependency link opens that task', await onPage(made.dep).then(() => true, () => false));
+
+        // The pinned bar follows the one rule (#7684): right-aligned, the primary (Complete) last, Cancel task alone at the left edge and first.
+        const pbar = await ev(pinnedBarProbe('#team-panel-item .goals-pinbar'));
+        check('the task page\'s bar: right-aligned, Complete last, Cancel task first at the left edge', pbar && pbar.rightAligned && pbar.primaryLast && pbar.dangerFirst && pbar.dangerAlone && pbar.names[0] === 'Cancel task' && pbar.names.at(-1) === 'Complete', JSON.stringify(pbar));
 
         // ── Cancel through its confirmation (on the dependency) ────────────
         await until(`!!${barBtn('Cancel task')}`, "the dependency's Cancel task");

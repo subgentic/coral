@@ -10,6 +10,7 @@ const { connect } = require('./agent_view_harness');
 
 const BASE = require('./test_base').BASE;
 const { removeBoards } = require('./helpers/board_cleanup');
+const { assertPinnedBar } = require('./helpers/pinned_bar');
 const hex = i => i.toString(16).padStart(20, '0');
 
 (async () => {
@@ -164,9 +165,10 @@ const hex = i => i.toString(16).padStart(20, '0');
         await waitFor(`!!document.querySelector('${SHEET} .detail-foot .btn-primary')`, 'the message as a sheet over the dock, with its Open button', 8000);
         assert.equal(await ev(`!!document.querySelector('#group-table-view:not([hidden])') && getComputedStyle(document.getElementById('group-table-view')).display !== 'none'`), false, 'the person is not sent to the Inbox');
         const sheet = await ev(`(() => { const s = document.querySelector('${SHEET}'), p = document.getElementById('agentic-panel-saved'); const r = s.getBoundingClientRect(), q = p.getBoundingClientRect(); return { covers: Math.abs(r.top - q.top) < 2 && Math.abs(r.bottom - q.bottom) < 2 && Math.abs(r.left - q.left) < 2 && Math.abs(r.right - q.right) < 2, title: s.querySelector('.detail-title').textContent, snippet: s.querySelector('.inbox-saved-snippet').textContent, foot: [...s.querySelectorAll('.detail-foot .btn')].map(b => b.textContent), focus: document.activeElement === s.querySelector('.detail-title') }; })()`);
-        assert.ok(sheet.covers, 'the sheet is over the dock panel'); assert.ok(sheet.snippet.length > 0 && sheet.title.length > 0); assert.equal(sheet.foot.length, 2); assert.equal(sheet.foot[1], 'Remove from saved', 'Open first (the primary), Remove after'); assert.ok(sheet.focus, 'the keyboard starts at its heading');
+        assert.ok(sheet.covers, 'the sheet is over the dock panel'); assert.ok(sheet.snippet.length > 0 && sheet.title.length > 0); assert.equal(sheet.foot.length, 2); assert.deepEqual(sheet.foot, ['Remove from saved', 'Open chat'], 'the bar\'s one order (#7684): Remove, then the primary, Open chat, last'); assert.ok(sheet.focus, 'the keyboard starts at its heading');
         await waitFor(`!!document.querySelector('${SHEET} .ibx-saved-body .md, ${SHEET} .ibx-saved-body .ibx-why')`, 'the whole text in the sheet, read at once', 6000);
         assert.equal(await ev(`!!document.querySelector('${SHEET} .ibx-saved-toggle')`), false, 'no Read the whole message button: the text is there');
+        await assertPinnedBar(ev, `${SHEET} .detail-foot`, 'the Saved sheet');
         await shot('saved-sheet-desktop');
         await ev(`document.querySelector('${SHEET} .group-back').click(); true`);
         await waitFor(`document.querySelector('${SHEET}').hidden && document.activeElement && document.activeElement.classList.contains('group-table-link') && document.activeElement.dataset.id === 'local:${list.items[0].id}'`, 'Back to bring the table back with the focus on the row', 4000);
