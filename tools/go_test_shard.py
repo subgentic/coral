@@ -117,12 +117,14 @@ def go(args, **kw):
     return subprocess.run(["go"] + args, cwd=MODULE_DIR, **kw)
 
 
+# -test.paniconexit0 is the flag `go test` always gives a test binary, and internal/testtemp (the private temp, home and data folder of every test package) acts only in a process that has it: a runner
+# that starts the binary itself must pass it, or its tests run in the real folders (#356).
 def run_shard(label, names, binary, pkgdir, work, flags, timeout, count):
     listfile = os.path.join(work, "%s.txt" % label)
     with open(listfile, "w", newline="\n") as f:
         f.write("\n".join(names) + "\n")
     env = dict(os.environ, CORAL_TEST_SHARD_LIST=listfile)
-    cmd = ["go", "tool", "test2json", "-p", "shard", binary, "-test.v=test2json", "-test.timeout=" + timeout, "-test.count=%d" % count] + flags
+    cmd = ["go", "tool", "test2json", "-p", "shard", binary, "-test.paniconexit0", "-test.v=test2json", "-test.timeout=" + timeout, "-test.count=%d" % count] + flags
     log = os.path.join(work, "%s.log" % label)
     with open(log, "wb") as out:
         rc = subprocess.run(cmd, cwd=pkgdir, env=env, stdout=out, stderr=subprocess.STDOUT).returncode
