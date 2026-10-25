@@ -32,8 +32,11 @@ func (h *SessionsHandler) SearchFiles(w http.ResponseWriter, r *http.Request) {
 	query := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("q")))
 	dir := r.URL.Query().Get("dir")
 	sessionID := r.URL.Query().Get("session_id")
+	if !h.requireAgentSession(w, r, name, sessionID) {
+		return
+	}
 	if r.URL.Query().Get("view") == "explorer" {
-		serveExplorerDirectory(w, r, h.resolveGitRoot(r.Context(), name, "", sessionID), dir, strictBounds(r))
+		serveExplorerDirectory(w, r, h.resolveGitRoot(agentCtx(r), name, "", sessionID), dir, strictBounds(r))
 		return
 	}
 
@@ -43,7 +46,7 @@ func (h *SessionsHandler) SearchFiles(w http.ResponseWriter, r *http.Request) {
 		fileSearchLimit = int(setreg.Int(settings, setreg.FileSearchLimit))
 	}
 
-	workdir := h.resolveGitRoot(r.Context(), name, "", sessionID)
+	workdir := h.resolveGitRoot(agentCtx(r), name, "", sessionID)
 	if workdir == "" {
 		writeJSON(w, http.StatusOK, map[string]any{"files": []string{}})
 		return

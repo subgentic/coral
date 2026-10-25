@@ -22,13 +22,16 @@ func (h *SessionsHandler) GetFileContent(w http.ResponseWriter, r *http.Request)
 	name := chi.URLParam(r, "name")
 	fp := r.URL.Query().Get("filepath")
 	sessionID := r.URL.Query().Get("session_id")
+	if !h.requireAgentSession(w, r, name, sessionID) {
+		return
+	}
 
 	if fp == "" || strings.HasPrefix(fp, "-") || strings.ContainsAny(fp, "\x00") {
 		errBadRequest(w, "filepath is required")
 		return
 	}
 
-	workdir := h.resolveGitRoot(r.Context(), name, "", sessionID)
+	workdir := h.resolveGitRoot(agentCtx(r), name, "", sessionID)
 	if workdir == "" {
 		errBadRequest(w, "Could not determine working directory")
 		return
@@ -199,13 +202,16 @@ func (h *SessionsHandler) GetFileOriginal(w http.ResponseWriter, r *http.Request
 	name := chi.URLParam(r, "name")
 	fp := r.URL.Query().Get("filepath")
 	sessionID := r.URL.Query().Get("session_id")
+	if !h.requireAgentSession(w, r, name, sessionID) {
+		return
+	}
 
 	if fp == "" || strings.HasPrefix(fp, "-") || strings.ContainsAny(fp, "\x00:") {
 		errBadRequest(w, "filepath is required")
 		return
 	}
 
-	workdir := h.resolveGitRoot(r.Context(), name, "", sessionID)
+	workdir := h.resolveGitRoot(agentCtx(r), name, "", sessionID)
 	if workdir == "" {
 		errBadRequest(w, "Could not determine working directory")
 		return
@@ -272,6 +278,9 @@ func (h *SessionsHandler) SaveFileContent(w http.ResponseWriter, r *http.Request
 	name := chi.URLParam(r, "name")
 	fp := r.URL.Query().Get("filepath")
 	sessionID := r.URL.Query().Get("session_id")
+	if !h.requireAgentSession(w, r, name, sessionID) {
+		return
+	}
 
 	if fp == "" {
 		errBadRequest(w, "filepath is required")
@@ -290,7 +299,7 @@ func (h *SessionsHandler) SaveFileContent(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	workdir := h.resolveGitRoot(r.Context(), name, "", sessionID)
+	workdir := h.resolveGitRoot(agentCtx(r), name, "", sessionID)
 	if workdir == "" {
 		errBadRequest(w, "Could not determine working directory")
 		return
