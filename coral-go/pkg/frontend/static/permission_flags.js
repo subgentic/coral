@@ -27,13 +27,15 @@ export const PERMISSION_MODE_DESCRIPTIONS = {
 };
 
 // Codex's Auto is a workspace sandbox with the network on (Security's #7483): a board member needs it to reach Coral
+// Codex launches both of these as workspace-write that never asks, which has the network on (Security's #7503)
+export const CODEX_NETWORK_MODES = ['auto', 'dontAsk'];
 export const CODEX_AUTO_DESCRIPTION = 'Workspace sandbox, with the network on so it can reach Coral.';
 
 export function _updatePermModeDescription(selectEl) {
     const hint = selectEl.parentElement?.querySelector('.perm-mode-desc');
     if (!hint) return;
     const codex = selectEl.closest('[data-acf-uid]')?.querySelector('.acf-agent-type')?.value === 'codex';
-    hint.textContent = codex && selectEl.value === 'auto' ? CODEX_AUTO_DESCRIPTION : PERMISSION_MODE_DESCRIPTIONS[selectEl.value] || '';
+    hint.textContent = codex && CODEX_NETWORK_MODES.includes(selectEl.value) ? CODEX_AUTO_DESCRIPTION : PERMISSION_MODE_DESCRIPTIONS[selectEl.value] || '';
 }
 
 export function _getPermissionFlagsForAgentMode(agentType, mode) {

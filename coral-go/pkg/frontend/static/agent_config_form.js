@@ -1,7 +1,7 @@
 /* Moved out of modals.js as it was (#3844): no behaviour change. */
 import { importOnce } from './import_once.js';
 const { ALL_CAPABILITIES } = await importOnce('./agent_presets.js');
-const { PERMISSION_MODE_DESCRIPTIONS, CODEX_AUTO_DESCRIPTION, _updatePermModeDescription, defaultPermissionMode, syncDefaultPermissionMode, trackPermissionPick, _hasPermFlag, _normalizePermFlagsForAgent, _permissionModeFromFlags, _stripPermFlags, _syncACFAutoPermissions } = await importOnce('./permission_flags.js');
+const { PERMISSION_MODE_DESCRIPTIONS, CODEX_AUTO_DESCRIPTION, CODEX_NETWORK_MODES, _updatePermModeDescription, defaultPermissionMode, syncDefaultPermissionMode, trackPermissionPick, _hasPermFlag, _normalizePermFlagsForAgent, _permissionModeFromFlags, _stripPermFlags, _syncACFAutoPermissions } = await importOnce('./permission_flags.js');
 const { _acfServer, _fillModelDatalist, _getAgentModels, _getDefaultModels, _settingsFor } = await importOnce('./launch_models.js');
 const { _checkAgentCLI } = await importOnce('./cli_check.js');
 const { _classifyLoadedACFModel } = await importOnce('./acf_models.js');
@@ -256,7 +256,7 @@ export function renderAgentConfigForm(containerId, opts = {}) {
         const permModeVal = autoPermsVal
             ? (typeof autoPermsVal === 'string' ? autoPermsVal : (_permissionModeFromFlags(flagsVal) || defaultMode))
             : 'default';
-        const permModeDesc = v.agentType === 'codex' && permModeVal === 'auto' ? CODEX_AUTO_DESCRIPTION : PERMISSION_MODE_DESCRIPTIONS[permModeVal] || '';
+        const permModeDesc = v.agentType === 'codex' && CODEX_NETWORK_MODES.includes(permModeVal) ? CODEX_AUTO_DESCRIPTION : PERMISSION_MODE_DESCRIPTIONS[permModeVal] || '';
         autoPermissionsHTML = `
             <label>Permission Mode:
                 <select class="acf-permission-mode" data-on-change="perm-mode-describe">
