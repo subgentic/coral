@@ -203,6 +203,7 @@ async function fillTab(tab, item = 0) {
             const m = await importOnce('./team_tasks_page.js');
             if (stale()) return;
             await m.showTasks(host, team, { ...teamHooks(), onCount: (n) => { S.counts.tasks = n; drawCounts(); } });
+            if (stale()) return;
             if (item) openTaskById(item, { kind: 'tasks' });
         } else if (tab === 'artifacts') {
             const m = await importOnce('./team_artifacts_page.js');
