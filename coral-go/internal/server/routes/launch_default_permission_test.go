@@ -302,7 +302,13 @@ func TestAnAgentsLaunchIsNotStartedInAutoByDefault(t *testing.T) {
 	// a member that is exactly an entry of a template the Operator saved is the Operator's choice
 	require.NoError(t, ss.SetSetting(ctx, "saved_team_templates", `[{"name":"t","agents":[{"name":"S","agent_type":"claude"}]}]`))
 	assert.Equal(t, "default", team(true, map[string]any{"name": "S", "agent_type": "claude"}), "a saved template member with nothing chosen: the CLI confirm mode (#6415)")
-	// a saved default still wins for the agent's child, as before this change
+	// a saved default that asks still wins for the agent's child, as before; one that skips the prompts is the Operator's, not an agent's to use (#7576, agent_launch_needs_mode_test.go)
+	require.NoError(t, ss.SetSetting(ctx, "default_permission_mode", "default"))
+	assert.Equal(t, "default", launch(true))
 	require.NoError(t, ss.SetSetting(ctx, "default_permission_mode", "acceptEdits"))
-	assert.Equal(t, "acceptEdits", launch(true))
+	b, _ := json.Marshal(map[string]any{"agent_type": at.Claude, "working_dir": t.TempDir()})
+	rec := httptest.NewRecorder()
+	h.Launch(rec, asAgent(httptest.NewRequest(http.MethodPost, "/api/sessions/launch", bytes.NewReader(b))))
+	assert.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
+	assert.Equal(t, "acceptEdits", launch(false), "the Operator's launch takes it")
 }
