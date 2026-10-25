@@ -1420,7 +1420,7 @@ button.subscriber-history-link {
 #notices {
     position: fixed;
     right: 20px;
-    bottom: 20px;
+    bottom: var(--notice-bottom, 20px); /* above a page's pinned bar when it has one (notifications.js placeNotices) */
     z-index: 300;
     display: flex;
     flex-direction: column;

@@ -147,6 +147,11 @@ const STUB = `(() => { const real = window.fetch; const J = b => Promise.resolve
             assert.deepEqual(await ev(`[...document.querySelectorAll('#wf-detail .wf-runs-table th')].map(h => [h.textContent, h.getAttribute('scope')])`), [['Started', 'col'], ['Result', 'col'], ['Duration', 'col'], ['Trigger', 'col']], at + 'Runs are a table');
             assert.deepEqual(await ev(`[...document.querySelectorAll('#wf-detail .item-bar > .btn, #wf-detail .item-bar > .wf-more > .btn')].filter(b => b.getClientRects().length).map(b => b.textContent.replace(/smart_toy|play_arrow/, '').trim() + (b.classList.contains('btn-primary') ? '*' : ''))`), ['More', 'Edit with Agent', 'Edit', 'Run*'], at + 'the pinned bar: More, Edit with Agent, Edit, Run, the primary last');
             assert.equal(await ev(`(() => { const r = document.querySelector('#wf-detail .item-bar').getBoundingClientRect(); return r.bottom <= innerHeight + 1 && r.bottom >= innerHeight - 40 && r.top >= 0; })()`), true, at + 'the bar is on screen, at the foot of it');
+            // UI/UX's #7588 item 3: a toast sits above the page's pinned bar, never over it (a phone's toasts are at the top, where the bar is not)
+            await ev(`import((window.__coralStatic || '/static/') + 'utils.js').then(m => m.showToast('Workflow triggered, run 2')).then(() => true)`);
+            await waitFor(`!!document.querySelector('#toast-host > .toast')`, at + 'a toast', 4000);
+            assert.equal(await ev(`(() => { const t = document.querySelector('#toast-host > .toast').getBoundingClientRect(), b = document.querySelector('#wf-detail .item-bar').getBoundingClientRect(); return mobileTop() || t.bottom <= b.top + 1; function mobileTop() { return getComputedStyle(document.getElementById('notices')).bottom === 'auto'; } })()`), true, at + 'the toast is above the bar (it hides none of its buttons)');
+            await shot(`workflows-one-toast-${w}`);
             assert.deepEqual(await ev(`(${ON_SCALE})(document.getElementById('wf-detail'), ${SCALE})`), [], at + "every text of the workflow's page is on the scale");
             await shot(`workflows-one-page-${w}`);
 

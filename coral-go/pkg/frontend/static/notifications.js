@@ -142,6 +142,9 @@ export function placeNotices() {
     const bar = document.querySelector("header.top-bar");
     const top = `${Math.max(bar ? Math.round(bar.getBoundingClientRect().bottom) : 0, 0) + 8}px`;
     document.getElementById("notices")?.style.setProperty("--notice-top", top);
+    // A page's pinned bar (its actions: Run, Edit, Done) is never under a toast: the column sits above the bar on the screen (UI/UX #7588 item 3; a phone's is at the top, where the bar is not).
+    const pinned = [...document.querySelectorAll(".item-bar")].map(b => b.getBoundingClientRect()).find(r => r.height > 0 && r.bottom > window.innerHeight - 90 && r.top < window.innerHeight);
+    document.getElementById("notices")?.style.setProperty("--notice-bottom", `${Math.max(20, pinned ? Math.ceil(window.innerHeight - pinned.top) + 8 : 0)}px`);
     if (!placeNotices._wired) { placeNotices._wired = true; window.addEventListener("resize", placeNotices); }
 }
 
