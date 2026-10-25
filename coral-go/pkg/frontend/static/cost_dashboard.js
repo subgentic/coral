@@ -631,8 +631,8 @@ function _renderProviderTable(rows) {
             ${_sortHeader('provider', 'requests', 'Requests', 'cost-col-right')}
             ${_sortHeader('provider', 'input_tokens', 'Input', 'cost-col-right')}
             ${_sortHeader('provider', 'output_tokens', 'Output', 'cost-col-right')}
-            ${_sortHeader('provider', 'cache_read_tokens', 'Cache Read', 'cost-col-right')}
-            ${_sortHeader('provider', 'cache_write_tokens', 'Cache Write', 'cost-col-right')}
+            ${_sortHeader('provider', 'cache_read_tokens', 'Cache read', 'cost-col-right')}
+            ${_sortHeader('provider', 'cache_write_tokens', 'Cache write', 'cost-col-right')}
             ${_sortHeader('provider', 'cost_usd', 'Cost', 'cost-col-right')}
             ${_sortHeader('provider', 'cost_pct', 'Share', 'cost-col-right')}
         </tr></thead><tbody>`;
@@ -679,8 +679,8 @@ function _renderModelTable(rows) {
             ${_sortHeader('model', 'requests', 'Requests', 'cost-col-right')}
             ${_sortHeader('model', 'input_tokens', 'Input', 'cost-col-right')}
             ${_sortHeader('model', 'output_tokens', 'Output', 'cost-col-right')}
-            ${_sortHeader('model', 'cache_read_tokens', 'Cache Read', 'cost-col-right')}
-            ${_sortHeader('model', 'cache_write_tokens', 'Cache Write', 'cost-col-right')}
+            ${_sortHeader('model', 'cache_read_tokens', 'Cache read', 'cost-col-right')}
+            ${_sortHeader('model', 'cache_write_tokens', 'Cache write', 'cost-col-right')}
             ${_sortHeader('model', 'cost_usd', 'Cost', 'cost-col-right')}
             ${_sortHeader('model', 'cost_pct', 'Share', 'cost-col-right')}
         </tr></thead><tbody>`;
@@ -734,8 +734,8 @@ function _renderThinkingTable(rows) {
             ${_sortHeader('thinking', 'requests', 'Calls', 'cost-col-right')}
             ${_sortHeader('thinking', 'input_tokens', 'Input', 'cost-col-right')}
             ${_sortHeader('thinking', 'output_tokens', 'Output', 'cost-col-right')}
-            ${_sortHeader('thinking', 'cache_read_tokens', 'Cache Read', 'cost-col-right')}
-            ${_sortHeader('thinking', 'cache_write_tokens', 'Cache Write', 'cost-col-right')}
+            ${_sortHeader('thinking', 'cache_read_tokens', 'Cache read', 'cost-col-right')}
+            ${_sortHeader('thinking', 'cache_write_tokens', 'Cache write', 'cost-col-right')}
             ${_sortHeader('thinking', 'thinking_tokens', 'Thinking', 'cost-col-right')}
             ${_sortHeader('thinking', 'cost_usd', 'Cost', 'cost-col-right')}
             ${_sortHeader('thinking', 'cost_pct', 'Share', 'cost-col-right')}
@@ -793,8 +793,8 @@ function _renderAgentTable(rows) {
             ${_sortHeader('agent', 'requests', 'Requests', 'cost-col-right')}
             ${_sortHeader('agent', 'input_tokens', 'Input', 'cost-col-right')}
             ${_sortHeader('agent', 'output_tokens', 'Output', 'cost-col-right')}
-            ${_sortHeader('agent', 'cache_read_tokens', 'Cache Read', 'cost-col-right')}
-            ${_sortHeader('agent', 'cache_write_tokens', 'Cache Write', 'cost-col-right')}
+            ${_sortHeader('agent', 'cache_read_tokens', 'Cache read', 'cost-col-right')}
+            ${_sortHeader('agent', 'cache_write_tokens', 'Cache write', 'cost-col-right')}
             ${_sortHeader('agent', 'cost_usd', 'Cost', 'cost-col-right')}
         </tr></thead><tbody>`;
 
@@ -980,12 +980,12 @@ function _renderTaskTable(tasks) {
             ${_sortHeader('task', 'title', 'Task', '')}
             ${_sortHeader('task', 'assigned_to', 'Agent', '', true)}
             ${_sortHeader('task', 'priority', 'Priority', '', true)}
-            ${_sortHeader('task', 'claimed_at', 'Start Time', '')}
+            ${_sortHeader('task', 'claimed_at', 'Start time', '')}
             ${_sortHeader('task', 'duration', 'Duration', 'cost-col-right')}
             ${_sortHeader('task', 'input_tokens', 'Input', 'cost-col-right')}
             ${_sortHeader('task', 'output_tokens', 'Output', 'cost-col-right')}
-            ${_sortHeader('task', 'cache_read_tokens', 'Cache Read', 'cost-col-right')}
-            ${_sortHeader('task', 'cache_write_tokens', 'Cache Write', 'cost-col-right')}
+            ${_sortHeader('task', 'cache_read_tokens', 'Cache read', 'cost-col-right')}
+            ${_sortHeader('task', 'cache_write_tokens', 'Cache write', 'cost-col-right')}
             ${_sortHeader('task', 'cost_usd', 'Cost', 'cost-col-right')}
         </tr></thead><tbody>`;
 
@@ -1252,8 +1252,8 @@ function _renderTeamTable(teams) {
             ${_sortHeader('team', 'num_agents', 'Agents', 'cost-col-right')}
             ${_sortHeader('team', 'input_tokens', 'Input', 'cost-col-right')}
             ${_sortHeader('team', 'output_tokens', 'Output', 'cost-col-right')}
-            ${_sortHeader('team', 'cache_read_tokens', 'Cache Read', 'cost-col-right')}
-            ${_sortHeader('team', 'cache_write_tokens', 'Cache Write', 'cost-col-right')}
+            ${_sortHeader('team', 'cache_read_tokens', 'Cache read', 'cost-col-right')}
+            ${_sortHeader('team', 'cache_write_tokens', 'Cache write', 'cost-col-right')}
             ${_sortHeader('team', 'cost_usd', 'Cost', 'cost-col-right')}
             <th class="cost-col-right" style="width:100px">Share</th>
         </tr></thead><tbody>`;
@@ -1316,8 +1316,8 @@ function _renderBranchTable(branches) {
             ${_sortHeader('branch', 'num_agents', 'Agents', 'cost-col-right')}
             ${_sortHeader('branch', 'input_tokens', 'Input', 'cost-col-right')}
             ${_sortHeader('branch', 'output_tokens', 'Output', 'cost-col-right')}
-            ${_sortHeader('branch', 'cache_read_tokens', 'Cache Read', 'cost-col-right')}
-            ${_sortHeader('branch', 'cache_write_tokens', 'Cache Write', 'cost-col-right')}
+            ${_sortHeader('branch', 'cache_read_tokens', 'Cache read', 'cost-col-right')}
+            ${_sortHeader('branch', 'cache_write_tokens', 'Cache write', 'cost-col-right')}
             ${_sortHeader('branch', 'cost_usd', 'Cost', 'cost-col-right')}
             <th class="cost-col-right" style="width:100px">Share</th>
         </tr></thead><tbody>`;

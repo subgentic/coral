@@ -19,10 +19,10 @@ const BRANCHES = [{ repo_name: 'coral', branch: 'main', board_name: 'coral-go-te
     { repo_name: 'coral', branch: 'fix/cost', board_name: 'docs-sprint', pr_number: 12, num_agents: 2, input_tokens: 900, output_tokens: 90, cache_read_tokens: 0, cache_write_tokens: 0, cost_usd: 0.9 }];
 // The original column order of each table, as a wide window shows it.
 const WIDE = {
-    'cost-by-provider': ['Provider', 'Requests', 'Input', 'Output', 'Cache Read', 'Cache Write', 'Cost', 'Share'],
-    'cost-by-model': ['Provider', 'Model', 'Requests', 'Input', 'Output', 'Cache Read', 'Cache Write', 'Cost', 'Share'],
-    'cost-by-thinking': ['Provider', 'Model', 'Thinking level', 'Calls', 'Input', 'Output', 'Cache Read', 'Cache Write', 'Thinking', 'Cost', 'Share'],
-    'cost-by-team': ['Team', 'Agents', 'Input', 'Output', 'Cache Read', 'Cache Write', 'Cost', 'Share'],
+    'cost-by-provider': ['Provider', 'Requests', 'Input', 'Output', 'Cache read', 'Cache write', 'Cost', 'Share'],
+    'cost-by-model': ['Provider', 'Model', 'Requests', 'Input', 'Output', 'Cache read', 'Cache write', 'Cost', 'Share'],
+    'cost-by-thinking': ['Provider', 'Model', 'Thinking level', 'Calls', 'Input', 'Output', 'Cache read', 'Cache write', 'Thinking', 'Cost', 'Share'],
+    'cost-by-team': ['Team', 'Agents', 'Input', 'Output', 'Cache read', 'Cache write', 'Cost', 'Share'],
 };
 
 (async () => {

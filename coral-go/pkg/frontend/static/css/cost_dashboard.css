@@ -208,30 +208,29 @@
 
 /* Summary Cards */
 .cost-summary-cards {
-    display: flex;
-    gap: 12px;
-    margin-bottom: 24px;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+    column-gap: 12px;
+    margin-bottom: 12px; /* each tile adds its own 12 below: the rows of one line are shared by its tiles (subgrid), so a label of two lines moves no figure */
     flex-shrink: 0;
 }
 
 .cost-card {
-    flex: 1 1 7rem;
+    grid-row: span 3; /* label, figure, sparkline: the three rows of the line, as high as the tallest tile's own, so the figures of a line sit on one baseline */
+    grid-template-rows: subgrid;
+    row-gap: 4px;
+    margin-bottom: 12px;
     min-width: min-content; /* a tile is never narrower than its figure (which does not break): they share a row when there is room and wrap to more rows when the text is large */
     background: var(--bg-secondary);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     padding: 14px 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
+    display: grid;
 }
 
 .cost-card-label {
     font-size: var(--fs-base);
     font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.4px;
     color: var(--text-secondary);
 }
 
@@ -290,10 +289,8 @@
     background: var(--bg-secondary);
     padding: 8px 12px;
     text-align: left;
-    font-weight: 600;
+    font-weight: 500;
     font-size: var(--fs-base);
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
     color: var(--text-secondary);
     border-bottom: 1px solid var(--border);
     white-space: nowrap;
@@ -445,8 +442,7 @@
 }
 
 .cost-card-burn .cost-card-value {
-    font-size: 1.25rem;
-    color: var(--warning);
+    font-size: 1.25rem; /* a number, in the normal colour: amber means a warning (UI/UX #7588) */
 }
 
 /* ── Cumulative Spend Chart ─────────────────────────────── */
