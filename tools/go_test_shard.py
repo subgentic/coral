@@ -9,6 +9,8 @@ isolated per process (own temp folder, ephemeral ports), so the same tests split
 PKG is a package path under coral-go, e.g. ./internal/server/routes (its TestMain must call internal/testshard.Apply).
 No --shard: all shards run here, together. With --shard I (1-based), only that one runs (one CI job per shard); every shard computes the
 same split from the same list, so the shards together are the whole package.
+--alone TEST (repeatable) runs a wall-clock-bounded test by itself, before the shards, in one process, and in no shard. It runs in exactly one job: with no --shard, here;
+with --shard I, in shard 1's run only, so if CI ever splits the shards across jobs the alone tests run once, in job 1.
 
 The test binary is built into a folder of its own and removed when the run ends: nothing is kept for a later run. The processes share no data
 folder or port: every test makes its folder with t.TempDir or os.MkdirTemp (a name no other process draws) and listens on port 0. The

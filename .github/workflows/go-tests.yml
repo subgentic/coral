@@ -87,7 +87,13 @@ jobs:
             # of this runner (#350), and the script fails when a test did not run exactly once.
             # The tests with a wall-clock bound (the slow-input guards of the shell-risk reading) run first and alone, in a quiet process: the bound holds
             # unchanged, and four processes sharing the CPU can't trip it. The script fails when one of these names no longer exists.
-            python3 ../tools/go_test_shard.py --shards 4 --timeout 45m ${TAGS:+--tags "$TAGS"}               --alone TestShellRiskDeepNestingIsAnsweredInOnePass --alone TestShellRiskWrapperRecursionIsMemoizedPerRun               --alone TestShellRiskNestedShellWrappersAreBoundedInTime --alone TestShellRiskNestedLaunchersAreBounded               --alone TestShellRiskNestedSubstitutionIsBoundedInTime "${pkgs[0]}"
+            python3 ../tools/go_test_shard.py --shards 4 --timeout 45m ${TAGS:+--tags "$TAGS"} \
+              --alone TestShellRiskDeepNestingIsAnsweredInOnePass \
+              --alone TestShellRiskWrapperRecursionIsMemoizedPerRun \
+              --alone TestShellRiskNestedShellWrappersAreBoundedInTime \
+              --alone TestShellRiskNestedLaunchersAreBounded \
+              --alone TestShellRiskNestedSubstitutionIsBoundedInTime \
+              "${pkgs[0]}"
           else
             go test -count=1 -p 4 -timeout 45m ${TAGS:+-tags "$TAGS"} "${pkgs[@]}"
           fi
