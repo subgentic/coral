@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -122,9 +123,9 @@ func TestGoalLinksNeedAnAcceptedRequestAndNothingLabelledAnyOtherWay(t *testing.
 func TestGoalLinksTitlesAreRedactedBoundedAndTheRowIsExactlyTheseFields(t *testing.T) {
 	s := testStore(t)
 	ctx := context.Background()
-	rid, _ := acceptedRequest(t, s, ctx, "alpha", "beta", "Rotate key ghp" + "_abcdefghijklmnopqrstuvwxyz0123456789", "Dev")
+	rid, _ := acceptedRequest(t, s, ctx, "alpha", "beta", "Rotate key ghp"+"_abcdefghijklmnopqrstuvwxyz0123456789", "Dev")
 	reply, err := s.GoalLinks(ctx, rid, "", "alpha", "", 50, func(s string) string {
-		return strings.ReplaceAll(s, "ghp" + "_abcdefghijklmnopqrstuvwxyz0123456789", "[redacted]")
+		return strings.ReplaceAll(s, "ghp"+"_abcdefghijklmnopqrstuvwxyz0123456789", "[redacted]")
 	})
 	require.NoError(t, err)
 	require.Len(t, reply.Accepted, 1)
@@ -289,5 +290,25 @@ func TestTwoSendersWithOneRequestIDEachGetTheirOwnRowAndTask(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, reply.Accepted, 1, "%v sees one row: its own", sd)
 		assert.Equal(t, titles[sd], reply.Accepted[0].Title, "%v sees its own task, not another sender's", sd)
+	}
+}
+
+// #7464: the title is redacted whole and then cut, so a token that straddles the 200-character bound is replaced, never left as its front half.
+func TestGoalLinksRedactBeforeTheyCut(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	token := "gh" + "p_" + strings.Repeat("Ab1", 12) // 38 characters: ghp_ and 36
+	redact := func(in string) string {
+		return regexp.MustCompile(`ghp_[A-Za-z0-9]{36}`).ReplaceAllString(in, "[redacted]")
+	}
+	for _, pad := range []int{150, 170, 185, 190, 195, 199, 200} {
+		title := strings.Repeat("a", pad) + token
+		rid, _ := acceptedRequest(t, s, ctx, "alpha", "beta", title, "Dev")
+		reply, err := s.GoalLinks(ctx, rid, "", "alpha", "", 50, redact)
+		require.NoError(t, err)
+		require.Len(t, reply.Accepted, 1)
+		got := reply.Accepted[0].Title
+		assert.NotContains(t, got, "ghp_", "pad %d: no front of the token is left: %q", pad, got)
+		assert.LessOrEqual(t, len([]rune(got)), GoalLinksTitleMax, "pad %d", pad)
 	}
 }
