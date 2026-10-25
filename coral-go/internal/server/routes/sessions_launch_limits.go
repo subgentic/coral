@@ -188,3 +188,22 @@ func agentLaunchUnsupervised(agentType string) bool {
 func agentLaunchUnsupervisedMessage(agentType string) string {
 	return "an agent cannot start a " + agentType + " agent: " + agentType + " does not ask before running tools; ask the Operator to start it"
 }
+
+// agentLaunchNeedsModeCode is the code of the refusal of an agent starting a Codex that names no permission mode on a board (#7552, Security's decision on #7527's caveat).
+const agentLaunchNeedsModeCode = "agent_launch_needs_mode"
+
+// agentLaunchNeedsMode says whether an agent's launch of agentType must be refused for want of a permission mode: a Codex on a board, with no mode in its flags and no saved
+// default_permission_mode. The Operator's launch with no mode is Auto (AutoByDefault); an agent's is not (it never starts a less-restricted agent, #4032, nor one that skips prompts,
+// #5901), so it would start bare Codex, which asks first, and a Codex that asks first cannot reach Coral from its sandbox: a worker that cannot post. An explicit mode, and a saved default (the
+// person's choice for every launch), are used as before; Claude and the other types are unchanged.
+func agentLaunchNeedsMode(agentType string, flags []string, onBoard bool, userSettings map[string]string) bool {
+	if agentType != "codex" || !onBoard {
+		return false
+	}
+	if carried, _ := agent.SplitPermissionFlags(flags); len(carried) > 0 || agent.PermissionModeFromFlags(flags) != "" {
+		return false
+	}
+	return setreg.Enum(userSettings, "default_permission_mode") == ""
+}
+
+const agentLaunchNeedsModeMessage = "an agent's Codex launch with no permission mode asks first, and a Codex that asks first cannot reach Coral from its sandbox: ask the Operator to start it, or to set a default permission mode in Settings"
