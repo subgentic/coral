@@ -8,6 +8,7 @@ import { responseErrorText } from './server_status.js';
 
 /** What to tell the person after a send, from the server's counts. */
 export function sendNowToast(r) {
+    if (r && r.draft_in_box) return 'There is a draft in the agent\'s input box: nothing was sent. Send or clear it first.';
     if (r && r.prompt_open) return 'A prompt is open in the agent\'s terminal: nothing was sent into it. Answer it first.';
     const n = Number(r && r.sent) || 0;
     if (n > 0) return `Sent ${n} message${n === 1 ? '' : 's'} now.`;
