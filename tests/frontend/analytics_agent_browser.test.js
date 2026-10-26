@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { setTheme } = require('./helpers/contrast');
 
 const AGENTS = [{ session_id: 'a1', agent_name: 'Frontend Dev', board_name: 'coral-go-team', folder: 'coral', requests: 120, input_tokens: 40000, output_tokens: 7000, cache_read_tokens: 360000, cache_write_tokens: 900, cost_usd: 24, first_seen: '2026-10-21T05:00:00Z', last_seen: '2026-10-21T06:00:00Z' },
     { session_id: 'a2', agent_name: 'QA Engineer', board_name: 'coral-go-team', folder: 'coral', requests: 4, input_tokens: 900, output_tokens: 90, cache_read_tokens: 0, cache_write_tokens: 0, cost_usd: 0.6, first_seen: '2026-10-21T05:00:00Z', last_seen: '2026-10-21T05:30:00Z' }];
@@ -67,7 +68,7 @@ const CALLS = Array.from({ length: 24 }, (_, h) => ({ bucket: hourIso(23 - h), c
         assert.notEqual(await ev(`document.getElementById('cost-agent-window').value`), '', 'the select shows the pick');
         await ev(`(() => { const s = document.getElementById('cost-agent-window'); s.value = ''; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
         await waitFor(`/^Biggest turns, last 24 hours/.test(document.querySelector('#cost-agent-detail .viz-table-title').textContent)`, 'the whole range again', 8000);
-        await shot('agent-detail');
+        await shot('agent-detail'); await setTheme(ev, 'light'); await shot('agent-detail-light'); await setTheme(ev, 'dark');
         console.log('   ✓');
 
         console.log('3. More charts: tool calls (failed on top, in the error colour) and cache hit');
@@ -76,6 +77,7 @@ const CALLS = Array.from({ length: 24 }, (_, h) => ({ bucket: hourIso(23 - h), c
         assert.ok(await ev(`[...document.querySelectorAll('#cost-agent-detail .viz-more .viz-bar')].some(p => p.getAttribute('fill') === 'var(--danger)')`), 'failed calls are drawn in the error colour');
         console.log('   ✓');
 
+        assert.equal(await ev(`document.querySelector('#cost-agent-detail .viz-back').textContent`), '\u2190 By agent'); assert.ok(await ev(`document.querySelector('#cost-agent-detail .viz-back').classList.contains('group-back')`), 'the back link of the page, not a button');
         console.log('4. Back to By agent; a failing read leaves the rest');
         await ev(`document.querySelector('#cost-agent-detail .viz-back').click(); true`);
         await waitFor(`document.getElementById('cost-dashboard-view').dataset.view === 'agent'`, 'back on By agent', 6000);
@@ -90,7 +92,7 @@ const CALLS = Array.from({ length: 24 }, (_, h) => ({ bucket: hourIso(23 - h), c
         await waitFor(`document.querySelectorAll('#cost-agent-detail .viz-svg').length >= 3`, 'the drill-down on a phone', 12000);
         const p = await ev(`({ page: document.documentElement.scrollWidth > innerWidth + 1, sel: Math.round(document.getElementById('cost-agent-window').getBoundingClientRect().height), back: Math.round(document.querySelector('#cost-agent-detail .viz-back').getBoundingClientRect().height) })`);
         assert.equal(p.page, false, JSON.stringify(p)); assert.ok(p.sel >= 44, JSON.stringify(p));
-        await shot('agent-detail-phone');
+        await shot('agent-detail-phone'); await setTheme(ev, 'light'); await shot('agent-detail-phone-light'); await setTheme(ev, 'dark');
         console.log('   ✓');
         console.log('PASS analytics agent drill-down: tiles, cost by turn and hour, the pick, biggest turns, more charts, back, failures, phone');
     } finally { await client.close(); }
