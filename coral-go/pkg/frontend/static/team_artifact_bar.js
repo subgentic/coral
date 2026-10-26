@@ -1,12 +1,12 @@
 /* The Team Artifacts panel's search box, filter menu, sort and chips (#4573): its words, fields and sorts on the shared list bar (list_bar.js, #4744). The server does the work: this only
  * collects what to ask for (team_artifact_filters.js). */
 import { importOnce } from './import_once.js';
-const { EMPTY, KINDS, ORIGINS, SORTS, KIND_LABEL, ORIGIN_LABEL, SORT_LABEL, clean, chips, isFiltered, without } = await importOnce('./team_artifact_filters.js'); // lazy: its failure is retried
+const { EMPTY, KINDS, ORIGINS, SORTS, KIND_LABEL, ORIGIN_LABEL, SORT_LABEL, clean, chips, isFiltered, without, INBOX } = await importOnce('./team_artifact_filters.js'); // lazy: its failure is retried
 import { buildListBar } from './list_bar.js';
 
 // The same fields for the team's list and for one agent's list (#5283): only the words and the ids differ, so the two bars (one per panel, both in the page) never share an id.
-const specFor = (personal, page = false) => {
-    const idp = personal ? 'aa' : 'ta';
+const specFor = (personal, page = false, teams = false) => {
+    const idp = teams ? 'ia' : personal ? 'aa' : 'ta';
     return {
         idp,
         noun: 'artifact',
@@ -19,6 +19,7 @@ const specFor = (personal, page = false) => {
         expandAll: page ? undefined : { expand: 'Expand all details', collapse: 'Collapse all details' }, // the team page shows details in its pane, not in the rows
         sorts: { values: SORTS, labels: SORT_LABEL, aria: 'Sort artifacts' },
         fields: [
+            ...(teams ? [{ type: 'select', key: 'team', id: `${idp}-team`, label: 'Team', values: [], labels: {}, any: 'Any team' }] : []), // the Inbox's list spans teams: its options come from the answer (setOptions)
             { type: 'select', key: 'kind', id: `${idp}-kind`, label: 'Type', values: KINDS, labels: KIND_LABEL, any: 'Any type' },
             { type: 'select', key: 'origin', id: `${idp}-origin`, label: 'Origin', values: ORIGINS, labels: ORIGIN_LABEL, any: 'Any origin' },
             { type: 'text', key: 'by', id: `${idp}-by`, className: 'list-bar-by', label: 'Uploaded by', max: 80, placeholder: 'Agent or person', datalist: `${idp}-by-list` },
@@ -26,11 +27,11 @@ const specFor = (personal, page = false) => {
             { type: 'date', key: 'from', id: `${idp}-from`, label: 'From' },
             { type: 'date', key: 'to', id: `${idp}-to`, label: 'Until' },
         ],
-        model: { EMPTY, clean, chips, isFiltered, without },
+        model: teams ? { EMPTY: INBOX.EMPTY, clean: INBOX.clean, chips: INBOX.chips, isFiltered: INBOX.isFiltered, without: INBOX.without } : { EMPTY, clean, chips, isFiltered, without },
     };
 };
 
 /** onChange(filters) is called with the new, clean filters when the person changes anything (typing after a short pause). personal: the bar of one agent's Artifacts tab. */
-export function buildBar(onChange, { personal = false, page = false, more = null, moreNoun = '', hooks = {} } = {}) {
-    return buildListBar({ ...specFor(personal, page), ...(more ? { more, moreNoun } : {}) }, onChange, hooks); // more: the list's other actions behind the More icon (#7686)
+export function buildBar(onChange, { personal = false, page = false, teams = false, more = null, moreNoun = '', hooks = {} } = {}) {
+    return buildListBar({ ...specFor(personal, page, teams), ...(more ? { more, moreNoun } : {}) }, onChange, hooks); // more: the list's other actions behind the More icon (#7686)
 }

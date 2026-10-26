@@ -38,6 +38,7 @@ const GF = await importOnce('./goal_filters.js'); // the Goals folder's search, 
 const IT = await importOnce('./inbox_toolbar.js'); // the folders' toolbar on the shared list bar
 const NF = await importOnce('./needs_filters.js'); // the Needs you folder's search, pills and Filters (#8604)
 const CF = await importOnce('./chat_filters.js'); // the chat folders' Filters (#8603)
+const IA = await importOnce('./inbox_artifacts.js'); // the Artifacts folder (Goal #62): every team's files in one list
 const CH = await importOnce('./mailbox_chats.js'); // the chat folders (#7776): All chats, Board history, By CLI, Tags
 const { providerName } = await importOnce('./model_labels.js'); // a CLI by its name (Claude, Codex, Antigravity), as the Chats list says it
 const { waitingText } = await importOnce('./waiting_text.js'); // a lazy module imports only what loads at startup (import_hygiene): this one loads with it
@@ -47,6 +48,7 @@ const GROUPS = [
     { key: 'needs', label: 'Needs you', search: 'Search needs you', short: 'Search' },
     { key: 'tasks', label: 'Tasks', search: 'Search tasks', short: 'Search' },
     { key: 'goals', label: 'Goals', search: 'Search goals', short: 'Search' }, // the open goals of every team the person runs (GET /api/goals): the team page's goal row plus a Team column (#7776)
+    { key: 'artifacts', label: 'Artifacts', search: 'Search artifacts', short: 'Search' }, // every team's artifacts (GET /api/team-artifacts): the team page's list plus a Team filter (Goal #62)
     { key: 'saved', label: 'Saved', search: 'Search saved messages', short: 'Search' }, // the box beside Display options and Expand is narrow: its placeholder is the short words, its name the whole ones
 ];
 const GROUP_KEY = 'coral.inbox.tab'; // the group last on screen, kept in this browser
@@ -54,7 +56,7 @@ let tasks = [];
 /** A folder's name and its search words: the groups above, or a chat folder (its title comes from the chat folders' own list). */
 const groupMeta = key => GROUPS.find(g => g.key === key) || (CH.CHAT_KEY.test(key) && CH.chatFolder(key) ? { key, label: CH.chatFolder(key).title, search: 'Search chats', short: 'Search' } : null);
 let group = (() => { const v = browserLocal.get(GROUP_KEY); return groupMeta(v) ? v : 'needs'; })();
-const queries = { needs: '', tasks: '', goals: '', saved: '' }; // a chat folder keeps its search as typed under its own key // each group's own search text (lower case; Saved's goes to the server as typed)
+const queries = { needs: '', tasks: '', goals: '', artifacts: '', saved: '' }; // a chat folder keeps its search as typed under its own key // each group's own search text (lower case; Saved's goes to the server as typed)
 let goalMount = null, goalOpener = null, goalScroll = 0, itemMount = null;
 const itemOpeners = new Map();
 const folderRoute = { view: 'inbox-goals', sub: 'goals' };
@@ -250,12 +252,13 @@ function inboxSavedToolbar() {
 const savedCounts = () => saved.savedView().totals;
 
 // ── The sidebar list ─────────────────────────────────────────────────────
-const countOf = key => key === 'needs' ? waitingSessions().length : key === 'tasks' ? taskRows().length : key === 'goals' ? goals.length : key === 'saved' ? savedCounts().open : undefined;
+const countOf = key => key === 'needs' ? waitingSessions().length : key === 'tasks' ? taskRows().length : key === 'goals' ? goals.length : key === 'artifacts' ? IA.artifactCount() ?? undefined : key === 'saved' ? savedCounts().open : undefined;
 /** The folders of the Inbox (#7785, the mailbox mock): one view list, a name and a count each. Needs you, Tasks and Saved open their table in the centre; */
 const folderSections = () => [{ title: 'Needs attention', items: [
     { key: 'needs', label: 'Needs you', count: countOf('needs'), alert: true }, { key: 'tasks', label: 'Tasks', count: countOf('tasks') },
     { key: 'goals', label: 'Goals', count: countOf('goals') },
-    { key: 'saved', label: 'Saved', count: countOf('saved') }] }, ...CH.chatSections()];
+    { key: 'saved', label: 'Saved', count: countOf('saved') }] },
+    { title: 'Files', items: [{ key: 'artifacts', label: 'Artifacts', count: countOf('artifacts') }] }, ...CH.chatSections()];
 let _navKey = null, _folders = null, _poll = 0;
 /** A folder was picked: a page that is open gives way, and the folder's table opens with the keyboard at its heading. */
 function pickFolder(key) {
@@ -436,6 +439,7 @@ registerGroupSource('hub-inbox', {
                     },
                     columns: GC.goalColumns({ teamOf: goalTeam }, ['state', 'goal', 'team', 'progress', 'updated']) }).el };
         }
+        if (key === 'artifacts') return IA.artifactsSpec();
         if (key === 'saved') return savedListSpec();
         return null;
     },
@@ -480,6 +484,7 @@ onViewShown(id => {
 export function filterInbox(value) {
     const text = String(value || '').trim();
     if (group === 'saved') { queries.saved = text; saved.setSavedQuery(text); return; }
+    if (group === 'artifacts') { IA.setArtifactSearch(text); return; } // the folder's own search box shows the same text
     queries[group] = CH.CHAT_KEY.test(group) || group === 'tasks' ? text : text.toLowerCase();
     if (group === 'tasks') { inboxTasksState.selected.clear(); taskFilters = { ...taskFilters, q: text }; } // a chat search goes to the server as typed
     if (CH.CHAT_KEY.test(group)) chatFilters.set(group, { ...chatFiltersOf(group), q: text }); // the sidebar's box and the page's share the one search (#8603)
@@ -594,6 +599,7 @@ export async function showInbox({ folder = '', quiet = false } = {}) {
     refreshTasks();
     refreshGoals();
     CH.loadChatCounts(() => renderInboxNav(true));
+    IA.refreshArtifactCount(() => renderInboxNav(true));
     saved.loadSaved(); // everything's list (the Inbox is the all scope), read for the table and the count
     if (quiet || (folder && state.currentSession && state.currentSession.type === 'history')) return; // a chat is on screen, or being opened (a saved message, a link to a chat): the Inbox is drawn under it, for the way back
     if (page) {

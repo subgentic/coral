@@ -32,7 +32,7 @@ const BASE = require('./test_base').BASE;
         console.log('1. Desktop: the folders and the All chats list');
         await open(1280, 800, false);
         const f = await ev(`(() => ({ items: [...document.querySelectorAll('.view-list-item')].map(b => [b.dataset.key, (b.querySelector('.view-list-count') || {}).textContent || '']), titles: [...document.querySelectorAll('.view-list-title')].map(t => t.textContent), dot: !!document.querySelector('.view-list-item[data-key="chats-tag-7"] .view-list-dot') }))()`);
-        assert.deepEqual(f.titles, ['Needs attention', 'Chats', 'By CLI', 'Tags'], 'the sections');
+        assert.deepEqual(f.titles, ['Needs attention', 'Files', 'Chats', 'By CLI', 'Tags'], 'the sections');
         const k = Object.fromEntries(f.items);
         assert.deepEqual([k['chats'], k['chats-group'], k['chats-notes'], k['chats-starred'], k['chats-active'], k['chats-archived'], k['chats-cli-claude'], k['chats-cli-codex'], k['chats-cli-agy'], k['chats-tag-7']], ['119', '1', '9', '0', '1', '3', '90', '30', '27', '4'], 'counts from the one grouped read (Antigravity is the server\'s one shared count, not the sum of its three names, #8011; each count is its folder\'s total as the route sends it: All chats is the agents\') ' + JSON.stringify(f.items));
         assert.ok(f.dot, 'a tag has its colour dot');

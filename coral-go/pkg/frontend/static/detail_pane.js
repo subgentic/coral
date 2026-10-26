@@ -64,7 +64,7 @@ export function openDetailPane({ key, title, sub = '', facts = [], body = null, 
     const more = makeDetails(); // the facts and the rest: one closed button in the header row, the document straight under the header
     const head = el('div', 'detail-head');
     const text = el('div', 'detail-head-text');
-    if (backLabel && !host) { // the phone's way back: a text link named for where it goes, on the title's line (#7734); a pane that is not a sheet has the close button
+    if (backLabel && (!host || host.classList.contains('inbox-detail-pane'))) { // the phone's way back (the Inbox's pane has its own host, and a way back like the team page's): a text link named for where it goes, on the title's line (#7734); a pane that is not a sheet has the close button
         const back = el('button', 'goals-back detail-back'); back.type = 'button';
         const arrow = el('span', 'goals-back-arrow', '\u2190'); arrow.setAttribute('aria-hidden', 'true');
         back.append(arrow, document.createTextNode(` ${backLabel}`));
@@ -77,7 +77,7 @@ export function openDetailPane({ key, title, sub = '', facts = [], body = null, 
     if (sub) { const p = el('p', 'detail-sub', sub); if (subTitle) p.title = subTitle; subRow.append(p); } // subTitle: the exact time behind a time in words
     subRow.append(more.button);
     text.append(subRow);
-    if (backLabel && !host) foldWayBack(text, '.detail-back', '.detail-title');
+    if (backLabel && (!host || host.classList.contains('inbox-detail-pane'))) foldWayBack(text, '.detail-back', '.detail-title');
     const close = el('button', 'detail-close');
     close.type = 'button'; close.setAttribute('aria-label', 'Close details');
     close.append(el('span', 'material-icons', 'close')); close.firstChild.setAttribute('aria-hidden', 'true');
