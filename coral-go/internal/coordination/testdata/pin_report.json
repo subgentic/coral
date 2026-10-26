@@ -1,0 +1,244 @@
+{
+  "metadata": {
+    "board": "seeded",
+    "generated_at": "2026-09-29T07:00:00Z",
+    "window_start": "2026-09-29T05:00:00Z",
+    "window_end": "2026-09-29T08:00:00Z",
+    "total_tasks_in_window": 6,
+    "total_messages_in_window": 3,
+    "subscribers_tracked": 3
+  },
+  "observable_facts": {
+    "task_counts": {
+      "total_created": 6,
+      "completed": 1,
+      "in_progress": 2,
+      "pending": 1,
+      "blocked": 1,
+      "cancelled": 1,
+      "skipped": 0
+    },
+    "durations": {
+      "ready_to_claim_latency": {
+        "count": 3,
+        "min_seconds": 60,
+        "max_seconds": 900,
+        "mean_seconds": 553.3333333333334,
+        "median_seconds": 700,
+        "p90_seconds": 900
+      },
+      "total_pre_claim_wait": {
+        "count": 3,
+        "min_seconds": 60,
+        "max_seconds": 900,
+        "mean_seconds": 553.3333333333334,
+        "median_seconds": 700,
+        "p90_seconds": 900
+      },
+      "execution_duration": {
+        "count": 1,
+        "min_seconds": 840,
+        "max_seconds": 840,
+        "mean_seconds": 840,
+        "median_seconds": 840,
+        "p90_seconds": 840
+      },
+      "total_lead_time": {
+        "count": 1,
+        "min_seconds": 900,
+        "max_seconds": 900,
+        "mean_seconds": 900,
+        "median_seconds": 900,
+        "p90_seconds": 900
+      },
+      "missing_timestamps_count": 0
+    },
+    "active_vs_planned_load": {
+      "active_in_progress_tasks": 2,
+      "planned_assigned_tasks": 1,
+      "unassigned_pending_tasks": 0,
+      "board_wide_active_tasks": 2,
+      "board_wide_pending_tasks": 2,
+      "subscriber_load": [
+        {
+          "subscriber_id": "Dev",
+          "role": "Backend",
+          "availability": "available",
+          "queued_count": 1
+        },
+        {
+          "subscriber_id": "Reviewer",
+          "role": "QA",
+          "availability": "busy",
+          "active_task_id": 2,
+          "queued_count": 0
+        },
+        {
+          "subscriber_id": "Writer",
+          "role": "Docs",
+          "availability": "available",
+          "queued_count": 1
+        },
+        {
+          "subscriber_id": "Dev2",
+          "role": "Dev2",
+          "availability": "busy",
+          "active_task_id": 6,
+          "queued_count": 0
+        }
+      ]
+    },
+    "dependency_graph": {
+      "total_blocked_tasks": 1,
+      "blocked_tasks": [
+        {
+          "task_id": 3,
+          "title": "Write release notes",
+          "assignee": "Writer",
+          "dependencies": [
+            {
+              "prerequisite_id": 2,
+              "current_status": "in_progress",
+              "condition": "success",
+              "satisfied": false
+            },
+            {
+              "prerequisite_id": 4,
+              "current_status": "pending",
+              "condition": "failure",
+              "satisfied": false
+            }
+          ]
+        }
+      ]
+    },
+    "review_held_slots": [
+      {
+        "task_id": 2,
+        "title": "Review the importer",
+        "assignee": "Reviewer",
+        "reviewer_role": "QA",
+        "duration_seconds": 2600
+      }
+    ]
+  },
+  "heuristic_signals": {
+    "ready_unclaimed_analysis": {
+      "owner_busy_count": 0,
+      "owner_busy_tasks": null,
+      "owner_idle_count": 1,
+      "owner_idle_tasks": [
+        {
+          "task_id": 4,
+          "title": "Migrate settings storage",
+          "priority": "high",
+          "assignee": "Dev",
+          "age_seconds": 3300,
+          "owner_status": "idle_available"
+        }
+      ],
+      "unassigned_count": 0,
+      "unassigned_tasks": null
+    },
+    "active_without_progress_candidates": [
+      {
+        "task_id": 2,
+        "title": "Review the importer",
+        "assignee": "Reviewer",
+        "claimed_at": "2026-09-29T06:16:40Z",
+        "duration_seconds": 2600,
+        "confidence_note": "Candidate indicator only. Does not prove inactivity; agent may be running local builds/tests or model reasoning."
+      },
+      {
+        "task_id": 6,
+        "title": "Rerun the nightly index",
+        "assignee": "Dev2",
+        "claimed_at": "2026-09-29T06:20:00Z",
+        "duration_seconds": 2400,
+        "last_message_at": "2026-09-29T06:26:40Z",
+        "confidence_note": "Candidate indicator only. Does not prove inactivity; agent may be running local builds/tests or model reasoning."
+      }
+    ],
+    "notification_churn_incidents": [
+      {
+        "task_id": 6,
+        "assignee": "Dev2",
+        "notice_count": 1,
+        "timespan_seconds": 300,
+        "stale_information_age_seconds": 300,
+        "first_notice_at": "2026-09-29T06:20:00Z",
+        "last_notice_at": "2026-09-29T06:25:00Z",
+        "churn_type": "stale_unclaimed_reminder",
+        "sample_message": "Task #6 is still unclaimed, please pick it up",
+        "sender": "Orchestrator",
+        "claimed_at": "2026-09-29T06:20:00Z",
+        "confidence": "High (message at 2026-09-29T06:25:00Z dispatched 300s after claim at 2026-09-29T06:20:00Z)",
+        "analysis_note": "Sender Orchestrator posted unclaimed reminder for Task #6 at 2026-09-29T06:25:00Z (stale-information age: 300s after claim by Dev2 at 2026-09-29T06:20:00Z). Stale context or delayed dispatch, not measured network transport lag."
+      }
+    ],
+    "manual_recovery_events": [
+      {
+        "task_id": 5,
+        "title": "Fix the cache key",
+        "event_type": "cancellation",
+        "actor": "Orchestrator",
+        "timestamp": "2026-09-29T06:06:40Z",
+        "reason": "superseded by #6"
+      },
+      {
+        "task_id": 6,
+        "title": "Rerun the nightly index",
+        "event_type": "retry",
+        "actor": "Orchestrator",
+        "timestamp": "2026-09-29T06:08:20Z",
+        "reason": "Retry of predecessor task",
+        "predecessor_id": 5
+      },
+      {
+        "task_id": 0,
+        "title": "Task 4 reassigned to Dev",
+        "event_type": "reassignment",
+        "actor": "Orchestrator",
+        "timestamp": "2026-09-29T06:28:20Z",
+        "reason": "Task 4 reassigned to Dev"
+      }
+    ],
+    "duplicate_scope_candidates": null,
+    "repetitive_handoff_loops": null
+  },
+  "unavailable_metrics": [
+    "Subagent internal execution duration and step count (only claimed task boundaries recorded)",
+    "Agent local CPU, memory, and compiler activity during silent in-progress periods",
+    "Exact reasoning activity for uninstrumented external providers",
+    "Unrecorded terminal/session crashes that did not trigger coral hook events",
+    "Granular file edit timestamps prior to task completion or commit landing"
+  ],
+  "coordination_scorecard": {
+    "total_score": 75.5,
+    "observed_points": 75.5,
+    "available_points": 100,
+    "coverage_ratio": 1,
+    "score_suppressed": false,
+    "claim_promptness_score": 21,
+    "slot_fluidity_score": 15,
+    "dependency_clarity_score": 20,
+    "notification_clean_score": 12,
+    "recovery_economy_score": 7.5,
+    "validation_status": "Provisional / Pending Audit",
+    "audit_caveat": "Score reflects observed board events only: 100.0 of 100 points are available from this sample (coverage: 100.0%). Missing dimensions are excluded rather than awarded full credit; local CPU/build runs, agent reasoning, and subagent steps remain unmeasured.",
+    "scoring_methodology": "Balanced 100-pt index: Claim Promptness (25), Slot Fluidity (25), Dependency Clarity (20), Notification Signal-to-Noise (15), Recovery Economy (15). Safeguards: serialized planned work is not penalized; cancellation is not scored as success; notification suppression is not rewarded."
+  },
+  "key_findings": [
+    "Total tasks in window: 6 (Completed: 1, In Progress: 2, Pending: 1, Blocked: 1, Cancelled: 1)",
+    "Median claim latency: 700.0s (P90: 900.0s, Mean: 553.3s across 3 claims)",
+    "Median execution duration: 840.0s (P90: 840.0s across 1 completed tasks)",
+    "Coordination lag candidate: 1 ready task(s) assigned to currently idle subscribers remain unclaimed.",
+    "Notification churn observed in 1 incident(s): reminders dispatched for tasks already claimed or in rapid (\u003c2m) succession.",
+    "Active duration observation: 2 task(s) in progress exceed threshold (candidate status, not proof of inactivity)."
+  ],
+  "recommendations": [
+    "Dispatch targeted nudges with explicit claim IDs (coral-board task claim \u003cID\u003e) for the 1 unclaimed task(s) assigned to idle subscribers.",
+    "Debounce orchestrator reminders against actual task claim state to avoid alerting on already-claimed tasks.",
+    "Monitor upstream prerequisites for blocked tasks to ensure prompt unblocking upon prerequisite completion."
+  ]
+}
