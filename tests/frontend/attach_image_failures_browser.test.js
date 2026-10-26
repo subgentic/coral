@@ -67,12 +67,12 @@ async function httpJson(method, p, body, headers = {}) {
         await ev(`(() => { window.__origCreate = URL.createObjectURL; URL.createObjectURL = () => { throw new Error('no object url'); }; return true; })()`);
         r = await attach();
         await ev(`URL.createObjectURL = window.__origCreate; true`);
-        check('a file that went up but could not be attached says so, never "Upload didn\'t finish", and logs the error', r.chips === 0 && r.toasts.some(t => /uploaded but could not be attached/.test(t)) && !r.toasts.some(t => /Upload didn.t finish/.test(t)) && r.errors.some(e => /could not be attached/.test(e) && /no object url/.test(e)), JSON.stringify(r));
+        check('a file that went up but could not be attached says so, never "Upload didn\'t finish", and logs the error', r.chips === 0 && r.toasts.some(t => /Image uploaded but not attached\. Try again\./.test(t)) && !r.toasts.some(t => /Upload didn.t finish/.test(t)) && r.errors.some(e => /could not be attached/.test(e) && /no object url/.test(e)), JSON.stringify(r));
 
         await reset('strip');
         r = await attach();
         const kept = await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'image_composer.js'); return m.getPendingAttachments(T.state.currentSession).length; })()`);
-        check('a strip that cannot be drawn still keeps the image attached (it is sent), says so in its own words and logs it', kept === 1 && r.toasts.some(t => /attached but could not be shown/.test(t)) && !r.toasts.some(t => /Upload didn.t finish/.test(t)) && r.errors.some(e => /could not be shown/.test(e) && /strip cannot be drawn/.test(e)), JSON.stringify({ kept, ...r }));
+        check('a strip that cannot be drawn still keeps the image attached (it is sent), says so in its own words and logs it', kept === 1 && r.toasts.some(t => /Image attached; the preview is not shown, it will still be sent\./.test(t)) && !r.toasts.some(t => /Upload didn.t finish/.test(t)) && r.errors.some(e => /could not be shown/.test(e) && /strip cannot be drawn/.test(e)), JSON.stringify({ kept, ...r }));
     } finally { await standIn?.stop?.().catch(() => {}); await guard.restore?.(); }
     if (results.some(r => !r)) { console.error(`${results.filter(r => !r).length} of ${results.length} failed`); process.exit(1); }
     console.log(`\nAll ${results.length} attach failure checks passed`);

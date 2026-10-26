@@ -208,7 +208,7 @@ export async function uploadAndInsertImage(file, session = state.currentSession)
             });
         } catch (e) {
             console.error("Image uploaded but could not be attached:", e);
-            showToast("The image was uploaded but could not be attached. Try adding it again.", true, 10000, { action: { label: "Retry", onClick: () => uploadAndInsertImage(file, targetSession) } });
+            showToast("Image uploaded but not attached. Try again.", true, 10000, { action: { label: "Retry", onClick: () => uploadAndInsertImage(file, targetSession) } });
             return false;
         }
         try {
@@ -222,7 +222,7 @@ export async function uploadAndInsertImage(file, session = state.currentSession)
             if (result.artifact_error) showToast(`Attached ${result.filename}, not shared: ${artifactErrorText(result)}`, true);
         } catch (e) {
             console.error("Image attached but could not be shown:", e);
-            showToast("The image is attached but could not be shown here. It will still be sent.", true);
+            showToast("Image attached; the preview is not shown, it will still be sent.", true);
         }
         return true;
     })();
