@@ -27,6 +27,7 @@ const checks = new Map(); // item (uid) -> { state: 'live' | 'ended' | 'board' |
 let filters = { ...SAVED_EMPTY };
 let bar = null;
 let totals = { open: 0, done: 0 };
+let loadSeq = 0; // the read in flight that was asked for last: an answer that comes after a newer ask is dropped, so a slow read of an old filter never overwrites the list of the newer one (#7945)
 let scope = ALL; // where the panel was opened from (#4792): the agent or the team on screen, or everything; the server matches it, and the counts are its own
 const convTitles = new Map(); // conversation reference -> its title, from every list read: the Conversation filter's options (they must outlast a filter that leaves one)
 /** An item's identity across servers: ids are each server's own. */
@@ -54,6 +55,7 @@ function ago(iso) {
 /** This server's saved messages, and in hub mode every online registered server's (#4551), newest saved first. This server failing is an error; a registered server
  *  that does not answer is a line saying so, and its items are left out. Each item is tagged with the server that has it. */
 async function load() {
+    const mine = ++loadSeq;
     const here = currentScope();
     if (here.key !== scope.key) { // another agent or team: its own conversations, and a conversation filter of the last one means nothing
         scope = here;
@@ -72,6 +74,7 @@ async function load() {
     };
     const onlyRemote = scope.kind !== 'all' && normServer(scope.server) !== LOCAL_SERVER;
     const [local, ...others] = await Promise.all([onlyRemote ? Promise.resolve(null) : read(LOCAL_SERVER), ...remotes.map(s => read(s.id).catch(() => ({ server: s.id, failed: true, label: s.label || s.id })))]);
+    if (mine !== loadSeq) return; // a newer read was asked for while this one was on its way: it draws the list
     const answered = [local, ...others.filter(o => !o.failed)].filter(Boolean);
     down = others.filter(o => o.failed).map(o => ({ id: o.server, label: o.label }));
     multi = scope.kind === 'all' && remotes.length > 0;
