@@ -1,5 +1,5 @@
 // The team page's Settings tab (#7453, stage 2; UI/UX's doc 7aa984fe item 7, the approved panel design as a tab): sections Workflow, Health check, Messaging and Prompts; each setting a row with its label and hint at
-// the left and its control at the right (a select named "Working mode", switches named "Require a goal", "Send health check", "Post when all is well"); a bar pinned at the bottom with a status line ("No changes to
+// the left and its control at the right (a select named "Working mode", switches named "Require a goal", "Send health check", "Post when all is well"); a save bar pinned on a wide view, at the scroll end on a narrow view ("No changes to
 // save."), Cancel at the left and Save settings at the right, Save off until something changes; a change turns the status on and Save on; Cancel puts it back; Save sends the change and the page says it saved.
 // Written failing-first by QA (#7499): by role and accessible name (helpers/team_page.js). Isolated dev server.
 const assert = require('node:assert/strict');
@@ -86,12 +86,33 @@ const TEAM = `qa-settings-${Date.now() % 100000}`;
                 assert.equal(m.selBorder, '1px', 'the group select has the input border, not the browser\'s');
                 await ev(`document.documentElement.style.fontSize = ''; true`);
             });
-            await S.run(`${label}: the bar is pinned at the bottom: status "No changes to save.", Cancel at the left, Save settings at the right, Save off`, async () => {
+            await S.run(`${label}: the save bar stays reachable: status "No changes to save.", Cancel at the left, Save settings at the right, Save off`, async () => {
                 const b = await bar(); assert.ok(b.save && b.cancel, 'Cancel and Save settings are there');
                 assert.match(b.status, /No changes to save/, `the status says there is nothing to save (got ${JSON.stringify(b.status)})`);
                 assert.equal(b.save.disabled, true, 'Save settings is off'); assert.ok(b.cancel.x < b.save.x, 'Cancel is left of Save settings');
-                assert.ok(b.vh - (b.save.y + b.save.h) <= 24, `the bar is at the bottom of the screen (${b.vh - (b.save.y + b.save.h)} px under it)`);
-                await ev(`window.scrollTo(0, 0); true`); const b2 = await bar(); assert.ok(Math.abs(b2.save.y - b.save.y) <= 1, 'the bar does not scroll away');
+                const narrow = await ev(`(() => { const root=document.querySelector('#team-settings-workspace .sv'); return root.clientWidth <= 24 * parseFloat(getComputedStyle(document.documentElement).fontSize); })()`);
+                if (narrow) {
+                    // settings_view's 24rem container mode deliberately scrolls the whole
+                    // view, with the bar after the pane, so large text keeps reading room.
+                    const end = await ev(`(() => {
+                        const scroll=document.querySelector('#team-settings-workspace .sv-scroll');
+                        scroll.scrollTop=scroll.scrollHeight;
+                        const footer=scroll.querySelector('.sv-bar'), shell=scroll.querySelector('.sv-shell'), r=footer.getBoundingClientRect(), box=scroll.getBoundingClientRect();
+                        return { overflow:getComputedStyle(scroll).overflowY, panes:getComputedStyle(scroll.querySelector('.settings-panes')).overflowY,
+                            after:shell.compareDocumentPosition(footer) & Node.DOCUMENT_POSITION_FOLLOWING,
+                            inside:r.top >= box.top-1 && r.bottom <= box.bottom+1, gap:box.bottom-r.bottom };
+                    })()`);
+                    assert.equal(end.overflow,'auto','the narrow view scrolls as a whole');
+                    assert.equal(end.panes,'visible','the pane keeps its reading room');
+                    assert.ok(end.after,'the save bar follows the pane');
+                    assert.ok(end.inside && Math.abs(end.gap)<=24,'the whole save bar is reachable at the scroll end: '+JSON.stringify(end));
+                    await ev(`document.querySelector('#team-settings-workspace .sv-scroll').scrollTop=0; true`);
+                } else {
+                    assert.ok(b.vh - (b.save.y + b.save.h) <= 24, `the bar is at the bottom of the screen (${b.vh - (b.save.y + b.save.h)} px under it)`);
+                    await ev(`document.querySelector('#team-settings-workspace .settings-panes').scrollTop=10000; true`);
+                    const b2=await bar();
+                    assert.ok(Math.abs(b2.save.y-b.save.y)<=1,'the wide view save bar does not scroll with its pane');
+                }
             });
             await S.run(`${label}: a change turns Save on and the status moves on; Cancel puts the switch back and the bar as it was`, async () => {
                 await openFor('Require a goal');
