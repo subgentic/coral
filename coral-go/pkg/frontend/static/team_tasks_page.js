@@ -7,6 +7,7 @@ import { pollEvery } from './overload.js';
 import { whenText } from './when_text.js';
 import { importOnce } from './import_once.js';
 const { teamTable, rowButton, rowFocusTarget, stateChip, el } = await importOnce('./team_table.js'); // lazy: its failure is retried
+const Toolbar = await importOnce('./team_toolbar.js'); // the one toolbar of the team tabs (#7717)
 import { goalTitle, refreshGoalTitles, noGoalLabel } from './task_goals.js';
 import { taskStatusWord, statusClass } from './goal_words.js';
 import { state } from './state.js';
@@ -179,22 +180,15 @@ function draw() {
     if (bar.node.parentElement !== body) body.prepend(bar.node);
     const query = TF.isQuery(model.filters), L = model.q, all = rowsNow(), failed = query ? L.error : model.failed;
     const c = counts();
-    const chips = el('div', 'goals-chips goals-chips-row'); chips.setAttribute('role', 'group'); chips.setAttribute('aria-label', 'Show tasks that are');
-    for (const [key, label] of FILTERS) {
-        const b = btn('goals-chip', `${label} ${c[key]}`, () => { model.filter = key; if (key === 'open' || key === 'all') browserLocal.set(HIDE_KEY, key === 'open' ? 'true' : 'false'); say(`${label}: ${c[key]} tasks`); draw(); });
-        b.setAttribute('aria-pressed', String(model.filter === key)); b.dataset.filter = key;
-        if (!c[key] && key !== 'all') b.classList.add('goals-chip-zero');
-        chips.append(b);
-    }
     newTask = newTask || btn('btn btn-primary goals-new', 'New task', () => { (window.showCreateTaskModal || (() => {}))(); });
-    const tools = el('div', 'goals-toolbar'); tools.append(chips); body.append(tools);
-    // on a phone New task is on the search row, so the chip strip has the whole width; on a desktop it stays beside the chips
-    if (PHONE.matches) bar.node.querySelector('.list-bar-search-row').append(newTask); else tools.append(newTask);
-    chips.querySelector('[aria-pressed="true"]')?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
-    const fade = () => chips.classList.toggle('goals-chips-more', chips.scrollWidth - chips.clientWidth - chips.scrollLeft > 1); // a chip cut by the strip's edge fades out: more is there, sideways
-    chips.addEventListener('scroll', fade, { passive: true }); requestAnimationFrame(fade);
-    const count = query && L.total != null && L.total > all.length ? `Showing ${all.length} of ${L.total}${L.truncated ? '+' : ''}` : `${all.length} task${all.length === 1 ? '' : 's'}`;
-    if (all.length && !model.loading) body.append(el('p', 'goals-note team-count-line', count));
+    // The one toolbar line (#7717): the list bar's own row holds the search, the state pills (one compact select when they do not fit), the Filters icon and New task at the right.
+    Toolbar.adopt(bar.node.querySelector('.list-bar-search-row'), {
+        pills: { label: 'Show tasks that are', current: model.filter, items: FILTERS.map(([key, label]) => ({ key, label, count: c[key] })),
+            onPick: key => { model.filter = key; if (key === 'open' || key === 'all') browserLocal.set(HIDE_KEY, key === 'open' ? 'true' : 'false'); say(`${FILTERS.find(f => f[0] === key)[1]}: ${c[key]} tasks`); draw(); } },
+        action: newTask,
+    });
+    // No count line: the selected pill's number is the count of the table under it (it said every task read, 69, beside "Open 19"). Only a search that matched more than was read says so.
+    if (query && L.total != null && L.total > all.length && all.length && !model.loading) body.append(el('p', 'goals-note team-count-line', `Showing ${all.length} of ${L.total}${L.truncated ? '+' : ''}`));
     if (failed) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, failed), btn('btn btn-small', 'Try again', loadTasks)); body.append(f); }
     if (model.loading) body.append(el('p', 'goals-note', 'Loading tasks…'));
     else if (!all.length) { if (!failed) { const e = el('div', 'goals-empty'); e.append(el('p', null, query && TF.isFiltered(model.filters) ? 'No tasks match this search.' : 'No tasks yet')); body.append(e); } }

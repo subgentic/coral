@@ -48,7 +48,7 @@ const HEX = n => String(n).repeat(64).slice(0, 64);
         const controls = await ev(`[...document.querySelectorAll('#agentic-panel-artifacts-view button, #agentic-panel-artifacts-view a[href]')].filter(e => !e.closest('.list-bar-menu, .list-bar-more-menu')).map(e => ({ name: (e.getAttribute('aria-label') || e.textContent || '').trim(), tab: e.tabIndex, shown: e.getClientRects().length > 0 }))`);
         assert.ok(controls.every(c => c.shown && c.tab >= 0 && c.name), 'every control is shown, focusable and named: ' + JSON.stringify(controls.filter(c => !(c.shown && c.tab >= 0 && c.name))));
         const bar = await ev(`[...document.querySelectorAll('#agentic-panel-artifacts-view .list-bar-search, #agentic-panel-artifacts-view .list-bar-toggle, #agentic-panel-artifacts-view .list-bar-more-btn')].map(e => e.getAttribute('aria-label') || e.placeholder)`);
-        assert.deepEqual(bar, ['More actions'], 'an agent with no team has the More icon in its header and no Refresh (its list has no search or filters)');
+        assert.deepEqual(bar, ['More artifact actions'], 'an agent with no team has the More icon in its header and no Refresh (its list has no search or filters)');
         assert.deepEqual(await ev(`[...document.querySelectorAll('${ROW}')].map(r => r.querySelectorAll('button').length)`), [1, 1, 1], 'a row is one button: its name');
 
         console.log('2. A row opens by Enter; Escape closes it with the focus back on the row');
@@ -77,7 +77,7 @@ const HEX = n => String(n).repeat(64).slice(0, 64);
         a = await active(); assert.equal(a.label, 'Copy publishing instructions', 'the first item has the focus: ' + JSON.stringify(a));
         await press('Escape', 'Escape', 27);
         await waitFor(`document.querySelector('#agentic-panel-artifacts-view .list-bar-more-menu').hidden`, 'the menu closed', 4000);
-        a = await active(); assert.equal(a.label, 'More actions', 'Escape returns the focus to the More button: ' + JSON.stringify(a));
+        a = await active(); assert.equal(a.label, 'More artifact actions', 'Escape returns the focus to the More button: ' + JSON.stringify(a));
         await ev(`document.querySelector('#agentic-panel-artifacts-view .list-bar-more-btn').focus(); import((window.__coralStatic || '/static/') + 'team_artifacts_page.js').then(m => m.loadArtifacts({ keep: true })); true`);
         await waitFor(`document.querySelectorAll('${ROW}').length === 3 && window.__calls.filter(c => c === 'GET artifacts').length >= 2`, 'the reload', 6000);
         await sleep(300); // sleep-ok: a redraw and a layout settle over frames; no completion event

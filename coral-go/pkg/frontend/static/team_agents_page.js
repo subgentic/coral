@@ -10,6 +10,7 @@ import { pollEvery } from './overload.js';
 import { OPERATOR_ID } from './utils.js';
 import { refreshTeamAvailability, remindAgent, stopAgentReminder } from './team_availability.js';
 const { openRemindDialog, REPEATS } = await importOnce('./team_remind_dialog.js');
+const Toolbar = await importOnce('./team_toolbar.js'); // the one toolbar of the team tabs (#7717)
 const { teamTable, rowButton, rowFocusTarget, stateChip, el } = await importOnce('./team_table.js'); // lazy modules load the others they need through importOnce, so a failed load is retried
 
 const WORD = { available: 'Free', busy: 'Busy', task_idle: 'Task assigned, idle', queued: 'Queued', waiting: 'Waiting', needs_input: 'Needs input', sleeping: 'Sleeping', offline: 'Offline', unknown: 'No signal yet', unavailable: 'Unavailable' };
@@ -19,7 +20,7 @@ const CHIP_WORD = { available: 'Free', unknown: 'Unknown' };
 const CLASS = { available: 'goal-state-done', busy: 'goal-state-active', queued: 'goal-state-blocked', needs_input: 'goal-state-blocked', offline: 'team-state-bad', unavailable: 'team-state-bad' }; // the colours of the goals' own states; Sleeping and the rest stay quiet
 const PROVIDER = { claude: 'Claude', codex: 'Codex', agy: 'Antigravity', antigravity: 'Antigravity', gemini: 'Antigravity', pi: 'Pi', terminal: 'Terminal' };
 
-const model = { team: '', data: null, filter: 'all', failed: '', loading: false };
+const model = { team: '', data: null, filter: 'all', search: '', failed: '', loading: false };
 let root = null, hooks = {};
 const subscribed = new Set(); // teams the operator is already subscribed to on this page, so a Remind is one write
 let itemStatus = null; // the agent page's own live region while that page is on screen: the tab's is hidden then and would not be read
@@ -104,22 +105,23 @@ function sidebarIndex(a) {
 }
 function visibleAgents() {
     const all = (model.data && model.data.agents) || [];
-    const shown = model.filter === 'all' ? all : all.filter(a => (a.availability || 'unknown') === model.filter);
+    const byState = model.filter === 'all' ? all : all.filter(a => (a.availability || 'unknown') === model.filter);
+    const q = model.search.trim().toLowerCase();
+    const shown = q ? byState.filter(a => `${a.name || ''} ${a.job_title || ''}`.toLowerCase().includes(q)) : byState;
     return [...shown].sort((x, y) => (isOrchestrator(y) - isOrchestrator(x)) || (rank(x) - rank(y)) || (sidebarIndex(x) - sidebarIndex(y)));
 }
 
 function drawChips(host) {
     const agents = (model.data && model.data.agents) || [];
-    const group = el('div', 'team-chips'); group.setAttribute('role', 'group'); group.setAttribute('aria-label', 'Show agents that are');
     const chips = chipCounts(agents);
     if (!chips.some(c => c[0] === model.filter)) model.filter = 'all';
-    for (const [key, word, n] of chips) {
-        const b = btn('team-chip', `${word} ${n}`);
-        b.dataset.filter = key; b.setAttribute('aria-pressed', String(model.filter === key));
-        b.addEventListener('click', () => { model.filter = key; draw(); root.querySelector(`.team-chip[data-filter="${key}"]`)?.focus({ preventScroll: true }); say(`Showing ${visibleAgents().length} agent${visibleAgents().length === 1 ? '' : 's'}.`); });
-        group.append(b);
-    }
-    host.append(group);
+    // The one toolbar line (#7717): the search field and the status pills (one compact select when they do not fit); Add agent stays in the page header.
+    host.append(Toolbar.build({
+        id: 'team-agents-search', label: 'Search agents', placeholder: 'Search agents', value: model.search,
+        onSearch: text => { model.search = text; draw(); },
+        pills: { label: 'Show agents that are', current: model.filter, items: chips.map(([key, word, n]) => ({ key, label: word, count: n })),
+            onPick: key => { model.filter = key; draw(); root.querySelector(`.goals-chip[data-filter="${key}"]`)?.focus({ preventScroll: true }); say(`Showing ${visibleAgents().length} agent${visibleAgents().length === 1 ? '' : 's'}`); } },
+    }));
 }
 
 function draw() {
@@ -147,7 +149,7 @@ function draw() {
             };
         }),
     }));
-    if (held) { const sel = held.startsWith('row:') ? rowFocusTarget(body, held.slice(4)) : body.querySelector(`.team-chip[data-filter="${CSS.escape(held.slice(5))}"]`); sel?.focus({ preventScroll: true }); }
+    if (held) { const sel = held.startsWith('row:') ? rowFocusTarget(body, held.slice(4)) : body.querySelector(`.goals-chip[data-filter="${CSS.escape(held.slice(5))}"]`); sel?.focus({ preventScroll: true }); }
 }
 
 // The tab keeps itself current, as Tasks does: when the window comes back to the front, and every 15 s while the tab is on screen.

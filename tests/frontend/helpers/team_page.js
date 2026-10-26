@@ -21,7 +21,9 @@ const SOURCE = `(() => {
     const rows = () => { const t = table(); return t ? [...t.querySelectorAll('tbody tr, [role=row]')].filter(r => A.vis(r) && !r.querySelector('th, [role=columnheader]')).map(r => A.text(r).replace(/\\s+/g, ' ').trim()) : null; };
     // A named group of filter chips (a role=group, toolbar or fieldset named for what it filters) and its buttons with their pressed state.
     const group = rx => { const m = main(); return m ? [...m.querySelectorAll('[role=group], [role=toolbar], fieldset')].filter(A.vis).find(g => rx.test(A.name(g))) || null : null; };
-    const chips = rx => { const g = group(rx); return g ? [...g.querySelectorAll('button, [role=button]')].filter(A.vis).map(b => ({ name: A.name(b).replace(/\\s+/g, ' ').trim(), pressed: b.getAttribute('aria-pressed') })) : null; };
+    // On a phone the toolbar's pills are one compact select with the same name (#7717): its options stand in for the chips, the chosen one pressed.
+    const chips = rx => { const g = group(rx); if (g) return [...g.querySelectorAll('button, [role=button]')].filter(A.vis).map(b => ({ name: A.name(b).replace(/\\s+/g, ' ').trim(), pressed: b.getAttribute('aria-pressed') }));
+        const m = main(); const s = m && [...m.querySelectorAll('select')].filter(A.vis).find(x => rx.test(A.name(x))); return s ? [...s.options].map(o => ({ name: o.textContent.replace(/\\s+/g, ' ').trim(), pressed: String(o.selected) })) : null; };
     // Every write the page makes after record(): method, path and body, so a suite can say "this click sent something".
     const record = () => { if (window.__writes) return true; window.__writes = []; const R = window.fetch.bind(window); window.fetch = (u, o = {}) => { const m = String((o && o.method) || 'GET').toUpperCase(); if (m !== 'GET') window.__writes.push({ m, p: new URL(String(u), location.origin).pathname, b: String((o && o.body) || '') }); return R(u, o); }; return true; };
     window.__tp = { page, h1, tablist, tabs, tabLabel, find, sidebar, pane, box, table, headers, rows, group, chips, record };

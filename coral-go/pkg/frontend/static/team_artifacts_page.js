@@ -183,9 +183,9 @@ function ensureBar() {
     const plain = !!(model.scope && model.scope.standalone); // an agent with no team: its list has no search or filters, only the More icon
     // The list's other action behind the More icon (#7686); Refresh is gone: the tab reads itself again (watch below).
     const more = [{ label: 'Copy publishing instructions', run: async () => { try { await navigator.clipboard.writeText(AGENT_ARTIFACT_PROMPT); showToast('Publishing instructions copied'); } catch { showToast('The instructions could not be copied', true); } } }];
-    if (!plain) { bar = buildBar(setFilters, { page: true, personal: !!model.scope, more, hooks: { onPanel: open => savePanelOpen(panel, filterKey(), open) } }); bar.setOpen(loadPanelOpen(panel, filterKey())); }
+    if (!plain) { bar = buildBar(setFilters, { page: true, personal: !!model.scope, more, moreNoun: 'artifact', hooks: { onPanel: open => savePanelOpen(panel, filterKey(), open) } }); bar.setOpen(loadPanelOpen(panel, filterKey())); }
     const title = el('span', 'sr-only', model.scope ? `Artifacts of ${model.scope.name}` : `Artifacts of ${keyLabel(model.project)}`); // the tab names the list: no label beside the search (UI/UX, #7622);
-    if (plain) { const node = el('div', 'team-artifacts-plain-head'); node.append(title, buildMoreMenu('ta-plain', more)); bar = { node, names() {}, set() {}, setOpen() {} }; }
+    if (plain) { const node = el('div', 'team-artifacts-plain-head'); node.append(title, buildMoreMenu('ta-plain', more, 'artifact')); bar = { node, names() {}, set() {}, setOpen() {} }; }
     else bar.setHeader(title, []);
 }
 

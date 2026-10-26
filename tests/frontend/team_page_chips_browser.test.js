@@ -1,5 +1,5 @@
-// The filter chips of the Goals and Tasks tabs are one line that scrolls sideways with its scrollbar hidden, 32 px high, the chosen chip kept in view (UI/UX #7453 round 1): at 390 px and at 200% text no chip is on a
-// second line, the row scrolls (its scrollWidth is wider than the screen), and a chip chosen at the far end is in view. The two tabs' chips are the same height. Isolated dev server.
+// The filter pills of the Goals and Tasks tabs at 390 px and at 200% text (#7717, which replaced the strip that scrolled sideways, UI/UX #7453 round 1): they are ONE compact select on the toolbar line, 44 px high, naming
+// the chosen pill; choosing another through it presses that pill and keeps the select's value; the two tabs' selects are the same height and nothing scrolls sideways. Isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { install: installTP, seed, openTeam, goTab, scenarios } = require('./helpers/team_page');
@@ -11,7 +11,7 @@ const TEAM = `qa-chips-${Date.now() % 100000}`;
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const { settle } = require('./helpers/wait').bind(ev);
     const S = scenarios();
-    const row = () => ev(`(() => { const r = [...document.querySelectorAll('#team-page-view .goals-chips-row')].find(e => e.getClientRects().length); if (!r) return null; const chips = [...r.children]; const rr = r.getBoundingClientRect(); return { tops: [...new Set(chips.map(c => Math.round(c.getBoundingClientRect().top)))], h: [...new Set(chips.map(c => Math.round(c.getBoundingClientRect().height)))], scroll: r.scrollWidth > r.clientWidth + 1, overflowX: getComputedStyle(r).overflowX, bar: getComputedStyle(r).scrollbarWidth, last: (() => { const l = chips[chips.length - 1].getBoundingClientRect(); return l.right <= rr.right + 1; })() }; })()`);
+    const sel = () => ev(`(() => { const s = [...document.querySelectorAll('#team-page-view .team-tb-select')].find(e => e.getClientRects().length); if (!s) return null; const pills = document.querySelector('#team-page-view .team-tb-pills'); return { h: Math.round(s.getBoundingClientRect().height), value: s.value, text: s.selectedOptions[0].textContent, options: s.options.length, pillsShown: !!pills && pills.getClientRects().length > 0, side: document.documentElement.scrollWidth - document.documentElement.clientWidth }; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
@@ -20,18 +20,17 @@ const TEAM = `qa-chips-${Date.now() % 100000}`;
         await seed(ev, TEAM); await ev(`window.syncMobileAgentList && window.syncMobileAgentList(); true`); await openTeam(ev, waitFor, TEAM); await settle(500);
         let heights = [];
         for (const tab of ['Goals', 'Tasks']) {
-            await S.run(`${tab} at 390 px and 200% text: one line, scrolls sideways, scrollbar hidden, 32 px`, async () => {
+            await S.run(`${tab} at 390 px and 200% text: the pills are one compact select, 44 px, nothing scrolls sideways`, async () => {
                 await goTab(ev, settle, tab); await settle(300);
-                const r = await row(); assert.ok(r, 'the chips row'); assert.equal(r.tops.length, 1, `all chips on one line (tops ${JSON.stringify(r.tops)})`); assert.equal(r.scroll, true, 'the row scrolls sideways');
-                assert.equal(r.overflowX, 'auto'); assert.equal(r.bar, 'none', 'its scrollbar is hidden');
-                assert.ok(r.h.every(x => Math.abs(x - 32 * 2) <= 4 || x >= 32), `chips are at least 32 px (${JSON.stringify(r.h)})`); heights.push(r.h.join());
+                const r = await sel(); assert.ok(r, 'the compact select'); assert.equal(r.pillsShown, false, 'the strip of pills is not shown');
+                assert.ok(r.h >= 43.5, `the select is a 44 px target (${r.h})`); assert.ok(r.options >= 5, `it holds every pill (${r.options})`); assert.ok(r.side <= 0, `nothing scrolls sideways (${r.side})`); heights.push(String(r.h));
             });
         }
-        await S.run('the Goals and Tasks chips are the same height', async () => { assert.equal(heights[0], heights[1], `Goals ${heights[0]} and Tasks ${heights[1]}`); });
-        await S.run('a chip chosen at the far end of the Tasks row is brought into view', async () => {
-            await ev(`(() => { const r = [...document.querySelectorAll('#team-page-view .goals-chips-row')].find(e => e.getClientRects().length); r.lastElementChild.click(); return true; })()`); await settle(500);
-            const inView = await ev(`(() => { const r = [...document.querySelectorAll('#team-page-view .goals-chips-row')].find(e => e.getClientRects().length); const p = r.querySelector('[aria-pressed=true]').getBoundingClientRect(), b = r.getBoundingClientRect(); return p.left >= b.left - 1 && p.right <= b.right + 1; })()`);
-            assert.equal(inView, true, 'the chosen chip is inside the row');
+        await S.run('the Goals and Tasks selects are the same height', async () => { assert.equal(heights[0], heights[1], `Goals ${heights[0]} and Tasks ${heights[1]}`); });
+        await S.run('a pill chosen through the select on Tasks is the pressed pill, and the select keeps it', async () => {
+            await ev(`(() => { const s = [...document.querySelectorAll('#team-page-view .team-tb-select')].find(e => e.getClientRects().length); s.value = s.options[s.options.length - 1].value; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); await settle(500);
+            const r = await sel(); const pressed = await ev(`[...document.querySelectorAll('[role=tabpanel]:not([hidden]) .team-tb-pills .goals-chip[aria-pressed=true]')].map(c => c.dataset.filter)`); // (the Done pill stays pressed with All: the earlier choice of Open or All is a saved view setting)
+            assert.ok(pressed.includes(r.value), `the select's value is a pressed pill: ${JSON.stringify({ pressed, value: r.value })}`); assert.ok(/^Done\b/.test(r.text), `and the select names it (${r.text})`);
         });
         await removeBoards(ev, [TEAM]); S.finish();
     } finally { await removeBoards(ev, [TEAM]); await client.close(); }

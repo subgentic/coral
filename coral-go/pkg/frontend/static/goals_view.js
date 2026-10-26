@@ -13,12 +13,13 @@ import { toGoalList, mergeGoalLists, toTaskPage, toDrivers, createBody, errorOf,
 import { importOnce } from './import_once.js';
 import { foldWayBack } from './way_back.js';
 const { teamTable, rowButton, stateChip: tableStateChip } = await importOnce('./team_table.js'); // lazy: its failure is retried
+const Toolbar = await importOnce('./team_toolbar.js'); // the one toolbar of the team tabs (#7717)
 const { attachDockResize, DOCK_MIN_WIDTH, dockMaxWidth } = await importOnce('./dock_resize.js');
 
 const PAGE = 50; // a goal's tasks are drawn this many at a time
 import * as W from './goal_words.js';
 
-const model = { project: '', sig: '', goals: [], requireGoal: false, noGoalOpen: null, filter: 'all', openId: 0, tasks: new Map(), loading: false, failed: '', asOf: '', creating: false, taskId: 0, taskSearch: '', screen: 'goal' };
+const model = { project: '', sig: '', goals: [], requireGoal: false, noGoalOpen: null, filter: 'all', openId: 0, tasks: new Map(), loading: false, failed: '', asOf: '', creating: false, taskId: 0, taskSearch: '', goalSearch: '', screen: 'goal' };
 const PHONE = matchMedia('(max-width: 760px)'); // the team page's phone layout (team_page.css): a goal, its task list and a task are three screens
 let root = null;
 let layout = 'cards'; // 'cards': the board's Goals face (cards and the goal beside them); 'page': the team page's Goals tab (a table, and a goal's own page, #7453)
@@ -113,7 +114,7 @@ async function showMoreTasks(id) {
 const taskTotal = (goal, t) => Math.max(t.rows.length, goal ? goal.rollup.done + goal.rollup.active + goal.rollup.blocked + goal.rollup.queued : 0);
 
 const goalById = (id) => model.goals.find(g => g.id === id);
-const visible = () => model.goals.filter(g => W.keepsGoal(model.filter, g));
+const visible = () => model.goals.filter(g => W.keepsGoal(model.filter, g) && (!model.goalSearch.trim() || String(g.title || '').toLowerCase().includes(model.goalSearch.trim().toLowerCase())));
 
 /** The live agent on this computer that is a task's assignee, or null (the button then says it is not running here). */
 function agentFor(task) {
@@ -304,17 +305,13 @@ function drawPage() {
 function drawTableRaw(col) {
     col.replaceChildren();
     const counts = W.filterCounts(model.goals);
-    const bar = el('div', 'goals-toolbar');
-    const chips = el('div', 'goals-chips goals-chips-row'); chips.setAttribute('role', 'group'); chips.setAttribute('aria-label', 'Show goals that are');
-    for (const f of W.FILTERS) {
-        const c = btn('goals-chip', `${W.filterLabel(f)} ${counts[f]}`, () => { model.filter = f; say(W.filterAnnouncement(f, counts[f])); drawList(); });
-        c.setAttribute('aria-pressed', String(model.filter === f)); c.dataset.filter = f;
-        if (!counts[f] && f !== 'all') c.classList.add('goals-chip-zero');
-        chips.append(c);
-    }
-    bar.append(chips, btn('btn btn-primary goals-new', 'New goal', () => openCreate()));
-    col.append(bar);
-    chips.querySelector('[aria-pressed="true"]')?.scrollIntoView({ inline: 'nearest', block: 'nearest' }); // the chosen chip stays in view in the one-line row
+    // The one toolbar line (#7717): the search field, the state pills (one compact select when they do not fit) and New goal at the right.
+    col.append(Toolbar.build({
+        id: 'goals-search', label: 'Search goals', placeholder: 'Search goals', value: model.goalSearch,
+        onSearch: text => { model.goalSearch = text; drawList(); },
+        pills: { label: 'Show goals that are', current: model.filter, items: W.FILTERS.map(f => ({ key: f, label: W.filterLabel(f), count: counts[f] })), onPick: f => { model.filter = f; say(W.filterAnnouncement(f, counts[f])); drawList(); } },
+        action: btn('btn btn-primary goals-new', 'New goal', () => openCreate()),
+    }));
     if (model.requireGoal) col.append(Object.assign(el('p', 'goals-note goals-require'), { textContent: W.requireGoalNote }));
     if (state.hubConnected || window.__goalsHub) col.append(el('p', 'goals-note', W.otherBoardsNote));
     if (model.noGoalOpen > 0) col.append(el('p', 'goals-note goals-no-goal', W.noGoalTasksText(model.noGoalOpen)));

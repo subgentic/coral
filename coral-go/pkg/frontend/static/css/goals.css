@@ -98,7 +98,7 @@
 .goals-close, .goals-reopen, .goals-alldone-actions .btn { min-height: var(--control-touch-height, 44px); }
 
 /* Findings of the Goals usability check (#7218, #7224): chips with no goals quieter; a lighter phone header */
-.goals-chip-zero:not([aria-pressed="true"]) { border-color: transparent; background: none; font-size: 0.75rem; }
+.goals-chip-zero:not([aria-pressed="true"]) { font-size: 0.75rem; } /* a pill with nothing in it is a little quieter in its text and keeps its edge like every other (#7715: Blocked 0 had none) */
 .goals-nobody { margin: 0; }
 @media (max-width: 767px) {
     /* a phone, large text (#7224): the page's own heading and New goal share a row, the sub-line is small, the chips take less, so the first goal is not a screen away */

@@ -44,20 +44,24 @@ const TEAM = `qa-design-${Date.now() % 100000}`;
                 assert.ok(Math.abs(m.left - tasks.left) <= 1, `the search box's left edge ${m.left} is the Tasks tab's ${tasks.left}`);
                 assert.ok(Math.abs(m.top - tasks.top) <= 6, `its top ${m.top} is the Tasks tab's ${tasks.top} (not 4 px under the tab strip)`);
                 // the toolbar is the Artifacts and Tasks tabs' (#7686): the Filters icon and the More icon (the jumps are its menu items), no text buttons
-                const btns = await ev(`[['.list-bar-toggle', 'Filters and sort'], ['.list-bar-more-btn', 'More actions']].map(([sel, n]) => { const b = ${panel()}.querySelector(sel); if (!b || !window.__na.vis(b)) return [n, null]; return [n, [b.getAttribute('aria-label'), Math.round(b.getBoundingClientRect().height)]]; })`);
+                const btns = await ev(`[['.list-bar-toggle', 'Filters and sort'], ['.list-bar-more-btn', 'More message actions']].map(([sel, n]) => { const b = ${panel()}.querySelector(sel); if (!b || !window.__na.vis(b)) return [n, null]; return [n, [b.getAttribute('aria-label'), Math.round(b.getBoundingClientRect().height)]]; })`);
                 for (const [n, v] of btns) { assert.ok(v, `${n} is there`); assert.deepEqual([v[0], v[1] >= 32], [n, true], `${n} is an icon button of 32 px or more: ${JSON.stringify(v)}`); }
                 assert.equal(await ev(`[...${panel()}.querySelectorAll('button')].filter(x => ['Filters', 'Jump to first', 'Jump to latest'].includes(x.textContent.trim()) && window.__na.vis(x)).length`), 0, 'no text button Filters or Jump on the toolbar');
             });
 
-            await S.run(`${label}: item 5, New task is on the search row on a phone (beside the chips on a desktop), and no chip clips its text`, async () => {
+            await S.run(`${label}: item 5 (#7717), the Tasks toolbar is one line: the search field, the state pills (the compact select on a phone), the Filters icon and New task at the right; no chip clips its text`, async () => {
                 await goTab(ev, settle, 'Tasks'); await settle(600);
-                const t = await ev(`(() => { const p = ${panel()}; const nt = [...p.querySelectorAll('button')].find(b => b.textContent.trim() === 'New task' && window.__na.vis(b)); const search = p.querySelector('[role=search]'); const chips = p.querySelector('.goals-chips-row'); const sr = search.getBoundingClientRect(), nr = nt.getBoundingClientRect(), cr = chips.getBoundingClientRect();
-                    return { inSearch: search.contains(nt), onRow: nr.top >= sr.top - 2 && nr.bottom <= sr.top + 80, besideChips: nr.top < cr.bottom && nr.bottom > cr.top, tailRoom: Math.round(chips.parentElement.getBoundingClientRect().right - cr.right),
-                        clipped: [...chips.children].filter(c => c.scrollWidth > c.clientWidth + 1).map(c => c.textContent), scrolls: chips.scrollWidth > chips.clientWidth + 1, fades: chips.classList.contains('goals-chips-more') }; })()`);
-                if (mobile) { assert.equal(t.inSearch, true, 'New task is in the search row'); assert.equal(t.onRow, true, "on the search row's line"); assert.ok(t.tailRoom <= 1, `the chip strip has the row's whole width (room left ${t.tailRoom})`); }
-                else { assert.equal(t.inSearch, false, 'on a desktop it stays out of the search row'); assert.equal(t.besideChips, true, 'beside the chips'); }
-                assert.deepEqual(t.clipped, [], 'no chip clips its text');
-                assert.equal(t.fades, t.scrolls, `the strip fades its edge exactly when it scrolls (scrolls ${t.scrolls}, fades ${t.fades})`);
+                const t = await ev(`(() => { const p = ${panel()}; const vis = e => e && window.__na.vis(e) && e.getBoundingClientRect().height > 0; const row = p.querySelector('.list-bar-search-row');
+                    const nt = [...p.querySelectorAll('button')].find(b => b.textContent.trim() === 'New task' && vis(b)); const search = p.querySelector('input.list-bar-search'), chips = p.querySelector('.team-tb-pills'), sel = p.querySelector('.team-tb-select'), tog = p.querySelector('.list-bar-toggle');
+                    const mid = e => { const r = e.getBoundingClientRect(); return (r.top + r.bottom) / 2; };
+                    return { inRow: row.contains(nt), pillsShown: vis(chips), selectShown: vis(sel), sameLine: [search, nt, tog].every(e => Math.abs(mid(e) - mid(search)) < 8) && (vis(chips) ? Math.abs(mid(chips) - mid(search)) < 8 : true), newLast: nt.getBoundingClientRect().right >= Math.max(...[...row.children].filter(vis).map(e => e.getBoundingClientRect().right)) - 1,
+                        newH: Math.round(nt.getBoundingClientRect().height), searchH: Math.round(search.getBoundingClientRect().height), countLine: !!p.querySelector('.team-count-line'),
+                        clipped: [...p.querySelectorAll('.team-tb-pills .goals-chip')].filter(c => vis(c) && c.scrollWidth > c.clientWidth + 1).map(c => c.textContent), side: document.documentElement.scrollWidth - document.documentElement.clientWidth }; })()`);
+                assert.equal(t.inRow, true, 'New task is on the list bar\'s own row'); assert.equal(t.newLast, true, 'and is the last control at the right');
+                assert.equal(t.countLine, false, 'no count line under the toolbar');
+                assert.deepEqual(t.clipped, [], 'no chip clips its text'); assert.ok(t.side <= 0, 'no sideways page scroll');
+                if (mobile) { assert.equal(t.selectShown, true, 'a phone has the compact select, not the strip'); assert.equal(t.pillsShown, false); assert.ok(t.newH >= 43.5, `New task is a 44 px target (${t.newH})`); }
+                else { assert.equal(t.sameLine, true, 'the field, the pills, the Filters icon and New task share one line'); assert.ok(t.newH <= t.searchH + 4, `New task is not taller than the field (${t.newH} against ${t.searchH})`); }
             });
 
             if (!mobile) await S.run(`${label}: item 6, Remind is left-aligned under its header and on the name's line`, async () => {

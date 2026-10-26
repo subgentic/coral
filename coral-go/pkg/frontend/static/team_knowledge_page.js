@@ -6,10 +6,11 @@ import { teamFetch } from './server_base.js';
 import { refusedTooLarge } from './utils.js';
 import { whenText } from './when_text.js';
 import { refreshDistill, startDistill, distillJob } from './knowledge_distill.js';
+const Toolbar = await importOnce('./team_toolbar.js'); // the one toolbar of the team tabs (#7717)
 const { teamTable, rowButton, rowFocusTarget, el } = await importOnce('./team_table.js'); // lazy modules load the others they need through importOnce, so a failed load is retried
 const { openDetailPane, closeDetailPane, detailKey } = await importOnce('./detail_pane.js');
 
-const model = { team: '', data: null, refused: false, failed: '', loading: false };
+const model = { team: '', data: null, refused: false, failed: '', loading: false, search: '' };
 let root = null, hooks = {};
 const say = (t) => { const s = root && root.querySelector('.team-knowledge-status'); if (s) { s.textContent = ''; s.textContent = t; } };
 const btn = (cls, text, onClick) => { const b = el('button', cls, text); b.type = 'button'; if (onClick) b.addEventListener('click', onClick); return b; };
@@ -104,17 +105,16 @@ function draw() {
     const held = a && body.contains(a) ? (a.closest('tr[data-key]')?.dataset.key || (a.classList.contains('team-distill') ? '#distill' : '')) : '';
     body.replaceChildren();
     const running = distillJob(model.team).status === 'running';
-    const bar = el('div', 'team-agents-top');
-    const entries = entriesOf(model.data);
-    bar.append(el('p', 'goals-note team-count-line', model.data && model.data.exists ? `${entries.length} entr${entries.length === 1 ? 'y' : 'ies'}` : ''));
+    const everything = entriesOf(model.data), q = model.search.trim().toLowerCase();
+    const entries = q ? everything.filter(e => String(e.name || '').toLowerCase().includes(q)) : everything;
     const d = btn('btn btn-small team-distill', running ? 'Distilling…' : 'Distill knowledge', distill); d.disabled = running;
     if (running) d.setAttribute('aria-label', 'Distill knowledge, running');
-    bar.append(d);
-    body.append(bar);
+    // The one toolbar line (#7717): the search field and Distill knowledge at the right (no count line: the table is the count).
+    body.append(Toolbar.build({ id: 'team-knowledge-search', label: 'Search knowledge', placeholder: 'Search knowledge', value: model.search, onSearch: text => { model.search = text; draw(); }, action: d }));
     if (model.failed) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, model.failed), btn('btn btn-small', 'Try again', () => load())); body.append(f); }
     if (model.loading) body.append(el('p', 'goals-note', 'Loading knowledge…'));
     else if (model.refused) body.append(emptyLine('This team’s knowledge is too large to show through Coral Hub; open it on the computer.'));
-    else if (!entries.length) { if (!model.failed) body.append(emptyLine('No knowledge yet.', 'Distill knowledge reads the team’s work and writes what each agent learned.')); }
+    else if (!entries.length) { if (!model.failed) body.append(everything.length ? emptyLine('No entries match this search.') : emptyLine('No knowledge yet.', 'Distill knowledge reads the team’s work and writes what each agent learned.')); }
     else {
         const stamp = model.data.created_at, wordsWhen = whenText(stamp);
         const when = () => { const t = el('span', null, wordsWhen); const d = new Date(stamp); if (!Number.isNaN(d.getTime())) t.title = d.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }); return t; }; // relative, with the exact time on hover

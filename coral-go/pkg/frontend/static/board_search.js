@@ -145,7 +145,7 @@ export function mountBoardSearch(host, project, hooks) {
         _status = null;
     }
     if (!_bar) {
-        _bar = buildListBar({ ...SPEC, more: [{ label: 'Jump to first message', run: () => _hooks.first() }, { label: 'Jump to latest message', run: () => _hooks.latest() }] }, run);
+        _bar = buildListBar({ ...SPEC, moreNoun: 'message', more: [{ label: 'Jump to first message', run: () => _hooks.first() }, { label: 'Jump to latest message', run: () => _hooks.latest() }] }, run);
         _status = make('div', 'mb-search-status'); _status.hidden = true;
         _results = make('span', 'mb-search-results'); _results.setAttribute('role', 'status'); _results.setAttribute('aria-live', 'polite');
         const icon = (name, label, stepName) => { const b = make('button', 'list-bar-filter-btn mb-search-step'); b.type = 'button'; b.dataset.step = stepName; b.setAttribute('aria-label', label); b.title = label;
