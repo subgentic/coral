@@ -5,7 +5,7 @@ import { showToast, escapeHtml, escapeAttr, boardNameProblem, OPERATOR_ID } from
 import { loadLiveSessions } from './api.js';
 import { loadBoardProjects } from './message_board.js';
 import { recordRecentDir, getRecentDirs } from './browser.js';
-import { teamForm, showTeamWorktree } from './team_form.js';
+import { teamForm, showTeamWorktree, showTeamWorkers } from './team_form.js';
 import { agentNameForm, agentStatus } from './agent_form.js';
 import { serverFetch, boardFetch, identityKey, LOCAL_SERVER } from './server_base.js';
 const { launch } = await importOnce('./launch_state.js');
@@ -99,7 +99,7 @@ function _syncTeamMembers() {
     const count = document.getElementById('team-agents-count');
     if (count) count.textContent = rows.length ? `${rows.length} ${rows.length === 1 ? 'member' : 'members'}. Select one to edit it.` : '';
     const line = document.getElementById('team-orchestrator-line'); if (line) line.hidden = hasOrchestrator();
-    const all = document.getElementById('team-allworkers'); if (all) all.hidden = !rows.some(r => !isOrchestrator(rowRole(r)));
+    showTeamWorkers(rows.some(r => !isOrchestrator(rowRole(r))));
     _syncTeamGate();
 }
 

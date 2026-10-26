@@ -1,6 +1,6 @@
-/* The New team dialog's first step (Name and where it launches) is a settings_view in form mode (#8335): the team's name, its folder (with the folder browser and the recent folders under it),
+/* The New team dialog's first step (Name and where it launches) is a settings_view in form mode (#8335), and so is its second, Members (#8476): the team's name, its folder (with the folder browser and the recent folders under it),
  * the address of another computer, and a git worktree with its base branch. The pieces other modules fill (the name's notice, Browse, the recent folders, the folder list) stay in the page
- * under their ids and are moved under their field (field.live); the fields keep their ids, so the rest of the dialog reads them as before. Step 2 and 3 are their own pages. */
+ * under their ids and are moved under their field (field.live); the fields keep their ids, so the rest of the dialog reads them as before. Step 3 is its own page (team_launch_settings.js). */
 import { mountSettingsView } from './settings_view.js';
 import { boardNameProblem } from './utils.js';
 import { onBuilt } from './lazy_dom.js';
@@ -27,6 +27,28 @@ export function showTeamWorktree(on) {
     _view?.refresh();
 }
 
+let _members = null;
+
+/** Show "Set all workers to" (there is a worker to set): the row follows team_dialogs' member list. */
+export function showTeamWorkers(on) {
+    const row = rowOf('team-set-all');
+    if (row) row.hidden = !on;
+}
+
+/** Step 2: the template, the bulk provider and the member list, as rows of a form. The pieces other modules fill (the template choices, the member rows, their menus) stay in the page under their ids and are moved into their row. */
+function mountMembers(modal) {
+    const host = modal.querySelector('#team-members-host'), parts = modal.querySelector('#team-members-parts');
+    if (!host || !parts || _members) return;
+    const take = sel => parts.querySelector(sel);
+    const fields = [
+        { key: 'template', type: 'custom', label: 'Start from a template', help: 'Optional. Fills the member list.', wide: true, render: slot => slot.append(take('.team-template-row')) },
+        { key: 'workers', type: 'custom', label: 'Set all workers to', help: "Skips the Orchestrator. Resets each worker's model.", render: slot => slot.append(take('#team-allworkers')) },
+        { key: 'members', type: 'custom', label: 'Members', wide: true, render: slot => { slot.append(take('#team-agents-count'), take('.team-agents-container')); } },
+    ];
+    _members = mountSettingsView(host, { mode: 'form', fields });
+    showTeamWorkers(false);
+}
+
 function mount(modal) {
     const host = modal.querySelector('#team-form-host');
     if (!host || _view) return;
@@ -48,3 +70,4 @@ function mount(modal) {
 }
 
 onBuilt('launch-modal', mount);
+onBuilt('launch-modal', mountMembers);

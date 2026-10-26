@@ -243,9 +243,11 @@
                         </div>
                     </section>
                     <section class="launch-page team-page team-page-members" id="team-panel-members" data-page="members" aria-label="Members">
+                        <div id="team-members-host"></div>
+                        <div id="team-members-parts" hidden>
                         <div class="team-template-row">
                             <div class="team-template-pick">
-                                <div class="launch-field-head"><label for="team-template-select">Start from a template</label> <span class="launch-optional">optional</span></div>
+                                <label class="sr-only" for="team-template-select">Start from a template</label>
                                 <input type="search" id="team-template-search" class="team-template-search" aria-label="Search templates" placeholder="Search templates" autocomplete="off" data-on-input="team-template-filter" hidden>
                                 <select id="team-template-select" data-on-change="team-template-select"></select>
                             </div>
@@ -260,16 +262,14 @@
                                 <input type="file" id="team-folder-input" webkitdirectory directory multiple style="display:none" data-on-change="m-handle-team-folder-import">
                             </div>
                         </div>
-                        <div class="team-allworkers" id="team-allworkers" hidden>
-                            <div class="launch-field-head"><label for="team-set-all">Set all workers to</label></div>
-                            <select id="team-set-all" data-on-change="team-set-all" aria-describedby="team-set-all-hint">
+                        <div class="team-allworkers" id="team-allworkers">
+                            <select id="team-set-all" aria-label="Set all workers to" data-on-change="team-set-all">
                                 <option value="">Choose a provider</option>
                                 <option value="claude">Claude</option>
                                 <option value="agy">Antigravity</option>
                                 <option value="codex">Codex</option>
                                 <option value="pi">Pi</option>
                             </select>
-                            <p class="settings-hint" id="team-set-all-hint">Skips the Orchestrator. Resets each worker's model.</p>
                         </div>
                         <p class="team-agents-count" id="team-agents-count" aria-live="polite"></p>
                         <div class="team-agents-container">
@@ -283,6 +283,7 @@
                             <div class="team-agents-footer">
                                 <button class="btn team-add-agent-btn" data-on-click="m-show-team-agent-modal">+ Add member</button>
                             </div>
+                        </div>
                         </div>
                     </section>
                     <section class="launch-page team-page team-page-start" id="team-panel-start" data-page="start" aria-label="Start and team settings">
