@@ -72,6 +72,9 @@ type teamArtifactCursor struct {
 	ID     string `json:"i"`
 }
 
+// crossTeamScopeParam is the internal marker ListAllTeamArtifacts sets on the values it parses (never a parameter a caller may send: both handlers refuse unknown names first).
+const crossTeamScopeParam = "_scope"
+
 var errTeamArtifactQuery = errors.New("invalid team artifacts query")
 
 func taErr(format string, a ...any) error {
@@ -252,8 +255,8 @@ func parseTeamArtifactQuery(vals url.Values) (*teamArtifactQuery, error) {
 	// What a cursor is tied to: every filter and the sort (not limit, offset or the cursor itself).
 	fp := sha256.New()
 	fmt.Fprintf(fp, "%s|%v|%v|%v|%v|%v|%v|%v|%v|%v|%v|%s|%s", q.q, q.kinds, q.origins, q.by, q.boards, q.kept, q.task, q.goal, q.tags, q.since, q.until, q.sortName, vals.Get("session_id"))
-	if teams := vals["team"]; len(teams) > 0 { // the cross-team list's teams are part of what a cursor is tied to
-		fmt.Fprintf(fp, "|%v", teams)
+	if scope := vals.Get(crossTeamScopeParam); scope != "" { // the cross-team list: its cursors are its own (a team route's is refused there) and tied to the teams asked for
+		fmt.Fprintf(fp, "|%s|%v", scope, vals["team"])
 	}
 	q.finger = hex.EncodeToString(fp.Sum(nil))[:16]
 	if v, ok, serr := taSingle("cursor", vals["cursor"]); serr != nil {
