@@ -13,7 +13,7 @@ import { escapeHtml, escapeAttr } from './utils.js';
 const { fieldRow } = await importOnce('./field_row.js');
 const { infoButton, infoBox } = await importOnce('./info_toggle.js'); // lazy modules load each other through importOnce, so a failed load is retried
 
-export const HEALTH_LIMITS = { minutes: [5, 1440], nudges: [1, 5], reviewers: 8 };
+export const HEALTH_LIMITS = { minutes: [5, 1440], nudges: [1, 5], reviewers: 8, goalTasks: [5, 500] };
 
 // The server's defaults (DefaultHealthSettings); held_notice is the Lead's #4225 field, filled in only when the server returns it.
 export const HEALTH_DEFAULTS = {
@@ -23,6 +23,8 @@ export const HEALTH_DEFAULTS = {
     status_nudge: { on: true, after_min: 20, escalate_after_min: 10 },
     mention_renudge: { on: true, after_min: 10 },
     held_notice: { on: true, after_min: 10 },
+    busy_no_task: { on: true, after_min: 10 }, post_no_task: { on: true }, upload_no_task: { on: true }, // work done off the books (#7793)
+    goal_size: { on: true, limit: 15 }, // a goal with too many tasks (#7808)
 };
 
 const [MIN_LO, MIN_HI] = HEALTH_LIMITS.minutes;

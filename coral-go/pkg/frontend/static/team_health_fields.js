@@ -8,7 +8,8 @@ const { refusalOf, answeredLocally } = await importOnce('./owner_refusal.js'); /
 
 const [LO, HI] = HEALTH_LIMITS.minutes;
 const [N_LO, N_HI] = HEALTH_LIMITS.nudges;
-const RULES = ['claim_nudge', 'status_nudge', 'mention_renudge', 'held_notice'];
+const [G_LO, G_HI] = HEALTH_LIMITS.goalTasks;
+const RULES = ['claim_nudge', 'status_nudge', 'mention_renudge', 'held_notice', 'busy_no_task', 'post_no_task', 'upload_no_task', 'goal_size'];
 
 /** The health object as the flat values of the fields. */
 export function healthToValues(h) {
@@ -30,6 +31,10 @@ export function valuesToHealth(v, base) {
     h.status_nudge = { ...h.status_nudge, on: !!v.status_nudge_on, after_min: v.status_nudge_after_min, escalate_after_min: v.status_nudge_escalate_after_min };
     h.mention_renudge = { ...h.mention_renudge, on: !!v.mention_renudge_on, after_min: v.mention_renudge_after_min };
     if (h.held_notice && v.held_notice_on !== undefined) h.held_notice = { ...h.held_notice, on: !!v.held_notice_on, after_min: v.held_notice_after_min };
+    if (h.busy_no_task && v.busy_no_task_on !== undefined) h.busy_no_task = { ...h.busy_no_task, on: !!v.busy_no_task_on, after_min: v.busy_no_task_after_min };
+    if (h.post_no_task && v.post_no_task_on !== undefined) h.post_no_task = { ...h.post_no_task, on: !!v.post_no_task_on };
+    if (h.upload_no_task && v.upload_no_task_on !== undefined) h.upload_no_task = { ...h.upload_no_task, on: !!v.upload_no_task_on };
+    if (h.goal_size && v.goal_size_on !== undefined) h.goal_size = { ...h.goal_size, on: !!v.goal_size_on, limit: v.goal_size_limit };
     return h;
 }
 
@@ -70,6 +75,12 @@ export function healthFields(ctx) {
         { ...minutes('held_notice_after_min', 'After', 'minutes held', 'held_notice_on'), visibleWhen: () => ctx.hasHeld() },
         { key: 'mention_renudge_on', type: 'toggle', label: 'Remind the orchestrator of an unanswered mention', help: 'A message that @mentions the orchestrator and has had no reply gets a reminder.' },
         minutes('mention_renudge_after_min', 'After', 'minutes', 'mention_renudge_on'),
+        { key: 'busy_no_task_on', type: 'toggle', label: 'Tell the orchestrator about an agent working with no task', help: 'An agent that has been working for a while with no task in progress is named in the next health check, once.' },
+        minutes('busy_no_task_after_min', 'Working with no task for', 'minutes', 'busy_no_task_on'), // a short unit: a longer one runs past the edge of a phone at 200% text
+        { key: 'post_no_task_on', type: 'toggle', label: 'Tell the orchestrator about a commit posted with no task', help: 'A commit, SHA or patch posted on the board with no task number, by an agent with no task in progress, is named in the next health check, once.' },
+        { key: 'upload_no_task_on', type: 'toggle', label: 'Tell the orchestrator about an artifact uploaded with no task', help: 'An artifact uploaded by an agent with no task in progress (and not sent with --no-task) is named in the next health check, once.' },
+        { key: 'goal_size_on', type: 'toggle', label: 'Tell the orchestrator when a goal has too many tasks', help: 'A goal that is not closed and has more tasks than the limit (open and done together) is named in the next health check, and again at each further limit.' },
+        { key: 'goal_size_limit', type: 'number', label: 'More than', unit: 'tasks in a goal', min: G_LO, max: G_HI, integer: true, disabledWhen: v => !v.goal_size_on },
         { key: 'health_defaults', type: 'custom', label: 'Defaults', help: 'Put every health setting back to the defaults. Save to apply them.', action: { label: 'Reset to defaults', run: view => ctx.onReset(view) } },
     ];
 }
