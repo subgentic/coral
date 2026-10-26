@@ -878,7 +878,7 @@ POST /api/board/{project}/tasks
 | `title` | string | Yes | Task title |
 | `body` | string | No | Detailed description |
 | `priority` | string | No | `"critical"`, `"high"`, `"medium"` (default), `"low"` |
-| `subscriber_id` | string | Yes | The creator: the caller's name |
+| `subscriber_id` | string | Yes (or `created_by` while it is kept) | The creator: the caller's name |
 | `created_by` | string | No | A legacy alias of `subscriber_id` (kept for now; use `subscriber_id`). Must match it when both are sent; one of the two is required |
 | `assigned_to` | string | No | Initial assignee (not an archived agent) |
 | `blocked_by` | array | No | Prerequisite IDs or rules with `task_id`, optional `board_id`, `condition`, and `required_artifacts` |
