@@ -93,7 +93,7 @@ const BASE = require('./test_base').BASE;
         await waitFor(`!!document.querySelector('#team-settings-workspace .sv-row[data-key="require_goal"] .sv-label') && document.querySelector('#team-settings-workspace .sv-row[data-key="require_goal"] .sv-label').textContent.trim() === 'Require a goal'`, 'the switch', 10000);
         await waitFor(`!!document.querySelector('#team-settings-workspace .sv[data-ready]')`, 'the settings to finish loading', 10000);
         assert.equal(await ev(`document.querySelector('#team-settings-workspace .sv-row[data-key="require_goal"] .sv-help-text').textContent`), 'Every new task needs a goal, and a task cannot be moved to no goal.');
-        assert.equal(await ev(`document.getElementById(document.querySelector('input[name="require_goal"]').getAttribute('aria-describedby')).querySelector('.sv-help-text').textContent`), 'Every new task needs a goal, and a task cannot be moved to no goal.', 'the switch is described by that sentence');
+        assert.equal(await ev(`document.getElementById(document.querySelector('input[name="require_goal"]').getAttribute('aria-describedby').split(' ')[0]).textContent`), 'Every new task needs a goal, and a task cannot be moved to no goal.', 'the switch is described by that sentence');
         assert.equal(await ev(`document.querySelector('input[name="require_goal"]').checked`), false);
         await ev(`const sw = document.querySelector('input[name="require_goal"]'); sw.click(); document.querySelector('#team-settings-workspace .sv-save').click(); true`);
         for (let n = 0; n < 40 && !(await api('GET', `/api/board/${B}/settings`)).json.require_goal; n++) await ev(`new Promise(r => setTimeout(r, 150))`); // sleep-ok: the save goes over the network
