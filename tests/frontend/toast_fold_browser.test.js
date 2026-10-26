@@ -1,5 +1,5 @@
 // Toasts of one kind fold into one card (UI/UX's 170 consistency pass 2, item 4, task 7690): five "Restarting <name>..." toasts are one card that says "Restarting 5 agents" (its dismiss button named for the count, the count said
-// once more to a screen reader, its time started again), on a phone the card is one compact line under the app bar and only the newest toast is drawn; a toast with no group is a card of its own. Drives Chrome over CDP through
+// once more to a screen reader, its time started again), on a phone the card is one compact line below the app bar and any visible sign-in banner and only the newest toast is drawn; a toast with no group is a card of its own. Drives Chrome over CDP through
 // agent_view_harness.js at 390 px; the toasts come from the page's own showToast.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -23,9 +23,19 @@ const S = `(window.__coralStatic || '/static/')`;
         assert.equal(folded.label, 'Dismiss: Restarting 5 agents', 'its dismiss button is named for the count');
         await ev(`document.querySelectorAll('.toast').forEach(t => { if (t.textContent.startsWith('Saved')) t.remove(); }); true`);
         await waitFor(`[...document.querySelectorAll('.toast')].every(e => e.getAnimations().length === 0) && document.querySelector('.toast').getClientRects().length > 0`, 'the card to settle', 5000);
-        const card = await ev(`(() => { const t = document.querySelector('.toast'), b = t.getBoundingClientRect(), bar = document.querySelector('header.top-bar').getBoundingClientRect(); return { top: Math.round(b.top - bar.bottom), h: Math.round(b.height), w: Math.round(b.width), vw: innerWidth, one: t.querySelector('.toast-message').scrollHeight <= t.querySelector('.toast-message').clientHeight + 1 }; })()`);
+        const measure = `(() => { const t = document.querySelector('.toast'), b = t.getBoundingClientRect(), bar = document.querySelector('header.top-bar').getBoundingClientRect(), banner = document.getElementById('local-auth-banner');
+            const edge = banner && banner.getClientRects().length ? Math.max(bar.bottom, banner.getBoundingClientRect().bottom) : bar.bottom;
+            return { top: Math.round(b.top - edge), h: Math.round(b.height), w: Math.round(b.width), vw: innerWidth, one: t.querySelector('.toast-message').scrollHeight <= t.querySelector('.toast-message').clientHeight + 1 }; })()`;
+        const compact = card => assert.ok(card.top >= 0 && card.top <= 16 && card.h <= 56 && card.w < card.vw - 80 && card.one, 'one compact line below the header and visible banner: ' + JSON.stringify(card));
+        compact(await ev(measure));
         await shot('toast-folded');
-        assert.ok(card.top >= 0 && card.top <= 16 && card.h <= 56 && card.w < card.vw - 80 && card.one, 'one compact line just under the app bar, not full width: ' + JSON.stringify(card));
+        const bannerDisplay = await ev(`(() => { const b = document.getElementById('local-auth-banner'); if (!b || !b.getClientRects().length) return null; const before = b.style.display; b.style.display = 'none'; return before; })()`);
+        if (bannerDisplay !== null) {
+            await waitFor(`(${measure}).top >= 0 && (${measure}).top <= 16`, 'toast moves below the app bar when the banner hides', 4000);
+            compact(await ev(measure));
+            await ev(`document.getElementById('local-auth-banner').style.display = ${JSON.stringify(bannerDisplay)}; true`);
+            await waitFor(`(${measure}).top >= 0 && (${measure}).top <= 16`, 'toast clears the restored banner', 4000);
+        }
         await ev(`import(${S} + 'notifications.js').then(n => { n.showToast('Restarting agent-6...', false, 600000, { group: { key: 'restarting', text: c => 'Restarting ' + c + ' agents' } }); return true; })`);
         assert.equal(await ev(`document.querySelectorAll('.toast').length`), 1, 'a sixth restart is still the one card');
         assert.equal(await ev(`document.querySelector('.toast-message').textContent`), 'Restarting 6 agents', 'and it says 6');
