@@ -165,7 +165,7 @@ func (s *TokenUsageStore) GetUsageTimeSeriesGrouped(ctx context.Context, q TimeS
 	if q.Interval == "5m" {
 		rel, args = `(SELECT `+usageCols+`, n_rows, recorded_at FROM token_usage_all`+sinceWhere(q.Since)+`)`, sinceArgs(q.Since)
 	} else {
-		rel, args = usageRelation(ctx, s.db.Reader(), q.Since)
+		rel, args = usageRelation(ctx, s.db.Reader(), q.Since, q.Until)
 	}
 	query := `SELECT ` + bucketExpr + ` AS bucket, ` + groupSQL + ` AS grp,
 	          COALESCE(SUM(cost_usd), 0) AS cost_usd,

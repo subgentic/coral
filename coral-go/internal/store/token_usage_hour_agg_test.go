@@ -222,7 +222,7 @@ func TestCostViewAggregateMatchesTheRawRows(t *testing.T) {
 		for _, since := range aggSinces() {
 			tokenUsageHourAggOn = true
 			got := costAnswersFor(t, s, since)
-			frag, _ := usageRelation(ctx, db, since)
+			frag, _ := usageRelation(ctx, db, since, "")
 			tokenUsageHourAggOn = false
 			want := costAnswersFor(t, s, since)
 			tokenUsageHourAggOn = true

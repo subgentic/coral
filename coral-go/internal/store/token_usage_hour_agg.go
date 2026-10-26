@@ -158,7 +158,10 @@ const usageCols = `session_id, agent_name, agent_type, team_id, board_name, inpu
 //   - the rolled-up hourly rows (token_usage_hourly) from since on.
 //
 // A since that is not a canonical UTC time, and a database with nothing aggregated yet, get the raw and hourly rows only, as before.
-func usageRelation(ctx context.Context, db sqlGetter, since string) (frag string, args []any) {
+//
+// until "" is no end. An until inside an hour (not on the hour) is a window that ends in an hour the aggregate holds whole: that hour is read from the raw rows, up to until, so that two
+// adjacent windows do not both count it (#8634). The caller still leaves out the rows at or after until.
+func usageRelation(ctx context.Context, db sqlGetter, since, until string) (frag string, args []any) {
 	raw := `SELECT ` + usageCols + `, 1 AS n_rows, recorded_at, recorded_at AS min_at, recorded_at AS max_at FROM token_usage`
 	hourly := `SELECT ` + usageCols + `, n_rows, recorded_at, recorded_at AS min_at, recorded_at AS max_at FROM token_usage_hourly`
 	bound := windowBound(since) // what the stamps are compared with; since itself is parsed below
@@ -187,11 +190,24 @@ func usageRelation(ctx context.Context, db sqlGetter, since string) (frag string
 		}
 	}
 	skip := `(SELECT hour FROM token_usage_hour_dirty UNION SELECT hour FROM token_usage_hour_odd)`
+	endHour := midHourOf(until) // "" unless the window ends inside an hour
+	aggEnd := last.String
+	if endHour != "" && endHour <= aggEnd {
+		aggEnd = endHour // exclusive below
+	}
+	aggCmp := `hour <= ?`
+	if aggEnd != last.String {
+		aggCmp = `hour < ?`
+	}
 	parts := []string{
 		`SELECT session_id, agent_name, agent_type, team_id, board_name, input_tokens, output_tokens, total_tokens, cost_usd, cache_read_tokens, cache_write_tokens, source, model, n_rows, hour || ':00:00.000Z' AS recorded_at, min_at, max_at
-		 FROM token_usage_hour_agg WHERE hour >= ? AND hour <= ? AND hour NOT IN ` + skip,
+		 FROM token_usage_hour_agg WHERE hour >= ? AND ` + aggCmp + ` AND hour NOT IN ` + skip,
 	}
-	args = append(args, from, last.String)
+	args = append(args, from, aggEnd)
+	if aggEnd != last.String && endHour >= from { // the hour the window ends in: its raw rows before until (the dirty and odd hours are read below)
+		parts = append(parts, raw+` WHERE recorded_at >= ? AND recorded_at < ? AND recorded_at < ? AND ? NOT IN `+skip)
+		args = append(args, endHour, endHour+"~", windowBound(until), endHour)
+	}
 	if since != "" { // the raw rows of the hours before the aggregate's, from since on
 		parts = append(parts, raw+` WHERE recorded_at >= ? AND recorded_at < ?`)
 		args = append(args, bound, from)
@@ -217,6 +233,20 @@ func usageRelation(ctx context.Context, db sqlGetter, since string) (frag string
 		frag += p
 	}
 	return frag + `)`, args
+}
+
+// midHourOf is the hour key (2006-01-02T15) of an until that is inside an hour, "" for no until, one on the hour, or one that is not a time.
+func midHourOf(until string) string {
+	for _, layout := range []string{time.RFC3339Nano, "2006-01-02T15:04:05", "2006-01-02 15:04:05"} {
+		if t, err := time.Parse(layout, until); err == nil {
+			t = t.UTC()
+			if t.Equal(t.Truncate(time.Hour)) {
+				return ""
+			}
+			return t.Format("2006-01-02T15")
+		}
+	}
+	return ""
 }
 
 // tokenUsageHourAggOn is false only in the tests that compare the aggregate with the raw rows.
