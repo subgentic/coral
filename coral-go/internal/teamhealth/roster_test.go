@@ -30,7 +30,7 @@ func TestRosterCheckLooksLikeTheExample(t *testing.T) {
 	}
 	in := CheckInput{Now: rosterNow(), Agents: 14, Roster: r, Progress: Progress{Since: rosterNow().Add(-10 * time.Minute), Posts: 55}}
 	lines := ComposeLines(in)
-	assert.Equal(t, "[Coral health check] 08:05Z · 2 working · 8 WAITING · 4 asleep · 0 claimable tasks", lines[0])
+	assert.Equal(t, "[Coral health check] 08:05Z · 2 working · 8 waiting · 4 asleep · 0 claimable tasks", lines[0])
 	assert.Equal(t, "Waiting on YOU (Orchestrator), 6: DevOps Engineer 19m, QA Engineer 12m, UX Engineer 8m, Backend Dev 7m, Doc Writer 6m, Tester 5m", lines[1], "the recipient's group first, the longest wait first")
 	assert.Equal(t, "Waiting on Security Reviewer, 2: Frontend Dev 37m, Lead Developer 17m (STALE: Security Reviewer has posted a message mentioning them since the wait started)", lines[2])
 	assert.Equal(t, "Asleep with unread tagged messages: Digital Ocean Expert (2 tagged since 07:23)", lines[3])
@@ -47,7 +47,7 @@ func TestRosterCheckLooksLikeTheExample(t *testing.T) {
 func TestRosterNeverSaysProgressingFromPosts(t *testing.T) {
 	in := CheckInput{Now: rosterNow(), Roster: &Roster{Recipient: "Orchestrator", Counts: counts(3, 0, 0, 0, 1, 0)}, Progress: Progress{Since: rosterNow().Add(-10 * time.Minute), Posts: 40, Completed: 2}}
 	lines := ComposeLines(in)
-	assert.Equal(t, "[Coral health check] 08:05Z · 3 working · 0 WAITING · 1 asleep · 0 claimable tasks", lines[0])
+	assert.Equal(t, "[Coral health check] 08:05Z · 3 working · 0 waiting · 1 asleep · 0 claimable tasks", lines[0])
 	assert.Contains(t, strings.Join(lines, "\n"), "All 3 awake agents are working. Nothing needs you.")
 	assert.Contains(t, strings.Join(lines, "\n"), "Since 07:55: 2 tasks completed, 40 posts.")
 	// one idle agent breaks it
@@ -98,7 +98,7 @@ func TestRosterStaysWithinTheCap(t *testing.T) {
 			Waits: []WaitGroup{{On: "Orchestrator", You: true, Waiters: many}}, Asleep: asleep}}
 	out := Compose(in)
 	assert.LessOrEqual(t, len(out), MaxCheck)
-	assert.Contains(t, out, "[Coral health check] 08:05Z · 0 working · 60 WAITING")
+	assert.Contains(t, out, "[Coral health check] 08:05Z · 0 working · 60 waiting")
 	assert.Contains(t, out, "…+52 more")
 	assert.Contains(t, out, "Waiting on YOU (Orchestrator), 60:", "the recipient's group is never the part left out")
 	assert.Contains(t, out, "lines not shown")

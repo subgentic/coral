@@ -90,7 +90,7 @@ func TestCheckGoesToTheOrchestratorOnly(t *testing.T) {
 	require.NoError(t, err)
 	before := len(msgs)
 	out := h.checkTo("Orchestrator")
-	assert.Equal(t, "[Coral health check] "+h.now.UTC().Format("15:04Z")+" · 1 working · 0 WAITING · 0 asleep · 0 claimable tasks • No progress since the last check ("+h.now.Add(-10*time.Minute).Format("15:04")+"). • The 1 awake agent is working. Nothing needs you.", out)
+	assert.Equal(t, "[Coral health check] "+h.now.UTC().Format("15:04Z")+" · 1 working · 0 waiting · 0 asleep · 0 claimable tasks • No progress since the last check ("+h.now.Add(-10*time.Minute).Format("15:04")+"). • The 1 awake agent is working. Nothing needs you.", out)
 	h.mu.Lock()
 	assert.Empty(t, h.sent["Dev"], "nobody else gets it")
 	h.mu.Unlock()

@@ -91,13 +91,13 @@ func TestRosterClassifiesEveryAgent(t *testing.T) {
 		require.NoError(t, err)
 	}
 	out := h.check()
-	assert.Contains(t, out, "[Coral health check] "+h.now.UTC().Format("15:04Z")+" · 1 working · 1 WAITING · 1 need input · 1 idle · 1 of unknown state · 1 asleep · 1 offline · 0 claimable tasks")
+	assert.Contains(t, out, "[Coral health check] "+h.now.UTC().Format("15:04Z")+" · 1 working · 1 waiting · 1 need input · 1 idle · 1 of unknown state · 1 asleep · 1 offline · 0 claimable tasks")
 	assert.NotContains(t, strings.ToLower(out), "progressing")
 	assert.NotContains(t, out, "awake agents are working")
 	assert.NotContains(t, out, "\n")
 	assert.Contains(t, out, "Waiting on YOU (Orchestrator), 1: Waiter ")
 	assert.Contains(t, out, "posts.", "volume is only counted")
-	// One word per meaning (#8294): WAITING is a wait on a task or a person, "need input" is an agent at a permission prompt (the dashboard's Needs input); the check no longer says "at a prompt".
+	// One word per meaning (#8294), all lower case (#8311): waiting is a wait on a task or a person, "need input" is an agent at a permission prompt (the dashboard's Needs input); the check no longer says "at a prompt".
 	assert.NotContains(t, out, "1 at a prompt", "the header counts them as need input")
 	// The agent at a prompt is named under "Needs you", before the idle one (most urgent first), and the one with no signal is named too, each with its ack id to clear it.
 	prompted, idler, blind := strings.Index(out, "Prompted: needs input"), strings.Index(out, "Idler: idle"), strings.Index(out, "Blind: no signal")
@@ -132,7 +132,7 @@ func TestRosterGroupsWaitsByWhoTheyWaitOn(t *testing.T) {
 	h.wait(15, "Dev F", "operator", "")                 // on the operator: not a group
 	h.wait(16, "Dev G", "message", "Nobody Here")       // a name that is no member: its own group
 	out := h.check()
-	assert.Contains(t, out, "7 WAITING")
+	assert.Contains(t, out, "7 waiting")
 	iYou := strings.Index(out, "Waiting on YOU (Orchestrator), 2: ")
 	iSec := strings.Index(out, "Waiting on Security Reviewer, 2: ")
 	require.True(t, iYou >= 0 && iSec > iYou, "the recipient's group first, then the larger: %s", out)

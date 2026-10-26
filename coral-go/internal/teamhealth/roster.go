@@ -83,7 +83,7 @@ const maxWaiters = 8
 func (r *Roster) headerCounts() string {
 	parts := []string{
 		fmt.Sprintf("%d working", r.Counts[StateWorking]),
-		fmt.Sprintf("%d WAITING", r.Counts[StateWaiting]),
+		fmt.Sprintf("%d waiting", r.Counts[StateWaiting]),
 	}
 	if n := r.Counts[StatePrompt]; n > 0 {
 		parts = append(parts, fmt.Sprintf("%d need input", n))
