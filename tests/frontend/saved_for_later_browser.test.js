@@ -240,7 +240,7 @@ const hex = i => i.toString(16).padStart(20, '0');
         assert.equal(await ev(`document.querySelector('#agentic-tab-saved .agentic-tab-count').textContent`), '2', 'the count is on the tab too');
         console.log('   ✓');
 
-        console.log('7b. A board message: saved from its row, listed as a Board item, the jump opens the board at the message, a deleted one is gone');
+        console.log('7b. A board message: saved from its row, listed as a Board item, the jump opens the team page at the message, a deleted one is gone');
         BOARD = 'saved-4510-board';
         await api('POST', `/api/board/${BOARD}/subscribe`, { subscriber_id: 'Saver', job_title: 'Saver' });
         for (const c of ['first board message', 'the one to save', 'the one to delete']) { const r = await api('POST', `/api/board/${BOARD}/messages`, { subscriber_id: 'Saver', content: c }); assert.equal(r.status, 200, 'post: ' + JSON.stringify(r)); }
@@ -249,8 +249,9 @@ const hex = i => i.toString(16).padStart(20, '0');
         const bm = got.body.messages || got.body;
         const keep = bm.find(m => m.content === 'the one to save'), drop = bm.find(m => m.content === 'the one to delete');
         assert.ok(keep && drop, 'the board has its messages');
-        await ev(`window.selectBoardProject(${JSON.stringify(BOARD)}); true`);
-        await waitFor(`document.querySelectorAll('#mb-messages .mb-message').length === 3`, 'the board rows', 8000);
+        await ev(`(async () => { localStorage.setItem('coral.board.view', 'chat'); window.switchNavTab('agents', { fromHistory: true }); const m = await import((window.__coralStatic || '/static/') + 'team_page.js'); await m.openTeamPage(${JSON.stringify(BOARD)}, { tab: 'messages' }); return true; })()`);
+        await waitFor(`document.querySelectorAll('#mb-messages .mb-message').length === 3`, 'the team page Board chat rows', 8000);
+        assert.equal(await ev(`location.pathname`), `/team/${BOARD}/messages`, 'saving starts on the team page');
         const bb = await ev(`(() => { const b = document.querySelector('#mb-messages [data-message-id="${keep.id}"] .mb-save-btn'); return b ? { label: b.getAttribute('aria-label'), pressed: b.getAttribute('aria-pressed'), hidden: b.hidden } : null; })()`);
         assert.deepEqual({ ...bb, label: bb.label.split(':')[0] }, { label: 'Save for later', pressed: 'false', hidden: false });
         for (const id of [keep.id, drop.id]) {
@@ -274,13 +275,13 @@ const hex = i => i.toString(16).padStart(20, '0');
         await ev(`[...document.querySelectorAll('${INBOX_ROWS}')].find(tr => tr.textContent.includes('the one to save')).querySelector('.dt-primary').click(); true`);
         await waitFor(`!!document.querySelector('#inbox-page .item-bar .btn-primary:not([disabled])')`, 'the board message\'s page with its Open button', 8000);
         await ev(`document.querySelector('#inbox-page .item-bar .btn-primary').click(); true`);
-        await waitFor(`!!document.querySelector('#mb-messages [data-message-id="${keep.id}"].chat-search-target')`, 'the jump into the board', 10000, `({ view: getComputedStyle(document.getElementById('messageboard-view')).display, rows: document.querySelectorAll('#mb-messages .mb-message').length, targets: document.querySelectorAll('.chat-search-target').length, tip: document.getElementById('saved-status').textContent, gone: [...document.querySelectorAll('.why:not([hidden])')].map(e => e.textContent) })`);
+        await waitFor(`!!document.querySelector('#mb-messages [data-message-id="${keep.id}"].chat-search-target')`, 'the jump into the board', 10000, `({ view: getComputedStyle(document.getElementById('team-page-view')).display, rows: document.querySelectorAll('#mb-messages .mb-message').length, targets: document.querySelectorAll('.chat-search-target').length, tip: document.getElementById('saved-status').textContent, gone: [...document.querySelectorAll('.why:not([hidden])')].map(e => e.textContent) })`);
+        assert.equal(await ev(`location.pathname`), `/team/${BOARD}/messages/${keep.id}`, 'a saved message opens its exact team page address');
         assert.equal(await ev(`document.activeElement === document.querySelector('#mb-messages [data-message-id="${keep.id}"]')`), true, 'the focus is on the message');
         await waitFor(`!!document.getElementById('saved-jumpbar') && !!document.querySelector('#mb-messages .saved-jump')`, 'the jump bar and the Saved tag', 6000);
         assert.equal(await ev(`document.querySelector('#saved-jumpbar .btn').textContent`), 'Back to Saved');
         await shot('saved-board-jump');
         for (const it of (await saved()).items) await api('DELETE', `/api/saved/${it.id}`);
-        await ev(`window.showMessageBoardProjects && window.showMessageBoardProjects(); true`);
         await select('sv-a');
         // two items again for the phone
         await ev(`(async () => { for (const k of [${JSON.stringify(hex(3))}, ${JSON.stringify(hex(4))}]) await fetch('/api/saved', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'agent', ref: 'sv-a-id', key: k, agent_type: 'claude', title: 'sv-a', snippet: 'a saved message', said_at: '2026-10-17T08:00:00Z' }) }); })()`);

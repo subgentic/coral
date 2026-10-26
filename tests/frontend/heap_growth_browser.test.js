@@ -4,7 +4,7 @@
 // its value after the warm-up and must stay under a bound. HEAP_CYCLES=n runs longer (the hour on epoch is HEAP_CYCLES=3000 or so), HEAP_OUT=file writes the numbers as
 // JSON, HEAP_FETCHES=file counts the page's fetches by URL and whether the body was read, HEAP_LEAK_SELFTEST=1 adds a deliberate leak (a listener and three nodes a round) that the bounds must catch, HEAP_SNAPSHOT_DIR=dir takes a heap snapshot after the warm-up and at the end (for the retainer paths of what grew).
 // Part 2 (#5050): every round also opens three real terminals in turn (each an xterm and a /ws/terminal socket) and goes back to the chat, resizes the window, opens the
-// board view and posts to it, and pages History. HEAP_TERMINAL=0 leaves that part out.
+// team page Board tab and posts to it, and pages History. HEAP_TERMINAL=0 leaves that part out.
 // Drives Chrome over CDP through agent_view_harness.js against the isolated dev server.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -109,7 +109,10 @@ async function httpJson(method, path, body) {
             if (parts.includes('resize')) await Emulation.setDeviceMetricsOverride({ width: n % 2 ? 1100 : 1280, height: 900, deviceScaleFactor: 1, mobile: false });
             if (parts.includes('board') || parts.includes('history')) await ev(`(async () => { const post = (p, b) => fetch(p, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) });
                 if (${parts.includes('board')}) { if (${n} <= 5) { await post('/api/board/${BOARD}/subscribe', { subscriber_id: 'Operator', job_title: 'Operator' }); await post('/api/board/${BOARD}/messages', { subscriber_id: 'Operator', content: 'round ${n} ' + 'y'.repeat(120) }); } // (the board's own messages are bounded: it shows a window of the newest)
-                window.switchNavTab('board'); if (window.selectBoardProject) await window.selectBoardProject(${JSON.stringify(BOARD)}); await ${framesJs(2)}; }
+                window.switchNavTab('agents', { fromHistory: true }); localStorage.setItem('coral.board.view', 'chat');
+                const teamPage = await import((window.__coralStatic || '/static/') + 'team_page.js'); await teamPage.openTeamPage(${JSON.stringify(BOARD)}, { tab: 'messages' });
+                if (location.pathname !== '/team/' + ${JSON.stringify(BOARD)} + '/messages' || !document.querySelector('#team-panel-messages #mb-board')) throw new Error('heap cycle did not reach the team Board tab');
+                await ${framesJs(2)}; }
                 if (${parts.includes('history')}) { window.switchNavTab('history'); await ${framesJs(2)}; }
                 window.switchNavTab('agents'); await ${framesJs(1)}; return true; })()`);
         };
