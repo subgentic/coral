@@ -49,7 +49,9 @@ func (s *Store) CheckUnread(ctx context.Context, project, subscriberID string) (
 	// System senders post audit messages that should not trigger notifications
 	systemFilter := " AND subscriber_id NOT IN ('Coral Task Queue')"
 
-	if receiveMode == "all" {
+	// What is counted is what the member's next plain read returns (ReadMessages), so it is nudged only when there is something to read: an orchestrator's read returns every unread message, any
+	// other member's the ones that tag it, whatever its mode says it receives (the operator, #7757: "prevent notifications when there is nothing to read").
+	if receiveMode == "all" && isOrchestrator(subscriberID, sub.JobTitle, sub.CanPeek) {
 		// Coral's own notice to one agent (CoralSender, #3636) counts only for the agent it
 		// names: never a fan-out to every subscriber that reads everything.
 		var count int
@@ -60,7 +62,7 @@ func (s *Store) CheckUnread(ctx context.Context, project, subscriberID string) (
 		return count, err
 	}
 
-	if receiveMode == "mentions" {
+	if receiveMode == "mentions" || receiveMode == "all" { // "all" here is a member whose read returns what tags it
 		terms := mentionTerms(subscriberID, sub.JobTitle)
 		// Convert terms to SQL LIKE patterns (% wildcard matches any substring)
 		whereClauses := make([]string, len(terms))
@@ -119,7 +121,7 @@ func (s *Store) LatestUnreadMessageID(ctx context.Context, project, subscriberID
 	}
 	args := []interface{}{project, sub.LastReadID, subscriberID}
 	where := "m.project=? AND m.id>? AND m.subscriber_id!=? AND m.subscriber_id!='Coral Task Queue'"
-	if sub.ReceiveMode != "all" && !isOrchestrator(subscriberID, sub.JobTitle, sub.CanPeek) {
+	if !isOrchestrator(subscriberID, sub.JobTitle, sub.CanPeek) { // the selection of a plain read: tagged messages, whatever the mode
 		args[1] = max(sub.LastReadID, s.unreadFloor(ctx, project)) // within the unread window (#3875)
 		return s.confirmedMention(ctx, project, subscriberID, sub.JobTitle, where, args, args[1].(int64), true)
 	}
@@ -191,7 +193,7 @@ func (s *Store) hasUnreadSenderMessage(ctx context.Context, project, subscriberI
 	}
 	args := []interface{}{project, sub.LastReadID, subscriberID, sender}
 	where := unreadSenderWhere(excludeSender)
-	if sub.ReceiveMode != "all" && !isOrchestrator(subscriberID, sub.JobTitle, sub.CanPeek) {
+	if !isOrchestrator(subscriberID, sub.JobTitle, sub.CanPeek) { // the selection of a plain read: tagged messages, whatever the mode
 		args[1] = max(sub.LastReadID, s.unreadFloor(ctx, project)) // within the unread window (#3875)
 		id, err := s.confirmedMention(ctx, project, subscriberID, sub.JobTitle, where, args, args[1].(int64), false)
 		return id > 0, err

@@ -16,15 +16,16 @@ import (
 
 // Looking at what waits for an agent changes nothing for the agent (#7727, Security's #7757 read): the page lists its unread board messages, and they stay unread.
 func TestListingWhatWaitsForAnAgentLeavesItsMessagesUnread(t *testing.T) {
-	waitingLookLeavesUnread(t, "mentions", []string{"@Worker first", "@Worker second"})
+	waitingLookLeavesUnread(t, "mentions", []string{"@Worker first", "@Worker second"}, 2)
 }
 
-// The same for an agent that gets every message (receive mode all): the page lists them, as many as it counts as unread, and still leaves them unread.
-func TestListingWhatWaitsForAnAgentThatReadsEverythingListsAndLeavesItsMessages(t *testing.T) {
-	waitingLookLeavesUnread(t, "all", []string{"first, tagging nobody", "second, tagging nobody"})
+// The same for an agent in receive mode all (#7757, the operator): it is counted, and shown, only what its plain read returns, the messages that tag it and the ones to @all; a message that tags nobody
+// is neither counted nor nudged, so the page says what the nudge says.
+func TestTheWaitingPageListsWhatAPlainReadReturnsForAnAgentInModeAll(t *testing.T) {
+	waitingLookLeavesUnread(t, "all", []string{"an update that tags nobody", "@Worker tagged", "@all for everyone"}, 2)
 }
 
-func waitingLookLeavesUnread(t *testing.T, mode string, texts []string) {
+func waitingLookLeavesUnread(t *testing.T, mode string, texts []string, want int) {
 	t.Helper()
 	server, h, _, ss := setupSessionsTestServer(t)
 	ctx := context.Background()
@@ -40,7 +41,7 @@ func waitingLookLeavesUnread(t *testing.T, mode string, texts []string) {
 		require.NoError(t, err)
 	}
 	unread := func() int { n, _ := h.bs.CheckUnread(ctx, "alpha", "Worker"); return n }
-	require.Equal(t, 2, unread())
+	require.Equal(t, want, unread())
 	for _, routeName := range []string{name, "Worker"} {
 		for i := 0; i < 2; i++ { // both API and dashboard names, twice: looking never consumes the messages
 			resp, err := http.Get(server.URL + "/api/sessions/live/" + routeName + "/waiting?agent_type=claude&session_id=" + sid)
@@ -52,9 +53,9 @@ func waitingLookLeavesUnread(t *testing.T, mode string, texts []string) {
 			require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
 			resp.Body.Close()
 			require.Equal(t, http.StatusOK, resp.StatusCode)
-			assert.Equal(t, 2, out.Unread, "look %d", i)
-			assert.Len(t, out.Messages, 2, "look %d lists both messages", i)
-			assert.Equal(t, 2, unread(), "look %d: the agent still has both unread", i)
+			assert.Equal(t, want, out.Unread, "look %d", i)
+			assert.Len(t, out.Messages, want, "look %d lists what a plain read returns", i)
+			assert.Equal(t, want, unread(), "look %d: the agent still has them unread", i)
 		}
 	}
 }

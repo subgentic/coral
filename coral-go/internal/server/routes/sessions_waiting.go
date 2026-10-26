@@ -72,7 +72,7 @@ func (h *SessionsHandler) ListWaiting(w http.ResponseWriter, r *http.Request) {
 			if n, err := h.bs.CheckUnread(r.Context(), sub.Project, sub.SubscriberID); err == nil {
 				out["unread"] = n
 			}
-			if msgs, err := h.bs.PeekMessages(r.Context(), sub.Project, sub.SubscriberID, maxWaitingMessages, sub.ReceiveMode == "all"); err == nil { // a look, not a read: the agent keeps them unread
+			if msgs, err := h.bs.PeekMessages(r.Context(), sub.Project, sub.SubscriberID, maxWaitingMessages); err == nil { // a look, not a read: the agent keeps them unread
 				rows := make([]waitingMessage, 0, len(msgs))
 				for _, m := range msgs {
 					text, cut := clitext.Clean(m.Content), false

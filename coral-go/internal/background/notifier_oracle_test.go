@@ -74,7 +74,7 @@ func TestRunPassAgreesWithBefore4599(t *testing.T) {
 		}
 	})
 	t.Logf("compared: %d nudge attempts, %d resends after a failure, %d health nudges, %d mentions", oracleTotals.nudges, oracleTotals.resends, oracleTotals.health, oracleTotals.mentions)
-	require.Greater(t, oracleTotals.nudges, 1000)
+	require.Greater(t, oracleTotals.nudges, 900) // 1000 before a member in mode all was nudged only for what a plain read returns (#7757): the volume fell by about 2%, and 900 is still a run that nudged a lot
 	require.Greater(t, oracleTotals.resends, 10)
 	require.Greater(t, oracleTotals.health, 50)
 	require.Greater(t, oracleTotals.mentions, 200)

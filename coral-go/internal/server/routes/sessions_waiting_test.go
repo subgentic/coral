@@ -36,7 +36,7 @@ func TestASkippedSendIsShownOnlyWhileAnUnreadMessageWaits(t *testing.T) {
 	require.NoError(t, err)
 	_, err = bs.Subscribe(ctx, "team", "Lead", "Lead", "", nil, "")
 	require.NoError(t, err)
-	first, err := bs.PostMessage(ctx, "team", "Lead", "please review", nil)
+	first, err := bs.PostMessage(ctx, "team", "Lead", "@Dev please review", nil)
 	require.NoError(t, err)
 
 	// a nudge met an open prompt: skipped
@@ -75,7 +75,7 @@ func TestASkippedSendIsShownOnlyWhileAnUnreadMessageWaits(t *testing.T) {
 	assert.Nil(t, skippedSendField(name, 0), "and not in the live row either")
 
 	// a new unread message after the skip: the skip is shown again until a send is typed
-	_, err = bs.PostMessage(ctx, "team", "Lead", "and again", nil)
+	_, err = bs.PostMessage(ctx, "team", "Lead", "@Dev and again", nil)
 	require.NoError(t, err)
 	assert.NotNil(t, get()["skipped"])
 	term.show(idleInputBox)

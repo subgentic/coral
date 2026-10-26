@@ -25,7 +25,7 @@ func TestBoardNotifier_IndependentSessionLifecycle(t *testing.T) {
 		require.NoError(t, err)
 		_, err = bs.Subscribe(ctx, id, "Poster", "Poster", "codex-poster-"+id, nil, "all")
 		require.NoError(t, err)
-		_, err = bs.PostMessage(ctx, id, "Poster", "new message", nil)
+		_, err = bs.PostMessage(ctx, id, "Poster", "@Dev new message", nil)
 		require.NoError(t, err)
 	}
 	require.NoError(t, n.RunOnce(ctx))
@@ -36,7 +36,7 @@ func TestBoardNotifier_IndependentSessionLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, n.RunOnce(ctx))
 	require.Len(t, rt.sent, 2, "reading one session must not reset the sibling")
-	_, err = bs.PostMessage(ctx, "one", "Poster", "after read", nil)
+	_, err = bs.PostMessage(ctx, "one", "Poster", "@Dev after read", nil)
 	require.NoError(t, err)
 	require.NoError(t, n.RunOnce(ctx))
 	require.Len(t, rt.sent, 3)
