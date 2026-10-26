@@ -236,6 +236,7 @@ func (c *Config) CoralDir() string {
 // UseCoralDir sets the data directory of a Config built by hand (Load sets it otherwise), so
 // tests that make a Config{} get their own folder instead of "" (paths relative to wherever the
 // test runs, shared by every test in the process: #3566).
+// UseCoralDir has no production caller: it is exported for tests in cmd/coral, cmd/launch-coral, server, server/routes.
 func (c *Config) UseCoralDir(dir string) {
 	c.coralDir = dir
 }
