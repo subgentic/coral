@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -279,7 +280,11 @@ func TestFindCLIReportsAMissingNodeAndFindCLIForLaunchDoesNot(t *testing.T) {
 func TestCLIVersionRunsAnNpmCLIUnderAMinimalPath(t *testing.T) {
 	minimalEnv(t)
 	_, cli := npmLayout(t, "#!/usr/bin/env node", true)
-	v := CLIVersion(map[string]string{CLIPathSettingKey("claude"): cli}, "claude")
+	// The first run of a script that was just written can take ~10 s on macOS when the machine is busy (the system checks a new executable before it first runs): CLIVersion then gives up at its own 10 s limit and answers
+	// "" without caching it. The version is waited for, not the clock: the next ask runs a script the system has already cleared (#7746).
+	settings := map[string]string{CLIPathSettingKey("claude"): cli}
+	var v string
+	require.Eventually(t, func() bool { v = CLIVersion(settings, "claude"); return v != "" }, 2*time.Minute, 50*time.Millisecond, "the npm CLI's version was never read")
 	assert.Equal(t, "1.2.3", v)
 	assert.Equal(t, minimalPath, os.Getenv("PATH"))
 }
