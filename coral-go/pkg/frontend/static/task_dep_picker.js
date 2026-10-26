@@ -2,10 +2,10 @@
 import { state } from './state.js';
 import { escapeHtml, escapeAttr } from './utils.js';
 
-export function _renderDepPicker(containerId, selectedIds = [], excludeTaskId = null) {
+export function _renderDepPicker(containerId, selectedIds = [], excludeTaskId = null, rows = state.currentBoardTasks) {
     const container = document.getElementById(containerId);
     if (!container) return;
-    const tasks = (state.currentBoardTasks || []).filter(t =>
+    const tasks = (rows || []).filter(t =>
         t.id !== excludeTaskId
     );
     const selected = new Set(selectedIds.map(Number));

@@ -71,6 +71,19 @@ const BASE = require('./test_base').BASE;
             await ev(`document.querySelector('#team-panel-goals .goal-main .goals-back').click(); true`);
             await waitFor(`location.pathname===${JSON.stringify(`/team/${board}/goals`)} && !!document.querySelector('#team-panel-goals .dt-primary')`, 'team Back to Goals');
         }
+        await load(url); await detail('#inbox-page');
+        await ev(`document.querySelector('#inbox-page .goals-add-task').click(); true`);
+        await waitFor(`document.getElementById('create-task-modal')?.getClientRects().length && document.getElementById('create-task-goal')?.value===${JSON.stringify(String(id))}`, 'Inbox Add task has the goal and its team');
+        assert.ok(await ev(`document.getElementById('create-task-deps').textContent.includes('Verify both mounts')`), 'dependency picker reads this goal team');
+        await ev(`document.getElementById('create-task-title').value='Created inside Inbox goal'; document.getElementById('create-task-title').dispatchEvent(new Event('input',{bubbles:true})); document.getElementById('create-task-submit').click(); true`);
+        await waitFor(`!document.getElementById('create-task-modal').getClientRects().length && document.querySelector('#inbox-page .goal-side-group')?.textContent==='Open 2'`, 'task created on the Inbox goal team');
+        assert.equal(await ev('location.pathname'),url,'Add task stays in Inbox');
+        await ev(`document.querySelector('#inbox-page .goals-close').click(); true`);
+        await waitFor(`!!document.querySelector('.goals-close-dialog[open]')`, 'close goal dialog');
+        await ev(`document.getElementById('goal-close-reason').value='Acceptance checked'; document.querySelector('.goals-close-dialog button[type="submit"]').click(); true`);
+        await waitFor(`!!document.querySelector('#inbox-page .goals-reopen')`, 'goal closes in place');
+        await ev(`document.querySelector('#inbox-page .goals-reopen').click(); true`);
+        await waitFor(`!!document.querySelector('#inbox-page .goals-close')`, 'goal reopens in place');
         console.log('PASS shared goal view: Inbox/team, 1280/390, Back/search, history, reload, task navigation');
     } finally { await removeBoards(ev,[board]).catch(()=>{}); await client.close(); }
 })().catch(e=>{console.error(e);process.exitCode=1;});

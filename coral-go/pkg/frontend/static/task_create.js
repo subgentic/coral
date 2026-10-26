@@ -1,5 +1,6 @@
 /* Creating a task: the dialog and its submit (moved out of tasks.js, #5082; no behaviour change). */
 import { state } from './state.js';
+import { readTaskChoices } from './tasks_view.js';
 import { closeOnBackdropAndEscape, releaseEscape } from './dialog_close.js';
 import { boardFetch, serverFetch, sessionServer } from './server_base.js';
 import { ensureBuilt } from './lazy_dom.js';
@@ -11,6 +12,7 @@ import { loadBoardTasks, loadAgentTasks } from './task_list.js';
 import { readOpenGoals, fillGoalSelect, chooseGoalLabel } from './task_goals.js';
 import { mountSettingsView } from './settings_view.js'; // the dialog's fields (a startup module)
 
+let _project = '', _dependencies, _created = null; // explicit page context, independent of the selected agent/team
 let _requireGoal = false; // the board asks for a goal on every task: the Goal select has no empty choice to stay on
 let _solo = false;        // an agent without a board: the task goes to this agent, and the board's fields are not shown
 let _goalShown = false;   // the board has open goals (or asks for one): the Goal select is shown
@@ -35,7 +37,7 @@ function taskFields() {
         { key: 'send', type: 'toggle', id: 'create-task-send', label: 'Tell the agent to claim it', default: true, help: 'A short prompt to run coral-agent task claim (queued if it is busy).', visibleWhen: () => _solo },
         { key: 'flow', type: 'heading', fold: true, id: 'create-task-flow', label: 'Workflow and prerequisites' },
         { key: 'blocked_by', type: 'custom', id: 'create-task-deps-field', label: 'Blocked by', default: [], visibleWhen: board,
-            render: slot => { const d = el('div', 'dep-picker'); d.id = 'create-task-deps'; slot.append(d); return { get: () => _getSelectedDeps('create-task-deps'), set: ids => _renderDepPicker('create-task-deps', (ids || []).map(Number)) }; } },
+            render: slot => { const d = el('div', 'dep-picker'); d.id = 'create-task-deps'; slot.append(d); return { get: () => _getSelectedDeps('create-task-deps'), set: ids => _renderDepPicker('create-task-deps', (ids || []).map(Number), null, _dependencies) }; } },
         { key: 'condition', type: 'select', id: 'create-task-condition', label: 'Proceed when prerequisites', default: 'success', visibleWhen: board,
             options: [{ value: 'success', label: 'Succeed' }, { value: 'failure', label: 'Fail' }, { value: 'termination', label: 'Finish (any outcome)' }] },
         { key: 'inputs', type: 'text', id: 'create-task-inputs', label: 'Required upstream artifacts', placeholder: 'build, test_report (comma separated)', default: '', visibleWhen: board },
@@ -61,10 +63,13 @@ function taskView(modal) {
 export async function showCreateTaskModal(preset = {}) {
     const modal = ensureBuilt('create-task-modal'); // built on first open (#4500)
     if (!modal) return;
+    _project = typeof preset.project === 'string' ? preset.project : '';
+    _created = typeof preset.onCreated === 'function' ? preset.onCreated : null;
+    _dependencies = _project ? [] : undefined;
     const v = taskView(modal);
 
     // Solo agent: no board fields; offer to send the task to the agent
-    _solo = _isSoloAgent();
+    _solo = !_project && _isSoloAgent();
     _goalShown = false; _requireGoal = false;
     v.reset(); // a fresh task: every field at its default, the optional workflow part folded, no mark, an empty status line
     v.fold(false);
@@ -79,7 +84,7 @@ export async function showCreateTaskModal(preset = {}) {
     // Populate assignee dropdown from board subscribers
     const assigneeSelect = document.getElementById('create-task-assignee');
     assigneeSelect.replaceChildren(new Option('Unassigned', ''));
-    const boardProject = _solo ? null : _getBoardProject();
+    const boardProject = _solo ? null : (_project || _getBoardProject());
     if (boardProject) {
         try {
             const resp = await boardFetch(boardProject, `/subscribers`);
@@ -92,7 +97,7 @@ export async function showCreateTaskModal(preset = {}) {
             }
         } catch { /* ignore */ }
     }
-    assigneeSelect.value = preset.assigned_to ?? agentTaskAssignee();
+    assigneeSelect.value = preset.assigned_to ?? (_project ? '' : agentTaskAssignee());
 
     // The Goal select lists the board's open goals; it stays hidden when the board has none (and does not require one), so a board without goals sees no new control (#7253).
     if (boardProject) {
@@ -102,6 +107,11 @@ export async function showCreateTaskModal(preset = {}) {
         _goalShown = read.goals.length > 0 || read.requireGoal;
     }
 
+    if (_project) {
+        try {
+            _dependencies = await readTaskChoices(_project);
+        } catch { _dependencies = []; }
+    }
     // A template or duplicate can supply workflow/prerequisites. Reveal those values.
     if (!_solo) {
         const deps = preset.blocked_by || [];
@@ -134,8 +144,8 @@ export function hideCreateTaskModal() {
 async function submitValues(values) {
     const title = String(values.title || '').trim();
     const body = String(values.body || '').trim();
-    if (_isSoloAgent()) { await _createSoloAgentTask(title, body, values); return; }
-    const boardProject = _getBoardProject();
+    if (_solo) { await _createSoloAgentTask(title, body, values); return; }
+    const boardProject = _project || _getBoardProject();
     if (!boardProject) throw new Error('No board project found');
     const goalId = _goalShown ? values.goal_id : '';
     const blockedBy = values.blocked_by || [];
@@ -151,7 +161,8 @@ async function submitValues(values) {
             throw new Error(data.error || `HTTP ${resp.status}`);
         }
         hideCreateTaskModal();
-        await loadBoardTasks(boardProject);
+        if (_created) await _created();
+        else await loadBoardTasks(boardProject);
         showToast('Task created');
     } catch (e) {
         view.fold(true); // server validation can name a workflow or prerequisite field; keep all of them visible

@@ -1,20 +1,22 @@
 // One goal's detail view, shared by the team Goals list and other page hosts.
 import { openTask } from './task_navigation.js';
-import { boardFetch } from './server_base.js';
+import { boardFetch, keyLabel } from './server_base.js';
 import { OPERATOR_ID } from './utils.js';
 import { browserLocal } from './safe_storage.js';
 import { whenText } from './when_text.js';
-import { toTaskPage, errorOf } from './goals_adapter.js';
+import { toTaskPage, toGoal, errorOf } from './goals_adapter.js';
 import { importOnce } from './import_once.js';
 import { foldWayBack } from './way_back.js';
 import * as W from './goal_words.js';
+import { onGoalsSeq } from './goals_feed.js';
+import { pollEvery } from './overload.js';
 const { attachDockResize, DOCK_MIN_WIDTH, dockMaxWidth } = await importOnce('./dock_resize.js');
 const DT = await importOnce('./data_table.js');
 const TV = await importOnce('./tasks_view.js');
 const PAGE = 50;
 
 /** Mount one goal; each mount owns its task pages, search and phone screen. */
-export function mountGoal(host, { team, id, back, onTask, goal, refresh, status }) {
+export function mountGoal(host, { team, id, back, onTask, goal, refresh, status, teamLink }) {
     const root = host;
     const model = { project: team, openId: id, tasks: new Map(), followUps: new Map(), followKey: new Map(), taskSearch: '', screen: 'goal', creating: false };
     let current = goal;
@@ -25,7 +27,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status 
     const drawPage = () => { if (!disposed && current) drawGoalPageRaw(root); };
     const drawDetail = drawPage;
     const focusDetail = () => root.querySelector('#goals-detail-title')?.focus({ preventScroll: true });
-    const loadGoals = () => refresh();
+    const loadGoals = () => refresh ? refresh() : reload();
     const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
     const btn = (cls, text, onClick) => { const b = el('button', cls, text); b.type = 'button'; if (onClick) b.addEventListener('click', onClick); return b; };
     const say = text => status?.(text);
@@ -117,6 +119,17 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status 
 
     function drawGoalMain(main, g) {
         main.append(backButton('Goals', () => closeGoal()));
+        if (teamLink) {
+            const link = el('a', 'goal-team-link', 'Open on team page'); link.href = teamLink;
+            link.setAttribute('aria-label', `Open ${keyLabel(team)} on team page`);
+            link.addEventListener('click', e => {
+                if (e.button || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+                e.preventDefault();
+                importOnce('./task_goals.js').then(m => m.openGoalOnTeamPage(team, id));
+            });
+            const row = el('div', 'goal-back-row');
+            row.append(main.querySelector('.goals-back'), link); main.append(row);
+        }
         const h = el('h2', 'goals-detail-title', g.title); h.tabIndex = -1; h.id = 'goals-detail-title'; main.append(h);
         foldWayBack(main, '.goals-back', '.goals-detail-title');
         const line = el('div', 'goals-detail-line'); line.append(stateChip(g));
@@ -149,7 +162,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status 
         }
         // The pinned bar: Add task and Close goal (Reopen for a closed one), always at the bottom of the page.
         const bar = el('div', 'goals-pinbar');
-        bar.append(btn('btn goals-add-task', 'Add task', () => { (window.showCreateTaskModal || (() => {}))({ goal_id: g.id }); }));
+        bar.append(btn('btn goals-add-task', 'Add task', () => { (window.showCreateTaskModal || (() => {}))({ project: model.project, goal_id: g.id, onCreated: loadGoals }); }));
         if (W.isOpenGoal(g)) { const cb = btn('btn btn-primary goals-close', 'Close goal', () => openClose(g)); cb.setAttribute('aria-label', `Close goal: ${g.title}`); bar.append(cb); } // named for its goal: the Close dialog's own button is just Close goal
         else if (W.isClosedGoal(g)) bar.append(btn('btn goals-reopen', 'Reopen', () => reopenGoal(g)));
         main.append(bar);
@@ -328,6 +341,39 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status 
 
 
     const update = g => { current = g; drawPage(); };
-    update(goal);
-    return { update, refreshTasks: () => loadTasks(id), dispose: () => { disposed = true; }, focus: focusDetail };
+    let reading = false, again = false, signature = '', first = true;
+    async function reload() {
+        if (disposed) return;
+        if (reading) { again = true; return; }
+        reading = true;
+        try {
+            const json = await readJson(`/goals/${id}`);
+            if (disposed) return;
+            const g = toGoal(json.goal || json);
+            if (!g || g.id !== id) throw new Error('That goal was not found');
+            const next = JSON.stringify(g);
+            if (next !== signature) { signature = next; update(g); }
+            if (first) { first = false; focusDetail(); }
+            await loadTasks(id);
+        } catch (e) {
+            if (disposed) return;
+            const problem = el('div', 'goals-failed'); problem.setAttribute('role', 'alert');
+            problem.append(el('span', null, W.failedText(e.message)), btn('btn btn-small', 'Try again', reload));
+            if (!current) { root.replaceChildren(backButton('Goals', back), problem); }
+            else { root.querySelector(':scope > .goals-failed')?.remove(); root.prepend(problem); }
+        } finally { reading = false; if (again && !disposed) { again = false; reload(); } }
+    }
+    const visibleRefresh = () => { if (!disposed && root.isConnected && root.getClientRects().length) reload(); };
+    let stop = null, timer = null;
+    if (goal) update(goal);
+    else {
+        root.replaceChildren(backButton('Goals', back), el('p', 'goals-note', 'Loading goal…'));
+        reload();
+        stop = onGoalsSeq(board => { if (board === team) visibleRefresh(); });
+        timer = pollEvery(visibleRefresh, 30000);
+        window.addEventListener('focus', visibleRefresh);
+    }
+    return { update, refreshTasks: () => loadTasks(id), dispose: () => {
+        disposed = true; stop?.(); if (timer) clearInterval(timer); window.removeEventListener('focus', visibleRefresh);
+    }, focus: focusDetail };
 }
