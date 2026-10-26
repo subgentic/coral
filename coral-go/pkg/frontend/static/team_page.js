@@ -232,7 +232,7 @@ async function fillTab(tab, item = 0) {
         } else if (tab === 'messages') {
             const m = await importOnce('./message_board.js');
             if (stale()) return;
-            m.showBoardInPage(team, host);
+            m.showBoardInPage(team, host, item || null);
             adoptBoardActions();
         } else if (tab === 'agents') {
             const m = await importOnce('./team_agents_page.js');

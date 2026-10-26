@@ -50,6 +50,8 @@
 1	board_export_render.js	subList
 1	board_export_render.js	tag
 1	board_system_lines.js	lines
+2	board_table.js	tagHtml
+1	board_table.js	timeHtml
 1	browser.js	machineBlock()
 1	changed_files.js	adds
 1	changed_files.js	agentOnlyCls
@@ -218,6 +220,10 @@
 1	message_board.js	messageTimeHtml(m.created_at)
 2	message_board.js	p.message_count
 1	message_board.js	p.subscriber_count
+1	message_board.js	parts.actions
+1	message_board.js	parts.classes
+1	message_board.js	parts.tagsOpen
+1	message_board.js	parts.toggle
 1	message_board.js	renderBoardMessageBody(m)
 1	message_board.js	selectedClass
 1	message_board.js	spacing

@@ -22,12 +22,13 @@ import { OUTCOME_UNKNOWN_LINE, isOutcomeUnknown } from './outcome_unknown.js';
 import { launchBlockedReason, blockedReason } from './hub_access.js';
 import { pollEvery, afterPause, isBusyStatus, busyRetryingText, machineOf } from './overload.js';
 import { note } from './nav.js';
-import { keyRoute } from './routes.js';
+import { keyRoute, build } from './routes.js';
 import { attachDialogFocus } from './dialog_focus.js';
 import { mountBoardSearch, highlightBoard, setBoardMembers, resetBoardSearch } from './board_search.js';
 import { PAGE_SIZE, fetchAllBoardMessages, fetchAllHistory, fetchAllLiveChat, fetchMessages, fetchProjects, fetchSubscribers, mergeMessages } from './board_fetch.js';
 import { navigateToAgentSession } from './board_agent_links.js';
 import { initGrowingTextarea } from './growing_textarea.js';
+import { boardView, saveBoardView, rowParts, toggleRow, setAllRows, refreshReplies, retagMentions, applyView, mountTableTools, forgetOpenRows, sameDay, dayDividerHtml } from './board_table.js'; // the board as a table (#7921)
 export { fetchAllBoardMessages, fetchAllHistory, fetchAllLiveChat } from './board_fetch.js';
 import { connectBoard, isSelectMode, isSelected, resetSelection, toggleMessageSelect, doExportBoard, hideExportBoardModal, selectAllMessages, selectNoneMessages, exportSelectedAsMarkdown, cancelSelectMode } from './board_export.js';
 export { showExportBoardModal, doExportBoard, toggleSelectMode, toggleMessageSelect, selectAllMessages, selectNoneMessages, cancelSelectMode, exportSelectedAsMarkdown } from './board_export.js';
@@ -137,6 +138,8 @@ export function selectBoardProject(project, messageId = null) {
     const computer = (state.servers || []).find(s => s.id === state.currentBoardServer);
     document.getElementById('messageboard-title').textContent = isCloud() && computer ? `Board on ${computer.label || computer.id}` : 'Message Board';
     mountBoardSearch(document.getElementById('mb-tools'), project, SEARCH_HOOKS);
+    applyView(document.getElementById('mb-messages'), 'chat'); // the board's own page keeps the chat; the table is the team page's Board tab
+    document.getElementById('mb-table-tools')?.remove();
 
     // Ensure dashboard is subscribed as a reader
     subscribeDashboard(project);
@@ -155,7 +158,7 @@ export function selectBoardProject(project, messageId = null) {
 
 /** The team page's Messages tab (#7453): the board's own column (#mb-board: the search bar, the messages, the composer) moved into `host`, and the board loaded and polled as on the board page. leaveBoardPage puts the column back and stops the poll. */
 let _boardHome = null;
-export function showBoardInPage(project, host) {
+export function showBoardInPage(project, host, messageId = null) {
     setMoreOpen(false);
     const board = document.getElementById('mb-board');
     if (!board || !host) return;
@@ -179,7 +182,9 @@ export function showBoardInPage(project, host) {
     loadPausedState(project);
     loadSleepState(project);
     syncBoardDeleteButton(project);
-    if (!again) { clearNewPill(); pendingMessageId = null; loadBoardMessages(project); }
+    applyBoardTable(project);
+    if (!again) { clearNewPill(); pendingMessageId = messageId != null ? String(messageId) : null; loadBoardMessages(project); }
+    else if (messageId != null) focusMessageById(messageId); // a link to a message of the board already on screen
     loadBoardSubscribers(project);
     startBoardPoll();
 }
@@ -198,6 +203,8 @@ export function leaveBoardPage() {
     const board = document.getElementById('mb-board');
     if (!board || !_boardHome) return;
     nameComposerForPage(false);
+    applyView(document.getElementById('mb-messages'), 'chat'); // the board's own page is the chat
+    document.getElementById('mb-table-tools')?.remove();
     stopBoardPoll();
     currentProject = null;
     board.style.display = 'none'; // display-ok: as above
@@ -437,9 +444,12 @@ function renderBoardItem(item, prev) {
     const snippet = String(m.content || '').replace(/\s+/g, ' ').trim().slice(0, 40);
     const moreLabel = `Actions for the message from ${agent}, ${formatTime(m.created_at)}${snippet ? `: ${snippet}` : ''}`; // each one names its own message (three at one minute are three names)
     const deleteLabel = `Delete the message from ${agent}, ${formatTime(m.created_at)}`; // names the message: the × alone is read as "times"
+    const parent = m.reply_to ? _allMessages[indexOfId(_allMessages, m.reply_to)] : null;
+    const parts = rowParts(m, { agent, timeHtml: messageTimeHtml(m.created_at), moreLabel, replyName: m.reply_to ? (parent ? (parent.job_title || 'Unknown') : 'an earlier message') : '', self: OPERATOR_ID.toLowerCase() }); // the table's head, actions and flags (board_table.js)
     const checkbox = isSelectMode() ? `<input type="checkbox" class="mb-select-checkbox" data-msg-id="${Number(m.id)}" ${isSelected(m.id) ? 'checked' : ''} data-on-click="mb-msg-select">` : '';
     return `
-        <div class="mb-message ${spacing}${alignClass}${selectedClass}" role="listitem" data-message-id="${escapeAttr(String(m.id))}"${messageAttachmentAttrs(m)} style="${boardMessageColorStyle(color)}">
+        <div class="mb-message ${spacing}${alignClass}${selectedClass}${parts.classes}" role="listitem" data-message-id="${escapeAttr(String(m.id))}"${m.reply_to ? ` data-reply-to="${Number(m.reply_to)}"` : ''}${messageAttachmentAttrs(m)} style="${boardMessageColorStyle(color)}">
+            ${parts.toggle}
             <div class="mb-message-header">
                 ${checkbox}
                 <span class="mb-agent-name">${m.icon ? escapeHtml(m.icon) + ' ' : ''}${escapeHtml(agent)}</span>
@@ -449,8 +459,10 @@ function renderBoardItem(item, prev) {
                 <button class="mb-delete-msg-btn" data-on-click="mb-msg-delete" data-msg-id="${Number(m.id)}" title="Delete message" aria-label="${escapeAttr(deleteLabel)}">&times;</button>
                 <button type="button" class="mb-msg-more" data-on-click="mb-msg-more" aria-haspopup="dialog" title="Message actions" aria-label="${escapeAttr(moreLabel)}">&hellip;</button>
             </div>
-            <div class="mb-message-body">${renderBoardMessageBody(m)}</div>
+            ${parts.tagsOpen}
+            <div class="mb-message-body" id="mbd-${Number(m.id)}">${renderBoardMessageBody(m)}</div>
             ${messageAttachmentsHtml(m)}
+            ${parts.actions}
         </div>`;
 }
 
@@ -464,10 +476,12 @@ function openMessageActions(opener) {
     dlg.append(title);
     const item = (cls, text, target) => { const b = document.createElement('button'); b.type = 'button'; b.className = cls; b.textContent = text; b.addEventListener('click', () => { dlg.close(); target.click(); }); return b; };
     if (save) dlg.append(item('btn mb-actions-item', save.getAttribute('aria-pressed') === 'true' ? 'Remove from saved' : 'Save for later', save));
+    const select = opener.closest('.mb-table') && !isSelectMode() ? document.getElementById('mb-select-btn') : null; // the table's More holds Select too
+    if (select) dlg.append(item('btn mb-actions-item', 'Select messages', select));
     if (del) { const apart = document.createElement('div'); apart.className = 'mb-actions-apart'; apart.append(item('btn mb-actions-item mb-actions-danger', 'Delete message', del)); dlg.append(apart); }
     const close = document.createElement('button'); close.type = 'button'; close.className = 'btn mb-actions-item'; close.textContent = 'Close'; close.addEventListener('click', () => dlg.close());
     dlg.append(close); document.body.append(dlg);
-    dlg.addEventListener('close', () => { dlg.remove(); const back = opener.isConnected ? opener : document.querySelector(`.mb-message[data-message-id="${CSS.escape(String(messageId))}"] .mb-msg-more`); if (back) back.focus(); }); // the list may have been drawn again (a save marks the row): the same message's button gets the focus
+    dlg.addEventListener('close', () => { dlg.remove(); const back = opener.isConnected ? opener : document.querySelector(`.mb-message[data-message-id="${CSS.escape(String(messageId))}"] .mb-row-more, .mb-message[data-message-id="${CSS.escape(String(messageId))}"] .mb-msg-more`); if (back) back.focus(); }); // the list may have been drawn again (a save marks the row): the same message's button gets the focus
     dlg.showModal();
     dlg.querySelector('.mb-actions-item')?.focus();
 }
@@ -501,10 +515,11 @@ function prependEarlier(container, count) {
     const prev = fresh[fresh.length - 1];
     const grouped = !!prev && prev.kind === 'msg' && (prev.m.job_title || 'Unknown') === (tail.m.job_title || 'Unknown');
     first.className = first.className.replace(/mb-message-(first|grouped)/, grouped ? 'mb-message-grouped' : 'mb-message-first'); // in place: the same class order as a whole render
-    first.before(tmp.content);
+    const lead = first.previousElementSibling && first.previousElementSibling.classList.contains('mb-day') ? first.previousElementSibling : first; // the day line above the first row stays above the new rows
+    lead.before(tmp.content);
     for (const el of added) { nameBoardButtons(el); resolveBoardArtifacts(el, state.currentBoardServer); }
     updateBoardHeader(container);
-    return true;
+    return true; // (renderMessages draws the day dividers after it)
 }
 
 // The jump's landing: the message in the middle of the board with the focus on it (Save for Later's jump and the search's, #4510, #4771); the one before it loses its mark.
@@ -512,6 +527,7 @@ function revealMessage(target) {
     for (const old of document.querySelectorAll('#mb-messages .chat-search-target')) if (old !== target) old.classList.remove('chat-search-target');
     const run = target.closest('details');
     if (run) run.open = true; // a task-queue line inside a collapsed row
+    if (target.classList.contains('mb-message')) toggleRow(target, true); // a jump (a search hit, a saved message, a link) lands on the whole message
     target.classList.add('chat-search-target');
     target.scrollIntoView({ block: 'center', behavior: scrollBehavior() });
     target.setAttribute('tabindex', '-1'); // the focus goes to the message
@@ -541,7 +557,68 @@ async function jumpToFirst() {
     if (first) { first.setAttribute('tabindex', '-1'); first.focus({ preventScroll: true }); }
 }
 
-const SEARCH_HOOKS = { me: OPERATOR_ID, redraw: () => highlightBoard(document.getElementById('mb-messages')), jumpTo: id => focusMessageById(id), first: () => jumpToFirst(), latest: () => jumpToLatest() };
+const SEARCH_HOOKS = { me: OPERATOR_ID, redraw: () => highlightBoard(document.getElementById('mb-messages')), jumpTo: id => focusMessageById(id), first: () => jumpToFirst(), latest: () => jumpToLatest(), expandAll: () => setAllRows(document.getElementById('mb-messages'), true), collapseAll: () => setAllRows(document.getElementById('mb-messages'), false) };
+
+// ── The board as a table (#7921) ─────────────────────────────────────────
+let _pill = 'all'; // All, Questions or Mentions me: which rows the table shows
+let _tableTeam = null;
+let _replyTo = null; // { id, name }: the message the composer's text answers (Reply), sent with the post while the text still starts with the name
+
+/** The day dividers: one above the first row of each day, kept in step with the rows after every draw, append, prepend and trim (a divider is no row: nothing else counts it). */
+function syncDays(container) {
+    const at = new Map(_allMessages.map(m => [String(m.id), m.created_at]));
+    const rows = [...container.querySelectorAll(ROW)];
+    let prev = null;
+    for (const row of rows) {
+        const when = at.get(String(rowFirstId(row)));
+        const key = when ? new Date(when).toDateString() : null;
+        const lead = row.previousElementSibling && row.previousElementSibling.classList.contains('mb-day') ? row.previousElementSibling : null;
+        const wants = !!key && (prev === null || !sameDay(prev, when));
+        if (wants && !(lead && lead.dataset.day === key)) {
+            lead?.remove();
+            row.insertAdjacentHTML('beforebegin', dayDividerHtml(when));
+        } else if (!wants && lead) lead.remove();
+        if (key) prev = when;
+    }
+    for (const d of container.querySelectorAll(':scope > .mb-day')) if (!d.nextElementSibling || !d.nextElementSibling.matches('.mb-message, .mb-queue-run')) d.remove();
+}
+
+/** The table's controls and view on the board's box: the pills and the Table | Chat switch under the search, the open rows dropped when the team changes. */
+function applyBoardTable(project) {
+    const box = document.getElementById('mb-messages'), host = document.getElementById('mb-tools');
+    if (!box || !host) return;
+    if (_tableTeam !== project) {
+        _tableTeam = project; _pill = 'all'; _replyTo = null;
+        forgetOpenRows();
+        host.querySelector(':scope > #mb-table-tools')?.remove();
+    }
+    box.setAttribute('data-pill', _pill);
+    applyView(box, boardView());
+    mountTableTools(host, {
+        view: boardView(), pill: _pill,
+        onView: v => { const bottom = isAtBottom(box); saveBoardView(v); applyView(box, v); if (bottom) box.scrollTop = box.scrollHeight; },
+        onPill: p => { _pill = p; box.setAttribute('data-pill', p); },
+    });
+}
+
+/** Reply: "@Sender " goes at the start of the composer's text and the focus to it; the post carries reply_to while the text still starts with the name. */
+function replyToMessage(id, name) {
+    const input = document.getElementById('mb-post-input');
+    if (!input) return;
+    const prefix = `@${name} `;
+    if (!input.value.toLowerCase().startsWith(prefix.toLowerCase())) input.value = prefix + input.value;
+    _replyTo = { id: Number(id), name };
+    input.dispatchEvent(new Event('input', { bubbles: true })); // the growing box follows the text
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+}
+
+/** Copy link: the message's own address (the team page's Board tab with the message's number). */
+async function copyMessageLink(id) {
+    if (!currentProject) return;
+    const url = `${location.origin}${build(keyRoute('team', currentProject, 'messages', Number(id)))}`;
+    try { await navigator.clipboard.writeText(url); showToast('Link copied'); } catch { showToast('Could not copy the link', true); }
+}
 
 function renderMessages(messages, { keepAnchor = false, prepended = 0 } = {}) {
     const container = document.getElementById('mb-messages');
@@ -565,6 +642,8 @@ function renderMessages(messages, { keepAnchor = false, prepended = 0 } = {}) {
         nameBoardButtons(container);
         resolveBoardArtifacts(container, state.currentBoardServer);
     }
+    syncDays(container);
+    refreshReplies(container);
     if (earlierFocused) {
         // The button again, or with every message loaded the count line, so focus doesn't drop to the page.
         const next = container.querySelector(':scope > .mb-load-earlier button');
@@ -633,6 +712,8 @@ function appendNewMessages(count) {
     if (replace) replace.replaceWith(tmp.content); else container.appendChild(tmp.content);
     for (const el of added) { nameBoardButtons(el); resolveBoardArtifacts(el, state.currentBoardServer); }
     if (wasAtBottom) trimBoardWindow(container);
+    syncDays(container);
+    refreshReplies(container);
     updateBoardHeader(container);
     highlightBoard(container);
     if (wasAtBottom) container.scrollTop = container.scrollHeight;
@@ -762,7 +843,7 @@ async function loadBoardSubscribers(project) {
         mentionNames = [...new Set(subs.filter(s => !isOperatorId(s.subscriber_id)).map(s => s.job_title || s.subscriber_id).filter(n => typeof n === 'string' && n))];
         setBoardMembers([...new Set(subs.map(s => s.job_title || s.subscriber_id).filter(n => typeof n === 'string' && n))].sort().slice(0, 50)); // the From field's names
         // @mentions of these members are highlighted; the bodies on screen are marked in place
-        if (setBoardMentionNames(subs.flatMap(s => [s.job_title, s.subscriber_id]))) highlightMentionsIn(document.getElementById('mb-messages')); // in place: no message is redrawn, so a jump's outline and focus stay
+        if (setBoardMentionNames(subs.flatMap(s => [s.job_title, s.subscriber_id]))) { highlightMentionsIn(document.getElementById('mb-messages')); retagMentions(document.getElementById('mb-messages'), OPERATOR_ID.toLowerCase()); } // in place: no message is redrawn, so a jump's outline and focus stay
         // The column and the phone sheet (#3610) show the same list.
         const lists = ['mb-subscribers-list', 'mb-subscribers-sheet-list'].map(id => document.getElementById(id)).filter(Boolean);
         if (!subs.length) {
@@ -842,7 +923,7 @@ export async function postBoardMessage() {
         const resp = await boardFetch(currentProject, `/messages`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ subscriber_id: OPERATOR_ID, as: 'Operator', content }),
+            body: JSON.stringify({ subscriber_id: OPERATOR_ID, as: 'Operator', content, ...(_replyTo && content.toLowerCase().startsWith(`@${_replyTo.name.toLowerCase()}`) ? { reply_to: _replyTo.id } : {}) }),
         });
         if (!resp.ok) {
             // The draft stays; say why, in the server's words when it gives them (a per-sender rate
@@ -856,6 +937,7 @@ export async function postBoardMessage() {
             return;
         }
         input.value = '';
+        _replyTo = null;
         // Fetch new messages since our last known total
         await _pollNewMessages();
     } catch (e) {
@@ -1174,6 +1256,10 @@ registerActions({
     'mb-msg-select': el => withId(el.dataset.msgId, id => toggleMessageSelect(id, el.checked)),
     'mb-msg-delete': el => withId(el.dataset.msgId, confirmDeleteBoardMessage),
     'mb-msg-more': el => openMessageActions(el),
+    'mb-row-toggle': el => { const row = el.closest('.mb-message'); if (row) toggleRow(row); },
+    'mb-msg-reply': el => withId(el.dataset.msgId, id => replyToMessage(id, textOf(el.dataset.sender))),
+    'mb-msg-copy-link': el => withId(el.dataset.msgId, copyMessageLink),
+    'mb-jump-msg': el => withId(el.dataset.msgId, id => focusMessageById(id)),
     'mb-subscriber-history': el => {
         const s = textOf(el.dataset.session);
         if (s) navigateToAgentSession(s, textOf(el.dataset.name) || '');
