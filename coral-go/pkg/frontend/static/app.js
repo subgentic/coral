@@ -325,7 +325,7 @@ import { closeSidebarKebabs, closeTopBarSettings, toggleSidebarKebab, toggleTopB
 import { _startListLoadSettled, pollStartupStatus } from './startup_status.js';
 import { getHistoryPage, setHistoryPage } from './history_state.js';
 import { initLocalStore, initPanels, initPlatform, installUnauthorizedRedirect, wireComposer, wirePaneScroll, wireWindowEvents, yieldToMain } from './app_wiring.js';
-import { loadHistoryFiltered, loadHistoryPage, populateHfTagSelect, syncFilterDomToState, wireHistoryFilters } from './history_filters.js'; // the suites' surface, installed only when the page's boot data asks for it (#5015)
+import { loadHistoryFiltered, loadHistoryPage, startHistoryList, syncFilterDomToState, wireHistoryFilters } from './history_filters.js'; // the suites' surface, installed only when the page's boot data asks for it (#5015)
 
 installTestHooks();
 
@@ -835,10 +835,7 @@ function loadInitialData(popout) {
     if (!popout) loadUpdatesFlag().then(on => on && importOnce('./update_ui.js').then(m => { m.startUpdateUi(); openUpdatesFromLink(); })).catch(() => {}); // the auto-update control, shown when the server says the updater is on (#5275, #5280)
     pollStartupStatus();
     if (!popout) {
-        populateHfTagSelect().then(() => {
-            syncFilterDomToState();
-            return loadHistoryFiltered();
-        }).finally(() => markReady('history'));
+        startHistoryList().finally(() => markReady('history'));
         initScheduler();
         initLiveJobs();
         initMessageBoard();

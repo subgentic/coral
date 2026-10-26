@@ -1,7 +1,8 @@
 /* Moved out of modals.js as it was (#3836): the Resume dialog loads on its own the first time it opens. */
 import { state } from './state.js';
 import { showToast } from './utils.js';
-import { keyLabel } from './server_base.js';
+import { keyLabel, isCloud } from './server_base.js';
+import { importOnce } from './import_once.js';
 import { recordRecentDir } from './browser.js';
 import { loadLiveSessions } from './api.js';
 
@@ -14,6 +15,8 @@ export async function showResumeModal() {
     }
 
     const sessionId = state.currentSession.name;
+    if (!isCloud() && !state.historySessionsList.some(s => s.session_id === sessionId)) await importOnce('./history_filters.js').then(m => m.ensureHistoryList()).catch(() => {}); // a local Coral reads its chat list when an entry is wanted (#8195)
+    if (state.currentSession?.name !== sessionId) return; // another chat opened while it loaded
     const historyEntry = state.historySessionsList.find(s => s.session_id === sessionId);
     // The list entry, else the loaded transcript (a /chats/<id> link that is not
     // in the list); /resume-info below overrides both. Never guess a type.

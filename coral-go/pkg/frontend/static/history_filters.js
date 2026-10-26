@@ -37,6 +37,16 @@ export function loadHistoryFiltered() {
     return loaded;
 }
 
+let listStarted = null;
+/** The first read of the chat list, once: the tag filter, then the page the filters ask for. The hub's Chats tab starts it with the page; a local Coral, which has no Chats list of its own (its chats are the Inbox's folders), reads it only when
+ *  something needs an entry of it: an opened chat, the Resume dialog, a chat search's rows (#8195). */
+export function startHistoryList() {
+    if (!listStarted) listStarted = populateHfTagSelect().then(() => { syncFilterDomToState(); return loadHistoryFiltered(); }).catch(() => {});
+    return listStarted;
+}
+/** Resolves when the list is there for a lookup. On the hub it is the page's own load, so this only waits for it. */
+export const ensureHistoryList = startHistoryList;
+
 export async function populateHfTagSelect() {
     const tags = await loadAllTags(true);
     const sel = document.getElementById('hf-tag-add');

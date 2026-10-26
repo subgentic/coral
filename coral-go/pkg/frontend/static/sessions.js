@@ -438,6 +438,11 @@ export async function selectHistorySession(sessionId, locator = null, entry = nu
     }
 
     if (entry && !state.historySessionsList.some(x => x.session_id === sessionId)) state.historySessionsList = [entry, ...state.historySessionsList];
+    // A local Coral reads its chat list the first time a chat's entry is wanted (a link, a saved message, the Resume dialog), not at every start (#8195); the chat's own page waits for it.
+    if (!entry && !isCloud() && !state.historySessionsList.some(x => x.session_id === sessionId)) {
+        await importOnce('./history_filters.js').then(m => m.ensureHistoryList()).catch(() => {});
+        if (generation !== switchGeneration) return false;
+    }
     state.currentSession = { type: "history", name: sessionId, server: source || 'local' };
     refreshAgentUI();
 
