@@ -2,8 +2,7 @@
    message in an 80-character column with its Reply, Copy link and More. The same message rows serve the Chat view: there the table's parts (the head, the tags, the actions, the day lines)
    are not drawn. A narrow box (a phone, the agent dock) folds the row to two lines. board_table.js builds the parts. */
 
-.mb-messages-scroll { container: mbtable / inline-size; }
-.mb-messages-scroll:not(.mb-table) :is(.mb-row-toggle, .mb-row-tags-open, .mb-row-actions, .mb-row-replies, .mb-day) { display: none; }
+:is(.mb-messages-scroll, .board-chat-messages):not(.mb-table) :is(.mb-row-toggle, .mb-row-tags-open, .mb-row-actions, .mb-row-replies, .mb-day) { display: none; }
 
 /* ── The controls: the pills at the left, the Table | Chat switch at the right ── */
 .mb-table-tools { display: flex; align-items: center; gap: 0.5rem 0.75rem; flex-wrap: wrap; padding: 0.25rem 0 0.5rem; }
@@ -13,6 +12,10 @@
 .mb-view-btn + .mb-view-btn { border-inline-start: 1px solid var(--control-border); }
 .mb-view-btn[aria-pressed="true"] { background: var(--accent-dim); color: var(--text-on-accent); font-weight: 600; }
 @media (pointer: coarse) { .mb-view-btn { min-height: var(--control-touch-height, 44px); } }
+
+/* In the agent dock's head line the switch sits between the title and the buttons. */
+.board-chat-header .mb-table-tools { padding: 0; margin-inline-start: auto; flex: none; }
+.board-chat-header .mb-view-btn { min-height: 1.75rem; padding-inline: 0.625rem; font-size: 0.75rem; }
 
 /* ── The table ── */
 .mb-table { padding: 0 0 0.75rem; }
@@ -66,19 +69,19 @@
 .mb-table[data-pill="questions"] > :is(.mb-message:not(.mb-q), .mb-queue-run, .mb-day),
 .mb-table[data-pill="mentions"] > :is(.mb-message:not(.mb-mine), .mb-queue-run, .mb-day) { display: none; }
 
-/* ── A narrow box (a phone, the dock): two lines a row, the tags with the open message ── */
-@container mbtable (max-width: 40rem) {
-    .mb-row-toggle { grid-template-columns: 0.875rem 1.25rem minmax(0, 1fr) auto; grid-template-areas: "chev avatar who time" ". snippet snippet snippet"; align-items: center; row-gap: 0.125rem; min-height: var(--control-touch-height, 44px); padding-block: 0.5rem; }
-    .mb-row-chev { grid-area: chev; }
-    .mb-row-avatar { grid-area: avatar; }
-    .mb-row-who { grid-area: who; }
-    .mb-row-toggle .message-time { grid-area: time; }
-    .mb-row-snippet { grid-area: snippet; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; white-space: normal; }
-    .mb-row-tags { display: none; }
-    .mb-open > .mb-row-toggle .mb-row-snippet { display: none; }
-    .mb-table .mb-message.mb-open > .mb-row-tags-open { display: flex; }
-    .mb-table .mb-message.mb-open > :not(.mb-row-toggle):not(.mb-message-header) { margin-inline: 0.875rem; max-width: none; }
-    .mb-row-btn { min-height: var(--control-touch-height, 44px); padding-inline: 0.875rem; }
-    .mb-row-reply { min-height: var(--control-touch-height, 44px); }
-    .mb-table .mb-message.mb-is-reply > .mb-row-toggle { padding-inline-start: 0.875rem; } /* the avatars of a folded list start at one edge: the tag inside the open message says it is a reply */
-}
+/* ── A narrow box (a phone, the dock; board_table.js watchFold sets .mb-fold): two lines a row, the tags with the open message ── */
+.mb-fold .mb-row-toggle { grid-template-columns: 0.875rem 1.25rem minmax(0, 1fr) auto; grid-template-areas: "chev avatar who time" ". snippet snippet snippet"; align-items: center; row-gap: 0.125rem; min-height: var(--control-touch-height, 44px); padding-block: 0.5rem; }
+.mb-fold .mb-row-chev { grid-area: chev; }
+.mb-fold .mb-row-avatar { grid-area: avatar; }
+.mb-fold .mb-row-who { grid-area: who; }
+.mb-fold .mb-row-toggle .message-time { grid-area: time; }
+.mb-fold .mb-row-snippet { grid-area: snippet; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; white-space: normal; }
+.mb-fold .mb-row-tags { display: none; }
+.mb-fold .mb-open > .mb-row-toggle .mb-row-snippet { display: none; }
+.mb-table.mb-fold .mb-message.mb-open > .mb-row-tags-open { display: flex; }
+.mb-table.mb-fold .mb-message.mb-open > :not(.mb-row-toggle):not(.mb-message-header) { margin-inline: 0.875rem; max-width: none; }
+.mb-fold .mb-row-btn { min-height: var(--control-touch-height, 44px); padding-inline: 0.875rem; }
+.mb-fold .mb-row-reply { min-height: var(--control-touch-height, 44px); }
+.mb-table.mb-fold .mb-message.mb-is-reply > .mb-row-toggle { padding-inline-start: 0.875rem; } /* the avatars of a folded list start at one edge: the tag inside the open message says it is a reply */
+.board-chat-messages.mb-table { max-width: none; }
+.board-chat-header .board-chat-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } /* a long team name gives way to the switch in the narrowest dock */
