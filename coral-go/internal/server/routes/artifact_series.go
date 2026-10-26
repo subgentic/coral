@@ -399,7 +399,7 @@ func planNewVersion(coralDir, ref, callerBoard, newDigest string) (*seriesPlan, 
 	if other, _, in := digestSeries(coralDir, newDigest); in && other != p.id {
 		return fail(errSeriesOtherOwner)
 	}
-	next := len(p.rows) + 1
+	var next int
 	prev := ""
 	if p.create {
 		next, prev = 2, digest

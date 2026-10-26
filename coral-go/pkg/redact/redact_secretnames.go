@@ -64,7 +64,7 @@ func secretGlue(b []byte) (n int, certain bool) {
 	} else {
 		i += q
 	}
-	sep := i
+	var sep int
 	if sep = skipGap(b, i); sep < 0 {
 		return sep, false
 	}

@@ -703,7 +703,7 @@ func generateTimestampingResponse(sig []byte, tsaCert *x509.Certificate, tsaKey 
 		return nil, err
 	}
 
-	req, err := timestamp.ParseRequest([]byte(tsq))
+	req, err := timestamp.ParseRequest(tsq)
 	if err != nil {
 		return nil, err
 	}

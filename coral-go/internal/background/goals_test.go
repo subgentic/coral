@@ -351,7 +351,7 @@ func TestParseGoalCLIOutput(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, goalCLIResult{Text: "Fix the tests", CostUSD: 0.000936, InputTokens: 386, OutputTokens: 9, CacheReadTokens: 2, CacheWriteTokens: 3}, res)
 
-	res, err = parseGoalCLIOutput([]byte(`{"result":"Credit balance is too low","is_error":true,"total_cost_usd":0}`))
+	_, err = parseGoalCLIOutput([]byte(`{"result":"Credit balance is too low","is_error":true,"total_cost_usd":0}`))
 	assert.ErrorContains(t, err, "Credit balance is too low")
 
 	_, err = parseGoalCLIOutput([]byte("plain text"))

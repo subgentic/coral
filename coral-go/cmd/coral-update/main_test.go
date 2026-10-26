@@ -46,7 +46,7 @@ func TestOnlyAProdBuildWithAVersionChecks(t *testing.T) {
 	assert.Equal(t, "off", out["result"], "the environment switch")
 
 	if !config.TierChecksForUpdates {
-		code, out = runOut(t, nil, "check")
+		_, out = runOut(t, nil, "check")
 		assert.Equal(t, "off", out["result"], "dev, beta and dropboxers builds never update themselves")
 	}
 }

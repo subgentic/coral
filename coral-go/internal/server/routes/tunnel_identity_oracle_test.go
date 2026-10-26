@@ -372,7 +372,6 @@ func tunnelIdentityGuardBefore4756(bs *board.Store, operatorAllowed func(*http.R
 					if f == "subscriber_id" && targetRoute {
 						continue // the reminded subscriber: a target, not an actor
 					}
-					anyActor = true
 					if namesMemberOrRole(v) {
 						slog.Warn("[cloud] Coral Hub write refused: it named an existing member or role", "field", f, "method", r.Method, "path", r.URL.Path)
 						writeJSON(w, http.StatusConflict, map[string]any{"code": "member_identity",

@@ -37,7 +37,7 @@ func writeBigClaudeTranscript(tb testing.TB, dir, sessionID string, targetBytes 
 		ts := fmt.Sprintf("2026-10-18T%02d:%02d:%02d.000Z", (turn/3600)%24, (turn/60)%60, turn%60)
 		emit(fmt.Sprintf(`{"type":"user","timestamp":%q,"message":{"content":"Please do step %d of the task and report back with details."}}`, ts, turn))
 		emit(fmt.Sprintf(`{"type":"assistant","timestamp":%q,"message":{"model":"claude-opus-5-5","content":[{"type":"text","text":"Working on step %d. %s"},{"type":"tool_use","id":"tu_%d","name":"Bash","input":{"command":"ls -la /repo/step%d","description":"list"}}]}}`, ts, turn, big, turn, turn))
-		result := "ok"
+		var result string
 		if turn%4 == 0 {
 			result = strings.Repeat(big, 6) // a ~10 KB tool output now and then
 		} else {

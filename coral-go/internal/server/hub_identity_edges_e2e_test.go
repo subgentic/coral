@@ -209,13 +209,13 @@ func TestHubIdentityEdgesEndToEnd(t *testing.T) {
 	}
 	setTier(tunnel.TierLaunch) // pausing a board is a Launch-tier action
 	n0 := len(recentActions())
-	code, out, b := viaHub("POST", "/api/board/team/pause", map[string]any{})
+	code, _, b = viaHub("POST", "/api/board/team/pause", map[string]any{})
 	require.Equal(t, http.StatusOK, code, b)
 	code, _, b = viaHub("POST", "/api/board/team/resume", map[string]any{})
 	require.Equal(t, http.StatusOK, code, b)
 	code, _, b = viaHub("POST", "/api/board/team/reminder", map[string]any{"subscriber_id": "Dev", "message": "hi", "interval_seconds": 60})
 	assert.NotContains(t, []int{http.StatusForbidden, http.StatusConflict}, code, "the guard lets a reminder through (the handler may refuse: no running agent): "+b)
-	code, out, b = viaHub("POST", "/api/board/team/tasks", map[string]any{"subscriber_id": "Operator", "created_by": "Operator", "title": "from the hub", "assigned_to": "Dev"})
+	code, out, b := viaHub("POST", "/api/board/team/tasks", map[string]any{"subscriber_id": "Operator", "created_by": "Operator", "title": "from the hub", "assigned_to": "Dev"})
 	require.Equal(t, http.StatusCreated, code, b)
 	assert.Equal(t, "Operator", out["created_by"])
 	acts := recentActions()

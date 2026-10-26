@@ -236,7 +236,7 @@ func TestPasswordSetChangeAndSessions(t *testing.T) {
 	assert.Equal(t, http.StatusForbidden, w.Code)
 	assert.Equal(t, "cli_only", out["code"])
 	g.cli = true
-	w, out = g.do(g.ar.ResetPassword, g.req("POST", "/api/auth/password/reset", `{"password":"fourth"}`, "127.0.0.1", nil))
+	w, _ = g.do(g.ar.ResetPassword, g.req("POST", "/api/auth/password/reset", `{"password":"fourth"}`, "127.0.0.1", nil))
 	require.Equal(t, http.StatusOK, w.Code)
 	assert.False(t, g.ks.ValidateSession(renewed.Value), "a reset ends every session")
 	w, _ = g.do(g.ar.ResetPassword, g.req("POST", "/api/auth/password/reset", `{"clear":true}`, "127.0.0.1", nil))
@@ -319,7 +319,7 @@ func TestCreatePasswordOnTheSignInPage(t *testing.T) {
 
 	// The command line reads the code; a browser can't.
 	g4 := newPwRig(t)
-	w, out = g4.do(g4.ar.GetSetupCode, g4.req("GET", "/api/auth/setup-code", "", "127.0.0.1", nil))
+	w, _ = g4.do(g4.ar.GetSetupCode, g4.req("GET", "/api/auth/setup-code", "", "127.0.0.1", nil))
 	assert.Equal(t, http.StatusForbidden, w.Code)
 	g4.cli = true
 	w, out = g4.do(g4.ar.GetSetupCode, g4.req("GET", "/api/auth/setup-code", "", "127.0.0.1", nil))

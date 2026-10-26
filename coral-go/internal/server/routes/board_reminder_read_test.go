@@ -43,7 +43,7 @@ func TestTheReminderInForceIsReadByAPersonAlone(t *testing.T) {
 	assert.Equal(t, 200, code)
 	assert.Equal(t, map[string]any{"active": true, "subscriber_id": "Orchestrator", "message": "Check the board.  Then report", "interval_seconds": float64(150)}, out, "the exact interval and the text as stored")
 
-	code, out = read("Dev")
+	_, out = read("Dev")
 	assert.Equal(t, map[string]any{"active": false}, out, "another agent's reminder is not this one's")
 	resp, err := http.Get(base + "/reminder")
 	require.NoError(t, err)

@@ -365,10 +365,6 @@ func runRelayOracle(t *testing.T, seed int64, counts map[string]int) {
 		var resp map[string]any
 		_ = json.Unmarshal([]byte(r.body), &resp)
 		code, _ := resp["error"].(string)
-		msg, _ := resp["message"].(string)
-		if msg == "" {
-			msg, _ = resp["detail"].(string)
-		}
 		files := 0
 		for _, c := range r.calls {
 			if strings.HasPrefix(c, "file ") {

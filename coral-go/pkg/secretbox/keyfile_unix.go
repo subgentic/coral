@@ -27,7 +27,7 @@ func readExistingKeyFile(name string) ([]byte, error) {
 	if info.Mode().Perm() != 0600 {
 		return nil, fmt.Errorf("%w: permissions must be 0600 (got %o)", ErrKeyPermissions, info.Mode().Perm())
 	}
-	if stat, ok := info.Sys().(*syscall.Stat_t); ok && uint32(stat.Uid) != uint32(os.Getuid()) {
+	if stat, ok := info.Sys().(*syscall.Stat_t); ok && stat.Uid != uint32(os.Getuid()) {
 		return nil, fmt.Errorf("%w: must be owned by the current user", ErrKeyPermissions)
 	}
 	data, err := io.ReadAll(io.LimitReader(f, 4096))

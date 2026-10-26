@@ -15,7 +15,7 @@ func TestThinkingLevelsAndArgs(t *testing.T) {
 	assert.Nil(t, ThinkingLevels("pi"), "Pi is not installed to check")
 	got := ThinkingLevels("claude")
 	got[0], got[len(got)-1] = "bogus", "bogus"
-	got = append(got, "extra")
+	_ = append(got, "extra")
 	assert.True(t, ValidThinking("claude", "low"), "what a caller does to the returned slice does not change what is accepted")
 	assert.False(t, ValidThinking("claude", "bogus"))
 	assert.Equal(t, []string{"low", "medium", "high", "xhigh", "max"}, ThinkingLevels("claude"))

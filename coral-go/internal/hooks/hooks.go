@@ -228,7 +228,6 @@ func GetToolInput(hookData map[string]any) map[string]any {
 	if !ok {
 		if args, ok := hookData["arguments"].(map[string]any); ok {
 			inp = args
-			ok = true
 		}
 	}
 	if !ok {

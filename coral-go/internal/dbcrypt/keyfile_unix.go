@@ -27,7 +27,7 @@ func readExistingKey(name string) ([]byte, error) {
 	if info.Mode().Perm() != 0600 {
 		return nil, fmt.Errorf("database key file permissions must be 0600 (got %o)", info.Mode().Perm())
 	}
-	if stat, ok := info.Sys().(*syscall.Stat_t); ok && uint32(stat.Uid) != uint32(os.Getuid()) {
+	if stat, ok := info.Sys().(*syscall.Stat_t); ok && stat.Uid != uint32(os.Getuid()) {
 		return nil, fmt.Errorf("database key file must be owned by the current user")
 	}
 	data, err := io.ReadAll(f)
