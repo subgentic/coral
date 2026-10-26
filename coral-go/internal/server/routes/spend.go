@@ -286,6 +286,47 @@ func bucketTokens(buckets []store.TimeSeriesBucket, fr spendFrame) *spendTokenSe
 	return ts
 }
 
+// spendToolRows is the tool calls of the agents that have a source (toolSources): in the window and the usual, per session in the window, and per hour ("2006-01-02T15").
+type spendToolRows struct {
+	window, usual int
+	bySession     map[string]int
+	byHour        map[string]int
+}
+
+// readToolCalls reads the tool_use events of the board's agents that have a tool source, hour by hour from the start of the usual period.
+func (h *SpendHandler) readToolCalls(ctx context.Context, ro *spendRoster, fr spendFrame) (*spendToolRows, string) {
+	var sessions []string
+	for _, id := range ro.order {
+		if toolSources[ro.accs[id].sess.AgentType] {
+			sessions = append(sessions, id)
+		}
+	}
+	const bucketLen = 13 // hourly always: the day series is made from the hours
+	var rows []store.ToolCallBucket
+	if len(sessions) > 0 {
+		var err error
+		if rows, err = h.db.ToolCallBuckets(ctx, sessions, spendDBStamp(fr.usualStart), spendDBStamp(fr.end), bucketLen); err != nil {
+			return nil, "could not read tool calls"
+		}
+	}
+	out := &spendToolRows{bySession: map[string]int{}, byHour: map[string]int{}}
+	for _, row := range rows {
+		bt := row.Bucket
+		t, perr := time.Parse("2006-01-02T15", bt)
+		if perr != nil {
+			continue
+		}
+		out.byHour[bt] += row.N
+		if t.Before(fr.start) { // the start is hour-aligned like the buckets
+			out.usual += row.N
+			continue
+		}
+		out.window += row.N
+		out.bySession[row.SessionID] += row.N
+	}
+	return out, ""
+}
+
 // Spend answers GET /api/board/{project}/spend?range=24h|7d.
 func (h *SpendHandler) Spend(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
@@ -305,7 +346,7 @@ func (h *SpendHandler) Spend(w http.ResponseWriter, r *http.Request) {
 	fr := newSpendFrame(rng, now)
 	start, end, usualStart, hours, hourly := fr.start, fr.end, fr.usualStart, fr.hours, fr.hourly
 	ctx := r.Context()
-	f, g := spendStamp, spendDBStamp
+	f := spendStamp
 
 	roster, fail := h.readRoster(ctx, project, fr)
 	if fail != "" {
@@ -322,38 +363,12 @@ func (h *SpendHandler) Spend(w http.ResponseWriter, r *http.Request) {
 	winCW, usualCW := tok.winCW, tok.usualCW
 	hourTokens, hourCache, hourCW := tok.hourTokens, tok.hourCache, tok.hourCW
 
-	// tool calls
-	var toolSessions []string
-	for _, id := range order {
-		if toolSources[accs[id].sess.AgentType] {
-			toolSessions = append(toolSessions, id)
-		}
+	tools, fail := h.readToolCalls(ctx, roster, fr)
+	if fail != "" {
+		errInternalServer(w, fail)
+		return
 	}
-	const bucketLen = 13 // hourly always: the day series is made from the hours
-	var toolRows []store.ToolCallBucket
-	if len(toolSessions) > 0 {
-		if toolRows, err = h.db.ToolCallBuckets(ctx, toolSessions, g(usualStart), g(end), bucketLen); err != nil {
-			errInternalServer(w, "could not read tool calls")
-			return
-		}
-	}
-	toolWin, toolUsual := 0, 0
-	toolBySession := map[string]int{}
-	toolByBucket := map[string]int{}
-	for _, row := range toolRows {
-		bt := row.Bucket
-		t, perr := time.Parse("2006-01-02T15", bt)
-		if perr != nil {
-			continue
-		}
-		toolByBucket[bt] += row.N
-		if t.Before(start) { // the start is hour-aligned like the buckets
-			toolUsual += row.N
-			continue
-		}
-		toolWin += row.N
-		toolBySession[row.SessionID] += row.N
-	}
+	toolWin, toolUsual, toolBySession, toolByBucket := tools.window, tools.usual, tools.bySession, tools.byHour
 
 	// commits from main's history
 	var dirs []string
