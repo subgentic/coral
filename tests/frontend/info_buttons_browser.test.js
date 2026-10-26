@@ -17,7 +17,7 @@ const MEASURE = `(() => {
         let first = null, last = null;
         if (label) { const range = document.createRange(); range.selectNodeContents(label); const rects = [...range.getClientRects()].filter(x => x.width > 1 && x.height > 1); first = rects.length ? rects[0] : null; last = rects.length ? rects.reduce((m, x) => x.right > m.right ? x : m) : null; /* a wrapped label: beside its widest line */ }
         // the switch of the same row (Settings rows with a toggle): its centre against the label's first line
-        const row = b.closest('.settings-row, .net-group-head'); const tog = row && row.querySelector('input[type=checkbox]'); const tr = tog && tog.getBoundingClientRect();
+        const row = b.closest('.settings-row'); const tog = row && row.querySelector('input[type=checkbox]'); const tr = tog && tog.getBoundingClientRect();
         out.push({ about: (b.getAttribute('aria-label') || '').slice(0, 40), w: Math.round(r.width * 10) / 10, h: Math.round(r.height * 10) / 10, cy: r.top + r.height / 2, first: first ? { top: first.top, bottom: first.bottom, cy: first.top + first.height / 2 } : null,
             gap: last ? Math.round((r.left - last.right) * 10) / 10 : null, tog: tr && tr.width && first ? Math.round((tr.top + tr.height / 2 - (first.top + first.height / 2)) * 10) / 10 : null,
             hit: cs.content !== 'none' && cs.position === 'absolute' ? { w: parseFloat(cs.width), h: parseFloat(cs.height) } : null });

@@ -54,7 +54,9 @@
 .sv-input[aria-invalid="true"] { border-color: var(--sv-error-color); }
 .sv-error { grid-column: 1 / -1; margin: 4px 0 0; font-size: var(--sv-help-size); font-weight: var(--sv-label-weight); color: var(--sv-error-color); }
 .sv-error[hidden] { display: none; }
-.sv .sv-notice > .net-group, .sv .sv-notice > #about-section { border-top: 0; padding-top: 0; margin-top: 0; } /* a live group of Network and Hub sits in the row's own divider */
+.sv .sv-notice > .net-group { border-top: 0; padding-top: 0; margin-top: 0; } /* a live group of Network and Hub sits in the row's own divider */
+.sv-row-heading + .sv-row-notice:has(> .sv-notice > .net-group) { border-top: 0; padding-top: 0; } /* the group's body sits under its title, not under a second rule */
+.sv-row-heading:has(+ .sv-row-notice > .sv-notice > [hidden]:only-child) { display: none; } /* a group's title leaves with its hidden body (Network and Hub, #8491) */
 #settings-modal .sv .telemetry-install-id code { font: var(--dlg-control); }
 .sv .sv-control > .telemetry-install-id { width: auto; max-width: none; justify-content: flex-start; } /* the value and its Copy start at the control column's left edge, as the API key's do */
 .sv .telemetry-install-id code { flex: 0 1 auto; } /* a value in the dialog is the dialog's control size, not the page's */

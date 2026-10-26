@@ -75,19 +75,20 @@ const SHORT_HINTS = {
     'Automatic cleanup': 'Prunes what is older than this, every hour. 0 is off.',
 };
 function buildInfoButtons(root) {
-    for (const row of root.querySelectorAll('.settings-row')) {
-        const dt = row.querySelector(':scope > dt, :scope > .net-group-head');
+    for (const row of root.querySelectorAll('.settings-row, .net-group')) {
+        const group = row.classList.contains('net-group'); // a Network group: its title is the heading its aria-labelledby names (#8491)
+        const dt = group ? document.getElementById(row.getAttribute('aria-labelledby')) : row.querySelector(':scope > dt');
         const texts = [...row.querySelectorAll('dt .toggle-desc, [data-info]')];
         if (!dt || !texts.length || row.dataset.hinted) continue;
         row.dataset.hinted = '1';
-        const label = dt.querySelector('label, .net-group-title, [id$="-label"]') || dt; // a label span that names its control counts too (Default permission mode)
+        const label = dt.querySelector('label, [id$="-label"]') || dt; // a label span that names its control counts too (Default permission mode)
         const name = (label.textContent || '').trim();
-        let holder = dt; // a group's head is a row (title, switch): its hints go in a line of their own under it
-        if (dt.classList.contains('net-group-head')) {
+        let holder = dt; // a Network group: its hints go in a line of their own at the top of its body
+        if (group) {
             holder = document.createElement('div'); holder.className = 'settings-hint-wrap';
             const lead = row.dataset.learnAfter && row.querySelector(row.dataset.learnAfter); // a group whose short line is in its body (Coral Hub's status, Manage's line): Learn more comes after that line, not before it (#7626, UI/UX)
             const anchor = lead && lead.closest('.net-body > *');
-            if (anchor) anchor.after(holder); else dt.after(holder);
+            if (anchor) anchor.after(holder); else row.prepend(holder);
         }
         const all = [];
         for (const t of texts) {
