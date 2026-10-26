@@ -208,6 +208,25 @@ func (h *SessionsHandler) wakeExistingSession(ctx context.Context, ls *store.Liv
 			_ = h.ss.StampSessionSettings(ctx, ls.SessionID) // the CLI now runs with the stored model and level: turns the transcript recorded before are older than them (#6225)
 		}
 	}()
+	plan, err := h.prepareWake(ctx, ls)
+	if err != nil {
+		return err
+	}
+	err = h.startWake(ctx, ls, plan, &launched)
+	if err != nil {
+		return err
+	}
+	h.finishWake(ctx, ls, plan)
+	return nil
+}
+
+type wakePlan struct {
+	agentImpl                                             agent.Agent
+	params                                                agent.LaunchParams
+	backend, sessionName, logFile, boardName, displayName string
+}
+
+func (h *SessionsHandler) prepareWake(ctx context.Context, ls *store.LiveSession) (*wakePlan, error) {
 	flags := wakeFlags(ls)
 	prompt := ptr.Value(ls.Prompt)
 	boardName := ptr.Value(ls.BoardName)
@@ -234,7 +253,7 @@ func (h *SessionsHandler) wakeExistingSession(ctx context.Context, ls *store.Liv
 	if _, onPTY := h.backend.(*ptymanager.PTYBackend); onPTY {
 		backend = "pty"
 		if h.inOldTmux != nil && h.inOldTmux(ctx, sessionName) {
-			return ErrStillInOldTmux
+			return nil, ErrStillInOldTmux
 		}
 	}
 
@@ -243,11 +262,11 @@ func (h *SessionsHandler) wakeExistingSession(ctx context.Context, ls *store.Liv
 
 	userSettings, serr := h.launchSettings(ctx)
 	if serr != nil { // never wake the agent on the CLI found on PATH (#4350)
-		return serr
+		return nil, serr
 	}
 	cliPath, err := agent.LaunchCLI(userSettings, ls.AgentType) // a broken cli_path_<agent> refuses the wake (#115)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	role := displayName
@@ -259,13 +278,13 @@ func (h *SessionsHandler) wakeExistingSession(ctx context.Context, ls *store.Liv
 	if ls.Capabilities != nil && *ls.Capabilities != "" {
 		caps = &agent.Capabilities{}
 		if err := json.Unmarshal([]byte(*ls.Capabilities), caps); err != nil {
-			return fmt.Errorf("corrupt stored capabilities: %w", err)
+			return nil, fmt.Errorf("corrupt stored capabilities: %w", err)
 		}
 	}
 	var permMode string
 	if ls.PermissionMode != nil && *ls.PermissionMode != "" {
 		if !agent.ValidPermissionMode(*ls.PermissionMode) {
-			return fmt.Errorf("corrupt stored permission mode: %s", *ls.PermissionMode)
+			return nil, fmt.Errorf("corrupt stored permission mode: %s", *ls.PermissionMode)
 		}
 		permMode = *ls.PermissionMode
 	} else {
@@ -309,7 +328,13 @@ func (h *SessionsHandler) wakeExistingSession(ctx context.Context, ls *store.Liv
 		log.Printf("[wake] session=%s: Codex could not find its saved conversation (no link, and no recent rollout carries its marker); starting a new one", sessionName)
 		launchParams.ResumeSessionID = ""
 	}
+	return &wakePlan{agentImpl: agentImpl, params: launchParams, backend: backend, sessionName: sessionName, logFile: logFile, boardName: boardName, displayName: displayName}, nil
+}
 
+func (h *SessionsHandler) startWake(ctx context.Context, ls *store.LiveSession, plan *wakePlan, launched *bool) error {
+	sessionName, backend := plan.sessionName, plan.backend
+	agentImpl, launchParams := plan.agentImpl, plan.params
+	boardName, logFile := plan.boardName, plan.logFile
 	// If the session is still running (e.g. it was marked sleeping by a false
 	// crash detection rather than an actual crash), do NOT relaunch on top of
 	// it: tmux new-session fails with "duplicate session" and, worse, the
@@ -332,7 +357,7 @@ func (h *SessionsHandler) wakeExistingSession(ctx context.Context, ls *store.Liv
 			if err != nil {
 				return err
 			}
-			launched = true
+			*launched = true
 			target := sessionName + ".0"
 			if backend == "pty" {
 				target = sessionName
@@ -349,7 +374,7 @@ func (h *SessionsHandler) wakeExistingSession(ctx context.Context, ls *store.Liv
 		if err != nil {
 			return err
 		}
-		launched = true
+		*launched = true
 		log.Printf("[wake] session=%s agent=%s backend=%s cmd=%s", sessionName, ls.AgentType, backend, cmd)
 
 		if backend == "pty" && h.backend != nil {
@@ -393,7 +418,11 @@ func (h *SessionsHandler) wakeExistingSession(ctx context.Context, ls *store.Liv
 			}
 		}
 	}
+	return nil
+}
 
+func (h *SessionsHandler) finishWake(ctx context.Context, ls *store.LiveSession, plan *wakePlan) {
+	sessionName, boardName, displayName := plan.sessionName, plan.boardName, plan.displayName
 	// Clear sleeping flag on existing row (no new DB row created)
 	h.ss.SetSessionSleeping(ctx, ls.SessionID, false)
 
@@ -401,8 +430,6 @@ func (h *SessionsHandler) wakeExistingSession(ctx context.Context, ls *store.Liv
 	if boardName != "" {
 		h.setupBoardAndPrompt(ls.SessionID, sessionName, ls.AgentType, boardName, displayName)
 	}
-
-	return nil
 }
 
 // ── Individual Session Sleep/Wake ────────────────────────────────────────

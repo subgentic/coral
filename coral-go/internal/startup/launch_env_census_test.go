@@ -24,7 +24,7 @@ var launchSites = map[string]struct {
 	"server/routes/sessions_launch_session.go.launchSession": {"a dashboard launch, and a team launch's members", launchEnvFields},
 	"server/routes/sessions_restart.go.restartCommand":       {"a restart", launchEnvFields},
 	"server/routes/sessions_resume.go.resumeCommand":         {"a resume", launchEnvFields},
-	"server/routes/sessions_sleep.go.wakeExistingSession":    {"a wake after sleep", launchEnvFields},
+	"server/routes/sessions_sleep.go.prepareWake":            {"a wake after sleep", launchEnvFields},
 	"background/launcher.go.LaunchAgent":                     {"a scheduled or one-shot run", launchEnvFields},
 	// launch-coral (a shipped entry point, #6799): its agents have no live row when they start, so no run tag can be looked up at Kill; the other four it passes.
 	"cmd/launch-coral/main.go.launchParamsFor": {"launch-coral's agents", []string{"SessionName", "CoralHost", "CoralPort", "CoralDir"}},
