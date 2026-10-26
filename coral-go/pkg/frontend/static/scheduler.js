@@ -296,8 +296,10 @@ const AGENT_NAMES = { claude: 'Claude', codex: 'Codex', agy: 'Antigravity', anti
 function resultCell(r) {
     const unseen = r.status === 'completed' && r.exit_reason === 'ended_while_coral_was_down';
     const cls = unseen ? '' : r.status === 'completed' ? 'goal-state-task-done' : r.status === 'failed' || r.status === 'killed' ? 'team-state-bad' : r.status === 'running' ? 'goal-state-task-active' : '';
-    const cell = DT.el('span'), chip = DT.chip(resultWords(r), cls); chip.classList.add('sched-status'); cell.append(chip);
-    const failure = runFailure(r); if (failure) cell.append(' ', DT.tag(`(${failure.short})`));
+    const cell = DT.el('span'), chip = DT.chip(r.status === 'failed' ? 'Failed' : resultWords(r), cls); chip.classList.add('sched-status'); cell.append(chip);
+    const failure = runFailure(r);
+    const reason = r.status === 'failed' ? reasonWords(r) || exitNote(r) || (failure ? `${failure.text}. ${failure.hint}` : '') : resultLine(r);
+    if (reason) { const line = DT.el('span', 'dt-subtitle dt-clamp-2', reason); line.title = reason; cell.append(line); }
     return cell;
 }
 const tookOf = (r) => (r.started_at && r.finished_at ? formatDuration(new Date(r.finished_at) - new Date(r.started_at)) : r.started_at ? 'running...' : '-');
@@ -315,7 +317,7 @@ function renderRunsTable(page) {
                 if (!workflowHistory) return time;
                 const b = DT.primaryButton(time.textContent, `Open run #${r.id}`); b.title = time.title; b.addEventListener('click', () => open(r)); return b;
             } },
-            { key: 'result', label: 'Result', line: 2, nowrap: false, cell: resultCell, subtitle: resultLine },
+            { key: 'result', label: 'Result', line: 2, nowrap: false, cell: resultCell },
             { key: 'duration', label: 'Duration', line: 2, tone: 'tertiary', cell: tookOf },
             ...(!workflowHistory ? [{ key: 'conversation', label: 'Conversation', hideLabel: true, line: 2, when: r => !!r.session_id, cell: r => {
                 if (!r.session_id) return '';

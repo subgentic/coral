@@ -137,10 +137,12 @@ function serverCell(s) {
     const box = DT.el('div'), wrap = DT.el('span', 'dt-title-cell'); // the name and its tags on one line, the warning under them, whole and wrapping
     box.append(wrap);
     if (isLocal(s)) {
-        wrap.append(DT.el('span', null, s.label || 'Local'), DT.tag('local'));
+        wrap.append(DT.el('span', 'dt-name-text', s.label || 'Local'), DT.tag('local'));
         return box;
     }
     const b = DT.primaryButton(s.label || s.id, `Open ${s.label || s.id}`);
+    b.replaceChildren(DT.el('span', 'dt-name-text', s.label || s.id));
+    b.title = s.label || s.id;
     b.dataset.action = 'open'; b.dataset.id = s.id; // the tab's click handler opens the server's page
     wrap.append(b, DT.tag(s.id));
     if (s.allow_private) { const t = DT.tag('private network'); t.title = 'Private network addresses are allowed for this server'; wrap.append(t); }
@@ -156,7 +158,7 @@ function serversTable(local, remotes) {
     const t = DT.dataTable({
         label: 'Registered servers', state: _dt, rows, rowKey: s => (isLocal(s) ? 'local' : s.id), rowName: s => s.label || s.id,
         columns: [
-            { key: 'server', label: 'Server', primary: true, width: 'grow', nowrap: false, line: 1, sort: true, sortValue: s => (s.label || s.id || '').toLowerCase(), cell: serverCell,
+            { key: 'server', label: 'Server', primary: true, width: 'grow', nowrap: false, line: 1, sort: true, sortValue: s => (s.label || s.id || '').toLowerCase(), cell: serverCell, title: s => s.label || s.id,
                 subtitle: s => (isLocal(s) ? ['This hub', state.localVersion ? `Coral ${state.localVersion}` : ''].filter(Boolean).join(' \u00b7 ') : '') },
             { key: 'status', label: 'Status', line: 2, sort: true, sortValue: s => statusMeta(live(s).status || s.status).label, cell: s => statusChip(live(s).status || s.status) },
             { key: 'agents', label: 'Agents', line: 2, tone: 'tertiary', align: 'end', sort: 'number', sortValue: s => serverAgentCount(live(s)), cell: s => agentsText(serverAgentCount(live(s))) },

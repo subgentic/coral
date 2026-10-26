@@ -108,7 +108,7 @@ const S = `(window.__coralStatic || '/static/')`;
             assert.deepEqual(await ev(`[...document.querySelectorAll('#scheduler-detail .sched-runs-table th')].map(t => t.textContent.trim())`), ['Started', 'Result', 'Duration', 'Conversation']);
             assert.equal(await ev(`document.querySelector('#scheduler-detail .sched-runs-table th:last-child .sr-only')?.textContent`), 'Conversation', 'the optional conversation column has a screen-reader heading');
             assert.equal(await ev(`document.querySelectorAll('#scheduler-detail .dt-table').length`), 1, 'job history uses the shared table');
-            assert.match(await ev(`document.querySelector('#scheduler-detail .sched-runs-table tbody tr').textContent.replace(/\\s+/g, ' ')`), /Failed: step 2 \(Test\) exited with 3/);
+            assert.match(await ev(`document.querySelector('#scheduler-detail .sched-runs-table tbody tr').textContent.replace(/\\s+/g, ' ')`), /Failed\s*step 2 \(Test\) exited with 3/);
             assert.match(await ev(`document.querySelectorAll('#scheduler-detail .sched-runs-table tbody tr')[1].textContent.replace(/\\s+/g, ' ')`), /Passed/);
 
             await assertPinnedBar(ev, '#scheduler-detail .item-bar', `${at}: the job page`);
