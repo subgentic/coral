@@ -17,6 +17,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -144,7 +145,7 @@ func (r *report) read(in io.Reader) {
 			kv := parseKV(line[i:])
 			key := reasonClass(kv["why"]) + "|" + orUnknown(kv["cli_version"])
 			r.disagreements[key]++
-			if ex := r.disExamples[key]; len(ex) < 3 && kv["session"] != "" && !contains(ex, kv["session"]) {
+			if ex := r.disExamples[key]; len(ex) < 3 && kv["session"] != "" && !slices.Contains(ex, kv["session"]) {
 				r.disExamples[key] = append(ex, kv["session"])
 			}
 		}
@@ -196,7 +197,7 @@ func (r *report) print(w io.Writer, top int) {
 			n++
 			p := d.agentType + ": " + d.old + "  ->  " + d.new
 			pairs[p]++
-			if ex := examples[p]; len(ex) < 3 && !contains(ex, d.session) {
+			if ex := examples[p]; len(ex) < 3 && !slices.Contains(ex, d.session) {
 				examples[p] = append(ex, d.session)
 			}
 		}
@@ -428,15 +429,6 @@ func orUnknown(s string) string {
 		return "?"
 	}
 	return s
-}
-
-func contains(list []string, s string) bool {
-	for _, x := range list {
-		if x == s {
-			return true
-		}
-	}
-	return false
 }
 
 func sum(m map[string]int) int {
