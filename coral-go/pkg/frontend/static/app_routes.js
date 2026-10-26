@@ -73,6 +73,15 @@ function registerRouteHandlers() {
         switchNavTab('history', { fromHistory: true });
     });
 
+    route('inbox-goals', async r => {
+        await liveListReady;
+        switchNavTab('hub-inbox', { fromHistory: true });
+        const m = await importOnce('./inbox_sidebar.js');
+        if (currentRoute()?.view !== 'inbox-goals' || currentRoute()?.id !== r.id || currentRoute()?.item !== r.item) return;
+        if (r.id && r.item) await m.openInboxGoal(r.id, r.item);
+        else await m.openInboxGroup('goals');
+    });
+
     onRoute('team', async r => {
         await liveListReady;
         switchNavTab('agents', { fromHistory: true });

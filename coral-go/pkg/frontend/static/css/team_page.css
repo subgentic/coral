@@ -261,3 +261,16 @@
     .inbox-tasks-toolbar .team-tb-pills { display: none; }
     .inbox-tasks-toolbar .team-tb-select { display: block; }
 }
+
+/* The Inbox hosts the same goal split; only its folder select and team link are new. */
+.inbox-local:has(> .inbox-goal-page:not([hidden])) { height: 100%; min-height: 0; }
+.inbox-page.inbox-goal-page { padding: 0; min-height: 0; height: 100%; }
+.inbox-goal-page > .goals-page { flex: 1 1 auto; width: 100%; min-height: 0; }
+.inbox-goal-page > .view-list { display: none; }
+.goal-back-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.goal-team-link { font-size: 0.8125rem; font-weight: 500; color: var(--accent); }
+@media (max-width: 760px) {
+    .inbox-goal-page > .view-list { display: block; padding: 12px 16px 0; }
+    .inbox-goal-page > .view-list .view-list-nav { display: none; }
+    .goal-team-link { display: inline-flex; align-items: center; min-height: 44px; }
+}

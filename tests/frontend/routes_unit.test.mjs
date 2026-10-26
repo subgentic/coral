@@ -136,9 +136,9 @@ console.log('routes_unit: ok');
 
 // #8571: Inbox goals have their own address; segments receive the same validation as team routes.
 for (const team of ['release-team', '@odd', 'team with spaces', 'a/b']) {
-    const r = {view:'inbox',sub:'goals',id:team,item:17};
+    const r = {view:'inbox-goals',sub:'goals',id:team,item:17};
     assert.deepEqual(parse(build(r)), r);
 }
-assert.deepEqual(parse('/inbox/goals'), {view:'inbox',sub:'goals'});
-assert.equal(build({view:'inbox',sub:'goals'}), '/inbox/goals');
+assert.deepEqual(parse('/inbox/goals'), {view:'inbox-goals',sub:'goals'});
+assert.equal(build({view:'inbox-goals',sub:'goals'}), '/inbox/goals');
 for (const bad of ['/inbox/goals/x/0','/inbox/goals/x/-1','/inbox/goals/x/NaN','/inbox/goals/%00/1','/inbox/goals/../1','/inbox/goals/%2e%2e/1','/inbox/goals/x/1/extra','/inbox/goals/%ZZ/1']) assert.equal(parse(bad),null,bad);

@@ -3,6 +3,7 @@
  * as a relative time. A task is the board's own record (status, review_requested, assigned_to, worked_by, completed_by, goal_id, priority, created_at, updated_at, board).
  *   tasksTable('team', rows, { ctx: { openGoal(goalId), goalTitleOf(goalId), noGoal, teamOf(task) }, open, state, ...dataTable options }) -> { el, bar, selectButton, ... } (a data_table)
  *   taskColumns(ctx, ['state', 'task', 'who', 'goal', 'priority', 'updated']) -> Column[] (the columns alone, for a surface that adds its own) */
+import { boardFetch } from './server_base.js';
 import { taskStatusWord, statusClass } from './goal_words.js';
 import * as DT from './data_table.js'; // static: a top-level await on a lazy import here would hold up every module that imports this one (the shape that froze startup in #7844 and #7904)
 import { buildListBar } from './list_bar.js';
@@ -125,4 +126,18 @@ export function newTaskButton({ small = false } = {}) {
     b.type = 'button'; b.className = `btn btn-primary btn-create-task${small ? ' btn-small' : ' goals-new'}`; b.textContent = '+ Task';
     b.title = 'Create task'; b.setAttribute('aria-label', 'New task'); b.setAttribute('data-on-click', 'task-create-show');
     return b;
+}
+
+/** Task choices for a team-scoped prerequisite picker, without changing the dock's task list. */
+export async function readTaskChoices(project) {
+    const rows = [];
+    let cursor = '';
+    do {
+        const r = await boardFetch(project, `/tasks?limit=200${cursor ? '&cursor=' + encodeURIComponent(cursor) : ''}`);
+        if (!r.ok) throw new Error('Task choices could not be read');
+        const d = await r.json();
+        rows.push(...(Array.isArray(d) ? d : (d.tasks || [])));
+        cursor = Array.isArray(d) ? '' : (d.next_cursor || '');
+    } while (cursor && rows.length < 10000);
+    return rows;
 }

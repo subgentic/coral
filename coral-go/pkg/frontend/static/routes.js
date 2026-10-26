@@ -73,6 +73,13 @@ export function parse(pathname, search = '') {
         if (srv) rest.shift();
         return { server: srv || null };
     };
+    // Only the Goals page family belongs to this dashboard; /inbox itself belongs to Coral Hub.
+    if ([top, rest[0]].join('/') === 'inbox/goals') {
+        if (rest.length === 1) return { view: 'inbox-goals', sub: 'goals' };
+        if (rest.length !== 3 || !INT_RE.test(rest[2])) return null;
+        const team = name(rest[1]);
+        return team === null ? null : { view: 'inbox-goals', sub: 'goals', id: team, item: Number(rest[2]) };
+    }
     switch (top) {
         case undefined: case '': case 'agents': {
             if (!rest.length) return { view: 'agents' };
@@ -171,6 +178,8 @@ export function build(r) {
             return r.id ? `/agents/${srvSeg(r.server)}${seg(r.id)}${r.sub ? '/' + r.sub : ''}` : '/agents';
         case 'chats':
             return r.id ? `/chats/${srvSeg(r.server)}${seg(r.id)}` : `/chats${r.server ? '/' + srvSeg(r.server).replace(/\/$/, '') : ''}${r.query ? '?' + r.query : ''}`;
+        case 'inbox-goals':
+            return r.sub === 'goals' ? `/inbox/goals${r.id && r.item ? '/' + seg(r.id) + '/' + r.item : ''}` : '/';
         case 'team':
             return `/team/${srvSeg(r.server)}${seg(r.id)}${TEAM_TABS.includes(r.sub) ? '/' + r.sub + (r.item && TEAM_ITEM_TABS.includes(r.sub) ? '/' + r.item : '') : ''}${r.sub === 'tasks' && !r.item && r.query ? '?' + r.query : ''}`;
         case 'board':

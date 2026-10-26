@@ -510,6 +510,7 @@ func (s *Server) servePagePath(w http.ResponseWriter, r *http.Request) {
 var DashboardPagePaths = []string{
 	"/agents", "/agents/*",
 	"/chats", "/chats/*",
+	"/inbox/goals", "/inbox/goals/*",
 	"/team/*",
 	"/board/*",
 	"/workflows", "/workflows/*",
