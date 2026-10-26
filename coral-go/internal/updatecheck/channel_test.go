@@ -75,7 +75,7 @@ func TestTheAgenticFeedIsAskedByTheRepositoryIDAndNothingIsBuiltFromAReply(t *te
 	assert.Equal(t, "https://api.github.com/repositories/1160696364/releases?per_page=10", ReleasesListAPI)
 	assert.Equal(t, "https://github.com/subgentic/coral/releases", ReleasesURL)
 	assert.Equal(t, "https://api.github.com/repositories/1160696364/releases/latest", ReleasesAPI, "the Approved feed is asked by the repository id too")
-	assert.Equal(t, Feeds{Approved: ReleasesAPI, Agentic: ReleasesListAPI}, DefaultFeeds)
+	assert.Equal(t, Feeds{Approved: ReleasesAPI, Agentic: ReleasesListAPI}, defaultFeeds)
 	assert.Equal(t, ReleasesURL, ReleasePageURL(Approved, "1.4.150"))
 	assert.Equal(t, ReleasesURL+"/tag/v1.4.150", ReleasePageURL(Agentic, "1.4.150"))
 	assert.Equal(t, ReleasesURL+"/tag/v1.4.150", ReleasePageURL(Agentic, "v1.4.150"))

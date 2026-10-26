@@ -228,8 +228,8 @@ func parseList(r io.Reader, now time.Time) (*Feed, error) {
 // Feeds are the two feed URLs: production's are the constants above; a test names its own server.
 type Feeds struct{ Approved, Agentic string }
 
-// DefaultFeeds is what the program asks.
-var DefaultFeeds = Feeds{Approved: ReleasesAPI, Agentic: ReleasesListAPI}
+// defaultFeeds is what the program asks.
+var defaultFeeds = Feeds{Approved: ReleasesAPI, Agentic: ReleasesListAPI}
 
 func (f Feeds) url(ch Channel) string {
 	if ch == Agentic {
