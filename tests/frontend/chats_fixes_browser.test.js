@@ -29,8 +29,8 @@ const S = `(window.__coralStatic || '/static/')`;
                     if (p.startsWith('/api/sessions/history/aaaaaa1/') || p.startsWith('/api/sessions/history/aaaaaa2/')) return json([]);
                     return real(u, o); };
                 return true; })()`);
-            await ev(`window.switchNavTab('history'); true`); await sleep(800); // sleep-ok: the list draws after the tab opens
-            await ev(`(async () => { const m = await import(${S} + 'history_list.js'); if (m.loadHistorySessions) await m.loadHistorySessions(); return true; })().catch(() => true)`);
+            await ev(`window.switchNavTab('history'); Promise.all([import((window.__coralStatic||'/static/')+'sidebar.js'), import((window.__coralStatic||'/static/')+'view_switch.js')]).then(([sb, vs]) => { sb.showSidebarPane('history'); vs.showView('chats-empty-view'); document.body.setAttribute('data-nav-tab', 'history'); return true; })`); await sleep(800); // sleep-ok: the list draws after the tab opens
+            await ev(`(async () => { const m = await import(${S} + 'history_list.js'); const hf = await import(${S} + 'history_filters.js'); await hf.loadHistoryFiltered(); return true; })().catch(() => true)`); // the list the hub's Chats tab loads when it opens
             await waitFor(`document.querySelectorAll('#history-sessions-list li[data-session-id]').length === 3`, 'three chats', 10000);
             // On a wide screen the tab opens on its first group's table (#7443): the empty pane is what shows with no chat and no group, so it is put on screen here to be measured
             if (!mobile) {

@@ -38,6 +38,7 @@ export const state = {
     autoScroll: true,
     isSelecting: false,         // true when user has text selected; pauses DOM updates
     liveSessions: [],           // cached live session list
+    inboxFolder: null,          // { key, label }: the Inbox chat folder the open chat came from (its way back), or null
     historySessionsList: [],    // cached history session list (from last paginated fetch)
     currentCommands: {},        // commands for current session's agent type
     sessionInputText: {},       // per-session draft text: { "sessionKey": "partial text" } (loadSessionDrafts)

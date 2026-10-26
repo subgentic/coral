@@ -85,7 +85,7 @@ const MODULES = ['workflows.js', 'cost_dashboard.js', 'docs.js', 'theme_config.j
         await ev(`window.showTemplateBrowser(); true`);
         await waitFor(`(() => { const m = document.getElementById('template-browser-modal'); return !!m && getComputedStyle(m).display !== 'none'; })()`, 'template browser', 8000);
         await ev(`(() => { const m = document.getElementById('template-browser-modal'); if (m) m.style.display = 'none'; return true; })()`);
-        await ev(`window.switchNavTab('history'); true`); await waitFor(`document.querySelector('.top-nav-tab.active')?.id === 'nav-tab-history'`, 'the History tab', 3000); await quietSeen();
+        await ev(`window.switchNavTab('history'); true`); await waitFor(`document.querySelector('.top-nav-tab.active')?.id === 'nav-tab-hub-inbox'`, 'the Inbox tab (Chats are its folders)', 3000); await quietSeen();
         await ev(`window.searchChats('needle', 1); true`);
         await waitFor(`(() => { const c = document.getElementById('chat-search-results'); return !!c && !c.hidden; })()`, 'chat search results', 8000);
         for (const m of ['theme_config.js', 'template_browser.js', 'chat_search.js']) assert.equal(count(m), 1, `${m} fetched once`);

@@ -85,13 +85,14 @@ export function rememberInboxGroup(name) { return importOnce('./inbox_sidebar.js
 export function selectInboxTab(name) { return importOnce('./inbox_sidebar.js').then(m => m.openInboxGroup(name)); }
 
 /** Called by switchNavTab('hub-inbox'): where the hub serves the dashboard the page is loaded the first time the tab is shown, and kept after; elsewhere the dashboard's own Inbox is drawn. */
-export function showInboxTabContent() {
+/** `folder` names the folder to open on (a chat folder from an old Chats link); `quiet` draws the Inbox without opening a table (a chat is on screen over it). */
+export function showInboxTabContent({ folder = '', quiet = false } = {}) {
     const view = document.getElementById('inbox-view');
     if (!view) return;
     if (!isCloud()) {
         const local = document.getElementById('inbox-local');
         if (local) local.hidden = false;
-        importOnce('./inbox_sidebar.js').then(m => m.showInbox()).catch(() => {}); // the groups, their tables and a task's or a message's page
+        importOnce('./inbox_sidebar.js').then(m => m.showInbox({ folder, quiet })).catch(() => {}); // the groups, their tables and a task's or a message's page
         return;
     }
     if (document.getElementById('inbox-frame')) return;

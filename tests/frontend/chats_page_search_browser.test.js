@@ -20,7 +20,7 @@ const SESSIONS = [
             window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin);
                 if (url.pathname === '/api/sessions/history/search') return Promise.resolve(new Response(JSON.stringify({ status: 'complete', results: window.__hits.map(id => ({ session_id: id, type: 'chat', source: 'claude', hits: [{ role: 'user', excerpt: 'release', timestamp: '2026-10-01T10:00:00Z', locator: { session_id: id }, matches: [] }] })) }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
                 return R(u, o); }; return true; })()`);
-        await ev(`window.switchNavTab('history'); true`);
+        await ev(`window.switchNavTab('history'); Promise.all([import((window.__coralStatic||'/static/')+'sidebar.js'), import((window.__coralStatic||'/static/')+'view_switch.js')]).then(([sb, vs]) => { sb.showSidebarPane('history'); vs.showView('chats-empty-view'); document.body.setAttribute('data-nav-tab', 'history'); return true; })`);
         await ev(`import((window.__coralStatic||'/static/')+'history_list.js').then(m => { m.renderHistorySessions(${JSON.stringify(SESSIONS)}, 3, 1, 50); return true; })`);
         const table = () => ev(`(() => { const v = document.getElementById('group-table-view'); if (!v || v.offsetParent === null) return null; return { title: (v.querySelector('#group-table-title') || {}).textContent, count: (v.querySelector('.group-table-head .session-group-count') || {}).textContent, rows: [...v.querySelectorAll('tbody tr')].map(r => r.querySelector('.group-table-link').textContent.trim()), text: v.innerText.replace(/\\s+/g, ' ').trim().slice(0, 200) }; })()`);
         await waitFor(`!!document.querySelector('#group-table-view tbody tr')`, 'the Chats page table', 10000);

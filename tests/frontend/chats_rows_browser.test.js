@@ -17,7 +17,7 @@ const S = `(window.__coralStatic || '/static/')`;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await ev(`window.__coralReady.then(() => true)`);
-            await ev(`${font ? `document.documentElement.style.fontSize = '${font}';` : ''} window.switchNavTab('history'); true`);
+            await ev(`${font ? `document.documentElement.style.fontSize = '${font}';` : ''} window.switchNavTab('history'); Promise.all([import((window.__coralStatic||'/static/')+'sidebar.js'), import((window.__coralStatic||'/static/')+'view_switch.js')]).then(([sb, vs]) => { sb.showSidebarPane('history'); vs.showView('chats-empty-view'); document.body.setAttribute('data-nav-tab', 'history'); return true; })`);
             await ev(`(async () => { const m = await import(${S} + 'history_list.js'); const at = (dd, hh, mm) => { const d = new Date(); d.setDate(d.getDate() - dd); d.setHours(hh, mm, 0, 0); return d.toISOString(); };
                 const rows = [
                     { session_id: 'aaaaaa1', title: 'Fix the flaky test', source_type: 'claude', display_name: 'Ada', last_timestamp: at(0, 14, 32), duration_sec: 21 * 60 },

@@ -15,7 +15,7 @@ const { DATA_WORLD } = require('./helpers/census_world');
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
             await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
-            await ev(`window.switchNavTab('history'); true`);
+            await ev(`window.switchNavTab('history'); Promise.all([import((window.__coralStatic||'/static/')+'sidebar.js'), import((window.__coralStatic||'/static/')+'view_switch.js')]).then(([sb, vs]) => { sb.showSidebarPane('history'); vs.showView('chats-empty-view'); document.body.setAttribute('data-nav-tab', 'history'); return true; })`);
             await waitFor(`document.getElementById('history-sessions-list').textContent.includes('Release notes chat')`, `${tag}: the chats`, 10000);
 
             // the advanced filters

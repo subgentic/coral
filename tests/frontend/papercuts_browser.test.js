@@ -83,7 +83,7 @@ const BASE = require('./test_base').BASE;
         // ── (7) Chats with nothing open: its own empty state, not the Agents home.
         await ev(`switchNavTab('history'); true`);
         // The Chats page is its own page, not the Agents home: its empty state, or, once the history list has drawn (a tab with nothing open opens on its first group's table, #7443), that table; which of the two is on screen at the moment of looking depends on the list's timing (the Windows flake, #7647)
-        await waitFor(`document.body.getAttribute('data-nav-tab') === 'history' && ['chats-empty-view', 'group-table-view'].some(id => getComputedStyle(document.getElementById(id)).display !== 'none')`, 'the Chats page (its empty state or its group table)', { diag: `({ tab: document.body.getAttribute('data-nav-tab'), shown: ['chats-empty-view', 'group-table-view', 'welcome-screen'].map(id => id + ':' + getComputedStyle(document.getElementById(id)).display) })` });
+        await waitFor(`document.body.getAttribute('data-nav-tab') === 'hub-inbox' && ['inbox-view', 'group-table-view'].some(id => getComputedStyle(document.getElementById(id)).display !== 'none')`, 'the Chats page (its empty state or its group table)', { diag: `({ tab: document.body.getAttribute('data-nav-tab'), shown: ['chats-empty-view', 'group-table-view', 'welcome-screen'].map(id => id + ':' + getComputedStyle(document.getElementById(id)).display) })` });
         assert.equal(await ev(`getComputedStyle(document.getElementById('welcome-screen')).display`), 'none', 'not the Agents home');
         await ev(`switchNavTab('agents'); true`);
         await waitFor(`getComputedStyle(document.getElementById('welcome-screen')).display !== 'none'`, 'the Agents home on Agents');

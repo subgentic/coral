@@ -201,11 +201,12 @@ export function drawDockSaved(host) {
 
 }
 
-/** A chat of a folder opens in the chat viewer as it does from the Chats list (the way back to the folder comes with the Chats tab's removal, step 3). */
+/** A chat of a folder opens in the chat viewer with its way back ("<- folder"): the folder is kept in state for the viewer and for the browser's Back. */
 async function openChat(c) {
+    state.inboxFolder = { key: group, label: (groupMeta(group) || {}).label || 'All chats' };
     const isGroup = c.type === 'group' || String(c.session_id || '').startsWith('board:');
     if (isGroup) { const { historyServer } = await importOnce('./history_source.js'); window.selectBoardProject?.(identityKey(historyServer(), c.title || String(c.session_id).replace(/^board:/, ''))); return; }
-    window.selectHistorySession?.(c.session_id);
+    window.selectHistorySession?.(c.session_id, null, c);
 }
 
 registerGroupSource('hub-inbox', {
@@ -410,7 +411,7 @@ function closePage(openTable = true, focusBack = false) {
 // ── The tab ──────────────────────────────────────────────────────────────
 let _mounted = false;
 /** Called by switchNavTab('hub-inbox') (where the dashboard builds its own Inbox): the lists are read again and the group last on screen opens as a table (a phone shows the list). */
-export async function showInbox() {
+export async function showInbox({ folder = '', quiet = false } = {}) {
     if (!_mounted) {
         _mounted = true;
         onInboxHooks({ needs: () => { if (!$('inbox-local')?.hidden) renderInboxNav(); }, counts: () => { if (!$('inbox-local')?.hidden) renderInboxNav(); } });
@@ -418,12 +419,14 @@ export async function showInbox() {
         saved.mountInboxSavedBar($('inbox-saved-bar'));
     }
     $('inbox-local').hidden = false;
+    if (folder && groupMeta(folder)) { page = null; $('inbox-page') && ($('inbox-page').hidden = true); group = folder; } // a link to a folder: the folder, not the page that was open
     setGroup(group);
     renderInboxNav(true);
     refreshTasks();
     refreshGoals();
     CH.loadChatCounts(() => renderInboxNav(true));
     saved.loadSaved(); // everything's list (the Inbox is the all scope), read for the table and the count
+    if (quiet || (folder && state.currentSession && state.currentSession.type === 'history')) return; // a chat is on screen, or being opened (a saved message, a link to a chat): the Inbox is drawn under it, for the way back
     if (page) { if (isPhoneLayout()) $('inbox-view')?.setAttribute('data-phone-item', ''); return; } // a task or a message is open: the tab returns to it
     $('inbox-view')?.removeAttribute('data-phone-item');
     if (document.body.getAttribute('data-nav-tab') !== 'hub-inbox') return; // the module arrived after the person had moved on (a notification's click, a chosen agent): its table must not cover that

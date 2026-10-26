@@ -48,7 +48,7 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         await Runtime.enable();
 
         console.log('1. Every top page loads at its path, and a reload keeps it');
-        const PAGES = [['/agents', 'nav-tab-agents'], ['/chats', 'nav-tab-history'], ['/workflows', 'nav-tab-workflows'],
+        const PAGES = [['/agents', 'nav-tab-agents'], ['/chats', 'nav-tab-hub-inbox'], ['/workflows', 'nav-tab-workflows'],
             ['/jobs', 'nav-tab-jobs'], ['/analytics', 'nav-tab-tokens'], ['/docs', 'nav-tab-docs']];
         for (const [path, tabId] of PAGES) {
             await open(path);
@@ -66,23 +66,23 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         console.log('2. Tabs are history entries: Back and Forward');
         await open('/agents');
         const len0 = await ev('history.length');
-        await ev(`document.getElementById('nav-tab-history').click(); true`);
+        await ev(`window.switchNavTab('history'); true`);
         await atUrl('/chats');
         await ev(`document.getElementById('nav-tab-workflows').click(); true`);
         await atUrl('/workflows');
         check('two tab clicks are two entries', (await ev('history.length')) === len0 + 2, `${len0} -> ${await ev('history.length')}`);
         await ev('history.back(); true');
         await atUrl('/chats');
-        await until(`(document.querySelector('.top-nav-tab.active') || {}).id === 'nav-tab-history'`, 'the Chats tab');
-        check('Back shows Chats', (await url()) === '/chats' && (await tab()) === 'nav-tab-history', `${await url()} ${await tab()}`);
+        await until(`(document.querySelector('.top-nav-tab.active') || {}).id === 'nav-tab-hub-inbox'`, 'the Chats tab');
+        check('Back shows Chats', (await url()) === '/chats' && (await tab()) === 'nav-tab-hub-inbox', `${await url()} ${await tab()}`);
         await ev('history.back(); true');
         await atUrl('/agents');
         await until(`(document.querySelector('.top-nav-tab.active') || {}).id === 'nav-tab-agents'`, 'the Agents tab');
         check('Back again shows Agents', (await url()) === '/agents' && (await tab()) === 'nav-tab-agents', `${await url()} ${await tab()}`);
         await ev('history.forward(); true');
         await atUrl('/chats');
-        await until(`(document.querySelector('.top-nav-tab.active') || {}).id === 'nav-tab-history'`, 'the Chats tab');
-        check('Forward shows Chats', (await url()) === '/chats' && (await tab()) === 'nav-tab-history', `${await url()} ${await tab()}`);
+        await until(`(document.querySelector('.top-nav-tab.active') || {}).id === 'nav-tab-hub-inbox'`, 'the Chats tab');
+        check('Forward shows Chats', (await url()) === '/chats' && (await tab()) === 'nav-tab-hub-inbox', `${await url()} ${await tab()}`);
 
         console.log('3. The Chats filters are the URL: a link, a reload, and Back from another tab');
         await open('/chats?q=routesqa');
@@ -97,7 +97,7 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         check('Back to the filtered list restores its filter', (await ev(`document.getElementById('history-search').value`)) === 'routesqa', await url());
 
         console.log('4. Old hash links become their paths (replaced, not pushed)');
-        for (const [hash, path, tabId] of [['#tokens', '/analytics', 'nav-tab-tokens'], ['#history', '/chats', 'nav-tab-history'],
+        for (const [hash, path, tabId] of [['#tokens', '/analytics', 'nav-tab-tokens'], ['#history', '/chats', 'nav-tab-hub-inbox'],
             ['#workflows', '/workflows', 'nav-tab-workflows'], ['#agents', '/agents', 'nav-tab-agents']]) {
             await open('/' + hash);
             await until(`(document.querySelector('.top-nav-tab.active') || {}).id === ${JSON.stringify(tabId)}`, tabId);
@@ -227,7 +227,7 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         const linkHref = await ev(`(${routeLink}).getAttribute('href')`);
         await ev(`window.__samePage = true; (${routeLink}).dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 })); true`);
         await atUrl('/chats?q=routeclick');
-        await until(`(document.querySelector('.top-nav-tab.active') || {}).id === 'nav-tab-history'`, 'the Chats tab');
+        await until(`(document.querySelector('.top-nav-tab.active') || {}).id === 'nav-tab-hub-inbox'`, 'the Chats tab');
         const rc = await ev(`({ url: location.pathname + location.search, same: window.__samePage === true, box: (document.getElementById('history-search') || {}).value })`);
         check('a page link in a post opens it through the router (no page load, its own query only)', linkHref === '/chats?q=routeclick' && rc.url === '/chats?q=routeclick' && rc.same && rc.box === 'routeclick', JSON.stringify({ linkHref, ...rc }));
         await ev('history.back(); true');

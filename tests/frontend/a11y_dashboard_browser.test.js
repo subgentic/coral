@@ -68,7 +68,7 @@ const contrast = (a, b) => {
         assert.deepEqual(n.current, ['nav-tab-agents'], 'Agents is the current page on load');
         await ev(`switchNavTab('history'); true`);
         n = await nav();
-        assert.deepEqual(n.current, ['nav-tab-history'], 'aria-current follows the open view'); assert.deepEqual(n.selected, []);
+        assert.deepEqual(n.current, ['nav-tab-hub-inbox'], 'aria-current follows the open view (a local Coral\'s Chats are the Inbox\'s folders, #7776)'); assert.deepEqual(n.selected, []);
         await ev(`switchNavTab('agents'); true`);
         assert.deepEqual((await nav()).current, ['nav-tab-agents']);
         console.log('   ✓ no tablist/tab/aria-selected; aria-current="page" follows the view');

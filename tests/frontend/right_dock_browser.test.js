@@ -69,12 +69,12 @@ const BASE = require('./test_base').BASE;
         assert.equal(d.page, 'none', 'the team page has no side panel either: ' + JSON.stringify(d));
         assert.equal(await ev(`getComputedStyle(document.getElementById('agentic-state')).display`), 'none');
 
-        console.log('3. Chats (no chat open) and the other pages: no sidebar at all; Saved for everything is its own page, which the top bar bookmark opens');
+        console.log('3. A chat open under the Inbox and the other pages: no sidebar at all; Saved for everything is its own page, which the top bar bookmark opens');
         await ev(`switchNavTab('history'); true`);
-        // The board created above is a chat even with no indexed agent history (#7809, #7953).
-        const boardChat = `#group-table-view [data-on-click="board-open"][data-board="${BOARD}"]`;
-        await waitFor(`(() => { const list = document.getElementById('group-table-view'); return list.getClientRects().length > 0 && list.dataset.group.startsWith('history:') && !!document.querySelector(${JSON.stringify(boardChat)}); })()`, 'Chats list with the seeded board chat');
-        assert.equal(await ev(`document.querySelector(${JSON.stringify(boardChat)}).textContent.trim()`), BOARD, 'the board chat is in the Chats list');
+        // The board created above is a chat even with no indexed agent history (#7809, #7953): it is in the Inbox's All chats folder.
+        await waitFor(`(() => { const list = document.getElementById('group-table-view'); return list.getClientRects().length > 0 && list.dataset.group === 'hub-inbox:chats' && [...list.querySelectorAll('.dt-primary')].some(b => b.textContent.trim() === ${JSON.stringify(BOARD)}); })()`, 'All chats with the seeded board chat');
+        await ev(`import((window.__coralStatic || '/static/') + 'utils.js').then(u => { u.showView('history-session-view'); return true; })`); // a chat open under the Inbox (#7776): its page is the chat's
+        await waitFor(`getComputedStyle(document.getElementById('history-session-view')).display !== 'none'`, 'Chats');
         d = await dock();
         assert.equal(d.page, 'chats');
         assert.deepEqual(d.tabs, [], 'no tab on Chats: ' + JSON.stringify(d));
@@ -84,7 +84,7 @@ const BASE = require('./test_base').BASE;
         await waitFor(`(() => { const t = document.getElementById('group-table-view'); return t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved'; })()`, 'the Saved page', 8000);
         assert.equal(await ev(`getComputedStyle(document.getElementById('agentic-state')).display`), 'none', 'the page has no sidebar beside it');
         await shot('saved-page-from-chats');
-        await ev(`switchNavTab('history'); true`);
+        await ev(`switchNavTab('history'); import((window.__coralStatic || '/static/') + 'utils.js').then(u => { u.showView('history-session-view'); return true; })`); // a chat open under the Inbox (#7776): the Chats tab is gone, its page is the chat's
 
         console.log('4. A shut sidebar whose tab is Saved reads nothing; opening it with the panel button reads the list');
         await select('dk-a');
@@ -105,7 +105,7 @@ const BASE = require('./test_base').BASE;
         assert.ok(d.open && d.active === 'saved', 'the agent page kept its last tab, Saved: ' + JSON.stringify(d));
         await toggle();
         assert.equal((await dock()).open, false, 'closed on the agent page');
-        await ev(`switchNavTab('history'); true`);
+        await ev(`switchNavTab('history'); import((window.__coralStatic || '/static/') + 'utils.js').then(u => { u.showView('history-session-view'); return true; })`); // a chat open under the Inbox (#7776): the Chats tab is gone, its page is the chat's
         await waitFor(`document.getElementById('agentic-state').dataset.page === 'chats'`, 'Chats');
         await select('dk-a');
         await waitFor(`document.getElementById('agentic-state').dataset.page === 'agent'`, 'the agent page again');
@@ -119,7 +119,7 @@ const BASE = require('./test_base').BASE;
         const mid = (rows.messages || rows).find(m => m.content === 'a board message to save').id;
         await ev(`document.querySelector('#mb-messages [data-message-id="${mid}"] .mb-save-btn').click(); true`);
         await waitFor(`document.querySelector('#mb-messages [data-message-id="${mid}"] .mb-save-btn').getAttribute('aria-pressed') === 'true'`, 'saved', 6000);
-        await ev(`switchNavTab('history'); true`);
+        await ev(`switchNavTab('history'); import((window.__coralStatic || '/static/') + 'utils.js').then(u => { u.showView('history-session-view'); return true; })`); // a chat open under the Inbox (#7776): the Chats tab is gone, its page is the chat's
         await waitFor(`document.getElementById('agentic-state').dataset.page === 'chats'`, 'Chats');
         await ev(`document.getElementById('saved-btn').click(); true`); // from Chats: the Saved page
         await waitFor(`(() => { const t = document.getElementById('group-table-view'); return t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved'; })() && document.querySelectorAll('#group-table-view tbody tr').length === 1`, 'the Saved page with the item', 10000);
@@ -141,7 +141,7 @@ const BASE = require('./test_base').BASE;
         await ev(`window.selectBoardProject(${JSON.stringify(BOARD)}); true`);
         await waitFor(`document.getElementById('agentic-state').dataset.page === 'none'`, 'the board on the phone');
         assert.equal(await ev(`getComputedStyle(document.getElementById('panel-toggle-btn')).display`), 'none', 'the board has no side panel to open');
-        await ev(`switchNavTab('history'); true`);
+        await ev(`switchNavTab('history'); import((window.__coralStatic || '/static/') + 'utils.js').then(u => { u.showView('history-session-view'); return true; })`); // a chat open under the Inbox (#7776): the Chats tab is gone, its page is the chat's
         await waitFor(`document.getElementById('agentic-state').dataset.page === 'chats'`, 'Chats on the phone');
         assert.equal(await ev(`getComputedStyle(document.getElementById('panel-toggle-btn')).display`), 'none', 'Chats has no side panel to open: Saved for everything is its own page');
         await Emulation.setTouchEmulationEnabled({ enabled: false });
