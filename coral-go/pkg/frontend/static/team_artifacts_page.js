@@ -228,7 +228,8 @@ function draw() {
     const held = a && body.contains(a) && !bar.node.contains(a) ? (a.dataset.artifactId || (a.classList.contains('goals-more') ? '#load-more' : a.classList.contains('team-artifacts-retry') ? '#retry' : '')) : '';
     for (const c of [...body.children]) if (c !== bar.node) c.remove();
     if (bar.node.parentElement !== body) body.prepend(bar.node);
-    const status = el('p', `goals-note team-count-line${model.error ? ' team-artifacts-error' : !model.loading && !model.items.length ? ' team-empty-line' : ''}`, statusLine());
+    const counting = !model.error && !model.loading && model.items.length > 0; // the count is not a line above the table: a screen reader hears it (sr-only), and "Showing 100 of 163" is under the table with Load more (#7729)
+    const status = el('p', counting ? 'sr-only team-count-line' : `goals-note team-count-line${model.error ? ' team-artifacts-error' : !model.loading && !model.items.length ? ' team-empty-line' : ''}`, statusLine());
     status.setAttribute('role', model.error ? 'alert' : 'status');
     body.append(status);
     if (model.error) body.append(btn('btn btn-small team-artifacts-retry', 'Retry', () => loadArtifacts({ append: model.items.length > 0 && !!model.cursor, keep: true })));
@@ -248,7 +249,12 @@ function draw() {
             }),
         }));
     }
-    if (model.hasMore) body.append(btn('btn goals-more', model.loadingMore ? 'Loading…' : 'Load more', () => { loadArtifacts({ append: true }); }));
+    if (model.hasMore) {
+        const foot = el('div', 'team-table-foot');
+        const shown = el('span', null, statusLine()); shown.setAttribute('aria-hidden', 'true'); // the status above says it to a screen reader
+        foot.append(shown, btn('btn goals-more', model.loadingMore ? 'Loading…' : 'Load more', () => { loadArtifacts({ append: true }); }));
+        body.append(foot);
+    }
     if (model.truncated) body.append(el('p', 'goals-note', 'Some older artifacts are not included in this list.'));
     bar.names([...new Set(model.items.flatMap(i => [i.produced_by, i.sent_by]).filter(n => typeof n === 'string' && n))].sort().slice(0, 50)); // the names on screen, offered in the Uploaded by field
     bar.set(model.filters, model.counts ? model.counts : model.items.length || !model.loading ? { matched: model.items.length, all: model.items.length } : null);
