@@ -47,6 +47,15 @@ type inputBox struct {
 	// is open answers it (option 1, as Claude Code takes it) and is logged; Esc dismisses it.
 	trigger    string
 	promptOpen bool
+	// notify, when set, hears the menu open ("permission_request") and close ("permission_answered", "permission_dismissed"): the run loop turns them into the hook events Claude Code runs for a tool's
+	// permission prompt, so Coral sees an agent waiting for a person (#8245), not only a menu on its screen.
+	notify func(kind string)
+}
+
+func (b *inputBox) tell(kind string) {
+	if b.notify != nil {
+		b.notify(kind)
+	}
 }
 
 // promptMenu is drawn like Claude Code's permission prompt, as Coral's PromptOnScreen knows it.
@@ -110,9 +119,11 @@ func (b *inputBox) feed(data []byte, submit func(string)) {
 			case '\r':
 				fmt.Print("\r\n[mock-agent] PROMPT ANSWERED by an Enter (option 1)\r\n")
 				b.promptOpen = false
+				b.tell("permission_answered")
 			case 0x1b:
 				fmt.Print("\r\n[mock-agent] prompt dismissed\r\n")
 				b.promptOpen = false
+				b.tell("permission_dismissed")
 			}
 			continue
 		}
@@ -151,6 +162,7 @@ func (b *inputBox) feed(data []byte, submit func(string)) {
 				b.promptOpen = true
 				drawBox(b)
 				fmt.Print(promptMenu)
+				b.tell("permission_request")
 			}
 		}
 	}
@@ -214,6 +226,20 @@ func runRawInput(dir, sessionID, settingsFile string, turn func(string)) {
 		hooks.fire("Stop", map[string]any{"stop_hook_active": false})
 	}
 	box := &inputBox{trigger: os.Getenv("MOCK_AGENT_PROMPT_TRIGGER")}
+	box.notify = func(kind string) {
+		events <- func() {
+			switch kind {
+			case "permission_request": // the tool call's request, then the notification that follows it, as Claude Code sends them
+				hooks.fire("PermissionRequest", map[string]any{"tool_name": "Bash", "tool_use_id": "toolu_mock_" + name, "tool_input": map[string]any{"command": "rm -rf build", "description": "Remove the build folder"}})
+				hooks.fire("Notification", map[string]any{"notification_type": "permission_prompt", "message": "Claude needs your permission to use Bash"})
+			case "permission_answered":
+				hooks.fire("PostToolUse", map[string]any{"tool_name": "Bash", "tool_use_id": "toolu_mock_" + name, "tool_response": map[string]any{"stdout": ""}})
+				hooks.fire("Stop", map[string]any{"stop_hook_active": false})
+			case "permission_dismissed":
+				hooks.fire("Stop", map[string]any{"stop_hook_active": false})
+			}
+		}
+	}
 	drawBox(box)
 	buf := make([]byte, 64*1024)
 	for {
