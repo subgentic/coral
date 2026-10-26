@@ -347,3 +347,13 @@
 
 /* The same literal board name as its list row, including digit+x (#8682). */
 .goals-detail-title, .team-page-title { font-feature-settings: "calt" 0; }
+
+/* Review actions wrap within the folded Needs you row. */
+.inbox-review-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.inbox-review-error { flex-basis: 100%; }
+.inbox-review-error:empty { display: none; }
+.inbox-review-more { margin: 12px 0; }
+.inbox-review-more a, .inbox-review-more button { margin-inline-end: 8px; }
+@media (max-width: 760px) {
+    .inbox-review-actions button { min-height: 44px; }
+}

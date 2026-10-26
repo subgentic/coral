@@ -5,8 +5,8 @@ import { defineFilters } from './filter_model.js';
 import { browserLocal } from './safe_storage.js';
 
 /** What an agent waits on, as the pills say it: its permission, its question, or anything else (an input request, a plan, a prompt only the screen showed). */
-export const KINDS = ['permission', 'question', 'other'];
-export const KIND_LABEL = { permission: 'Permission', question: 'Question', other: 'Needs input' };
+export const KINDS = ['permission', 'question', 'other', 'review'];
+export const KIND_LABEL = { permission: 'Permission', question: 'Question', other: 'Needs input', review: 'For review' };
 /** How long it has waited, at least (minutes), as the Filters panel offers it. */
 export const LONGER = ['5', '15', '60', '240'];
 export const LONGER_LABEL = { 5: '5 minutes', 15: '15 minutes', 60: '1 hour', 240: '4 hours' };
@@ -30,7 +30,7 @@ export const loadFilters = () => ({ ...kept.load('inbox-needs', browserLocal), q
 export const saveFilters = f => kept.save('inbox-needs', { ...f, q: '' }, browserLocal);
 
 /** The kind of a waiting agent for the pills: `waiting_kind` permission or question, else other. */
-export const kindOf = s => (s && (s.waiting_kind === 'permission' || s.waiting_kind === 'question') ? s.waiting_kind : 'other');
+export const kindOf = s => (s && (s.waiting_kind === 'permission' || s.waiting_kind === 'question' || s.waiting_kind === 'review') ? s.waiting_kind : 'other');
 
 /** Whether a waiting agent passes the filters. ctx: { text(s) the words the search covers, teamOf(s), nameOf(s) }; `now` (ms) is the clock. The pill's kind is a filter here too. */
 export function matches(s, f, ctx, now = Date.now()) {
