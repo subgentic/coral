@@ -122,7 +122,7 @@ func (in AutomatedInput) look(ctx context.Context) verdict {
 		return verdict{skip: SkipUnreadable}
 	}
 	open, why := PromptOnScreen(screen)
-	if open && isPromptHold(why) && !AgySlashMenuFor(agentType, in.Text, screen) { // a footer alone, or one drawn while the agent works, is not a menu: the text goes
+	if open && in.blocks(why, agentType, screen) {
 		return verdict{skip: SkipPrompt + " (" + why + ")"}
 	}
 	box, haveBox := inputBoxText(screen)
@@ -139,6 +139,26 @@ func (in AutomatedInput) look(ctx context.Context) verdict {
 	}
 	v.skip = SkipDraft
 	return v
+}
+
+// blocks reports whether the prompt on screen (why, from PromptOnScreen) is one the text must not be typed into. A footer alone, or one drawn
+// while the agent works, is not a menu: the text goes. Claude's session survey ("1: Bad ... 0: Dismiss") takes single digit keys and nothing
+// else, so a text that does not start with a digit is typed over it (it is ignored there, and the agent is not left deaf to the board until
+// a person dismisses it); a text that starts with one would answer it, and is skipped. A bracketed paste is ignored by a menu (#3457).
+func (in AutomatedInput) blocks(why, agentType, screen string) bool {
+	if !isPromptHold(why) || AgySlashMenuFor(agentType, in.Text, screen) {
+		return false
+	}
+	if isClaudeSurvey(why) {
+		t := strings.TrimSpace(in.Text)
+		return t == "" || (t[0] >= '0' && t[0] <= '9')
+	}
+	return true
+}
+
+// isClaudeSurvey: the reason PromptOnScreen gives for Claude Code's session survey (its choices end in "0: Dismiss").
+func isClaudeSurvey(why string) bool {
+	return strings.HasPrefix(why, dialogWhy) && strings.Contains(strings.ToLower(why), "dismiss")
 }
 
 // emptyBox: nothing in the box, the agent's own placeholder, or Claude's faint prompt suggestion.
@@ -200,7 +220,7 @@ func (g *inputGate) typeNow(ctx context.Context, in AutomatedInput) (enterWithhe
 			return false // cannot look: the Enter is not pressed
 		}
 		open, why := PromptOnScreen(screen)
-		return !(open && isPromptHold(why)) || AgySlashMenuFor(agentType, in.Text, screen)
+		return !(open && in.blocks(why, agentType, screen))
 	}
 	pctx := tmux.WithBeforeEnter(ctx, check)
 	if _, known := BracketedPasteHint(pctx); !known {

@@ -3,6 +3,7 @@ package ptymanager
 import (
 	"context"
 	"errors"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -315,4 +316,18 @@ func TestDeliveredKeysAndForgetSession(t *testing.T) {
 	ForgetSession(n)
 	assert.True(t, LastDelivered(n, "board-unread:team").IsZero())
 	assert.Equal(t, n, <-forgotten)
+}
+
+// Claude's session survey ("How is Claude doing? ... 0: Dismiss") takes digit keys only: with a real capture of it on screen, a board nudge is typed (the agent is
+// not left deaf to the board until a person dismisses it), and a text that starts with a digit, which would answer it, is not.
+func TestTheSessionSurveyDoesNotKeepTheBoardFromAnAgent(t *testing.T) {
+	raw, err := os.ReadFile("testdata/screens/claude/2.1.300/feedback_survey.ansi")
+	require.NoError(t, err)
+	n := "claude-t-survey"
+	defer ForgetSession(n)
+	a := &fakeAgent{screen: string(raw)}
+	assert.Equal(t, Sent, deliver(t, a, n, "You have 1 unread message"))
+	assert.Equal(t, []string{"You have 1 unread message"}, a.sent())
+	assert.Equal(t, Skipped, deliver(t, a, n, "1"), "a digit would answer the survey")
+	assert.Len(t, a.sent(), 1)
 }
