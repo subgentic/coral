@@ -174,7 +174,7 @@ const stagedFrom = (source, relaunch = {}) => { const st = staged('1.4.160', {},
         await ev(`window.hideSettingsModal && window.hideSettingsModal(); true`);
         // the Updates pane says the same under its "Relaunch from Coral Hub" row (the stub's saved switch is off)
         await ev(`(async () => { await window.showSettingsModal('updates'); return true; })()`); await settle(500);
-        const row = await ev(`(() => { const r = [...document.querySelectorAll('#settings-modal .settings-row')].find(x => /Relaunch from Coral Hub/.test(x.textContent)); return r ? r.textContent.replace(/\\s+/g, ' ').trim() : null; })()`);
+        const row = await ev(`(() => { const r = [...document.querySelectorAll('#settings-modal .sv-row')].find(x => /Relaunch from Coral Hub/.test(x.textContent)); return r ? r.textContent.replace(/\\s+/g, ' ').trim() : null; })()`);
         check('the Updates pane row carries the Off sentence when the switch is off', row && row.includes(OFF), row);
         await ev(`window.hideSettingsModal && window.hideSettingsModal(); true`);
 
