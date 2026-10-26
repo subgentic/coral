@@ -556,6 +556,8 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 	// History
 	r.Get("/api/sessions/history", histHandler.ListSessions)
 	r.Get("/api/sessions/history/search", histHandler.SearchChats)
+	r.Get("/api/sessions/history/counts", histHandler.ChatCounts)
+	r.Patch("/api/sessions/history/{sessionID}/flags", histHandler.SetChatFlags)
 	r.Get("/api/sessions/history/{sessionID}", histHandler.GetSessionDetail)
 	r.Get("/api/sessions/history/{sessionID}/agent-notes", histHandler.GetSessionAgentNotes)
 	r.Get("/api/sessions/history/{sessionID}/notes", histHandler.GetSessionNotes)

@@ -248,6 +248,8 @@ var operatorOnlyRoutes = map[string]string{
 	"PUT /api/teams/detail/{name}/knowledge/{agentName}":              "change a team's knowledge",
 	// Reads across every session, board and team (#5013): an agent reads its own session and board (agentSessionRoutes, checkBoard), and its own
 	// history through /api/agent/history; none of these is called by an agent tool.
+	"GET /api/sessions/history/counts":                   "read every chat folder count",
+	"PATCH /api/sessions/history/{sessionID}/flags":      "change a chat mailbox flag",
 	"GET /api/sessions/history":                          "list every session's history",
 	"GET /api/sessions/history/search":                   "search every session's history",
 	"GET /api/token-usage":                               "list every session's token usage",

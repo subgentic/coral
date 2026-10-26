@@ -443,3 +443,5 @@ b PUT /api/views/{id}
 b PUT /api/workflows/{workflowID}
 b QUERY /api/remote/{server}/*
 b TRACE /api/remote/{server}/*
+b GET /api/sessions/history/counts
+b PATCH /api/sessions/history/{sessionID}/flags

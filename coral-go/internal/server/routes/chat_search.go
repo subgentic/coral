@@ -116,8 +116,24 @@ func (h *HistoryHandler) SearchChats(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				status = "unavailable"
 			} else {
+				projects := []string{}
+				seen := map[string]bool{}
+				for _, m := range msgs {
+					if !seen[m.Project] {
+						seen[m.Project] = true
+						projects = append(projects, m.Project)
+					}
+				}
+				flags, err := h.ss.ChatFlagsForBoards(r.Context(), projects)
+				if err != nil {
+					errInternalServer(w, "could not read chat flags")
+					return
+				}
 				byProject := map[string]*ChatSearchResult{}
 				for _, m := range msgs {
+					if flags[m.Project].Archived {
+						continue
+					}
 					content := cleanWhitespace(m.Content)
 					off := strings.Index(strings.ToLower(content), strings.ToLower(q))
 					if off < 0 {

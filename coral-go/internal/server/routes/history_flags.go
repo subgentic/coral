@@ -1,0 +1,117 @@
+package routes
+
+import (
+	"net/http"
+	"strings"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/subgentic/coral/internal/store"
+)
+
+// SetChatFlags changes mailbox flags, independently of the live agent's archive/sleep state.
+// Local Operator or machine credential only; the connector classifies this route Never.
+func (h *HistoryHandler) SetChatFlags(w http.ResponseWriter, r *http.Request) {
+	if refuseUnlessOperator(w, r, "change a chat's mailbox flags") {
+		return
+	}
+	var body struct {
+		Starred  *bool `json:"starred"`
+		Archived *bool `json:"archived"`
+	}
+	if err := decodeJSONStrict(r, &body); err != nil {
+		errBadRequest(w, "starred and archived must be booleans")
+		return
+	}
+	if body.Starred == nil && body.Archived == nil {
+		errBadRequest(w, "supply starred or archived")
+		return
+	}
+	id := chi.URLParam(r, "sessionID")
+	exists := false
+	if board, ok := strings.CutPrefix(id, "board:"); ok {
+		if h.bs != nil {
+			projects, err := h.bs.ListProjects(r.Context())
+			if err != nil {
+				errInternalServer(w, "could not read chats")
+				return
+			}
+			for _, p := range projects {
+				if p.Project == board {
+					exists = true
+					break
+				}
+			}
+		}
+	} else {
+		item, err := h.ss.GetIndexedSession(r.Context(), id)
+		if err != nil {
+			errInternalServer(w, "could not read chat")
+			return
+		}
+		exists = item != nil
+	}
+	if !exists {
+		errNotFound(w, "chat not found")
+		return
+	}
+	if err := h.ss.UpdateChatFlags(r.Context(), id, body.Starred, body.Archived); err != nil {
+		errInternalServer(w, "could not save chat flags")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// ChatCounts returns the whole mailbox's chat counts, not a page or a separate query per folder.
+func (h *HistoryHandler) ChatCounts(w http.ResponseWriter, r *http.Request) {
+	if refuseUnlessOperator(w, r, "read chat folder counts") {
+		return
+	}
+	boards := []string{}
+	if h.bs != nil {
+		projects, err := h.bs.ListProjects(r.Context())
+		if err != nil {
+			errInternalServer(w, "could not read chats")
+			return
+		}
+		for _, p := range projects {
+			boards = append(boards, p.Project)
+		}
+	}
+	counts, err := h.ss.CountChatFolders(r.Context(), boards)
+	if err != nil {
+		errInternalServer(w, "could not count chats")
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, http.StatusOK, counts)
+}
+
+func (h *HistoryHandler) filterBoardChatRows(r *http.Request, rows []map[string]any, params store.SessionListParams) ([]map[string]any, error) {
+	ids := make([]string, len(rows))
+	for i, row := range rows {
+		ids[i] = strings.TrimPrefix(row["session_id"].(string), "board:")
+	}
+	flags, err := h.ss.ChatFlagsForBoards(r.Context(), ids)
+	if err != nil {
+		return nil, err
+	}
+	out := rows[:0]
+	for i, row := range rows {
+		f := flags[ids[i]]
+		if f.Archived != params.Archived || params.Starred && !f.Starred || params.Active && !f.Active || params.WithNotes {
+			continue
+		}
+		row["starred"], row["archived"], row["active"] = f.Starred, f.Archived, f.Active
+		out = append(out, row)
+	}
+	return out, nil
+}
+
+// Preserve the empty-install response without dropping group-only histories.
+func (h *HistoryHandler) noBoardChats(r *http.Request) bool {
+	if h.bs == nil {
+		return true
+	}
+	projects, err := h.bs.ListProjects(r.Context())
+	return err == nil && len(projects) == 0
+}

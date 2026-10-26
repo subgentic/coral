@@ -26,6 +26,10 @@ type SessionListParams struct {
 	MinDurationSec *int
 	MaxDurationSec *int
 	AgentName      string
+	Starred        bool
+	Archived       bool
+	Active         bool
+	WithNotes      bool
 }
 
 // SessionListResult holds paginated session results.
@@ -38,6 +42,9 @@ type SessionListResult struct {
 
 // SessionListItem is an enriched session for list display.
 type SessionListItem struct {
+	Starred        bool    `json:"starred"`
+	Archived       bool    `json:"archived"`
+	Active         bool    `json:"active"`
 	SessionID      string  `json:"session_id"`
 	SourceType     string  `json:"source_type"`
 	SourceFile     string  `json:"source_file"`
@@ -105,11 +112,21 @@ type sessionListSQL struct {
 // sessionListQuery turns the list's filters into SQL: a full-text search (ordered by rank), the dates, the
 // duration, the tags (all or any), the source types and the agent name; newest first without a search.
 func sessionListQuery(params SessionListParams) sessionListSQL {
-	q := sessionListSQL{from: "session_index si", order: "si.last_timestamp DESC"}
+	q := sessionListSQL{from: "session_index si LEFT JOIN chat_flags cf ON cf.session_id = si.session_id", order: "si.last_timestamp DESC"}
 	var whereClauses []string
 	where := func(clause string, arg interface{}) {
 		whereClauses = append(whereClauses, clause)
 		q.args = append(q.args, arg)
+	}
+	where("COALESCE(cf.archived, 0) = ?", params.Archived)
+	if params.Starred {
+		where("COALESCE(cf.starred, 0) = ?", true)
+	}
+	if params.Active {
+		where(activeChatSQL("si.session_id", "si.source_type")+" = ?", true)
+	}
+	if params.WithNotes {
+		where(notesChatSQL("si.session_id")+" = ?", true)
 	}
 	if params.Search != "" {
 		if safeQ := sanitizeFTSQuery(params.Search, params.FTSMode); safeQ != "" {
@@ -153,6 +170,9 @@ func sessionListQuery(params SessionListParams) sessionListSQL {
 
 // sessionPageRow is one session_index row of a list page.
 type sessionPageRow struct {
+	Starred          bool    `db:"starred"`
+	Archived         bool    `db:"archived"`
+	Active           bool    `db:"active"`
 	SessionID        string  `db:"session_id"`
 	SourceType       string  `db:"source_type"`
 	SourceFile       string  `db:"source_file"`
@@ -178,7 +198,7 @@ func (s *SessionStore) pageSessions(ctx context.Context, q sessionListSQL, param
 	offset := (params.Page - 1) * params.PageSize
 	selectFields := `si.session_id, si.source_type, si.source_file,
 		si.first_timestamp, si.last_timestamp, si.message_count, si.display_summary, si.first_user_message,
-		si.agent_name, si.display_name`
+		si.agent_name, si.display_name, COALESCE(cf.starred,0) AS starred, COALESCE(cf.archived,0) AS archived, ` + activeChatSQL("si.session_id", "si.source_type") + ` AS active`
 	query, pageArgs, err := sqlx.In(fmt.Sprintf("SELECT %s FROM %s%s ORDER BY %s LIMIT ? OFFSET ?", selectFields, q.from, q.where, q.order),
 		append(q.args, params.PageSize, offset)...)
 	if err != nil {
@@ -340,6 +360,9 @@ func (x sessionListExtras) item(r sessionPageRow) SessionListItem {
 	}
 	meta := x.meta[r.SessionID]
 	return SessionListItem{
+		Starred:          r.Starred,
+		Archived:         r.Archived,
+		Active:           r.Active,
 		SessionID:        r.SessionID,
 		SourceType:       r.SourceType,
 		SourceFile:       r.SourceFile,

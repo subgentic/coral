@@ -69,6 +69,7 @@ GET /api/board/{project}/working-mode | board-claims
 GET /api/board/{project}/working-mode/presets | board-claims
 GET /api/session-artifacts | token-session
 GET /api/sessions/history | unbound | operator-only
+GET /api/sessions/history/counts | unbound | operator-only
 GET /api/sessions/history/search | unbound | operator-only
 GET /api/sessions/history/{sessionID} | unbound
 GET /api/sessions/history/{sessionID}/agent-notes | unbound
@@ -120,6 +121,7 @@ PATCH /api/board/{project} | board-claims | operator-only
 PATCH /api/board/{project}/goals/{goalID} | board-claims
 PATCH /api/board/{project}/tasks/{taskID} | board-claims
 PATCH /api/board/{project}/tasks/{taskID}/amend | board-claims
+PATCH /api/sessions/history/{sessionID}/flags | unbound | operator-only
 PATCH /api/sessions/live/{name}/notes/{noteID} | token-bound
 PATCH /api/sessions/live/{name}/tasks/{taskID} | token-bound
 POST /api/agent/artifacts | token-bound

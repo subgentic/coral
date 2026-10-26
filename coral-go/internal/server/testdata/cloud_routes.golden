@@ -117,6 +117,7 @@ GET /api/scheduled/jobs/{jobID}/runs view
 GET /api/scheduled/runs/recent view
 GET /api/session-artifacts view
 GET /api/sessions/history view
+GET /api/sessions/history/counts view
 GET /api/sessions/history/search view
 GET /api/sessions/history/{sessionID} view
 GET /api/sessions/history/{sessionID}/agent-notes view
@@ -233,6 +234,7 @@ PATCH /api/board/{project}/goals/{goalID} interact
 PATCH /api/board/{project}/tasks/{taskID} interact
 PATCH /api/board/{project}/tasks/{taskID}/amend interact
 PATCH /api/saved/{id} interact
+PATCH /api/sessions/history/{sessionID}/flags never
 PATCH /api/sessions/live/{name}/notes/{noteID} interact
 PATCH /api/sessions/live/{name}/tasks/{taskID} interact
 POST /api/agent/artifacts never

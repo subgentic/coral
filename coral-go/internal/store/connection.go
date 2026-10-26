@@ -514,6 +514,13 @@ CREATE TABLE IF NOT EXISTS claude_artifact_nudges (
 );
 CREATE INDEX IF NOT EXISTS idx_claude_artifact_nudges_seen ON claude_artifact_nudges(seen_at);
 
+-- Operator mailbox flags survive transcript reindexing; board chats use their history id (board:<id>).
+CREATE TABLE IF NOT EXISTS chat_flags (
+    session_id TEXT PRIMARY KEY,
+    starred INTEGER NOT NULL DEFAULT 0 CHECK (starred IN (0,1)),
+    archived INTEGER NOT NULL DEFAULT 0 CHECK (archived IN (0,1))
+);
+
 CREATE TABLE IF NOT EXISTS session_index (
 	session_id      TEXT PRIMARY KEY,
 	source_type     TEXT NOT NULL,

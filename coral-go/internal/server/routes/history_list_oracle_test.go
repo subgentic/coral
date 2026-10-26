@@ -156,7 +156,24 @@ func TestListSessionsAgreesWithBefore4713(t *testing.T) {
 			oc, ob := historyListGet(t, srv, "/old", q)
 			nc, nb := historyListGet(t, srv, "/new", q)
 			require.Equal(t, oc, nc, "seed %d %s", seed, q.Encode())
-			require.Equal(t, ob, nb, "seed %d %s", seed, q.Encode())
+			// #7809 adds mailbox metadata; the old oracle still checks every pre-existing field.
+			withoutFlags := func(raw string) string {
+				var body map[string]any
+				require.NoError(t, json.Unmarshal([]byte(raw), &body))
+				if rows, ok := body["sessions"].([]any); ok {
+					for _, row := range rows {
+						if item, ok := row.(map[string]any); ok {
+							delete(item, "starred")
+							delete(item, "archived")
+							delete(item, "active")
+						}
+					}
+				}
+				b, err := json.Marshal(body)
+				require.NoError(t, err)
+				return string(b)
+			}
+			require.Equal(t, withoutFlags(ob), withoutFlags(nb), "seed %d %s", seed, q.Encode())
 			var out struct {
 				Sessions []map[string]any `json:"sessions"`
 				Total    int              `json:"total"`

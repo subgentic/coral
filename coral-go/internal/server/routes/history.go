@@ -69,7 +69,7 @@ func (h *HistoryHandler) ListSessions(w http.ResponseWriter, r *http.Request) {
 
 		// Cold-start fast path: when DB is empty and no filters active,
 		// match Python's file-scan fallback response shape (page_size=0).
-		if result.Total == 0 && !historyFiltered(params) && chatType != "group" {
+		if result.Total == 0 && !historyFiltered(params) && (chatType == "agent" || h.noBoardChats(r)) {
 			if h.indexKick != nil {
 				h.indexKick() // an empty, unfiltered History: a first conversation may just not be indexed yet. On a machine with no history at all each opening of Chats kicks, at most one pass per kickGap (#6198)
 			}
@@ -90,6 +90,12 @@ func (h *HistoryHandler) ListSessions(w http.ResponseWriter, r *http.Request) {
 	var boardSessions []map[string]any
 	if (chatType == "all" || chatType == "group") && h.bs != nil {
 		boardSessions = h.boardHistoryRows(r, q.Get("q"), q.Get("date_from"), q.Get("date_to"))
+		var err error
+		boardSessions, err = h.filterBoardChatRows(r, boardSessions, params)
+		if err != nil {
+			errInternalServer(w, "could not read chat flags")
+			return
+		}
 	}
 
 	// ── Merge and return ──
@@ -173,6 +179,10 @@ func parseHistoryListQuery(q url.Values) (store.SessionListParams, string) {
 		MinDurationSec: optionalInt(q.Get("min_duration_sec")),
 		MaxDurationSec: optionalInt(q.Get("max_duration_sec")),
 		AgentName:      q.Get("agent_name"),
+		Starred:        q.Get("starred") == "1",
+		Archived:       q.Get("archived") == "1",
+		Active:         q.Get("active") == "1",
+		WithNotes:      q.Get("with_notes") == "1",
 	}
 
 	// Chat type filter: all, agent, group
@@ -200,7 +210,7 @@ func historyFiltered(params store.SessionListParams) bool {
 	return params.Search != "" || len(params.TagIDs) > 0 ||
 		len(params.SourceTypes) > 0 || params.DateFrom != "" || params.DateTo != "" ||
 		params.MinDurationSec != nil || params.MaxDurationSec != nil ||
-		params.AgentName != ""
+		params.AgentName != "" || params.Starred || params.Archived || params.Active || params.WithNotes
 }
 
 // agentHistoryRows are the agent sessions' rows.
@@ -209,6 +219,9 @@ func agentHistoryRows(sessions []store.SessionListItem) []map[string]any {
 	for _, s := range sessions {
 		rows = append(rows, map[string]any{
 			"session_id":         s.SessionID,
+			"starred":            s.Starred,
+			"archived":           s.Archived,
+			"active":             s.Active,
 			"source_type":        s.SourceType,
 			"first_timestamp":    ptr.Value(s.FirstTimestamp),
 			"last_timestamp":     ptr.Value(s.LastTimestamp),

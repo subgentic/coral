@@ -130,6 +130,7 @@ func cat(groups ...[]route) []route {
 //	subscribe, and /api/sessions/resolve (an agent finding itself by its process ids).
 //	The dashboard's POST subscribe stays (Interact).
 var routeTable = cat(
+	rules("*", TierNever, "/api/sessions/history/{id}/flags"), // Operator mailbox state is local only (#7809).
 	// ── explicit never rules ────────────────────────────────────────────
 	// First match wins, so a static route that a later parametric rule would otherwise
 	// swallow (for example /api/board/remotes vs /api/board/{project}) is pinned here.
@@ -175,6 +176,7 @@ var routeTable = cat(
 		"/api/sessions/{id}/changes",
 		"/api/sessions/{id}/changes.diff",
 		"/api/sessions/history",
+		"/api/sessions/history/counts",
 		"/api/sessions/history/search",
 		"/api/sessions/history/{id}",
 		"/api/sessions/history/{id}/agent-notes",
