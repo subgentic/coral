@@ -1,6 +1,6 @@
 // Settings at 200% text (#8277): every group, at 1280 and at 390 px with the text doubled (root font-size 32px), plus Network and Hub and Updates in hub mode.
 // In each pane no control is clipped by its own container, runs past the dialog's edge, or sits on top of another control; the pane never scrolls sideways.
-// Drives Chrome over CDP through agent_view_harness.js against an isolated dev server; run_cdp_suites.mjs finds it by name. A shot of each pane goes to CORAL_SCREENSHOT_DIR, else RUNNER_TEMP/out (what the gate uploads).
+// Drives Chrome over CDP through agent_view_harness.js against an isolated dev server; run_cdp_suites.mjs finds it by name. A shot of each pane goes to CORAL_SCREENSHOT_DIR, else RUNNER_TEMP/out/shots (what the gate uploads).
 const fs = require('node:fs');
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -40,9 +40,7 @@ const SCAN = `(() => {
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    // the shots go where the gate uploads from (RUNNER_TEMP/out) when no folder is named, so a run on a runner has its pictures
-    const shotDir = process.env.CORAL_SCREENSHOT_DIR || (process.env.RUNNER_TEMP ? `${process.env.RUNNER_TEMP}/out` : '');
-    const shot = async n => { const d = shotDir; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
+    const shot = require('./helpers/scene_shots')(Page);
     const findings = [];
     let allGroups = [];
     try {
@@ -70,10 +68,10 @@ const SCAN = `(() => {
                 await waitFor(`[...document.querySelectorAll('#settings-modal .settings-pane')].some(p => !p.hidden && p.dataset.group === ${JSON.stringify(g)})`, `${label}: the ${g} pane`, 10000);
                 if (hub) await ev(`(async () => { (await import((window.__coralStatic || '/static/') + 'cloud_settings.js')).applyCloudSettingsDialog(); return true; })()`);
                 const r = await ev(SCAN);
+                await shot(`settings-200-${label}-${g}`);
                 if (r.missing) { findings.push(`${label} ${g}: no pane shown`); continue; }
                 for (const k of ['sideways', 'beyond', 'clipped', 'overlap']) if (r[k].length) findings.push(`${label} ${g} ${k}: ${r[k].slice(0, 5).join('; ')}`);
                 if (process.env.WALK_LOG) fs.appendFileSync(process.env.WALK_LOG, `${label} ${g}: ${r.n} controls ${JSON.stringify(r)}\n`);
-                await shot(`settings-200-${label}-${g}`);
                 // the same pane with every disclosure open: what a person sees after opening Change password or the CLI paths
                 await ev(`[...document.querySelectorAll('#settings-modal .settings-pane:not([hidden]) details')].forEach(d => { d.open = true; }); true`);
                 const ro = await ev(SCAN);

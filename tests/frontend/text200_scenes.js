@@ -3,7 +3,6 @@
 // root font doubled and touch on: the page is not wider than the screen, no control runs off an edge, no text is cut without an ellipsis, every control is
 // 44 px, and text that is sized in rem/em grows with the root font (the CSS and the inline styles no longer use px font sizes: font_size_units.test.mjs).
 // Also the header's glyph buttons (the svg icons and the Chat/Terminal toggle) scale. Run against an isolated dev server.
-const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { SCAN } = require('./helpers/phone_scan'); // the page scan the phone suites share (#5273 moved it out of phone_layout_browser)
 const FONTS = stage => `(() => { const out = []; const vis = e => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden';
@@ -17,6 +16,8 @@ const GROUPS = ['tabs', 'drawers', 'dialogs', 'wide', 'light', 'surfaces'];
 module.exports = async function runScenes(group) {
     if (!GROUPS.includes(group)) throw new Error('text200_scenes: unknown group ' + JSON.stringify(group) + ', expected one of ' + GROUPS.join(', '));
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const shot = ['tabs', 'surfaces'].includes(group) || process.env.T200_SHOTS
+        ? require('./helpers/scene_shots')(Page, 'text200-' + group) : async () => {};
     // settle(ms): wait for the layout to stop moving before a scan measures its geometry (#4768). One shared copy
     // in helpers/wait.js; it is no worse than the old fixed settle-sleeps (caps at ms, never throws) and usually
     // far faster. The views and dialogs fill over frames with no completion event, so the scans below settle first.
@@ -51,7 +52,6 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 await ev(`document.documentElement.style.fontSize = '32px'; true`); await settle(700);
                 const r = await ev(SCAN); const grew = await ev(FONTS('b'));
                 if (check) { const bad = await ev(check); if (bad.length) problems.push(`${name}: ${bad.slice(0, 4).join('; ')}`); }
-                if (process.env.T200_SHOTS) { fs.mkdirSync(process.env.T200_SHOTS, { recursive: true }); fs.writeFileSync(`${process.env.T200_SHOTS}/${name.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
                 const off = await ev(`[...(window.__scanRoot ? document.querySelector(window.__scanRoot) : document.body).querySelectorAll('button, a[href], select, input:not([type=hidden])')].filter(e => { if (!e.getClientRects().length || getComputedStyle(e).visibility === 'hidden' || e.closest('.top-nav-tabs, .xterm, [data-scan-skip], .modal-content, #mobile-session-list')) return false; const b = e.getBoundingClientRect(); if (!(b.width > 0 && (b.right > innerWidth + 1 || b.left < -1))) return false; for (let p = e.parentElement; p && p !== document.body; p = p.parentElement) { const pr = p.getBoundingClientRect(); if (pr.width > 0 && (pr.right <= 1 || pr.left >= innerWidth - 1)) return false; } /* inside a drawer that is closed, off the screen by design */ for (let p = e.parentElement; p; p = p.parentElement) { const o = getComputedStyle(p); if (/(auto|scroll)/.test(o.overflowX) && p.scrollWidth > p.clientWidth + 1) return false; } return true; }).map(e => (e.id ? '#' + e.id : e.tagName.toLowerCase() + '.' + String(e.className).trim().split(/\\s+/).slice(0, 2).join('.')) + ' ' + Math.round(e.getBoundingClientRect().left) + '..' + Math.round(e.getBoundingClientRect().right) + ' "' + e.textContent.trim().slice(0, 16) + '"')`);
                 if (off.length) problems.push(`${name}: controls off the edge of the screen ${off.slice(0, 4).join('; ')}`);
                 const spill = await ev(`[...(window.__scanRoot ? document.querySelector(window.__scanRoot) : document.body).querySelectorAll('button, .btn, a.btn, summary, [role=tab]')].filter(e => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden' && e.scrollHeight > e.clientHeight + 8 && !/(auto|scroll)/.test(getComputedStyle(e).overflowY)).map(e => (e.id ? '#' + e.id : e.tagName.toLowerCase() + '.' + String(e.className).trim().split(/\\s+/).slice(0, 2).join('.')) + ' ' + e.scrollHeight + '>' + e.clientHeight + ' "' + e.textContent.trim().slice(0, 20) + '"')`);
@@ -72,6 +72,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 }
                 report.push(`${name}: ${r.missing ? 'SCENE MISSING' : `docOver=${r.docOver} wide=${r.nWide}${r.wide.length ? ' [' + r.wide.slice(0, 3).join('; ') + ']' : ''} clipped=${r.nClipped}${r.clipped.length ? ' [' + r.clipped.slice(0, 3).join('; ') + ']' : ''} small=${r.nSmall}${r.small.length ? ' [' + r.small.slice(0, 6).join('; ') + ']' : ''}`} | no-grow=${grew.length}${grew.length ? ' [' + [...new Set(grew)].slice(0, 8).join('; ') + ']' : ''}`);
             } catch (e) { report.push(`${name}: ERROR ${String(e.message).slice(0, 1400)}`); problems.push(`${name}: the probe itself failed: ${String(e.message).slice(0, 300)}`); }
+            await shot(name); // keep the scene at 200%, including one whose probe reported a problem
             await ev(`document.documentElement.style.fontSize = ''; true`);
         };
         if (group === 'tabs') {
@@ -177,7 +178,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(`window.selectLiveSession('phone-bot-with-a-long-name', 'claude', 'phone-bot-with-a-long-name-id', 'local'); true`); await settle(900);
             // Each glyph is tagged on the first pass and measured again by tag, so a button that moves into a menu at large text (Saved, #4510) is not compared against its neighbour.
             const gl = async (tag) => ev(`[...document.querySelectorAll('.terminal-header-btn svg, .top-bar-btn svg')].filter(e => e.getClientRects().length).map((e, i) => { if (${tag}) e.dataset.t200 = String(i); return [e.dataset.t200, Math.round(e.getBoundingClientRect().width * 10) / 10]; })`);
-            const first = await gl(true); const g16 = first.map(x => x[1]); await ev(`document.documentElement.style.fontSize = '32px'; true`); await settle(500); const at32 = new Map((await gl(false)).map(x => [x[0], x[1]])); const g32 = first.map(x => at32.get(x[0])).filter(w => w !== undefined); const g16m = first.filter(x => at32.has(x[0])).map(x => x[1]); await ev(`document.documentElement.style.fontSize = ''; true`);
+            const first = await gl(true); const g16 = first.map(x => x[1]); await ev(`document.documentElement.style.fontSize = '32px'; true`); await settle(500); const at32 = new Map((await gl(false)).map(x => [x[0], x[1]])); const g32 = first.map(x => at32.get(x[0])).filter(w => w !== undefined); const g16m = first.filter(x => at32.has(x[0])).map(x => x[1]); await shot('header glyph buttons'); await ev(`document.documentElement.style.fontSize = ''; true`);
             if (!g16m.length || g16m.some((w, i) => !(g32[i] / w >= 1.9))) problems.push(`header glyph buttons did not scale: ${JSON.stringify(g16)} -> ${JSON.stringify(g32)}`);
             report.push('HEADER GLYPHS ' + JSON.stringify(g16) + ' -> ' + JSON.stringify(g32));
             report.push('HEADER BUTTONS: ' + JSON.stringify(await ev(`[...document.querySelectorAll('.terminal-header button, .terminal-header-btn, .terminal-header a')].filter(e => e.getClientRects().length).map(e => ({ c: String(e.className).slice(0, 30), w: Math.round(e.getBoundingClientRect().width), h: Math.round(e.getBoundingClientRect().height), icon: (e.querySelector('.material-icons, svg') ? (parseFloat(getComputedStyle(e.querySelector('.material-icons') || e.querySelector('svg')).fontSize) || e.querySelector('svg').getBoundingClientRect().width) : null) }))`)));
