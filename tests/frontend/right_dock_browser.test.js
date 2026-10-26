@@ -71,7 +71,10 @@ const BASE = require('./test_base').BASE;
 
         console.log('3. Chats (no chat open) and the other pages: no sidebar at all; Saved for everything is its own page, which the top bar bookmark opens');
         await ev(`switchNavTab('history'); true`);
-        await waitFor(`getComputedStyle(document.getElementById('chats-empty-view')).display !== 'none'`, 'Chats');
+        // The board created above is a chat even with no indexed agent history (#7809, #7953).
+        const boardChat = `#group-table-view [data-on-click="board-open"][data-board="${BOARD}"]`;
+        await waitFor(`(() => { const list = document.getElementById('group-table-view'); return list.getClientRects().length > 0 && list.dataset.group.startsWith('history:') && !!document.querySelector(${JSON.stringify(boardChat)}); })()`, 'Chats list with the seeded board chat');
+        assert.equal(await ev(`document.querySelector(${JSON.stringify(boardChat)}).textContent.trim()`), BOARD, 'the board chat is in the Chats list');
         d = await dock();
         assert.equal(d.page, 'chats');
         assert.deepEqual(d.tabs, [], 'no tab on Chats: ' + JSON.stringify(d));
