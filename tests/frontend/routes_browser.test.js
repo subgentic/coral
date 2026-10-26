@@ -198,31 +198,33 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
             `${await url()} length ${lenP} -> ${await ev('history.length')}`);
         await Emulation.clearDeviceMetricsOverride();
 
-        console.log('9. A board: its page; a name from the URL is text, never markup');
+        console.log('9. A board: /board/<name> opens its team page\'s Messages tab (#8129); a name from the URL is text, never markup');
+        await ev(`localStorage.setItem('coral.board.view', 'chat'); true`); // the chat rows: the Board tab is the table by default
+        const TITLE = `(document.getElementById('team-page-title') || {}).textContent`;
         const board = 'routes-qa-3532';
         boards.push(board);
         await open(`/board/${board}`);
-        await until(`(document.getElementById('messageboard-project-badge') || {}).textContent === ${JSON.stringify(board)}`, 'the board');
-        check('/board/<name> opens the board', (await ev(shown('messageboard-view'))) && (await url()) === `/board/${board}`, await url());
+        await until(`${TITLE} === ${JSON.stringify(board)}`, 'the board');
+        check('/board/<name> opens the board on its team page, at /team/<name>/messages', (await ev(shown('team-page-view'))) && (await url()) === `/team/${board}/messages`, await url());
         // A #team-view=x link in a post is never a route (Security, #3532). Since #3542 it isn't a
         // link at all: board Markdown shows it as text with its target, and clicking that leaves
         // the board's page, hash and view as they are. (nav_unit covers the router ignoring a hash.)
         await api('POST', `/api/board/${board}/subscribe`, { subscriber_id: 'Routes QA', job_title: 'QA' });
         await api('POST', `/api/board/${board}/messages`, { subscriber_id: 'Routes QA', content: 'see [the team](#team-view=evil) here' });
         await open(`/board/${board}`);
-        const frag = `[...document.querySelectorAll('#messageboard-view .mb-message-body .blocked-link')].find(s => s.textContent === 'the team (#team-view=evil)')`;
+        const frag = `[...document.querySelectorAll('#team-page-view .mb-message-body .blocked-link')].find(s => s.textContent === 'the team (#team-view=evil)')`;
         await until(`!!(${frag})`, 'the posted link, as text');
-        check('a #team-view= link in a post is text, not a link', await ev(`![...document.querySelectorAll('#messageboard-view .mb-message-body a')].some(a => (a.getAttribute('href') || '').includes('team-view'))`), 'an anchor is left');
+        check('a #team-view= link in a post is text, not a link', await ev(`![...document.querySelectorAll('#team-page-view .mb-message-body a')].some(a => (a.getAttribute('href') || '').includes('team-view'))`), 'an anchor is left');
         await ev(`(${frag}).click(); true`);
         await new Promise(r => setTimeout(r, 300)); // sleep-ok: a negative check, nothing may react
-        const after = await ev(`({ path: location.pathname, hash: location.hash, board: ${shown('messageboard-view')}, team: !!(document.getElementById('team-center-view') && !document.getElementById('team-center-view').hidden) })`);
-        check('a #team-view= link in a post drives nothing', after.path === `/board/${board}` && !after.hash && after.board && !after.team, JSON.stringify(after));
+        const after = await ev(`({ path: location.pathname, hash: location.hash, board: ${shown('team-page-view')}, team: !!(document.getElementById('team-center-view') && !document.getElementById('team-center-view').hidden) })`);
+        check('a #team-view= link in a post drives nothing', after.path === `/team/${board}/messages` && !after.hash && after.board && !after.team, JSON.stringify(after));
 
         // A dashboard page link in a post (#3542 keeps it, rebuilt from the parsed route): a plain
         // click goes through the router, with no page load, and Back returns to the board.
         await api('POST', `/api/board/${board}/messages`, { subscriber_id: 'Routes QA', content: 'open [the chats](/chats?q=routeclick&x=1) now' });
         await open(`/board/${board}`);
-        const routeLink = `[...document.querySelectorAll('#messageboard-view .mb-message-body a[data-route]')].find(a => a.textContent === 'the chats')`;
+        const routeLink = `[...document.querySelectorAll('#team-page-view .mb-message-body a[data-route]')].find(a => a.textContent === 'the chats')`;
         await until(`!!(${routeLink})`, 'the route link');
         const linkHref = await ev(`(${routeLink}).getAttribute('href')`);
         await ev(`window.__samePage = true; (${routeLink}).dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 })); true`);
@@ -231,22 +233,22 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         const rc = await ev(`({ url: location.pathname + location.search, same: window.__samePage === true, box: (document.getElementById('history-search') || {}).value })`);
         check('a page link in a post opens it through the router (no page load, its own query only)', linkHref === '/chats?q=routeclick' && rc.url === '/chats?q=routeclick' && rc.same && rc.box === 'routeclick', JSON.stringify({ linkHref, ...rc }));
         await ev('history.back(); true');
-        await atUrl(`/board/${board}`);
-        check('and Back returns to the board', (await url()) === `/board/${board}` && (await ev('window.__samePage === true')), await url());
+        await atUrl(`/team/${board}/messages`);
+        check('and Back returns to the board', (await url()) === `/team/${board}/messages` && (await ev('window.__samePage === true')), await url());
 
         // "../../api" is a legal name: encoded, it stays one segment under /api/board/.
         const climb = '../../api';
         boards.push(climb);
         await open(`/board/${encodeURIComponent(climb)}`);
-        await until(`(document.getElementById('messageboard-project-badge') || {}).textContent === ${JSON.stringify(climb)}`, 'the ../../api board');
+        await until(`${TITLE} === ${JSON.stringify(climb)}`, 'the ../../api board');
         const reqs = await ev(`performance.getEntriesByType('resource').map(r => new URL(r.name).pathname).filter(p => p.startsWith('/api/'))`);
         const outside = reqs.filter(p => /^\/api\/(subscribe|messages|api)\b/.test(p));
         check('a name with ../ stays inside /api/board/', outside.length === 0 && reqs.some(p => p.startsWith('/api/board/..%2F..%2Fapi')), JSON.stringify(outside.length ? outside : reqs.filter(p => p.startsWith('/api/board/')).slice(0, 4)));
         const evil = '<img src=x onerror="window.__routesPwn=1">';
         boards.push(evil);
         await open(`/board/${encodeURIComponent(evil)}`);
-        await until(`(document.getElementById('messageboard-project-badge') || {}).textContent === ${JSON.stringify(evil)}`, 'the markup-named board');
-        const xss = await ev(`({ text: document.getElementById('messageboard-project-badge').textContent, imgs: document.querySelectorAll('#messageboard-view img[src="x"], #messageboard-project-badge img').length, pwn: window.__routesPwn === 1 })`);
+        await until(`${TITLE} === ${JSON.stringify(evil)}`, 'the markup-named board');
+        const xss = await ev(`({ text: document.getElementById('team-page-title').textContent, imgs: document.querySelectorAll('#team-page-view img[src="x"], #team-page-title img').length, pwn: window.__routesPwn === 1 })`);
         check('a markup name is shown as text', xss.text === evil && xss.imgs === 0 && !xss.pwn, JSON.stringify(xss));
 
         console.log('10. The pop-out keeps its URL');
