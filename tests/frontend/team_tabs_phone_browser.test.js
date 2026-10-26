@@ -1,8 +1,8 @@
-// The team page's tab strip on a phone (#8149): the strip scrolls sideways, and the selected tab is scrolled into view when it is chosen; the counts arrive after that and widen the tabs before it, so
+// The team page's tab strip on a phone (#8149; since #8648 Artifacts, Knowledge and Settings are behind More, so the strip holds Goals, Board, Tasks and Agents and More): the strip scrolls sideways when the counts widen it, and the selected tab is scrolled into view when it is chosen; the counts arrive after that and widen the tabs before it, so
 // a selected tab far along the strip ended half out of view ("Ar", cut at the edge). It is brought back into view when a count changes. 390 px, real seeded team, the counts' reads stubbed wide.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
-const { install: installTP, seed, openTeam } = require('./helpers/team_page');
+const { install: installTP, seed, openTeam, goTab } = require('./helpers/team_page');
 const BASE = require('./test_base').BASE;
 const { removeBoards } = require('./helpers/board_cleanup');
 const TEAM = `qa-tabs-${Date.now() % 100000}`;
@@ -28,14 +28,17 @@ const TEAM = `qa-tabs-${Date.now() % 100000}`;
             } return out; })()`);
         assert.ok(made.every(x => x < 300), 'the task with 123 artifacts was made: ' + JSON.stringify(made));
         await openTeam(ev, waitFor, TEAM); await settle(700);
-        // the last tabs: a count on each tab before them widens the strip after the scroll
-        for (const name of ['Artifacts', 'Knowledge', 'Settings']) {
-            await ev(`(() => { const t = window.__tp.tabs().find(x => window.__tp.tabLabel(x) === ${JSON.stringify(name)}); t.click(); return true; })()`);
+        // the row's last tabs: a count on each tab before them widens the strip after the scroll; the tabs behind More are chosen from its menu, where More is the one in the strip
+        for (const name of ['Board', 'Tasks', 'Agents', 'Artifacts', 'Settings']) {
+            await goTab(ev, settle, name);
             await settle(900);
-            const r = await ev(`(() => { const strip = document.getElementById('team-tabs'), sel = strip.querySelector('[aria-selected="true"]'); const a = strip.getBoundingClientRect(), b = sel.getBoundingClientRect(); return { name: sel.textContent.trim(), left: Math.round(b.left - a.left), right: Math.round(a.right - b.right), strip: Math.round(a.width) }; })()`);
-            if (name === 'Artifacts') assert.match(r.name, /114|1\d\d/, 'the stubbed list gave the tab its count: ' + JSON.stringify(r));
-            assert.ok(r.left >= -1 && r.right >= -1, `${name}: the selected tab is wholly inside the strip: ` + JSON.stringify(r));
+            const r = await ev(`(() => { const strip = document.getElementById('team-tabs'), sel = [...strip.querySelectorAll('[aria-selected="true"]')].find(t => t.getClientRects().length) || document.getElementById('team-tab-more'); const a = strip.getBoundingClientRect(), b = sel.getBoundingClientRect(); const more = document.getElementById('team-tab-more').getBoundingClientRect(); return { name: sel.textContent.trim(), left: Math.round(b.left - a.left), right: Math.round(innerWidth - b.right), strip: Math.round(a.width), moreIn: more.left >= 0 && more.right <= innerWidth + 1 }; })()`);
+            assert.ok(r.left >= -1 && r.right >= -1 && r.moreIn, `${name}: the selected tab (or More, for a tab behind it) is wholly inside the window: ` + JSON.stringify(r));
         }
+        // the Artifacts tab's count (three digits, from its list) is on its item in the More menu
+        await ev(`document.getElementById('team-tab-more').click(); true`); await settle(300);
+        const item = await ev(`document.querySelector('#team-tabs-more-menu [data-tab="artifacts"]').textContent.replace(/\\s+/g, ' ').trim()`);
+        assert.match(item, /Artifacts\s*1\d\d/, 'the stubbed list gave the Artifacts item its count: ' + item);
         console.log('PASS the selected team tab stays wholly in view on a phone after the counts arrive');
     } finally { await removeBoards(ev, [TEAM]).catch(() => { }); await client.close(); }
 })().catch(e => { console.error('FAIL', e); process.exit(1); });

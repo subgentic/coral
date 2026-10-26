@@ -27,7 +27,7 @@ const TEAM = `qa-design-${Date.now() % 100000}`;
 
             await S.run(`${label}: item 7, no tab has a badge at zero (Artifacts has none, Goals and Tasks show their counts)`, async () => {
                 await goTab(ev, settle, 'Artifacts'); await settle(500);
-                const tabs = await ev(`window.__tp.tabs().map(t => [window.__tp.tabLabel(t), window.__na.name(t)])`);
+                const tabs = await ev(`window.__tp.allTabs().map(t => [window.__tp.tabLabel(t), window.__na.name(t)])`);
                 const names = Object.fromEntries(tabs);
                 for (const [k, v] of tabs) assert.equal(/\s0$/.test(v), false, `${k} shows a badge at zero: ${JSON.stringify(v)}`);
                 assert.equal(names.Artifacts, 'Artifacts', `Artifacts with nothing has no badge (${JSON.stringify(names.Artifacts)})`);

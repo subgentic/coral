@@ -37,7 +37,7 @@ const TEAM = `qa-agents-${Date.now() % 100000}`;
                 assert.equal(await ev(`!!window.__tp.find('button', /^Refresh$/i)`), false, 'no Refresh button');
                 const rows = await ev(`window.__tp.rows()`); assert.ok(await ev(`window.__tp.table().querySelector('.dt-primary').getAttribute('aria-label') === 'Orchestrator'`), `the Orchestrator is first (${JSON.stringify(rows.map(r => r.slice(0, 20)))})`);
                 await goTab(ev, settle, 'Knowledge'); await settle(500);
-                assert.equal(await ev(`(() => { const t = window.__tp.tabs().find(x => window.__tp.tabLabel(x) === 'Knowledge'); return t ? window.__na.name(t) : null; })()`), 'Knowledge', 'the tab carries no 0');
+                assert.equal(await ev(`(() => { const t = window.__tp.allTabs().find(x => window.__tp.tabLabel(x) === 'Knowledge'); return t ? window.__na.name(t) : null; })()`), 'Knowledge', 'the tab carries no 0');
                 await goTab(ev, settle, 'Agents'); await settle(300);
             });
             await S.run(`${label}: a group named "Show agents that are" holds the status chips with counts, All pressed`, async () => {

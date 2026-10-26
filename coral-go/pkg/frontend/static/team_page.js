@@ -18,6 +18,7 @@ const { closeDetailPane } = await importOnce('./detail_pane.js'); // a lazy modu
 const { el } = await importOnce('./team_table.js');
 const { quietFocus } = await importOnce('./quiet_focus.js');
 
+const PHONE_MORE = ['artifacts', 'knowledge', 'settings']; // the tabs a phone puts behind its More menu (CSS hides their tabs under 761 px)
 const LABEL = { goals: 'Goals', messages: 'Board', tasks: 'Tasks', agents: 'Agents', artifacts: 'Artifacts', knowledge: 'Knowledge', settings: 'Settings' };
 const S = { team: '', tab: 'goals', item: null, counts: {}, built: false, countSeq: 0, navSeq: 0, noGoal: false }; // noGoal: the next Tasks tab opens filtered to the tasks that serve no goal (the Goals table's last row, #7717)
 const $ = (id) => document.getElementById(id);
@@ -37,10 +38,11 @@ function buildOnce() {
         b.addEventListener('click', () => { goTab(t, { focus: false, user: true }); });
         tabs.append(b);
     }
+    buildTabsMore(tabs);
     tabs.addEventListener('scroll', drawTabEdges, { passive: true });
     window.addEventListener('resize', drawTabEdges);
     tabs.addEventListener('keydown', (e) => {
-        const list = [...tabs.querySelectorAll('[role=tab]')], i = list.indexOf(document.activeElement);
+        const list = [...tabs.querySelectorAll('[role=tab]')].filter(b => b.getClientRects().length), i = list.indexOf(document.activeElement); // a phone's tabs behind More are not in the row
         if (i < 0) return;
         const to = { ArrowRight: (i + 1) % list.length, ArrowLeft: (i - 1 + list.length) % list.length, Home: 0, End: list.length - 1 }[e.key];
         if (to === undefined) return;
@@ -53,6 +55,42 @@ function buildOnce() {
     buildMore();
     // A click or a tap that opens a page or the pane puts the focus on its heading by script: no ring for a pointer, the ring for a key (the dialogs' rule, quiet_focus.js).
     $('team-page-view').addEventListener('click', () => quietFocus($('team-page-view')), true);
+}
+
+/** A phone's tab row: Goals, Board, Tasks and Agents, then More (Artifacts, Knowledge, Settings behind it): the row never scrolls sideways (the audit's point 5, #8572). The More button sits beside the tab list, not in it (it is a menu button, not a tab); on a desktop it is not drawn. */
+function buildTabsMore(tabs) {
+    const row = el('div', 'team-tabs-row'); row.id = 'team-tabs-row';
+    tabs.replaceWith(row); row.append(tabs);
+    const b = el('button', 'team-tab team-tab-more'); b.type = 'button'; b.id = 'team-tab-more';
+    b.setAttribute('aria-haspopup', 'menu'); b.setAttribute('aria-expanded', 'false'); b.setAttribute('aria-controls', 'team-tabs-more-menu'); b.setAttribute('aria-label', 'More tabs');
+    b.append(el('span', 'team-tab-label', 'More'));
+    const menu = el('div', 'team-more-menu team-tabs-more-menu'); menu.id = 'team-tabs-more-menu'; menu.hidden = true; menu.setAttribute('role', 'menu'); menu.setAttribute('aria-label', 'More tabs');
+    for (const t of PHONE_MORE) {
+        const m = el('button', null); m.type = 'button'; m.setAttribute('role', 'menuitem'); m.dataset.tab = t;
+        m.append(el('span', 'team-more-label', LABEL[t]), el('span', 'team-tab-count'));
+        menu.append(m);
+    }
+    row.append(b, menu);
+    b.addEventListener('click', async () => { syncTabsMore(); (await importOnce('./menu_button.js')).toggleMenu(b); }); // its keys (arrows, Escape, Tab) and outside click are the shared menu's
+    menu.addEventListener('click', (e) => {
+        const m = e.target.closest('[data-tab]'); if (!m) return;
+        importOnce('./menu_button.js').then(x => x.closeMenus());
+        goTab(m.dataset.tab, { focus: false, user: true }).then(() => $('team-tab-more')?.focus()); // the tab is not on a phone's row: the keyboard stays on More
+    });
+}
+
+/** More follows the page: it is the current tab (underlined, named for it for a screen reader; its words stay "More", so the strip keeps its width from tab to tab) while one of its tabs is open, and its items carry the counts of their tabs. */
+function syncTabsMore() {
+    const b = $('team-tab-more'); if (!b) return;
+    const here = PHONE_MORE.includes(S.tab) && !S.item ? S.tab : '';
+    b.classList.toggle('is-current', !!here);
+    b.setAttribute('aria-label', here ? `${LABEL[here]}, more tabs` : 'More tabs');
+    for (const m of document.querySelectorAll('#team-tabs-more-menu [data-tab]')) {
+        const c = document.querySelector(`#team-tab-${m.dataset.tab} .team-tab-count`), mine = m.querySelector('.team-tab-count');
+        mine.textContent = c ? c.textContent : ''; mine.hidden = !c || c.hidden || !c.textContent;
+        m.setAttribute('aria-current', m.dataset.tab === here ? 'true' : 'false');
+        if (m.dataset.tab !== here) m.removeAttribute('aria-current');
+    }
 }
 
 /** The folder the team works in: where an agent added to it starts. */
@@ -187,6 +225,7 @@ function markTab(tab) {
         panel(t).hidden = !on;
     }
     $('team-panel-item').hidden = true;
+    syncTabsMore();
     $(`team-tab-${tab}`)?.scrollIntoView({ inline: 'nearest', block: 'nearest' }); // the selected tab is in view inside the strip (on load and on change); the fade's room is the strip's scroll padding
     drawTabEdges();
 }
@@ -203,7 +242,7 @@ export async function goTab(tab, { focus = false, user = false, item = 0, replac
     adoptBoardActions();
     if (user || item) note(keyRoute('team', S.team, tab, item || null), { replace });
     await fillTab(tab, item);
-    if (focus) $(`team-tab-${tab}`).focus();
+    if (focus) { const b = $(`team-tab-${tab}`); (b.getClientRects().length ? b : $('team-tab-more')).focus(); } // a tab behind More is not in the row
 }
 
 const teamHooks = () => ({

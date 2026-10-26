@@ -33,21 +33,21 @@ const BROKEN = (sel) => `(() => { const c = document.createElement('canvas').get
             await ev(`document.documentElement.style.fontSize = '${font}px'; true`);
             await openTeam(ev, waitFor, TEAM).catch(() => {}); await settle(1500);
             await S.run(`${label}: every tab is reachable in the strip: the selected tab is in view on load and after each press, a fade says there is more, and the page does not scroll sideways`, async () => {
-                const inView = (name) => ev(`(() => { const t = window.__tp.tabs().find(x => window.__tp.tabLabel(x) === ${JSON.stringify(name)}); const b = t.getBoundingClientRect(), s = window.__tp.tablist().getBoundingClientRect(); return b.left >= s.left - 1 && b.right <= s.right + 1 && b.left >= -1 && b.right <= innerWidth + 1; })()`);
-                const r = await ev(`(() => { const t = window.__tp.tablist(); return { over: t.scrollWidth - t.clientWidth, more: t.dataset.more || '', n: window.__tp.tabs().length, page: document.documentElement.scrollWidth - innerWidth, h: Math.round(t.getBoundingClientRect().height) }; })()`);
-                assert.equal(r.n, 7, 'seven tabs'); assert.ok(r.page <= 1, `the page does not scroll sideways (${r.page})`);
+                const inView = (name) => ev(`(() => { const t = window.__tp.tabs().find(x => window.__tp.tabLabel(x) === ${JSON.stringify(name)}) || document.getElementById('team-tab-more'); const b = t.getBoundingClientRect(), s = t.id === 'team-tab-more' ? { left: 0, right: innerWidth } : window.__tp.tablist().getBoundingClientRect(); /* a phone's tab behind More: More is the one in view, beside the strip */ return b.left >= s.left - 1 && b.right <= s.right + 1 && b.left >= -1 && b.right <= innerWidth + 1; })()`);
+                const r = await ev(`(() => { const t = window.__tp.tablist(); return { over: t.scrollWidth - t.clientWidth, more: t.dataset.more || '', n: window.__tp.allTabs().length, shown: window.__tp.tabs().length, page: document.documentElement.scrollWidth - innerWidth, h: Math.round(t.getBoundingClientRect().height) }; })()`);
+                assert.equal(r.n, 7, 'seven tabs'); assert.equal(r.shown, mobile ? 4 : 7, mobile ? 'four tabs in the row, the rest behind More' : 'every tab in the row'); assert.ok(r.page <= 1, `the page does not scroll sideways (${r.page})`);
                 if (r.over > 1) assert.ok(r.more, 'the strip scrolls, and a fade at its edge says there is more');
                 assert.equal(await inView('Goals'), true, 'the selected tab (Goals) is in view on load');
                 for (const name of ['Artifacts', 'Knowledge', 'Settings', 'Tasks']) {
                     await goTab(ev, settle, name); await settle(300);
                     assert.equal(await inView(name), true, `${name} is in view after it is pressed`);
-                    assert.equal(await ev(`window.__tp.tabs().find(x => window.__tp.tabLabel(x) === ${JSON.stringify(name)}).getAttribute('aria-selected')`), 'true');
+                    assert.equal(await ev(`window.__tp.allTabs().find(x => window.__tp.tabLabel(x) === ${JSON.stringify(name)}).getAttribute('aria-selected')`), 'true');
                 }
                 assert.equal(await ev(`Math.round(window.__tp.tablist().getBoundingClientRect().height)`), r.h, 'the strip keeps its height from tab to tab');
             });
             await S.run(`${label}: the Knowledge tab shows its count without being visited`, async () => {
                 await goTab(ev, settle, 'Goals'); await settle(300);
-                await waitFor(`(() => { const t = window.__tp.tabs().find(x => window.__tp.tabLabel(x) === 'Knowledge'); return !!t && /Knowledge\\s*3/.test(window.__na.name(t)); })()`, 'Knowledge 3 on the tab', 8000);
+                await waitFor(`(() => { const t = window.__tp.allTabs().find(x => window.__tp.tabLabel(x) === 'Knowledge'); return !!t && /Knowledge\\s*3/.test(window.__na.name(t)); })()`, 'Knowledge 3 on the tab', 8000);
             });
             await S.run(`${label}: Settings: no word is broken, the rows stack (the control under its label) and Working mode is reachable`, async () => {
                 await goTab(ev, settle, 'Settings'); await settle(900);

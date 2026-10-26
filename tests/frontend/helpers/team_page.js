@@ -9,6 +9,8 @@ const SOURCE = `(() => {
     const h1 = () => { const m = main(); return m ? [...m.querySelectorAll('h1')].find(A.vis) || null : null; };
     const tablist = () => { const m = main(); return m ? [...m.querySelectorAll('[role=tablist]')].find(t => /^Team$/i.test(A.name(t))) || null : null; };
     const tabs = () => { const t = tablist(); return t ? [...t.querySelectorAll('[role=tab]')].filter(A.vis) : []; };
+    // every tab of the list, including the ones a phone puts behind its More menu (Artifacts, Knowledge, Settings: display none under 761 px)
+    const allTabs = () => { const t = tablist(); return t ? [...t.querySelectorAll('[role=tab]')] : []; };
     const tabLabel = e => A.name(e).replace(/\\s*\\d[\\d,]*\\s*$/, '').trim();
     const find = (sel, rx) => { const m = main(); return m ? [...m.querySelectorAll(sel)].filter(A.vis).find(e => rx.test(A.name(e))) || null : null; };
     // On a phone the list the sidebar holds is the Agents screen (the bottom bar's Agents tab), not an aside.
@@ -26,7 +28,7 @@ const SOURCE = `(() => {
         const m = main(); const s = m && [...m.querySelectorAll('select')].filter(A.vis).find(x => rx.test(A.name(x))); return s ? [...s.options].map(o => ({ name: o.textContent.replace(/\\s+/g, ' ').trim(), pressed: String(o.selected) })) : null; };
     // Every write the page makes after record(): method, path and body, so a suite can say "this click sent something".
     const record = () => { if (window.__writes) return true; window.__writes = []; const R = window.fetch.bind(window); window.fetch = (u, o = {}) => { const m = String((o && o.method) || 'GET').toUpperCase(); if (m !== 'GET') window.__writes.push({ m, p: new URL(String(u), location.origin).pathname, b: String((o && o.body) || '') }); return R(u, o); }; return true; };
-    window.__tp = { page, h1, tablist, tabs, tabLabel, find, sidebar, pane, box, table, headers, rows, group, chips, record };
+    window.__tp = { page, h1, tablist, tabs, allTabs, tabLabel, find, sidebar, pane, box, table, headers, rows, group, chips, record };
     return true;
 })()`;
 const install = async ev => { await na.install(ev); return ev(SOURCE); };
@@ -61,7 +63,7 @@ async function openTeam(ev, waitFor, team) {
     await ev(`(() => { const side = window.__tp.sidebar() || document; const b = [...side.querySelectorAll('button, a, [role=button]')].filter(window.__na.vis).find(x => window.__na.name(x).replace(/^Open team\\s+/i, '').startsWith(${JSON.stringify(team)}) && !/^(Collapse|Expand)/i.test(window.__na.name(x))); if (!b) return false; b.click(); return true; })()`);
     await waitFor(`!!window.__tp.h1() && window.__tp.h1().textContent.includes(${JSON.stringify(team)})`, `the team page of ${team} (a main region with the team's h1)`, 6000);
 }
-const goTab = async (ev, settle, name) => { await ev(`(() => { const t = window.__tp.tabs().find(x => window.__tp.tabLabel(x) === ${JSON.stringify(name)}); if (!t) return false; t.click(); return true; })()`); await settle(300); };
+const goTab = async (ev, settle, name) => { await ev(`(() => { const t = window.__tp.tabs().find(x => window.__tp.tabLabel(x) === ${JSON.stringify(name)}); if (t) { t.click(); return true; } const li = [...document.querySelectorAll('#team-tabs-more-menu [role=menuitem]')].find(i => i.textContent.trim().startsWith(${JSON.stringify(name)})); if (!li) return false; li.click(); return true; })()`); await settle(300); }; // a phone's tabs behind More (Artifacts, Knowledge, Settings) are chosen from its menu: the suite taps its item
 const rect = ev => ev(`(() => { const h = window.__tp.h1(), t = window.__tp.tablist(); return { h1: window.__tp.box(h), tabs: window.__tp.box(t) }; })()`);
 // The seeded members have no terminal, so the board's status calls them Ended (offline, #8271) and the Agents tab draws no Remind for them. A suite about Remind's place on a row needs them up: the board's /status answer is read
 // as it is, the first offline member made available and the others waiting for input (a team with someone to remind, two statuses and a health icon).
