@@ -155,7 +155,7 @@ export function mountSettingsView(host, spec) {
         if (help && help.text) helpBits.push(help.text);
         if (field.apply === 'now') helpBits.push('Applies immediately.');
         if (helpBits.length || (help && help.more)) {
-            helpEl = node('p', 'sv-help'); helpEl.id = `${id}-h`;
+            helpEl = node(helpBits.length ? 'p' : 'span', helpBits.length ? 'sv-help' : 'sv-help sv-help-inline'); helpEl.id = `${id}-h`; // no sentence: the Learn more follows the label on its line
             helpEl.append(node('span', 'sv-help-text', helpBits.join(' ')));
             if (help && help.more) {
                 const more = node('div', 'sv-more'); more.id = `${id}-m`; more.hidden = true; more.append(...paragraphs(help.more));
