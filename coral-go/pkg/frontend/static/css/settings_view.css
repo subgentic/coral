@@ -29,9 +29,9 @@
 .sv-control { display: flex; align-items: center; gap: 8px; min-width: 0; justify-content: flex-end; }
 .sv-form .sv-control { justify-content: flex-start; }
 .sv-control > .sv-input, .sv-control > .sv-custom, .sv-control > .sv-choices { flex: 1; min-width: 0; }
-.sv-input { box-sizing: border-box; width: 100%; min-height: var(--sv-control-height); font: inherit; font-size: var(--fs-md); }
+.sv-input { box-sizing: border-box; width: 100%; min-height: var(--sv-control-height); font: inherit; font-size: var(--fs-md); background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--control-border); border-radius: var(--radius-lg); } /* the page's input look: the toolbar's search field's, in both themes */
 .sv-textarea { min-height: 6rem; resize: vertical; }
-input.sv-input, .sv-textarea { padding: 6px 10px; }
+.sv input.sv-input, .sv .sv-textarea { padding: 6px 10px; }
 .sv-unit { flex: none; font-size: var(--sv-help-size); color: var(--sv-help-color); }
 .sv-input[aria-invalid="true"] { border-color: var(--sv-error-color); }
 .sv-error { grid-column: 1 / -1; margin: 4px 0 0; font-size: var(--sv-help-size); font-weight: var(--sv-label-weight); color: var(--sv-error-color); }
@@ -59,6 +59,7 @@ input.sv-input, .sv-textarea { padding: 6px 10px; }
 .sv-status { font-size: var(--sv-status-size); font-weight: 500; color: var(--text-secondary); min-width: 0; overflow-wrap: anywhere; }
 .sv-status.is-error { color: var(--sv-error-color); }
 .sv-bar-buttons { display: flex; align-items: center; gap: 8px; flex: none; }
+.sv-bar .btn:disabled { opacity: .5; cursor: not-allowed; } /* nothing changed: both are off, the status says why */
 
 /* a touch screen: every control is a 44 px target */
 @media (pointer: coarse) {
