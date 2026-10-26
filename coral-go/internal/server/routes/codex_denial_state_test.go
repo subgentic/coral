@@ -25,6 +25,7 @@ import (
 // bookkeeping, a message and event_msg/turn_aborted, with no later hook, and there is no refusal that lets the turn go on. So the cases below are: the dialog open (nothing written), the abort
 // tail, and any later record of the turn closing the request.
 type codexRig struct {
+	server  *httptest.Server
 	mock    *mockSessionTerminal
 	t       *testing.T
 	h       *SessionsHandler
@@ -47,7 +48,9 @@ func newCodexRig(t *testing.T) *codexRig {
 	tok := agentToken(t, h, sid, name)
 	dir := filepath.Join(codexHome, "sessions", "2026", "10", "23")
 	require.NoError(t, os.MkdirAll(dir, 0o700))
-	r := &codexRig{mock: mock, t: t, h: h, sid: sid, name: name, rollout: filepath.Join(dir, "rollout-2026-10-23T10-00-00-"+sid+".jsonl")}
+	r := &codexRig{server: server, mock: mock, t: t, h: h, sid: sid, name: name, rollout: filepath.Join(dir, "rollout-2026-10-23T10-00-00-"+sid+".jsonl")}
+	// These historical dialog/denial captures used the person as reviewer.
+	require.NoError(t, os.WriteFile(r.rollout, []byte(`{"type":"turn_context","payload":{"approval_policy":"on-request","approvals_reviewer":"user"}}`+"\n"), 0600))
 	r.post = func(body string) {
 		req, _ := http.NewRequest("POST", server.URL+"/api/sessions/live/cx/events", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
@@ -69,6 +72,10 @@ func (r *codexRig) line(kind, payloadType string, offset time.Duration) {
 	ts := time.Now().UTC().Add(offset).Format(time.RFC3339Nano)
 	_, err = f.WriteString(`{"timestamp":"` + ts + `","type":"` + kind + `","payload":{"type":"` + payloadType + `"}}` + "\n")
 	require.NoError(r.t, err)
+	if kind == "event_msg" && payloadType == "task_started" {
+		_, err = f.WriteString(`{"type":"turn_context","payload":{"approval_policy":"on-request","approvals_reviewer":"user"}}` + "\n")
+		require.NoError(r.t, err)
+	}
 }
 
 func (r *codexRig) needsInput() bool {
