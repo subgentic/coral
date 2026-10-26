@@ -384,19 +384,18 @@ function openSavedPage(id) {
 /** A page was opened: the keyboard and a screen reader start at its heading, not on the body. */
 function focusTitle(host) { foldWayBack(host, '.inbox-phone-back', '.wf-item-title'); const h = host.querySelector('.wf-item-title'); if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); } }
 
-/** Back from a page: the focus goes to the row it came from (in the table, or in the list on a phone), else to the table's title. */
-function focusCameFrom(was, inList) {
+/** Back from a page: the focus goes to the row it came from in the table (a phone's list is that table too), else to the table's title. */
+function focusCameFrom(was) {
     if (!was) return;
-    const root = inList ? document.querySelector('.sidebar-pane[data-pane="hub-inbox"]') : $('group-table-view');
+    const root = $('group-table-view');
     const id = CSS.escape(String(was.id));
-    const sel = inList ? (was.kind === 'task' ? `.row-btn[data-row-key="${CSS.escape('t:' + was.project + '#' + was.id)}"]` : `.row-btn[data-id="${id}"]`) : (was.kind === 'task' ? `.dt-primary[data-task-id="${id}"]` : `.dt-primary[data-id="${id}"]`);
-    const row = root && root.querySelector(sel);
-    if (row) row.focus({ preventScroll: true }); else if (!inList) $('group-table-title')?.focus({ preventScroll: true });
+    const row = root && root.querySelector(was.kind === 'task' ? `.dt-primary[data-task-id="${id}"]` : `.dt-primary[data-id="${id}"]`);
+    if (row) row.focus({ preventScroll: true }); else $('group-table-title')?.focus({ preventScroll: true });
 }
 
 function sayLive(text) { const live = $('inbox-live'); if (live) { const s = document.createElement('span'); s.textContent = text; live.replaceChildren(s); } }
 
-/** Leave a page for its group's table (a phone: for the list). */
+/** Leave a page for its group's table (a phone's table has the folders' select on top). */
 function closePage(openTable = true, focusBack = false) {
     const was = page, g = page ? (page.kind === 'task' ? 'tasks' : 'saved') : group;
     page = null;
@@ -405,7 +404,7 @@ function closePage(openTable = true, focusBack = false) {
     $('inbox-view')?.removeAttribute('data-phone-item');
     renderInboxNav(true);
     if (openTable) openGroupTable('hub-inbox', g);
-    if (focusBack) focusCameFrom(was, !openTable);
+    if (focusBack) focusCameFrom(was);
 }
 
 // ── The tab ──────────────────────────────────────────────────────────────
@@ -464,5 +463,5 @@ registerActions({
     },
     'inbox-goal-open': el => { const board = textOf(el.dataset.board), id = Number(el.dataset.goalId); if (board && id) importOnce('./task_goals.js').then(m => m.openGoalOnTeamPage(board, id)).catch(() => {}); },
     'inbox-phone-back': () => closePage(true, true),
-    'inbox-back': () => { const was = page, g = was ? (was.kind === 'task' ? 'tasks' : 'saved') : group; closePage(false); openGroupTable('hub-inbox', g); focusCameFrom(was, false); }, // the link back to the group's table (on a phone too, as the shared back link did), with the focus on the row it came from
+    'inbox-back': () => { const was = page, g = was ? (was.kind === 'task' ? 'tasks' : 'saved') : group; closePage(false); openGroupTable('hub-inbox', g); focusCameFrom(was); }, // the link back to the group's table (on a phone too, as the shared back link did), with the focus on the row it came from
 });
