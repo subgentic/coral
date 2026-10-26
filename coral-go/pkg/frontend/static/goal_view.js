@@ -130,7 +130,9 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
             const row = el('div', 'goal-back-row');
             row.append(main.querySelector('.goals-back'), link); main.append(row);
         }
-        const h = el('h2', 'goals-detail-title', g.title); h.tabIndex = -1; h.id = 'goals-detail-title'; main.append(h);
+        const h = el('h2', 'goals-detail-title', g.title); h.tabIndex = -1; h.id = 'goals-detail-title';
+        const backRow = main.querySelector(':scope > .goal-back-row');
+        (backRow || main).append(h); // with the team link the title is in the way-back row: a phone puts the back beside it and the link under (team_page.css), as on the task page
         foldWayBack(main, '.goals-back', '.goals-detail-title');
         const line = el('div', 'goals-detail-line'); line.append(stateChip(g));
         const meta = W.driverLine(g.driver, whenText(g.updatedAt)); if (meta) line.append(el('span', 'goal-card-meta', meta));
