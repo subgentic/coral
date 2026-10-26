@@ -88,7 +88,8 @@ export function dataTable(cfg) {
     const columns = cfg.columns, sel = cfg.selectable || null, ctx = cfg.ctx || {};
     const foldKind = cfg.fold || 'column', foldAt = cfg.foldAt || 40;
     if (sel && sel.contextKey !== undefined && st.ctx !== String(sel.contextKey)) { st.selected.clear(); st.rowCache?.clear(); st.confirming = -1; st.choices = null; st.anchor = null; st.ctx = String(sel.contextKey); }
-    const box = el('div', `dt-box${cfg.bare ? ' dt-bare' : ''}${cfg.scroll ? ' dt-scroll' : ''} ${foldKind === 'labeled' ? 'dt-fold-labeled' : foldKind === 'always' ? 'dt-fold-column' : foldKind === 'none' ? 'dt-fold-none' : 'dt-fold-column'}`);
+    const hasContent = cfg.columns.some(c => c.width === 'content');
+    const box = el('div', `dt-box${hasContent ? ' dt-has-content' : ''}${cfg.bare ? ' dt-bare' : ''}${cfg.scroll ? ' dt-scroll' : ''} ${foldKind === 'labeled' ? 'dt-fold-labeled' : foldKind === 'always' ? 'dt-fold-column' : foldKind === 'none' ? 'dt-fold-none' : 'dt-fold-column'}`);
     const bar = el('div', 'dt-bar'); bar.hidden = true;
     const selectButton = button('btn btn-small dt-select-toggle', 'Select', () => { st.select = !st.select; syncSelectMode(); });
     selectButton.setAttribute('aria-pressed', 'false'); selectButton.hidden = !sel;
@@ -198,6 +199,7 @@ export function dataTable(cfg) {
             const th = el('th', `dt-th${c.numeric || c.align === 'end' ? ' dt-end' : ''}`); th.scope = 'col'; th.setAttribute('role', 'columnheader'); th.dataset.key = c.key;
             if (c.width && /rem$/.test(c.width)) th.style.width = c.width;
             if (c.width === 'grow') th.classList.add('dt-grow');
+            if (c.width === 'content') th.classList.add('dt-content');
             if (c.narrowHide) th.classList.add('dt-narrow-hide');
             if (c.sort) {
                 const on = st.sort && st.sort.key === c.key;
@@ -246,6 +248,7 @@ export function dataTable(cfg) {
     function cellOf(c, r) {
         const td = el('td', `dt-td dt-tone-${c.tone || (c.primary ? 'primary' : 'secondary')}${c.numeric || c.align === 'end' ? ' dt-end' : ''}${c.nowrap === false ? ' dt-wrap' : ''}`);
         if (c.width === 'grow') td.classList.add('dt-grow');
+        if (c.width === 'content') td.classList.add('dt-content');
         td.setAttribute('role', 'cell'); td.dataset.label = c.label; td.dataset.key = c.key;
         td.classList.add(c.line === 1 ? 'dt-line-1' : c.line === 2 ? 'dt-line-2' : 'dt-line-0');
         if (c.when && !c.when(r)) td.classList.add('dt-when-off');
