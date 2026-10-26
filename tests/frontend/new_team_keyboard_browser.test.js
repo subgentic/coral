@@ -4,7 +4,7 @@
 // focus to the row that opened it, Tab stays inside the top dialog, Mode is a radiogroup with arrow keys, every control of every step and tab has an accessible name. 1280 px, isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
-const { install: installNT, N, T, openNewTeam, scenarios, stubModels } = require('./helpers/new_team');
+const { install: installNT, M, N, T, openNewTeam, scenarios, stubModels } = require('./helpers/new_team');
 const BASE = require('./test_base').BASE;
 
 (async () => {
@@ -80,16 +80,17 @@ const BASE = require('./test_base').BASE;
             assert.ok(await ev(`!!window.__nt.dlg(${N.team})`), 'New team is still open');
             assert.match((await insideTop()).name, new RegExp('^Edit ' + role.replace(/[^\w]/g, '.') + ': '), 'focus is back on the row that opened it');
         });
-        await S.run('Edit member: tabs Persona, Agent, Permissions, Advanced are real tabs with the arrow keys; every control of each tab is named; Mode is a radiogroup with arrow keys; Tab stays inside it', async () => {
+        await S.run('Edit member: the tabs Agent, Permissions, Advanced of the settings are real tabs with the arrow keys, the persona page before them is named; every control of each tab is named; Mode is a radiogroup with arrow keys; Tab stays inside it', async () => {
             const role = (await ev(`window.__nt.roles(window.__nt.dlg(${N.team}))`))[1];
             await focusRow(role); await key('Enter'); await waitFor(`!!window.__nt.dlg(${N.member})`, 'Edit member', 4000);
             const tl = await ev(`(() => { const tl = window.__nt.tablist(window.__nt.dlg(${N.member})); return tl ? [...tl.querySelectorAll('[role=tab]')].filter(window.__na.vis).map(x => window.__na.name(x)) : null; })()`);
-            assert.deepEqual(tl, N.memberTabs, 'a tablist with the four tabs');
+            assert.deepEqual(tl, N.memberTabs, 'a tablist with the three tabs');
             const vertical = await ev(`window.__nt.tablist(window.__nt.dlg(${N.member})).getAttribute('aria-orientation') === 'vertical'`); const next = vertical ? 'ArrowDown' : 'ArrowRight';
             await ev(`[...window.__nt.dlg(${N.member}).querySelectorAll('[role=tab]')].find(x => x.getAttribute('aria-selected') === 'true').focus(); true`); await key(next);
-            assert.equal(await ev(`window.__na.name([...window.__nt.dlg(${N.member}).querySelectorAll('[role=tab]')].find(x => x.getAttribute('aria-selected') === 'true'))`), 'Agent', 'the arrow selects the next tab');
+            assert.equal(await ev(`window.__na.name([...window.__nt.dlg(${N.member}).querySelectorAll('[role=tab]')].find(x => x.getAttribute('aria-selected') === 'true'))`), 'Permissions', 'the arrow selects the next tab (Edit member opens on Agent)');
             for (const n of N.memberTabs) { await ev(`[...window.__nt.dlg(${N.member}).querySelectorAll('[role=tab]')].find(x => window.__na.name(x) === ${JSON.stringify(n)}).click(); true`); await settle(250); assert.deepEqual(await unnamed(N.member), [], `Edit member, ${n}: unnamed controls`); }
             await ev(`[...window.__nt.dlg(${N.member}).querySelectorAll('[role=tab]')].find(x => window.__na.name(x) === 'Permissions').click(); true`); await settle(250); // Permissions open: the loop above ended on Advanced
+            await M(ev, waitFor).toPersona(); assert.deepEqual(await unnamed(N.member), [], 'Edit member, the persona page: unnamed controls'); await M(ev, waitFor).section('Permissions');
             const mode = () => ev(`(() => { const g = [...window.__nt.dlg(${N.member}).querySelectorAll('[role=radiogroup]')].find(e => /mode$/i.test(window.__na.name(e))); if (!g) return null; const r = window.__na.radios(g); const i = r.findIndex(x => window.__na.isChecked(x)); return { i, n: r.length, f: document.activeElement === r[i] }; })()`);
             await ev(`(() => { const g = [...window.__nt.dlg(${N.member}).querySelectorAll('[role=radiogroup]')].find(e => /mode$/i.test(window.__na.name(e))); window.__na.radios(g).find(x => window.__na.isChecked(x)).focus(); return true; })()`);
             const a = await mode(); assert.ok(a, 'a Mode radiogroup on Permissions'); await key('ArrowRight'); const b = await mode(); assert.equal(b.i, (a.i + 1) % a.n, 'ArrowRight moves the mode'); assert.ok(b.f, 'and the focus with it');

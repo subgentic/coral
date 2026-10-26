@@ -3,7 +3,7 @@
 // as one line at 200% text (the word wraps under, the label does not). Controls by role and name (helpers/new_team.js). 1280 px, isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
-const { install: installNT, N, T, openNewTeam, scenarios, stubModels } = require('./helpers/new_team');
+const { install: installNT, M, N, T, openNewTeam, scenarios, stubModels } = require('./helpers/new_team');
 const BASE = require('./test_base').BASE;
 
 (async () => {
@@ -33,10 +33,11 @@ const BASE = require('./test_base').BASE;
             await t.click('button', /^Back$/i); await t.step(2); await settle(200);
             await ev(`(() => { const d = window.__nt.dlg(${N.team}); const b = window.__nt.rows(d)[1]; b.click(); return true; })()`);
             await waitFor(`!!window.__nt.dlg(${N.member})`, 'the Edit member dialog', 4000);
+            const mem = M(ev, waitFor); await mem.toPersona(); // the persona and the prompt are the page before a member's settings (#7861)
             const r = await ev(`(() => { const d = window.__nt.dlg(${N.member}); const lab = [...d.querySelectorAll('label')].filter(window.__na.vis).find(l => /Start from a persona/i.test(l.textContent)); const sel = lab && d.querySelector('#' + CSS.escape(lab.htmlFor)); const ta = [...d.querySelectorAll('textarea.acf-prompt')].find(window.__na.vis); return { label: !!lab, bound: !!sel && sel.tagName === 'SELECT', optional: !!lab && /optional/.test(lab.parentElement.textContent), font: ta ? getComputedStyle(ta).fontFamily : null }; })()`);
             assert.equal(r.label, true, 'a visible label "Start from a persona"'); assert.equal(r.bound, true, 'it names the select'); assert.equal(r.optional, true, 'with "optional" beside it');
             assert.ok(r.font && !/mono|courier/i.test(r.font), `the prompt is in the product font (got ${r.font})`);
-            await ev(`(() => { const d = window.__nt.dlg(${N.member}); const c = [...d.querySelectorAll('button')].find(b => /^Cancel$/i.test(window.__na.name(b))); if (c) c.click(); return true; })()`); await settle(250);
+            await mem.cancel(); await settle(250);
         });
         await S.run('at 200% text the label "Start from a template" stays on one line and "optional" wraps under it', async () => {
             await ev(`document.documentElement.style.fontSize = '200%'; true`); await settle(300);

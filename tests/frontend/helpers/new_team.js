@@ -20,7 +20,7 @@ const N = {
     teamName: /^Team name/i, folder: /^Folder/i, recents: /^Recent folders$/i, machine: /^Machine$/i, address: /^Another computer's address$/i,
     template: /template/i, bulk: /^Set all workers to/i, section: /section$/i,
     cancel: /^Cancel$/i, back: /^Back$/i, next: /^Next$/i, launch: /^Launch team$/i, save: /^Save member$/i, addMember: /^\+?\s*Add member$/i, addOrch: /^Add Orchestrator$/i,
-    tabs: ['Start', 'Workflow', 'Health check', 'Messaging'], memberTabs: ['Persona', 'Agent', 'Permissions', 'Advanced'],
+    tabs: ['Start', 'Workflow', 'Health check', 'Messaging'], memberTabs: ['Agent', 'Permissions', 'Advanced'], // the sections of a member's settings page; its role and prompt are the persona page before it (#7861)
 };
 const stepLine = ev => ev(`(() => { const d = window.__nt.dlg(${N.team}); if (!d) return ''; const hits = [...d.querySelectorAll('*')].filter(window.__na.vis).map(e => window.__na.text(e)).filter(t => /^Step \\d of 3: /.test(t)); hits.sort((a, b) => a.length - b.length); return hits[0] || ''; })()`);
 // Open New team as a person does: the Launch dialog, then the Team choice.
@@ -48,5 +48,22 @@ const T = (ev, waitFor) => {
     };
     return t;
 };
+// The member dialog is the Launch dialog's agent step in a second mode (#7861): the same element as New team, so while it is open the team's own rows are hidden (dlg(N.team) is null). Add member opens on the persona page (the Role),
+// Edit member on the settings page (sections Agent, Permissions, Advanced); Next and Back move between the two, and Save member is on the settings page.
+const M = (ev, waitFor) => {
+    const click = async (rx, what) => assert_(await ev(`(() => { const e = window.__nt.find(window.__nt.dlg(${N.member}), 'button', ${rx}); if (!e) return false; e.click(); return true; })()`), what);
+    const m = {
+        onPersona: () => ev(`!!window.__nt.find(window.__nt.dlg(${N.member}), 'input', /^Role$/i)`),
+        open: () => ev(`!!window.__nt.dlg(${N.member})`),
+        toPersona: async () => { if (!(await m.onPersona())) await click(N.back, 'no Back button to reach the persona page'); await waitFor(`!!window.__nt.find(window.__nt.dlg(${N.member}), 'input', /^Role$/i)`, 'the persona page (Role)', 4000); },
+        toSettings: async () => { if (await m.onPersona()) await click(N.next, 'no Next button to reach the settings page'); await waitFor(`!!window.__nt.find(window.__nt.dlg(${N.member}), 'button', ${N.save})`, 'the settings page (Save member)', 4000); },
+        setRole: async v => { await m.toPersona(); assert_(await ev(`(() => { const e = window.__nt.find(window.__nt.dlg(${N.member}), 'input', /^Role$/i); e.value = ${JSON.stringify(v)}; e.dispatchEvent(new Event('input', { bubbles: true })); e.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`), 'no Role field'); },
+        // a section of the settings page: a tab, or the Section select on a phone
+        section: async name => { await m.toSettings(); await ev(`(() => { const d = window.__nt.dlg(${N.member}); const tab = [...d.querySelectorAll('[role=tab]')].filter(window.__na.vis).find(x => window.__na.name(x) === ${JSON.stringify(name)}); if (tab) { tab.click(); return true; } const s = window.__nt.find(d, 'select', ${N.section}); if (!s) return false; const o = [...s.options].find(o => o.textContent.trim() === ${JSON.stringify(name)}); s.value = o.value; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); },
+        save: async () => { await m.toSettings(); await click(N.save, 'no Save member button'); await waitFor(`!window.__nt.dlg(${N.member}) && !!window.__nt.dlg(${N.team})`, 'Save member returns to New team', 4000); },
+        cancel: async () => { await click(N.cancel, 'no Cancel button'); await waitFor(`!window.__nt.dlg(${N.member}) && !!window.__nt.dlg(${N.team})`, 'Cancel returns to New team', 4000); },
+    };
+    return m;
+};
 function assert_(ok, msg) { if (!ok) throw new Error(msg); }
-module.exports = { T, SOURCE, install, N, stepLine, openNewTeam, scenarios: na.scenarios, stubModels: na.stubModels };
+module.exports = { T, M, SOURCE, install, N, stepLine, openNewTeam, scenarios: na.scenarios, stubModels: na.stubModels };
