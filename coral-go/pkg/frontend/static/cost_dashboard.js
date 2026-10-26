@@ -631,7 +631,7 @@ function _renderTaskTable(tasks) {
         { key: 'status', label: 'Status', cell: t => chip(STATUS[t.status] || 'Waiting', `status-${String(t.status || 'pending').replace('_', '-')}`), tone: 'secondary' },
         { key: 'id', label: 'ID', cell: t => `#${t.id}`, tone: 'tertiary' },
         { key: 'title', label: 'Task', primary: true, sort: true, sortValue: t => t.title || '', cell: t => t.title || '', width: 'grow' },
-        _textCol('task', 'assigned_to', 'Agent', t => t.assigned_to || '', { cell: t => avatar(t.assigned_to, '—'), tone: 'secondary' }),
+        _textCol('task', 'assigned_to', 'Agent', t => t.assigned_to || '', { cell: t => avatar(t.assigned_to, t.assigned_to || '—'), tone: 'secondary' }),
         _textCol('task', 'priority', 'Priority', t => t.priority || 'medium', { sortValue: t => priorityOrder[t.priority] ?? 2, cell: t => tag(t.priority || 'medium'), tone: 'secondary', firstDir: 'asc' }),
         { key: 'claimed_at', label: 'Start time', sort: true, sortValue: t => t.claimed_at || '', cell: t => (t.claimed_at ? _formatTime(t.claimed_at) : '—'), tone: 'secondary' },
         _numCol('duration', 'Duration', span, () => '', { cell: t => _formatDuration(t.claimed_at, t.completed_at) }),

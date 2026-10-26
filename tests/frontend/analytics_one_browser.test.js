@@ -24,9 +24,12 @@ const BRANCHES = [{ repo_name: 'coral', branch: 'main', board_name: 'coral-go-te
     { repo_name: 'coral', branch: 'fix/cost', board_name: 'docs-sprint', pr_number: 12, num_agents: 2, input_tokens: 900, output_tokens: 90, cache_read_tokens: 0, cache_write_tokens: 0, cost_usd: 0.9 }];
 
 
+const TASKS = [{ id: 86091, title: 'Named agent task', status: 'completed', assigned_to: 'Backend Dev', priority: 'high', cost_usd: 1.25 },
+    { id: 86092, title: 'Unassigned task', status: 'completed', assigned_to: null, priority: 'low', cost_usd: 0.5 }];
 const VIEWS = ['Overview', 'By provider', 'By model', 'By thinking level', 'By team', 'By agent', 'By branch', 'By task', 'Tool and API calls', 'Tokens per commit', 'Task time'];
 const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve(new Response(JSON.stringify(b), { headers: { 'content-type': 'application/json' } }));
     window.fetch = (u, o) => { const url = String(u && u.url || u); window.__costReq = (window.__costReq || []).concat(url);
+        if (new URL(url, location.origin).pathname === '/api/board/tasks') return json({ tasks: ${JSON.stringify(TASKS)} });
         if (url.includes('/api/token-usage/summary')) return json({ totals: { input_tokens: 10, output_tokens: 20, cost_usd: 4 }, by_model: ${JSON.stringify(MODEL)}, by_thinking: ${JSON.stringify(THINKING)}, by_agent_type: ${JSON.stringify(PROVIDER)}, by_agent: ${JSON.stringify(AGENT)} });
         if (url.includes('/api/token-usage/by-team')) return json({ teams: ${JSON.stringify(TEAMS)} });
         if (url.includes('/api/token-usage/by-branch')) return json({ branches: ${JSON.stringify(BRANCHES)} });
@@ -137,6 +140,10 @@ const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve
                 assert.equal(r.name, 'Time range', at + `${label}: the select is named`);
                 if (mobile) assert.ok(r.h >= 44, at + `${label}: a 44 px target on a phone: ` + r.h);
             }
+            await choose('By task');
+            await waitFor(`document.querySelectorAll('#cost-by-task tbody tr').length === 2`, at + 'the seeded task rows', 5000);
+            const people = await ev(`[...document.querySelectorAll('#cost-by-task tbody tr')].map(r => r.querySelector('[data-key="assigned_to"]').textContent.trim())`);
+            assert.deepEqual(people, ['BBackend Dev', '—'], at + 'By task shows the named agent beside its circle; only an unassigned task has a dash');
             await choose('Overview');
             await ev(`(() => { const s = document.getElementById('cost-time-range'); s.value = 'week'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
             await waitFor(`document.getElementById('cost-range-text').textContent === 'Last 7 days'`, at + 'the page says the range', 5000);
