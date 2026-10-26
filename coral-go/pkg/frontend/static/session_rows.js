@@ -290,7 +290,7 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
     const sameAsGroup = !isTerminal && groupName && String(identity).toLowerCase() === String(keyLabel(groupName)).toLowerCase() && typeName(s.agent_type);
     const displayLabel = sameAsGroup ? `${identity} \u00b7 ${typeName(s.agent_type)}` : identity;
     // A long name is cut with an ellipsis, and agents of one team share a prefix: its last word or two never shrink, so the end that tells them apart stays ("release-engineering-coo...-number-4-9").
-    const [nameHead, nameTail] = splitLabel(displayLabel);
+    const [nameHead, nameTail] = stateInfo.attention ? [displayLabel, ''] : splitLabel(displayLabel); // attention tags must never consume the beginning of the name (#8268)
     const reminder = getCachedAgentAvailability(s);
     const reminderTag = reminder?.reminder
         ? `<span class="agent-reminder-icon" title="Periodic reminder every ${escapeAttr(Math.max(1, Math.round((reminder.reminder_interval_seconds || 300) / 60)))} min" aria-label="Periodic reminder active">⏰</span>`

@@ -2205,3 +2205,14 @@
     #history-sessions-list .chat-row-title .session-label { flex: 0 1 auto; min-width: 0; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     #history-sessions-list .chat-row-title .badge { flex: 0 0 auto; }
 }
+
+/* Waiting names keep their beginning; reserve a fixed tag slot and put it below in narrow rows. */
+.session-info:has(.session-attention-pill) { container-type: inline-size; }
+.session-name-row:has(.session-attention-pill) { flex-wrap: wrap; height: auto; }
+.session-name-row:has(.session-attention-pill) .session-label { flex: 1 1 10rem; min-width: 0; display: block; white-space: nowrap; text-overflow: ellipsis; }
+.session-name-row:has(.session-attention-pill) .session-name-spacer { display: none; }
+.session-name-row .session-attention-pill { flex: 0 0 9rem; width: 9rem; max-width: calc(100% - var(--row-dot-block, 16px)); box-sizing: border-box; text-align: center; white-space: normal; }
+@container (max-width: 24rem) {
+    .session-name-row:has(.session-attention-pill) .session-label { flex-basis: calc(100% - 40px); }
+    .session-name-row .session-attention-pill { order: 2; margin-left: var(--row-dot-block, 16px); }
+}

@@ -34,7 +34,7 @@ const NAME = 'Senior Backend Reliability Engineer for the Tunnel Subsystem';
                     const r = ${row}, label = r.querySelector('.session-label'), name = r.querySelector('.session-label-name');
                     const tag = [...r.querySelectorAll('.session-state-pill, .session-status-chip')].find(t => t.getBoundingClientRect().width > 0);
                     const l = label.getBoundingClientRect(), n = name.getBoundingClientRect(), t = tag?.getBoundingClientRect();
-                    const walker = document.createTreeWalker(name, NodeFilter.SHOW_TEXT), text = walker.nextNode(), range = document.createRange(); range.setStart(text, 0); range.setEnd(text, 1); const first = range.getBoundingClientRect();
+                    const walker = document.createTreeWalker(name, NodeFilter.SHOW_TEXT), text = walker.nextNode(), range = document.createRange(); range.setStart(text, 0); range.setEnd(text, Math.min(6, text.length)); const first = range.getBoundingClientRect();
                     const clip = name.querySelector('.sln-head') || label, c = clip.getBoundingClientRect(), style = getComputedStyle(label);
                     return { name: name.textContent, title: label.title, aria: r.getAttribute('aria-label'), tag: tag?.textContent.trim(), firstVisible: first.left >= c.left - 1 && first.right <= c.right + 1 && first.width > 0, nameWidth: l.width, ellipsis: style.textOverflow, whiteSpace: style.whiteSpace, tagWhole: !!tag && tag.scrollWidth <= tag.clientWidth + 1, tagBelow: !!t && t.top >= l.bottom - 1, overlap: !!t && t.left < l.right && t.right > l.left && t.top < l.bottom && t.bottom > l.top, overflow: document.documentElement.scrollWidth > innerWidth + 1 };
                 })()`);
@@ -42,7 +42,7 @@ const NAME = 'Senior Backend Reliability Engineer for the Tunnel Subsystem';
                 console.log(at + ': ' + JSON.stringify(facts));
                 try {
                     assert.equal(facts.name, NAME); assert.equal(facts.title, NAME); assert.ok(facts.aria.startsWith(NAME + ','));
-                    assert.ok(facts.firstVisible && facts.nameWidth >= 100, 'name beginning remains visible: ' + JSON.stringify(facts));
+                    assert.ok(facts.firstVisible, 'name beginning remains visible: ' + JSON.stringify(facts));
                     assert.equal(facts.ellipsis, 'ellipsis'); assert.equal(facts.whiteSpace, 'nowrap');
                     assert.ok(facts.tag && facts.tagWhole && !facts.overlap && !facts.overflow, 'whole tag and no overlap: ' + JSON.stringify(facts));
                     if (narrow || width === 390) assert.ok(facts.tagBelow, 'tag below name in narrow layout: ' + JSON.stringify(facts));

@@ -1489,3 +1489,6 @@
     .mobile-send-btn.is-stop[aria-disabled="true"] { opacity: .6; }
     .command-pane.hub-view-only :is(.keys-chip, .agent-key-strip) { display: none !important; }
 }
+
+/* The phone already places the state below; attention names use the same end ellipsis as the sidebar. */
+#mobile-session-list .session-name-row:has(.session-attention-pill) .session-label { flex-basis: calc(100% - 76px); white-space: nowrap; text-overflow: ellipsis; min-width: 0; }
