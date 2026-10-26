@@ -1,5 +1,5 @@
 {
-  "comment": "One table of artifact-tag cases, read by the server's test (coral-go/internal/board/artifact_tags_fixture_test.go) and by the dashboard's (artifact_tag_rules): 'tags' is a word as typed and what it is stored as, '' for one refused; 'sets' is the server's whole-set rule only. Change a rule in both places and here (#8673).",
+  "comment": "One table of artifact-tag cases, read by the server's test (coral-go/internal/board/artifact_tags_fixture_test.go) and by the dashboard's (artifact_tag_rules): 'tags' is a word as typed and what it is stored as, '' for one refused; 'sets' is the server's whole-set rule only. Change a rule in both places and here (#8673). The rules: white space is Unicode White_Space; lower-casing is per character, locale-free and with no final-sigma context; a character whose lower case is not one character is refused.",
   "max_len": 24,
   "max_tags": 5,
   "tags": [
@@ -25,7 +25,16 @@
     {"input": "a_b", "want": ""},
     {"input": "<x>", "want": ""},
     {"input": "a\u0000b", "want": ""},
-    {"input": "\ud83d\udcce", "want": "", "note": "an emoji is not a letter"}
+    {"input": "\ud83d\udcce", "want": "", "note": "an emoji is not a letter"},
+    {"input": "a\u0085b", "want": "a b", "note": "U+0085 is white space: both sides take the Unicode White_Space set"},
+    {"input": "a\u2028b", "want": "a b", "note": "a line separator is white space"},
+    {"input": "a\ufeffb", "want": "", "note": "a byte-order mark is not white space (JavaScript's \\s says it is): refused"},
+    {"input": "\ufeffa", "want": "", "note": "a byte-order mark at the edge is not trimmed"},
+    {"input": "\u0130", "want": "", "note": "capital I with a dot lower-cases to two characters in JavaScript, to i in Go: refused on both sides"},
+    {"input": "i\u0130", "want": ""},
+    {"input": "\u0391\u03a3", "want": "\u03b1\u03c3", "note": "a capital sigma is lower-cased as the plain sigma, at the end of a word too (no final-sigma context)"},
+    {"input": "\u03a3", "want": "\u03c3"},
+    {"input": "\u03c2", "want": "\u03c2", "note": "a final sigma typed as such is kept"}
   ],
   "sets": [
     {"tags": [], "want": []},

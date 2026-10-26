@@ -25,9 +25,14 @@ var StarterArtifactTags = []string{"for review", "internal", "final", "draft"}
 // ErrArtifactTag is a tag (or a set of them) that is refused.
 var ErrArtifactTag = errors.New("invalid artifact tag")
 
-// NormalizeArtifactTag is a tag as it is stored: trimmed, lower-cased, runs of spaces made one; ok is false for one that is empty, over MaxArtifactTagLen characters, or holds anything but
+// NormalizeArtifactTag is a tag as it is stored: trimmed, lower-cased, runs of white space (the Unicode White_Space set) made one space; ok is false for one that is empty, over MaxArtifactTagLen characters, or holds anything but
 // letters, digits, spaces and hyphens.
 func NormalizeArtifactTag(s string) (string, bool) {
+	// Lower-casing is per character and locale-free, with no final-sigma context, as the dashboard does it; the one character whose full lower case is two characters (capital I with a dot, which
+	// JavaScript makes i and a combining dot) is refused on both sides rather than made "i" here (#8680).
+	if strings.ContainsRune(s, '\u0130') {
+		return "", false
+	}
 	s = strings.ToLower(strings.Join(strings.Fields(s), " "))
 	n := 0
 	for _, r := range s {
