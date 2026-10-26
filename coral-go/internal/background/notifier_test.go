@@ -670,13 +670,6 @@ func TestBoardNotifier_SeedsOnlyRunningAgents(t *testing.T) {
 	require.Equal(t, 1, notifier.notified["claude-run-0001"].count)
 }
 
-// heldScreenTerm shows a permission menu, so whatever is sent to it is held.
-type heldScreenTerm struct{}
-
-func (heldScreenTerm) AgentScreen(context.Context, string, string, string) (string, error) {
-	return " Do you want to proceed?\n ❯ 1. Yes\n   2. No\n\n Esc to cancel\n", nil
-}
-
 // The reminder window is spread per agent (#3613): never before 0.8 x remindAfter, always by
 // 1.2 x, so reminders set in one pass don't all come due in the same one.
 func TestBoardNotifier_ReminderWindowIsJittered(t *testing.T) {
