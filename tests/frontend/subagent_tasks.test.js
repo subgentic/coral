@@ -86,7 +86,7 @@ async function run() {
     return { sub: el.classList.contains('board-task-subagent'), classes: el.className, subagentId: el.dataset.subagentId || null,
       type: (q('.board-task-source')||{}).textContent, typeIsChip: !!q('.board-task-source.dt-tag'), typeIcon: (q('.board-task-type-subagent .material-icons')||{}).textContent || null, typeTitle: q('.board-task-source') ? q('.board-task-source').getAttribute('title') : null,
       badge: (q('.dt-subtitle')||{}).textContent || null, desc: (q('.board-task-desc')||{}).textContent, descHasImg: !!q('.board-task-desc img'), tooltip: q('.board-task-desc') ? q('.board-task-desc').getAttribute('title') : null,
-      assignee: (q('.board-task-assignee')||{}).textContent, kind: el.dataset.kind || null,
+      assignee: (() => { const i = q('td[data-key="who"] [role=img]'); return i ? i.getAttribute('aria-label') : null; })(), kind: el.dataset.kind || null,
       spinner: !!q('.task-spinner'), icon: (q('.board-task-status-wrap')||{}).textContent || null, clickable: el.getAttribute('data-on-click') === 'task-subagent-open' || el.hasAttribute('onclick'),
       descW: q('.board-task-desc') ? q('.board-task-desc').closest('td').getBoundingClientRect().width : 0, rowW: el.getBoundingClientRect().width, listScrollW: document.getElementById('board-task-list').scrollWidth,
       boxShadow: cs.boxShadow, bgImage: cs.backgroundImage, chipColor: q('.board-task-source') ? getComputedStyle(q('.board-task-source')).color : null }; })`);
@@ -114,7 +114,7 @@ async function run() {
 
   // Content
   check('description is the title', done.desc === 'Map Coral task-board UI code', done.desc);
-  check('assigned to the launching main agent', done.assignee === 'Lead Dev' && running.assignee === 'Lead Dev', done.assignee);
+  check('the Who circles name the launching main agent (a finished one says "Done by", #8507)', done.assignee === 'Done by Lead Dev' && running.assignee === 'Lead Dev', done.assignee + ' / ' + running.assignee);
   check('tooltip: type, model, calls, tokens', /Subagent \(Explore\)/.test(done.tooltip) && /claude-opus-5/.test(done.tooltip) && /25 API calls/.test(done.tooltip) && /tokens/.test(done.tooltip), done.tooltip);
   check('tooltip singular "1 API call"', /1 API call(?!s)/.test(running.tooltip), running.tooltip);
   check('no metadata: generic title, no badge', bare.desc === 'Subagent' && !bare.badge, bare.desc);

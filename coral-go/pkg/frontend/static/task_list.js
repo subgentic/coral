@@ -507,7 +507,7 @@ function _taskTable(tasks, footer) {
             if (t._source === 'board') { const mark = document.createElement('template'); mark.innerHTML = _verifyMark(t); cell.append(mark.content); }
             return cell;
         };
-        if (whoCol) { whoCol.firstDir = 'desc'; whoCol.when = t => !!t.assigned_to; whoCol.width = 'content'; whoCol.cell = t => (t.assigned_to ? span('board-task-assignee', t.assigned_to) : ''); } // an empty Agent is an empty cell, not a dash (#8003)
+        if (whoCol) { whoCol.firstDir = 'desc'; whoCol.when = t => !!TV.doerOf(t); whoCol.cell = t => (TV.doerOf(t) ? TV.whoCell(t) : ''); } // the same circles as the Tasks tab (#8507); an empty Who is an empty cell, not a dash (#8003)
     };
     const table = TV.tasksTable(agentTaskScope() ? 'agent' : 'agent-team', tasks, { label: 'Agent tasks', tweak, rowKey: key, rowName: t => t.title || t.description || '',
         footer, state: dockTaskTableState, onSort: field => _toggleTaskSort(FIELD[field] || field), bare: true, sortBar: false, defaultSortLabel: _queryActive() && _taskFilters.sort !== 'open' ? taskSortLabel[_taskFilters.sort] : 'Open first, newest first' });
