@@ -4,11 +4,13 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { removeBoards } = require('./helpers/board_cleanup');
+const sceneShots = require('./helpers/scene_shots');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const api = (method, path, body) => ev(`fetch(${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, headers: { 'Content-Type': 'application/json' }, cache: 'no-store', body: ${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'} }).then(async r => ({ status: r.status, body: await r.json().catch(() => null) }))`);
-    const B = 'mt-' + Date.now().toString(36);
+    const shot = sceneShots(Page, 'inbox-tasks-no-files');
+    const B = 'mt-2f0x-' + Date.now().toString(36);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
@@ -20,6 +22,43 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await ev(`window.switchNavTab('hub-inbox'); true`);
         await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('tasks')).then(() => true)`);
         await waitFor(`document.querySelectorAll('#group-table-view .dt-table tbody tr').length === 3`, 'the three tasks', 15000);
+        await ev(`(() => { const s=document.createElement('style'); s.textContent='*, *::before, *::after { transition: none !important; animation: none !important; }'; document.head.append(s); return true; })()`);
+        assert.equal(await ev(`document.querySelectorAll('#group-table-view [data-key="files"]').length`), 0, 'no empty Files heading or cells');
+        for (const width of [1280,390]) {
+            await Emulation.setDeviceMetricsOverride({ width, height: 844, deviceScaleFactor: 1, mobile: width===390 });
+            await Emulation.setTouchEmulationEnabled({ enabled: width===390 });
+            for (const theme of ['dark','light']) {
+                await ev(`document.documentElement.setAttribute('data-theme', ${JSON.stringify(theme)}); true`);
+                await waitFor(`document.querySelector('#group-table-view .dt-box').classList.contains('dt-folded') === ${width===390}`, 'table layout settled');
+                await shot(`${width}-${theme}`);
+            }
+        }
+        await Emulation.setDeviceMetricsOverride({ width:1280, height:800, deviceScaleFactor:1, mobile:false });
+        await Emulation.setTouchEmulationEnabled({ enabled:false });
+        // Keep the real API rows and their timestamps; change only the returned artifact count.
+        // The heading must appear and disappear on refresh even when updated_at did not change.
+        await ev(`(() => {
+            window.__filesFetchOriginal = window.fetch;
+            window.__filesCount = 2;
+            window.fetch = async (...args) => {
+                const response = await window.__filesFetchOriginal(...args);
+                const url = new URL(typeof args[0]==='string' ? args[0] : args[0].url, location.href);
+                if (url.pathname !== '/api/board/tasks') return response;
+                window.__filesRequested = (url.searchParams.get('fields')||'').split(',').includes('artifact_count');
+                const data = await response.json();
+                data.tasks = data.tasks.map(t => ({...t, artifact_count: t.id===${ids[0]} ? window.__filesCount : 0}));
+                return new Response(JSON.stringify(data), {status:response.status,headers:{'Content-Type':'application/json'}});
+            };
+            return true;
+        })()`);
+        const refresh = () => ev(`import((window.__coralStatic||'/static/')+'inbox_sidebar.js').then(m=>m.showInbox({quiet:true})).then(()=>true)`);
+        await refresh();
+        await waitFor(`document.querySelector('#group-table-view th[data-key="files"]') && document.querySelectorAll('#group-table-view .dt-files').length===1`, 'Files appears with one populated row');
+        assert.equal(await ev('window.__filesRequested'),true,'the adapter requests the server count');
+        assert.equal(await ev(`document.querySelector('#group-table-view .dt-files-count').textContent.trim()`), '2 files', 'the count is kept');
+        await ev(`window.__filesCount=0; true`); await refresh();
+        await waitFor(`!document.querySelector('#group-table-view [data-key="files"]')`, 'Files disappears after the count clears');
+        await ev(`window.fetch=window.__filesFetchOriginal; delete window.__filesFetchOriginal; delete window.__filesCount; delete window.__filesRequested; true`);
         const cb = i => `document.querySelectorAll('#group-table-view tbody .dt-check input')[${i}]`;
         const state = () => ev(`(() => { const r = document.querySelector('#group-table-view .gt-toolbar'), bar = document.querySelector('#group-table-view .dt-bar'); return { selecting: r.classList.contains('team-toolbar-selecting'), count: bar && !bar.hidden ? bar.querySelector('.dt-bar-count').textContent : '', actions: bar ? [...bar.querySelectorAll('button')].map(b => b.textContent) : [] }; })()`);
         assert.equal((await state()).selecting, false);

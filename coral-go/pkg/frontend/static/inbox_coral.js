@@ -10,7 +10,7 @@ import { setInboxCount } from './inbox_tab.js'; // the count on the Tasks tab
 const { mountInbox, clearInboxDrafts, INBOX_CONTRACT } = await importOnce('./inbox_panel.js'); // the component (shared with the hub); this file is the one that is Coral's
 
 const OPEN_STATUSES = ['pending', 'in_progress', 'review_pending', 'blocked'];
-const FIELDS = 'id,board_id,board_label,title,priority,status,created_by,created_at,updated_at,revision,goal_id,goal_title'; // updated_at and revision are the change stamp the panel keeps a drawn task by (#5803)
+const FIELDS = 'id,board_id,board_label,title,priority,status,created_by,created_at,updated_at,revision,goal_id,goal_title,artifact_count'; // updated_at and revision are the change stamp the panel keeps a drawn task by (#5803)
 
 async function json(resp) {
     let data = {};
@@ -41,7 +41,7 @@ export const coralInboxAdapter = {
         for (const s of OPEN_STATUSES) q.append('status', s);
         const d = await json(await fetch(`/api/board/tasks?${q}`));
         return (d.tasks || []).map(t => ({ id: t.id, project: t.board_id, board: t.board_label || keyLabel(t.board_id), title: t.title, priority: t.priority, status: t.status,
-            created_by: t.created_by, created_at: t.created_at, updated_at: t.updated_at, revision: t.revision,
+            created_by: t.created_by, created_at: t.created_at, updated_at: t.updated_at, revision: t.revision, artifact_count: t.artifact_count,
             goal: t.goal_id && t.goal_title ? { id: Number(t.goal_id), title: String(t.goal_title) } : null })); // the goal it serves, when the route sends one (#7302)
     },
     openGoal(task) { return importOnce('./task_goals.js').then(m => m.openGoalOnTeamPage(task.project, task.goal.id)); },
