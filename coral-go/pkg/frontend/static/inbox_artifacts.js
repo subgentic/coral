@@ -36,11 +36,11 @@ const hooks = () => ({ detailHost: pageHost && pageHost.querySelector('.inbox-de
 
 /** The folder's page for the group table: its own title row, the list and the detail pane. */
 export function artifactsSpec() {
-    return { title: 'Artifacts', headless: true, ownBar: true, rows: [], signature: 'artifacts', node: () => {
+    return { title: 'Artifacts', headless: true, rows: [], signature: 'artifacts', node: () => {
         const row = DT.el('div', 'inbox-artifacts-row');
         const main = DT.el('div', 'inbox-artifacts-main');
         const head = DT.el('div', 'group-table-head');
-        const h = DT.el('h2', null, 'Artifacts'); h.id = 'group-table-title'; h.tabIndex = -1;
+        const h = DT.el('h2', null, 'Artifacts'); h.id = 'group-table-title'; // not focusable: the page opens on its search box (focusSel), and no ring is drawn round words (#7404)
         const n = DT.el('span', 'session-group-count inbox-artifacts-count', count == null ? '' : String(count));
         head.append(h, n);
         const body = DT.el('div', 'inbox-artifacts-list team-panel'); // the team page's list rules (its bar, its table) apply by .team-panel
