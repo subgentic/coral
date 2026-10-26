@@ -21,11 +21,11 @@ var ErrNotWanted = errors.New("automated input no longer wanted")
 
 // The reasons a send is skipped (SkippedSend.Why): what the person sees on the agent's page.
 const (
-	SkipPrompt     = "a prompt or menu is open in the agent's terminal"
-	SkipDraft      = "there is text in the agent's input box that Coral did not type (a draft)"
-	SkipUnreadable = "the agent's screen could not be read"
-	SkipEnter      = "a prompt opened before the Enter, so it was not pressed"
-	SkipTeamBusy   = "this team's automated input is spaced out and the next slot is too far away"
+	SkipPrompt     = "a prompt is open"
+	SkipDraft      = "you have a draft in the box"
+	SkipUnreadable = "the screen could not be read"
+	SkipEnter      = "a prompt opened before the Enter"
+	SkipTeamBusy   = "this team's sends are spaced out and the next slot is too far away"
 )
 
 // DeliverAutomated types an automated send now, with its Enter, unless the screen shows that typing would be a wrong answer
@@ -123,7 +123,7 @@ func (in AutomatedInput) look(ctx context.Context) verdict {
 	}
 	open, why := PromptOnScreen(screen)
 	if open && in.blocks(why, agentType, screen) {
-		return verdict{skip: SkipPrompt + " (" + why + ")"}
+		return verdict{skip: SkipPrompt}
 	}
 	box, haveBox := inputBoxText(screen)
 	v := verdict{boxShown: haveBox || InputBoxOnScreen(screen)}

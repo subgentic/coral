@@ -491,7 +491,6 @@
 1	session_state.js	gs.ahead
 1	session_state.js	gs.behind
 1	session_state.js	gs.dirty
-1	session_state.js	held
 1	session_state.js	rows.join("")
 1	session_state.js	s.changed_file_count
 1	session_state.js	stateLabel.toLowerCase().replace(/ /g, '-')

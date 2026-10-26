@@ -6,6 +6,7 @@ import { state } from './state.js';
 import { showToast } from './utils.js';
 import { serverFetch, currentServer } from './server_base.js';
 import { responseErrorText } from './server_status.js';
+import { whenText } from './when_text.js';
 
 /** A safe non-negative integer from a row's board_unread. */
 export function waitingCount(row) {
@@ -25,9 +26,9 @@ export function waitingText(row) {
     if (!row || row.sleeping) return '';
     const n = waitingCount(row), k = skippedOf(row);
     const unread = n > 0 ? `${n} unread board message${n === 1 ? '' : 's'} for this agent` : '';
-    if (unread && k) return `${unread}. The last send was not typed: ${k.why}`;
+    if (unread && k) return `${unread}. Not typed: ${k.why}.`;
     if (unread) return unread;
-    return k ? `The last automated message was not typed: ${k.why}` : '';
+    return k ? `Not typed: ${k.why}.` : '';
 }
 
 /** What is said after a Send now, from the server's answer. */
@@ -64,23 +65,29 @@ const url = (s, tail) => `/api/sessions/live/${encodeURIComponent(s.name)}/waiti
 
 function listNode(r) {
     const root = document.createElement('div');
+    const k = r && r.skipped;
+    if (k && k.why) { // why they wait comes first
+        const p = document.createElement('p');
+        p.className = 'composer-waiting-why';
+        p.textContent = `Not typed: ${String(k.why)}.`;
+        root.append(p);
+    }
     const ms = Array.isArray(r && r.messages) ? r.messages : [];
-    if (!ms.length) { root.textContent = 'No unread board messages.'; }
+    if (!ms.length) { const p = document.createElement('p'); p.textContent = 'No unread board messages.'; root.append(p); }
     for (const m of ms) {
         const d = document.createElement('details');
         const sum = document.createElement('summary');
-        sum.textContent = `${String(m.sender || '')} · ${String(m.at || '')}`;
+        const when = document.createElement('time');
+        when.dateTime = String(m.at || '');
+        const at = new Date(m.at);
+        if (!Number.isNaN(at.getTime())) when.title = at.toLocaleString();
+        when.textContent = whenText(m.at) || String(m.at || '');
+        sum.append(`${String(m.sender || '')} \u00b7 `, when);
         const p = document.createElement('p');
         p.className = 'composer-waiting-body';
-        p.textContent = String(m.text || '') + (m.truncated ? ' …' : '');
+        p.textContent = String(m.text || '') + (m.truncated ? ' \u2026' : '');
         d.append(sum, p);
         root.append(d);
-    }
-    const k = r && r.skipped;
-    if (k && k.why) {
-        const p = document.createElement('p');
-        p.textContent = `The last automated send (${String(k.what || '')}) was not typed since ${String(k.since || '')}: ${String(k.why)}`;
-        root.append(p);
     }
     return root;
 }
@@ -119,4 +126,7 @@ async function sendNow() {
     } finally { busy = false; }
 }
 
-registerActions({ 'waiting-toggle': () => toggleList(), 'waiting-send-now': () => sendNow() });
+registerActions({
+    'waiting-toggle': () => toggleList(),
+    'waiting-send-now': () => sendNow(),
+});
