@@ -39,7 +39,10 @@ export function onDockPage(fn) { hooks.push(fn); }
 export function tabShown(btn) { return !!btn && btn.style.display !== 'none' && getComputedStyle(btn).display !== 'none'; }
 
 export function setDockPage(viewId) {
-    const next = KIND_OF_VIEW[viewId] || 'other';
+    // The populated Chats list uses the shared table view; it keeps the same
+    // dock state as the empty list and transcripts, not other lists' state (#7953).
+    const chatTable = viewId === 'group-table-view' && document.getElementById(viewId)?.dataset.group?.startsWith('history:');
+    const next = chatTable ? 'chats' : KIND_OF_VIEW[viewId] || 'other';
     const dock = document.getElementById('agentic-state');
     if (dock) dock.dataset.page = next;
     document.body.setAttribute('data-dock-page', next);
