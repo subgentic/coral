@@ -114,7 +114,8 @@ export function healthCard(h, { title = 'Machine health', online = false, waitin
     if (chip) { // the status as the shared chip, the dot and the word as the Servers table shows them (#8276)
         const tones = { ok: 'goal-state-done', busy: 'goal-state-blocked', stalled: 'goal-state-failed' };
         const c = chip(healthStatusText(h), tones[healthStatus(h)] || '');
-        c.setAttribute('role', 'img'); c.setAttribute('aria-label', `${title} health: ${healthStatusText(h)}`);
+        c.classList.add('machine-health-status', `machine-health-${healthStatus(h)}`); // the card's status and its state, as the dot carried them (the suites and the page read them)
+        c.setAttribute('role', 'img'); c.setAttribute('aria-label', `Machine health: ${healthStatusText(h)}`); // as the dot said it
         head.append(t, c);
     } else head.append(healthDot(h), t, status);
     card.appendChild(head);

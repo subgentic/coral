@@ -32,7 +32,7 @@ const HEALTH = {
     const card = () => ev(`(() => {
         const c = document.querySelector('#machine-health-local .machine-health-card');
         if (!c) return null;
-        const dot = c.querySelector('.machine-health-dot');
+        const dot = c.querySelector('.machine-health-dot, .machine-health-status'); // the status is the shared chip (#8276): it carries the state class and the name
         return { status: c.querySelector('.machine-health-status').textContent, dot: dot.className, label: dot.getAttribute('aria-label'),
             rows: Object.fromEntries([...c.querySelectorAll('dt')].map(dt => [dt.textContent, dt.nextElementSibling.textContent])) };
     })()`);
