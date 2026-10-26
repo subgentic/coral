@@ -28,7 +28,6 @@ const DIALOGS = {
     'cli-not-found (script)': { root: '.modal:has(button[data-action=close])', isOpen: `!!document.querySelector('.modal:has(button[data-action=close])')`, open: `__M('cli_dialogs.js').then(m => m._showCLINotFoundModal('claude'))` },
     'permission-flag (script)': { root: '.modal:has(button[data-action=enable])', isOpen: `!!document.querySelector('.modal:has(button[data-action=enable])')`, open: `__M('cli_dialogs.js').then(m => { window.__pf = undefined; m._checkPermissionFlag('', 'claude').then(v => { window.__pf = v === null ? 'null' : v; }); })`, resolves: `window.__pf === 'null'` },
     'template-browser (script)': { root: '#template-browser-modal', isOpen: `!!document.getElementById('template-browser-modal')`, open: `__M('template_browser.js').then(m => { m.showTemplateBrowser('agents', () => {}); })` },
-    'team-settings (native)': { root: '#team-working-mode-dialog', isOpen: `!!document.querySelector('#team-working-mode-dialog')?.open`, open: `__M('team_working_mode.js').then(m => m.showTeamWorkingMode('census-team', { workspace: false }))` },
     'team-view (native)': { root: '#team-availability-dialog', isOpen: `!!document.querySelector('#team-availability-dialog')?.open`, open: `__M('team_availability.js').then(m => m.showTeamAvailability('census-team'))` },
 };
 

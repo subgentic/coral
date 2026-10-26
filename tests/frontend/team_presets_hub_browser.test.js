@@ -12,12 +12,12 @@ const { removeBoards } = require('./helpers/board_cleanup');
     const ok = name => console.log(`   ✓ ${name}`);
     const TEAM = 'preset-hub-' + Date.now().toString(36);
     const state = () => ev(`(() => { const q = s => document.querySelector(s); const vis = el => !!el && !el.hidden && el.checkVisibility({ checkVisibilityCSS: true });
-        return { save: vis(q('.preset-save')), reset: vis(q('.preset-reset')), saveText: q('.preset-save').textContent, nameRO: q('.working-mode-form [name=preset_name]')?.readOnly ?? null,
-        textRO: q('.working-mode-form [name=preset_instructions]').readOnly, status: q('.preset-state').textContent }; })()`);
+        return { save: vis(q('.preset-save')), reset: vis(q('.preset-reset')), saveText: q('.preset-save').textContent, nameRO: q('.sv [name=preset_name]')?.readOnly ?? null,
+        textRO: q('.sv [name=preset_instructions]').readOnly, status: q('.preset-state').textContent }; })()`);
     const open = async () => {
-        await ev(`document.getElementById('team-settings-workspace')?.remove(); import((window.__coralStatic || '/static/') + 'team_working_mode.js').then(m => m.showTeamWorkingMode(${JSON.stringify(TEAM)}, { workspace: false })); true`);
+        await ev(`document.getElementById('team-settings-workspace')?.remove(); import((window.__coralStatic || '/static/') + 'team_working_mode.js').then(m => m.showTeamWorkingMode(${JSON.stringify(TEAM)}, { page: (document.getElementById('qa-ts-host') || document.body.appendChild(Object.assign(document.createElement('div'), { id: 'qa-ts-host', style: 'position:fixed;inset:0;display:flex;z-index:50;background:var(--bg-primary)' }))) })); true`);
         await waitFor(`!!document.querySelector('.preset-save') && !!document.querySelector('.preset-select, [name=preset]')`, 'the preset controls', 15000);
-        await waitFor(`document.querySelector('.working-mode-form [type=submit]') && !document.querySelector('.working-mode-form [type=submit]').disabled`, 'the dialog to load', 15000);
+        await waitFor(`!!document.querySelector('#team-settings-workspace .sv[data-ready]')`, 'the page to load', 15000);
         await ev(`document.querySelector('.preset-editor').open = true; true`); // the preset editor is behind Edit presets (#5589)
     };
     try {
@@ -36,8 +36,8 @@ const { removeBoards } = require('./helpers/board_cleanup');
         let st = await state();
         assert.equal(st.save, true, 'local: Save shows'); assert.equal(st.textRO, false, 'local: instructions editable');
         await ev(`(() => { const s = document.querySelector('.preset-select, [name=preset]'); s.value = 'worktrees'; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
-        const ins = await ev(`(() => { const t = document.querySelector('.working-mode-form [name=preset_instructions]'); t.value = t.value + ' (edited)'; document.querySelector('.preset-save').click(); return true; })()`);
-        await waitFor(`/saved/i.test(document.querySelector('.working-mode-status, .preset-status')?.textContent || document.body.textContent)`, 'the save', 8000);
+        const ins = await ev(`(() => { const t = document.querySelector('.sv [name=preset_instructions]'); t.value = t.value + ' (edited)'; document.querySelector('.preset-save').click(); return true; })()`);
+        await waitFor(`/saved/i.test(document.querySelector('#team-settings-workspace .sv-status')?.textContent || document.body.textContent)`, 'the save', 8000);
         await waitFor(`!document.querySelector('.preset-reset').hidden`, 'Reset built-in appears after an override');
         st = await state();
         assert.equal(st.reset, true, 'local: Reset built-in shows for an overridden built-in');
@@ -65,7 +65,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         st = await state();
         assert.equal(st.save, false, 'hub: no Save for an existing preset'); assert.equal(st.reset, false, 'hub: no Reset built-in even when overridden');
         assert.equal(st.textRO, true); assert.match(st.status, /Through Coral Hub a preset can be added but not changed/);
-        await ev(`window.__puts = 0; { const w = window.fetch; window.fetch = (u, o = {}) => { if (/presets/.test(String(u)) && (o.method || 'GET') !== 'GET') window.__puts++; return w(u, o); }; } document.querySelector('.working-mode-form [name=preset_name]').focus(); true`);
+        await ev(`window.__puts = 0; { const w = window.fetch; window.fetch = (u, o = {}) => { if (/presets/.test(String(u)) && (o.method || 'GET') !== 'GET') window.__puts++; return w(u, o); }; } document.querySelector('.sv [name=preset_name]').focus(); true`);
         for (const type of ['keyDown', 'keyUp']) await Input.dispatchKeyEvent({ type, key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: type === 'keyDown' ? '\r' : undefined });
         assert.equal(await ev(`window.__puts`), 0, 'Enter in the name box sends nothing');
         ok('Hub session: Save and Reset built-in are not drawn for an existing preset, the text is read-only with the reason, Enter sends nothing');

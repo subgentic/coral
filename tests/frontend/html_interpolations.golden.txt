@@ -696,17 +696,10 @@
 1	team_working_mode.js	cards
 1	team_working_mode.js	head
 1	team_working_mode.js	infoBox(infoId, explanation)
-1	team_working_mode.js	infoButton('wm-info', 'working modes')
 1	team_working_mode.js	infoButton(infoId, `${label} prompts`)
 2	team_working_mode.js	label
 1	team_working_mode.js	options
-1	team_working_mode.js	pageRow({ id: 'tsr-instr', label: 'Additional instructions', hint: 'Team-specific conventions, given to agents
-1	team_working_mode.js	pageSwitch('dependency_guidance', 'Include dependent-queue guidance', 'Tells agents how to work when a task wa
-1	team_working_mode.js	pageSwitch('require_goal', 'Require a goal', requireGoalSentence)
-1	team_working_mode.js	switchRow({ label: 'Include dependent-queue guidance', name: 'dependency_guidance', labelClass: 'check-hit' })
-1	team_working_mode.js	switchRow({ label: 'Require a goal', name: 'require_goal', labelClass: 'check-hit', describedBy: ['require-goa
 1	team_working_mode.js	title
-1	team_working_mode.js	workspaceActions
 1	template_browser.js	active
 1	template_browser.js	btnLabel
 1	template_browser.js	meta.length ? `<div class="template-preview-meta">${meta.map(m => escapeHtml(m)).join(' &middot; ')}</div>` : 

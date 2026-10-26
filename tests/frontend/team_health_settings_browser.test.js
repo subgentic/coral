@@ -28,31 +28,31 @@ const { removeBoards } = require('./helpers/board_cleanup');
             assert.ok(r.status < 300, `subscribe ${id}: ${JSON.stringify(r)}`);
         }
         const open = async () => {
-            await ev(`document.getElementById('team-settings-workspace')?.remove(); import((window.__coralStatic || '/static/') + 'team_working_mode.js').then(m => m.showTeamWorkingMode(${JSON.stringify(TEAM)}, { workspace: false })); true`);
-            await waitFor(`!!document.querySelector('[data-settings-tab=health]')`, 'the Health check tab', 15000);
-            await waitFor(`!!document.querySelector('[data-settings-tab=messaging]')`, 'the Messaging tab (drawn after the board\'s cross-team state is read, #5516)', 15000); // so the tab order read below is the settled one
+            await ev(`document.getElementById('team-settings-workspace')?.remove(); import((window.__coralStatic || '/static/') + 'team_working_mode.js').then(m => m.showTeamWorkingMode(${JSON.stringify(TEAM)}, { page: (document.getElementById('qa-ts-host') || document.body.appendChild(Object.assign(document.createElement('div'), { id: 'qa-ts-host', style: 'position:fixed;inset:0;display:flex;z-index:50;background:var(--bg-primary)' }))) })); true`);
+            await waitFor(`!!document.querySelector('#team-settings-workspace .settings-tab[data-section=health]')`, 'the Health check tab', 15000);
+            await waitFor(`!!document.querySelector('#team-settings-workspace .settings-tab[data-section=messaging]')`, 'the Messaging tab (drawn after the board\'s cross-team state is read, #5516)', 15000); // so the tab order read below is the settled one
         };
         // The dialog can be drawn again after the Health check tab first appears (the page's settings arrive after it): a click at that instant finds no tab (null),
         // or lands on the one about to be replaced, and the panel's form is drawn only after the board's settings are read, so a read of it straight after finds null. So click in the same evaluation that finds the tab, until the panel and its form are showing (#4992: TypeError null.click and null.elements, ~10%).
-        const clickHealthTab = () => waitFor(`(() => { const t = document.querySelector('[data-settings-tab=health]'); if (!t) return false; t.click(); const p = document.getElementById('team-settings-health'); return !!p && !p.hidden && !!p.querySelector('form'); })()`, 'the Health check tab clicked and its panel and form showing', 15000);
+        const clickHealthTab = () => waitFor(`(() => { const t = document.querySelector('#team-settings-workspace .settings-tab[data-section=health]'); if (!t) return false; t.click(); const p = document.getElementById('team-settings-health'); return !!p && !p.hidden && !!p.querySelector('form'); })()`, 'the Health check tab clicked and its panel and form showing', 15000);
         await open();
 
         // 1. the tab: named, in the tablist, panel linked, roving order includes it
-        const tab = await ev(`(() => { const t = document.querySelector('[data-settings-tab=health]'); const p = document.getElementById(t.getAttribute('aria-controls')); return { role: t.getAttribute('role'), text: t.textContent, ctl: !!p, panelRole: p.getAttribute('role'), label: p.getAttribute('aria-labelledby'), tabIndex: t.tabIndex, hidden: p.hidden, order: [...document.querySelectorAll('[role=tablist] [role=tab][data-settings-tab]')].map(x => x.dataset.settingsTab) }; })()`);
-        assert.deepEqual(tab, { role: 'tab', text: 'Health check', ctl: true, panelRole: 'tabpanel', label: 'team-settings-tab-health', tabIndex: -1, hidden: true, order: ['workflow', 'prompts', 'health', 'messaging'] });
-        await ev(`document.querySelector('[data-settings-tab=prompts]').focus(); true`);
-        await key('ArrowRight', 'ArrowRight', 39);
-        assert.equal(await ev(`document.activeElement.dataset.settingsTab`), 'health', 'ArrowRight from Prompt inspection reaches Health check');
+        const tab = await ev(`(() => { const t = document.querySelector('#team-settings-workspace .settings-tab[data-section=health]'); const p = document.getElementById(t.getAttribute('aria-controls')); return { role: t.getAttribute('role'), text: t.querySelector('.settings-tab-name').textContent, ctl: !!p, panelRole: p.getAttribute('role'), labelled: p.getAttribute('aria-labelledby') === t.id, tabIndex: t.tabIndex, hidden: p.hidden, order: [...document.querySelectorAll('#team-settings-workspace [role=tablist] [role=tab]')].map(x => x.dataset.section) }; })()`);
+        assert.deepEqual(tab, { role: 'tab', text: 'Health check', ctl: true, panelRole: 'tabpanel', labelled: true, tabIndex: -1, hidden: true, order: ['workflow', 'health', 'messaging', 'prompts'] });
+        await ev(`document.querySelector('#team-settings-workspace .settings-tab[data-section=workflow]').focus(); true`);
+        await key('ArrowDown', 'ArrowDown', 40);
+        assert.equal(await ev(`document.activeElement.dataset.section`), 'health', 'ArrowDown from Workflow reaches Health check');
         await key('Home', 'Home', 36); await key('End', 'End', 35);
-        assert.equal(await ev(`document.activeElement.dataset.settingsTab`), 'messaging', 'End reaches the last tab, Messaging (#5516)');
+        assert.equal(await ev(`document.activeElement.dataset.section`), 'prompts', 'End reaches the last tab, Prompts');
         await clickHealthTab();
-        const shown = await ev(`(() => ({ panel: !document.getElementById('team-settings-health').hidden, mainForm: document.querySelector('form.working-mode-form').hidden, mainSave: !!document.querySelector('form.working-mode-form [type=submit]')?.getClientRects().length }))()`);
-        assert.deepEqual(shown, { panel: true, mainForm: true, mainSave: false });
-        ok('a Health check tab after Global, reached by the arrow keys; the main Save bar is hidden on it');
+        const shown = await ev(`(() => ({ panel: !document.getElementById('team-settings-health').closest('.settings-pane').hidden, bar: !!document.querySelector('#team-settings-workspace .sv-save')?.getClientRects().length }))()`);
+        assert.deepEqual(shown, { panel: true, bar: true });
+        ok('a Health check group after Workflow, reached by the arrow keys; the page\'s one Save bar is there and holds the health check\'s change');
 
         // 2. defaults, labels and the server's limits as the inputs' limits
         const form = await ev(`(() => { const f = document.querySelector('${P} form'); const v = n => f.elements[n]; const nums = [...f.querySelectorAll('input[type=number]')].map(i => [i.name, i.value, i.min, i.max]);
-            const unlabelled = [...f.querySelectorAll('input, select')].filter(e => !(e.closest('label') || e.getAttribute('aria-label'))).map(e => e.name);
+            const unlabelled = [...f.querySelectorAll('input, select')].filter(e => !(e.closest('label') || e.getAttribute('aria-label') || e.getAttribute('aria-labelledby'))).map(e => e.name);
             return { on: v('on').checked, allClear: v('all_clear').checked, rcpt: v('recipient').value, opts: [...v('recipient').options].map(o => o.value + '=' + o.textContent), nums, unlabelled, rev: v('default_reviewers').value, rules: ['auto_delegate', 'claim_nudge', 'status_nudge', 'mention_renudge'].map(r => v(r + '_on').checked), held: !!document.querySelector('[data-rule=held_notice]'), save: f.querySelector('[type=submit]').disabled }; })()`);
         assert.equal(form.on, false, 'a new team has the check off (#4962)'); assert.equal(form.allClear, true); assert.equal(form.rcpt, '');
         assert.deepEqual(form.nums, [['interval_min', '10', '5', '1440'], ['claim_nudge_after_min', '10', '5', '1440'], ['claim_nudge_nudges', '2', '1', '5'], ['status_nudge_after_min', '20', '5', '1440'], ['status_nudge_escalate_after_min', '10', '5', '1440'], ['held_notice_after_min', '10', '5', '1440'], ['mention_renudge_after_min', '10', '5', '1440']]); // the server returns held_notice since Lead's #4225: its card is in the defaults
@@ -135,10 +135,10 @@ const { removeBoards } = require('./helpers/board_cleanup');
 
         // 8. through Coral Hub the GET leaves "health" out: no tab
         await ev(`{ const w = window.fetch; window.fetch = (u, o = {}) => (/board\\/[^/]+\\/settings$/.test(String(u)) && (o.method || 'GET') === 'GET') ? w(u, o).then(async r => { const b = await r.json(); delete b.health; return new Response(JSON.stringify(b), { status: 200, headers: { 'content-type': 'application/json' } }); }) : w(u, o); } true`);
-        await ev(`document.getElementById('team-working-mode-dialog')?.remove(); document.getElementById('team-settings-workspace')?.remove(); import((window.__coralStatic || '/static/') + 'team_working_mode.js').then(m => m.showTeamWorkingMode(${JSON.stringify(TEAM)}, { workspace: false })); true`);
-        await waitFor(`!!document.querySelector('[type=submit]') && !document.querySelector('[type=submit]').disabled`, 'the settings to load', 15000);
+        await ev(`document.getElementById('team-settings-workspace')?.remove(); import((window.__coralStatic || '/static/') + 'team_working_mode.js').then(m => m.showTeamWorkingMode(${JSON.stringify(TEAM)}, { page: (document.getElementById('qa-ts-host') || document.body.appendChild(Object.assign(document.createElement('div'), { id: 'qa-ts-host', style: 'position:fixed;inset:0;display:flex;z-index:50;background:var(--bg-primary)' }))) })); true`);
+        await waitFor(`!!document.querySelector('#team-settings-workspace .sv[data-ready]')`, 'the settings to load', 15000);
         await sleep(400); // sleep-ok: the tab would appear from a late answer, so wait past the load for it not to; no completion event
-        assert.equal(await ev(`!!document.querySelector('[data-settings-tab=health]') || !!document.getElementById('team-settings-health')`), false);
+        assert.equal(await ev(`!!document.querySelector('#team-settings-workspace .settings-tab[data-section=health]') || !!document.getElementById('team-settings-health')`), false);
         ok('no Health check tab when the settings GET has no health (through Coral Hub)');
 
         // 9. phone and 200% text: no sideways scroll in the panel
@@ -149,7 +149,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(`document.documentElement.style.fontSize = ${big ? "'200%'" : "''"}; true`);
             await open(); await clickHealthTab();
             await sleep(500); // sleep-ok: a layout settles over frames; there is no completion event
-            const m = await ev(`(() => { const p = document.getElementById('team-settings-health'); const d = document.querySelector('#team-working-mode-dialog') || p.parentElement; const over = [...p.querySelectorAll('input, select, button, label')].filter(e => e.getClientRects().length && e.getBoundingClientRect().right > innerWidth + 1).map(e => e.name || e.className); return { over, panelScroll: [p.scrollWidth, p.clientWidth], dialogScroll: [d.scrollWidth, d.clientWidth] }; })()`);
+            const m = await ev(`(() => { const p = document.getElementById('team-settings-health'); const d = document.querySelector('#team-settings-workspace') || p.parentElement; const over = [...p.querySelectorAll('input, select, button, label')].filter(e => e.getClientRects().length && e.getBoundingClientRect().right > innerWidth + 1).map(e => e.name || e.className); return { over, panelScroll: [p.scrollWidth, p.clientWidth], dialogScroll: [d.scrollWidth, d.clientWidth] }; })()`);
             assert.deepEqual(m.over, [], `${label}: nothing runs past the screen: ${JSON.stringify(m)}`);
             assert.ok(m.panelScroll[0] <= m.panelScroll[1] + 1, `${label}: no sideways scroll in the panel ${JSON.stringify(m)}`);
             ok(`${label}: no control past the screen edge, no sideways scroll`);

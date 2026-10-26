@@ -1,6 +1,6 @@
 // UI audit #5589, findings 9, 10 and 12: Team settings uses the room it has and has one scroll.
 //   - the side panel is clamp(420px, 30vw, 640px) wide until the person drags it (a saved width is kept);
-//   - Workflow: Team working mode first; the preset editor is behind "Edit presets", closed to begin with, and opens;
+//   - Workflow: the working mode first (the row's own select); the preset editor is behind "Edit presets", closed to begin with, and opens;
 //   - Prompt inspection: one read-only page: effective texts, defaults and overrides folded (closed), no scroll boxes inside it, one role at a time (a select),
 //     and Copy copies the text of the role shown.
 // Drives Chrome over CDP against the isolated dev server.
@@ -35,11 +35,11 @@ const BASE = require('./test_base').BASE;
         await load(1280, 900);
         const sub = await ev(`fetch('/api/board/${TEAM}/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'boss-session' }) }).then(r => r.status)`);
         assert.ok(sub < 300);
-        await ev(`import((window.__coralStatic || '/static/') + 'team_working_mode.js').then(m => m.showTeamWorkingMode(${JSON.stringify(TEAM)}, { workspace: false })); true`);
-        await waitFor(`!!document.querySelector('form.working-mode-form') && document.querySelector('form.working-mode-form').dataset.initialState !== undefined`, 'the Team settings', 15000);
-        const wf = await ev(`(() => { const sections = [...document.querySelectorAll('#team-settings-workflow .team-settings-section')].map(s => s.tagName.toLowerCase() + ':' + (s.querySelector('legend, summary')?.textContent.trim() || s.getAttribute('aria-label'))); const ed = document.querySelector('.preset-editor'); const vis = e => e.checkVisibility({ checkVisibilityCSS: true });
+        await ev(`import((window.__coralStatic || '/static/') + 'team_working_mode.js').then(m => m.showTeamWorkingMode(${JSON.stringify(TEAM)}, { page: (document.getElementById('qa-ts-host') || document.body.appendChild(Object.assign(document.createElement('div'), { id: 'qa-ts-host', style: 'position:fixed;inset:0;display:flex;z-index:50;background:var(--bg-primary)' }))) })); true`);
+        await waitFor(`!!document.querySelector('#team-settings-workspace .sv[data-ready]')`, 'the Team settings', 15000);
+        const wf = await ev(`(() => { const sections = [...document.querySelectorAll('#team-settings-workspace .settings-pane[data-section=workflow] .team-settings-section')].map(s => s.tagName.toLowerCase() + ':' + (s.querySelector('legend, summary')?.textContent.trim() || s.getAttribute('aria-label'))); const ed = document.querySelector('.preset-editor'); const vis = e => e.checkVisibility({ checkVisibilityCSS: true });
             return { sections, open: ed.open, nameVisible: vis(document.querySelector('[name=preset_name]')), modeVisible: vis(document.querySelector('[name=mode]')) }; })()`);
-        assert.deepEqual(wf.sections, ['fieldset:Team working mode', 'details:Edit presets'], JSON.stringify(wf));
+        assert.deepEqual(wf.sections, ['details:Edit presets'], JSON.stringify(wf));
         assert.equal(wf.open, false); assert.equal(wf.nameVisible, false, 'the preset editor is closed'); assert.equal(wf.modeVisible, true);
         await shot('team-settings-workflow-closed');
         await ev(`document.querySelector('.preset-editor > summary').click(); true`);
@@ -47,7 +47,7 @@ const BASE = require('./test_base').BASE;
         await shot('team-settings-workflow-open');
 
         console.log('3. Prompt inspection: one read-only page, one role at a time, Copy');
-        await ev(`document.querySelector('[data-settings-tab=prompts]').click(); true`);
+        await ev(`document.querySelector('#team-settings-workspace .settings-tab[data-section=prompts]').click(); true`);
         await waitFor(`!!document.querySelector('.prompt-inspection-role')`, 'the inspection', 15000);
         const pi = await ev(`(() => ({ details: [...document.querySelectorAll('.prompt-inspection-content details')].filter(d => d.open || !d.classList.contains('prompt-inspection-folded')).length, boxes: [...document.querySelectorAll('.prompt-inspection-content pre')].filter(p => getComputedStyle(p).overflowY !== 'visible').length,
             shown: [...document.querySelectorAll('.prompt-inspection-card')].map(c => !c.hidden), roles: [...document.querySelectorAll('.prompt-inspection-role option')].map(o => o.textContent) }))()`);

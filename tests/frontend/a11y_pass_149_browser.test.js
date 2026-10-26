@@ -46,13 +46,13 @@ const BASE = require('./test_base').BASE;
         console.log('2. Messaging at 200% text on a phone: the primary button wraps');
         await ev(`fetch('/api/board/${TEAM}/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'boss-session' }) }).then(r => r.status)`);
         await start(390, 844, true);
-        await ev(`document.documentElement.style.fontSize = '32px'; import((window.__coralStatic || '/static/') + 'team_working_mode.js').then(m => m.showTeamWorkingMode('${TEAM}', { workspace: false })); true`);
-        await waitFor(`!!document.querySelector('[data-settings-tab=messaging]')`, 'the tabs', 15000);
-        await ev(`document.querySelector('[data-settings-tab=messaging]').click(); true`);
+        await ev(`document.documentElement.style.fontSize = '32px'; import((window.__coralStatic || '/static/') + 'team_working_mode.js').then(m => m.showTeamWorkingMode('${TEAM}', { page: (document.getElementById('qa-ts-host') || document.body.appendChild(Object.assign(document.createElement('div'), { id: 'qa-ts-host', style: 'position:fixed;inset:0;display:flex;z-index:50;background:var(--bg-primary)' }))) })); true`);
+        await waitFor(`!!document.querySelector('#team-settings-workspace .settings-tab[data-section=messaging]')`, 'the tabs', 15000);
+        await ev(`document.querySelector('#team-settings-workspace .settings-tab[data-section=messaging]').click(); true`);
         await waitFor(`!!document.querySelector('.xt-primary')`, 'the primary button', 15000);
-        const b = await ev(`(() => { const e = document.querySelector('.xt-primary'); const r = e.getBoundingClientRect(); const d = document.getElementById('team-working-mode-dialog').getBoundingClientRect(); return { text: e.textContent.trim().slice(0, 40), clipped: e.scrollWidth > e.clientWidth + 1, right: Math.round(r.right), dialogRight: Math.round(d.right), lines: Math.round(r.height / parseFloat(getComputedStyle(e).lineHeight || 20)) }; })()`);
+        const b = await ev(`(() => { const e = document.querySelector('.xt-primary'); const r = e.getBoundingClientRect(); const d = document.getElementById('team-settings-workspace').getBoundingClientRect(); return { text: e.textContent.trim().slice(0, 40), clipped: e.scrollWidth > e.clientWidth + 1, right: Math.round(r.right), dialogRight: Math.round(d.right), lines: Math.round(r.height / parseFloat(getComputedStyle(e).lineHeight || 20)) }; })()`);
         assert.equal(b.clipped, false, 'the label is not cut off: ' + JSON.stringify(b)); assert.ok(b.right <= b.dialogRight + 1, 'and the button stays in the panel: ' + JSON.stringify(b));
-        await ev(`document.getElementById('team-working-mode-dialog')?.close?.(); document.documentElement.style.fontSize = ''; true`);
+        await ev(`document.getElementById('qa-ts-host')?.remove(); document.documentElement.style.fontSize = ''; true`);
 
         console.log('3. Network and Hub: the access list reads as a sentence');
         await start(1280, 900, false);

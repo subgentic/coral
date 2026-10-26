@@ -117,13 +117,13 @@ const { removeBoards } = require('./helpers/board_cleanup');
             const r = await ev(`fetch('/api/board/${TEAM}/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: ${JSON.stringify(id)}, job_title: ${JSON.stringify(title)}, session_name: ${JSON.stringify(id.toLowerCase().replace(' ', '-') + '-session')} }) }).then(r => r.status)`);
             assert.ok(r < 300, `subscribe ${id}: ${r}`);
         }
-        await ev(`import((window.__coralStatic || '/static/') + 'team_working_mode.js').then(m => m.showTeamWorkingMode(${JSON.stringify(TEAM)}, { workspace: false })); true`);
-        await waitFor(`!!document.querySelector('[data-settings-tab=health]')`, 'the Health check tab', 15000);
-        await ev(`document.querySelector('[data-settings-tab=health]').click(); true`);
+        await ev(`import((window.__coralStatic || '/static/') + 'team_working_mode.js').then(m => m.showTeamWorkingMode(${JSON.stringify(TEAM)}, { page: (document.getElementById('qa-ts-host') || document.body.appendChild(Object.assign(document.createElement('div'), { id: 'qa-ts-host', style: 'position:fixed;inset:0;display:flex;z-index:50;background:var(--bg-primary)' }))) })); true`);
+        await waitFor(`!!document.querySelector('#team-settings-workspace .settings-tab[data-section=health]')`, 'the Health check tab', 15000);
+        await ev(`document.querySelector('#team-settings-workspace .settings-tab[data-section=health]').click(); true`);
         await waitFor(`!document.getElementById('team-settings-health').hidden`, 'the panel shows');
         await DOM.enable(); await Accessibility.enable();
-        const doc = await DOM.getDocument({ depth: -1 });
         const ax = async selector => {
+            const doc = await DOM.getDocument({ depth: -1 });
             const { nodeId } = await DOM.querySelector({ nodeId: doc.root.nodeId, selector });
             const { nodes } = await Accessibility.getPartialAXTree({ nodeId, fetchRelatives: false });
             const n = nodes[0];
@@ -131,7 +131,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         };
         const P = '#team-settings-health';
         const on = await ax(`${P} input[name=on]`);
-        assert.equal(on.name, 'Send health check'); assert.match(on.desc, /Uses tokens each time\./); assert.match(on.desc, /Checks in on the team every few minutes/); // the hint, and the explanation behind the (i)
+        assert.equal(on.name, 'Send health check'); assert.match(on.desc, /Uses tokens each time\./); // the hint (the page has no (i) explanation behind it)
         const every = await ax(`${P} input[name=interval_min]`);
         assert.equal(every.name, 'Every minutes'); assert.equal(every.desc, '5 to 1440');
         await ev(`document.querySelector('${P} .health-advanced').open = true; true`); // Reviews and the automatic rules are behind one disclosure (#5589 finding 11)

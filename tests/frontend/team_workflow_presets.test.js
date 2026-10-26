@@ -20,9 +20,9 @@ const TEAM_A = 'team-alpha-' + RUN, TEAM_B = 'team-beta-' + RUN;
   const { waitFor } = require('./helpers/wait').bind(ev);
 const { removeBoards } = require('./helpers/board_cleanup');
   // load() sets data-initial-state once the team's mode, presets and settings are in the form.
-  const formOpen = () => waitFor(`document.querySelector('.working-mode-form')?.dataset.initialState !== undefined`, 'the working-mode form to load');
-  const statusSet = () => waitFor(`(t => t && !/saving|resetting|loading/i.test(t))(document.querySelector('.working-mode-status')?.textContent.trim())`, 'the status message');
-  const dialogGone = () => waitFor(`!document.getElementById('team-working-mode-dialog')`, 'the dialog to close');
+  const formOpen = () => waitFor(`!!document.querySelector('#team-settings-workspace .sv[data-ready]')`, 'the working-mode form to load');
+  const statusSet = () => waitFor(`(t => t && !/saving|resetting|loading|unsaved changes|No changes to save/i.test(t))(document.querySelector('#team-settings-workspace .sv-status')?.textContent.trim())`, 'the status message');
+  const dialogGone = () => waitFor(`!document.getElementById('team-settings-workspace')`, 'the page to go');
   try {
     await Page.enable();
     await Page.navigate({ url: BASE });
@@ -32,34 +32,37 @@ const { removeBoards } = require('./helpers/board_cleanup');
 
     // Load team settings dialog module
     await ev(`import((window.__coralStatic||'/static/')+'team_working_mode.js').then(m => { window.showTeamWorkingMode = m.showTeamWorkingMode; })`);
+    // The team's Settings tab is drawn into a host of its own; __f finds a control by name, __set changes one as a person does (the page follows the change event).
+    await ev(`window.__open = team => { document.getElementById('qa-ts-host')?.remove(); return window.showTeamWorkingMode(team, { page: document.body.appendChild(Object.assign(document.createElement('div'), { id: 'qa-ts-host', style: 'position:fixed;inset:0;display:flex;z-index:50;background:var(--bg-primary)' })) }); };
+      window.__f = name => document.querySelector('#team-settings-workspace [name="' + name + '"]');
+      window.__set = (name, v) => { const e = window.__f(name); if (e.type === 'checkbox') e.checked = v; else e.value = v; e.dispatchEvent(new Event(e.tagName === 'SELECT' || e.type === 'checkbox' ? 'change' : 'input', { bubbles: true })); e.dispatchEvent(new Event('change', { bubbles: true })); }; true`);
 
     // 1. Initial load for team-alpha
-    await ev(`window.showTeamWorkingMode('${TEAM_A}')`);
+    await ev(`window.__open('${TEAM_A}')`);
     await formOpen();
 
     // Verify initial working mode is none
-    const initialMode = await ev(`document.querySelector('.working-mode-form').elements.mode.value`);
+    const initialMode = await ev(`window.__f('mode').value`);
     assert.equal(initialMode, 'none', 'Initial mode should be none');
 
     // Verify initial preset options are the built-in ones: none, shared_checkout, worktrees, merge_queue
-    const initialPresets = await ev(`Array.from(document.querySelector('.working-mode-form').elements.preset.options).map(o => o.value)`);
+    const initialPresets = await ev(`Array.from(window.__f('preset').options).map(o => o.value)`);
     assert.deepEqual(initialPresets, ['none', 'shared_checkout', 'worktrees', 'merge_queue']);
 
-    const settingsTabs = await ev(`Array.from(document.querySelectorAll('[data-settings-tab]')).map(tab => ({label: tab.textContent.trim(), selected: tab.getAttribute('aria-selected')}))`);
+    const settingsTabs = await ev(`Array.from(document.querySelectorAll('#team-settings-workspace .settings-tab')).map(tab => ({label: tab.querySelector('.settings-tab-name').textContent.trim(), selected: tab.getAttribute('aria-selected')}))`);
     assert.deepEqual(settingsTabs, [
       { label: 'Workflow', selected: 'true' },
-      { label: 'Prompt inspection', selected: 'false' },
       { label: 'Health check', selected: 'false' }, // #4230: the real settings API returns a health object
       { label: 'Messaging', selected: 'false' }, // #5516: shown whether or not the allowlist is in force
+      { label: 'Prompts', selected: 'false' },
     ], 'Team settings should expose clear section tabs');
-    await ev(`document.querySelector('[data-settings-tab="prompts"]').click()`);
-    assert.equal(await ev(`document.querySelector('[data-settings-panel="workflow"]').hidden`), true, 'Workflow panel should hide while inspecting prompts');
-    assert.equal(await ev(`document.querySelector('[data-settings-panel="prompts"]').hidden`), false, 'Prompt panel should be visible when selected');
-    const scrolledLayout = await ev(`(() => { const d=document.querySelector('#team-working-mode-dialog'), f=document.querySelector('.working-mode-form'); f.scrollTop=f.scrollHeight; return {headerTop:d.querySelector('header').getBoundingClientRect().top, dialogTop:d.getBoundingClientRect().top, saveVisible:d.querySelector('.team-settings-actions').getBoundingClientRect().bottom <= d.getBoundingClientRect().bottom, details:[...d.querySelectorAll('.prompt-inspection-fragment')].every(detail => !detail.open)}; })()`);
-    assert.ok(scrolledLayout.headerTop >= scrolledLayout.dialogTop, 'Dialog header should remain reachable at the bottom of long prompt content');
-    assert.equal(scrolledLayout.saveVisible, true, 'Shared Save action should remain reachable from every tab');
+    await ev(`document.querySelector('#team-settings-workspace .settings-tab[data-section="prompts"]').click()`);
+    assert.equal(await ev(`document.querySelector('#team-settings-workspace .settings-pane[data-section="workflow"]').hidden`), true, 'Workflow panel should hide while inspecting prompts');
+    assert.equal(await ev(`document.querySelector('#team-settings-workspace .settings-pane[data-section="prompts"]').hidden`), false, 'Prompt panel should be visible when selected');
+    const scrolledLayout = await ev(`(() => { const d = document.querySelector('#team-settings-workspace'), p = d.querySelector('.settings-panes'); p.scrollTop = p.scrollHeight; return { saveVisible: d.querySelector('.sv-bar').getBoundingClientRect().bottom <= innerHeight + 1, details: [...d.querySelectorAll('.prompt-inspection-fragment')].every(detail => !detail.open) }; })()`);
+    assert.equal(scrolledLayout.saveVisible, true, 'The page\'s Save bar should remain reachable from every group');
     assert.equal(scrolledLayout.details, true, 'Long prompt fragments should be collapsed by default');
-    await ev(`document.querySelector('[data-settings-tab="workflow"]').click()`);
+    await ev(`document.querySelector('#team-settings-workspace .settings-tab[data-section="workflow"]').click()`);
 
     // Verify prompt inspection cards
     const inspectionText = await ev(`document.querySelector('.prompt-inspection-content').textContent`);
@@ -77,70 +80,70 @@ const { removeBoards } = require('./helpers/board_cleanup');
 
     // 2. Create custom preset
     await ev(`document.querySelector('.preset-new').click()`);
-    const customPresetId = await ev(`document.querySelector('.working-mode-form').elements.preset.value`);
+    const customPresetId = await ev(`window.__f('preset').value`);
     assert.ok(customPresetId.startsWith('custom-'), 'New preset has custom- prefix');
 
     await ev(`(() => {
-      const form = document.querySelector('.working-mode-form');
-      form.elements.preset_name.value = 'Sprint Workflow';
-      form.elements.preset_instructions.value = 'All PRs must include unit tests and pass lint.';
-      document.querySelector('.working-mode-status').textContent = ''; document.querySelector('.preset-save').click();
+      const form = document.querySelector('#team-settings-workspace');
+      window.__set('preset_name', 'Sprint Workflow');
+      window.__set('preset_instructions', 'All PRs must include unit tests and pass lint.');
+      document.querySelector('#team-settings-workspace .sv-status').textContent = ''; document.querySelector('.preset-save').click();
     })()`);
     await statusSet();
 
-    const saveStatus = await ev(`document.querySelector('.working-mode-status').textContent`);
+    const saveStatus = await ev(`document.querySelector('#team-settings-workspace .sv-status').textContent`);
     assert.ok(saveStatus.includes('Workflow preset saved'), `Status should indicate saved: ${saveStatus}`);
 
     // Verify mode options now include the custom preset
-    const modeOptionsAfterCreate = await ev(`Array.from(document.querySelector('.working-mode-form').elements.mode.options).map(o => o.value)`);
+    const modeOptionsAfterCreate = await ev(`Array.from(window.__f('mode').options).map(o => o.value)`);
     assert.ok(modeOptionsAfterCreate.includes(customPresetId), 'Mode options should include the newly created custom preset');
 
     console.log('✓ Custom preset creation verified');
 
     // 3. Edit custom preset and re-save (must use PUT and succeed, not 409 conflict)
     await ev(`(() => {
-      const form = document.querySelector('.working-mode-form');
-      form.elements.preset_instructions.value = 'All PRs must include unit tests, pass lint, and have approval.';
-      document.querySelector('.working-mode-status').textContent = ''; document.querySelector('.preset-save').click();
+      const form = document.querySelector('#team-settings-workspace');
+      window.__set('preset_instructions', 'All PRs must include unit tests, pass lint, and have approval.');
+      document.querySelector('#team-settings-workspace .sv-status').textContent = ''; document.querySelector('.preset-save').click();
     })()`);
     await statusSet();
 
-    const editStatus = await ev(`document.querySelector('.working-mode-status').textContent`);
+    const editStatus = await ev(`document.querySelector('#team-settings-workspace .sv-status').textContent`);
     assert.ok(editStatus.includes('Workflow preset saved'), `Re-save should succeed without 409 conflict: ${editStatus}`);
 
     console.log('✓ Custom preset re-saving (PUT) verified');
 
     // 4. Select custom preset as active team working mode and save team settings
     await ev(`(() => {
-      const form = document.querySelector('.working-mode-form');
-      form.elements.mode.value = '${customPresetId}';
-      form.elements.dependency_guidance.checked = true;
-      form.elements.custom_instructions.value = 'Follow ${TEAM_A} conventions.';
-      document.querySelector('.working-mode-status').textContent = ''; form.querySelector('button[type=submit]').click();
+      const form = document.querySelector('#team-settings-workspace');
+      window.__set('mode', '${customPresetId}');
+      window.__set('dependency_guidance', true);
+      window.__set('custom_instructions', 'Follow ${TEAM_A} conventions.');
+      document.querySelector('#team-settings-workspace .sv-status').textContent = ''; document.querySelector('#team-settings-workspace .sv-save').click();
     })()`);
     await statusSet();
 
-    const teamSaveStatus = await ev(`document.querySelector('.working-mode-status').textContent`);
+    const teamSaveStatus = await ev(`document.querySelector('#team-settings-workspace .sv-status').textContent`);
     assert.ok(teamSaveStatus.includes('Saved. Working mode applies on first claim'), `Team settings saved: ${teamSaveStatus}`);
 
     console.log('✓ Team working mode selection with custom preset saved');
 
     // 5. Close dialog and reopen: verify persistence across reopen
-    await ev(`document.querySelector('#team-working-mode-dialog header .modal-close-btn').click()`);
+    await ev(`document.getElementById('qa-ts-host').remove()`);
     await dialogGone();
-    assert.equal(await ev(`document.getElementById('team-working-mode-dialog')`), null, 'Dialog should be closed');
+    assert.equal(await ev(`document.getElementById('team-settings-workspace')`), null, 'Dialog should be closed');
 
-    await ev(`window.showTeamWorkingMode('${TEAM_A}')`);
+    await ev(`window.__open('${TEAM_A}')`);
     await formOpen();
 
-    const reopenedMode = await ev(`document.querySelector('.working-mode-form').elements.mode.value`);
+    const reopenedMode = await ev(`window.__f('mode').value`);
     assert.equal(reopenedMode, customPresetId, 'Reopened mode should match saved custom preset');
 
     const reopenedCustomText = await ev(`(() => {
-      const form = document.querySelector('.working-mode-form');
-      form.elements.preset.value = '${customPresetId}';
-      form.elements.preset.onchange();
-      return form.elements.preset_instructions.value;
+      const form = document.querySelector('#team-settings-workspace');
+      window.__f('preset').value = '${customPresetId}';
+      window.__f('preset').onchange();
+      return window.__f('preset_instructions').value;
     })()`);
     assert.equal(reopenedCustomText, 'All PRs must include unit tests, pass lint, and have approval.');
 
@@ -149,9 +152,9 @@ const { removeBoards } = require('./helpers/board_cleanup');
     // 6. Board-local built-in overrides and reset
     // Select shared_checkout
     await ev(`(() => {
-      const form = document.querySelector('.working-mode-form');
-      form.elements.preset.value = 'shared_checkout';
-      form.elements.preset.onchange();
+      const form = document.querySelector('#team-settings-workspace');
+      window.__f('preset').value = 'shared_checkout';
+      window.__f('preset').onchange();
     })()`);
 
     const isResetHiddenInitially = await ev(`document.querySelector('.preset-reset').hidden`);
@@ -159,30 +162,30 @@ const { removeBoards } = require('./helpers/board_cleanup');
 
     // Override with empty instructions
     await ev(`(() => {
-      const form = document.querySelector('.working-mode-form');
-      form.elements.preset_instructions.value = '';
-      document.querySelector('.working-mode-status').textContent = ''; document.querySelector('.preset-save').click();
+      const form = document.querySelector('#team-settings-workspace');
+      window.__set('preset_instructions', '');
+      document.querySelector('#team-settings-workspace .sv-status').textContent = ''; document.querySelector('.preset-save').click();
     })()`);
     await statusSet();
 
-    const emptyOverrideStatus = await ev(`document.querySelector('.working-mode-status').textContent`);
+    const emptyOverrideStatus = await ev(`document.querySelector('#team-settings-workspace .sv-status').textContent`);
     assert.ok(emptyOverrideStatus.includes('Workflow preset saved'), `Empty override should be accepted: ${emptyOverrideStatus}`);
 
     // Verify empty instructions are preserved (not falling back to default text)
-    const currentInstructions = await ev(`document.querySelector('.working-mode-form').elements.preset_instructions.value`);
+    const currentInstructions = await ev(`window.__f('preset_instructions').value`);
     assert.equal(currentInstructions, '', 'Empty built-in override must display empty text, not default text');
 
     const isResetVisibleNow = await ev(`document.querySelector('.preset-reset').hidden`);
     assert.equal(isResetVisibleNow, false, 'Reset button should be visible after override');
 
     // Reset the built-in preset
-    await ev(`document.querySelector('.working-mode-status').textContent = ''; document.querySelector('.preset-reset').click()`);
+    await ev(`document.querySelector('#team-settings-workspace .sv-status').textContent = ''; document.querySelector('.preset-reset').click()`);
     await statusSet();
 
-    const resetStatus = await ev(`document.querySelector('.working-mode-status').textContent`);
+    const resetStatus = await ev(`document.querySelector('#team-settings-workspace .sv-status').textContent`);
     assert.ok(resetStatus.includes('Built-in preset reset'), `Status should indicate reset: ${resetStatus}`);
 
-    const restoredInstructions = await ev(`document.querySelector('.working-mode-form').elements.preset_instructions.value`);
+    const restoredInstructions = await ev(`window.__f('preset_instructions').value`);
     assert.ok(restoredInstructions.includes('In the shared checkout'), `Default instructions restored: ${restoredInstructions}`);
 
     const isResetHiddenAfterReset = await ev(`document.querySelector('.preset-reset').hidden`);
@@ -193,35 +196,35 @@ const { removeBoards } = require('./helpers/board_cleanup');
     // 7. Validation and edit preservation on failure
     await ev(`document.querySelector('.preset-new').click()`);
     await ev(`(() => {
-      const form = document.querySelector('.working-mode-form');
-      form.elements.preset_name.value = '';
-      form.elements.preset_instructions.value = 'Valuable text that must not be cleared.';
-      document.querySelector('.working-mode-status').textContent = ''; document.querySelector('.preset-save').click();
+      const form = document.querySelector('#team-settings-workspace');
+      window.__set('preset_name', '');
+      window.__set('preset_instructions', 'Valuable text that must not be cleared.');
+      document.querySelector('#team-settings-workspace .sv-status').textContent = ''; document.querySelector('.preset-save').click();
     })()`);
 
-    const valError = await ev(`document.querySelector('.working-mode-status').textContent`);
+    const valError = await ev(`document.querySelector('#team-settings-workspace .sv-status').textContent`);
     assert.ok(valError.includes('Preset name is required'), `Validation error shown: ${valError}`);
 
-    const preservedText = await ev(`document.querySelector('.working-mode-form').elements.preset_instructions.value`);
+    const preservedText = await ev(`window.__f('preset_instructions').value`);
     assert.equal(preservedText, 'Valuable text that must not be cleared.', 'Typed instructions must be preserved on validation error');
 
     console.log('✓ Validation and edit preservation verified');
 
     // Close dialog
-    await ev(`document.querySelector('#team-working-mode-dialog header .modal-close-btn').click()`);
+    await ev(`document.getElementById('qa-ts-host').remove()`);
     await dialogGone();
 
     // 8. Team isolation: team-beta should NOT have team-alpha's custom preset
-    await ev(`window.showTeamWorkingMode('${TEAM_B}')`);
+    await ev(`window.__open('${TEAM_B}')`);
     await formOpen();
 
-    const betaPresets = await ev(`Array.from(document.querySelector('.working-mode-form').elements.preset.options).map(o => o.value)`);
+    const betaPresets = await ev(`Array.from(window.__f('preset').options).map(o => o.value)`);
     assert.ok(!betaPresets.includes(customPresetId), 'team-beta should not have team-alpha custom preset');
 
-    const betaMode = await ev(`document.querySelector('.working-mode-form').elements.mode.value`);
+    const betaMode = await ev(`window.__f('mode').value`);
     assert.equal(betaMode, 'none', 'team-beta mode should be isolated');
 
-    await ev(`document.querySelector('#team-working-mode-dialog header .modal-close-btn').click()`);
+    await ev(`document.getElementById('qa-ts-host').remove()`);
     await dialogGone();
 
     console.log('✓ Team isolation verified');

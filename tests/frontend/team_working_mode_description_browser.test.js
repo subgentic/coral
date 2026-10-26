@@ -19,34 +19,34 @@ const BASE = require('./test_base').BASE;
             const call = (m, p, body) => ev(`fetch('/api/board/${TEAM}/${p}', { method: ${JSON.stringify(m)}, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(${JSON.stringify(body)}) }).then(r => r.status)`);
             assert.ok(await call('POST', 'subscribe', { subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'boss-session' }) < 300);
             if (!mobile) assert.equal(await call('POST', 'working-mode/presets', { id: 'mine', name: 'Mine', instructions: 'My way.', subscriber_id: 'Boss' }), 201);
-            await ev(`import((window.__coralStatic || '/static/') + 'team_working_mode.js').then(m => m.showTeamWorkingMode(${JSON.stringify(TEAM)}, { workspace: false })); true`);
-            await waitFor(`!!document.querySelector('form.working-mode-form') && document.querySelector('form.working-mode-form').dataset.initialState !== undefined`, 'the Team settings', 15000);
-            await waitFor(`[...document.querySelector('form.working-mode-form select[name=mode]').options].some(o => o.value === 'merge_queue')`, 'the presets in the list', 15000);
-            const modeLabels = await ev(`[...document.querySelector('form.working-mode-form select[name=mode]').options].map(o => o.textContent)`);
+            await ev(`import((window.__coralStatic || '/static/') + 'team_working_mode.js').then(m => m.showTeamWorkingMode(${JSON.stringify(TEAM)}, { page: (document.getElementById('qa-ts-host') || document.body.appendChild(Object.assign(document.createElement('div'), { id: 'qa-ts-host', style: 'position:fixed;inset:0;display:flex;z-index:50;background:var(--bg-primary)' }))) })); true`);
+            await waitFor(`!!document.querySelector('#team-settings-workspace .sv[data-ready]')`, 'the Team settings', 15000);
+            await waitFor(`[...document.querySelector('#team-settings-workspace select[name=mode]').options].some(o => o.value === 'merge_queue')`, 'the presets in the list', 15000);
+            const modeLabels = await ev(`[...document.querySelector('#team-settings-workspace select[name=mode]').options].map(o => o.textContent)`);
             assert.ok(['None', 'Shared checkout', 'Worktrees', 'Merge queue'].every(l => modeLabels.includes(l)) && !modeLabels.some(l => /built in/i.test(l)), 'the modes read the same way: no "built in" suffix on one of them: ' + JSON.stringify(modeLabels));
-            const read = id => ev(`(() => { const f = document.querySelector('form.working-mode-form'); const sel = f.elements.mode; sel.value = ${JSON.stringify(id)}; sel.dispatchEvent(new Event('change', { bubbles: true })); const d = document.getElementById(sel.getAttribute('aria-describedby')); const r = d.getBoundingClientRect(); return { text: d.textContent, hidden: d.hidden || !d.getClientRects().length, right: r.right, vw: innerWidth, h: Math.round(r.height) }; })()`);
+            const read = id => ev(`(() => { const f = document.querySelector('#team-settings-workspace'); const sel = f.querySelector('select[name=mode]'); sel.value = ${JSON.stringify(id)}; sel.dispatchEvent(new Event('change', { bubbles: true })); const d = document.getElementById('working-mode-desc'); const r = d.getBoundingClientRect(); return { text: d.textContent, hidden: d.hidden || !d.getClientRects().length, right: r.right, vw: innerWidth, h: Math.round(r.height) }; })()`);
             const want = { none: 'No extra guidance.', shared_checkout: 'Everyone works in one checkout; agents coordinate who edits which files.', worktrees: 'Each agent works in its own Git worktree and branch from the agreed base.', merge_queue: 'Agents hand in patches for review; one role lands them with coral-board queue.' };
             for (const [id, text] of Object.entries(want)) {
                 const r = await read(id);
                 assert.equal(r.text, text, `${id}: the line says what the mode means`);
                 assert.ok(!r.hidden && r.right <= r.vw + 1, `${id}: the line shows and fits the window: ${JSON.stringify(r)}`);
             }
-            const link = await ev(`(() => { const s = document.querySelector('form.working-mode-form select[name=mode]'); const id = s.getAttribute('aria-describedby'); return { id, ok: !!id && document.querySelectorAll('#' + id).length === 1 }; })()`);
-            assert.ok(link.ok, 'the list is described by exactly one element: ' + JSON.stringify(link));
+            const link = await ev(`(() => { const s = document.querySelector('#team-settings-workspace select[name=mode]'); const ids = (s.getAttribute('aria-describedby') || '').split(/\\s+/); return { ids, ok: ids.includes('working-mode-desc') && ids.every(id => document.querySelectorAll('#' + id).length === 1) }; })()`);
+            assert.ok(link.ok, 'the list is described by its hint and the line, each exactly one element: ' + JSON.stringify(link));
             if (!mobile) { const r = await read('mine'); assert.equal(r.text, '', 'a team\'s own preset has no description'); assert.ok(r.hidden, 'and the line is hidden, not an empty paragraph'); }
             if (process.env.CORAL_SCREENSHOT_DIR) { // CORAL_SCREENSHOT_DIR=<dir>: the Workflow tab with Merge queue chosen, for a look
                 await read('merge_queue'); require('node:fs').mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true });
                 require('node:fs').writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/working-mode-${w}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));
             }
             // choosing a preset in Edit presets changes the mode, and the line follows
-            await ev(`(() => { const p = document.querySelector('form.working-mode-form select[name=preset]'); p.value = 'worktrees'; p.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+            await ev(`(() => { const p = document.querySelector('#team-settings-workspace select[name=preset]'); p.value = 'worktrees'; p.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
             assert.equal(await ev(`document.getElementById('working-mode-desc').textContent`), want.worktrees, 'the line follows the preset chosen for editing');
             { // the description and the Workflow tab hold 4.5:1 in both themes, the real light one included (#5781)
                 const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
                 await installAudit(ev); await read('merge_queue');
                 for (const theme of ['dark', 'light']) {
                     await setTheme(ev, theme);
-                    const au = await auditRegion(ev, ['#team-settings-workflow']);
+                    const au = await auditRegion(ev, ['#team-settings-workspace .settings-pane[data-section=workflow]']);
                     assert.ok(au.checked > 0 && !au.fails.length, `${w} px, ${theme}: the Workflow tab holds 4.5:1: ${JSON.stringify(au.fails).slice(0, 500)}`);
                     if (process.env.CORAL_SCREENSHOT_DIR) require('node:fs').writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/working-mode-${w}-${theme}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));
                 }

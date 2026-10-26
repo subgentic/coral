@@ -64,17 +64,17 @@ const MEASURE = `(() => {
                 await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
                 await ev(`window.__coralReady.startup('liveList', 'settings')`);
                 await ev(`fetch('/api/board/${TEAM}/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'boss-session' }) }).then(r => r.status)`);
-                await ev(`import((window.__coralStatic || '/static/') + 'team_working_mode.js').then(m => m.showTeamWorkingMode(${JSON.stringify(TEAM)}, { workspace: false })); true`);
-                await waitFor(`!!document.querySelector('form.working-mode-form') && document.querySelector('form.working-mode-form').dataset.initialState !== undefined`, 'the Team settings', 15000);
-                const tabs = await ev(`[...document.querySelectorAll('[data-settings-tab]')].map(t => t.dataset.settingsTab)`);
+                await ev(`import((window.__coralStatic || '/static/') + 'team_working_mode.js').then(m => m.showTeamWorkingMode(${JSON.stringify(TEAM)}, { page: (document.getElementById('qa-ts-host') || document.body.appendChild(Object.assign(document.createElement('div'), { id: 'qa-ts-host', style: 'position:fixed;inset:0;display:flex;z-index:50;background:var(--bg-primary)' }))) })); true`);
+                await waitFor(`!!document.querySelector('#team-settings-workspace .sv[data-ready]')`, 'the Team settings', 15000);
+                const tabs = await ev(`[...document.querySelectorAll('#team-settings-workspace .settings-tab[data-section]')].map(t => t.dataset.section)`);
                 const seen = [];
                 for (const t of tabs) {
-                    await ev(`document.querySelector('[data-settings-tab=' + JSON.stringify(${JSON.stringify(t)}) + ']').click(); window.__infoRoot = '.settings-info-btn'; true`);
+                    await ev(`document.querySelector('#team-settings-workspace .settings-tab[data-section=' + JSON.stringify(${JSON.stringify(t)}) + ']').click(); window.__infoRoot = '.settings-info-btn'; true`);
                     await sleep(500); // sleep-ok: the page draws
                     for (const x of await ev(MEASURE)) seen.push({ g: t, ...x });
                     if (t === 'workflow' || t === 'health') await shot(`info-team-${t}-${w}`);
                 }
-                check(`${tag}: found the (i) buttons of ${tabs.join(', ')}`, seen.length >= 3, `${seen.length} buttons`);
+                check(`${tag}: found the (i) buttons of ${tabs.join(', ')}`, seen.length >= 3, `${seen.length} buttons in ${[...new Set(seen.map(x => x.g))].join(', ')}`); // the Health check's rows and the prompt preview's cards keep theirs; the component's rows have a Learn more
                 const big = seen.filter(x => x.w > 24.5 || x.h > 24.5);
                 check(`${tag}: every (i) is a circle of at most 24 px`, big.length === 0, JSON.stringify(big.slice(0, 4)));
                 const off = seen.filter(x => x.first && Math.abs(x.cy - x.first.cy) > 5);

@@ -38,9 +38,9 @@ const SID = '0b7c2e4a-5d1f-4c8e-9a36-2f4d8e1b7c90';
             if (p === '/api/cloud/status' && window.__xt.cloud) return json(window.__xt.cloud);
             return R(u, o); }; return true; })()`);
     const open = async (opts = {}) => {
-        await ev(`document.getElementById('team-settings-workspace')?.remove(); document.getElementById('team-working-mode-dialog')?.remove(); import(${S} + 'team_working_mode.js').then(m => m.showTeamWorkingMode(${JSON.stringify(TEAM)}, { workspace: false })); true`);
-        await waitFor(`${opts.noHealth ? 'true' : "!!document.querySelector('[data-settings-tab=health]')"} && !!document.querySelector('#team-settings-messaging form, #team-settings-messaging .ct-unavailable')`, 'the settings dialog and the Messaging panel', 15000);
-        await ev(`document.querySelector('[data-settings-tab=messaging]').click(); true`);
+        await ev(`document.getElementById('team-settings-workspace')?.remove(); import(${S} + 'team_working_mode.js').then(m => m.showTeamWorkingMode(${JSON.stringify(TEAM)}, { page: (document.getElementById('qa-ts-host') || document.body.appendChild(Object.assign(document.createElement('div'), { id: 'qa-ts-host', style: 'position:fixed;inset:0;display:flex;z-index:50;background:var(--bg-primary)' }))) })); true`);
+        await waitFor(`${opts.noHealth ? 'true' : "!!document.querySelector('#team-settings-workspace .settings-tab[data-section=health]')"} && !!document.querySelector('#team-settings-messaging form, #team-settings-messaging .ct-unavailable')`, 'the settings dialog and the Messaging panel', 15000);
+        await ev(`document.querySelector('#team-settings-workspace .settings-tab[data-section=messaging]').click(); true`);
         await settle(150);
     };
     const P = '#team-settings-messaging';

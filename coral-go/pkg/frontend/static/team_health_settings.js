@@ -60,7 +60,7 @@ export function healthPanelHTML(h, members, embedded = false) {
     return `<form class="health-form working-mode-form" autocomplete="off" novalidate>
       <fieldset class="team-settings-section" aria-label="Health check">
       ${embedded ? `${pageSwitch('on', 'Send health check', 'Checks on stuck or idle agents. Uses tokens each time.', { checked: h.on })}
-        ${pageRow({ id: 'hc-every', label: 'Every', control: `<span class="ts-inline"><input type="number" name="interval_min" id="hk-interval_min" value="${Number(h.interval_min)}" min="${MIN_LO}" max="${MIN_HI}" aria-labelledby="hc-every-l" title="${escapeAttr(`${MIN_LO} to ${MIN_HI}`)}"> minutes</span>` })}
+        ${pageRow({ id: 'hc-every', label: 'Every', control: `<span class="ts-inline"><input type="number" name="interval_min" id="hk-interval_min" value="${Number(h.interval_min)}" min="${MIN_LO}" max="${MIN_HI}" aria-labelledby="hc-every-l hc-every-unit" title="${escapeAttr(`${MIN_LO} to ${MIN_HI}`)}"> <span id="hc-every-unit">minutes</span></span>` })}
         ${pageRow({ id: 'hc-to', label: 'Send it to', control: `<select name="recipient" aria-labelledby="hc-to-l">${options.join('')}</select>` })}
         <span data-check-dep>${pageSwitch('all_clear', 'Post when all is well', 'So a quiet team is not mistaken for a stopped check.', { checked: h.all_clear })}</span>` : `<div class="health-line">${switchRow({ label: 'Send health check', name: 'on', checked: h.on, labelClass: 'health-rule-head', labelId: 'hc-on-t', titleTag: 'b', desc: 'Uses tokens each time.', descId: 'hc-on-h', descClass: 'health-why', descInside: true, sep: ' ', describedBy: ['hc-on-w'] })}${infoButton('hc-on-w', 'the health check')}</div>
         ${infoBox('hc-on-w', 'Checks in on the team every few minutes to spot stuck or idle agents, and tells one person who is idle, stuck or waiting, and what changed.')}
@@ -118,7 +118,7 @@ export function healthProblem(form) {
     for (const el of form.querySelectorAll('input[type=number]:not(:disabled)')) {
         const v = el.value.trim();
         const n = Number(v);
-        if (v === '' || !Number.isInteger(n) || n < Number(el.min) || n > Number(el.max)) return { el, text: `${el.closest('label')?.firstChild?.textContent?.trim() || 'A number'}: use a whole number from ${el.min} to ${el.max}.` };
+        if (v === '' || !Number.isInteger(n) || n < Number(el.min) || n > Number(el.max)) return { el, text: `${el.closest('label')?.firstChild?.textContent?.trim() || document.getElementById((el.getAttribute('aria-labelledby') || '').split(' ')[0])?.textContent?.trim() || 'A number'}: use a whole number from ${el.min} to ${el.max}.` };
     }
     const revs = field(form, 'default_reviewers').value.split(',').map(s => s.trim()).filter(Boolean);
     if (new Set(revs).size > HEALTH_LIMITS.reviewers) return { el: field(form, 'default_reviewers'), text: `Default reviewers: at most ${HEALTH_LIMITS.reviewers} names.` };

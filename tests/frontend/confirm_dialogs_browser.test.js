@@ -81,7 +81,7 @@ const MOD = `(window.__coralStatic || '/static/')`;
         await ev(`(async () => { window.__tw = await import(${MOD} + 'team_working_mode.js');
             const sec = document.createElement('section'); sec.id = 'team-settings-workspace';
             const form = document.createElement('form'); const input = document.createElement('input'); input.name = 'custom_instructions'; input.value = 'saved';
-            form.append(input); const sv = document.createElement('div'); sv.className = 'sv'; sec.append(form, sv); document.body.append(sec); // the page's settings_view marks itself data-dirty while any part holds a change (#7744)
+            form.append(input); const sv = document.createElement('div'); sv.className = 'sv'; sec.hasUnsaved = () => sv.dataset.dirty === '1'; sec.append(form, sv); document.body.append(sec); // the page's settings_view marks itself data-dirty while any part holds a change (#7744)
             const snap = () => JSON.stringify(Array.from(form.elements).filter(el => el.name).map(el => ({ name: el.name, type: el.type, value: el.value })));
             form.dataset.initialState = snap(); window.__form = { input, form, sv }; return true; })()`);
         check('with nothing unsaved, leaving resolves true without a dialog', (await ev(`window.__tw.confirmTeamWorkspaceChange().then(v => v)`)) === true && !(await ev(dialogOpen)));

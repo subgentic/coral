@@ -21,9 +21,9 @@ const BASE = require('./test_base').BASE;
     const key = async (k, code, vk) => { await Input.dispatchKeyEvent({ type: 'keyDown', key: k, code, windowsVirtualKeyCode: vk }); await Input.dispatchKeyEvent({ type: 'keyUp', key: k, code, windowsVirtualKeyCode: vk }); };
     const FOCUSABLE = `a[href], button:not([disabled]), input:not([disabled]):not([type=hidden]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])`;
     const SURFACES = {
-        'Team settings, Messaging': { root: '#team-working-mode-dialog', open: `import((window.__coralStatic || '/static/') + 'team_working_mode.js').then(m => m.showTeamWorkingMode('${TEAM}', { workspace: false })); true`,
-            ready: `!!document.querySelector('[data-settings-tab=messaging]')`, then: `document.querySelector('[data-settings-tab=messaging]').click(); true`, ready2: `!!document.querySelector('.xt-primary') && !!document.querySelector('.xt-links')`,
-            isOpen: `!!document.querySelector('#team-working-mode-dialog')?.open`, esc: true, closeBtn: `document.querySelector('#team-working-mode-dialog .modal-close-btn')` },
+        'Team settings, Messaging': { root: '#team-settings-workspace', open: `import((window.__coralStatic || '/static/') + 'team_working_mode.js').then(m => m.showTeamWorkingMode('${TEAM}', { page: (document.getElementById('qa-ts-host') || document.body.appendChild(Object.assign(document.createElement('div'), { id: 'qa-ts-host', style: 'position:fixed;inset:0;display:flex;z-index:50;background:var(--bg-primary)' }))) })); true`,
+            ready: `!!document.querySelector('#team-settings-workspace .settings-tab[data-section=messaging]')`, then: `document.querySelector('#team-settings-workspace .settings-tab[data-section=messaging]').click(); true`, ready2: `!!document.querySelector('.xt-primary') && !!document.querySelector('.xt-links')`,
+            page: true, isOpen: `!!document.querySelector('#team-settings-workspace')` },
         'Artifact viewer': { root: '.artifact-viewer', open: `import((window.__coralStatic || '/static/') + 'artifact_viewer.js').then(m => m.openArtifactViewer('${HEX}', {})); true`,
             ready: `!!document.querySelector('.artifact-readers > summary')`, then: `const t = document.querySelector('.artifact-viewer .details-toggle'); if (t.getAttribute('aria-expanded') !== 'true') t.click(); document.querySelector('.artifact-readers > summary').click(); true`, ready2: `document.querySelector('.artifact-readers').open`,
             isOpen: `!!document.querySelector('.artifact-viewer') && !document.querySelector('.artifact-viewer').hidden`, closeBtn: `document.querySelector('.artifact-viewer-close')` },
@@ -65,15 +65,8 @@ const BASE = require('./test_base').BASE;
         const neg = await auditRegion(ev, ['body'], { focus: ['#noring'] });
         assert.ok(neg.fails.some(f => f.what === 'focus ring' && /no ring/.test(f.text)), 'a button with no ring is flagged: ' + JSON.stringify(neg.fails.filter(f => f.what === 'focus ring')));
 
-        console.log('2. Team settings: Close closes it, Rename board does not');
-        await fresh(); await show(SURFACES['Team settings, Messaging']);
-        await ev(`document.querySelector('#team-working-mode-dialog .board-rename-toggle').click(); true`);
-        assert.equal(await ev(SURFACES['Team settings, Messaging'].isOpen), true, 'Rename board leaves the dialog open');
-        await ev(`document.querySelector('#team-working-mode-dialog .modal-close-btn').click(); true`);
-        await waitFor(`!document.querySelector('#team-working-mode-dialog')`, 'Close closes the dialog');
-
         console.log('3. Focus returns to the opener when each dialog closes');
-        for (const [name, s] of Object.entries(SURFACES)) for (const how of ['Escape', 'its button']) {
+        for (const [name, s] of Object.entries(SURFACES)) if (!s.page) for (const how of ['Escape', 'its button']) { // (the team's Settings tab is a page, not a dialog)
             await fresh(); await ev(`document.getElementById('opener').focus(); true`); await show(s);
             if (how === 'Escape') await key('Escape', 'Escape', 27); else await ev(`(${s.closeBtn}).click(); true`);
             await waitFor(`!(${s.isOpen})`, `${name} closes by ${how}`, 8000);
@@ -81,10 +74,7 @@ const BASE = require('./test_base').BASE;
         }
 
         console.log('4. 390 px with a mouse: 44px close buttons and disclosure');
-        await fresh(390, 844, true); await show(SURFACES['Team settings, Messaging']);
-        const c1 = await ev(`(() => { const r = document.querySelector('#team-working-mode-dialog .modal-close-btn').getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })()`);
-        assert.ok(c1[0] >= 44 && c1[1] >= 44, 'the dialog\'s close button is 44px: ' + c1);
-        await ev(`document.getElementById('team-working-mode-dialog').close(); true`);
+        await fresh(390, 844, true);
         await show(SURFACES['Artifact viewer']);
         const c2 = await ev(`(() => { const q = s => { const r = document.querySelector(s).getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; }; return { close: q('.artifact-viewer-close'), summary: q('.artifact-readers > summary') }; })()`);
         assert.ok(c2.close[0] >= 44 && c2.close[1] >= 44, 'the viewer\'s close button is 44px: ' + c2.close); assert.ok(c2.summary[1] >= 44, 'the disclosure is 44px high: ' + c2.summary);

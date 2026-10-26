@@ -46,6 +46,7 @@ export function installDom({ mode = 'cloud' } = {}) {
         Object.defineProperty(globalThis, k, { value: w[k], configurable: true, writable: true });
     }
     globalThis.window = w;
+    for (const k of ['Event', 'CustomEvent', 'EventTarget', 'MouseEvent', 'KeyboardEvent']) globalThis[k] = w[k]; // Node has its own: an event made with it is not one the DOM's dispatchEvent takes
     globalThis.fetch = async (url) => ({ ok: true, status: 200, json: async () => ({}), text: async () => '', headers: new Map(), url: String(url) });
     w.fetch = globalThis.fetch;
     globalThis.WebSocket = w.WebSocket = class { constructor() { this.readyState = 0; } send() {} close() {} addEventListener() {} };

@@ -376,6 +376,12 @@ export function mountSettingsView(host, spec) {
             barSpec && barSpec.onCancel && barSpec.onCancel();
         },
         showGroup(id) { if (shell) { showSection(shell, id); announce(); } },
+        removeGroup(id) { // a group that does not apply (known only after the load): its nav entry and its pane go
+            if (!shell) return;
+            const open = view.group() === id;
+            for (const e of shell.querySelectorAll(`[data-section="${id}"], .settings-group-pick option[value="${id}"]`)) e.remove();
+            if (open) { const next = shell.querySelector('.settings-pane')?.dataset.section; if (next) showSection(shell, next); }
+        },
         group() { return shell?.querySelector('.settings-pane:not([hidden])')?.dataset.section || null; },
         async reload() {
             const loaded = (await spec.load?.()) || {};
@@ -384,6 +390,7 @@ export function mountSettingsView(host, spec) {
             for (const [k, r] of fields) { r.ctl.set(loaded[k] === undefined ? r.field.default : loaded[k]); applied.set(k, r.ctl.get()); }
             view.clearErrors(); status = null; statusError = false; lastSaved = false; wasDirty = false;
             refreshRows(); paintBar();
+            root.dataset.ready = '1'; // read: the values are in (a caller or a test waits for this)
         },
         destroy() { destroyed = true; root.remove(); },
         ready: null,

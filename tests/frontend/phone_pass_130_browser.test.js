@@ -111,20 +111,20 @@ const LONG_WAIT = "⏳ This agent hasn't done anything yet — check the termina
                         return R0(u, o); }; return true; })()`);
                 await ev(`window.__m.add('p130-bot', 'A', 4, { sleeping: false, board_project: ${JSON.stringify(team)} }); true`); await settle(600);
                 await ev(`window.selectLiveSession('p130-bot', 'claude', 'p130-bot-id', 'local'); true`); await settle(900);
-                await ev(`(async () => { const m = await import(${S} + 'team_working_mode.js'); await m.showTeamWorkingMode(${JSON.stringify(team)}); return true; })()`);
+                await ev(`(async () => { const m = await import(${S} + 'team_working_mode.js'); await m.showTeamWorkingMode(${JSON.stringify(team)}, { page: (document.getElementById('qa-ts-host') || document.body.appendChild(Object.assign(document.createElement('div'), { id: 'qa-ts-host', style: 'position:fixed;inset:0;display:flex;z-index:50;background:var(--bg-primary)' }))) }); return true; })()`);
                 await ev(`(() => { const side = document.getElementById('agentic-state'); if (side.getBoundingClientRect().width === 0) window.toggleAgenticPanel(true); return true; })()`); // a phone shows the side panel as a drawer
-                await waitFor(`document.getElementById('team-working-mode-dialog').getClientRects().length > 0`, `${tag} the team settings are on screen`, 8000);
-                await waitFor(`!!document.querySelector('#team-working-mode-dialog .working-mode-form') && document.querySelector('#team-working-mode-dialog .working-mode-form').dataset.initialState !== undefined`, `${tag} the team settings`, 10000); await settle(500);
+                await waitFor(`document.getElementById('team-settings-workspace').getClientRects().length > 0`, `${tag} the team settings are on screen`, 8000);
+                await waitFor(`!!document.querySelector('#team-settings-workspace .sv[data-ready]')`, `${tag} the team settings`, 10000); await settle(500);
                 if (label === 'Health check save') {
-                    await ev(`document.getElementById('team-settings-tab-health').click(); true`);
+                    await ev(`document.querySelector('#team-settings-workspace .settings-tab[data-section=health]').click(); true`);
                     await waitFor(`!!document.querySelector('#team-settings-health form')`, `${tag} the Health check form`, 8000);
                     await ev(`(() => { const f = document.querySelector('#team-settings-health form'); const on = f.elements.on; on.checked = !on.checked; on.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
                     await ev(`document.querySelector('#team-settings-health form [type=submit]').click(); true`);
                     await waitFor(`document.querySelector('#team-settings-health .health-state').classList.contains('health-error')`, `${tag} the refusal`, 6000);
                 }
-                const said = await ev(`(() => { const e = document.querySelector(${JSON.stringify('#team-working-mode-dialog ' + expect.replace('#team-settings-health', '#team-settings-health'))}) || document.querySelector(${JSON.stringify(expect)}); return e ? e.textContent.trim() : ''; })()`);
+                const said = await ev(`(() => { const e = document.querySelector(${JSON.stringify('#team-settings-workspace ' + expect.replace('#team-settings-health', '#team-settings-health'))}) || document.querySelector(${JSON.stringify(expect)}); return e ? e.textContent.trim() : ''; })()`);
                 if (!said || /undefined|\[object/.test(said)) problems.push(`${tag} ${label}: no refusal sentence shown (${JSON.stringify(said)})`);
-                await scene(`the owner refusal: ${label}`, '#team-working-mode-dialog');
+                await scene(`the owner refusal: ${label}`, '#team-settings-workspace');
             }
         }
         if (process.env.PASS_REPORT) { fs.writeFileSync(process.env.PASS_REPORT, problems.join('\n') + '\n'); fs.writeFileSync(process.env.PASS_REPORT + '.info', info.join('\n') + '\n'); console.log(problems.length + ' problems'); }

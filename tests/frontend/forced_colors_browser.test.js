@@ -45,10 +45,10 @@ const MD = '# Migration plan\n\n## Steps\n\n1. Add the new columns behind a flag
 
             console.log(`2. ${mode}: the selected tab has a border the others do not`);
             const st = await tabs('#settings-modal .settings-tab'); assert.ok(st.n >= 5 && st.selected && st.other, 'Settings tabs found: ' + JSON.stringify(st));  assert.notEqual(st.selected, st.other, 'the selected Settings tab differs from the others: ' + JSON.stringify(st));
-            await ev(`window.hideSettingsModal(); import((window.__coralStatic || '/static/') + 'team_working_mode.js').then(m => m.showTeamWorkingMode('${TEAM}', { workspace: false })); true`);
-            await waitFor(`!!document.querySelector('.team-settings-tabs [role=tab]')`, 'the Team settings tabs', 15000);
-            const tt = await tabs('.team-settings-tabs [role=tab]'); assert.ok(tt.n >= 3 && tt.selected && tt.other, 'Team settings tabs found: ' + JSON.stringify(tt)); assert.notEqual(tt.selected, tt.other, 'the selected Team settings tab differs: ' + JSON.stringify(tt));
-            await ev(`document.getElementById('team-working-mode-dialog')?.close?.(); true`);
+            await ev(`window.hideSettingsModal(); import((window.__coralStatic || '/static/') + 'team_working_mode.js').then(m => m.showTeamWorkingMode('${TEAM}', { page: (document.getElementById('qa-ts-host') || document.body.appendChild(Object.assign(document.createElement('div'), { id: 'qa-ts-host', style: 'position:fixed;inset:0;display:flex;z-index:50;background:var(--bg-primary)' }))) })); true`);
+            await waitFor(`!!document.querySelector('#team-settings-workspace .settings-tab')`, 'the Team settings tabs', 15000);
+            const tt = await tabs('#team-settings-workspace .settings-tab'); assert.ok(tt.n >= 3 && tt.selected && tt.other, 'Team settings tabs found: ' + JSON.stringify(tt)); assert.notEqual(tt.selected, tt.other, 'the selected Team settings tab differs: ' + JSON.stringify(tt));
+            await ev(`document.getElementById('qa-ts-host')?.remove(); true`);
 
             console.log(`3. ${mode}: the status dots each have their own look`);
             const dots = await ev(`(() => { const host = document.createElement('div'); host.className = 'session-group-item'; host.style.cssText = 'position:fixed;left:0;top:0'; const names = ['working', 'waiting', 'stuck', 'stale']; host.innerHTML = names.map(n => '<span class="session-dot ' + n + '"></span>').join(''); document.body.append(host);
@@ -72,8 +72,8 @@ const MD = '# Migration plan\n\n## Steps\n\n1. Add the new columns behind a flag
 
             console.log(`7. ${mode}: the Launch dialog's section list marks the selected section, and a field in it is outlined when focused (#5735)`);
             await ev(`(async () => { await window.showLaunchModal(); window._selectLaunchType('agent'); { const d = document.getElementById('launch-dir'); if (!d.value) d.value = '/tmp'; window._launchStage('agent'); } return true; })()`);
-            await waitFor(`document.querySelectorAll('[id^="sd1-tab-"]').length >= 3`, 'the Launch section list', 15000);
-            const lt = await tabs('.settings-tab[id^="sd1-tab-"]'); assert.ok(lt.n >= 3 && lt.selected && lt.other, 'Launch tabs found: ' + JSON.stringify(lt)); assert.notEqual(lt.selected, lt.other, 'the selected Launch section has a border the others do not: ' + JSON.stringify(lt));
+            await waitFor(`document.querySelectorAll('#launch-modal .settings-tab').length >= 3`, 'the Launch section list', 15000);
+            const lt = await tabs('#launch-modal .settings-tab'); assert.ok(lt.n >= 3 && lt.selected && lt.other, 'Launch tabs found: ' + JSON.stringify(lt)); assert.notEqual(lt.selected, lt.other, 'the selected Launch section has a border the others do not: ' + JSON.stringify(lt));
             await ev(`window._launchStage('persona'); true`);
             const lf = await ev(`(() => { const i = document.getElementById('launch-agent-name-input'); i.focus(); const cs = getComputedStyle(i); return [cs.outlineStyle, cs.outlineWidth]; })()`);
             assert.ok(lf[0] !== 'none' && parseFloat(lf[1]) >= 2, 'a focused field in the Launch dialog is outlined (its rule drew a box-shadow): ' + JSON.stringify(lf));

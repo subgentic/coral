@@ -21,11 +21,9 @@ const { removeBoards } = require('./helpers/board_cleanup');
         const sub = await api('/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'boss-session' }) });
         assert.ok(sub.status < 300, JSON.stringify(sub));
         const open = async () => {
-            await ev(`document.getElementById('team-settings-workspace')?.remove(); document.getElementById('team-working-mode-dialog')?.remove(); import((window.__coralStatic || '/static/') + 'team_working_mode.js').then(m => m.showTeamWorkingMode(${JSON.stringify(TEAM)}, { workspace: false })); true`);
-            await waitFor(`!!document.querySelector('[data-settings-tab=health]')`, 'the loaded Team settings', 15000);
-            // the dialog's first focus is its first tab (Workflow), not the Rename board button in its header (#5962)
-            await waitFor(`document.activeElement && document.activeElement.id === 'team-settings-tab-workflow'`, 'the first focus on the first tab', 8000);
-            await ev(`document.querySelector('[data-settings-tab=messaging]').click(); true`);
+            await ev(`document.getElementById('team-settings-workspace')?.remove(); import((window.__coralStatic || '/static/') + 'team_working_mode.js').then(m => m.showTeamWorkingMode(${JSON.stringify(TEAM)}, { page: (document.getElementById('qa-ts-host') || document.body.appendChild(Object.assign(document.createElement('div'), { id: 'qa-ts-host', style: 'position:fixed;inset:0;display:flex;z-index:50;background:var(--bg-primary)' }))) })); true`);
+            await waitFor(`!!document.querySelector('#team-settings-workspace .settings-tab[data-section=health]')`, 'the loaded Team settings', 15000);
+            await ev(`document.querySelector('#team-settings-workspace .settings-tab[data-section=messaging]').click(); true`);
             await waitFor(`!!document.querySelector('${P} .xt-reach')`, 'the two reaches', 8000);
         };
         const reach = () => ev(`(() => { const q = s => document.querySelector('${P} ' + s); return { here: q('.xt-reach-here').textContent.replace(/\\s+/g, ' ').trim(), button: !!q('[data-act=turn-on-here]'), msg: q('input[name=cross_team_messaging]').checked }; })()`);

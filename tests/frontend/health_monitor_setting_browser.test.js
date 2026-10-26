@@ -30,8 +30,8 @@ const SENTENCE = 'Applies to every team; each team still turns its own check on 
         await waitFor(`getComputedStyle(document.getElementById('settings-modal')).display !== 'none' && !!document.getElementById('settings-board-health-monitor')`, 'Settings');
     };
     const openTeam = async () => {
-        await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'team_working_mode.js'); m.showTeamWorkingMode(${JSON.stringify(TEAM)}); return true; })()`);
-        await waitFor(`!!document.getElementById('team-settings-tab-health') && document.querySelector('.working-mode-form').dataset.initialState !== undefined`, 'Team settings with its Health check tab');
+        await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'team_working_mode.js'); m.showTeamWorkingMode(${JSON.stringify(TEAM)}, { page: (document.getElementById('qa-ts-host') || document.body.appendChild(Object.assign(document.createElement('div'), { id: 'qa-ts-host', style: 'position:fixed;inset:0;display:flex;z-index:50;background:var(--bg-primary)' }))) }); return true; })()`);
+        await waitFor(`!!document.querySelector('#team-settings-workspace .sv[data-ready]') && !!document.querySelector('#team-settings-workspace .settings-tab[data-section=health]')`, 'Team settings with its Health check tab');
     };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -57,18 +57,18 @@ const SENTENCE = 'Applies to every team; each team still turns its own check on 
         // The team panel, switch off
         await ev(`(() => { const d = document.getElementById('settings-modal'); return true; })()`);
         await load(); await openTeam();
-        const off = await ev(`(() => { const d = document.querySelector('#team-working-mode-dialog') || document; const tabs = [...d.querySelectorAll('[data-settings-tab]')].map(t => t.textContent.trim());
-            return { tabs, global: !!d.querySelector('[data-settings-tab=global]'), box: !!d.querySelector('input[name=board_health_monitor]'), legends: [...d.querySelectorAll('.team-settings-section legend')].map(l => l.textContent), note: (d.querySelector('.health-global-off') || {}).textContent || null }; })()`);
+        const off = await ev(`(() => { const d = document.querySelector('#team-settings-workspace') || document; const tabs = [...d.querySelectorAll('[data-settings-tab]')].map(t => t.textContent.trim());
+            return { tabs, global: !!d.querySelector('#team-settings-workspace .settings-tab[data-section=global]'), box: !!d.querySelector('input[name=board_health_monitor]'), legends: [...d.querySelectorAll('.team-settings-section legend')].map(l => l.textContent), note: (d.querySelector('.health-global-off') || {}).textContent || null }; })()`);
         check('Team settings has no Global settings tab and no board_health_monitor checkbox', !off.global && !off.box && !off.tabs.includes('Global settings') && !off.legends.includes('Global settings'), JSON.stringify([off.tabs, off.legends]));
         check('with the switch off the Health check tab says it needs the switch, naming it', /turned off for all of Coral/.test(off.note || '') && /Team health checks/.test(off.note) && /after Coral restarts/.test(off.note), off.note);
-        await ev(`document.getElementById('team-settings-tab-health').click(); true`);
+        await ev(`document.querySelector('#team-settings-workspace .settings-tab[data-section=health]').click(); true`);
         const vis = await ev(`(() => { const n = document.querySelector('.health-global-off'); const r = n.getBoundingClientRect(); return { shown: r.width > 0 && r.height > 0 && !n.closest('[hidden]'), link: n.querySelector('button.working-mode-settings-link').textContent, form: !!document.querySelector('#team-settings-health form.health-form') }; })()`);
         check('the note is on the Health check tab, above its form, with a Settings link', vis.shown && vis.link === 'Settings' && vis.form, JSON.stringify(vis));
         for (const th of ['dark', 'light']) { await theme(th); await new Promise(r => setTimeout(r, 350)); await shot(`health-monitor-team-note-${th}`); } // sleep-ok: the theme's colour transitions
         await theme('dark');
         await ev(`document.querySelector('.health-global-off .working-mode-settings-link').click(); true`);
         await waitFor(`!!document.getElementById('settings-modal') && getComputedStyle(document.getElementById('settings-modal')).display !== 'none' && !document.getElementById('settings-pane-agents').hidden`, 'Settings at Agents');
-        check('the Settings link opens Settings at Agents, with the team dialog closed', (await ev(`!(document.querySelector('#team-working-mode-dialog') && document.querySelector('#team-working-mode-dialog').open)`)) === true);
+        check('the Settings link opens Settings at Agents, with the team dialog closed', (await ev(`!(document.querySelector('#team-settings-workspace') && document.querySelector('#team-settings-workspace').open)`)) === true);
 
         // switch on: no note
         await put({ board_health_monitor: 'true' });

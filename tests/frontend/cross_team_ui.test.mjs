@@ -47,11 +47,11 @@ assert.equal(badge(2), null, 'ordinary messages have no badge');
 mb.showMessageBoardProjects();
 
 // ── Team settings switch ──
-// the dialog (the sidebar's panel went with the right dock, #7457); jsdom has no showModal
-const panel = { querySelector: sel => document.getElementById('team-working-mode-dialog').querySelector(sel) };
-if (window.HTMLDialogElement && !window.HTMLDialogElement.prototype.showModal) { window.HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); }; window.HTMLDialogElement.prototype.close = window.HTMLDialogElement.prototype.close || function () { this.removeAttribute('open'); }; }
+// the team page's Settings tab, drawn into a host of its own
+const panel = { querySelector: sel => document.getElementById('team-settings-workspace').querySelector(sel) };
+const host = document.body.appendChild(document.createElement('div'));
 const { showTeamWorkingMode } = await importUi('team_working_mode');
-await showTeamWorkingMode('beta');
+await showTeamWorkingMode('beta', { page: host });
 await settle(10);
 // The Messaging tab (#5572) holds the two switches, saved with its own Save, only what changed; this test runs in the Coral Hub view, where the tab is drawn too.
 const pane = () => panel.querySelector('#team-settings-messaging');
@@ -62,13 +62,13 @@ assert.equal(sw('cross_team_artifacts').disabled, true);
 assert.equal(pane().querySelector('.xt-locked').textContent, 'This setting can only be changed on the computer itself.');
 assert.equal(pane().querySelector('.xt-save').hidden, true, 'and no Save');
 crossState = { can_change: true, owner_path_live: true };
-await showTeamWorkingMode('beta');
+await showTeamWorkingMode('beta', { page: host });
 await settle(10);
 const toggle = sw('cross_team_messaging');
 assert.ok(toggle, 'switch present on the Messaging tab');
 assert.equal(toggle.checked, false, 'off by default');
 assert.equal(toggle.disabled, false);
-assert.equal(panel.querySelector('form.working-mode-form:not(.ct-form)').elements.cross_team_messaging, undefined, 'and no longer on the Workflow tab');
+assert.equal(panel.querySelector('.settings-pane[data-section=workflow] [name=cross_team_messaging]'), null, 'and no longer on the Workflow tab');
 toggle.checked = true;
 toggle.dispatchEvent(new window.Event('change', { bubbles: true }));
 await settle(5);

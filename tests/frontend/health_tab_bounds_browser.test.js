@@ -34,9 +34,9 @@ const TEAM = 'health-bounds-team';
             const bg = await ev(`getComputedStyle(document.body).backgroundColor`);
             const lum = bg.match(/\d+/g).slice(0, 3).reduce((a, b) => a + Number(b), 0) / 3;
             assert.equal(theme === 'light', lum > 128, `the ${theme} theme is really on (${bg})`);
-            await ev(`document.getElementById('team-settings-workspace')?.remove(); import((window.__coralStatic || '/static/') + 'team_working_mode.js').then(m => m.showTeamWorkingMode(${JSON.stringify(TEAM)}, { workspace: false })); true`);
-            await waitFor(`!!document.querySelector('[data-settings-tab=health]')`, 'the Health check tab', 15000);
-            await ev(`document.querySelector('[data-settings-tab=health]').click(); true`);
+            await ev(`document.getElementById('team-settings-workspace')?.remove(); import((window.__coralStatic || '/static/') + 'team_working_mode.js').then(m => m.showTeamWorkingMode(${JSON.stringify(TEAM)}, { page: (document.getElementById('qa-ts-host') || document.body.appendChild(Object.assign(document.createElement('div'), { id: 'qa-ts-host', style: 'position:fixed;inset:0;display:flex;z-index:50;background:var(--bg-primary)' }))) })); true`);
+            await waitFor(`!!document.querySelector('#team-settings-workspace .settings-tab[data-section=health]')`, 'the Health check tab', 15000);
+            await ev(`document.querySelector('#team-settings-workspace .settings-tab[data-section=health]').click(); true`);
             await waitFor(`!document.getElementById('team-settings-health').hidden && !!document.querySelector('#team-settings-health form')`, 'the panel', 5000);
 
             // 1. Nothing is clipped by the box it sits in, however deep that box is.

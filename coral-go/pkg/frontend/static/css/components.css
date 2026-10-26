@@ -4121,12 +4121,10 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
    and the terminal form are small forms: they keep their narrow width and take the same height rule. A phone's own rule
    (mobile.css: 95vw wide) still applies. */
 .modal-content.settings-modal-content,
-.modal-content.sd-modal-content,
-.team-availability-dialog#team-working-mode-dialog { width: clamp(360px, 92vw, 960px); max-width: 100vw; }
+.modal-content.sd-modal-content { width: clamp(360px, 92vw, 960px); max-width: 100vw; }
 .modal-content.settings-modal-content,
 .modal-content.sd-modal-content,
-#launch-modal .modal-content,
-.team-availability-dialog#team-working-mode-dialog { height: auto; max-height: 90dvh; }
+#launch-modal .modal-content { height: auto; max-height: 90dvh; }
 .modal-content:has(.settings-shell) { min-height: min(30rem, 90dvh); }
 #launch-modal .modal-content:not(.sd-modal-content) { min-height: 0; } /* the chooser and the terminal form hold the hidden New Agent step's .settings-shell, which gave them the tabbed dialogs' 30rem floor: half the chooser was empty (#6316) */
 .launch-dir-recents { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; }

@@ -1340,7 +1340,6 @@
 .agent-ui-card button,
 .agent-ui-send,
 .sched-preset,
-.team-settings-tabs [role="tab"],
 .team-availability-dialog button,
 :is(.working-mode-form, .team-launch-health) select,
 :is(.working-mode-form, .team-launch-health) input[name="preset_name"],

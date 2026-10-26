@@ -19,7 +19,7 @@ const EXPECTED = {
     "minHeight": "44px",
     "padding": "2px 0px 2px 0px",
     "size": "13px",
-    "w": 880,
+    "w": 834,
     "weight": "600"
   },
   "edit presets | coarse | open": {
@@ -31,7 +31,7 @@ const EXPECTED = {
     "minHeight": "44px",
     "padding": "2px 0px 2px 0px",
     "size": "13px",
-    "w": 876,
+    "w": 834,
     "weight": "600"
   },
   "edit presets | fine | closed": {
@@ -43,7 +43,7 @@ const EXPECTED = {
     "minHeight": "auto",
     "padding": "2px 0px 2px 0px",
     "size": "13px",
-    "w": 880,
+    "w": 834,
     "weight": "600"
   },
   "edit presets | fine | open": {
@@ -55,7 +55,7 @@ const EXPECTED = {
     "minHeight": "auto",
     "padding": "2px 0px 2px 0px",
     "size": "13px",
-    "w": 876,
+    "w": 834,
     "weight": "600"
   },
   "health advanced | coarse | closed": {
@@ -115,7 +115,7 @@ const EXPECTED = {
     "minHeight": "44px",
     "padding": "0px 0px 0px 0px",
     "size": "12px",
-    "w": 854,
+    "w": 834,
     "weight": "600"
   },
   "prompt text | coarse | open": {
@@ -127,7 +127,7 @@ const EXPECTED = {
     "minHeight": "44px",
     "padding": "0px 0px 0px 0px",
     "size": "12px",
-    "w": 850,
+    "w": 834,
     "weight": "600"
   },
   "prompt text | fine | closed": {
@@ -139,7 +139,7 @@ const EXPECTED = {
     "minHeight": "0px",
     "padding": "0px 0px 0px 0px",
     "size": "12px",
-    "w": 854,
+    "w": 834,
     "weight": "600"
   },
   "prompt text | fine | open": {
@@ -151,7 +151,7 @@ const EXPECTED = {
     "minHeight": "0px",
     "padding": "0px 0px 0px 0px",
     "size": "12px",
-    "w": 850,
+    "w": 834,
     "weight": "600"
   }
 };
@@ -167,9 +167,9 @@ const EXPECTED = {
         await ev(`window.__coralReady.startup('liveList', 'settings')`);
         const sub = await ev(`fetch('/api/board/${TEAM}/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'boss-session' }) }).then(r => r.status)`);
         assert.ok(sub < 300);
-        await ev(`import((window.__coralStatic || '/static/') + 'team_working_mode.js').then(m => m.showTeamWorkingMode(${JSON.stringify(TEAM)}, { workspace: false })); true`);
-        await waitFor(`!!document.querySelector('form.working-mode-form') && document.querySelector('form.working-mode-form').dataset.initialState !== undefined && !!document.querySelector('[data-settings-tab=health]')`, 'Team settings', 15000);
-        await ev(`document.querySelector('[data-settings-tab=prompts]').click(); true`);
+        await ev(`import((window.__coralStatic || '/static/') + 'team_working_mode.js').then(m => m.showTeamWorkingMode(${JSON.stringify(TEAM)}, { page: (document.getElementById('qa-ts-host') || document.body.appendChild(Object.assign(document.createElement('div'), { id: 'qa-ts-host', style: 'position:fixed;inset:0;display:flex;z-index:50;background:var(--bg-primary)' }))) })); true`);
+        await waitFor(`!!document.querySelector('#team-settings-workspace .sv[data-ready]') && !!document.querySelector('#team-settings-workspace .settings-tab[data-section=health]')`, 'Team settings', 15000);
+        await ev(`document.querySelector('#team-settings-workspace .settings-tab[data-section=prompts]').click(); true`);
         await waitFor(`!!document.querySelector('.prompt-inspection-folded')`, 'the prompt texts', 15000);
         const STYLE = sel => `(() => { const s = document.querySelector(${JSON.stringify(sel)}); const c = getComputedStyle(s); const r = s.getBoundingClientRect();
             const box = k => k.map(p => c[p]).join(' '); return { cursor: c.cursor, weight: c.fontWeight, size: c.fontSize, color: c.color, padding: box(['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft']), margin: box(['marginTop', 'marginRight', 'marginBottom', 'marginLeft']), display: c.display, minHeight: c.minHeight, w: Math.round(r.width), h: Math.round(r.height) }; })()`;
@@ -181,7 +181,7 @@ const EXPECTED = {
         for (const [coarse] of [[false], [true]]) {
             await Emulation.setTouchEmulationEnabled({ enabled: coarse });
             for (const [name, s] of Object.entries(SUMMARIES)) {
-                await ev(`document.querySelector('[data-settings-tab=${s.tab}]').click(); true`);
+                await ev(`document.querySelector('#team-settings-workspace .settings-tab[data-section=${s.tab}]').click(); true`);
                 await waitFor(`!!document.querySelector(${JSON.stringify(s.sel)})`, name, 10000);
                 for (const open of [false, true]) {
                     await ev(`document.querySelector(${JSON.stringify(s.det)}).open = ${open}; true`);

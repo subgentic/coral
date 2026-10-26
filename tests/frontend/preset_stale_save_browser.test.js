@@ -17,18 +17,18 @@ const TEAM = 'preset-stale-' + Date.now().toString(36);
   };
   const { waitFor } = require('./helpers/wait').bind(ev);
   const URL = `/api/board/${encodeURIComponent(TEAM)}/working-mode/presets`;
-  const formOpen = () => waitFor(`document.querySelector('.working-mode-form')?.dataset.initialState !== undefined`, 'the working-mode form to load');
-  const statusSet = () => waitFor(`(t => t && !/saving|resetting|loading/i.test(t))(document.querySelector('.working-mode-status')?.textContent.trim())`, 'the status message');
+  const formOpen = () => waitFor(`!!document.querySelector('#team-settings-workspace .sv[data-ready]')`, 'the working-mode form to load');
+  const statusSet = () => waitFor(`(t => t && !/saving|resetting|loading/i.test(t))(document.querySelector('#team-settings-workspace .sv-status')?.textContent.trim())`, 'the status message');
   const serverPreset = id => ev(`fetch(${JSON.stringify(URL)}).then(r=>r.json()).then(d=>(d.presets||[]).find(p=>p.id===${JSON.stringify(id)})||null)`);
   // Another client: a PUT straight to the server.
   const otherClientSave = (id, name, instructions) => ev(`fetch(${JSON.stringify(URL + '/')}+encodeURIComponent(${JSON.stringify(id)}),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:${JSON.stringify(id)},name:${JSON.stringify(name)},instructions:${JSON.stringify(instructions)}})}).then(r=>r.status)`);
-  const field = (name, text) => ev(`(()=>{const e=document.querySelector('.working-mode-form').elements[${JSON.stringify(name)}];e.value=${JSON.stringify(text)};e.dispatchEvent(new Event('input',{bubbles:true}));return true;})()`);
-  const saveClick = () => ev(`(()=>{document.querySelector('.working-mode-status').textContent='';document.querySelector('.preset-save').click();return true;})()`);
-  const formValue = name => ev(`document.querySelector('.working-mode-form').elements[${JSON.stringify(name)}].value`);
+  const field = (name, text) => ev(`(()=>{const e=document.querySelector('#team-settings-workspace [name=' + ${JSON.stringify(JSON.stringify(name))} + ']');e.value=${JSON.stringify(text)};e.dispatchEvent(new Event('input',{bubbles:true}));return true;})()`);
+  const saveClick = () => ev(`(()=>{document.querySelector('#team-settings-workspace .sv-status').textContent='';document.querySelector('.preset-save').click();return true;})()`);
+  const formValue = name => ev(`document.querySelector('#team-settings-workspace [name=' + ${JSON.stringify(JSON.stringify(name))} + ']').value`);
   try {
     await Page.enable(); await Page.navigate({ url: BASE }); await Page.loadEventFired();
     await ev(`import((window.__coralStatic||'/static/')+'team_working_mode.js').then(m => { window.showTeamWorkingMode = m.showTeamWorkingMode; })`);
-    await ev(`window.showTeamWorkingMode(${JSON.stringify(TEAM)})`);
+    await ev(`window.showTeamWorkingMode(${JSON.stringify(TEAM)}, { page: (document.getElementById('qa-ts-host') || document.body.appendChild(Object.assign(document.createElement('div'), { id: 'qa-ts-host', style: 'position:fixed;inset:0;display:flex;z-index:50;background:var(--bg-primary)' }))) })`);
     await formOpen();
 
     // A custom preset, made in the form.

@@ -46,12 +46,12 @@
   },
   "ts-row": {
     "css": 17,
-    "js": 3,
+    "js": 1,
     "html": 0
   },
   "working-mode-form": {
     "css": 14,
-    "js": 5,
+    "js": 3,
     "html": 0
   },
   "health-row": {
@@ -70,13 +70,13 @@
     "html": 0
   },
   "workflow-mode-line": {
-    "css": 3,
-    "js": 1,
+    "css": 0,
+    "js": 0,
     "html": 0
   },
   "preset-name-field": {
     "css": 0,
-    "js": 2,
+    "js": 0,
     "html": 0
   },
   "launch-prompt-field": {
@@ -112,7 +112,6 @@
     "launch-server-row",
     "net-group-head",
     "net-level-row",
-    "preset-name-field",
     "settings-api-key-row",
     "settings-cli-row",
     "settings-cloud-connect-row",
@@ -130,9 +129,6 @@
     "tb-line",
     "tb-row",
     "ts-inline",
-    "ts-name-row",
-    "ts-row",
-    "workflow-mode-line",
     "working-mode-form"
   ]
 }

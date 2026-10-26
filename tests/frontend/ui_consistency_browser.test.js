@@ -95,7 +95,7 @@ const fixtures = async () => {
     await mods.tasks.loadBoardTasks('coral-task-workflows');
     await mods.agent_ui.refreshAgentUI();
     window.uiView = async name => {
-        document.getElementById('team-working-mode-dialog')?.close();
+        document.getElementById('qa-ts-host')?.remove();
         mods.modals.hideSettingsModal();mods.tasks.hideTaskDetailModal();
         document.querySelectorAll('.session-view').forEach(e=>e.style.display='none');
         document.querySelector('.layout')?.classList.toggle('sidebar-hidden', ['workflows','analytics','docs'].includes(name));
@@ -108,7 +108,7 @@ const fixtures = async () => {
             if(name==='agent-ui')await mods.agent_ui.refreshAgentUI();
             if(name==='tasks'){await mods.tasks.loadAgentTasks(s.currentSession.name,s.currentSession.session_id);await mods.tasks.showAgentTaskDetailModal(2505);} // the task dialog is an agent's own task and a subagent's since #7644 (a board's task is the team page's page): the shared dialog's chrome is what this scene pins
             if(name==='settings')await mods.modals.showSettingsModal('agents');
-            if(name==='team-settings')mods.team_working_mode.showTeamWorkingMode('coral-task-workflows');
+            if(name==='team-settings')mods.team_working_mode.showTeamWorkingMode('coral-task-workflows',{page:document.body.appendChild(Object.assign(document.createElement('div'),{id:'qa-ts-host',style:'position:fixed;inset:0;display:flex;z-index:50;background:var(--bg-primary)'}))});
             if(name==='agent-ui'&&innerWidth<768)window.toggleAgenticPanel(true);
         } else if(name==='workflows'){mods.workflows.showWorkflowsTab();await new Promise(r=>setTimeout(r,30));await mods.workflows.selectWorkflow(1)}
         else if(name==='docs'){await mods.docs.showDocsTab();await mods.docs.selectDoc('README')}
@@ -160,18 +160,20 @@ const fixtures = async () => {
                     const modal=view==='tasks'?'task-detail-modal':'settings-modal';
                     assert.ok(await ev(`(()=>{const r=document.getElementById('${modal}').querySelector('.modal-content').getBoundingClientRect();return r.width>0&&r.height>0&&r.left>=-1&&r.right<=innerWidth+1&&r.bottom<=innerHeight+1})()`),`${view} fits ${device}`);
                 }
-                const required={workspace:'.chat-bubble.assistant .message-text',tasks:'#task-detail-content',settings:'#settings-working-dir','team-settings':'.working-mode-form',board:'.mb-message-body','agent-ui':'.agent-ui-request',workflows:'.wf-steps-table',scheduler:'.sched-header',docs:'#docs-content h1',analytics:'.cost-card-value'};
+                const required={workspace:'.chat-bubble.assistant .message-text',tasks:'#task-detail-content',settings:'#settings-working-dir','team-settings':'#team-settings-workspace .sv',board:'.mb-message-body','agent-ui':'.agent-ui-request',workflows:'.wf-steps-table',scheduler:'.sched-header',docs:'#docs-content h1',analytics:'.cost-card-value'};
                 assert.ok(await ev(`Array.from(document.querySelectorAll('${required[view]}')).some(node=>node.getBoundingClientRect().width>0)`),`${view} renderer produced visible content`);
                 if(!baseline && view==='team-settings') {
-                    assert.equal(await ev(`document.querySelector('.team-settings-actions [type=submit]').disabled`),false);
-                    await ev(`document.querySelector('.working-mode-form [name=custom_instructions]').value='Preserve this draft';document.querySelector('[data-settings-tab=workflow]').focus()`);
-                    await c.Input.dispatchKeyEvent({type:'keyDown',key:'ArrowRight',code:'ArrowRight'});
-                    assert.equal(await ev(`document.activeElement.dataset.settingsTab`),'prompts');
-                    await ev(`document.querySelector('[data-settings-tab=workflow]').click()`);
-                    assert.equal(await ev(`document.querySelector('.working-mode-form [name=custom_instructions]').value`),'Preserve this draft');
-                    await ev(`document.querySelector('[data-settings-tab=workflow]').focus()`);
-                    const bounds=await ev(`{const r=document.querySelector('#team-working-mode-dialog').getBoundingClientRect();({left:r.left,right:r.right,bottom:r.bottom,width:innerWidth,height:innerHeight})}`);
-                    assert.ok(bounds.left>=0&&bounds.right<=bounds.width&&bounds.bottom<=bounds.height,'team dialog fits');
+                    await ev(`new Promise(r=>{const t=()=>document.querySelector('#team-settings-workspace .sv[data-ready]')?r(true):setTimeout(t,50);t()})`); // the page has loaded
+                    assert.equal(await ev(`document.querySelector('#team-settings-workspace .sv-save').disabled`),true,'nothing changed: Save is off');
+                    await ev(`{const t=document.querySelector('#team-settings-workspace [name=custom_instructions]');t.value='Preserve this draft';t.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('#team-settings-workspace .settings-tab[data-section=workflow]').focus()}`);
+                    assert.equal(await ev(`new Promise(r=>setTimeout(()=>r(document.querySelector('#team-settings-workspace .sv-save').disabled),50))`),false,'a change turns Save on');
+                    await c.Input.dispatchKeyEvent({type:'keyDown',key:'ArrowDown',code:'ArrowDown'});
+                    assert.notEqual(await ev(`document.activeElement.dataset.section`),'workflow','ArrowDown moves to the next group');
+                    await ev(`document.querySelector('#team-settings-workspace .settings-tab[data-section=workflow]').click()`);
+                    assert.equal(await ev(`document.querySelector('#team-settings-workspace [name=custom_instructions]').value`),'Preserve this draft');
+                    await ev(`document.querySelector('#team-settings-workspace .settings-tab[data-section=workflow]').focus()`);
+                    const bounds=await ev(`{const r=document.querySelector('#team-settings-workspace').getBoundingClientRect();({left:r.left,right:r.right,bottom:r.bottom,width:innerWidth,height:innerHeight})}`);
+                    assert.ok(bounds.left>=0&&bounds.right<=bounds.width&&bounds.bottom<=bounds.height,'the team settings page fits');
                 }
                 if(!baseline && view==='tasks') {
                     assert.ok(await ev(`Array.from(document.querySelectorAll('#task-detail-modal-footer button')).filter(b=>b.getBoundingClientRect().width).every(b=>{const r=b.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.bottom<=innerHeight})`),'all task actions remain visible');

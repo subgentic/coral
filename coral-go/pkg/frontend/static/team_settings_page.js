@@ -93,7 +93,7 @@ export async function showTeamSettingsPage(team, options = {}) {
             let boardSettings = null;
             if (boardSettingsResponse?.ok) {
                 boardSettings = await boardSettingsResponse.json();
-                if (boardSettings.health && typeof boardSettings.health === 'object') await addHealth(boardSettings.health).catch(() => {}); // only when the settings GET returned a "health" object: not through Coral Hub
+                if (boardSettings.health && typeof boardSettings.health === 'object') await addHealth(boardSettings.health).catch(() => {}); else view.removeGroup('health'); // only when the settings GET returned a "health" object: not through Coral Hub
                 let crossTeam = null;
                 { // the machine's own answer; through Coral Hub the route may not be served (then null and the switches stay as they were)
                     const stateResponse = await fetch(serverUrl(`/api/board/${board}/cross-team-state`, teamServer)).catch(() => null);
@@ -101,6 +101,7 @@ export async function showTeamSettingsPage(team, options = {}) {
                 }
                 await fillMessaging({ state: crossTeam, settings: boardSettings }).catch(() => fillMessaging({}));
             } else {
+                view.removeGroup('health');
                 // The board settings could not be loaded: through Coral Hub the owner-only settings can be refused (#5323): the Messaging group says why, in our words (and the Health check is not drawn).
                 await fillMessaging({ refusal: boardSettingsResponse ? await refusalOf(boardSettingsResponse, answeredLocally(team)) : '' });
             }
@@ -134,6 +135,7 @@ export async function showTeamSettingsPage(team, options = {}) {
             return { note: modeChanged ? 'Saved. Working mode applies on first claim.' : null };
         },
     });
+    page.hasUnsaved = () => view.isDirty(); // read live by the leave-the-page question (team_working_mode.js)
     view.say('Loading\u2026');
     view.ready.then(() => syncModeDescription()).catch(() => {}); // the line under the list follows the mode the load set
     view.ready.catch(error => { view.say(error.message, true); const c = q('.prompt-inspection-content'); if (c) c.textContent = 'Prompt inspection could not be loaded.'; fillMessaging({}).catch(() => {}); });
