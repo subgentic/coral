@@ -1,0 +1,4789 @@
+{
+  "sqlite_master": [
+    {
+      "name": "idx_board_asks_project",
+      "sql": "CREATE INDEX idx_board_asks_project ON board_asks(project, message_id)",
+      "tbl_name": "board_asks",
+      "type": "index"
+    },
+    {
+      "name": "idx_board_goal_events_board",
+      "sql": "CREATE INDEX idx_board_goal_events_board ON board_goal_events(board_id, id)",
+      "tbl_name": "board_goal_events",
+      "type": "index"
+    },
+    {
+      "name": "idx_board_goals_board",
+      "sql": "CREATE INDEX idx_board_goals_board ON board_goals(board_id, state, id)",
+      "tbl_name": "board_goals",
+      "type": "index"
+    },
+    {
+      "name": "idx_board_goals_uid",
+      "sql": "CREATE UNIQUE INDEX idx_board_goals_uid ON board_goals(goal_uid)",
+      "tbl_name": "board_goals",
+      "type": "index"
+    },
+    {
+      "name": "idx_board_groups_project_group",
+      "sql": "CREATE INDEX idx_board_groups_project_group ON board_groups(project, group_id)",
+      "tbl_name": "board_groups",
+      "type": "index"
+    },
+    {
+      "name": "idx_board_messages_project",
+      "sql": "CREATE INDEX idx_board_messages_project ON board_messages(project, id)",
+      "tbl_name": "board_messages",
+      "type": "index"
+    },
+    {
+      "name": "idx_board_messages_sender",
+      "sql": "CREATE INDEX idx_board_messages_sender ON board_messages(project, subscriber_id, id)",
+      "tbl_name": "board_messages",
+      "type": "index"
+    },
+    {
+      "name": "idx_board_messages_task",
+      "sql": "CREATE INDEX idx_board_messages_task ON board_messages(project, task_id, id) WHERE task_id IS NOT NULL",
+      "tbl_name": "board_messages",
+      "type": "index"
+    },
+    {
+      "name": "idx_board_replies_to",
+      "sql": "CREATE INDEX idx_board_replies_to ON board_replies(project, reply_to)",
+      "tbl_name": "board_replies",
+      "type": "index"
+    },
+    {
+      "name": "idx_board_settings_log",
+      "sql": "CREATE INDEX idx_board_settings_log ON board_settings_log(board_id, id)",
+      "tbl_name": "board_settings_log",
+      "type": "index"
+    },
+    {
+      "name": "idx_board_subscribers_session_name",
+      "sql": "CREATE INDEX idx_board_subscribers_session_name ON board_subscribers(session_name)",
+      "tbl_name": "board_subscribers",
+      "type": "index"
+    },
+    {
+      "name": "idx_board_subscribers_subscriber",
+      "sql": "CREATE INDEX idx_board_subscribers_subscriber ON board_subscribers(subscriber_id, project)",
+      "tbl_name": "board_subscribers",
+      "type": "index"
+    },
+    {
+      "name": "idx_board_tasks_assigned",
+      "sql": "CREATE INDEX idx_board_tasks_assigned ON board_tasks(board_id, assigned_to)",
+      "tbl_name": "board_tasks",
+      "type": "index"
+    },
+    {
+      "name": "idx_board_tasks_board_status",
+      "sql": "CREATE INDEX idx_board_tasks_board_status ON board_tasks(board_id, status)",
+      "tbl_name": "board_tasks",
+      "type": "index"
+    },
+    {
+      "name": "idx_board_tasks_done",
+      "sql": "CREATE INDEX idx_board_tasks_done ON board_tasks(board_id, completed_at, id)\n\t\t\tWHERE status IN ('completed', 'skipped')",
+      "tbl_name": "board_tasks",
+      "type": "index"
+    },
+    {
+      "name": "idx_board_tasks_goal",
+      "sql": "CREATE INDEX idx_board_tasks_goal ON board_tasks(board_id, goal_id) WHERE goal_id IS NOT NULL",
+      "tbl_name": "board_tasks",
+      "type": "index"
+    },
+    {
+      "name": "idx_board_tasks_request_key",
+      "sql": "CREATE UNIQUE INDEX idx_board_tasks_request_key ON board_tasks(board_id, request_server, request_board, request_id) WHERE request_id IS NOT NULL",
+      "tbl_name": "board_tasks",
+      "type": "index"
+    },
+    {
+      "name": "idx_board_waits_active",
+      "sql": "CREATE INDEX idx_board_waits_active ON board_waits(project, status)",
+      "tbl_name": "board_waits",
+      "type": "index"
+    },
+    {
+      "name": "idx_board_waits_expiry",
+      "sql": "CREATE INDEX idx_board_waits_expiry ON board_waits(expires_at) WHERE status='active'",
+      "tbl_name": "board_waits",
+      "type": "index"
+    },
+    {
+      "name": "idx_board_waits_subscriber",
+      "sql": "CREATE INDEX idx_board_waits_subscriber ON board_waits(project, subscriber_id, status)",
+      "tbl_name": "board_waits",
+      "type": "index"
+    },
+    {
+      "name": "idx_board_waits_timeout_pending",
+      "sql": "CREATE INDEX idx_board_waits_timeout_pending ON board_waits(id) WHERE status='expired' AND timeout_notified_at IS NULL",
+      "tbl_name": "board_waits",
+      "type": "index"
+    },
+    {
+      "name": "idx_boards_board_uid",
+      "sql": "CREATE UNIQUE INDEX idx_boards_board_uid ON boards(board_uid) WHERE board_uid IS NOT NULL",
+      "tbl_name": "boards",
+      "type": "index"
+    },
+    {
+      "name": "idx_boards_cross_team_id",
+      "sql": "CREATE UNIQUE INDEX idx_boards_cross_team_id ON boards(cross_team_id)",
+      "tbl_name": "boards",
+      "type": "index"
+    },
+    {
+      "name": "idx_boards_label",
+      "sql": "CREATE INDEX idx_boards_label ON boards(label)",
+      "tbl_name": "boards",
+      "type": "index"
+    },
+    {
+      "name": "idx_cross_team_switch_log",
+      "sql": "CREATE INDEX idx_cross_team_switch_log ON cross_team_switch_log (project, key, id)",
+      "tbl_name": "cross_team_switch_log",
+      "type": "index"
+    },
+    {
+      "name": "idx_goal_requests_in_board",
+      "sql": "CREATE INDEX idx_goal_requests_in_board ON board_goal_requests_in(board_id, status, id)",
+      "tbl_name": "board_goal_requests_in",
+      "type": "index"
+    },
+    {
+      "name": "idx_goal_requests_in_key",
+      "sql": "CREATE UNIQUE INDEX idx_goal_requests_in_key ON board_goal_requests_in(board_id, from_server, from_board, request_id)",
+      "tbl_name": "board_goal_requests_in",
+      "type": "index"
+    },
+    {
+      "name": "idx_goal_requests_in_lookup",
+      "sql": "CREATE INDEX idx_goal_requests_in_lookup ON board_goal_requests_in(from_server, from_board, request_id)",
+      "tbl_name": "board_goal_requests_in",
+      "type": "index"
+    },
+    {
+      "name": "idx_goal_requests_out_goal",
+      "sql": "CREATE INDEX idx_goal_requests_out_goal ON board_goal_requests_out(board_id, goal_id, status, id)",
+      "tbl_name": "board_goal_requests_out",
+      "type": "index"
+    },
+    {
+      "name": "idx_goal_requests_out_rid",
+      "sql": "CREATE UNIQUE INDEX idx_goal_requests_out_rid ON board_goal_requests_out(request_id)",
+      "tbl_name": "board_goal_requests_out",
+      "type": "index"
+    },
+    {
+      "name": "idx_health_actions",
+      "sql": "CREATE INDEX idx_health_actions ON health_actions(project, at)",
+      "tbl_name": "health_actions",
+      "type": "index"
+    },
+    {
+      "name": "idx_task_deps_blocked_by",
+      "sql": "CREATE INDEX idx_task_deps_blocked_by ON task_dependencies(blocked_by_task_id)",
+      "tbl_name": "task_dependencies",
+      "type": "index"
+    },
+    {
+      "name": "sqlite_autoindex_board_goal_meta_1",
+      "sql": null,
+      "tbl_name": "board_goal_meta",
+      "type": "index"
+    },
+    {
+      "name": "sqlite_autoindex_board_groups_1",
+      "sql": null,
+      "tbl_name": "board_groups",
+      "type": "index"
+    },
+    {
+      "name": "sqlite_autoindex_board_rekeys_1",
+      "sql": null,
+      "tbl_name": "board_rekeys",
+      "type": "index"
+    },
+    {
+      "name": "sqlite_autoindex_board_relayed_messages_1",
+      "sql": null,
+      "tbl_name": "board_relayed_messages",
+      "type": "index"
+    },
+    {
+      "name": "sqlite_autoindex_board_reminders_1",
+      "sql": null,
+      "tbl_name": "board_reminders",
+      "type": "index"
+    },
+    {
+      "name": "sqlite_autoindex_board_settings_1",
+      "sql": null,
+      "tbl_name": "board_settings",
+      "type": "index"
+    },
+    {
+      "name": "sqlite_autoindex_board_subscribers_1",
+      "sql": null,
+      "tbl_name": "board_subscribers",
+      "type": "index"
+    },
+    {
+      "name": "sqlite_autoindex_board_workflow_presets_1",
+      "sql": null,
+      "tbl_name": "board_workflow_presets",
+      "type": "index"
+    },
+    {
+      "name": "sqlite_autoindex_board_working_modes_1",
+      "sql": null,
+      "tbl_name": "board_working_modes",
+      "type": "index"
+    },
+    {
+      "name": "sqlite_autoindex_boards_1",
+      "sql": null,
+      "tbl_name": "boards",
+      "type": "index"
+    },
+    {
+      "name": "sqlite_autoindex_cross_team_links_1",
+      "sql": null,
+      "tbl_name": "cross_team_links",
+      "type": "index"
+    },
+    {
+      "name": "sqlite_autoindex_health_counters_1",
+      "sql": null,
+      "tbl_name": "health_counters",
+      "type": "index"
+    },
+    {
+      "name": "sqlite_autoindex_health_goal_size_1",
+      "sql": null,
+      "tbl_name": "health_goal_size",
+      "type": "index"
+    },
+    {
+      "name": "sqlite_autoindex_health_items_1",
+      "sql": null,
+      "tbl_name": "health_items",
+      "type": "index"
+    },
+    {
+      "name": "sqlite_autoindex_health_offbooks_1",
+      "sql": null,
+      "tbl_name": "health_offbooks",
+      "type": "index"
+    },
+    {
+      "name": "sqlite_autoindex_task_amendments_1",
+      "sql": null,
+      "tbl_name": "task_amendments",
+      "type": "index"
+    },
+    {
+      "name": "sqlite_autoindex_task_dependencies_1",
+      "sql": null,
+      "tbl_name": "task_dependencies",
+      "type": "index"
+    },
+    {
+      "name": "sqlite_autoindex_task_dependency_rules_1",
+      "sql": null,
+      "tbl_name": "task_dependency_rules",
+      "type": "index"
+    },
+    {
+      "name": "board_asks",
+      "sql": "CREATE TABLE board_asks (\n\t\t\tmessage_id INTEGER PRIMARY KEY,\n\t\t\tproject    TEXT NOT NULL,\n\t\t\tasker      TEXT NOT NULL,\n\t\t\tasked      TEXT NOT NULL,\n\t\t\tcreated_at TEXT NOT NULL\n\t\t)",
+      "tbl_name": "board_asks",
+      "type": "table"
+    },
+    {
+      "name": "board_goal_events",
+      "sql": "CREATE TABLE board_goal_events (\n\t\t\tid       INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\t\tboard_id TEXT NOT NULL,\n\t\t\tgoal_id  INTEGER NOT NULL,\n\t\t\tkind     TEXT NOT NULL,\n\t\t\tseq      INTEGER NOT NULL,\n\t\t\tat       TEXT NOT NULL\n\t\t)",
+      "tbl_name": "board_goal_events",
+      "type": "table"
+    },
+    {
+      "name": "board_goal_meta",
+      "sql": "CREATE TABLE board_goal_meta (\n\t\t\tboard_id   TEXT PRIMARY KEY,\n\t\t\tseq        INTEGER NOT NULL DEFAULT 0,\n\t\t\tupdated_at TEXT NOT NULL\n\t\t)",
+      "tbl_name": "board_goal_meta",
+      "type": "table"
+    },
+    {
+      "name": "board_goal_requests_in",
+      "sql": "CREATE TABLE board_goal_requests_in (\n\t\t\tid          INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\t\tboard_id    TEXT NOT NULL,\n\t\t\trequest_id  TEXT NOT NULL,\n\t\t\tfrom_server TEXT NOT NULL DEFAULT '',\n\t\t\tfrom_board  TEXT NOT NULL,\n\t\t\tfrom_sender TEXT NOT NULL DEFAULT '',\n\t\t\tgoal_uid    TEXT NOT NULL,\n\t\t\tgoal_title  TEXT NOT NULL DEFAULT '',\n\t\t\task         TEXT NOT NULL DEFAULT '',\n\t\t\tstatus      TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'declined', 'expired')),\n\t\t\ttask_id     INTEGER,\n\t\t\treason      TEXT NOT NULL DEFAULT '',\n\t\t\tdecided_by  TEXT NOT NULL DEFAULT '',\n\t\t\tcreated_at  TEXT NOT NULL,\n\t\t\tanswered_at TEXT\n\t\t)",
+      "tbl_name": "board_goal_requests_in",
+      "type": "table"
+    },
+    {
+      "name": "board_goal_requests_out",
+      "sql": "CREATE TABLE board_goal_requests_out (\n\t\t\tid          INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\t\tboard_id    TEXT NOT NULL,\n\t\t\tgoal_id     INTEGER NOT NULL,\n\t\t\trequest_id  TEXT NOT NULL,\n\t\t\tto_server   TEXT NOT NULL DEFAULT '',\n\t\t\tto_board    TEXT NOT NULL,\n\t\t\tstatus      TEXT NOT NULL DEFAULT 'requested' CHECK (status IN ('requested', 'accepted', 'declined', 'expired')),\n\t\t\treason      TEXT NOT NULL DEFAULT '',\n\t\t\tcreated_by  TEXT NOT NULL DEFAULT '',\n\t\t\tcreated_at  TEXT NOT NULL,\n\t\t\tanswered_at TEXT\n\t\t)",
+      "tbl_name": "board_goal_requests_out",
+      "type": "table"
+    },
+    {
+      "name": "board_goals",
+      "sql": "CREATE TABLE board_goals (\n\t\t\tid            INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\t\tgoal_uid      TEXT NOT NULL,\n\t\t\tboard_id      TEXT NOT NULL,\n\t\t\ttitle         TEXT NOT NULL,\n\t\t\toutcome       TEXT NOT NULL DEFAULT '',\n\t\t\tdone_when     TEXT NOT NULL DEFAULT '',\n\t\t\tstate         TEXT NOT NULL DEFAULT 'active' CHECK (state IN ('proposed', 'active', 'blocked', 'done', 'dropped')),\n\t\t\tblocked_on    TEXT NOT NULL DEFAULT '',\n\t\t\tdriver        TEXT NOT NULL DEFAULT '',\n\t\t\tcreated_by    TEXT NOT NULL DEFAULT '',\n\t\t\tcreated_at    TEXT NOT NULL,\n\t\t\tupdated_at    TEXT NOT NULL,\n\t\t\tclosed_at     TEXT,\n\t\t\tclosed_reason TEXT NOT NULL DEFAULT ''\n\t\t)",
+      "tbl_name": "board_goals",
+      "type": "table"
+    },
+    {
+      "name": "board_groups",
+      "sql": "CREATE TABLE board_groups (\n\t\t\tid         INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\t\tproject    TEXT NOT NULL,\n\t\t\tgroup_id   TEXT NOT NULL,\n\t\t\tsession_id TEXT NOT NULL, subscriber_id TEXT,\n\t\t\tUNIQUE(project, group_id, session_id)\n\t\t)",
+      "tbl_name": "board_groups",
+      "type": "table"
+    },
+    {
+      "name": "board_mention_index_state",
+      "sql": "CREATE TABLE board_mention_index_state (\n\t\t\tid         INTEGER PRIMARY KEY CHECK (id = 1),\n\t\t\tindexed_to INTEGER NOT NULL\n\t\t)",
+      "tbl_name": "board_mention_index_state",
+      "type": "table"
+    },
+    {
+      "name": "board_message_mentions",
+      "sql": "CREATE TABLE board_message_mentions (\n\t\t\ttoken      TEXT NOT NULL,\n\t\t\tmessage_id INTEGER NOT NULL,\n\t\t\tPRIMARY KEY (token, message_id)\n\t\t) WITHOUT ROWID",
+      "tbl_name": "board_message_mentions",
+      "type": "table"
+    },
+    {
+      "name": "board_messages",
+      "sql": "CREATE TABLE board_messages (\n\t\t\tid          INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\t\tproject     TEXT NOT NULL,\n\t\t\tsession_id  TEXT NOT NULL,\n\t\t\tcontent     TEXT NOT NULL,\n\t\t\tcreated_at  TEXT NOT NULL\n\t\t, target_group_id TEXT, subscriber_id TEXT, external_json TEXT, origin TEXT, is_system INTEGER NOT NULL DEFAULT 0, hub_user TEXT, task_id INTEGER)",
+      "tbl_name": "board_messages",
+      "type": "table"
+    },
+    {
+      "name": "board_rekeys",
+      "sql": "CREATE TABLE board_rekeys (\n\t\told_id TEXT PRIMARY KEY, new_id TEXT NOT NULL, rekeyed_at TEXT NOT NULL)",
+      "tbl_name": "board_rekeys",
+      "type": "table"
+    },
+    {
+      "name": "board_relayed_messages",
+      "sql": "CREATE TABLE board_relayed_messages (\n\t\tsource_server     TEXT NOT NULL,\n\t\tmessage_id        TEXT NOT NULL,\n\t\ttarget_message_id INTEGER NOT NULL,\n\t\tcreated_at        TEXT NOT NULL,\n\t\tPRIMARY KEY (source_server, message_id)\n\t)",
+      "tbl_name": "board_relayed_messages",
+      "type": "table"
+    },
+    {
+      "name": "board_reminders",
+      "sql": "CREATE TABLE board_reminders (\n\t\t\tproject TEXT NOT NULL,\n\t\t\tsubscriber_id TEXT NOT NULL,\n\t\t\tmessage TEXT NOT NULL,\n\t\t\tinterval_seconds INTEGER NOT NULL,\n\t\t\tPRIMARY KEY(project, subscriber_id)\n\t\t)",
+      "tbl_name": "board_reminders",
+      "type": "table"
+    },
+    {
+      "name": "board_replies",
+      "sql": "CREATE TABLE board_replies (\n\t\t\tmessage_id INTEGER PRIMARY KEY,\n\t\t\tproject    TEXT NOT NULL,\n\t\t\treply_to   INTEGER NOT NULL\n\t\t)",
+      "tbl_name": "board_replies",
+      "type": "table"
+    },
+    {
+      "name": "board_settings",
+      "sql": "CREATE TABLE board_settings (\n\t\tproject TEXT NOT NULL,\n\t\tkey     TEXT NOT NULL,\n\t\tvalue   TEXT NOT NULL,\n\t\tPRIMARY KEY (project, key)\n\t)",
+      "tbl_name": "board_settings",
+      "type": "table"
+    },
+    {
+      "name": "board_settings_log",
+      "sql": "CREATE TABLE board_settings_log (\n\t\t\tid         INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\t\tboard_id   TEXT NOT NULL,\n\t\t\tat         TEXT NOT NULL,\n\t\t\tkind       TEXT NOT NULL,\n\t\t\tactor      TEXT NOT NULL DEFAULT '',\n\t\t\tfield      TEXT NOT NULL DEFAULT '',\n\t\t\told_value  TEXT NOT NULL DEFAULT '',\n\t\t\tnew_value  TEXT NOT NULL DEFAULT '',\n\t\t\twindow     TEXT NOT NULL DEFAULT '',\n\t\t\tcount      INTEGER NOT NULL DEFAULT 0,\n\t\t\tsenders    TEXT NOT NULL DEFAULT '[]'\n\t\t)",
+      "tbl_name": "board_settings_log",
+      "type": "table"
+    },
+    {
+      "name": "board_subscribers",
+      "sql": "CREATE TABLE board_subscribers (\n\t\t\tid            INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\t\tproject       TEXT NOT NULL,\n\t\t\tsession_id    TEXT NOT NULL,\n\t\t\tjob_title     TEXT NOT NULL,\n\t\t\twebhook_url   TEXT,\n\t\t\torigin_server TEXT,\n\t\t\treceive_mode  TEXT NOT NULL DEFAULT 'mentions',\n\t\t\tlast_read_id  INTEGER NOT NULL DEFAULT 0,\n\t\t\tsubscribed_at TEXT NOT NULL, is_active INTEGER NOT NULL DEFAULT 1, can_peek INTEGER NOT NULL DEFAULT 0, subscriber_id TEXT, session_name TEXT, session_joined_at TEXT,\n\t\t\tUNIQUE(project, session_id)\n\t\t)",
+      "tbl_name": "board_subscribers",
+      "type": "table"
+    },
+    {
+      "name": "board_tasks",
+      "sql": "CREATE TABLE board_tasks (\n\t\t\tid INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\t\trevision INTEGER NOT NULL DEFAULT 1,\n\t\t\tboard_id TEXT NOT NULL,\n\t\t\ttitle TEXT NOT NULL,\n\t\t\tbody TEXT,\n\t\t\tstatus TEXT NOT NULL DEFAULT 'pending'\n\t\t\t\tCHECK (status IN ('pending', 'in_progress', 'completed', 'skipped', 'blocked', 'draft', 'review_pending')),\n\t\t\tpriority TEXT NOT NULL DEFAULT 'medium'\n\t\t\t\tCHECK (priority IN ('critical', 'high', 'medium', 'low')),\n\t\t\tcreated_by TEXT NOT NULL,\n\t\t\tassigned_to TEXT,\n\t\t\tcompleted_by TEXT,\n\t\t\tcompletion_message TEXT,\n\t\t\tcreated_at TEXT NOT NULL,\n\t\t\tclaimed_at TEXT,\n\t\t\tcompleted_at TEXT,\n\t\t\tlast_activity_at TEXT,\n\t\t\tedited_at TEXT,\n\t\t\tidle_snoozed_until TEXT\n\t\t, session_id TEXT, cost_usd REAL, input_tokens INTEGER, output_tokens INTEGER, cache_read_tokens INTEGER, cache_write_tokens INTEGER, parked_reason TEXT, parked_until TEXT, remind_at TEXT, reminded_at TEXT, goal_id INTEGER, remote_board_uid TEXT, remote_goal_uid TEXT, request_id TEXT, request_server TEXT, request_board TEXT)",
+      "tbl_name": "board_tasks",
+      "type": "table"
+    },
+    {
+      "name": "board_waits",
+      "sql": "CREATE TABLE board_waits (\n\t\t\tid             INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\t\tproject        TEXT NOT NULL,\n\t\t\tsubscriber_id  TEXT NOT NULL,\n\t\t\tsession_name   TEXT NOT NULL,\n\t\t\twait_type      TEXT NOT NULL DEFAULT 'message',\n\t\t\ttarget_id      TEXT NOT NULL DEFAULT '',\n\t\t\treason         TEXT NOT NULL DEFAULT '',\n\t\t\tstatus         TEXT NOT NULL DEFAULT 'active'\n\t\t\t\tCHECK (status IN ('active', 'resolved', 'cancelled', 'expired')),\n\t\t\tcreated_at     TEXT NOT NULL,\n\t\t\tresolved_at    TEXT,\n\t\t\texpires_at     TEXT NOT NULL,\n\t\t\ttimeout_notified_at TEXT\n\t\t)",
+      "tbl_name": "board_waits",
+      "type": "table"
+    },
+    {
+      "name": "board_workflow_presets",
+      "sql": "CREATE TABLE board_workflow_presets (board_id TEXT NOT NULL, id TEXT NOT NULL, name TEXT NOT NULL, instructions TEXT NOT NULL, PRIMARY KEY(board_id,id))",
+      "tbl_name": "board_workflow_presets",
+      "type": "table"
+    },
+    {
+      "name": "board_working_modes",
+      "sql": "CREATE TABLE board_working_modes (board_id TEXT PRIMARY KEY, data TEXT NOT NULL)",
+      "tbl_name": "board_working_modes",
+      "type": "table"
+    },
+    {
+      "name": "boards",
+      "sql": "CREATE TABLE boards (\n\t\t\tid         TEXT PRIMARY KEY,\n\t\t\tlabel      TEXT NOT NULL,\n\t\t\tcreated_at TEXT NOT NULL,\n\t\t\tcreated_by TEXT NOT NULL DEFAULT ''\n\t\t, cross_team_id TEXT, board_uid TEXT)",
+      "tbl_name": "boards",
+      "type": "table"
+    },
+    {
+      "name": "cross_team_links",
+      "sql": "CREATE TABLE cross_team_links (\n\t\tsource_server       TEXT NOT NULL,\n\t\tsource_team         TEXT NOT NULL,\n\t\ttarget_team         TEXT NOT NULL,\n\t\ttarget_server       TEXT NOT NULL DEFAULT '',\n\t\tsource_label        TEXT NOT NULL DEFAULT '',\n\t\ttarget_label        TEXT NOT NULL DEFAULT '',\n\t\tsource_server_label TEXT NOT NULL DEFAULT '',\n\t\tapplied_at          TEXT NOT NULL,\n\t\tPRIMARY KEY (target_team, target_server, source_server, source_team)\n\t)",
+      "tbl_name": "cross_team_links",
+      "type": "table"
+    },
+    {
+      "name": "cross_team_switch_log",
+      "sql": "CREATE TABLE cross_team_switch_log (\n\t\tid      INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\tproject TEXT NOT NULL,\n\t\tkey     TEXT NOT NULL,\n\t\told     TEXT NOT NULL,\n\t\tnew     TEXT NOT NULL,\n\t\tvia     TEXT NOT NULL,\n\t\twho     TEXT NOT NULL,\n\t\tat      TEXT NOT NULL\n\t, who_id TEXT NOT NULL DEFAULT '')",
+      "tbl_name": "cross_team_switch_log",
+      "type": "table"
+    },
+    {
+      "name": "health_actions",
+      "sql": "CREATE TABLE health_actions (\n\tproject TEXT NOT NULL,\n\trule    TEXT NOT NULL,\n\ttarget  TEXT NOT NULL,\n\tat      TEXT NOT NULL\n)",
+      "tbl_name": "health_actions",
+      "type": "table"
+    },
+    {
+      "name": "health_counters",
+      "sql": "CREATE TABLE health_counters (\n\tproject   TEXT NOT NULL,\n\trule      TEXT NOT NULL,\n\ttarget    TEXT NOT NULL,\n\tsubject   TEXT NOT NULL,\n\tcount     INTEGER NOT NULL,\n\tlast_at   TEXT NOT NULL,\n\tescalated INTEGER NOT NULL DEFAULT 0,\n\tPRIMARY KEY (project, rule, target, subject)\n)",
+      "tbl_name": "health_counters",
+      "type": "table"
+    },
+    {
+      "name": "health_goal_size",
+      "sql": "CREATE TABLE health_goal_size (\n\tproject    TEXT NOT NULL,\n\tgoal_id    INTEGER NOT NULL,\n\tsaid_level INTEGER NOT NULL,\n\tPRIMARY KEY (project, goal_id)\n)",
+      "tbl_name": "health_goal_size",
+      "type": "table"
+    },
+    {
+      "name": "health_items",
+      "sql": "CREATE TABLE health_items (\n\tproject     TEXT NOT NULL,\n\titem        TEXT NOT NULL,\n\tstate       TEXT NOT NULL,\n\tshown_at    TEXT NOT NULL,\n\tacked_state TEXT,\n\tacked_by    TEXT,\n\tacked_at    TEXT,\n\tPRIMARY KEY (project, item)\n)",
+      "tbl_name": "health_items",
+      "type": "table"
+    },
+    {
+      "name": "health_offbooks",
+      "sql": "CREATE TABLE health_offbooks (\n\tid       INTEGER PRIMARY KEY AUTOINCREMENT,\n\tproject  TEXT NOT NULL,\n\tkind     TEXT NOT NULL,\n\tagent    TEXT NOT NULL,\n\tref      TEXT NOT NULL,\n\tdetail   TEXT NOT NULL,\n\tat       TEXT NOT NULL,\n\tshown_at TEXT,\n\tUNIQUE (project, kind, ref)\n)",
+      "tbl_name": "health_offbooks",
+      "type": "table"
+    },
+    {
+      "name": "hub_operator_actions",
+      "sql": "CREATE TABLE hub_operator_actions (\n\t\tid       INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\tat       TEXT NOT NULL,\n\t\thub_user TEXT NOT NULL,\n\t\tmethod   TEXT NOT NULL,\n\t\tpath     TEXT NOT NULL,\n\t\tproject  TEXT NOT NULL,\n\t\tstatus   INTEGER NOT NULL\n\t, hub_user_id TEXT NOT NULL DEFAULT '')",
+      "tbl_name": "hub_operator_actions",
+      "type": "table"
+    },
+    {
+      "name": "sqlite_sequence",
+      "sql": "CREATE TABLE sqlite_sequence(name,seq)",
+      "tbl_name": "sqlite_sequence",
+      "type": "table"
+    },
+    {
+      "name": "task_amendments",
+      "sql": "CREATE TABLE task_amendments (\n\t\t\tid INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\t\ttask_id INTEGER NOT NULL REFERENCES board_tasks(id),\n\t\t\trevision INTEGER NOT NULL,\n\t\t\tactor TEXT NOT NULL,\n\t\t\tcreated_at TEXT NOT NULL,\n\t\t\treason TEXT NOT NULL,\n\t\t\tchanges_json TEXT NOT NULL,\n\t\t\tprevious_snapshot_json TEXT NOT NULL,\n\t\t\teffective_snapshot_json TEXT NOT NULL,\n\t\t\tUNIQUE(task_id, revision)\n\t\t)",
+      "tbl_name": "task_amendments",
+      "type": "table"
+    },
+    {
+      "name": "task_dependencies",
+      "sql": "CREATE TABLE task_dependencies (\n\t\t\ttask_id INTEGER NOT NULL,\n\t\t\tblocked_by_task_id INTEGER NOT NULL,\n\t\t\tblocked_by_board_id TEXT NOT NULL,\n\t\t\tPRIMARY KEY (task_id, blocked_by_task_id),\n\t\t\tFOREIGN KEY (task_id) REFERENCES board_tasks(id),\n\t\t\tFOREIGN KEY (blocked_by_task_id) REFERENCES board_tasks(id)\n\t\t)",
+      "tbl_name": "task_dependencies",
+      "type": "table"
+    },
+    {
+      "name": "task_dependency_rules",
+      "sql": "CREATE TABLE task_dependency_rules (\n\t task_id INTEGER NOT NULL, upstream_id INTEGER NOT NULL,\n\t condition TEXT NOT NULL, required_artifacts TEXT NOT NULL,\n\t PRIMARY KEY(task_id, upstream_id))",
+      "tbl_name": "task_dependency_rules",
+      "type": "table"
+    },
+    {
+      "name": "task_ready_notifications",
+      "sql": "CREATE TABLE task_ready_notifications (\n\t task_id INTEGER PRIMARY KEY REFERENCES board_tasks(id))",
+      "tbl_name": "task_ready_notifications",
+      "type": "table"
+    },
+    {
+      "name": "task_workflows",
+      "sql": "CREATE TABLE task_workflows (\n\t task_id INTEGER PRIMARY KEY REFERENCES board_tasks(id), data TEXT NOT NULL)",
+      "tbl_name": "task_workflows",
+      "type": "table"
+    },
+    {
+      "name": "board_goal_requests_out_seq_insert",
+      "sql": "CREATE TRIGGER board_goal_requests_out_seq_insert AFTER INSERT ON board_goal_requests_out BEGIN INSERT INTO board_goal_meta (board_id, seq, updated_at) VALUES (NEW.board_id, 1, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))\n\t\tON CONFLICT(board_id) DO UPDATE SET seq = seq + 1, updated_at = excluded.updated_at; END",
+      "tbl_name": "board_goal_requests_out",
+      "type": "trigger"
+    },
+    {
+      "name": "board_goal_requests_out_seq_update",
+      "sql": "CREATE TRIGGER board_goal_requests_out_seq_update AFTER UPDATE OF status ON board_goal_requests_out WHEN OLD.status IS NOT NEW.status BEGIN INSERT INTO board_goal_meta (board_id, seq, updated_at) VALUES (NEW.board_id, 1, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))\n\t\tON CONFLICT(board_id) DO UPDATE SET seq = seq + 1, updated_at = excluded.updated_at; END",
+      "tbl_name": "board_goal_requests_out",
+      "type": "trigger"
+    },
+    {
+      "name": "board_goals_seq_closed",
+      "sql": "CREATE TRIGGER board_goals_seq_closed AFTER UPDATE OF state ON board_goals WHEN NOT (OLD.state IN ('done', 'dropped')) AND (NEW.state IN ('done', 'dropped'))\n\t\t\tBEGIN INSERT INTO board_goal_meta (board_id, seq, updated_at) VALUES (NEW.board_id, 1, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))\n\t\tON CONFLICT(board_id) DO UPDATE SET seq = seq + 1, updated_at = excluded.updated_at; INSERT INTO board_goal_events (board_id, goal_id, kind, seq, at) SELECT NEW.board_id, NEW.id, 'goal_closed', seq, strftime('%Y-%m-%dT%H:%M:%SZ', 'now') FROM board_goal_meta WHERE board_id = NEW.board_id AND (1); END",
+      "tbl_name": "board_goals",
+      "type": "trigger"
+    },
+    {
+      "name": "board_goals_seq_delete",
+      "sql": "CREATE TRIGGER board_goals_seq_delete AFTER DELETE ON board_goals BEGIN INSERT INTO board_goal_meta (board_id, seq, updated_at) VALUES (OLD.board_id, 1, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))\n\t\tON CONFLICT(board_id) DO UPDATE SET seq = seq + 1, updated_at = excluded.updated_at; INSERT INTO board_goal_events (board_id, goal_id, kind, seq, at) SELECT OLD.board_id, OLD.id, 'goal_deleted', seq, strftime('%Y-%m-%dT%H:%M:%SZ', 'now') FROM board_goal_meta WHERE board_id = OLD.board_id AND (1); END",
+      "tbl_name": "board_goals",
+      "type": "trigger"
+    },
+    {
+      "name": "board_goals_seq_insert",
+      "sql": "CREATE TRIGGER board_goals_seq_insert AFTER INSERT ON board_goals BEGIN INSERT INTO board_goal_meta (board_id, seq, updated_at) VALUES (NEW.board_id, 1, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))\n\t\tON CONFLICT(board_id) DO UPDATE SET seq = seq + 1, updated_at = excluded.updated_at; INSERT INTO board_goal_events (board_id, goal_id, kind, seq, at) SELECT NEW.board_id, NEW.id, 'goal_created', seq, strftime('%Y-%m-%dT%H:%M:%SZ', 'now') FROM board_goal_meta WHERE board_id = NEW.board_id AND (1); END",
+      "tbl_name": "board_goals",
+      "type": "trigger"
+    },
+    {
+      "name": "board_goals_seq_reopened",
+      "sql": "CREATE TRIGGER board_goals_seq_reopened AFTER UPDATE OF state ON board_goals WHEN (OLD.state IN ('done', 'dropped')) AND NOT (NEW.state IN ('done', 'dropped'))\n\t\t\tBEGIN INSERT INTO board_goal_meta (board_id, seq, updated_at) VALUES (NEW.board_id, 1, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))\n\t\tON CONFLICT(board_id) DO UPDATE SET seq = seq + 1, updated_at = excluded.updated_at; INSERT INTO board_goal_events (board_id, goal_id, kind, seq, at) SELECT NEW.board_id, NEW.id, 'goal_reopened', seq, strftime('%Y-%m-%dT%H:%M:%SZ', 'now') FROM board_goal_meta WHERE board_id = NEW.board_id AND (1); END",
+      "tbl_name": "board_goals",
+      "type": "trigger"
+    },
+    {
+      "name": "board_goals_seq_update",
+      "sql": "CREATE TRIGGER board_goals_seq_update AFTER UPDATE OF title, outcome, done_when, state, blocked_on, driver, closed_at, closed_reason ON board_goals\n\t\t\tWHEN (OLD.title IS NOT NEW.title OR OLD.outcome IS NOT NEW.outcome OR OLD.done_when IS NOT NEW.done_when OR OLD.state IS NOT NEW.state OR OLD.blocked_on IS NOT NEW.blocked_on OR OLD.driver IS NOT NEW.driver\n\t\t\tOR OLD.closed_at IS NOT NEW.closed_at OR OLD.closed_reason IS NOT NEW.closed_reason) AND ((OLD.state IN ('done', 'dropped')) = (NEW.state IN ('done', 'dropped')))\n\t\t\tBEGIN INSERT INTO board_goal_meta (board_id, seq, updated_at) VALUES (NEW.board_id, 1, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))\n\t\tON CONFLICT(board_id) DO UPDATE SET seq = seq + 1, updated_at = excluded.updated_at; INSERT INTO board_goal_events (board_id, goal_id, kind, seq, at) SELECT NEW.board_id, NEW.id, 'goal_updated', seq, strftime('%Y-%m-%dT%H:%M:%SZ', 'now') FROM board_goal_meta WHERE board_id = NEW.board_id AND (1); END",
+      "tbl_name": "board_goals",
+      "type": "trigger"
+    },
+    {
+      "name": "board_goals_uid_immutable",
+      "sql": "CREATE TRIGGER board_goals_uid_immutable BEFORE UPDATE OF goal_uid ON board_goals WHEN OLD.goal_uid IS NOT NEW.goal_uid\n\t\t\tBEGIN SELECT RAISE(ABORT, 'a goal uid is never changed'); END",
+      "tbl_name": "board_goals",
+      "type": "trigger"
+    },
+    {
+      "name": "board_tasks_goal_seq_delete",
+      "sql": "CREATE TRIGGER board_tasks_goal_seq_delete AFTER DELETE ON board_tasks WHEN OLD.goal_id IS NOT NULL BEGIN INSERT INTO board_goal_meta (board_id, seq, updated_at) VALUES (OLD.board_id, 1, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))\n\t\tON CONFLICT(board_id) DO UPDATE SET seq = seq + 1, updated_at = excluded.updated_at; INSERT INTO board_goal_events (board_id, goal_id, kind, seq, at) SELECT OLD.board_id, OLD.goal_id, 'task_unlinked', seq, strftime('%Y-%m-%dT%H:%M:%SZ', 'now') FROM board_goal_meta WHERE board_id = OLD.board_id AND (1); END",
+      "tbl_name": "board_tasks",
+      "type": "trigger"
+    },
+    {
+      "name": "board_tasks_goal_seq_insert",
+      "sql": "CREATE TRIGGER board_tasks_goal_seq_insert AFTER INSERT ON board_tasks WHEN NEW.goal_id IS NOT NULL BEGIN INSERT INTO board_goal_meta (board_id, seq, updated_at) VALUES (NEW.board_id, 1, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))\n\t\tON CONFLICT(board_id) DO UPDATE SET seq = seq + 1, updated_at = excluded.updated_at; INSERT INTO board_goal_events (board_id, goal_id, kind, seq, at) SELECT NEW.board_id, NEW.goal_id, 'task_linked', seq, strftime('%Y-%m-%dT%H:%M:%SZ', 'now') FROM board_goal_meta WHERE board_id = NEW.board_id AND (1); END",
+      "tbl_name": "board_tasks",
+      "type": "trigger"
+    },
+    {
+      "name": "board_tasks_goal_seq_move",
+      "sql": "CREATE TRIGGER board_tasks_goal_seq_move AFTER UPDATE OF goal_id ON board_tasks WHEN OLD.goal_id IS NOT NEW.goal_id\n\t\t\tBEGIN INSERT INTO board_goal_meta (board_id, seq, updated_at) VALUES (NEW.board_id, 1, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))\n\t\tON CONFLICT(board_id) DO UPDATE SET seq = seq + 1, updated_at = excluded.updated_at; INSERT INTO board_goal_events (board_id, goal_id, kind, seq, at) SELECT NEW.board_id, OLD.goal_id, 'task_unlinked', seq, strftime('%Y-%m-%dT%H:%M:%SZ', 'now') FROM board_goal_meta WHERE board_id = NEW.board_id AND (OLD.goal_id IS NOT NULL); INSERT INTO board_goal_events (board_id, goal_id, kind, seq, at) SELECT NEW.board_id, NEW.goal_id, 'task_linked', seq, strftime('%Y-%m-%dT%H:%M:%SZ', 'now') FROM board_goal_meta WHERE board_id = NEW.board_id AND (NEW.goal_id IS NOT NULL); END",
+      "tbl_name": "board_tasks",
+      "type": "trigger"
+    },
+    {
+      "name": "board_tasks_goal_seq_state",
+      "sql": "CREATE TRIGGER board_tasks_goal_seq_state AFTER UPDATE OF status ON board_tasks WHEN OLD.goal_id IS NEW.goal_id AND NEW.goal_id IS NOT NULL AND OLD.status IS NOT NEW.status\n\t\t\tBEGIN INSERT INTO board_goal_meta (board_id, seq, updated_at) VALUES (NEW.board_id, 1, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))\n\t\tON CONFLICT(board_id) DO UPDATE SET seq = seq + 1, updated_at = excluded.updated_at; INSERT INTO board_goal_events (board_id, goal_id, kind, seq, at) SELECT NEW.board_id, NEW.goal_id, 'task_state', seq, strftime('%Y-%m-%dT%H:%M:%SZ', 'now') FROM board_goal_meta WHERE board_id = NEW.board_id AND (1); END",
+      "tbl_name": "board_tasks",
+      "type": "trigger"
+    },
+    {
+      "name": "boards_board_uid_immutable",
+      "sql": "CREATE TRIGGER boards_board_uid_immutable BEFORE UPDATE OF board_uid ON boards WHEN OLD.board_uid IS NOT NULL AND NEW.board_uid IS NOT OLD.board_uid\n\t\t\tBEGIN SELECT RAISE(ABORT, 'a board uid is never changed'); END",
+      "tbl_name": "boards",
+      "type": "trigger"
+    },
+    {
+      "name": "boards_cross_team_id",
+      "sql": "CREATE TRIGGER boards_cross_team_id AFTER INSERT ON boards WHEN NEW.cross_team_id IS NULL\n\t\t\tBEGIN UPDATE boards SET cross_team_id = 'x-' || substr('abcdefghijklmnopqrstuvwxyz234567', 1 + (abs(random()) % 32), 1) || substr('abcdefghijklmnopqrstuvwxyz234567', 1 + (abs(random()) % 32), 1) || substr('abcdefghijklmnopqrstuvwxyz234567', 1 + (abs(random()) % 32), 1) || substr('abcdefghijklmnopqrstuvwxyz234567', 1 + (abs(random()) % 32), 1) || substr('abcdefghijklmnopqrstuvwxyz234567', 1 + (abs(random()) % 32), 1) || substr('abcdefghijklmnopqrstuvwxyz234567', 1 + (abs(random()) % 32), 1) || substr('abcdefghijklmnopqrstuvwxyz234567', 1 + (abs(random()) % 32), 1) || substr('abcdefghijklmnopqrstuvwxyz234567', 1 + (abs(random()) % 32), 1) || substr('abcdefghijklmnopqrstuvwxyz234567', 1 + (abs(random()) % 32), 1) || substr('abcdefghijklmnopqrstuvwxyz234567', 1 + (abs(random()) % 32), 1) || substr('abcdefghijklmnopqrstuvwxyz234567', 1 + (abs(random()) % 32), 1) || substr('abcdefghijklmnopqrstuvwxyz234567', 1 + (abs(random()) % 32), 1) || substr('abcdefghijklmnopqrstuvwxyz234567', 1 + (abs(random()) % 32), 1) || substr('abcdefghijklmnopqrstuvwxyz234567', 1 + (abs(random()) % 32), 1) || substr('abcdefghijklmnopqrstuvwxyz234567', 1 + (abs(random()) % 32), 1) || substr('abcdefghijklmnopqrstuvwxyz234567', 1 + (abs(random()) % 32), 1) WHERE id = NEW.id; END",
+      "tbl_name": "boards",
+      "type": "trigger"
+    }
+  ],
+  "tables": {
+    "board_asks": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "message_id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "project",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "asker",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 3,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "asked",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 4,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "created_at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "project",
+              "seqno": 0
+            },
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "message_id",
+              "seqno": 1
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 2
+            }
+          ],
+          "name": "idx_board_asks_project",
+          "origin": "c",
+          "partial": 0,
+          "seq": 0,
+          "unique": 0
+        }
+      ]
+    },
+    "board_goal_events": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "board_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "goal_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 3,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "kind",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 4,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "seq",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 5,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "board_id",
+              "seqno": 0
+            },
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "id",
+              "seqno": 1
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 2
+            }
+          ],
+          "name": "idx_board_goal_events_board",
+          "origin": "c",
+          "partial": 0,
+          "seq": 0,
+          "unique": 0
+        }
+      ]
+    },
+    "board_goal_meta": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "board_id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "TEXT"
+        },
+        {
+          "cid": 1,
+          "dflt_value": "0",
+          "hidden": 0,
+          "name": "seq",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "updated_at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "board_id",
+              "seqno": 0
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 1
+            }
+          ],
+          "name": "sqlite_autoindex_board_goal_meta_1",
+          "origin": "pk",
+          "partial": 0,
+          "seq": 0,
+          "unique": 1
+        }
+      ]
+    },
+    "board_goal_requests_in": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "board_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "request_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 3,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "from_server",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 4,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "from_board",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 5,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "from_sender",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 6,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "goal_uid",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 7,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "goal_title",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 8,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "ask",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 9,
+          "dflt_value": "'pending'",
+          "hidden": 0,
+          "name": "status",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 10,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "task_id",
+          "notnull": 0,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 11,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "reason",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 12,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "decided_by",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 13,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "created_at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 14,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "answered_at",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "board_id",
+              "seqno": 0
+            },
+            {
+              "cid": 9,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "status",
+              "seqno": 1
+            },
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "id",
+              "seqno": 2
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 3
+            }
+          ],
+          "name": "idx_goal_requests_in_board",
+          "origin": "c",
+          "partial": 0,
+          "seq": 0,
+          "unique": 0
+        },
+        {
+          "columns": [
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "board_id",
+              "seqno": 0
+            },
+            {
+              "cid": 3,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "from_server",
+              "seqno": 1
+            },
+            {
+              "cid": 4,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "from_board",
+              "seqno": 2
+            },
+            {
+              "cid": 2,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "request_id",
+              "seqno": 3
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 4
+            }
+          ],
+          "name": "idx_goal_requests_in_key",
+          "origin": "c",
+          "partial": 0,
+          "seq": 2,
+          "unique": 1
+        },
+        {
+          "columns": [
+            {
+              "cid": 3,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "from_server",
+              "seqno": 0
+            },
+            {
+              "cid": 4,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "from_board",
+              "seqno": 1
+            },
+            {
+              "cid": 2,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "request_id",
+              "seqno": 2
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 3
+            }
+          ],
+          "name": "idx_goal_requests_in_lookup",
+          "origin": "c",
+          "partial": 0,
+          "seq": 1,
+          "unique": 0
+        }
+      ]
+    },
+    "board_goal_requests_out": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "board_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "goal_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 3,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "request_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 4,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "to_server",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 5,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "to_board",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 6,
+          "dflt_value": "'requested'",
+          "hidden": 0,
+          "name": "status",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 7,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "reason",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 8,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "created_by",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 9,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "created_at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 10,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "answered_at",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "board_id",
+              "seqno": 0
+            },
+            {
+              "cid": 2,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "goal_id",
+              "seqno": 1
+            },
+            {
+              "cid": 6,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "status",
+              "seqno": 2
+            },
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "id",
+              "seqno": 3
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 4
+            }
+          ],
+          "name": "idx_goal_requests_out_goal",
+          "origin": "c",
+          "partial": 0,
+          "seq": 0,
+          "unique": 0
+        },
+        {
+          "columns": [
+            {
+              "cid": 3,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "request_id",
+              "seqno": 0
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 1
+            }
+          ],
+          "name": "idx_goal_requests_out_rid",
+          "origin": "c",
+          "partial": 0,
+          "seq": 1,
+          "unique": 1
+        }
+      ]
+    },
+    "board_goals": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "goal_uid",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "board_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 3,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "title",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 4,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "outcome",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 5,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "done_when",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 6,
+          "dflt_value": "'active'",
+          "hidden": 0,
+          "name": "state",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 7,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "blocked_on",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 8,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "driver",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 9,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "created_by",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 10,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "created_at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 11,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "updated_at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 12,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "closed_at",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 13,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "closed_reason",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 2,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "board_id",
+              "seqno": 0
+            },
+            {
+              "cid": 6,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "state",
+              "seqno": 1
+            },
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "id",
+              "seqno": 2
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 3
+            }
+          ],
+          "name": "idx_board_goals_board",
+          "origin": "c",
+          "partial": 0,
+          "seq": 0,
+          "unique": 0
+        },
+        {
+          "columns": [
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "goal_uid",
+              "seqno": 0
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 1
+            }
+          ],
+          "name": "idx_board_goals_uid",
+          "origin": "c",
+          "partial": 0,
+          "seq": 1,
+          "unique": 1
+        }
+      ]
+    },
+    "board_groups": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "project",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "group_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 3,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "session_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 4,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "subscriber_id",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "project",
+              "seqno": 0
+            },
+            {
+              "cid": 2,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "group_id",
+              "seqno": 1
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 2
+            }
+          ],
+          "name": "idx_board_groups_project_group",
+          "origin": "c",
+          "partial": 0,
+          "seq": 0,
+          "unique": 0
+        },
+        {
+          "columns": [
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "project",
+              "seqno": 0
+            },
+            {
+              "cid": 2,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "group_id",
+              "seqno": 1
+            },
+            {
+              "cid": 3,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "session_id",
+              "seqno": 2
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 3
+            }
+          ],
+          "name": "sqlite_autoindex_board_groups_1",
+          "origin": "u",
+          "partial": 0,
+          "seq": 1,
+          "unique": 1
+        }
+      ]
+    },
+    "board_mention_index_state": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "indexed_to",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        }
+      ],
+      "indexes": []
+    },
+    "board_message_mentions": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "token",
+          "notnull": 1,
+          "pk": 1,
+          "type": "TEXT"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "message_id",
+          "notnull": 1,
+          "pk": 2,
+          "type": "INTEGER"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "token",
+              "seqno": 0
+            },
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "message_id",
+              "seqno": 1
+            }
+          ],
+          "name": "sqlite_autoindex_board_message_mentions_1",
+          "origin": "pk",
+          "partial": 0,
+          "seq": 0,
+          "unique": 1
+        }
+      ]
+    },
+    "board_messages": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "project",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "session_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 3,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "content",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 4,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "created_at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 5,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "target_group_id",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 6,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "subscriber_id",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 7,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "external_json",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 8,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "origin",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 9,
+          "dflt_value": "0",
+          "hidden": 0,
+          "name": "is_system",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 10,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "hub_user",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 11,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "task_id",
+          "notnull": 0,
+          "pk": 0,
+          "type": "INTEGER"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "project",
+              "seqno": 0
+            },
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "id",
+              "seqno": 1
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 2
+            }
+          ],
+          "name": "idx_board_messages_project",
+          "origin": "c",
+          "partial": 0,
+          "seq": 2,
+          "unique": 0
+        },
+        {
+          "columns": [
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "project",
+              "seqno": 0
+            },
+            {
+              "cid": 6,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "subscriber_id",
+              "seqno": 1
+            },
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "id",
+              "seqno": 2
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 3
+            }
+          ],
+          "name": "idx_board_messages_sender",
+          "origin": "c",
+          "partial": 0,
+          "seq": 1,
+          "unique": 0
+        },
+        {
+          "columns": [
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "project",
+              "seqno": 0
+            },
+            {
+              "cid": 11,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "task_id",
+              "seqno": 1
+            },
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "id",
+              "seqno": 2
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 3
+            }
+          ],
+          "name": "idx_board_messages_task",
+          "origin": "c",
+          "partial": 1,
+          "seq": 0,
+          "unique": 0
+        }
+      ]
+    },
+    "board_rekeys": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "old_id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "TEXT"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "new_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "rekeyed_at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "old_id",
+              "seqno": 0
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 1
+            }
+          ],
+          "name": "sqlite_autoindex_board_rekeys_1",
+          "origin": "pk",
+          "partial": 0,
+          "seq": 0,
+          "unique": 1
+        }
+      ]
+    },
+    "board_relayed_messages": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "source_server",
+          "notnull": 1,
+          "pk": 1,
+          "type": "TEXT"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "message_id",
+          "notnull": 1,
+          "pk": 2,
+          "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "target_message_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 3,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "created_at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "source_server",
+              "seqno": 0
+            },
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "message_id",
+              "seqno": 1
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 2
+            }
+          ],
+          "name": "sqlite_autoindex_board_relayed_messages_1",
+          "origin": "pk",
+          "partial": 0,
+          "seq": 0,
+          "unique": 1
+        }
+      ]
+    },
+    "board_reminders": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "project",
+          "notnull": 1,
+          "pk": 1,
+          "type": "TEXT"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "subscriber_id",
+          "notnull": 1,
+          "pk": 2,
+          "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "message",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 3,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "interval_seconds",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "project",
+              "seqno": 0
+            },
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "subscriber_id",
+              "seqno": 1
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 2
+            }
+          ],
+          "name": "sqlite_autoindex_board_reminders_1",
+          "origin": "pk",
+          "partial": 0,
+          "seq": 0,
+          "unique": 1
+        }
+      ]
+    },
+    "board_replies": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "message_id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "project",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "reply_to",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "project",
+              "seqno": 0
+            },
+            {
+              "cid": 2,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "reply_to",
+              "seqno": 1
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 2
+            }
+          ],
+          "name": "idx_board_replies_to",
+          "origin": "c",
+          "partial": 0,
+          "seq": 0,
+          "unique": 0
+        }
+      ]
+    },
+    "board_settings": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "project",
+          "notnull": 1,
+          "pk": 1,
+          "type": "TEXT"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "key",
+          "notnull": 1,
+          "pk": 2,
+          "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "value",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "project",
+              "seqno": 0
+            },
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "key",
+              "seqno": 1
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 2
+            }
+          ],
+          "name": "sqlite_autoindex_board_settings_1",
+          "origin": "pk",
+          "partial": 0,
+          "seq": 0,
+          "unique": 1
+        }
+      ]
+    },
+    "board_settings_log": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "board_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 3,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "kind",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 4,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "actor",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 5,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "field",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 6,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "old_value",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 7,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "new_value",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 8,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "window",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 9,
+          "dflt_value": "0",
+          "hidden": 0,
+          "name": "count",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 10,
+          "dflt_value": "'[]'",
+          "hidden": 0,
+          "name": "senders",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "board_id",
+              "seqno": 0
+            },
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "id",
+              "seqno": 1
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 2
+            }
+          ],
+          "name": "idx_board_settings_log",
+          "origin": "c",
+          "partial": 0,
+          "seq": 0,
+          "unique": 0
+        }
+      ]
+    },
+    "board_subscribers": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "project",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "session_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 3,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "job_title",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 4,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "webhook_url",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 5,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "origin_server",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 6,
+          "dflt_value": "'mentions'",
+          "hidden": 0,
+          "name": "receive_mode",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 7,
+          "dflt_value": "0",
+          "hidden": 0,
+          "name": "last_read_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 8,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "subscribed_at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 9,
+          "dflt_value": "1",
+          "hidden": 0,
+          "name": "is_active",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 10,
+          "dflt_value": "0",
+          "hidden": 0,
+          "name": "can_peek",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 11,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "subscriber_id",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 12,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "session_name",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 13,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "session_joined_at",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 12,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "session_name",
+              "seqno": 0
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 1
+            }
+          ],
+          "name": "idx_board_subscribers_session_name",
+          "origin": "c",
+          "partial": 0,
+          "seq": 1,
+          "unique": 0
+        },
+        {
+          "columns": [
+            {
+              "cid": 11,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "subscriber_id",
+              "seqno": 0
+            },
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "project",
+              "seqno": 1
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 2
+            }
+          ],
+          "name": "idx_board_subscribers_subscriber",
+          "origin": "c",
+          "partial": 0,
+          "seq": 0,
+          "unique": 0
+        },
+        {
+          "columns": [
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "project",
+              "seqno": 0
+            },
+            {
+              "cid": 2,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "session_id",
+              "seqno": 1
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 2
+            }
+          ],
+          "name": "sqlite_autoindex_board_subscribers_1",
+          "origin": "u",
+          "partial": 0,
+          "seq": 2,
+          "unique": 1
+        }
+      ]
+    },
+    "board_tasks": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 1,
+          "dflt_value": "1",
+          "hidden": 0,
+          "name": "revision",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "board_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 3,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "title",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 4,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "body",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 5,
+          "dflt_value": "'pending'",
+          "hidden": 0,
+          "name": "status",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 6,
+          "dflt_value": "'medium'",
+          "hidden": 0,
+          "name": "priority",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 7,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "created_by",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 8,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "assigned_to",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 9,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "completed_by",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 10,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "completion_message",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 11,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "created_at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 12,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "claimed_at",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 13,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "completed_at",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 14,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "last_activity_at",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 15,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "edited_at",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 16,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "idle_snoozed_until",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 17,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "session_id",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 18,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "cost_usd",
+          "notnull": 0,
+          "pk": 0,
+          "type": "REAL"
+        },
+        {
+          "cid": 19,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "input_tokens",
+          "notnull": 0,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 20,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "output_tokens",
+          "notnull": 0,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 21,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "cache_read_tokens",
+          "notnull": 0,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 22,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "cache_write_tokens",
+          "notnull": 0,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 23,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "parked_reason",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 24,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "parked_until",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 25,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "remind_at",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 26,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "reminded_at",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 27,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "goal_id",
+          "notnull": 0,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 28,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "remote_board_uid",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 29,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "remote_goal_uid",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 30,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "request_id",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 31,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "request_server",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 32,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "request_board",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 2,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "board_id",
+              "seqno": 0
+            },
+            {
+              "cid": 8,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "assigned_to",
+              "seqno": 1
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 2
+            }
+          ],
+          "name": "idx_board_tasks_assigned",
+          "origin": "c",
+          "partial": 0,
+          "seq": 3,
+          "unique": 0
+        },
+        {
+          "columns": [
+            {
+              "cid": 2,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "board_id",
+              "seqno": 0
+            },
+            {
+              "cid": 5,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "status",
+              "seqno": 1
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 2
+            }
+          ],
+          "name": "idx_board_tasks_board_status",
+          "origin": "c",
+          "partial": 0,
+          "seq": 4,
+          "unique": 0
+        },
+        {
+          "columns": [
+            {
+              "cid": 2,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "board_id",
+              "seqno": 0
+            },
+            {
+              "cid": 13,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "completed_at",
+              "seqno": 1
+            },
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "id",
+              "seqno": 2
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 3
+            }
+          ],
+          "name": "idx_board_tasks_done",
+          "origin": "c",
+          "partial": 1,
+          "seq": 2,
+          "unique": 0
+        },
+        {
+          "columns": [
+            {
+              "cid": 2,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "board_id",
+              "seqno": 0
+            },
+            {
+              "cid": 27,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "goal_id",
+              "seqno": 1
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 2
+            }
+          ],
+          "name": "idx_board_tasks_goal",
+          "origin": "c",
+          "partial": 1,
+          "seq": 1,
+          "unique": 0
+        },
+        {
+          "columns": [
+            {
+              "cid": 2,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "board_id",
+              "seqno": 0
+            },
+            {
+              "cid": 31,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "request_server",
+              "seqno": 1
+            },
+            {
+              "cid": 32,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "request_board",
+              "seqno": 2
+            },
+            {
+              "cid": 30,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "request_id",
+              "seqno": 3
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 4
+            }
+          ],
+          "name": "idx_board_tasks_request_key",
+          "origin": "c",
+          "partial": 1,
+          "seq": 0,
+          "unique": 1
+        }
+      ]
+    },
+    "board_waits": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "project",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "subscriber_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 3,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "session_name",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 4,
+          "dflt_value": "'message'",
+          "hidden": 0,
+          "name": "wait_type",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 5,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "target_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 6,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "reason",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 7,
+          "dflt_value": "'active'",
+          "hidden": 0,
+          "name": "status",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 8,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "created_at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 9,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "resolved_at",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 10,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "expires_at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 11,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "timeout_notified_at",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "project",
+              "seqno": 0
+            },
+            {
+              "cid": 7,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "status",
+              "seqno": 1
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 2
+            }
+          ],
+          "name": "idx_board_waits_active",
+          "origin": "c",
+          "partial": 0,
+          "seq": 3,
+          "unique": 0
+        },
+        {
+          "columns": [
+            {
+              "cid": 10,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "expires_at",
+              "seqno": 0
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 1
+            }
+          ],
+          "name": "idx_board_waits_expiry",
+          "origin": "c",
+          "partial": 1,
+          "seq": 1,
+          "unique": 0
+        },
+        {
+          "columns": [
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "project",
+              "seqno": 0
+            },
+            {
+              "cid": 2,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "subscriber_id",
+              "seqno": 1
+            },
+            {
+              "cid": 7,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "status",
+              "seqno": 2
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 3
+            }
+          ],
+          "name": "idx_board_waits_subscriber",
+          "origin": "c",
+          "partial": 0,
+          "seq": 2,
+          "unique": 0
+        },
+        {
+          "columns": [
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "id",
+              "seqno": 0
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 1
+            }
+          ],
+          "name": "idx_board_waits_timeout_pending",
+          "origin": "c",
+          "partial": 1,
+          "seq": 0,
+          "unique": 0
+        }
+      ]
+    },
+    "board_workflow_presets": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "board_id",
+          "notnull": 1,
+          "pk": 1,
+          "type": "TEXT"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "id",
+          "notnull": 1,
+          "pk": 2,
+          "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "name",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 3,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "instructions",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "board_id",
+              "seqno": 0
+            },
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "id",
+              "seqno": 1
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 2
+            }
+          ],
+          "name": "sqlite_autoindex_board_workflow_presets_1",
+          "origin": "pk",
+          "partial": 0,
+          "seq": 0,
+          "unique": 1
+        }
+      ]
+    },
+    "board_working_modes": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "board_id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "TEXT"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "data",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "board_id",
+              "seqno": 0
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 1
+            }
+          ],
+          "name": "sqlite_autoindex_board_working_modes_1",
+          "origin": "pk",
+          "partial": 0,
+          "seq": 0,
+          "unique": 1
+        }
+      ]
+    },
+    "boards": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "TEXT"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "label",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "created_at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 3,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "created_by",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 4,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "cross_team_id",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 5,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "board_uid",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 5,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "board_uid",
+              "seqno": 0
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 1
+            }
+          ],
+          "name": "idx_boards_board_uid",
+          "origin": "c",
+          "partial": 1,
+          "seq": 0,
+          "unique": 1
+        },
+        {
+          "columns": [
+            {
+              "cid": 4,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "cross_team_id",
+              "seqno": 0
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 1
+            }
+          ],
+          "name": "idx_boards_cross_team_id",
+          "origin": "c",
+          "partial": 0,
+          "seq": 1,
+          "unique": 1
+        },
+        {
+          "columns": [
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "label",
+              "seqno": 0
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 1
+            }
+          ],
+          "name": "idx_boards_label",
+          "origin": "c",
+          "partial": 0,
+          "seq": 2,
+          "unique": 0
+        },
+        {
+          "columns": [
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "id",
+              "seqno": 0
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 1
+            }
+          ],
+          "name": "sqlite_autoindex_boards_1",
+          "origin": "pk",
+          "partial": 0,
+          "seq": 3,
+          "unique": 1
+        }
+      ]
+    },
+    "cross_team_links": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "source_server",
+          "notnull": 1,
+          "pk": 3,
+          "type": "TEXT"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "source_team",
+          "notnull": 1,
+          "pk": 4,
+          "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "target_team",
+          "notnull": 1,
+          "pk": 1,
+          "type": "TEXT"
+        },
+        {
+          "cid": 3,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "target_server",
+          "notnull": 1,
+          "pk": 2,
+          "type": "TEXT"
+        },
+        {
+          "cid": 4,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "source_label",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 5,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "target_label",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 6,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "source_server_label",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 7,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "applied_at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 2,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "target_team",
+              "seqno": 0
+            },
+            {
+              "cid": 3,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "target_server",
+              "seqno": 1
+            },
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "source_server",
+              "seqno": 2
+            },
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "source_team",
+              "seqno": 3
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 4
+            }
+          ],
+          "name": "sqlite_autoindex_cross_team_links_1",
+          "origin": "pk",
+          "partial": 0,
+          "seq": 0,
+          "unique": 1
+        }
+      ]
+    },
+    "cross_team_switch_log": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "project",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "key",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 3,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "old",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 4,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "new",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 5,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "via",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 6,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "who",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 7,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 8,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "who_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "project",
+              "seqno": 0
+            },
+            {
+              "cid": 2,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "key",
+              "seqno": 1
+            },
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "id",
+              "seqno": 2
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 3
+            }
+          ],
+          "name": "idx_cross_team_switch_log",
+          "origin": "c",
+          "partial": 0,
+          "seq": 0,
+          "unique": 0
+        }
+      ]
+    },
+    "health_actions": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "project",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "rule",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "target",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 3,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "project",
+              "seqno": 0
+            },
+            {
+              "cid": 3,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "at",
+              "seqno": 1
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 2
+            }
+          ],
+          "name": "idx_health_actions",
+          "origin": "c",
+          "partial": 0,
+          "seq": 0,
+          "unique": 0
+        }
+      ]
+    },
+    "health_counters": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "project",
+          "notnull": 1,
+          "pk": 1,
+          "type": "TEXT"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "rule",
+          "notnull": 1,
+          "pk": 2,
+          "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "target",
+          "notnull": 1,
+          "pk": 3,
+          "type": "TEXT"
+        },
+        {
+          "cid": 3,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "subject",
+          "notnull": 1,
+          "pk": 4,
+          "type": "TEXT"
+        },
+        {
+          "cid": 4,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "count",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 5,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "last_at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 6,
+          "dflt_value": "0",
+          "hidden": 0,
+          "name": "escalated",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "project",
+              "seqno": 0
+            },
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "rule",
+              "seqno": 1
+            },
+            {
+              "cid": 2,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "target",
+              "seqno": 2
+            },
+            {
+              "cid": 3,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "subject",
+              "seqno": 3
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 4
+            }
+          ],
+          "name": "sqlite_autoindex_health_counters_1",
+          "origin": "pk",
+          "partial": 0,
+          "seq": 0,
+          "unique": 1
+        }
+      ]
+    },
+    "health_goal_size": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "project",
+          "notnull": 1,
+          "pk": 1,
+          "type": "TEXT"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "goal_id",
+          "notnull": 1,
+          "pk": 2,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "said_level",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "project",
+              "seqno": 0
+            },
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "goal_id",
+              "seqno": 1
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 2
+            }
+          ],
+          "name": "sqlite_autoindex_health_goal_size_1",
+          "origin": "pk",
+          "partial": 0,
+          "seq": 0,
+          "unique": 1
+        }
+      ]
+    },
+    "health_items": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "project",
+          "notnull": 1,
+          "pk": 1,
+          "type": "TEXT"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "item",
+          "notnull": 1,
+          "pk": 2,
+          "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "state",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 3,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "shown_at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 4,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "acked_state",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 5,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "acked_by",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 6,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "acked_at",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "project",
+              "seqno": 0
+            },
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "item",
+              "seqno": 1
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 2
+            }
+          ],
+          "name": "sqlite_autoindex_health_items_1",
+          "origin": "pk",
+          "partial": 0,
+          "seq": 0,
+          "unique": 1
+        }
+      ]
+    },
+    "health_offbooks": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "project",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "kind",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 3,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "agent",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 4,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "ref",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 5,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "detail",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 6,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 7,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "shown_at",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "project",
+              "seqno": 0
+            },
+            {
+              "cid": 2,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "kind",
+              "seqno": 1
+            },
+            {
+              "cid": 4,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "ref",
+              "seqno": 2
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 3
+            }
+          ],
+          "name": "sqlite_autoindex_health_offbooks_1",
+          "origin": "u",
+          "partial": 0,
+          "seq": 0,
+          "unique": 1
+        }
+      ]
+    },
+    "hub_operator_actions": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "hub_user",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 3,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "method",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 4,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "path",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 5,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "project",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 6,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "status",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 7,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "hub_user_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": []
+    },
+    "sqlite_sequence": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "name",
+          "notnull": 0,
+          "pk": 0,
+          "type": ""
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "seq",
+          "notnull": 0,
+          "pk": 0,
+          "type": ""
+        }
+      ],
+      "indexes": []
+    },
+    "task_amendments": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "task_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "revision",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 3,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "actor",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 4,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "created_at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 5,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "reason",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 6,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "changes_json",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 7,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "previous_snapshot_json",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 8,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "effective_snapshot_json",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "task_id",
+              "seqno": 0
+            },
+            {
+              "cid": 2,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "revision",
+              "seqno": 1
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 2
+            }
+          ],
+          "name": "sqlite_autoindex_task_amendments_1",
+          "origin": "u",
+          "partial": 0,
+          "seq": 0,
+          "unique": 1
+        }
+      ]
+    },
+    "task_dependencies": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "task_id",
+          "notnull": 1,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "blocked_by_task_id",
+          "notnull": 1,
+          "pk": 2,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "blocked_by_board_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "blocked_by_task_id",
+              "seqno": 0
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 1
+            }
+          ],
+          "name": "idx_task_deps_blocked_by",
+          "origin": "c",
+          "partial": 0,
+          "seq": 0,
+          "unique": 0
+        },
+        {
+          "columns": [
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "task_id",
+              "seqno": 0
+            },
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "blocked_by_task_id",
+              "seqno": 1
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 2
+            }
+          ],
+          "name": "sqlite_autoindex_task_dependencies_1",
+          "origin": "pk",
+          "partial": 0,
+          "seq": 1,
+          "unique": 1
+        }
+      ]
+    },
+    "task_dependency_rules": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "task_id",
+          "notnull": 1,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "upstream_id",
+          "notnull": 1,
+          "pk": 2,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "condition",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 3,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "required_artifacts",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "task_id",
+              "seqno": 0
+            },
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "upstream_id",
+              "seqno": 1
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 2
+            }
+          ],
+          "name": "sqlite_autoindex_task_dependency_rules_1",
+          "origin": "pk",
+          "partial": 0,
+          "seq": 0,
+          "unique": 1
+        }
+      ]
+    },
+    "task_ready_notifications": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "task_id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "INTEGER"
+        }
+      ],
+      "indexes": []
+    },
+    "task_workflows": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "task_id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "data",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": []
+    }
+  }
+}
