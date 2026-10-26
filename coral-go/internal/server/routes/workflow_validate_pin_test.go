@@ -49,6 +49,8 @@ func TestPinWorkflowValidateSteps(t *testing.T) {
 		{"the step's own agent type wins over the default", []string{`{"name":"a","type":"agent","prompt":"p","agent":{"agent_type":"nope"}}`}, `{"agent_type":"claude"}`, `step 0: unknown agent_type "nope"`},
 		{"unknown agent type", []string{`{"name":"a","type":"agent","prompt":"p","agent":{"agent_type":"nope"}}`}, "", `step 0: unknown agent_type "nope"`},
 		{"a print step on a CLI not verified yet", []string{`{"name":"a","type":"agent","prompt":"p","agent":{"agent_type":"codex"}}`}, "", "step 0: print (non-interactive) steps aren't supported for codex yet; use claude, or make the step interactive"},
+		{"an unknown agent type on an interactive step: only this check refuses it (#8351, Security's review)", []string{`{"name":"a","type":"agent","prompt":"p","interactive":true,"agent":{"agent_type":"nope"}}`}, "", `step 0: unknown agent_type "nope"`},
+		{"an unknown default agent type on an interactive step", []string{`{"name":"a","type":"agent","prompt":"p","interactive":true}`}, `{"agent_type":"nope"}`, `step 0: unknown agent_type "nope"`},
 		{"the same step, interactive, is fine", []string{`{"name":"a","type":"agent","prompt":"p","interactive":true,"agent":{"agent_type":"codex"}}`}, "", ""},
 		{"type is required", []string{`{"name":"a","command":"x"}`}, "", "step 0: type must be 'shell' or 'agent'"},
 		{"type must be known", []string{`{"name":"a","type":"python","command":"x"}`}, "", "step 0: type must be 'shell' or 'agent'"},
