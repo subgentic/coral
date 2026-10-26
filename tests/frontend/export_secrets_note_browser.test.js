@@ -16,7 +16,8 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await Page.navigate({ url: BASE });
         await Page.loadEventFired();
         await install();
-        await ev(`(async () => { const mb = await import((window.__coralStatic || '/static/') + 'message_board.js'); mb.selectBoardProject('qa-export-board'); await mb.showExportBoardModal(); return true; })()`);
+        await require('./helpers/team_board').openBoardPage(ev, waitFor, 'qa-export-board');
+        await ev(`(async () => { const mb = await import((window.__coralStatic || '/static/') + 'message_board.js'); await mb.showExportBoardModal(); return true; })()`);
         await waitFor(`getComputedStyle(document.getElementById('mb-export-modal')).display === 'flex'`, 'the Export dialog', 8000);
 
         console.log('1. The Export dialog says the export may hold secrets and is not encrypted');

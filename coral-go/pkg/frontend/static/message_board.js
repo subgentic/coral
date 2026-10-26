@@ -984,7 +984,8 @@ export function deleteMessageBoardProject() {
                 showToast(out.error || 'The board was not deleted.', true);
                 return;
             }
-            showMessageBoardProjects();
+            if (document.getElementById('team-page-view')?.getClientRects().length) { window.exitTeamPage?.({ force: true }); window.switchNavTab?.('agents'); } // deleted from its team page: back to Agents, not the board list
+            else showMessageBoardProjects();
         } catch (e) {
             console.error('Failed to delete project:', e);
             showToast('Could not reach Coral to delete the board.', true);
