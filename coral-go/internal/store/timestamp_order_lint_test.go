@@ -36,15 +36,16 @@ type nanoWriter struct {
 
 // nanoWriters: file (under internal/) -> what it writes.
 var nanoWriters = map[string]nanoWriter{
-	"store/artifact_comments.go":   {calls: 1, tables: []string{"artifact_comments"}}, // created_at, edited_at, resolved_at, deleted_at (listed by id)
-	"store/saved_messages.go":      {calls: 2, tables: []string{"saved_messages"}},    // created_at, done_at (listed by id)
-	"store/sessions_tags.go":       {calls: 1, tables: []string{"pinned_folders"}},    // pinned_at (listed by rowid)
-	"store/ui_requests.go":         {calls: 3, tables: []string{"agent_ui_requests"}}, // created_at, updated_at (only a retention cutoff compares them)
-	"store/call_metrics.go":        {calls: 5, tables: []string{"call_metrics"}},      // created_at (hour-prefix ranges, a prune cutoff, and the summary's and the series' window start)
-	"store/cloud_enrollment.go":    {calls: 1, tables: []string{"cloud_enrollment"}},  // parsed to time.Time, never compared as text
-	"tracking/milestones.go":       {calls: 1, why: "a JSON file, parsed"},
-	"server/routes/token_usage.go": {calls: 1, why: "a response field, not stored"},
-	"background/health_held.go":    {calls: 1, why: "part of an episode id, not compared"},
+	"server/routes/display_activity_hint.go": {calls: 1, why: "response-only display lease timestamp, parsed by Date.parse; never stored or ordered as text"},
+	"store/artifact_comments.go":             {calls: 1, tables: []string{"artifact_comments"}}, // created_at, edited_at, resolved_at, deleted_at (listed by id)
+	"store/saved_messages.go":                {calls: 2, tables: []string{"saved_messages"}},    // created_at, done_at (listed by id)
+	"store/sessions_tags.go":                 {calls: 1, tables: []string{"pinned_folders"}},    // pinned_at (listed by rowid)
+	"store/ui_requests.go":                   {calls: 3, tables: []string{"agent_ui_requests"}}, // created_at, updated_at (only a retention cutoff compares them)
+	"store/call_metrics.go":                  {calls: 5, tables: []string{"call_metrics"}},      // created_at (hour-prefix ranges, a prune cutoff, and the summary's and the series' window start)
+	"store/cloud_enrollment.go":              {calls: 1, tables: []string{"cloud_enrollment"}},  // parsed to time.Time, never compared as text
+	"tracking/milestones.go":                 {calls: 1, why: "a JSON file, parsed"},
+	"server/routes/token_usage.go":           {calls: 1, why: "a response field, not stored"},
+	"background/health_held.go":              {calls: 1, why: "part of an episode id, not compared"},
 }
 
 // nanoTables and their time columns that hold such text.

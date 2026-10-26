@@ -525,6 +525,9 @@ func (h *SessionsHandler) liveSessionRowsBefore4713(r *http.Request, trace *phas
 			"first_prompt":          firstPrompt,
 			"enrichment_pending":    skipExpensive && !sleeping,
 		}
+		// #7974 adds explicit display lease fields. This oracle's mock screens have
+		// no positive working footer; pin nulls without sharing the new hint builder.
+		entry["display_activity_hint"], entry["display_activity_hint_at"] = nil, nil
 		// Always present (false/""/null too): the dashboard merges entries, so
 		// an omitted false would leave the AUTO chip on after it was turned off.
 		for k, v := range autoAcceptFields(agent.AgentType, autoAcceptStates[sid]) {
@@ -626,6 +629,8 @@ func (h *SessionsHandler) liveSessionRowsBefore4713(r *http.Request, trace *phas
 		})
 		// Include prompt, model, and capabilities for sleeping sessions too
 		entry := sessions[len(sessions)-1]
+		// #7974: sleeping placeholders always clear the display lease.
+		entry["display_activity_hint"], entry["display_activity_hint_at"] = nil, nil
 		addContextUsage(entry, nil, 0)
 		if ls.Prompt != nil {
 			entry["prompt"] = *ls.Prompt
