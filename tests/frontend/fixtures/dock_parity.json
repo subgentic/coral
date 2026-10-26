@@ -1667,7 +1667,7 @@
       "status": "moved",
       "newHome": "team page: Settings tab",
       "proof": {
-        "file": "static/team_working_mode.js",
+        "file": "static/team_settings_page.js",
         "needle": "Team settings sections"
       }
     },
@@ -1680,8 +1680,8 @@
       "status": "moved",
       "newHome": "team page: Settings tab",
       "proof": {
-        "file": "static/team_working_mode.js",
-        "needle": "Team working mode"
+        "file": "static/team_settings_page.js",
+        "needle": "label: 'Working mode'"
       }
     },
     {
@@ -1691,10 +1691,10 @@
       "what": "click handler: dialog.addEventListener('click', event => {",
       "source": "static/team_working_mode.js:161",
       "status": "moved",
-      "newHome": "team page: Settings tab (the same module draws the page now; this listener is still in it)",
+      "newHome": "team page: Settings tab (team_settings_page.js draws the page now)",
       "proof": {
-        "file": "static/team_working_mode.js",
-        "needle": "dialog.addEventListener('click', event => {"
+        "file": "static/team_settings_page.js",
+        "needle": "page.addEventListener('click', event => {"
       }
     },
     {
@@ -1704,9 +1704,9 @@
       "what": "change handler: inspection.addEventListener('change', event => {",
       "source": "static/team_working_mode.js:226",
       "status": "moved",
-      "newHome": "team page: Settings tab (the same module draws the page now; this listener is still in it)",
+      "newHome": "team page: Settings tab (team_settings_page.js draws the page now)",
       "proof": {
-        "file": "static/team_working_mode.js",
+        "file": "static/team_settings_page.js",
         "needle": "inspection.addEventListener('change', event => {"
       }
     },
@@ -1717,9 +1717,9 @@
       "what": "click handler: inspection.addEventListener('click', async event => {",
       "source": "static/team_working_mode.js:230",
       "status": "moved",
-      "newHome": "team page: Settings tab (the same module draws the page now; this listener is still in it)",
+      "newHome": "team page: Settings tab (team_settings_page.js draws the page now)",
       "proof": {
-        "file": "static/team_working_mode.js",
+        "file": "static/team_settings_page.js",
         "needle": "inspection.addEventListener('click', async event => {"
       }
     },
@@ -1730,10 +1730,10 @@
       "what": "click handler: link.addEventListener('click', () => {",
       "source": "static/team_working_mode.js:276",
       "status": "moved",
-      "newHome": "team page: Settings tab (the same module draws the page now; this listener is still in it)",
+      "newHome": "team page: Settings tab (team_settings_page.js draws the page now)",
       "proof": {
-        "file": "static/team_working_mode.js",
-        "needle": "link.addEventListener('click', () => {"
+        "file": "static/team_settings_page.js",
+        "needle": "working-mode-docs-link"
       }
     },
     {
@@ -1743,10 +1743,10 @@
       "what": "change handler: form.elements.mode.addEventListener('change', syncModeDescription);",
       "source": "static/team_working_mode.js:320",
       "status": "moved",
-      "newHome": "team page: Settings tab (the same module draws the page now; this listener is still in it)",
+      "newHome": "team page: Settings tab (team_settings_page.js draws the page now)",
       "proof": {
-        "file": "static/team_working_mode.js",
-        "needle": "form.elements.mode.addEventListener('change', syncModeDescri"
+        "file": "static/team_settings_page.js",
+        "needle": "modeSelect().addEventListener('change', syncModeDescription)"
       }
     },
     {
@@ -1756,9 +1756,9 @@
       "what": "keydown handler: presetName.addEventListener('keydown', event => {",
       "source": "static/team_working_mode.js:385",
       "status": "moved",
-      "newHome": "team page: Settings tab (the same module draws the page now; this listener is still in it)",
+      "newHome": "team page: Settings tab (team_settings_page.js draws the page now)",
       "proof": {
-        "file": "static/team_working_mode.js",
+        "file": "static/team_settings_page.js",
         "needle": "presetName.addEventListener('keydown', event => {"
       }
     },
@@ -1782,10 +1782,10 @@
       "what": "input handler: form.addEventListener('input', () => { syncRules(); changed(); });",
       "source": "static/team_health_settings.js:162",
       "status": "moved",
-      "newHome": "team page: Settings tab: the Health check form is still the same module, saved with the page's one Save",
+      "newHome": "team page: Settings tab: the Health check group is fields of settings_view (team_health_fields.js), saved with the page's one Save",
       "proof": {
-        "file": "static/team_working_mode.js",
-        "needle": "importOnce('./team_health_settings.js')"
+        "file": "static/team_settings_page.js",
+        "needle": "healthFields("
       }
     },
     {
@@ -1795,10 +1795,10 @@
       "what": "change handler: form.addEventListener('change', () => { syncRules(); changed(); });",
       "source": "static/team_health_settings.js:163",
       "status": "moved",
-      "newHome": "team page: Settings tab: the Health check form is still the same module, saved with the page's one Save",
+      "newHome": "team page: Settings tab: the Health check group is fields of settings_view (team_health_fields.js), saved with the page's one Save",
       "proof": {
-        "file": "static/team_working_mode.js",
-        "needle": "importOnce('./team_health_settings.js')"
+        "file": "static/team_settings_page.js",
+        "needle": "healthFields("
       }
     },
     {
@@ -1808,10 +1808,10 @@
       "what": "click handler: form.querySelector('.health-reset').addEventListener('click', () => {",
       "source": "static/team_health_settings.js:164",
       "status": "moved",
-      "newHome": "team page: Settings tab: the Health check form is still the same module, saved with the page's one Save",
+      "newHome": "team page: Settings tab: the Health check group is fields of settings_view (team_health_fields.js), saved with the page's one Save",
       "proof": {
-        "file": "static/team_working_mode.js",
-        "needle": "importOnce('./team_health_settings.js')"
+        "file": "static/team_settings_page.js",
+        "needle": "healthFields("
       }
     },
     {
@@ -1821,10 +1821,10 @@
       "what": "submit handler: form.addEventListener('submit', async event => {",
       "source": "static/team_health_settings.js:174",
       "status": "moved",
-      "newHome": "team page: Settings tab: the Health check form is still the same module, saved with the page's one Save",
+      "newHome": "team page: Settings tab: the Health check group is fields of settings_view (team_health_fields.js), saved with the page's one Save",
       "proof": {
-        "file": "static/team_working_mode.js",
-        "needle": "importOnce('./team_health_settings.js')"
+        "file": "static/team_settings_page.js",
+        "needle": "healthFields("
       }
     },
     {
@@ -1836,7 +1836,7 @@
       "status": "moved",
       "newHome": "team page: Settings tab: the Messaging section",
       "proof": {
-        "file": "static/team_cross_team_settings.js",
+        "file": "static/team_cross_team_fields.js",
         "needle": "Turn on messaging for teams on this computer"
       }
     },
@@ -1849,8 +1849,8 @@
       "status": "moved",
       "newHome": "team page: Settings tab: the Messaging section",
       "proof": {
-        "file": "static/team_cross_team_settings.js",
-        "needle": "Copy this computer's Coral Hub id"
+        "file": "static/team_cross_team_fields.js",
+        "needle": "Copy this computer"
       }
     },
     {
@@ -1860,10 +1860,10 @@
       "what": "change handler: form.addEventListener('change', () => { readDraft(); const keep = document.activeElement && document.activeEle",
       "source": "static/team_cross_team_settings.js:133",
       "status": "moved",
-      "newHome": "team page: Settings tab: the Messaging form is still the same module, saved with the page's one Save",
+      "newHome": "team page: Settings tab: the Messaging group is fields of settings_view (team_cross_team_fields.js), saved with the page's one Save",
       "proof": {
-        "file": "static/team_working_mode.js",
-        "needle": "importOnce('./team_cross_team_settings.js')"
+        "file": "static/team_settings_page.js",
+        "needle": "createMessaging"
       }
     },
     {
@@ -1873,10 +1873,10 @@
       "what": "toggle handler: form.addEventListener('toggle', e => { if (e.target.classList && e.target.classList.contains('xt-how')) how = ",
       "source": "static/team_cross_team_settings.js:134",
       "status": "moved",
-      "newHome": "team page: Settings tab: the Messaging form is still the same module, saved with the page's one Save",
+      "newHome": "team page: Settings tab: the Messaging group is fields of settings_view (team_cross_team_fields.js), saved with the page's one Save",
       "proof": {
-        "file": "static/team_working_mode.js",
-        "needle": "importOnce('./team_cross_team_settings.js')"
+        "file": "static/team_settings_page.js",
+        "needle": "createMessaging"
       }
     },
     {
@@ -1886,10 +1886,10 @@
       "what": "click handler: form.addEventListener('click', async event => {",
       "source": "static/team_cross_team_settings.js:135",
       "status": "moved",
-      "newHome": "team page: Settings tab: the Messaging form is still the same module, saved with the page's one Save",
+      "newHome": "team page: Settings tab: the Messaging group is fields of settings_view (team_cross_team_fields.js), saved with the page's one Save",
       "proof": {
-        "file": "static/team_working_mode.js",
-        "needle": "importOnce('./team_cross_team_settings.js')"
+        "file": "static/team_settings_page.js",
+        "needle": "createMessaging"
       }
     },
     {
@@ -1899,10 +1899,10 @@
       "what": "submit handler: form.addEventListener('submit', async event => {",
       "source": "static/team_cross_team_settings.js:145",
       "status": "moved",
-      "newHome": "team page: Settings tab: the Messaging form is still the same module, saved with the page's one Save",
+      "newHome": "team page: Settings tab: the Messaging group is fields of settings_view (team_cross_team_fields.js), saved with the page's one Save",
       "proof": {
-        "file": "static/team_working_mode.js",
-        "needle": "importOnce('./team_cross_team_settings.js')"
+        "file": "static/team_settings_page.js",
+        "needle": "createMessaging"
       }
     },
     {
@@ -2713,8 +2713,8 @@
       "status": "moved",
       "newHome": "every task name opens its page (and the dependency links under the facts, taskExtraHtml, open the task)",
       "proof": {
-        "file": "static/team_tasks_page.js",
-        "needle": "open: () => hooks.openTask?.(t)"
+        "file": "static/task_columns.js",
+        "needle": "Open task #"
       }
     },
     {
@@ -2904,8 +2904,8 @@
       "status": "moved",
       "newHome": "team page: Tasks tab, a row of the Tasks table opens the task page",
       "proof": {
-        "file": "static/team_tasks_page.js",
-        "needle": "Open task"
+        "file": "static/task_columns.js",
+        "needle": "Open task #"
       }
     },
     {
@@ -2918,8 +2918,8 @@
       "status": "moved",
       "newHome": "team page: Tasks tab, a row of the Tasks table opens the task page",
       "proof": {
-        "file": "static/team_tasks_page.js",
-        "needle": "Open task"
+        "file": "static/task_columns.js",
+        "needle": "Open task #"
       }
     },
     {
@@ -4995,8 +4995,8 @@
       "status": "moved",
       "newHome": "team page: Tasks tab, a row of the Tasks table opens the task page",
       "proof": {
-        "file": "static/team_tasks_page.js",
-        "needle": "Open task"
+        "file": "static/task_columns.js",
+        "needle": "Open task #"
       }
     },
     {
@@ -5008,8 +5008,8 @@
       "status": "moved",
       "newHome": "team page: Tasks tab, a row of the Tasks table opens the task page",
       "proof": {
-        "file": "static/team_tasks_page.js",
-        "needle": "Open task"
+        "file": "static/task_columns.js",
+        "needle": "Open task #"
       }
     },
     {
@@ -5021,8 +5021,8 @@
       "status": "moved",
       "newHome": "team page: Tasks tab, a row of the Tasks table opens the task page",
       "proof": {
-        "file": "static/team_tasks_page.js",
-        "needle": "Open task"
+        "file": "static/task_columns.js",
+        "needle": "Open task #"
       }
     },
     {
@@ -5257,7 +5257,7 @@
       "status": "moved",
       "newHome": "team page: Settings tab, the Rename button of the name row (the same board_rename.js control and request as the old panel)",
       "proof": {
-        "file": "static/team_working_mode.js",
+        "file": "static/team_settings_page.js",
         "needle": "boardRenameControl(team"
       }
     },
@@ -5270,8 +5270,8 @@
       "status": "moved",
       "newHome": "team page: Settings tab: a section of the page",
       "proof": {
-        "file": "static/team_working_mode.js",
-        "needle": "Workflow"
+        "file": "static/team_settings_page.js",
+        "needle": "label: 'Workflow'"
       }
     },
     {
@@ -5283,8 +5283,8 @@
       "status": "moved",
       "newHome": "team page: Settings tab: a section of the page",
       "proof": {
-        "file": "static/team_working_mode.js",
-        "needle": "Prompt inspection"
+        "file": "static/team_settings_page.js",
+        "needle": "id: 'prompts'"
       }
     },
     {
@@ -5296,8 +5296,8 @@
       "status": "moved",
       "newHome": "team page: Settings tab: a section of the page",
       "proof": {
-        "file": "static/team_working_mode.js",
-        "needle": "Health check"
+        "file": "static/team_settings_page.js",
+        "needle": "label: 'Health check'"
       }
     },
     {
@@ -5309,8 +5309,8 @@
       "status": "moved",
       "newHome": "team page: Settings tab: a section of the page",
       "proof": {
-        "file": "static/team_working_mode.js",
-        "needle": "Messaging"
+        "file": "static/team_settings_page.js",
+        "needle": "label: 'Messaging'"
       }
     },
     {
@@ -5322,7 +5322,7 @@
       "status": "moved",
       "newHome": "team page: Settings tab: Working mode",
       "proof": {
-        "file": "static/team_working_mode.js",
+        "file": "static/team_settings_page.js",
         "needle": "Working mode"
       }
     },
@@ -5335,7 +5335,7 @@
       "status": "moved",
       "newHome": "team page: Settings tab: Working mode select",
       "proof": {
-        "file": "static/team_working_mode.js",
+        "file": "static/team_settings_page.js",
         "needle": "Working mode"
       }
     },
@@ -5348,7 +5348,7 @@
       "status": "moved",
       "newHome": "team page: Settings tab, Workflow section: the Working mode row's hint 'Instructions are saved with each task when it is first claimed.' with Learn more (aria-expanded) that opens the rest and the link to the teams docs",
       "proof": {
-        "file": "static/team_working_mode.js",
+        "file": "static/team_settings_page.js",
         "needle": "Instructions are saved with each task when it is first claimed."
       }
     },
@@ -5361,8 +5361,8 @@
       "status": "moved",
       "newHome": "team page: Settings tab, Workflow section: the switch 'Include dependent-queue guidance' (name dependency_guidance; saved in the same PUT /api/board/<project>/working-mode as the old panel, board.WorkingMode.DependencyGuidance)",
       "proof": {
-        "file": "static/team_working_mode.js",
-        "needle": "pageSwitch('dependency_guidance', 'Include dependent-queue guidance'"
+        "file": "static/team_settings_page.js",
+        "needle": "key: 'dependency_guidance'"
       }
     },
     {
@@ -5374,7 +5374,7 @@
       "status": "moved",
       "newHome": "team page: Settings tab",
       "proof": {
-        "file": "static/team_working_mode.js",
+        "file": "static/team_settings_page.js",
         "needle": "Team-specific conventions"
       }
     },
@@ -5387,7 +5387,7 @@
       "status": "moved",
       "newHome": "team page: Settings tab",
       "proof": {
-        "file": "static/team_working_mode.js",
+        "file": "static/team_settings_page.js",
         "needle": "Edit presets"
       }
     },
@@ -5400,7 +5400,7 @@
       "status": "moved",
       "newHome": "team page: Settings tab, Workflow section: the Preset select (same form and save as the old panel; the crawler did not name it)",
       "proof": {
-        "file": "static/team_working_mode.js",
+        "file": "static/team_settings_page.js",
         "needle": "<label>Preset<select name=\"preset\"></select></label>"
       }
     },
@@ -5413,7 +5413,7 @@
       "status": "moved",
       "newHome": "team page: Settings tab",
       "proof": {
-        "file": "static/team_working_mode.js",
+        "file": "static/team_settings_page.js",
         "needle": "New preset"
       }
     },
@@ -5426,7 +5426,7 @@
       "status": "moved",
       "newHome": "team page: Settings tab, Workflow section: the Preset name field (same form and save as the old panel; the crawler did not name it)",
       "proof": {
-        "file": "static/team_working_mode.js",
+        "file": "static/team_settings_page.js",
         "needle": "Preset name<input name=\"preset_name\""
       }
     },
@@ -5439,7 +5439,7 @@
       "status": "moved",
       "newHome": "team page: Settings tab",
       "proof": {
-        "file": "static/team_working_mode.js",
+        "file": "static/team_settings_page.js",
         "needle": "Instructions agents should follow"
       }
     },
@@ -5452,7 +5452,7 @@
       "status": "moved",
       "newHome": "team page: Settings tab",
       "proof": {
-        "file": "static/team_working_mode.js",
+        "file": "static/team_settings_page.js",
         "needle": "Save built-in override"
       }
     },
@@ -5465,7 +5465,7 @@
       "status": "moved",
       "newHome": "team page: Settings tab",
       "proof": {
-        "file": "static/team_working_mode.js",
+        "file": "static/team_settings_page.js",
         "needle": "Save settings"
       }
     },
@@ -5633,8 +5633,8 @@
       "status": "moved",
       "newHome": "team page: Tasks tab, a row of the Tasks table opens the task page",
       "proof": {
-        "file": "static/team_tasks_page.js",
-        "needle": "Open task"
+        "file": "static/task_columns.js",
+        "needle": "Open task #"
       }
     },
     {
@@ -5646,8 +5646,8 @@
       "status": "moved",
       "newHome": "team page: Tasks tab, a row of the Tasks table opens the task page",
       "proof": {
-        "file": "static/team_tasks_page.js",
-        "needle": "Open task"
+        "file": "static/task_columns.js",
+        "needle": "Open task #"
       }
     },
     {
@@ -5659,8 +5659,8 @@
       "status": "moved",
       "newHome": "team page: Tasks tab, a row of the Tasks table opens the task page",
       "proof": {
-        "file": "static/team_tasks_page.js",
-        "needle": "Open task"
+        "file": "static/task_columns.js",
+        "needle": "Open task #"
       }
     },
     {
