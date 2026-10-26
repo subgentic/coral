@@ -85,7 +85,7 @@ export const SCOPES = {
 export function tasksTable(scope, rows, { ctx = {}, tweak, ...table } = {}) {
     const keys = SCOPES[scope];
     if (!keys) throw new Error(`tasksTable: no scope "${scope}"`);
-    let columns = taskColumns(ctx, keys).filter(c => c.key !== 'files' || rows.some(t => Number(t.artifact_count) > 0 && !isCloud())); // a Files column nothing fills is not drawn: its head would sit over nothing (the cells are hidden per row, not the column): every scope, the Inbox's (#8682) among them
+    let columns = taskColumns(ctx, keys).filter(c => c.key !== 'files' || rows.some(t => c.when(t))); // a Files column nothing fills is not drawn: its head would sit over nothing (the cells are hidden per row, not the column): every scope, the Inbox's (#8682) among them
     if (tweak) columns = tweak(columns) || columns;
     return DT.dataTable({ compact: true, label: `Tasks, ${rows.length}`, rowKey: taskKey, rowName: (t) => `#${t.id} ${t.title}`, ...table, columns, rows });
 }

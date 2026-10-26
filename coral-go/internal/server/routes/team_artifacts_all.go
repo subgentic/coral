@@ -114,7 +114,7 @@ func (h *BoardHandler) ListAllTeamArtifacts(w http.ResponseWriter, r *http.Reque
 			break
 		}
 		walked++
-		rows, scanCut, err := h.projectArtifactItems(r, p.Project, "", tq.task)
+		rows, scanCut, err := h.projectArtifactItems(r, p.Project, "")
 		if err != nil {
 			errInternalServer(w, "could not list artifacts")
 			return

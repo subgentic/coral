@@ -150,11 +150,7 @@ func (h *BoardHandler) ListTeamArtifacts(w http.ResponseWriter, r *http.Request)
 		errBadRequest(w, "session_id must be at most 128 characters without control characters")
 		return
 	}
-	var onlyTask int64
-	if tq != nil {
-		onlyTask = tq.task
-	}
-	items, scanTruncated, err := h.projectArtifactItems(r, project, sessionFilter, onlyTask)
+	items, scanTruncated, err := h.projectArtifactItems(r, project, sessionFilter)
 	if err != nil {
 		errInternalServer(w, "could not list artifacts")
 		return
@@ -198,7 +194,7 @@ func (h *BoardHandler) ListTeamArtifacts(w http.ResponseWriter, r *http.Request)
 
 // projectArtifactItems is a team's artifact list as the team route builds it, before any query: the task results, the uploads of its agents, the cross-team rows and the upload task links, cut to what the caller may read.
 // sessionFilter keeps one session's uploads (only a session of this board).
-func (h *BoardHandler) projectArtifactItems(r *http.Request, project, sessionFilter string, onlyTask int64) ([]teamArtifact, bool, error) {
+func (h *BoardHandler) projectArtifactItems(r *http.Request, project, sessionFilter string) ([]teamArtifact, bool, error) {
 	subscribers, err := h.bs.TeamSubscriberSessions(r.Context(), project)
 	if err != nil {
 		return nil, false, err
