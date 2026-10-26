@@ -54,6 +54,14 @@ const FOLDERS = [['needs', '/inbox/needs', 'Needs you'], ['tasks', '/inbox/tasks
                     check(`${name}: the count is beside the title`, g.count !== null && /^\d+$/.test(g.count), JSON.stringify(g.count));
                     check(`${name}: the search keeps at least 10rem`, g.searchW >= 158, String(g.searchW));
                 }
+                if (mobile && (key === 'goals' || key === 'tasks')) {
+                    // 200% text: the search gives way so the Filters icon stays whole inside the screen, at least a 44 px target (#8700, UI/UX's shot of #8662)
+                    await ev(`document.documentElement.style.fontSize = '32px'; true`); await settle(400);
+                    const z = await ev(`(() => { const row = document.querySelector('#group-table-view .inbox-folder-toolbar .list-bar-search-row'), t = row.querySelector('.list-bar-toggle').getBoundingClientRect(), q = row.querySelector('input[type=search]').getBoundingClientRect(); return { iconRight: Math.round(t.right), iconW: Math.round(t.width), iconH: Math.round(t.height), searchW: Math.round(q.width), vw: innerWidth, over: document.documentElement.scrollWidth - innerWidth }; })()`);
+                    if (key === 'goals') await shot('inbox-header-goals-390-200pct-dark', 'dark');
+                    check(`${name} at 200% text: the Filters icon is whole inside the screen (44 px or more) and the search shrinks to fit`, z.iconRight <= z.vw && z.iconW >= 44 && z.iconH >= 44 && z.searchW >= 100 && z.over <= 0, JSON.stringify(z));
+                    await ev(`document.documentElement.style.fontSize = ''; true`); await settle(300);
+                }
                 if (key === 'goals' || key === 'tasks') {
                     if (!mobile) {
                         check(`${name}: the quick-filter pills are in the row between the search and the icon, on the same line`, g.pillsShown && g.pillsY != null && !g.rowSelect, JSON.stringify(g));
