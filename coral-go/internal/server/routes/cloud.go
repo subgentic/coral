@@ -673,18 +673,6 @@ func (h *CloudHandler) Disconnect(w http.ResponseWriter, r *http.Request) {
 // tier) but never change it.
 const HubOperatorDisabledSetting = "hub_operator_disabled"
 
-// legacyHubOperatorSetting is #3377's opt-in (v1.4.18), "hub_acts_as_operator". It is
-// dropped at startup (DropLegacyHubOperatorSetting): the opt-out replaces it, and its "true"
-// means what the opt-out's default now means.
-const legacyHubOperatorSetting = "hub_acts_as_operator"
-
-// DropLegacyHubOperatorSetting removes #3377's hub_acts_as_operator, if present.
-func DropLegacyHubOperatorSetting(ctx context.Context, ss *store.SessionStore) {
-	if ok, err := ss.DeleteSetting(ctx, legacyHubOperatorSetting); err == nil && ok {
-		slog.Info("[cloud] dropped the v1.4.18 setting hub_acts_as_operator: Coral Hub acts as the Operator unless 'Don't let Coral Hub act as the Operator' is on")
-	}
-}
-
 func hubOperatorDisabled(settings map[string]string) bool {
 	return setreg.Bool(settings, HubOperatorDisabledSetting)
 }

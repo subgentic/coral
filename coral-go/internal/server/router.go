@@ -424,7 +424,6 @@ func (s *Server) registerCloud(r *chi.Mux) {
 	s.cloudHandler.SetIdentityObserver(s.identity)
 	s.cloudHandler.SetBoardStore(s.boardStore)
 	// #3404: the v1.4.18 opt-in is replaced by an opt-out.
-	routes.DropLegacyHubOperatorSetting(context.Background(), store.NewSessionStore(s.db))
 	if s.keyStore != nil {
 		s.cloudHandler.SetLoginMinter(s.keyStore.MintLoginToken)
 	}

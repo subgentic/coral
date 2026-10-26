@@ -75,11 +75,9 @@ func (h *SystemHandler) putSettingsBefore4599(w http.ResponseWriter, r *http.Req
 	// unchanged is not re-checked, so a CLI that was uninstalled since doesn't block
 	// saving other settings.
 	// The Hub-as-Operator opt-out has its own route, which logs every change (#3377, #3404).
-	for _, k := range []string{HubOperatorDisabledSetting, legacyHubOperatorSetting} {
-		if _, ok := body[k]; ok {
-			errBadRequest(w, k+" is set with PUT /api/system/hub-operator")
-			return
-		}
+	if _, ok := body[HubOperatorDisabledSetting]; ok {
+		errBadRequest(w, HubOperatorDisabledSetting+" is set with PUT /api/system/hub-operator")
+		return
 	}
 	// Sign in with Coral Hub's settings have their own routes (#3966, Security condition 4):
 	// only a local Operator may change them, and turning it off ends Hub sessions.
@@ -359,7 +357,7 @@ func TestPutSettingsAgreesWithBefore4599(t *testing.T) {
 		}
 	}
 	sort.Strings(keys)
-	keys = append(keys, "terminal_backend", HubOperatorDisabledSetting, legacyHubOperatorSetting, "hub_signin_enabled",
+	keys = append(keys, "terminal_backend", HubOperatorDisabledSetting, "hub_signin_enabled",
 		MaxModeSetting, AllowHubAutoAcceptSetting, RedactTokensSetting, IdentityActorSetting, HubModeSetting,
 		retentionEnabledAtKey, retentionSeenDaysKey, RetentionAckAtKey, RetentionLastKey, "cli_path_claude", "cli_path_codex",
 		"cli_path_nope", "not_a_setting")

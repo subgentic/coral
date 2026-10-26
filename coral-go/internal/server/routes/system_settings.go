@@ -144,10 +144,8 @@ func settingWithItsOwnRoute(body map[string]any) string {
 		}
 	}
 	// The Hub-as-Operator opt-out has its own route, which logs every change (#3377, #3404).
-	for _, k := range []string{HubOperatorDisabledSetting, legacyHubOperatorSetting} {
-		if _, ok := body[k]; ok {
-			return k + " is set with PUT /api/system/hub-operator"
-		}
+	if _, ok := body[HubOperatorDisabledSetting]; ok {
+		return HubOperatorDisabledSetting + " is set with PUT /api/system/hub-operator"
 	}
 	for k := range body {
 		// Sign in with Coral Hub's settings have their own routes (#3966, Security condition 4):
