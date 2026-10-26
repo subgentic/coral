@@ -55,6 +55,7 @@ func (l *Limiter) Allow(key string) (log bool, heldBack int) {
 }
 
 // SetClock replaces the Limiter's clock (tests).
+// SetClock has no production caller: it is exported for tests in tmux.
 func (l *Limiter) SetClock(now func() time.Time) {
 	l.mu.Lock()
 	l.now = now
