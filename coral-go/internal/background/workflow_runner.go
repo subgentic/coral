@@ -524,8 +524,8 @@ func (wr *WorkflowRunner) isRunKilled(runID int64) bool {
 	return run.Status == "killed"
 }
 
-// IsRunActive returns true if the given run ID is currently being executed.
-func (wr *WorkflowRunner) IsRunActive(runID int64) bool {
+// isRunActive returns true if the given run ID is currently being executed.
+func (wr *WorkflowRunner) isRunActive(runID int64) bool {
 	wr.mu.Lock()
 	defer wr.mu.Unlock()
 	_, ok := wr.runCancels[runID]

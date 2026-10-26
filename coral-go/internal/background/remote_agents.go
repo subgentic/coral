@@ -1190,6 +1190,7 @@ func (h *RemoteAgentHub) pingFeed(ctx context.Context, conn proxy.WSConn, p feed
 // NewRemoteSnapshot builds a snapshot from already tagged sessions, for
 // RemoteAgentSource implementations other than the hub (tests, fakes). Like
 // the hub's, it caches its encoded sessions and must be treated as read-only.
+// NewRemoteSnapshot has no production caller: it is exported for the remote-list benchmark test in internal/server/routes.
 func NewRemoteSnapshot(servers []RemoteServerStatus, sessions []map[string]any) RemoteSnapshot {
 	return RemoteSnapshot{Servers: servers, Sessions: sessions, enc: &snapshotEncoding{}}
 }

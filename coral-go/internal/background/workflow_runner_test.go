@@ -651,10 +651,10 @@ func TestKillRun(t *testing.T) {
 	// Wait for the run to finish (its last status write), not a fixed time: under
 	// -race the step's failure used to land after KillRun's "killed" (#3474).
 	deadline := time.Now().Add(10 * time.Second)
-	for runner.IsRunActive(run.ID) && time.Now().Before(deadline) {
+	for runner.isRunActive(run.ID) && time.Now().Before(deadline) {
 		time.Sleep(10 * time.Millisecond)
 	}
-	if runner.IsRunActive(run.ID) {
+	if runner.isRunActive(run.ID) {
 		t.Fatal("the run never finished after KillRun")
 	}
 
@@ -712,10 +712,10 @@ func TestKillRunIsNotOverwrittenByTheStepsFailure(t *testing.T) {
 	if !runner.KillRun(context.Background(), run.ID) {
 		t.Fatal("expected kill to return true")
 	}
-	for end := time.Now().Add(10 * time.Second); runner.IsRunActive(run.ID) && time.Now().Before(end); {
+	for end := time.Now().Add(10 * time.Second); runner.isRunActive(run.ID) && time.Now().Before(end); {
 		time.Sleep(10 * time.Millisecond)
 	}
-	if runner.IsRunActive(run.ID) {
+	if runner.isRunActive(run.ID) {
 		t.Fatal("the run never finished after its step was killed")
 	}
 	finalRun, _ := wfStore.GetWorkflowRunDirect(context.Background(), run.ID)
