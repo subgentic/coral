@@ -194,7 +194,7 @@ func (h *SpendHandler) Spend(w http.ResponseWriter, r *http.Request) {
 		errInternalServer(w, "could not read the board's agents")
 		return
 	}
-	summaries, err := h.ts.GetUsageSummaryByAgentBoard(ctx, f(start), project)
+	summaries, err := h.ts.GetUsageSummaryByAgentBoardUntil(ctx, f(start), g(end), project) // to the window's end, as the totals below are
 	if err != nil {
 		errInternalServer(w, "could not read token usage")
 		return
