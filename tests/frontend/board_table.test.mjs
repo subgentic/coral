@@ -18,10 +18,20 @@ assert.deepEqual(taskRefs('See #7740, #7757 and #7740 again; not C#, not a#b, no
 assert.deepEqual(taskRefs('```\n#99\n```'), []);
 
 const t = tagsOf({ content: 'Question for @Backend Dev and @QA Engineer and @Orchestrator: @Operator #7757', ask: { open: ['Backend Dev'] } });
-assert.deepEqual(t.mentions.map(m => m.name), ['Backend Dev', 'QA Engineer']); assert.equal(t.more, 2); assert.equal(t.task, '7757'); assert.equal(t.ask, true); assert.equal(t.mine, true);
+assert.deepEqual(t.mentions.map(m => m.name), ['Backend Dev', 'QA Engineer', 'Orchestrator', 'Operator']); assert.equal(t.task, '7757'); assert.equal(t.ask, true); assert.equal(t.mine, true);
 assert.equal(tagsOf({ content: 'a@b.com no mention' }).mentions.length, 0, 'an email is no mention');
 assert.equal(tagsOf({ content: '`@Backend Dev` in code' }).mentions.length, 0, 'code is not read');
 assert.equal(tagsOf({ content: 'x' }).ask, false);
+
+const { layoutChips, chipsOf } = await importUi('board_table');
+const many = chipsOf({ content: '@Backend Dev @QA Engineer please look at #7790', ask: { open: ['Backend Dev'] } }, tagsOf({ content: '@Backend Dev @QA Engineer please look at #7790', ask: { open: ['Backend Dev'] } }, { replyName: 'Lead Developer' }));
+assert.deepEqual(many.map(c => c.t), ['Reply to Lead Developer', '@Backend Dev', '@QA Engineer', '#7790', 'Question']);
+const head = layoutChips(many), full = layoutChips(many, { all: true });
+assert.equal((head.match(/class="mb-row-tag /g) || []).length + (head.match(/mb-ask-badge/g) || []).length, 3, 'more than three marks: the first mention, the Question badge and a +N pill');
+assert.ok(head.includes('>+3</span>') && head.includes('title="Reply to Lead Developer, @QA Engineer, #7790"') && head.includes('aria-label="3 more: Reply to Lead Developer, @QA Engineer, #7790"') && head.includes('@Backend Dev') && head.includes('Question'), head);
+assert.ok(['Reply to Lead Developer', '@Backend Dev', '@QA Engineer', '#7790', 'Question'].every(w => full.includes(w)) && !full.includes('more-tag'), 'the open message draws every mark');
+assert.ok(!layoutChips(many.slice(0, 3)).includes('more-tag'), 'three marks fit: no pill');
+assert.ok(layoutChips([many[0], many[1], many[2], many[3]]).includes('>+3</span>') && layoutChips([many[0], many[1], many[2], many[3]]).includes('@Backend Dev'), 'no Question: the first mention, then +N');
 
 const now = new Date(2026, 9, 26, 12, 0, 0);
 assert.equal(dayLabel(new Date(2026, 9, 26, 1, 0).toISOString(), now), 'Today');

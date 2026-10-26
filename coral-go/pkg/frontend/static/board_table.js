@@ -9,7 +9,6 @@ import { registerActions, withId, textOf } from './actions.js';
 
 const VIEW_KEY = 'coral.board.view';
 const SNIPPET_CHARS = 300;
-const MENTIONS_SHOWN = 2;
 
 /** 'table' (the default) or 'chat': the viewer's choice, remembered in this browser. */
 export function boardView() { return browserLocal.get(VIEW_KEY) === 'chat' ? 'chat' : 'table'; }
@@ -55,8 +54,7 @@ export function taskRefs(content) {
 export function tagsOf(m, { replyName = '', self = 'operator' } = {}) {
     const names = mentionedNames(m && m.content);
     return {
-        mentions: names.slice(0, MENTIONS_SHOWN).map(n => ({ name: n, self: n.toLowerCase() === self })),
-        more: Math.max(0, names.length - MENTIONS_SHOWN),
+        mentions: names.map(n => ({ name: n, self: n.toLowerCase() === self })),
         task: taskRefs(m && m.content)[0] || '',
         ask: !!(m && m.ask && typeof m.ask === 'object'),
         mine: names.some(n => n.toLowerCase() === self),
@@ -64,14 +62,34 @@ export function tagsOf(m, { replyName = '', self = 'operator' } = {}) {
     };
 }
 
-function tagsHtml(m, tags) {
+const CHIP_FIT = 3; // up to this many marks are all drawn in the head; more are the Question badge, the first mention and a "+N" pill that names the rest
+
+/** The marks of a message as plain data (kept on the head, so the open message and a re-read of the mentions can draw them again): { k: 'in-reply'|'mention'|'task'|'ask', t: text, self?, h?: the ask's own markup }. */
+export function chipsOf(m, tags) {
     const out = [];
-    if (tags.replyName) out.push(`<span class="mb-row-tag mb-row-reply-tag">Reply to ${escapeHtml(tags.replyName)}</span>`);
-    for (const t of tags.mentions) out.push(`<span class="mb-row-tag mb-row-mention${t.self ? ' is-self' : ''}">@${escapeHtml(t.name)}</span>`);
-    if (tags.more) out.push(`<span class="mb-row-tag mb-row-more-tag" title="${escapeAttr(`${Number(tags.more)} more mentioned`)}">+${Number(tags.more)}</span>`);
-    if (tags.task) out.push(`<span class="mb-row-tag mb-row-task">#${escapeHtml(tags.task)}</span>`);
-    if (tags.ask) out.push(askBadge(m));
-    return out.join('');
+    if (tags.replyName) out.push({ k: 'in-reply', t: `Reply to ${tags.replyName}` });
+    for (const x of tags.mentions) out.push({ k: 'mention', t: `@${x.name}`, self: x.self });
+    if (tags.task) out.push({ k: 'task', t: `#${tags.task}` });
+    if (tags.ask) out.push({ k: 'ask', t: 'Question', h: askBadge(m) });
+    return out;
+}
+
+function chipHtml(c) {
+    if (c.k === 'ask') return c.h || '';
+    const cls = c.k === 'in-reply' ? 'mb-row-reply-tag' : c.k === 'mention' ? `mb-row-mention${c.self ? ' is-self' : ''}` : 'mb-row-task';
+    return `<span class="mb-row-tag ${cls}">${escapeHtml(c.t)}</span>`;
+}
+
+/** The marks as the head draws them (all = false): up to three as they are; more, the Question badge (always) and the first mention (else the first mark), then one "+N" pill whose title and name list the rest.
+ * With all (the open message) every mark is drawn. The row's marks are never cut off by the stylesheet. */
+export function layoutChips(chips, { all = false } = {}) {
+    if (all || chips.length <= CHIP_FIT) return chips.map(chipHtml).join('');
+    const ask = chips.find(c => c.k === 'ask');
+    const first = chips.find(c => c.k === 'mention') || chips.find(c => c.k !== 'ask');
+    const shown = chips.filter(c => c === ask || c === first);
+    const rest = chips.filter(c => !shown.includes(c)).map(c => c.t);
+    const list = rest.join(', ');
+    return shown.map(chipHtml).join('') + `<span class="mb-row-tag mb-row-more-tag" title="${escapeAttr(list)}" aria-label="${escapeAttr(`${rest.length} more: ${list}`)}">+${Number(rest.length)}</span>`;
 }
 
 const day = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
@@ -116,7 +134,8 @@ function ensureOpenParts(row) {
     if (row.querySelector(':scope > .mb-row-actions')) return;
     const who = row.querySelector(':scope > .mb-row-toggle .mb-row-who');
     const tags = row.querySelector(':scope > .mb-row-toggle .mb-row-tags');
-    const parts = openParts(Number(row.dataset.messageId), who ? who.getAttribute('title') || who.textContent : '', row.getAttribute('data-more') || '', row.hasAttribute('data-more'), tags ? tags.innerHTML : '');
+    const chips = tags && tags.dataset.chips ? JSON.parse(tags.dataset.chips) : [];
+    const parts = openParts(Number(row.dataset.messageId), who ? who.getAttribute('title') || who.textContent : '', row.getAttribute('data-more') || '', row.hasAttribute('data-more'), layoutChips(chips, { all: true }));
     const body = row.querySelector(':scope > .mb-message-body');
     if (parts.tagsOpen && !row.querySelector(':scope > .mb-row-tags-open')) body?.insertAdjacentHTML('beforebegin', parts.tagsOpen);
     row.insertAdjacentHTML('beforeend', parts.actions);
@@ -128,12 +147,13 @@ export function rowParts(m, { agent, timeHtml, moreLabel, replyName = '', self =
     const tags = tagsOf(m, { replyName, self });
     const open = isRowOpen(m.id);
     const snippet = snippetOf(m.content);
-    const tagHtml = tagsHtml(m, tags);
+    const chips = chipsOf(m, tags);
+    const tagHtml = layoutChips(chips, { all: true });
     const initial = Array.from(String(agent || '?'))[0] || '?';
     return {
         bodyId: `${idp}-${Number(m.id)}`, // each surface its own ids: the team page and the dock can show the same message at once
         classes: `${open ? ' mb-open' : ''}${tags.ask ? ' mb-q' : ''}${tags.mine ? ' mb-mine' : ''}${replyName ? ' mb-is-reply' : ''}`,
-        toggle: `<button type="button" class="mb-row-toggle" data-on-click="mb-row-toggle" aria-expanded="${escapeAttr(String(open))}" aria-controls="${escapeAttr(idp)}-${Number(m.id)}"><span class="mb-row-chev" aria-hidden="true"></span><span class="mb-row-avatar" style="--mb-avatar:${escapeAttr(avatarColor(agent))}" aria-hidden="true">${escapeHtml(initial.toUpperCase())}</span><span class="mb-row-who" title="${escapeAttr(agent)}">${escapeHtml(agent)}</span><span class="mb-row-snippet">${escapeHtml(snippet)}</span><span class="mb-row-tags">${tagHtml}</span>${timeHtml}</button>`,
+        toggle: `<button type="button" class="mb-row-toggle" data-on-click="mb-row-toggle" aria-expanded="${escapeAttr(String(open))}" aria-controls="${escapeAttr(idp)}-${Number(m.id)}"><span class="mb-row-chev" aria-hidden="true"></span><span class="mb-row-avatar" style="--mb-avatar:${escapeAttr(avatarColor(agent))}" aria-hidden="true">${escapeHtml(initial.toUpperCase())}</span><span class="mb-row-who" title="${escapeAttr(agent)}">${escapeHtml(agent)}</span><span class="mb-row-snippet">${escapeHtml(snippet)}</span><span class="mb-row-tags" data-chips="${escapeAttr(JSON.stringify(chips))}">${layoutChips(chips)}</span>${timeHtml}</button>`,
         tagsOpen: open ? openParts(m.id, agent, moreLabel, more, tagHtml).tagsOpen : '',
         actions: open ? openParts(m.id, agent, moreLabel, more, tagHtml).actions : '',
         attrs: more ? ` data-more="${escapeAttr(moreLabel)}"` : '', // what an opened row needs to build its actions (a collapsed row has none: a long board is a lot of rows)
@@ -147,22 +167,17 @@ export function retagMentions(container, self = 'operator') {
         const body = row.querySelector('.mb-message-body');
         if (!body) continue;
         const names = mentionedNames(body.textContent);
-        const same = [...row.querySelectorAll(':scope > .mb-row-toggle .mb-row-mention')].map(e => e.textContent.slice(1)).join('\n') === names.slice(0, MENTIONS_SHOWN).join('\n');
         row.classList.toggle('mb-mine', names.some(n => n.toLowerCase() === self));
-        if (same) continue;
-        for (const holder of row.querySelectorAll(':scope > .mb-row-toggle .mb-row-tags, :scope > .mb-row-tags-open')) {
-            for (const old of holder.querySelectorAll('.mb-row-mention, .mb-row-more-tag')) old.remove();
-            const at = holder.querySelector('.mb-row-task, .mb-external-badge');
-            const frag = document.createDocumentFragment();
-            for (const n of names.slice(0, MENTIONS_SHOWN)) {
-                const t = document.createElement('span');
-                t.className = `mb-row-tag mb-row-mention${n.toLowerCase() === self ? ' is-self' : ''}`;
-                t.textContent = `@${n}`;
-                frag.append(t);
-            }
-            if (names.length > MENTIONS_SHOWN) { const more = document.createElement('span'); more.className = 'mb-row-tag mb-row-more-tag'; more.textContent = `+${names.length - MENTIONS_SHOWN}`; frag.append(more); }
-            holder.insertBefore(frag, at);
-        }
+        const head = row.querySelector(':scope > .mb-row-toggle .mb-row-tags');
+        if (!head || !head.dataset.chips) continue;
+        const old = JSON.parse(head.dataset.chips);
+        const had = old.filter(c => c.k === 'mention').map(c => c.t).join('\n');
+        if (had === names.map(n => `@${n}`).join('\n')) continue;
+        const chips = [...old.filter(c => c.k === 'in-reply'), ...names.map(n => ({ k: 'mention', t: `@${n}`, self: n.toLowerCase() === self })), ...old.filter(c => c.k === 'task' || c.k === 'ask')];
+        head.dataset.chips = JSON.stringify(chips);
+        head.innerHTML = layoutChips(chips);
+        const open = row.querySelector(':scope > .mb-row-tags-open');
+        if (open) open.innerHTML = layoutChips(chips, { all: true });
     }
 }
 

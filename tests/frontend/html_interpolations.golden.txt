@@ -55,7 +55,9 @@
 1	board_export_render.js	subList
 1	board_export_render.js	tag
 1	board_system_lines.js	lines
-2	board_table.js	tagHtml
+1	board_table.js	cls
+1	board_table.js	layoutChips(chips)
+1	board_table.js	tagHtml
 1	board_table.js	taskLink
 1	board_table.js	timeHtml
 1	browser.js	machineBlock()

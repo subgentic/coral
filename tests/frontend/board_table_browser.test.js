@@ -23,7 +23,7 @@ const BASE = require('./test_base').BASE;
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
         await ev(`(async () => { const sc = await import((window.__coralStatic || '/static/') + 'settings_core.js'); sc.clearCustomThemeVars(); sc.applyTheme(${JSON.stringify(theme)}); try { localStorage.setItem('coral.board.view', ${JSON.stringify(view)}); } catch {} return true; })()`);
         await Page.navigate({ url: BASE + path }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
-        await waitFor(`document.querySelectorAll('#mb-messages > .mb-message').length >= 5`, 'the board rows', 15000);
+        await waitFor(`document.querySelectorAll('#mb-messages > .mb-message').length >= 6`, 'the board rows', 15000);
         await settle(400);
     };
     try {
@@ -31,21 +31,30 @@ const BASE = require('./test_base').BASE;
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
         for (const [id, t] of [['Orchestrator', 'Orchestrator'], ['QA Engineer', 'QA Engineer'], ['Backend Dev', 'Backend Dev'], ['Lead Developer', 'Lead Developer']]) assert.equal((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: id, job_title: t, session_name: id + '-s' })).status, 200);
-        await post('QA Engineer', 'Review of the Inbox patch: approved with two small follow-ups for the empty states. @Orchestrator #7740');
+        const firstId = await post('QA Engineer', 'Review of the Inbox patch: approved with two small follow-ups for the empty states. @Orchestrator #7740');
         const qid = await post('Lead Developer', 'Question for @Backend Dev: should group posts reach members, or only the ones they tag?\n\nToday a plain read returns tagged messages.\n\n- the read includes the group\'s posts\n- group posts stay tagged-only\n\nI lean to the second. #7757', { ask: true });
         const rid = await post('Backend Dev', 'Agreed with the second; the count already follows the read.', { reply_to: qid });
         await post('Orchestrator', 'Fine. @Operator please look at the plan when you can: ' + 'a long line that goes on and on to be cut by the row and shown whole when open, '.repeat(4) + '#7809');
         await post('Backend Dev', 'Summary posted. #7809');
+        await post('Lead Developer', '@Backend Dev @QA Engineer @Orchestrator six marks in one message #7790', { ask: true, reply_to: firstId }); // a reply, three mentions, a task and a question: six marks
 
         console.log('1. Desktop: Table is the default, one row a message');
         await open(1280, 800, false, 'dark');
         const t = await ev(`(() => { const rows = ${ROWS}.map(r => { const h = r.querySelector(':scope > .mb-row-toggle'), hr = h.getBoundingClientRect(), body = r.querySelector('.mb-message-body'); return { h: Math.round(hr.height), who: h.querySelector('.mb-row-who').textContent, snippetCut: h.querySelector('.mb-row-snippet').scrollWidth > h.querySelector('.mb-row-snippet').clientWidth, tags: [...h.querySelectorAll('.mb-row-tag, .mb-ask-badge')].map(x => x.textContent.trim()), bodyShown: body.getClientRects().length > 0, expanded: h.getAttribute('aria-expanded'), reply: r.classList.contains('mb-is-reply'), time: !!h.querySelector('time') && getComputedStyle(h.querySelector('time')).opacity }; }); const day = document.querySelector('#mb-messages > .mb-day'); const box = document.getElementById('mb-messages'); return { view: box.dataset.view, rows, day: day && { text: day.textContent, sticky: getComputedStyle(day).position }, sideways: document.documentElement.scrollWidth > innerWidth + 1, switchPressed: [...document.querySelectorAll('.mb-view-btn')].map(b => b.textContent + ':' + b.getAttribute('aria-pressed')), pills: [...document.querySelectorAll('.mb-pill')].map(b => b.textContent + ':' + b.getAttribute('aria-pressed')) }; })()`);
-        assert.equal(t.view, 'table'); assert.equal(t.rows.length, 5);
+        assert.equal(t.view, 'table'); assert.equal(t.rows.length, 6);
         assert.ok(t.rows.every(r => r.h >= 36 && r.h <= 44 && !r.bodyShown && r.expanded === 'false' && r.time === '1'), 'collapsed rows are one line of 36 to 44 px with no body: ' + JSON.stringify(t.rows.map(r => [r.h, r.bodyShown, r.expanded])));
         assert.ok(t.rows.some(r => r.snippetCut), 'a long message is cut to the row: ' + JSON.stringify(t.rows.map(r => r.snippetCut)));
         assert.deepEqual(t.rows[0].tags, ['@Orchestrator', '#7740'], 'mention and task tags: ' + JSON.stringify(t.rows[0].tags));
         assert.deepEqual(t.rows[1].tags, ['@Backend Dev', '#7757', 'Question · answered'], 'a question is marked by its tag (answered, as its reply answers it): ' + JSON.stringify(t.rows[1].tags));
         assert.ok(t.rows[2].reply && /Reply to Lead Developer/.test(t.rows[2].tags.join(' ')), 'a reply is indented and says whom it answers: ' + JSON.stringify(t.rows[2]));
+        // six marks (#8147): the Question badge and the first mention, then "+4" whose title and name list the rest; nothing is cut off; the open message shows all six
+        const six = await ev(`(() => { const r = ${ROWS}[5], tags = r.querySelector(':scope > .mb-row-toggle .mb-row-tags'); const more = tags.querySelector('.mb-row-more-tag'); return { shown: [...tags.children].map(c => c.textContent.trim()), title: more && more.title, name: more && more.getAttribute('aria-label'), clipped: tags.scrollWidth > tags.clientWidth + 1 }; })()`);
+        assert.deepEqual(six.shown, ['@Backend Dev', 'Question', '+4'], 'the first mention, the question and a +N pill: ' + JSON.stringify(six));
+        assert.equal(six.title, 'Reply to QA Engineer, @QA Engineer, @Orchestrator, #7790', 'the pill lists the rest'); assert.equal(six.name, '4 more: Reply to QA Engineer, @QA Engineer, @Orchestrator, #7790'); assert.equal(six.clipped, false, 'nothing is cut off by the stylesheet');
+        await ev(`${ROWS}[5].scrollIntoView({ block: 'center' }); true`); await settle(200); await shot('board-six-marks-1280-dark');
+        await ev(`${ROWS}[5].querySelector(':scope > .mb-row-toggle').click(); true`); await settle(250);
+        assert.deepEqual(await ev(`[...${ROWS}[5].querySelectorAll(':scope > .mb-row-tags-open > *')].map(c => c.textContent.trim())`), ['Reply to QA Engineer', '@Backend Dev', '@QA Engineer', '@Orchestrator', '#7790', 'Question'], 'the open message shows every mark');
+        await ev(`${ROWS}[5].querySelector(':scope > .mb-row-toggle').click(); true`); await settle(150);
         assert.ok(t.day && t.day.text === 'Today' && t.day.sticky === 'sticky', 'a sticky day line: ' + JSON.stringify(t.day));
         assert.equal(t.sideways, false, 'nothing scrolls sideways');
         const fills = await ev(`${ROWS}.map(r => { const a = getComputedStyle(r.querySelector('.mb-row-avatar')); return [a.backgroundColor, a.color]; })`);
@@ -75,11 +84,11 @@ const BASE = require('./test_base').BASE;
 
         console.log('4. Pills: Questions and Mentions me');
         await ev(`[...document.querySelectorAll('.mb-pill')].find(b => b.textContent === 'Questions').click(); true`); await settle(150);
-        assert.equal(await ev(`${ROWS}.filter(r => r.getClientRects().length).length`), 1, 'Questions shows the one question');
+        assert.equal(await ev(`${ROWS}.filter(r => r.getClientRects().length).length`), 2, 'Questions shows the two questions');
         await ev(`[...document.querySelectorAll('.mb-pill')].find(b => b.textContent === 'Mentions me').click(); true`); await settle(150);
         assert.equal(await ev(`${ROWS}.filter(r => r.getClientRects().length).map(r => r.querySelector('.mb-row-who').textContent).join()`), 'Orchestrator', 'Mentions me shows the message that names the Operator');
         await ev(`[...document.querySelectorAll('.mb-pill')].find(b => b.textContent === 'All').click(); true`); await settle(150);
-        assert.equal(await ev(`${ROWS}.filter(r => r.getClientRects().length).length`), 5);
+        assert.equal(await ev(`${ROWS}.filter(r => r.getClientRects().length).length`), 6);
 
         console.log('5. Expand all and Collapse all are in the search bar\'s More menu');
         const more = async label => { await ev(`(() => { const b = [...document.querySelectorAll('#mb-tools button')].find(x => x.getAttribute('aria-label') === 'More board actions' || /More/.test(x.getAttribute('aria-label') || '')); b.click(); return true; })()`); await settle(150); await ev(`[...document.querySelectorAll('#mb-tools [role=menuitem], #mb-tools .list-bar-more-menu button, #mb-tools [role=menu] button')].find(x => x.textContent.trim() === ${JSON.stringify(label)}).click(); true`); await settle(250); };
@@ -94,7 +103,7 @@ const BASE = require('./test_base').BASE;
         const c = await ev(`({ value: document.getElementById('mb-post-input').value, focused: document.activeElement === document.getElementById('mb-post-input') })`);
         assert.deepEqual(c, { value: '@QA Engineer ', focused: true });
         await ev(`(() => { const i = document.getElementById('mb-post-input'); i.value += 'thanks, noted'; i.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('#mb-board .mb-post-send-btn').click(); return true; })()`);
-        await waitFor(`document.querySelectorAll('#mb-messages > .mb-message').length >= 6`, 'the reply row', 10000);
+        await waitFor(`document.querySelectorAll('#mb-messages > .mb-message').length >= 7`, 'the reply row', 10000);
         const posted = await ev(`fetch('/api/board/${B}/messages/all?limit=20').then(r => r.json())`);
         const list = Array.isArray(posted) ? posted : (posted.messages || []);
         const mine = list.find(m => /thanks, noted/.test(m.content));
