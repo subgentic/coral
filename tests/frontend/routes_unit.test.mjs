@@ -41,12 +41,13 @@ for (const bad of ['/team/qa/goals/0', '/team/qa/goals/x', '/team/qa/goals/12/y'
 // The Inbox folders' pages (#8652): needs, saved and the chat folders; goals, tasks and boards belong to other page families, a bare /inbox to Coral Hub
 rt('/inbox/needs', { view: 'inbox-folder', folder: 'needs' });
 rt('/inbox/saved', { view: 'inbox-folder', folder: 'saved' });
+rt('/inbox/artifacts', { view: 'inbox-folder', folder: 'artifacts' }); // every team's artifacts (Goal #62)
 rt('/inbox/chats/all', { view: 'inbox-folder', folder: 'chats' });
 for (const f of ['active', 'starred', 'notes', 'archived', 'cli-claude', 'cli-agy', 'tag-7']) rt(`/inbox/chats/${f}`, { view: 'inbox-folder', folder: `chats-${f}` });
 assert.deepEqual(parse('/inbox/chats'), { view: 'inbox-folder', folder: 'chats' }, 'a bare /inbox/chats is All chats');
 assert.equal(build(parse('/inbox/chats')), '/inbox/chats/all', 'and is written in full');
-for (const bad of ['/inbox', '/inbox/', '/inbox/other', '/inbox/needs/x', '/inbox/saved/1', '/inbox/chats/nonsense', '/inbox/chats/tag-0', '/inbox/chats/cli-', '/inbox/chats/cli-Claude', '/inbox/chats/all/x', '/inbox/chats-group']) assert.equal(parse(bad), null, bad);
-assert.equal(inboxFolderPath('needs'), '/inbox/needs'); assert.equal(inboxFolderPath('chats-cli-codex'), '/inbox/chats/cli-codex'); assert.equal(inboxFolderPath('chats-group'), '/inbox/boards'); assert.equal(inboxFolderPath('nope'), '', 'a folder with no path');
+for (const bad of ['/inbox', '/inbox/', '/inbox/other', '/inbox/needs/x', '/inbox/saved/1', '/inbox/artifacts/x', '/inbox/chats/nonsense', '/inbox/chats/tag-0', '/inbox/chats/cli-', '/inbox/chats/cli-Claude', '/inbox/chats/all/x', '/inbox/chats-group']) assert.equal(parse(bad), null, bad);
+assert.equal(inboxFolderPath('needs'), '/inbox/needs'); assert.equal(inboxFolderPath('artifacts'), '/inbox/artifacts'); assert.equal(inboxFolderPath('chats-cli-codex'), '/inbox/chats/cli-codex'); assert.equal(inboxFolderPath('chats-group'), '/inbox/boards'); assert.equal(inboxFolderPath('nope'), '', 'a folder with no path');
 assert.equal(valid({ view: 'inbox-folder', folder: 'saved' }), true); assert.equal(valid({ view: 'inbox-folder', folder: 'goals' }), false, 'goals is not this family');
 rt('/board/@m2/qa', { view: 'board', server: 'm2', id: 'qa' });
 rt('/workflows', { view: 'workflows' });

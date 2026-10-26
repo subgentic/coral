@@ -8,7 +8,7 @@
      /chats[/@<server>][?filters]         { view: 'chats', query }
      /chats/[@<server>/]<id>              { view: 'chats', id }
      /team/[@<server>/]<team>[/<tab>[/<n>]]  { view: 'team', server, id, sub, item }: the team page (#7453); <tab> is one of TEAM_TABS (none = Goals), <n> a goal or a task; the Board tab's path word is "board" (the old "messages" is read and written as board, #8652)
-     /inbox/needs, /inbox/saved, /inbox/chats[/<all|active|starred|notes|archived|cli-<cli>|tag-<n>]  { view: 'inbox-folder', folder }: an Inbox folder's page (#8652); goals, tasks and boards are their own page families (#8571, #8633)
+     /inbox/needs, /inbox/saved, /inbox/artifacts, /inbox/chats[/<all|active|starred|notes|archived|cli-<cli>|tag-<n>]  { view: 'inbox-folder', folder }: an Inbox folder's page (#8652); goals, tasks and boards are their own page families (#8571, #8633)
      /board/[@<server>/]<name>            { view: 'board', server, id }
      /workflows[/<id>[/runs/<run>]]       { view: 'workflows', id, run }
      /jobs, /analytics, /docs[/<name>], /servers[/<id>]
@@ -33,9 +33,9 @@ const TEAM_ITEM_TABS = ['goals', 'tasks', 'messages']; // the tabs with an item:
 export const AGENT_SUBTABS = ['board', 'tasks', 'notes', 'files', 'browse', 'artifacts', 'activity', 'agent-ui'];
 const NAME_MAX = 200; // board.MaxIdentityRunes
 const INBOX = 'in' + 'box'; // the path word, spelled in two parts: the icon-name lint reads that quoted word as an icon name
-// The Inbox folders' paths (#8652): /inbox/needs, /inbox/saved, /inbox/chats/<all|active|starred|notes|archived|cli-<cli>|tag-<n>>. The folder keys are the Inbox's own (inbox_sidebar.js): chats is All chats, the others chats-<word>.
+// The Inbox folders' paths (#8652): /inbox/needs, /inbox/saved, /inbox/artifacts (every team's artifacts, Goal #62), /inbox/chats/<all|active|starred|notes|archived|cli-<cli>|tag-<n>>. The folder keys are the Inbox's own (inbox_sidebar.js): chats is All chats, the others chats-<word>.
 const INBOX_CHATS_RE = /^(?:all|active|starred|notes|archived|cli-[a-z0-9]{1,20}|tag-[1-9]\d{0,11})$/;
-const INBOX_FOLDER_RE = /^(?:needs|saved|chats|chats-(?:active|starred|notes|archived|cli-[a-z0-9]{1,20}|tag-[1-9]\d{0,11}))$/;
+const INBOX_FOLDER_RE = /^(?:needs|saved|artifacts|chats|chats-(?:active|starred|notes|archived|cli-[a-z0-9]{1,20}|tag-[1-9]\d{0,11}))$/;
 // The team page's tabs by the word their path uses: the Board tab was Messages (#7784), and /team/<t>/messages still opens it, as /board (#8652).
 const TAB_PATH = { messages: 'board' };
 const TAB_FROM_PATH = { board: 'messages', messages: 'messages' };
@@ -124,7 +124,7 @@ export function parse(pathname, search = '') {
             return rest.length === 3 && TEAM_ITEM_TABS.includes(tab) && INT_RE.test(rest[2]) ? { view: 'team', server: t.server, id: n, sub: tab, item: Number(rest[2]) } : null;
         }
         case INBOX:
-            if (rest.length === 1 && (rest[0] === 'needs' || rest[0] === 'saved')) return { view: 'inbox-folder', folder: rest[0] };
+            if (rest.length === 1 && (rest[0] === 'needs' || rest[0] === 'saved' || rest[0] === 'artifacts')) return { view: 'inbox-folder', folder: rest[0] };
             if (rest[0] === 'chats' && rest.length <= 2 && (rest.length === 1 || INBOX_CHATS_RE.test(rest[1]))) return { view: 'inbox-folder', folder: rest.length === 1 || rest[1] === 'all' ? 'chats' : `chats-${rest[1]}` };
             return null;
         case 'workflows': {
@@ -201,7 +201,7 @@ export function build(r) {
         case 'board':
             return `/board/${srvSeg(r.server)}${seg(r.id)}`;
         case 'inbox-folder':
-            return INBOX_FOLDER_RE.test(String(r.folder)) ? `/inbox/${r.folder === 'needs' || r.folder === 'saved' ? r.folder : 'chats/' + (r.folder === 'chats' ? 'all' : r.folder.slice(6))}` : '/';
+            return INBOX_FOLDER_RE.test(String(r.folder)) ? `/inbox/${r.folder === 'needs' || r.folder === 'saved' || r.folder === 'artifacts' ? r.folder : 'chats/' + (r.folder === 'chats' ? 'all' : r.folder.slice(6))}` : '/';
         case 'workflows':
             return r.id ? `/workflows/${r.id}${r.run ? '/runs/' + r.run : ''}` : '/workflows';
         case 'jobs': case 'analytics':

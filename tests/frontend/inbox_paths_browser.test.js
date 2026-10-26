@@ -46,11 +46,17 @@ const TEAM = `qa-paths-${Date.now() % 100000}`;
             await ev(`history.forward(); true`); await folderTitle('Starred');
             check(`${label}: Forward shows Starred again`, (await path()) === '/inbox/chats/starred', await path());
 
+            // the Artifacts folder (Goal #62) has its path too
+            await pickFolder('artifacts', mobile); await folderTitle('Artifacts');
+            check(`${label}: opening Artifacts writes /inbox/artifacts`, (await path()) === '/inbox/artifacts', await path());
+
             // a reload and a pasted link open the folder
             await load('/inbox/chats/starred'); await inboxReady(); await folderTitle('Starred');
             check(`${label}: a reload of /inbox/chats/starred opens Starred and keeps the address`, (await path()) === '/inbox/chats/starred', await path());
             await load('/inbox/saved'); await inboxReady(); await folderTitle('Saved');
             check(`${label}: a link to /inbox/saved opens Saved`, (await path()) === '/inbox/saved', await path());
+            await load('/inbox/artifacts'); await inboxReady(); await folderTitle('Artifacts');
+            check(`${label}: a link to /inbox/artifacts opens Artifacts`, (await path()) === '/inbox/artifacts', await path());
             await load('/inbox/chats/cli-codex'); await inboxReady(); await folderTitle('Codex');
             check(`${label}: a link to a CLI folder opens it (/inbox/chats/cli-codex)`, (await path()) === '/inbox/chats/cli-codex', await path());
             await load('/inbox/chats/nonsense'); await settle(500);
