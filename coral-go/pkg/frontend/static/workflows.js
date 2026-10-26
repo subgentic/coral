@@ -578,7 +578,7 @@ function renderRunDetail(run) {
         <div class="wf-run-steps wf-timeline">${stepsHtml}</div>
         ${killBtn || retriggerBtn ? `<div class="item-bar wf-run-actions">${killBtn}${retriggerBtn}</div>` : ''}
     `;
-    foldWayBack(container, '#wf-run-back', '.wf-run-title');
+    foldWayBack(container, '#wf-run-back, .wf-phone-back', '.wf-run-title'); // the workflow's link, or the list's when the run has no workflow
     for (const b of container.querySelectorAll('.wf-run-step-output-toggle')) {
         const id = b.getAttribute('aria-controls');
         if (!wasOpen.has(id)) continue;
