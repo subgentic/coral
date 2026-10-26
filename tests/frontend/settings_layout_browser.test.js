@@ -1,4 +1,4 @@
-// Settings layout (#7040, UI/UX's #7036 audit): Agents has four headed parts (Defaults, Behaviour, Team and board, Tools); the render
+// Settings layout (#7040, UI/UX's #7036 audit): Agents has five headed parts (Defaults, Default models, Behaviour, Team and board, Tools); the render
 // engine is a Terminal setting, Customize Theme sits in the Theme row, About and Connect to Coral Hub are in Network and Hub, "Log terminal
 // input" is in Security and privacy, Notifications' first row says what it does, Network and Hub keeps one row order at every width, and
 // the needless lines are gone. Drives Chrome over CDP through agent_view_harness.js against an isolated dev server; run_cdp_suites.mjs finds it by name.
@@ -11,7 +11,7 @@ const AGENT_PARTS = {
     'settings-agents-models': ['settings-default-model-claude'],
     'settings-agents-behaviour': ['settings-auto-resume', 'settings-auto-goals', 'settings-agent-low-priority'],
     'settings-agents-team': ['settings-board-auto-attach'],
-    'settings-agents-tools': ['settings-cli-path-claude'],
+    'settings-agents-tools': ['settings-codex-trust-hooks', 'settings-cli-path-claude', 'settings-cli-path-codex', 'settings-cli-path-agy', 'settings-cli-path-pi'],
 };
 
 (async () => {
@@ -28,12 +28,20 @@ const AGENT_PARTS = {
         await Page.enable();
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
 
-        console.log('1. Agents: four headed parts, each switch under its own heading');
+        console.log('1. Agents: five headed parts, each control under its own heading');
         await open('agents');
         const heads = await ev(`[...document.querySelectorAll('#settings-pane-agents .sv-heading')].map(h => h.id + '=' + h.textContent.trim())`);
         assert.deepEqual(heads, ['settings-agents-defaults=Defaults', 'settings-agents-models=Default models', 'settings-agents-behaviour=Behaviour', 'settings-agents-team=Team and board', 'settings-agents-tools=Tools']);
         for (const [head, ids] of Object.entries(AGENT_PARTS)) {
-            const under = await ev(`${JSON.stringify(ids)}.map(id => { let r = document.getElementById(id); r = r && r.closest('.sv-row'); while (r && !r.querySelector(':scope > .sv-heading')) r = r.previousElementSibling; return r ? r.querySelector('.sv-heading').id : null; })`);
+            // #8460 put CLI paths inside a settings_view fold. Its rows still belong to
+            // Tools: at the first folded row, continue before the disclosure (#8530).
+            const under = await ev(`${JSON.stringify(ids)}.map(id => {
+                let r = document.getElementById(id)?.closest('.sv-row');
+                while (r && !r.querySelector(':scope > .sv-heading')) {
+                    r = r.previousElementSibling || r.closest('details.sv-fold')?.previousElementSibling;
+                }
+                return r ? r.querySelector(':scope > .sv-heading').id : null;
+            })`);
             assert.deepEqual(under, ids.map(() => head), `${head}: ${JSON.stringify(under)}`);
         }
         console.log('2. Terminal has the render engine; General has Customize Theme beside Theme and no About');
