@@ -54,12 +54,14 @@
 .team-panel .list-bar-search { min-height: 32px; }
 .team-panel .list-bar-search-row .team-tb-pills { flex: 0 0 auto; min-width: auto; overflow: visible; } /* the pills keep their size: the field gives way first, and below 54 rem the select takes their place */
 .team-panel .team-tb-pills .goals-chip { min-height: 32px; }
+.team-panel .team-tb-chip { flex: none; min-height: 32px; white-space: nowrap; } /* a filter that is on, removable ("No goal ×") */
 .team-panel .team-tb-select { display: none; flex: 0 1 auto; min-height: 32px; max-width: 14em; }
 .team-panel .team-tb-action { flex: none; margin-left: auto; min-height: 32px; padding: 0 12px; font-size: 0.8125rem; }
 @container (max-width: 54rem) { .team-panel .team-tb-pills { display: none; } .team-panel .team-tb-select { display: block; } }
 @media (max-width: 760px) {
     .team-panel .list-bar-search-row { flex-wrap: wrap; }
     .team-panel .list-bar-search-wrap, .team-panel .list-bar-search-row:has(.team-tb-pills) .list-bar-search-wrap { flex: 1 1 8em; max-width: none; }
+    .team-panel .team-tb-chip { min-height: var(--control-touch-height, 44px); }
     .team-panel .list-bar-search, .team-panel .team-tb-select, .team-panel .team-tb-action, .team-panel .list-bar-toggle, .team-panel .list-bar-more-btn { min-height: var(--control-touch-height, 44px); }
     .team-panel .list-bar-toggle, .team-panel .list-bar-more-btn { min-width: var(--control-touch-height, 44px); }
     .team-panel .team-tb-select { flex: 1 1 7em; max-width: 11em; }

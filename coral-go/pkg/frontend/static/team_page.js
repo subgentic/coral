@@ -18,7 +18,7 @@ const { el } = await importOnce('./team_table.js');
 const { quietFocus } = await importOnce('./quiet_focus.js');
 
 const LABEL = { goals: 'Goals', messages: 'Messages', tasks: 'Tasks', agents: 'Agents', artifacts: 'Artifacts', knowledge: 'Knowledge', settings: 'Settings' };
-const S = { team: '', tab: 'goals', item: null, counts: {}, built: false, countSeq: 0 };
+const S = { team: '', tab: 'goals', item: null, counts: {}, built: false, countSeq: 0, noGoal: false }; // noGoal: the next Tasks tab opens filtered to the tasks that serve no goal (the Goals table's last row, #7717)
 const $ = (id) => document.getElementById(id);
 
 export const currentTeamPage = () => (S.team && $('team-page-view') && $('team-page-view').style.display !== 'none' ? { team: S.team, tab: S.tab } : null);
@@ -219,7 +219,8 @@ async function fillTab(tab, item = 0) {
         } else if (tab === 'tasks') {
             const m = await importOnce('./team_tasks_page.js');
             if (stale()) return;
-            await m.showTasks(host, team, { ...teamHooks(), onCount: (n) => { S.counts.tasks = n; drawCounts(); } });
+            const noGoal = S.noGoal; S.noGoal = false;
+            await m.showTasks(host, team, { ...teamHooks(), noGoal, onCount: (n) => { S.counts.tasks = n; drawCounts(); } });
             if (stale()) return;
             if (item) openTaskById(item, { kind: 'tasks' });
         } else if (tab === 'artifacts') {
@@ -320,6 +321,7 @@ export async function openTeamPage(team, opts = {}) {
         if (hasUnsavedTeamSettings() && !(await confirmTeamWorkspaceChange())) return false;
     }
     const tab = TEAM_TABS.includes(opts.tab) ? opts.tab : 'goals';
+    S.noGoal = tab === 'tasks' && !!opts.noGoal;
     const changed = S.team !== team;
     if (changed) { S.team = team; S.counts = {}; S.item = null; S.knowledgeFor = ''; }
     state.selectedTeam = team; // the team on screen (the sidebar marks its row; the panels moved in read it)

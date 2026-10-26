@@ -26,7 +26,7 @@ const emptyQuery = () => ({ rows: [], phase: 0, cursor: '', total: null, doneTot
 // Hide completed (the old tab's toggle, same stored key): the Open chip, chosen until the person picks All; kept in this browser (#7453).
 const HIDE_KEY = 'coral-hide-completed';
 const startFilter = () => (browserLocal.get(HIDE_KEY) === 'false' ? 'all' : 'open');
-const model = { project: '', filters: { ...TF.EMPTY }, q: emptyQuery(), seq: 0, moreLoaded: false, rows: [], cursor: '', totalOpen: null, totalDone: null, filter: startFilter(), loading: false, failed: '', loadingMore: false, moreFailed: '' };
+const model = { noGoal: false, project: '', filters: { ...TF.EMPTY }, q: emptyQuery(), seq: 0, moreLoaded: false, rows: [], cursor: '', totalOpen: null, totalDone: null, filter: startFilter(), loading: false, failed: '', loadingMore: false, moreFailed: '' };
 let root = null, hooks = {};
 const say = (t) => { const s = root && root.querySelector('.team-tasks-status'); if (s) { s.textContent = ''; s.textContent = t; } };
 const bucket = (t) => { const w = taskStatusWord(t.status, t.review_requested); return { 'Queued': 'queued', 'In progress': 'active', 'Blocked': 'blocked', 'In review': 'review', 'Done': 'done' }[w] || 'queued'; };
@@ -185,6 +185,7 @@ function draw() {
     Toolbar.adopt(bar.node.querySelector('.list-bar-search-row'), {
         pills: { label: 'Show tasks that are', current: model.filter, items: FILTERS.map(([key, label]) => ({ key, label, count: c[key] })),
             onPick: key => { model.filter = key; if (key === 'open' || key === 'all') browserLocal.set(HIDE_KEY, key === 'open' ? 'true' : 'false'); say(`${FILTERS.find(f => f[0] === key)[1]}: ${c[key]} tasks`); draw(); } },
+        chip: model.noGoal ? { label: 'No goal', aria: 'Remove the No goal filter', onRemove: () => { model.noGoal = false; say('Showing every task again'); draw(); } } : null,
         action: newTask,
     });
     // No count line: the selected pill's number is the count of the table under it (it said every task read, 69, beside "Open 19"). Only a search that matched more than was read says so.
@@ -193,7 +194,7 @@ function draw() {
     if (model.loading) body.append(el('p', 'goals-note', 'Loading tasks…'));
     else if (!all.length) { if (!failed) { const e = el('div', 'goals-empty'); e.append(el('p', null, query && TF.isFiltered(model.filters) ? 'No tasks match this search.' : 'No tasks yet')); body.append(e); } }
     else {
-        const shown = all.filter(t => model.filter === 'all' || (model.filter === 'open' ? bucket(t) !== 'done' : bucket(t) === model.filter));
+        const shown = all.filter(t => (model.filter === 'all' || (model.filter === 'open' ? bucket(t) !== 'done' : bucket(t) === model.filter)) && (!model.noGoal || !t.goal_id));
         if (!shown.length) {
             const e = el('div', 'goals-empty'); e.append(el('p', null, 'No tasks match this filter.'), btn('btn', 'Show all', () => { model.filter = 'all'; draw(); })); body.append(e);
         } else {
@@ -249,8 +250,9 @@ function watch() {
 }
 
 export function showTasks(host, project, h = {}) {
-    if (project !== model.project) { bar = null; Object.assign(model, { project, filters: TF.loadFilters(project, browserLocal), q: emptyQuery(), rows: [], cursor: '', moreLoaded: false, totalOpen: null, totalDone: null, filter: startFilter(), loading: false, failed: '', loadingMore: false, moreFailed: '' }); }
+    if (project !== model.project) { bar = null; Object.assign(model, { noGoal: false, project, filters: TF.loadFilters(project, browserLocal), q: emptyQuery(), rows: [], cursor: '', moreLoaded: false, totalOpen: null, totalDone: null, filter: startFilter(), loading: false, failed: '', loadingMore: false, moreFailed: '' }); }
     hooks = h;
+    if (h.noGoal) { model.noGoal = true; model.filter = 'open'; } // opened from the Goals table's "N tasks have no goal" row: exactly those tasks, with a chip that removes the filter (#7717)
     if (!host.dataset.built) {
         host.dataset.built = '1';
         const status = el('div', 'team-tasks-status sr-only'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');

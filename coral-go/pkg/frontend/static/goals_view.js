@@ -334,8 +334,8 @@ function drawTableRaw(col) {
             key: g.id, current: g.id === model.openId,
             open: () => openGoal(g.id, true),
             cells: [goalRowBtn(g), tableStateChip(W.stateWord(g), `goal-state-${g.state || 'unknown'}`), tasksCell(g.rollup), whenText(g.updatedAt)],
-        })).concat(model.noGoalOpen > 0 && model.filter === 'all' ? [{ // the tasks that serve no goal are a last row of the table, not a line under the toolbar (#7717): it opens the team's Tasks
-            key: 'no-goal', open: () => window.openTeamPage?.(model.project, { tab: 'tasks' }),
+        })).concat(model.noGoalOpen > 0 && model.filter === 'all' ? [{ // the tasks that serve no goal are a last row of the table, not a line under the toolbar (#7717): it opens the team's Tasks with the no-goal filter on
+            key: 'no-goal', open: () => window.openTeamPage?.(model.project, { tab: 'tasks', noGoal: true }),
             cells: [(() => { const b = rowButton(W.noGoalRowText(model.noGoalOpen)); b.classList.add('goals-no-goal'); return b; })(), '', '', ''],
         }] : []),
     }));

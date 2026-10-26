@@ -25,12 +25,20 @@ function pillElements(p) {
     return [group, select];
 }
 
+/** A filter that is on, as a removable chip ("No goal ×"): pressing it takes the filter off. */
+function chipButton(c) {
+    const b = el('button', 'goals-chip team-tb-chip', `${c.label} \u00d7`); b.type = 'button'; b.setAttribute('aria-label', c.aria || `Remove the ${c.label} filter`); b.title = c.aria || `Remove the ${c.label} filter`; b.setAttribute('aria-pressed', 'true');
+    b.addEventListener('click', c.onRemove);
+    return b;
+}
+
 /** Put the pills and the action into a list bar's search row: [search][pills or select][Filters][More][action]. Called on every draw: what an earlier draw put there goes first. */
-export function adopt(row, { pills = null, action = null } = {}) {
-    for (const old of row.querySelectorAll('.team-tb-pills, .team-tb-select, .team-tb-action')) old.remove();
+export function adopt(row, { pills = null, chip = null, action = null } = {}) {
+    for (const old of row.querySelectorAll('.team-tb-pills, .team-tb-select, .team-tb-chip, .team-tb-action')) old.remove();
     row.classList.add('team-toolbar-row');
     const first = row.querySelector('.list-bar-toggle') || row.querySelector('.list-bar-more');
     if (pills) { const [group, select] = pillElements(pills); for (const e of [group, select]) { if (first) row.insertBefore(e, first); else row.append(e); } group.querySelector('[aria-pressed="true"]')?.scrollIntoView({ inline: 'nearest', block: 'nearest' }); }
+    if (chip) { const c = chipButton(chip); if (first) row.insertBefore(c, first); else row.append(c); }
     if (action) { action.classList.add('team-tb-action'); row.append(action); }
     return row;
 }
