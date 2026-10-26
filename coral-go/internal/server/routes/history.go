@@ -50,6 +50,9 @@ func NewHistoryHandler(db *store.DB, cfg *config.Config, bs *board.Store) *Histo
 	}
 }
 
+// maxMergedWindow is the most agent chats one page of the merged All chats list reads (its page times its size).
+const maxMergedWindow = 20000
+
 // ListSessions returns paginated, filtered history sessions.
 // GET /api/sessions/history
 func (h *HistoryHandler) ListSessions(w http.ResponseWriter, r *http.Request) {
@@ -61,7 +64,13 @@ func (h *HistoryHandler) ListSessions(w http.ResponseWriter, r *http.Request) {
 	agentSessions := make([]map[string]any, 0)
 	agentTotal := 0
 	if chatType == "all" || chatType == "agent" {
-		result, err := h.ss.ListSessionsPaged(r.Context(), params)
+		agentParams := params
+		if chatType == "all" {
+			// The merged list is cut into pages after the group chats are put among the agent chats by time, so the agent chats must be read from the first to the end of the page asked for: a
+			// page of agent chats merged and then cut again lost every agent chat after the first page (All chats said 196 and gave 53). Capped, a page deeper than that is not served.
+			agentParams.Page, agentParams.PageSize = 1, min(page*pageSize, maxMergedWindow)
+		}
+		result, err := h.ss.ListSessionsPaged(r.Context(), agentParams)
 		if err != nil {
 			errInternalServer(w, err.Error())
 			return
