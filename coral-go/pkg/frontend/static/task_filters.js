@@ -32,7 +32,7 @@ const model = defineFilters({
     assignee: { type: 'text', max: 80, chip: v => `Agent: ${v}` },
     goal: { type: 'custom', empty: '', clean: goalValue, filtered: v => !!v, chip: v => goalChipLabel(v) },
     from: { type: 'day', chip: v => `Updated since ${v}` },
-    sort: { type: 'sort', values: SORTS, default: 'open' },
+    sort: { type: 'order', values: SORTS, default: 'open' },
 });
 export const { EMPTY, clean, isFiltered, isQuery, chips, without } = model;
 

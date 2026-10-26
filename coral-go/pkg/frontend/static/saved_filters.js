@@ -14,7 +14,7 @@ const filters = convLabel => defineFilters({
     q: { type: 'text', max: 200, chip: v => `Search: ${v}` },
     kind: { type: 'choice', values: KINDS, chip: v => `Type: ${KIND_LABEL[v]}` },
     conv: { type: 'text', max: 300, chip: v => `From: ${convLabel(v)}` },
-    sort: { type: 'sort', values: SORTS, default: 'newest' },
+    sort: { type: 'order', values: SORTS, default: 'newest' },
 });
 const model = filters(v => v);
 export const { EMPTY, clean, isFiltered, isQuery } = model;
