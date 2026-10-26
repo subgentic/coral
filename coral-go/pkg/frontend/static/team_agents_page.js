@@ -16,7 +16,7 @@ const { rowFocusTarget, stateChip, el } = await importOnce('./team_table.js'); /
 const DT = await importOnce('./data_table.js');
 let agentsTableState = DT.tableState();
 
-const WORD = { available: 'Free', busy: 'Busy', task_idle: 'Task assigned, idle', queued: 'Queued', waiting: 'Waiting', needs_input: 'Needs input', sleeping: 'Sleeping', offline: 'Offline', unknown: 'No signal yet', unavailable: 'Unavailable' };
+const WORD = { available: 'Free', busy: 'Busy', task_idle: 'Task assigned, idle', queued: 'Queued', waiting: 'Waiting', needs_input: 'Needs input', sleeping: 'Sleeping', archived: 'Archived', offline: 'Offline', unknown: 'No signal yet', unavailable: 'Unavailable' };
 // The chips: the statuses people look for first; any other status that has agents gets its own chip after them.
 const FIRST = ['available', 'busy', 'queued', 'sleeping', 'offline'];
 const CHIP_WORD = { available: 'Free', unknown: 'Unknown' };
