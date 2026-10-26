@@ -44,7 +44,8 @@
 
 /* the tables of the tabs and the pages that hold them (the goals engine's classes, now a table and a page) */
 .goals-page.goals-table-page { max-width: none; margin-inline: 0; } /* the team page's tabs fill the page area at every width: the board's 1100 px and 1440 px caps (goals.css .goals-page) are not theirs (#7729) */
-.goals-table-page { padding: 16px 24px 0; width: 100%; box-sizing: border-box; flex: 1; display: flex; flex-direction: column; gap: 12px; min-height: 100%; }
+.goals-table-page { padding: var(--team-page-padding, 16px 24px 0); width: 100%; box-sizing: border-box; flex: 1; display: flex; flex-direction: column; gap: 12px; min-height: 100%; }
+.agentic-panel { --team-page-padding: 0; } /* dock tables fill the panel; their toolbar and cells supply the inner spacing */
 .goals-body, .team-tasks-body, .team-artifacts-body, .team-knowledge-body { display: flex; flex-direction: column; gap: 12px; flex: 1; min-height: 0; }
 /* The one toolbar line of every list tab (#7717, team_toolbar.js; Messages, Tasks and Artifacts are list bars, Goals, Agents and Knowledge build a row of the same make): the search field, the state pills, the Filters and More icons, the tab's action at the right, 32 px high on a desktop.
    The pills become one compact select on the same line when the line is narrow (a container query on the row), and a phone wraps the line at most once with 44 px hit areas. */
@@ -147,7 +148,7 @@
     .team-tab { min-height: 44px; }
     .team-page-actions .btn, .goals-pinbar .btn, .team-more-menu > button { min-height: 44px; }
     .team-more-menu > button.team-more-add { display: block !important; }
-    .goals-table-page { padding: 12px 16px 0; }
+    .goals-table-page { padding: var(--team-page-padding, 12px 16px 0); }
     .goals-pinbar .btn { flex: 1 1 auto; }
     .goals-table-page .goals-back { min-height: 44px; min-width: 44px; } /* a short label ("Goals") is still a 44 px target both ways */
     .team-task-extra summary { min-height: 44px; display: flex; align-items: center; } /* the dialog's folded sections are 44 px targets on a phone */
