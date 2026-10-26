@@ -92,7 +92,9 @@ const BASE = require('./test_base').BASE;
         await ev(`document.getElementById('task-complete-message').value = 'Done from the task page'; [...document.querySelectorAll('#team-panel-item .goals-pinbar .btn')].find(b => b.textContent === 'Complete').click(); true`);
         await waitFor(`!document.getElementById('task-complete-message')`, 'completion saved');
         await ev(`document.querySelector('#team-panel-item .goals-back').click(); true`);
-        await waitFor(`location.pathname === '/team/${B}/tasks' && (document.activeElement?.dataset.taskId === '${second}' || document.activeElement?.id === 'team-tab-tasks')`, 'back at Tasks with row focus', 8000);
+        // A refresh may remove the now-completed row from Open after Back focuses it.
+        // The list then restores focus to its selected filter; both are valid return targets.
+        await waitFor(`location.pathname === '/team/${B}/tasks' && !!document.activeElement?.getClientRects().length && (document.activeElement?.dataset.taskId === '${second}' || document.activeElement?.id === 'team-tab-tasks' || document.activeElement?.matches('#team-panel-tasks .goals-chip[aria-pressed="true"]'))`, 'back at Tasks with row, tab or selected-filter focus', 8000);
         await openGoal(goal);
         await waitFor(`document.querySelector('.goal-side-head').textContent.replace(/\\s+/g, ' ').includes('1 open, 2 done')`, 'goal reflects the completed task', 15000);
         // The goal rollup arrives before its separate task-list request. Wait for the
