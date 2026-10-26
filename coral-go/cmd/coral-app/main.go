@@ -27,7 +27,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
-	"sync"
 	"syscall"
 	"time"
 
@@ -58,23 +57,16 @@ func init() {
 
 func main() {
 
-	url := flag.String("url", "http://localhost:8420", "Coral server URL")
-	title := flag.String("title", "Coral", "Window title")
-	width := flag.Int("width", 1200, "Window width")
-	height := flag.Int("height", 800, "Window height")
-	wait := flag.Bool("wait", false, "Wait for server to be ready before opening")
-	debugFlag := flag.Bool("debug", false, "Enable debug logging to app.log in the data folder")
-	dataDir := flag.String("data-dir", "", "Coral's data folder, to ask it for a sign-in link (default: the usual one)")
-	flag.Parse()
+	cfg := parseAppFlags(flag.CommandLine, os.Args[1:])
 	// A sign-in link handed over by the tray (#3394), in the environment so no other user can
 	// read it with ps. Used once: drop it so nothing this window starts inherits it.
 	handedLink := os.Getenv("CORAL_APP_LOGIN_URL")
 	os.Unsetenv("CORAL_APP_LOGIN_URL")
 
-	debugMode = *debugFlag || os.Getenv("CORAL_DEBUG") == "1"
+	debugMode = cfg.debug || os.Getenv("CORAL_DEBUG") == "1"
 
 	// Always log to file so we catch crashes — debug mode adds JS console redirect
-	setupDebugLogging(*dataDir)
+	setupDebugLogging(cfg.dataDir)
 
 	// Check EULA acceptance before proceeding. On macOS, this shows a native
 	// Cocoa dialog on first launch. If the user declines, the app exits.
@@ -97,32 +89,24 @@ func main() {
 
 	// Catch SIGTERM/SIGINT for clean shutdown — terminate the webview event
 	// loop so deferred Destroy() runs, preventing leaked WKWebView processes.
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT)
-	go func() {
-		sig := <-sigCh
-		log.Printf("[SHUTDOWN] received signal: %v", sig)
-		log.Printf("[SHUTDOWN] goroutines: %d", runtime.NumGoroutine())
+	watchTerminationSignals(func() terminator {
 		if w := webviewInstance; w != nil {
-			log.Println("[SHUTDOWN] terminating webview event loop")
-			w.Terminate()
-		} else {
-			log.Println("[SHUTDOWN] no webview yet, exiting")
-			os.Exit(1)
+			return w
 		}
-	}()
+		return nil
+	}, os.Exit)
 
 	log.Printf("[STARTUP] coral-app starting pid=%d", os.Getpid())
 	log.Printf("[STARTUP] args=%v", os.Args)
 	log.Printf("[STARTUP] go=%s os=%s arch=%s goroutines=%d", runtime.Version(), runtime.GOOS, runtime.GOARCH, runtime.NumGoroutine())
-	log.Printf("[STARTUP] url=%s title=%s size=%dx%d wait=%v debug=%v", *url, *title, *width, *height, *wait, debugMode)
+	log.Printf("[STARTUP] url=%s title=%s size=%dx%d wait=%v debug=%v", cfg.url, cfg.title, cfg.width, cfg.height, cfg.wait, debugMode)
 
 	// Optionally wait for the server to be ready
-	if *wait {
-		log.Printf("[STARTUP] waiting for server at %s...", *url)
-		if !waitForServer(*url, 15*time.Second) {
+	if cfg.wait {
+		log.Printf("[STARTUP] waiting for server at %s...", cfg.url)
+		if !waitForServer(cfg.url, 15*time.Second) {
 			log.Printf("[STARTUP] server not responding after 15s — exiting")
-			fmt.Fprintf(os.Stderr, "Server at %s is not responding. Is Coral running?\n", *url)
+			fmt.Fprintf(os.Stderr, "Server at %s is not responding. Is Coral running?\n", cfg.url)
 			os.Exit(1)
 		}
 		log.Println("[STARTUP] server is ready")
@@ -130,20 +114,7 @@ func main() {
 
 	// Sign in without the API key or a prompt (#3394): the link the tray handed over, or a
 	// fresh one from this computer's Coral. Without one (an older Coral) the URL itself opens.
-	startURL := handedLink
-	if startURL == "" || !loginlink.HasToken(startURL) {
-		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-		link, err := loginlink.FromCLI(ctx, *url, config.ResolveCoralDir(*dataDir))
-		cancel()
-		if err != nil {
-			log.Printf("[STARTUP] no sign-in link (%v); opening %s", err, *url)
-			startURL = *url
-		} else {
-			startURL = link
-		}
-	}
-	// The session this link makes is named "Coral app on ..." on the Sessions page (#6100), so a person can tell it from their own browser.
-	startURL = loginlink.MarkApp(startURL)
+	startURL := chooseStartURL(handedLink, cfg.url, cfg.dataDir, loginlink.FromCLI)
 
 	log.Println("[WEBVIEW] calling showInDock()")
 	showInDock()
@@ -170,13 +141,13 @@ func main() {
 		log.Println("[WEBVIEW] webview destroyed")
 	}()
 
-	log.Printf("[WEBVIEW] setting title=%q size=%dx%d", *title, *width, *height)
+	log.Printf("[WEBVIEW] setting title=%q size=%dx%d", cfg.title, cfg.width, cfg.height)
 	installFilePanel(w.Window()) // a file input opens the system chooser (#5743)
-	w.SetTitle(*title)
+	w.SetTitle(cfg.title)
 	workW, workH := workArea()
-	fw, fh := fitSize(*width, *height, workW, workH)
-	if fw != *width || fh != *height {
-		log.Printf("[WEBVIEW] the screen's work area cannot hold %dx%d: opening at %dx%d", *width, *height, fw, fh)
+	fw, fh := fitSize(cfg.width, cfg.height, workW, workH)
+	if fw != cfg.width || fh != cfg.height {
+		log.Printf("[WEBVIEW] the screen's work area cannot hold %dx%d: opening at %dx%d", cfg.width, cfg.height, fw, fh)
 	}
 	w.SetSize(fw, fh, webview.HintNone)
 	placeInWorkArea(w.Window()) // the cascade can put the window partly off a small screen (#6004 W5)
@@ -191,87 +162,9 @@ func main() {
 	// and WKWebView layout fixes are active from the first layout pass.
 	// Also applies on <body> at DOMContentLoaded as a safety net.
 	log.Println("[WEBVIEW] injecting native app JS (class flags, external link handler)")
-	w.Init(logHintScript(config.ResolveCoralDir(*dataDir)))
+	w.Init(logHintScript(config.ResolveCoralDir(cfg.dataDir)))
 	// documentElement and body can be null where the script runs (a blank first page): each is marked only when it exists, and again at DOMContentLoaded.
-	w.Init(`window.__CORAL_APP__ = true;
-	(function() {
-		var mac = navigator.platform && navigator.platform.indexOf('Mac') !== -1;
-		var win = navigator.platform && navigator.platform.indexOf('Win') !== -1;
-		function mark(el) {
-			if (!el || !el.classList) return;
-			el.classList.add('native-app');
-			if (mac) el.classList.add('native-macos');
-			if (win) el.classList.add('native-windows');
-		}
-		mark(document.documentElement);
-		document.addEventListener('DOMContentLoaded', function() { mark(document.documentElement); mark(document.body); });
-	})();
-
-	// Server health check — detect when the backend crashes
-	(function() {
-		var wasConnected = false;
-		var overlayEl = null;
-
-		function getOverlay() {
-			if (overlayEl) return overlayEl;
-			overlayEl = document.getElementById('coral-app-disconnect-overlay');
-			if (overlayEl) return overlayEl;
-			// Create overlay if it doesn't exist yet (injected before DOM loads)
-			var el = document.createElement('div');
-			el.id = 'coral-app-disconnect-overlay';
-			el.style.cssText = 'display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.75);align-items:center;justify-content:center;flex-direction:column;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:#e0e0e0;';
-			el.innerHTML = '<div style="text-align:center;max-width:400px;padding:32px">'
-				+ '<div style="font-size:48px;margin-bottom:16px">⚠️</div>'
-				+ '<h2 style="margin:0 0 8px;font-size:20px;color:#fff">Server Disconnected</h2>'
-				+ '<p style="margin:0 0 16px;font-size:14px;color:#aaa">Coral may have crashed. Check <code style="background:rgba(255,255,255,0.1);padding:2px 6px;border-radius:3px;font-size:12px">~/.coral/coral.log</code> for details.</p>'
-				+ '<div style="display:flex;align-items:center;gap:8px;justify-content:center">'
-				+ '<span class="coral-reconnect-spinner" style="display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,0.2);border-top-color:#fff;border-radius:50%;animation:coral-reconnect-spin 0.8s linear infinite"></span>'
-				+ '<span style="font-size:13px;color:#888">Reconnecting...</span>'
-				+ '</div></div>';
-			// The log this server writes, in its own data folder (#4151), as text.
-			var code = el.querySelector('code');
-			if (code && window.__CORAL_LOG_PATH__) code.textContent = window.__CORAL_LOG_PATH__;
-			// Add spinner animation
-			var style = document.createElement('style');
-			style.textContent = '@keyframes coral-reconnect-spin { to { transform: rotate(360deg); } }';
-			document.head.appendChild(style);
-			document.body.appendChild(el);
-			overlayEl = el;
-			return el;
-		}
-
-		function checkHealth() {
-			fetch('/api/health', { method: 'GET', cache: 'no-store' })
-				.then(function(r) {
-					if (r.ok) {
-						if (!wasConnected) wasConnected = true;
-						var ov = getOverlay();
-						if (ov.style.display !== 'none') {
-							ov.style.display = 'none';
-							// Reload to restore full state after reconnect
-							location.reload();
-						}
-					} else {
-						showDisconnect();
-					}
-				})
-				.catch(function() {
-					showDisconnect();
-				});
-		}
-
-		function showDisconnect() {
-			if (!wasConnected) return; // Don't show overlay during initial load
-			var ov = getOverlay();
-			ov.style.display = 'flex';
-		}
-
-		// Start polling after page loads
-		document.addEventListener('DOMContentLoaded', function() {
-			wasConnected = true;
-			setInterval(checkHealth, 5000);
-		});
-	})();`)
+	w.Init(nativeAppScript)
 
 	// What a link may do in this window (#5094): see linkInterceptScript.
 	w.Init(linkInterceptScript)
@@ -333,49 +226,7 @@ func main() {
 		natives = append(natives, apptoken.Native{Page: "_coralLog", Native: "__coralNativeLog"})
 
 		// Inject JS that redirects console.log/warn/error to Go
-		w.Init(`
-			(function() {
-				const origLog = console.log;
-				const origWarn = console.warn;
-				const origError = console.error;
-				console.log = function() {
-					origLog.apply(console, arguments);
-					try { _coralLog('LOG', Array.from(arguments).join(' ')); } catch(e) {}
-				};
-				console.warn = function() {
-					origWarn.apply(console, arguments);
-					try { _coralLog('WARN', Array.from(arguments).join(' ')); } catch(e) {}
-				};
-				console.error = function() {
-					origError.apply(console, arguments);
-					try { _coralLog('ERROR', Array.from(arguments).join(' ')); } catch(e) {}
-				};
-
-				// Log navigation and WebSocket events
-				window.addEventListener('hashchange', function(e) {
-					_coralLog('NAV', 'hashchange: ' + location.hash);
-				});
-				window.addEventListener('popstate', function(e) {
-					_coralLog('NAV', 'popstate: ' + location.href);
-				});
-
-				// Monitor WebSocket connections
-				const origWS = window.WebSocket;
-				window.WebSocket = function(url, protocols) {
-					_coralLog('WS', 'connecting: ' + url);
-					const ws = new origWS(url, protocols);
-					ws.addEventListener('open', function() { _coralLog('WS', 'connected: ' + url); });
-					ws.addEventListener('close', function(e) { _coralLog('WS', 'closed: ' + url + ' code=' + e.code); });
-					ws.addEventListener('error', function() { _coralLog('WS', 'error: ' + url); });
-					return ws;
-				};
-				window.WebSocket.prototype = origWS.prototype;
-				window.WebSocket.CONNECTING = origWS.CONNECTING;
-				window.WebSocket.OPEN = origWS.OPEN;
-				window.WebSocket.CLOSING = origWS.CLOSING;
-				window.WebSocket.CLOSED = origWS.CLOSED;
-			})();
-		`)
+		w.Init(consoleRedirectScript)
 
 		log.Printf("Navigating to %s", loginlink.Redact(startURL))
 	}
@@ -385,25 +236,20 @@ func main() {
 	// this Coral's own sign-in page, and at most once every 30 s, so a page that keeps
 	// answering 403 can't loop. The link never reaches the page's script. It lands on the page
 	// the sign-in page was asked for (its return_to), when that is a page of this dashboard (#3532).
-	baseOrigin := originOf(*url)
-	var lastSignIn time.Time
-	var signInMu sync.Mutex
+	baseOrigin := originOf(cfg.url)
+	var signIn signInThrottle
 	w.Bind("__coralNativeAppSignIn", func(token, page string) {
 		if !guard.Allowed(token) {
 			refused("appSignIn")
 			return
 		}
-		signInMu.Lock()
-		if time.Since(lastSignIn) < 30*time.Second {
-			signInMu.Unlock()
+		if !signIn.allow(time.Now()) {
 			return
 		}
-		lastSignIn = time.Now()
-		signInMu.Unlock()
 		go func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 			defer cancel()
-			link, err := loginlink.FromCLI(ctx, *url, config.ResolveCoralDir(*dataDir))
+			link, err := loginlink.FromCLI(ctx, cfg.url, config.ResolveCoralDir(cfg.dataDir))
 			if err != nil {
 				log.Printf("[WEBVIEW] sign-in page shown; no new sign-in link: %v", err)
 				return
