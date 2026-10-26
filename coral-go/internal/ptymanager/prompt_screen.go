@@ -132,18 +132,8 @@ func busyOnScreen(lines []string) bool {
 	return false
 }
 
-// codexWorkingRe: Codex's working line above its input box, "• Working (12s • esc to interrupt)" (or a reasoning title in
-// place of "Working": "• Planning the change (1m 3s • esc to interrupt)").
-var codexWorkingRe = regexp.MustCompile(`(?i)^\s*[•◦]\s+\S.*\(.*\besc to interrupt\)\s*$`)
-
 // codexWorkingLines: how many lines above Codex's input box are read for its working line (queued messages sit between them).
 const codexWorkingLines = 6
-
-// codexWorkingOnScreen reports whether Codex's screen shows it working (#247): its working line within the few lines just above
-// the lowest input box. Only there: the same words further up are output (a reply quoting them), not the status.
-func codexWorkingOnScreen(screen string) (line string, busy bool) {
-	return codexWorkingMatching(screen, codexWorkingRe)
-}
 
 // CodexDisplayWorkingOnScreen is a presentation hint, never an input gate. An
 // actual prompt always wins, even with a working line above it.
@@ -390,18 +380,6 @@ func InputBoxKnown(agentType string) bool {
 	return false
 }
 
-// screenTailBytes is how much of a PTY's output is read for its screen: enough
-// for a menu and its footer.
-const screenTailBytes = 16 << 10
-
-// screenTail returns the end of raw terminal output, for PromptOnScreen.
-func screenTail(b []byte) string {
-	if len(b) > screenTailBytes {
-		b = b[len(b)-screenTailBytes:]
-	}
-	return string(b)
-}
-
 // AgentScreen implements ScreenReader for tmux: the bottom of the agent's pane.
 func (t *TmuxSessionTerminal) AgentScreen(ctx context.Context, name, agentType, sessionID string) (string, error) {
 	return t.client.CapturePane(ctx, name, 40, agentType, sessionID)
@@ -459,16 +437,6 @@ func (m *PTYBackend) renderedScreenStyled(name string) (string, error) {
 // RenderedScreenStyledText is RenderedScreenText with faint cells marked (see AgentScreenStyled).
 func (m *PTYBackend) RenderedScreenStyledText(name string) (string, error) {
 	return m.renderedScreenStyled(name)
-}
-
-// ReplayScreen is the end of a PTY session's raw output: a fallback for a screen that
-// renders empty. Gate checks use RenderedScreenText.
-func (m *PTYBackend) ReplayScreen(name string) (string, error) {
-	data, err := m.Replay(name)
-	if err != nil {
-		return "", err
-	}
-	return screenTail(data), nil
 }
 
 // SendEnter implements EnterSender for tmux: the Enter a send withheld because

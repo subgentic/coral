@@ -72,8 +72,6 @@ func normalizeDelivered(text string) string {
 	return strings.TrimSpace(runOfSpaceRE.ReplaceAllString(text, " "))
 }
 
-func deliveredHash(text string) ([sha256.Size]byte, bool) { return delivered.hash(text) }
-
 func (l *textLog) hash(text string) ([sha256.Size]byte, bool) {
 	t := normalizeDelivered(text)
 	if t == "" || utf8.RuneCountInString(t) < l.minLen {

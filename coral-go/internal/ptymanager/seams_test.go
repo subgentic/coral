@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"sync"
 	"testing"
-	"time"
 )
 
 // setWaits replaces the gate's and the prompt's waits for the test: f edits a copy of the ones in force, and the cleanup puts them back.
@@ -17,16 +16,6 @@ func setWaits(t *testing.T, f func(w *waitTimings)) {
 	waitsP.Store(&n)
 	t.Cleanup(func() {
 		waitsP.Store(old)
-	})
-}
-
-// setNow replaces the gate's clock for the test (the cleanup puts the old one back).
-func setNow(t *testing.T, g *inputGate, f func() time.Time) {
-	t.Helper()
-	old := g.nowFn.Load()
-	g.nowFn.Store(&f)
-	t.Cleanup(func() {
-		g.nowFn.Store(old)
 	})
 }
 
