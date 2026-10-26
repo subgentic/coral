@@ -112,7 +112,7 @@ const BASE = require('./test_base').BASE;
         await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
         await openGoal(goal);
         const vis = sel => ev(`!!document.querySelector(${JSON.stringify(sel)}) && document.querySelector(${JSON.stringify(sel)}).getClientRects().length > 0`);
-        check('the goal is the first screen: its details and a "Tasks, 1 open, 2 done" button, no column', await vis('.goal-main #goals-detail-title') && !(await vis('.goal-side')) && /Tasks, 1 open, 2 done/.test(await ev(`document.querySelector('.goal-tasks-open').textContent`)));
+        check('the goal is the first screen: its details and a "Tasks, 1 open, 2 done" button, no column', await vis('.goal-main #goals-detail-title') && !(await vis('.goal-side')) && /Tasks, 1 open, 2 done/.test(await ev(`document.querySelector('.goal-tasks-open').getAttribute('aria-label')`)));
         check('the button is a 44 px target', await ev(`document.querySelector('.goal-tasks-open').getBoundingClientRect().height >= 43.5`));
         await shot('goal-phone-goal');
         await ev(`document.querySelector('.goal-tasks-open').click(); true`);
