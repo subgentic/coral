@@ -118,27 +118,6 @@ func TestRestartAndResumeRefuseABrokenConfiguredCLIPath(t *testing.T) {
 	assert.Empty(t, term.sent, "nothing was started")
 }
 
-// harmlessCLI is a real program that does nothing and prints nothing, to stand in as an agent's configured CLI: a configured path that can't
-// be run is refused (#115), so the Unix-only /usr/bin/true is not enough on Windows, where it is a .cmd that exits 0.
-func harmlessCLI(t testing.TB) string {
-	if runtime.GOOS != "windows" {
-		return "/usr/bin/true"
-	}
-	p := filepath.Join(t.TempDir(), "harmless-cli.cmd")
-	if err := os.WriteFile(p, []byte("@exit /b 0\r\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	return p
-}
-
-// harmlessCLIName is what harmlessCLI's program is called in a terminal's output.
-func harmlessCLIName() string {
-	if runtime.GOOS == "windows" {
-		return "harmless-cli"
-	}
-	return "/usr/bin/true"
-}
-
 // The launch and the wake refuse a broken configured path with the text and a 422, not a 500 or a bare 200 "failed"; through Coral Hub
 // the text names the setting only, never this computer's path (#115).
 func TestLaunchAndWakeRefuseABrokenConfiguredCLIPath(t *testing.T) {
