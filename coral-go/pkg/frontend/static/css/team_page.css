@@ -76,8 +76,8 @@
 .goals-table-page .goals-chips-row::-webkit-scrollbar { display: none; }
 .goals-table-page .goals-chip { flex: none; min-height: 32px; white-space: nowrap; }
 .goals-table-page .goals-new { flex: none; }
-.goals-table-page .goals-back { display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; padding: 4px 0; min-height: 36px; }
-.goals-table-page .goals-back:hover { text-decoration: underline; }
+.goals-table-page .goals-back, .inbox-board-head .goals-back { display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; padding: 4px 0; min-height: 36px; }
+.goals-table-page .goals-back:hover, .inbox-board-head .goals-back:hover { text-decoration: underline; }
 .team-count-line { margin: 0; }
 .team-empty { display: flex; flex-direction: column; gap: 2px; } /* the one empty line of the team page's tabs: the sentence at 14/400, an optional hint at 12/400, no box (UI/UX 170 consistency, item 5) */
 .goals-note.team-empty-line, .team-empty-line { margin: 0; font-size: 0.875rem; font-weight: 400; line-height: 1.5; color: var(--text-primary); }
@@ -151,7 +151,7 @@
     .team-more-menu > button.team-more-add { display: block !important; }
     .goals-table-page { padding: var(--team-page-padding, 12px 16px 0); }
     .goals-pinbar .btn { flex: 1 1 auto; }
-    .goals-table-page .goals-back { min-height: 44px; min-width: 44px; } /* a short label ("Goals") is still a 44 px target both ways */
+    .goals-table-page .goals-back, .inbox-board-head .goals-back { min-height: 44px; min-width: 44px; } /* a short label ("Goals") is still a 44 px target both ways */
     .team-task-extra summary { min-height: 44px; display: flex; align-items: center; } /* the dialog's folded sections are 44 px targets on a phone */
     .team-task-artifact-name { min-height: 44px; display: inline-flex; align-items: center; } /* a task's artifact is a 44 px target on a phone (#7739) */
     .detail-pane { position: fixed; inset: 0; z-index: 30; width: auto; border-left: 0; }
@@ -281,12 +281,12 @@
 .inbox-item-page > .inbox-item-body { flex: 1 1 auto; min-height: 0; min-width: 0; display: flex; flex-direction: column; }
 .inbox-item-body > .team-task-page { flex: 1; overflow-y: auto; }
 .inbox-item-page > .view-list { display: none; }
-.inbox-board-head { padding: 16px 24px 0; }
+.inbox-board-head { padding: 16px 24px 12px; display: flex; flex-direction: column; gap: 12px; }
 .inbox-board-body { padding: 0 24px; }
 .inbox-board-body .mb-tools { padding: 0; }
 @media (max-width: 760px) {
     .inbox-item-page > .view-list { display: block; padding: 12px 16px 0; }
     .inbox-item-page > .view-list .view-list-nav { display: none; }
-    .inbox-board-head { padding: 12px 16px 0; }
+    .inbox-board-head { padding: 12px 16px; }
     .inbox-board-body { padding: 0 16px; }
 }
