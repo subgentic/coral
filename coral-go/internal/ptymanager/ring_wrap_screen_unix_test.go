@@ -25,24 +25,12 @@ func TestTheScreenKeepsTheInputBoxAfterTheReplayRingWrapped(t *testing.T) {
 	backend := NewPTYBackend()
 	defer backend.Close()
 	require.NoError(t, backend.Spawn("ring-wrap", "codex", t.TempDir(), "sid-ring-wrap", codexLikeStandIn, 120, 40))
-	ch, err := backend.Attach("ring-wrap", "ws-ring-wrap")
-	require.NoError(t, err)
-	var seen strings.Builder
-	deadline := time.After(2 * time.Minute) // only the ceiling of a stand-in that never ends: the wait itself is for REPAINTS-DONE (#7163)
-	for !strings.Contains(seen.String(), "REPAINTS-DONE") {
-		select {
-		case data, ok := <-ch:
-			require.True(t, ok, "the terminal closed")
-			seen.Write(data)
-			if seen.Len() > 4096 {
-				s := seen.String()
-				seen.Reset()
-				seen.WriteString(s[len(s)-2048:])
-			}
-		case <-deadline:
-			t.Fatal("the stand-in did not finish")
-		}
-	}
+	// The wait is for the stand-in's last line, read from the ring itself (the end of the ring is where it lands). A subscriber would be cut off for falling behind (lag.go) when this goroutine
+	// is not scheduled for a moment under load: the 7000 repaints fill its channel, and the test saw "the terminal closed" (#7746).
+	require.Eventually(t, func() bool {
+		replay, err := backend.Replay("ring-wrap")
+		return err == nil && strings.Contains(string(replay), "REPAINTS-DONE")
+	}, 2*time.Minute, 20*time.Millisecond, "the stand-in did not finish") // only the ceiling of a stand-in that never ends (#7163)
 	replay, err := backend.Replay("ring-wrap")
 	require.NoError(t, err)
 	require.LessOrEqual(t, len(replay), 256*1024+32*1024, "the ring is bounded")
