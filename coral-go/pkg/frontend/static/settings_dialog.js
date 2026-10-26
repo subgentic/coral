@@ -19,6 +19,7 @@ import { browserLocal } from './safe_storage.js';
 import { openSettingsGroup } from './settings_nav.js';
 const { _fillModelDatalist, _getAgentModels, _invalidateAgentModels, _invalidateDefaultModels } = await importOnce('./launch_models.js');
 const { _updatePermModeDescription } = await importOnce('./permission_flags.js');
+import { settingsRowsReady } from './settings_rows_boot.js';
 
 // ── Settings: API key (#3152) ─────────────────────────────────────────────
 // Masked at full width with Show and Copy; a status message (not configured,
@@ -865,6 +866,7 @@ export async function refreshUnsavedNote() {
 }
 
 export async function showSettingsModal(group) {
+    await settingsRowsReady(); // the dialog's rows that are fields (settings_fields.js) are in the page before anything reads them by id
     // Focus moves in on open, Tab stays inside, and focus comes back on close (accessibility pass).
     attachDialogFocus(document.getElementById('settings-modal'));
     importOnce('./quiet_focus.js').then(m => m.quietFocus(document.getElementById('settings-modal')), () => {}); // the open tab takes the focus by script: no ring for a pointer's start, the ring for a key press (#7405, as #7391's New Agent)

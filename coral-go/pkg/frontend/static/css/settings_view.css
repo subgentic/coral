@@ -30,9 +30,10 @@
 .sv-more[hidden] { display: none; }
 .sv-row > .sv-row-notice { grid-column: -2 / -1; margin: 0; } /* a line of the caller's under the control (the open column; the only one when folded) */
 .sv-more > p { margin: 0 0 6px; }
-.sv-control { display: flex; align-items: center; gap: 8px; min-width: 0; justify-content: flex-end; }
+.sv-control { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; justify-content: flex-end; }
 .sv-form .sv-control { justify-content: flex-start; }
 .sv-control > .sv-input, .sv-control > .sv-custom, .sv-control > .sv-choices { flex: 1; min-width: 0; }
+.sv-control > select.sv-input { min-width: min(100%, 9rem); } /* a select beside a button wraps the button under it before it narrows past a readable word */
 .sv-input { box-sizing: border-box; width: 100%; min-height: var(--sv-control-height); font: inherit; font-size: var(--fs-md); background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--control-border); border-radius: var(--radius-lg); } /* the page's input look: the toolbar's search field's, in both themes */
 .sv-textarea { min-height: 6rem; resize: vertical; }
 .sv input.sv-input, .sv .sv-textarea { padding: 6px 10px; }
@@ -53,6 +54,7 @@
 .sv-switch-hit { display: inline-flex; align-items: center; justify-content: flex-end; }
 .sv-switch { appearance: none; -webkit-appearance: none; position: relative; width: 40px; height: 22px; margin: 0; flex: none; border-radius: 1rem; border: 1px solid var(--control-border); background: var(--bg-hover); cursor: pointer; }
 .sv-switch::before { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--text-secondary); transition: transform .12s; }
+.sv input.sv-switch.sv-switch { padding: 0; box-sizing: border-box; width: 40px; height: 22px; min-height: 0; margin: 0; flex: none; } /* inside a dialog, the dialog's own input padding must not squeeze the switch */
 .sv-switch:checked { background: var(--accent-dim); border-color: var(--accent-dim); }
 .sv-switch:checked::before { background: var(--text-on-accent); transform: translateX(18px); }
 .sv-switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -82,10 +84,17 @@
     .sv .settings-nav .settings-group-pick { display: block; }
     .sv .settings-group-pick select { width: 100%; min-height: var(--sv-control-height-touch); font-size: 0.875rem; background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--control-border); border-radius: var(--radius-lg); }
     .sv .settings-panes { padding: 12px 16px 20px; } /* px: the margins do not grow with the text size, the words get the room */
-    .sv-settings .sv-row { grid-template-columns: minmax(0, 1fr); }
-    .sv-settings .sv-row-toggle { grid-template-columns: minmax(0, 1fr) auto; }
-    .sv-settings .sv-row:not(.sv-row-toggle) .sv-control { justify-content: flex-start; }
+    .sv-settings:not(.sv-flat) .sv-row { grid-template-columns: minmax(0, 1fr); }
+    .sv-settings:not(.sv-flat) .sv-row-toggle { grid-template-columns: minmax(0, 1fr) auto; }
+    .sv-settings:not(.sv-flat) .sv-row:not(.sv-row-toggle) .sv-control { justify-content: flex-start; }
     .sv-bar { padding: 8px 16px; flex-wrap: wrap; }
+}
+
+/* a view of rows only (no nav: a group of the main Settings) folds by its own width, at the main Settings' 40 rem */
+@container sv (max-width: 40rem) {
+    .sv-flat .sv-row { grid-template-columns: minmax(0, 1fr); }
+    .sv-flat .sv-row-toggle { grid-template-columns: minmax(0, 1fr) auto; }
+    .sv-flat .sv-row:not(.sv-row-toggle) .sv-control { justify-content: flex-start; }
 }
 
 /* Windows High Contrast: a switch shows its state with system colours (backgrounds are dropped) */

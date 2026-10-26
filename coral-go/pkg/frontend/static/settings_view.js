@@ -142,7 +142,7 @@ export function mountSettingsView(host, spec) {
             return { field, group, row, ctl: { node: row, get: () => undefined, set: () => {}, disable: () => {}, focus: () => {} }, errorEl: node('p', 'sv-error'), helpEl: null, actionEl: null, id, label: null };
         }
         const text = node('div', 'sv-text');
-        const label = node('label', 'sv-label', field.label); label.id = `${id}-l`;
+        const label = node('label', 'sv-label', field.label); label.id = field.labelId || `${id}-l`; // labelId: a stable id for the label (a test, an aria-labelledby of the caller)
         const ctl = buildControl(field, id);
         if (ctl.input && !ctl.group && !ctl.custom) label.htmlFor = ctl.input.id; else if (ctl.group || ctl.custom) { label.removeAttribute('for'); ctl.node.setAttribute('aria-labelledby', `${id}-l`); }
         if (ctl.labelledBy) { ctl.input.setAttribute('aria-labelledby', `${id}-l`); label.removeAttribute('for'); }
@@ -166,6 +166,8 @@ export function mountSettingsView(host, spec) {
             } else text.append(helpEl);
         }
         const target = ctl.input || ctl.node;
+        if (target && target.setAttribute) for (const [k, v] of Object.entries(field.attrs || {})) target.setAttribute(k, v); // attributes of the caller's: an aria attribute
+        if (field.setup && target) field.setup(target); // the caller's own touch on the control (a data-on-* action it names with setAttribute, which the action census reads)
         if (helpEl && target && target.setAttribute) target.setAttribute('aria-describedby', helpEl.id);
         const control = node('div', 'sv-control');
         control.append(ctl.node);
@@ -176,7 +178,10 @@ export function mountSettingsView(host, spec) {
         let actionEl = null;
         if (field.action) {
             const a = field.action;
-            actionEl = node('button', `btn sv-action${a.danger ? ' btn-danger sv-danger' : ''}`, a.label); actionEl.type = 'button';
+            actionEl = node('button', `btn sv-action${a.className ? ' ' + a.className : ''}${a.small ? ' btn-small' : ''}${a.danger ? ' btn-danger sv-danger' : ''}`, a.icon ? '' : a.label); actionEl.type = 'button';
+            if (a.icon) { const ic = node('span', 'material-icons icon-inline', a.icon); ic.setAttribute('aria-hidden', 'true'); actionEl.append(ic, ` ${a.label}`); }
+            for (const [k, v] of Object.entries(a.attrs || {})) actionEl.setAttribute(k, v);
+            if (a.setup) a.setup(actionEl); // a data-on-* action of the page, named with setAttribute (the action census reads that)
             const runIt = async () => { actionEl.disabled = true; try { await a.run(view); } finally { actionEl.disabled = false; } };
             actionEl.addEventListener('click', () => {
                 if (!a.confirm) { runIt(); return; }
@@ -216,6 +221,7 @@ export function mountSettingsView(host, spec) {
     }
     const flat = mode === 'form' || (groups.length === 1 && !groups[0].label);
     if (flat) {
+        root.classList.add('sv-flat'); // rows only (no nav, no bar): folded by the pane's own width
         const body = node('div', 'sv-body');
         for (const g of groups) for (const field of g.fields || []) { if (!field.key) continue; const rec = buildRow(field, g); fields.set(field.key, rec); body.append(rec.row); }
         inner.append(body);
@@ -416,6 +422,10 @@ export function mountSettingsView(host, spec) {
         ready: null,
     };
     refreshRows(); paintBar();
-    view.ready = view.reload();
+    if (spec.load) view.ready = view.reload();
+    else { // no load: the caller fills the controls (by id) and saves them itself; the view only draws the rows
+        for (const [, r] of fields) if (r.field.default !== undefined) r.ctl.set(r.field.default);
+        refreshRows(); root.dataset.ready = '1'; view.ready = Promise.resolve();
+    }
     return view;
 }
