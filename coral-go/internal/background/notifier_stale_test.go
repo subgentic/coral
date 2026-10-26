@@ -10,10 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/ptymanager"
-	"github.com/subgentic/coral/internal/terminalinput"
 )
-
-const menuScreen = " Do you want to proceed?\n ❯ 1. Yes\n   2. No\n\n Esc to cancel\n"
 
 // screenRuntime is a runtime whose screen the test sets (a menu holds Coral's sends), and which
 // records what is typed. onScreen, when set, runs on each screen read, before the screen is
@@ -34,8 +31,6 @@ func (r *screenRuntime) AgentScreen(context.Context, string, string, string) (st
 	}
 	return s, nil
 }
-
-func (r *screenRuntime) setScreen(s string) { r.smu.Lock(); r.screen = s; r.smu.Unlock() }
 
 func (r *screenRuntime) typed() []string {
 	r.mu.Lock()
@@ -91,15 +86,4 @@ func TestBoardNotifier_ANudgeReadBeforeItIsTypedIsDropped(t *testing.T) {
 	typed := rt.typed()
 	require.Len(t, typed, 1)
 	assert.Contains(t, typed[0], "1 unread message on the message board")
-}
-
-// pasteRuntime takes Coral's sends as a bracketed paste (PromptSender), the path where the gate
-// runs the send's Ready check before pasting.
-type pasteRuntime struct{ screenRuntime }
-
-func (r *pasteRuntime) SendPrompt(_ context.Context, _ terminalinput.Origin, name, text, _, _ string) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.sent = append(r.sent, sendCall{session: name, text: text})
-	return nil
 }
