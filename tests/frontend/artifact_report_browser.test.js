@@ -16,8 +16,8 @@ const sample = fs.readFileSync(path.join(__dirname,'fixtures/verification_report
     };
     const settle=()=>ev('new Promise(r=>setTimeout(r,80))');
     const until=async expr=>{for(let i=0;i<300;i++){if(await ev(expr))return;await ev('new Promise(r=>setTimeout(r,20))');}throw Error('timed out waiting for '+expr);};
-    // a row opens its sheet over the panel; Open in the sheet is the report in the preview pane
-    const openReport=async()=>{await until("document.querySelectorAll('#agentic-panel-artifacts tbody tr .dt-primary').length>0");await ev(`document.querySelector('#agentic-panel-artifacts tbody tr .dt-primary').click()`);await until("[...document.querySelectorAll('#agentic-detail-pane .detail-foot .btn')].some(b=>b.textContent==='Open')");await ev(`[...document.querySelectorAll('#agentic-detail-pane .detail-foot .btn')].find(b=>b.textContent==='Open').click()`);await ev(`document.querySelector('#agentic-detail-pane .detail-close').click()`);await settle();}; // the sheet shows the report too: it is closed so the report in the preview pane is the only one
+    // an agent's row opens the report in the preview pane
+    const openReport=async()=>{await until("document.querySelectorAll('#agentic-panel-artifacts tbody tr .dt-primary').length>0");await ev(`document.querySelector('#agentic-panel-artifacts tbody tr .dt-primary').click()`);await settle();}; // an agent's row opens the report in the preview pane (#8487); the sheet is its Details link
     const shot=async(name,mobile=false)=>{
         if(!process.env.CORAL_SCREENSHOT_DIR)return;
         fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR,{recursive:true});

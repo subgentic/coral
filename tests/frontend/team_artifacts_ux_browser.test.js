@@ -46,8 +46,8 @@ const HEX = c => c.repeat(64);
 
         console.log('1. Desktop: a row is one control and overlaps nothing');
         const overlap = await ev(`(() => { const hit = (a, b) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top; const bad = [];
-            for (const row of document.querySelectorAll('${ROWS}')) { const nameBtn = row.querySelector('.dt-primary').getBoundingClientRect(); const cells = [...row.querySelectorAll('td')]; const created = cells[cells.length - 1].getBoundingClientRect();
-                if (hit(nameBtn, created)) bad.push('the name over Created'); if (row.querySelectorAll('button, a[href]').length !== 1) bad.push('more than one control'); }
+            for (const row of document.querySelectorAll('${ROWS}')) { const nameBtn = row.querySelector('.dt-primary').getBoundingClientRect(); const cells = [...row.querySelectorAll('td')]; const created = cells[cells.length - 2].getBoundingClientRect();
+                if (hit(nameBtn, created)) bad.push('the name over Created'); if (row.querySelectorAll('button, a[href]').length !== 2) bad.push('not exactly the name and the Details link'); }
             return bad; })()`);
         assert.deepEqual(overlap, [], 'nothing overprints: ' + overlap.join(', '));
         await shot('team-artifacts-ux-desktop');
@@ -61,7 +61,7 @@ const HEX = c => c.repeat(64);
 
         console.log('3. Delete by keyboard: the focus goes to the next row, the previous one, then the search box');
         const deleteRow = async i => {
-            await ev(`document.querySelectorAll('${ROWS} .dt-primary')[${i}].focus(); true`);
+            await ev(`document.querySelectorAll('${ROWS} .artifact-details')[${i}].focus(); true`);
             await press('Enter', 'Enter', 13);
             await waitFor(`!document.getElementById('agentic-detail-pane').hidden && !!(${FOOT('Delete')})`, 'the sheet', 8000);
             await ev(`(${FOOT('Delete')}).focus(); true`);
@@ -121,11 +121,11 @@ const HEX = c => c.repeat(64);
             await waitFor(`document.querySelectorAll('${ROWS}').length === 3`, 'the rows on the phone', 8000);
             await sleep(400); // sleep-ok: layout settles
             const m = await ev(`(() => { const small = [];
-                for (const b of document.querySelectorAll('${ROWS} .dt-primary, #agentic-panel-artifacts-view .list-bar-more-btn')) { const r = b.getBoundingClientRect(); if (r.height < 43.5 || (!b.classList.contains('dt-primary') && r.width < 43.5)) small.push((b.getAttribute('aria-label') || b.textContent).slice(0, 20) + ' ' + Math.round(r.width) + 'x' + Math.round(r.height)); }
+                for (const b of document.querySelectorAll('${ROWS} .dt-primary, ${ROWS} .artifact-details, #agentic-panel-artifacts-view .list-bar-more-btn')) { let r = b.getBoundingClientRect(); if (b.classList.contains('artifact-details')) { const pe = getComputedStyle(b, '::after'); r = { width: parseFloat(pe.width), height: parseFloat(pe.height) }; } /* the Details link's 44 px target is its pseudo-element (#8539) */ if (r.height < 43.5 || (!b.classList.contains('dt-primary') && r.width < 43.5)) small.push((b.getAttribute('aria-label') || b.textContent).slice(0, 20) + ' ' + Math.round(r.width) + 'x' + Math.round(r.height)); }
                 return { small, docOver: document.documentElement.scrollWidth - innerWidth }; })()`);
             assert.deepEqual(m.small, [], `${size || '100%'}: every control is a 44 px target`);
             assert.ok(m.docOver <= 0, `${size || '100%'}: no sideways scroll`);
-            await ev(`document.querySelector('${ROWS} .dt-primary').click(); true`);
+            await ev(`document.querySelector('${ROWS} .artifact-details').click(); true`); // the sheet is the Details link; the row itself opens the preview
             await waitFor(`!document.getElementById('agentic-detail-pane').hidden`, 'the sheet on the phone', 8000);
             const sheet = await ev(`(() => { const a = document.getElementById('agentic-detail-pane'); return { small: [...a.querySelectorAll('.detail-foot .btn, .detail-close')].filter(b => { const r = b.getBoundingClientRect(); return r.height < 43.5; }).map(b => b.textContent || b.getAttribute('aria-label')), over: a.scrollWidth - a.clientWidth }; })()`);
             assert.deepEqual(sheet.small, [], `${size || '100%'}: the sheet's buttons are 44 px targets`);

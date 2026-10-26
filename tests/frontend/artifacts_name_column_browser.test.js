@@ -16,7 +16,7 @@ const HEX = c => c.repeat(64);
     const now = new Date(), yest = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 12), old = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 60, 12); // noon of the calendar day, so 'yesterday' is yesterday at any hour (now - 1.2 days was two days back before 04:48)
     const NAMES = ['image-2026-10-21.png', 'orchestrator-notes.md', 'a-very-long-report-name-that-keeps-going-and-going-for-a-whole-quarter-of-the-year-final-v3.txt'];
     const ITEMS = [now, yest, old].map((d, i) => ({ id: HEX('abc'[i]), name: NAMES[i], media_type: ['image/png', 'text/markdown', 'text/plain'][i], size: 1000 + i, task_id: 20 + i, task_title: 'T' + i, created_at: d.toISOString(), uri: 'coral://artifacts/' + HEX('abc'[i]), produced_by: 'orc' }));
-    const measure = () => ev(`(() => [...document.querySelectorAll('#agentic-panel-artifacts tbody tr')].map(row => { const cell = row.querySelector('td'), b = row.querySelector('.dt-primary'), when = row.querySelector('td:last-child span'); const lh = parseFloat(getComputedStyle(b).lineHeight) || 1.4 * parseFloat(getComputedStyle(b).fontSize); const br = b.getBoundingClientRect(); return { folded: !!row.closest('.dt-box.dt-folded'), nameW: Math.round(cell.getBoundingClientRect().width), btnH: Math.round(br.height), lh: Math.round(lh), text: b.textContent, created: when.textContent, createdTitle: when.title, tds: [...row.querySelectorAll('td')].filter(t => t.getClientRects().length).length }; }))()`);
+    const measure = () => ev(`(() => [...document.querySelectorAll('#agentic-panel-artifacts tbody tr')].map(row => { const cell = row.querySelector('td'), b = row.querySelector('.dt-primary'), when = row.querySelector('td .dt-time, td time, td:nth-last-child(2) span') || row.querySelector('td:last-child span'); const lh = parseFloat(getComputedStyle(b).lineHeight) || 1.4 * parseFloat(getComputedStyle(b).fontSize); const br = b.getBoundingClientRect(); return { folded: !!row.closest('.dt-box.dt-folded'), nameW: Math.round(cell.getBoundingClientRect().width), btnH: Math.round(br.height), lh: Math.round(lh), text: b.textContent, created: when.textContent, createdTitle: when.title, tds: [...row.querySelectorAll('td')].filter(t => t.getClientRects().length).length }; }))()`);
     try {
         await Page.enable();
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -46,7 +46,7 @@ const HEX = c => c.repeat(64);
                 assert.equal(r.text, NAMES[i], at + 'the whole name is the button');
                 assert.ok(r.created && r.created.length <= 20, at + 'Created is short: ' + r.created);
                 assert.ok(r.createdTitle && /\d{4}|\d{1,2}:\d{2}/.test(r.createdTitle), at + 'the whole time is the tooltip');
-                assert.equal(r.tds, 5, at + `${r.folded ? 'all facts in the folded row' : 'every column'}: ${r.tds}`);
+                assert.equal(r.tds, 6, at + `${r.folded ? 'all facts in the folded row' : 'every column'}: ${r.tds}`);
             }
             if (w === 680) await shot('artifacts-name-680');
             if (w === 480) await shot('artifacts-name-480');
@@ -58,7 +58,7 @@ const HEX = c => c.repeat(64);
         const phone = await measure();
         for (const r of phone) {
             assert.ok(r.nameW >= 150, `phone: Name keeps a readable width: ${JSON.stringify(r)}`);
-            assert.ok(r.tds === 5, `phone: Name and Created, a 44 px target: ${JSON.stringify(r)}`);
+            assert.ok(r.tds === 6, `phone: Name, Created and the Details link, a 44 px target: ${JSON.stringify(r)}`);
         }
         await shot('artifacts-name-phone');
         console.log('PASS artifacts list: Name keeps its width');

@@ -91,7 +91,13 @@ const STUB = `(() => {
             // A compact fixture fits in the default dock; the old fixed 40rem breakpoint folds it anyway.
             await ev(`window.__data = window.__data.map((r,i) => ({...r, name: 'File '+i, task_id: null, created_at: new Date().toISOString()})); import((window.__coralStatic || '/static/') + 'team_artifacts_page.js').then(m => m.loadArtifacts({keep:true})); true`);
             await settled(); await settle(400);
-            if (!view.phone) check(`${view.w}: compact columns fit without folding at the default dock width`, await ev(`!document.querySelector('${panel} .dt-box').classList.contains('dt-folded')`));
+            if (!view.phone) {
+                // A readable name needs 200 px (--table-fit-name-min, #8539), so the default dock folds a row into its two compact lines; a dock wide enough for the name and the facts does not fold it.
+                check(`${view.w}: the default dock folds a row into its two compact lines`, await ev(`document.querySelector('${panel} .dt-box').classList.contains('dt-folded')`));
+                await ev(`document.getElementById('agentic-state').style.width = '760px'; true`); await settle(500);
+                check(`${view.w}: compact columns fit without folding in a wide dock`, await ev(`!document.querySelector('${panel} .dt-box').classList.contains('dt-folded')`));
+                await ev(`document.getElementById('agentic-state').style.width = ''; true`); await settle(500);
+            }
             check(`${view.w}: artifact table fits its dock`, await ev(`(() => {const b=document.querySelector('${panel} .dt-box');return b.scrollWidth <= b.clientWidth + 1;})()`));
             await ev(`document.querySelector('${panel} tbody tr .dt-primary').click(); true`); await settle(500);
             check(`${view.w}: one click opens preview without covering the artifact list`, await ev(`document.getElementById('preview-pane').getBoundingClientRect().height > 0 && document.getElementById('agentic-detail-pane').hidden`));
