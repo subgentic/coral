@@ -1,5 +1,5 @@
-// An agent's dock shows what that agent would read (#8484): "For this agent | Whole board" under the Board tab's head, the list asked of the server's one read rule (for_subscriber), one quiet line saying
-// what is shown and how many of the board, an empty state with the way to the whole board, the choice kept per browser. The Orchestrator's dock has no switch and shows the whole board. Real board over the
+// An agent's dock shows what that agent would read, and its own posts (#8484): "For this agent | Whole board" under the Board tab's head, the list asked of the server's one read rule (for_subscriber), one quiet line saying
+// what is shown and how many of the board, a search that searches that list (and "No match in what <agent> reads" with the way to the whole board), an empty state with the way to the whole board, the choice kept per browser. The Orchestrator's dock has no switch and shows the whole board. Real board over the
 // API on the isolated dev server (removed again); the dock is mounted as board_table_dock does. 1280 and 390 px; CORAL_SCREENSHOT_DIR saves the shots.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -34,6 +34,7 @@ const BASE = require('./test_base').BASE;
         await post('Orchestrator', '@all standup at five');
         await post('QA Engineer', 'Untagged chatter two');
         await post('Orchestrator', '@QA Engineer only you');
+        await post('Backend Dev', 'On it: the dock task is mine'); // its own post, untagged: it is in its list
     };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -45,34 +46,49 @@ const BASE = require('./test_base').BASE;
             await seed(w);
             console.log(`${at}1. An agent's dock starts on what that agent reads`);
             await show(AGENT);
-            await waitFor(`document.querySelectorAll('#board-panel-msgs > .mb-message').length === 2`, 'the two messages it reads', 15000);
+            await waitFor(`document.querySelectorAll('#board-panel-msgs > .mb-message').length === 3`, 'the two messages it reads and its own post', 15000);
             let st = await state();
             assert.deepEqual(st.pressed, ['For this agent:true', 'Whole board:false'], at + JSON.stringify(st));
-            assert.equal(st.note, 'Showing what Backend Dev reads: its mentions, @all and its replies. 2 of 5 messages', at + 'the line says what is shown and how many');
-            assert.match((await rows()).join('|'), /dock task.*standup/s);
+            assert.equal(st.note, 'Showing what Backend Dev reads: its mentions, @all, its replies and its own posts. 3 of 6 messages', at + 'the line says what is shown and how many');
+            assert.match((await rows()).join('|'), /dock task.*standup.*On it/s);
             await shot(`dock-scope-agent-${w}`);
 
             console.log(`${at}2. Whole board shows everything, says nothing more, and is remembered`);
             await ev(`document.querySelector('.board-chat-scope .mb-view-btn[data-scope="all"]').click(); true`);
-            await waitFor(`document.querySelectorAll('#board-panel-msgs > .mb-message').length === 5`, 'the whole board', 15000);
+            await waitFor(`document.querySelectorAll('#board-panel-msgs > .mb-message').length === 6`, 'the whole board', 15000);
             st = await state();
             assert.deepEqual(st.pressed, ['For this agent:false', 'Whole board:true']); assert.equal(st.note, '', at + 'no line while the whole board is shown');
             assert.equal(await ev(`localStorage.getItem('coral.board.scope')`), 'all');
             await shot(`dock-scope-all-${w}`);
             await show(AGENT);
-            await waitFor(`document.querySelectorAll('#board-panel-msgs > .mb-message').length === 5`, 'the choice kept', 8000);
+            await waitFor(`document.querySelectorAll('#board-panel-msgs > .mb-message').length === 6`, 'the choice kept', 8000);
 
             console.log(`${at}3. Back to the agent; a new message that tags it arrives through the poll's after_id`);
             await ev(`document.querySelector('.board-chat-scope .mb-view-btn[data-scope="agent"]').click(); true`);
-            await waitFor(`document.querySelectorAll('#board-panel-msgs > .mb-message').length === 2`, 'filtered again', 15000);
+            await waitFor(`document.querySelectorAll('#board-panel-msgs > .mb-message').length === 3`, 'filtered again', 15000);
             await post('Orchestrator', '@Backend Dev one more for you'); await post('QA Engineer', 'Untagged chatter three');
             await show(AGENT); // the panel is kept and asks only for what came after the newest shown
-            await waitFor(`document.querySelectorAll('#board-panel-msgs > .mb-message').length === 3`, 'the new tagged message, not the untagged one', 15000);
-            assert.equal((await state()).note, 'Showing what Backend Dev reads: its mentions, @all and its replies. 3 of 7 messages');
+            await waitFor(`document.querySelectorAll('#board-panel-msgs > .mb-message').length === 4`, 'the new tagged message, not the untagged one', 15000);
+            assert.equal((await state()).note, 'Showing what Backend Dev reads: its mentions, @all, its replies and its own posts. 4 of 8 messages');
+
+            console.log(`${at}3b. The dock's search searches what the agent reads, and says so when nothing in it matches`);
+            const searchBox = `document.getElementById('bd-search')`;
+            const typeSearch = text => ev(`(() => { const i = ${searchBox}; i.focus(); i.value = ${JSON.stringify(text)}; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+            await typeSearch('dock');
+            await waitFor(`document.querySelectorAll('#board-panel-msgs > .mb-message-match, #board-panel-msgs > .mb-message-current').length === 2`, 'the two messages of its list that say dock', 15000);
+            await typeSearch('chatter'); // said only by messages outside its list
+            await waitFor(`/No match in what Backend Dev reads/.test((document.querySelector('#agentic-panel-board .board-chat-search .mb-search-status') || {}).textContent || '')`, 'the no-match line', 15000);
+            await shot(`dock-scope-nomatch-${w}`);
+            await ev(`document.querySelector('#agentic-panel-board .mb-search-link').click(); true`);
+            await waitFor(`document.querySelectorAll('#board-panel-msgs > .mb-message-match, #board-panel-msgs > .mb-message-current').length === 3`, 'the link shows the whole board, searched again: three chatter messages', 15000);
+            assert.equal(await ev(`localStorage.getItem('coral.board.scope')`), 'all');
+            await typeSearch('');
+            await ev(`document.querySelector('.board-chat-scope .mb-view-btn[data-scope="agent"]').click(); true`);
+            await waitFor(`document.querySelectorAll('#board-panel-msgs > .mb-message').length === 4`, 'back to the agent\'s list', 15000);
 
             console.log(`${at}4. The Orchestrator's dock shows the whole board and has no switch`);
             await show({ subscriber: 'Orchestrator', orchestrator: true, name: 'Orchestrator' });
-            await waitFor(`document.querySelectorAll('#board-panel-msgs > .mb-message').length === 7`, 'the whole board for the Orchestrator', 15000);
+            await waitFor(`document.querySelectorAll('#board-panel-msgs > .mb-message').length === 8`, 'the whole board for the Orchestrator', 15000);
             st = await state(); assert.equal(st.bar, false, at + 'no switch'); assert.equal(st.note, '');
 
             console.log(`${at}5. An agent that has read nothing yet (@all reaches every member, so it is one with no seat on the board): the empty line and the way to the whole board`);
@@ -82,7 +98,7 @@ const BASE = require('./test_base').BASE;
             st = await state(); assert.equal(st.empty, 'Nothing for Newcomer yet. Show the whole board'); assert.equal(st.rows, 0);
             await shot(`dock-scope-empty-${w}`);
             await ev(`document.querySelector('#board-panel-msgs .board-scope-link').click(); true`);
-            await waitFor(`document.querySelectorAll('#board-panel-msgs > .mb-message').length === 7`, 'the link shows the whole board', 15000);
+            await waitFor(`document.querySelectorAll('#board-panel-msgs > .mb-message').length === 8`, 'the link shows the whole board', 15000);
             assert.deepEqual((await state()).pressed, ['For this agent:false', 'Whole board:true']);
             assert.equal(await ev(`document.documentElement.scrollWidth <= innerWidth`), true, at + 'no sideways scroll');
             console.log('   ✓');

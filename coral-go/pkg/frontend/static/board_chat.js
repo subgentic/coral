@@ -12,10 +12,11 @@ import { initGrowingTextarea } from './growing_textarea.js';
 import { announceNotice } from './notifications.js';
 import { outcomeUnknownLine } from './outcome_unknown.js';
 import { paintPauseButton as _paintPauseButton } from './board_pause_button.js';
-import { applyAskUpdates, onRowActions, boardView, saveBoardView, rowParts, applyView, mountTableTools, forgetOpenRows, refreshReplies, retagMentions, watchFold, dayLineBefore } from './board_table.js'; // the Board as a table (#7922): the team page's module at dock width
+import { setAllRows, applyAskUpdates, onRowActions, boardView, saveBoardView, rowParts, applyView, mountTableTools, forgetOpenRows, refreshReplies, retagMentions, watchFold, dayLineBefore } from './board_table.js'; // the Board as a table (#7922): the team page's module at dock width
 import { messageTimeHtml } from './message_time.js';
 import { keyRoute, build } from './routes.js';
 import { browserLocal } from './safe_storage.js';
+import { createBoardSearch } from './board_search.js';
 
 // ── Board (right-panel tab) ──────────────────────────────────────
 let _boardChatTimer = null;
@@ -50,6 +51,20 @@ let _boardChatReader = null;   // { id, name } the dock's agent as a board membe
 let _boardChatBoardTotal = 0;  // the whole board's count, beside the reader's own
 const scopePref = () => (browserLocal.get(SCOPE_KEY) === 'all' ? 'all' : 'agent');
 const scopeQuery = () => (_boardChatScope ? `&for_subscriber=${encodeURIComponent(_boardChatScope)}` : '');
+
+// The dock's search is the board page's search bar in its own instance (board_search.js), asking for the same list the dock shows: for the agent's list, the matches are the search and that list together.
+const _dockSearch = createBoardSearch('bd');
+const _dockSearchHooks = {
+    me: OPERATOR_ID,
+    scope: () => _boardChatScope,
+    redraw: () => _dockSearch.highlight(document.getElementById('board-panel-msgs')),
+    jumpTo: id => _dockJumpTo(id),
+    first: async () => { await _dockLoadAllEarlier(); const box = document.getElementById('board-panel-msgs'); if (box) box.scrollTop = 0; },
+    latest: () => { const box = document.getElementById('board-panel-msgs'); if (box) box.scrollTop = box.scrollHeight; },
+    expandAll: () => setAllRows(document.getElementById('board-panel-msgs'), true),
+    collapseAll: () => setAllRows(document.getElementById('board-panel-msgs'), false),
+    noMatch: () => (_boardChatScope && _boardChatReader ? { text: `No match in what ${_boardChatReader.name} reads`, link: { label: 'Show the whole board', run: () => _setBoardChatScopePref('all') } } : null),
+};
 
 // What a rebuild used to reset and a kept panel must reset itself on a switch: select mode, an open @-mention list, the title.
 function _resetBoardPanelForSwitch(panel, boardName) {
@@ -145,6 +160,7 @@ export function showBoardChatTab(boardName, agent = null) {
     _boardChatSelectMode = false;
     _boardChatSelectedIds.clear();
     _syncScopeBar(panel, agent);
+    _mountDockSearch(panel, boardName);
     if (_boardChatLoaded) _renderBoardPanelMessages(document.getElementById('board-panel-msgs'), true);
 
     _loadBoardPanelChat(boardName);
@@ -156,6 +172,7 @@ export function showBoardChatTab(boardName, agent = null) {
 }
 
 export function hideBoardChatTab() {
+    _dockSearch.reset();
     _activeBoardChat = null;
     ++_boardChatGen;
     _boardChatSelectMode = false;
@@ -386,6 +403,7 @@ function _renderBoardPanelMessages(msgsEl, scrollToBottom) {
     if (wasAtBottom) msgsEl.scrollTop = msgsEl.scrollHeight;
     msgsEl.dataset.rendered = '1';
     _syncScopeNote();
+    _dockSearch.highlight(msgsEl);
     _fillBoardChatTop(msgsEl);
     // Update select bar if in select mode
     if (_boardChatSelectMode) _updateBoardChatSelectBar();
@@ -516,10 +534,40 @@ function mountDockTableSwitch(panel) {
     head.insertBefore(head.querySelector(':scope > .mb-table-tools'), head.querySelector('#board-chat-pause-btn'));
 }
 
+/** The search row under the scope row (or the head): the board's search bar in the dock. */
+function _mountDockSearch(panel, boardName) {
+    let host = panel.querySelector(':scope > .board-chat-search');
+    if (!host) {
+        host = document.createElement('div'); host.className = 'board-chat-search';
+        (panel.querySelector(':scope > .board-chat-scope') || panel.querySelector('.board-chat-header')).after(host);
+    }
+    _dockSearch.mount(host, boardName, _dockSearchHooks);
+}
+
+/** The older pages the dock has not loaded yet, until the message asked for is in the list (or the board's start is). */
+async function _dockLoadAllEarlier(untilId = null) {
+    for (let i = 0; i < 400 && _boardChatOffset > 0 && (untilId === null || !_boardChatMessages.some(m => m.id === untilId)); i++) {
+        const before = _boardChatMessages.length;
+        await _loadEarlierBoardChat();
+        if (_boardChatMessages.length === before && _boardChatOffset > 0) await new Promise(r => setTimeout(r, 50)); // sleep-ok: a page already loading: wait for it
+    }
+}
+
+/** A match of the dock's search: its page is loaded, the row scrolled to the middle, the matches marked. */
+async function _dockJumpTo(id) {
+    await _dockLoadAllEarlier(id);
+    const box = document.getElementById('board-panel-msgs');
+    if (!box) return;
+    const row = box.querySelector(`:scope > .mb-message[data-message-id="${CSS.escape(String(id))}"]`);
+    if (row) row.scrollIntoView({ block: 'center' });
+    _dockSearch.highlight(box);
+}
+
 /** The dock's choice between what this agent reads and the whole board, kept per browser; the list is asked for again. */
 function _setBoardChatScopePref(pref) {
     browserLocal.set(SCOPE_KEY, pref === 'all' ? 'all' : 'agent');
     if (_activeBoardChat) showBoardChatTab(_activeBoardChat, _boardChatAgentArg);
+    _dockSearch.rerun(); // a search in hand was of the other list
 }
 let _boardChatAgentArg = null;
 
@@ -544,12 +592,12 @@ function _syncScopeBar(panel, agent) {
     _syncScopeNote();
 }
 
-/** "Showing what Ada reads: its mentions, @all and its replies. 12 of 184 messages": only while the list is filtered. */
+/** "Showing what Ada reads: its mentions, @all, its replies and its own posts. 12 of 184 messages": only while the list is filtered. */
 function _syncScopeNote() {
     const note = document.getElementById('board-chat-scope-note');
     if (!note) return;
     const text = _boardChatScope && _boardChatReader
-        ? `Showing what ${_boardChatReader.name} reads: its mentions, @all and its replies.${_boardChatLoaded && _boardChatBoardTotal ? ` ${_boardChatTotal}\u00a0of\u00a0${_boardChatBoardTotal}\u00a0messages` : ''}`
+        ? `Showing what ${_boardChatReader.name} reads: its mentions, @all, its replies and its own posts.${_boardChatLoaded && _boardChatBoardTotal ? ` ${_boardChatTotal}\u00a0of\u00a0${_boardChatBoardTotal}\u00a0messages` : ''}`
         : '';
     if (note.textContent !== text) note.textContent = text;
     note.hidden = !text;
