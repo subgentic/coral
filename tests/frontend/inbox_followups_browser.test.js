@@ -72,9 +72,9 @@ const AGENTS = (waiting) => waiting ? [
             if (!mobile) await step('a task page starts at its title and Back puts the focus on the task row', async () => {
                 await ev(`window.switchNavTab('hub-inbox'); true`); await click('Tasks', `${pane} .view-list-item[data-key="tasks"]`); await settle(300);
                 await click('the task', '#group-table-view .dt-primary[data-task-id="12"]');
-                await waitFor(`!!document.querySelector('#team-panel-item .ibx-reply-input')`, 'the task page', 8000); await settle(300);
+                await waitFor(`!!document.querySelector('#inbox-page .ibx-reply-input')`, 'the task page', 8000); await settle(300);
                 assert.equal((await active()).id, 'team-task-title', 'the title has the focus');
-                await click('Back', '#team-panel-item .goals-back'); await settle(400);
+                await click('Back', '#inbox-page .goals-back'); await settle(400);
                 const a = await active(); assert.equal(a.data.taskId, '12', 'Back: the row the task was opened from (' + JSON.stringify(a) + ')');
             });
             if (!mobile) await step('Escape on a task page is one level back, on the same row', async () => {
@@ -97,7 +97,7 @@ const AGENTS = (waiting) => waiting ? [
                 await ev(`document.querySelector('${pane} .view-list-item[data-key="tasks"]').click(); true`); await settle(400);
                 await ev(`document.querySelector('#group-table-view .dt-primary').click(); true`); await settle(600);
                 assert.equal((await active()).id, 'team-task-title', 'the title has the focus');
-                await ev(`document.querySelector('#team-panel-item .goals-back').click(); true`); await settle(500);
+                await ev(`document.querySelector('#inbox-page .goals-back').click(); true`); await settle(500);
                 const a = await active(); assert.ok(a.cls.includes('dt-primary') && a.data.taskId, 'the task row in the table has the focus (' + JSON.stringify(a) + ')');
             });
             if (mobile) await step('the Saved table stacks: the message has the row, its state and action are under it, nothing is behind a sideways scroll', async () => {

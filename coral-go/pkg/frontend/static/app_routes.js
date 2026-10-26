@@ -73,13 +73,14 @@ function registerRouteHandlers() {
         switchNavTab('history', { fromHistory: true });
     });
 
-    route('inbox-goals', async r => {
+    for (const sub of ['goals', 'tasks', 'boards']) route('inbox-' + sub, async r => {
         await liveListReady;
         switchNavTab('hub-inbox', { fromHistory: true });
         const m = await importOnce('./inbox_sidebar.js');
-        if (currentRoute()?.view !== 'inbox-goals' || currentRoute()?.id !== r.id || currentRoute()?.item !== r.item) return;
-        if (r.id && r.item) await m.openInboxGoal(r.id, r.item);
-        else await m.openInboxGroup('goals');
+        if (currentRoute()?.view !== r.view || currentRoute()?.id !== r.id || currentRoute()?.item !== r.item) return;
+        if (r.id && sub === 'goals') await m.openInboxGoal(r.id, r.item);
+        else if (r.id) await m.openInboxItem(sub, r.id, r.item);
+        else await m.openInboxGroup(sub === 'boards' ? 'chats-group' : sub);
     });
 
     onRoute('team', async r => {

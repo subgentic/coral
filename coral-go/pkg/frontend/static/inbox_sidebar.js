@@ -1,4 +1,3 @@
-import { openTask } from './task_navigation.js';
 import { needsInputAttention } from './display_activity_hint.js';
 /* The dashboard's own Inbox on the shared sidebar (#7472), loaded the first time the Inbox tab is shown (inbox_tab.js keeps the badge and the counts, which are always there).
  *
@@ -33,6 +32,7 @@ const TB = await importOnce('./task_bulk.js'); // what the selection bar does to
 const Toolbar = await importOnce('./team_toolbar.js'); // the selection bar takes the page's toolbar line (mountSelection)
 const GC = await importOnce('./goal_columns.js');
 const { mountGoal } = await importOnce('./goal_view.js');
+const { mountInboxItem } = await importOnce('./inbox_item_page.js');
 const { quietFocus } = await importOnce('./quiet_focus.js');
 const CH = await importOnce('./mailbox_chats.js'); // the chat folders (#7776): All chats, Board history, By CLI, Tags
 const { providerName } = await importOnce('./model_labels.js'); // a CLI by its name (Claude, Codex, Antigravity), as the Chats list says it
@@ -51,9 +51,18 @@ let tasks = [];
 const groupMeta = key => GROUPS.find(g => g.key === key) || (CH.CHAT_KEY.test(key) && CH.chatFolder(key) ? { key, label: CH.chatFolder(key).title, search: 'Search chats', short: 'Search' } : null);
 let group = (() => { const v = browserLocal.get(GROUP_KEY); return groupMeta(v) ? v : 'needs'; })();
 const queries = { needs: '', tasks: '', goals: '', saved: '' }; // a chat folder keeps its search as typed under its own key // each group's own search text (lower case; Saved's goes to the server as typed)
-let goalMount = null, goalOpener = null, goalScroll = 0;
+let goalMount = null, goalOpener = null, goalScroll = 0, itemMount = null;
+const itemOpeners = new Map();
 const folderRoute = { view: 'inbox-goals', sub: 'goals' };
-const pageGroup = () => page?.kind === 'goal' ? 'goals' : page ? 'saved' : group;
+const routeForFolder = key => key === 'goals' ? folderRoute : key === 'tasks' ? { view: 'inbox-tasks', sub: 'tasks' } : key === 'chats-group' ? { view: 'inbox-boards', sub: 'boards' } : null;
+const pageGroup = () => page?.kind === 'goal' ? 'goals' : page?.kind === 'tasks' ? 'tasks' : page?.kind === 'boards' ? 'chats-group' : page ? 'saved' : group;
+function openItemRoute(kind, team, id, rowKey) {
+    const key = kind === 'tasks' ? 'tasks' : 'chats-group', route = routeForFolder(key);
+    quietFocus($('inbox-view'));
+    itemOpeners.set(key, { key: rowKey, scroll: $('group-table-view')?.scrollTop || 0 });
+    note(route);
+    go({ ...route, id: team, ...(kind === 'tasks' ? { item: id } : {}) });
+}
 let page = null; // { kind: 'task', project, id } | { kind: 'saved', id }: the item on screen, or null
 
 // ── Needs you ────────────────────────────────────────────────────────────
@@ -144,7 +153,7 @@ function pickFolder(key) {
     if (page) closePage(false);
     setGroup(key);
     openGroupTable('hub-inbox', key, { focus: true });
-    if (key === 'goals') note(folderRoute);
+    const route = routeForFolder(key); if (route) note(route);
 }
 /** The folders in the sidebar. Only drawn when a count or the current folder changed (this runs for every message of the feed). */
 function renderInboxNav(force = false) {
@@ -247,7 +256,7 @@ export function drawDockSaved(host) {
 async function openChat(c) {
     state.inboxFolder = { key: group, label: (groupMeta(group) || {}).label || 'All chats' };
     const isGroup = c.type === 'group' || String(c.session_id || '').startsWith('board:');
-    if (isGroup) { const { historyServer } = await importOnce('./history_source.js'); window.selectBoardProject?.(identityKey(historyServer(), c.title || String(c.session_id).replace(/^board:/, ''))); return; }
+    if (isGroup) { const { historyServer } = await importOnce('./history_source.js'); openItemRoute('boards', identityKey(historyServer(), c.title || String(c.session_id).replace(/^board:/, '')), null, c.session_id); return; }
     window.selectHistorySession?.(c.session_id, null, c);
 }
 
@@ -282,7 +291,7 @@ registerGroupSource('hub-inbox', {
                 node: () => {
                     const row = document.querySelector('#group-table-view .gt-toolbar');
                     const t = TV.tasksTable('mine', rows, { ctx: { teamOf: t => t.board || '' }, rowKey: t => `${t.project}#${t.id}`, // only my tasks: no who; the Team column because the group spans teams
-                        open: t => openTask(t.project, t.id), state: inboxTasksState,
+                        open: t => openItemRoute('tasks', t.project, t.id, `${t.project}#${t.id}`), state: inboxTasksState,
                         selectable: { contextKey: 'inbox-tasks', actions: TB.inboxTaskActions(() => { inboxTasksState.selected.clear(); refreshTasks(); }), onChange: keys => row && Toolbar.mountSelection(row, keys.size ? t.bar : null) } }); // the bar takes the toolbar's line while tasks are selected
                     if (row) { Toolbar.mountSelection(row, inboxTasksState.selected.size ? t.bar : null); row.querySelectorAll('.dt-select-toggle').forEach(b => b.remove()); if (isPhoneLayout()) row.append(t.selectButton); }
                     return t.el;
@@ -337,6 +346,7 @@ function setGroup(key) {
 
 // The table on screen names the group (its data-group), a page names its own: the search and Display options follow.
 onViewShown(id => {
+    if (itemMount && id !== 'inbox-view') closePage(false); // release the shared Board before another page takes it
     if (document.body.getAttribute('data-nav-tab') !== 'hub-inbox') return;
     if (id === 'group-table-view') {
         const g = ($('group-table-view')?.dataset.group || '').split(':');
@@ -432,9 +442,10 @@ function sayLive(text) { const live = $('inbox-live'); if (live) { const s = doc
 function closePage(openTable = true, focusBack = false) {
     const was = page, g = pageGroup();
     goalMount?.dispose(); goalMount = null;
+    itemMount?.dispose(); itemMount = null;
     page = null;
     const host = $('inbox-page');
-    if (host) { host.hidden = true; host.replaceChildren(); host.dataset.saved = ''; host.classList.remove('inbox-goal-page'); }
+    if (host) { host.hidden = true; host.replaceChildren(); host.dataset.saved = ''; host.classList.remove('inbox-goal-page', 'inbox-item-page'); }
     $('inbox-view')?.removeAttribute('data-phone-item');
     renderInboxNav(true);
     if (openTable) openGroupTable('hub-inbox', g);
@@ -463,7 +474,8 @@ export async function showInbox({ folder = '', quiet = false } = {}) {
     if (quiet || (folder && state.currentSession && state.currentSession.type === 'history')) return; // a chat is on screen, or being opened (a saved message, a link to a chat): the Inbox is drawn under it, for the way back
     if (page) {
         if (isPhoneLayout()) $('inbox-view')?.setAttribute('data-phone-item', '');
-        if (page.kind === 'goal' && currentRoute()?.view !== 'inbox-goals') note({ ...folderRoute, id: page.project, item: page.id });
+        const route = routeForFolder(pageGroup());
+        if (route && !currentRoute()?.view.startsWith('inbox-')) note({ ...route, id: page.project, ...(page.id ? { item: page.id } : {}) });
         return;
     } // the tab returns to its open item
     $('inbox-view')?.removeAttribute('data-phone-item');
@@ -483,9 +495,12 @@ export async function openInboxGroup(name) {
     $('inbox-page') && ($('inbox-page').hidden = true);
     setGroup(name);
     openGroupTable('hub-inbox', name);
-    if (name === 'goals') {
-        note(folderRoute);
-        restoreGoalList();
+    const route = routeForFolder(name); if (route) note(route);
+    if (name === 'goals') restoreGoalList();
+    const opener = itemOpeners.get(name), table = $('group-table-view');
+    if (opener && table) {
+        table.querySelector(`tr[data-key="${CSS.escape(opener.key)}"] .dt-primary`)?.focus({ preventScroll: true });
+        table.scrollTop = opener.scroll;
     }
 }
 
@@ -514,6 +529,23 @@ export async function openInboxGoal(team, id) {
         teamLink: build(keyRoute('team', team, 'goals', id)),
         back: () => { if (backIs(folderRoute)) history.back(); else go(folderRoute); },
     });
+    renderInboxNav(true);
+}
+
+
+/** Task and Board details share their team renderers, with an Inbox-owned address and way back. */
+export async function openInboxItem(kind, team, id) {
+    closePage(false);
+    const key = kind === 'tasks' ? 'tasks' : 'chats-group', route = routeForFolder(key);
+    await showInbox({ folder: key, quiet: true });
+    if (currentRoute()?.view !== route.view || currentRoute()?.id !== team || (kind === 'tasks' && currentRoute()?.item !== id)) return;
+    page = { kind, project: team, id };
+    setGroup(key);
+    const host = $('inbox-page'); host.hidden = false; host.classList.add('inbox-item-page'); host.replaceChildren();
+    showView('inbox-view'); $('inbox-view')?.setAttribute('data-phone-item', '');
+    host.append(VL.build({ id: 'inbox-item-folders', label: 'Inbox views', sections: folderSections(), current: key, onPick: pickFolder }));
+    const body = el('div', 'inbox-item-body'); host.append(body);
+    itemMount = mountInboxItem(body, { kind, team, id, onChanged: refreshTasks, back: () => { if (backIs(route)) history.back(); else go(route); } });
     renderInboxNav(true);
 }
 

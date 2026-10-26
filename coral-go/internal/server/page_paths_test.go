@@ -14,24 +14,28 @@ import (
 // One sample URL per dashboard page family (#3532); every family in DashboardPagePaths must
 // have one, so a family added without a test fails here.
 var pageSamples = map[string]string{
-	"/inbox/goals":   "/inbox/goals",
-	"/inbox/goals/*": "/inbox/goals/release-team/17",
-	"/agents":        "/agents",
-	"/agents/*":      "/agents/@m2/6f9a3c1e-0000-4000-8000-000000000001/files",
-	"/chats":         "/chats?q=battle&page=2",
-	"/chats/*":       "/chats/42",
-	"/team/*":        "/team/@m2/coral-go-team/settings",
-	"/board/*":       "/board/%40odd",
-	"/workflows":     "/workflows",
-	"/workflows/*":   "/workflows/7/runs/3",
-	"/jobs":          "/jobs",
-	"/jobs/*":        "/jobs/x",
-	"/analytics":     "/analytics",
-	"/analytics/*":   "/analytics/x",
-	"/docs":          "/docs",
-	"/docs/*":        "/docs/board",
-	"/servers":       "/servers",
-	"/servers/*":     "/servers/m2",
+	"/inbox/tasks":    "/inbox/tasks",
+	"/inbox/tasks/*":  "/inbox/tasks/release-team/17",
+	"/inbox/boards":   "/inbox/boards",
+	"/inbox/boards/*": "/inbox/boards/release-team",
+	"/inbox/goals":    "/inbox/goals",
+	"/inbox/goals/*":  "/inbox/goals/release-team/17",
+	"/agents":         "/agents",
+	"/agents/*":       "/agents/@m2/6f9a3c1e-0000-4000-8000-000000000001/files",
+	"/chats":          "/chats?q=battle&page=2",
+	"/chats/*":        "/chats/42",
+	"/team/*":         "/team/@m2/coral-go-team/settings",
+	"/board/*":        "/board/%40odd",
+	"/workflows":      "/workflows",
+	"/workflows/*":    "/workflows/7/runs/3",
+	"/jobs":           "/jobs",
+	"/jobs/*":         "/jobs/x",
+	"/analytics":      "/analytics",
+	"/analytics/*":    "/analytics/x",
+	"/docs":           "/docs",
+	"/docs/*":         "/docs/board",
+	"/servers":        "/servers",
+	"/servers/*":      "/servers/m2",
 }
 
 func pageGet(t *testing.T, c *http.Client, method, u string) (*http.Response, string) {
@@ -82,7 +86,7 @@ func TestDashboardPagePathsStrictKeepTheView(t *testing.T) {
 	_, ts, _ := strictServer(t, true)
 	c := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	root, _ := pageGet(t, c, "GET", ts.URL+"/")
-	for _, sample := range []string{"/inbox/goals/release-team/17", "/team/@m2/coral-go-team/settings", "/chats?q=battle&page=2", "/agents/@m2/6f9a3c1e-0000-4000-8000-000000000001"} {
+	for _, sample := range []string{"/inbox/tasks/release-team/17", "/inbox/boards/release-team", "/inbox/goals/release-team/17", "/team/@m2/coral-go-team/settings", "/chats?q=battle&page=2", "/agents/@m2/6f9a3c1e-0000-4000-8000-000000000001"} {
 		resp, _ := pageGet(t, c, "GET", ts.URL+sample)
 		assert.Equal(t, root.StatusCode, resp.StatusCode, "%s: refused like /", sample)
 		loc, err := url.Parse(resp.Header.Get("Location"))

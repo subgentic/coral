@@ -47,15 +47,15 @@ const BASE = require('./test_base').BASE;
         const links = [];
         for (const title of ['Pick the icon', 'Sign the installer']) { // the one with a goal last: its page stays open for the look below
             await ev(`[...document.querySelectorAll('#group-table-view .dt-primary')].find(b => b.textContent === ${JSON.stringify(title)}).click(); true`);
-            await waitFor(`!!document.querySelector('#team-panel-item .ibx-reply-label')`, `${title} opened`, 8000);
-            links.push(await ev(`({ t: document.querySelector('#team-task-title').textContent.replace(/^#\\d+ /, ''), g: ([...document.querySelectorAll('#team-panel-item .goals-facts dt')].find(x => x.textContent === 'Goal')?.nextElementSibling.querySelector('button') || {}).textContent || '' })`));
+            await waitFor(`!!document.querySelector('#inbox-page .ibx-reply-label')`, `${title} opened`, 8000);
+            links.push(await ev(`({ t: document.querySelector('#team-task-title').textContent.replace(/^#\\d+ /, ''), g: ([...document.querySelectorAll('#inbox-page .goals-facts dt')].find(x => x.textContent === 'Goal')?.nextElementSibling.querySelector('button') || {}).textContent || '' })`));
             if (title === 'Sign the installer') break;
-            await ev(`window.switchNavTab('hub-inbox'); true`);
+            await ev(`document.querySelector('#inbox-page .goals-back').click(); true`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2`, 'back at the table', 8000);
         }
         assert.deepEqual(links.sort((a, b) => a.t.localeCompare(b.t)), [{ t: 'Pick the icon', g: '' }, { t: 'Sign the installer', g: 'Ship the new installer' }]);
-        assert.equal(await ev(`location.pathname`), `/team/${B}/tasks/${t1.json.id}`, 'Inbox opens the canonical team task page');
-        await ev(`[...document.querySelectorAll('#team-panel-item .goals-facts dt')].find(x => x.textContent === 'Goal').nextElementSibling.querySelector('button').click(); true`);
+        assert.equal(await ev(`location.pathname`), `/inbox/tasks/${B}/${t1.json.id}`, 'Inbox task row stays in the Inbox');
+        await ev(`[...document.querySelectorAll('#inbox-page .goals-facts dt')].find(x => x.textContent === 'Goal').nextElementSibling.querySelector('button').click(); true`);
         await waitFor(`document.querySelector('#team-panel-goals .goals-detail-title')?.textContent === 'Ship the new installer' && location.pathname.includes('/goals/')`, 'task Goal link opens the goal', 10000);
         await shot('inbox-task-goal');
         console.log('PASS the goal a waiting agent or task serves');
