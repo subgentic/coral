@@ -5,7 +5,6 @@ import { formatTokens } from './format.js';
 import { _formatCost } from './session_state.js';
 import { formatDurationSec as formatDuration } from './utils.js';
 import { importOnce } from './import_once.js';
-const { dataTable, tableState } = await importOnce('./data_table.js'); // the shared table (#7743)
 
 export async function updateTokenUsage(sessionId) {
     const el = document.getElementById('session-token-usage');
@@ -110,18 +109,19 @@ export async function showTeamTokenUsage(boardName) {
 
     // Render summary + agent table
     const executionTimeRow = usageData?.totals?.execution_time_sec > 0
-        ? `<span class="info-token-label">Execution Time</span><span class="info-token-value">${formatDuration(usageData.totals.execution_time_sec)}</span>`
+        ? `<div><span class="info-token-label">Execution Time</span><span class="info-token-value">${formatDuration(usageData.totals.execution_time_sec)}</span></div>`
         : '';
     let html = `<div class="info-token-grid" style="margin-bottom:16px">
-        <span class="info-token-label">Input</span><span class="info-token-value">${formatTokens(totalIn)}</span>
-        <span class="info-token-label">Output</span><span class="info-token-value">${formatTokens(totalOut)}</span>
-        <span class="info-token-label">Cache Read</span><span class="info-token-value">${formatTokens(totalCacheR)}</span>
-        <span class="info-token-label">Cache Write</span><span class="info-token-value">${formatTokens(totalCacheW)}</span>
-        <span class="info-token-label">Requests</span><span class="info-token-value">${totalReqs}</span>
-        <span class="info-token-label">Cost</span><span class="info-token-value">${_formatCost(totalCost)}</span>
+        <div><span class="info-token-label">Input</span><span class="info-token-value">${formatTokens(totalIn)}</span></div>
+        <div><span class="info-token-label">Output</span><span class="info-token-value">${formatTokens(totalOut)}</span></div>
+        <div><span class="info-token-label">Cache Read</span><span class="info-token-value">${formatTokens(totalCacheR)}</span></div>
+        <div><span class="info-token-label">Cache Write</span><span class="info-token-value">${formatTokens(totalCacheW)}</span></div>
+        <div><span class="info-token-label">Requests</span><span class="info-token-value">${totalReqs}</span></div>
+        <div><span class="info-token-label">Cost</span><span class="info-token-value">${_formatCost(totalCost)}</span></div>
         ${executionTimeRow}
     </div>`;
 
+    const { dataTable, tableState } = await importOnce('./data_table.js'); // the shared table (#7743), loaded when this dialog is opened
     // The members' table is data_table, with By agent's column order (Agent, Cost, then the tokens) and its K/M/B figures; the dearest member first.
     content.innerHTML = html;
     const num = (key, label, extra) => ({ key, label, numeric: true, sort: 'number', firstDir: 'desc', sortValue: r => r[key] || 0, cell: r => formatTokens(r[key] || 0), ...extra });
