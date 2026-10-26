@@ -25,7 +25,9 @@ const VIEWS = ['provider', 'model', 'thinking', 'team', 'agent', 'branch', 'call
         return { sideways: box.scrollWidth > box.clientWidth + 1, pageSw: document.documentElement.scrollWidth > innerWidth + 1, display: getComputedStyle(t).display, head: getComputedStyle(t.querySelector('thead')).display, roles: [t.getAttribute('role'), row && row.getAttribute('role'), cells[0] && cells[0].getAttribute('role')],
             labels: cells.map(c => c.dataset.label || ''), firstFull: cells[0] ? Math.round(cells[0].getBoundingClientRect().width) : 0, rowW: row ? Math.round(row.getBoundingClientRect().width) : 0, tops: cells.map(top),
             first: cells.filter(c => c.classList.contains('dt-fold-first')).map(c => c.dataset.label), before: [...new Set(cells.filter(c => !c.classList.contains('dt-tone-primary')).map(c => getComputedStyle(c, '::before').content))],
-            sortBar: !!(bar && bar.getClientRects().length), sortKey: bar && bar.querySelector('select') ? bar.querySelector('select').value : '', rows: t.querySelectorAll('tbody tr').length }; })()`);
+            sortBar: !!(bar && bar.getClientRects().length), sortKey: bar && bar.querySelector('select') ? bar.querySelector('select').value : '',
+            strong: cells.filter(c => c.classList.contains('dt-fold-key')).map(c => { const st = getComputedStyle(c), k = parseFloat(getComputedStyle(document.documentElement).fontSize) / 16; return [c.dataset.label, Math.round(parseFloat(st.fontSize) / k) + 'px', st.fontWeight]; }),
+            rest: [...new Set(cells.filter(c => !c.classList.contains('dt-fold-key') && !c.classList.contains('dt-tone-primary') && c.dataset.label).map(c => { const st = getComputedStyle(c), k = parseFloat(getComputedStyle(document.documentElement).fontSize) / 16; return Math.round(parseFloat(st.fontSize) / k) + 'px,' + st.fontWeight; }))], rows: t.querySelectorAll('tbody tr').length }; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: DATA_WORLD });
         for (const [label, w, h, mobile, big] of [['390 px', 390, 844, true, false], ['1280 px at 200% text', 1280, 800, false, true]]) {
@@ -38,6 +40,7 @@ const VIEWS = ['provider', 'model', 'thinking', 'team', 'agent', 'branch', 'call
                 assert.deepEqual(p.roles, ['table', 'row', 'cell'], 'the roles stay: ' + JSON.stringify(p)); assert.ok(p.labels.slice(1).every(Boolean), 'every cell has its column name: ' + JSON.stringify(p.labels));
                 assert.ok(p.firstFull >= p.rowW - 2 * 12 - 2, 'the name takes the row (inside its padding): ' + JSON.stringify(p)); assert.ok(p.tops[1] > p.tops[0], 'the figures are under the name: ' + JSON.stringify(p));
                 assert.ok(p.first.length >= 1 && p.before.every(c => c.length > 2), 'Cost or Calls first, labels drawn: ' + JSON.stringify(p));
+                assert.deepEqual([p.strong.length, p.strong[0] && p.strong[0].slice(1)], [1, ['13px', '600']], 'one stronger figure, the sort key\'s, 13/600: ' + JSON.stringify(p.strong)); assert.deepEqual(p.rest, ['12px,400'], 'the other lines 12/400: ' + JSON.stringify(p.rest));
                 if (key !== 'calls') assert.ok(p.sortBar, 'a Sort by select is above it: ' + JSON.stringify(p));
             });
             await S.run(`${label}: Sort by changes the order, and the reverse button reverses it`, async () => {

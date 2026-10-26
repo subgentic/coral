@@ -4,7 +4,7 @@
  *   dataTable({ label, columns, rows, rowKey, open, current, state, onSort, layout, fold, foldAt, sortBar, bare, empty, footer, selectable, rowName, quiet, scroll }) -> { el, bar, selectButton, selection(), clear(), state }
  *   selectable = { contextKey, onChange(keys), actions: [{ label, run(rows, keys, value), danger, confirm, choose: { label, options() -> [{ value, label }] } }] }: a danger action confirms in the bar, a choose action asks for its value there.
  *   Column = { key, label, field | cell(row, ctx), primary, tone: 'primary'|'secondary'|'tertiary', width: 'grow'|'content'|'<n>rem', nowrap, align: 'start'|'end', numeric,
- *              sort: true|'number'|'date'|fn(a, b), sortValue(row), firstDir: 'asc'|'desc', foldFirst, line: 0|1|2, when(row), subtitle(row), title(row), filter: { label, active(), open(button) } }
+ *              sort: true|'number'|'date'|fn(a, b), sortValue(row), firstDir: 'asc'|'desc', foldFirst, narrowHide, line: 0|1|2, when(row), subtitle(row), title(row), filter: { label, active(), open(button) } }
  *   cell types: chip(word, cls), avatar(name), personButton(name, label), tag(text), timeCell(stamp), link(text, run), primaryButton(text, label)
  *   state: tableState(), kept by the caller across redraws: the sort, and the selection (a set of row keys, kept while the rows are filtered or paged, cleared when selectable.contextKey changes).
  * Folded (the table's own box narrower than foldAt rem, 40 by default; also at 200% text): fold 'column' is the two-line row (line 1 and line 2 cells), fold 'labeled' is the name, then "label value" lines
@@ -122,6 +122,7 @@ export function dataTable(cfg) {
             const th = el('th', `dt-th${c.numeric || c.align === 'end' ? ' dt-end' : ''}`); th.scope = 'col'; th.setAttribute('role', 'columnheader'); th.dataset.key = c.key;
             if (c.width && /rem$/.test(c.width)) th.style.width = c.width;
             if (c.width === 'grow') th.classList.add('dt-grow');
+            if (c.narrowHide) th.classList.add('dt-narrow-hide');
             if (c.sort) {
                 const on = st.sort && st.sort.key === c.key;
                 th.setAttribute('aria-sort', on ? (st.sort.dir === 'desc' ? 'descending' : 'ascending') : 'none');
@@ -169,7 +170,9 @@ export function dataTable(cfg) {
         td.setAttribute('role', 'cell'); td.dataset.label = c.label; td.dataset.key = c.key;
         td.classList.add(c.line === 1 ? 'dt-line-1' : c.line === 2 ? 'dt-line-2' : 'dt-line-0');
         if (c.when && !c.when(r)) td.classList.add('dt-when-off');
-        if (c.foldFirst) td.classList.add('dt-fold-first'); // folded 'labeled': this figure follows the name, ahead of the other "label value" lines
+        if (c.foldFirst) td.classList.add('dt-fold-first');
+        if (st.sort && st.sort.key === c.key) td.classList.add('dt-fold-key'); // folded 'labeled': the figure the rows are sorted by is the one stronger line (#7738)
+        if (c.narrowHide) td.classList.add('dt-narrow-hide'); // folded 'labeled': this figure follows the name, ahead of the other "label value" lines
         let v = c.cell ? c.cell(r, ctx) : (c.field != null ? r[c.field] : '');
         if (typeof v === 'string' && c.primary) v = primaryButton(v, `Open ${v}`);
         if (v instanceof Node) td.append(v); else td.textContent = v == null ? '' : String(v);
