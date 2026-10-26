@@ -6,6 +6,7 @@ import { loadLiveSessions } from './api.js';
 import { loadBoardProjects } from './message_board.js';
 import { recordRecentDir, getRecentDirs } from './browser.js';
 import { teamForm, showTeamWorktree } from './team_form.js';
+import { agentNameForm, agentStatus } from './agent_form.js';
 import { serverFetch, boardFetch, identityKey, LOCAL_SERVER } from './server_base.js';
 const { launch } = await importOnce('./launch_state.js');
 const { _acfServer, _effectiveServer, _settingsFor } = await importOnce('./launch_models.js');
@@ -241,9 +242,9 @@ function saveTeamAgentFromModal() {
     const config = getAgentConfig('launch-agent-acf');
     config.name = (document.getElementById('launch-agent-name-input')?.value || '').trim() || config.name; // the role is the persona step's name field
     if (!config.name) {
-        showToast('A member needs a role', true);
         window._launchStage?.('persona');
-        markFieldInvalid(document.getElementById('launch-agent-name-input'), 'A member needs a role');
+        agentNameForm().validate({ focus: true }); // the role is flagged under its field, and one red line above the buttons says it
+        agentStatus('A member needs a role');
         return;
     }
 

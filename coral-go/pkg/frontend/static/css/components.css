@@ -4181,7 +4181,7 @@ body:has(#nav-tab-hub-inbox.active) #saved-btn .saved-count { display: none; }
 .launch-wizard .acf-persona-page { padding: 0; }
 .launch-wizard .settings-panes { padding: 20px 24px; overflow: auto; }
 #launch-modal[data-agent-stage="persona"] .launch-server-row, #launch-modal[data-agent-stage="agent"] .launch-server-row { display: none !important; } /* the machine is a step 1 choice; its row is set by style where it is drawn (launch_dialog.js) */
-.launch-field-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; margin: 0 0 6px; font-size: .875rem; font-weight: 600; }
+.launch-field-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; margin: 0 0 6px; font-size: var(--fs-md); font-weight: 500; } /* the field label style of every form: 13/500 (UI/UX on #8401) */
 .launch-field-head label, .launch-field-head span:first-child { margin: 0; flex: none; } /* the label stays on one line; "optional" wraps under it at 200% text (UI/UX, #7407) */
 .sd-modal-content.restart-wizard-content :is(.settings-pane, .acf-persona-page) textarea.acf-prompt { font-family: inherit; font-size: var(--fs-md, .875rem); }
 .sd-modal-content.restart-wizard-content .acf-persona-page textarea.acf-prompt { min-height: 16rem; resize: vertical; } /* the prompt is the person's writing: the product font, not mono */
@@ -4323,8 +4323,8 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .launch-recap.launch-recap-warn { color: var(--warning-text, var(--warning)); }
 .launch-recap.launch-recap-error { color: var(--sv-error-color); }
 #team-recap:empty { display: none; }
-#launch-folder-status:empty { display: none; }
-#launch-folder-status { border-top: 0; } /* the buttons' own rule is the one divider above the red line */
+#launch-agent-status:empty { display: none; }
+#launch-agent-status { border-top: 0; } /* the buttons' own rule is the one divider above the red line */
 .team-template-row { display: flex; align-items: flex-end; gap: 8px; margin: 0 0 14px; }
 .team-template-pick { flex: 1; min-width: 0; }
 .team-template-pick select { width: 100%; }

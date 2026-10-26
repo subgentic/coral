@@ -95,7 +95,8 @@ const BASE = require('./test_base').BASE;
         assert.equal(await ev(`document.getElementById('launch-step-agent').dataset.stage`), 'persona', 'a new member opens on its role (the persona step, #7861)');
         assert.equal(await ev(`getComputedStyle(document.getElementById('launch-step-team')).display`), 'none', 'the team form is behind it, not closed');
         await ev(`window.saveTeamAgentFromModal(); true`);
-        assert.ok((await toasts()).some(t => /A member needs a role/.test(t)));
+        // said where the role is (the form's error under the field) and on the one red line above the buttons, not as a toast
+        assert.deepEqual(await ev(`(() => { const f = document.getElementById('launch-agent-name-input'); const e = f.closest('.sv-row').querySelector('.sv-error'); return [e.hidden ? '' : e.textContent, document.getElementById('launch-agent-status').textContent, document.activeElement === f]; })()`), ['A member needs a role', 'A member needs a role', true]);
         await ev(`{ const n = document.getElementById('launch-agent-name-input'); n.value = 'Scribe'; n.dispatchEvent(new Event('input', { bubbles: true })); } true`);
         await ev(`window.saveTeamAgentFromModal(); true`);
         assert.equal((await teamRows()).includes('Scribe'), true, 'added'); assert.equal(await ev(`(document.getElementById('launch-modal').hasAttribute('data-member') ? 'flex' : 'none')`), 'none');

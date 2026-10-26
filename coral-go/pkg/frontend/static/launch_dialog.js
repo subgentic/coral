@@ -271,8 +271,8 @@ function _syncLaunchBlock() {
     go.disabled = !!why;
     // The reason Launch is off is its description (#7391): the missing CLI's line. A missing folder never turns a button off: pressing Next says it where the folder is (one red line above the buttons, the error under the field).
     const noDir = !launch.member && !(document.getElementById('launch-dir')?.value || '').trim();
-    const status = document.getElementById('launch-folder-status');
-    if (status) status.textContent = _folderPressed && noDir ? 'Choose a folder' : '';
+    const status = document.getElementById('launch-agent-status');
+    if (status && (_folderPressed || status.textContent === 'Choose a folder')) status.textContent = _folderPressed && noDir ? 'Choose a folder' : ''; // the folder's line only: a member's role line is said by the member's own save
     for (const b of [go, next]) {
         if (!b) continue;
         b.removeAttribute('aria-disabled');
