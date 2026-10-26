@@ -12,7 +12,8 @@
 
 import { copyText } from './utils.js';
 import { importOnce } from './import_once.js';
-const { morePermsWords, operatorLine, spellCode } = await importOnce('./cloud_words.js');
+const { morePermsWords, operatorLine, spellCode, OFF_TEXT, LEVEL_NOW, HUB_ACCESS_URL, EXPIRED_TEXT, codeExpired, autoAcceptChangedText, severalAccountsText } = await importOnce('./cloud_words.js');
+export const { enrolledRetrying, rekeyText, describe } = await importOnce('./cloud_words.js');
 const { HUB_RELAUNCH_ON, HUB_RELAUNCH_OFF, HUB_RELAUNCH_WINDOWS } = await importOnce('./update_words.js'); // a lazy module loads the others through importOnce, so a failed load is retried
 
 const STATUS_URL = '/api/cloud/status';
@@ -32,12 +33,6 @@ const HUB_OPERATOR_URL = '/api/system/hub-operator';
  const START_COMMAND = 'coral --cloud-url https://app.coralhub.dev';
 // In Settings the sentence says it once and the row holds the whole sequence, which Copy takes (UI audit #5589); the connect dialog keeps the sentence the command line says too (#3285).
  const OFF_SHORT = "Start Coral with the Hub address, then connect:";
-// Said when this server has no hub (a dev build, or --cloud-url off); the CLI says the same (#3285).
- const OFF_TEXT = "Coral Hub isn't configured on this server. Start Coral with --cloud-url https://app.coralhub.dev (or CORAL_CLOUD_URL=https://app.coralhub.dev), then run: coral cloud connect";
-
-// What the Hub may do at each level, as the sentence after "may now:" said once a change is saved.
-const LEVEL_NOW = { view: 'look only', interact: 'send and answer', launch: 'start agents' };
-
 const ENROLLED = ['connecting', 'connected', 'retrying', 'revoked', 'key_unreadable', 'upgrade_required'];
 const LIVE = ['enrolling', 'connecting', 'retrying'];
 
@@ -49,77 +44,6 @@ function post(method, url, body) {
     });
 }
 
-const cleanLabel = v => String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069]/g, '').trim().slice(0, 80); // display text: no control or bidi characters, bounded
-
-/** "Turned on from Coral Hub by <user>, <time>" / "Turned off on this computer, <time>" from the status; '' when it was never changed. The state is the switch's own: the last change set it. */
-function autoAcceptChangedText(st) {
-    const c = st && st.allow_hub_auto_accept_changed;
-    if (!c || typeof c !== 'object' || (c.by !== 'hub' && c.by !== 'local')) return '';
-    const d = typeof c.at === 'string' ? new Date(c.at) : null;
-    const at = d && !Number.isNaN(d.getTime()) ? d.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '';
-    const what = st.allow_hub_auto_accept === false ? 'Turned off' : 'Turned on';
-    const who = c.by === 'hub' ? `from Coral Hub by ${cleanLabel(c.user) || 'a Coral Hub user'}` : 'on this computer';
-    return `${what} ${who}${at ? ', ' + at : ''}`;
-}
-
-/** Enrolled, but the tunnel is down and retrying (the hub approved the code, then was
- *  unreachable): the server is connected to the hub as far as the user is concerned. A
- *  'retrying' without an enrollment (no server id or label) is still not connected. */
-export function enrolledRetrying(st) {
-    return !!st && st.state === 'retrying' && !!(st.server_id || st.label);
-}
-
-/** The secret key that seals the Hub token and the remote servers' API keys is refused (#3698):
- *  what a re-key discards, said before the Operator confirms. */
-export function rekeyText(sk) {
-    const lost = [];
-    if (sk.hub_url) lost.push('the Coral Hub connection to ' + sk.hub_url + ' (connect again afterwards, and remove this computer in Coral Hub)');
-    if (sk.remote_server_keys) lost.push(sk.remote_server_keys === 1 ? "1 remote server's API key (enter it again)" : sk.remote_server_keys + " remote servers' API keys (enter them again)");
-    const why = sk.exposed ? 'Other accounts on this computer could read the secret key file, so what it protects must be treated as known.'
-        : "Coral can't use its secret key file" + (sk.message ? ' (' + sk.message + ')' : '') + '.';
-    return why + ' Replacing it makes a new key and discards ' + (lost.length ? lost.join(' and ') : 'nothing stored yet') + '.';
-}
-
-export function describe(st) {
-    switch (st.state) {
-        case 'off':
-            return OFF_TEXT;
-        case 'idle':
-            if (codeExpired(st)) return EXPIRED_TEXT + HUB_ACCESS_URL;
-            // The two failures of starting a connection are sentences for a person (#5962); the seconds until the next try are counted down beside them (syncRetry), not baked into the words.
-            if (st.last_error_code === 'hub_unreachable') return 'Coral could not reach Coral Hub. Check your connection and try again.';
-            if (st.last_error_code === 'rate_limited') return 'Coral Hub is busy. Try again in a moment.';
-            return st.last_error || ('Ready to connect to ' + st.hub_url + '. Nothing is sent until you connect.');
-        case 'enrolling':
-            return 'Waiting for you to approve…';
-        case 'connecting':
-            return 'Connecting' + (st.label ? ' as "' + st.label + '"' : '') + '…';
-        case 'connected':
-            return 'Connected to Coral Hub' + (st.label ? ' as ' + st.label : '') + '.';
-        case 'retrying':
-            if (enrolledRetrying(st)) return 'Connected to Coral Hub' + (st.label ? ' as ' + st.label : '') + ' (reconnecting…). Coral keeps working locally meanwhile.';
-            return 'Not connected right now (' + (st.last_error || 'retrying') + '). Coral keeps working locally and will reconnect on its own.';
-        case 'revoked':
-            return 'The hub revoked this server, so Coral stopped retrying. Connect again to re-enroll.';
-        case 'key_unreadable':
-            return st.last_error;
-        case 'upgrade_required':
-            return st.last_error;
-        default:
-            return st.state;
-    }
-}
-
-// Coral Hub never says why a code went unapproved (that would leak who is in the beta), so an
-// expired code may mean the user could not sign in at all: say so, with where to ask for access.
- const HUB_ACCESS_URL = 'https://coralhub.dev/hub.html';
- const EXPIRED_TEXT = "The code expired before it was approved. If you couldn't sign in at app.coralhub.dev, Coral Hub is in closed beta: request access at ";
-
-/** An idle status after a code expired (last_error_code, #3285). */
- function codeExpired(st) {
-    return st.state === 'idle' && st.last_error_code === 'code_expired';
-}
-
 /** Write a text only when it changed: the poll redraws the panel every few seconds, and rewriting an element's text throws away a selection inside it (the code a person is selecting, #6323). */
 function put(el, v) { if (el && el.textContent !== v) el.textContent = v; }
 
@@ -128,14 +52,6 @@ function safeHref(u) {
         const p = new URL(u);
         return (p.protocol === 'https:' || p.protocol === 'http:') ? p.href : '';
     } catch { return ''; }
-}
-
-// The refusal when more than one Coral Hub account was named as the owner in the last hour (#6186), with the time the computer will accept Confirm owner again (retry_after, in seconds).
-function severalAccountsText(retryAfter) {
-    const base = 'More than one Coral Hub account tried this; check who has access, then try again';
-    if (!Number.isFinite(retryAfter) || retryAfter <= 0) return base + '.';
-    const at = new Date(Date.now() + retryAfter * 1000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-    return `${base} after ${at}.`;
 }
 
 /** One connect panel: `root` holds the data-cloud parts; onState(st) follows every status. */

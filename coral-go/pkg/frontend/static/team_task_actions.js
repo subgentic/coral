@@ -13,12 +13,13 @@ const { el } = await importOnce('./team_table.js'); // lazy: its failure is retr
 const { readOpenGoals, readGoal, fillGoalSelect, showGoalInvalid, chooseGoalLabel } = await importOnce('./task_goals.js');
 const { _renderDepPicker, _getSelectedDeps } = await importOnce('./task_dep_picker.js');
 const { _taskRequiredOutputs, nudgeBoardTask, remindBoardTask, stopBoardTaskReminder } = await importOnce('./task_reminders.js');
-const { _reviewRequested, loadBoardTasks } = await importOnce('./task_list.js');
+const { loadBoardTasks } = await importOnce('./task_list.js');
+const { reviewRequested } = await importOnce('./task_list_data.js');
 
 const btn = (cls, text, onClick) => { const b = el('button', cls, text); b.type = 'button'; if (onClick) b.addEventListener('click', onClick); return b; };
 
 /** A task that can still be changed: not waiting on a review, and open. */
-export const isOpen = (t) => !_reviewRequested(t) && ['pending', 'in_progress', 'blocked', 'draft'].includes(t.status);
+export const isOpen = (t) => !reviewRequested(t) && ['pending', 'in_progress', 'blocked', 'draft'].includes(t.status);
 
 async function failure(resp) { const data = await resp.json().catch(() => ({})); return new Error(data.error || `HTTP ${resp.status}`); }
 
