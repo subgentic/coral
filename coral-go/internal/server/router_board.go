@@ -193,6 +193,7 @@ func (s *Server) registerBoardTaskRoutes(r chi.Router, boardHandler *routes.Boar
 	r.Get("/api/board/{project}/tasks/{taskID}", boardHandler.GetTask)
 	r.Get("/api/board/{project}/tasks/{taskID}/artifact-content", boardHandler.TeamArtifactContent)
 	r.Get("/api/board/{project}/artifacts", boardHandler.ListTeamArtifacts)
+	r.Put("/api/board/{project}/artifacts/{id}/tags", boardHandler.SetArtifactTags) // the Operator's and the team owner's (#8583); no tunnel row
 	r.Post("/api/board/{project}/tasks/{taskID}/complete", boardHandler.CompleteTaskByID)
 	r.Post("/api/board/{project}/tasks/{taskID}/submit-review", boardHandler.SubmitCompletionReview)
 	r.Post("/api/board/{project}/tasks/{taskID}/release-review", boardHandler.ReleaseCompletionReview)

@@ -223,6 +223,15 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 	}
 	_ = fresh
 	h.noteOffBooksUpload(r.Context(), taskID, hexID) // an agent with no task in progress: a line of the orchestrator's check (#7793)
+	var tags []string
+	if asked := board.CleanArtifactTags(r.URL.Query()["tag"]); len(asked) > 0 { // --tag (#8583): the team's tags of this object, added to what it already has
+		if teamBoard, _, _ := uploaderOf(sid); teamBoard != "" && h.bs != nil {
+			var terr error
+			if tags, terr = h.bs.AddArtifactTags(r.Context(), teamBoard, hexID, asked); terr != nil {
+				slog.Warn("[artifacts] the tags of an upload were not recorded", "digest", hexID, "error", terr)
+			}
+		}
+	}
 	// The name and type viewers get: the first upload's, when these bytes were stored before.
 	reply := map[string]any{
 		"uri":        "coral://artifacts/" + hexID,
@@ -235,6 +244,9 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 	}
 	if taskID > 0 {
 		reply["task_id"] = taskID // the task the upload is linked to (#7739)
+	}
+	if len(tags) > 0 {
+		reply["tags"] = tags
 	}
 	if plan == nil {
 		// Bytes that are already a version of their own board's series say so (#6495): a script that uploaded v1 again needs not read the series back. Only the uploading board's own series

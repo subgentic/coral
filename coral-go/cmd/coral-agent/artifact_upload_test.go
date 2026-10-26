@@ -239,3 +239,48 @@ func TestArtifactUploadTaskOptionsOnTheCommandLine(t *testing.T) {
 		t.Errorf("headers %q", gotHeaders)
 	}
 }
+
+// #8583: --tag is repeatable and each word travels as a tag parameter of the upload; the server's reply (with the normalised tags) is printed as it came.
+func TestUploadArtifactSendsEachTagAsAParameter(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "note.txt")
+	if err := os.WriteFile(file, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got = r.URL.Query()["tag"]
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"uri":"coral://artifacts/` + strings.Repeat("a", 64) + `","tags":["for review","internal"]}`))
+	}))
+	defer srv.Close()
+	var out, errOut bytes.Buffer
+	if err := uploadArtifactTags(srv.URL, file, "note.txt", "text/plain", "sess-1", "", "", []string{"for review", "internal", "q4&x=1"}, &out, &errOut); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(got, "|") != "for review|internal|q4&x=1" {
+		t.Errorf("the server saw tags %q", got)
+	}
+	if !strings.Contains(out.String(), `"tags":["for review","internal"]`) {
+		t.Errorf("the reply is printed as it came: %q", out.String())
+	}
+	got = nil
+	if err := uploadArtifact(srv.URL, file, "note.txt", "text/plain", "sess-1", "", "", &out, &errOut); err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 0 {
+		t.Errorf("no --tag: no tag parameter, saw %q", got)
+	}
+}
+
+func TestSplitOptionsKeepsEveryValueOfARepeatedOption(t *testing.T) {
+	opts, err := splitOptions([]string{"report.md", "--tag", "for review", "--tag=internal", "--name", "n", "-tag", "final"}, []string{"name", "tag"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(opts.All["tag"], "|") != "for review|internal|final" {
+		t.Errorf("all the tags, in order: %q", opts.All["tag"])
+	}
+	if opts.Values["tag"] != "final" || opts.Values["name"] != "n" || len(opts.Positional) != 1 {
+		t.Errorf("the others are as before: %+v", opts)
+	}
+}

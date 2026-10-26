@@ -79,6 +79,7 @@ func (h *BoardHandler) vetTaskArtifacts(r *http.Request, project string, artifac
 			slog.Warn("task artifact link not verified: kept as a plain link", "board", project, "artifact", a.Name, "id", id, "caller", actor.Kind)
 		}
 	}
+	h.applyManifestTags(r.Context(), project, artifacts)
 	return unverified
 }
 

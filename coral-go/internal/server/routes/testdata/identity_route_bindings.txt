@@ -220,6 +220,7 @@ POST /api/sessions/live/{sessionID}/sleep | unbound | operator-only
 POST /api/sessions/live/{sessionID}/unarchive | unbound | operator-only
 POST /api/sessions/live/{sessionID}/wake | unbound | operator-only
 PUT /api/agent/ui/{id} | token-bound
+PUT /api/board/{project}/artifacts/{id}/tags | board-claims | operator-only
 PUT /api/board/{project}/settings | board-claims +token-session | operator-only
 PUT /api/board/{project}/tasks/{taskID}/goal | board-claims
 PUT /api/board/{project}/working-mode | board-claims | operator-only

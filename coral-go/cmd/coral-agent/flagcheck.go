@@ -23,6 +23,7 @@ func checkTaskFlags(sub string, args []string) error {
 type optionArgs struct {
 	Positional []string
 	Values     map[string]string
+	All        map[string][]string // every value of an option given more than once, in order (Values keeps the last)
 	Bools      map[string]bool
 }
 
@@ -38,7 +39,7 @@ func splitOptions(args []string, values, bools []string) (optionArgs, error) {
 	for _, n := range bools {
 		known[n] = false
 	}
-	out := optionArgs{Values: map[string]string{}, Bools: map[string]bool{}}
+	out := optionArgs{Values: map[string]string{}, All: map[string][]string{}, Bools: map[string]bool{}}
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		if a == "--" {
@@ -61,11 +62,13 @@ func splitOptions(args []string, values, bools []string) (optionArgs, error) {
 			out.Bools[name] = true
 		case inline:
 			out.Values[name] = value
+			out.All[name] = append(out.All[name], value)
 		case i+1 >= len(args):
 			return out, fmt.Errorf("--%s needs a value", name)
 		default:
 			i++
 			out.Values[name] = args[i]
+			out.All[name] = append(out.All[name], args[i])
 		}
 	}
 	return out, nil

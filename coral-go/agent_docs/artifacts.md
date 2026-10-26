@@ -27,6 +27,8 @@ Publish with Coral, not on claude.ai: if you publish an artifact on claude.ai (a
 
    That is enough to share it: the upload is listed under your name in Artifacts and Team Artifacts.
 
+   Tag a file "for review" when a person must look at it before the task can close; tag logs and scratch files "internal"; do not invent other tags unless the task asks for one. Tag it when you upload (`coral-agent artifact upload <file> --tag "for review" --tag internal`, repeatable, at most 5, lowercase words of at most 24 characters) or in a task result's artifacts manifest (`"tags": ["for review"]` on a row that links the stored file). The team's Artifacts tab filters by tag (`GET /api/board/{project}/artifacts?tag=for+review`, repeatable, any of); only the Operator changes a file's tags afterwards (`PUT /api/board/{project}/artifacts/{id}/tags`).
+
    An upload is linked to the task you have in progress: the reply carries `task_id`, `coral-agent` prints `Linked to task #N`, and the task's page lists it. `--task N` links it to another task assigned to you instead, `--no-task` to none; a task that is not yours is refused and nothing is stored.
 
 2. Optional: attach it to a task result (so it carries the task's number and title). Write a manifest and complete the task with it:

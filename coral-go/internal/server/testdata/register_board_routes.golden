@@ -105,6 +105,7 @@ POST /api/cloud/cross-team-links | (*BoardHandler).PostCrossTeamLinks-fm
 POST /api/notifications | (*NotificationHandler).Create-fm
 POST /api/tasks/run | (*TasksHandler).SubmitTask-fm
 POST /api/tasks/runs/{runID}/kill | (*TasksHandler).KillTask-fm
+PUT /api/board/{project}/artifacts/{id}/tags | (*BoardHandler).SetArtifactTags-fm
 PUT /api/board/{project}/settings | (*BoardHandler).UpdateBoardSettings-fm
 PUT /api/board/{project}/tasks/{taskID}/goal | (*BoardHandler).SetTaskGoal-fm
 PUT /api/board/{project}/working-mode | (*BoardHandler).SetWorkingMode-fm

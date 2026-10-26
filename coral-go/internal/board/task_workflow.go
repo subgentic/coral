@@ -17,21 +17,23 @@ import (
 const DefaultTaskWorkflowInstructions = `Use your judgment to accomplish the task, considering its requirements and upstream results. Use task detail for context and dependency results. Complete with --message for results and --outcome failed for unsuccessful work. When outputs are required, use --artifacts manifest.json with inline content or durable links; upload shared files with coral-agent artifact upload <file>.`
 
 type TaskArtifact struct {
-	Name         string `json:"name"`
-	URI          string `json:"uri,omitempty"`
-	Content      string `json:"content,omitempty"`
-	MediaType    string `json:"media_type,omitempty"`
-	Revision     string `json:"revision,omitempty"`
-	Digest       string `json:"digest,omitempty"`
-	Kind         string `json:"kind,omitempty"`
-	Command      string `json:"command,omitempty"`
-	Runner       string `json:"runner,omitempty"`
-	OutputDigest string `json:"output_digest,omitempty"`
-	StartedAt    string `json:"started_at,omitempty"`
-	FinishedAt   string `json:"finished_at,omitempty"`
-	Branch       string `json:"branch,omitempty"`
-	Remote       string `json:"remote,omitempty"`
-	Landed       bool   `json:"landed,omitempty"`
+	Name      string `json:"name"`
+	URI       string `json:"uri,omitempty"`
+	Content   string `json:"content,omitempty"`
+	MediaType string `json:"media_type,omitempty"`
+	Revision  string `json:"revision,omitempty"`
+	Digest    string `json:"digest,omitempty"`
+	Kind      string `json:"kind,omitempty"`
+	// Tags: the tags an agent asks for on a stored object the result links (#8583). They are applied to the team's tags of that object when the result is recorded and are not kept in the row.
+	Tags         []string `json:"tags,omitempty"`
+	Command      string   `json:"command,omitempty"`
+	Runner       string   `json:"runner,omitempty"`
+	OutputDigest string   `json:"output_digest,omitempty"`
+	StartedAt    string   `json:"started_at,omitempty"`
+	FinishedAt   string   `json:"finished_at,omitempty"`
+	Branch       string   `json:"branch,omitempty"`
+	Remote       string   `json:"remote,omitempty"`
+	Landed       bool     `json:"landed,omitempty"`
 	// Seq and AttachedBy are the server's (#5689): the order rows were recorded in on a task, and who recorded each. A value a
 	// client sends is replaced (stampArtifacts), so a patch row's author cannot be forged.
 	Seq        int    `json:"seq,omitempty"`

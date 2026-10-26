@@ -234,6 +234,7 @@ func (s *Store) deleteProject(ctx context.Context, project string, onlyIfUnused 
 		{"DELETE FROM board_goal_requests_out WHERE board_id = ? OR (to_server = '' AND to_board = ?)", 2},
 		{"DELETE FROM board_asks WHERE project = ?", 1},
 		{"DELETE FROM board_replies WHERE project = ?", 1},
+		{"DELETE FROM artifact_tags WHERE board_id = ?", 1}, // a board made again under the name inherits none of its tags
 		{"DELETE FROM board_messages WHERE project = ?", 1},
 		{"DELETE FROM board_subscribers WHERE project = ?", 1},
 		{"DELETE FROM board_reminders WHERE project = ?", 1},

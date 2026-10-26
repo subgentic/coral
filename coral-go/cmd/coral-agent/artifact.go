@@ -20,12 +20,12 @@ import (
 	"github.com/subgentic/coral/internal/mediatype"
 )
 
-const artifactUsageText = `Usage: coral-agent artifact upload <file> [--name NAME] [--media-type TYPE] [--new-version-of <link>] [--task N | --no-task]
+const artifactUsageText = `Usage: coral-agent artifact upload <file> [--name NAME] [--media-type TYPE] [--new-version-of <link>] [--task N | --no-task] [--tag WORD]...
        coral-agent artifact download <coral://artifacts/digest> [--output FILE] [--force]
        coral-agent artifact reply <coral://artifacts/digest> <comment-id> <text | ->
 Run coral-agent artifact upload --help, artifact download --help or artifact reply --help for one of them.`
 
-const artifactUploadUsageText = `Usage: coral-agent artifact upload <file> [--name NAME] [--media-type TYPE] [--new-version-of <link>] [--task N | --no-task]
+const artifactUploadUsageText = `Usage: coral-agent artifact upload <file> [--name NAME] [--media-type TYPE] [--new-version-of <link>] [--task N | --no-task] [--tag WORD]...
 
 An upload is linked to the task you have in progress (the reply says task_id, and this prints
 "Linked to task #N"); the task's page and the team's Artifacts tab then list it. --task N links it to
@@ -36,6 +36,10 @@ nothing is stored.
 coral://artifacts/<digest> link, or a series link coral://artifacts/series/<id>): the reply carries
 series_id, version and versions. Same bytes as the newest version add nothing (exit 0); same
 bytes as an older version are refused (non-zero), so nobody takes it for the newest.
+
+--tag puts a word on the file in your team's Artifacts tab (repeat it, at most 5 in all; lowercase letters, digits, spaces and
+hyphens, 24 characters at most): tag a file "for review" when a person must look at it before the task can close, and logs and
+scratch files "internal"; do not invent other tags unless the task asks for one. A word that is not a tag is left out.
 
 Upload long reports, logs, diffs and evidence instead of pasting them into posts.
 Link the returned coral://artifacts/<digest> in a short board post: a one-line
@@ -105,7 +109,7 @@ func cmdArtifact(args []string) {
 		fmt.Fprintln(os.Stderr, artifactUsageText)
 		clierr.Exit1()
 	}
-	opts, err := splitOptions(args[1:], []string{"name", "media-type", "new-version-of", "task"}, []string{"no-task"})
+	opts, err := splitOptions(args[1:], []string{"name", "media-type", "new-version-of", "task", "tag"}, []string{"no-task"})
 	if err != nil || len(opts.Positional) != 1 {
 		if err == nil {
 			err = fmt.Errorf("upload needs exactly one file")
@@ -134,7 +138,7 @@ func cmdArtifact(args []string) {
 	}
 	name = mediatype.EnsureExtension(name, file)
 	mediaType := mediatype.Resolve(opts.Values["media-type"], file, name)
-	if err := uploadArtifact(serverURL, file, name, mediaType, resolveSessionID(), opts.Values["new-version-of"], task, os.Stdout, os.Stderr); err != nil {
+	if err := uploadArtifactTags(serverURL, file, name, mediaType, resolveSessionID(), opts.Values["new-version-of"], task, opts.All["tag"], os.Stdout, os.Stderr); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		clierr.Exit1()
 	}
@@ -145,12 +149,17 @@ func cmdArtifact(args []string) {
 // an error and prints NO link, so a caller that misses the exit code can't take a refusal for a
 // success (#4004: the CLI used to exit 0 on a refused upload, so dead links were posted).
 func uploadArtifact(serverURL, file, name, mediaType, sid, newVersionOf, task string, stdout, stderr io.Writer) error {
+	return uploadArtifactTags(serverURL, file, name, mediaType, sid, newVersionOf, task, nil, stdout, stderr)
+}
+
+// uploadArtifactTags is uploadArtifact with the tags asked for the file (#8583), each sent as a tag parameter.
+func uploadArtifactTags(serverURL, file, name, mediaType, sid, newVersionOf, task string, tags []string, stdout, stderr io.Writer) error {
 	f, err := os.Open(file) // streamed to Coral, not read into memory (#3553)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
-	req, err := http.NewRequest(http.MethodPost, serverURL+"/api/agent/artifacts?session_id="+url.QueryEscape(sid), f)
+	req, err := http.NewRequest(http.MethodPost, serverURL+"/api/agent/artifacts?session_id="+url.QueryEscape(sid)+tagQuery(tags), f)
 	if err != nil {
 		return err
 	}
@@ -290,4 +299,13 @@ func replyToComment(serverURL, ref, commentID, text string, stdout io.Writer) er
 	}
 	fmt.Fprintf(stdout, "Reply posted (comment %d).\n", reply.ID)
 	return nil
+}
+
+// tagQuery is the tag parameters of an upload: "&tag=<word>" for each.
+func tagQuery(tags []string) string {
+	var b strings.Builder
+	for _, t := range tags {
+		b.WriteString("&tag=" + url.QueryEscape(t))
+	}
+	return b.String()
 }

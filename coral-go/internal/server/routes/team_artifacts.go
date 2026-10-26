@@ -40,17 +40,19 @@ type teamArtifact struct {
 	TaskID    int64  `json:"task_id"`
 	TaskTitle string `json:"task_title"`
 	// GoalID and GoalTitle: the goal of this board the task works toward (#8579); absent for a task with none, and for a row of no task.
-	GoalID         *int64 `json:"goal_id,omitempty"`
-	GoalTitle      string `json:"goal_title,omitempty"`
-	Source         string `json:"source"`
-	URI            string `json:"uri,omitempty"`
-	Digest         string `json:"digest,omitempty"`
-	Available      bool   `json:"available"`
-	Inline         bool   `json:"inline"`
-	ReferenceCount int    `json:"reference_count"`
-	PreviewURL     string `json:"preview_url,omitempty"`
-	DownloadURL    string `json:"download_url,omitempty"`
-	ContentURL     string `json:"content_url,omitempty"`
+	GoalID    *int64 `json:"goal_id,omitempty"`
+	GoalTitle string `json:"goal_title,omitempty"`
+	// Tags: the team's tags on this stored object (#8583), lowercase words, sorted; absent for none.
+	Tags           []string `json:"tags,omitempty"`
+	Source         string   `json:"source"`
+	URI            string   `json:"uri,omitempty"`
+	Digest         string   `json:"digest,omitempty"`
+	Available      bool     `json:"available"`
+	Inline         bool     `json:"inline"`
+	ReferenceCount int      `json:"reference_count"`
+	PreviewURL     string   `json:"preview_url,omitempty"`
+	DownloadURL    string   `json:"download_url,omitempty"`
+	ContentURL     string   `json:"content_url,omitempty"`
 	// SessionID/ProducedBy are the stored-ownership attribution (null when it
 	// cannot be established); see board.ArtifactProducer.
 	SessionID  *string `json:"session_id"`
@@ -169,6 +171,7 @@ func (h *BoardHandler) ListTeamArtifacts(w http.ResponseWriter, r *http.Request)
 		items = h.mergeCrossTeamRows(items, project)
 	}
 	h.linkUploadTasks(r.Context(), project, items)
+	h.attachArtifactTags(r.Context(), project, items)
 	items = filterReadable(r, h.coralDir, items) // an agent's list holds only what the one read check lets it read, so the totals and the cursor count nothing else (#5577)
 	if tq != nil {
 		h.queryTeamArtifacts(w, r, project, items, scanTruncated, limit, offset, sessionFilter, tq)

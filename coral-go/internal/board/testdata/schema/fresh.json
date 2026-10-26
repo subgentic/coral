@@ -1,6 +1,12 @@
 {
   "sqlite_master": [
     {
+      "name": "idx_artifact_tags_board_tag",
+      "sql": "CREATE INDEX idx_artifact_tags_board_tag ON artifact_tags(board_id, tag)",
+      "tbl_name": "artifact_tags",
+      "type": "index"
+    },
+    {
       "name": "idx_board_asks_project",
       "sql": "CREATE INDEX idx_board_asks_project ON board_asks(project, message_id)",
       "tbl_name": "board_asks",
@@ -193,6 +199,12 @@
       "type": "index"
     },
     {
+      "name": "sqlite_autoindex_artifact_tags_1",
+      "sql": null,
+      "tbl_name": "artifact_tags",
+      "type": "index"
+    },
+    {
       "name": "sqlite_autoindex_board_goal_meta_1",
       "sql": null,
       "tbl_name": "board_goal_meta",
@@ -299,6 +311,12 @@
       "sql": null,
       "tbl_name": "task_dependency_rules",
       "type": "index"
+    },
+    {
+      "name": "artifact_tags",
+      "sql": "CREATE TABLE artifact_tags (\n\t\t\tboard_id TEXT NOT NULL,\n\t\t\thex      TEXT NOT NULL,\n\t\t\ttag      TEXT NOT NULL,\n\t\t\tPRIMARY KEY (board_id, hex, tag)\n\t\t)",
+      "tbl_name": "artifact_tags",
+      "type": "table"
     },
     {
       "name": "board_asks",
@@ -602,6 +620,113 @@
     }
   ],
   "tables": {
+    "artifact_tags": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "board_id",
+          "notnull": 1,
+          "pk": 1,
+          "type": "TEXT"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "hex",
+          "notnull": 1,
+          "pk": 2,
+          "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "tag",
+          "notnull": 1,
+          "pk": 3,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "board_id",
+              "seqno": 0
+            },
+            {
+              "cid": 2,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "tag",
+              "seqno": 1
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 2
+            }
+          ],
+          "name": "idx_artifact_tags_board_tag",
+          "origin": "c",
+          "partial": 0,
+          "seq": 0,
+          "unique": 0
+        },
+        {
+          "columns": [
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "board_id",
+              "seqno": 0
+            },
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "hex",
+              "seqno": 1
+            },
+            {
+              "cid": 2,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "tag",
+              "seqno": 2
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 3
+            }
+          ],
+          "name": "sqlite_autoindex_artifact_tags_1",
+          "origin": "pk",
+          "partial": 0,
+          "seq": 1,
+          "unique": 1
+        }
+      ]
+    },
     "board_asks": {
       "columns": [
         {

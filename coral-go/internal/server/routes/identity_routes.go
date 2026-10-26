@@ -131,6 +131,7 @@ var operatorOnlyRoutes = map[string]string{
 	// #3554: pruning, and the keep mark that protects an artifact from it.
 	"POST /api/artifacts/retention/ack":               "acknowledge artifact retention",
 	"POST /api/artifacts/prune":                       "prune artifacts",
+	"PUT /api/board/{project}/artifacts/{id}/tags":    "change an artifact's tags",
 	"PUT /api/artifacts/{id}/keep":                    "keep an artifact",
 	"POST /api/artifacts/{id}/comments":               "comment on an artifact",
 	"PATCH /api/artifacts/{id}/comments/{cid}":        "edit a comment on an artifact",
