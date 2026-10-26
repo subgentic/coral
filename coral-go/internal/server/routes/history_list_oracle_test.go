@@ -323,7 +323,14 @@ func (h *HistoryHandler) listSessionsBefore4713(w http.ResponseWriter, r *http.R
 	agentSessions := make([]map[string]any, 0)
 	agentTotal := 0
 	if chatType == "all" || chatType == "agent" {
-		result, err := h.ss.ListSessionsPaged(r.Context(), params)
+		// The one change made to this copy since v1.4.92 (#8011): All chats read a single page of agent chats and cut the merged list into pages again, so
+		// every page after the first lost agent chats; the agent chats are now read to the end of the page asked for before the group chats are merged in.
+		// TestAllChatsPagesAddUpToTheTotal pins what it fixed; this copy has the same change so the rest of the list stays compared.
+		agentParams := params
+		if chatType == "all" {
+			agentParams.Page, agentParams.PageSize = 1, min(page*pageSize, maxMergedWindow)
+		}
+		result, err := h.ss.ListSessionsPaged(r.Context(), agentParams)
 		if err != nil {
 			errInternalServer(w, err.Error())
 			return
