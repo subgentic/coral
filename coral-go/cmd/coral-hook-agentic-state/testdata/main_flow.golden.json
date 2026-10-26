@@ -1,4 +1,148 @@
 {
+  "(d, e) a failed tool call: the error is cut at 300 bytes and an interrupt is said": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/events",
+        "body": {
+          "detail_json": {
+            "command": "sleep 99",
+            "error": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee...",
+            "failed": true,
+            "interrupted": true
+          },
+          "event_type": "tool_use",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Failed: Ran: sleep 99",
+          "tool_name": "Bash"
+        }
+      }
+    ]
+  },
+  "(f) a negative time is dropped": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/events",
+        "body": {
+          "detail_json": {
+            "command": "ls"
+          },
+          "event_type": "tool_use",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Ran: ls",
+          "tool_name": "Bash"
+        }
+      }
+    ]
+  },
+  "(f) the time a tool call took is kept from 0 up": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/events",
+        "body": {
+          "detail_json": {
+            "command": "ls"
+          },
+          "duration_ms": 0,
+          "event_type": "tool_use",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Ran: ls",
+          "tool_name": "Bash"
+        }
+      }
+    ]
+  },
+  "(g) a payload with stop_hook_active and no name is a stop": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/events",
+        "body": {
+          "event_type": "stop",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Agent stopped: unknown"
+        }
+      }
+    ]
+  },
+  "(h) a payload with only a message is a notification": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/events",
+        "body": {
+          "event_type": "notification",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Notification: Claude needs your attention"
+        }
+      }
+    ]
+  },
+  "(i) a notification message is cut at 100 bytes": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/events",
+        "body": {
+          "event_type": "notification",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Notification: mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm..."
+        }
+      }
+    ]
+  },
+  "(j) a prompt with a tool name is a tool call": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/events",
+        "body": {
+          "detail_json": {
+            "command": "ls"
+          },
+          "event_type": "tool_use",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Ran: ls",
+          "tool_name": "Bash"
+        }
+      }
+    ]
+  },
+  "(j) a prompt with stop_hook_active is a stop": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/events",
+        "body": {
+          "event_type": "stop",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Agent stopped: unknown"
+        }
+      }
+    ]
+  },
+  "(l) the event is named by event_name alone": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/turn-end",
+        "body": {
+          "stop_hook_active": false
+        }
+      },
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/events",
+        "body": {
+          "event_type": "stop",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Agent stopped: unknown"
+        }
+      }
+    ]
+  },
   "a payload over the size bound records nothing": {
     "requests": []
   },
