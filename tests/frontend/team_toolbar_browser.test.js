@@ -65,6 +65,8 @@ const TABS = [['Goals', { pills: true, filters: false, action: 'New goal' }], ['
                 const clicked = await ev(`(() => { const p = document.querySelector('[role=tabpanel]:not([hidden])'); const rows = [...p.querySelectorAll('tbody tr')]; const b = rows[rows.length - 1].querySelector('.goals-no-goal, button'); if (!b || !/no goal/.test(b.textContent)) return false; b.click(); return true; })()`);
                 assert.ok(clicked, 'the last row is the no-goal row');
                 await waitFor(`!!document.querySelector('[role=tabpanel]:not([hidden]) .team-tb-chip')`, 'the Tasks tab with its No goal chip', 8000);
+                // the chip is there as soon as the filter is set; the table fills when the tasks have been read (a slow runner takes a while: red since run 64, #8473): wait for the rows, then say what they are
+                await waitFor(`document.querySelectorAll('[role=tabpanel]:not([hidden]) tbody tr').length >= 1`, 'the tasks the filter leaves', 15000);
                 const shown = await ev(`(() => { const p = document.querySelector('[role=tabpanel]:not([hidden])'); return { chip: p.querySelector('.team-tb-chip').textContent, rows: [...p.querySelectorAll('tbody tr')].map(r => r.textContent.replace(/\\s+/g, ' ').trim()) }; })()`);
                 assert.match(shown.chip, /^No goal/, 'the chip names the filter'); assert.equal(shown.rows.length, 1, `exactly the one task that serves no goal: ${JSON.stringify(shown.rows)}`); assert.match(shown.rows[0], /Fix the focus ring/);
                 await ev(`document.querySelector('[role=tabpanel]:not([hidden]) .team-tb-chip').click(); true`);
