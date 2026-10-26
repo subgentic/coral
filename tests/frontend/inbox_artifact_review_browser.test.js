@@ -1,0 +1,72 @@
+// #8628: for-review artifacts join Needs you; ten per producer, overflow disclosed,
+// preview stays in Inbox, and Mark reviewed preserves the artifact's other tags.
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const { connect } = require('./agent_view_harness');
+const { removeBoards } = require('./helpers/board_cleanup');
+const BASE = require('./test_base').BASE;
+(async () => {
+    const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const team = 'review-inbox-' + Date.now().toString(36), failures = [];
+    const row = name => `[...document.querySelectorAll('#group-table-view tbody tr')].find(r=>r.textContent.includes(${JSON.stringify(name)}))`;
+    const rows = `document.querySelectorAll('#group-table-view [data-review-artifact]')`;
+    try {
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD});
+        for (const width of [1280,390]) {
+            try {
+                await Emulation.setDeviceMetricsOverride({width,height:900,deviceScaleFactor:1,mobile:width===390});
+                await Emulation.setTouchEmulationEnabled({enabled:width===390});
+                await Page.navigate({url:BASE+'/'}); await Page.loadEventFired(); await install();
+                await ev(`window.__coralReady.startup('liveList','liveListLoaded','settings')`);
+                assert.equal(await ev(`fetch('/api/board/${team}/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subscriber_id:'Review Writer',job_title:'Writer'})}).then(r=>r.status)`),200);
+                // Mock only artifact storage; the team exists through the real board API.
+                await ev(`(() => {
+                    localStorage.removeItem('coral-inbox-needs-filters');
+                    const style=document.createElement('style'); style.textContent='*,*::before,*::after{transition:none!important;animation:none!important}';document.head.append(style);
+                    window.__reviewWrites=[];window.__reviewFail=false;
+                    window.__reviewItems=Array.from({length:13},(_,i)=>({id:(i+1).toString(16).padStart(64,'0'),name:'Review file '+String(i+1).padStart(2,'0')+'.txt',media_type:'text/plain',size:30,created_at:new Date(Date.now()-(20-i)*60000).toISOString(),task_id:0,source:'upload',available:true,session_id:i<11?'writer-a':'writer-b',produced_by:i<11?'Writer A':'Writer B',tags:['for review','internal'],uri:'coral://artifacts/'+(i+1).toString(16).padStart(64,'0')}));
+                    const original=window.fetch, json=(body,status=200)=>Promise.resolve(new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}}));
+                    window.fetch=(url,opts={})=>{
+                        const u=new URL(String(url),location.origin);
+                        if(u.pathname==='/api/board/${team}/artifacts'){
+                            const items=window.__reviewItems.filter(a=>!u.searchParams.has('tag')||a.tags.includes(u.searchParams.get('tag'))),offset=Number(u.searchParams.get('offset')||0),limit=Number(u.searchParams.get('limit')||100);
+                            return json({project:'${team}',artifacts:items.slice(offset,offset+limit),has_more:offset+limit<items.length});
+                        }
+                        if(u.pathname.startsWith('/api/board/${team}/artifacts/')&&u.pathname.endsWith('/tags')){
+                            if(window.__reviewFail)return json({error:'Review save failed'},500);
+                            const id=u.pathname.split('/').at(-2),body=JSON.parse(opts.body);window.__reviewWrites.push(body);
+                            window.__reviewItems.find(a=>a.id===id).tags=body.tags;return json({tags:body.tags});
+                        }
+                        if(u.pathname.startsWith('/api/artifacts/')&&/^[0-9a-f]{64}$/.test(u.pathname.split('/')[3])&&u.pathname.split('/').length<=5)return Promise.resolve(new Response('Review preview text',{headers:{'Content-Type':'text/plain'}}));
+                        return original(url,opts);
+                    };return true;
+                })()`);
+                await ev(`window.switchNavTab('hub-inbox');true`);
+                await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);
+                await waitFor(`!!(${row('Review file 01.txt')})`,'for-review artifact in Needs you',15000);
+                assert.equal(await ev(`${rows}.length`),12,'ten from Writer A and two from Writer B');
+                assert.match(await ev(`document.getElementById('group-table-view').textContent`),/1 more/,'overflow remains discoverable');
+                assert.equal(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`),'13','all pending artifacts count');
+                assert.ok(await ev(`document.documentElement.scrollWidth<=innerWidth+1`),'no horizontal overflow');
+                const dir=process.env.CORAL_SCREENSHOT_DIR||(process.env.RUNNER_TEMP&&path.join(process.env.RUNNER_TEMP,'out'));
+                if(dir){fs.mkdirSync(dir,{recursive:true});for(const theme of ['light','dark']){await ev(`document.documentElement.setAttribute('data-theme','${theme}');true`);fs.writeFileSync(path.join(dir,`inbox-review-${width}-${theme}.png`),Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}}
+                await ev(`[...(${row('Review file 01.txt')}).querySelectorAll('button')].find(b=>b.textContent.trim()==='Open').click();true`);
+                await waitFor(`document.body.textContent.includes('Review preview text')`,'artifact preview');
+                assert.equal(await ev(`document.body.dataset.navTab`),'hub-inbox','preview keeps Inbox');
+                // Close the shared viewer using its visible control, retaining the list.
+                await ev(`document.querySelector('.artifact-viewer-close').click();true`);
+                await ev(`window.__reviewFail=true;[...(${row('Review file 01.txt')}).querySelectorAll('button')].find(b=>b.textContent.trim()==='Mark reviewed').click();true`);
+                await waitFor(`document.body.textContent.includes('Review save failed')`,'failed save is visible');
+                assert.ok(await ev(`!!(${row('Review file 01.txt')})`),'failed save keeps row');
+                await ev(`window.__reviewFail=false;[...(${row('Review file 01.txt')}).querySelectorAll('button')].find(b=>b.textContent.trim()==='Mark reviewed').click();true`);
+                await waitFor(`!(${row('Review file 01.txt')})`,'reviewed row removed');
+                assert.deepEqual((await ev(`window.__reviewWrites.at(-1).tags`)).sort(),['internal','reviewed']);
+                assert.equal(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`),'12');
+                assert.ok(await ev(`!!(${row('Review file 11.txt')})`),'overflow promotes next artifact');
+                console.log('PASS review artifacts '+width);
+            } catch(error){failures.push(width+': '+error.message);console.error(failures.at(-1));}
+        }
+        assert.equal(failures.length,0,failures.join('\n'));
+    } finally {await removeBoards(ev,[team]).catch(()=>{});await client.close();}
+})().catch(error=>{console.error(error);process.exitCode=1;});
