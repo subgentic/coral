@@ -139,14 +139,15 @@ function drawCounts() {
     queueMicrotask(() => { if (widened) $(`team-tab-${S.tab}`)?.scrollIntoView({ inline: 'nearest', block: 'nearest' }); drawTabEdges(); });
 }
 
-/** The counts on the tabs and the header's status: three light reads, repeated while the page is on screen. */
+/** The counts on the tabs and the header's status: three light reads, repeated while the page is on screen.
+ * Consume failed JSON replies too: discarding a Response leaves its stream alive across page visits (#8169). */
 async function readCounts() {
     const team = S.team, seq = ++S.countSeq;
     if (!team) return;
-    const knowledge = S.knowledgeFor === team ? null : (S.knowledgeFor = team, teamFetch(team, n => `/api/teams/detail/${encodeURIComponent(n)}/knowledge`).then(r => (r.ok ? r.json() : null)).catch(() => null)); // the Knowledge tab's count once per team, with the others (the notes are read again when the tab opens)
+    const knowledge = S.knowledgeFor === team ? null : (S.knowledgeFor = team, teamFetch(team, n => `/api/teams/detail/${encodeURIComponent(n)}/knowledge`).then(async r => { const data = await r.json(); return r.ok ? data : null; }).catch(() => null)); // the Knowledge tab's count once per team, with the others (the notes are read again when the tab opens)
     const [goals, tasks, avail, kn] = await Promise.allSettled([
-        boardFetch(team, '/goals?state=proposed,active,blocked,done,dropped&limit=200').then(r => (r.ok ? r.json() : null)),
-        boardFetch(team, '/tasks?limit=1').then(r => (r.ok ? r.json() : null)),
+        boardFetch(team, '/goals?state=proposed,active,blocked,done,dropped&limit=200').then(async r => { const data = await r.json(); return r.ok ? data : null; }),
+        boardFetch(team, '/tasks?limit=1').then(async r => { const data = await r.json(); return r.ok ? data : null; }),
         refreshTeamAvailability(team, true),
         knowledge,
     ]);
