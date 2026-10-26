@@ -295,6 +295,9 @@ function draw() {
             footer: { auto: !model.truncated && !model.error, text: `Showing ${model.items.length} of ${model.counts?.matched ?? model.items.length}${model.truncated ? '+' : ''}`,
                 more: model.hasMore ? { label: 'Load more', busy: !!model.controller, run: () => { if (!model.loadingMore) loadArtifacts({ append: true }); } } : null },
         });
+        // Keep row heights stable while the new ResizeObserver settles the dock width.
+        // Restoring scroll against an unfolded table first makes browser anchoring jump.
+        if (tableBox) table.el.classList.toggle('dt-folded', tableBox.classList.contains('dt-folded'));
         body.append(table.el); Toolbar.mountSelection(toolbarRow, artifactState.selected.size ? table.bar : null);
         if (!model.scope && matchMedia('(max-width: 760px)').matches) toolbarRow?.append(table.selectButton);
     }
