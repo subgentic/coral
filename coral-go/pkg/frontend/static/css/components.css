@@ -96,12 +96,14 @@
     min-height: var(--control-compact-height);
 }
 
-.mb-project-count, .mb-project-meta, .mb-message-count {
+.mb-project-count, .mb-project-meta {
     font-size: var(--fs-base);
     color: var(--text-secondary);
 }
 .mb-project-count { margin-left: auto; }
-.mb-message-count { text-align: center; padding: var(--space-xs) 0 var(--space-md); }
+.mb-earlier-loading { position: absolute; top: var(--space-xs, 4px); left: 50%; transform: translateX(-50%); z-index: 2; padding: 2px var(--space-sm, 8px); border-radius: var(--radius-ml); background: var(--bg-secondary, var(--bg)); font-size: var(--fs-sm); font-weight: 400; color: var(--text-secondary); pointer-events: none; } /* "Loading earlier messages\u2026" floats over the top of the box while a page is out and takes no room: nothing shifts (#7762) */
+.mb-earlier-loading[hidden] { display: none; }
+.mb-earlier-line { text-align: center; padding: var(--space-xs) 0 var(--space-md); font-size: var(--fs-sm); font-weight: 400; color: var(--text-secondary); } /* "Loading earlier messages\u2026" and "Start of the board": quiet, one line (#7762) */
 
 /* Message board — sleep banner */
 .mb-sleep-banner {
@@ -151,12 +153,6 @@
        and every row was laid out in that box and clipped (#4505, WCAG 1.4.10). Never wider than its column. */
     width: 100%;
     min-width: 0;
-}
-
-/* "Load earlier" wraps instead of running off the feed at large text (#4505). */
-.mb-load-earlier .btn {
-    white-space: normal;
-    max-width: 100%;
 }
 
 /* Message board rows (#3590, the operator's choice; no initials badge since #7315): the name and time on one line in the sender's

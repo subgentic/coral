@@ -340,7 +340,6 @@
 1	live_jobs.js	triggerBadge
 1	markdown.js	HL_MARK
 1	message_board.js	BOARD_SAVE_BUTTON(currentProject || '', keyLabel(currentProject || ''), String(m.created_at || ''), String(m.j
-1	message_board.js	_totalMessages
 1	message_board.js	alignClass
 1	message_board.js	boardMessageColorStyle(color)
 1	message_board.js	checkbox
@@ -352,7 +351,6 @@
 1	message_board.js	messageTimeHtml(m.created_at)
 2	message_board.js	p.message_count
 1	message_board.js	p.subscriber_count
-1	message_board.js	remaining
 1	message_board.js	renderBoardMessageBody(m)
 1	message_board.js	selectedClass
 1	message_board.js	spacing

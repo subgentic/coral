@@ -46,11 +46,9 @@ const LONG = 'Senior Platform Reliability Developer With A Long Title';
         const view = document.getElementById('messageboard-view');
         const sideways = [document.documentElement, document.body, view, ...view.querySelectorAll('*')].filter(e => e.scrollWidth > e.clientWidth + 1 && /auto|scroll/.test(getComputedStyle(e).overflowX) && e.clientWidth > 0 && !e.closest('pre, code, .mb-message-body table'))
             .map(e => (e.id || e.className || e.tagName) + ' ' + e.scrollWidth + '>' + e.clientWidth);
-        const earlier = feed.querySelector('.mb-load-earlier button');
-        if (earlier && earlier.getBoundingClientRect().right > fr.right + 0.5) over.push('Load earlier right ' + Math.round(earlier.getBoundingClientRect().right));
         const col = document.getElementById('mb-board').getBoundingClientRect();
         return { vw, rows: rows.length, feedRight: Math.round(fr.right), feedScroll: feed.scrollWidth - feed.clientWidth, feedWidth: Math.round(fr.width),
-            feedMargins: [Math.round(fr.left - col.left), Math.round(col.right - fr.right)], colWidth: Math.round(col.width), hasEarlier: !!earlier,
+            feedMargins: [Math.round(fr.left - col.left), Math.round(col.right - fr.right)], colWidth: Math.round(col.width),
             docOver: document.documentElement.scrollWidth - vw, over: over.slice(0, 8), nOver: over.length, sideways, chain,
             widest: Math.max(...rows.map(r => r.getBoundingClientRect().right)) - fr.right };
     })()`;
@@ -90,7 +88,6 @@ const LONG = 'Senior Platform Reliability Developer With A Long Title';
             assert.deepEqual(m.sideways, [], `${v.name}: nothing in the board view scrolls sideways` + why);
             assert.ok(m.docOver <= 0, `${v.name}: the page is not wider than the screen (${m.docOver})` + why);
             assert.ok(m.feedRight <= m.vw && m.widest <= 0.5, `${v.name}: every row fits the feed, and the feed the screen (feed right ${m.feedRight}, widest row ${m.widest} past it)` + why);
-            assert.ok(m.hasEarlier, `${v.name}: the board shows "Load earlier"`);
             if (v.font === '200%') {
                 // Whatever is wide and unbreakable in the feed (here a 600 px nowrap line), the feed keeps its column's width and the
                 // rows still fit: the feed scrolls it instead of growing (the auto margins no longer size the feed by its content).

@@ -60,14 +60,15 @@ for (let i = 0; i < 5; i++) await settle();
 assert.equal(requests.length, 1, 'one request loads the latest page (no separate count call)');
 assert.equal(query(requests[0]).get('offset'), '0');
 assert.deepEqual(renderedIds(), board.slice(-50).map(m => m.id));
-assert.match(document.getElementById('mb-messages').textContent, /70 remaining/);
+assert.equal(window.__coral.boardCounts().notLoaded, 70, 'seventy are not loaded yet');
+assert.doesNotMatch(document.getElementById('mb-messages').textContent, /remaining|Load \d+ earlier|Showing \d+ of/, 'no button or count line (#7762)');
 
 window.__coral.loadEarlierMessages();
 for (let i = 0; i < 3; i++) await settle();
 assert.equal(query(requests.at(-1)).get('before_id'), '71', 'load earlier pages by the oldest loaded id');
 assert.equal(query(requests.at(-1)).get('offset'), '0');
 assert.deepEqual(renderedIds(), board.slice(-100).map(m => m.id));
-assert.match(document.getElementById('mb-messages').textContent, /20 remaining/);
+assert.equal(window.__coral.boardCounts().notLoaded, 20);
 
 board.push({ id: 121, content: 'new', job_title: 'QA', created_at: '2026-10-01T00:01:00Z' });
 pollTick();

@@ -52,7 +52,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
     const MB = `(await import((window.__coralStatic || '/static/') + 'message_board.js'))`;
     const C = `document.getElementById('mb-messages')`;
     const ROWS = `[...${C}.querySelectorAll(':scope > .mb-message, :scope > .mb-queue-run')]`;
-    const shown = () => ev(`(() => { const t = ${C}.querySelector('.mb-message-count'); return t ? Number(t.textContent.match(/Showing (\\d+)/)[1]) : 0; })()`);
+    const shown = () => ev(`window.__coral.boardCounts().shown`); // the board has no count line (#7762): the messages loaded are asked of the page
     const atBottom = () => ev(`(() => { const c = ${C}; return c.scrollHeight - c.scrollTop - c.clientHeight < 50; })()`);
     const toBottom = () => ev(`(() => { const c = ${C}; c.scrollTop = c.scrollHeight; return ${framesJs(2)}; })()`);
     // The app's own 10 s poll can be in flight when the test asks for one (then that call returns at once): ask until it shows.
@@ -81,7 +81,9 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await Page.navigate({ url: `${BASE}/board/${B}` });
         await loaded;
         await coralReady();
-        await waitFor(`(${C}.querySelector('.mb-message-count') || {}).textContent?.includes('Showing 50 of 1000')`, 'the latest page');
+        await waitFor(`(() => { const n = window.__coral.boardCounts(); return n.shown === 50 && n.total === 1000; })()`, 'the latest page');
+        assert.equal(await ev(`${C}.querySelectorAll('.mb-load-earlier, .mb-message-count').length`), 0, 'no Load earlier button and no count line on load (#7762)');
+        assert.equal(await ev(`${C}.querySelector('.mb-earlier-line')?.textContent || ''`), '', 'and no line at all while earlier messages are waiting and none is loading');
         await waitFor(`(() => { const c = ${C}; return c.scrollHeight > c.clientHeight * 2 && c.scrollHeight - c.scrollTop - c.clientHeight < 50; })()`, 'a scrolled board, at the bottom');
 
         console.log('A poll appends; a task-queue run continues across it; rows shown keep their nodes');
@@ -136,24 +138,14 @@ const { removeBoards } = require('./helpers/board_cleanup');
         // to go, it swings within one page.
         const late = series.slice(10).map(x => x.nodes);
         assert.ok(Math.max(...late) <= Math.min(...late) * 1.2 && series[19].nodes <= series[9].nodes * 1.2, `DOM nodes flat: ${JSON.stringify(series.map(x => x.nodes))}`);
-        const header = await ev(`({ earlier: ${C}.querySelector('.mb-load-earlier')?.textContent.replace(/\\s+/g, ' ').trim(), count: ${C}.querySelector('.mb-message-count').textContent.replace(/\\s+/g, ' ').trim(),
+        const header = await ev(`({ buttons: ${C}.querySelectorAll('.mb-load-earlier, .mb-message-count').length, line: ${C}.querySelector('.mb-earlier-line')?.textContent || '', counts: window.__coral.boardCounts(),
             firstClass: ${ROWS}[0].className })`);
-        assert.equal(header.count, `Showing ${s} of ${model.length} messages`);
-        assert.equal(header.earlier, `Load 50 earlier messages (${model.length - s} remaining)`);
+        assert.equal(header.buttons, 0, 'still no button or count line after the window trimmed the top');
+        assert.equal(header.line, '', 'and nothing said while earlier messages are waiting');
+        assert.equal(header.counts.total, model.length);
+        assert.equal(header.counts.notLoaded, model.length - s);
         assert.ok(/mb-message-first|mb-queue-run/.test(header.firstClass), 'the first row shown starts its group');
         assert.equal(await ev(rowsHtml), await wholeRender(), 'after trimming, still the same as a whole render');
-        await toBottom();
-
-        console.log('Keyboard focus on "Load earlier" stays across a poll (UX on #4492)');
-        await ev(`(() => { const b = ${C}.querySelector('.mb-load-earlier button'); b.__mark = true; b.focus({ preventScroll: true }); return document.activeElement === b; })()`);
-        const label0 = await ev(`${C}.querySelector('.mb-load-earlier button').textContent.trim()`);
-        add(60);
-        await pollUntil(`${C}.querySelector('[data-message-id="${nextId - 1}"]')`, 'the 60 new posts, focused on Load earlier');
-        const kept = await ev(`(() => { const a = document.activeElement; return { same: !!a && a.__mark === true && a.isConnected, text: a && a.textContent.trim() }; })()`);
-        assert.ok(kept.same, 'focus is still on the same button');
-        assert.notEqual(kept.text, label0, `its label follows (${label0} -> ${kept.text})`);
-        assert.equal(kept.text.replace(/\s+/g, ' '), `Load 50 earlier messages (${model.length - await shown()} remaining)`);
-        await ev(`document.activeElement.blur(); true`);
         await toBottom();
 
         console.log('Not trimmed while reading higher up; trimmed again back at the bottom');
@@ -167,30 +159,11 @@ const { removeBoards } = require('./helpers/board_cleanup');
         assert.ok(await shown() <= 301, `trimmed back at the bottom (${await shown()})`);
 
         console.log('Scrolling to the top loads the page before, and what you read stays put');
-        const top0 = await ev(`(() => { const c = ${C}; c.scrollTop = 0; const r = ${ROWS}[0]; return { id: r.dataset.messageId || r.dataset.queueRun, y: r.getBoundingClientRect().top, n: Number(c.querySelector('.mb-message-count').textContent.match(/Showing (\\d+)/)[1]) }; })()`);
-        await waitFor(`Number(${C}.querySelector('.mb-message-count').textContent.match(/Showing (\\d+)/)[1]) >= ${top0.n + 50}`, 'the earlier page, from scrolling');
+        const top0 = await ev(`(() => { const c = ${C}; c.scrollTop = 0; const r = ${ROWS}[0]; return { id: r.dataset.messageId || r.dataset.queueRun, y: r.getBoundingClientRect().top, n: window.__coral.boardCounts().shown }; })()`);
+        await waitFor(`window.__coral.boardCounts().shown >= ${top0.n + 50}`, 'the earlier page, from scrolling');
+        assert.equal(await ev(`${C}.querySelectorAll('.mb-load-earlier, .mb-message-count').length`), 0, 'no button or count line while or after it loads');
         const top1 = await ev(`(() => { const r = ${C}.querySelector('[data-message-id="${top0.id}"], [data-queue-run="${top0.id}"]'); return { y: r.getBoundingClientRect().top, st: ${C}.scrollTop }; })()`);
         assert.ok(Math.abs(top1.y - top0.y) < 2 && top1.st > 0, `the row that was at the top stays there (${top0.y} -> ${top1.y})`);
-
-        console.log('"Load earlier" pressed with Enter loads the page before and keeps keyboard focus (UX on #4492)');
-        const n1 = await shown();
-        await ev(`(() => { const b = ${C}.querySelector('.mb-load-earlier button'); b.focus({ preventScroll: true }); return document.activeElement === b; })()`);
-        await Input.dispatchKeyEvent({ type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' }); // text: a real Enter activates the button
-        await Input.dispatchKeyEvent({ type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
-        await waitFor(`Number(${C}.querySelector('.mb-message-count').textContent.match(/Showing (\\d+)/)[1]) >= ${n1 + 50}`, 'the page before, from Enter');
-        assert.ok(await ev(`document.activeElement === ${C}.querySelector('.mb-load-earlier button')`), 'focus is on the new Load earlier button, not the page');
-        await ev(`document.activeElement.blur(); true`);
-
-        console.log('Tabbing onto "Load earlier" from lower down scrolls it into view and loads nothing');
-        await toBottom();
-        const n2 = await shown();
-        await ev(`(() => { const b = ${C}.querySelector('.mb-load-earlier button'); b.focus(); return true; })()`); // as Tab does: scrolls to it
-        assert.ok(await ev(`${C}.scrollTop < 80`), 'the focus scrolled the list to the button');
-        const settled = await waitStable(`${C}.querySelector('.mb-message-count').textContent`, 'the count after the focus', 400);
-        assert.equal(Number(settled.match(/Showing (\d+)/)[1]), n2, 'no page loaded by the scroll the focus made');
-        assert.ok(await ev(`document.activeElement === ${C}.querySelector('.mb-load-earlier button')`), 'focus stays on the button');
-        await ev(`document.activeElement.blur(); true`);
-        await toBottom();
 
         console.log('Select mode: new rows can be selected, a selection stays, nothing is dropped');
         await toBottom();
@@ -213,11 +186,11 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await ev(`(async () => { ${MB}.cancelSelectMode(); return true; })()`);
         await toBottom();
 
-        console.log('"Load earlier" draws only the page it adds: the rows shown keep their nodes, and the result is the same as a whole render (#4638)');
+        console.log('An earlier page draws only the rows it adds: the rows shown keep their nodes, and the result is the same as a whole render (#4638)');
         await ev(`${ROWS}.forEach(r => { r.__old = true; }); true`);
         const rowsBefore = await ev(`${ROWS}.length`), shownBefore = await shown();
-        await ev(`${C}.querySelector('.mb-load-earlier button').click(); true`);
-        await waitFor(`Number(${C}.querySelector('.mb-message-count').textContent.match(/Showing (\\d+)/)[1]) >= ${shownBefore + 50}`, 'the earlier page, from the button');
+        await ev(`window.__coral.loadEarlierMessages(); true`); // what the scroll to the top and the search's jump run
+        await waitFor(`window.__coral.boardCounts().shown >= ${shownBefore + 50}`, 'the earlier page');
         const drawn = await ev(`({ n: ${ROWS}.length, kept: ${ROWS}.filter(r => r.__old).length, firstOld: ${ROWS}.findIndex(r => r.__old) })`);
         assert.equal(drawn.kept, rowsBefore, 'every row shown keeps its node: the board was not drawn again');
         assert.ok(drawn.n > rowsBefore && drawn.firstOld === drawn.n - rowsBefore, `the new rows are above the old ones (${JSON.stringify(drawn)})`);
@@ -237,7 +210,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         let gone = nextId - 3;
         remove(gone);
         await pollUntil(`!${C}.querySelector('[data-message-id="${gone}"]')`, `deleted ${gone} gone`);
-        assert.ok(await ev(`(${C}.querySelector('.mb-message-count').textContent).includes('of ${model.length} messages')`));
+        assert.equal(await ev(`window.__coral.boardCounts().total`), model.length, 'the total follows the deletion');
         gone = nextId - 2; remove(gone); add(1); // deleted and arrived in one tick: the total alone doesn't change
         await pollUntil(`!${C}.querySelector('[data-message-id="${gone}"]') && !!${C}.querySelector('[data-message-id="${nextId - 1}"]')`, `deleted ${gone} gone, the new one in`);
         await ev(`(() => { const c = ${C}; c.scrollTop = Math.round(c.scrollHeight / 2); return true; })()`);

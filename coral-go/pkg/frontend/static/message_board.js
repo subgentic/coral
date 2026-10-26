@@ -346,6 +346,7 @@ async function loadEarlierMessages() {
     const project = currentProject;
     if (!project || _loadedProject !== project || _loadedOffset <= 0 || !_allMessages.length || _earlierInFlight) return;
     _earlierInFlight = true;
+    setEarlierLoading(true);
     const firstId = _allMessages[0].id;
     let result;
     try {
@@ -355,6 +356,7 @@ async function loadEarlierMessages() {
         return;
     } finally {
         _earlierInFlight = false; // before the render: a search jump that still misses its message loads the next page from it
+        setEarlierLoading(false); // the line goes with the load, success or not
     }
     // A trim or a reload while it was out moved the oldest message loaded: this page would leave a gap.
     if (currentProject !== project || !_allMessages.length || _allMessages[0].id !== firstId) return;
@@ -362,7 +364,11 @@ async function loadEarlierMessages() {
     _allMessages = mergeMessages(result.messages, _allMessages);
     _loadedOffset = result.beforeCount;
     renderMessages(_allMessages, { keepAnchor: true, prepended: _allMessages.length - had });
+    const added = _allMessages.length - had;
+    sayEarlier(added > 0 ? `${added} earlier message${added === 1 ? '' : 's'} loaded${_loadedOffset <= 0 ? '. This is the start of the board' : ''}.` : '');
 }
+/** Tests: how many messages are loaded, how many the board has, and how many are not loaded yet. */
+(window.__coral ||= {}).boardCounts = () => ({ shown: _allMessages.length, total: _totalMessages, notLoaded: _loadedOffset });
 (window.__coral ||= {}).loadEarlierMessages = loadEarlierMessages;
 
 // The board keeps about this many messages in the DOM while you read at the bottom (#4492): a poll appends what is new, and once
@@ -378,6 +384,12 @@ function isAtBottom(container) {
 // Scrolling near the top loads the page before the oldest message shown, as "Load earlier" does. Not the scroll that moving
 // keyboard focus onto "Load earlier" makes (the browser scrolls it into view): that is the reader reaching the button, who
 // then presses it or not (Frontend's finding on #4492).
+/** Earlier messages with nothing to scroll: a box the loaded messages do not fill (short messages, a tall window) never gets a scroll event, so the page before loads without one. */
+function fillTop() {
+    const c = document.getElementById('mb-messages');
+    if (c && c.clientHeight > 0 && _loadedOffset > 0 && !_earlierInFlight && c.scrollHeight <= c.clientHeight + 80) loadEarlierMessages();
+}
+
 function wireBoardScroll(container) {
     if (container._mbScrollWired) return;
     container._mbScrollWired = true;
@@ -392,22 +404,10 @@ function wireBoardScroll(container) {
     }, { passive: true });
 }
 
-function boardHeaderHtml(messages) {
-    // "Load Earlier" button if there are older messages
-    let loadEarlierHtml = '';
-    if (_loadedOffset > 0) {
-        const remaining = _loadedOffset;
-        loadEarlierHtml = `<div class="mb-load-earlier" role="listitem" style="text-align:center;padding:8px 0 12px">
-            <button class="btn btn-small" data-on-click="mb-earlier" class="mb-project-meta">
-                Load ${Math.min(remaining, PAGE_SIZE)} earlier messages (${remaining} remaining)
-            </button>
-        </div>`;
-    }
-    // Message count indicator: only while the window is smaller than the board, where it says how much is not shown ("Showing 2 of 2" said nothing, #5991)
-    const countHtml = messages.length < _totalMessages ? `<div class="mb-message-count" role="listitem">
-        Showing ${messages.length} of ${_totalMessages} messages
-    </div>` : '';
-    return loadEarlierHtml + countHtml;
+function boardHeaderHtml() {
+    // No button and no count (#7762): scrolling near the top loads the page before the oldest message shown. One quiet line above the rows, once the board's first message is the one on screen ("Loading earlier messages\u2026" floats over the box while a page is out: setEarlierLoading).
+    if (_loadedOffset <= 0 && _allMessages.length) return '<div class="mb-earlier-line" role="listitem">Start of the board</div>';
+    return '';
 }
 
 // Names each row's Save and Delete by its message, so a list of them reads as different buttons. The text is the message's own (untrusted), so it goes in as an attribute value, never as markup.
@@ -561,7 +561,7 @@ function renderMessages(messages, { keepAnchor = false, prepended = 0 } = {}) {
     // Runs of task-queue lines are one collapsed row (#3343), except in select mode.
     if (!(prepended > 0 && prependEarlier(container, prepended))) {
         const items = groupTaskQueueRuns(messages, !isSelectMode());
-        container.innerHTML = boardHeaderHtml(messages) + items.map((item, i) => renderBoardItem(item, i > 0 ? items[i - 1] : null)).join('');
+        container.innerHTML = boardHeaderHtml() + items.map((item, i) => renderBoardItem(item, i > 0 ? items[i - 1] : null)).join('');
         nameBoardButtons(container);
         resolveBoardArtifacts(container, state.currentBoardServer);
     }
@@ -597,6 +597,7 @@ function renderMessages(messages, { keepAnchor = false, prepended = 0 } = {}) {
     } else {
         container.scrollTop = prevScrollTop;
     }
+    fillTop();
 }
 
 // A poll's new messages (already merged into _allMessages) go in after the rows shown (#4492): message rows already shown are
@@ -708,21 +709,28 @@ function trimBoardWindow(container) {
     }
 }
 
-// The "Load earlier" button and the count above the rows, after a poll changed them: their text changes in place, so keyboard
-// focus on the button stays (UX on #4492); the button's row goes in or out only when there are older messages or no longer.
+// The quiet line above the rows ("Loading earlier messages\u2026", "Start of the board"), after a poll or a load changed it: its text changes in place, and it goes in or out only when it has something to say.
 function updateBoardHeader(container) {
     const tmp = document.createElement('template');
-    tmp.innerHTML = boardHeaderHtml(_allMessages);
-    const fresh = sel => tmp.content.querySelector(sel);
-    const count = container.querySelector(':scope > .mb-message-count');
-    if (count && !fresh('.mb-message-count')) count.remove();
-    else if (count) count.textContent = fresh('.mb-message-count').textContent;
-    else if (fresh('.mb-message-count')) container.prepend(fresh('.mb-message-count'));
-    const row = container.querySelector(':scope > .mb-load-earlier');
-    const newRow = fresh('.mb-load-earlier');
-    if (row && newRow) row.querySelector('button').textContent = newRow.querySelector('button').textContent;
-    else if (row) row.remove();
-    else if (newRow) container.prepend(newRow);
+    tmp.innerHTML = boardHeaderHtml();
+    const fresh = tmp.content.querySelector('.mb-earlier-line');
+    const line = container.querySelector(':scope > .mb-earlier-line');
+    if (line && !fresh) line.remove();
+    else if (line) { if (line.outerHTML !== fresh.outerHTML) line.replaceWith(fresh); }
+    else if (fresh) container.prepend(fresh);
+}
+
+/** "Loading earlier messages\u2026" over the top of the box while a page is out: it takes no room, so the rows do not move when it comes and goes. */
+function setEarlierLoading(on) {
+    const el = document.getElementById('mb-earlier-loading');
+    if (el && el.hidden === on) el.hidden = !on;
+    if (on) sayEarlier('Loading earlier messages\u2026');
+}
+
+/** What the screen reader hears when earlier messages are added (a status, not a focus move). */
+function sayEarlier(text) {
+    const el = document.getElementById('mb-earlier-status');
+    if (el && el.textContent !== text) el.textContent = text;
 }
 
 // The time of a message today, the date and time of an older one: the date said nothing on a board that is read the day it is written (#5991).
@@ -1159,7 +1167,6 @@ document.addEventListener('click', (e) => {
 // before use; a bad one does nothing. Deleting a message never asked first, and still doesn't.
 registerActions({
     'mb-project': el => { const p = textOf(el.dataset.project); if (p) selectBoardProject(p); },
-    'mb-earlier': () => loadEarlierMessages(),
     'mb-face': el => { browserLocal.set(FACE_KEY, el.dataset.face === 'goals' ? 'goals' : 'messages'); applyBoardFace(currentProject); },
     'mb-team-page': () => { if (currentProject) window.openTeamPage?.(currentProject); }, // the board's page offers its team's page (#7457)
     'mb-more': (el, event) => toggleMoreMenu(event),
