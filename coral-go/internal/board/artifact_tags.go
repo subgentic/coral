@@ -13,8 +13,10 @@ import (
 // object id), so another team that holds the same bytes has its own. Letters, digits, spaces and hyphens, 1 to 24 characters, at most 5 on an artifact; normalised on save.
 
 const (
-	MaxArtifactTags   = 5
-	MaxArtifactTagLen = 24
+	MaxArtifactTags = 5
+	// MaxBoardArtifactTagRows bounds the tag rows of one board: AddArtifactTags (a manifest, an upload) names an object by its id without checking that it exists, so the rows are bounded here.
+	MaxBoardArtifactTagRows = 5000
+	MaxArtifactTagLen       = 24
 )
 
 // StarterArtifactTags are the four tags the UI offers first.
@@ -127,7 +129,7 @@ func (s *Store) SetArtifactTags(ctx context.Context, boardID, hex string, tags [
 	return tx.Commit()
 }
 
-// AddArtifactTags adds tags (already cleaned) to the object's tags on the board, up to MaxArtifactTags in all: what is over is left off. It reports the object's tags after.
+// AddArtifactTags adds tags (already cleaned) to the object's tags on the board, up to MaxArtifactTags in all and MaxBoardArtifactTagRows on the board: what is over is left off. It reports the object's tags after.
 func (s *Store) AddArtifactTags(ctx context.Context, boardID, hex string, add []string) ([]string, error) {
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
@@ -138,15 +140,20 @@ func (s *Store) AddArtifactTags(ctx context.Context, boardID, hex string, add []
 	if err := tx.SelectContext(ctx, &have, `SELECT tag FROM artifact_tags WHERE board_id = ? AND hex = ? ORDER BY tag`, boardID, hex); err != nil {
 		return nil, err
 	}
+	var rows int
+	if err := tx.GetContext(ctx, &rows, `SELECT COUNT(*) FROM artifact_tags WHERE board_id = ?`, boardID); err != nil {
+		return nil, err
+	}
 	set := map[string]bool{}
 	for _, t := range have {
 		set[t] = true
 	}
 	for _, tag := range add {
-		if len(have) >= MaxArtifactTags {
+		if len(have) >= MaxArtifactTags || rows >= MaxBoardArtifactTagRows {
 			break
 		}
 		if !set[tag] {
+			rows++
 			set[tag] = true
 			have = append(have, tag)
 			if _, err := tx.ExecContext(ctx, `INSERT INTO artifact_tags (board_id, hex, tag) VALUES (?, ?, ?)`, boardID, hex, tag); err != nil {

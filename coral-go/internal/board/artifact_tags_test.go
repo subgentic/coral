@@ -85,6 +85,35 @@ func TestArtifactTagsAreAPerBoardSetOfAStoredObject(t *testing.T) {
 	assert.Contains(t, have, "internal")
 }
 
+// AddArtifactTags names an object by its id without checking that it exists (a manifest, an upload), so one board's rows are bounded (#8623).
+func TestAddArtifactTagsStopsAtTheBoardsRowCap(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	_, err := s.db.ExecContext(ctx, `WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < ?)
+		INSERT INTO artifact_tags (board_id, hex, tag) SELECT 'alpha', printf('%064d', i), 'x' FROM n`, MaxBoardArtifactTagRows-1)
+	require.NoError(t, err)
+	count := func(board string) int {
+		var n int
+		require.NoError(t, s.db.GetContext(ctx, &n, `SELECT COUNT(*) FROM artifact_tags WHERE board_id = ?`, board))
+		return n
+	}
+	require.Equal(t, MaxBoardArtifactTagRows-1, count("alpha"))
+
+	const fresh = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+	have, err := s.AddArtifactTags(ctx, "alpha", fresh, []string{"one", "two", "three"})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"one"}, have, "one row is left, the rest is left off")
+	assert.Equal(t, MaxBoardArtifactTagRows, count("alpha"))
+	have, err = s.AddArtifactTags(ctx, "alpha", fresh, []string{"four"})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"one"}, have, "a full board takes no more")
+	assert.Equal(t, MaxBoardArtifactTagRows, count("alpha"))
+
+	have, err = s.AddArtifactTags(ctx, "beta", fresh, []string{"one", "two"})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"one", "two"}, have, "another board has its own rows")
+}
+
 func TestDeletingABoardDeletesItsArtifactTags(t *testing.T) {
 	s := testStore(t)
 	ctx := context.Background()
