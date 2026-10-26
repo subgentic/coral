@@ -150,6 +150,11 @@ func TestListTitleIsOneShortLine(t *testing.T) {
 
 func TestAgentDocsSummary(t *testing.T) {
 	cases := []struct{ name, body, want string }{
+		{"leading-quote", "# Title\n\n> A **useful** summary with `<name>`.\n\nChecked against an old release.", "A useful summary with <name>."},
+		{"front-matter", "---\nsummary: 'Use [topics](https://example.test): a guide.'\n---\n# Title\n\n> A different summary.\n\nMeta notes.", "Use topics: a guide."},
+		{"empty-front-matter", "---\nsummary: ''\n---\n# Title\n\n> Use the leading line.\n\nMeta notes.", "Use the leading line."},
+		{"later-quote", "# Title\n\nThe actual introduction.\n\n> A later warning.", "The actual introduction."},
+		{"front-matter-no-summary", "---\ntitle: Metadata\n---\n# Title\n\nThe introduction.", "The introduction."},
 		{"prose", "# Title\n\nRead **topics** with `coral-agent docs`\nand [examples](https://example.test).\n\nSecond paragraph.", "Read topics with coral-agent docs and examples."},
 		{"blocks", "---\ntitle: metadata\n---\n# Title\n\n<!-- hidden\ncomment -->\n```sh\nnot prose\n```\n\n- bullet\n\n| table |\n| --- |\n\nThe _first_ __real__ paragraph &amp; [reference][ref].\n\n[ref]: https://example.test", "The first real paragraph & reference."},
 		{"setext", "Title\n=====\n\nBody with <em>inline</em> markup and user_id.", "Body with inline markup and user_id."},
@@ -173,4 +178,26 @@ func TestAgentDocsSummary(t *testing.T) {
 		})
 	}
 	assert.Empty(t, docSummary(fstest.MapFS{}, "missing.md"))
+}
+
+func TestDocsMetaIntroductionsHaveExplicitSummaries(t *testing.T) {
+	docs := os.DirFS("../../../agent_docs")
+	rec := httptest.NewRecorder()
+	NewAgentDocsHandler(docs).List(rec, httptest.NewRequest(http.MethodGet, "/api/agent-docs", nil))
+	var list []struct{ Name, Summary string }
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &list))
+	summaries := map[string]string{}
+	for _, doc := range list {
+		summaries[doc.Name] = doc.Summary
+	}
+	for _, name := range []string{"troubleshooting", "using-the-dashboard", "worked-demos"} {
+		data, err := fs.ReadFile(docs, name+".md")
+		require.NoError(t, err)
+		explicit := explicitDocSummary(string(data))
+		require.NotEmpty(t, explicit, name)
+		assert.Equal(t, plainDocSummary(explicit), summaries[name], name)
+		assert.Less(t, len([]rune(summaries[name])), 100, name+": a short topic description")
+		assert.NotContains(t, summaries[name], "v1.")
+		assert.NotContains(t, summaries[name], "checked against")
+	}
 }

@@ -13,6 +13,7 @@ import (
 	"unicode"
 
 	"github.com/go-chi/chi/v5"
+	"gopkg.in/yaml.v3"
 )
 
 // AgentDocsHandler serves embedded API reference documentation.
@@ -300,6 +301,9 @@ func docSummary(docs fs.FS, file string) string {
 		return ""
 	}
 	text := docComment.ReplaceAllString(string(data), "")
+	if summary := explicitDocSummary(text); summary != "" {
+		return plainDocSummary(summary)
+	}
 	lines := strings.Split(text, "\n")
 	var paragraph []string
 	fence := ""
@@ -343,7 +347,10 @@ func docSummary(docs fs.FS, file string) string {
 		}
 		paragraph = append(paragraph, line)
 	}
-	line := strings.Join(paragraph, " ")
+	return plainDocSummary(strings.Join(paragraph, " "))
+}
+
+func plainDocSummary(line string) string {
 	line = docRefLink.ReplaceAllString(line, "$1")
 	line = docInlineHTML.ReplaceAllStringFunc(line, func(part string) string {
 		if strings.HasPrefix(part, "`") {
@@ -360,6 +367,41 @@ func docSummary(docs fs.FS, file string) string {
 	}
 	line = docEscape.ReplaceAllString(line, "$1")
 	return strings.Join(strings.Fields(html.UnescapeString(line)), " ")
+}
+
+// Authors can describe a topic independently of its historical or verification
+// notes. Only front matter and a quote before the first body paragraph qualify;
+// a warning later in a document must never replace its summary.
+func explicitDocSummary(text string) string {
+	lines := strings.Split(text, "\n")
+	start := 0
+	if len(lines) > 0 && strings.TrimSpace(lines[0]) == "---" {
+		for i := 1; i < len(lines); i++ {
+			marker := strings.TrimSpace(lines[i])
+			if marker != "---" && marker != "..." {
+				continue
+			}
+			var meta struct {
+				Summary string `yaml:"summary"`
+			}
+			if yaml.Unmarshal([]byte(strings.Join(lines[1:i], "\n")), &meta) == nil && strings.TrimSpace(meta.Summary) != "" {
+				return meta.Summary
+			}
+			start = i + 1
+			break
+		}
+	}
+	for _, raw := range lines[start:] {
+		line := strings.TrimSpace(raw)
+		if line == "" || strings.HasPrefix(line, "# ") {
+			continue
+		}
+		if strings.HasPrefix(line, "> ") {
+			return strings.TrimSpace(strings.TrimPrefix(line, "> "))
+		}
+		return ""
+	}
+	return ""
 }
 
 var (

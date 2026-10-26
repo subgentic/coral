@@ -1,5 +1,7 @@
 # Worked Demos
 
+> Follow examples of agents sharing a repository, reviewing work and resuming a team.
+
 Three multi-agent scenarios run end to end against the shipped v1.0.8 build on a real
 repository. Commands and output are real. Where a demo did not behave as the docs
 promised, the result is reported as it happened rather than staged.

@@ -145,7 +145,7 @@ The session list and `GET /api/sessions/live/{name}/info` carry `model`, the mod
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/api/spec.json` | Machine-readable API metadata used by custom views. |
-| `GET` | `/api/agent-docs` | List embedded documentation as `{name,title,summary?}` entries. Optional `summary` is the first prose paragraph as one line of plain text; omitted when absent. |
+| `GET` | `/api/agent-docs` | List embedded documentation as `{name,title,summary?}` entries. Optional `summary` is one line of plain text: a `summary:` front-matter value or leading blockquote takes precedence over the first prose paragraph; omitted when absent. |
 | `GET` | `/api/agent-docs/{name}` | Return one document as JSON with `name`, `content`, and `path`. |
 | `GET` | `/api/agent-docs/all` | Return all documents concatenated as Markdown. |
 
