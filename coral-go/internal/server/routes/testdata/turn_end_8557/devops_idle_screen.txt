@@ -1,0 +1,12 @@
+  The run heads are listed in the post, so each first-red run points to the
+  commits added since the previous run. v1.4.170 stays a tag with no release,
+  per the operator, and I run no browser suites on the Mac. I'll gate any
+  branch the owners name.
+
+✻ Sautéed for 7m 40s · done 10:35 AM
+
+──────────────────────────────────────────────────────────────────────────────
+❯ 
+──────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ bypass permissions on (shift+tab to cycle)
+                                      ✔ Update installed · Restart to update
