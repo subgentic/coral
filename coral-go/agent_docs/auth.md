@@ -248,7 +248,7 @@ Your own programs are unaffected: the dashboard, the app, the tray, the `coral` 
 
 **What it protects against, and what it doesn't.** Strict mode is about **mistakes and prompt-injected agents acting through Coral's tools**: an agent told to post as the Orchestrator or the Operator, to work on another team's board, or a stray local script or web page calling Coral's API without a sign-in. It is **not** a defence against a malicious program running as your user: such a program can read Coral's data folder (the command-line token, the sign-in link file) and act as you. Keep untrusted code in another user account or a sandbox.
 
-## Threat model: what Coral defends and what it does not (v1.4.146 to 151)
+## Threat model: what Coral defends and what it does not
 
 Coral is one person's tool on one person's computer. The pieces that can go wrong are the agents (they read untrusted text, so a prompt can steer them), the other accounts and programs on the computer, the other computers that reach Coral, the people you give access through Coral Hub, and any text a machine wrote (an agent's reply, a board post, a saved message). What follows is the whole list, in plain words, including what Coral leaves to you.
 
