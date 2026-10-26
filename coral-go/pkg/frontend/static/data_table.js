@@ -8,7 +8,7 @@
  *   column widths (#7949): every header has a resize handle on its right edge (drag, Left and Right keys, double-click or Enter to fit the content); the widths are kept per list in this browser (widthsKey, else the label without its row count), and "Reset column widths" appears while any are set. minWidth per column (64 px by default), resize: false for one that must not.
  *   detail = { id(row), open(row) -> bool, render(row) -> Node }: a second full-width row under each row (hidden while open(row) is false); the surface's own toggle in a cell opens it (Coral Hub's Servers: health, what applies).
  *   decorate(row, tr, detailTr) and decorateHead(th, column): called each time the rows (or the header) are drawn, for the hooks a surface keeps on them.
- *   cell types: chip(word, cls), avatar(name), personButton(name, label), tag(text), timeCell(stamp), link(text, run), primaryButton(text, label)
+ *   cell types: chip(word, cls), avatar(name), avatars(people, label), personButton(name, label), tag(text), timeCell(stamp), link(text, run), primaryButton(text, label)
  *   state: tableState(), kept by the caller across redraws: the sort, and the selection (a set of row keys, kept while the rows are filtered or paged, cleared when selectable.contextKey changes).
  * Folded (the table's own box narrower than foldAt rem, 40 by default; also at 200% text): fold 'column' is the two-line row (line 1 and line 2 cells), fold 'labeled' is the name, then "label value" lines
  * (the Analytics tables); scroll: a table of many columns scrolls sideways inside its box, shaded where more is to come, rather than being cut off; the header row is hidden and a "Sort by" select takes its place. Everything is built with the DOM and textContent: titles and names are written by agents. */
@@ -46,6 +46,18 @@ export function avatar(name, text) {
     if (!n) { w.textContent = text || ''; return w; }
     const a = el('span', 'dt-avatar', [...n][0].toUpperCase()); a.setAttribute('aria-hidden', 'true'); a.style.background = `var(--avatar-${(hash(n.toLowerCase()) % 8) + 1})`;
     w.append(a, el('span', 'dt-person-name', text || n)); // text: what is said beside the circle when it is more than the name ("Done by Dev")
+    return w;
+}
+/** People as a row of circles and nothing else (the Tasks table's Assigned to, #8492): the person responsible first, one solid circle; then reviewers as smaller outlined circles, at most two, then "+N". The whole cell is one image named by label
+ *  ("Done by Dev, reviewed by QA"), which is also its hover text, so the column is as narrow as its circles. people = [{ name, review? }]. */
+export function avatars(people, label) {
+    const w = el('span', 'dt-person dt-avatars'); w.setAttribute('role', 'img'); w.setAttribute('aria-label', label); w.title = label;
+    const circle = (name, cls) => { const n = String(name || '').trim(); const a = el('span', `dt-avatar${cls}`, [...n][0].toUpperCase()); a.setAttribute('aria-hidden', 'true'); a.style.setProperty('--dt-avatar-bg', `var(--avatar-${(hash(n.toLowerCase()) % 8) + 1})`); return a; };
+    const named = people.filter(p => p && String(p.name || '').trim());
+    for (const p of named.filter(x => !x.review)) w.append(circle(p.name, ''));
+    const reviewers = named.filter(x => x.review);
+    for (const p of reviewers.slice(0, 2)) w.append(circle(p.name, ' dt-avatar-review'));
+    if (reviewers.length > 2) w.append(el('span', 'dt-avatars-more', `+${reviewers.length - 2}`));
     return w;
 }
 /** A person who is also the row's button: the circle, then the name as the one real button (Needs you: the agent). */

@@ -34,7 +34,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             const long = tb.querySelector('tbody tr:nth-child(4) .dt-primary'); const cs = long && getComputedStyle(long);
             const idCs = getComputedStyle(tb.querySelector('.dt-id')), titleCs = getComputedStyle(tb.querySelector('.dt-primary'));
             return { heads: [...tb.querySelectorAll('thead th')].map(th => th.textContent.replace(/[↑↓↕]/g, '').trim()).filter(Boolean), rows, ellipsis: cs && cs.textOverflow + ' ' + cs.whiteSpace, idSize: idCs.fontSize + ' ' + idCs.fontWeight, titleSize: titleCs.fontSize + ' ' + titleCs.fontWeight, goalLink: !!tb.querySelector('.dt-link[data-goal-link]'), whenRight: getComputedStyle(tb.querySelector('tbody td[data-key="updated"]')).textAlign }; })()`);
-        assert.deepEqual(t.heads, ['State', 'Task', 'Assigned to', 'Goal', 'Priority', 'Updated'], 'the columns, in the design\'s order');
+        assert.deepEqual(t.heads, ['State', 'Task', 'Who', 'Goal', 'Priority', 'Updated'], 'the columns, in the design\'s order');
         assert.ok(t.rows.every(r => r.idFirst), 'the id comes before the title in every row ' + JSON.stringify(t.rows[0]));
         const words = t.rows.map(r => r.chip);
         assert.ok(words.every(w => ['Queued', 'In progress', 'Blocked', 'In review', 'Done'].includes(w)), 'one word set for state ' + JSON.stringify(words));

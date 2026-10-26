@@ -96,6 +96,11 @@
 .dt-tag { display: inline-block; white-space: nowrap; border: 1px solid var(--table-outer); border-radius: var(--radius-md); padding: 1px 6px; font-size: var(--table-head-size); font-weight: var(--table-head-weight); color: var(--table-secondary-color); } /* a tag is one line: a server called build-west was build- / west at 390 (#8220) */
 .dt-person { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; }
 .dt-avatar { flex: none; display: inline-flex; align-items: center; justify-content: center; width: var(--table-avatar); height: var(--table-avatar); border-radius: 50%; color: var(--on-avatar); font-size: 0.6875rem; font-weight: 700; }
+.dt-avatars { gap: 4px; }
+.dt-avatars > .dt-avatar { background: var(--dt-avatar-bg); }
+/* a reviewer: smaller, outlined in its colour, the letter in the text colour (#8492) */
+.dt-avatars > .dt-avatar-review { width: calc(var(--table-avatar) - 4px); height: calc(var(--table-avatar) - 4px); background: transparent; border: 1.5px solid var(--dt-avatar-bg); color: var(--text-primary); font-size: 0.625rem; }
+.dt-avatars-more { font-size: var(--table-tertiary-size); color: var(--table-tertiary-color); font-variant-numeric: tabular-nums; }
 .dt-person-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dt-quiet { font-size: var(--table-tertiary-size); font-weight: var(--table-secondary-weight); color: var(--table-secondary-color); } /* a row's own small action (Done, Reopen): quiet, not a call to action */
 .dt-group th { position: sticky; top: var(--table-head-h); z-index: 1; padding: 6px var(--table-pad-x); text-align: left; background: var(--table-bg); border-bottom: 1px solid var(--table-border); font-size: var(--table-head-size); font-weight: var(--table-head-weight); letter-spacing: var(--table-head-track); text-transform: uppercase; color: var(--table-tertiary-color); } /* a day, a type: a divider that stays under the head while its rows scroll */

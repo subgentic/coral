@@ -14,6 +14,10 @@ const isDone = (t) => t.status === 'completed';
 /** Who did the work (the server's worked_by: the author of a reviewed task, not the orchestrator it was handed to); an older server has no worked_by: who completed a done task, else its assignee. */
 export const doerOf = (t) => t.worked_by || (isDone(t) ? t.completed_by : '') || t.assigned_to;
 export const whoText = (t) => { const w = doerOf(t); return isDone(t) ? (w ? `Done by ${w}` : 'Done') : (w || 'Nobody yet'); };
+/** The reviewers a task row names (a list item's reviewers: the names of its current or last review round), none when the server sends none. */
+const reviewersOf = (t) => (Array.isArray(t.reviewers) ? t.reviewers.map(r => String(r && r.name !== undefined ? r.name : r || '').trim()).filter(Boolean) : []);
+/** Who a row's Assigned to cell says, in words: the doer ("Done by Dev", "Dev"), then the reviewers ("reviewed by QA" once done, "review by QA" before). It is the circles' accessible name and hover text (#8492). */
+const whoWords = (t) => { const rv = reviewersOf(t); return rv.length ? `${whoText(t)}, ${isDone(t) ? 'reviewed by' : 'review by'} ${rv.join(', ')}` : whoText(t); };
 export const priorityWord = (p) => { const s = String(p || '').trim(); return s ? s[0].toUpperCase() + s.slice(1).toLowerCase() : ''; };
 const STATE_RANK = { 'In progress': 0, 'In review': 1, 'Blocked': 2, 'Queued': 3, 'Done': 4 };
 const PRIORITY_RANK = { high: 0, medium: 1, low: 2 };
@@ -23,7 +27,7 @@ export function taskColumns(ctx, keys = ['state', 'task', 'who', 'goal', 'priori
         state: { key: 'state', label: 'State', cell: (t) => DT.chip(taskWord(t), statusClass(taskWord(t))), sort: true, sortValue: (t) => STATE_RANK[taskWord(t)] ?? 9, line: 2 },
         task: { key: 'task', label: 'Task', primary: true, width: 'grow', sort: true, sortValue: (t) => t.title, line: 1,
             cell: (t) => { const c = DT.el('span', 'dt-title-cell'); const b = DT.primaryButton(t.title, `Open task #${t.id}: ${t.title}`); b.dataset.taskId = String(t.id); c.append(DT.el('span', 'dt-id', `#${t.id}`), b); return c; } },
-        who: { key: 'who', label: 'Assigned to', sort: true, sortValue: (t) => doerOf(t) || '', line: 2, cell: (t) => (doerOf(t) ? DT.avatar(doerOf(t), whoText(t)) : whoText(t)) },
+        who: { key: 'who', label: 'Who', sort: true, sortValue: (t) => doerOf(t) || '', line: 2, width: '6rem', cell: (t) => (doerOf(t) ? DT.avatars([{ name: doerOf(t) }, ...reviewersOf(t).map(name => ({ name, review: true }))], whoWords(t)) : whoText(t)) },
         goal: { key: 'goal', label: 'Goal', sort: true, sortValue: (t) => (t.goal_id ? ctx.goalTitleOf(t.goal_id) : ''), line: 0,
             cell: (t) => { if (!t.goal_id) return ctx.noGoal || 'No goal'; const l = DT.link(ctx.goalTitleOf(t.goal_id), () => ctx.openGoal?.(t.goal_id)); l.dataset.goalLink = String(t.goal_id); return l; } },
         team: { key: 'team', label: 'Team', sort: true, sortValue: (t) => (ctx.teamOf ? ctx.teamOf(t) : t.board || ''), line: 0, cell: (t) => (ctx.teamOf ? ctx.teamOf(t) : t.board || '') },

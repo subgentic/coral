@@ -57,7 +57,7 @@ const B = 'dock-tasks-' + Date.now().toString(36);
         const head = await ev(`(() => { const h = document.querySelector('#board-task-list thead tr'); const cs = getComputedStyle(h.cells[0]); return { texts: [...h.children].map(c => c.textContent.replace(/[↕↑↓]/g, '').trim()), transform: cs.textTransform, weight: cs.fontWeight, size: cs.fontSize }; })()`);
         assert.equal(head.transform, 'uppercase', 'the head uses shared typography: ' + JSON.stringify(head));
         assert.deepEqual([head.weight, head.size], ['600', '11px'], 'shared header typography');
-        assert.deepEqual(head.texts, ['State', 'Task', 'Assigned to'], 'the words as written: the dock shows State, Task and Assigned to only (#7962, #8060)');
+        assert.deepEqual(head.texts, ['State', 'Task', 'Who'], 'the words as written: the dock shows State, Task and Assigned to only (#7962, #8060)');
         const row = await ev(`(() => { const r = document.querySelector('#board-task-list .board-task-item:not(.board-task-header)'); const b = [...r.querySelectorAll('button')]; return { buttons: b.length, name: b[0] && b[0].getAttribute('aria-label'), inDesc: !!(b[0] && b[0].closest('.board-task-desc')), idIsButton: !!r.querySelector('button.board-task-id') }; })()`);
         assert.equal(row.buttons, 1, 'one real button on the row: ' + JSON.stringify(row)); assert.ok(row.inDesc && !row.idIsButton, 'it is the name, and the id is text');
         assert.ok(/^Open task #\d+: [A-Z]/.test(row.name), 'its name says what it opens: ' + row.name);
