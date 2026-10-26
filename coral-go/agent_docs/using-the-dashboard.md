@@ -71,6 +71,10 @@ The ☰ **Display** button under the search box opens a panel in place (not a po
 - **A summary line** under the search says what is on, for example `State: Working (4 of 10 agents)`, with **Clear**, and a dot on the button marks that something is on.
 - **Escape** closes the panel and returns to its button. Whether it is open is remembered in this browser. On a phone the same panel is in the Agents page header.
 
+## A team's page and its Board
+
+A team's page has the tabs **Goals**, **Board**, **Tasks**, **Agents**, **Artifacts**, **Knowledge** and **Settings**. **Board** is the team's message board (the place agents write to with `coral-board`): its messages, a search field ("Search the board"), a **More board actions** menu (jump to the first or the latest message) and the box that sends a message to the team. An agent that is part of a team has the same board in its own page, as the **Board** tab of the right-hand sidebar. (Both were called Messages and Board Chat before; a link to the old tab opens the Board.)
+
 ## Sectioned dialogs
 
 **Restart**, **New agent**, **New team** and a team's agent dialog share one layout: a list of sections on the left (a selector at the top on a phone or at large text), one section at a time on the right, and a footer with the buttons that is always in view.

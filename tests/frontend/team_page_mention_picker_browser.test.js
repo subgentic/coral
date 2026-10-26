@@ -29,7 +29,7 @@ const TEAM = `qa-mention-${Date.now() % 100000}`;
             await ev(`(() => { const R = window.fetch.bind(window); window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin);
                 if (/\\/api\\/board\\/[^/]+\\/subscribers$/.test(url.pathname)) return Promise.resolve(new Response(JSON.stringify([{ subscriber_id: 'Orchestrator', job_title: 'Orchestrator' }, { subscriber_id: 'Backend Dev', job_title: 'Backend Dev' }, { subscriber_id: 'Operator', job_title: 'Operator' }]), { status: 200, headers: { 'Content-Type': 'application/json' } }));
                 return R(u, o); }; return true; })()`);
-            await openTeam(ev, waitFor, TEAM).catch(() => {}); await goTab(ev, settle, 'Messages'); await settle(1200);
+            await openTeam(ev, waitFor, TEAM).catch(() => {}); await goTab(ev, settle, 'Board'); await settle(1200);
             await S.run(`${label}: "@" opens a list named "Mention an agent": @all first with its note, then the agents; the box is a combobox with the first row active`, async () => {
                 await type('@'); await settle(200);
                 const l = await list(); assert.ok(l, 'the list opens');

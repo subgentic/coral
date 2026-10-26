@@ -34,17 +34,17 @@ const TEAM = `qa-design-${Date.now() % 100000}`;
                 assert.ok(/Tasks\s*5/.test(names.Tasks) && /Goals\s*2/.test(names.Goals), `a count above zero is shown (${JSON.stringify(names)})`);
             });
 
-            await S.run(`${label}: item 4, the Messages tab has the other tabs' top and left edge, "Search messages" and the page's buttons`, async () => {
+            await S.run(`${label}: item 4, the Board tab has the other tabs' top and left edge, "Search the board" and the page's buttons`, async () => {
                 await goTab(ev, settle, 'Tasks'); await settle(500);
                 const tasks = await searchBox(); assert.ok(tasks, 'the Tasks tab has its search box');
-                await goTab(ev, settle, 'Messages'); await settle(700);
+                await goTab(ev, settle, 'Board'); await settle(700);
                 assert.equal(await ev(`!!document.querySelector('.mb-search-toggle')`), false, 'no Search disclosure row on any width: the field and its icons are shown directly (#7713)');
-                const m = await searchBox(); assert.ok(m, 'the Messages tab has its search box');
-                assert.equal(m.ph, 'Search messages', 'the placeholder');
+                const m = await searchBox(); assert.ok(m, 'the Board tab has its search box');
+                assert.equal(m.ph, 'Search the board', 'the placeholder');
                 assert.ok(Math.abs(m.left - tasks.left) <= 1, `the search box's left edge ${m.left} is the Tasks tab's ${tasks.left}`);
                 assert.ok(Math.abs(m.top - tasks.top) <= 6, `its top ${m.top} is the Tasks tab's ${tasks.top} (not 4 px under the tab strip)`);
                 // the toolbar is the Artifacts and Tasks tabs' (#7686): the Filters icon and the More icon (the jumps are its menu items), no text buttons
-                const btns = await ev(`[['.list-bar-toggle', 'Filters and sort'], ['.list-bar-more-btn', 'More message actions']].map(([sel, n]) => { const b = ${panel()}.querySelector(sel); if (!b || !window.__na.vis(b)) return [n, null]; return [n, [b.getAttribute('aria-label'), Math.round(b.getBoundingClientRect().height)]]; })`);
+                const btns = await ev(`[['.list-bar-toggle', 'Filters and sort'], ['.list-bar-more-btn', 'More board actions']].map(([sel, n]) => { const b = ${panel()}.querySelector(sel); if (!b || !window.__na.vis(b)) return [n, null]; return [n, [b.getAttribute('aria-label'), Math.round(b.getBoundingClientRect().height)]]; })`);
                 for (const [n, v] of btns) { assert.ok(v, `${n} is there`); assert.deepEqual([v[0], v[1] >= 32], [n, true], `${n} is an icon button of 32 px or more: ${JSON.stringify(v)}`); }
                 assert.equal(await ev(`[...${panel()}.querySelectorAll('button')].filter(x => ['Filters', 'Jump to first', 'Jump to latest'].includes(x.textContent.trim()) && window.__na.vis(x)).length`), 0, 'no text button Filters or Jump on the toolbar');
             });

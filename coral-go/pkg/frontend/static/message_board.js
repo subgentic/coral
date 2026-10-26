@@ -547,7 +547,7 @@ function renderMessages(messages, { keepAnchor = false, prepended = 0 } = {}) {
     const container = document.getElementById('mb-messages');
     wireBoardScroll(container);
     if (!messages.length) {
-        emptyState(container, 'No messages yet');
+        emptyState(container, 'No messages on the board yet');
         container.firstElementChild.setAttribute('role', 'listitem'); // the messages box is a list: its one notice is an item
         return;
     }

@@ -52,7 +52,7 @@ const TEAM = `qa-team-${Date.now() % 100000}`;
                 await ev(`(() => { const t = window.__tp.tabs().find(x => x.getAttribute('aria-selected') === 'true'); t.focus(); return true; })()`);
                 const tabindexes = await ev(`window.__tp.tabs().map(t => t.tabIndex)`);
                 assert.deepEqual(tabindexes.filter(i => i === 0).length, 1, `exactly one tab is a tab stop (got ${JSON.stringify(tabindexes)})`);
-                await key('ArrowRight'); assert.equal(await focusedTab(), 'Messages', 'Right moves to Messages');
+                await key('ArrowRight'); assert.equal(await focusedTab(), 'Board', 'Right moves to Board');
                 await key('End'); assert.equal(await focusedTab(), 'Settings', 'End moves to Settings');
                 await key('ArrowRight'); assert.equal(await focusedTab(), 'Goals', 'Right wraps to Goals');
                 await key('ArrowLeft'); assert.equal(await focusedTab(), 'Settings', 'Left wraps to Settings');

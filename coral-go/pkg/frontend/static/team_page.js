@@ -17,7 +17,7 @@ const { closeDetailPane } = await importOnce('./detail_pane.js'); // a lazy modu
 const { el } = await importOnce('./team_table.js');
 const { quietFocus } = await importOnce('./quiet_focus.js');
 
-const LABEL = { goals: 'Goals', messages: 'Messages', tasks: 'Tasks', agents: 'Agents', artifacts: 'Artifacts', knowledge: 'Knowledge', settings: 'Settings' };
+const LABEL = { goals: 'Goals', messages: 'Board', tasks: 'Tasks', agents: 'Agents', artifacts: 'Artifacts', knowledge: 'Knowledge', settings: 'Settings' };
 const S = { team: '', tab: 'goals', item: null, counts: {}, built: false, countSeq: 0, noGoal: false }; // noGoal: the next Tasks tab opens filtered to the tasks that serve no goal (the Goals table's last row, #7717)
 const $ = (id) => document.getElementById(id);
 

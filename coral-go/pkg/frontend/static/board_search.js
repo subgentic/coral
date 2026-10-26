@@ -10,8 +10,8 @@ const SPEC = {
     idp: 'bm',
     noun: 'message',
     label: 'Search and filter the board',
-    searchLabel: 'Search messages',
-    placeholder: 'Search messages',
+    searchLabel: 'Search the board',
+    placeholder: 'Search the board',
     sorts: null,
     collapsible: true, // the same Filters icon as Artifacts and Tasks (#7686); the jumps are behind the More icon
     fields: [
@@ -145,7 +145,7 @@ export function mountBoardSearch(host, project, hooks) {
         _status = null;
     }
     if (!_bar) {
-        _bar = buildListBar({ ...SPEC, moreNoun: 'message', more: [{ label: 'Jump to first message', run: () => _hooks.first() }, { label: 'Jump to latest message', run: () => _hooks.latest() }] }, run);
+        _bar = buildListBar({ ...SPEC, moreNoun: 'board', more: [{ label: 'Jump to first message', run: () => _hooks.first() }, { label: 'Jump to latest message', run: () => _hooks.latest() }] }, run);
         _status = make('div', 'mb-search-status'); _status.hidden = true;
         _results = make('span', 'mb-search-results'); _results.setAttribute('role', 'status'); _results.setAttribute('aria-live', 'polite');
         const icon = (name, label, stepName) => { const b = make('button', 'list-bar-filter-btn mb-search-step'); b.type = 'button'; b.dataset.step = stepName; b.setAttribute('aria-label', label); b.title = label;

@@ -1,4 +1,4 @@
-// The team page's Messages tab (#7453, stage 2; UI/UX's doc 7aa984fe item 2): the board's messages and the composer in the page, one click from Goals; the message the seed posted is shown, the composer is a text box
+// The team page's Board tab (it was called Messages until #7784) (#7453, stage 2; UI/UX's doc 7aa984fe item 2): the board's messages and the composer in the page, one click from Goals; the message the seed posted is shown, the composer is a text box
 // named "Message the team" with a Send button, a message sent from it appears and the box is emptied; the header and tab strip do not move; Messages is not the page a team opens on. Written failing-first by QA
 // (#7499): by role and accessible name (helpers/team_page.js). Isolated dev server.
 const assert = require('node:assert/strict');
@@ -26,10 +26,10 @@ const BOX = `window.__tp.find('textarea, input[type=text], [role=textbox]', /^Me
             await openTeam(ev, waitFor, TEAM).catch(() => {});
             await S.run(`${label}: a team opens on Goals, not Messages; Messages is the second tab`, async () => {
                 assert.equal(await ev(`(() => { const t = window.__tp.tabs().find(x => x.getAttribute('aria-selected') === 'true'); return t ? window.__tp.tabLabel(t) : ''; })()`), 'Goals', 'the page opens on Goals');
-                assert.equal(await ev(`window.__tp.tabs().length > 1 ? window.__tp.tabLabel(window.__tp.tabs()[1]) : ''`), 'Messages', 'Messages is the second tab');
+                assert.equal(await ev(`window.__tp.tabs().length > 1 ? window.__tp.tabLabel(window.__tp.tabs()[1]) : ''`), 'Board', 'Board is the second tab');
             });
             await S.run(`${label}: Messages shows the board's messages and a text box named "Message the team" with a Send button, and the header and tab strip stay put`, async () => {
-                const base = await rect(ev); await goTab(ev, settle, 'Messages'); await settle(600);
+                const base = await rect(ev); await goTab(ev, settle, 'Board'); await settle(600);
                 assert.ok(await ev(`/A message for the team page suites\\./.test(window.__na.text(window.__tp.page()))`), 'the seeded message is shown');
                 assert.ok(await ev(`!!${BOX}`), 'a text box named Message the team');
                 assert.ok(await ev(`!!window.__tp.find('button', /^Send$/i)`), 'a button named Send');

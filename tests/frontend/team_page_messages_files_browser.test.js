@@ -1,4 +1,4 @@
-// The Messages tab keeps what the board's chat showed inline (#7535, the census's board chat rows): a message from another computer lists its files as chips under the text (an image with its thumbnail, another file with its size) and a plain click on a chip opens the
+// The Board tab keeps what the board's chat showed inline (#7535, the census's board chat rows): a message from another computer lists its files as chips under the text (an image with its thumbnail, another file with its size) and a plain click on a chip opens the
 // artifact viewer; an artifact image in the text is an image of this server; an @mention is marked; and the composer is named "Message the team" with its button "Send" only while the column is in the team page (the board page keeps its own names).
 // The board's messages are stubbed in the page. 1280 px, isolated dev server.
 const assert = require('node:assert/strict');
@@ -28,7 +28,7 @@ const A = 'a'.repeat(64), B = 'b'.repeat(64), C = 'c'.repeat(64);
                 if (/\\/api\\/board\\/[^/]+\\/subscribers$/.test(url.pathname)) return j([{ subscriber_id: 'Orchestrator', job_title: 'Orchestrator' }]);
                 if (/^\\/api\\/artifacts\\/[a-f0-9]{64}$/.test(url.pathname)) { const png = !url.pathname.endsWith('${B}'); return Promise.resolve(new Response(png ? Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='), c => c.charCodeAt(0)) : 'log text', { headers: { 'Content-Type': png ? 'image/png' : 'text/plain' } })); }
                 return R(u, o); }; return true; })()`);
-        await openTeam(ev, waitFor, TEAM); await goTab(ev, settle, 'Messages'); await settle(900);
+        await openTeam(ev, waitFor, TEAM); await goTab(ev, settle, 'Board'); await settle(900);
         await S.run('files from another computer are chips under the message: an image with a thumbnail, a file with its size', async () => {
             const chips = await ev(`[...document.querySelectorAll('#team-panel-messages .mb-attachment')].map(c => ({ name: c.getAttribute('aria-label'), image: c.classList.contains('is-image'), thumb: !!c.querySelector('img.mb-attachment-thumb'), size: (c.querySelector('.mb-attachment-size') || {}).textContent || '' }))`);
             assert.deepEqual(chips.map(c => c.name), ['Open shot.png, 2.0 KB', 'Open build-log.txt, 900 B', 'Open inline.png, 70 B'], JSON.stringify(chips));

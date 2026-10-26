@@ -14,7 +14,7 @@ const { connect } = require('./agent_view_harness');
             const same = (build, old) => { const a = document.createElement('div'); const b = document.createElement('div'); build(a); b.innerHTML = old; return a.innerHTML === b.innerHTML; };
             const r = {};
             r.cost = same(c => emptyState(c, 'No usage data yet', 'cost-empty'), '<div class="cost-empty">No usage data yet</div>');
-            r.board = same(c => emptyState(c, 'No messages yet'), '<div class="empty-state">No messages yet</div>');
+            r.board = same(c => emptyState(c, 'No messages on the board yet'), '<div class="empty-state">No messages on the board yet</div>');
             const ul = document.createElement('ul'); ul.innerHTML = '<li>old one</li><li>old two</li>'; emptyState(ul, 'No projects', 'empty-state', 'li'); r.li = ul.innerHTML; r.liKids = ul.children.length;
             const c = document.createElement('div'); emptyState(c, '<img src=x onerror=alert(1)> & more', 'cost-empty'); r.text = [c.textContent, c.querySelectorAll('img').length, c.innerHTML];
             return r; })()`);

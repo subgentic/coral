@@ -44,14 +44,14 @@ const TEAM = `qa-tbr-${Date.now() % 100000}`;
             await Emulation.setEmulatedMedia({ features: [] });
         });
         await S.run('a More menu opens on Enter (the keyboard on its first item), ArrowDown moves, Escape closes it and returns to the button', async () => {
-            await goTab(ev, settle, 'Messages'); await settle(600);
-            await ev(`[...document.querySelectorAll('[role=tabpanel]:not([hidden]) button')].find(b => /More message actions/.test(b.getAttribute('aria-label') || '')).focus(); true`);
+            await goTab(ev, settle, 'Board'); await settle(600);
+            await ev(`[...document.querySelectorAll('[role=tabpanel]:not([hidden]) button')].find(b => /More board actions/.test(b.getAttribute('aria-label') || '')).focus(); true`);
             await key('Enter', 'Enter', 13); await settle(300);
-            const open1 = await ev(`(() => { const a = document.activeElement; return { role: a.getAttribute('role'), name: (a.textContent || '').trim(), expanded: [...document.querySelectorAll('button[aria-haspopup=menu]')].find(b => /More message actions/.test(b.getAttribute('aria-label') || '')).getAttribute('aria-expanded') }; })()`);
+            const open1 = await ev(`(() => { const a = document.activeElement; return { role: a.getAttribute('role'), name: (a.textContent || '').trim(), expanded: [...document.querySelectorAll('button[aria-haspopup=menu]')].find(b => /More board actions/.test(b.getAttribute('aria-label') || '')).getAttribute('aria-expanded') }; })()`);
             assert.deepEqual(open1, { role: 'menuitem', name: 'Jump to first message', expanded: 'true' }, JSON.stringify(open1));
             await key('ArrowDown', 'ArrowDown', 40); await settle(150); assert.equal(await ev(`document.activeElement.textContent.trim()`), 'Jump to latest message');
             await key('Escape', 'Escape', 27); await settle(300);
-            assert.deepEqual(await ev(`({ name: document.activeElement.getAttribute('aria-label'), open: [...document.querySelectorAll('[role=menu]')].some(e => e.getClientRects().length) })`), { name: 'More message actions', open: false });
+            assert.deepEqual(await ev(`({ name: document.activeElement.getAttribute('aria-label'), open: [...document.querySelectorAll('[role=menu]')].some(e => e.getClientRects().length) })`), { name: 'More board actions', open: false });
         });
         await open(390, 844, true);
         await S.run('390 px: a task in the Tasks tab is one 44 px button named for the task and its state', async () => {

@@ -62,7 +62,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             const btns = [...t.querySelectorAll('.list-bar-search-row > .list-bar-toggle, .list-bar-search-row .list-bar-more-btn')].map(b => [b.getAttribute('aria-label'), Math.round(b.getBoundingClientRect().height)]);
             const st = t.querySelector('.mb-search-status'); const steps = [...t.querySelectorAll('button[data-step], .mb-search-clear')].map(b => Math.round(b.getBoundingClientRect().height));
             return { shown: t.getClientRects().length > 0, search: h('.list-bar-search'), btns, status: !!st && !st.hidden, steps, tools: t.scrollWidth - t.clientWidth, page: document.documentElement.scrollWidth - document.documentElement.clientWidth }; })()`);
-        check('the tools row shows with the search, the Filters icon and the More icon (#7686)', g.shown && g.btns.map(b => b[0]).join() === 'Filters and sort,More message actions', JSON.stringify(g.btns));
+        check('the tools row shows with the search, the Filters icon and the More icon (#7686)', g.shown && g.btns.map(b => b[0]).join() === 'Filters and sort,More board actions', JSON.stringify(g.btns));
         check('the icons are 44px targets, and so are the search box and the result buttons', g.search >= 44 && g.btns.every(b => b[1] >= 44) && g.steps.every(h => h >= 44), JSON.stringify([g.search, g.btns, g.steps]));
         check('the results line shows, and nothing scrolls sideways', g.status && g.tools <= 1 && g.page <= 0, JSON.stringify([g.status, g.tools, g.page]));
     } finally { await removeBoards(ev, [BOARD]); await client.close(); }

@@ -32,7 +32,7 @@ const TEAM = `qa-consist-${Date.now() % 100000}`;
             await openTeam(ev, waitFor, TEAM).catch(() => {});
             await S.run(`${label}: item 3, every tab's search and chips start on the page edge (24 px, 16 on a phone) and 16 px (12) under the strip`, async () => {
                 const edge = mobile ? 16 : 24, top = mobile ? 12 : 16;
-                for (const tab of ['Goals', 'Messages', 'Tasks', 'Agents', 'Artifacts', 'Knowledge']) {
+                for (const tab of ['Goals', 'Board', 'Tasks', 'Agents', 'Artifacts', 'Knowledge']) {
                     await goTab(ev, settle, tab); await settle(600);
                     const at = await start(); assert.ok(at, `${tab} has a search box or chips`);
                     assert.equal(at.left, edge, `${tab}: its first row starts ${at.left} px from the page edge, not ${edge} (${at.what})`);

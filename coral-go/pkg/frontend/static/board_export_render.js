@@ -43,7 +43,7 @@ function agentHue(name) {
 }
 
 export function renderExportMarkdown(d) {
-    let out = `# Board Chat Export: ${d.project}\n\n`;
+    let out = `# Board Export: ${d.project}\n\n`;
     out += `**Exported**: ${d.exported_at}\n`;
     out += `**Messages**: ${d.stats.total}\n`;
     if (d.stats.agent_chat > 0) {
@@ -86,7 +86,7 @@ export function renderExportHTML(d) {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Board Chat Export: ${escapeHtml(d.project)}</title>
+<title>Board Export: ${escapeHtml(d.project)}</title>
 <style>
   :root { --bg: #1a1a1e; --surface: #212126; --border: #3a3a40; --text: #e0e0e4; --muted: #8c8c94; --accent: #58a6ff; --side-chat: #22222a; }
   * { box-sizing: border-box; margin: 0; padding: 0; }

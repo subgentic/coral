@@ -39,7 +39,7 @@ const FAKE_HUB = `(() => {
     const look = () => {
         if (document.querySelector('#live-history-messages .chat-load-error')) window.__seen.add('chat-error');
         const mb = document.getElementById('mb-messages');
-        if (mb && /No messages yet/.test(mb.textContent)) window.__seen.add('board-empty');
+        if (mb && /No messages on the board yet/.test(mb.textContent)) window.__seen.add('board-empty');
         const bt = document.getElementById('board-task-list');
         if (bt && /No tasks/.test(bt.textContent)) window.__seen.add('tasks-empty');
         for (const el of document.querySelectorAll('.chat-history-busy, .mb-busy, .board-task-busy')) window.__seen.add('busy:' + el.textContent.trim());
@@ -106,7 +106,7 @@ async function api(method, path, body) {
         assert.ok(tookBoard <= 2200, `the board is in ${tookBoard} ms, not at the next 10 s poll`);
         const seenBoard = await ev(`[...window.__seen]`);
         assert.ok(!seenBoard.includes('board-empty'), `the refusal never showed as an empty board (${JSON.stringify(seenBoard)})`);
-        console.log(`   ✓ busy line shown, messages in ${tookBoard} ms, never "No messages yet"`);
+        console.log(`   ✓ busy line shown, messages in ${tookBoard} ms, never "No messages on the board yet"`);
         await ev(`(async () => { ${overload}._resetOverloadForTests(); return true; })()`);
 
         console.log('4. Board tasks, first load refused once');
