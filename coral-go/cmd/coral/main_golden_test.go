@@ -22,6 +22,9 @@ import (
 // each refusal before the server starts says and exits with (a bad value, a bad flag, a stray word, a wrong Hub mode). The refactor of main
 // into named steps (#8272) must leave all of it as it is. Regenerate with UPDATE_MAIN_GOLDEN=1 only for a change meant to change the text.
 func TestMainCommandLineIsGolden(t *testing.T) {
+	if config.BuildFlavor != "" {
+		t.Skip("a relaunchfixture build's main exits without its fixture folder (#5452): its command line is not the golden's")
+	}
 	if args := os.Getenv("CORAL_TEST_MAIN_GOLDEN_ARGS"); args != "" {
 		os.Args = append([]string{"coral"}, strings.Split(args, " ")...)
 		main()

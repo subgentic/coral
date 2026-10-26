@@ -138,6 +138,10 @@ func configureServerCfg(t *testing.T) *config.Config {
 }
 
 func TestConfigureServerAppliesTheListenFlags(t *testing.T) {
+	// A relaunchfixture build's main refuses to start without its fixture folder (#5452): the step cannot run in it.
+	if config.BuildFlavor != "" {
+		t.Skip("a relaunchfixture build: configureServer's fixture check exits the test process")
+	}
 	cfg := configureServerCfg(t)
 	defaultHost, defaultPort := cfg.Host, cfg.Port
 	configureServer(cfg, serverFlagsFor(t))
@@ -163,6 +167,10 @@ func TestConfigureServerAppliesTheListenFlags(t *testing.T) {
 // The Terms gate: with the Terms accepted the step returns; without them (and nobody to ask) the process exits 0 saying so, before anything is
 // served. The refusal exits, so it runs in a child process. A tier that skips the Terms (the dev build) has no gate to test.
 func TestConfigureServerStopsWithoutAcceptedTerms(t *testing.T) {
+	// A relaunchfixture build's main refuses to start without its fixture folder (#5452): the step cannot run in it.
+	if config.BuildFlavor != "" {
+		t.Skip("a relaunchfixture build: configureServer's fixture check exits the test process")
+	}
 	if os.Getenv("CORAL_TEST_CONFIGURE_SERVER") == "1" {
 		// the guard learns the real ~/.coral from HOME at its first check: take that first, then point HOME at the temp folder
 		testguard.CheckDataPath("/nonexistent")
