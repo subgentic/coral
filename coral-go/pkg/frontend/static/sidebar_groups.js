@@ -142,12 +142,13 @@ function tableHtml(t, kind, key, n = 0, lead = '', several = false, bar = false)
     const tid = n ? `group-table-title-${n + 1}` : 'group-table-title'; // a page with several tables (the landing's groups, #7722): one title id each
     // A table that stacks its rows on a phone (the Inbox's Saved: the message over its state and action) says it is a table in its roles, since a display other than table-* loses the native ones.
     const st = !!t.stack;
-    const head = t.columns.map(c => `<th scope="col"${st ? ' role="columnheader"' : ''}>${escapeHtml(c)}</th>`).join('');
-    const rows = t.rows.map(r => `<tr${st ? ' role="row"' : ''}><td${st ? ' role="cell"' : ''}><button type="button" class="group-table-link" ${ROW_ACTION_ATTR[r.action] || ''} ${dataAttrs(r.data)}>${escapeHtml(r.title)}</button></td>`
+    const head = t.node ? '' : t.columns.map(c => `<th scope="col"${st ? ' role="columnheader"' : ''}>${escapeHtml(c)}</th>`).join('');
+    const rows = t.node ? '' : t.rows.map(r => `<tr${st ? ' role="row"' : ''}><td${st ? ' role="cell"' : ''}><button type="button" class="group-table-link" ${ROW_ACTION_ATTR[r.action] || ''} ${dataAttrs(r.data)}>${escapeHtml(r.title)}</button></td>`
         + r.cells.map(c => (st ? cellHtml(c).replace('<td>', '<td role="cell">') : cellHtml(c))).join('') + '</tr>').join('');
     const top = (t.headless ? lead : `<div class="group-table-head">${lead}<h2 id="${escapeAttr(tid)}" tabindex="-1">${escapeHtml(t.title)}</h2><span class="session-group-count">${t.rows.length}</span>${bar ? '' : extraHtml(t.extra)}</div>`) + (bar && !n ? '' : chipsHtml(t)); // the page's toolbar line has the first table's chips and the create actions
     // A group with nothing in it says so in one line (its chips, if it has them, stay: they are how the list is widened)
     if (!t.rows.length && t.empty) return top + `<div class="empty-pane"><p class="empty-line">${escapeHtml(t.empty.line)}</p>${t.empty.hint ? `<p class="empty-hint">${escapeHtml(t.empty.hint)}</p>` : ''}</div>`;
+    if (t.node) return top + '<div class="group-table-node"></div>'; // a table that draws its own rows (the Inbox's Tasks: the one task row, task_row.js): its node goes in here, built by drawTable
     return top + `<div class="group-table-scroll"><table class="group-table${st ? ' group-table-stack' : ''}${several ? ' group-table-aligned' : ''}"${st ? ' role="table"' : ''} ${t.headless ? 'aria-label="' + escapeAttr(t.title) + '"' : 'aria-labelledby="${escapeAttr(tid)}"'}><thead${st ? ' role="rowgroup"' : ''}><tr${st ? ' role="row"' : ''}>${head}</tr></thead><tbody${st ? ' role="rowgroup"' : ''}>${rows}</tbody></table></div>`
         + (t.note ? `<p class="empty-hint group-table-note">${escapeHtml(t.note)}</p>` : '');
 }
@@ -164,7 +165,13 @@ function drawTable() {
     const html = (bar ? toolbarHtml(bar, tables[0]) : '') + tables.map((x, i) => tableHtml(x, open.kind, open.key, i, i ? '' : back, tables.length > 1, !!bar)).join('');
     host.dataset.group = open.kind + ':' + open.key; // which table is on screen (saved.js asks for the Inbox's Saved)
     const a = document.activeElement, typing = a && host.contains(a) && a.id === 'gt-search' ? { start: a.selectionStart, end: a.selectionEnd } : null;
-    if (host.dataset.drawn !== html) { host.innerHTML = html; host.dataset.drawn = html; } // a redraw of what is there would drop the focus from a row the keyboard is on
+    const drawn = html + tables.map(x => (x.node ? `|${x.signature || ''}` : '')).join(''); // a table with its own rows says what they are (signature): the same rows are not drawn again
+    if (host.dataset.drawn !== drawn) {
+        host.innerHTML = html; host.dataset.drawn = drawn; // a redraw of what is there would drop the focus from a row the keyboard is on
+        const slots = host.querySelectorAll('.group-table-node'); // one per table that draws its own rows (and has some), in order
+        let k = 0;
+        for (const x of tables) if (x.node && x.rows.length) slots[k++]?.replaceWith(x.node());
+    }
     if (typing) { const again = document.getElementById('gt-search'); if (again && again !== a) { again.focus({ preventScroll: true }); try { again.setSelectionRange(typing.start, typing.end); } catch { /* a search field has a caret */ } } } // the person is typing in the page's search: the redraw keeps their caret
     return true;
 }

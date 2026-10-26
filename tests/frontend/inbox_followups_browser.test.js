@@ -70,7 +70,7 @@ const AGENTS = (waiting) => waiting ? [
             const escape = () => ev(`(document.activeElement || document.body).dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); true`);
             if (!mobile) await step('a task page starts at its title and Back puts the focus on the task row', async () => {
                 await click('Tasks', `${pane} .sgroup-header[data-group-name="hub-inbox:tasks"]`); await settle(300);
-                await click('the task', '#group-table-view .group-table-link[data-task-id="12"]');
+                await click('the task', '#group-table-view .team-row-btn[data-task-id="12"]');
                 await waitFor(`!!document.querySelector('#inbox-page .ibx-reply-input')`, 'the task page', 8000); await settle(300);
                 assert.equal((await active()).cls.includes('wf-item-title'), true, 'the title has the focus');
                 await click('Back', '#inbox-page > .group-back'); await settle(400);
@@ -78,7 +78,7 @@ const AGENTS = (waiting) => waiting ? [
             });
             if (!mobile) await step('Escape on a task page is one level back, on the same row', async () => {
                 await click('Tasks', `${pane} .sgroup-header[data-group-name="hub-inbox:tasks"]`); await settle(300);
-                await click('the task', '#group-table-view .group-table-link[data-task-id="13"]'); await settle(500);
+                await click('the task', '#group-table-view .team-row-btn[data-task-id="13"]'); await settle(500);
                 await escape(); await settle(500);
                 const a = await active(); assert.equal(a.data.taskId, '13', 'Escape (' + JSON.stringify(a) + ')');
             });

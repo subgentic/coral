@@ -1,4 +1,4 @@
-// One task row (#7737, UI/UX's design, task_row.js): the same task reads the same wherever it is listed. Step 1: the team page's Tasks tab. On a desktop a table: State (the one chip), Task (the id in tertiary before the title,
+// One task row (#7737, UI/UX's design, task_row.js): the same task reads the same wherever it is listed: the team page's Tasks tab, the Inbox's Tasks group and a goal's task column. On a desktop a table: State (the one chip), Task (the id in tertiary before the title,
 // the title the row's one button), Assigned to, Goal (a link of its own), Priority (a word), Updated; on a phone the column: two lines in a 44 px row (id and title, then the chip, who, and the priority only when High). Real board on
 // the isolated dev server, removed again.
 const assert = require('node:assert/strict');
@@ -18,14 +18,14 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
             await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'tasks' }); true`);
-            await waitFor(`document.querySelectorAll('#team-panel-tasks .task-table tbody tr, #team-panel-tasks .task-col-row').length >= 4`, 'the tasks', 15000);
+            await waitFor(`document.querySelectorAll('#team-panel-tasks .task-table tbody tr, #team-panel-tasks .task-col-row').length >= 5`, 'the tasks', 15000);
         };
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); // the page first: the board is made through its own fetch
         for (const [id, jt] of [['orch', 'Orchestrator'], ['dev', 'Developer']]) assert.equal((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: id, job_title: jt, session_name: id + '-s' })).status, 200);
         const g = await api('POST', `/api/board/${B}/goals`, { subscriber_id: 'Operator', title: 'One row everywhere', outcome: 'x', done_when: 'y' }); assert.equal(g.status, 201);
         const goal = g.body.id;
         const mk = async (title, assigned, priority) => (await api('POST', `/api/board/${B}/tasks`, { title, body: 'Text of ' + title, created_by: 'orch', priority, goal_id: goal, ...(assigned ? { assigned_to: assigned } : {}) })).body;
-        const first = await mk('Build the column', 'dev', 'high'); await mk('Review the patch', 'orch', 'medium'); await mk('A very long title that a table cell cuts with an ellipsis instead of wrapping it onto four lines of text in a narrow window', '', 'low'); await mk('Fourth task', 'dev', 'medium');
+        const first = await mk('Build the column', 'dev', 'high'); await mk('Review the patch', 'orch', 'medium'); await mk('A very long title that a table cell cuts with an ellipsis instead of wrapping it onto four lines of text in a narrow window', '', 'low'); await mk('Fourth task', 'dev', 'medium'); await mk('Mine to do', 'Operator', 'high');
         assert.equal((await api('POST', `/api/board/${B}/tasks/claim`, { subscriber_id: 'dev', task_id: first.id || first.task.id })).status, 200); // the server's ids are not ours: this board's first task, whatever number it has
 
         console.log('1. Desktop: the table');
@@ -53,7 +53,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await ev(`document.querySelector('#team-panel-tasks .team-link[data-goal-link]').click(); true`);
         await waitFor(`!!document.querySelector('.goal-split') || !!document.getElementById('goals-detail-title')`, 'the goal opened', 10000);
         await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'tasks' }); true`);
-        await waitFor(`document.querySelectorAll('#team-panel-tasks .task-table tbody tr').length >= 4`, 'the tasks again', 10000);
+        await waitFor(`document.querySelectorAll('#team-panel-tasks .task-table tbody tr').length >= 5`, 'the tasks again', 10000);
         await ev(`document.querySelector('#team-panel-tasks .task-table tbody tr td:nth-child(3)').click(); true`);
         await waitFor(`!!document.getElementById('team-task-title')`, 'the task page from a click on the row', 10000);
         console.log('   ✓');
@@ -61,12 +61,42 @@ const { removeBoards } = require('./helpers/board_cleanup');
         console.log('2. Phone: the column, two lines in a 44 px row');
         await load(390, true);
         const p = await ev(`(() => { const rows = [...document.querySelectorAll('#team-panel-tasks .task-col-row')]; return { table: !!document.querySelector('#team-panel-tasks .task-table'), n: rows.length, h: rows.map(r => Math.round(r.getBoundingClientRect().height)), lines: rows.map(r => [r.querySelector('.task-col-line1').textContent.replace(/\\s+/g, ' ').trim(), r.querySelector('.task-col-line2 .goal-chip').textContent, !!r.querySelector('.task-col-priority')]), over: document.documentElement.scrollWidth - innerWidth }; })()`);
-        assert.equal(p.table, false, 'no table on a phone'); assert.ok(p.n >= 4 && p.h.every(h => h >= 44), 'every row is at least 44 px ' + JSON.stringify(p.h));
+        assert.equal(p.table, false, 'no table on a phone'); assert.ok(p.n >= 5 && p.h.every(h => h >= 44), 'every row is at least 44 px ' + JSON.stringify(p.h));
         assert.ok(p.lines[0][0].startsWith('#') && p.lines.some(l => l[1] === 'In progress'), 'line 1 is the id and title, line 2 the chip ' + JSON.stringify(p.lines));
-        assert.equal(p.lines.filter(l => l[2]).length, 1, 'the priority shows only for the one High task ' + JSON.stringify(p.lines)); assert.ok(p.over <= 1, 'no sideways scroll ' + p.over);
+        assert.equal(p.lines.filter(l => l[2]).length, 2, 'the priority shows only for the two High tasks ' + JSON.stringify(p.lines)); assert.ok(p.over <= 1, 'no sideways scroll ' + p.over);
         await shot('task-row-phone');
         await ev(`document.querySelector('#team-panel-tasks .task-col-btn').click(); true`);
         await waitFor(`!!document.getElementById('team-task-title')`, 'the task page from the phone row', 10000);
+        console.log('   ✓');
+        // the same row in the Inbox's Tasks group (my tasks) and in the goal's column
+        const word = (rowSel, chip) => `[...document.querySelectorAll('${rowSel}')].map(r => r.querySelector('${chip}').textContent)`;
+        for (const [w, mobile, label] of [[1280, false, 'desktop'], [390, true, 'phone']]) {
+            console.log(`3. The Inbox's Tasks group, ${label}`);
+            await Emulation.setDeviceMetricsOverride({ width: w, height: 844, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
+            await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await ev(`window.switchNavTab('hub-inbox'); true`);
+            await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('tasks')).then(() => true)`);
+            await waitFor(`document.querySelectorAll('#group-table-view .task-table tbody tr, #group-table-view .task-col-row').length >= 1`, 'the inbox tasks', 15000);
+            const ib = await ev(`(() => { const tb = document.querySelector('#group-table-view .task-table'); const rows = [...document.querySelectorAll('#group-table-view .task-table tbody tr, #group-table-view .task-col-row')]; return { table: !!tb, heads: tb ? [...tb.querySelectorAll('thead th')].map(h => h.textContent) : [], n: rows.length, words: rows.map(r => r.querySelector('.goal-chip').textContent), idFirst: rows.every(r => r.querySelector('.task-title-cell > .task-id + .team-row-btn') || r.querySelector('.task-col-line1 > .task-id')), h: rows.map(r => Math.round(r.getBoundingClientRect().height)) }; })()`);
+            assert.equal(ib.n, 1, 'one task is assigned to the operator ' + JSON.stringify(ib)); assert.deepEqual(ib.words, ['Queued'], 'the same word as the Tasks tab (not "Open") ' + JSON.stringify(ib)); assert.ok(ib.idFirst, 'the id comes before the title ' + JSON.stringify(ib));
+            if (mobile) assert.ok(!ib.table && ib.h.every(h => h >= 44), 'a phone: the two-line column, 44 px ' + JSON.stringify(ib)); else assert.deepEqual(ib.heads, ['State', 'Task', 'Priority', 'Team', 'Updated'], 'a desktop: the table ' + JSON.stringify(ib));
+            await shot(`task-row-inbox-${label}`);
+            console.log('   ✓');
+        }
+        console.log('4. The goal\'s column');
+        for (const [w, mobile] of [[1280, false], [390, true]]) {
+            await Emulation.setDeviceMetricsOverride({ width: w, height: 844, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
+            await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'goals', item: ${goal} }); true`);
+            await waitFor(`!!document.querySelector('.goal-split')`, 'the goal page', 15000);
+            if (mobile) await ev(`document.querySelector('.goal-tasks-open').click(); true`);
+            await waitFor(`document.querySelectorAll('.goal-side .task-col-row').length >= 5`, 'the goal column', 10000);
+            const gc = await ev(`(() => { const rows = [...document.querySelectorAll('.goal-side .task-col-row')]; return { words: [...new Set(rows.map(r => r.querySelector('.goal-chip').textContent))].sort(), idFirst: rows.every(r => r.querySelector('.task-col-line1 > .task-id')), high: rows.filter(r => r.querySelector('.task-col-priority')).length, h: rows.map(r => Math.round(r.getBoundingClientRect().height)) }; })()`);
+            assert.deepEqual(gc.words, ['In progress', 'Queued'], 'the same word set ' + JSON.stringify(gc)); assert.ok(gc.idFirst, 'the id before the title'); assert.equal(gc.high, 2, 'High only'); assert.ok(gc.h.every(h => h >= 44), '44 px rows ' + JSON.stringify(gc.h));
+            await shot(`task-row-goal-column-${mobile ? 'phone' : 'desktop'}`);
+        }
         console.log('   ✓');
         console.log('PASS One task row: the Tasks tab as a table and as the phone column');
     } finally { await removeBoards(ev, [B]).catch(() => {}); await client.close(); }
