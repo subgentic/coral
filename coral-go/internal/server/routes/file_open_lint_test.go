@@ -30,6 +30,7 @@ var reviewedFileOpens = map[string]string{
 	"artifacts.go:SessionsHandler.uploadAgentArtifact:WriteFile":          "uploads/<uploadsDir(session)>/<server hex>.json",
 	"artifacts.go:createSidecarExclusive:OpenFile":                        "O_EXCL in the server's objects folder, server hex name",
 	"artifacts.go:readHead:Open":                                          "an object named by its server-computed hex",
+	"artifacts.go:storeArtifactFile:ReadFile":                             "the upload's own record in uploads/<session>/<server hex>.json, read to keep the task link an earlier upload of the same bytes made (#7739)",
 	"artifacts.go:readSidecar:ReadFile":                                   "an object's sidecar, hex name",
 	"auto_attach.go:NewAutoAttacher:ReadFile":                             "server data folder (auto-attach-bytes)",
 	"board_task_read.go:BoardHandler.TaskChangesDiff:ReadFile":            "the task id is an int64; the server's artifacts folder",

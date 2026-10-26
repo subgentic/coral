@@ -65,6 +65,9 @@ type agentUploadRecord struct {
 	SeriesID string `json:"series_id,omitempty"`
 	Version  int    `json:"version,omitempty"`
 	Previous string `json:"previous,omitempty"`
+	// TaskID is the task of the uploader's board this upload is linked to (#7739): the agent's one task in progress at the upload, or the one it named. Absent on a person's upload and on one made
+	// with no task. It is checked against the board when the list is made (a task that is not on the team's board is not shown).
+	TaskID int64 `json:"task_id,omitempty"`
 }
 
 // sourcePaste marks an upload record made from an image pasted or attached in the dashboard.
@@ -453,6 +456,11 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 	if mediaType == "" {
 		mediaType = mediatype.Generic
 	}
+	taskID, refused := h.artifactTaskLink(r.Context(), r) // before a byte is read: a task that cannot be named stores nothing (#7739)
+	if refused != "" {
+		errNotFound(w, refused)
+		return
+	}
 	if refuseIfDiskLow(w) {
 		return
 	}
@@ -545,7 +553,7 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 		}
 		stamp = &plan.stamp
 	}
-	meta, fresh, err := storeArtifactFile(coralDir, sid, name, mediaType, tmpPath, hexID, size, stamp)
+	meta, fresh, err := storeArtifactFile(coralDir, sid, name, mediaType, tmpPath, hexID, size, stamp, taskID)
 	if errors.Is(err, errStoreFull) {
 		b, _, max := st.size()
 		artifactRefusal(w, http.StatusRequestEntityTooLarge, "artifact_quota", "store",
@@ -566,6 +574,9 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 		"size":       meta.Size, // the stored size: smaller than the file when metadata was removed
 		"digest":     meta.Digest,
 		"stripped":   stripped, // image metadata was removed: the id is the hash of the stored bytes
+	}
+	if taskID > 0 {
+		reply["task_id"] = taskID // the task the upload is linked to (#7739)
 	}
 	if plan == nil {
 		// Bytes that are already a version of their own board's series say so (#6495): a script that uploaded v1 again needs not read the series back. Only the uploading board's own series
@@ -626,7 +637,7 @@ var errStoreFull = errors.New("artifact store is full")
 // hexID, with its sidecar and the session's upload record (#3553: the streamed counterpart of
 // storeArtifact). An object that is already stored makes it a free duplicate. It refuses a new
 // object that would take the store past its cap. fresh reports whether the object is new.
-func storeArtifactFile(coralDir, sessionID, name, mediaType, tmpPath, hexID string, size int64, stamp *seriesStamp) (agentArtifactMeta, bool, error) {
+func storeArtifactFile(coralDir, sessionID, name, mediaType, tmpPath, hexID string, size int64, stamp *seriesStamp, taskID int64) (agentArtifactMeta, bool, error) {
 	defer lockArtifact(hexID)()
 	mine := agentArtifactMeta{Name: name, MediaType: mediaType, Size: size, Digest: "sha256:" + hexID}
 	st := storeFor(coralDir)
@@ -662,8 +673,20 @@ func storeArtifactFile(coralDir, sessionID, name, mediaType, tmpPath, hexID stri
 			if stamp != nil { // a version of a series: the record says which (#6357)
 				ur.SeriesID, ur.Version, ur.Previous = stamp.ID, stamp.Version, stamp.Previous
 			}
+			recPath := filepath.Join(up, hexID+".json")
+			switch {
+			case taskID > 0:
+				ur.TaskID = taskID
+			case taskID == 0: // no task this time: the link an earlier upload of the same bytes made stays
+				if old, err := os.ReadFile(recPath); err == nil {
+					var prev agentUploadRecord
+					if json.Unmarshal(old, &prev) == nil {
+						ur.TaskID = prev.TaskID
+					}
+				}
+			}
 			rec, _ := json.Marshal(ur)
-			_ = writeFileAtomic(filepath.Join(up, hexID+".json"), rec, 0o600)
+			_ = writeFileAtomic(recPath, rec, 0o600)
 		}
 	}
 	return stored, fresh, nil

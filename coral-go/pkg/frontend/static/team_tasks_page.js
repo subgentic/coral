@@ -333,6 +333,9 @@ export function renderTaskPage(host, task, ctx, mode = 'view') {
         const extra = el('div', 'team-task-extra'); extra.innerHTML = m.taskExtraHtml(task, task.status === 'in_progress' ? list._liveCosts[task.id] : null); // the running cost of a task in progress
         if (extra.children.length) bar.before(extra);
     }).catch(() => {});
+    importOnce('./team_task_artifacts.js').then(m => m.taskArtifactsSection(ctx.project, task)).then(section => { // the artifacts an agent uploaded for the task, and the ones on its result (#7739); none: no section
+        if (section && page.isConnected) bar.before(section);
+    }).catch(() => {});
     const session = agentOf(ctx.project, task);
     if (mode === 'cancel') {
         page.append(bar);

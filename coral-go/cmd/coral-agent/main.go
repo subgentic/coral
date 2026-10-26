@@ -145,12 +145,17 @@ func main() {
 	}
 }
 
-const artifactUsageText = `Usage: coral-agent artifact upload <file> [--name NAME] [--media-type TYPE] [--new-version-of <link>]
+const artifactUsageText = `Usage: coral-agent artifact upload <file> [--name NAME] [--media-type TYPE] [--new-version-of <link>] [--task N | --no-task]
        coral-agent artifact download <coral://artifacts/digest> [--output FILE] [--force]
        coral-agent artifact reply <coral://artifacts/digest> <comment-id> <text | ->
 Run coral-agent artifact upload --help, artifact download --help or artifact reply --help for one of them.`
 
-const artifactUploadUsageText = `Usage: coral-agent artifact upload <file> [--name NAME] [--media-type TYPE] [--new-version-of <link>]
+const artifactUploadUsageText = `Usage: coral-agent artifact upload <file> [--name NAME] [--media-type TYPE] [--new-version-of <link>] [--task N | --no-task]
+
+An upload is linked to the task you have in progress (the reply says task_id, and this prints
+"Linked to task #N"); the task's page and the team's Artifacts tab then list it. --task N links it to
+another task of yours instead; --no-task links it to none. A task that is not yours is refused and
+nothing is stored.
 
 --new-version-of adds the file as a new version of an artifact this agent's board uploaded (its
 coral://artifacts/<digest> link, or a series link coral://artifacts/series/<id>): the reply carries
@@ -225,7 +230,7 @@ func cmdArtifact(args []string) {
 		fmt.Fprintln(os.Stderr, artifactUsageText)
 		clierr.Exit1()
 	}
-	opts, err := splitOptions(args[1:], []string{"name", "media-type", "new-version-of"}, nil)
+	opts, err := splitOptions(args[1:], []string{"name", "media-type", "new-version-of", "task"}, []string{"no-task"})
 	if err != nil || len(opts.Positional) != 1 {
 		if err == nil {
 			err = fmt.Errorf("upload needs exactly one file")
@@ -234,13 +239,27 @@ func cmdArtifact(args []string) {
 		os.Exit(2)
 	}
 	file := opts.Positional[0]
+	task := opts.Values["task"]
+	if opts.Bools["no-task"] {
+		if task != "" {
+			fmt.Fprintf(os.Stderr, "Error: give --task N or --no-task, not both\n%s\n", artifactUploadUsageText)
+			os.Exit(2)
+		}
+		task = "none"
+	}
+	if task != "" && task != "none" {
+		if n, perr := strconv.ParseInt(task, 10, 64); perr != nil || n <= 0 {
+			fmt.Fprintf(os.Stderr, "Error: --task needs a task number\n%s\n", artifactUploadUsageText)
+			os.Exit(2)
+		}
+	}
 	name, ok := opts.Values["name"]
 	if !ok {
 		name = filepath.Base(file)
 	}
 	name = mediatype.EnsureExtension(name, file)
 	mediaType := mediatype.Resolve(opts.Values["media-type"], file, name)
-	if err := uploadArtifact(serverURL, file, name, mediaType, resolveSessionID(), opts.Values["new-version-of"], os.Stdout, os.Stderr); err != nil {
+	if err := uploadArtifact(serverURL, file, name, mediaType, resolveSessionID(), opts.Values["new-version-of"], task, os.Stdout, os.Stderr); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		clierr.Exit1()
 	}
@@ -250,7 +269,7 @@ func cmdArtifact(args []string) {
 // to stdout. A refused or failed upload (any non-2xx; the Retry-After is surfaced on a 429) returns
 // an error and prints NO link, so a caller that misses the exit code can't take a refusal for a
 // success (#4004: the CLI used to exit 0 on a refused upload, so dead links were posted).
-func uploadArtifact(serverURL, file, name, mediaType, sid, newVersionOf string, stdout, stderr io.Writer) error {
+func uploadArtifact(serverURL, file, name, mediaType, sid, newVersionOf, task string, stdout, stderr io.Writer) error {
 	f, err := os.Open(file) // streamed to Coral, not read into memory (#3553)
 	if err != nil {
 		return err
@@ -267,6 +286,9 @@ func uploadArtifact(serverURL, file, name, mediaType, sid, newVersionOf string, 
 	if mediaType != "" {
 		req.Header.Set("X-Artifact-Media-Type", mediaType)
 	}
+	if task != "" { // a task number, or "none": the server checks it is the agent's own (#7739)
+		req.Header.Set("X-Artifact-Task", task)
+	}
 	wait := clierr.Timeout(5 * time.Minute) // http.DefaultClient has no timeout: an upload to a server that stopped answering waited for ever
 	resp, err := (&http.Client{Timeout: wait}).Do(req)
 	if err != nil {
@@ -277,6 +299,7 @@ func uploadArtifact(serverURL, file, name, mediaType, sid, newVersionOf string, 
 	body, _ := readServer(resp.Body)
 	var reply struct {
 		URI      string `json:"uri"`
+		TaskID   int64  `json:"task_id"`
 		Error    string `json:"error"`
 		Code     string `json:"code"`
 		Stripped bool   `json:"stripped"`
@@ -311,6 +334,9 @@ func uploadArtifact(serverURL, file, name, mediaType, sid, newVersionOf string, 
 		fmt.Fprintln(stderr, "Note: Coral removed this image's metadata (camera, location) before storing it, so its id is the SHA-256 of the stored bytes, not of your file.")
 	}
 	fmt.Fprintln(stdout, string(body))
+	if reply.TaskID > 0 { // the reply (stdout) is the JSON a script reads; the line for a person is on stderr (#7739)
+		fmt.Fprintf(stderr, "Linked to task #%d\n", reply.TaskID)
+	}
 	return nil
 }
 

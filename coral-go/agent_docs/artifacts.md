@@ -27,6 +27,8 @@ Publish with Coral, not on claude.ai: if you publish an artifact on claude.ai (a
 
    That is enough to share it: the upload is listed under your name in Artifacts and Team Artifacts.
 
+   An upload is linked to the task you have in progress: the reply carries `task_id`, `coral-agent` prints `Linked to task #N`, and the task's page lists it. `--task N` links it to another task assigned to you instead, `--no-task` to none; a task that is not yours is refused and nothing is stored.
+
 2. Optional: attach it to a task result (so it carries the task's number and title). Write a manifest and complete the task with it:
 
    ```sh

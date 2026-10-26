@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -25,10 +26,10 @@ import (
 // (so % and _ are ordinary characters), the rest are enum words, names compared for equality, and times.
 
 var teamArtifactParamNames = map[string]bool{"limit": true, "offset": true, "session_id": true,
-	"q": true, "kind": true, "origin": true, "by": true, "board": true, "kept": true, "since": true, "until": true, "sort": true, "cursor": true}
+	"q": true, "kind": true, "origin": true, "by": true, "board": true, "kept": true, "task": true, "since": true, "until": true, "sort": true, "cursor": true}
 
 // teamArtifactQueryParams are the parameters that make the reply a query (the others are the list's original ones).
-var teamArtifactQueryParams = []string{"q", "kind", "origin", "by", "board", "kept", "since", "until", "sort", "cursor"}
+var teamArtifactQueryParams = []string{"q", "kind", "origin", "by", "board", "kept", "task", "since", "until", "sort", "cursor"}
 
 var (
 	teamArtifactKinds   = []string{"image", "pdf", "text", "other"}
@@ -48,6 +49,7 @@ type teamArtifactQuery struct {
 	by       []string // lower-cased
 	boards   []string // lower-cased
 	kept     *bool
+	task     int64 // 0: any; a task's number: only what is attached to or linked to that task (#7739, the task page's Artifacts)
 	since    *time.Time
 	until    *time.Time
 	sortName string
@@ -195,6 +197,15 @@ func parseTeamArtifactQuery(vals url.Values) (*teamArtifactQuery, error) {
 			return nil, taErr("kept must be true or false")
 		}
 	}
+	if v, ok, serr := taSingle("task", vals["task"]); serr != nil {
+		return nil, serr
+	} else if ok {
+		n, perr := strconv.ParseInt(v, 10, 64)
+		if perr != nil || n <= 0 {
+			return nil, taErr("task must be a task number")
+		}
+		q.task = n
+	}
 	if q.since, err = taTime("since", vals["since"]); err != nil {
 		return nil, err
 	}
@@ -215,7 +226,7 @@ func parseTeamArtifactQuery(vals url.Values) (*teamArtifactQuery, error) {
 	}
 	// What a cursor is tied to: every filter and the sort (not limit, offset or the cursor itself).
 	fp := sha256.New()
-	fmt.Fprintf(fp, "%s|%v|%v|%v|%v|%v|%v|%v|%s|%s", q.q, q.kinds, q.origins, q.by, q.boards, q.kept, q.since, q.until, q.sortName, vals.Get("session_id"))
+	fmt.Fprintf(fp, "%s|%v|%v|%v|%v|%v|%v|%v|%v|%s|%s", q.q, q.kinds, q.origins, q.by, q.boards, q.kept, q.task, q.since, q.until, q.sortName, vals.Get("session_id"))
 	q.finger = hex.EncodeToString(fp.Sum(nil))[:16]
 	if v, ok, serr := taSingle("cursor", vals["cursor"]); serr != nil {
 		return nil, serr
@@ -336,6 +347,9 @@ func (q *teamArtifactQuery) cheapMatch(it teamArtifact, kept map[string]bool) bo
 		}
 	}
 	if len(q.boards) > 0 && !teamArtifactMatchesBoard(it, q.boards) {
+		return false
+	}
+	if q.task != 0 && it.TaskID != q.task {
 		return false
 	}
 	if q.kept != nil {

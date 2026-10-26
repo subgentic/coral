@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/subgentic/coral/internal/querypage"
@@ -67,8 +68,9 @@ type teamArtifact struct {
 	AlsoReceivedFrom []string `json:"also_received_from,omitempty"`
 	SentBy           string   `json:"sent_by,omitempty"`
 
-	index   int
-	managed string // 64-hex Coral object id for coral-managed artifacts
+	index      int
+	managed    string // 64-hex Coral object id for coral-managed artifacts
+	uploadTask int64  // the task an upload's record says it is linked to (#7739): shown only once the board says the task is the team's (linkUploadTasks)
 }
 
 func (h *BoardHandler) artifactObjectDir() string {
@@ -163,6 +165,7 @@ func (h *BoardHandler) ListTeamArtifacts(w http.ResponseWriter, r *http.Request)
 		items = h.uploads.merge(items, h.coralDir, teamUploadSessions(tasks, subscribers))
 		items = h.mergeCrossTeamRows(items, project)
 	}
+	h.linkUploadTasks(r.Context(), project, items)
 	items = filterReadable(r, h.coralDir, items) // an agent's list holds only what the one read check lets it read, so the totals and the cursor count nothing else (#5577)
 	if tq != nil {
 		h.queryTeamArtifacts(w, r, project, items, scanTruncated, limit, offset, sessionFilter, tq)
@@ -527,7 +530,7 @@ func (c *uploadDirCache) merge(items []teamArtifact, coralDir string, sessions m
 			item := teamArtifact{
 				ID: u.id, Name: u.rec.Name, MediaType: u.rec.MediaType, CreatedAt: u.rec.CreatedAt,
 				Source: "upload", URI: "coral://artifacts/" + u.id, Digest: u.rec.Digest,
-				ReferenceCount: 1, SessionID: &sid, managed: u.id,
+				ReferenceCount: 1, SessionID: &sid, managed: u.id, uploadTask: u.rec.TaskID,
 			}
 			if producer != "" {
 				p := producer
@@ -592,4 +595,32 @@ func (h *BoardHandler) ListSessionArtifacts(w http.ResponseWriter, r *http.Reque
 		"artifacts": page, "limit": limit, "offset": offset, "has_more": hasMore,
 		"truncated": false, "session_id": sessionID,
 	})
+}
+
+// linkUploadTasks gives an upload row the task its record says it is linked to (#7739): its number and title, but only when that task is on this team's board (a record's number is the
+// uploader's own claim at the time, so it is checked here, where the title is read). A row that already has a task (a task result's reference) keeps it.
+func (h *BoardHandler) linkUploadTasks(ctx context.Context, project string, items []teamArtifact) {
+	var ids []int64
+	seen := map[int64]bool{}
+	for _, it := range items {
+		if it.TaskID == 0 && it.uploadTask > 0 && !seen[it.uploadTask] {
+			seen[it.uploadTask] = true
+			ids = append(ids, it.uploadTask)
+		}
+	}
+	if len(ids) == 0 {
+		return
+	}
+	titles, err := h.bs.TaskTitles(ctx, project, ids)
+	if err != nil {
+		return
+	}
+	for i := range items {
+		if items[i].TaskID != 0 || items[i].uploadTask <= 0 {
+			continue
+		}
+		if title, ok := titles[items[i].uploadTask]; ok {
+			items[i].TaskID, items[i].TaskTitle = items[i].uploadTask, title
+		}
+	}
 }

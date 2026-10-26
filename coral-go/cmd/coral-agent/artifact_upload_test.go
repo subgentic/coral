@@ -44,7 +44,7 @@ func TestUploadArtifactRefusalIsAnError(t *testing.T) {
 			defer srv.Close()
 
 			var out, errOut bytes.Buffer
-			err := uploadArtifact(srv.URL, file, "note.txt", "text/plain", "sess-1", "", &out, &errOut)
+			err := uploadArtifact(srv.URL, file, "note.txt", "text/plain", "sess-1", "", "", &out, &errOut)
 			if err == nil {
 				t.Fatalf("a %d answer must be an error, got nil (out=%q)", tc.status, out.String())
 			}
@@ -81,7 +81,7 @@ func TestUploadArtifactTwoXXWithoutIdIsAFailure(t *testing.T) {
 			}))
 			defer srv.Close()
 			var out, errOut bytes.Buffer
-			err := uploadArtifact(srv.URL, file, "note.txt", "text/plain", "sess-1", "", &out, &errOut)
+			err := uploadArtifact(srv.URL, file, "note.txt", "text/plain", "sess-1", "", "", &out, &errOut)
 			if err == nil {
 				t.Fatalf("a 2xx with no artifact id must be an error, got nil (out=%q)", out.String())
 			}
@@ -109,7 +109,7 @@ func TestUploadArtifactSuccessPrintsTheLink(t *testing.T) {
 	defer srv.Close()
 
 	var out, errOut bytes.Buffer
-	if err := uploadArtifact(srv.URL, file, "note.txt", "text/plain", "sess-1", "", &out, &errOut); err != nil {
+	if err := uploadArtifact(srv.URL, file, "note.txt", "text/plain", "sess-1", "", "", &out, &errOut); err != nil {
 		t.Fatalf("a 2xx upload must succeed: %v (stderr=%q)", err, errOut.String())
 	}
 	if !strings.Contains(out.String(), "coral://artifacts/abc123") {
@@ -139,10 +139,10 @@ func TestUploadArtifactSendsTheNewVersionHeaderAndAnOlderVersionIsAnError(t *tes
 	defer srv.Close()
 	var out, errOut bytes.Buffer
 	link := "coral://artifacts/series/" + strings.Repeat("cd", 16)
-	if err := uploadArtifact(srv.URL, file, "plan.txt", "text/plain", "s1", link, &out, &errOut); err != nil {
+	if err := uploadArtifact(srv.URL, file, "plan.txt", "text/plain", "s1", link, "", &out, &errOut); err != nil {
 		t.Fatal(err)
 	}
-	if err := uploadArtifact(srv.URL, file, "plan.txt", "text/plain", "s1", "", &out, &errOut); err != nil {
+	if err := uploadArtifact(srv.URL, file, "plan.txt", "text/plain", "s1", "", "", &out, &errOut); err != nil {
 		t.Fatal(err)
 	}
 	if len(seen) != 2 || seen[0] != link || seen[1] != "" {
@@ -153,11 +153,79 @@ func TestUploadArtifactSendsTheNewVersionHeaderAndAnOlderVersionIsAnError(t *tes
 	}
 	refuse = true
 	out.Reset()
-	err := uploadArtifact(srv.URL, file, "plan.txt", "text/plain", "s1", link, &out, &errOut)
+	err := uploadArtifact(srv.URL, file, "plan.txt", "text/plain", "s1", link, "", &out, &errOut)
 	if err == nil || !strings.Contains(err.Error(), "version 1 of this series") || !strings.Contains(err.Error(), "HTTP 409") {
 		t.Fatalf("an older version must be an error naming the version: %v", err)
 	}
 	if out.Len() != 0 {
 		t.Errorf("no link is printed for a refusal: %q", out.String())
+	}
+}
+
+// #7739: --task N and --no-task go to the server as X-Artifact-Task (a number, or "none"); without either no such header goes. The task the reply says it linked is on stderr as "Linked to task #N",
+// and stdout is still the reply alone, which a script parses.
+func TestUploadArtifactSendsTheTaskHeaderAndSaysWhatItLinked(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "note.txt")
+	if err := os.WriteFile(file, []byte("hello"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got = append(got, r.Header.Get("X-Artifact-Task"))
+		task := r.Header.Get("X-Artifact-Task")
+		if task == "none" {
+			_, _ = w.Write([]byte(`{"uri":"coral://artifacts/abc123"}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"uri":"coral://artifacts/abc123","task_id":7644}`))
+	}))
+	defer srv.Close()
+	for _, task := range []string{"", "7644", "none"} {
+		var out, errOut bytes.Buffer
+		if err := uploadArtifact(srv.URL, file, "note.txt", "text/plain", "sess-1", "", task, &out, &errOut); err != nil {
+			t.Fatalf("task %q: %v", task, err)
+		}
+		linked := strings.Contains(errOut.String(), "Linked to task #7644")
+		if linked != (task != "none") {
+			t.Errorf("task %q: stderr %q", task, errOut.String())
+		}
+		if strings.Contains(out.String(), "Linked to") || !strings.Contains(out.String(), "coral://artifacts/abc123") {
+			t.Errorf("task %q: stdout must be the reply alone, got %q", task, out.String())
+		}
+	}
+	if strings.Join(got, ",") != ",7644,none" {
+		t.Errorf("the header goes only when asked for: %q", got)
+	}
+}
+
+// #7739: the options of the command line: --no-task is a switch, --task needs a number, and the two together are a usage error that sends nothing.
+func TestArtifactUploadTaskOptionsOnTheCommandLine(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "note.txt")
+	if err := os.WriteFile(file, []byte("hello"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var headers []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		headers = append(headers, r.Header.Get("X-Artifact-Task"))
+		_, _ = w.Write([]byte(`{"uri":"coral://artifacts/abc123"}`))
+	}))
+	defer srv.Close()
+	for _, bad := range [][]string{{"--task", "abc"}, {"--task", "0"}, {"--task", "5", "--no-task"}} {
+		code, _, _ := runAgentWithToken(t, srv.URL, append([]string{"artifact", "upload", file}, bad...)...)
+		if code != 2 {
+			t.Errorf("%v: exit %d, want the usage error 2", bad, code)
+		}
+	}
+	if len(headers) != 0 {
+		t.Fatalf("a usage error sends nothing: %v", headers)
+	}
+	if code, _, e := runAgentWithToken(t, srv.URL, "artifact", "upload", file, "--no-task"); code != 0 {
+		t.Fatalf("--no-task: exit %d %s", code, e)
+	}
+	if code, _, e := runAgentWithToken(t, srv.URL, "artifact", "upload", file, "--task", "7644"); code != 0 {
+		t.Fatalf("--task: exit %d %s", code, e)
+	}
+	if strings.Join(headers, ",") != "none,7644" {
+		t.Errorf("headers %q", headers)
 	}
 }
