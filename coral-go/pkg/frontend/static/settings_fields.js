@@ -94,8 +94,21 @@ export const CLEANUP_FIELDS = [
     { key: 'worktrees_list', type: 'notice', render: slot => { slot.id = 'settings-worktrees-row'; const el = document.getElementById('settings-worktrees-live'); if (el) slot.append(el); } },
 ];
 
+// The API key's line (#8460): the key (masked, read only; security_settings.js and settings_machine.js fill it) on a line of its own, and Show, Copy and the Mobile QR under it. Drawn here, with the component's own line class.
+const apiKeyLine = slot => {
+    const mk = (tag, cls, attrs = {}, text = '') => { const e = document.createElement(tag); if (cls) e.className = cls; for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); if (text) e.textContent = text; return e; };
+    const line = mk('div', 'sv-ctl-line', { id: 'settings-api-key-live' });
+    const input = mk('input', 'sv-input settings-mono-input', { type: 'password', id: 'settings-api-key', readonly: '', autocomplete: 'off', placeholder: 'Loading...', 'aria-label': 'API key' });
+    const show = mk('button', 'btn btn-small settings-copy-btn', { type: 'button', id: 'settings-api-key-show', 'aria-pressed': 'false' }, 'Show'); show.hidden = true;
+    const copy = mk('button', 'btn btn-small settings-copy-btn', { type: 'button', id: 'settings-api-key-copy' }, 'Copy'); copy.disabled = true;
+    const qr = mk('button', 'btn btn-small', { type: 'button', title: 'Show QR code for mobile connection' });
+    qr.setAttribute('data-on-click', 'm-show-mobile-connect-modal');
+    const icon = mk('span', 'material-icons sv-ctl-icon', { 'aria-hidden': 'true' }, 'qr_code_2'); qr.append(icon, ' Mobile QR');
+    line.append(input, show, copy, qr); slot.append(line);
+};
+
 export const SECURITY_FIELDS = [
-    { key: 'api_key', type: 'custom', id: 'settings-api-key-group', label: 'API key', render: slot => { const el = document.getElementById('settings-api-key-live'); if (el) slot.append(el); } },
+    { key: 'api_key', type: 'custom', id: 'settings-api-key-group', label: 'API key', render: slot => apiKeyLine(slot) },
     live('settings-security'),
     { key: 'database_encryption', type: 'select', id: 'settings-database-encryption', labelId: 'settings-database-encryption-label', label: 'Database encryption', live: ['settings-database-encryption-status'], visibleWhen: () => { const e = document.getElementById('settings-database-encryption'); return !e || e.dataset.unsupported !== '1'; }, disabledWhen: () => { const e = document.getElementById('settings-database-encryption'); return !!e && e.dataset.locked === '1'; },
         help: { text: 'Applies after restart.', more: 'Coral never stores a database password in browser storage, URLs, logs, or ordinary settings.' },

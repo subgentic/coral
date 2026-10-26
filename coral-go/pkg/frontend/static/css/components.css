@@ -1069,7 +1069,6 @@
         margin-bottom: 6px;
     }
 
-    .settings-api-key-row,
     .settings-cli-row {
         flex-wrap: wrap;
         align-items: flex-start;
@@ -2037,19 +2036,6 @@
 .settings-mono-input {
     font-family: var(--font-mono);
     font-size: 0.75rem;
-}
-
-.settings-api-key-row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-}
-
-.settings-api-key-row .settings-input {
-    flex: 1 1 100%; /* the key on its own full-width line, its buttons below (#3152) */
-    min-width: 0;
 }
 
 .settings-copy-btn {
