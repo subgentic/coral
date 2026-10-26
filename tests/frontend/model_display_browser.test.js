@@ -43,7 +43,7 @@ const SUMMARY = {
         console.log('2. By Model: a Provider and a Model column, one row per model and provider');
         await ev(`(async () => { const m = await import(${MOD} + 'cost_dashboard.js'); m.showCostDashboard(); return true; })()`);
         await waitFor(`document.querySelectorAll('#cost-by-model tbody tr').length === 5`, 'the table');
-        const table = () => ev(`(() => ({ head: [...document.querySelectorAll('#cost-by-model thead th')].map(th => th.textContent.replace(/[▲▼↑↓↕]/g, '').trim().replace(/\\s*filter_list|\\s*filter_alt/g, '')), rows: [...document.querySelectorAll('#cost-by-model tbody tr')].map(tr => [tr.children[0].textContent.trim(), tr.children[1].textContent.trim(), tr.children[1].getAttribute('title')]) }))()`);
+        const table = () => ev(`(() => ({ head: [...document.querySelectorAll('#cost-by-model thead th:not(.dt-check)')].map(th => th.textContent.replace(/[▲▼↑↓↕]/g, '').trim().replace(/\\s*filter_list|\\s*filter_alt/g, '')), rows: [...document.querySelectorAll('#cost-by-model tbody tr')].map(tr => [tr.querySelectorAll('td:not(.dt-check)')[0].textContent.trim(), tr.querySelectorAll('td:not(.dt-check)')[1].textContent.trim(), tr.querySelectorAll('td:not(.dt-check)')[1].getAttribute('title')]) }))()`);
         let t = await table();
         assert.deepEqual(t.head.slice(0, 3), ['Provider', 'Model', 'Requests'], 'columns: ' + t.head);
         const byCost = t.rows.map(r => r.slice(0, 2).join(' / '));

@@ -478,3 +478,5 @@
 .viz-more { margin: 12px 0 0; }
 .viz-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .viz-pick { stroke: var(--text-secondary); stroke-dasharray: 3 3; }
+.cost-swatch-off { background: transparent; border-color: var(--text-muted); } /* a row not checked: its line is not drawn */
+.viz-legend-item { display: flex; align-items: center; gap: 8px; min-height: 28px; padding: 0 4px; font-size: 0.8125rem; color: var(--text-secondary); }

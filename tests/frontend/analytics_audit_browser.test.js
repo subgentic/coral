@@ -35,8 +35,8 @@ const CALLS = [{ operation: '/api/board/{project}/messages', call_type: 'api', a
         await ev(`window.switchNavTab('tokens'); true`);
         await waitFor(`['cost-by-provider', 'cost-by-model', 'cost-by-agent'].every(id => document.querySelectorAll('#' + id + ' tbody tr').length >= 2) && document.querySelectorAll('#call-metrics-summary tbody tr').length >= 1`, 'the tables');
     };
-    const heads = id => ev(`[...document.querySelectorAll('#${id} thead th')].map(th => th.textContent.replace(/[▲▼↑↓↕]|filter_list/g, '').trim())`);
-    const column = (id, name) => ev(`(() => { const t = document.getElementById('${id}'); const i = [...t.querySelectorAll('thead th')].findIndex(th => th.textContent.replace(/[▲▼↑↓↕]|filter_list/g, '').trim() === ${JSON.stringify(name)}); return [...t.querySelectorAll('tbody tr')].map(tr => tr.children[i].textContent.trim()); })()`);
+    const heads = id => ev(`[...document.querySelectorAll('#${id} thead th:not(.dt-check)')].map(th => th.textContent.replace(/[▲▼↑↓↕]|filter_list/g, '').trim())`);
+    const column = (id, name) => ev(`(() => { const t = document.getElementById('${id}'); const i = [...t.querySelectorAll('thead th:not(.dt-check)')].findIndex(th => th.textContent.replace(/[▲▼↑↓↕]|filter_list/g, '').trim() === ${JSON.stringify(name)}); return [...t.querySelectorAll('tbody tr')].map(tr => tr.querySelectorAll('td:not(.dt-check)')[i].textContent.trim()); })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await open(1280, 800, false);
@@ -72,12 +72,12 @@ const CALLS = [{ operation: '/api/board/{project}/messages', call_type: 'api', a
         console.log('7. By agent: Cost is the second column at 1280 px and inside its card');
         const ah = await heads('cost-by-agent');
         assert.deepEqual(ah.slice(0, 3), ['Agent', 'Cost', 'Team'], 'Cost follows the name: ' + JSON.stringify(ah));
-        assert.ok(await ev(`(() => { const box = document.getElementById('cost-by-agent'), c = box.getBoundingClientRect(), th = box.querySelectorAll('thead th')[1].getBoundingClientRect(); return th.left >= c.left - 1 && th.right <= c.right + 1; })()`), 'the Cost heading is inside the card without a scroll');
+        assert.ok(await ev(`(() => { const box = document.getElementById('cost-by-agent'), c = box.getBoundingClientRect(), th = box.querySelectorAll('thead th:not(.dt-check)')[1].getBoundingClientRect(); return th.left >= c.left - 1 && th.right <= c.right + 1; })()`), 'the Cost heading is inside the card without a scroll');
         assert.ok((await column('cost-by-agent', 'Cost')).every(x => /^\$/.test(x)), 'and the cells under it are costs');
         console.log('   ✓');
 
         console.log('8. The Model column is in its neighbours font');
-        const sizes = await ev(`(() => { const out = {}; for (const id of ['cost-by-model']) { const tr = document.querySelector('#' + id + ' tbody tr'); out[id] = [...tr.children].map(td => getComputedStyle(td).fontFamily); } return out; })()`);
+        const sizes = await ev(`(() => { const out = {}; for (const id of ['cost-by-model']) { const tr = document.querySelector('#' + id + ' tbody tr'); out[id] = [...tr.querySelectorAll('td:not(.dt-check)')].map(td => getComputedStyle(td).fontFamily); } return out; })()`);
         assert.equal(new Set(sizes['cost-by-model']).size, 1, 'every cell of a By model row has one font (the model is not in the code font): ' + JSON.stringify(sizes));
         console.log('   ✓');
 

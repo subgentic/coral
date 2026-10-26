@@ -13,6 +13,7 @@ export const METRICS = [
     { key: 'cache_write_tokens', label: 'Cache write', fmt: compactCount, table: 'cache_write_tokens' },
     { key: 'num_requests', label: 'Requests', fmt: compactCount, table: 'requests' },
 ];
+export const METRIC_SLOT = { input_tokens: 0, output_tokens: 1, cache_read_tokens: 2, cache_write_tokens: 3, cost_usd: 0, num_requests: 0 }; // a metric's own colour when metrics are the lines
 export const GROUPS = { provider: 'provider', model: 'model', team: 'team', agent: 'agent' };
 export const TOP = 7;
 const STEP_MS = { '5m': 300000, '1h': 3600000, '1d': 86400000 };
@@ -40,24 +41,56 @@ export function rankKeys(buckets) {
     return [...cost.keys()].sort((a, b) => (cost.get(b) - cost.get(a)) || (reqs.get(b) - reqs.get(a)) || String(a).localeCompare(String(b)));
 }
 
-/** The series of a metric: the top `top` keys of `ranked` each their own line, every other key one "Other" line; every line has a value for every time of the axis; `cumulative` makes each a running total. */
-export function buildSeries(buckets, ranked, times, metric, cumulative, top = TOP) {
+/** Which keys get a line and which colour. With nothing checked: the top `top` of `ranked` (by cost), their colours their ranks, the rest folded into Other. With rows checked: only those, a checked key that was in the top keeping the colour
+ *  it had, and a checked key that was not taking a colour no checked key has (so a filter never repaints a line that survives it); more checked keys than colours fold into Other. */
+export function assignLines(ranked, selected, top = TOP) {
+    const chosen = selected && selected.size ? ranked.filter(k => selected.has(k)) : null;
+    if (!chosen) return { active: false, lines: ranked.slice(0, top).map((key, slot) => ({ key, slot })), folded: ranked.slice(top) };
+    const used = new Set(), lines = [], later = [];
+    for (const k of chosen) { const rank = ranked.indexOf(k); if (rank < top) { lines.push({ key: k, slot: rank }); used.add(rank); } else later.push(k); }
+    const folded = [];
+    for (const k of later) { let slot = 0; while (slot < top && used.has(slot)) slot++; if (slot < top) { lines.push({ key: k, slot }); used.add(slot); } else folded.push(k); }
+    lines.sort((a, b) => ranked.indexOf(a.key) - ranked.indexOf(b.key));
+    return { active: true, lines, folded };
+}
+
+const finish = l => { l.total = l.vals.reduce((a, b) => a + b, 0); return l; };
+const accumulate = (l, cumulative) => { if (cumulative) { let run = 0; l.plot = l.vals.map(v => (run += v)); } else l.plot = l.vals; return l; };
+
+/** The lines of one metric for an assignment: a line per assigned key (every time of the axis has a value), one "Other" line for the folded keys; `cumulative` makes each a running total. */
+export function buildSeries(buckets, assignment, times, metric, cumulative) {
     const at = new Map(times.map((t, i) => [t, i]));
-    const keep = new Set(ranked.slice(0, top));
-    const lines = ranked.slice(0, top).map(k => ({ key: k, label: k, other: false, vals: new Array(times.length).fill(0) }));
+    const lines = assignment.lines.map(a => ({ key: a.key, label: a.key, slot: a.slot, other: false, vals: new Array(times.length).fill(0) }));
     const byKey = new Map(lines.map(l => [l.key, l]));
-    const rest = { key: OTHER, label: `Other (${Math.max(0, ranked.length - top)})`, other: true, vals: new Array(times.length).fill(0) };
+    const folded = new Set(assignment.folded);
+    const rest = { key: OTHER, label: `Other (${assignment.folded.length})`, slot: 0, other: true, vals: new Array(times.length).fill(0) };
     for (const b of buckets) {
         const i = at.get(Date.parse(b.bucket));
         if (i == null) continue;
-        for (const s of b.series || []) (keep.has(s.key) ? byKey.get(s.key) : rest).vals[i] += Number(s[metric]) || 0;
+        for (const s of b.series || []) { const to = byKey.get(s.key) || (folded.has(s.key) ? rest : null); if (to) to.vals[i] += Number(s[metric]) || 0; }
     }
-    if (ranked.length > top) lines.push(rest);
-    for (const l of lines) {
-        l.total = l.vals.reduce((a, b) => a + b, 0);
-        if (cumulative) { let run = 0; l.plot = l.vals.map(v => (run += v)); } else l.plot = l.vals;
+    if (assignment.folded.length) lines.push(rest);
+    return lines.map(l => accumulate(finish(l), cumulative));
+}
+
+/** One key's (or, for the keys folded into Other, their) several metrics as lines: a line per metric, in the metric's own colour. Used when one row is checked and several metrics are picked. */
+export function buildMetricLines(buckets, keys, times, metrics, cumulative) {
+    const at = new Map(times.map((t, i) => [t, i])), want = new Set(keys);
+    const lines = metrics.map(m => ({ key: m.key, label: m.label, slot: METRIC_SLOT[m.key] ?? 0, other: false, vals: new Array(times.length).fill(0) }));
+    for (const b of buckets) {
+        const i = at.get(Date.parse(b.bucket));
+        if (i == null) continue;
+        for (const s of b.series || []) if (want.has(s.key)) metrics.forEach((m, k) => { lines[k].vals[i] += Number(s[m.key]) || 0; });
     }
-    return lines;
+    return lines.map(l => accumulate(finish(l), cumulative));
+}
+
+/** The groups of metrics that share a unit, so share one axis: tokens, dollars, requests. */
+export function metricUnits(metrics) {
+    const unit = m => (m.key === 'cost_usd' ? 'cost' : m.key === 'num_requests' ? 'requests' : 'tokens');
+    const out = new Map();
+    for (const m of metrics) { const u = unit(m); out.set(u, [...(out.get(u) || []), m]); }
+    return [...out.values()];
 }
 
 /** Whether a table's rows add up to the chart's total, within what a float can say. */
@@ -66,8 +99,7 @@ export function agrees(a, b) { return Math.abs(a - b) <= 1e-6 * Math.max(1, Math
 // ── the chart ───────────────────────────────────────────────────────────
 
 const niceMax = v => { if (!(v > 0)) return 1; const p = 10 ** Math.floor(Math.log10(v)), f = v / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p; };
-const colorOf = (line, i) => (line.other ? 'var(--viz-other)' : `var(--viz-${(i % 7) + 1})`);
-export const lineColor = (view, key, ranked) => { const i = ranked.indexOf(key); return i < 0 || i >= TOP ? 'var(--viz-other)' : `var(--viz-${i + 1})`; };
+const colorOf = line => (line.other ? 'var(--viz-other)' : `var(--viz-${((line.slot ?? 0) % 7) + 1})`);
 
 export function timeLabel(ms, interval) {
     const d = new Date(ms);
@@ -77,21 +109,22 @@ export function timeLabel(ms, interval) {
 }
 
 /** The lines as one SVG (aria-hidden: the table is the text alternative), with a crosshair and a tooltip that names every line at the time, the end labels of the top two and a dash pattern per line for forced colours. */
-export function drawChart(host, { times, lines, metric, interval, hi, phone, xLabel, when, fmt }) {
+export function drawChart(host, { times, lines, metric, interval, hi, phone, xLabel, when, fmt, log }) {
     const label = xLabel || (i => timeLabel(times[i], interval)), heading = when || label;
     host.replaceChildren();
     const W = Math.max(280, Math.round(host.clientWidth || (phone ? 340 : 880))), H = phone ? 200 : 250, L = 48, R = phone ? 12 : 104, T = 10, B = 24, pw = W - L - R, ph = H - T - B, N = times.length;
     const m = { ...(METRICS.find(x => x.key === metric) || METRICS[0]), ...(fmt ? { fmt } : {}) };
-    const max = niceMax(Math.max(0, ...lines.flatMap(l => l.plot)));
-    const x = i => L + (N > 1 ? (i / (N - 1)) * pw : pw / 2), y = v => T + ph - (v / max) * ph;
-    const s = svg('svg', { viewBox: `0 0 ${W} ${H}`, width: W, height: H, 'aria-hidden': 'true', focusable: 'false', class: 'viz-svg' });
-    for (let g = 0; g <= 4; g++) { const v = (max / 4) * g; s.append(svg('line', { x1: L, x2: W - R, y1: y(v), y2: y(v), class: 'viz-grid' }), svg('text', { x: L - 6, y: y(v) + 4, 'text-anchor': 'end', class: 'viz-axis' }, m.fmt(v))); }
+    const top = Math.max(0, ...lines.flatMap(l => l.plot)), max = log ? 10 ** Math.max(1, Math.ceil(Math.log10(top + 1))) : niceMax(top);
+    const x = i => L + (N > 1 ? (i / (N - 1)) * pw : pw / 2), y = log ? (v => T + ph - (Math.log10(1 + Math.max(v, 0)) / Math.log10(1 + max)) * ph) : (v => T + ph - (v / max) * ph);
+    const s = svg('svg', { viewBox: `0 0 ${W} ${H}`, width: W, height: H, 'aria-hidden': 'true', focusable: 'false', class: 'viz-svg', 'data-scale': log ? 'log' : 'linear' });
+    const gridAt = log ? [0, ...Array.from({ length: Math.round(Math.log10(max)) }, (_, k) => 10 ** (k + 1))].filter(v => v <= max) : [0, 1, 2, 3, 4].map(g => (max / 4) * g); // a log axis steps by powers of ten
+    for (const v of gridAt) { s.append(svg('line', { x1: L, x2: W - R, y1: y(v), y2: y(v), class: 'viz-grid' }), svg('text', { x: L - 6, y: y(v) + 4, 'text-anchor': 'end', class: 'viz-axis' }, m.fmt(v))); }
     const ticks = N <= 1 ? [0] : [0, Math.round((N - 1) / 3), Math.round(((N - 1) * 2) / 3), N - 1].filter((v, i, a) => a.indexOf(v) === i);
     for (const i of ticks.slice(0, phone ? 3 : 4)) s.append(svg('text', { x: x(i), y: H - 6, 'text-anchor': i === 0 ? 'start' : i === N - 1 ? 'end' : 'middle', class: 'viz-axis' }, label(i)));
     const order = lines.map((l, k) => k).sort((a, b) => (hi === lines[a].key) - (hi === lines[b].key)); // the highlighted line is drawn last, so in front
     for (const k of order) {
         const l = lines[k], dim = hi && hi !== l.key;
-        s.append(svg('path', { d: l.plot.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(' '), class: `viz-line viz-line-${l.other ? 'o' : k % 7}`, stroke: colorOf(l, k), 'stroke-width': hi === l.key ? 3.5 : 2, fill: 'none', opacity: dim ? 0.2 : 1 }));
+        s.append(svg('path', { d: l.plot.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(' '), class: `viz-line viz-line-${l.other ? 'o' : (l.slot ?? 0) % 7}`, stroke: colorOf(l), 'stroke-width': hi === l.key ? 3.5 : 2, fill: 'none', opacity: dim ? 0.2 : 1 }));
     }
     if (!phone) { // the end labels: the top two by where they end
         let lastY = -99;
@@ -101,7 +134,7 @@ export function drawChart(host, { times, lines, metric, interval, hi, phone, xLa
         }
     }
     const cross = svg('line', { y1: T, y2: T + ph, class: 'viz-cross', visibility: 'hidden' }); s.append(cross);
-    const dots = lines.map((l, k) => { const c = svg('circle', { r: 4, fill: colorOf(l, k), class: 'viz-dot', visibility: 'hidden' }); s.append(c); return c; });
+    const dots = lines.map((l, k) => { const c = svg('circle', { r: 4, fill: colorOf(l), class: 'viz-dot', visibility: 'hidden' }); s.append(c); return c; });
     const hit = svg('rect', { x: L, y: T, width: pw, height: ph, fill: 'transparent' }); s.append(hit);
     host.classList.add('viz-host'); host.append(s);
     const tip = el('div', 'viz-tip'); tip.hidden = true; host.append(tip);
@@ -112,7 +145,7 @@ export function drawChart(host, { times, lines, metric, interval, hi, phone, xLa
         dots.forEach((c, k) => { c.setAttribute('cx', x(i)); c.setAttribute('cy', y(lines[k].plot[i])); c.setAttribute('visibility', 'visible'); });
         tip.replaceChildren(el('div', 'viz-tip-when', heading(i)));
         const rows = lines.map((l, k) => ({ l, k, v: l.plot[i] })).sort((a, b) => b.v - a.v).slice(0, 6);
-        for (const e of rows) { const row = el('div', 'viz-tip-row'); const key = el('i'); key.style.background = colorOf(e.l, e.k); const name = el('span'); name.append(key, document.createTextNode(e.l.label)); row.append(name, el('b', null, m.fmt(e.v))); tip.append(row); }
+        for (const e of rows) { const row = el('div', 'viz-tip-row'); const key = el('i'); key.style.background = colorOf(e.l); const name = el('span'); name.append(key, document.createTextNode(e.l.label)); row.append(name, el('b', null, m.fmt(e.v))); tip.append(row); }
         if (lines.length > 6) tip.append(el('div', 'viz-tip-when', `+${lines.length - 6} more in the table`));
         tip.hidden = false;
         const hr = host.getBoundingClientRect(); let tx = ev.clientX - hr.left + 14; if (tx + 200 > hr.width) tx = ev.clientX - hr.left - 214; tip.style.left = `${Math.max(4, tx)}px`; tip.style.top = '8px';
@@ -124,29 +157,39 @@ export function drawChart(host, { times, lines, metric, interval, hi, phone, xLa
 // ── the panel above a table ─────────────────────────────────────────────
 
 export const OTHER = '\u0000other';
-const state = {}; // per view: metric, cumulative, hi, data ({ buckets, interval, since, until }), ranked
+const state = {}; // per view: metrics, cumulative, hi, selected, data ({ buckets, interval, sinceMs, untilMs }), ranked
 
-export const seriesState = view => (state[view] ||= { metric: 'cost_usd', cumulative: true, hi: '', data: null, ranked: [], error: '' });
-/** The line colour of a table row's key (a swatch), or '' when it has no line. */
-export const swatchColor = (view, key) => { const st = state[view]; return st && st.data ? lineColor(view, key, st.ranked) : ''; };
-/** The key of the line a table row belongs to: its own, or Other when the row is not among the top 7. */
-export const lineKeyOf = (view, key) => { const st = state[view]; return st && st.ranked.indexOf(key) >= TOP ? OTHER : key; };
+export const seriesState = view => (state[view] ||= { metrics: ['cost_usd'], cumulative: true, hi: '', selected: new Set(), data: null, ranked: [], error: '' });
+/** The line colour of a table row's key (a swatch): its line's, Other's when it is folded into it, 'off' when rows are checked and this one is not, '' when nothing is read yet. */
+export function swatchColor(view, key) {
+    const st = state[view]; if (!st || !st.data) return '';
+    const a = assignLines(st.ranked, st.selected), hit = a.lines.find(l => l.key === key);
+    if (hit) return `var(--viz-${hit.slot + 1})`;
+    if (a.folded.includes(key)) return 'var(--viz-other)';
+    return a.active ? 'off' : 'var(--viz-other)';
+}
+/** The key of the line a table row belongs to: its own, or Other when it is folded into it. */
+export const lineKeyOf = (view, key) => { const st = state[view]; return st && assignLines(st.ranked, st.selected).folded.includes(key) ? OTHER : key; };
 export const highlighted = view => (state[view] ? state[view].hi : '');
 export function setHighlight(view, key, redraw) { const st = seriesState(view); st.hi = st.hi === key ? '' : key; if (redraw) redraw(); }
 export const wordFor = interval => STEP_WORD[interval] || STEP_WORD['1h'];
+/** The keys checked in the table (the table's own selection, mapped to keys by the caller). */
+export function setSelected(view, keys) { const st = seriesState(view); st.selected = new Set(keys); if (st.hi && st.hi !== OTHER && st.selected.size && !st.selected.has(st.hi)) st.hi = ''; }
 
 /** Sets what the view has read (null while it loads or after an error) and keeps the colours' order. */
 export function setData(view, data, error) { const st = seriesState(view); st.data = data; st.error = error || ''; st.ranked = data ? rankKeys(data.buckets) : []; }
 
-function seg(label, items, cur, on) {
+function seg(label, items, isOn, onToggle) {
     const wrap = el('div', 'viz-ctl'); wrap.append(el('span', 'viz-ctl-label', label));
     const g = el('div', 'viz-seg'); g.setAttribute('role', 'group'); g.setAttribute('aria-label', label);
-    for (const [k, t] of items) { const b = el('button', null, t); b.type = 'button'; b.setAttribute('aria-pressed', String(k === cur)); b.addEventListener('click', () => on(k)); g.append(b); }
+    for (const [k, t] of items) { const b = el('button', null, t); b.type = 'button'; b.setAttribute('aria-pressed', String(isOn(k))); b.addEventListener('click', () => onToggle(k)); g.append(b); }
     wrap.append(g); return wrap;
 }
+const joinWords = list => (list.length < 2 ? list.join('') : `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}`);
 
-/** Draws the panel: the pickers, the chart and the line under the table ("Totals agree"). tableTotal(metricTableField) is the sum of the table's rows for that figure, or null when the table has none;
- *  redraw re-draws the table beside it (its swatches), and again(view) draws this panel again. */
+/** Draws the panel: the pickers (the metrics, any of them together; running total or each interval), the chart or charts, and the line under them ("Totals agree"). With one metric: a line per shown row.
+ *  With several metrics and one row: a line per metric (one chart per unit: tokens together, dollars and requests apart). With several metrics and several rows: one chart per metric, a line per row, one under another.
+ *  tableTotal(field, keys) is the sum of the table's rows (those with these keys, or all when keys is null) for a table figure, or null when the table has none; redraw draws the table beside it again. */
 export function drawPanel(host, view, { tableTotal, redraw, phone }) {
     host.replaceChildren();
     const st = seriesState(view);
@@ -155,24 +198,44 @@ export function drawPanel(host, view, { tableTotal, redraw, phone }) {
     const { buckets, interval, sinceMs, untilMs } = st.data;
     const times = axis(sinceMs, untilMs, interval);
     if (!buckets.length || !st.ranked.length) { host.append(el('p', 'cost-empty', 'No usage over time in this range yet.')); return; }
-    const m = METRICS.find(x => x.key === st.metric) || METRICS[0];
     const again = () => { drawPanel(host, view, { tableTotal, redraw, phone }); redraw?.(); };
+    const picked = METRICS.filter(x => st.metrics.includes(x.key));
     const tools = el('div', 'viz-tools');
-    tools.append(seg('Metric', METRICS.map(x => [x.key, x.label]), st.metric, k => { st.metric = k; again(); }),
-        seg('Show', [['cum', 'Running total'], ['int', wordFor(interval).replace(/^each/, 'Each')]], st.cumulative ? 'cum' : 'int', k => { st.cumulative = k === 'cum'; again(); }));
-    const lines = buildSeries(buckets, st.ranked, times, m.key, st.cumulative);
-    const card = el('div', 'viz-card');
-    card.append(el('h4', 'viz-title', `${m.label}, ${st.cumulative ? 'running total' : wordFor(interval)}`));
-    const chart = el('div', 'viz-chart'); card.append(chart);
-    host.append(tools, card);
-    drawChart(chart, { times, lines, metric: m.key, interval, hi: st.hi, phone });
-    // the rows against the chart: one figure, said once, or the two that differ
-    const rowsTotal = tableTotal ? tableTotal(m.table) : null, chartTotal = lines.reduce((a, l) => a + l.total, 0);
-    if (rowsTotal != null) {
-        const ok = agrees(rowsTotal, chartTotal), line = el('p', `viz-check${ok ? '' : ' viz-check-bad'}`);
+    tools.append(seg('Metrics', METRICS.map(x => [x.key, x.label]), k => st.metrics.includes(k), k => { st.metrics = st.metrics.includes(k) ? (st.metrics.length > 1 ? st.metrics.filter(x => x !== k) : st.metrics) : [...st.metrics, k]; again(); }),
+        seg('Show', [['cum', 'Running total'], ['int', wordFor(interval).replace(/^each/, 'Each')]], k => (k === 'cum') === st.cumulative, k => { st.cumulative = k === 'cum'; again(); }));
+    const asg = assignLines(st.ranked, st.selected), when = st.cumulative ? 'running total' : wordFor(interval);
+    const oneRowMany = picked.length > 1 && asg.lines.length === 1 && !asg.folded.length;
+    if (oneRowMany) tools.append(seg('Scale', [['lin', 'Linear'], ['log', 'Log']], k => (k === 'log') === !!st.log, k => { st.log = k === 'log'; again(); })); // the metrics of one row differ by orders of magnitude: a log axis reads them together
+    host.append(tools);
+    const shownKeys = [...asg.lines.map(l => l.key), ...asg.folded];
+    const rowsOf = st.selected.size ? shownKeys : null;
+    const card = (title, hint) => { const c = el('div', 'viz-card'); c.append(el('h4', 'viz-title', title)); if (hint) c.append(el('p', 'viz-hint', hint)); const chart = el('div', 'viz-chart'); c.append(chart); host.append(c); return chart; };
+    const checks = [];
+    const byRows = (m, title) => { // a line per shown row, for one metric
+        const lines = buildSeries(buckets, asg, times, m.key, st.cumulative), chart = card(title, asg.active ? `Showing the ${shownKeys.length} checked ${shownKeys.length === 1 ? 'row' : 'rows'}. Clear the checks above the table to see the top 7.` : '');
+        drawChart(chart, { times, lines, metric: m.key, interval, hi: st.hi, phone });
+        checks.push([m, lines.reduce((a, l) => a + l.total, 0)]);
+    };
+    if (picked.length === 1) byRows(picked[0], `${picked[0].label}, ${when}`);
+    else if (asg.lines.length === 1 && !asg.folded.length) { // one row, several metrics: the metrics are the lines, a chart for each unit
+        for (const group of metricUnits(picked)) {
+            const lines = buildMetricLines(buckets, [asg.lines[0].key], times, group, st.cumulative), chart = card(`${asg.lines[0].key}: ${joinWords(group.map(g => g.label))}, ${when}`);
+            drawChart(chart, { times, lines, metric: group[0].key, interval, hi: '', phone, log: !!st.log && group.length > 1 });
+            if (lines.length > 1) { // the metrics are the lines: a key (the table names rows, not metrics), each metric with what it adds up to
+                const ul = el('ul', 'viz-legend viz-legend-plain');
+                lines.forEach((l, i) => { const li = el('li', 'viz-legend-item'), sw = el('i', 'cost-swatch'); sw.style.background = colorOf(l); sw.setAttribute('aria-hidden', 'true'); li.append(sw, el('span', 'viz-legend-name', l.label), el('span', 'viz-legend-value', group[i].fmt(l.total))); ul.append(li); });
+                chart.parentElement.append(ul);
+            }
+            lines.forEach((l, i) => checks.push([group[i], l.total]));
+        }
+    } else for (const m of picked) byRows(m, `${m.label}, ${when}`); // several rows, several metrics: one chart each
+    // the rows against the charts: one line saying it once, or the figures that differ
+    const rows = checks.map(([m, chartTotal]) => ({ m, chartTotal, rowsTotal: tableTotal ? tableTotal(m.table, rowsOf) : null })).filter(x => x.rowsTotal != null);
+    if (rows.length) {
+        const bad = rows.filter(x => !agrees(x.rowsTotal, x.chartTotal)), line = el('p', `viz-check${bad.length ? ' viz-check-bad' : ''}`);
         line.setAttribute('role', 'status');
-        if (ok) line.append(el('b', null, '✓ Totals agree'), document.createTextNode(` The table's rows add up to ${m.fmt(rowsTotal)}, where the chart ends.`));
-        else line.append(el('b', null, '✗ Totals differ'), document.createTextNode(` The table's rows add up to ${m.fmt(rowsTotal)}, the chart to ${m.fmt(chartTotal)}.`));
+        if (!bad.length) line.append(el('b', null, '\u2713 Totals agree'), document.createTextNode(rows.length === 1 ? ` The table's rows add up to ${rows[0].m.fmt(rows[0].rowsTotal)}, where the chart ends.` : ` The table's rows add up to what each chart ends on (${joinWords(rows.map(x => x.m.label))}).`));
+        else line.append(el('b', null, '\u2717 Totals differ'), document.createTextNode(` ${joinWords(bad.map(x => `${x.m.label}: the table's rows ${x.m.fmt(x.rowsTotal)}, the chart ${x.m.fmt(x.chartTotal)}`))}.`));
         host.append(line);
     }
 }
@@ -215,7 +278,7 @@ export function drawArea(host, { times, lines, metric, interval, hi, phone }) {
     lines.forEach((l, k) => { // the first line is the bottom fill
         const top = base.map((b, i) => b + l.vals[i]);
         const d = top.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(' ') + ' ' + base.map((_, i) => `L${x(N - 1 - i).toFixed(1)} ${y(base[N - 1 - i]).toFixed(1)}`).join(' ') + ' Z';
-        s.append(svg('path', { d, class: 'viz-fill', fill: colorOf(l, k), opacity: hi && hi !== l.key ? 0.25 : 1 })); base = top;
+        s.append(svg('path', { d, class: 'viz-fill', fill: colorOf(l), opacity: hi && hi !== l.key ? 0.25 : 1 })); base = top;
     });
     const cross = svg('line', { y1: T, y2: T + ph, class: 'viz-cross', visibility: 'hidden' }); s.append(cross);
     const hit = svg('rect', { x: L, y: T, width: pw, height: ph, fill: 'transparent' }); s.append(hit);
@@ -225,7 +288,7 @@ export function drawArea(host, { times, lines, metric, interval, hi, phone }) {
         const r = s.getBoundingClientRect(), sx = r.width / W, i = Math.max(0, Math.min(N - 1, Math.round(N > 1 ? ((((ev.clientX - r.left) / sx) - L) / pw) * (N - 1) : 0)));
         cross.setAttribute('x1', x(i)); cross.setAttribute('x2', x(i)); cross.setAttribute('visibility', 'visible');
         tip.replaceChildren(el('div', 'viz-tip-when', timeLabel(times[i], interval)));
-        for (const [l, k] of lines.map((l, k) => [l, k]).reverse().filter(([l]) => l.vals[i] > 0).slice(0, 6)) { const row = el('div', 'viz-tip-row'), key = el('i'); key.style.background = colorOf(l, k); const name = el('span'); name.append(key, document.createTextNode(l.label)); row.append(name, el('b', null, m.fmt(l.vals[i]))); tip.append(row); }
+        for (const [l, k] of lines.map((l, k) => [l, k]).reverse().filter(([l]) => l.vals[i] > 0).slice(0, 6)) { const row = el('div', 'viz-tip-row'), key = el('i'); key.style.background = colorOf(l); const name = el('span'); name.append(key, document.createTextNode(l.label)); row.append(name, el('b', null, m.fmt(l.vals[i]))); tip.append(row); }
         const all = el('div', 'viz-tip-row'); all.append(el('span', null, 'All'), el('b', null, m.fmt(sums[i]))); tip.append(all);
         tip.hidden = false;
         const hr = host.getBoundingClientRect(); let tx = ev.clientX - hr.left + 14; if (tx + 200 > hr.width) tx = ev.clientX - hr.left - 214; tip.style.left = `${Math.max(4, tx)}px`; tip.style.top = '8px';
@@ -243,14 +306,14 @@ export function drawOverviewPanel(host, { phone }) {
     const { buckets, interval, sinceMs, untilMs } = st.data;
     if (!buckets.length || !st.ranked.length) return;
     const times = axis(sinceMs, untilMs, interval);
-    const lines = buildSeries(buckets, st.ranked, times, 'cost_usd', false);
+    const lines = buildSeries(buckets, assignLines(st.ranked, null), times, 'cost_usd', false);
     const card = el('div', 'viz-card');
     card.append(el('h4', 'viz-title', `Cost ${wordFor(interval)}, stacked by team`));
     const chart = el('div', 'viz-chart'); card.append(chart);
     const ul = el('ul', 'viz-legend');
     lines.forEach((l, k) => {
         const li = el('li'), b = el('button', 'viz-legend-btn'); b.type = 'button'; b.setAttribute('aria-pressed', String(st.hi === l.key));
-        const sw = el('i', 'cost-swatch'); sw.style.background = colorOf(l, k); sw.setAttribute('aria-hidden', 'true');
+        const sw = el('i', 'cost-swatch'); sw.style.background = colorOf(l); sw.setAttribute('aria-hidden', 'true');
         b.append(sw, el('span', 'viz-legend-name', l.label), el('span', 'viz-legend-value', METRICS[0].fmt(l.total)));
         b.addEventListener('click', () => { st.hi = st.hi === l.key ? '' : l.key; drawOverviewPanel(host, { phone }); });
         li.append(b); ul.append(li);

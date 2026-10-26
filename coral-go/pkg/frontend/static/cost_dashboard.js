@@ -464,26 +464,34 @@ const _textCol = (table, key, label, get, extra) => ({ key, label, sort: true, s
 // By provider, By model, By team and By agent each have a line per table row above the table. The table is the legend: a swatch before the first column's name (a button: it brings the line forward), a click on the
 // row does the same, and under the table a line says whether the rows add up to where the chart ends. The chart reads /api/token-usage/timeseries?group_by=...
 const SERIES_VIEWS = {
-    provider: { group: 'provider', key: r => r.agent_type || 'unknown', name: r => r.agent_type || 'unknown' },
-    model: { group: 'model', key: r => r.model_id || 'unknown', name: r => r.model || 'unknown' },
-    team: { group: 'team', key: r => r.board_name || '(no team)', name: r => (r.board_name ? keyLabel(r.board_name) : '(no team)') },
-    agent: { group: 'agent', key: r => r.agent_name || '(unknown)', name: r => r.display_name || r.agent_name || 'Agent' },
+    provider: { group: 'provider', key: r => r.agent_type || 'unknown', rowKey: r => r.agent_type || 'unknown', name: r => r.agent_type || 'unknown' },
+    model: { group: 'model', key: r => r.model_id || 'unknown', rowKey: r => `${r.model_id || 'unknown'}|${r.agent_type || ''}`, name: r => r.model || 'unknown' },
+    team: { group: 'team', key: r => r.board_name || '(no team)', rowKey: r => r.board_name || '(no team)', name: r => (r.board_name ? keyLabel(r.board_name) : '(no team)') },
+    agent: { group: 'agent', key: r => r.agent_name || '(unknown)', rowKey: r => r.session_id || `${r.agent_name}:${r.launched_at || r.first_seen}`, name: r => r.display_name || r.agent_name || 'Agent' },
 };
 const _currentView = () => document.getElementById('cost-dashboard-view')?.dataset.view || '';
 const _periodHours = () => ({ hour: 1, day: 24, week: 168, month: 720 })[document.getElementById('cost-time-range')?.value || 'day'] || 24;
 const _periodInterval = () => ({ hour: '5m', day: '1h', week: '1h', month: '1d' })[document.getElementById('cost-time-range')?.value || 'day'] || '1h';
 
-/** The sum of a figure over a view's rows (the unfiltered ones), or null when its rows do not have it (By team has no Requests). */
-function _rowsTotal(view, field) {
-    const rows = _rawData[view] || [];
+/** The sum of a figure over a view's rows (the unfiltered ones; only those with a key in `keys` when it is given), or null when its rows do not have it (By team has no Requests). */
+function _rowsTotal(view, field, keys) {
+    const v = SERIES_VIEWS[view], want = keys ? new Set(keys) : null;
+    const rows = (_rawData[view] || []).filter(r => !want || want.has(v.key(r)));
     if (!rows.length || rows.some(r => r[field] == null)) return null;
     return rows.reduce((a, r) => a + (Number(r[field]) || 0), 0);
+}
+
+/** The keys of the rows checked in a view's table. */
+function _selectedKeys(view) {
+    const st = _tables[view], v = SERIES_VIEWS[view];
+    if (!st || !st.selected.size) return [];
+    return (_rawData[view] || []).filter(r => st.selected.has(String(v.rowKey(r)))).map(v.key);
 }
 
 function _drawSeries(view) {
     const host = document.getElementById(`cost-series-${view}`);
     if (!host) return;
-    series.drawPanel(host, view, { tableTotal: f => _rowsTotal(view, f), redraw: () => _rerender(view), phone: isPhoneLayout() });
+    series.drawPanel(host, view, { tableTotal: (f, keys) => _rowsTotal(view, f, keys), redraw: () => _refreshSwatches(view), phone: isPhoneLayout() });
 }
 
 async function _refreshSeries(view = _currentView()) {
@@ -502,25 +510,39 @@ async function _refreshSeries(view = _currentView()) {
     _rerender(view); // the swatches
 }
 
-/** A row's key in the table's first column: a swatch (a button) in its line's colour, then what the cell says. */
+/** Paints a row's swatch for its view's current lines: its line's colour, Other's, or an empty ring when rows are checked and this one is not; pressed when its line is the one brought forward. */
+function _paintSwatch(b, view, r) {
+    const v = SERIES_VIEWS[view], color = series.swatchColor(view, v.key(r)), line = series.lineKeyOf(view, v.key(r)), on = series.highlighted(view) === line;
+    b.classList.toggle('cost-swatch-off', color === 'off'); b.style.background = color === 'off' ? '' : color;
+    if (b.tagName === 'BUTTON') b.setAttribute('aria-pressed', String(on)); else if (on) b.setAttribute('aria-pressed', 'true'); else b.removeAttribute('aria-pressed');
+}
+/** The swatches of a view's table painted again, in place: a check or a click does not rebuild the table, so the keyboard stays where it was. */
+function _refreshSwatches(view) {
+    const v = SERIES_VIEWS[view], box = document.getElementById(`cost-by-${view}`);
+    if (!box) return;
+    const byKey = new Map((_rawData[view] || []).map(r => [String(v.rowKey(r)), r]));
+    for (const tr of box.querySelectorAll('tr.dt-row')) { const sw = tr.querySelector('.cost-swatch'), r = byKey.get(tr.dataset.key); if (sw && r) _paintSwatch(sw, view, r); }
+}
+const _highlight = (view, r) => { series.setHighlight(view, series.lineKeyOf(view, SERIES_VIEWS[view].key(r))); _drawSeries(view); _refreshSwatches(view); };
+const _selectionChanged = view => { series.setSelected(view, _selectedKeys(view)); _drawSeries(view); _refreshSwatches(view); };
+
+/** A row's key in the table's first column: a swatch (a button for a pointer, only the colour for a finger) in its line's colour, then what the cell says. */
 function _swatched(view, cell) {
-    const v = SERIES_VIEWS[view];
     return r => {
-        const inner = cell(r), color = series.swatchColor(view, v.key(r));
-        if (!color) return inner;
+        const inner = cell(r);
+        if (!series.swatchColor(view, SERIES_VIEWS[view].key(r))) return inner;
         const wrap = document.createElement('span'); wrap.className = 'cost-lead';
-        const line = series.lineKeyOf(view, v.key(r)), on = series.highlighted(view) === line;
         // a pointer has a button (a small target); a finger has the row, which is 44 px and does the same, so the swatch is only its colour
         const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
-        const b = document.createElement(coarse ? 'span' : 'button'); b.className = 'cost-swatch'; b.style.background = color;
-        if (coarse) { b.setAttribute('aria-hidden', 'true'); if (on) b.setAttribute('aria-pressed', 'true'); }
-        else { b.type = 'button'; b.setAttribute('aria-pressed', String(on)); b.setAttribute('aria-label', `Bring ${v.name(r)}'s line forward`); b.addEventListener('click', () => { series.setHighlight(view, line); _drawSeries(view); _rerender(view); }); }
+        const b = document.createElement(coarse ? 'span' : 'button'); b.className = 'cost-swatch';
+        if (coarse) b.setAttribute('aria-hidden', 'true');
+        else { b.type = 'button'; b.setAttribute('aria-label', `Bring ${SERIES_VIEWS[view].name(r)}'s line forward`); b.addEventListener('click', () => _highlight(view, r)); }
+        _paintSwatch(b, view, r);
         wrap.append(b, inner instanceof Node ? inner : document.createTextNode(String(inner == null ? '' : inner)));
         return wrap;
     };
 }
-const _pick = view => r => { series.setHighlight(view, series.lineKeyOf(view, SERIES_VIEWS[view].key(r))); _drawSeries(view); _rerender(view); };
-const _seriesOpts = view => ({ open: _pick(view), rowName: r => SERIES_VIEWS[view].name(r) });
+const _seriesOpts = view => ({ open: r => _highlight(view, r), rowName: r => SERIES_VIEWS[view].name(r), rowKey: SERIES_VIEWS[view].rowKey, selectable: { contextKey: view, actions: [], onChange: () => _selectionChanged(view) } });
 
 
 // ── The Overview over time (#7930): the change against the period before, and cost by team stacked ──
@@ -556,8 +578,9 @@ function _drawTable(container, table, columns, rows, empty, extra) {
     const st = _tables[table] || (_tables[table] = tableState());
     if (!st.sort) st.sort = { key: 'cost_usd', dir: 'desc' };
     if (!rows.length) { emptyState(container, empty || NO_DATA, 'cost-empty'); return; }
+    if (SERIES_VIEWS[table]) series.setSelected(table, _selectedKeys(table)); // the rows checked before keep their lines through a refresh
     const t = dataTable({ label: TABLE_TITLES[table], columns, rows, rowKey: r => rows.indexOf(r), state: st, fold: 'labeled', scroll: true, ...extra });
-    container.replaceChildren(t.el);
+    container.replaceChildren(...(extra && extra.selectable ? [t.bar, ...(isPhoneLayout() ? [t.selectButton] : [])] : []), t.el);
     if (SERIES_VIEWS[table]) _drawSeries(table); // the line under the chart compares its total with these rows
 }
 
@@ -644,7 +667,7 @@ function _renderAgentTable(rows) {
         _numCol('requests', 'Requests', r => r.requests || 0, String),
         _tokCol('input_tokens', 'Input'), _tokCol('output_tokens', 'Output'), ..._cacheCols(),
         { key: 'details', label: 'Details', tone: 'secondary', cell: r => { const b = dtLink('Charts', () => agentDetail.openAgent(r, document.getElementById('cost-time-range')?.value || 'day')); b.setAttribute('aria-label', `Charts for ${r.display_name || r.agent_name || 'agent'}`); return b; } }, // one agent over the range (#7930)
-    ], filtered, NO_DATA, { ..._seriesOpts('agent'), rowKey: r => r.session_id || `${r.agent_name}:${start(r)}` });
+    ], filtered, NO_DATA, _seriesOpts('agent'));
     _attachAgentChartHovers(container, new Set(filtered.map(r => r.session_id).filter(Boolean)));
 }
 
