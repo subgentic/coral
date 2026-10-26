@@ -163,37 +163,55 @@ export async function uploadAndInsertImage(file, session = state.currentSession)
         formData.append("file", file);
         formData.append("session_id", sid); // the agent this image is for: its artifact copy goes on that agent's record (#5284)
 
+        // A failed upload says so in a sentence, with Retry where trying again can work (#6088: through Coral Hub an upload can be cut short and answered with an EMPTY 200).
+        const failed = (text, retry) => showToast(text, true, 10000, retry ? { action: { label: "Retry", onClick: () => uploadAndInsertImage(file, targetSession) } } : {});
+        // The request and its answer: only what goes wrong HERE is "Upload didn't finish". What happens after the answer (the strip, the toasts) has its own line below: one catch used to say the upload had not finished when the
+        // file had gone up and the page failed to show it (#8735), and told nobody which error it was.
+        let resp, text;
         try {
             // The path is typed into the agent, so the file must land on the agent's own server.
-            const resp = await serverFetch(sessionServer(targetSession), "/api/upload", {
+            resp = await serverFetch(sessionServer(targetSession), "/api/upload", {
                 method: "POST",
                 body: formData,
             });
-            // A failed upload says so in a sentence, with Retry where trying again can work (#6088: through Coral Hub an upload can be cut short and answered with an EMPTY 200).
-            const failed = (text, retry) => showToast(text, true, 10000, retry ? { action: { label: "Retry", onClick: () => uploadAndInsertImage(file, targetSession) } } : {});
-            if (!resp.ok) {
-                const said = await resp.clone().json().catch(() => null); // the hub's proxy names the limit it hit in "code" (#6190); it wins over the status
-                const known = uploadCodeFailure(said && said.code) || uploadStatusFailure(resp.status);
-                if (known) failed(known.text, known.retry);
-                else showToast(`Image not uploaded: ${await responseErrorText(resp, sessionServer(targetSession), `HTTP ${resp.status}`)}`, true);
-                return false;
-            }
-            const result = parseUploadReply(await resp.text());
-            if (!result) { failed(UPLOAD_UNFINISHED, true); return false; }
-            if (result.error) {
-                showToast(result.error, true);
-                return false;
-            }
+            if (resp.ok) text = await resp.text();
+        } catch (e) {
+            console.error("Upload request failed:", e);
+            failed(UPLOAD_UNFINISHED, true);
+            return false;
+        }
+        if (!resp.ok) {
+            const said = await resp.clone().json().catch(() => null); // the hub's proxy names the limit it hit in "code" (#6190); it wins over the status
+            const known = uploadCodeFailure(said && said.code) || uploadStatusFailure(resp.status);
+            if (known) failed(known.text, known.retry);
+            else showToast(`Image not uploaded: ${await responseErrorText(resp, sessionServer(targetSession), `HTTP ${resp.status}`)}`, true);
+            return false;
+        }
+        const result = parseUploadReply(text);
+        if (!result) { console.error("Upload answered with no usable reply:", resp.status, String(text).slice(0, 200)); failed(UPLOAD_UNFINISHED, true); return false; }
+        if (result.error) {
+            showToast(result.error, true);
+            return false;
+        }
 
+        // The file is on the agent's server: it is attached first, so a page that then fails to draw it still sends it.
+        let list;
+        try {
             // Create a local object URL for the thumbnail preview
             const previewUrl = URL.createObjectURL(file);
-            const list = getPendingAttachments(targetSession);
+            list = getPendingAttachments(targetSession);
             list.push({
                 path: result.path,
                 filename: result.filename,
                 previewUrl,
                 artifact: result.artifact || null, // the image as an artifact (#5284); null with artifact_error saying why
             });
+        } catch (e) {
+            console.error("Image uploaded but could not be attached:", e);
+            showToast("The image was uploaded but could not be attached. Try adding it again.", true, 10000, { action: { label: "Retry", onClick: () => uploadAndInsertImage(file, targetSession) } });
+            return false;
+        }
+        try {
             if (state.currentSession?.session_id === sid) {
                 renderAttachments(targetSession);
                 document.getElementById("command-input")?.focus();
@@ -202,12 +220,11 @@ export async function uploadAndInsertImage(file, session = state.currentSession)
             const status = document.getElementById("image-attach-status");
             if (status) status.textContent = list.length === 1 ? `Attached ${result.filename}` : `${list.length} images attached`;
             if (result.artifact_error) showToast(`Attached ${result.filename}, not shared: ${artifactErrorText(result)}`, true);
-            return true;
         } catch (e) {
-            showToast(UPLOAD_UNFINISHED, true, 10000, { action: { label: "Retry", onClick: () => uploadAndInsertImage(file, targetSession) } });
-            console.error("Upload error:", e);
-            return false;
+            console.error("Image attached but could not be shown:", e);
+            showToast("The image is attached but could not be shown here. It will still be sent.", true);
         }
+        return true;
     })();
 
     const activeList = activeUploadPromisesBySession.get(sid) || [];
