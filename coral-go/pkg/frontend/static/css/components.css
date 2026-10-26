@@ -2812,22 +2812,11 @@
     width: 100%;
 }
 
-/* Message board — header actions */
+/* Message board header */
 
 .mb-view-header h2 { font-size: var(--type-page-size); }
 /* With a board open its own name is the heading and "Message Board" is the quiet label above it (#6279); the class is set by message_board.js. */
 
-.mb-header-end { display: contents; } /* a unit only on a phone (mobile.css) */
-.mb-header-actions {
-    display: flex;
-    gap: 4px;
-    align-items: center;
-    /* With the right sidebar open (#4539) the board is narrower than it was: the actions wrap, right-aligned, inside the gutter. */
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    min-width: 0;
-    max-width: 100%;
-}
 .mb-action-btn {
     display: inline-flex;
     align-items: center;
