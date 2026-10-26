@@ -275,7 +275,7 @@ function draw() {
     Toolbar.mountSelection(toolbarRow, null);
     if (model.items.length || artifactState.selected.size) {
         const table = DT.dataTable({
-            label: `Artifacts, ${model.items.length}`, bare: !!model.scope, foldAt: model.scope ? 'fit' : 40, rows: model.items, rowKey: itemKey, current: detailKey(), sortBar: false, state: artifactState, rowName: readableName,
+            label: `Artifacts, ${model.items.length}`, bare: !!model.scope, compact: !!model.scope, foldAt: model.scope ? 'fit' : 40, rows: model.items, rowKey: itemKey, current: detailKey(), sortBar: false, state: artifactState, rowName: readableName,
             selectable: model.scope ? null : { contextKey: model.key, canSelect: item => !!linkOf(item)?.preview, actions: artifactBulkActions(), onChange: keys => Toolbar.mountSelection(toolbarRow, keys.size ? table.bar : null) },
             open: (item, tr) => openArtifact(item, tr.querySelector('.dt-primary')),
             columns: [

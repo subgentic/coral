@@ -259,30 +259,30 @@
 .dt-box.dt-folded .dt-primary:has(.dt-name-text) { display: flex; align-items: center; }
 .dt-box.dt-folded .dt-name-text { line-height: 1.35; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: normal; overflow-wrap: anywhere; max-inline-size: 100%; }
 
-/* A folded column row keeps its two lines compact. The title still has a 44px
+/* A table that asks for it (cfg.compact: the Tasks lists and the dock's Artifacts, #8496) keeps a folded column row to its two compact lines. Other folded tables keep their names and descriptions at two lines (a failed run's reason, a long server name). The title still has a 44px
  * hit area, centered over its 24px text line; the row itself opens across both lines. */
-.dt-box.dt-fold-column.dt-folded .dt-row { min-height: var(--table-fold-row-h); align-content: center; }
-.dt-box.dt-fold-column.dt-folded td.dt-line-1 { height: var(--table-fold-line-h); overflow: visible; display: flex; align-items: center; min-width: 0; }
-.dt-box.dt-fold-column.dt-folded td.dt-line-1.dt-end { justify-content: flex-end; }
+.dt-box.dt-compact.dt-fold-column.dt-folded .dt-row { min-height: var(--table-fold-row-h); align-content: center; }
+.dt-box.dt-compact.dt-fold-column.dt-folded td.dt-line-1 { height: var(--table-fold-line-h); overflow: visible; display: flex; align-items: center; min-width: 0; }
+.dt-box.dt-compact.dt-fold-column.dt-folded td.dt-line-1.dt-end { justify-content: flex-end; }
 /* A compact row lets the name's 44 px hit area hang 10 px over its 24 px line. A row that also holds an action button (a .btn: Run, Mark done, Rename) gives the name line its whole 44 px instead, so no two controls overlap, at any text size (#8541). */
-.dt-box.dt-fold-column.dt-folded .dt-row:has(.btn) td.dt-line-1 { height: var(--table-touch); }
-.dt-box.dt-fold-column.dt-folded .dt-row:has(.btn) .dt-primary { margin-block: 0; }
+.dt-box.dt-compact.dt-fold-column.dt-folded .dt-row:has(.btn) td.dt-line-1 { height: var(--table-touch); }
+.dt-box.dt-compact.dt-fold-column.dt-folded .dt-row:has(.btn) .dt-primary { margin-block: 0; }
 /* What a cell's flex line holds may shrink with it (a wrapper div would otherwise keep its content's width and push the name off the screen, #8541); the buttons keep their 44 px minimum. */
-.dt-box.dt-fold-column.dt-folded td.dt-line-1 > :not(.dt-primary):not(.dt-link) { min-width: 0; max-width: 100%; }
+.dt-box.dt-compact.dt-fold-column.dt-folded td.dt-line-1 > :not(.dt-primary):not(.dt-link) { min-width: 0; max-width: 100%; }
 /* A name with its description under it stacks: the description is not a second flex item squeezing the name to ellipsis at a large text size (#8541) */
-.dt-box.dt-fold-column.dt-folded td.dt-line-1:has(> .dt-subtitle) { flex-direction: column; align-items: flex-start; height: auto; }
-.dt-box.dt-fold-column.dt-folded .dt-title-cell { align-items: center; width: 100%; }
-.dt-box.dt-fold-column.dt-folded .dt-title-stack { width: 100%; }
-.dt-box.dt-fold-column.dt-folded .dt-primary { box-sizing: border-box; padding: 0; margin-block: calc((var(--table-fold-line-h) - var(--table-touch)) / 2); line-height: 1.3; font-weight: var(--table-fold-primary-weight); }
-.dt-box.dt-fold-column.dt-folded .dt-title-cell > .dt-primary { min-width: 0; flex: 1; }
-.dt-box.dt-fold-column.dt-folded td.dt-line-2 { min-height: var(--table-fold-meta-h); line-height: var(--table-fold-meta-h); }
-.dt-box.dt-fold-column.dt-folded .dt-name-text { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dt-box.dt-fold-column.dt-folded .dt-subtitle.dt-clamp-2 { -webkit-line-clamp: 1; }
+.dt-box.dt-compact.dt-fold-column.dt-folded td.dt-line-1:has(> .dt-subtitle) { flex-direction: column; align-items: flex-start; height: auto; }
+.dt-box.dt-compact.dt-fold-column.dt-folded .dt-title-cell { align-items: center; width: 100%; }
+.dt-box.dt-compact.dt-fold-column.dt-folded .dt-title-stack { width: 100%; }
+.dt-box.dt-compact.dt-fold-column.dt-folded .dt-primary { box-sizing: border-box; padding: 0; margin-block: calc((var(--table-fold-line-h) - var(--table-touch)) / 2); line-height: 1.3; font-weight: var(--table-fold-primary-weight); }
+.dt-box.dt-compact.dt-fold-column.dt-folded .dt-title-cell > .dt-primary { min-width: 0; flex: 1; }
+.dt-box.dt-compact.dt-fold-column.dt-folded td.dt-line-2 { min-height: var(--table-fold-meta-h); line-height: var(--table-fold-meta-h); }
+.dt-box.dt-compact.dt-fold-column.dt-folded .dt-name-text { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dt-box.dt-compact.dt-fold-column.dt-folded .dt-subtitle.dt-clamp-2 { -webkit-line-clamp: 1; }
 
 .dt-title-content { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.dt-box.dt-fold-column.dt-folded .dt-title-content { overflow: visible; }
-.dt-box.dt-fold-column.dt-folded .dt-id { min-width: 0; }
-.dt-box.dt-fold-column.dt-folded .dt-chip { box-sizing: border-box; height: var(--table-fold-meta-h); padding-block: 0; font-size: var(--table-head-size); font-weight: var(--table-head-weight); }
+.dt-box.dt-compact.dt-fold-column.dt-folded .dt-title-content { overflow: visible; }
+.dt-box.dt-compact.dt-fold-column.dt-folded .dt-id { min-width: 0; }
+.dt-box.dt-compact.dt-fold-column.dt-folded .dt-chip { box-sizing: border-box; height: var(--table-fold-meta-h); padding-block: 0; font-size: var(--table-head-size); font-weight: var(--table-head-weight); }
 
 /* The hover/current background is stronger than the panel. Quiet text still
  * needs 4.5:1 on that background in either theme. */
