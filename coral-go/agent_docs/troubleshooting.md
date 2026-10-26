@@ -326,8 +326,9 @@ the Codex agent produced **no usage record at all**, even though its own session
 under `~/.codex/sessions` contained token counts. Codex support exists in
 `internal/background/token_poller.go` (`extractCodexUsage`), so this is a runtime
 ingestion failure rather than a missing feature — note that Codex names its rollout files
-with its *own* UUID, which defeats the filename-matching strategy at
-`token_poller.go:312`.
+with its *own* UUID, which defeats the filename-matching strategy of
+`resolveCodexTranscriptCtx` (`internal/jsonl`; it then falls back to a search for a marker in
+the file, `resolveCodexTranscriptByMarkerCtx`).
 
 Do not read a team total as complete spend across vendors. A missing agent shows as
 nothing rather than as an error.
@@ -367,8 +368,8 @@ When Coral starts and finds a team that was running but has no live agents (its 
 
 ### A scheduled job ends in `killed` / `timeout` instead of `completed`
 
-Expected with an interactive agent. `scheduler.go:611-620` records `completed` only when the
-launch call returns; an interactive agent session does not exit after answering, so the run
+Expected with an interactive agent. `launchAndWatch` (`internal/background`, through
+`runOutcome`) records `completed` only when the launch call returns; an interactive agent session does not exit after answering, so the run
 runs until `max_duration_s` and is recorded `killed` with `exit_reason: timeout`. The agent's
 work still happened. Whether any agent configuration exits cleanly enough to record
 `completed` is untested.
