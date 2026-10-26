@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	"github.com/subgentic/coral/internal/safego"
@@ -171,7 +172,16 @@ func (s *Session) serveInbound(st io.ReadWriteCloser, setDeadline func(time.Time
 		writeInboundResponse(st, RelayResponse{Status: http.StatusTooManyRequests, Body: k.busy, RetryAfter: 1})
 		return
 	}
-	defer inflight.Add(-1)
+	// The slot is given back before the answer is sent, as the redactor's budget is (#4136): a caller that has the answer asks again at once, and a release that ran
+	// after the write (a deferred one) could still be pending when the next request arrived, which then came back busy under load (#8016: TestSigninCheck's "busy" for "refused").
+	released := false
+	release := func() {
+		if !released {
+			released = true
+			inflight.Add(-1)
+		}
+	}
+	defer release()
 	_ = setDeadline(time.Time{})
 	ctx, cancel := context.WithTimeout(context.Background(), k.timeout)
 	defer cancel()
@@ -189,9 +199,16 @@ func (s *Session) serveInbound(st io.ReadWriteCloser, setDeadline func(time.Time
 	if len(resp.Body) > k.maxReply {
 		resp = RelayResponse{Status: http.StatusBadGateway, Body: k.failed}
 	}
+	release()
 	_ = setDeadline(time.Now().Add(inboundReadDeadline))
 	writeInboundResponse(st, resp)
+	if f := inboundAnswered.Load(); f != nil {
+		(*f)()
+	}
 }
+
+// inboundAnswered runs just after an answer is written, before the handler returns: a seam for the test that holds a handler there to prove its budget slot is already free.
+var inboundAnswered atomic.Pointer[func()]
 
 func writeInboundResponse(w io.Writer, r RelayResponse) {
 	rh := ResponseHeader{Status: r.Status}

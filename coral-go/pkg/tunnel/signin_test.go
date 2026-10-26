@@ -235,3 +235,44 @@ func TestSigninHasItsOwnInFlightBudget(t *testing.T) {
 	assert.JSONEq(t, `{"ok":false}`, string(r.Body))
 	assert.Equal(t, 1, r.RetryAfter)
 }
+
+// #8016: the budget slot of an answered request is free before its answer is on the wire. A release that ran after the write (a deferred one) could still be pending when the caller, which
+// has the answer, asked again at once; the next check then came back busy ("Coral Hub didn't answer: busy" for a refusal, under load). The test holds each handler just after its answer is
+// written, so a release that waits for the handler to return holds its slot: the third sequential check (the budget is 2) would be answered 429.
+func TestSigninSlotIsFreeWhenTheAnswerArrives(t *testing.T) {
+	hold := make(chan struct{})
+	var answered atomic.Int32
+	hook := func() { answered.Add(1); <-hold }
+	inboundAnswered.Store(&hook)
+	t.Cleanup(func() { close(hold); inboundAnswered.Store(nil) })
+	h := signinHub(t, []string{CapabilitySignin}, func(context.Context, *Session, SigninRequest) SigninResponse {
+		return SigninResponse{Status: 200, Body: []byte(`{"ok":true}`)}
+	}, nil)
+	_, cs := connect(t, h, noopLocal(), nil)
+	for i := 1; i <= 4; i++ { // one more than twice the budget
+		r, err := cs.Signin(context.Background(), SigninCheck, []byte(`{}`))
+		require.NoError(t, err, "check %d", i)
+		require.Equal(t, 200, r.Status, "check %d is answered, not busy: the slot of the one before it was free when its answer arrived", i)
+	}
+	require.Eventually(t, func() bool { return answered.Load() == 4 }, 5*time.Second, 10*time.Millisecond, "every answer was written before its handler returned")
+}
+
+// A hook that panics gives its slot back too (the deferred release is the one that runs then): three panics in a row on a budget of two, and the next check is still answered.
+func TestSigninSlotIsFreeAfterAPanickingHook(t *testing.T) {
+	var calls atomic.Int32
+	h := signinHub(t, []string{CapabilitySignin}, func(context.Context, *Session, SigninRequest) SigninResponse {
+		if calls.Add(1) <= 3 {
+			panic("a hook that fails")
+		}
+		return SigninResponse{Status: 200, Body: []byte(`{"ok":true}`)}
+	}, nil)
+	_, cs := connect(t, h, noopLocal(), nil)
+	for i := 1; i <= 3; i++ {
+		r, err := cs.Signin(context.Background(), SigninCheck, []byte(`{}`))
+		require.NoError(t, err, "check %d", i)
+		require.Equal(t, http.StatusBadGateway, r.Status, "check %d: the panic is a fixed 502, not busy", i)
+	}
+	r, err := cs.Signin(context.Background(), SigninCheck, []byte(`{}`))
+	require.NoError(t, err)
+	require.Equal(t, 200, r.Status, "the slots of the three panics were given back")
+}
