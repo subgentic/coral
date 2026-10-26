@@ -5,11 +5,18 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import gate_check as g  # noqa: E402
 import release_provenance as p  # noqa: E402
 
 REPO = "subgentic/coral"
-CFG = g.load_config(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".github", "gate.json"))
+# Keep the policy exercised by these cases fixed, independent of changes to the
+# live gate.json. The real release_provenance.main still loads that live policy.
+CFG = {
+    "branch_prefix": "ci/",
+    "always": ["go-tests", "go-race", "cdp-gate"],
+    "events": ["push", "pull_request", "workflow_dispatch"],
+    "always_events": ["push", "workflow_dispatch"],
+    "workflow_files": {n: f".github/workflows/{n}.yml" for n in ("go-tests", "go-race", "cdp-gate")},
+}
 TAGGED = "b" * 40  # the notes commit that is tagged
 GATED = "a" * 40  # its parent: the code the gates ran on
 
