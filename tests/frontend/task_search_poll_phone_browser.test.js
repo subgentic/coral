@@ -49,7 +49,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         check('the first page is shown (not all 130)', first > 0 && first < N, String(first));
         for (let i = 0; i < 3 && (await rows()) < N; i++) {
             const before = await rows();
-            await ev(`document.querySelector('#board-task-list .board-task-load-more').click(); true`);
+            await ev(`document.querySelector('#board-task-list .dt-foot').scrollIntoView({block: 'center'}); true`);
             await waitFor(`document.querySelectorAll('#board-task-list .board-task-item:not(.board-task-header)').length > ${before}`, 'the next page', { timeout: 8000 });
         }
         const paged = await rows();

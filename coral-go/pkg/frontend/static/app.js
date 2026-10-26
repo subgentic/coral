@@ -38,7 +38,7 @@ import { toggleAgenticPanel, toggleSidebarRail, showSidebarPane, focusSidebarSea
 import { connectTerminalWs, disconnectTerminalWs } from './xterm_renderer.js';
 import { saveNotes, generateSummary, toggleNotesEdit, cancelNotesEdit, switchHistoryTab } from './notes.js';
 import { addTagToSession, removeTagFromSession, showTagDropdown, hideTagDropdown, createTag } from './tags.js';
-import { loadMoreBoardTasks, hideTaskDetailModal, showCreateTaskModal, hideCreateTaskModal, submitCreateTask, completeAgentTask, _doCompleteAgentTask, showAgentTaskDetailModal } from './tasks.js';
+import { hideTaskDetailModal, showCreateTaskModal, hideCreateTaskModal, submitCreateTask, completeAgentTask, _doCompleteAgentTask, showAgentTaskDetailModal } from './tasks.js';
 import { openFilePreview, openFileEdit, refreshChangedFiles, copyFilePath } from './changed_files.js';
 import './file_mention.js';
 import './command_mention.js';
@@ -370,7 +370,7 @@ Object.assign(window, {
     openFilePreview, openFileEdit, refreshChangedFiles,
     copyFilePath, 
     // tasks
-    hideTaskDetailModal, loadMoreBoardTasks,
+    hideTaskDetailModal,
     showCreateTaskModal, hideCreateTaskModal, submitCreateTask,
     completeAgentTask, _doCompleteAgentTask, showAgentTaskDetailModal,
     // agent_notes

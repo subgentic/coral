@@ -6,6 +6,7 @@ import { buildListBar } from './list_bar.js';
 const SPEC = {
     idp: 'tk',
     noun: 'task',
+    hideCount: true,
     label: 'Search and filter tasks',
     searchLabel: 'Search tasks',
     placeholder: 'Search tasks',

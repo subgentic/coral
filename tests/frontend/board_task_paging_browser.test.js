@@ -47,7 +47,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
     const MODS = `const tasks = await import((window.__coralStatic||'/static/')+'tasks.js'); const { state } = await import((window.__coralStatic||'/static/')+'state.js');`;
     const listed = () => ev(`(async () => { ${MODS} return (state.currentBoardTasks || []).map(t => ({ id: t.id, status: t.status, hasBody: 'body' in t, hasWorkflow: 'workflow' in t })); })()`);
     const load = () => ev(`(async () => { ${MODS} await tasks.loadBoardTasks(${JSON.stringify(BOARD)}); return true; })()`);
-    const dom = () => ev(`({ more: document.querySelector('#board-task-list .board-task-load-more')?.textContent.trim() || null,
+    const dom = () => ev(`({ more: document.querySelector('#board-task-list .dt-foot')?.textContent.trim() || null,
         count: document.getElementById('task-bar-count')?.textContent || '',
         hide: document.querySelector('.board-task-hide-toggle')?.textContent.trim() || '' })`);
 
@@ -79,11 +79,13 @@ const { removeBoards } = require('./helpers/board_cleanup');
         check('a load lists every open task and the newest 50 done tasks', rows.length === 53 && done.length === 50 && openIds.every(id => rows.some(r => r.id === id)), `${rows.length} rows, ${done.length} done`);
         check('list items are light: no body, no workflow', rows.every(r => !r.hasBody && !r.hasWorkflow));
         let d = await dom();
-        check('"Load more" offers the 10 done tasks not loaded', !!d.more && /10 not shown/.test(d.more), JSON.stringify(d.more));
+        check('"Load more" offers the 10 done tasks not loaded', !!d.more && /Showing 53 of 63/.test(d.more), JSON.stringify(d.more));
         check('the counts are the board totals (60 done of 63), not the loaded rows', d.count === '60/63' && /\(60\)/.test(d.hide), JSON.stringify(d));
 
         // ── Load more ──
-        await ev(`(async () => { ${MODS} await tasks.loadMoreBoardTasks(); return true; })()`);
+        await ev(`(() => { const host = document.createElement('div'); host.id = 'paging-dock'; host.style.cssText = 'position:fixed;inset:0 auto 0 0;width:680px;overflow:auto;background:var(--bg-primary);z-index:99999'; host.append(document.getElementById('board-task-list')); document.body.append(host); document.querySelector('#paging-dock .dt-foot').scrollIntoView({block:'center'}); return true; })()`);
+        await waitFor(`!document.querySelector('#board-task-list .dt-foot') && document.querySelectorAll('#board-task-list tbody tr').length === 63`, 'scrolling the shared footer loads the final page');
+        await ev(`document.getElementById('paging-dock').style.display = 'none'; true`);
         rows = await listed();
         const ids = rows.map(r => r.id);
         check('"Load more" adds the older done tasks, each once', rows.length === 63 && new Set(ids).size === 63, `${rows.length} rows, ${new Set(ids).size} distinct`);
