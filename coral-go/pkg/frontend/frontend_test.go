@@ -59,6 +59,13 @@ func TestBootJSON(t *testing.T) {
 }
 
 func TestAssetsEmbedded(t *testing.T) {
+	// Startup assets come from the transitive module list, so splitting the entry
+	// checks every new dependency instead of only the old app.js filename (#8381).
+	for _, module := range StartupModules() {
+		if _, err := Static.ReadFile("static/" + module); err != nil {
+			t.Errorf("startup module %s not embedded: %v", module, err)
+		}
+	}
 	for _, p := range []string{
 		"static/app.js", "static/actions.js", "static/cloud.js", "static/server_access.js", "static/servers.js", "static/server_controller.js", "static/server_table.js",
 		"static/cloud_server_view.js", "static/registered_server_view.js", "static/theme_init.js",

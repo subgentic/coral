@@ -37,6 +37,34 @@ func TestModuleGraphSkipsMissingFilesAndCycles(t *testing.T) {
 	}
 }
 
+// Moving entry responsibilities into modules must retain the original dependencies;
+// static re-exports count too, while panels loaded on demand stay outside the list.
+func TestModuleGraphFollowsSplitEntry(t *testing.T) {
+	before := fstest.MapFS{
+		"app.js":   {Data: []byte("import './state.js';\nimport './nav.js';\n")},
+		"state.js": {Data: []byte("")},
+		"nav.js":   {Data: []byte("")},
+	}
+	after := fstest.MapFS{
+		"app.js":          {Data: []byte("import './initial_load.js';\nexport { startRoute } from './app_routes.js';\n")},
+		"initial_load.js": {Data: []byte("import './state.js';\n")},
+		"app_routes.js":   {Data: []byte("import './nav.js';\nimport './state.js';\nconst panel = () => importOnce('./panel.js');\n")},
+		"state.js":        before["state.js"],
+		"nav.js":          before["nav.js"],
+		"panel.js":        {Data: []byte("")},
+	}
+	got := moduleGraph(after, "app.js")
+	want := []string{"app.js", "app_routes.js", "initial_load.js", "nav.js", "state.js"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("split startup graph = %v, want %v", got, want)
+	}
+	for _, module := range moduleGraph(before, "app.js") {
+		if !strings.Contains(","+strings.Join(got, ",")+",", ","+module+",") {
+			t.Errorf("split lost startup module %s", module)
+		}
+	}
+}
+
 // The real startup graph: large, every file exists, and the lazily loaded dialogs and panels are not in it.
 func TestStartupModulesIsTheRealGraph(t *testing.T) {
 	mods := StartupModules()
