@@ -1082,16 +1082,32 @@ function _flashLiveIndicator() {
 
 // ── Cumulative Spend Chart ───────────────────────────────────
 
+let _spendBuckets = [], _spendDrawnW = 0, _spendWatch = null;
+
+/** The chart is drawn at the card's inside width, and again when that changes (the window, the sidebar): an svg drawn at a width measured once sat centred in a wider card, with an empty band beside it (#7712). */
+function _watchSpendChart(container) {
+    if (_spendWatch || typeof ResizeObserver !== 'function') return;
+    _spendWatch = new ResizeObserver(() => { if (_spendBuckets.length >= 2 && _spendInnerWidth(container) !== _spendDrawnW) _renderSpendChart(_spendBuckets); });
+    _spendWatch.observe(container);
+}
+function _spendInnerWidth(container) {
+    const cs = getComputedStyle(container);
+    return Math.round(container.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0));
+}
+
 function _renderSpendChart(buckets) {
     const container = document.getElementById('cost-spend-chart');
     if (!container) return;
+    _spendBuckets = buckets;
+    _watchSpendChart(container);
 
     if (buckets.length < 2) {
         emptyState(container, 'Not enough data', 'cost-empty');
         return;
     }
 
-    const W = container.clientWidth || 600;
+    const W = _spendInnerWidth(container) || 600;
+    _spendDrawnW = W;
     const H = 180;
     const PAD = { top: 24, right: 16, bottom: 32, left: 56 };
     const plotW = W - PAD.left - PAD.right;
@@ -1114,17 +1130,6 @@ function _renderSpendChart(buckets) {
         `${(PAD.left + plotW).toFixed(1)},${(PAD.top + plotH).toFixed(1)}`
     ];
 
-    // Bar chart for per-bucket cost
-    const maxBucketCost = Math.max(...buckets.map(b => b.cost_usd)) || 1;
-    const barW = Math.max(1, (plotW / n) - 1);
-    let bars = '';
-    for (let i = 0; i < n; i++) {
-        const x = PAD.left + (i / n) * plotW;
-        const barH = (buckets[i].cost_usd / maxBucketCost) * plotH * 0.4;
-        const y = PAD.top + plotH - barH;
-        bars += `<rect class="spend-bar" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${barH.toFixed(1)}" rx="1"/>`;
-    }
-
     // Y-axis labels
     const midCost = maxCost / 2;
 
@@ -1140,11 +1145,9 @@ function _renderSpendChart(buckets) {
     const chartLabel = `Cumulative spend: ${_formatCost(buckets[buckets.length - 1].cumulative_cost || 0)} over ${n} intervals`;
     const svg = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" class="spend-chart-svg" role="img" aria-label="${escapeAttr(chartLabel)}">
         <!-- Grid lines -->
-        <line class="spend-grid" x1="${PAD.left}" y1="${PAD.top}" x2="${PAD.left + plotW}" y2="${PAD.top}" />
-        <line class="spend-grid" x1="${PAD.left}" y1="${PAD.top + plotH / 2}" x2="${PAD.left + plotW}" y2="${PAD.top + plotH / 2}" stroke-dasharray="4,4" />
-        <line class="spend-grid" x1="${PAD.left}" y1="${PAD.top + plotH}" x2="${PAD.left + plotW}" y2="${PAD.top + plotH}" />
-        <!-- Bars -->
-        ${bars}
+        <line class="cost-chart-grid" x1="${PAD.left}" y1="${PAD.top}" x2="${PAD.left + plotW}" y2="${PAD.top}" />
+        <line class="cost-chart-grid" x1="${PAD.left}" y1="${PAD.top + plotH / 2}" x2="${PAD.left + plotW}" y2="${PAD.top + plotH / 2}" stroke-dasharray="4,4" />
+        <line class="cost-chart-grid" x1="${PAD.left}" y1="${PAD.top + plotH}" x2="${PAD.left + plotW}" y2="${PAD.top + plotH}" />
         <!-- Area + Line -->
         <polygon class="spend-area" points="${areaPoints.join(' ')}" />
         <polyline class="spend-line" points="${points.join(' ')}" />
