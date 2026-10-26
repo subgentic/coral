@@ -13,6 +13,7 @@ import (
 
 	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/clitext"
+	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/terminalinput"
 )
@@ -672,6 +673,7 @@ func (h *SessionsHandler) AnswerPrompt(w http.ResponseWriter, r *http.Request) {
 			"The answer was sent, but the agent's prompt is still open. Check the terminal.")
 		return
 	}
+	h.retrySkippedBoardNudge(r.Context(), body.SessionID, naming.SessionName(body.AgentType, body.SessionID), "request_resolved")
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "answered": opt.Label})
 }
 
@@ -871,6 +873,7 @@ func (h *SessionsHandler) submitMulti(w http.ResponseWriter, r *http.Request, na
 			"Submit was sent, but the agent's prompt is still open. Check the terminal.")
 		return
 	}
+	h.retrySkippedBoardNudge(r.Context(), sessionID, naming.SessionName(agentType, sessionID), "request_resolved")
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "answered": before.Submit.Label})
 }
 
