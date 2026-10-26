@@ -347,7 +347,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         })()`);
 
         console.log('Board older-page navigation landing result:', boardLandingResult);
-        assert.ok(boardLandingResult.boardViewShown, 'Message board view must be shown');
+        assert.ok(boardLandingResult.boardViewShown, 'Board view must be shown');
         assert.ok(boardLandingResult.target105Found, 'Older message 105 must be loaded and rendered in DOM');
         assert.ok(boardLandingResult.target105HasTargetClass, 'Target message 105 must receive .chat-search-target class');
         assert.ok(boardLandingResult.target105Text.includes('post-mortem 105'), 'Target message 105 text must match');

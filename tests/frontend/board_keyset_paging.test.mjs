@@ -54,7 +54,7 @@ const mb = await importUi('message_board');
 const renderedIds = () => [...document.querySelectorAll('#mb-messages [data-message-id]')].map(e => Number(e.dataset.messageId));
 const query = s => new URL(s, 'https://hub.example/').searchParams;
 
-// ── Message board on a keyset server ──
+// ── Board on a keyset server ──
 mb.selectBoardProject('team');
 for (let i = 0; i < 5; i++) await settle();
 assert.equal(requests.length, 1, 'one request loads the latest page (no separate count call)');

@@ -92,7 +92,7 @@ async function api(method, path, body) {
         console.log(`   ✓ paused ${pause} ms (was the 5th doubling step, 16-24 s)`);
         await ev(`(async () => { ${overload}._resetOverloadForTests(); return true; })()`);
 
-        console.log('3. Message board, first load refused once');
+        console.log('3. Board, first load refused once');
         await api('POST', `/api/board/${BOARD}/subscribe`, { subscriber_id: 'Busy Dev', job_title: 'Developer' });
         await api('POST', `/api/board/${BOARD}/messages`, { subscriber_id: 'Busy Dev', content: 'hello from a busy board' });
         // Only what this load draws counts: the list may still hold an earlier view's empty state.

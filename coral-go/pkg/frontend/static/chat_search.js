@@ -43,7 +43,7 @@ export function highlightExcerpt(text, offsets = []) {
 
 // A result is named for its chat the way the list names it (its title, else the start of its first reply), never by the session's id; a chat that is not in the loaded list is a plain "Chat".
 function resultLabel(result) {
-    if (result.type === 'group') return result.project || result.session_id || 'Message board';
+    if (result.type === 'group') return result.project || result.session_id || 'Board';
     const row = (known.rows || []).find(s => s.session_id === result.session_id);
     return row ? historyLabel(row) : 'Chat';
 }
