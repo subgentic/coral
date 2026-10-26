@@ -14,7 +14,7 @@ const filters = (boardLabel, machineLabel) => defineFilters({
     state: { type: 'choice', values: STATES, chip: v => `State: ${STATE_LABEL[v]}` },
     board: { type: 'text', max: 200, chip: v => `Board: ${boardLabel(v)}` },
     machine: { type: 'text', max: 200, chip: v => `Machine: ${machineLabel(v)}` },
-    sort: { type: 'sort', values: SORTS, default: 'default' },
+    sort: { type: 'order', values: SORTS, default: 'default' },
 });
 const model = filters(v => v, v => v);
 export const { EMPTY, clean, isFiltered } = model;

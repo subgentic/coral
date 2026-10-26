@@ -17,7 +17,7 @@ const model = defineFilters({
     by: { type: 'text', max: 80, chip: v => `By: ${v}` },
     kept: { type: 'flag', chip: 'Kept' },
     dates: { type: 'range', from: 'from', to: 'to', chip: (a, b) => (a && b ? `${a} to ${b}` : a ? `From ${a}` : `Until ${b}`) },
-    sort: { type: 'sort', values: SORTS, default: 'newest' },
+    sort: { type: 'order', values: SORTS, default: 'newest' },
 });
 export const { EMPTY, clean, isFiltered, chips, without } = model;
 
