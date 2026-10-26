@@ -217,6 +217,54 @@ func TestTaskListsSendTheKeysTheFrontendReads(t *testing.T) {
 	requireKeys(t, "a task of the Inbox's field list", irows[0].(map[string]any), "id", "board_id", "board_label", "title", "priority", "status", "created_by", "created_at", "updated_at", "revision")
 }
 
+// The Who column (#8492, #8501): a task in review names its reviewers, in the default list and in the list of a goal's tasks, as "reviewers"; a task nobody reviews sends no such key.
+func TestTaskListRowsNameTheReviewersOfATaskInReview(t *testing.T) {
+	_, h := setupBoardTestServer(t)
+	r := chi.NewRouter()
+	r.Get("/api/board/{project}/tasks", h.ListTasks)
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+	ctx := context.Background()
+	for name, role := range map[string]string{"Orchestrator": "Orchestrator", "Dev": "Developer", "Rev": "Security"} {
+		_, err := h.bs.Subscribe(ctx, "who-team", name, role, name+"-session", nil, "all")
+		require.NoError(t, err)
+	}
+	plain, err := h.bs.CreateTask(ctx, "who-team", "Nobody reviews this", "", "low", "Orchestrator", "Dev")
+	require.NoError(t, err)
+	reviewed, err := h.bs.CreateTask(ctx, "who-team", "Reviewed", "", "high", "Orchestrator", "Dev")
+	require.NoError(t, err)
+	_, err = h.bs.ClaimTask(ctx, "who-team", "Dev", reviewed.ID)
+	require.NoError(t, err)
+	_, err = h.bs.SubmitCompletionReview(ctx, "who-team", reviewed.ID, "Dev", "built", "success", "needs review", []board.TaskArtifact{{Name: "notes.md", MediaType: "text/markdown", Content: "# notes"}})
+	require.NoError(t, err)
+	_, _, err = h.bs.HandToOrchestrator(ctx, "who-team", reviewed.ID, "Dev")
+	require.NoError(t, err)
+	_, _, err = h.bs.DelegateReview(ctx, "who-team", reviewed.ID, "Orchestrator", []string{"Rev"})
+	require.NoError(t, err)
+
+	resp, err := http.Get(srv.URL + "/api/board/who-team/tasks?limit=50")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var list struct {
+		Tasks []map[string]any `json:"tasks"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&list))
+	var seenReviewed, seenPlain bool
+	for _, row := range list.Tasks {
+		switch int64(row["id"].(float64)) {
+		case reviewed.ID:
+			seenReviewed = true
+			requireKeys(t, "a task in review", row, "id", "title", "status", "reviewers")
+			assert.Equal(t, []any{"Rev"}, row["reviewers"])
+		case plain.ID:
+			seenPlain = true
+			assert.NotContains(t, row, "reviewers", "a task nobody reviews sends no key")
+		}
+	}
+	assert.True(t, seenReviewed && seenPlain, "both rows are in the list")
+}
+
 // Artifacts (team_artifacts_page.js, team_task_artifacts.js): GET /api/board/{p}/artifacts, also with task=.
 func TestTeamArtifactsListSendsTheKeysTheFrontendReads(t *testing.T) {
 	srv, h, _ := teamArtifactServer(t)

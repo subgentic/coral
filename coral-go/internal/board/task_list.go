@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -72,6 +73,10 @@ type TaskListItem struct {
 	// Verification: a finished task's verification state, as Task.Verification says it (loadListVerification); absent for any other task.
 	Verification *Verification `db:"-" json:"verification,omitempty"`
 	BlockedBy    []TaskDep     `db:"-" json:"blocked_by,omitempty"`
+	// Reviewers: who reviews the task, from its newest review round (the open one, else the last): the Tasks tab's Who column (#8501). Absent for a task that was never in review.
+	Reviewers []string `db:"-" json:"reviewers,omitempty"`
+	// ReviewersJSON is the reviewers as the query reads them (a JSON array of names); fillListReviewers turns it into Reviewers.
+	ReviewersJSON string `db:"reviewers_json" json:"-"`
 }
 
 // TaskListPage is one page of the task list.
@@ -102,7 +107,8 @@ const taskListColumns = `t.id, t.revision, t.board_id, t.title,
 	CASE WHEN COALESCE(json_extract(w.data, '$.original_author'), '') != '' THEN json_extract(w.data, '$.original_author')
 	     WHEN t.status = 'completed' AND COALESCE(t.completed_by, '') != '' THEN t.completed_by
 	     ELSE COALESCE(t.assigned_to, '') END AS worked_by,
-	` + prefixedUpdatedAtSQL + ` AS updated_at
+	` + prefixedUpdatedAtSQL + ` AS updated_at,
+	COALESCE((SELECT json_group_array(json_extract(v.value, '$.reviewer')) FROM json_each(w.data, '$.review_rounds[#-1].reviewers') v), '[]') AS reviewers_json
 	FROM board_tasks t LEFT JOIN task_workflows w ON w.task_id = t.id`
 
 // ListTaskPage returns a page of the board's task list. Each page costs O(limit) rows:
@@ -148,6 +154,7 @@ func (s *Store) ListTaskPage(ctx context.Context, project string, q TaskListQuer
 		return nil, err
 	}
 	s.loadListVerification(ctx, page.Tasks)
+	fillListReviewers(page.Tasks)
 	if err := s.loadListBlockedBy(ctx, page.Tasks); err != nil {
 		return nil, err
 	}
@@ -250,6 +257,16 @@ func (s *Store) loadListVerification(ctx context.Context, items []TaskListItem) 
 		t := &Task{Status: items[i].Status, CompletedBy: items[i].CompletedBy, CompletedAt: items[i].CompletedAt, AssignedTo: items[i].AssignedTo}
 		finishWorkflow(t, w)
 		items[i].Verification = t.Verification
+	}
+}
+
+// fillListReviewers turns each item's reviewers_json into Reviewers (nothing for a task that was never in review).
+func fillListReviewers(items []TaskListItem) {
+	for i := range items {
+		var names []string
+		if json.Unmarshal([]byte(items[i].ReviewersJSON), &names) == nil && len(names) > 0 {
+			items[i].Reviewers = names
+		}
 	}
 }
 
