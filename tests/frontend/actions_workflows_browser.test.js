@@ -74,7 +74,7 @@ const JOB_RUNS = { runs: [{ id: 44, status: 'completed', scheduled_at: '2026-10-
         await clear();
         await click('#wf-nav-list .row-btn[data-on-click="wf-select"]');
         check('a workflow row opens the workflow', await sent('GET /api/workflows/7', 'the workflow') && await ev(`document.getElementById('wf-detail-container').style.display !== 'none'`));
-        await until(`!!document.querySelector('#wf-detail-container tr[data-on-click="wf-run"]')`, 'its runs');
+        await until(`!!document.querySelector('#wf-detail-container .wf-runs-table tr.dt-row[data-key="31"]')`, 'its runs');
 
         await clear();
         await click('#wf-detail-container [data-on-click="wf-trigger"]');
@@ -116,7 +116,7 @@ const JOB_RUNS = { runs: [{ id: 44, status: 'completed', scheduled_at: '2026-10-
         check('the dialog\'s close button closes it', await ev(`getComputedStyle(document.getElementById('wf-create-modal')).display === 'none'`));
 
         await clear();
-        await click('#wf-detail-container tr[data-on-click="wf-run"]');
+        await click('#wf-detail-container .wf-runs-table tr.dt-row[data-key="31"]');
         check('a run row opens the run', await sent('GET /api/workflows/runs/31', 'the run'));
         await until(`!!document.querySelector('#wf-run-detail-container [data-on-click="wf-output-toggle"]')`, 'the run detail');
         const toggle = await ev(`(() => { const b = document.querySelector('#wf-run-detail-container [data-on-click="wf-output-toggle"]'); const out = document.getElementById(b.getAttribute('aria-controls'));
@@ -190,9 +190,9 @@ const JOB_RUNS = { runs: [{ id: 44, status: 'completed', scheduled_at: '2026-10-
         await ev(`(() => { const b = document.createElement('a'); b.setAttribute('data-on-click', 'job-run-session'); b.dataset.sessionId = '../../etc'; document.body.appendChild(b); b.click(); b.remove(); return true; })()`);
         check('...and a session link that is not a session id does nothing', (await ev(`window.__hist.length`)) === 1);
         await click('#scheduled-jobs-list [data-on-click="job-select"][data-job-id="5"]');
-        await until(`!!document.querySelector('#scheduler-view tr[data-on-click="job-run"]')`, 'the workflow job again', 5000);
+        await until(`!!document.querySelector('#scheduler-view .sched-runs-table tr.dt-row[data-key="31"]')`, 'the workflow job again', 5000);
         await clear();
-        const rowSel = '#scheduler-view tr[data-on-click="job-run"]';
+        const rowSel = '#scheduler-view .sched-runs-table tr.dt-row[data-key="31"]';
         check('the job shows its workflow runs', await ev(`!!document.querySelector(${JSON.stringify(rowSel)})`));
         await click(rowSel);
         check('a workflow run row opens the run', await sent('GET /api/workflows/runs/31', 'the run'));

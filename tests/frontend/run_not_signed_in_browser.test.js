@@ -66,8 +66,8 @@ const JOB = { id: 5, name: 'Nightly review', enabled: true, cron_expr: '0 3 * * 
 
         console.log('2. The workflow: run list and last run');
         await ev(`${WF}.then(m => m.selectWorkflow(7)).then(() => true)`);
-        await waitFor(`document.querySelectorAll('#wf-detail table tr[data-run-id]').length === 3`, 'the run list');
-        const rows = await ev(`[...document.querySelectorAll('#wf-detail table tr[data-run-id]')].map(r => r.textContent.replace(/\\s+/g, ' ').trim())`);
+        await waitFor(`document.querySelectorAll('#wf-detail .wf-runs-table tr.dt-row').length === 3`, 'the run list');
+        const rows = await ev(`[...document.querySelectorAll('#wf-detail .wf-runs-table tr.dt-row')].map(r => r.textContent.replace(/\\s+/g, ' ').trim())`);
         check(`the not-signed-in runs are tagged, the other is not (${JSON.stringify(rows.map(r => r.slice(0, 40)))})`, /not signed in/.test(rows[0]) && /not signed in/.test(rows[1]) && !/not signed in/.test(rows[2]));
         await ev(`${WF}.then(m => { m.workflowsBackToList(); return m.showWorkflowsTab ? true : true; })`);
         await waitFor(`document.querySelectorAll('#wf-list .wf-last-run-status').length >= 1 || document.querySelectorAll('.wf-last-run-status').length >= 1`, 'the list with the last run', 8000).catch(() => {});
