@@ -373,12 +373,16 @@ func winStageRisk(st winStage, outside func(string) bool) string {
 		return why
 	}
 
+	return winCmdletRisk(words, name, args, outside)
+}
+
+// winCmdletRisk judges any other PowerShell cmdlet by its verb: reading and printing verbs pass, the rest asks unless every path it names is inside the working folder.
+func winCmdletRisk(words []string, name string, args []string, outside func(string) bool) string {
 	recurse, force := false, false
 	for _, a := range args {
 		recurse = recurse || isRecurse(a)
 		force = force || isForce(a)
 	}
-
 	// Any other PowerShell cmdlet: by its verb. Reading and printing verbs pass; the rest (Stop-Service, Set-Foo,
 	// Install-Thing, anything nobody has thought of yet) asks unless every path it names is inside the working folder.
 	if cmdletRe.MatchString(words[0]) && !cmdletReadOnly(name) {
