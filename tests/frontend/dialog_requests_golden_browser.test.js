@@ -145,7 +145,7 @@ const GOLDEN = path.join(__dirname, 'fixtures', 'dialog_requests_golden.json');
         // edit the second: the dialog opens with its values and saves them back
         await ev(`window.showTeamAgentModal([...document.querySelectorAll('#team-agents-list .team-agent-row')].find(r => r.querySelector('.team-agent-role-name').textContent === 'Dev')); true`);
         await waitFor(`(document.getElementById('launch-modal').hasAttribute('data-member') && getComputedStyle(document.getElementById('launch-step-agent')).display !== 'none') && document.getElementById('launch-agent-name-input').value === 'Dev'`, 'the edit dialog with its values');
-        out.team_edit_prefilled = await acfOf('launch-agent-acf');
+        out.team_edit_prefilled = { ...(await acfOf('launch-agent-acf')), name: await ev(`document.getElementById('launch-agent-name-input').value`) }; // the role is the persona step's name field (#7861)
         await set('launch-agent-acf', '.acf-prompt', 'Write the code, edited.');
         await click('#launch-step-agent #launch-agent-save');
         await waitFor(`!document.getElementById('launch-modal').hasAttribute('data-member')`, 'the edit dialog to close');

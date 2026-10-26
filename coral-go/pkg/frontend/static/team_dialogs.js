@@ -211,6 +211,8 @@ function showTeamAgentModal(row = null, { role = '' } = {}) {
     const acfValue = row?.dataset.acfId ? getAgentConfig(row.dataset.acfId) : { ..._defaultTeamAgentModalConfig(), name: role };
     // A member with no Mode of its own launches with the saved default Mode: the dialog shows that Mode (saving it unchanged keeps the member following it, see saveTeamAgentFromModal).
     if (row && !/--permission-mode|--mode|--sandbox|--full-auto|--dangerously/.test(acfValue.flags || '')) acfValue.flags = [acfValue.flags, _teamModeFlags(acfValue.agentType)].filter(Boolean).join(' ');
+    const dialog = document.getElementById('launch-modal');
+    if (dialog && getComputedStyle(dialog).display === 'none') { dialog.style.display = 'flex'; launch.mode = 'team'; _showLaunchStep('team'); } // display-ok: the member is a step of the Launch dialog, which is open when a person is in the team form; opened as it is when something else asks (the team form is kept, not reset)
     launch.member = { row, returnTo: currentTeamStep(), value: acfValue };
     window._selectLaunchType('agent');
 }

@@ -58,6 +58,8 @@ function _selectLaunchType(type) {
     if (type === "agent") {
         if (!launch.addTo && !launch.member) { // New Agent: its own title and no team (Add agent and a member set both below, #7778, #7861)
             document.getElementById('launch-modal')?.removeAttribute('data-add-to');
+            const nameLabel = document.getElementById('launch-agent-name-label'); if (nameLabel) nameLabel.textContent = 'Name'; // a member's field is its Role, and a role is required
+            const nameOptional = document.getElementById('launch-agent-name-optional'); if (nameOptional) nameOptional.hidden = false;
             const t = document.getElementById('launch-agent-title-text'); if (t) t.textContent = 'New agent';
         }
         _loadAgentBoardProjects();
@@ -359,8 +361,11 @@ function _applyMember() {
     const name = document.getElementById('launch-agent-name-input');
     if (name) name.value = m.value.name || '';
     const help = document.getElementById('launch-name-help'); if (help) help.textContent = 'The role this member has on the team.';
+    const nameLabel = document.getElementById('launch-agent-name-label'); if (nameLabel) nameLabel.textContent = 'Role';
+    const nameOptional = document.getElementById('launch-agent-name-optional'); if (nameOptional) nameOptional.hidden = true; // Save member needs a role
     _syncLaunchBlock();
     _launchStage(m.row ? 'agent' : 'persona'); // an existing member opens on its settings, a new one on its role
+    if (!m.row) name?.focus(); // the role is the first thing a new member needs
 }
 
 /** The parts of Add agent that the dialog shows: the title, the folder, and where it starts. */
