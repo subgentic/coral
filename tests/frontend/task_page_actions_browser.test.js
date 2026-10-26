@@ -137,13 +137,16 @@ const BASE = require('./test_base').BASE;
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false }); await Emulation.setTouchEmulationEnabled({ enabled: false });
 
         console.log('7. The dock opens the page');
-        await ev(`window.__m.add('tpa-agent', 'B', 1, { sleeping: false, board_project: ${JSON.stringify(B)} }); true`);
+        await ev(`window.__m.add('tpa-agent', 'B', 1, { sleeping: false, board_project: ${JSON.stringify(B)}, board_is_orchestrator: false, board_subscriber_id: 'fe' }); true`);
         await waitFor(`(window.__qaState.liveSessions || []).some(s => s.name === 'tpa-agent')`, 'the agent', 8000);
-        await ev(`window.selectLiveSession('tpa-agent', 'claude', 'tpa-agent-id', 'local'); true`);
+        await ev(`window.selectLiveSession('tpa-agent', 'claude', 'tpa-agent-id', 'local')`);
         await ev(`(() => { const d = document.getElementById('agentic-state'); if (d.getBoundingClientRect().width < 50 || d.classList.contains('collapsed')) (document.getElementById('panel-toggle-btn') || document.getElementById('popout-panel-toggle-btn')).click(); window.switchAgenticTab('tasks', 'top'); return true; })()`);
-        await waitFor(`!!document.querySelector('#agentic-panel-tasks .board-task-item:not(.board-task-header) .board-task-desc')`, 'the dock\'s task rows', 12000);
-        await ev(`document.querySelector('#agentic-panel-tasks .board-task-item:not(.board-task-header) .board-task-desc').click(); true`);
-        await waitFor(`!!document.querySelector('#team-panel-item #team-task-title')`, 'the task page from the dock', 12000);
+        // Selection and board refresh are async: old team rows or private tasks can exist first. Wait for the worker's exact result.
+        const ownRow = `#board-task-list .board-task-item[data-kind="board"][data-task-id="${open1}"]`;
+        await waitFor(`!!document.querySelector('${ownRow} .board-task-name') && document.querySelectorAll('#board-task-list .board-task-item[data-kind="board"]').length === 1`, 'the worker\'s assigned board task', 12000);
+        assert.deepEqual(await ev(`[...document.querySelectorAll('#board-task-list .board-task-item[data-kind="board"]')].map(r => r.dataset.taskId)`), [String(open1)], 'the worker dock contains only its assigned board task');
+        await ev(`document.querySelector('${ownRow} .board-task-name').click(); true`);
+        await waitFor(`document.querySelector('#team-panel-item #team-task-title')?.textContent === '#${open1} Build the task page'`, 'the assigned task page from the worker dock', 12000);
         check('a task name in the dock opens the team page\'s task page and no dialog', await ev(`getComputedStyle(document.getElementById('task-detail-modal')).display === 'none'`));
     } finally { await api('DELETE', `/api/board/${B}`).catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

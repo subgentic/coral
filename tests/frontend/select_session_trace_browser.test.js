@@ -87,6 +87,10 @@ const RECORD = `(() => {
         const normalise = t => JSON.stringify(JSON.parse(t).map(s => ({ ...s, label: 'x' })));
         assert.equal(normalise(again), normalise(first), 'the same trace twice');
         delete trace['again']; void was;
+        if (process.env.CORAL_TRACE_EVIDENCE_DIR) {
+            fs.mkdirSync(process.env.CORAL_TRACE_EVIDENCE_DIR, { recursive: true });
+            fs.writeFileSync(path.join(process.env.CORAL_TRACE_EVIDENCE_DIR, 'select_session_trace.raw.json'), JSON.stringify(trace, null, 1) + '\n');
+        }
         const hashes = {}, lines = {};
         for (const [name, steps] of Object.entries(trace)) {
             hashes[name] = steps.map(s => ({ step: s.label, sha256: sha(JSON.stringify(s)) }));

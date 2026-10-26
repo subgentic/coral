@@ -19,15 +19,22 @@ const { removeBoards } = require('./helpers/board_cleanup');
             const {state} = await import((window.__coralStatic||'/static/')+'state.js');
             const tasks = await import((window.__coralStatic||'/static/')+'tasks.js'); await (await import((window.__coralStatic||'/static/')+'lazy_panels.js')).loadTaskDetail(); /* the task dialog is a lazy module (#5364): loaded once, then its functions answer synchronously */ 
             window.testTasks = tasks;
-            state.currentSession = {name:'workflow-browser', board_project:'workflow-browser', type:'live'};
+            // #7833: this is a real board worker, so its dock creates and lists its own assigned tasks.
+            const subscribed = await fetch('/api/board/workflow-browser/subscribe', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subscriber_id:'workflow-worker',job_title:'Developer',session_name:'workflow-browser'})});
+            if (!subscribed.ok) throw new Error('worker subscribe failed: ' + await subscribed.text());
+            state.currentSession = {name:'workflow-browser', board_project:'workflow-browser', type:'live', board_is_orchestrator:false, board_subscriber_id:'workflow-worker'};
             await tasks.showCreateTaskModal();
+            if (document.getElementById('create-task-assignee').value !== 'workflow-worker') throw new Error('new task must start assigned to the selected worker');
             document.getElementById('create-task-title').value = 'Build candidate';
             document.getElementById('create-task-workflow').value = 'Build → Test → Release';
             document.getElementById('create-task-stage').value = 'Build';
             document.getElementById('create-task-outputs').value = 'build';
             document.getElementById('create-task-instructions').value = 'Use revision-specific evidence.';
             await tasks.submitCreateTask();
-            window.testTaskID = state.currentBoardTasks.find(t => t.title === 'Build candidate').id;
+            // Worker board rows live in the filtered dock view, not the old board-wide state array.
+            const ownTask = [...document.querySelectorAll('#board-task-list .board-task-item[data-kind="board"]')].find(row => row.querySelector('.board-task-name')?.textContent === 'Build candidate');
+            if (!ownTask) throw new Error('created task missing from the worker dock: ' + document.getElementById('create-task-error').textContent);
+            window.testTaskID = Number(ownTask.dataset.taskId);
             // the task's own page on the team page (#7644: the task dialog is gone for a board's task)
             window.openTeamPage('workflow-browser', { tab: 'tasks', item: window.testTaskID });
         })()`);
