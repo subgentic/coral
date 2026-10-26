@@ -134,12 +134,11 @@ registerActions({
     },
 });
 
-/** With the keyboard up the strip must not push the chat out: under three lines of chat it closes itself and says so. */
+/** With the keyboard up the strip must not push the output out: under three lines of the terminal it closes itself and says so. */
 function checkRoom() {
     if (!open) return;
-    const chat = $('live-history-messages');
-    const pane = chat && chat.closest('.chat-wrapper, .live-history, #live-history') || chat;
-    const h = pane ? pane.clientHeight : 0;
+    const shown = [$('xterm-container'), $('pane-capture')].find(e => e && e.checkVisibility && e.checkVisibility()); // the strip is in the terminal view: the room is the terminal's output
+    const h = shown ? shown.clientHeight : 0;
     if (h && h < MIN_CHAT_PX) closeStrip('Keys closed: there is no room for them with the keyboard up', { forQuestion: true });
 }
 

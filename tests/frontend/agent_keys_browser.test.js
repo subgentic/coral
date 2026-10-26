@@ -41,6 +41,18 @@ const STUB = `(() => { const real = window.fetch; window.__keys = [];
             await load(w, h, true);
             // Keys is for the terminal view only (#7623): the chat view's composer is one row, with Options
             assert.equal(await ev(q('#keys-chip')), null, at + 'the chat view has no Keys chip');
+            // the strip is not drawn in the chat view, where it has no toggle: not when the choice is on, not for a question (#8728)
+            await ev(`localStorage.setItem('coral-agent-keys', 'on'); true`);
+            await row({ working: false }); await sleep(200); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
+            await ev(`document.getElementById('command-pane').style.display = 'none'; true`); await row({ working: false }); await ev(`document.getElementById('command-pane').style.display = ''; true`); await row({ working: false }); await sleep(200); // sleep-ok: a new visit with the choice on
+            assert.equal(await ev(q('#agent-key-strip')), null, at + 'the chat view does not show the strip when the choice is on');
+            if (w === 390) await shot('agent-keys-chat-on-390');
+            await ev(`localStorage.removeItem('coral-agent-keys'); true`);
+            await row({ waiting_for_input: true, waiting_kind: 'choice', waiting_summary: 'In chat?' }); await sleep(250); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
+            assert.equal(await ev(q('#agent-key-strip')), null, at + 'a question in the chat view does not put the strip above the message box');
+            if (w === 390) await shot('agent-keys-chat-question-390');
+            await row({ waiting_for_input: false }); await sleep(150); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
+            await ev(`document.getElementById('command-pane').style.display = 'none'; true`); await row({ working: false }); await ev(`document.getElementById('command-pane').style.display = ''; true`); await row({ working: false }); await sleep(200); // sleep-ok: a new visit, closed (nothing chosen)
             await ev(`document.querySelector('[aria-label="Terminal view"]').click(); true`);
             await waitFor(`!document.getElementById('command-pane').classList.contains('chat-mode')`, 'the terminal view', 8000);
             // closed by default, the chip
@@ -194,6 +206,8 @@ const STUB = `(() => { const real = window.fetch; window.__keys = [];
         }
         // the keyboard up at 390 x 464: the strip must not push the chat out; under three lines it closes itself and says so
         await load(390, 844, true);
+        await ev(`document.querySelector('[aria-label="Terminal view"]').click(); true`);
+        await waitFor(`!document.getElementById('command-pane').classList.contains('chat-mode')`, 'the terminal view', 8000);
         await ev(`document.getElementById('keys-chip').click(); true`); await sleep(200); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
         await size(390, 380, true); await sleep(900); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
         const room = await ev(`(() => { const c = document.getElementById('live-history-messages'); return { chat: c ? c.clientHeight : -1, strip: !!document.querySelector('#agent-key-strip') && document.getElementById('agent-key-strip').checkVisibility() }; })()`);
