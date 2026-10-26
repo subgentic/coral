@@ -23,7 +23,7 @@
     --table-fold-line-h: 24px;
     --table-fold-meta-h: 20px;
     --table-fold-row-h: 60px;
-    --table-fit-name-min: 5rem;
+    --table-fit-name-min: 12.5rem; /* 200 px: a table that cannot give its name this much folds instead (#8539) */
     --table-primary-color: var(--text-primary);
     --table-secondary-size: 0.8125rem;
     --table-secondary-weight: 400;
@@ -283,3 +283,7 @@
 
 /* Measuring fit must reserve a readable name, not only fit the metadata. */
 .dt-box.dt-fit:not(.dt-folded) td.dt-grow { min-width: var(--table-fit-name-min); }
+
+/* The Details link on an agent's artifact row (#8539): 12/400 in the link colour on the meta line, never hover-only; its 44 px target on a phone or a coarse pointer is a pseudo-element around it, not a taller row. */
+.dt-box .artifact-details, .dt-box.dt-folded .artifact-details { position: relative; display: inline; min-height: 0; min-width: 0; font-size: 0.75rem; font-weight: 400; }
+@media (max-width: 767px), (pointer: coarse) { .dt-box .artifact-details::after { content: ""; position: absolute; inset: -16px -10px; } }

@@ -291,6 +291,8 @@ function draw() {
                 { key: 'size', label: 'Size', line: 2, tone: 'tertiary', align: 'end', cell: item => isUnverified(item) ? '—' : sizeText(item.size) || '—' },
                 { key: 'task', label: 'Task', line: 2, tone: 'tertiary', when: item => !model.scope || !!item.task_id, cell: taskText },
                 { key: 'created', label: 'Created', line: 1, tone: 'tertiary', align: 'end', cell: item => DT.timeCell(item.created_at) },
+                // An agent's list opens an artifact in the preview panel; its sheet (the facts, Keep, Delete, Copy link, who can read it) is one quiet link away (#8539)
+                { key: 'details', label: 'Details', line: 2, tone: 'tertiary', align: 'end', when: () => !!model.scope, cell: item => detailsLink(item) },
             ],
             footer: { auto: !model.truncated && !model.error, text: `Showing ${model.items.length} of ${model.counts?.matched ?? model.items.length}${model.truncated ? '+' : ''}`,
                 more: model.hasMore ? { label: 'Load more', busy: !!model.controller, run: () => { if (!model.loadingMore) loadArtifacts({ append: true }); } } : null },
@@ -321,8 +323,16 @@ function renderText(host, content, path) {
 
 const sources = (list) => (Array.isArray(list) ? list.map(v => { const at = String(v).indexOf('/'); const server = at < 0 ? String(v) : String(v).slice(0, at), board = at < 0 ? '' : String(v).slice(at + 1); return board ? `${server}, board ${board} (claimed by the sender)` : server; }).join('\n') : '');
 
+/** The sheet's own link on an agent's row (the row itself opens the preview): the item's facts and actions, as the team page's rows open them. */
+function detailsLink(item) {
+    const b = DT.link('Details', () => openArtifactSheet(item, b));
+    b.classList.add('artifact-details');
+    b.setAttribute('aria-label', `Details for ${readableName(item)}`);
+    return b;
+}
+
 function openArtifact(item, opener) {
-    const key = itemKey(item), link = linkOf(item), un = isUnverified(item), name = readableName(item);
+    const key = itemKey(item), link = linkOf(item), name = readableName(item);
     if (model.scope && link) {
         importOnce('./preview_pane.js').then(m => m.openArtifactTab(link.hex ? `coral://artifacts/${link.hex}` : item.uri || '', {
             server: link.server, filename: name, mediaType: item.media_type,
@@ -331,6 +341,11 @@ function openArtifact(item, opener) {
         root?.querySelectorAll('tr[data-key]').forEach(r => { if (r.dataset.key === key) r.setAttribute('aria-current', 'true'); else r.removeAttribute('aria-current'); });
         return;
     }
+    openArtifactSheet(item, opener);
+}
+
+function openArtifactSheet(item, opener) {
+    const key = itemKey(item), link = linkOf(item), un = isUnverified(item), name = readableName(item);
     const hex = link && link.hex;
     const received = item.source === 'received';
     const facts = [
