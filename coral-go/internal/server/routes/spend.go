@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"net/http"
 	"path/filepath"
 	"sort"
@@ -193,6 +194,54 @@ func spendRange(w http.ResponseWriter, r *http.Request) (string, bool) {
 	return rng, true
 }
 
+// spendAgentAcc is one agent of the board with what the token store knows of it in the window.
+type spendAgentAcc struct {
+	sess store.LiveSession
+	sum  *store.AgentUsageSummary
+}
+
+// spendRoster is the board's agents in the order they are found, and the roles members have on the board.
+type spendRoster struct {
+	order  []string
+	accs   map[string]*spendAgentAcc
+	roleOf map[string]string // terminal name -> the role name on the board
+	orchOf map[string]bool   // terminal name -> the member is an orchestrator (it lands no commits of its own: the page says "team")
+}
+
+// readRoster reads the board's agents: its live sessions, and any session that has token rows in the window (an ended one), then the roles. A failed read comes back as the words of the 500 ("" when it worked).
+func (h *SpendHandler) readRoster(ctx context.Context, project string, fr spendFrame) (*spendRoster, string) {
+	sessions, err := h.ss.GetBoardSessions(ctx, project)
+	if err != nil {
+		return nil, "could not read the board's agents"
+	}
+	summaries, err := h.ts.GetUsageSummaryByAgentBoard(ctx, spendStamp(fr.start), project)
+	if err != nil {
+		return nil, "could not read token usage"
+	}
+	ro := &spendRoster{accs: map[string]*spendAgentAcc{}, roleOf: map[string]string{}, orchOf: map[string]bool{}}
+	subs, _ := h.bs.ListSubscribers(ctx, project)
+	for _, s := range subs {
+		if s.SessionName != "" {
+			ro.roleOf[s.SessionName] = s.SubscriberID
+			ro.orchOf[s.SessionName] = s.CanPeek != 0
+		}
+	}
+	for _, s := range sessions {
+		ro.accs[s.SessionID] = &spendAgentAcc{sess: s}
+		ro.order = append(ro.order, s.SessionID)
+	}
+	for i := range summaries {
+		s := &summaries[i]
+		if a, ok := ro.accs[s.SessionID]; ok {
+			a.sum = s
+			continue
+		}
+		ro.accs[s.SessionID] = &spendAgentAcc{sess: store.LiveSession{SessionID: s.SessionID, AgentType: s.AgentType, AgentName: s.Folder, WorkingDir: s.WorkingDir}, sum: s}
+		ro.order = append(ro.order, s.SessionID)
+	}
+	return ro, ""
+}
+
 // Spend answers GET /api/board/{project}/spend?range=24h|7d.
 func (h *SpendHandler) Spend(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
@@ -214,50 +263,16 @@ func (h *SpendHandler) Spend(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	f, g := spendStamp, spendDBStamp
 
-	sessions, err := h.ss.GetBoardSessions(ctx, project)
-	if err != nil {
-		errInternalServer(w, "could not read the board's agents")
+	roster, fail := h.readRoster(ctx, project, fr)
+	if fail != "" {
+		errInternalServer(w, fail)
 		return
 	}
-	summaries, err := h.ts.GetUsageSummaryByAgentBoard(ctx, f(start), project)
-	if err != nil {
-		errInternalServer(w, "could not read token usage")
-		return
-	}
+	accs, order, roleOf, orchOf := roster.accs, roster.order, roster.roleOf, roster.orchOf
 	buckets, err := h.ts.GetUsageTimeSeriesBoard(ctx, f(usualStart), "1h", project)
 	if err != nil {
 		errInternalServer(w, "could not read token usage")
 		return
-	}
-	subs, _ := h.bs.ListSubscribers(ctx, project)
-	roleOf := map[string]string{} // terminal name -> the role name on the board
-	orchOf := map[string]bool{}   // terminal name -> the member is an orchestrator (it lands no commits of its own: the page says "team")
-	for _, s := range subs {
-		if s.SessionName != "" {
-			roleOf[s.SessionName] = s.SubscriberID
-			orchOf[s.SessionName] = s.CanPeek != 0
-		}
-	}
-
-	// the board's agents: its live sessions, and any session that has token rows in the window (an ended one)
-	type agentAcc struct {
-		sess store.LiveSession
-		sum  *store.AgentUsageSummary
-	}
-	accs := map[string]*agentAcc{}
-	var order []string
-	for _, s := range sessions {
-		accs[s.SessionID] = &agentAcc{sess: s}
-		order = append(order, s.SessionID)
-	}
-	for i := range summaries {
-		s := &summaries[i]
-		if a, ok := accs[s.SessionID]; ok {
-			a.sum = s
-			continue
-		}
-		accs[s.SessionID] = &agentAcc{sess: store.LiveSession{SessionID: s.SessionID, AgentType: s.AgentType, AgentName: s.Folder, WorkingDir: s.WorkingDir}, sum: s}
-		order = append(order, s.SessionID)
 	}
 
 	// tokens, window against the usual, from the hourly buckets
