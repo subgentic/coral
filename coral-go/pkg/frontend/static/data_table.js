@@ -290,8 +290,9 @@ export function dataTable(cfg) {
         box.append(foot);
     }
 
-    // before the box has a width (it is built apart from the page) a window that is a phone, or narrower than the fold, starts folded: a first paint of the wide table would scroll the page sideways (#7868); the observer below then settles it
-    if (cfg.fold !== 'none') { const root0 = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16; if (cfg.fold === 'always' || window.innerWidth <= 760 || window.innerWidth < foldAt * root0) box.classList.add('dt-folded'); }
+    // before the box has a width (it is built apart from the page) a window narrower than THIS table's fold starts it folded: a first paint of the wide table would scroll the page sideways (#7868). Only that window: one that is wider
+    // than the fold (a 481-760 px one among them) is left unfolded, or the observer below would unfold it a frame later, a flash (#7994). A box that already has a width is judged by it. The observer then settles every case.
+    if (cfg.fold !== 'none') { const root0 = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16; const known = box.clientWidth; if (cfg.fold === 'always' || (known ? known : window.innerWidth) < foldAt * root0) box.classList.add('dt-folded'); }
     // folded: the table's own box narrower than foldAt rem (the root font size is read, so a larger text size folds sooner); set before the first paint
     if (cfg.fold !== 'none' && typeof ResizeObserver === 'function') {
         const root = () => parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
