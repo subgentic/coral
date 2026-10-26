@@ -9,6 +9,7 @@ export const REVIEW = 'for review';
 /** A tag as the server stores it: spaces made one, lowercase; '' for one the server would refuse. */
 export function normalizeTag(s) {
     const t = String(s ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
-    return t.length >= 1 && t.length <= MAX_LEN && /^[\p{L}\p{N} -]+$/u.test(t) ? t : '';
+    const n = [...t].length; // characters, as the server counts them (an astral letter is one), not UTF-16 units
+    return n >= 1 && n <= MAX_LEN && /^[\p{L}\p{Nd} -]+$/u.test(t) ? t : ''; // a decimal digit only: the server's unicode.IsDigit refuses "²" and "½"
 }
 

@@ -39,6 +39,10 @@ const { pathToFileURL } = require('node:url');
     assert.deepEqual(m.toParams({ ...m.EMPTY, tag: 'for review' }), { tag: 'for review', sort: 'newest' });
     assert.deepEqual(m.chips({ ...m.EMPTY, tag: 'internal' }).map(c => c.label), ['Tag: internal']); assert.equal(m.isFiltered({ ...m.EMPTY, tag: 'internal' }), true);
 
+    // the editor's normalizer is the server's (internal/board/artifact_tags.go): characters, not UTF-16 units; a decimal digit only
+    const { normalizeTag } = await import(pathToFileURL(path.resolve(__dirname, '../../coral-go/pkg/frontend/static/artifact_tag_rules.js')).href);
+    for (const [input, want] of [['x'.repeat(24), 'x'.repeat(24)], ['x'.repeat(25), ''], ['\u{1D4D0}'.repeat(24), '\u{1D4D0}'.repeat(24)], ['\u{1D4D0}'.repeat(25), ''], ['a\u00b2', ''], ['\u00bd', ''], ['\u0663', '\u0663'], ['a_b', ''], ['a/b', ''], ['  Two   Words ', 'two words'], ['ready-2', 'ready-2'], ['', ''], ['   ', '']]) assert.equal(normalizeTag(input), want, JSON.stringify(input));
+
     // chips and removing them
     assert.deepEqual(m.chips(m.EMPTY), []);
     const f = { ...m.EMPTY, q: 'x', kind: 'pdf', origin: 'unlisted', by: 'Dev', kept: true, from: '2026-10-01', to: '2026-10-02' };

@@ -13,6 +13,7 @@ const BASE = require('./test_base').BASE;
     const B = 'at-' + Date.now().toString(36);
     const api = (method, path, body, headers) => ev(`fetch(${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, headers: ${JSON.stringify(headers || { 'Content-Type': 'application/json' })}, body: ${body === undefined ? 'undefined' : typeof body === 'string' ? JSON.stringify(body) : JSON.stringify(JSON.stringify(body))} }).then(async r => ({ status: r.status, body: await r.json().catch(() => ({})) }))`);
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
+    const pick = async (id, value) => { await ev(`(() => { const s = document.getElementById(${JSON.stringify(id)}); s.value = ${JSON.stringify(value)}; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); };
     const rowNames = () => ev(`[...document.querySelectorAll('#team-panel-artifacts [data-artifact-id]')].map(b => b.textContent)`);
     let sid = null, sname = null;
     try {
@@ -47,7 +48,7 @@ const BASE = require('./test_base').BASE;
         await ev(`[...document.querySelectorAll('.detail-head .artifact-tag-offer')].find(b => b.textContent === 'for review').click(); true`);
         await waitFor(`[...document.querySelectorAll('.detail-head .artifact-tag-list .artifact-tag')].some(t => t.textContent.startsWith('for review'))`, 'the chip', 8000);
         assert.deepEqual(await tagsOf(files[0]), ['for review'], 'the server kept it');
-        await ev(`document.querySelector('.detail-head .artifact-tag-add').click(); const i = document.querySelector('.detail-head .artifact-tag-input'); i.value = '  Needs  QA '; i.form.requestSubmit(); true`);
+        await ev(`(() => { document.querySelector('.detail-head .artifact-tag-add').click(); const i = document.querySelector('.detail-head .artifact-tag-input'); i.value = '  Needs  QA '; i.form.requestSubmit(); return true; })()`);
         await waitFor(`[...document.querySelectorAll('.detail-head .artifact-tag-list .artifact-tag')].some(t => t.textContent.startsWith('needs qa'))`, 'a typed tag, normalised', 8000);
         assert.deepEqual(await tagsOf(files[0]), ['for review', 'needs qa']);
         await ev(`document.querySelector('.detail-head [aria-label="Remove tag needs qa"]').click(); true`);
@@ -74,7 +75,7 @@ const BASE = require('./test_base').BASE;
         await waitFor(`[...document.querySelectorAll('#team-panel-artifacts .dt-bar-action')].some(b => b.textContent === 'Tag')`, 'the Tag action', 8000);
         await ev(`[...document.querySelectorAll('#team-panel-artifacts .dt-bar-action')].find(b => b.textContent === 'Tag').click(); true`);
         await waitFor(`!!document.querySelector('#team-panel-artifacts .dt-bar-choice')`, 'the tag choice', 5000);
-        await ev(`const c = document.querySelector('#team-panel-artifacts .dt-bar-choice'); c.value = 'internal'; document.querySelector('#team-panel-artifacts .dt-bar-apply').click(); true`);
+        await ev(`(() => { const c = document.querySelector('#team-panel-artifacts .dt-bar-choice'); c.value = 'internal'; document.querySelector('#team-panel-artifacts .dt-bar-apply').click(); return true; })()`);
         await waitFor(`document.querySelectorAll('#team-panel-artifacts .artifact-tags-row').length === 3`, 'three rows tagged', 10000);
         assert.deepEqual(await tagsOf(files[1]), ['internal']); assert.deepEqual(await tagsOf(files[2]), ['internal']);
         await shot('artifact-tags-bulk');
@@ -88,6 +89,115 @@ const BASE = require('./test_base').BASE;
         await waitFor(`[...document.querySelectorAll('#preview-toolbar .artifact-tag-list .artifact-tag')].some(t => t.textContent.startsWith('final'))`, 'final added from the preview', 8000);
         assert.deepEqual(await tagsOf(files[0]), ['final', 'for review'], 'the server keeps a file\'s tags in alphabetical order');
         await shot('artifact-tags-preview');
+        console.log('   ✓');
+
+        // ── the edges (#8594 review): set the tags through the route, then read the page ──────────────────────────────────
+        const put = async (hex, tags) => assert.equal((await api('PUT', `/api/board/${B}/artifacts/${hex}/tags`, { tags })).status, 200);
+        const reload = async () => { await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'tasks' }); true`); await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'artifacts' }); true`); await waitFor(`document.querySelectorAll('#team-panel-artifacts [data-artifact-id]').length === 3`, 'the list again', 15000); };
+        const sheet = async name => { await ev(`[...document.querySelectorAll('#team-panel-artifacts [data-artifact-id]')].find(b => b.textContent === ${JSON.stringify(name)}).click(); true`); await waitFor(`document.querySelector('.detail-head h2')?.textContent === ${JSON.stringify(name)}`, `the sheet of ${name}`, 10000); };
+        const rowOf = name => `[...document.querySelectorAll('#team-panel-artifacts tbody tr')].find(r => r.querySelector('[data-artifact-id]')?.textContent === ${JSON.stringify(name)})`;
+        const select = async names => { await ev(`(() => { ${JSON.stringify(names)}.forEach(n => { const r = [...document.querySelectorAll('#team-panel-artifacts tbody tr')].find(x => x.querySelector('[data-artifact-id]')?.textContent === n); const c = r.querySelector('input[type=checkbox]'); if (!c.checked) c.click(); }); return true; })()`); };
+        await put(files[0], ['final', 'for review']); await put(files[1], ['t1', 't2', 't3', 't4', 't5']); await put(files[2], ['alpha', 'beta', 'gamma']);
+        await reload();
+
+        console.log('7. A row says two tags then +N; the title and the row\'s name list them all');
+        const row = await ev(`(() => { const r = ${rowOf('log.txt')}, w = r.querySelector('.artifact-tags-row'); return { chips: [...w.querySelectorAll('.artifact-tag:not(.artifact-tag-more)')].map(c => c.textContent), more: w.querySelector('.artifact-tag-more')?.textContent, title: w.title, name: r.querySelector('input[type=checkbox]').getAttribute('aria-label') }; })()`);
+        assert.deepEqual(row, { chips: ['alpha', 'beta'], more: '+1', title: 'Tags: alpha, beta, gamma', name: 'Select log.txt, tags: alpha, beta, gamma' });
+        const two = await ev(`(() => { const w = ${rowOf('plan.txt')}.querySelector('.artifact-tags-row'); return { n: w.querySelectorAll('.artifact-tag').length, more: !!w.querySelector('.artifact-tag-more') }; })()`);
+        assert.deepEqual(two, { n: 2, more: false }, 'two tags: no +N');
+        console.log('   ✓');
+
+        console.log('8. Five tags: no + Tag; the box offers the starters, then the team\'s tags with counts; a refused word is said and the box stays');
+        await sheet('draft.txt');
+        assert.equal(await ev(`document.querySelectorAll('.detail-head .artifact-tag-list .artifact-tag').length`), 5);
+        assert.equal(await ev(`document.querySelector('.detail-head .artifact-tag-add').hidden`), true, 'five is the most: no + Tag');
+        await sheet('log.txt');
+        await ev(`document.querySelector('.detail-head .artifact-tag-add').click(); true`);
+        const offers2 = await ev(`[...document.querySelectorAll('.detail-head .artifact-tag-offer')].map(b => b.textContent)`);
+        assert.deepEqual(offers2.slice(0, 4), ['for review', 'internal', 'final', 'draft'], 'the starter set first');
+        assert.ok(offers2.includes('t1 (1)') && offers2.includes('t5 (1)'), 'then the team\'s tags with their counts: ' + JSON.stringify(offers2));
+        assert.ok(!offers2.some(t => /^(alpha|beta|gamma)/.test(t)), 'not the ones the file has');
+        await ev(`(() => { const i = document.querySelector('.detail-head .artifact-tag-input'); i.value = 'bad_tag'; i.form.requestSubmit(); return true; })()`);
+        await waitFor(`/1 to 24 letters, digits, spaces or hyphens/.test(document.querySelector('.detail-head .artifact-tag-status').textContent)`, 'the refusal in words', 5000);
+        assert.equal(await ev(`document.querySelector('.detail-head .artifact-tag-box').hidden`), false, 'the box stays open');
+        assert.deepEqual(await tagsOf(files[2]), ['alpha', 'beta', 'gamma'], 'nothing was changed');
+        console.log('   ✓');
+
+        console.log('9. The Tag select narrows the list, with the route\'s counts');
+        await ev(`document.querySelector('#team-panel-artifacts .list-bar-filter-btn, #team-panel-artifacts button[aria-label*="Filters" i], #team-panel-artifacts .list-bar-icon')?.click(); true`);
+        await waitFor(`!!document.getElementById('ta-tag') && document.getElementById('ta-tag').offsetParent !== null`, 'the Tag select', 5000);
+        assert.ok(await ev(`[...document.getElementById('ta-tag').options].some(o => o.textContent === 'alpha (1)')`), 'counts from tag_counts');
+        await pick('ta-tag', 'alpha');
+        await waitFor(`document.querySelectorAll('#team-panel-artifacts [data-artifact-id]').length === 1`, 'only the tagged file', 8000);
+        assert.deepEqual(await rowNames(), ['log.txt']);
+        assert.ok(await ev(`[...document.querySelectorAll('#team-panel-artifacts [class*=chip]')].some(c => c.textContent.includes('Tag: alpha'))`), 'its chip');
+        await pick('ta-tag', '');
+        await waitFor(`document.querySelectorAll('#team-panel-artifacts [data-artifact-id]').length === 3`, 'all again', 8000);
+        console.log('   ✓');
+
+        console.log('10. Untag takes the tag off the selected files only; Tag leaves a file with five alone and says so');
+        await ev(`(() => { window.__puts = []; if (!window.__fetchWrapped) { const real = window.fetch; window.__fetchWrapped = true; window.fetch = (u, o) => { if (o && o.method === 'PUT') window.__puts.push(String(u && u.url || u)); return real(u, o); }; } return true; })()`); // which files a bulk action asks the server to change
+        await select(['plan.txt', 'log.txt']);
+        await waitFor(`[...document.querySelectorAll('#team-panel-artifacts .dt-bar-action')].some(b => b.textContent === 'Untag')`, 'the Untag action', 8000);
+        await ev(`[...document.querySelectorAll('#team-panel-artifacts .dt-bar-action')].find(b => b.textContent === 'Untag').click(); true`);
+        await waitFor(`!!document.querySelector('#team-panel-artifacts .dt-bar-choice')`, 'the choice', 5000);
+        await ev(`document.querySelector('#team-panel-artifacts .dt-bar-choice').value = 'for review'; document.querySelector('#team-panel-artifacts .dt-bar-apply').click(); true`);
+        await waitFor(`!${rowOf('plan.txt')}.querySelector('.artifact-tags-row')?.textContent.includes('for review')`, 'plan.txt untagged', 10000);
+        assert.deepEqual(await tagsOf(files[0]), ['final'], 'the tag is off');
+        assert.deepEqual(await tagsOf(files[2]), ['alpha', 'beta', 'gamma'], 'a file without it is left as it was');
+        assert.deepEqual(await ev('window.__puts.map(u => /[a-f0-9]{64}/.exec(u)[0])'), [files[0]], 'only the file that has the tag is changed: the other is not asked about');
+        await ev(`document.querySelector('#team-panel-artifacts .dt-bar .dt-bar-clear, #team-panel-artifacts .dt-bar [class*=clear]')?.click(); true`);
+        await reload();
+        await ev('window.__puts = []; true');
+        await select(['draft.txt', 'log.txt']);
+        await waitFor(`[...document.querySelectorAll('#team-panel-artifacts .dt-bar-action')].some(b => b.textContent === 'Tag')`, 'the Tag action', 8000);
+        await ev(`[...document.querySelectorAll('#team-panel-artifacts .dt-bar-action')].find(b => b.textContent === 'Tag').click(); true`);
+        await waitFor(`!!document.querySelector('#team-panel-artifacts .dt-bar-choice')`, 'the choice', 5000);
+        await ev(`(() => { const c = document.querySelector('#team-panel-artifacts .dt-bar-choice'); c.value = 'draft'; document.querySelector('#team-panel-artifacts .dt-bar-apply').click(); return true; })()`);
+        await waitFor(`/could not be changed/.test(document.body.textContent)`, 'the toast says one could not be changed', 10000);
+        assert.deepEqual(await tagsOf(files[1]), ['t1', 't2', 't3', 't4', 't5'], 'five is the most: left alone');
+        assert.ok(!(await ev('window.__puts.map(u => /[a-f0-9]{64}/.exec(u)[0])')).includes(files[1]), 'a file with five tags is not even asked');
+        assert.deepEqual(await tagsOf(files[2]), ['alpha', 'beta', 'draft', 'gamma'], 'the other got it');
+        console.log('   ✓');
+
+        console.log('11. A tag changed in the sheet moves the For review pill without another read');
+        await reload();
+        assert.equal(await ev(`!!document.querySelector('#team-panel-artifacts .team-tb-pills')`), false, 'nobody has For review: no pill');
+        await sheet('plan.txt');
+        await ev(`document.querySelector('.detail-head .artifact-tag-add').click(); [...document.querySelectorAll('.detail-head .artifact-tag-offer')].find(b => b.textContent === 'for review').click(); true`);
+        await waitFor(`/For review 1/.test(document.querySelector('#team-panel-artifacts .team-tb-pills')?.textContent || '')`, 'the pill says 1', 8000);
+        await ev(`document.querySelector('.detail-head [aria-label="Remove tag for review"]').click(); true`);
+        await waitFor(`!document.querySelector('#team-panel-artifacts .team-tb-pills')`, 'the pill is gone at 0', 8000);
+        console.log('   ✓');
+
+        console.log('12. A viewer who cannot change tags sees the chips and no controls');
+        await ev(`document.body.classList.add('popout-mode'); true`); // local() is false: the Operator's own Coral only
+        await put(files[0], ['final', 'for review']);
+        await reload();
+        await sheet('plan.txt');
+        assert.equal(await ev(`document.querySelectorAll('.detail-head .artifact-tag-list .artifact-tag').length`), 2, 'the chips are there');
+        assert.equal(await ev(`document.querySelectorAll('.detail-head .artifact-tag-remove').length`), 0, 'no x');
+        assert.equal(await ev(`document.querySelector('.detail-head .artifact-tag-add').hidden`), true, 'no + Tag');
+        await select(['plan.txt']);
+        await waitFor(`!![...document.querySelectorAll('#team-panel-artifacts .dt-bar-action')].length`, 'the selection bar', 8000);
+        assert.deepEqual(await ev(`[...document.querySelectorAll('#team-panel-artifacts .dt-bar-action')].map(b => b.textContent).filter(t => /^(Tag|Untag)$/.test(t))`), [], 'no Tag or Untag');
+        await ev(`document.body.classList.remove('popout-mode'); true`);
+        console.log('   ✓');
+
+        console.log('13. On a phone every control of the editor is a 44 px target');
+        await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+        await Emulation.setTouchEmulationEnabled({ enabled: true, maxTouchPoints: 5 });
+        await reload();
+        await ev(`(() => { document.querySelectorAll('.toast').forEach(t => t.remove()); const clear = [...document.querySelectorAll('#team-panel-artifacts .dt-bar button')].find(b => b.textContent === 'Clear'); clear?.click(); const k = document.getElementById('ta-kept'); if (k && k.offsetParent !== null) document.querySelector('#team-panel-artifacts .list-bar-filter-btn, #team-panel-artifacts button[aria-label*="Filters" i], #team-panel-artifacts .list-bar-icon')?.click(); return true; })()`); // a clean list for the shot: no toast, nothing selected, the filter panel shut
+        await shot('artifact-tags-row-390');
+        await sheet('log.txt');
+        await ev(`document.querySelector('.detail-head .artifact-tag-add').click(); true`);
+        await waitFor(`!!document.querySelector('.detail-head .artifact-tag-offer')`, 'the box', 5000);
+        const sizes = await ev(`(() => { const h = sel => Math.round(document.querySelector(sel).getBoundingClientRect().height), x = document.querySelector('.detail-head .artifact-tag-remove'), pe = x && getComputedStyle(x, '::after'); return { add: h('.detail-head .artifact-tag-add'), offer: h('.detail-head .artifact-tag-offer'), input: h('.detail-head .artifact-tag-input'), go: h('.detail-head .artifact-tag-form .btn'), x: x ? Math.round(parseFloat(pe.height)) : 0 }; })()`);
+        for (const k of ['add', 'offer', 'input', 'go']) assert.ok(sizes[k] >= 44, `${k} is ${sizes[k]} px: ` + JSON.stringify(sizes));
+        assert.ok(sizes.x >= 44, 'the x inset target: ' + JSON.stringify(sizes));
+        await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); true`);
+        await shot('artifact-tags-sheet-box-390');
         console.log('   ✓');
 
         console.log('PASS artifact tags: chips and + Tag in the sheet, row chips, the For review pill and Tag filter, Tag and Untag in the selection bar');
