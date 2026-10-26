@@ -103,14 +103,14 @@ func TestBoardMessageSearchOverHTTP(t *testing.T) {
 	assert.Empty(t, r.PrevCursor)
 	assert.NotNil(t, r.Messages[0]["id"])
 	assert.Equal(t, "Orchestrator", r.Messages[0]["job_title"], "the rows are the ones /messages/all gives")
-	code, r = e.get("q="+url.QueryEscape("100%"), false)
+	_, r = e.get("q="+url.QueryEscape("100%"), false)
 	assert.Equal(t, []string{"alpha built, 100% sure"}, r.contents())
 	// from (a name or an id, any case), mentions, newest first by default
-	code, r = e.get("from=backend+dev", false)
+	_, r = e.get("from=backend+dev", false)
 	assert.Equal(t, []string{"Alpha again", "alpha built, 100% sure"}, r.contents())
-	code, r = e.get("mentions=Backend+Dev", false)
+	_, r = e.get("mentions=Backend+Dev", false)
 	assert.Equal(t, []string{"BETA checks for @all", "Alpha plan for @Backend Dev"}, r.contents(), "@all tags everyone")
-	code, r = e.get("q=alpha&from=QA+Engineer", false)
+	_, r = e.get("q=alpha&from=QA+Engineer", false)
 	assert.Equal(t, 0, r.Total)
 	assert.Equal(t, []string{}, append([]string{}, r.contents()...))
 	// paging both ways, with the total on every page
@@ -120,21 +120,21 @@ func TestBoardMessageSearchOverHTTP(t *testing.T) {
 	assert.Equal(t, []string{"Alpha plan for @Backend Dev", "alpha built, 100% sure"}, r.contents())
 	require.NotEmpty(t, r.NextCursor)
 	assert.Empty(t, r.PrevCursor)
-	code, r2 := e.get("limit=2&sort=oldest&cursor="+r.NextCursor, false)
+	_, r2 := e.get("limit=2&sort=oldest&cursor="+r.NextCursor, false)
 	assert.Equal(t, []string{"BETA checks for @all", "Alpha again"}, r2.contents())
 	assert.Equal(t, 5, r2.Total)
 	require.NotEmpty(t, r2.NextCursor)
 	require.NotEmpty(t, r2.PrevCursor)
-	code, r3 := e.get("limit=2&sort=oldest&cursor="+r2.NextCursor, false)
+	_, r3 := e.get("limit=2&sort=oldest&cursor="+r2.NextCursor, false)
 	assert.Equal(t, []string{"nothing here"}, r3.contents())
 	assert.Empty(t, r3.NextCursor)
-	code, back := e.get("limit=2&sort=oldest&cursor="+r3.PrevCursor, false)
+	_, back := e.get("limit=2&sort=oldest&cursor="+r3.PrevCursor, false)
 	assert.Equal(t, r2.contents(), back.contents(), "back from the last page is the page before it")
-	code, back = e.get("limit=2&sort=oldest&cursor="+back.PrevCursor, false)
+	_, back = e.get("limit=2&sort=oldest&cursor="+back.PrevCursor, false)
 	assert.Equal(t, r.contents(), back.contents())
 	assert.Empty(t, back.PrevCursor, "the first page again")
 	// jump to the first match
-	code, r = e.get("q=beta&sort=oldest&limit=1", false)
+	_, r = e.get("q=beta&sort=oldest&limit=1", false)
 	assert.Equal(t, []string{"BETA checks for @all"}, r.contents())
 	// refusals name the problem
 	for query, want := range map[string]string{
@@ -147,13 +147,13 @@ func TestBoardMessageSearchOverHTTP(t *testing.T) {
 		assert.Contains(t, r.Error, want, query)
 	}
 	// a cursor made for other filters is refused
-	code, r = e.get("q=alpha&limit=1", false)
+	_, r = e.get("q=alpha&limit=1", false)
 	require.NotEmpty(t, r.NextCursor)
 	code, r = e.get("q=beta&limit=1&cursor="+r.NextCursor, false)
 	assert.Equal(t, 400, code)
 	assert.Contains(t, r.Error, "other filters")
 	// another board's messages are not here
-	code, r = e.get("q=alpha", false)
+	_, r = e.get("q=alpha", false)
 	assert.Equal(t, 3, r.Total)
 }
 
@@ -173,18 +173,18 @@ func TestBoardMessageSearchThroughTheHub(t *testing.T) {
 	code, r := e.get("q=redacted&sort=oldest", true)
 	require.Equal(t, 200, code)
 	assert.Equal(t, 1, r.Total, "the viewer sees [redacted token] in the text")
-	code, r = e.get("q=deploy&sort=oldest", true)
+	_, r = e.get("q=deploy&sort=oldest", true)
 	assert.Equal(t, 2, r.Total)
-	code, r = e.get("from="+url.QueryEscape("[redacted token]"), true)
+	_, r = e.get("from="+url.QueryEscape("[redacted token]"), true)
 	assert.Equal(t, 1, r.Total, "the sender the viewer sees")
-	code, r = e.get("mentions=Backend+Dev", true)
+	_, r = e.get("mentions=Backend+Dev", true)
 	assert.Equal(t, 1, r.Total)
 	// a local caller searches the stored text, secret and all
-	code, r = e.get("q="+tok, false)
+	_, r = e.get("q="+tok, false)
 	assert.Equal(t, 1, r.Total)
-	code, r = e.get("from="+tok, false)
+	_, r = e.get("from="+tok, false)
 	assert.Equal(t, 1, r.Total)
-	code, r = e.get("q=redacted", false)
+	_, r = e.get("q=redacted", false)
 	assert.Equal(t, 0, r.Total, "the stored text has no marker")
 }
 

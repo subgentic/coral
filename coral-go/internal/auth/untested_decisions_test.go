@@ -98,7 +98,7 @@ func TestANewPasswordOverTheLimitIsRefusedWithoutBeingStored(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
 	assert.Equal(t, "too_long", out["code"])
 	assert.False(t, g.ks.PasswordSet(), "nothing was stored")
-	w, out = g.do(g.ar.SetPassword, g.req("POST", "/api/auth/password/set", `{"password":"`+strings.Repeat("a", MaxPasswordBytes)+`"}`, "127.0.0.1", nil))
+	w, _ = g.do(g.ar.SetPassword, g.req("POST", "/api/auth/password/set", `{"password":"`+strings.Repeat("a", MaxPasswordBytes)+`"}`, "127.0.0.1", nil))
 	assert.Equal(t, http.StatusOK, w.Code, "a password at the limit is accepted: "+w.Body.String())
 	assert.True(t, g.ks.PasswordSet())
 }

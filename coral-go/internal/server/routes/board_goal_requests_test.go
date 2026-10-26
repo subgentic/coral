@@ -87,7 +87,7 @@ func TestGoalRequestFlowAcceptAndDecline(t *testing.T) {
 	require.NoError(t, err)
 	code, _ = call("POST", "/api/board/beta/goal-requests/"+id+"/accept", map[string]any{"subscriber_id": "Worker", "title": "x"})
 	assert.Equal(t, 403, code)
-	code, out = call("POST", "/api/board/beta/goal-requests/"+id+"/accept", map[string]any{"subscriber_id": "Orchestrator B"})
+	code, _ = call("POST", "/api/board/beta/goal-requests/"+id+"/accept", map[string]any{"subscriber_id": "Orchestrator B"})
 	assert.Equal(t, 400, code, "a title is required: the ask is not copied")
 
 	code, out = call("POST", "/api/board/beta/goal-requests/"+id+"/accept", map[string]any{"subscriber_id": "Orchestrator B", "title": "Build the importer", "priority": "high"})
@@ -188,7 +188,7 @@ func TestGoalRequestAdmission(t *testing.T) {
 	assert.Equal(t, 403, code)
 	code, _ = sendRequest(call, 99999, "x")
 	assert.Equal(t, 404, code)
-	code, out = call("POST", "/api/board/beta/goal-requests", map[string]any{"from_board": "beta", "subscriber_id": "Orchestrator B", "goal_id": goal, "ask": "x"})
+	code, _ = call("POST", "/api/board/beta/goal-requests", map[string]any{"from_board": "beta", "subscriber_id": "Orchestrator B", "goal_id": goal, "ask": "x"})
 	assert.Equal(t, 400, code, "a request to its own team is refused")
 	code, _ = sendRequest(call, goal, strings.Repeat("a", board.GoalRequestAskMax+1))
 	assert.Equal(t, 400, code)
@@ -383,6 +383,6 @@ func TestGoalRequestSendRefusalWording(t *testing.T) {
 	require.Equal(t, 403, code)
 	assert.Contains(t, out["error"], "job title must be the word Orchestrator")
 	// the answering routes keep the goal routes' sentence: accepting or declining is not sending
-	code, out = call("POST", "/api/board/beta/goal-requests/1/decline", map[string]any{"subscriber_id": "Worker"})
+	code, _ = call("POST", "/api/board/beta/goal-requests/1/decline", map[string]any{"subscriber_id": "Worker"})
 	assert.Equal(t, 403, code)
 }

@@ -510,7 +510,7 @@ func TestAUsedTokenStaysUsedAcrossARestart(t *testing.T) {
 	// And for another staged version the old token is spent: it answers its own operation only while it would be valid, never starts.
 	e.up.rec.Staged.Version = "1.4.132"
 	e.up.rec.HubRelaunched = ""
-	code, out = e.post(ack(tok), hubHdr(ownerA))
+	code, _ = e.post(ack(tok), hubHdr(ownerA))
 	assert.Equal(t, 202, code, "repeat of the same token inside its minute")
 	assert.Equal(t, 1, e.up.applyCount())
 	e.now = e.now.Add(2 * time.Minute)

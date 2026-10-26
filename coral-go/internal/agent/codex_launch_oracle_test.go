@@ -335,7 +335,7 @@ func (a *CodexAgent) launchCommandBefore4845(params LaunchParams) (string, error
 	}
 
 	if !permissionApplied {
-		parts, bypassSandbox, permissionApplied = appendCodexPermissionMode(parts, bypassSandbox, params.PermissionMode)
+		parts, _, _ = appendCodexPermissionMode(parts, bypassSandbox, params.PermissionMode)
 	}
 	parts = collapseCodexSandboxFlags(parts, !params.Capabilities.IsEmpty()) // #5222: the one change since #4845 on purpose: Codex refuses a repeated --sandbox or -a, so the last one of each is kept
 

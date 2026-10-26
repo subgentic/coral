@@ -129,7 +129,7 @@ func TestGoalTasksReadHonoursStatusAndRefusesOtherFilters(t *testing.T) {
 		code, out := call("GET", "/api/board/team/tasks?goal="+itoa(gid)+bad, nil)
 		assert.Equal(t, 400, code, "%s: %v", bad, out)
 	}
-	code, out = call("GET", "/api/board/team/tasks?goal="+itoa(gid)+"&assigned_to=Dev", nil)
+	_, out = call("GET", "/api/board/team/tasks?goal="+itoa(gid)+"&assigned_to=Dev", nil)
 	assert.Contains(t, fmt.Sprint(out["error"]), "assigned_to", "the refusal names the key")
 
 	// a cursor holds the status it was issued for

@@ -95,9 +95,9 @@ func isIPBlocked(ip net.IP) bool {
 			var embedded net.IP
 			switch {
 			case nat64Prefix.Contains(ip):
-				embedded = net.IP(ip16[12:16])
+				embedded = ip16[12:16]
 			case ip16[0] == 0x20 && ip16[1] == 0x02:
-				embedded = net.IP(ip16[2:6])
+				embedded = ip16[2:6]
 			}
 			if embedded != nil && isIPBlocked(embedded) {
 				return true

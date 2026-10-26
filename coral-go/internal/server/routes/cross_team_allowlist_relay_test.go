@@ -179,11 +179,11 @@ func TestFilesFollowTheList(t *testing.T) {
 	assert.Empty(t, e.stored(), "nothing refused is stored")
 
 	e.list(board.AllowedSender{Server: relaySrc, CrossTeamID: theirID("a")})
-	status, out = e.send("auth", relaySrc, "", frame(withClaim(""), data))
+	status, _ = e.send("auth", relaySrc, "", frame(withClaim(""), data))
 	assert.Equal(t, http.StatusForbidden, status, "no claim: refused")
-	status, out = e.send("auth", relaySrc, "", frame(withClaim(theirID("b")), data))
+	status, _ = e.send("auth", relaySrc, "", frame(withClaim(theirID("b")), data))
 	assert.Equal(t, http.StatusForbidden, status, "another board's id: refused")
-	status, out = e.send("auth", "other-server", "", frame(withClaim(theirID("a")), data))
+	status, _ = e.send("auth", "other-server", "", frame(withClaim(theirID("a")), data))
 	assert.Equal(t, http.StatusForbidden, status, "the right id on the wrong server: refused")
 	assert.Empty(t, e.stored())
 
