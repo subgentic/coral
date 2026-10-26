@@ -137,7 +137,7 @@ export function closeDetailPane({ restoreFocus = false } = {}) {
     if (onClose) { try { onClose(); } catch { /* the pane is closed either way */ } }
     if (restoreFocus) {
         // The row that opened it, or the row with its key when the table was drawn again.
-        const again = opener && opener.isConnected ? opener : [...document.querySelectorAll(hosted ? '#agentic-panel-artifacts tr[data-key]' : '#team-page-view tr[data-key]')].find(r => r.dataset.key === String(key))?.querySelector('.dt-primary, .team-row-btn');
+        const again = opener && opener.isConnected ? opener : [...document.querySelectorAll(hosted ? '#agentic-panel-artifacts tr[data-key]' : '#team-page-view tr[data-key]')].find(r => r.dataset.key === String(key))?.querySelector('.dt-primary');
         (again || (hosted ? null : document.getElementById('team-page-title')))?.focus();
     }
     return true;

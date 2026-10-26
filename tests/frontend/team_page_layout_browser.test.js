@@ -12,7 +12,7 @@ const TEAM = `qa-layout-${Date.now() % 100000}`;
 // words wider than the room they are in: a word the line broke in the middle (canvas-measured with the element's own font)
 const BROKEN = (sel) => `(() => { const c = document.createElement('canvas').getContext('2d'); const vis = e => e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden';
     return [...document.querySelectorAll(${JSON.stringify(sel)})].filter(vis).filter(e => { const cs = getComputedStyle(e); c.font = cs.fontStyle + ' ' + cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily; const room = e.getBoundingClientRect().width - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
-        return (e.textContent || '').split(/\\s+/).some(w => w && c.measureText(w).width > room + 1); }).map(e => (e.className || e.tagName) + ': ' + e.textContent.trim().slice(0, 40) + ' (' + Math.round(e.getBoundingClientRect().width) + ' px wide, ' + cs0(e) + ')'); })()`.replace('cs0(e)', "getComputedStyle(e).fontSize");
+        return cs.whiteSpace !== 'nowrap' && (e.textContent || '').split(/\\s+/).some(w => w && c.measureText(w).width > room + 1); }).map(e => (e.className || e.tagName) + ': ' + e.textContent.trim().slice(0, 40) + ' (' + Math.round(e.getBoundingClientRect().width) + ' px wide, ' + cs0(e) + ')'); })()`.replace('cs0(e)', "getComputedStyle(e).fontSize");
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -57,15 +57,15 @@ const BROKEN = (sel) => `(() => { const c = document.createElement('canvas').get
             });
             await S.run(`${label}: Knowledge: no word of the table or its count line is broken`, async () => {
                 await goTab(ev, settle, 'Knowledge'); await settle(900);
-                const broken = await ev(BROKEN('#team-panel-knowledge td, #team-panel-knowledge th, #team-panel-knowledge .team-count-line, #team-panel-knowledge .team-row-btn')); assert.deepEqual(broken, [], 'no word is broken: ' + JSON.stringify(broken));
-                const sc = await ev(`(() => { const page = document.querySelector('#team-panel-knowledge .goals-table-page'), box = document.querySelector('#team-panel-knowledge .team-table-scroll'); const cs = getComputedStyle(page); return { pageScrolls: /auto|scroll/.test(cs.overflowX) || page.scrollWidth > page.clientWidth + 1, box: !!box && /auto|scroll/.test(getComputedStyle(box).overflowX) }; })()`);
-                assert.equal(sc.pageScrolls, false, 'the tab page is not the scroller: the count line and Distill knowledge stay put'); assert.equal(sc.box, true, 'the table scrolls in a box of its own');
+                const broken = await ev(BROKEN('#team-panel-knowledge td, #team-panel-knowledge th, #team-panel-knowledge .team-count-line, #team-panel-knowledge .dt-primary')); assert.deepEqual(broken, [], 'no word is broken: ' + JSON.stringify(broken));
+                const sc = await ev(`(() => { const page = document.querySelector('#team-panel-knowledge .goals-table-page'), box = document.querySelector('#team-panel-knowledge .dt-box'); const cs = getComputedStyle(page); return { pageScrolls: /auto|scroll/.test(cs.overflowX) || page.scrollWidth > page.clientWidth + 1, box: !!box && box.scrollWidth <= box.clientWidth + 1 }; })()`);
+                assert.equal(sc.pageScrolls, false, 'the tab page is not the scroller: the count line and Distill knowledge stay put'); assert.equal(sc.box, true, 'the shared table fits its box');
             });
             await S.run(`${label}: the pane is a sheet over the page: the sidebar keeps its width or is out of the way, no rail of letters`, async () => {
                 await ev(`(() => { const b = [...window.__tp.table().querySelectorAll('button')].find(x => /Backend Dev/.test(window.__na.name(x))); b.click(); return true; })()`); await settle(600);
                 const r = await ev(`(() => { const p = window.__tp.pane(); const b = p.getBoundingClientRect(); const side = document.querySelector('.layout > .sidebar'); const s = side && getComputedStyle(side).display !== 'none' ? side.getBoundingClientRect().width : 0; return { pane: { w: Math.round(b.width), left: Math.round(b.left) }, sidebar: Math.round(s), collapsed: !!document.querySelector('.layout.sidebar-collapsed'), vw: innerWidth }; })()`);
                 if (font > 16 || mobile) assert.equal(r.collapsed, false, `the sidebar is not squeezed to a rail (${JSON.stringify(r)})`); // at 100% on a desktop the pane sits beside a 56 px rail, by design
-                const under = await ev(`(() => { const p = window.__tp.pane().getBoundingClientRect(), t = document.querySelector('#team-panel-knowledge .team-table-scroll').getBoundingClientRect(); return t.right > p.left + 1 && p.left > 1 && p.width < innerWidth - 2; })()`);
+                const under = await ev(`(() => { const p = window.__tp.pane().getBoundingClientRect(), t = document.querySelector('#team-panel-knowledge .dt-box').getBoundingClientRect(); return t.right > p.left + 1 && p.left > 1 && p.width < innerWidth - 2; })()`);
                 assert.equal(under, false, 'the table does not run under the pane');
                 if (font > 16 || mobile) assert.ok(r.pane.w >= r.vw - 2 && r.pane.left <= 1, `the pane is a sheet over the whole window (${JSON.stringify(r)})`);
             });

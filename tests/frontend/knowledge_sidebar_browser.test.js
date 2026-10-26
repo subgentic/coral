@@ -67,7 +67,7 @@ const BUNDLE = { exists: true, team_name: TEAM, created_at: '2026-10-25T05:00:00
             await ev(`[...window.__tp.pane().querySelectorAll('.knowledge-md a')].find(a => a.textContent === 'Orchestrator').click(); true`); await settle(400);
             assert.equal(await title(), 'Orchestrator', 'the pane now shows the Orchestrator entry');
             assert.equal(await ev(`window.__tp.pane().querySelectorAll('.knowledge-md').length`), 1, 'one pane, one document');
-            assert.equal(await ev(`window.__tp.table().querySelector('tr[aria-current="true"] .team-row-btn').textContent`), 'Orchestrator', 'the table marks the open entry');
+            assert.equal(await ev(`window.__tp.table().querySelector('tr[aria-current="true"] .dt-primary').textContent`), 'Orchestrator', 'the table marks the open entry');
             await ev(`[...window.__tp.pane().querySelectorAll('.knowledge-md a')].find(a => a.textContent === 'Backend Dev').click(); true`); await settle(400);
             assert.equal(await title(), 'Backend Dev', 'a link inside an agent entry opens the other entry');
             assert.match(await paneText(), /Backend knowledge text\./);

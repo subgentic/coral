@@ -12,8 +12,11 @@ const { splitFrontMatter, entryForLink } = await importOnce('./knowledge_text.js
 const { renderSafe } = await importOnce('./safe_markdown.js'); // the Inbox's renderer: DOM-built, no markup from text
 const { loadSafeMarkdown } = await importOnce('./vendor_loader.js');
 const Toolbar = await importOnce('./team_toolbar.js'); // the one toolbar of the team tabs (#7717)
-const { teamTable, rowButton, rowFocusTarget, el } = await importOnce('./team_table.js'); // lazy modules load the others they need through importOnce, so a failed load is retried
+const { rowFocusTarget, el } = await importOnce('./team_table.js'); // lazy modules load the others they need through importOnce, so a failed load is retried
 const { openDetailPane, closeDetailPane, detailKey } = await importOnce('./detail_pane.js');
+
+const DT = await importOnce('./data_table.js');
+let knowledgeTableState = DT.tableState();
 
 const model = { team: '', data: null, refused: false, failed: '', loading: false, search: '' };
 let root = null, hooks = {};
@@ -170,12 +173,15 @@ function draw() {
     else if (model.refused) body.append(emptyLine('This team’s knowledge is too large to show through Coral Hub; open it on the computer.'));
     else if (!entries.length) { if (!model.failed) body.append(everything.length ? emptyLine('No entries match this search.') : emptyLine('No knowledge yet.', 'Distill knowledge reads the team’s work and writes what each agent learned.')); }
     else {
-        const stamp = model.data.created_at, wordsWhen = whenText(stamp);
-        const when = () => { const t = el('span', null, wordsWhen); const d = new Date(stamp); if (!Number.isNaN(d.getTime())) t.title = d.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }); return t; }; // relative, with the exact time on hover
-        body.append(teamTable({
-            label: `Knowledge, ${entries.length}`, columns: ['Entry', 'Updated', 'From'],
-            rows: entries.map(e => ({ key: e.key, current: detailKey() === e.key, open: (tr) => openEntry(e, tr.querySelector('.team-row-btn')), cells: [rowButton(e.name), when(), e.from] })),
-        }));
+        body.append(DT.dataTable({
+            label: `Knowledge, ${entries.length}`, rows: entries, rowKey: e => e.key, current: detailKey(), state: knowledgeTableState,
+            open: (e, tr) => openEntry(e, tr.querySelector('.dt-primary')),
+            columns: [
+                { key: 'entry', label: 'Entry', primary: true, width: 'grow', field: 'name', sort: true, line: 1, cell: e => DT.primaryButton(e.name) },
+                { key: 'updated', label: 'Updated', tone: 'tertiary', align: 'end', line: 1, cell: () => DT.timeCell(model.data.created_at) },
+                { key: 'from', label: 'From', field: 'from', sort: true, line: 2 },
+            ],
+        }).el);
     }
     if (held) (held === '#distill' ? body.querySelector('.team-distill') : rowFocusTarget(body, held))?.focus({ preventScroll: true });
 }
@@ -202,7 +208,7 @@ document.addEventListener('coral:distill-status', (e) => {
 
 /** Show the team's knowledge in `host`. hooks: onCount(n). */
 export function showKnowledge(host, team, h = {}) {
-    if (team !== model.team) Object.assign(model, { team, data: null, refused: false, failed: '', loading: false });
+    if (team !== model.team) { knowledgeTableState = DT.tableState(); Object.assign(model, { team, data: null, refused: false, failed: '', loading: false, search: '' }); }
     hooks = h;
     if (!host.dataset.built) {
         host.dataset.built = '1';

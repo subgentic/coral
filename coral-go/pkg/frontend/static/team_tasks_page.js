@@ -97,7 +97,7 @@ async function loadMore() {
     draw();
     say(`${model.rows.length - before} more tasks`);
     const first = root && root.querySelectorAll('tbody tr')[before];
-    first?.querySelector('.team-row-btn')?.focus();
+    first?.querySelector('.dt-primary')?.focus();
 }
 
 // ── search, filters and sort (#4744): with one on, the tasks come from the task query (the server matches every task of the board, not the loaded page); "Open first" is the open tasks, then the done ones ──

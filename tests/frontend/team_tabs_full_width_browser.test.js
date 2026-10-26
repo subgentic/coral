@@ -29,7 +29,7 @@ const TEAM = `qa-width-${Date.now() % 100000}`;
                 const r = await ev(`(() => { const panel = [...document.querySelectorAll('.team-panel')].find(p => p.getClientRects().length > 0 && p.getAttribute('aria-label') === ${JSON.stringify(tab)}); if (!panel) return null;
                     const page = panel.querySelector('.goals-table-page'); if (!page) return { nopage: true };
                     const cs = getComputedStyle(page), inner = page.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
-                    const table = page.querySelector('.dt-box, .team-table-scroll'); const t = table ? table.getBoundingClientRect().width : null;
+                    const table = page.querySelector('.dt-box'); const t = table ? table.getBoundingClientRect().width : null;
                     return { panel: panel.clientWidth, page: Math.round(page.getBoundingClientRect().width), inner: Math.round(inner), table: t === null ? null : Math.round(t) }; })()`);
                 assert.ok(r && !r.nopage, `${w}: the ${tab} tab has its page ${JSON.stringify(r)}`);
                 assert.ok(Math.abs(r.page - r.panel) <= 1, `${w}: ${tab}: the page is as wide as the page area ${JSON.stringify(r)}`);
