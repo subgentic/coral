@@ -3426,7 +3426,6 @@ button.subscriber-history-link {
 /* ── Servers settings dialog (multi-server hub) ───────────────────── */
 
 .servers-empty { color: var(--text-secondary); font-size: var(--fs-base); margin: 0 0 var(--space-lg); }
-.servers-row-title { font-size: var(--fs-md); font-weight: 600; color: var(--text-primary); overflow-wrap: anywhere; }
 .servers-id, .servers-tag {
     font-family: var(--font-mono);
     font-size: var(--fs-sm);
@@ -3434,7 +3433,6 @@ button.subscriber-history-link {
     color: var(--text-secondary);
 }
 .servers-tag { padding: 0 var(--space-sm); border: 1px solid var(--warning); border-radius: var(--radius-md); font-family: var(--font-sans); }
-.servers-row-meta { font-size: var(--fs-base); color: var(--text-secondary); overflow-wrap: anywhere; }
 .servers-row-error { margin-top: var(--space-xs); font-size: var(--fs-base); color: var(--error); overflow-wrap: anywhere; }
 .servers-row-warn { display: flex; align-items: flex-start; gap: var(--space-sm); margin-top: var(--space-xs); font-size: var(--fs-base); font-weight: 400; color: var(--text-primary); overflow-wrap: anywhere; min-width: 0; } /* #4301: icon and words, not only a colour */
 .servers-row-warn .material-icons { flex: none; font-size: 1.15em; color: var(--warning); }
@@ -4640,8 +4638,6 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 #settings-modal .settings-controls-row > label.settings-inline { margin-bottom: 0; padding-bottom: 0; } /* the dialog's generic label leaves 12 px under itself: the buttons beside Older than and What to prune sit level with their fields (#7627) */
 
 /* The Servers tab of a self-hosted hub (#7638): a table (Server, Status, Agents), and a server's page with its facts and Test, Edit and Remove in a bar pinned at its foot */
-.servers-table td:first-child { overflow-wrap: anywhere; }
-.servers-table .servers-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .servers-page { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; }
 .servers-page > * { flex-shrink: 0; }
 .servers-page-name { margin: 0; font-size: 1.0625rem; font-weight: 700; line-height: 1.3; color: var(--text-primary); overflow-wrap: anywhere; }
@@ -4653,4 +4649,3 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .servers-page .item-bar { margin-top: auto; bottom: calc(-1 * var(--space-lg, 16px)); margin-bottom: calc(-1 * var(--space-lg, 16px)); padding-bottom: calc(var(--space-lg) + var(--space-lg, 16px)); } /* the view's padding is taken back so nothing shows under the bar */
 .servers-view.servers-view-page .servers-tab { min-height: 100%; display: flex; flex-direction: column; }
 .servers-view.servers-view-page .servers-tab-body { flex: 1 1 auto; display: flex; flex-direction: column; }
-@media (pointer: coarse), (max-width: 767px) { .servers-table .group-table-link { min-width: var(--control-touch-height, 44px); } } /* a short name is still a 44 px target */

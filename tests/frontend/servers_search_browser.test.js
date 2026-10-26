@@ -36,7 +36,7 @@ const hubRows = n => remotes(n).map(s => ({ id: s.id, label: s.label, online: s.
     });
     const typeInto = (text) => ev(`(() => { const e = document.getElementById('sb-search'); e.focus(); e.value = ${JSON.stringify(text)}; e.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
     const view = (rowSel) => ev(`(() => { const bar = document.getElementById('servers-bar'); const rows = [...document.querySelectorAll(${JSON.stringify(rowSel)})].map(r => r.id);
-        const list = document.querySelector('#servers-view .servers-table, #servers-view .cs-table'); const add = document.querySelector('#servers-view [data-action="add"]');
+        const list = document.querySelector('#servers-view .dt-table, #servers-view .cs-table'); const add = document.querySelector('#servers-view [data-action="add"]');
         return { shown: !!bar && !bar.hidden && bar.getClientRects().length > 0, hasBox: !!document.getElementById('sb-search'), count: (bar.querySelector('.list-bar-count') || {}).textContent || '', rows,
             empty: (document.querySelector('#servers-view .servers-empty') || {}).textContent || null, above: !!(list && bar.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING), filtersBtn: !!bar.querySelector('.list-bar-filter-btn'), chips: bar.querySelectorAll('.list-bar-chip').length,
             addVisible: !!add && add.getClientRects().length > 0, over: document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -62,7 +62,7 @@ const hubRows = n => remotes(n).map(s => ({ id: s.id, label: s.label, online: s.
         };
         const showLocal = n => ev(`(async () => { window.__servers = ${JSON.stringify([{ id: 'local', label: 'studio', local: true, status: 'online' }, ...remotes(8)].slice(0, n + 1))}; const base = (window.__coralStatic || '/static/');
             const s = await import(base + 'state.js'); s.state.hub = true; s.state.servers = window.__servers; const t = await import(base + 'servers_tab.js'); t.updateServersTabVisibility(); return true; })()`);
-        const ROWS = '#servers-view .servers-row[id^="server-row-m"]';
+        const ROWS = '#servers-view .dt-row[id^="server-row-m"]';
         console.log('self-hosted hub, desktop');
         await local(1200, false);
         await showLocal(5);

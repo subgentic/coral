@@ -38,7 +38,7 @@ const SERVERS = [
             await waitFor(`!!document.querySelector('#server-row-lan')`, 'the servers table');
 
             // 1. a table: Server, Status, Agents; the name opens the page; no Test, Edit or Remove in the rows
-            const t = await ev(`(() => { const tb = document.querySelector('table.servers-table'); return { heads: [...tb.querySelectorAll('thead th')].map(h => h.textContent.trim()), scopes: [...tb.querySelectorAll('thead th')].map(h => h.getAttribute('scope')), rows: tb.querySelectorAll('tbody tr').length,
+            const t = await ev(`(() => { const tb = document.querySelector('table.dt-table'); return { heads: [...tb.querySelectorAll('thead th')].map(h => (h.querySelector('.dt-sort span') || h.querySelector('.dt-head-text')).textContent.trim()), scopes: [...tb.querySelectorAll('thead th')].map(h => h.getAttribute('scope')), rows: tb.querySelectorAll('tbody tr').length,
                 links: [...tb.querySelectorAll('tbody [data-action=open]')].map(b => b.textContent.trim()), rowButtons: [...tb.querySelectorAll('tbody button')].filter(b => b.dataset.action !== 'open').length, overflow: document.documentElement.scrollWidth - innerWidth }; })()`);
             assert.deepEqual(t.heads, ['Server', 'Status', 'Agents'], at + 'the columns');
             assert.equal(await ev(`document.getElementById('servers-tab-title').checkVisibility()`), true, at + 'the table keeps the Servers title');
@@ -92,14 +92,14 @@ const SERVERS = [
             await ev(`document.querySelector('.servers-page [data-action=delete]').click(); true`);
             await waitFor(`!!document.querySelector('.servers-page [data-action=delete-confirm]')`, 'the confirmation again');
             await ev(`document.querySelector('.servers-page [data-action=delete-confirm]').click(); true`);
-            await waitFor(`window.__calls.includes('delete lan') && !!document.querySelector('table.servers-table') && !document.querySelector('#server-row-lan')`, 'the table without the server');
+            await waitFor(`window.__calls.includes('delete lan') && !!document.querySelector('table.dt-table') && !document.querySelector('#server-row-lan')`, 'the table without the server');
             ok(at + 'Remove asks in the bar; Confirm removes the server and returns to the table');
 
             // 5. the way back: the text link returns to the table with the focus on that server
             await ev(`document.querySelector('#server-row-epoch [data-action=open]').click(); true`);
             await waitFor(`!!document.getElementById('servers-back')`, 'the page');
             await ev(`document.getElementById('servers-back').click(); true`);
-            await waitFor(`!!document.querySelector('table.servers-table')`, 'the table');
+            await waitFor(`!!document.querySelector('table.dt-table')`, 'the table');
             assert.equal(await ev(`document.activeElement.closest('tr') && document.activeElement.closest('tr').id`), 'server-row-epoch', at + 'the focus is on the server it came from');
             ok(at + 'the way back returns to the table with the focus on that server');
             await ev(`window.__list = ${JSON.stringify(SERVERS)}; true`);

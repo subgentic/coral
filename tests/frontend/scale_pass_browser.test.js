@@ -40,7 +40,7 @@ const { connect } = require('./agent_view_harness');
         assert.equal(await ev(`document.querySelector('${v} .team-count-line').textContent`), 'Showing 3 of 500+');
 
         console.log('2. Servers: Add server above a long list, under a short one');
-        const where = () => ev(`(() => { const b = document.querySelector('#servers-view [data-action="add"]'); const l = document.querySelector('#servers-view .servers-table'); if (!b || !l) return null; return { above: !!(b.compareDocumentPosition(l) & Node.DOCUMENT_POSITION_FOLLOWING), n: document.querySelectorAll('#servers-view [data-action="add"]').length, summary: (document.querySelector('#servers-view .servers-summary') || {}).textContent || '' }; })()`);
+        const where = () => ev(`(() => { const b = document.querySelector('#servers-view [data-action="add"]'); const l = document.querySelector('#servers-view .dt-table'); if (!b || !l) return null; return { above: !!(b.compareDocumentPosition(l) & Node.DOCUMENT_POSITION_FOLLOWING), n: document.querySelectorAll('#servers-view [data-action="add"]').length, summary: (document.querySelector('#servers-view .servers-summary') || {}).textContent || '' }; })()`);
         await ev(`(async () => { const base = (window.__coralStatic || '/static/'); const s = await import(base + 'state.js'); s.state.hub = true; s.state.servers = window.__servers; const t = await import(base + 'servers_tab.js'); t.updateServersTabVisibility(); return true; })()`);
         await ev(`window.switchNavTab('servers'); true`);
         await waitFor(`!!document.querySelector('#server-row-m3')`, 'a few servers');
