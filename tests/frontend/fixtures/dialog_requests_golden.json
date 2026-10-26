@@ -193,6 +193,12 @@
       }
     ],
     "board_server": "http://remote:8420",
+    "working_mode": {
+      "mode": "none",
+      "dependency_guidance": false,
+      "asks_are_tasks": true,
+      "custom_instructions": ""
+    },
     "worktree": true,
     "base_branch": "develop"
   }

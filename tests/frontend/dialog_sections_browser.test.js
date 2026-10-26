@@ -140,7 +140,7 @@ const BASE = require('./test_base').BASE;
         await open(1440, false);
         console.log('The team agent dialog');
         await ev(`window.showLaunchModal(); window._selectLaunchType('team'); window.showTeamAgentModal(); true`);
-        await waitFor(`${vis('#launch-step-agent .settings-tabs')} && !!document.getElementById('launch-agent-name-input')`, 'the agent dialog');
+        await waitFor(`${vis('#launch-agent-name-input')} && !!document.querySelector('#launch-agent-acf .acf-agent-type')`, 'the member dialog on its role');
         const TA = '#launch-step-agent'; // the member is the agent step of the Launch dialog in a second mode (#7861): the role and prompt are its persona step, the tabs are Agent, Permissions, Advanced
         assert.deepEqual(await names(TA), [['Agent', 'smart_toy'], ['Permissions', 'lock'], ['Advanced', 'tune']]);
         assert.equal(await ev(`document.getElementById('launch-step-agent').dataset.stage`), 'persona', 'a new member opens on its role');
@@ -150,6 +150,28 @@ const BASE = require('./test_base').BASE;
         assert.equal(await ev(`document.getElementById('launch-step-agent').dataset.stage`), 'persona', 'Save without a name opens the role');
         await shot('team-agent-role-desktop');
         await ev(`window.cancelTeamMember(); window.hideLaunchModal(); true`);
+        // Add member and Edit member at both sizes (UI/UX, #7861): the title, the steps, Back, Next and Save member, the member's own values
+        for (const [w, mobile, tag] of [[1440, false, 'desktop'], [390, true, 'phone']]) {
+            await open(w, mobile);
+            await ev(`window.showLaunchModal(); window._selectLaunchType('team'); window._addTeamAgent('Scribe', 'Write the notes.'); window.showTeamAgentModal(); true`);
+            await waitFor(`${vis('#launch-agent-name-input')} && !!document.querySelector('#launch-agent-acf .acf-agent-type')`, `${tag}: Add member`);
+            const foot = () => ev(`(() => { const v = id => { const e = document.getElementById(id); return !!e && !e.hidden && getComputedStyle(e).display !== 'none' && e.getClientRects().length > 0; }; return { title: document.getElementById('launch-agent-title-text').textContent, sub: document.getElementById('launch-stage-sub').textContent.replace(/\\s+/g, ' ').trim(), back: v('launch-agent-back'), next: v('launch-agent-next'), save: v('launch-agent-save'), go: v('launch-agent-go') }; })()`);
+            assert.deepEqual(await foot(), { title: 'Add member', sub: 'Step 1 of 2: Persona', back: false, next: true, save: false, go: false }, `${tag}: Add member opens on the role, with Next and no Save`);
+            assert.deepEqual(await ev(`[document.getElementById('launch-agent-name-label').textContent, document.getElementById('launch-agent-name-optional').hidden]`), ['Role', true], `${tag}: the member's field is its Role and it is required, not optional`);
+            await shot(`add-member-persona-${tag}`);
+            await ev(`window._launchStage('agent'); true`); await waitFor(`document.getElementById('launch-step-agent').dataset.stage === 'agent'`, `${tag}: the settings`);
+            assert.deepEqual(await foot(), { title: 'Add member', sub: 'Step 2 of 2: The agent', back: true, next: false, save: true, go: false }, `${tag}: Save member on the settings only, no Launch`);
+            await shot(`add-member-agent-${tag}`);
+            await ev(`window.cancelTeamMember(); window.showTeamAgentModal([...document.querySelectorAll('#team-agents-list .team-agent-row')].find(r => r.querySelector('.team-agent-role-name').textContent === 'Scribe')); true`);
+            await waitFor(`document.getElementById('launch-agent-title-text').textContent === 'Edit member' && document.getElementById('launch-step-agent').dataset.stage === 'agent'`, `${tag}: Edit member`);
+            assert.equal(await ev(`document.getElementById('launch-agent-name-input').value`), 'Scribe', `${tag}: the member's own role`);
+            assert.deepEqual(await foot(), { title: 'Edit member', sub: 'Step 2 of 2: The agent', back: true, next: false, save: true, go: false }, `${tag}: Edit member opens on the settings with Save member`);
+            await shot(`edit-member-agent-${tag}`);
+            await ev(`window._launchStage('persona'); true`); await waitFor(`document.getElementById('launch-step-agent').dataset.stage === 'persona'`, `${tag}: back to the role`);
+            assert.equal(await ev(`document.querySelector('#launch-agent-acf .acf-prompt').value`), 'Write the notes.', `${tag}: the member's prompt is loaded`);
+            await shot(`edit-member-persona-${tag}`);
+            await ev(`window.cancelTeamMember(); window.hideLaunchModal(); true`);
+        }
         console.log('PASS dialog sections: Restart, the team member dialog');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

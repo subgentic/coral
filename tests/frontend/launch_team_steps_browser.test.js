@@ -100,7 +100,7 @@ const BASE = require('./test_base').BASE;
         console.log('The Edit dialog says it beside the Mode too (#6412, #6425)');
         await ev(`window.showTeamAgentModal([...document.querySelectorAll('#team-agents-list .team-agent-row')].find(r => r.querySelector('.team-agent-role-name').textContent === 'Open')); true`);
         // the Mode sits in one of the dialog's sections: open the one that has it, as a person looking for the Mode does
-        const showModeSection = () => ev(`import((window.__coralStatic || '/static/') + 'section_dialog.js').then(m => { const shell = document.querySelector('#launch-step-agent .settings-shell'); const pane = document.querySelector('#launch-agent-acf .acf-permission-mode').closest('.settings-pane'); m.showSection(shell, pane.dataset.section); return true; })`);
+        const showModeSection = () => ev(`import((window.__coralStatic || '/static/') + 'section_dialog.js').then(m => { const shell = document.querySelector('#launch-agent-acf').closest('.settings-shell'); const pane = document.querySelector('#launch-agent-acf .acf-permission-mode').closest('.settings-pane'); m.showSection(shell, pane.dataset.section); return true; })`);
         const line = () => ev(`(() => { const e = document.querySelector('#launch-agent-acf .acf-mode-override'); return !!e && !e.hidden && e.getClientRects().length > 0 ? e.textContent : ''; })()`);
         await showModeSection();
         assert.equal(await line(), 'No Mode chosen, so the capabilities decide: Sandboxed: can change files in its folder and use the network.', 'the Mode says Default and the chips decide: said beside it');
