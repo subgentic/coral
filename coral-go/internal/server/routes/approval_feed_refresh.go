@@ -59,14 +59,22 @@ func (h *SessionsHandler) refreshAfterConfirmedAnswer(ctx context.Context, agent
 	var timer *time.Timer
 	timer = time.AfterFunc(delay, func() {
 		refresh.mu.Lock()
-		if refresh.pending[sessionID] != timer {
-			refresh.mu.Unlock()
-			return
-		}
-		delete(refresh.pending, sessionID)
-		refresh.mu.Unlock()
-		h.displayScreens.forget(sessionID)
-		h.kickWS()
+		h.finishApprovalFeedRefreshLocked(sessionID, timer)
 	})
 	refresh.pending[sessionID] = timer
+}
+
+// A stopped timer may already have entered its callback. Only the timer still
+// registered for this session may invalidate the screen and push a fresh read.
+// The caller holds approvalRefresh.mu; this method releases it on every path.
+func (h *SessionsHandler) finishApprovalFeedRefreshLocked(sessionID string, timer *time.Timer) {
+	refresh := &h.approvalRefresh
+	if refresh.pending[sessionID] != timer {
+		refresh.mu.Unlock()
+		return
+	}
+	delete(refresh.pending, sessionID)
+	refresh.mu.Unlock()
+	h.displayScreens.forget(sessionID)
+	h.kickWS()
 }
