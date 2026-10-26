@@ -53,14 +53,14 @@ const host = document.body.appendChild(document.createElement('div'));
 const { showTeamWorkingMode } = await importUi('team_working_mode');
 await showTeamWorkingMode('beta', { page: host });
 await settle(10);
-// The Messaging tab (#5572) holds the two switches, saved with its own Save, only what changed; this test runs in the Coral Hub view, where the tab is drawn too.
+// The Messaging tab (#5572) holds the two switches, saved with the page's Save, only what changed; this test runs in the Coral Hub view, where the tab is drawn too.
 const pane = () => panel.querySelector('#team-settings-messaging');
-const sw = name => pane().querySelector(`form input[name=${name}]`);
+const sw = name => pane().querySelector(`input[name=${name}]`);
 // Through Coral Hub the switches are disabled until the machine says this request may change them (can_change), with the reason and no Save.
 assert.equal(sw('cross_team_messaging').disabled, true, 'Hub, nothing said: disabled');
 assert.equal(sw('cross_team_artifacts').disabled, true);
 assert.equal(pane().querySelector('.xt-locked').textContent, 'This setting can only be changed on the computer itself.');
-assert.equal(pane().querySelector('.xt-save').hidden, true, 'and no Save');
+assert.equal(panel.querySelector('.sv-save').disabled, true, 'and no Save (it is off: nothing can change)');
 crossState = { can_change: true, owner_path_live: true };
 await showTeamWorkingMode('beta', { page: host });
 await settle(10);
@@ -72,7 +72,7 @@ assert.equal(panel.querySelector('.settings-pane[data-section=workflow] [name=cr
 toggle.checked = true;
 toggle.dispatchEvent(new window.Event('change', { bubbles: true }));
 await settle(5);
-pane().querySelector('form').requestSubmit();
+panel.querySelector('.sv-save').click();
 await settle(10);
 assert.deepEqual(puts, [{ subscriber_id: 'Operator', cross_team_messaging: true }], 'saved as the Operator, only what changed');
 assert.equal(boardSettings.cross_team_messaging, true);
@@ -80,12 +80,12 @@ assert.equal(boardSettings.cross_team_messaging, true);
 // ── Share files with other teams (cross_team_artifacts, #4407): on the Messaging tab, its own switch, sent only when it was changed.
 const files = sw('cross_team_artifacts');
 assert.ok(files, 'the files switch exists');
-assert.equal(files.closest('label').textContent.trim(), 'Share files with teams on other computers');
+assert.equal(files.closest('.sv-row').querySelector('.sv-label').textContent.trim(), 'Share files with teams on other computers');
 assert.equal(files.checked, false);
 files.checked = true;
 files.dispatchEvent(new window.Event('change', { bubbles: true }));
 await settle(5);
-pane().querySelector('form').requestSubmit();
+panel.querySelector('.sv-save').click();
 await settle(10);
 assert.deepEqual(puts[1], { subscriber_id: 'Operator', cross_team_artifacts: true }, 'the files switch is saved on its own');
 assert.ok(!('cross_team_messaging' in puts[1]), 'and the unchanged messaging switch is not sent again');

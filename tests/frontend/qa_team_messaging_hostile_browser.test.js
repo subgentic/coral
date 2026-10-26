@@ -1,4 +1,4 @@
-// QA #5584: the Messaging panel (team_cross_team_settings.js) against hostile and odd answers from the machine, drawn straight into a host element with mountCrossTeamSettings: the server's words and the
+// QA #5584: the Messaging panel (team_cross_team_fields.js) against hostile and odd answers from the machine, drawn straight into a host element with mountMessaging: the server's words and the
 // linked teams are shown as text only, an unknown state or a status without words falls back to the switch, a hub caller's "can_change" must be exactly true to unlock the switches, the Hub's 404 and 403
 // on save never show a raw word, and the panel keeps its two switches and its link constant whatever the state says. Drives Chrome over CDP through agent_view_harness.js against the isolated dev server.
 const assert = require('node:assert/strict');
@@ -15,13 +15,13 @@ const BASE = require('./test_base').BASE;
     const draw = (state, { hub = false, settings = { cross_team_messaging: true, cross_team_artifacts: false } } = {}) => ev(`(async () => {
         document.getElementById('qa-host')?.remove(); window.__pwn = 0;
         const host = document.createElement('div'); host.id = 'qa-host'; document.body.append(host);
-        const m = await import(${S} + 'team_cross_team_settings.js'); m._setHubForTests(${hub ? 'true' : 'null'});
-        await m.mountCrossTeamSettings(host, 'qa-team', { state: ${JSON.stringify(state)}, settings: ${JSON.stringify(settings)} });
+        const m = await import(${S} + 'team_cross_team_fields.js'); m._setHubForTests(${hub ? 'true' : 'null'});
+        await m.mountMessaging(host, 'qa-team', { state: ${JSON.stringify(state)}, settings: ${JSON.stringify(settings)} });
         const q = s => host.querySelector(s), all = s => [...host.querySelectorAll(s)];
-        const prim = q('.xt-primary'), sw = all('input[type=checkbox]');
+        const prim = q('.xt-primary'), sw = all('input[type=checkbox]').filter(c => !c.closest('.sv-row').hidden);
         return { line: (q('.xt-line') || {}).textContent || '', dot: (q('.update-state-dot') || { dataset: {} }).dataset.k || '', prim: prim ? { tag: prim.tagName, act: prim.dataset.act || '', href: prim.getAttribute('href') } : null,
             switches: sw.map(c => c.name + ':' + c.checked + ':' + c.disabled), teams: all('.xt-teams li').map(li => li.textContent), imgs: host.querySelectorAll('img, script, iframe').length, bolds: host.querySelectorAll('.xt-teams b b').length,
-            links: all('a').map(a => a.getAttribute('href')), pwn: window.__pwn, locked: (q('.xt-locked') || {}).textContent || '', saveHidden: !!(q('.xt-save') || {}).hidden, html: host.innerHTML.length };
+            links: all('a').map(a => a.getAttribute('href')), pwn: window.__pwn, locked: (q('.xt-locked') || {}).textContent || '', saveHidden: !!q('.xt-locked'), html: host.innerHTML.length };
     })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });

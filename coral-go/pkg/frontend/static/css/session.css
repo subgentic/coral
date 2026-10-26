@@ -1726,16 +1726,13 @@
 .health-form input:focus-visible, .health-form select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 /* Team settings, Messaging tab (#5572): one status line and one button, two switches, the linked teams, "How this works". */
-.xt-panel { display: grid; gap: 14px; }
 .xt-head { display: flex; align-items: center; gap: 10px; }
 .xt-head .update-state-dot { margin: 0; flex: none; }
 .xt-line { font-weight: 600; font-size: var(--fs-lg, 1rem); min-width: 0; overflow-wrap: anywhere; }
 .xt-row-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .xt-primary { text-decoration: none; display: inline-flex; align-items: center; justify-content: center; text-align: center; white-space: normal; max-width: 100%; box-sizing: border-box; } /* the label wraps: at 200% text on a phone it was one line wider than the panel and cut off */
-.xt-switches { display: grid; gap: 4px; }
 .xt-reach { margin: 6px 0 10px; padding: 0; min-width: 0; overflow-wrap: anywhere; color: var(--text-secondary); font-size: var(--fs-sm, 0.875rem); } /* its own line under the box, not indented as if it explained it */
-.xt-switches label { display: flex; gap: 10px; align-items: center; min-height: 36px; font-weight: 500; }
-.xt-changed { margin: -2px 0 4px 26px; font-size: .75rem; color: var(--text-secondary); }
+.xt-changed { margin: 0; font-size: .75rem; color: var(--text-secondary); }
 .settings-cloud-changed { margin: 8px 0 14px; font-size: .75rem; color: var(--text-secondary); } /* its own line below the switch row's description, apart from it (#5847, the same words and size as .xt-changed) */
 .xt-hub-may { margin: 6px 0 0; }
 .xt-h { margin: 0 0 6px; font-size: var(--fs-md); color: var(--text-secondary); font-weight: 600; }
@@ -1746,11 +1743,10 @@
 .xt-sub { color: var(--text-secondary); font-size: 0.75rem; overflow-wrap: anywhere; }
 .xt-how summary { cursor: pointer; min-height: 32px; display: flex; align-items: center; color: var(--text-secondary); }
 .xt-sid { font-family: var(--font-mono, monospace); font-size: 0.8125rem; color: var(--text-primary); overflow-wrap: anywhere; }
-.xt-state.ct-error { color: var(--error, var(--fx-red)); }
-.xt-panel button:focus-visible, .xt-panel a.btn:focus-visible, .xt-panel input:focus-visible, .xt-how summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.xt-row-actions .btn:focus-visible, .xt-reach .btn:focus-visible, .xt-how .btn:focus-visible, .xt-how summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 @media (max-width: 767px), (pointer: coarse) {
-    .xt-switches label, .xt-how summary { min-height: var(--control-touch-height, 44px); }
-    .xt-panel .btn { min-height: var(--control-touch-height, 44px); }
+    .xt-how summary { min-height: var(--control-touch-height, 44px); }
+    .xt-row-actions .btn, .xt-reach .btn, .xt-how .btn { min-height: var(--control-touch-height, 44px); }
 }
 
 .team-availability-dialog .modal-close-btn { padding: 0; background: transparent; border-color: transparent; }

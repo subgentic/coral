@@ -69,7 +69,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         const axNodes = (await client.Accessibility.getFullAXTree()).nodes.filter(n => !n.ignored && ['spinbutton', 'combobox', 'textbox'].includes(n.role && n.role.value));
         const axPairs = axNodes.map(n => [n.name && n.name.value, n.description && n.description.value]).filter(([name]) => name);
         assert.deepEqual(axPairs.filter(([name]) => /min|nudges|^Default reviewers$/.test(name)).map(([name, d]) => [name, /^Names of agents/.test(d) ? 'Names of agents' : d]), [
-            ['Every minutes', '5 to 1440'], ['Default reviewers', 'Names of agents'], ['After minutes idle', '5 to 1440'], ['Nudges before telling the orchestrator nudges', '1 to 5'],
+            ['Check every minutes', '5 to 1440'], ['Default reviewers', 'Names of agents'], ['After minutes idle', '5 to 1440'], ['Nudges before telling the orchestrator nudges', '1 to 5'],
             ['Ask after minutes quiet', '5 to 1440'], ['Tell the orchestrator minutes later', '5 to 1440'], ['After minutes held', '5 to 1440'], ['After minutes', '5 to 1440']]);
         ok('every number box is named by its label and unit and described by its limits; the reviewers box by its label, described by its sentence');
 
@@ -77,7 +77,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await ev(`window.__puts = 0; { const w = window.fetch; window.fetch = (u, o = {}) => { if ((o.method || 'GET') === 'PUT' && /board\\/[^/]+\\/settings$/.test(String(u))) window.__puts++; return w(u, o); }; } true`);
         await ev(`{ if (!window.__h('on').checked) window.__fire('on', true); /* the number is live only while the check is on */ window.__fire('interval_min', '4'); document.querySelector('#team-settings-workspace .sv-save').click(); } true`);
         const bad = await ev(`({ text: document.querySelector('${P} .sv-row[data-key=interval_min] .sv-error').textContent, focus: document.activeElement.name, err: document.querySelector('${P} [name=interval_min]').getAttribute('aria-invalid'), puts: window.__puts })`);
-        assert.match(bad.text, /Every: use a whole number from 5 to 1440/); assert.equal(bad.focus, 'interval_min'); assert.equal(bad.err, 'true'); assert.equal(bad.puts, 0);
+        assert.match(bad.text, /Check every: use a whole number from 5 to 1440/); assert.equal(bad.focus, 'interval_min'); assert.equal(bad.err, 'true'); assert.equal(bad.puts, 0);
         ok('4 minutes is refused in words, focus goes to the field, and nothing is sent');
 
         // 4. save through the real PUT; the server's stored copy

@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { switchRow } from '../../coral-go/pkg/frontend/static/switch_row.js';
 
-// team_cross_team_settings.js: label wraps the box; description ids come from describedBy.
+// team_cross_team_fields.js (before #7837): label wraps the box; description ids come from describedBy.
 assert.equal(switchRow({ label: 'Cross-team messaging', name: 'cross_team_messaging', checked: true, disabled: true, describedBy: ['xt-changed-cross_team_messaging', 'xt-hub-may'] }),
     '<label><input type="checkbox" name="cross_team_messaging" checked disabled aria-describedby="xt-changed-cross_team_messaging xt-hub-may"> Cross-team messaging</label>');
 assert.equal(switchRow({ label: 'Share files with other teams', name: 'cross_team_artifacts' }),
