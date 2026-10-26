@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/subgentic/coral/internal/clihelp"
 	"io"
 	"net/url"
 	"os"
@@ -53,8 +54,8 @@ type taskShowFollowUp struct {
 // artifacts' links, from the same read as task detail (GET /tasks/<id>), so it shows a worker nothing task detail doesn't.
 // Server text is printed without terminal controls.
 func cmdTaskShow(st *boardState, args []string) {
-	wantJSON := hasFlag(args, "--json")
-	args = withoutFlag(args, "--json")
+	wantJSON := clihelp.HasFlag(args, "--json")
+	args = clihelp.WithoutFlag(args, "--json")
 	if len(args) != 1 {
 		fmt.Fprintln(os.Stderr, "usage: coral-board task show <id> [--json]")
 		os.Exit(clierr.ExitUsage)

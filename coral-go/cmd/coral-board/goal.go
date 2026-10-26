@@ -165,7 +165,7 @@ func cmdGoalAdd(st *boardState, args []string) {
 }
 
 func cmdGoalList(st *boardState, args []string) {
-	asJSON := hasFlag(args, "--json")
+	asJSON := clihelp.HasFlag(args, "--json")
 	fs := flag.NewFlagSet("goal-list", flag.ContinueOnError)
 	states := fs.String("state", "", "open (default), all, or a comma list of states")
 	fs.Bool("json", false, "")
@@ -241,8 +241,8 @@ func rollupWords(g map[string]any) string {
 }
 
 func cmdGoalShow(st *boardState, args []string) {
-	asJSON := hasFlag(args, "--json")
-	args = withoutFlag(args, "--json")
+	asJSON := clihelp.HasFlag(args, "--json")
+	args = clihelp.WithoutFlag(args, "--json")
 	if len(args) != 1 {
 		fmt.Fprintln(os.Stderr, "Usage: coral-board goal show <id> [--json]")
 		clierr.Exit1()

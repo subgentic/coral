@@ -296,7 +296,7 @@ func uploadArtifact(serverURL, file, name, mediaType, sid, newVersionOf, task st
 	}
 	defer resp.Body.Close()
 	clierr.NoteStatus(resp.StatusCode)
-	body, _ := readServer(resp.Body)
+	body, _ := clitext.ReadReply(resp.Body, rawOutput)
 	var reply struct {
 		URI      string `json:"uri"`
 		TaskID   int64  `json:"task_id"`
@@ -391,11 +391,11 @@ func cmdTask() {
 	case "add":
 		cmdTaskAdd(taskArgs)
 	case "list":
-		cmdTaskList(hasFlag(taskArgs, "--json"))
+		cmdTaskList(clihelp.HasFlag(taskArgs, "--json"))
 	case "claim":
 		cmdTaskClaim(taskArgs...)
 	case "current":
-		cmdTaskCurrent(hasFlag(taskArgs, "--json"))
+		cmdTaskCurrent(clihelp.HasFlag(taskArgs, "--json"))
 	case "detail":
 		cmdTaskDetail(taskArgs)
 	case "edit":
@@ -807,7 +807,7 @@ func positiveTaskID(arg string) int64 {
 }
 
 func cmdTaskDetail(args []string) {
-	args = withoutFlag(args, "--json") // task detail always prints JSON; --json is accepted so a script can say so
+	args = clihelp.WithoutFlag(args, "--json") // task detail always prints JSON; --json is accepted so a script can say so
 	if len(args) != 1 {
 		fmt.Fprintln(os.Stderr, "Usage: coral-agent task detail <id>")
 		clierr.Exit1()
@@ -911,7 +911,7 @@ func apiCall(method, path string, body any, timeout time.Duration) ([]byte, int,
 	defer resp.Body.Close()
 	clierr.NoteStatus(resp.StatusCode)
 
-	respData, _ := readServer(resp.Body)
+	respData, _ := clitext.ReadReply(resp.Body, rawOutput)
 	return respData, resp.StatusCode, nil
 }
 
@@ -920,15 +920,6 @@ func apiCall(method, path string, body any, timeout time.Duration) ([]byte, int,
 // an escape sequence in them could rewrite or hide what the terminal shows, set its title or
 // reach the clipboard. Artifact downloads are never changed.
 var rawOutput bool
-
-// readServer reads a reply from the Coral server, cleaned of terminal control unless --raw.
-func readServer(r io.Reader) ([]byte, error) {
-	b, err := io.ReadAll(r)
-	if rawOutput {
-		return b, err
-	}
-	return clitext.CleanJSON(b), err
-}
 
 // cmdArtifactReply is "coral-agent artifact reply <link> <comment-id> <text | ->" (#6523): the reply to a comment the Operator sent this agent (the Send-to-agent message names this
 // command with the ids filled in). The text is one argument, or - for standard input.
@@ -980,7 +971,7 @@ func replyToComment(serverURL, ref, commentID, text string, stdout io.Writer) er
 	}
 	defer resp.Body.Close()
 	clierr.NoteStatus(resp.StatusCode)
-	body, _ := readServer(resp.Body)
+	body, _ := clitext.ReadReply(resp.Body, rawOutput)
 	var reply struct {
 		ID    int64  `json:"id"`
 		Error string `json:"error"`

@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/subgentic/coral/internal/clierr"
+	"github.com/subgentic/coral/internal/clitext"
 	"io"
 	"net/http"
 	"strings"
@@ -57,7 +58,7 @@ func cmdNotify(args []string, out io.Writer) error {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 300 {
-		b, _ := readServer(io.LimitReader(resp.Body, 4096))
+		b, _ := clitext.ReadReply(io.LimitReader(resp.Body, 4096), rawOutput)
 		return fmt.Errorf("Coral answered %s: %s", resp.Status, strings.TrimSpace(string(b)))
 	}
 	fmt.Fprintln(out, "Notification sent")

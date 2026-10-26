@@ -6,6 +6,7 @@ package clitext
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -280,4 +281,14 @@ func cleanValue(v any) (any, bool) {
 		return out, changed
 	}
 	return v, false
+}
+
+// ReadReply reads a reply from the Coral server, cleaned of terminal control (CleanJSON) unless raw (the CLIs' --raw: what the server
+// sent, byte for byte).
+func ReadReply(r io.Reader, raw bool) ([]byte, error) {
+	b, err := io.ReadAll(r)
+	if raw {
+		return b, err
+	}
+	return CleanJSON(b), err
 }

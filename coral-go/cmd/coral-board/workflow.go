@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/subgentic/coral/internal/clierr"
+	"github.com/subgentic/coral/internal/clitext"
 	"io"
 	"net/http"
 	"net/url"
@@ -35,7 +36,7 @@ func workflowAPICall(method, path string, body any) ([]byte, int, error) {
 	}
 	defer resp.Body.Close()
 	clierr.NoteStatus(resp.StatusCode)
-	respData, _ := readServer(resp.Body)
+	respData, _ := clitext.ReadReply(resp.Body, rawOutput)
 	return respData, resp.StatusCode, nil
 }
 

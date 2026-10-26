@@ -45,3 +45,24 @@ func FlagError(fs *flag.FlagSet, err error) string {
 	}
 	return msg
 }
+
+// HasFlag reports whether args holds the option flag.
+func HasFlag(args []string, flag string) bool {
+	for _, a := range args {
+		if a == flag {
+			return true
+		}
+	}
+	return false
+}
+
+// WithoutFlag is args without the option flag.
+func WithoutFlag(args []string, flag string) []string {
+	out := make([]string, 0, len(args))
+	for _, a := range args {
+		if a != flag {
+			out = append(out, a)
+		}
+	}
+	return out
+}

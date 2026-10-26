@@ -1,6 +1,11 @@
 package clihelp
 
-import "strings"
+import (
+	"fmt"
+	"io"
+	"os"
+	"strings"
+)
 
 // Topics are the short help pages behind "coral-board help <topic>" and "coral-agent help <topic>" (#236): the things that bite on Windows and
 // that a usage line cannot explain. Plain text, under 25 lines each, Windows examples first. In a page, "TOOL" is the program's name and
@@ -155,4 +160,19 @@ func TopicPage(tool, name string) (string, bool) {
 // UnknownTopic is the message for a topic that does not exist, naming the ones that do.
 func UnknownTopic(tool, name string) string {
 	return "unknown help topic \"" + name + "\". " + TopicLine(tool)
+}
+
+// HelpTopic answers "help <topic>": the topic's page, the usage of a command it names, or (for anything else) an error on stderr that
+// lists the topics. It returns the exit code.
+func HelpTopic(tool string, name string, w io.Writer, commandUsage func(string) string) (code int) {
+	if page, ok := TopicPage(tool, name); ok {
+		fmt.Fprintln(w, page)
+		return 0
+	}
+	if u := commandUsage(name); u != "" {
+		fmt.Fprintln(w, u)
+		return 0
+	}
+	fmt.Fprintln(os.Stderr, "Error: "+UnknownTopic(tool, name))
+	return 2
 }

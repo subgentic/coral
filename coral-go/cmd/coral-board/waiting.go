@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/subgentic/coral/internal/clitext"
 	"net/http"
 	"net/url"
 	"os"
@@ -148,7 +149,7 @@ func waitingCall(method, u string, body any, into any) {
 	}
 	defer resp.Body.Close()
 	clierr.NoteStatus(resp.StatusCode)
-	data, _ := readServer(resp.Body)
+	data, _ := clitext.ReadReply(resp.Body, rawOutput)
 	if resp.StatusCode != http.StatusOK {
 		var e map[string]any
 		_ = json.Unmarshal(data, &e)

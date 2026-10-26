@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/subgentic/coral/internal/cliauth"
 	"github.com/subgentic/coral/internal/clierr"
+	"github.com/subgentic/coral/internal/clitext"
 	"github.com/subgentic/coral/internal/hooks"
 	"github.com/subgentic/coral/internal/testguard"
 	"github.com/subgentic/coral/internal/tmux"
@@ -190,7 +191,7 @@ func resolveViaPID() *pidResolution {
 	defer resp.Body.Close()
 
 	var result map[string]string
-	data, _ := readServer(resp.Body)
+	data, _ := clitext.ReadReply(resp.Body, rawOutput)
 	if err := json.Unmarshal(data, &result); err != nil {
 		return nil
 	}

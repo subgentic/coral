@@ -467,7 +467,7 @@ func cmdPeek() {
 	}
 	defer resp.Body.Close()
 
-	data, _ := readServer(resp.Body)
+	data, _ := clitext.ReadReply(resp.Body, rawOutput)
 
 	if resp.StatusCode == http.StatusForbidden {
 		var errResp map[string]string

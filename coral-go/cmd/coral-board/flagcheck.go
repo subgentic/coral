@@ -110,24 +110,3 @@ func checkReadNumbers(args []string) error {
 	}
 	return nil
 }
-
-// hasFlag reports whether args holds the option flag.
-func hasFlag(args []string, flag string) bool {
-	for _, a := range args {
-		if a == flag {
-			return true
-		}
-	}
-	return false
-}
-
-// withoutFlag is args without the option flag.
-func withoutFlag(args []string, flag string) []string {
-	out := make([]string, 0, len(args))
-	for _, a := range args {
-		if a != flag {
-			out = append(out, a)
-		}
-	}
-	return out
-}

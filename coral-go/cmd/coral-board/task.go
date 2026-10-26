@@ -57,10 +57,10 @@ Subcommands:
 	case "claim":
 		cmdTaskClaim(st, taskArgs...)
 	case "current":
-		cmdTaskCurrent(st, hasFlag(taskArgs, "--json"))
+		cmdTaskCurrent(st, clihelp.HasFlag(taskArgs, "--json"))
 	case "detail":
-		wantJSON := hasFlag(taskArgs, "--json")
-		taskArgs = withoutFlag(taskArgs, "--json") // task detail always prints JSON; --json is accepted so a script can say so
+		wantJSON := clihelp.HasFlag(taskArgs, "--json")
+		taskArgs = clihelp.WithoutFlag(taskArgs, "--json") // task detail always prints JSON; --json is accepted so a script can say so
 		if len(taskArgs) == 0 {
 			cmdTaskCurrent(st, wantJSON)
 			return
@@ -300,7 +300,7 @@ func cmdTaskList(st *boardState, asJSON bool) { cmdTaskListGoal(st, asJSON, 0) }
 
 // taskListArgs reads task list's options: --json and --goal ID (a whole number, 1 or more).
 func taskListArgs(args []string) (asJSON bool, goal int64) {
-	asJSON = hasFlag(args, "--json")
+	asJSON = clihelp.HasFlag(args, "--json")
 	for i, a := range args {
 		name, value, inline := strings.Cut(a, "=")
 		if name != "--goal" {

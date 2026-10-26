@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/subgentic/coral/internal/clierr"
+	"github.com/subgentic/coral/internal/clitext"
 	"net/http"
 	"net/url"
 	"os"
@@ -222,7 +223,7 @@ func blockUntilResolved(project, subscriberID string) {
 			fmt.Fprintln(os.Stderr, "Poll error:", err)
 			clierr.Exit1()
 		}
-		respBytes, _ := readServer(resp.Body)
+		respBytes, _ := clitext.ReadReply(resp.Body, rawOutput)
 		status := resp.StatusCode
 		resp.Body.Close()
 		var pollResult map[string]any

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/subgentic/coral/internal/clierr"
+	"github.com/subgentic/coral/internal/clitext"
 	"io"
 	"net/http"
 	"net/url"
@@ -80,7 +81,7 @@ func docsGet(path string) ([]byte, error) {
 		return nil, clierr.CannotReach(hooks.RedactedURL(serverURL), err, wait)
 	}
 	defer resp.Body.Close()
-	b, _ := readServer(resp.Body)
+	b, _ := clitext.ReadReply(resp.Body, rawOutput)
 	switch {
 	case resp.StatusCode == http.StatusNotFound:
 		return nil, docNotFoundError{topic: path}

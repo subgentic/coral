@@ -20,15 +20,6 @@ import (
 	"time"
 )
 
-// readServer reads a reply from the Coral server, cleaned of terminal control unless --raw.
-func readServer(r io.Reader) ([]byte, error) {
-	b, err := io.ReadAll(r)
-	if rawOutput {
-		return b, err
-	}
-	return clitext.CleanJSON(b), err
-}
-
 // endpointFromEnv resolves the client endpoint without allowing a legacy port
 // variable to overwrite an explicit URL. CORAL_HOST/CORAL_PORT are only the
 // fallback for launch environments that do not provide CORAL_URL.
@@ -74,7 +65,7 @@ func apiCall(method, path string, body any) (map[string]any, int, error) {
 	defer resp.Body.Close()
 	clierr.NoteStatus(resp.StatusCode)
 
-	respData, _ := readServer(resp.Body)
+	respData, _ := clitext.ReadReply(resp.Body, rawOutput)
 	var result map[string]any
 	json.Unmarshal(respData, &result)
 	return result, resp.StatusCode, nil
@@ -144,7 +135,7 @@ func getBoard(path string) ([]byte, error) {
 		return nil, clierr.CannotReach(redactedServerURL(), err, wait)
 	}
 	defer resp.Body.Close()
-	data, _ := readServer(resp.Body)
+	data, _ := clitext.ReadReply(resp.Body, rawOutput)
 	var result map[string]any
 	json.Unmarshal(data, &result) // a list reply leaves result empty, but then the status is 2xx
 	if e := serverError(resp.StatusCode, result); e != nil {
@@ -188,7 +179,7 @@ func apiCallRawTimeout(method, path string, body any, timeout time.Duration) ([]
 		}
 		defer resp.Body.Close()
 		clierr.NoteStatus(resp.StatusCode)
-		respData, _ := readServer(resp.Body)
+		respData, _ := clitext.ReadReply(resp.Body, rawOutput)
 		return respData, resp.StatusCode, nil
 	}
 	return nil, 0, clierr.CannotReach(redactedServerURL(), lastErr, timeout)
