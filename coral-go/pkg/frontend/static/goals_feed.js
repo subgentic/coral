@@ -15,8 +15,5 @@ export function publishGoalsBrief(brief) {
     }
 }
 
-/** How many goals the feed last said a board has open (0 when it has said nothing). */
-export const goalsOpenOf = (board) => (seen.get(board) || { open: 0 }).open;
-
 /** fn(board, seq, open) runs when a board's seq moves. Returns the function that stops it. */
 export function onGoalsSeq(fn) { listeners.add(fn); return () => listeners.delete(fn); }

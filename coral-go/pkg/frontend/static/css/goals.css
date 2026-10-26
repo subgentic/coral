@@ -1,12 +1,5 @@
 /* The local Goals view (#7113, layout A of UI/UX's #7091): the board's second face. Two columns wide (list 300 to 380 px, the open goal beside it); on a phone two screens with a back row. */
-.mb-face-switch { display: inline-flex; gap: 0; margin-right: 8px; max-width: 100%; } /* at 200% text a long label wraps inside its button instead of pushing Messages off the left edge (#7252) */
-.mb-face-switch .mb-face-btn { min-width: 0; white-space: normal; }
-.mb-face-switch #mb-face-messages { flex-shrink: 0; } /* Goals gives way: a one-word Messages is never narrower than its word (360 px at 200% text) */
-.mb-face-switch[hidden] { display: none; }
-.mb-face-btn[aria-pressed="true"] { background: var(--accent-dim); color: var(--text-on-accent); border-color: var(--accent); }
 
-.mb-goals { flex: 1; min-height: 0; overflow: auto; }
-.mb-goals[hidden] { display: none; }
 .goals-page { display: flex; flex-direction: column; gap: 12px; padding: 12px 16px; min-height: 100%; box-sizing: border-box; }
 .goals-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .goals-head-text { min-width: 0; }
@@ -112,7 +105,6 @@
 /* Goals uses the width (#7404, UI/UX's #7401): the list 280 to 360 px beside a wide detail, the detail under the list when the Goals area is under 880 px (never a strip), the chips on one line,
    no ring round the detail (it takes focus when a goal opens, as a region named by the goal's title; real controls inside it keep their rings), Outcome and Done when side by side, one-line task rows.
    A phone keeps its own rules above: one column, the list then the detail. */
-.mb-goals { container-type: inline-size; }
 .goals-page { max-width: 1440px; width: 100%; margin-inline: auto; }
 .goals-chips { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; } /* it scrolls sideways when the six do not fit (a phone); no bar is drawn under the chips */
 .goals-chip { flex: none; white-space: nowrap; }

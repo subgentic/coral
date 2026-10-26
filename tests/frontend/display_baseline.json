@@ -22,7 +22,7 @@
   "launch_core.js": 5,
   "launch_dialog.js": 8,
   "mention_list.js": 3,
-  "message_board.js": 24,
+  "message_board.js": 15,
   "mobile.js": 5,
   "mobile_connect.js": 3,
   "modal_chrome.js": 1,
