@@ -28,7 +28,7 @@ import { mountBoardSearch, highlightBoard, setBoardMembers, resetBoardSearch } f
 import { PAGE_SIZE, fetchAllBoardMessages, fetchAllHistory, fetchAllLiveChat, fetchMessages, fetchProjects, fetchSubscribers, mergeMessages } from './board_fetch.js';
 import { navigateToAgentSession } from './board_agent_links.js';
 import { initGrowingTextarea } from './growing_textarea.js';
-import { boardView, saveBoardView, rowParts, toggleRow, setAllRows, refreshReplies, retagMentions, applyView, mountTableTools, forgetOpenRows, sameDay, dayDividerHtml } from './board_table.js'; // the board as a table (#7921)
+import { onRowActions, boardView, saveBoardView, rowParts, toggleRow, setAllRows, refreshReplies, retagMentions, applyView, mountTableTools, forgetOpenRows, sameDay, dayDividerHtml, watchFold } from './board_table.js'; // the board as a table (#7921)
 export { fetchAllBoardMessages, fetchAllHistory, fetchAllLiveChat } from './board_fetch.js';
 import { connectBoard, isSelectMode, isSelected, resetSelection, toggleMessageSelect, doExportBoard, hideExportBoardModal, selectAllMessages, selectNoneMessages, exportSelectedAsMarkdown, cancelSelectMode } from './board_export.js';
 export { showExportBoardModal, doExportBoard, toggleSelectMode, toggleMessageSelect, selectAllMessages, selectNoneMessages, cancelSelectMode, exportSelectedAsMarkdown } from './board_export.js';
@@ -139,7 +139,7 @@ export function selectBoardProject(project, messageId = null) {
     document.getElementById('messageboard-title').textContent = isCloud() && computer ? `Board on ${computer.label || computer.id}` : 'Message Board';
     mountBoardSearch(document.getElementById('mb-tools'), project, SEARCH_HOOKS);
     applyView(document.getElementById('mb-messages'), 'chat'); // the board's own page keeps the chat; the table is the team page's Board tab
-    document.getElementById('mb-table-tools')?.remove();
+    document.querySelector('#mb-tools > .mb-table-tools')?.remove();
 
     // Ensure dashboard is subscribed as a reader
     subscribeDashboard(project);
@@ -204,7 +204,7 @@ export function leaveBoardPage() {
     if (!board || !_boardHome) return;
     nameComposerForPage(false);
     applyView(document.getElementById('mb-messages'), 'chat'); // the board's own page is the chat
-    document.getElementById('mb-table-tools')?.remove();
+    document.querySelector('#mb-tools > .mb-table-tools')?.remove();
     stopBoardPoll();
     currentProject = null;
     board.style.display = 'none'; // display-ok: as above
@@ -590,9 +590,10 @@ function applyBoardTable(project) {
     if (_tableTeam !== project) {
         _tableTeam = project; _pill = 'all'; _replyTo = null;
         forgetOpenRows();
-        host.querySelector(':scope > #mb-table-tools')?.remove();
+        host.querySelector(':scope > .mb-table-tools')?.remove();
     }
     box.setAttribute('data-pill', _pill);
+    watchFold(box);
     applyView(box, boardView());
     mountTableTools(host, {
         view: boardView(), pill: _pill,
@@ -619,6 +620,8 @@ async function copyMessageLink(id) {
     const url = `${location.origin}${build(keyRoute('team', currentProject, 'messages', Number(id)))}`;
     try { await navigator.clipboard.writeText(url); showToast('Link copied'); } catch { showToast('Could not copy the link', true); }
 }
+
+onRowActions('.mb-messages-scroll', { reply: replyToMessage, link: copyMessageLink });
 
 function renderMessages(messages, { keepAnchor = false, prepended = 0 } = {}) {
     const container = document.getElementById('mb-messages');
@@ -1256,10 +1259,6 @@ registerActions({
     'mb-msg-select': el => withId(el.dataset.msgId, id => toggleMessageSelect(id, el.checked)),
     'mb-msg-delete': el => withId(el.dataset.msgId, confirmDeleteBoardMessage),
     'mb-msg-more': el => openMessageActions(el),
-    'mb-row-toggle': el => { const row = el.closest('.mb-message'); if (row) toggleRow(row); },
-    'mb-msg-reply': el => withId(el.dataset.msgId, id => replyToMessage(id, textOf(el.dataset.sender))),
-    'mb-msg-copy-link': el => withId(el.dataset.msgId, copyMessageLink),
-    'mb-jump-msg': el => withId(el.dataset.msgId, id => focusMessageById(id)),
     'mb-subscriber-history': el => {
         const s = textOf(el.dataset.session);
         if (s) navigateToAgentSession(s, textOf(el.dataset.name) || '');
