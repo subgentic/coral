@@ -3800,6 +3800,7 @@ body[data-nav-tab]:not([data-nav-tab="agents"], [data-nav-tab="jobs"], [data-nav
 #settings-modal .tb-autowake input[type="checkbox"] { flex: none; width: 16px; height: 16px; min-height: 0; margin: 0; }
 #settings-modal .tb-autowake input[type="number"] { width: 4.5em; min-height: 0; padding: 2px 6px; }
 @media (max-width: 767px), (pointer: coarse) { #settings-modal .tb-autowake label, #settings-modal .tb-autowake .tb-learn { min-height: var(--control-touch-height, 44px); } #settings-modal .tb-autowake input[type="number"] { min-height: var(--control-touch-height, 44px); } }
+@media (max-width: 767px) { .tb-learn { min-height: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); display: inline-flex; align-items: center; } } /* a phone is 44 px wherever the Learn more is, in the page or the dialog (the coarse-pointer rule is in touch.css; a narrow window is not coarse) (#8079) */
 
 /* ── Browser password (#3948): the set-password prompt and Settings > Browser sign-in ─────────────────────────── */
 .pw-lead { margin: 8px 0 14px; line-height: 1.5; color: var(--text-secondary); font-size: 0.875rem; }

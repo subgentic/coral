@@ -20,7 +20,8 @@
 .sv .sv-notice > #settings-terminal-backend { margin: 0; }
 .sv .sv-notice > #tb-autowake { display: block; margin: 0; padding: 0; border-top: 0; }
 #settings-modal .sv .sv-notice > #tb-autowake > span:not(:first-child) { display: inline; margin: 0; }
-#settings-modal .sv .sv-notice > #tb-autowake > button { display: inline; min-height: 0; }
+#settings-modal .sv .sv-notice > #tb-autowake > button { display: inline; position: relative; min-height: 0; }
+#settings-modal .sv .sv-notice > #tb-autowake > button::after { content: ''; position: absolute; left: -8px; right: -8px; top: 50%; height: var(--sv-control-height-touch); transform: translateY(-50%); } /* inline in its line like .sv-learn, with the same invisible 44 px target (#8079) */
 .sv-row-notice:has(> .sv-notice > [hidden]:only-child), .sv-row-notice:has(> .sv-notice > dl > [hidden]:only-child) { display: none; } /* a live part its own module has hidden leaves no empty row */
 .sv-pane > .sv-row:first-of-type, .sv-body > .sv-row:first-of-type { border-top: 0; }
 .sv-settings .sv-row { grid-template-columns: minmax(0, 1fr) var(--sv-control-width); }
