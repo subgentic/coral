@@ -30,7 +30,7 @@ var terminalLogged sync.Map
 // ("<board>\x00<session name>").
 var refusedNotices sync.Map
 
-// All three are forgotten when the session ends (#4057): they are keyed by the session's
+// All of these are forgotten when the session ends (#4057): they are keyed by the session's
 // name or id, and would otherwise keep every session the server has run.
 func init() {
 	ptymanager.OnSessionEnd(func(name string) {
@@ -39,6 +39,7 @@ func init() {
 		if sid := naming.SessionIDFromName(name); sid != "" {
 			exitLogged.Delete(sid)
 			terminalLogged.Delete(sid)
+			openRequests.Delete(sid) // a session killed with a request open never sends the event that closes it (#7462)
 		}
 		refusedNotices.Range(func(k, _ any) bool {
 			if _, session, _ := strings.Cut(k.(string), "\x00"); session == name {
