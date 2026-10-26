@@ -675,6 +675,7 @@ func (s *Server) registerBoard(r *chi.Mux, h *routeHandlers) {
 	boardHandler.SetLiveSessionLookup(routes.LiveSessionLookup(store.NewSessionStore(s.db)))
 	boardHandler.SetTaskArtifactWriter(s.cfg.CoralDir(), sessHandler.PersistTaskChanges)
 	sessStore := store.NewSessionStore(s.db)
+	boardHandler.SetBoardChatFlagsClearer(sessStore.DeleteBoardChatFlags)
 	boardHandler.SetAllowlistFlag(routes.AllowlistEnabled(sessStore))
 	artifactNudger := routes.NewClaudeArtifactNudger(sessStore, s.terminal)
 	boardHandler.SetArtifactNudger(artifactNudger)

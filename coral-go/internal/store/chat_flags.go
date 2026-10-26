@@ -29,6 +29,12 @@ func (s *SessionStore) UpdateChatFlags(ctx context.Context, id string, starred, 
 	return err
 }
 
+// DeleteBoardChatFlags keeps a new board from inheriting a deleted board's mailbox flags.
+func (s *SessionStore) DeleteBoardChatFlags(ctx context.Context, project string) error {
+	_, err := s.db.ExecContext(ctx, "DELETE FROM chat_flags WHERE session_id = ?", "board:"+project)
+	return err
+}
+
 // ChatFlagsForBoards batches group metadata; no query per group or folder.
 func (s *SessionStore) ChatFlagsForBoards(ctx context.Context, boards []string) (map[string]ChatFlags, error) {
 	raw, err := json.Marshal(boards)

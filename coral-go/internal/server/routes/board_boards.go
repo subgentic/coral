@@ -38,6 +38,12 @@ func (h *BoardHandler) DeleteBoard(w http.ResponseWriter, r *http.Request) {
 	delete(h.paused, project)
 	delete(h.sleepPaused, project)
 	h.mu.Unlock()
+	if h.clearBoardChatFlags != nil {
+		if err := h.clearBoardChatFlags(r.Context(), project); err != nil {
+			errInternalServer(w, "could not clear the deleted board's chat flags; retry deleting the board by its id")
+			return
+		}
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 

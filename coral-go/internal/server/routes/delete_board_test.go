@@ -77,6 +77,11 @@ func TestDeleteBoardIsRefusedWhileItsAgentsRun(t *testing.T) {
 	ctx := context.Background()
 	term := newMockTerminal()
 	h.SetTerminal(term)
+	var cleared []string
+	h.SetBoardChatFlagsClearer(func(_ context.Context, project string) error {
+		cleared = append(cleared, project)
+		return nil
+	})
 	for _, s := range []struct{ project, id, title, session string }{
 		{"busy", "Boss", "Orchestrator", "claude-aaaaaaaa-0000-4000-8000-000000000001"},
 		{"busy", "QA", "QA Engineer", "claude-aaaaaaaa-0000-4000-8000-000000000002"},
@@ -105,19 +110,47 @@ func TestDeleteBoardIsRefusedWhileItsAgentsRun(t *testing.T) {
 	assert.Regexp(t, `^2 agents are still on this board \((Orchestrator, QA Engineer|QA Engineer, Orchestrator)\): kill them or move them first$`, body.Error)
 	count, _ := h.bs.CountMessages(ctx, "busy")
 	assert.Equal(t, 1, count, "a refused delete deletes nothing")
+	assert.Empty(t, cleared, "a refused delete keeps the board's chat flags")
 
 	delete(term.sessions, "claude-aaaaaaaa-0000-4000-8000-000000000001")
 	rec = deleteBoardReq(t, h, "busy")
 	require.Equal(t, http.StatusConflict, rec.Code)
+	assert.Empty(t, cleared)
 	assert.Contains(t, rec.Body.String(), "1 agent is still on this board (QA Engineer): kill it or move it first")
 
 	delete(term.sessions, "claude-aaaaaaaa-0000-4000-8000-000000000002")
 	rec = deleteBoardReq(t, h, "busy")
 	require.Equal(t, http.StatusOK, rec.Code, "with nothing running the delete goes through: "+rec.Body.String())
+	assert.Equal(t, []string{"busy"}, cleared)
 	count, _ = h.bs.CountMessages(ctx, "busy")
 	assert.Equal(t, 0, count)
 	subs, _ := h.bs.ListSubscribers(ctx, "elsewhere")
 	assert.Len(t, subs, 1, "the other board is untouched")
+}
+
+func TestDeleteBoardChatFlagsCleanupFailureCanBeRetried(t *testing.T) {
+	_, h := setupBoardTestServer(t)
+	ctx := context.Background()
+	_, err := h.bs.Subscribe(ctx, "team", "member", "Developer", "", nil, "all")
+	require.NoError(t, err)
+	var attempts int
+	h.SetBoardChatFlagsClearer(func(_ context.Context, project string) error {
+		assert.Equal(t, "team", project)
+		exists, err := h.bs.BoardExists(ctx, project)
+		require.NoError(t, err)
+		assert.False(t, exists, "flags clear only after the board delete succeeds")
+		attempts++
+		if attempts == 1 {
+			return errors.New("sessions database unavailable")
+		}
+		return nil
+	})
+	rec := deleteBoardReq(t, h, "team")
+	require.Equal(t, http.StatusInternalServerError, rec.Code)
+	assert.Contains(t, rec.Body.String(), "retry deleting the board by its id")
+	rec = deleteBoardReq(t, h, "team")
+	assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	assert.Equal(t, 2, attempts)
 }
 
 // #5043: when the running terminals cannot be listed, the delete is refused (503) and nothing is deleted: a check that could not be made is not a pass.

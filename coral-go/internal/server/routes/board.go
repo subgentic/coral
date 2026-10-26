@@ -94,6 +94,8 @@ type BoardHandler struct {
 	// board notices are typed only into a live session of the type its name says (#3864).
 	// Nil skips that check (a handler without the sessions database).
 	liveSessionType func(ctx context.Context, sessionID string) (agentType string, ok bool, err error)
+	// clearBoardChatFlags removes the deleted board's mailbox flags from the separate sessions database.
+	clearBoardChatFlags func(ctx context.Context, project string) error
 	// uploads caches per-session upload records for the artifact views.
 	uploads uploadDirCache
 	// hubOperatorAllowed reports whether a tunnel request may act as the Operator
@@ -124,6 +126,11 @@ func (h *BoardHandler) SetArchivedSessionLookup(fn func(ctx context.Context, ses
 // SetLiveSessionLookup tells the board how to find a live session's agent type (#3864).
 func (h *BoardHandler) SetLiveSessionLookup(fn func(ctx context.Context, sessionID string) (string, bool, error)) {
 	h.liveSessionType = fn
+}
+
+// SetBoardChatFlagsClearer wires the sessions database's cleanup after a board is deleted.
+func (h *BoardHandler) SetBoardChatFlagsClearer(fn func(context.Context, string) error) {
+	h.clearBoardChatFlags = fn
 }
 
 // subscriberArchived reports whether subscriberID's session on project is an
