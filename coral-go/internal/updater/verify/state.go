@@ -223,8 +223,8 @@ type ackFile struct {
 
 const maxAckEntries = 4096
 
-// NewAckStore opens dir's store.
-func NewAckStore(dir string) *AckStore { return &AckStore{dir: dir} }
+// newAckStore opens dir's store.
+func newAckStore(dir string) *AckStore { return &AckStore{dir: dir} }
 
 // Use marks id used until expires and reports whether it was unused: false is a repeat. An unreadable store is an error (fail closed: nothing is
 // treated as unused when the record of what was used cannot be read).

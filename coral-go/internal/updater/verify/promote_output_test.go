@@ -51,7 +51,7 @@ func TestThePromoteWorkflowsManifestIsAcceptedByTheClient(t *testing.T) {
 	assert.Equal(t, "subgentic/coral", m.Repo)
 	pins := DefaultPins()
 	assert.NoError(t, CheckManifest(m, pins, State{}, "1.4.159", time.Now()), "a normal promotion of a newer release passes the client's rules")
-	assert.Less(t, m.ExpiresTime().Sub(m.PromotedTime()), pins.MaxManifestLifetime, "the lifetime the workflow writes is under the one the client allows")
+	assert.Less(t, m.expiresTime().Sub(m.promotedTime()), pins.MaxManifestLifetime, "the lifetime the workflow writes is under the one the client allows")
 }
 
 // A promotion of a release that is still a pre-release (the rehearsal's) parses, and the client's rules refuse it: the signature is what the rehearsal checks.

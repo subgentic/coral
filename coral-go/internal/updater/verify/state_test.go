@@ -121,19 +121,19 @@ func TestHistoryIsCapped(t *testing.T) {
 func TestAckStoreRemembersAUsedTokenAcrossRestarts(t *testing.T) {
 	dir := t.TempDir()
 	now := time.Unix(1_000_000, 0)
-	a := NewAckStore(dir)
+	a := newAckStore(dir)
 	first, err := a.Use("tok-1", now.Add(time.Minute), now)
 	require.NoError(t, err)
 	assert.True(t, first)
 	// A new store over the same directory (an updater restart): the token is still used.
-	again, err := NewAckStore(dir).Use("tok-1", now.Add(time.Minute), now.Add(time.Second))
+	again, err := newAckStore(dir).Use("tok-1", now.Add(time.Minute), now.Add(time.Second))
 	require.NoError(t, err)
 	assert.False(t, again, "single use")
-	other, err := NewAckStore(dir).Use("tok-2", now.Add(time.Minute), now)
+	other, err := newAckStore(dir).Use("tok-2", now.Add(time.Minute), now)
 	require.NoError(t, err)
 	assert.True(t, other)
 	// Expired entries are dropped, so the store does not grow; the id can be used once more after its own expiry (a new token never repeats an id).
-	later, err := NewAckStore(dir).Use("tok-1", now.Add(3*time.Minute), now.Add(2*time.Minute))
+	later, err := newAckStore(dir).Use("tok-1", now.Add(3*time.Minute), now.Add(2*time.Minute))
 	require.NoError(t, err)
 	assert.True(t, later)
 	if runtime.GOOS != "windows" {
@@ -148,7 +148,7 @@ func TestAckStoreRemembersAUsedTokenAcrossRestarts(t *testing.T) {
 func TestAckStoreFailsClosedWhenItCannotBeRead(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, AckUsedFile), []byte("garbage"), 0o600))
-	ok, err := NewAckStore(dir).Use("tok", time.Now().Add(time.Minute), time.Now())
+	ok, err := newAckStore(dir).Use("tok", time.Now().Add(time.Minute), time.Now())
 	assert.Error(t, err)
 	assert.False(t, ok, "an unreadable record of what was used never means unused")
 }
@@ -156,7 +156,7 @@ func TestAckStoreFailsClosedWhenItCannotBeRead(t *testing.T) {
 func TestAckStoreIsBounded(t *testing.T) {
 	dir := t.TempDir()
 	now := time.Unix(1_000_000, 0)
-	a := NewAckStore(dir)
+	a := newAckStore(dir)
 	var f ackFile
 	f.Used = map[string]int64{}
 	for i := 0; i < maxAckEntries; i++ {

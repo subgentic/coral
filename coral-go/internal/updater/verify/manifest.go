@@ -112,5 +112,5 @@ func parseUTC(s string) (time.Time, error) {
 }
 
 // PromotedAt and ExpiresAt are the parsed times.
-func (m *Manifest) PromotedTime() time.Time { return m.promoted }
-func (m *Manifest) ExpiresTime() time.Time  { return m.until }
+func (m *Manifest) promotedTime() time.Time { return m.promoted }
+func (m *Manifest) expiresTime() time.Time  { return m.until }
