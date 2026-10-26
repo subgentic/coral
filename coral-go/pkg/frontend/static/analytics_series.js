@@ -175,3 +175,85 @@ export function drawPanel(host, view, { tableTotal, redraw, phone }) {
         host.append(line);
     }
 }
+
+// ── the Overview: the change against the period before, and cost by team stacked ─────────────────────
+
+const PRIOR_WORD = { hour: 'the hour before', day: 'the prior 24 hours', week: 'the prior 7 days', month: 'the prior 30 days' };
+export const priorWord = period => PRIOR_WORD[period] || PRIOR_WORD.day;
+
+/** What a figure did against the same stretch before it, in words with its sign (never a colour): "+12% vs the prior 24 hours", "no usage in the prior 24 hours" when there was none to compare, '' when neither period has any. */
+export function changeText(current, prior, word) {
+    const c = Number(current) || 0, p = Number(prior) || 0;
+    if (!c && !p) return '';
+    if (!p) return `no usage in ${word}`;
+    const pct = Math.round(((c - p) / p) * 100);
+    if (pct === 0) return `no change vs ${word}`;
+    return `${pct > 0 ? '+' : '−'}${Math.abs(pct)}% vs ${word}`;
+}
+
+/** The totals of a time series' buckets (what a period before is compared by). */
+export function bucketTotals(buckets) {
+    const t = { cost_usd: 0, input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 0, num_requests: 0 };
+    for (const b of buckets || []) for (const k in t) t[k] += Number(b[k]) || 0;
+    return t;
+}
+
+/** The lines stacked, each fill one line (2 px of the surface between fills), the daily or hourly total the height; a crosshair and a tooltip that lists the fills at the time and their total. */
+export function drawArea(host, { times, lines, metric, interval, hi, phone }) {
+    host.replaceChildren();
+    const W = Math.max(280, Math.round(host.clientWidth || (phone ? 340 : 880))), H = phone ? 190 : 230, L = 48, R = 12, T = 10, B = 24, pw = W - L - R, ph = H - T - B, N = times.length;
+    const m = METRICS.find(x => x.key === metric) || METRICS[0];
+    const sums = times.map((_, i) => lines.reduce((a, l) => a + l.vals[i], 0));
+    const max = niceMax(Math.max(0, ...sums));
+    const x = i => L + (N > 1 ? (i / (N - 1)) * pw : pw / 2), y = v => T + ph - (v / max) * ph;
+    const s = svg('svg', { viewBox: `0 0 ${W} ${H}`, width: W, height: H, 'aria-hidden': 'true', focusable: 'false', class: 'viz-svg' });
+    for (let g = 0; g <= 4; g++) { const v = (max / 4) * g; s.append(svg('line', { x1: L, x2: W - R, y1: y(v), y2: y(v), class: 'viz-grid' }), svg('text', { x: L - 6, y: y(v) + 4, 'text-anchor': 'end', class: 'viz-axis' }, m.fmt(v))); }
+    const ticks = N <= 1 ? [0] : [0, Math.round((N - 1) / 3), Math.round(((N - 1) * 2) / 3), N - 1].filter((v, i, a) => a.indexOf(v) === i);
+    for (const i of ticks.slice(0, phone ? 3 : 4)) s.append(svg('text', { x: x(i), y: H - 6, 'text-anchor': i === 0 ? 'start' : i === N - 1 ? 'end' : 'middle', class: 'viz-axis' }, timeLabel(times[i], interval)));
+    let base = new Array(N).fill(0);
+    lines.forEach((l, k) => { // the first line is the bottom fill
+        const top = base.map((b, i) => b + l.vals[i]);
+        const d = top.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(' ') + ' ' + base.map((_, i) => `L${x(N - 1 - i).toFixed(1)} ${y(base[N - 1 - i]).toFixed(1)}`).join(' ') + ' Z';
+        s.append(svg('path', { d, class: 'viz-fill', fill: colorOf(l, k), opacity: hi && hi !== l.key ? 0.25 : 1 })); base = top;
+    });
+    const cross = svg('line', { y1: T, y2: T + ph, class: 'viz-cross', visibility: 'hidden' }); s.append(cross);
+    const hit = svg('rect', { x: L, y: T, width: pw, height: ph, fill: 'transparent' }); s.append(hit);
+    host.classList.add('viz-host'); host.append(s);
+    const tip = el('div', 'viz-tip'); tip.hidden = true; host.append(tip);
+    const show = ev => {
+        const r = s.getBoundingClientRect(), sx = r.width / W, i = Math.max(0, Math.min(N - 1, Math.round(N > 1 ? ((((ev.clientX - r.left) / sx) - L) / pw) * (N - 1) : 0)));
+        cross.setAttribute('x1', x(i)); cross.setAttribute('x2', x(i)); cross.setAttribute('visibility', 'visible');
+        tip.replaceChildren(el('div', 'viz-tip-when', timeLabel(times[i], interval)));
+        for (const [l, k] of lines.map((l, k) => [l, k]).reverse().filter(([l]) => l.vals[i] > 0).slice(0, 6)) { const row = el('div', 'viz-tip-row'), key = el('i'); key.style.background = colorOf(l, k); const name = el('span'); name.append(key, document.createTextNode(l.label)); row.append(name, el('b', null, m.fmt(l.vals[i]))); tip.append(row); }
+        const all = el('div', 'viz-tip-row'); all.append(el('span', null, 'All'), el('b', null, m.fmt(sums[i]))); tip.append(all);
+        tip.hidden = false;
+        const hr = host.getBoundingClientRect(); let tx = ev.clientX - hr.left + 14; if (tx + 200 > hr.width) tx = ev.clientX - hr.left - 214; tip.style.left = `${Math.max(4, tx)}px`; tip.style.top = '8px';
+    };
+    hit.addEventListener('pointermove', show); hit.addEventListener('pointerdown', show);
+    hit.addEventListener('pointerleave', () => { tip.hidden = true; cross.setAttribute('visibility', 'hidden'); });
+}
+
+/** The Overview's panel: cost by team, each interval, stacked, with a legend that is a list of the teams and what each cost (a click brings a fill forward). */
+export function drawOverviewPanel(host, { phone }) {
+    host.replaceChildren();
+    const st = seriesState('overview');
+    if (st.error) { const e = el('p', 'cost-empty', st.error); e.setAttribute('role', 'status'); host.append(e); return; }
+    if (!st.data) return;
+    const { buckets, interval, sinceMs, untilMs } = st.data;
+    if (!buckets.length || !st.ranked.length) return;
+    const times = axis(sinceMs, untilMs, interval);
+    const lines = buildSeries(buckets, st.ranked, times, 'cost_usd', false);
+    const card = el('div', 'viz-card');
+    card.append(el('h4', 'viz-title', `Cost ${wordFor(interval)}, stacked by team`));
+    const chart = el('div', 'viz-chart'); card.append(chart);
+    const ul = el('ul', 'viz-legend');
+    lines.forEach((l, k) => {
+        const li = el('li'), b = el('button', 'viz-legend-btn'); b.type = 'button'; b.setAttribute('aria-pressed', String(st.hi === l.key));
+        const sw = el('i', 'cost-swatch'); sw.style.background = colorOf(l, k); sw.setAttribute('aria-hidden', 'true');
+        b.append(sw, el('span', 'viz-legend-name', l.label), el('span', 'viz-legend-value', METRICS[0].fmt(l.total)));
+        b.addEventListener('click', () => { st.hi = st.hi === l.key ? '' : l.key; drawOverviewPanel(host, { phone }); });
+        li.append(b); ul.append(li);
+    });
+    card.append(ul); host.append(card);
+    drawArea(chart, { times, lines, metric: 'cost_usd', interval, hi: st.hi, phone });
+}

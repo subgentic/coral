@@ -14,7 +14,8 @@ const PROVIDERS = [{ agent_type: 'claude', num_requests: 10, input_tokens: 9000,
 const MODELS = [{ model: 'claude-opus-5-5', agent_type: 'claude', num_requests: 10, input_tokens: 9000, output_tokens: 900, cache_read_tokens: 100, cache_write_tokens: 10, cost_usd: 8 }, { model: 'gpt-5-codex', agent_type: 'codex', num_requests: 6, input_tokens: 2000, output_tokens: 200, cache_read_tokens: 0, cache_write_tokens: 0, cost_usd: 1.5 }];
 const tot = k => TEAMS.reduce((a, t) => a + t[k], 0);
 // a day of hourly buckets whose lines add up to each row's figure
-const series = (rows, key) => Array.from({ length: 24 }, (_, h) => ({ bucket: new Date(Date.now() - (23 - h) * 3600000).toISOString().replace(/:\d\d:\d\d\.\d+Z$/, ':00:00Z'), series: rows.map(r => ({ key: key(r), label: key(r),
+const sum = (rows, k, d = 24) => rows.reduce((a, r) => a + (r[k] || 0), 0) / d;
+const series = (rows, key) => Array.from({ length: 24 }, (_, h) => ({ cost_usd: sum(rows, 'cost_usd'), input_tokens: sum(rows, 'input_tokens'), output_tokens: sum(rows, 'output_tokens'), cache_read_tokens: sum(rows, 'cache_read_tokens'), cache_write_tokens: sum(rows, 'cache_write_tokens'), num_requests: sum(rows.map(r => ({ n: r.requests || 1 })), 'n'), bucket: new Date(Date.now() - (23 - h) * 3600000).toISOString().replace(/:\d\d:\d\d\.\d+Z$/, ':00:00Z'), series: rows.map(r => ({ key: key(r), label: key(r),
     cost_usd: r.cost_usd / 24, input_tokens: r.input_tokens / 24, output_tokens: r.output_tokens / 24, cache_read_tokens: (r.cache_read_tokens || 0) / 24, cache_write_tokens: (r.cache_write_tokens || 0) / 24, num_requests: (r.requests || 1) / 24 })) }));
 
 (async () => {
@@ -26,7 +27,7 @@ const series = (rows, key) => Array.from({ length: 24 }, (_, h) => ({ bucket: ne
             if (url.includes('/api/token-usage/summary')) return json({ totals: { input_tokens: ${tot('input_tokens')}, output_tokens: ${tot('output_tokens')}, cost_usd: ${tot('cost_usd')}, num_requests: 16 }, by_agent_type: ${JSON.stringify(PROVIDERS)}, by_model: ${JSON.stringify(MODELS)}, by_thinking: [], by_agent: ${JSON.stringify(AGENTS)} });
             if (url.includes('/api/token-usage/by-team')) return json({ teams: ${JSON.stringify(TEAMS)} });
             if (url.includes('/api/token-usage/by-branch')) return json({ branches: [] });
-            if (url.includes('/api/token-usage/timeseries')) { if (window.__fail) return json({}, 500); const g = new URL(url, location.origin).searchParams.get('group_by'); return json({ buckets: g === 'agent' ? ${JSON.stringify(series(AGENTS, r => r.agent_name))} : g === 'provider' ? ${JSON.stringify(series(PROVIDERS.map(r => ({ ...r, requests: r.num_requests })), r => r.agent_type))} : g === 'model' ? ${JSON.stringify(series(MODELS.map(r => ({ ...r, requests: r.num_requests })), r => r.model))} : ${JSON.stringify(series(TEAMS, r => r.board_name))}, interval: '1h' }); }
+            if (url.includes('/api/token-usage/timeseries')) { if (window.__fail) return json({}, 500); const q = new URL(url, location.origin).searchParams, g = q.get('group_by'); if (q.get('until')) return json({ buckets: [{ bucket: new Date(Date.now() - 30 * 3600000).toISOString().replace(/:\\d\\d:\\d\\d\\.\\d+Z$/, ':00:00Z'), cost_usd: ${tot('cost_usd') / 2}, input_tokens: ${tot('input_tokens') / 2}, output_tokens: ${tot('output_tokens') / 2}, cache_read_tokens: ${tot('cache_read_tokens') / 2}, cache_write_tokens: ${tot('cache_write_tokens') / 2}, num_requests: 8 }], interval: '1d' }); return json({ buckets: g === 'agent' ? ${JSON.stringify(series(AGENTS, r => r.agent_name))} : g === 'provider' ? ${JSON.stringify(series(PROVIDERS.map(r => ({ ...r, requests: r.num_requests })), r => r.agent_type))} : g === 'model' ? ${JSON.stringify(series(MODELS.map(r => ({ ...r, requests: r.num_requests })), r => r.model))} : ${JSON.stringify(series(TEAMS, r => r.board_name))}, interval: '1h' }); }
             if (url.includes('/api/token-usage/')) return json({});
             return R(u, o); }; ${extra} return true; })()`);
     const view = async key => { await ev(`import(${MOD} + 'analytics_views.js').then(m => { m.selectView(${JSON.stringify(key)}); return true; })`); };
@@ -57,6 +58,17 @@ const series = (rows, key) => Array.from({ length: 24 }, (_, h) => ({ bucket: ne
 
         for (const theme of ['dark', 'light']) { await setTheme(ev, theme); await ev(`document.querySelector('#cost-series-team').scrollIntoView({ block: 'start' }); true`); await shot(`series-team-${theme}`); }
         await setTheme(ev, 'dark');
+        console.log('1b. The Overview: the change against the period before, cost by team stacked');
+        await view('overview');
+        await waitFor(`document.querySelectorAll('#cost-series-overview .viz-fill').length === 8 && /vs the prior 24 hours/.test(document.getElementById('cost-change-cost').textContent)`, 'the stacked chart and the change lines', 12000);
+        const ov = await ev(`({ cost: document.getElementById('cost-change-cost').textContent, input: document.getElementById('cost-change-input').textContent, legend: document.querySelectorAll('#cost-series-overview .viz-legend-btn').length, hidden: document.querySelector('#cost-series-overview .viz-svg').getAttribute('aria-hidden'), title: document.querySelector('#cost-series-overview .viz-title').textContent })`);
+        assert.equal(ov.cost, '+100% vs the prior 24 hours', JSON.stringify(ov)); assert.equal(ov.input, '+100% vs the prior 24 hours'); assert.equal(ov.legend, 8); assert.equal(ov.hidden, 'true'); assert.match(ov.title, /^Cost each hour, stacked by team/);
+        await ev(`document.querySelectorAll('#cost-series-overview .viz-legend-btn')[2].click(); true`);
+        assert.equal(await ev(`document.querySelectorAll('#cost-series-overview .viz-fill[opacity="0.25"]').length`), 7, 'a legend item brings its fill forward and dims the rest');
+        await shot('series-overview');
+        await view('team'); await waitFor(`document.querySelectorAll('#cost-series-team .viz-svg path.viz-line').length === 8`, 'the team chart again', 8000);
+        console.log('   ✓');
+
         console.log('2. The rows add up to where the chart ends, said once; a figure the table does not have says nothing');
         assert.match(await ev(`document.querySelector('#cost-series-team .viz-check').textContent`), /^✓ Totals agree/);
         await ev(`[...document.querySelectorAll('#cost-series-team .viz-seg')[0].querySelectorAll('button')].find(b => b.textContent === 'Input').click(); true`);
