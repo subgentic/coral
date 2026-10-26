@@ -149,6 +149,57 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
             check(`${tag}: ten at most: the eleventh and twelfth cannot be picked, and it says so`, b.go === 'Send to 10 agents' && b.agents.filter(a => a.checked).length === 10 && b.agents.slice(10).every(a => a.disabled && !a.checked), b.go);
             await ev(`document.querySelector('.ac-ask .ac-cancel').click(); true`);
 
+            // Pins of the ask block's gaps (#8420, Lead on #8376): the cap held by the block itself, the follow-up refreshes, and a stale agent list.
+            console.log(`${tag}: the ask block's own guards`);
+            await open('ask-team');
+            await ev(`window.__agents = Array.from({ length: 12 }, (_, i) => ({ name: 'A' + i, role: 'Agent ' + i, agent_type: 'claude', availability: 'available' })); ${sendBtn(1)}.click(); true`);
+            await waitFor(`document.querySelectorAll('.ac-ask .ac-ask-agent').length === 12`, 'twelve agents for the cap', 8000);
+            // A change event that reaches a box drawn before the cap was hit (a double tap lands on the box the redraw just replaced): the block refuses the eleventh itself.
+            await ev(`window.__old = [...document.querySelectorAll('.ac-ask input')].slice(10); for (let i = 0; i < 10; i++) document.querySelector('.ac-ask input[value="Agent ' + i + '"]').click(); true`);
+            await ev(`window.__old.forEach(c => { c.checked = true; c.dispatchEvent(new Event('change')); }); true`);
+            b = await block();
+            check(`${tag}: a tick on a stale box cannot make an eleventh agent: still ten, "Send to 10 agents"`, b.go === 'Send to 10 agents' && b.agents.filter(a => a.checked).length === 10, JSON.stringify([b.go, b.agents.filter(a => a.checked).length]));
+            // The follow-up refreshes: ten, thirty and ninety seconds after an ask, on a stopped clock, each only while this artifact is the one open.
+            await ev(`window.__rt = []; const rs = window.setTimeout; window.setTimeout = (fn, ms, ...a) => (ms === 10000 || ms === 30000 || ms === 90000) ? (window.__rt.push({ ms, fn }), 0) : rs(fn, ms, ...a);
+                window.__gets = 0; const f1 = window.fetch; window.fetch = (u, o) => { if (String(u).includes('/api/artifacts/${HEX}/comments') && !((o && o.method) || 'GET').match(/POST|PUT|DELETE|PATCH/)) window.__gets++; return f1(u, o); }; true`);
+            await ev(`document.querySelector('.ac-ask-go').click(); true`);
+            await waitFor(`window.__rt.length === 3`, 'the three follow-up timers', 6000);
+            check(`${tag}: an ask that reached agents plans its refreshes at 10, 30 and 90 seconds`, (await ev(`window.__rt.map(t => t.ms).join()`)) === '10000,30000,90000');
+            await ev(`window.__gets = 0; window.__rt[0].fn(); true`);
+            await waitFor(`window.__gets === 1`, 'the first refresh', 6000);
+            check(`${tag}: the first follow-up reads the comments again (the agent's reply may be there)`, true);
+            await ev(`window.__gets2 = 0; const f2 = window.fetch; window.fetch = (u, o) => { const s = String(u); if (s.includes('/api/artifacts/${'f'.repeat(64)}')) { if (s.includes('/comments')) { window.__gets2++; return Promise.resolve(new Response(JSON.stringify({ comments: [], locked: false, you: window.__you, limits: {} }), { status: 200, headers: { 'Content-Type': 'application/json' } })); } return Promise.resolve(new Response(${JSON.stringify(MD)}, { status: 200, headers: { 'Content-Type': 'text/markdown' } })); } return f2(u, o); }; true`);
+            await ev(`document.querySelector('#artifact-viewer [data-dialog-close], #artifact-viewer .artifact-viewer-close')?.click(); true`);
+            await sleep(300); // sleep-ok: the viewer closes over a frame
+            await ev(`(async () => { const v = await import(${S} + 'artifact_viewer.js'); v.openArtifactViewer(${JSON.stringify('f'.repeat(64))}, { filename: 'other.md', board: 'ask-team' }); return true; })()`);
+            await waitFor(`!!document.querySelector('#artifact-viewer .artifact-viewer-markdown') && window.__gets2 >= 1`, 'another document', 8000);
+            await sleep(300); // sleep-ok: the other document's own first read settles
+            await ev(`window.__gets2 = 0; window.__gets = 0; window.__rt[1].fn(); window.__rt[2].fn(); true`);
+            await sleep(400); // sleep-ok: an unguarded refresh would answer over a few frames; there is no event for "nothing happened"
+            check(`${tag}: once another artifact is open the old ask's later refreshes read nothing`, (await ev(`window.__gets2 + window.__gets`)) === 0, String(await ev(`window.__gets2 + window.__gets`)));
+            await ev(`document.querySelector('#artifact-viewer [data-dialog-close], #artifact-viewer .artifact-viewer-close')?.click(); true`);
+            await sleep(300); // sleep-ok: the viewer closes over a frame
+
+            // A second ask opened before the first one's agents came back: the late answer of the first, a list or a failure, must not redraw or take the focus.
+            for (const lateFails of [false, true]) {
+                await open('ask-team');
+                await ev(`window.__agents = Array.from({ length: 4 }, (_, i) => ({ name: 'F' + i, role: 'Fresh ' + i, agent_type: 'claude', availability: 'available' })); window.__gate = []; window.__hold = true; (() => { const f3 = window.fetch; window.fetch = (u, o) => (window.__hold && String(u).includes('/status')) ? new Promise((res, rej) => window.__gate.push((fail) => fail ? rej(new TypeError('offline')) : f3(u, o).then(res))) : f3(u, o); })(); ${sendBtn(1)}.click(); true`);
+                await waitFor(`window.__gate.length === 1`, 'the first agent list request', 6000);
+                await ev(`document.querySelector('.ac-ask .ac-cancel').click(); ${sendBtn(1)}.click(); true`);
+                await waitFor(`window.__gate.length === 2`, 'the second agent list request', 6000);
+                await ev(`window.__gate[1](); true`);
+                await waitFor(`document.querySelectorAll('.ac-ask .ac-ask-agent').length >= 3`, 'the second ask\'s agents', 8000);
+                await ev(`document.querySelector('.ac-ask input[value="Fresh 2"]').click(); true`);
+
+                await ev(`window.__gate[0](${lateFails}); true`);
+                await sleep(400); // sleep-ok: the late answer would redraw over a few frames; there is no event for "nothing happened"
+                check(`${tag}: the first ask's late ${lateFails ? 'failure' : 'agent list'} changes nothing: the second ask keeps its tick and its focus`, (await ev(`document.activeElement && document.activeElement.value`)) === 'Fresh 2' && (await ev(`document.querySelector('.ac-ask input[value="Fresh 2"]').checked`)) && (await block()).agents.length >= 3);
+                await ev(`window.__hold = false; document.querySelector('.ac-ask .ac-cancel').click(); true`);
+                await ev(`document.querySelector('#artifact-viewer [data-dialog-close], #artifact-viewer .artifact-viewer-close')?.click(); true`);
+                await sleep(300); // sleep-ok: the viewer closes over a frame
+
+            }
+
             // not offered: a comment made with no board; and a viewer who is not the owner
             await ev(`document.querySelector('#artifact-viewer [data-dialog-close], #artifact-viewer .artifact-viewer-close')?.click(); true`);
             await sleep(300); // sleep-ok: the viewer closes over a frame
