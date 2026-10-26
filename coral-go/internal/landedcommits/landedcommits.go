@@ -136,11 +136,10 @@ func Read(ctx context.Context, root, branch string, since, until time.Time) (com
 	return commits, capped, sc.Err()
 }
 
-// Cache keeps the answers of Read for ttl (60 s), by repository, branch and window, so a page that reloads does not run git each time. The zero value is ready; now is the clock (nil: time.Now).
+// Cache keeps the answers of Read for 60 s, by repository, branch and window, so a page that reloads does not run git each time. The zero value is ready; now is the clock (nil: time.Now).
 type Cache struct {
 	mu    sync.Mutex
 	m     map[string]cached
-	ttl   time.Duration
 	now   func() time.Time
 	repos map[string]*sync.Mutex // one read at a time per repository: a burst waits for the first and then finds its answer cached
 }
