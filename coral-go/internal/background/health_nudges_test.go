@@ -312,6 +312,11 @@ func TestAnUnansweredAskRemindsTheAskedMemberOnce(t *testing.T) {
 	to, err := n.bs.AskTargets(ctx, "team", "Lead", q.Content)
 	require.NoError(t, err)
 	require.NoError(t, n.bs.RecordAsk(ctx, "team", q, to))
+	// The "N min ago" text is the harness clock minus the ask's stored time, which is the wall time the post was made: anchor the harness clock to
+	// it, so a slow machine (a post a second or more after the harness started) cannot move the text across a minute (#8210).
+	asked, err := time.Parse(time.RFC3339Nano, q.CreatedAt)
+	require.NoError(t, err)
+	n.now = asked.UTC()
 
 	n.h.RunOnce(ctx)
 	assert.Empty(t, n.sentTo("Dev A"), "not yet: the ask is new")
