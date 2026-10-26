@@ -2,6 +2,10 @@
 // Tasks table uses the shared header typography, a board task's name is the row's one real button (its id is text), and a mouse click on a row leaves no focus ring behind. The task
 // list is an agent's Tasks tab on a real board of the isolated dev server (helpers/board_tasks_tab.js). Drives Chrome over CDP through agent_view_harness.js.
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const os = require('node:os');
+const SHOT_DIR = process.env.CORAL_SCREENSHOT_DIR || path.join(process.env.RUNNER_TEMP || os.tmpdir(), 'out', 'shots');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { openBoardTasksTab } = require('./helpers/board_tasks_tab');
@@ -13,6 +17,7 @@ const B = 'dock-tasks-' + Date.now().toString(36);
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     try {
+        fs.mkdirSync(SHOT_DIR, { recursive: true });
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install();
@@ -37,10 +42,10 @@ const B = 'dock-tasks-' + Date.now().toString(36);
             for (const col of edges.filter(c => c.visible)) for (const left of col.rows)
                 assert.ok(Math.abs(left - col.head) < 1, `${col.col}: header ${col.head}, cell ${left}`);
 
-            if (process.env.CORAL_SCREENSHOT_DIR) {
+            if (SHOT_DIR) {
                 for (const theme of ['dark', 'light']) {
                     await setTheme(ev, theme);
-                    require('node:fs').writeFileSync(require('node:path').join(process.env.CORAL_SCREENSHOT_DIR, 'dock-tasks-' + width + '-' + theme + '.png'), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));
+                    fs.writeFileSync(path.join(SHOT_DIR, 'dock-tasks-' + width + '-' + theme + '.png'), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));
                 }
                 await setTheme(ev, 'dark');
             }
@@ -48,7 +53,7 @@ const B = 'dock-tasks-' + Date.now().toString(36);
         await ev(`document.getElementById('agentic-state').style.width = '420px'; true`);
 
         console.log('12. a shared table head, the name is the one button, no ring after a click');
-        if (process.env.CORAL_SCREENSHOT_DIR) require('node:fs').writeFileSync(require('node:path').join(process.env.CORAL_SCREENSHOT_DIR, 'dock-tasks.png'), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));
+        if (SHOT_DIR) fs.writeFileSync(path.join(SHOT_DIR, 'dock-tasks.png'), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));
         const head = await ev(`(() => { const h = document.querySelector('#board-task-list thead tr'); const cs = getComputedStyle(h.cells[0]); return { texts: [...h.children].map(c => c.textContent.replace(/[↕↑↓]/g, '').trim()), transform: cs.textTransform, weight: cs.fontWeight, size: cs.fontSize }; })()`);
         assert.equal(head.transform, 'uppercase', 'the head uses shared typography: ' + JSON.stringify(head));
         assert.deepEqual([head.weight, head.size], ['600', '11px'], 'shared header typography');
