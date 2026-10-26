@@ -318,3 +318,8 @@
 .artifact-tag-input { flex: 1 1 auto; min-width: 0; font: inherit; font-size: 0.8125rem; }
 .artifact-tag-status { margin: 0; flex-basis: 100%; font-size: 0.75rem; }
 .artifact-tag-error { color: var(--table-danger); }
+@media (pointer: coarse) { /* the buttons of the tag editor are 44 px targets on a phone (phone_targets_census): + Tag, the offers, Add and the box */
+    .artifact-tag-add, .artifact-tag-offer, .artifact-tag-form .btn, .artifact-tag-input { min-height: 44px; }
+    .artifact-tag-add, .artifact-tag-offer { padding: 0 12px; }
+    .artifact-tag-offers { gap: 8px; }
+}
