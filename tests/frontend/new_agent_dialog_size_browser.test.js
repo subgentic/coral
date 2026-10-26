@@ -57,12 +57,16 @@ const VIEWS = [['1280x800', 1280, 800, false, false], ['390x844', 390, 844, true
                 const probe = () => ev(`(() => { const f = (s, rx) => { const e = window.__na.find(s, rx); return e ? window.__na.box(e) : null; }; const m = f('select', ${N.model}); const t = [...window.__na.dialog().querySelectorAll('[role=radiogroup]')].find(e => ${N.thinking}.test(window.__na.name(e))); const go = document.getElementById('launch-agent-go'); return { dialog: window.__na.box(window.__na.panel()), model: m, thinking: t ? window.__na.box(t) : null, launch: go ? window.__na.box(go) : null }; })()`);
                 let slotMin = Infinity;
                 const first = await probe(); assert.ok(first.model && first.thinking && first.launch, 'Model, Thinking and Launch are on the Agent tab');
-                for (const n of names) {
-                    await ev(`(() => { const g = [...window.__na.dialog().querySelectorAll('[role=radiogroup]')].find(e => ${N.provider}.test(window.__na.name(e))); window.__na.radios(g).find(r => window.__na.radioName(r) === ${JSON.stringify(n)}).click(); return true; })()`);
-                    await settle(300);
-                    const p = await probe(); same(first.dialog, p.dialog, `provider ${n}: dialog`);
-                    slotMin = Math.min(slotMin, await ev(`document.getElementById('launch-note-slot').offsetHeight`));
-                    for (const k of ['model', 'thinking', 'launch']) { assert.ok(p[k], `provider ${n}: ${k} is shown`); for (const c of ['x', 'y', 'w', 'h']) assert.ok(Math.abs(first[k][c] - p[k][c]) <= 0.5, `provider ${n}: ${k} ${c} moved from ${first[k][c]} to ${p[k][c]}`); } // Provider, Model, Thinking and Launch never move, at any width: the notes have their room at the end of the pane, under Thinking (#8528, the operator's no-shift rule #8497)
+                await ev(`(() => { if (window.__cliMocked) return true; window.__cliMocked = true; window.__cli = 'found'; const real = window.fetch; window.fetch = (u, o) => String(u).includes('/api/system/cli-check') ? Promise.resolve(new Response(JSON.stringify(window.__cli === 'missing' ? { found: false, install_url: 'https://docs.example.com/install', install_command: 'npm install -g example-cli' } : { found: true, version: '1.0.0', status: 'ok' }), { status: 200, headers: { 'content-type': 'application/json' } })) : real(u, o); return true; })()`); // the CLI check answers what the suite says: found, then missing (its row is in the notes area under Thinking, so neither moves anything)
+                for (const cli of ['found', 'missing']) {
+                    await ev(`window.__cli = ${JSON.stringify(cli)}; true`);
+                    for (const n of names) {
+                        await ev(`(() => { const g = [...window.__na.dialog().querySelectorAll('[role=radiogroup]')].find(e => ${N.provider}.test(window.__na.name(e))); window.__na.radios(g).find(r => window.__na.radioName(r) === ${JSON.stringify(n)}).click(); return true; })()`);
+                        await settle(300);
+                        const p = await probe(); same(first.dialog, p.dialog, `provider ${n} (CLI ${cli}): dialog`);
+                        slotMin = Math.min(slotMin, await ev(`document.getElementById('launch-note-slot').offsetHeight`));
+                        for (const k of ['model', 'thinking', 'launch']) { assert.ok(p[k], `provider ${n} (CLI ${cli}): ${k} is shown`); for (const c of ['x', 'y', 'w', 'h']) assert.ok(Math.abs(first[k][c] - p[k][c]) <= 0.5, `provider ${n} (CLI ${cli}): ${k} ${c} moved from ${first[k][c]} to ${p[k][c]}`); } // Provider, Model, Thinking and Launch never move, at any width: the notes have their room at the end of the pane, under Thinking (#8528, the operator's no-shift rule #8497)
+                    }
                 }
                 if (mobile) assert.ok(slotMin <= 24, `on a phone an empty notes slot takes no room (the smallest slot seen was ${slotMin}px tall)`);
                 assert.ok(await ev(`(() => { const d = window.__na.dialog(); return [...d.querySelectorAll('[aria-live=polite]')].some(e => e.getClientRects().length > 0 || e.offsetHeight > 0); })()`), 'a polite live region holds the provider note');
