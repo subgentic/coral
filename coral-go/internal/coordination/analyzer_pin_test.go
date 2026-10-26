@@ -818,8 +818,10 @@ func TestPinKeyFindingsAndRecommendations(t *testing.T) {
 	h.NotificationChurn = make([]NotificationChurnIncident, 4)
 	h.ActiveWithoutProgress = make([]ActiveWithoutProgress, 5)
 	h.DuplicateScopeCandidates = make([]DuplicateScopeCandidate, 6)
+	f.ReviewHeldSlots = []ReviewHeldTask{{TaskID: 11, Title: "A", ReviewerRole: "QA", DurationSec: 120}, {TaskID: 12, Title: "B", ReviewerRole: "Security", DurationSec: 900}}
+	h.RepetitiveHandoffLoops = []RepetitiveHandoffLoop{{Agents: []string{"Amy", "Zed"}, MessageCount: 6, TimeSpanSec: 100, Summary: "Rapid 6-message back-and-forth between Amy & Zed within 100s"}, {Agents: []string{"A", "B"}}}
 	got := generateKeyFindings(f, h)
-	require.Len(t, got, 8)
+	require.Len(t, got, 10)
 	assert.Equal(t, base[0], got[0])
 	assert.Equal(t, "Median claim latency: 12.3s (P90: 56.8s, Mean: 20.0s across 3 claims)", got[1])
 	assert.Equal(t, "Median execution duration: 100.0s (P90: 200.0s across 2 completed tasks)", got[2])
@@ -829,6 +831,8 @@ func TestPinKeyFindingsAndRecommendations(t *testing.T) {
 	assert.Equal(t, "Active duration observation: 5 task(s) in progress exceed threshold (candidate status, not proof of inactivity).", got[6])
 	// the wording states the detector's own rule (#8292): a half the words in common (jaccard), or 70% of the shorter title with 3 shared words, within 6 hours
 	assert.Equal(t, "Duplicate scope candidates: 6 pair(s) of tasks created within 6 hours of each other have overlapping titles (at least half their words in common, or 70% of the shorter title's words with 3 or more shared).", got[7])
+	assert.Equal(t, "Review-held slots: 2 task(s) hold a slot while a completion review is pending (longest: task #12, 900s, reviewer Security).", got[8])
+	assert.Equal(t, "Repetitive handoff loops: 2 rapid back-and-forth exchange(s) between the same two agents; the first: Rapid 6-message back-and-forth between Amy & Zed within 100s.", got[9])
 
 	// each finding appears on its own condition
 	for _, c := range []struct {
@@ -849,6 +853,12 @@ func TestPinKeyFindingsAndRecommendations(t *testing.T) {
 		{"duplicates", func(f *ObservableFacts, h *HeuristicSignals) {
 			h.DuplicateScopeCandidates = make([]DuplicateScopeCandidate, 1)
 		}, "Duplicate scope candidates"},
+		{"review-held slot", func(f *ObservableFacts, h *HeuristicSignals) {
+			f.ReviewHeldSlots = []ReviewHeldTask{{TaskID: 3, ReviewerRole: "QA"}}
+		}, "Review-held slots: 1 task(s)"},
+		{"handoff loop", func(f *ObservableFacts, h *HeuristicSignals) {
+			h.RepetitiveHandoffLoops = []RepetitiveHandoffLoop{{Summary: "S"}}
+		}, "Repetitive handoff loops: 1 rapid"},
 	} {
 		var ff ObservableFacts
 		var hh HeuristicSignals
@@ -1139,4 +1149,34 @@ func TestPinMarkdownIdlessEventHasNoTaskNumber(t *testing.T) {
 	c := pinTask(7, "cancelled", 0)
 	md = FormatMarkdown(Analyze([]Task{c}, nil, nil, ReportFilter{}, pinTime(60)))
 	assert.Contains(t, md, "| #7 | `cancellation` |")
+}
+
+func TestPinMarkdownReviewHeldSlots(t *testing.T) {
+	review := pinTask(2, "in_progress", 0)
+	review.Title = "Review the importer"
+	review.AssignedTo = strPtr("Reviewer")
+	review.ClaimedAt = strPtr(pinAt(1000))
+	review.Workflow = &TaskWorkflow{CompletionReview: &CompletionReview{ReviewerRole: "QA", Status: "pending"}}
+	md := FormatMarkdown(Analyze([]Task{review}, nil, nil, ReportFilter{}, pinTime(3600)))
+	assert.Contains(t, md, "### E. Review-Held Slots\n\n")
+	assert.Contains(t, md, "| Task ID | Title | Assignee | Reviewer Role | Held For |\n| :---: | :--- | :--- | :--- | :---: |\n| #2 | Review the importer | Reviewer | QA | 2600s |\n")
+	assert.Contains(t, md, "Review-held slots: 1 task(s) hold a slot while a completion review is pending (longest: task #2, 2600s, reviewer QA).")
+	// no review, no section
+	md = FormatMarkdown(Analyze([]Task{pinTask(1, "pending", 0)}, nil, nil, ReportFilter{}, pinTime(10)))
+	assert.NotContains(t, md, "Review-Held Slots")
+	assert.NotContains(t, md, "Review-held slots:")
+}
+
+func TestPinMarkdownHandoffLoops(t *testing.T) {
+	var msgs []Message
+	for i := 0; i < 6; i++ {
+		msgs = append(msgs, pinMsg(int64(i+1), []string{"Zed", "Amy"}[i%2], "ping", i*20))
+	}
+	md := FormatMarkdown(Analyze(nil, msgs, nil, ReportFilter{}, pinTime(600)))
+	assert.Contains(t, md, "### F. Repetitive Handoff Loops\n\n")
+	assert.Contains(t, md, "| Agents | Messages | Time Span | Window (UTC) |\n| :--- | :---: | :---: | :--- |\n| Amy & Zed | 6 | 100s | 06:00:00 – 06:01:40 |\n")
+	assert.Contains(t, md, "Repetitive handoff loops: 1 rapid back-and-forth exchange(s) between the same two agents; the first: Rapid 6-message back-and-forth between Amy & Zed within 100s.")
+	md = FormatMarkdown(Analyze(nil, msgs[:3], nil, ReportFilter{}, pinTime(600)))
+	assert.NotContains(t, md, "Repetitive Handoff Loops")
+	assert.NotContains(t, md, "Repetitive handoff loops:")
 }

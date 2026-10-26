@@ -64,6 +64,12 @@
 | :---: | :--- | :--- | :--- |
 | #3 | Write release notes | Writer | #2 (in_progress ⏳), #4 (pending ⏳) |
 
+### E. Review-Held Slots
+
+| Task ID | Title | Assignee | Reviewer Role | Held For |
+| :---: | :--- | :--- | :--- | :---: |
+| #2 | Review the importer | Reviewer | QA | 2600s |
+
 ## 3. Heuristic Signals & Inefficiency Candidates
 
 > [!NOTE]
@@ -118,6 +124,7 @@ The following dimensions cannot be derived from messageboard data alone and are 
 - Coordination lag candidate: 1 ready task(s) assigned to currently idle subscribers remain unclaimed.
 - Notification churn observed in 1 incident(s): reminders dispatched for tasks already claimed or in rapid (<2m) succession.
 - Active duration observation: 2 task(s) in progress exceed threshold (candidate status, not proof of inactivity).
+- Review-held slots: 1 task(s) hold a slot while a completion review is pending (longest: task #2, 2600s, reviewer QA).
 
 ## 6. Actionable Recommendations
 
