@@ -445,7 +445,23 @@ func (m *BoardHealthMonitor) composeCheckBefore4599(ctx context.Context, project
 			continue
 		}
 		sig, known := m.signal(ctx, a.SessionID)
-		if !known || sig.InTurn || sig.NeedsInput || sig.Since.IsZero() || now.Sub(sig.Since) < m.idleAfter {
+		// The one change made to this copy since #4599 (#8294, with idleItems): the agent at a prompt is named first and the one with no signal after the idle ones, so the oracle keeps comparing the rest.
+		if !known {
+			items = append(items, teamhealth.Item{Rank: 3, Agent: teamhealth.Name(sub.SubscriberID),
+				Problem: "no signal from it yet, so its state is unknown",
+				Suggest: "read its terminal to see what it is doing", Key: "unknown|" + sub.SubscriberID, State: "unknown"})
+			continue
+		}
+		if sig.NeedsInput && !sig.InTurn {
+			problem := "needs input, stopped at a prompt"
+			if !sig.Since.IsZero() {
+				problem = fmt.Sprintf("needs input, stopped at a prompt for %s", teamhealth.Age(now.Sub(sig.Since)))
+			}
+			items = append(items, teamhealth.Item{Rank: 1, Agent: teamhealth.Name(sub.SubscriberID), Problem: problem,
+				Suggest: "read its terminal to see what it asks, then tell the Operator", Key: "input|" + sub.SubscriberID, State: sig.Since.UTC().Format(time.RFC3339)})
+			continue
+		}
+		if sig.InTurn || sig.NeedsInput || sig.Since.IsZero() || now.Sub(sig.Since) < m.idleAfter {
 			continue
 		}
 		idleNoWork[sub.SubscriberID] = true
