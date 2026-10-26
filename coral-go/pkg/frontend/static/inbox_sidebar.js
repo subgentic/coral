@@ -290,6 +290,8 @@ function renderInboxNav(force = false) {
     if (needsRows().some(s => s.waiting_since) && !_poll) _poll = pollEvery(() => renderInboxNav(true), 30000); // "waiting 4 min" in the Needs you table moves on while the tab is open
     if (_folders && list.contains(_folders)) VL.update(_folders, { sections, current: here });
     else { _folders = VL.build({ id: 'inbox-folders', label: 'Inbox views', sections, current: here, onPick: pickFolder }); list.replaceChildren(_folders); }
+    const pageList = page && $('inbox-page')?.querySelector('[data-view-list="inbox-goal-folders"], [data-view-list="inbox-item-folders"]'); // an opened item's own folder list (a phone's select) follows the counts too: it was drawn once, with the counts of that moment (#8681)
+    if (pageList) VL.update(pageList, { sections, current: here });
     setHidden(document.querySelector('.sidebar-header[data-header="hub-inbox"] [data-group-toggle]'), true); // folders do not fold: the collapse-all button has nothing to fold
     refreshGroupTable('hub-inbox');
 }
@@ -652,7 +654,7 @@ export async function openInboxGoal(team, id) {
     const view = el('div', 'goals-page goals-table-page goals-open');
     const body = el('div', 'goals-body'); view.append(body); host.append(view);
     goalMount = mountGoal(body, { team, id, status: sayLive,
-        teamLink: build(keyRoute('team', team, 'goals', id)),
+        teamLink: build(keyRoute('team', team, 'goals', id)), focusOnOpen: false,
         back: () => { if (backIs(folderRoute)) history.back(); else go(folderRoute); },
     });
     renderInboxNav(true);

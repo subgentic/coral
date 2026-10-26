@@ -47,6 +47,7 @@ const path = require('node:path');
             } else check(`${label}: the title and its number stay, the count line is not shown`, head.h2 === 'Goals' && head.h2box.w > 20 && head.countShown && !head.lineShown, JSON.stringify(head));
 
             await shot(`inbox-polish-closed-${label}-dark`, 'dark');
+            await shot(`inbox-polish-closed-${label}-light`, 'light');
             // the Filters panel
             const top0 = await firstRowTop();
             const lock0 = await ev(`getComputedStyle(document.body).overflow + '|' + getComputedStyle(document.documentElement).overflow`);
@@ -82,6 +83,9 @@ const path = require('node:path');
                     return { h: Math.round(r.height), full: Math.abs(r.width - p.width) < 4, border: parseFloat(s.borderTopWidth) >= 1 && s.borderTopStyle !== 'none', chevronRight: c.right > r.right - 24, countsAfterLabel: n.left > t.right, aria: e.getAttribute('aria-label'), text: e.textContent }; })()`);
                 await shot('inbox-polish-goal-390-dark', 'dark'); await shot('inbox-polish-goal-390-light', 'light');
                 check(`${label}: the Tasks button is a full-width bordered row, 44 px, with the label, the counts at the right and a chevron at the edge`, b.h >= 44 && b.full && b.border && b.chevronRight && b.countsAfterLabel && /^Tasks\d+ open, \d+ done$/.test(b.text), JSON.stringify(b));
+                await waitFor(`/Goals \\([1-9]/.test((document.querySelector('#inbox-page .view-list select') || {}).selectedOptions?.[0]?.textContent || '')`, 'the folder select keeping the Goals total', 8000).catch(() => {});
+                check(`${label}: the open goal's folder select keeps the folder's total (Goals (N), not 0)`, await ev(`/Goals \\([1-9]/.test((document.querySelector('#inbox-page .view-list select') || {}).selectedOptions?.[0]?.textContent || '')`), await ev(`(document.querySelector('#inbox-page .view-list select') || {}).selectedOptions?.[0]?.textContent`));
+                check(`${label}: the goal's heading does not take the focus on arrival`, await ev(`document.activeElement !== document.getElementById('goals-detail-title')`), await activeId());
                 check(`${label}: it keeps its accessible name ("Tasks, N open, M done")`, /^Tasks, \d+ open, \d+ done$/.test(b.aria), b.aria);
             }
         }
