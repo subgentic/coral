@@ -4,7 +4,7 @@
  * A colour dot (a tag's colour) is a hex colour only. Text is set with textContent only.
  *
  *   build({ id, label, sections, current, onPick })  -> the element (the column and the select)
- *   sections: [{ title?, items: [{ key, label, count?, dot?, soon? }] }]      onPick(key) is not called for a disabled item
+ *   sections: [{ title?, items: [{ key, label, count?, alert?, dot?, soon? }] }]      onPick(key) is not called for a disabled item; a section's title is also the select's group label
  *   update(root, { sections, current })               -> draws the same element again with new counts or another current view; the keyboard stays on the item it was on */
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = String(text); return e; };
 const HEX = /^#[0-9a-f]{3,8}$/i;
@@ -24,7 +24,7 @@ function draw(root, { sections, current }) {
             lab.append(el('span', 'view-list-name', it.label));
             b.append(lab);
             if (it.soon) { b.disabled = true; b.classList.add('view-list-soon'); b.append(el('span', 'view-list-count', 'soon')); }
-            else if (it.count != null) b.append(el('span', 'view-list-count', it.count));
+            else if (it.count != null) b.append(el('span', it.alert && Number(it.count) > 0 ? 'view-list-count view-list-alert' : 'view-list-count', it.count)); // alert: the one count that is a red pill (Needs you), and only while it is above 0; every other count stays quiet
             if (it.key === current) { b.setAttribute('aria-current', 'true'); b.classList.add('view-list-current'); }
             nav.append(b);
             if (!it.soon) {

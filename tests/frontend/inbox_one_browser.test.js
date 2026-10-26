@@ -65,35 +65,32 @@ const AGENTS = (waiting) => waiting ? [
             await ev(`localStorage.clear(); window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
             await setAgents(true);
             await ev(`window.switchNavTab('hub-inbox'); true`);
-            await waitFor(`!document.querySelector('${pane}').hidden && document.querySelectorAll('${pane} .sgroup-header').length === 3`, at + 'the Inbox pane', 10000);
-            await waitFor(`document.querySelectorAll('${pane} .sgroup-header .session-group-count')[1].textContent === '3' && document.querySelectorAll('${pane} .sgroup-header .session-group-count')[2].textContent === '2'`, at + 'the counts', 10000);
+            await waitFor(`!document.querySelector('${pane}').hidden && document.querySelectorAll('${pane} .view-list-item').length === 4`, at + 'the Inbox pane', 10000);
+            await waitFor(`document.querySelector('${pane} .view-list-item[data-key="tasks"] .view-list-count').textContent === '3' && document.querySelector('${pane} .view-list-item[data-key="saved"] .view-list-count').textContent === '2'`, at + 'the counts', 10000);
 
-            assert.deepEqual(await ev(`[...document.querySelectorAll('${pane} .sgroup-header .group-name-text')].map(e => e.textContent)`), ['Needs you', 'Tasks', 'Saved'], at + 'the three groups');
-            assert.deepEqual(await ev(`[...document.querySelectorAll('${pane} .sgroup-header .session-group-count')].map(e => e.textContent)`), ['2', '3', '2'], at + 'with their counts');
-            assert.deepEqual(await ev(`[...document.querySelectorAll('${pane} .sgroup-header')].map(h => !!h.querySelector('button.group-chevron'))`), [true, true, true], at + 'every group has a chevron, and Saved lists its messages under it like the others');
-            assert.equal(await ev(`document.querySelectorAll('${pane} li.sb-row').length`), 7, at + 'the three groups list their rows (2, 3 and the 2 saved messages)');
-            // the button is the row: the li around it has no padding and the button is 36 px high (44 on a phone), UI/UX's rule for every sidebar list (#7473)
-            assert.deepEqual(await ev(`(() => { const b = document.querySelector('${pane} li:not(.session-group-header) > .row-btn'), li = b.parentElement, cs = getComputedStyle(li); return { pad: [cs.paddingTop, cs.paddingBottom], h: Math.round(b.getBoundingClientRect().height) >= ${mobile ? 44 : 36}, same: Math.abs(li.getBoundingClientRect().height - b.getBoundingClientRect().height) <= 1 }; })()`), { pad: ['0px', '0px'], h: true, same: true }, at + 'a row is its button, no padding on the li, at least ${mobile ? 44 : 36} px high');
+            assert.deepEqual(await ev(`[...document.querySelectorAll('${pane} .view-list-item .view-list-name')].map(e => e.textContent)`), ['Needs you', 'Tasks', 'Goals', 'Saved'], at + 'the folders (#7785)');
+            assert.deepEqual(await ev(`[...document.querySelectorAll('${pane} .view-list-item .view-list-count')].map(e => e.textContent)`), ['2', '3', 'soon', '2'], at + 'with their counts, and Goals saying soon');
+            assert.equal(await ev(`document.querySelectorAll('${pane} li.sb-row, ${pane} .sgroup-header').length`), 0, at + 'the pane lists folders only: the rows are the table\'s');
+            if (!mobile) assert.equal(await ev(`Math.round(document.querySelector('${pane} .view-list-item').getBoundingClientRect().height) >= 36`), true, at + 'a folder is at least 36 px high');
 
             assert.equal(await ev(`document.querySelector('${pane} .sidebar-search-input').getAttribute('aria-label')`), 'Search needs you', at + 'the search is named for the group on screen');
             assert.equal(await ev(`document.querySelector('${pane} [data-display-button]').hidden`), true, at + 'Display options is for Saved only');
-            if (mobile) assert.equal(await ev(`Math.round(document.querySelector('${pane}').getBoundingClientRect().width) >= innerWidth - 1`), true, at + 'the phone list is the width of the screen');
             assert.equal(await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth`), true, at + 'no sideways scroll');
             assert.equal(await ev(`document.getElementById('inbox-title') === null && document.getElementById('inbox-tablist') === null`), true, at + 'the old title and tab strip are gone');
 
             if (mobile) {
-                assert.equal(await ev(`!!document.querySelector('#mobile-inbox-list ${pane}')`), true, at + 'the pane is in the phone page');
+                await waitFor(`!!document.querySelector('#group-table-view .view-list-select') && document.getElementById('group-table-view').getClientRects().length > 0`, at + 'the phone opens on the table with the folders\' select on top', 10000);
                 assert.equal(await ev(`[...document.querySelectorAll('#mobile-inbox-list .sidebar-hide-btn')].some(b => b.getClientRects().length > 0)`), false, at + 'no Hide on a phone');
-                assert.equal(await ev(`document.getElementById('inbox-local').getClientRects().length`), 0, at + 'the centre is not shown until an item is chosen');
                 await shot(`inbox-one-list-${w}`);
-                await ev(`document.querySelector('${pane} .row-btn[data-on-click="inbox-task-open"]').click(); true`);
+                await ev(`(() => { const s = document.querySelector('#group-table-view .view-list-select'); s.value = 'tasks'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+                await waitFor(`!!document.querySelector('#group-table-view .dt-primary')`, at + 'the select opens Tasks', 8000);
+                await ev(`document.querySelector('#group-table-view .dt-primary').click(); true`);
                 await waitFor(`document.getElementById('inbox-page').getClientRects().length > 0 && !!document.querySelector('#inbox-page .ibx-reply-input')`, at + 'the task as a screen of its own', 10000);
-                assert.equal(await ev(`document.getElementById('mobile-inbox-list').getClientRects().length`), 0, at + 'and the list is not under it');
-                assert.equal(await ev(`document.querySelector('#inbox-page .inbox-phone-back').textContent.trim()`), '\u2190 Inbox', at + 'with the way back');
+                assert.equal(await ev(`document.querySelector('#inbox-page .inbox-phone-back').textContent.trim()`), '\u2190 Tasks', at + 'with the way back, to the folder it came from');
                 assert.equal(await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1`), true, at + 'no sideways scroll on a task');
                 await shot(`inbox-one-task-${w}`);
                 await ev(`document.querySelector('#inbox-page .inbox-phone-back').click(); true`);
-                await waitFor(`document.getElementById('mobile-inbox-list').getClientRects().length > 0 && document.getElementById('inbox-local').getClientRects().length === 0`, at + 'back is the list', 4000);
+                await waitFor(`document.getElementById('group-table-view').getClientRects().length > 0 && document.getElementById('inbox-page').hidden`, at + 'back is the Tasks table', 4000);
                 continue;
             }
 
@@ -113,12 +110,12 @@ const AGENTS = (waiting) => waiting ? [
 
             // the search names its group and narrows it
             await ev(`(() => { const i = document.querySelector('${pane} .sidebar-search-input'); i.value = 'two'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 1 && document.querySelectorAll('${pane} li.sb-row .row-btn[data-on-click="inbox-agent-open"]').length === 1`, at + 'the search narrows Needs you', 5000);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 1`, at + 'the search narrows Needs you', 5000);
             await ev(`(() => { const i = document.querySelector('${pane} .sidebar-search-input'); i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2`, at + 'cleared', 5000);
 
             // Tasks
-            await ev(`document.querySelector('${pane} .sgroup-header[data-group-name="hub-inbox:tasks"]').click(); true`);
+            await ev(`document.querySelector('${pane} .view-list-item[data-key="tasks"]').click(); true`);
             await waitFor(`document.querySelector('#group-table-title').textContent === 'Tasks'`, at + 'Tasks opens its table', 8000);
             assert.equal(await ev(`document.querySelector('${pane} .sidebar-search-input').getAttribute('aria-label')`), 'Search tasks', at + 'the search is named for Tasks now');
             // the one task row (#7737): a table on a desktop (State, Task, Priority, Team, Updated), the two-line column on a phone; one word set for the state (the Inbox's "Open" is Queued)
@@ -135,13 +132,13 @@ const AGENTS = (waiting) => waiting ? [
             assert.match(await ev(`document.querySelector('#inbox-page .ibx-panel').textContent`), /Please check the plan/, at + "the component shows the task's own text");
             assert.equal(await ev(`getComputedStyle(document.querySelector('#inbox-page .ibx-task-head')).display`), 'none', at + "and not a second heading");
             assert.equal(await ev(`document.querySelectorAll('#inbox-page .ibx-task').length`), 1, at + 'one task is mounted');
-            assert.equal(await ev(`document.querySelector('${pane} li.sb-row.active .sb-row-name').textContent`), 'Review the release plan', at + 'the open task is the sidebar'+"'s current row");
+            assert.equal(await ev(`document.querySelector('${pane} .view-list-item[aria-current="true"]').dataset.key`), 'tasks', at + 'the open task\'s folder is the current one');
             await shot(`inbox-one-task-${w}`);
             await ev(`document.querySelector('#inbox-page > .group-back').click(); true`);
             await waitFor(`document.getElementById('group-table-view').checkVisibility() && document.querySelector('#group-table-title').textContent === 'Tasks'`, at + 'back is the table', 8000);
 
             // Saved
-            await ev(`document.querySelector('${pane} .sgroup-header[data-group-name="hub-inbox:saved"]').click(); true`);
+            await ev(`document.querySelector('${pane} .view-list-item[data-key="saved"]').click(); true`);
             await waitFor(`document.querySelector('#group-table-title').textContent === 'Saved' && document.querySelectorAll('#group-table-view tbody tr').length === 2`, at + 'Saved opens its table', 10000);
             assert.equal(await ev(`document.querySelector('${pane} .sidebar-search-input').getAttribute('aria-label')`), 'Search saved messages', at + 'the search says it is for saved messages');
             assert.equal(await ev(`document.querySelector('${pane} [data-display-button]').hidden`), false, at + 'Display options is there for Saved');
@@ -199,11 +196,11 @@ const AGENTS = (waiting) => waiting ? [
             await ev(`document.querySelector('#inbox-page .wf-more > .btn').click(); true`);
             await ev(`[...document.querySelectorAll('#inbox-page .wf-more-menu button')].find(b => /Remove/.test(b.textContent)).click(); true`);
             await waitFor(`document.getElementById('group-table-view').checkVisibility() && document.querySelectorAll('#group-table-view tbody tr').length === 1`, at + 'Remove takes it from the list and returns to the table', 8000);
-            assert.equal(await ev(`document.querySelectorAll('${pane} .sgroup-header .session-group-count')[2].textContent`), '1', at + "and the group's count");
+            assert.equal(await ev(`document.querySelector('${pane} .view-list-item[data-key="saved"] .view-list-count').textContent`), '1', at + "and the folder's count");
 
             // nothing waiting: one empty line
             await setAgents(false);
-            await ev(`document.querySelector('${pane} .sgroup-header[data-group-name="hub-inbox:needs"]').click(); true`);
+            await ev(`document.querySelector('${pane} .view-list-item[data-key="needs"]').click(); true`);
             await waitFor(`document.querySelector('#group-table-title').textContent === 'Needs you' && !!document.querySelector('#group-table-view .empty-line')`, at + 'the empty Needs you', 8000);
             assert.deepEqual(await ev(`(() => { const l = document.querySelector('#group-table-view .empty-line'), c = getComputedStyle(l); return [l.textContent, c.fontSize, c.fontWeight]; })()`), ['Nothing needs your input.', '14px', '400'], at + 'one empty line, 14/400');
             await shot(`inbox-one-empty-${w}`);
@@ -213,7 +210,7 @@ const AGENTS = (waiting) => waiting ? [
             if (w === 1280) for (const theme of ['dark', 'light']) for (const zoom of ['', '32px']) {
                 const how = at + `${theme}${zoom ? ', 200% text' : ''}: `;
                 await setTheme(ev, theme); await ev(`document.documentElement.style.fontSize = ${JSON.stringify(zoom)}; true`);
-                await ev(`document.querySelector('${pane} .sgroup-header[data-group-name="hub-inbox:tasks"]').click(); true`);
+                await ev(`document.querySelector('${pane} .view-list-item[data-key="tasks"]').click(); true`);
                 await waitFor(`document.querySelector('#group-table-title').textContent === 'Tasks'`, how + 'the tasks table', 8000);
                 const au = await auditRegion(ev, ['.sidebar', '#group-table-view']);
                 assert.deepEqual(au.fails.map(f => `${f.sel} ${f.what} ${f.ratio}`), [], how + 'the sidebar and the table: contrast');

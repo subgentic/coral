@@ -34,10 +34,10 @@ const BASE = require('./test_base').BASE;
         r = await rows();
         assert.equal(a('qa-a-id').waited, 'waiting 7 min'); assert.equal(r.find(x => x.id === 'fe-a-id').waited, 'waiting 2 h 10 min');
         // time passes with no new feed message: the 30-second tick redraws it, and a row the keyboard is on keeps it (UI Accessibility's #7004 review)
-        await ev(`document.querySelector('#inbox-nav-list .row-btn[data-session-id="qa-a-id"]').focus(); true`);
+        await ev(`document.querySelector('#group-table-view .dt-primary[data-session-id="qa-a-id"]').focus(); true`);
         await ev(`window.__realNow = Date.now; Date.now = () => window.__realNow() + 3 * 60000; true`);
         await waitFor(`[...document.querySelectorAll('#group-table-view tbody tr')].some(tr => tr.cells[${WHEN}].textContent.trim() === 'waiting 10 min')`, 'the wait moves on by itself', 40000);
-        assert.equal(await ev(`document.activeElement.classList.contains('row-btn') && document.activeElement.dataset.sessionId`), 'qa-a-id', 'focus stays on the row after the redraw');
+        assert.equal(await ev(`document.activeElement.classList.contains('dt-primary') && document.activeElement.dataset.sessionId`), 'qa-a-id', 'focus stays on the row after the redraw');
         console.log('PASS it updates as time passes, and keeps the focused row');
         console.log('PASS Inbox waiting_since');
     } finally { await client.close(); }

@@ -103,7 +103,7 @@ const hex = i => i.toString(16).padStart(20, '0');
             await ev(tabBtn('needs'));
             await settle(`document.getElementById('group-table-view').dataset.group === 'hub-inbox:needs' && document.getElementById('group-table-view').getClientRects().length > 0`, 'Needs you');
             s = await state();
-            check(`${dev}: Needs you lists the waiting agent, and the sidebar row says what it waits for`, s.needs.length === 1 && /QA Beta/.test(s.needs[0]) && /Needs input/.test(await ev(`document.querySelector('#inbox-nav-list .sb-row-meta').textContent`)), JSON.stringify(s.needs));
+            check(`${dev}: Needs you lists the waiting agent, and the folder counts it`, s.needs.length === 1 && /QA Beta/.test(s.needs[0]) && (await ev(`document.querySelector('#inbox-nav-list .view-list-item[data-key="needs"] .view-list-count').textContent`)) === '1', JSON.stringify(s.needs));
             await shot(`inbox-local-needs-${dev}`);
             await ev(`document.querySelector('#group-table-view tbody .dt-primary').click(); true`);
             await settle(`window.T && T.state.currentSession && T.state.currentSession.session_id === 'qa-b-id' && document.querySelector('.top-nav-tab.active').dataset.arg === 'agents'`, 'the waiting agent opened');

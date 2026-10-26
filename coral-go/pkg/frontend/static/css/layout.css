@@ -966,10 +966,6 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 @media (pointer: coarse) { .group-table-link, .group-back { min-height: 44px; } .group-back { min-width: 44px; } } /* a short name ("\2190 Jobs") is still a 44 px target both ways (#7734) */
 
 /* ── The Inbox on the shared sidebar (inbox_sidebar.js, #7472) ── */
-/* A row of the sidebar: a name and one muted line under it (Needs you, Tasks) */
-.sb-row .row-btn { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
-.sb-row-name { display: block; font-size: var(--fs-md); font-weight: 600; overflow-wrap: anywhere; }
-.sb-row-meta { display: block; font-size: var(--fs-base); font-weight: 400; color: var(--text-secondary); overflow-wrap: anywhere; }
 /* The chips above a table that show one part of a list (Saved: Open and Done, with their counts) */
 .group-table-chips { display: flex; flex-wrap: wrap; gap: var(--space-md); margin: 0 0 var(--space-lg); }
 .group-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 4px 12px; border: 1px solid var(--control-border); border-radius: 999px; background: none; color: var(--text-secondary); font: 500 var(--fs-md)/1.4 var(--font-sans); cursor: pointer; }

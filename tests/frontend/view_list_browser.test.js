@@ -6,7 +6,7 @@ const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 
 const VIEWS = [['1280x800', 1280, 800, false], ['390x844', 390, 844, true]];
-const SECTIONS = `[{ title: 'Views', items: [{ key: 'all', label: 'All chats', count: 183 }, { key: 'groups', label: 'Group chats', count: 12 }, { key: 'active', label: 'Active now', soon: true }] },
+const SECTIONS = `[{ title: 'Views', items: [{ key: 'all', label: 'All chats', count: 183, alert: true }, { key: 'groups', label: 'Group chats', count: 0, alert: true }, { key: 'active', label: 'Active now', soon: true }] },
     { title: 'Tags', items: [{ key: 'tag:1', label: 'release', count: 14, dot: '#be185d' }, { key: 'tag:2', label: 'bad', count: 1, dot: 'url(javascript:1)' }] }]`;
 
 (async () => {
@@ -26,7 +26,7 @@ const SECTIONS = `[{ title: 'Views', items: [{ key: 'all', label: 'All chats', c
                 return { nav: vis(nav), sel: vis(sel), selH: Math.round(sel.getBoundingClientRect().height), current: items.filter(b => b.getAttribute('aria-current') === 'true').map(b => b.dataset.key),
                     soon: items.filter(b => b.disabled).map(b => b.dataset.key + ':' + b.textContent.trim()), titles: [...r.querySelectorAll('.view-list-title')].map(e => e.textContent), minH: Math.min(...items.map(b => Math.round(b.getBoundingClientRect().height))),
                     dots: [...r.querySelectorAll('.view-list-dot')].map(d => d.style.getPropertyValue('--view-list-dot')), options: [...sel.querySelectorAll('option')].map(o => o.textContent + (o.selected ? '*' : '')),
-                    counts: items.map(b => b.querySelector('.view-list-count') ? b.querySelector('.view-list-count').textContent : ''), side: document.documentElement.scrollWidth - document.documentElement.clientWidth }; })()`);
+                    alerts: [...r.querySelectorAll('.view-list-alert')].map(e => e.textContent), groups: [...sel.querySelectorAll('optgroup')].map(g => g.label), counts: items.map(b => b.querySelector('.view-list-count') ? b.querySelector('.view-list-count').textContent : ''), side: document.documentElement.scrollWidth - document.documentElement.clientWidth }; })()`);
             await check(`${label}: ${mobile ? 'one select, no column' : 'the column, no select'}`, async () => {
                 const p = await probe();
                 assert.equal(p.nav, !mobile, JSON.stringify(p)); assert.equal(p.sel, mobile, JSON.stringify(p));
@@ -38,9 +38,11 @@ const SECTIONS = `[{ title: 'Views', items: [{ key: 'all', label: 'All chats', c
                 assert.deepEqual(p.current, ['all'], JSON.stringify(p));
                 assert.deepEqual(p.soon, ['active:Active nowsoon'], JSON.stringify(p));
                 assert.deepEqual(p.titles, ['Views', 'Tags']);
-                assert.deepEqual(p.counts, ['183', '12', 'soon', '14', '1'], JSON.stringify(p));
+                assert.deepEqual(p.counts, ['183', '0', 'soon', '14', '1'], JSON.stringify(p));
+                assert.deepEqual(p.alerts, ['183'], 'only a count above 0 that asks for it is the red pill: ' + JSON.stringify(p));
+                assert.deepEqual(p.groups, ['Views', 'Tags'], 'the sections are the select\'s groups: ' + JSON.stringify(p));
                 assert.deepEqual(p.dots, ['#be185d'], 'a colour that is not a hex draws no dot: ' + JSON.stringify(p));
-                assert.deepEqual(p.options, ['All chats (183)*', 'Group chats (12)', 'release (14)', 'bad (1)'], 'the select holds the views that can be picked: ' + JSON.stringify(p));
+                assert.deepEqual(p.options, ['All chats (183)*', 'Group chats (0)', 'release (14)', 'bad (1)'], 'the select holds the views that can be picked: ' + JSON.stringify(p));
             });
             await check(`${label}: picking calls back once, a disabled view never, and an update moves the current view and keeps the keyboard`, async () => {
                 if (mobile) await ev(`(() => { const s = window.__root.querySelector('.view-list-select'); s.value = 'groups'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);

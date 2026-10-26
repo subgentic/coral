@@ -8,9 +8,9 @@
  * are in Display options. The hub's own framed /inbox is not this: it keeps the frame, full width (inbox_tab.js). */
 import { state } from './state.js';
 import { sessionServer, keyLabel, identityKey } from './server_base.js';
-import { escapeHtml as esc, escapeAttr as escAttr, showView } from './utils.js';
+import { showView } from './utils.js';
 import { registerActions, textOf } from './actions.js';
-import { tableMarkup, registerGroupSource, groupHeaderHtml, isGroupFolded, syncPaneGroupToggle, refreshGroupTable, openGroupTable, foldWayBack } from './sidebar_groups.js';
+import { tableMarkup, registerGroupSource, refreshGroupTable, openGroupTable, foldWayBack } from './sidebar_groups.js';
 import { isPhoneLayout } from './phone_layout.js';
 import { browserLocal } from './safe_storage.js';
 import { resolveSessionIdentity, sessionStateInfo } from './session_state.js';
@@ -25,18 +25,20 @@ const { mountInbox } = await importOnce('./inbox_panel.js');
 const saved = await importOnce('./saved.js');
 const DT = await importOnce('./data_table.js'); // the one table (#7743): the Tasks group's page is its Tasks columns
 const TC = await importOnce('./task_columns.js');
+const VL = await importOnce('./view_list.js'); // the mailbox's view list (#7785)
 const { waitingText } = await importOnce('./waiting_text.js'); // a lazy module imports only what loads at startup (import_hygiene): this one loads with it
 
 const $ = id => document.getElementById(id);
 const GROUPS = [
     { key: 'needs', label: 'Needs you', search: 'Search needs you', short: 'Search' },
     { key: 'tasks', label: 'Tasks', search: 'Search tasks', short: 'Search' },
+    { key: 'goals', label: 'Goals', search: 'Search goals', short: 'Search' }, // its table is Frontend Dev's (#7776, table('goals')); until it answers the folder says soon
     { key: 'saved', label: 'Saved', search: 'Search saved messages', short: 'Search' }, // the box beside Display options and Expand is narrow: its placeholder is the short words, its name the whole ones
 ];
 const GROUP_KEY = 'coral.inbox.tab'; // the group last on screen, kept in this browser
 let tasks = [];
 let group = (() => { const v = browserLocal.get(GROUP_KEY); return GROUPS.some(g => g.key === v) ? v : 'needs'; })();
-const queries = { needs: '', tasks: '', saved: '' }; // each group's own search text (lower case; Saved's goes to the server as typed)
+const queries = { needs: '', tasks: '', goals: '', saved: '' }; // each group's own search text (lower case; Saved's goes to the server as typed)
 let page = null; // { kind: 'task', project, id } | { kind: 'saved', id }: the item on screen, or null
 
 // ── Needs you ────────────────────────────────────────────────────────────
@@ -66,34 +68,34 @@ async function refreshTasks() {
 const savedCounts = () => saved.savedView().totals;
 
 // ── The sidebar list ─────────────────────────────────────────────────────
-const countOf = key => key === 'needs' ? needsRows().length : key === 'tasks' ? taskRows().length : savedCounts().open;
-let _navKey = null, _poll = 0;
-/** The three groups in the sidebar: Needs you and Tasks list their rows, Saved is its header (its list is long and has its own table). Only drawn when it changed (this runs for every message of the feed). */
+const countOf = key => key === 'needs' ? needsRows().length : key === 'tasks' ? taskRows().length : key === 'saved' ? savedCounts().open : undefined;
+/** The folders of the Inbox (#7785, the mailbox mock): one view list, a name and a count each. Needs you, Tasks and Saved open their table in the centre; Goals is not built yet. */
+const folderSections = () => [{ title: 'Needs attention', items: [
+    { key: 'needs', label: 'Needs you', count: countOf('needs'), alert: true }, { key: 'tasks', label: 'Tasks', count: countOf('tasks') },
+    { key: 'goals', label: 'Goals', soon: true }, // Frontend Dev removes soon with table('goals') (#7776)
+    { key: 'saved', label: 'Saved', count: countOf('saved') }] }];
+let _navKey = null, _folders = null, _poll = 0;
+/** A folder was picked: a page that is open gives way, and the folder's table opens with the keyboard at its heading. */
+function pickFolder(key) {
+    if (page) closePage(false);
+    setGroup(key);
+    openGroupTable('hub-inbox', key, { focus: true });
+}
+/** The folders in the sidebar. Only drawn when a count or the current folder changed (this runs for every message of the feed). */
 export function renderInboxNav(force = false) {
     const list = $('inbox-nav-list');
     if (!list) return;
+    const here = page ? (page.kind === 'task' ? 'tasks' : 'saved') : group, sections = folderSections();
+    // what the tables show is part of the key too: the folder list is drawn from the counts, but the table on screen is refreshed (refreshGroupTable below) only when a row of it changed
     const needs = needsRows(), tk = taskRows(), sv = saved.savedView().shown.map(saved.savedItemFacts);
-    const openSaved = page && page.kind === 'saved' ? page.id : '';
-    const open = page && page.kind === 'task' ? `${page.project}#${page.id}` : '';
-    const key = JSON.stringify([group, queries.needs, queries.tasks, open, GROUPS.map(g => isGroupFolded('hub-inbox', g.key)), savedCounts().open,
-        needs.map(s => [sessionServer(s), s.session_id, s.display_name, s.waiting_kind, s.waiting_since, teamOf(s), askOf(s)]), tk.map(t => [t.project, t.id, t.title, t.priority, t.status, t.board]), openSaved, sv.map(f => [f.id, f.which, f.saved, f.state])]);
+    const key = JSON.stringify([here, sections, queries.needs, queries.tasks, page && `${page.kind}:${page.project || ''}#${page.id}`,
+        needs.map(s => [sessionServer(s), s.session_id, s.display_name, s.waiting_kind, s.waiting_since, teamOf(s), askOf(s)]), tk.map(t => [t.project, t.id, t.title, t.priority, t.status, t.board, t.updated_at]), sv.map(f => [f.id, f.which, f.saved, f.state])]);
     if (!force && key === _navKey) return;
     _navKey = key;
-    if (needs.some(s => s.waiting_since) && !_poll) _poll = pollEvery(() => renderInboxNav(true), 30000); // "waiting 4 min" moves on while the list is open
-    const held = list.contains(document.activeElement) ? document.activeElement.dataset.rowKey : null; // the row the keyboard is on
-    const needsRow = s => {
-        const wt = waitingText(s.waiting_since);
-        return `<li class="session-list-item sb-row"><button type="button" class="row-btn" data-on-click="inbox-agent-open" data-row-key="${escAttr('n:' + s.session_id)}" data-name="${escAttr(s.name)}" data-agent-type="${escAttr(s.agent_type)}" data-session-id="${escAttr(s.session_id)}" data-server="${escAttr(sessionServer(s))}"><span class="sb-row-name">${esc(resolveSessionIdentity(s))}</span><span class="sb-row-meta">${esc([sessionStateInfo(s).label, wt].filter(Boolean).join(' · '))}</span></button></li>`;
-    };
-    const taskRow = t => {
-        const here = open === `${t.project}#${t.id}`;
-        return `<li class="session-list-item sb-row${escAttr(here ? ' active' : '')}"><button type="button" class="row-btn"${here ? ' aria-current="true"' : ''} data-on-click="inbox-task-open" data-row-key="${escAttr('t:' + t.project + '#' + t.id)}" data-project="${escAttr(t.project)}" data-task-id="${escAttr(t.id)}"><span class="sb-row-name">${esc(t.title || '(no title)')}</span><span class="sb-row-meta">${esc([PRIORITY_WORDS[t.priority] || t.priority, t.board, stateOf(t)].filter(Boolean).join(' · '))}</span></button></li>`;
-    };
-    const savedRow = f => `<li class="session-list-item sb-row${escAttr(openSaved === f.id ? ' active' : '')}"><button type="button" class="row-btn"${openSaved === f.id ? ' aria-current="true"' : ''} data-on-click="inbox-saved-open" data-row-key="${escAttr('s:' + f.id)}" data-id="${escAttr(f.id)}"><span class="sb-row-name">${esc(f.which)}</span><span class="sb-row-meta">${esc([`Saved ${f.saved}`, f.state].filter(Boolean).join(' · '))}</span></button></li>`;
-    list.innerHTML = GROUPS.map(g => groupHeaderHtml('hub-inbox', g.key, g.label, countOf(g.key))
-        + (isGroupFolded('hub-inbox', g.key) ? '' : g.key === 'needs' ? needs.map(needsRow).join('') : g.key === 'tasks' ? tk.map(taskRow).join('') : sv.map(savedRow).join(''))).join('');
-    if (held) [...list.querySelectorAll('.row-btn')].find(b => b.dataset.rowKey === held)?.focus({ preventScroll: true });
-    syncPaneGroupToggle('hub-inbox');
+    if (needsRows().some(s => s.waiting_since) && !_poll) _poll = pollEvery(() => renderInboxNav(true), 30000); // "waiting 4 min" in the Needs you table moves on while the tab is open
+    if (_folders && list.contains(_folders)) VL.update(_folders, { sections, current: here });
+    else { _folders = VL.build({ id: 'inbox-folders', label: 'Inbox views', sections, current: here, onPick: pickFolder }); list.replaceChildren(_folders); }
+    setHidden(document.querySelector('.sidebar-header[data-header="hub-inbox"] [data-group-toggle]'), true); // folders do not fold: the collapse-all button has nothing to fold
     refreshGroupTable('hub-inbox');
 }
 
@@ -214,6 +216,7 @@ registerGroupSource('hub-inbox', {
         if (key === 'saved') return savedListSpec();
         return null;
     },
+    lead: () => { const here = page ? (page.kind === 'task' ? 'tasks' : 'saved') : group, sections = folderSections(); return { signature: JSON.stringify([here, sections]), node: () => VL.build({ id: 'inbox-folders-page', label: 'Inbox views', sections, current: here, onPick: pickFolder }) }; }, // a phone: the folders are one select on top of the table
     isEmpty: () => false, // the tab opens its group's table itself (showInbox)
     showList: () => { closePage(false); window.switchNavTab?.('hub-inbox'); },
     empty: () => { closePage(false); window.switchNavTab?.('hub-inbox'); },
@@ -269,7 +272,7 @@ function openPageShell(kindLabel, groupKey) {
     host.replaceChildren();
     const back = el('button', 'group-back', `\u2190 ${kindLabel}`); // the link back to the group's table (the shared one, sidebar_groups.js)
     back.type = 'button'; back.setAttribute('data-on-click', 'inbox-back'); back.dataset.kind = 'hub-inbox'; back.dataset.group = groupKey; // the way back puts the focus on the row it came from
-    const phoneBack = el('button', 'group-back inbox-phone-back', '\u2190 Inbox');
+    const phoneBack = el('button', 'group-back inbox-phone-back', `\u2190 ${kindLabel}`); // a phone: back to the folder's table, which has the folders' select on top
     phoneBack.type = 'button'; phoneBack.setAttribute('data-on-click', 'inbox-phone-back');
     host.append(back, phoneBack);
     return host;
@@ -356,8 +359,8 @@ function closePage(openTable = true, focusBack = false) {
     if (host) { host.hidden = true; host.replaceChildren(); host.dataset.saved = ''; }
     $('inbox-view')?.removeAttribute('data-phone-item');
     renderInboxNav(true);
-    if (openTable && !isPhoneLayout()) openGroupTable('hub-inbox', g);
-    if (focusBack) focusCameFrom(was, isPhoneLayout() || !openTable);
+    if (openTable) openGroupTable('hub-inbox', g);
+    if (focusBack) focusCameFrom(was, !openTable);
 }
 
 // ── The tab ──────────────────────────────────────────────────────────────
@@ -378,7 +381,7 @@ export async function showInbox() {
     if (page) { if (isPhoneLayout()) $('inbox-view')?.setAttribute('data-phone-item', ''); return; } // a task or a message is open: the tab returns to it
     $('inbox-view')?.removeAttribute('data-phone-item');
     if (document.body.getAttribute('data-nav-tab') !== 'hub-inbox') return; // the module arrived after the person had moved on (a notification's click, a chosen agent): its table must not cover that
-    if (!isPhoneLayout()) openGroupTable('hub-inbox', group);
+    openGroupTable('hub-inbox', group); // a phone too: the table has the folders' select on top
 }
 
 /** The group the Inbox opens on the next time it is shown, with nothing drawn (the Saved button names it before it switches to the tab, so the last group is not on screen first). */
@@ -411,6 +414,6 @@ registerActions({
         if (await saved.savedSetDone(it, done)) sayLive(done ? 'Marked done' : 'Moved back to Open');
     },
     'inbox-goal-open': el => { const board = textOf(el.dataset.board), id = Number(el.dataset.goalId); if (board && id) importOnce('./task_goals.js').then(m => m.openGoalOnBoard(board, id)).catch(() => {}); },
-    'inbox-phone-back': () => closePage(false, true),
+    'inbox-phone-back': () => closePage(true, true),
     'inbox-back': () => { const was = page, g = was ? (was.kind === 'task' ? 'tasks' : 'saved') : group; closePage(false); openGroupTable('hub-inbox', g); focusCameFrom(was, false); }, // the link back to the group's table (on a phone too, as the shared back link did), with the focus on the row it came from
 });

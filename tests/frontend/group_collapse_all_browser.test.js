@@ -29,9 +29,9 @@ const { connect } = require('./agent_view_harness');
             const press = async name => { assert.equal(await label(), name, dev + ': the toggle offers ' + name); await ev(`${toggle}.click(); true`); };
             const after = name => waitFor(`${toggle}.getAttribute('aria-label') === ${JSON.stringify(name)}`, 'the toggle now offers ' + name);
             await build();
-            // The Inbox has been shown, so its three headers are in the page too (#7606): Collapse all folds the Agents list's own groups and stores nothing of the Inbox's
+            // The Inbox has been shown, so its folders are in the page too (#7606, #7785): Collapse all folds the Agents list's own groups and stores nothing of the Inbox's
             await ev(`window.switchNavTab('hub-inbox'); true`);
-            await waitFor(`document.querySelectorAll('[data-pane="hub-inbox"] .session-group-header').length === 3`, dev + ': the Inbox\'s headers are drawn', 10000);
+            await waitFor(`document.querySelectorAll('[data-pane="hub-inbox"] .view-list-item').length === 4`, dev + ': the Inbox\'s folders are drawn', 10000);
             await ev(`window.switchNavTab('agents'); true`);
             await waitFor(`document.querySelectorAll(${JSON.stringify(root)} + ' .session-group-header[data-group-name]').length === 10`, dev + ': back on the Agents list', 5000);
             let s = await state();

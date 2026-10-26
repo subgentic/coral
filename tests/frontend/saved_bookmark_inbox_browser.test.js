@@ -64,8 +64,8 @@ const BASE = require('./test_base').BASE;
             if (mobile) await ev(`window.switchNavTab('hub-inbox'); true`); else await click('#nav-tab-hub-inbox'); // a phone's navigation is not the top row: the switch is the same call
             await sleep(1500); // sleep-ok: the frame sampler records for a fixed window and the page settles after a navigation: no event to wait for
             const viaTab = await ev(`({ group: document.getElementById('group-table-view').getClientRects().length ? (document.getElementById('group-table-view').dataset.group || '').split(':')[1] : '', scroll: (() => { let n = 0; for (let e = document.getElementById('group-table-view'); e; e = e.parentElement) n += Math.round(e.scrollTop); return n; })(), top: document.getElementById('group-table-view').getClientRects().length ? Math.round(document.querySelector('#group-table-view .group-table-chips').getBoundingClientRect().top) : null })`);
-            if (mobile) { // a phone's Inbox is its list, and a group's table is the screen after it (as every tab): the bookmark opens the Saved table, the tab opens the list, neither scrolls
-                assert.deepEqual([viaBookmark.group, viaTab.group, viaBookmark.scroll, viaTab.scroll], ['saved', '', 0, 0], `${tag}: the bookmark opens the Saved table, the Inbox tab the list`);
+            if (mobile) { // a phone's Inbox is a folder's table with the folders' select on top (#7785): the bookmark opens the Saved table, and the tab returns to the folder last on screen, which is Saved; neither scrolls
+                assert.deepEqual([viaBookmark.group, viaTab.group, viaBookmark.scroll, viaTab.scroll], ['saved', 'saved', 0, 0], `${tag}: the bookmark opens the Saved table, the Inbox tab the folder last on screen`);
             } else assert.deepEqual(viaBookmark, viaTab, `${tag}: the bookmark and the Inbox tab land on the same screen`);
             assert.equal(viaBookmark.group, 'saved', `${tag}: and it is Saved`);
 

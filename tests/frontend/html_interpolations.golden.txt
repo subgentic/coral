@@ -313,18 +313,6 @@
 1	history_list.js	typeTag
 1	history_tabs.js	icon
 1	history_tabs.js	statusClass
-1	inbox_sidebar.js	escAttr('n:' + s.session_id)
-1	inbox_sidebar.js	escAttr('s:' + f.id)
-1	inbox_sidebar.js	escAttr('t:' + t.project + '#' + t.id)
-1	inbox_sidebar.js	escAttr(f.id)
-1	inbox_sidebar.js	escAttr(here ? ' active' : '')
-1	inbox_sidebar.js	escAttr(openSaved === f.id ? ' active' : '')
-1	inbox_sidebar.js	escAttr(s.agent_type)
-1	inbox_sidebar.js	escAttr(s.name)
-1	inbox_sidebar.js	escAttr(s.session_id)
-1	inbox_sidebar.js	escAttr(sessionServer(s))
-1	inbox_sidebar.js	escAttr(t.id)
-1	inbox_sidebar.js	escAttr(t.project)
 1	launch_core.js	failList
 1	launch_core.js	started
 1	list_card_parts.js	PIN_ICON

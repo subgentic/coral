@@ -51,25 +51,25 @@ const AGENTS = (waiting) => waiting ? [
             await ev(`localStorage.clear(); window.__coralReady.startup('liveList', 'liveListLoaded', 'settings'); document.documentElement.style.fontSize = '${font}px'; true`);
             await setAgents(false);
             await ev(`window.switchNavTab('hub-inbox'); true`);
-            await waitFor(`!document.querySelector('${pane}').hidden && document.querySelectorAll('${pane} .sgroup-header').length === 3`, `${label}: the Inbox pane`, 10000);
-            await waitFor(`document.querySelectorAll('${pane} .sgroup-header .session-group-count')[1].textContent === '3'`, `${label}: the counts`, 10000);
+            await waitFor(`!document.querySelector('${pane}').hidden && document.querySelectorAll('${pane} .view-list-item').length === 4`, `${label}: the Inbox pane`, 10000);
+            await waitFor(`document.querySelector('${pane} .view-list-item[data-key="tasks"] .view-list-count').textContent === '3'`, `${label}: the counts`, 10000);
             const step = async (name, fn) => { try { await fn(); console.log(`[PASS] ${label}: ${name}`); } catch (e) { console.log(`[FAIL] ${label}: ${name}: ${e.message}`); process.exitCode = 1; } };
 
             await step('the search says "Search" for every group and keeps its whole name', async () => {
                 for (const [group, name] of [['needs', 'Search needs you'], ['tasks', 'Search tasks'], ['saved', 'Search saved messages']]) {
-                    await ev(`document.querySelector('${pane} .sgroup-header[data-group-name="hub-inbox:${group}"]').click(); true`); await settle(300);
+                    await ev(`document.querySelector('${pane} .view-list-item[data-key="${group}"]').click(); true`); await settle(300);
                     const r = await ev(`(() => { const i = document.querySelector('${pane} .sidebar-search-input'); return { ph: i.placeholder, name: i.getAttribute('aria-label') }; })()`);
                     assert.deepEqual(r, { ph: 'Search', name }, group);
                 }
             });
             if (!mobile) await step('opening a group by its header starts at its heading', async () => {
-                await ev(`document.querySelector('${pane} .sgroup-header[data-group-name="hub-inbox:tasks"]').click(); true`); await settle(400);
+                await ev(`document.querySelector('${pane} .view-list-item[data-key="tasks"]').click(); true`); await settle(400);
                 assert.equal((await active()).id, 'group-table-title');
             });
             const click = async (what, sel) => { const ok = await ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return false; e.click(); return true; })()`); assert.ok(ok, `${what}: no ${sel}`); };
             const escape = () => ev(`(document.activeElement || document.body).dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); true`);
             if (!mobile) await step('a task page starts at its title and Back puts the focus on the task row', async () => {
-                await click('Tasks', `${pane} .sgroup-header[data-group-name="hub-inbox:tasks"]`); await settle(300);
+                await click('Tasks', `${pane} .view-list-item[data-key="tasks"]`); await settle(300);
                 await click('the task', '#group-table-view .dt-primary[data-task-id="12"]');
                 await waitFor(`!!document.querySelector('#inbox-page .ibx-reply-input')`, 'the task page', 8000); await settle(300);
                 assert.equal((await active()).cls.includes('wf-item-title'), true, 'the title has the focus');
@@ -77,13 +77,13 @@ const AGENTS = (waiting) => waiting ? [
                 const a = await active(); assert.equal(a.data.taskId, '12', 'Back: the row the task was opened from (' + JSON.stringify(a) + ')');
             });
             if (!mobile) await step('Escape on a task page is one level back, on the same row', async () => {
-                await click('Tasks', `${pane} .sgroup-header[data-group-name="hub-inbox:tasks"]`); await settle(300);
+                await click('Tasks', `${pane} .view-list-item[data-key="tasks"]`); await settle(300);
                 await click('the task', '#group-table-view .dt-primary[data-task-id="13"]'); await settle(500);
                 await escape(); await settle(500);
                 const a = await active(); assert.equal(a.data.taskId, '13', 'Escape (' + JSON.stringify(a) + ')');
             });
             if (!mobile) await step('a saved message page starts at its title; Escape goes back to the Saved table with the focus on that message, not to another tab', async () => {
-                await click('Saved', `${pane} .sgroup-header[data-group-name="hub-inbox:saved"]`); await settle(400);
+                await click('Saved', `${pane} .view-list-item[data-key="saved"]`); await settle(400);
                 const id = await ev(`document.querySelectorAll('#group-table-view .dt-primary')[1].dataset.id`);
                 await click('the message', `#group-table-view .dt-primary[data-id="${id}"]`); await settle(500);
                 assert.equal((await active()).cls.includes('wf-item-title'), true, 'a message page starts at its title');
@@ -92,14 +92,15 @@ const AGENTS = (waiting) => waiting ? [
                 const a = await active(); assert.equal(a.data.id, id, 'with the focus on that message (' + JSON.stringify(a) + ')');
                 assert.equal(await ev(`document.body.getAttribute('data-nav-tab')`), 'hub-inbox', 'still in the Inbox');
             });
-            if (mobile) await step('the phone: a task opens at its title and Back to the list puts the focus on its row', async () => {
-                await ev(`document.querySelector('${pane} .row-btn[data-on-click="inbox-task-open"]').click(); true`); await settle(600);
+            if (mobile) await step('the phone: a task opens at its title and Back puts the focus on its row in the table', async () => {
+                await ev(`document.querySelector('${pane} .view-list-item[data-key="tasks"]').click(); true`); await settle(400);
+                await ev(`document.querySelector('#group-table-view .dt-primary').click(); true`); await settle(600);
                 assert.equal((await active()).cls.includes('wf-item-title'), true, 'the title has the focus');
                 await ev(`document.querySelector('#inbox-page .inbox-phone-back').click(); true`); await settle(500);
-                const a = await active(); assert.ok(/^t:/.test(a.data.rowKey), 'the task row in the list has the focus (' + JSON.stringify(a) + ')');
+                const a = await active(); assert.ok(a.cls.includes('dt-primary') && a.data.taskId, 'the task row in the table has the focus (' + JSON.stringify(a) + ')');
             });
             if (mobile) await step('the Saved table stacks: the message has the row, its state and action are under it, nothing is behind a sideways scroll', async () => {
-                await ev(`window.switchNavTab('hub-inbox'); document.querySelector('${pane} .sgroup-header[data-group-name="hub-inbox:saved"]').click(); true`); await settle(500);
+                await ev(`window.switchNavTab('hub-inbox'); document.querySelector('${pane} .view-list-item[data-key="saved"]').click(); true`); await settle(500);
                 const r = await ev(`(() => { const tb = document.querySelector('#group-table-view .dt-table'); const row = tb.querySelector('tbody tr'); const tds = [...row.children]; const rb = row.getBoundingClientRect(); const first = tds[0].getBoundingClientRect(); const rest = tds.filter(t => t.classList.contains('dt-line-2')).map(t => t.getBoundingClientRect()); const sc = document.querySelector('#group-table-view .dt-box'); const act = row.querySelector('button.dt-quiet'); const ab = act && act.getBoundingClientRect();
                     return { firstW: Math.round(first.width), rowW: Math.round(rb.width), under: rest.every(b => b.top >= first.bottom - 1), over: sc.scrollWidth - sc.clientWidth, actionIn: !!ab && ab.left >= -1 && ab.right <= innerWidth + 1, role: tb.getAttribute('role'), cells: tds.map(t => t.getAttribute('role')) }; })()`);
                 assert.ok(r.firstW >= r.rowW * 0.45, 'the message takes the first line (its date at the right): ' + JSON.stringify(r)); assert.ok(r.under, 'its state and action are under it: ' + JSON.stringify(r)); assert.ok(r.over <= 1, 'no sideways scroll: ' + JSON.stringify(r));

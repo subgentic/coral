@@ -30,12 +30,23 @@
 .view-list-item:hover:not(:disabled) { background: var(--bg-hover); }
 .view-list-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .view-list-current { background: var(--bg-hover); color: var(--text-primary); font-weight: 600; box-shadow: inset 3px 0 0 var(--accent); }
+.view-list-current .view-list-count { color: var(--text-primary); } /* on the hover-coloured current row the secondary colour is under 4.5:1 in the light theme */
+/* the red count pill: the same make as the tab strip's unread badge (layout.css .nav-tab-badge) */
+.view-list-count.view-list-alert {
+    min-width: 16px;
+    padding: 0 6px;
+    border-radius: var(--radius-lg);
+    background: color-mix(in srgb, var(--rail-badge-unread) 82%, black);
+    color: var(--rail-badge-text);
+    font-weight: 700;
+    line-height: 16px;
+    text-align: center;
+}
 .view-list-item:disabled { color: var(--text-muted); cursor: default; }
 .view-list-label { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .view-list-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .view-list-dot { width: 9px; height: 9px; border-radius: var(--radius-xs); flex: none; background: var(--view-list-dot); }
-.view-list-count { flex: none; font-size: 0.75rem; font-weight: 400; font-variant-numeric: tabular-nums; color: var(--text-muted); }
-.view-list-current .view-list-count { color: var(--text-secondary); }
+.view-list-count { flex: none; font-size: 0.75rem; font-weight: 400; color: var(--text-secondary); }
 .view-list-select { display: none; width: 100%; height: 44px; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-secondary); color: var(--text-primary); font-family: var(--font-sans); font-size: 0.875rem; font-weight: 600; }
 .view-list-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (max-width: 767px) {
@@ -45,3 +56,6 @@
 @media (forced-colors: active) {
     .view-list-current { outline: 2px solid Highlight; outline-offset: -2px; box-shadow: none; }
 }
+
+/* In the sidebar the pane is the column: no background or edge of its own */
+.sidebar-section-body > div > .view-list > .view-list-nav { background: none; border-right: 0; padding: 4px; }
