@@ -83,7 +83,7 @@ const SERVERS = [
         await waitFor(`!!document.getElementById('servers-url').closest('.sv-row').querySelector('.sv-error') && !document.getElementById('servers-url').closest('.sv-row').querySelector('.sv-error').hidden`, 'the inline URL error');
         const err = await ev(`(() => { const e = document.getElementById('servers-url').closest('.sv-row').querySelector('.sv-error'); const u = document.getElementById('servers-url');
             return { text: e.textContent.replace(/\\s+/g, ' ').trim(), role: e.getAttribute('role'), invalid: u.getAttribute('aria-invalid'), by: u.getAttribute('aria-describedby'), errId: e.id, focus: document.activeElement === u, top: document.querySelector('#servers-form .sv-status').textContent.includes('unencrypted'), posts: window.__posts, kept: u.value }; })()`);
-        assert.equal(err.text, REFUSED); assert.equal(err.role, 'alert'); assert.equal(err.invalid, 'true'); assert.ok(err.by.split(' ').includes(err.errId), 'the URL field is described by the error: ' + err.by);
+        assert.equal(err.text, REFUSED); assert.equal(err.role, null, 'described, not an alert: the form\'s status line says it once (#8431)'); assert.equal(err.invalid, 'true'); assert.ok(err.by.split(' ').includes(err.errId), 'the URL field is described by the error: ' + err.by);
         assert.equal(err.focus, true, 'focus goes to the URL field');  assert.equal(err.posts, 1); assert.equal(err.kept, 'http://example.org:8420', 'what was typed is kept');
         await shot('refused-desktop');
         // another refusal (a duplicate id) still goes to the form's top error, not next to the URL
