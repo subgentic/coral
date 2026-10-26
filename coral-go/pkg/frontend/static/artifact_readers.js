@@ -48,31 +48,31 @@ function lines(data) {
     return out;
 }
 
-/** The disclosure for an artifact: closed to begin with, loaded when it is opened. */
-export function readersDisclosure(hex, server) {
-    const d = document.createElement('details');
-    d.className = 'artifact-readers';
-    const summary = document.createElement('summary');
-    const chevron = document.createElement('span'); // turns when open, as More options does
-    chevron.className = 'material-icons artifact-readers-chevron'; chevron.setAttribute('aria-hidden', 'true'); chevron.textContent = 'expand_more';
-    summary.append(chevron, 'Who can read this');
+/** "Who can read this" for an artifact, shown directly inside the Details panel (no second disclosure inside the first, #7796): a small heading and the answer, loaded the first time Details is
+ *  shown (details_disclosure.js onShown) and taken out again when the machine cannot say (nothing is drawn, not a line about it, #5991). */
+export function readersBlock(hex, server, details) {
+    const block = document.createElement('section');
+    block.className = 'artifact-readers';
+    const head = document.createElement('h3');
+    head.className = 'artifact-readers-head'; head.textContent = 'Who can read this';
     const body = document.createElement('div');
     body.className = 'artifact-readers-body';
     body.setAttribute('role', 'status');
-    d.append(summary, body);
+    block.append(head, body);
     let loaded = false;
-    d.addEventListener('toggle', async () => {
-        if (!d.open || loaded) return;
+    const load = async () => {
+        if (loaded) return;
         loaded = true;
         body.textContent = 'Loading…';
         try {
             const data = await fetchReaders(hex, server);
-            if (!data) { d.remove(); return; } // the machine cannot say now: draw nothing, not a line about it (#5991)
+            if (!data) { details.remove(block); return; }
             body.replaceChildren(...lines(data).map(t => { const p = document.createElement('p'); p.textContent = t; return p; }));
             if (typeof data.note === 'string' && data.note.trim()) { const n = document.createElement('p'); n.className = 'artifact-readers-note'; n.textContent = clean(data.note, 400); body.append(n); }
-        } catch { d.remove(); }
-    });
-    return d;
+        } catch { details.remove(block); }
+    };
+    details.onShown(load);
+    return block;
 }
 
 export function _resetForTests() { _allowed = undefined; }

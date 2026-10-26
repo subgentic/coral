@@ -1376,10 +1376,11 @@
     body #mobile-session-list .session-goal { height: auto; }
 }
 
-/* Close buttons and the "Who can read this" disclosure are 44px targets on a phone-width window on any pointer (the touch rule covers a coarse pointer only) (#5681). */
+/* Close buttons and the Details button are 44px targets on a phone-width window on any pointer (the touch rule covers a coarse pointer only) (#5681, #7796). The pane's Details button ends the title's small line:
+   its text stays small and it is drawn over the line's edges (negative margins) so the header does not grow. */
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
-    .modal-close-btn, .artifact-viewer-close { min-width: 44px; min-height: 44px; }
-    .artifact-readers > summary { min-height: 44px; }
+    .modal-close-btn, .artifact-viewer-close, .details-toggle { min-width: 44px; min-height: 44px; }
+    .detail-sub-row .details-toggle { min-width: 44px; min-height: 44px; margin: -14px 0 -14px -6px; } /* the pane's own rule (a line's height) is more specific than the one above */
 }
 
 /* Jobs on phones: the Jobs list lives in the page above the job's detail, as History's does (#6139). */

@@ -4,7 +4,7 @@
 //     no ring is flagged (checked on a control that has none);
 //   - the Team settings dialog's Close button closes it, and "Rename board" does not (the dialog's close handler was on the first button of its header);
 //   - focus returns to the opener when the Team settings dialog, the artifact viewer, Settings and the Launch dialog close, by Escape and by their button;
-//   - at 390 px with a mouse (no touch pointer) the close buttons are 44 px and the "Who can read this" summary is 44 px high;
+//   - at 390 px with a mouse (no touch pointer) the close buttons are 44 px and the Details button is 44 px high;
 //   - the Linked teams heading holds its words only: the "Manage in Coral Hub" link is beside it, not inside it.
 // Drives Chrome over CDP against the isolated dev server through agent_view_harness.js; run_cdp_suites.mjs finds it by name.
 const assert = require('node:assert/strict');
@@ -25,7 +25,7 @@ const BASE = require('./test_base').BASE;
             ready: `!!document.querySelector('#team-settings-workspace .settings-tab[data-section=messaging]')`, then: `document.querySelector('#team-settings-workspace .settings-tab[data-section=messaging]').click(); true`, ready2: `!!document.querySelector('.xt-primary') && !!document.querySelector('.xt-links')`,
             page: true, isOpen: `!!document.querySelector('#team-settings-workspace')` },
         'Artifact viewer': { root: '.artifact-viewer', open: `import((window.__coralStatic || '/static/') + 'artifact_viewer.js').then(m => m.openArtifactViewer('${HEX}', {})); true`,
-            ready: `!!document.querySelector('.artifact-readers > summary')`, then: `const t = document.querySelector('.artifact-viewer .details-toggle'); if (t.getAttribute('aria-expanded') !== 'true') t.click(); document.querySelector('.artifact-readers > summary').click(); true`, ready2: `document.querySelector('.artifact-readers').open`,
+            ready: `!!document.querySelector('.artifact-viewer .details-toggle:not([hidden])')`, then: `const t = document.querySelector('.artifact-viewer .details-toggle'); if (t.getAttribute('aria-expanded') !== 'true') t.click(); true`, ready2: `!!document.querySelector('.artifact-readers .artifact-readers-head') && document.querySelector('.artifact-readers .artifact-readers-head').getClientRects().length > 0`,
             isOpen: `!!document.querySelector('.artifact-viewer') && !document.querySelector('.artifact-viewer').hidden`, closeBtn: `document.querySelector('.artifact-viewer-close')` },
         'Settings': { root: '#settings-modal', open: `(async () => { await window.showSettingsModal('network'); return true; })()`, ready: `getComputedStyle(document.getElementById('settings-modal')).display !== 'none' && !!document.getElementById('settings-cloud-hub-cross-team')`,
             isOpen: `getComputedStyle(document.getElementById('settings-modal')).display !== 'none'`, closeBtn: `[...document.querySelectorAll('#settings-modal .modal-actions .btn')].find(x => x.textContent.trim() === 'Cancel')` },
@@ -73,11 +73,11 @@ const BASE = require('./test_base').BASE;
             await waitFor(`document.activeElement && document.activeElement.id === 'opener'`, `${name}, closed by ${how}: the focus is back on the opener`, 5000).catch(async () => assert.fail(`${name}, closed by ${how}: focus is on ${await ev(`document.activeElement.tagName + '#' + document.activeElement.id + '.' + document.activeElement.className`)}`));
         }
 
-        console.log('4. 390 px with a mouse: 44px close buttons and disclosure');
+        console.log('4. 390 px with a mouse: 44px close buttons and Details button');
         await fresh(390, 844, true);
         await show(SURFACES['Artifact viewer']);
-        const c2 = await ev(`(() => { const q = s => { const r = document.querySelector(s).getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; }; return { close: q('.artifact-viewer-close'), summary: q('.artifact-readers > summary') }; })()`);
-        assert.ok(c2.close[0] >= 44 && c2.close[1] >= 44, 'the viewer\'s close button is 44px: ' + c2.close); assert.ok(c2.summary[1] >= 44, 'the disclosure is 44px high: ' + c2.summary);
+        const c2 = await ev(`(() => { const q = s => { const r = document.querySelector(s).getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; }; return { close: q('.artifact-viewer-close'), details: q('.artifact-viewer .details-toggle') }; })()`);
+        assert.ok(c2.close[0] >= 44 && c2.close[1] >= 44, 'the viewer\'s close button is 44px: ' + c2.close); assert.ok(c2.details[0] >= 44 && c2.details[1] >= 44, 'the Details button is a 44px target: ' + c2.details);
 
         console.log('5. The Linked teams heading holds its words only');
         await fresh(); await show(SURFACES['Team settings, Messaging']);

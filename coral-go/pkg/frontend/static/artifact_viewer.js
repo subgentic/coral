@@ -12,7 +12,7 @@ import { downloadArtifact, sanitizeDownloadName } from './artifact_download.js';
 import { trapTab } from './dialog_focus.js';
 import { importOnce } from './import_once.js';
 import { pushOverlay, popOverlay } from './overlay_history.js';
-const { readersAllowed, readersDisclosure } = await importOnce('./artifact_readers.js'); // lazy: its failure is retried
+const { readersAllowed, readersBlock } = await importOnce('./artifact_readers.js'); // lazy: its failure is retried
 const { makeDetails } = await importOnce('./details_disclosure.js'); // "Who can read this" behind the one Details button (#7775)
 // Asked for when used, not imported: this module loads lazily and may only import startup modules statically.
 const { attachComments, commentBoard } = await importOnce('./artifact_comments.js');
@@ -118,7 +118,7 @@ export function openArtifactViewer(hex, opts = {}) {
     _versions.open(hex, opts.server, { switched: !!opts.switched });
     // "Who can read this", for the Operator (the owner through Coral Hub): drawn only when the machine answers it; anyone else sees nothing.
     _details.clear();
-    readersAllowed(hex, opts.server).then(ok => { if (ok && gen === _gen && !d.hidden) _details.add(readersDisclosure(hex, opts.server)); }).catch(() => {});
+    readersAllowed(hex, opts.server).then(ok => { if (ok && gen === _gen && !d.hidden) _details.add(readersBlock(hex, opts.server, _details)); }).catch(() => {});
     if (!opts.switched) d.querySelector('.artifact-viewer-close').focus(); // a version chosen from the bar keeps the keyboard on the bar
     renderArtifact(body, `coral://artifacts/${hex}`, { server: opts.server, filename: opts.filename, mediaType: opts.mediaType }, {
         signal: _abort.signal,
