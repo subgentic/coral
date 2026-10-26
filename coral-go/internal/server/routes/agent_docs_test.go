@@ -128,8 +128,8 @@ func TestTheDocsListUsesEachDocsOwnHeading(t *testing.T) {
 func TestListTitleIsOneShortLine(t *testing.T) {
 	for in, want := range map[string]string{
 		"Personal tasks: coral-agent CLI and API": "Personal tasks",
-		"Agent UI (POC)":                  "Agent UI",
-		"Team configuration (agent.json)": "Team configuration",
+		"Agent UI (POC)":                                           "Agent UI",
+		"Team configuration (agent.json)":                          "Team configuration",
 		"Coordination efficiency reporting & metrics architecture": "Coordination efficiency reporting",
 		"What Coral stores on this computer":                       "What Coral stores on this computer",
 		"Task workflows and completion artifacts":                  "Task workflows and completion artifacts",
@@ -146,4 +146,31 @@ func TestListTitleIsOneShortLine(t *testing.T) {
 	}
 	assert.NotContains(t, listTitle("Words, and more words that go on and on and on, & more"), "&", "never ends on a bare ampersand")
 	assert.Equal(t, "MCP servers", sentenceCase("mcp Servers"))
+}
+
+func TestAgentDocsSummary(t *testing.T) {
+	cases := []struct{ name, body, want string }{
+		{"prose", "# Title\n\nRead **topics** with `coral-agent docs`\nand [examples](https://example.test).\n\nSecond paragraph.", "Read topics with coral-agent docs and examples."},
+		{"blocks", "---\ntitle: metadata\n---\n# Title\n\n<!-- hidden\ncomment -->\n```sh\nnot prose\n```\n\n- bullet\n\n| table |\n| --- |\n\nThe _first_ __real__ paragraph &amp; [reference][ref].\n\n[ref]: https://example.test", "The first real paragraph & reference."},
+		{"setext", "Title\n=====\n\nBody with <em>inline</em> markup and user_id.", "Body with inline markup and user_id."},
+		{"empty", "# Only heading\n\n~~~\nonly code\n~~~\n", ""},
+		{"code-markup", "# Title\n\nUse `<topic>` and <strong>words</strong>, or <https://example.test>.", "Use <topic> and words, or https://example.test."},
+		{"unicode", "# Title\n\nRésumé — use \\*literal\\* marks.", "Résumé — use *literal* marks."},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			fsys := fstest.MapFS{"topic.md": {Data: []byte(tc.body)}}
+			rec := httptest.NewRecorder()
+			NewAgentDocsHandler(fsys).List(rec, httptest.NewRequest(http.MethodGet, "/api/agent-docs", nil))
+			require.Equal(t, http.StatusOK, rec.Code)
+			var got []map[string]string
+			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &got))
+			require.Len(t, got, 1)
+			assert.Equal(t, tc.want, got[0]["summary"])
+			if tc.want == "" {
+				assert.NotContains(t, got[0], "summary")
+			}
+		})
+	}
+	assert.Empty(t, docSummary(fstest.MapFS{}, "missing.md"))
 }

@@ -2,10 +2,12 @@ package routes
 
 import (
 	"errors"
+	"html"
 	"io"
 	"io/fs"
 	"net/http"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"unicode"
@@ -39,8 +41,9 @@ func (h *AgentDocsHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type docEntry struct {
-		Name  string `json:"name"`
-		Title string `json:"title"`
+		Name    string `json:"name"`
+		Title   string `json:"title"`
+		Summary string `json:"summary,omitempty"`
 	}
 
 	docs := []docEntry{} // [] when there are none, never null: the Docs tab reads null as a failed load
@@ -49,7 +52,7 @@ func (h *AgentDocsHandler) List(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		name := strings.TrimSuffix(e.Name(), ".md")
-		docs = append(docs, docEntry{Name: name, Title: docTitle(h.docsFS, e.Name(), name)})
+		docs = append(docs, docEntry{Name: name, Title: docTitle(h.docsFS, e.Name(), name), Summary: docSummary(h.docsFS, e.Name())})
 	}
 	sort.Slice(docs, func(i, j int) bool {
 		// README first, then alphabetical
@@ -287,3 +290,88 @@ func upperFirst(s string) string {
 	}
 	return s
 }
+
+// docSummary returns the first prose paragraph, excluding headings, code, lists,
+// tables and metadata. List clients receive plain text and never need to fetch
+// every document just to describe its topic.
+func docSummary(docs fs.FS, file string) string {
+	data, err := fs.ReadFile(docs, file)
+	if err != nil {
+		return ""
+	}
+	text := docComment.ReplaceAllString(string(data), "")
+	lines := strings.Split(text, "\n")
+	var paragraph []string
+	fence := ""
+	frontmatter := len(lines) > 0 && strings.TrimSpace(lines[0]) == "---"
+	for i, raw := range lines {
+		line := strings.TrimSpace(raw)
+		if frontmatter {
+			if i > 0 && (line == "---" || line == "...") {
+				frontmatter = false
+			}
+			continue
+		}
+		if fence != "" {
+			if strings.HasPrefix(line, fence) {
+				fence = ""
+			}
+			continue
+		}
+		if strings.HasPrefix(line, "```") || strings.HasPrefix(line, "~~~") {
+			if len(paragraph) > 0 {
+				break
+			}
+			fence = line[:3]
+			continue
+		}
+		if line == "" {
+			if len(paragraph) > 0 {
+				break
+			}
+			continue
+		}
+		// Setext headings are prose-looking lines followed by an underline.
+		if i+1 < len(lines) && docUnderline.MatchString(strings.TrimSpace(lines[i+1])) {
+			continue
+		}
+		if strings.HasPrefix(raw, "    ") || strings.HasPrefix(raw, "\t") || docBlock.MatchString(line) {
+			if len(paragraph) > 0 {
+				break
+			}
+			continue
+		}
+		paragraph = append(paragraph, line)
+	}
+	line := strings.Join(paragraph, " ")
+	line = docRefLink.ReplaceAllString(line, "$1")
+	line = docInlineHTML.ReplaceAllStringFunc(line, func(part string) string {
+		if strings.HasPrefix(part, "`") {
+			return part
+		} // inline code may contain literal <placeholders>
+		if docAutolink.MatchString(part) {
+			return docAutolink.ReplaceAllString(part, "$1")
+		}
+		return ""
+	})
+	line = markdownLine(line)
+	for _, re := range docEmphasis {
+		line = re.ReplaceAllString(line, "$1$2$3")
+	}
+	line = docEscape.ReplaceAllString(line, "$1")
+	return strings.Join(strings.Fields(html.UnescapeString(line)), " ")
+}
+
+var (
+	docComment    = regexp.MustCompile(`(?s)<!--.*?-->`)
+	docUnderline  = regexp.MustCompile(`^(?:=+|-+)\s*$`)
+	docBlock      = regexp.MustCompile(`^(?:#{1,6}(?:\s|$)|>|[-+*]\s|[0-9]+[.)]\s|\||\[[^]]+\]:|[-*_]{3,}\s*$|=+\s*$|<[/!a-zA-Z])`)
+	docRefLink    = regexp.MustCompile(`!?\[([^]]+)\]\[[^]]*\]`)
+	docAutolink   = regexp.MustCompile(`<((?:https?://|mailto:)[^>]+)>`)
+	docInlineHTML = regexp.MustCompile("`+[^`]*`+|<[^>]*>")
+	docEscape     = regexp.MustCompile(`\\([[:punct:]])`)
+	docEmphasis   = []*regexp.Regexp{
+		regexp.MustCompile(`(^|[\s(])__(\S(?:.*?\S)?)__($|[\s).,;:!?])`),
+		regexp.MustCompile(`(^|[\s(])_(\S(?:.*?\S)?)_($|[\s).,;:!?])`),
+	}
+)
