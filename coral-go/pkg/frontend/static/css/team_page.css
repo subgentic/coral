@@ -166,7 +166,6 @@
 .team-agent-tasks { margin: 0; padding-left: 18px; }
 /* The Settings tab (stage 3): one page of four sections, rows with the label and hint at the left and the control at the right, and a bar pinned under it (the status line, Cancel at the left, Save settings at the right). */
 .team-settings-page { flex: 1; min-height: 0; display: flex; flex-direction: column; container-type: inline-size; }
-.xt-embedded .xt-save { display: none; }
 @media (max-width: 760px) {
     .team-settings-page select, .team-settings-page input:not([type="checkbox"]), .team-settings-page .btn { min-height: var(--control-touch-height, 44px); } /* every control of the page is a touch target (the prompt role list too) */
 }

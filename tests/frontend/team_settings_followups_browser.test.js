@@ -70,13 +70,13 @@ const BASE = require('./test_base').BASE;
         const foot = await ev(`(() => { const f = document.querySelector('.sv-bar'); const r = f.getBoundingClientRect(); return { h: Math.round(r.height), wrap: r.width }; })()`);
         assert.ok(foot.h <= 64, 'the footer is short: ' + JSON.stringify(foot)); 
         assert.equal(await ev(`[...document.querySelector('.sv-bar-buttons').children].filter(c => c.tagName === 'SPAN').length`), 0, 'no caption beside the Save button: it says what it saves (#5998)');
-        const wide = await ev(`(() => { const f = document.querySelector('.working-mode-form'); const over = [...f.querySelectorAll('*')].filter(e => e.getClientRects().length && e.getBoundingClientRect().right > f.getBoundingClientRect().right + 1).slice(0, 4).map(e => e.tagName + '.' + (e.className || e.name || '')); return { sw: f.scrollWidth, cw: f.clientWidth, over }; })()`);
+        const wide = await ev(`(() => { const f = document.querySelector('#team-settings-workspace .settings-panes'); const over = [...f.querySelectorAll('*')].filter(e => e.getClientRects().length && e.getBoundingClientRect().right > f.getBoundingClientRect().right + 1).slice(0, 4).map(e => e.tagName + '.' + (e.className || e.name || '')); return { sw: f.scrollWidth, cw: f.clientWidth, over }; })()`);
         assert.ok(wide.sw <= wide.cw + 1, 'the form does not scroll sideways on a phone: ' + JSON.stringify(wide));
         // the end of the Workflow tab, and the Edit presets editor: the last control scrolled to is above the footer, not under it
         await ev(`document.querySelector('.preset-editor > summary').click(); true`);
         const covered = async sel => ev(`(() => { const el = document.querySelector(${JSON.stringify(sel)}); el.focus(); el.scrollIntoView({ block: 'nearest' }); const r = el.getBoundingClientRect(); const f = document.querySelector('.sv-bar').getBoundingClientRect(); const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return { onTop: top === el || el.contains(top), above: r.bottom <= f.top + 1 }; })()`);
         for (const sel of ['.preset-editor > summary', '.preset-save']) { const c = await covered(sel); assert.ok(c.onTop, `${sel} is not under the footer: ` + JSON.stringify(c)); }
-        await ev(`document.querySelector('.preset-save').focus(); document.querySelector('.working-mode-form').scrollTop = 1e6; true`);
+        await ev(`document.querySelector('.preset-save').focus(); document.querySelector('#team-settings-workspace .settings-panes').scrollTop = 1e6; true`);
         const end = await ev(`(() => { const last = [...document.querySelectorAll('#team-settings-workspace .preset-editor > *')].pop().getBoundingClientRect(); const f = document.querySelector('.sv-bar').getBoundingClientRect(); return { lastBottom: Math.round(last.bottom), footTop: Math.round(f.top) }; })()`);
         assert.ok(end.lastBottom <= end.footTop + 1, 'scrolled to the end, the last line is above the footer: ' + JSON.stringify(end));
         await shot('workflow-phone-end');

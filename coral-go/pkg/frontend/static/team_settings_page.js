@@ -9,6 +9,7 @@ const { boardRenameControl } = await importOnce('./board_rename.js');
 const { bindInfo } = await importOnce('./info_toggle.js');
 const { refusalOf, answeredLocally } = await importOnce('./owner_refusal.js');
 const { requireGoalSentence } = await importOnce('./task_goals.js');
+const { createMessaging, XT_KEYS } = await importOnce('./team_cross_team_fields.js');
 const { healthFields, healthToValues, saveHealth, HEALTH_KEYS } = await importOnce('./team_health_fields.js');
 const { HEALTH_DEFAULTS } = await importOnce('./team_health_settings.js');
 const { jsonError, presetNameText, presetInstructionsText, presetLabel, renderInspection } = await importOnce('./team_working_mode.js');
@@ -43,7 +44,7 @@ export async function showTeamSettingsPage(team, options = {}) {
     const presetsURL = serverUrl(`/api/board/${board}/working-mode/presets`, teamServer);
     const boardSettingsURL = serverUrl(`/api/board/${board}/settings`, teamServer);
     const inspectionURL = serverUrl(`/api/settings/prompt-inspection?board=${board}`, teamServer);
-    let presets = [], workingMode = null, healthMonitorOn = true, healthBase = null, crossApi = null, view = null;
+    let presets = [], workingMode = null, healthMonitorOn = true, healthBase = null, view = null;
 
     // One read of everything the tab shows, started now: the mode list and the load both wait for it.
     const dataReady = Promise.all([fetch(workingModeURL), fetch(presetsURL), fetch('/api/settings'), fetch(inspectionURL), fetch(boardSettingsURL).catch(() => null)]);
@@ -58,6 +59,7 @@ export async function showTeamSettingsPage(team, options = {}) {
         v.say('The defaults are filled in. Save to apply them.');
         q('input[name="on"]')?.focus();
     }
+    const xt = createMessaging(team); // the Messaging group: its fields, its lines and its save
     const modeOptions = () => (presets.length ? presets.map(p => ({ value: p.id, label: presetNameText(p) })) : DEFAULT_MODES);
     const modeSelect = () => view.host.querySelector('select[name="mode"]');
     const q = sel => view.host.querySelector(sel);
@@ -75,7 +77,6 @@ export async function showTeamSettingsPage(team, options = {}) {
             const h = host.querySelector('.settings-pane:not([hidden]) .settings-pane-title'); if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); } // the button that had the focus is gone: it goes to the open group's heading
         } },
         readOnly: key => (key === 'require_goal' && !answeredLocally(team) ? true : false), // only this computer changes it (the route refuses it through Coral Hub)
-        parts: () => [crossApi && { dirty: () => crossApi.dirty(), save: () => crossApi.save() }],
         groups: [
             { id: 'workflow', label: 'Workflow', icon: 'account_tree', hint: 'How agents work on this team.', fields: [
                 { key: 'board_name', type: 'custom', label: 'Board name', help: 'Only the label changes: its agents, tasks and history stay.',
@@ -90,7 +91,7 @@ export async function showTeamSettingsPage(team, options = {}) {
                 { key: 'presets', type: 'custom', label: 'Presets', help: 'A preset saves with Save preset, not Save settings.', wide: true, render: slot => { slot.innerHTML = PRESET_EDITOR; } },
             ] },
             { id: 'health', domId: 'team-settings-health', label: 'Health check', icon: 'notifications', hint: 'When an agent that stopped working is noticed.', fields: healthFields({ members: () => membersReady, hasHeld: () => Boolean(healthBase && healthBase.held_notice), monitorOff: () => !healthMonitorOn, onReset: resetHealth, openSettings: () => window.showSettingsModal?.('agents') }) },
-            { id: 'messaging', label: 'Messaging', icon: 'chat', hint: 'How the team\'s messages reach its agents.', render: p => { p.innerHTML = '<div id="team-settings-messaging"><p class="sv-help ct-loading" role="status">Loading\u2026</p></div>'; } },
+            { id: 'messaging', domId: 'team-settings-messaging', label: 'Messaging', icon: 'chat', hint: 'How the team\'s messages reach its agents.', fields: xt.fields() },
             { id: 'prompts', label: 'Prompts', icon: 'description', hint: 'Read-only preview of the prompts agents get.', render: p => { p.innerHTML = '<div class="prompt-inspection-content" aria-live="polite">Loading prompt inspection\u2026</div>'; } },
         ],
         load: async () => {
@@ -102,7 +103,7 @@ export async function showTeamSettingsPage(team, options = {}) {
             renderPresets();
             // The all-Coral health switch lives in Settings (#5128); this page only reads it, for the Health check note.
             if (settingsResponse.ok) healthMonitorOn = String((await settingsResponse.json()).settings?.board_health_monitor ?? '').trim().toLowerCase() !== 'false'; // a boolean is stored as "False"
-            let boardSettings = null;
+            let boardSettings = null, xtValues = {};
             if (boardSettingsResponse?.ok) {
                 boardSettings = await boardSettingsResponse.json();
                 if (boardSettings.health && typeof boardSettings.health === 'object') healthBase = JSON.parse(JSON.stringify(boardSettings.health)); else view.removeGroup('health'); // only when the settings GET returned a "health" object: not through Coral Hub
@@ -111,14 +112,14 @@ export async function showTeamSettingsPage(team, options = {}) {
                     const stateResponse = await fetch(serverUrl(`/api/board/${board}/cross-team-state`, teamServer)).catch(() => null);
                     crossTeam = stateResponse?.ok ? await stateResponse.json().catch(() => null) : null;
                 }
-                await fillMessaging({ state: crossTeam, settings: boardSettings }).catch(() => fillMessaging({}));
+                xtValues = await xt.load({ state: crossTeam, settings: boardSettings }).catch(() => xt.load({}));
             } else {
                 view.removeGroup('health');
                 // The board settings could not be loaded: through Coral Hub the owner-only settings can be refused (#5323): the Messaging group says why, in our words (and the Health check is not drawn).
-                await fillMessaging({ refusal: boardSettingsResponse ? await refusalOf(boardSettingsResponse, answeredLocally(team)) : '' });
+                xtValues = await xt.load({ refusal: boardSettingsResponse ? await refusalOf(boardSettingsResponse, answeredLocally(team)) : '' });
             }
             q('.prompt-inspection-content').innerHTML = inspectionResponse.ok ? renderInspection(await inspectionResponse.json(), workingMode) : `<p class="sv-help">Prompt inspection: ${escapeHtml(await refusalOf(inspectionResponse, answeredLocally(team)))}</p>`;
-            return { mode: workingMode.mode || 'none', dependency_guidance: Boolean(workingMode.dependency_guidance), asks_are_tasks: Boolean(workingMode.asks_are_tasks), custom_instructions: workingMode.custom_instructions || '', require_goal: Boolean(boardSettings?.require_goal), ...(healthBase ? healthToValues(healthBase) : {}) };
+            return { mode: workingMode.mode || 'none', dependency_guidance: Boolean(workingMode.dependency_guidance), asks_are_tasks: Boolean(workingMode.asks_are_tasks), ...xtValues, custom_instructions: workingMode.custom_instructions || '', require_goal: Boolean(boardSettings?.require_goal), ...(healthBase ? healthToValues(healthBase) : {}) };
         },
         // What changed since the page loaded (the working mode is saved whole: what the server has now, with only the fields changed here, #4423).
         save: async (changes, { before, values }) => {
@@ -151,15 +152,19 @@ export async function showTeamSettingsPage(team, options = {}) {
                     saved.push(...HEALTH_KEYS);
                 } catch (error) { failures.push(error.message); }
             }
+            if (XT_KEYS.some(k => k in changes)) {
+                try { await xt.save(); saved.push(...XT_KEYS); } catch (error) { failures.push(error.message); }
+            }
             if (failures.length) throw Object.assign(new Error(failures[0]), { saved });
-            return { note: modeChanged ? 'Saved. Working mode applies on first claim.' : null, rebase: saved.filter(k => HEALTH_KEYS.includes(k)) };
+            return { note: modeChanged ? 'Saved. Working mode applies on first claim.' : null, rebase: saved.filter(k => HEALTH_KEYS.includes(k) || XT_KEYS.includes(k)) };
         },
     });
     page.view = view; // the page's settings_view (a test reads what changed through it)
     page.hasUnsaved = () => view.isDirty(); // read live by the leave-the-page question (team_working_mode.js)
+    xt.bind(view);
     view.say('Loading\u2026');
-    view.ready.then(() => syncModeDescription()).catch(() => {}); // the line under the list follows the mode the load set
-    view.ready.catch(error => { view.say(error.message, true); const c = q('.prompt-inspection-content'); if (c) c.textContent = 'Prompt inspection could not be loaded.'; fillMessaging({}).catch(() => {}); });
+    view.ready.then(() => { syncModeDescription(); xt.drawn(); }).catch(() => {}); // the line under the list follows the mode the load set
+    view.ready.catch(error => { view.say(error.message, true); const c = q('.prompt-inspection-content'); if (c) c.textContent = 'Prompt inspection could not be loaded.'; xt.load({}).then(() => xt.drawn()).catch(() => {}); });
 
     // -- the Working mode row: the line under it, the docs link in its Learn more --------------------------
     const modeRow = q('.sv-row[data-key="mode"]');
@@ -280,13 +285,6 @@ export async function showTeamSettingsPage(team, options = {}) {
     };
 
     // -- the Health check and Messaging groups: their forms, saved by the page's bar ---------------------------
-    async function fillMessaging(info) {
-        const slot = q('#team-settings-messaging');
-        if (!slot) return;
-        const m = await importOnce('./team_cross_team_settings.js');
-        crossApi = await m.mountCrossTeamSettings(slot, team, info || {}, { embedded: true });
-    }
-    page.addEventListener('cross-team-saved', () => view.refresh());
 
     // -- the prompt preview: one role at a time, Copy takes the text of the one shown (UI audit #5589, finding 10) ----
     const inspection = q('.prompt-inspection-content');

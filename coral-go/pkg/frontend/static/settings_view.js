@@ -341,6 +341,7 @@ export function mountSettingsView(host, spec) {
         dirty: dirtyKeys,
         isDirty: () => dirtyKeys().size > 0 || partsDirty().length > 0,
         refresh: afterChange,
+        accept(keys) { for (const k of keys) if (fields.has(k) && fields.get(k).field.apply !== 'now') baseline[k] = fields.get(k).ctl.get(); afterChange(); }, // what a field shows now is its loaded value (the caller saved it elsewhere)
         say(text, isError = false) { status = text || null; statusError = !!isError && !!text; paintBar(); }, // a line of the caller's own in the bar (a part saved elsewhere, a load that failed)
         changes() { const o = {}; for (const k of dirtyKeys()) if (!(readOnlyOf(k) || fields.get(k).field.readOnly || fields.get(k).row.hidden)) o[k] = fields.get(k).ctl.get(); return o; },
         error: showError,
@@ -392,6 +393,7 @@ export function mountSettingsView(host, spec) {
             barSpec && barSpec.onCancel && barSpec.onCancel();
         },
         showGroup(id) { if (shell) { showSection(shell, id); announce(); } },
+        removeFields(keys) { for (const k of keys) { const r = fields.get(k); if (r) { r.row.remove(); fields.delete(k); errors.delete(k); } } afterChange(); }, // fields that do not apply (known only after the load): their rows go, with their values
         removeGroup(id) { // a group that does not apply (known only after the load): its nav entry and its pane go
             if (!shell) return;
             const open = view.group() === id;

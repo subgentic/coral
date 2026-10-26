@@ -54,7 +54,7 @@ export function healthFields(ctx) {
             note.append(link, '. It takes effect after Coral restarts.'); slot.append(note);
         } },
         { key: 'on', type: 'toggle', label: 'Send health check', help: 'Checks on stuck or idle agents. Uses tokens each time.' },
-        { key: 'interval_min', type: 'number', label: 'Every', unit: 'minutes', min: LO, max: HI, integer: true, disabledWhen: v => !v.on },
+        { key: 'interval_min', type: 'number', label: 'Check every', unit: 'minutes', min: LO, max: HI, integer: true, disabledWhen: v => !v.on },
         { key: 'recipient', type: 'select', label: 'Send it to', disabledWhen: v => !v.on, options: async () => {
             const members = await ctx.members();
             return [{ value: '', label: 'The orchestrator (default)' }, ...members.map(m => ({ value: m.subscriber_id, label: `${m.subscriber_id}${m.job_title ? ` (${m.job_title})` : ''}` }))];

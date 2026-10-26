@@ -39,18 +39,18 @@ const SID = '0b7c2e4a-5d1f-4c8e-9a36-2f4d8e1b7c90';
             return R(u, o); }; return true; })()`);
     const open = async (opts = {}) => {
         await ev(`document.getElementById('team-settings-workspace')?.remove(); import(${S} + 'team_working_mode.js').then(m => m.showTeamWorkingMode(${JSON.stringify(TEAM)}, { page: (document.getElementById('qa-ts-host') || document.body.appendChild(Object.assign(document.createElement('div'), { id: 'qa-ts-host', style: 'position:fixed;inset:0;display:flex;z-index:50;background:var(--bg-primary)' }))) })); true`);
-        await waitFor(`${opts.noHealth ? 'true' : "!!document.querySelector('#team-settings-workspace .settings-tab[data-section=health]')"} && !!document.querySelector('#team-settings-messaging form, #team-settings-messaging .ct-unavailable')`, 'the settings dialog and the Messaging panel', 15000);
+        await waitFor(`${opts.noHealth ? 'true' : "!!document.querySelector('#team-settings-workspace .settings-tab[data-section=health]')"} && !!document.querySelector('#team-settings-messaging [name=cross_team_messaging], #team-settings-messaging .ct-unavailable')`, 'the settings dialog and the Messaging panel', 15000);
         await ev(`document.querySelector('#team-settings-workspace .settings-tab[data-section=messaging]').click(); true`);
         await settle(150);
     };
     const P = '#team-settings-messaging';
-    const panel = () => ev(`(() => { const q = s => document.querySelector('${P} ' + s); const all = s => [...document.querySelectorAll('${P} ' + s)];
+    const panel = () => ev(`(() => { const q = s => document.querySelector('${P} ' + s); const shown = n => { const i = q('input[name=' + n + ']'); const r = i && i.closest('.sv-row'); return !!r && !r.hidden; }; const all = s => [...document.querySelectorAll('${P} ' + s)];
         const dot = q('.xt-head .update-state-dot'); const prim = q('.xt-primary');
         return { line: (q('.xt-line') || {}).textContent || '', dot: dot ? dot.dataset.k || '' : null, prim: prim ? { tag: prim.tagName, text: prim.textContent.replace(/\\s+/g, ' ').trim(), href: prim.getAttribute('href'), target: prim.target, rel: prim.rel, act: prim.dataset.act || '' } : null,
-            msg: q('input[name=cross_team_messaging]') ? q('input[name=cross_team_messaging]').checked : null, files: q('input[name=cross_team_artifacts]') ? q('input[name=cross_team_artifacts]').checked : null,
-            labels: all('.xt-switches label').map(l => l.textContent.trim()), teams: all('.xt-teams li').map(li => ({ name: li.querySelector('b').textContent, sub: li.querySelector('.xt-sub').textContent })), manage: (q('.xt-links a') || {}).href || null, heading: (q('.xt-links .xt-h') || {}).textContent || null,
-            how: q('.xt-how') ? q('.xt-how').open : null, sid: (q('.xt-sid') || {}).textContent || '', save: q('[type=submit]') ? q('[type=submit]').disabled : null, stateText: (q('.xt-state') || {}).textContent || '',
-            unavailable: (q('.ct-unavailable') || {}).textContent || '', msgDisabled: q('input[name=cross_team_messaging]') ? q('input[name=cross_team_messaging]').disabled : null, filesDisabled: q('input[name=cross_team_artifacts]') ? q('input[name=cross_team_artifacts]').disabled : null, locked: (q('.xt-locked') || {}).textContent || '', saveHidden: q('.xt-save') ? q('.xt-save').hidden : null, pwn: !!window.__pwn, imgs: all('img').length + all('script').length, workflowHasSwitch: !!document.querySelector('#team-settings-workflow [name=cross_team_messaging], #team-settings-workflow [name=cross_team_artifacts]') }; })()`);
+            msg: shown('cross_team_messaging') ? q('input[name=cross_team_messaging]').checked : null, files: shown('cross_team_artifacts') ? q('input[name=cross_team_artifacts]').checked : null,
+            labels: all('.sv-row[data-key^=cross_team] .sv-label').map(l => l.textContent.trim()), teams: all('.xt-teams li').map(li => ({ name: li.querySelector('b').textContent, sub: li.querySelector('.xt-sub').textContent })), manage: (q('.xt-links a') || {}).href || null, heading: (q('.xt-links .xt-h') || {}).textContent || null,
+            how: q('.xt-how') ? q('.xt-how').open : null, sid: (q('.xt-sid') || {}).textContent || '', save: document.querySelector('#team-settings-workspace .sv-save').disabled, stateText: document.querySelector('#team-settings-workspace .sv-status').textContent,
+            unavailable: (q('.ct-unavailable') || {}).textContent || '', msgDisabled: q('input[name=cross_team_messaging]') ? q('input[name=cross_team_messaging]').disabled : null, filesDisabled: q('input[name=cross_team_artifacts]') ? q('input[name=cross_team_artifacts]').disabled : null, locked: (q('.xt-locked') || {}).textContent || '', saveHidden: !!q('.xt-locked'), pwn: !!window.__pwn, imgs: all('img').length + all('script').length, workflowHasSwitch: !!document.querySelector('#team-settings-workflow [name=cross_team_messaging], #team-settings-workflow [name=cross_team_artifacts]') }; })()`);
     const click = sel => ev(`document.querySelector(${JSON.stringify(sel)}).click(); true`);
     const setState = st => ev(`window.__xt.state = ${JSON.stringify(st)}; true`);
     const links = n => Array.from({ length: n }, (_, i) => ({ server_label: 'box-' + i, server_id: 'srv-' + i, team_label: 'Team ' + i, refreshed: '2026-10-21T10:00:00Z' }));
@@ -81,13 +81,13 @@ const SID = '0b7c2e4a-5d1f-4c8e-9a36-2f4d8e1b7c90';
             check(`${tag}: "Turn on" ticks the switch in the form only: the line follows it, Save is on, nothing is saved yet (${p.line})`, p.msg === true && p.line === 'Cross-team messaging is on for this team.' && p.save === false && (await ev(`window.__xt.puts.length`)) === 0);
             check(`${tag}: the primary is now the Coral Hub link: the constant page, a new tab, noopener, and its name says so (${p.prim.href})`, p.prim.tag === 'A' && p.prim.href === HUB_LINKS && p.prim.target === '_blank' && /noopener/.test(p.prim.rel) && /Link a team on another Coral \(opens Coral Hub in a new tab\)/.test(p.prim.text));
             check(`${tag}: the unsaved change is guarded`, await ev(`import(${S} + 'team_working_mode.js').then(m => m.hasUnsavedTeamSettings())`));
-            await click(`${P} [type=submit]`); await waitFor(`document.querySelector('${P} .xt-state').textContent === 'Saved.'`, `${tag}: saved`, 8000);
+            await click(`#team-settings-workspace .sv-save`); await waitFor(`document.querySelector('#team-settings-workspace .sv-status').textContent === 'Saved.'`, `${tag}: saved`, 8000);
             const put1 = await ev(`window.__xt.puts[window.__xt.puts.length - 1]`);
             check(`${tag}: Save sent only what changed (${JSON.stringify(put1)}) and the server kept it`, JSON.stringify(put1) === JSON.stringify({ subscriber_id: 'Operator', cross_team_messaging: true }) && (await board('/settings')).body.cross_team_messaging === true);
             p = await panel(); check(`${tag}: after Save nothing is unsaved (Save is off, the guard is quiet)`, p.save === true && !(await ev(`import(${S} + 'team_working_mode.js').then(m => m.hasUnsavedTeamSettings())`)));
             // the files switch on its own
             await ev(`(() => { const c = document.querySelector('${P} input[name=cross_team_artifacts]'); c.checked = true; c.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); await settle(100);
-            await click(`${P} [type=submit]`); await waitFor(`document.querySelector('${P} .xt-state').textContent === 'Saved.' && window.__xt.puts.length === 2`, `${tag}: files saved`, 8000);
+            await click(`#team-settings-workspace .sv-save`); await waitFor(`document.querySelector('#team-settings-workspace .sv-status').textContent === 'Saved.' && window.__xt.puts.length === 2`, `${tag}: files saved`, 8000);
             check(`${tag}: the files switch is saved on its own (${JSON.stringify(await ev('window.__xt.puts[1]'))})`, JSON.stringify(await ev('window.__xt.puts[1]')) === JSON.stringify({ subscriber_id: 'Operator', cross_team_artifacts: true }) && (await board('/settings')).body.cross_team_artifacts === true);
             await board('/settings', 'PUT', { subscriber_id: 'Operator', cross_team_messaging: false, cross_team_artifacts: false });
 
@@ -148,9 +148,9 @@ const SID = '0b7c2e4a-5d1f-4c8e-9a36-2f4d8e1b7c90';
             await board('/settings', 'PUT', { subscriber_id: 'Operator', cross_team_messaging: false, cross_team_artifacts: false });
             await setState(undefined); await open();
             await ev(`(() => { const c = document.querySelector('${P} input[name=cross_team_messaging]'); c.checked = true; c.dispatchEvent(new Event('change', { bubbles: true })); window.__xt.put = { status: 403, body: { code: 'owner_only', error: 'secret words' } }; return true; })()`); await settle(100);
-            await click(`${P} [type=submit]`); await waitFor(`/Could not save/.test(document.querySelector('${P} .xt-state').textContent)`, `${tag}: the refusal`, 6000);
+            await click(`#team-settings-workspace .sv-save`); await waitFor(`/Could not save/.test(document.querySelector('#team-settings-workspace .sv-status').textContent)`, `${tag}: the refusal`, 6000);
             p = await panel();
-            check(`${tag}: a refusal is said in our words, never the server's, and the draft stays (${p.stateText})`, /^Could not save\. Only the account/.test(p.stateText) && !/secret words|owner_only/.test(p.stateText) && p.msg === true && p.save === false);
+            check(`${tag}: a refusal is said in our words, never the server's, and the draft stays (${p.stateText})`, /^Could not save: Only the account/.test(p.stateText) && !/secret words|owner_only/.test(p.stateText) && p.msg === true && p.save === false);
             // 6. settings that cannot be read
             await ev(`window.__xt.settingsGet = { status: 403, body: { code: 'mode_too_low' } }; true`); await open({ noHealth: true });
             p = await panel();
@@ -158,7 +158,7 @@ const SID = '0b7c2e4a-5d1f-4c8e-9a36-2f4d8e1b7c90';
             await ev(`window.__xt.settingsGet = null; true`);
 
             // 6b. through Coral Hub (the page itself is not booted as the Hub: a seam says it is): the switches are shown, disabled, with the reason, until the machine says this request may change them
-            await ev(`import(${S} + 'team_cross_team_settings.js').then(m => m._setHubForTests(true)).then(() => true)`);
+            await ev(`import(${S} + 'team_cross_team_fields.js').then(m => m._setHubForTests(true)).then(() => true)`);
             await setState(null); await open(); p = await panel();
             check(`${tag}: Hub, the machine says nothing: both switches are disabled with the plain reason, no Save, no turn-on button (${p.locked})`, p.msgDisabled === true && p.filesDisabled === true && p.locked === 'This setting can only be changed on the computer itself.' && p.saveHidden === true && (!p.prim || p.prim.act !== 'turn-on'));
             await setState({ ...base, can_change: false, owner_path_live: true, status: { state: 'waiting', text: 'No team on another Coral is linked to this team yet.' }, links: [] }); await open(); p = await panel();
@@ -167,10 +167,10 @@ const SID = '0b7c2e4a-5d1f-4c8e-9a36-2f4d8e1b7c90';
             await setState({ ...base, can_change: true, owner_path_live: true, status: { state: 'off', text: 'Cross-team messaging is off for this team.' }, links: [] }); await open(); p = await panel();
             check(`${tag}: Hub, the owner path live: the switches work and there is no locked line (${JSON.stringify([p.msgDisabled, p.locked])})`, p.msgDisabled === false && p.filesDisabled === false && p.locked === '' && p.saveHidden === false && p.prim.act === 'turn-on');
             await ev(`(() => { const c = document.querySelector('${P} input[name=cross_team_messaging]'); c.checked = true; c.dispatchEvent(new Event('change', { bubbles: true })); window.__xt.put = { status: 404, body: { error: 'not_found' } }; return true; })()`); await settle(100);
-            await click(`${P} [type=submit]`); await waitFor(`/Could not save/.test(document.querySelector('${P} .xt-state').textContent)`, `${tag}: the Hub refusal`, 6000);
+            await click(`#team-settings-workspace .sv-save`); await waitFor(`/Could not save/.test(document.querySelector('#team-settings-workspace .sv-status').textContent)`, `${tag}: the Hub refusal`, 6000);
             p = await panel();
-            check(`${tag}: Hub, a 404 on the save is the plain sentence, never a raw word (${p.stateText})`, p.stateText === 'Could not save. This setting can only be changed on the computer itself, or by the owner through Coral Hub.' && !/not_found/.test(p.stateText) && p.msg === true);
-            await ev(`import(${S} + 'team_cross_team_settings.js').then(m => m._setHubForTests(null)).then(() => true)`);
+            check(`${tag}: Hub, a 404 on the save is the plain sentence, never a raw word (${p.stateText})`, p.stateText === 'Could not save: This setting can only be changed on the computer itself, or by the owner through Coral Hub.' && !/not_found/.test(p.stateText) && p.msg === true);
+            await ev(`import(${S} + 'team_cross_team_fields.js').then(m => m._setHubForTests(null)).then(() => true)`);
 
             // 7. layout, keyboard, contrast
             await setState({ ...base, status: { state: 'ready', text: '2 teams on other Corals can message this team.' }, links: links(2) }); await open();

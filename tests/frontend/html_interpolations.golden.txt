@@ -491,16 +491,10 @@
 1	team_availability.js	label
 1	team_availability.js	tasks(a.tasks)
 1	team_availability.js	tasks(data.unassigned_tasks)
-1	team_cross_team_settings.js	[l.machine && escapeHtml(l.machine), l.sid && 'server ' + escapeHtml(l.sid), l.refreshed && 'confirmed ' + esc
-1	team_cross_team_settings.js	buttonFor(st)
-1	team_cross_team_settings.js	changed('cross_team_artifacts')
-1	team_cross_team_settings.js	changed('cross_team_messaging')
-1	team_cross_team_settings.js	links.length ? `<div class="xt-links"><div class="xt-h-row"><h3 class="xt-h">${escapeHtml(linksHeading)}</h3> 
-1	team_cross_team_settings.js	links.map(l => `<li><span><b>${escapeHtml(l.team)}</b></span><span class="xt-sub">${[l.machine && escapeHtml(l
-1	team_cross_team_settings.js	reach()
-1	team_cross_team_settings.js	switchRow({ label: 'Message teams on other computers', name: 'cross_team_messaging', checked: draft.messaging,
-1	team_cross_team_settings.js	switchRow({ label: 'Share files with teams on other computers', name: 'cross_team_artifacts', checked: draft.f
-1	team_cross_team_settings.js	turnOn
+1	team_cross_team_fields.js	[l.machine && escapeHtml(l.machine), l.sid && 'server ' + escapeHtml(l.sid), l.refreshed && 'confirmed ' + esc
+1	team_cross_team_fields.js	buttonFor(st)
+1	team_cross_team_fields.js	links.map(l => `<li><span><b>${escapeHtml(l.team)}</b></span><span class="xt-sub">${[l.machine && escapeHtml(l
+1	team_cross_team_fields.js	turnOn
 1	team_health_settings.js	extra
 1	team_health_settings.js	held
 1	team_health_settings.js	infoBox('hc-clear-w', 'A short line so a quiet team is not mistaken for a stopped check.')

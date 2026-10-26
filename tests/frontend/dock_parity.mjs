@@ -30,7 +30,7 @@ const TABS = {
     'browse': { files: ['browser.js'], home: 'agent page: Files tab (the folder as a table)' },
     'artifacts': { files: ['artifacts_tab.js', 'artifact_*.js'], home: 'agent page: Artifacts tab; previews in the detail pane' },
     'team-view': { files: ['team_availability.js', 'team_context.js'], home: 'team page: Agents tab (status chips, one row per agent, Remind)' },
-    'team-settings': { files: ['team_working_mode.js', 'team_health_settings.js', 'team_cross_team_settings.js'], home: 'team page: Settings tab' },
+    'team-settings': { files: ['team_working_mode.js', 'team_settings_page.js', 'team_health_fields.js', 'team_cross_team_fields.js'], home: 'team page: Settings tab' },
     'team-artifacts': { files: ['team_artifacts.js', 'team_artifact_*.js', 'board_artifacts.js'], home: 'team page: Artifacts tab; previews in the detail pane' },
     'knowledge': { files: ['knowledge_*.js'], home: 'team page: Knowledge tab' },
     'tasks': { files: ['tasks.js', 'task_*.js'], home: "team page: Tasks tab (and a goal's own task table); a task opens its page" },

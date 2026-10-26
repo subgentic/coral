@@ -50,16 +50,16 @@ const BASE = require('./test_base').BASE;
         await ev(`window.hideSettingsModal(); true`);
 
         console.log('2. Messaging tab: the persistent line and the last-changed lines');
-        const mount = state => ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'team_cross_team_settings.js'); m._setHubForTests(false);
+        const mount = state => ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'team_cross_team_fields.js'); m._setHubForTests(false);
             document.getElementById('owner-host')?.remove(); const host = document.createElement('div'); host.id = 'owner-host'; host.style.cssText = 'position:fixed;left:20px;top:20px;width:560px;background:var(--bg-secondary);padding:16px;z-index:9999'; document.body.append(host);
-            await m.mountCrossTeamSettings(host, 'owner-team', { state: ${JSON.stringify(state)}, settings: { cross_team_messaging: true, cross_team_artifacts: false } }); return true; })()`);
+            await m.mountMessaging(host, 'owner-team', { state: ${JSON.stringify(state)}, settings: { cross_team_messaging: true, cross_team_artifacts: false } }); return true; })()`);
         const read = () => ev(`(() => { const h = document.getElementById('owner-host'); return { may: h.querySelector('.xt-hub-may')?.textContent.trim() || null, changed: [...h.querySelectorAll('.xt-changed')].map(e => [e.dataset.for, e.textContent.trim()]), imgs: h.querySelectorAll('img, script, iframe').length, links: h.querySelectorAll('a').length }; })()`);
         await mount({ status: { state: 'ready', text: 'A team on another Coral can message this team.' }, links: [], hub_may_change: true, can_change: true, owner_path_live: true,
             last_changed: { cross_team_messaging: { via: 'hub', by: 'ada', at: '2026-10-21T10:00:00Z', on: true }, cross_team_artifacts: { via: 'local', at: '2026-10-21T09:00:00Z', on: false } } });
         let r = await read();
         assert.equal(r.may, 'Coral Hub can change these settings.');
         // The Save bar repeats no permission sentence (the tab's header says it once, #5987), and each switch is described by what is said about it
-        assert.equal(await ev(`document.querySelector('#owner-host .xt-state').textContent.trim()`), '');
+        assert.equal(await ev(`document.querySelector('#owner-host .sv-status').textContent.trim()`), 'No changes to save.');
         const described = await ev(`['cross_team_messaging', 'cross_team_artifacts'].map(n => { const c = document.querySelector('#owner-host [name=' + n + ']'); return (c.getAttribute('aria-describedby') || '').split(' ').filter(Boolean).map(id => [id, (document.getElementById(id) || {}).textContent]); })`);
         assert.deepEqual(described.map(d => d.map(x => x[0])), [['xt-changed-cross_team_messaging', 'xt-hub-may'], ['xt-changed-cross_team_artifacts', 'xt-hub-may']]);
         assert.ok(described.flat().every(([id, text]) => text && text.trim()), 'every id names a line that is there: ' + JSON.stringify(described));
@@ -68,7 +68,7 @@ const BASE = require('./test_base').BASE;
         await shot('messaging-owner-path');
         await mount({ status: { state: 'off', text: 'Off.' }, hub_may_change: false, last_changed: {} });
         r = await read(); assert.equal(r.may, null, 'no line when the lock forbids it'); assert.deepEqual(r.changed, [], 'and none for a switch nobody changed');
-        assert.equal(await ev(`document.querySelector('#owner-host .xt-state').textContent.trim()`), '', 'no permission sentence in the Save bar');
+        assert.equal(await ev(`document.querySelector('#owner-host .sv-status').textContent.trim()`), 'No changes to save.', 'no permission sentence in the Save bar');
         assert.equal(await ev(`document.querySelector('#owner-host [name=cross_team_messaging]').hasAttribute('aria-describedby')`), false, 'and no empty description');
         await mount({ status: { state: 'off', text: 'Off.' } });
         r = await read(); assert.equal(r.may, null, 'an older server (no field) says nothing'); assert.deepEqual(r.changed, []);
