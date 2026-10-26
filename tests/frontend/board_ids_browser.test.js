@@ -99,8 +99,8 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
             await Page.navigate({ url: `${BASE}/board/${id}` });
             await l2;
             await coralReady();
-            await until(`((document.getElementById('messageboard-project-badge') || {}).textContent || '').startsWith(${JSON.stringify(NAME)})`, 'the header label');
-            const badge = await ev(`(document.getElementById('messageboard-project-badge') || {}).textContent || ''`);
+            await until(`((document.getElementById('team-page-title') || {}).textContent || '').startsWith(${JSON.stringify(NAME)})`, 'the header label (the team page\'s, which /board/<id> opens, #8129)');
+            const badge = await ev(`(document.getElementById('team-page-title') || {}).textContent || ''`);
             check(`/board/<${id.slice(0, 6)}…>: the header shows the label (with its short id), never the bare id`, badge.startsWith(NAME) && badge !== id && badge.includes(`(${id.slice(0, 6)})`), badge);
         }
 

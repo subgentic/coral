@@ -52,7 +52,7 @@ const BASE = require('./test_base').BASE;
             await ev(`document.querySelector('#agentic-panel-board .board-select-btn').click(); true`);
             check(`${tag}: and leaving it lets go`, (await state()).exp.pressed === 'false');
             // the Board page writes this button too (loading a board, pausing it there): it must not put the text back or leave the name stale
-            await ev(`import(${S} + 'message_board.js').then(m => m.selectBoardProject(${JSON.stringify(board)})).then(() => true)`);
+            await require('./helpers/team_board').openBoardPage(ev, waitFor, board); // the Board page is the team page's Messages tab (#8129)
             s = await state();
             check(`${tag}: the Board page loading the board leaves the icon, name and tooltip (${JSON.stringify(s.pause)})`, s.pause.icon === 'pause' && s.pause.text === '' && s.pause.label === 'Pause board' && /^Pause board/.test(s.pause.title));
             await ev(`import(${S} + 'message_board.js').then(m => m.toggleBoardPause()).then(() => true)`);

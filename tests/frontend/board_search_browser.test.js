@@ -73,7 +73,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await settle(`document.querySelectorAll('#mb-messages > .mb-message').length >= 50`, 'the latest page');
 
         let s = await snap();
-        check('the tools row has the Filters icon and the More icon (the jumps are in its menu, #7686; Expand all and Collapse all belong to the table and are hidden on this page, #7921); no results line yet (#7183)', s.controls.join() === 'Filters,More board actions' && s.menu.join() === 'Jump to first message,Jump to latest message' && s.results === null, JSON.stringify([s.controls, s.menu, s.results]));
+        check('the tools row has the Filters icon and the More icon (the jumps are in its menu, #7686; Expand all and Collapse all belong to the table and show on the team page Board tab, #7921, #8129); no results line yet (#7183)', s.controls.join() === 'Filters,More board actions' && s.menu.join() === 'Expand all,Collapse all,Jump to first message,Jump to latest message' && s.results === null, JSON.stringify([s.controls, s.menu, s.results]));
         // The retry total: messages with the word retry in any form (the code messages hold it too).
         await type('#bm-search', 'retry');
         await settle(`document.querySelector('#mb-tools .mb-search-results')?.textContent.startsWith('1 of ')`, 'the first result');

@@ -48,7 +48,7 @@ const { removeBoards, removeTeams } = require('./helpers/board_cleanup');
         await until(`!!document.querySelector('#mb-projects-ul [data-on-click="mb-project"][data-project="${agent.board}"]')`, 'the board in the list');
         await ev(`document.querySelector('#mb-projects-ul [data-on-click="mb-project"][data-project="${agent.board}"]').click(); true`);
         await until(`document.getElementById('mb-board') && getComputedStyle(document.getElementById('mb-board')).display !== 'none'`, 'the board');
-        check('a board in the list opens it', await ev(`getComputedStyle(document.getElementById('mb-project-list')).display === 'none'`));
+        check('a board in the list opens it, on its team page (#8129)', await ev(`getComputedStyle(document.getElementById('team-page-view')).display !== 'none' && location.pathname.startsWith('/team/')`));
 
         // ── Post ───────────────────────────────────────────────────────────
         const post = async (text, how) => ev(`(() => { const t = document.getElementById('mb-post-input'); t.value = ${JSON.stringify(text)};
