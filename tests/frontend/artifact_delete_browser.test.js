@@ -50,7 +50,7 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         await ev(`document.getElementById('agentic-tab-artifacts').click(); true`);
         const row = `[...document.querySelectorAll('#agentic-panel-artifacts tbody tr')].find(r => r.textContent.includes('delete-me.txt'))`;
         const del = `[...document.querySelectorAll('#agentic-detail-pane .detail-foot .btn')].find(b => b.textContent === 'Delete')`; // the sheet's Delete
-        const openRow = async tr => { await ev(`(${tr}).querySelector('.team-row-btn').click(); true`); await until(`!document.getElementById('agentic-detail-pane').hidden`, 'the sheet'); };
+        const openRow = async tr => { await ev(`(${tr}).querySelector('.dt-primary').click(); true`); await until(`!document.getElementById('agentic-detail-pane').hidden`, 'the sheet'); };
         await until(`!!(${row})`, 'the uploaded artifact');
         await openRow(row);
         const btn = await ev(`(() => { const b = ${del}; return b && { tag: b.tagName, type: b.type, danger: b.classList.contains('btn-danger') }; })()`);

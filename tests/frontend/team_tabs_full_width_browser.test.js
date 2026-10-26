@@ -29,14 +29,14 @@ const TEAM = `qa-width-${Date.now() % 100000}`;
                 const r = await ev(`(() => { const panel = [...document.querySelectorAll('.team-panel')].find(p => p.getClientRects().length > 0 && p.getAttribute('aria-label') === ${JSON.stringify(tab)}); if (!panel) return null;
                     const page = panel.querySelector('.goals-table-page'); if (!page) return { nopage: true };
                     const cs = getComputedStyle(page), inner = page.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
-                    const table = page.querySelector('.team-table-scroll'); const t = table ? table.getBoundingClientRect().width : null;
+                    const table = page.querySelector('.dt-box, .team-table-scroll'); const t = table ? table.getBoundingClientRect().width : null;
                     return { panel: panel.clientWidth, page: Math.round(page.getBoundingClientRect().width), inner: Math.round(inner), table: t === null ? null : Math.round(t) }; })()`);
                 assert.ok(r && !r.nopage, `${w}: the ${tab} tab has its page ${JSON.stringify(r)}`);
                 assert.ok(Math.abs(r.page - r.panel) <= 1, `${w}: ${tab}: the page is as wide as the page area ${JSON.stringify(r)}`);
                 if (r.table !== null) assert.ok(Math.abs(r.table - r.inner) <= 2, `${w}: ${tab}: the table is as wide as the page's content ${JSON.stringify(r)}`);
                 if (tab === 'Artifacts') {
                     await waitFor(`document.querySelectorAll('#team-panel-artifacts tbody tr').length === 100`, 'the first 100 artifacts', 10000);
-                    const f = await ev(`(() => { const p = document.getElementById('team-panel-artifacts'), t = p.querySelector('.team-table-scroll').getBoundingClientRect(), foot = p.querySelector('.team-table-foot'), page = p.querySelector('.goals-table-page'), pc = getComputedStyle(page);
+                    const f = await ev(`(() => { const p = document.getElementById('team-panel-artifacts'), t = p.querySelector('.dt-table').getBoundingClientRect(), foot = p.querySelector('.dt-foot'), page = p.querySelector('.goals-table-page'), pc = getComputedStyle(page);
                         const above = [...p.querySelectorAll('.team-count-line, p')].filter(e => !e.classList.contains('sr-only') && e.getClientRects().length > 0 && /Showing 100 of 163/.test(e.textContent)).length;
                         const ft = foot ? foot.getBoundingClientRect() : null;
                         return { tableW: Math.round(t.width), inner: Math.round(page.clientWidth - parseFloat(pc.paddingLeft) - parseFloat(pc.paddingRight)), footText: foot ? foot.textContent.replace(/\\s+/g, ' ').trim() : null, footBelow: !!ft && ft.top >= t.bottom - 1, footLeft: ft ? Math.round(ft.left - t.left) : null, visibleAbove: above, srStatus: [...p.querySelectorAll('.sr-only[role="status"]')].map(e => e.textContent).filter(Boolean) }; })()`);
@@ -46,7 +46,7 @@ const TEAM = `qa-width-${Date.now() % 100000}`;
                     assert.equal(f.visibleAbove, 0, `${w}: no count line above the table ${JSON.stringify(f)}`);
                     assert.deepEqual(f.srStatus, ['Showing 100 of 163'], `${w}: a screen reader still hears the count ${JSON.stringify(f)}`);
                 }
-                if (tab === 'Artifacts' && process.env.CORAL_SCREENSHOT_DIR) { const fs = require('node:fs'); fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); await ev(`document.getElementById('team-panel-artifacts').querySelector('.team-table-foot').scrollIntoView({ block: 'end' }); new Promise(r => setTimeout(r, 300))`); /* sleep-ok: a screenshot waits out scrolling */ fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/artifacts-${w}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
+                if (tab === 'Artifacts' && process.env.CORAL_SCREENSHOT_DIR) { const fs = require('node:fs'); fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); await ev(`document.getElementById('team-panel-artifacts').querySelector('.dt-foot').scrollIntoView({ block: 'end' }); new Promise(r => setTimeout(r, 300))`); /* sleep-ok: a screenshot waits out scrolling */ fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/artifacts-${w}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
                 console.log(`   ✓ ${w} ${tab} ${JSON.stringify(r)}`);
             }
         }

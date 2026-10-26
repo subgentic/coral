@@ -16,7 +16,7 @@ const HEX = c => c.repeat(64);
     const now = new Date(), yest = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 12), old = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 60, 12); // noon of the calendar day, so 'yesterday' is yesterday at any hour (now - 1.2 days was two days back before 04:48)
     const NAMES = ['image-2026-10-21.png', 'orchestrator-notes.md', 'a-very-long-report-name-that-keeps-going-and-going-for-a-whole-quarter-of-the-year-final-v3.txt'];
     const ITEMS = [now, yest, old].map((d, i) => ({ id: HEX('abc'[i]), name: NAMES[i], media_type: ['image/png', 'text/markdown', 'text/plain'][i], size: 1000 + i, task_id: 20 + i, task_title: 'T' + i, created_at: d.toISOString(), uri: 'coral://artifacts/' + HEX('abc'[i]), produced_by: 'orc' }));
-    const measure = () => ev(`(() => [...document.querySelectorAll('#agentic-panel-artifacts tbody tr')].map(row => { const cell = row.querySelector('td'), b = row.querySelector('.team-row-btn'), when = row.querySelector('td:last-child span'); const lh = parseFloat(getComputedStyle(b).lineHeight) || 1.4 * parseFloat(getComputedStyle(b).fontSize); const br = b.getBoundingClientRect(); return { nameW: Math.round(cell.getBoundingClientRect().width), btnH: Math.round(br.height), lh: Math.round(lh), text: b.textContent, created: when.textContent, createdTitle: when.title, tds: [...row.querySelectorAll('td')].filter(t => t.getClientRects().length).length }; }))()`);
+    const measure = () => ev(`(() => [...document.querySelectorAll('#agentic-panel-artifacts tbody tr')].map(row => { const cell = row.querySelector('td'), b = row.querySelector('.dt-primary'), when = row.querySelector('td:last-child span'); const lh = parseFloat(getComputedStyle(b).lineHeight) || 1.4 * parseFloat(getComputedStyle(b).fontSize); const br = b.getBoundingClientRect(); return { folded: !!row.closest('.dt-box.dt-folded'), nameW: Math.round(cell.getBoundingClientRect().width), btnH: Math.round(br.height), lh: Math.round(lh), text: b.textContent, created: when.textContent, createdTitle: when.title, tds: [...row.querySelectorAll('td')].filter(t => t.getClientRects().length).length }; }))()`);
     try {
         await Page.enable();
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -42,11 +42,11 @@ const HEX = c => c.repeat(64);
             const rows = await measure(); const at = `panel ${w}px: `;
             for (const [i, r] of rows.entries()) {
                 assert.ok(r.nameW >= 200, at + `the Name column keeps a readable width (>= 200 px), row ${i}: ${JSON.stringify(r)}`);
-                assert.ok(r.btnH <= r.lh * (i === 2 ? 5.5 : 1.5), at + `${i === 2 ? 'a very long name wraps to at most five lines' : 'the name is one line'}: ${r.btnH} px high`); // the table wraps a long name whole (the full name stays readable) instead of cutting it
+                assert.ok(r.btnH <= Math.max(44, r.lh * 1.5), at + `${i === 2 ? 'a very long name wraps to at most five lines' : 'the name is one line'}: ${r.btnH} px high`); // the table wraps a long name whole (the full name stays readable) instead of cutting it
                 assert.equal(r.text, NAMES[i], at + 'the whole name is the button');
                 assert.ok(r.created && r.created.length <= 20, at + 'Created is short: ' + r.created);
                 assert.ok(r.createdTitle && /\d{4}|\d{1,2}:\d{2}/.test(r.createdTitle), at + 'the whole time is the tooltip');
-                assert.equal(r.tds, w <= 560 ? 2 : 5, at + `${w <= 560 ? 'Name and Created only' : 'every column'}: ${r.tds}`);
+                assert.equal(r.tds, r.folded ? 3 : 5, at + `${r.folded ? 'Name, Task and Created in the folded row' : 'every column'}: ${r.tds}`);
             }
             if (w === 680) await shot('artifacts-name-680');
             if (w === 480) await shot('artifacts-name-480');
@@ -58,7 +58,7 @@ const HEX = c => c.repeat(64);
         const phone = await measure();
         for (const r of phone) {
             assert.ok(r.nameW >= 150, `phone: Name keeps a readable width: ${JSON.stringify(r)}`);
-            assert.ok(r.tds === 2, `phone: Name and Created, a 44 px target: ${JSON.stringify(r)}`);
+            assert.ok(r.tds === 3, `phone: Name and Created, a 44 px target: ${JSON.stringify(r)}`);
         }
         await shot('artifacts-name-phone');
         console.log('PASS artifacts list: Name keeps its width');

@@ -28,12 +28,13 @@ const items = Array.from({ length: N }, (_, i) => ({ name: `report-${String(i).p
         console.log('1. the first page, then Load more a page at a time');
         await ev(`window.switchAgenticTab('artifacts', 'top'); true`);
         await waitFor(`document.querySelectorAll('${ROWS}').length === 100`, 'the first page', 15000);
-        const rowsNow = () => ev(`[...document.querySelectorAll('${ROWS} .team-row-btn')].map(e => e.textContent.trim())`);
-        const more = () => ev(`document.querySelector('#agentic-panel-artifacts .goals-more') ? document.querySelector('#agentic-panel-artifacts .goals-more').textContent : null`);
+        const rowsNow = () => ev(`[...document.querySelectorAll('${ROWS} .dt-primary')].map(e => e.textContent.trim())`);
+        const more = () => ev(`document.querySelector('#agentic-panel-artifacts .dt-more') ? document.querySelector('#agentic-panel-artifacts .dt-more').textContent : null`);
         check('the first page is 100 rows and Load more is offered', (await rowsNow()).length === 100 && (await more()) === 'Load more');
-        await ev(`document.querySelector('#agentic-panel-artifacts .goals-more').click(); true`);
+        check('shared footer counts the loaded rows', await ev(`document.querySelector('#agentic-panel-artifacts .dt-foot-text').textContent.startsWith('Showing ')`));
+        await ev(`document.querySelector('#agentic-panel-artifacts .dt-more').click(); true`);
         await waitFor(`document.querySelectorAll('${ROWS}').length === 200`, 'the second page', 15000);
-        await ev(`document.querySelector('#agentic-panel-artifacts .goals-more').click(); true`);
+        await ev(`document.querySelector('#agentic-panel-artifacts .dt-more').click(); true`);
         await waitFor(`document.querySelectorAll('${ROWS}').length === ${N}`, 'all 300 rows', 15000);
         await ev(`${framesJs(3)}`);
         const names = await rowsNow();
@@ -50,7 +51,7 @@ const items = Array.from({ length: N }, (_, i) => ({ name: `report-${String(i).p
 
         await ev(`window.__scroller = () => { let e = document.querySelector('${ROWS}'); while (e && !(e.scrollHeight > e.clientHeight + 20 && /(auto|scroll)/.test(getComputedStyle(e).overflowY))) e = e.parentElement; return e; }; true`); // whichever box the page scrolls in
         console.log('2b. a redraw of a scrolled list keeps its place (QA, #5331)');
-        const topRow = () => ev(`(() => { const v = window.__scroller(); const top = v.getBoundingClientRect().top; const r = [...document.querySelectorAll('${ROWS}')].find(e => e.getBoundingClientRect().bottom > top + 40); return r ? r.querySelector('.team-row-btn').textContent.trim() : null; })()`);
+        const topRow = () => ev(`(() => { const v = window.__scroller(); const top = v.getBoundingClientRect().top; const r = [...document.querySelectorAll('${ROWS}')].find(e => e.getBoundingClientRect().bottom > top + 40); return r ? r.querySelector('.dt-primary').textContent.trim() : null; })()`);
         await ev(`(() => { const v = window.__scroller(); const row = document.querySelectorAll('${ROWS}')[60]; v.scrollTop += row.getBoundingClientRect().top - v.getBoundingClientRect().top; return v.scrollTop; })()`);
         await ev(`${framesJs(3)}`); // the scroll event of a scroll the person made has long been delivered when they press Refresh
         const before = await topRow(), st0 = await ev(`window.__scroller().scrollTop`);

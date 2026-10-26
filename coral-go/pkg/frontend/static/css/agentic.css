@@ -2335,8 +2335,6 @@ body.panel-dragging .agentic-state {
 .list-bar-chip-all { background: none; }
 .list-bar-search:focus-visible, .list-bar-clear-q:focus-visible, .list-bar-filter-btn:focus-visible, .list-bar-clear-all:focus-visible, .list-bar-select:focus-visible, .list-bar-by:focus-visible, .list-bar-chip:focus-visible, .list-bar-field input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 /* Where a row came from: a file this team sent, one from another computer, or a link Coral could not verify (#4396). Words, not colour alone. */
-.team-artifact-badge { display: inline-block; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: top; margin-top: var(--space-xs); padding: 0.125rem 0.5rem; border: 1px solid var(--border); border-radius: 0.75rem; color: var(--text-secondary); font-size: var(--fs-base); line-height: 1.4; overflow-wrap: anywhere; }
-.team-artifact-badge-unverified { border-color: var(--warning); color: var(--text-primary); }
 .team-artifacts-action:disabled, .team-artifacts-action[aria-disabled="true"] { opacity: 0.6; cursor: default; }
 
 /* The icons sit in one row so rows stay short. */

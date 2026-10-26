@@ -36,7 +36,7 @@ assert.equal(rows.length, 3);
 const pane = document.getElementById('agentic-detail-pane');
 // a row opens its sheet over the panel; Copy link is one of the sheet's actions
 const copyLink = () => [...pane.querySelectorAll('.detail-foot .btn')].find(b => b.textContent === 'Copy link');
-const openRow = async (i) => { rows[i].querySelector('.team-row-btn').click(); await until(() => !pane.hidden); return copyLink(); };
+const openRow = async (i) => { rows[i].querySelector('.dt-primary').click(); await until(() => !pane.hidden); return copyLink(); };
 
 const first = await openRow(0);
 assert.ok(first, 'a stored artifact has a Copy link action');

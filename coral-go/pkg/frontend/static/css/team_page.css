@@ -76,8 +76,6 @@
 .goals-table-page .goals-back { display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; padding: 4px 0; min-height: 36px; }
 .goals-table-page .goals-back:hover { text-decoration: underline; }
 .team-count-line { margin: 0; }
-.team-table-foot { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 4px 0 12px; font-size: 0.8125rem; color: var(--text-secondary); } /* under a paged table: how many are shown of how many, and Load more (#7729) */
-.team-table-foot .goals-more { margin: 0; }
 .team-empty { display: flex; flex-direction: column; gap: 2px; } /* the one empty line of the team page's tabs: the sentence at 14/400, an optional hint at 12/400, no box (UI/UX 170 consistency, item 5) */
 .goals-note.team-empty-line, .team-empty-line { margin: 0; font-size: 0.875rem; font-weight: 400; line-height: 1.5; color: var(--text-primary); }
 .team-empty-hint { margin: 0; font-size: 0.75rem; font-weight: 400; line-height: 1.5; color: var(--text-secondary); }
@@ -91,7 +89,6 @@
 .team-row-btn { background: none; border: 0; padding: 0; color: var(--text-primary); font: inherit; font-weight: 600; font-size: 0.875rem; text-align: left; cursor: pointer; overflow-wrap: break-word; }
 .team-row-btn:hover { color: var(--accent); text-decoration: underline; }
 .team-row-btn:focus-visible, .team-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
-.team-row-cell { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; }
 .team-link { background: none; border: 0; padding: 0; color: var(--link-text, var(--accent)); font: inherit; text-align: left; cursor: pointer; }
 .team-link:hover { text-decoration: underline; }
 
@@ -145,7 +142,6 @@
 #team-panel-messages .mb-tools { padding: 0; }
 #team-panel-messages .list-bar-filter-btn { background: var(--bg-tertiary); font-weight: 500; min-height: 32px; padding: 0 12px; } /* Filters, Jump to first and Jump to latest are the page's buttons: 13/500 on the tertiary fill, as Add agent and More (UI/UX #7588 item 4) */
 #team-panel-messages .list-bar-filter-btn:hover { background: var(--bg-hover); }
-.team-row-phone { display: none; font-size: 0.75rem; color: var(--text-secondary); }
 
 @media (max-width: 760px) {
     #team-panel-messages { padding: 12px 16px 0; }
@@ -165,7 +161,6 @@
     .team-task-extra summary { min-height: 44px; display: flex; align-items: center; } /* the dialog's folded sections are 44 px targets on a phone */
     .team-task-artifact-name { min-height: 44px; display: inline-flex; align-items: center; } /* a task's artifact is a 44 px target on a phone (#7739) */
     .team-table th:nth-child(n+3), .team-table td:nth-child(n+3) { display: none; } /* the name cell carries its second line: who and which goal fold into it (the phone's table is Name and State) */
-    .team-row-phone { display: block; }
     .detail-pane { position: fixed; inset: 0; z-index: 30; width: auto; border-left: 0; }
     .detail-close { width: 44px; height: 44px; }
     .detail-grip { display: none; }
@@ -224,17 +219,6 @@
 #agentic-panel-artifacts-view { container: artifactsview / inline-size; } /* named: an unnamed @container query below would otherwise read the nearest container, the tables' own box (teamtable) */
 .dock-detail-pane { position: absolute; inset: 0; z-index: 5; width: auto; border-left: 0; }
 .team-artifacts-plain-head { display: flex; align-items: center; justify-content: flex-end; gap: 4px; padding: 8px 12px; }
-@container artifactsview (max-width: 560px) {
-    .team-table th, .team-table td { padding-left: 8px; padding-right: 8px; } /* a narrow panel gives the cells less air: Name and Created fit at 200% text */
-    .team-table th:nth-child(n+2):nth-child(-n+4), .team-table td:nth-child(n+2):nth-child(-n+4) { display: none; } /* Type, Size and Task fold under the name (and Task is in the pane's facts); Created stays on the right */
-    .team-row-phone { display: block; }
-}
-@media (max-width: 760px) {
-    #agentic-panel-artifacts-view .team-row-btn { min-height: 44px; display: inline-flex; align-items: center; } /* a 44 px target on a touch screen */
-    #agentic-panel-artifacts-view td:last-child { vertical-align: middle; } /* Created on the line of the name, whose button is 44 px tall */
-    #agentic-panel-artifacts-view .team-table th:nth-child(5), #agentic-panel-artifacts-view .team-table td:nth-child(5) { display: table-cell; } /* the page's phone table is Name and State; here Created stays beside the name, as in any narrow panel */
-}
-.team-row-cell .team-artifact-badge { white-space: normal; overflow-wrap: anywhere; } /* the origin words wrap in the name cell (a 390 px phone at 200% text) instead of widening the table */
 .team-artifacts-error { color: var(--error-text); } /* a failed load is red, not the grey of the other lines (UX #4469) */
 
 /* a task's page as a form (#7644): Edit and Complete on the page, the fields the dialog had, one column */

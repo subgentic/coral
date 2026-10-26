@@ -27,11 +27,11 @@ const SHOTS = process.env.CORAL_SCREENSHOT_DIR;
         fs.writeFileSync(path.join(SHOTS, name + '.png'), Buffer.from(data, 'base64'));
     };
     const ROWS = '#agentic-panel-artifacts-view tbody tr';
-    const rowOf = name => `[...document.querySelectorAll('${ROWS}')].find(r => r.querySelector('.team-row-btn').textContent === ${JSON.stringify(name)})`;
+    const rowOf = name => `[...document.querySelectorAll('${ROWS}')].find(r => r.querySelector('.dt-primary').textContent === ${JSON.stringify(name)})`;
     const until = async expr => { for (let i = 0; i < 300; i++) { if (await ev(expr)) return; await ev('new Promise(r => setTimeout(r, 20))'); } throw new Error('timed out waiting for ' + expr); };
     // open a row's sheet and read it: its facts as label/value, its actions, whether it is open
     const sheetOf = async name => {
-        await ev(`(${rowOf(name)}).querySelector('.team-row-btn').click(); true`);
+        await ev(`(${rowOf(name)}).querySelector('.dt-primary').click(); true`);
         await until(`!document.getElementById('agentic-detail-pane').hidden && document.querySelector('#agentic-detail-pane .detail-title').textContent === ${JSON.stringify(name)}`);
         return ev(`(() => { const a = document.getElementById('agentic-detail-pane'); return { facts: [...a.querySelectorAll('.detail-facts > *')].map(c => c.tagName + ':' + c.textContent), actions: [...a.querySelectorAll('.detail-foot .btn')].map(b => b.textContent) }; })()`);
     };
@@ -71,13 +71,13 @@ const SHOTS = process.env.CORAL_SCREENSHOT_DIR;
 
         console.log('1. An unverified row says so and offers nothing to open');
         const unvNames = ['Design review.md', "Another team's report.pdf"];
-        const unv = await ev(`[...document.querySelectorAll('${ROWS}')].filter(r => r.querySelector('.team-artifact-badge-unverified')).map(r => ({ name: r.querySelector('.team-row-btn').textContent, badge: r.querySelector('.team-artifact-badge').textContent, cells: [...r.querySelectorAll('td')].slice(1, 3).map(c => c.textContent) }))`);
+        const unv = await ev(`[...document.querySelectorAll('${ROWS}')].filter(r => r.querySelector('.team-artifact-badge-unverified')).map(r => ({ name: r.querySelector('.dt-primary').textContent, badge: r.querySelector('.team-artifact-badge').textContent, cells: [...r.querySelectorAll('td')].slice(1, 3).map(c => c.textContent) }))`);
         assert.equal(unv.length, 2);
         for (const r of unv) {
             assert.equal(r.badge, 'Link not verified');
             assert.deepEqual(r.cells, ['—', '—'], 'no type and no size');
         }
-        const un = await ev(`(() => { const r = document.querySelector('${ROWS} .team-artifact-badge-unverified').closest('tr'); r.querySelector('.team-row-btn').click(); return r.querySelector('.team-row-btn').textContent; })()`);
+        const un = await ev(`(() => { const r = document.querySelector('${ROWS} .team-artifact-badge-unverified').closest('tr'); r.querySelector('.dt-primary').click(); return r.querySelector('.dt-primary').textContent; })()`);
         await until(`document.querySelector('#agentic-detail-pane .detail-title').textContent === ${JSON.stringify(un)}`);
         const unSheet = await ev(`(() => { const a = document.getElementById('agentic-detail-pane'); return { facts: [...a.querySelectorAll('.detail-facts > *')].map(c => c.textContent), actions: a.querySelectorAll('.detail-foot .btn').length }; })()`);
         assert.equal(unSheet.actions, 0, 'nothing to open, download or copy');
@@ -87,7 +87,7 @@ const SHOTS = process.env.CORAL_SCREENSHOT_DIR;
 
         console.log('2. The real row with the same id is still managed');
         const real = await sheetOf('Design review.md').catch(() => null);
-        const realRow = await ev(`(() => { const r = [...document.querySelectorAll('${ROWS}')].find(r => r.querySelector('.team-row-btn').textContent === 'Design review.md' && !r.querySelector('.team-artifact-badge')); return r ? { type: r.querySelectorAll('td')[1].textContent, badge: false } : null; })()`);
+        const realRow = await ev(`(() => { const r = [...document.querySelectorAll('${ROWS}')].find(r => r.querySelector('.dt-primary').textContent === 'Design review.md' && !r.querySelector('.team-artifact-badge')); return r ? { type: r.querySelectorAll('td')[1].textContent, badge: false } : null; })()`);
         assert.deepEqual(realRow, { type: 'Markdown', badge: false });
         void real;
 
@@ -118,7 +118,7 @@ const SHOTS = process.env.CORAL_SCREENSHOT_DIR;
         assert.equal((await sheetOf('Earlier screenshot.png')).actions.length, 0, 'a missing object has no actions');
 
         console.log('5. The words are in the page for a screen reader, and the keyboard order is unchanged');
-        const ax = await ev(`(() => { const r = ${rowOf('Their logs.txt')}; const b = r.querySelector('.team-artifact-badge'); return { hidden: !!b.closest('[aria-hidden=true]'), after: !!(r.querySelector('.team-row-btn').compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) }; })()`);
+        const ax = await ev(`(() => { const r = ${rowOf('Their logs.txt')}; const b = r.querySelector('.team-artifact-badge'); return { hidden: !!b.closest('[aria-hidden=true]'), after: !!(r.querySelector('.dt-primary').compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) }; })()`);
         assert.equal(ax.hidden, false); assert.equal(ax.after, true);
         const stops = await ev(`[...document.querySelectorAll('${ROWS}')].map(r => r.querySelectorAll('button, a[href], summary').length)`);
         assert.ok(stops.every(n => n === 1), 'every row has one stop, its name: ' + JSON.stringify(stops));
@@ -130,7 +130,7 @@ const SHOTS = process.env.CORAL_SCREENSHOT_DIR;
         await ev(`document.getElementById('agentic-state').style.width = ''; document.documentElement.style.fontSize = '32px'; (document.getElementById('popout-panel-toggle-btn') || document.getElementById('panel-toggle-btn')).click(); true`); await settle();
         await ev(`window.switchAgenticTab('artifacts', 'top'); true`); await settle();
         assert.ok(await ev(`[...document.querySelectorAll('.team-artifact-badge')].filter(b => b.getBoundingClientRect().width > 0).length`) >= 4, 'the badges are on screen on the phone (the drawer is open)');
-        const fit = await ev(`(() => { const s = document.querySelector('#agentic-panel-artifacts-view .team-table-scroll'); const sr = s.getBoundingClientRect(); const out = [...document.querySelectorAll('#agentic-panel-artifacts-view .team-artifact-badge')].filter(b => { const r = b.getBoundingClientRect(); return r.right > sr.right + 1 || r.left < sr.left - 1; }).length; return { fits: s.scrollWidth <= s.clientWidth + 1, docOver: document.documentElement.scrollWidth - document.documentElement.clientWidth, out, badge: parseFloat(getComputedStyle(document.querySelector('.team-artifact-badge')).fontSize) }; })()`);
+        const fit = await ev(`(() => { const s = document.querySelector('#agentic-panel-artifacts-view .dt-box'); const sr = s.getBoundingClientRect(); const out = [...document.querySelectorAll('#agentic-panel-artifacts-view .team-artifact-badge')].filter(b => { const r = b.getBoundingClientRect(); return r.right > sr.right + 1 || r.left < sr.left - 1; }).length; return { fits: s.scrollWidth <= s.clientWidth + 1, docOver: document.documentElement.scrollWidth - document.documentElement.clientWidth, out, badge: parseFloat(getComputedStyle(document.querySelector('.team-artifact-badge')).fontSize) }; })()`);
         assert.equal(fit.fits, true, 'no horizontal scroll in the table'); assert.ok(fit.docOver <= 0, 'no sideways scroll'); assert.equal(fit.out, 0, 'every badge stays inside the table');
         assert.ok(fit.badge >= 20, 'the badge text grows with the root font: ' + fit.badge);
         await shot('origin-phone-200');

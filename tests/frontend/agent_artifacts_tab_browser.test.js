@@ -109,23 +109,23 @@ const STUB = `(() => {
             check(`${tag}: a reload asks again (${before} -> ${await ev('window.__req.length')} requests)`, (await ev('window.__req.length')) > before);
 
             // ═══ a row opens its document as a sheet over the panel; the chat is still there
-            await ev(`document.querySelector('${panel} tbody tr .team-row-btn').focus(); document.querySelector('${panel} tbody tr .team-row-btn').click(); true`);
+            await ev(`document.querySelector('${panel} tbody tr .dt-primary').focus(); document.querySelector('${panel} tbody tr .dt-primary').click(); true`);
             await waitFor(`!document.getElementById('agentic-detail-pane').hidden`, 'the sheet opens');
             const sheet = await ev(`(() => { const a = document.getElementById('agentic-detail-pane'), p = document.querySelector('${panel}'); const ar = a.getBoundingClientRect(), pr = p.getBoundingClientRect(); const foot = [...a.querySelectorAll('.detail-foot .btn')]; const d = foot.find(b => b.textContent === 'Delete'); return { inside: p.contains(a), covers: Math.abs(ar.left - pr.left) <= 1 && Math.abs(ar.width - pr.width) <= 1 && Math.abs(ar.top - pr.top) <= 1, noPageClass: !document.body.classList.contains('team-detail-open'), foot: foot.map(b => b.textContent), danger: !!d && d.classList.contains('btn-danger'), title: (a.querySelector('.detail-title') || {}).textContent, focus: document.activeElement === a.querySelector('.detail-title'), chat: !!document.querySelector('#live-session-view') && document.querySelector('#live-session-view').getClientRects().length > 0 }; })()`);
             check(`${tag}: the document is a sheet over the panel itself, the actions pinned, Delete a danger button, the title focused (${JSON.stringify(sheet)})`, sheet.inside && sheet.covers && sheet.noPageClass && ['Open', 'Download', 'Copy link', 'Keep', 'Delete'].every(t => sheet.foot.includes(t)) && sheet.danger && sheet.focus && sheet.chat);
             await assertPinnedBar(ev, '#agentic-detail-pane .detail-foot', `${tag}: the Artifacts sheet`);
             await shot(`sheet-${view.name}-${view.theme}`);
             await press('Escape', 'Escape', 27);
-            const back = await ev(`(() => ({ hidden: document.getElementById('agentic-detail-pane').hidden, onRow: document.activeElement === document.querySelector('${panel} tbody tr .team-row-btn') }))()`);
+            const back = await ev(`(() => ({ hidden: document.getElementById('agentic-detail-pane').hidden, onRow: document.activeElement === document.querySelector('${panel} tbody tr .dt-primary') }))()`);
             check(`${tag}: Escape closes the sheet and the focus is back on the row (${JSON.stringify(back)})`, back.hidden && back.onRow);
-            await ev(`document.querySelector('${panel} tbody tr .team-row-btn').click(); true`); await waitFor(`!document.getElementById('agentic-detail-pane').hidden`, 'the sheet opens again');
+            await ev(`document.querySelector('${panel} tbody tr .dt-primary').click(); true`); await waitFor(`!document.getElementById('agentic-detail-pane').hidden`, 'the sheet opens again');
             await ev(`document.querySelector('#agentic-detail-pane .detail-close').click(); true`);
-            check(`${tag}: Close closes it too, the focus on the row`, await ev(`document.getElementById('agentic-detail-pane').hidden && document.activeElement === document.querySelector('${panel} tbody tr .team-row-btn')`));
+            check(`${tag}: Close closes it too, the focus on the row`, await ev(`document.getElementById('agentic-detail-pane').hidden && document.activeElement === document.querySelector('${panel} tbody tr .dt-primary')`));
 
             // ═══ the table follows the PANEL's width: narrow, Type, Size and Task fold under the name; Created stays
-            const cols = await ev(`(() => { const p = document.querySelector('${panel}'); const vis = e => e.getClientRects().length > 0; const w = p.getBoundingClientRect().width; return { w, th: [...p.querySelectorAll('thead th')].filter(vis).map(h => h.textContent), phone: vis(p.querySelector('.team-row-phone')) }; })()`);
-            const folded = cols.w <= 560;
-            check(`${tag}: ${folded ? 'a narrow panel shows Name and Created, the rest folded under the name' : 'a wide panel shows every column'} (${JSON.stringify(cols)})`, folded ? cols.phone && cols.th.join() === 'Name,Created' : cols.th.length === 5 && !cols.phone);
+            const cols = await ev(`(() => { const p = document.querySelector('${panel}'); const vis = e => e.getClientRects().length > 0; const w = p.getBoundingClientRect().width; return { w, th: [...p.querySelectorAll('thead th')].filter(vis).map(h => h.textContent), phone: !!p.querySelector('.dt-box.dt-folded'), subtitle: vis(p.querySelector('.dt-subtitle')) }; })()`);
+            const folded = cols.phone;
+            check(`${tag}: ${folded ? 'a narrow panel folds the shared rows with their description' : 'a wide panel shows every column'} (${JSON.stringify(cols)})`, folded ? cols.subtitle && cols.th.length === 0 : cols.th.length === 5 && cols.subtitle);
             const un = await axUnnamed(`#agentic-panel-artifacts-view`);
             const au = await auditRegion(ev, [`#agentic-panel-artifacts-view`]);
             check(`${tag}: every control has a name (${JSON.stringify(un)}) and the text has 4.5:1 contrast (${JSON.stringify((au.fails || []).slice(0, 2))})`, un.length === 0 && (au.fails || []).length === 0);

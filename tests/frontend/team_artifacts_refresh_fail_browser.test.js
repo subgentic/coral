@@ -30,7 +30,7 @@ const items = Array.from({ length: N }, (_, i) => ({ name: `report-${String(i).p
         await ev(`window.switchAgenticTab('artifacts', 'top'); true`);
         await waitFor(`document.querySelectorAll('${ROWS}').length === ${N}`, 'the first page', 15000);
         await ev(`${framesJs(3)}`);
-        const names = () => ev(`[...document.querySelectorAll('${ROWS} .team-row-btn')].map(e => e.textContent.trim())`);
+        const names = () => ev(`[...document.querySelectorAll('${ROWS} .dt-primary')].map(e => e.textContent.trim())`);
 
         console.log('1. a Refresh that fails keeps the rows and says so');
         await ev(`window.__fail = true; window.__delay = 150; import((window.__coralStatic || '/static/') + 'team_artifacts_page.js').then(m => m.loadArtifacts({ keep: true })); true`);

@@ -66,7 +66,7 @@ const A = 'a'.repeat(64), B = 'b'.repeat(64), C = 'c'.repeat(64);
             await ev(`document.getElementById('confirm-modal-yes').click(); true`); await settle(600);
             assert.equal(await ev(`window.__deleted`), `/api/artifacts/${B}`);
             assert.equal((await rows()).length, 2, `the row is gone: ${JSON.stringify(await rows())}`);
-            assert.ok(await ev(`document.activeElement && document.activeElement.classList.contains('team-row-btn')`), 'the focus is on a row, not the page');
+            assert.ok(await ev(`document.activeElement && document.activeElement.classList.contains('dt-primary')`), 'the focus is on a row, not the page');
         });
         await S.run('the list reads itself again (it has no Refresh button: the tab refreshes itself, #7686)', async () => {
             const before = (await ev(`window.__req`)).length;
@@ -78,7 +78,7 @@ const A = 'a'.repeat(64), B = 'b'.repeat(64), C = 'c'.repeat(64);
         await S.run('a reload and Load more keep the keyboard focus in the list, not on the page', async () => {
             const inList = `!!document.activeElement && document.activeElement !== document.body && !!document.activeElement.closest('#team-panel-artifacts')`;
             await ev(`window.__paged = true; true`);
-            await ev(`document.querySelector('#team-panel-artifacts tbody .team-row-btn').focus(); import((window.__coralStatic || '/static/') + 'team_artifacts_page.js').then(m => m.loadArtifacts({ keep: true })); true`); // a reload with the focus on a row
+            await ev(`document.querySelector('#team-panel-artifacts tbody .dt-primary').focus(); import((window.__coralStatic || '/static/') + 'team_artifacts_page.js').then(m => m.loadArtifacts({ keep: true })); true`); // a reload with the focus on a row
             await waitFor(`!![...document.querySelectorAll('#team-panel-artifacts button')].find(x => /^Load more$/.test(window.__na.name(x)))`, 'Load more after the refreshed first page', 6000);
             assert.ok(await ev(inList), 'after a reload the focus is still in the list');
             await ev(`(() => { const b = [...document.querySelectorAll('#team-panel-artifacts button')].find(x => /^Load more$/.test(window.__na.name(x))); b.focus(); b.click(); return true; })()`);
@@ -93,7 +93,7 @@ const A = 'a'.repeat(64), B = 'b'.repeat(64), C = 'c'.repeat(64);
                     return R(u, o); };
                 m.showArtifacts(host, '@m2/ci', {}); return true; })()`);
             await waitFor(`!!document.querySelector('#qa-remote-host tbody tr')`, 'the remote team row', 6000);
-            await ev(`document.querySelector('#qa-remote-host .team-row-btn').click(); true`); await settle(500);
+            await ev(`document.querySelector('#qa-remote-host .dt-primary').click(); true`); await settle(500);
             const names = await ev(`[...window.__tp.pane().querySelectorAll('button, a')].map(x => x.textContent.trim())`);
             assert.ok(names.includes('Open') && names.includes('Copy link'), `Open and Copy link: ${JSON.stringify(names)}`);
             assert.ok(!names.includes('Keep') && !names.includes('Kept') && !names.includes('Delete'), `no Keep and no Delete: ${JSON.stringify(names)}`);

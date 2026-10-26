@@ -8,7 +8,8 @@ import { importOnce } from './import_once.js';
 import { browserLocal } from './safe_storage.js';
 import { renderArtifact } from './artifact_preview.js';
 import { renderMarkdownStrict, highlightCodeIn, escapeHtml, showToast } from './utils.js';
-const { teamTable, rowButton, el } = await importOnce('./team_table.js'); // lazy modules load the others they need through importOnce, so a failed load is retried
+const DT = await importOnce('./data_table.js');
+const { el } = DT; // lazy modules load the others they need through importOnce, so a failed load is retried
 const { openDetailPane, closeDetailPane, detailKey } = await importOnce('./detail_pane.js');
 const { buildBar } = await importOnce('./team_artifact_bar.js');
 const { loadFilters, saveFilters, toParams, isFiltered, EMPTY } = await importOnce('./team_artifact_filters.js');
@@ -123,7 +124,7 @@ function deleteArtifact(hex, name, size) {
                     forget(hex); deletions?.postMessage({ hex, server: server() });
                     say(r.ok ? `Deleted ${name}.` : `${name} was already gone.`);
                     // the row the focus was on is gone: the same place in the list (the next row, else the one before), never the page (#4469)
-                    const after = [...(root?.querySelectorAll('tbody tr') || [])]; ((after[at] || after[at - 1])?.querySelector('.team-row-btn') || root?.querySelector('.list-bar-search') || root?.querySelector('.list-bar-more-btn'))?.focus(); // and the search box when none is left
+                    const after = [...(root?.querySelectorAll('tbody tr') || [])]; ((after[at] || after[at - 1])?.querySelector('.dt-primary') || root?.querySelector('.list-bar-search') || root?.querySelector('.list-bar-more-btn'))?.focus(); // and the search box when none is left
                 } else { const d = await r.json().catch(() => ({})); showToast(`Couldn't delete ${name}: ${d.error || `HTTP ${r.status}`}`, true); }
             } catch { showToast(`Couldn't delete ${name}: Coral didn't answer.`, true); }
         }, null, { label: 'Delete' });
@@ -222,10 +223,10 @@ function draw() {
     const body = root && root.querySelector('.team-artifacts-body'); if (!body) return;
     const rowsBefore = drawnRows;
     const box = scrollBox(body), at = box ? box.scrollTop : 0;
-    const tableBox = body.querySelector('.team-table-scroll'), tableAt = tableBox ? tableBox.scrollTop : 0; // the table's own box is built again with the table
+    const tableBox = body.querySelector('.dt-box'), tableAt = tableBox ? tableBox.scrollTop : 0; // the table's own box is built again with the table
     ensureBar();
     const a = document.activeElement;
-    const held = a && body.contains(a) && !bar.node.contains(a) ? (a.dataset.artifactId || (a.classList.contains('goals-more') ? '#load-more' : a.classList.contains('team-artifacts-retry') ? '#retry' : '')) : '';
+    const held = a && body.contains(a) && !bar.node.contains(a) ? (a.dataset.artifactId || (a.classList.contains('dt-more') ? '#load-more' : a.classList.contains('team-artifacts-retry') ? '#retry' : '')) : '';
     for (const c of [...body.children]) if (c !== bar.node) c.remove();
     if (bar.node.parentElement !== body) body.prepend(bar.node);
     const counting = !model.error && !model.loading && model.items.length > 0; // the count is not a line above the table: a screen reader hears it (sr-only), and "Showing 100 of 163" is under the table with Load more (#7729)
@@ -234,35 +235,35 @@ function draw() {
     body.append(status);
     if (model.error) body.append(btn('btn btn-small team-artifacts-retry', 'Retry', () => loadArtifacts({ append: model.items.length > 0 && !!model.cursor, keep: true })));
     if (model.items.length) {
-        body.append(teamTable({
-            label: `Artifacts, ${model.items.length}`, columns: ['Name', 'Type', 'Size', 'Task', 'Created'],
-            rows: model.items.map(item => {
-                const key = itemKey(item), un = isUnverified(item);
-                const first = el('span', 'team-row-cell');
-                const b = rowButton(readableName(item)); b.dataset.artifactId = key;
-                first.append(b);
-                const badge = originBadge(item);
-                if (badge) first.append(el('span', `team-artifact-badge team-artifact-badge-${un ? 'unverified' : item.source === 'shared' ? 'shared' : 'received'}`, badge));
-                first.append(el('span', 'team-row-phone', [un ? '' : typeText(item), un ? '' : sizeText(item.size), taskText(item)].filter(Boolean).join(' · ')));
-                const when = el('span', null, whenText(item.created_at)); when.title = createdText(item);
-                return { key, current: detailKey() === key, open: tr => openArtifact(item, tr.querySelector('.team-row-btn')), cells: [first, un ? '—' : typeText(item), un ? '—' : sizeText(item.size) || '—', taskText(item), when] };
-            }),
-        }));
-    }
-    if (model.hasMore) {
-        const foot = el('div', 'team-table-foot');
-        const shown = el('span', null, statusLine()); shown.setAttribute('aria-hidden', 'true'); // the status above says it to a screen reader
-        foot.append(shown, btn('btn goals-more', model.loadingMore ? 'Loading…' : 'Load more', () => { loadArtifacts({ append: true }); }));
-        body.append(foot);
+        body.append(DT.dataTable({
+            label: `Artifacts, ${model.items.length}`, rows: model.items, rowKey: itemKey, current: detailKey(), sortBar: false,
+            open: (item, tr) => openArtifact(item, tr.querySelector('.dt-primary')),
+            columns: [
+                { key: 'name', label: 'Name', primary: true, width: 'grow', line: 1,
+                    cell: item => {
+                        const first = el('span', 'dt-title-stack');
+                        const b = DT.primaryButton(readableName(item)); b.dataset.artifactId = itemKey(item); first.append(b);
+                        const badge = originBadge(item);
+                        if (badge) { const note = DT.tag(badge); note.classList.add('dt-note', 'team-artifact-badge', `team-artifact-badge-${isUnverified(item) ? 'unverified' : item.source === 'shared' ? 'shared' : 'received'}`); if (isUnverified(item)) note.classList.add('dt-warning'); first.append(note); }
+                        return first;
+                    }, subtitle: item => item.description || (isUnverified(item) ? '' : [typeText(item), sizeText(item.size)].filter(Boolean).join(' · ')) },
+                { key: 'type', label: 'Type', line: 0, cell: item => isUnverified(item) ? '—' : DT.tag(typeText(item)) },
+                { key: 'size', label: 'Size', line: 0, tone: 'tertiary', align: 'end', cell: item => isUnverified(item) ? '—' : sizeText(item.size) || '—' },
+                { key: 'task', label: 'Task', line: 2, tone: 'tertiary', cell: taskText },
+                { key: 'created', label: 'Created', line: 1, tone: 'tertiary', align: 'end', cell: item => DT.timeCell(item.created_at) },
+            ],
+            footer: { text: `Showing ${model.items.length} of ${model.counts?.matched ?? model.items.length}${model.truncated ? '+' : ''}`,
+                more: model.hasMore ? { label: 'Load more', busy: model.loadingMore, run: () => { if (!model.loadingMore) loadArtifacts({ append: true }); } } : null },
+        }).el);
     }
     if (model.truncated) body.append(el('p', 'goals-note', 'Some older artifacts are not included in this list.'));
     bar.names([...new Set(model.items.flatMap(i => [i.produced_by, i.sent_by]).filter(n => typeof n === 'string' && n))].sort().slice(0, 50)); // the names on screen, offered in the Uploaded by field
     bar.set(model.filters, model.counts ? model.counts : model.items.length || !model.loading ? { matched: model.items.length, all: model.items.length } : null);
     drawnRows = model.items.length;
-    if (tableAt) { const now = body.querySelector('.team-table-scroll'); if (now) now.scrollTop = tableAt; }
+    if (tableAt) { const now = body.querySelector('.dt-box'); if (now) now.scrollTop = tableAt; }
     if (box && box.scrollTop !== at) box.scrollTop = at; // the same place in the list, as the redraw left the box shorter for a moment
     // Load more: the button again, or, when the last page came and the button is gone, the first new row (the keyboard stays in the list, not on the page)
-    if (held === '#load-more') (body.querySelector('.goals-more') || body.querySelectorAll('[data-artifact-id]')[Math.min(rowsBefore, model.items.length - 1)])?.focus({ preventScroll: true });
+    if (held === '#load-more') (body.querySelector('.dt-more') || body.querySelectorAll('[data-artifact-id]')[Math.min(rowsBefore, model.items.length - 1)])?.focus({ preventScroll: true });
     else if (held === '#retry') (body.querySelector('.team-artifacts-retry') || body.querySelector('[data-artifact-id]') || bar.node.querySelector('.list-bar-search'))?.focus({ preventScroll: true }); // Retry is drawn away by the answer: the list's first row, never the page
     else if (held) body.querySelector(`[data-artifact-id="${CSS.escape(held)}"]`)?.focus({ preventScroll: true });
 }

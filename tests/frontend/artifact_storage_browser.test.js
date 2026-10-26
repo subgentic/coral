@@ -85,7 +85,7 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         await ev(`document.getElementById('agentic-tab-artifacts').click(); true`);
         const row = `[...document.querySelectorAll('#agentic-panel-artifacts tbody tr')].find(r => r.textContent.includes('keep-me.txt'))`;
         const keep = `[...document.querySelectorAll('#agentic-detail-pane .detail-foot .btn')].find(b => /^(Keep|Kept)$/.test(b.textContent))`; // the sheet's toggle
-        const openRow = async () => { await until(`!!(${row})`, 'the row'); await ev(`(${row}).querySelector('.team-row-btn').click(); true`); };
+        const openRow = async () => { await until(`!!(${row})`, 'the row'); await ev(`(${row}).querySelector('.dt-primary').click(); true`); };
         await openRow();
         await until(`!!(${keep})`, 'the Keep toggle');
         const before = await ev(`(${keep}).getAttribute('aria-pressed')`);
