@@ -21,6 +21,7 @@ func TestRemoteUploadThroughTheHubTakesTheUploadLimit(t *testing.T) {
 		})
 	})
 	r.Handle("/api/remote/{server}/*", http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	r.Handle("/x/{server}/*", http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})) // another wildcard route whose tail can be api/upload: not the hub's proxy, so the default
 	for _, c := range []struct {
 		method, path string
 		want         int64
@@ -31,6 +32,7 @@ func TestRemoteUploadThroughTheHubTakesTheUploadLimit(t *testing.T) {
 		{http.MethodPost, "/api/remote/box-2/api/uploads", defaultBodyLimit},
 		{http.MethodPost, "/api/remote/box-2/api/tags", defaultBodyLimit},
 		{http.MethodPut, "/api/remote/box-2/api/upload", defaultBodyLimit},
+		{http.MethodPost, "/x/box-2/api/upload", defaultBodyLimit},
 	} {
 		limit = 0
 		r.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(c.method, "http://x"+c.path, nil))
