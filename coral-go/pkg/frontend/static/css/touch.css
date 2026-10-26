@@ -135,9 +135,7 @@
         justify-content: center;
     }
     .pw-toggle {
-        top: 0;
-        bottom: 0;
-        transform: none;
+        align-self: stretch;
         display: flex;
         align-items: center;
         min-width: var(--control-touch-height);
