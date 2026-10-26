@@ -99,7 +99,8 @@ const spec = (i) => {
             const n = await pagesUp(250);
             assert.ok(n >= 250, `five pages up: ${n} shown`);
             await orderOk('after paging up');
-            assert.ok((await days()).length >= 2, 'more than one day line after paging up: ' + JSON.stringify(await days()));
+            const dbg = await ev(`(() => { const b = ${box}; const rs = [...b.querySelectorAll(':scope > .mb-message')]; const t = r => { const e = r && r.querySelector('.message-time'); return e ? (e.getAttribute('title') || e.textContent).slice(0, 40) : ''; }; return { st: Math.round(b.scrollTop), sh: b.scrollHeight, ch: b.clientHeight, rows: rs.length, firstId: rs[0] && rs[0].dataset.messageId, lastId: rs.length && rs[rs.length - 1].dataset.messageId, firstT: t(rs[0]), lastT: t(rs[rs.length - 1]), dayLines: [...b.querySelectorAll(':scope > .mb-day')].map(d => d.dataset.day + '@' + Math.round(d.getBoundingClientRect().top)), shown: window.__coral.boardCounts().shown, now: new Date().toString() }; })()`);
+            assert.ok((await days()).length >= 2, 'more than one day line after paging up: ' + JSON.stringify(await days()) + ' DBG ' + JSON.stringify(dbg));
             await shot(`seeded-${tag}-paged`);
 
             log(`${label}: opening and closing a row keeps the scroll`);
