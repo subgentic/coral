@@ -49,20 +49,20 @@ const HEX = n => String(n).repeat(64).slice(0, 64);
         assert.ok(controls.every(c => c.shown && c.tab >= 0 && c.name), 'every control is shown, focusable and named: ' + JSON.stringify(controls.filter(c => !(c.shown && c.tab >= 0 && c.name))));
         const bar = await ev(`[...document.querySelectorAll('#agentic-panel-artifacts-view .list-bar-search, #agentic-panel-artifacts-view .list-bar-toggle, #agentic-panel-artifacts-view .list-bar-more-btn')].map(e => e.getAttribute('aria-label') || e.placeholder)`);
         assert.deepEqual(bar, ['More artifact actions'], 'an agent with no team has the More icon in its header and no Refresh (its list has no search or filters)');
-        assert.deepEqual(await ev(`[...document.querySelectorAll('${ROW}')].map(r => r.querySelectorAll('button').length)`), [1, 1, 1], 'a row is one button: its name');
+        assert.deepEqual(await ev(`[...document.querySelectorAll('${ROW}')].map(r => r.querySelectorAll('button').length)`), [2, 2, 2], 'a row is two buttons: its name and its Details link');
 
-        console.log('2. A row opens by Enter; Escape closes it with the focus back on the row');
-        await ev(`document.querySelector('${ROW} .dt-primary').focus(); true`);
+        console.log('2. A row\'s Details link opens the sheet by Enter; Escape closes it with the focus back on the link');
+        await ev(`document.querySelector('${ROW} .artifact-details').focus(); true`);
         await press('Enter', 'Enter', 13);
         await waitFor(`!document.getElementById('agentic-detail-pane').hidden`, 'the sheet after Enter', 6000);
         assert.equal(await ev(`document.activeElement === document.querySelector('#agentic-detail-pane .detail-title')`), true, 'the title of the sheet has the focus');
         await press('Escape', 'Escape', 27);
         assert.equal(await ev(`document.getElementById('agentic-detail-pane').hidden`), true, 'Escape closes the sheet');
-        a = await active(); assert.match(a.cls, /dt-primary/, 'the focus is back on the row: ' + JSON.stringify(a)); assert.equal(a.row, 0);
+        a = await active(); assert.match(a.cls, /artifact-details/, 'the focus is back on the Details link: ' + JSON.stringify(a)); assert.equal(a.row, 0);
 
         console.log('3. Keep by Space keeps the focus');
         const FOOT = (t) => `[...document.querySelectorAll('#agentic-detail-pane .detail-foot .btn')].find(b => /^(${t})$/.test(b.textContent))`;
-        await ev(`document.querySelectorAll('${ROW} .dt-primary')[1].focus(); true`);
+        await ev(`document.querySelectorAll('${ROW} .artifact-details')[1].focus(); true`);
         await press('Enter', 'Enter', 13);
         await waitFor(`!document.getElementById('agentic-detail-pane').hidden && !!(${FOOT('Keep|Kept')})`, 'the second row\'s sheet', 6000);
         await ev(`(${FOOT('Keep|Kept')}).focus(); true`);
@@ -84,7 +84,7 @@ const HEX = n => String(n).repeat(64).slice(0, 64);
         assert.equal(await ev(`document.activeElement === document.querySelector('#agentic-panel-artifacts-view .list-bar-more-btn')`), true, 'a quiet reload leaves the focus on the More button');
 
         console.log('5. Delete asks first; Escape returns to the Delete button');
-        await ev(`document.querySelectorAll('${ROW} .dt-primary')[2].focus(); true`);
+        await ev(`document.querySelectorAll('${ROW} .artifact-details')[2].focus(); true`);
         await press('Enter', 'Enter', 13);
         await waitFor(`!document.getElementById('agentic-detail-pane').hidden && !!(${FOOT('Delete')}) && document.querySelector('#agentic-detail-pane .detail-title').textContent === 'report-3.md'`, 'the third row\'s sheet', 6000);
         await ev(`(${FOOT('Delete')}).focus(); true`);

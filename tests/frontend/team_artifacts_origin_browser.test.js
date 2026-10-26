@@ -31,7 +31,7 @@ const SHOTS = process.env.CORAL_SCREENSHOT_DIR;
     const until = async expr => { for (let i = 0; i < 300; i++) { if (await ev(expr)) return; await ev('new Promise(r => setTimeout(r, 20))'); } throw new Error('timed out waiting for ' + expr); };
     // open a row's sheet and read it: its facts as label/value, its actions, whether it is open
     const sheetOf = async name => {
-        await ev(`(${rowOf(name)}).querySelector('.dt-primary').click(); true`);
+        await ev(`(${rowOf(name)}).querySelector('.artifact-details').click(); true`);
         await until(`!document.getElementById('agentic-detail-pane').hidden && document.querySelector('#agentic-detail-pane .detail-title').textContent === ${JSON.stringify(name)}`);
         return ev(`(() => { const a = document.getElementById('agentic-detail-pane'); return { facts: [...a.querySelectorAll('.detail-facts > *')].map(c => c.tagName + ':' + c.textContent), actions: [...a.querySelectorAll('.detail-foot .btn')].map(b => b.textContent) }; })()`);
     };
@@ -121,7 +121,7 @@ const SHOTS = process.env.CORAL_SCREENSHOT_DIR;
         const ax = await ev(`(() => { const r = ${rowOf('Their logs.txt')}; const b = r.querySelector('.team-artifact-badge'); return { hidden: !!b.closest('[aria-hidden=true]'), after: !!(r.querySelector('.dt-primary').compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) }; })()`);
         assert.equal(ax.hidden, false); assert.equal(ax.after, true);
         const stops = await ev(`[...document.querySelectorAll('${ROWS}')].map(r => r.querySelectorAll('button, a[href], summary').length)`);
-        assert.ok(stops.every(n => n === 1), 'every row has one stop, its name: ' + JSON.stringify(stops));
+        assert.ok(stops.every(n => n === 2), 'every row has two stops, its name and its Details link: ' + JSON.stringify(stops));
         await ev(`document.querySelector('#agentic-detail-pane .detail-close').click(); true`);
 
         console.log('6. A 390 px phone at 200% text: the table fits and the words stay in their row');
