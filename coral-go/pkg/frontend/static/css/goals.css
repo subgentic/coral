@@ -20,7 +20,7 @@
 .goal-state-done, .goal-state-task-done { --goal-hue: var(--success); }
 .goal-state-failed { --goal-hue: var(--error); } /* a server that refused its key (#7903) */
 
-.goal-rollup { display: flex; height: 6px; border-radius: var(--radius-xs); overflow: hidden; background: var(--bg-tertiary); }
+.goal-rollup { display: flex; height: 6px; border-radius: var(--radius-xs); overflow: hidden; background: var(--bg-tertiary); border: 1px solid var(--text-muted); }
 .goal-rollup-done { background: var(--success); }
 .goal-rollup-active { background: var(--accent); }
 .goal-rollup-blocked { background: var(--warning); }
