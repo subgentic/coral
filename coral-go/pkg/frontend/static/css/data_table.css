@@ -264,6 +264,13 @@
 .dt-box.dt-fold-column.dt-folded .dt-row { min-height: var(--table-fold-row-h); align-content: center; }
 .dt-box.dt-fold-column.dt-folded td.dt-line-1 { height: var(--table-fold-line-h); overflow: visible; display: flex; align-items: center; min-width: 0; }
 .dt-box.dt-fold-column.dt-folded td.dt-line-1.dt-end { justify-content: flex-end; }
+/* A compact row lets the name's 44 px hit area hang 10 px over its 24 px line. A row that also holds an action button (a .btn: Run, Mark done, Rename) gives the name line its whole 44 px instead, so no two controls overlap, at any text size (#8541). */
+.dt-box.dt-fold-column.dt-folded .dt-row:has(.btn) td.dt-line-1 { height: var(--table-touch); }
+.dt-box.dt-fold-column.dt-folded .dt-row:has(.btn) .dt-primary { margin-block: 0; }
+/* What a cell's flex line holds may shrink with it (a wrapper div would otherwise keep its content's width and push the name off the screen, #8541); the buttons keep their 44 px minimum. */
+.dt-box.dt-fold-column.dt-folded td.dt-line-1 > :not(.dt-primary):not(.dt-link) { min-width: 0; max-width: 100%; }
+/* A name with its description under it stacks: the description is not a second flex item squeezing the name to ellipsis at a large text size (#8541) */
+.dt-box.dt-fold-column.dt-folded td.dt-line-1:has(> .dt-subtitle) { flex-direction: column; align-items: flex-start; height: auto; }
 .dt-box.dt-fold-column.dt-folded .dt-title-cell { align-items: center; width: 100%; }
 .dt-box.dt-fold-column.dt-folded .dt-title-stack { width: 100%; }
 .dt-box.dt-fold-column.dt-folded .dt-primary { box-sizing: border-box; padding: 0; margin-block: calc((var(--table-fold-line-h) - var(--table-touch)) / 2); line-height: 1.3; font-weight: var(--table-fold-primary-weight); }
