@@ -72,6 +72,7 @@ const AGENTS = (waiting) => waiting ? [
             assert.deepEqual(await ev(`[...document.querySelectorAll('${pane} .view-list-item .view-list-count')].map(e => e.textContent)`), ['2', '3', 'soon', '2'], at + 'with their counts, and Goals saying soon');
             assert.equal(await ev(`document.querySelectorAll('${pane} li.sb-row, ${pane} .sgroup-header').length`), 0, at + 'the pane lists folders only: the rows are the table\'s');
             if (!mobile) assert.equal(await ev(`Math.round(document.querySelector('${pane} .view-list-item').getBoundingClientRect().height) >= 36`), true, at + 'a folder is at least 36 px high');
+            if (!mobile) assert.deepEqual(await ev(`(() => { const t = document.querySelector('${pane} .view-list-title'), n = document.querySelector('${pane} .view-list-item .view-list-name'); const left = e => { const r = document.createRange(); r.selectNodeContents(e); return Math.round(r.getBoundingClientRect().left); }; return [left(t), left(n)]; })()`).then(([t, n]) => Math.abs(t - n) <= 1), true, at + 'the section title starts where the folders\' text does (#7851)');
 
             assert.equal(await ev(`document.querySelector('${pane} .sidebar-search-input').getAttribute('aria-label')`), 'Search needs you', at + 'the search is named for the group on screen');
             assert.equal(await ev(`document.querySelector('${pane} [data-display-button]').hidden`), true, at + 'Display options is for Saved only');
@@ -81,6 +82,7 @@ const AGENTS = (waiting) => waiting ? [
             if (mobile) {
                 await waitFor(`!!document.querySelector('#group-table-view .view-list-select') && document.getElementById('group-table-view').getClientRects().length > 0`, at + 'the phone opens on the table with the folders\' select on top', 10000);
                 assert.equal(await ev(`[...document.querySelectorAll('#mobile-inbox-list .sidebar-hide-btn')].some(b => b.getClientRects().length > 0)`), false, at + 'no Hide on a phone');
+                assert.equal(await ev(`(() => { const sel = document.querySelector('#group-table-view .view-list-select').getBoundingClientRect(), nxt = document.querySelector('#group-table-view .gt-toolbar, #group-table-view .group-table-head').getBoundingClientRect(); return nxt.top - sel.bottom >= 8; })()`), true, at + 'the folders\' select does not touch the field under it: 8 px (#7851)');
                 await shot(`inbox-one-list-${w}`);
                 await ev(`(() => { const s = document.querySelector('#group-table-view .view-list-select'); s.value = 'tasks'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
                 await waitFor(`!!document.querySelector('#group-table-view .dt-primary')`, at + 'the select opens Tasks', 8000);
