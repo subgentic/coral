@@ -22,6 +22,7 @@ const BASE = require('./test_base').BASE;
         await ev(`(() => { const i = window.__na.find('input', ${N.folder}); i.value = '/work/payments-app'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
         await click('button', N.next); await waitFor(`/Step 2 of 3/.test(window.__na.dialog().textContent)`, 'step 2', 4000);
         await click('button', N.next); await waitFor(`/Step 3 of 3/.test(window.__na.dialog().textContent)`, 'step 3', 4000);
+        await waitFor(`!document.getElementById('launch-agent-pick').hidden && getComputedStyle(document.getElementById('launch-agent-pick')).display !== 'none'`, 'the Provider group (shown when the CLI probes are in, up to 1.5 s after the step opens)', 8000); // #8001
         await S.run('Codex with Auto: the line says workspace sandbox with the network on', async () => {
             await tab('Agent'); await radio(N.provider, /^Codex$/i);
             await tab('Permissions'); await radio(N.mode, /^Auto$/i);
