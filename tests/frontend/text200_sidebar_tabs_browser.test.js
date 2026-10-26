@@ -16,7 +16,7 @@ const JOBS = [
 ];
 const WORKFLOWS = [{ id: 1, name: 'nightly-build-and-publish', description: 'Build, test and publish the release candidate to every channel we ship to', enabled: true, step_count: 4, last_run: null }, { id: 2, name: 'release-notes', description: '', enabled: false, step_count: 1, last_run: null }];
 const INBOX_TASKS = [{ id: 11, board_id: 'team-a', board_label: 'team-a', title: 'Review the release plan before it goes out to every channel', priority: 'high', status: 'pending', created_by: 'Orchestrator', created_at: '2026-10-25T07:00:00Z', updated_at: '2026-10-25T08:00:00Z', revision: 1 }, { id: 12, board_id: 'team-b', board_label: 'team-b', title: 'Write the notes', priority: 'low', status: 'blocked', created_by: 'QA', created_at: '2026-10-25T06:00:00Z', updated_at: '2026-10-25T06:30:00Z', revision: 1 }];
-const INBOX_SAVED = [{ id: 1, kind: 'agent', ref: 'ag-one', key: '0000000000000000000a', title: 'Agent One', snippet: 'The release plan needs a rollback step before Tuesday, and the notes must say so.', agent_type: 'claude', saved_at: '2026-10-25T09:00:00Z', said_at: '2026-10-25T08:50:00Z', done_at: null }, { id: 2, kind: 'agent', ref: 'ag-two', key: '0000000000000000000b', title: 'Agent Two', snippet: 'Ship on Tuesday, after QA.', agent_type: 'claude', saved_at: '2026-10-25T09:10:00Z', said_at: '2026-10-25T09:00:00Z', done_at: null }];
+const INBOX_SAVED = [{ id: 1, kind: 'agent', ref: 'ag-one', key: '0000000000000000000a', title: 'Agent One planning the release', snippet: 'The release plan needs a rollback step before Tuesday, and the notes must say so.', agent_type: 'claude', saved_at: '2026-10-25T09:00:00Z', said_at: '2026-10-25T08:50:00Z', done_at: null }, { id: 2, kind: 'agent', ref: 'ag-two', key: '0000000000000000000b', title: 'Agent Two reviewing the release notes', snippet: 'Ship on Tuesday, after QA.', agent_type: 'claude', saved_at: '2026-10-25T09:10:00Z', said_at: '2026-10-25T09:00:00Z', done_at: null }];
 const STUB = `(() => { const inner = window.fetch; const json = b => Promise.resolve(new Response(JSON.stringify(b), { headers: { 'content-type': 'application/json' } }));
     window.fetch = (url, opts = {}) => { const path = String(url && url.url || url).replace(/^https?:\\/\\/[^/]+/, '').split('?')[0], m = (opts.method || 'GET').toUpperCase();
         if (m === 'GET' && path === '/api/scheduled/jobs') return json({ jobs: ${JSON.stringify(JOBS)} });
@@ -80,6 +80,16 @@ const BROKEN = `(() => { const c = document.createElement('canvas').getContext('
                             await ev(`[...document.querySelectorAll('#group-table-view tbody .dt-primary')].find(e => e.textContent.includes(${JSON.stringify(task.title)})).click(); true`);
                             await waitFor(`!!document.getElementById('team-task-title')?.getClientRects().length`, 'the task detail heading', 6000);
                             assert.equal(await ev(`document.getElementById('team-task-title').textContent.trim()`), `#${task.id} ${task.title}`, `${where}: the heading must have the seeded task ID and title`);
+                        }
+                    }
+                    if (name === 'Inbox, the Saved table' && mobile && font === 32) {
+                        const savedNames = await ev(`(() => { const rem=parseFloat(getComputedStyle(document.documentElement).fontSize); return [...document.querySelectorAll('#group-table-view tbody td[data-key="message"] > .dt-primary')].map(button => { const r=button.getBoundingClientRect(), row=button.closest('tr').getBoundingClientRect(), cs=getComputedStyle(button); return { text:button.textContent, width:r.width, need:8*rem, height:r.height, lineHeight:parseFloat(cs.lineHeight), clamp:cs.webkitLineClamp, inside:r.left>=row.left && r.right<=row.right+1 && r.top>=row.top && r.bottom<=row.bottom+1 }; }); })()`);
+                        assert.equal(savedNames.length, INBOX_SAVED.length, `${where}: both Saved titles are present`);
+                        for (const savedName of savedNames) {
+                            assert.ok(savedName.width >= savedName.need-1, `${where}: Saved name needs at least 8rem: ${JSON.stringify(savedName)}`);
+                            assert.equal(savedName.clamp, '2', `${where}: Saved titles use at most two lines`);
+                            assert.ok(Math.abs(savedName.height-2*savedName.lineHeight)<=1, `${where}: the long Saved title has two visible lines: ${JSON.stringify(savedName)}`);
+                            assert.ok(savedName.inside, `${where}: Saved name stays in its row: ${JSON.stringify(savedName)}`);
                         }
                     }
                     const r = await ev(SCAN); const broken = await ev(BROKEN);
