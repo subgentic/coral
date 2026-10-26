@@ -4176,12 +4176,7 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .mb-tools { flex: none; padding: 0 var(--space-md, 12px); }
 .mb-tools:empty { display: none; }
 .mb-tools .list-bar-bar { padding-left: 0; padding-right: 0; }
-/* On a phone the search and its buttons are one "Search" row that opens on a tap (#7183): the messages get the room. A wider screen shows the bar as before. */
-.mb-search-toggle { display: none; }
-@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
-    .mb-search-toggle { display: flex; align-items: center; width: 100%; min-height: var(--control-touch-height, 44px); margin: 4px 0; justify-content: flex-start; }
-    .mb-tools:not(.mb-tools-open) > .list-bar-bar, .mb-tools:not(.mb-tools-open) > .mb-search-status { display: none; }
-}
+/* On a phone the search row is shown as it is: the field growing, the Filters and More icons at its right, like the Artifacts and Tasks tabs (#7713; the "Search" row of #7183 that opened it is gone). */
 .mb-search-status { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .mb-search-status[hidden] { display: none; }
 .mb-search-results { margin-right: auto; font-size: 0.8125rem; font-weight: 600; color: var(--text-primary); }

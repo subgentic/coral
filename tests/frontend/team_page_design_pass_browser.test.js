@@ -38,12 +38,7 @@ const TEAM = `qa-design-${Date.now() % 100000}`;
                 await goTab(ev, settle, 'Tasks'); await settle(500);
                 const tasks = await searchBox(); assert.ok(tasks, 'the Tasks tab has its search box');
                 await goTab(ev, settle, 'Messages'); await settle(700);
-                if (mobile) { // a phone folds the board's search under one Search row: its left edge and top are where the other tabs' search box is
-                    const t = await ev(`(() => { const b = [...${panel()}.querySelectorAll('button')].find(x => /^Search$/.test(x.textContent.trim()) && window.__na.vis(x)); const r = b && b.getBoundingClientRect(); return r && { left: Math.round(r.left), top: Math.round(r.top) }; })()`);
-                    assert.ok(t, 'the phone has the Search row'); assert.ok(Math.abs(t.left - tasks.left) <= 1, `its left edge ${t.left} is the other tabs' ${tasks.left}`);
-                    assert.ok(Math.abs(t.top - tasks.top) <= 6, `its top ${t.top} is the other tabs' ${tasks.top}`);
-                    return;
-                }
+                assert.equal(await ev(`!!document.querySelector('.mb-search-toggle')`), false, 'no Search disclosure row on any width: the field and its icons are shown directly (#7713)');
                 const m = await searchBox(); assert.ok(m, 'the Messages tab has its search box');
                 assert.equal(m.ph, 'Search messages', 'the placeholder');
                 assert.ok(Math.abs(m.left - tasks.left) <= 1, `the search box's left edge ${m.left} is the Tasks tab's ${tasks.left}`);

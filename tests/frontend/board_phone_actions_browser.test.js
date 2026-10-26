@@ -24,19 +24,14 @@ const S = `(window.__coralStatic || '/static/')`;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
 
-        console.log('390 px: one Search row, one "..." per message');
+        console.log('390 px: the search row shown directly, one "..." per message');
         await open(390, true);
-        assert.equal(await shown('#mb-tools .mb-search-toggle'), true, 'a Search row');
-        assert.equal((await ev(`document.querySelector('#mb-tools .mb-search-toggle').textContent`)), 'Search');
-        assert.ok(await ev(`document.querySelector('#mb-tools .mb-search-toggle').getBoundingClientRect().height >= 43.5`), 'it is 44 px');
-        assert.equal(await shown('#mb-tools .list-bar-bar'), false, 'the search box and its icons are folded away');
-        assert.equal(await ev(`document.querySelector('#mb-tools .mb-search-toggle').getAttribute('aria-expanded')`), 'false');
-        await ev(`document.querySelector('#mb-tools .mb-search-toggle').click(); true`);
-        assert.equal(await shown('#mb-tools .list-bar-bar'), true, 'a tap opens the bar');
-        assert.equal(await ev(`document.querySelector('#mb-tools .mb-search-toggle').getAttribute('aria-expanded')`), 'true');
+        assert.equal(await shown('#mb-tools .mb-search-toggle'), false, 'no Search row: the disclosure is gone (#7713)');
+        assert.equal(await ev(`!!document.querySelector('.mb-search-toggle')`), false, 'and none is built');
+        assert.equal(await shown('#mb-tools .list-bar-bar'), true, 'the search box and its icons are shown directly');
+        assert.equal(await ev(`(() => { const r = document.querySelector('#mb-tools .list-bar-search').getBoundingClientRect(), t = document.querySelector('#mb-tools .list-bar-toggle').getBoundingClientRect(), m = document.querySelector('#mb-tools .list-bar-more-btn').getBoundingClientRect(); return Math.abs((r.top + r.bottom) / 2 - (t.top + t.bottom) / 2) < 8 && r.right <= t.left + 1 && t.right <= m.left + 1 && t.height >= 31.5 && m.height >= 31.5; })()`), true, 'the field grows and the Filters and More icons (32 px or more) are at its right, on one line');
+        assert.equal(await ev(`document.documentElement.scrollWidth - document.documentElement.clientWidth`) <= 0, true, 'nothing scrolls sideways');
         assert.deepEqual(await ev(`[...document.querySelectorAll('#mb-tools .list-bar-more-menu [role=menuitem]')].map(b => b.textContent)`), ['Jump to first message', 'Jump to latest message'], 'the jumps are menu items of the More icon and say what they do (#7686)');
-        await ev(`document.querySelector('#mb-tools .mb-search-toggle').click(); true`);
-        assert.equal(await shown('#mb-tools .list-bar-bar'), false, 'and folds again');
         assert.equal(await ev(`[...document.querySelectorAll('.mb-message-header .mb-delete-msg-btn')].filter(b => b.getClientRects().length).length`), 0, 'no Delete cross beside the time');
         assert.equal(await ev(`[...document.querySelectorAll('.mb-message-header .mb-save-btn')].filter(b => b.getClientRects().length).length`), 0, 'no Save bookmark drawn on an unsaved message');
         const more = await ev(`[...document.querySelectorAll('.mb-message-header .mb-msg-more')].map(b => ({ shown: b.getClientRects().length > 0, h: Math.round(b.getBoundingClientRect().height), w: Math.round(b.getBoundingClientRect().width), name: b.getAttribute('aria-label') }))`);
@@ -65,7 +60,7 @@ const S = `(window.__coralStatic || '/static/')`;
 
         console.log('1280 px: the bar as before, no "..."');
         await open(1280, false);
-        assert.equal(await shown('#mb-tools .mb-search-toggle'), false, 'no Search row on a wide screen');
+        assert.equal(await ev(`!!document.querySelector('.mb-search-toggle')`), false, 'no Search row on a wide screen');
         assert.equal(await shown('#mb-tools .list-bar-bar'), true, 'the bar is shown as before');
         assert.equal(await ev(`[...document.querySelectorAll('.mb-msg-more')].filter(b => b.getClientRects().length).length`), 0, 'no "..." on a wide screen');
         assert.deepEqual(await ev(`[...document.querySelectorAll('#mb-tools .list-bar-more-menu [role=menuitem]')].map(b => b.textContent)`), ['Jump to first message', 'Jump to latest message']);

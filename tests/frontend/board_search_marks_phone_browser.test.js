@@ -58,7 +58,6 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 800, deviceScaleFactor: 2, mobile: true });
         await Emulation.setTouchEmulationEnabled({ enabled: true, maxTouchPoints: 5 });
         await ev(`new Promise(r => setTimeout(r, 500))`); // sleep-ok: the layout settles after the resize
-        await ev(`(() => { const t = document.querySelector('#mb-tools .mb-search-toggle'); if (t.getAttribute('aria-expanded') !== 'true') t.click(); })(); true`); // on a phone the bar is under one Search row (#7183)
         const g = await ev(`(() => { const t = document.getElementById('mb-tools'); const h = sel => { const x = t.querySelector(sel); return x ? Math.round(x.getBoundingClientRect().height) : null; };
             const btns = [...t.querySelectorAll('.list-bar-search-row > .list-bar-toggle, .list-bar-search-row .list-bar-more-btn')].map(b => [b.getAttribute('aria-label'), Math.round(b.getBoundingClientRect().height)]);
             const st = t.querySelector('.mb-search-status'); const steps = [...t.querySelectorAll('button[data-step], .mb-search-clear')].map(b => Math.round(b.getBoundingClientRect().height));
