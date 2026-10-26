@@ -876,16 +876,18 @@ func TestPinKeyFindingsAndRecommendations(t *testing.T) {
 	rh.ReadyUnclaimed.OwnerIdleCount = 2
 	rh.NotificationChurn = make([]NotificationChurnIncident, 1)
 	rh.DuplicateScopeCandidates = make([]DuplicateScopeCandidate, 1)
+	rh.ActiveWithoutProgress = make([]ActiveWithoutProgress, 3)
 	recs := generateRecommendations(rf, rh, CoordinationScorecard{})
-	require.Len(t, recs, 4)
+	require.Len(t, recs, 5)
 	assert.Equal(t, "Dispatch targeted nudges with explicit claim IDs (coral-board task claim <ID>) for the 2 unclaimed task(s) assigned to idle subscribers.", recs[0])
-	assert.Equal(t, "Debounce orchestrator reminders against actual task claim state to avoid alerting on already-claimed tasks.", recs[1])
-	assert.Equal(t, "Monitor upstream prerequisites for blocked tasks to ensure prompt unblocking upon prerequisite completion.", recs[2])
-	assert.Equal(t, "Review overlapping task titles before launch to clarify task boundaries and prevent duplicated agent work.", recs[3])
-	// the "smoothly" line is only for a board with nothing to say; a stalled task alone says nothing, so it is "smoothly" too (quirk: no recommendation for it)
+	assert.Equal(t, "Check in with the assignees of the 3 task(s) in progress past the inactivity limit (candidates only: a long build or a long reasoning step looks the same).", recs[1])
+	assert.Equal(t, "Debounce orchestrator reminders against actual task claim state to avoid alerting on already-claimed tasks.", recs[2])
+	assert.Equal(t, "Monitor upstream prerequisites for blocked tasks to ensure prompt unblocking upon prerequisite completion.", recs[3])
+	assert.Equal(t, "Review overlapping task titles before launch to clarify task boundaries and prevent duplicated agent work.", recs[4])
+	// a stalled task alone gets its own recommendation, and so not the "smoothly" line (#8292)
 	var stalled HeuristicSignals
-	stalled.ActiveWithoutProgress = make([]ActiveWithoutProgress, 3)
-	assert.Equal(t, []string{"Queue coordination is operating smoothly with balanced slot utilization and low notification churn."}, generateRecommendations(ObservableFacts{}, stalled, CoordinationScorecard{}))
+	stalled.ActiveWithoutProgress = make([]ActiveWithoutProgress, 1)
+	assert.Equal(t, []string{"Check in with the assignees of the 1 task(s) in progress past the inactivity limit (candidates only: a long build or a long reasoning step looks the same)."}, generateRecommendations(ObservableFacts{}, stalled, CoordinationScorecard{}))
 }
 
 func TestPinParseTime(t *testing.T) {
