@@ -42,7 +42,9 @@ async function load() {
     draw();
 }
 
-/** The entry's front matter as a quiet block of facts: type, title, description, tags as chips, and when as words with the exact time in the title. */
+const exactTime = (stamp) => { const d = new Date(stamp); return stamp && !Number.isNaN(d.getTime()) ? d.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : ''; };
+
+/** The entry's front matter as a quiet block of facts: type, title, description and tags as chips. The time is the pane's header line alone (one time format, UI/UX on #7761). */
 function factsBlock(f) {
     const dl = el('dl', 'detail-facts knowledge-facts');
     const row = (k, v) => { dl.append(el('dt', null, k), v); };
@@ -50,7 +52,6 @@ function factsBlock(f) {
     if (f.title) row('Title', el('dd', null, f.title));
     if (f.description) row('About', el('dd', null, f.description));
     if (f.tags.length) { const dd = el('dd'), box = el('span', 'knowledge-tags'); for (const t of f.tags) box.append(el('span', 'knowledge-tag', t)); dd.append(box); row('Tags', dd); }
-    if (f.timestamp) { const d = new Date(f.timestamp), dd = el('dd', null, whenText(f.timestamp) || f.timestamp); if (!Number.isNaN(d.getTime())) dd.title = d.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }); row('Written', dd); }
     return dl.children.length ? dl : null;
 }
 
@@ -126,7 +127,7 @@ function openEntry(entry, opener, { focus = true } = {}) {
         box.focus();
     }
     openDetailPane({
-        key: entry.key, opener, title: entry.name, sub: [whenText(when), entry.from].filter(Boolean).join(' · '), resizable: true, backLabel: 'Knowledge', focus,
+        key: entry.key, opener, title: entry.name, sub: [whenText(when), entry.from].filter(Boolean).join(' · '), subTitle: exactTime(when), resizable: true, backLabel: 'Knowledge', focus,
         body: (host) => { bodyHost = host; showText(); },
         actions: editable ? [{ label: 'Edit', run: (b) => { editButton = b; startEdit(); } }] : [],
         onClose: () => { root?.querySelectorAll('tr[aria-current="true"]').forEach(r => r.removeAttribute('aria-current')); },

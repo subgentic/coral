@@ -51,11 +51,12 @@ const BUNDLE = { exists: true, team_name: TEAM, created_at: '2026-10-25T05:00:00
             assert.equal(d.li, 4, 'the four list items'); assert.ok(d.code, 'the code block'); assert.deepEqual(d.th, ['Agent', 'Role'], 'the table');
             assert.ok(!/^#|\n#|---|\]\(\.\//.test(d.text), `no raw Markdown text: ${JSON.stringify(d.text.match(/^#|\n#|---|\]\(\.\//))} in ${JSON.stringify(d.text)}`); assert.equal(d.pre, false, 'the plain text is replaced by the rendering');
         });
-        await S.run('the front matter is a facts block: type, title, tags as chips, and the time in words with the exact one on hover, not raw text', async () => {
-            const f = await ev(`(() => { const p = window.__tp.pane(), dl = p.querySelector('.knowledge-facts'); if (!dl) return null; const rows = {}; dl.querySelectorAll('dt').forEach(t => { rows[t.textContent] = t.nextElementSibling; }); return { keys: [...dl.querySelectorAll('dt')].map(t => t.textContent), type: rows.Type.textContent, title: rows.Title.textContent, tags: [...rows.Tags.querySelectorAll('.knowledge-tag')].map(t => t.textContent), when: rows.Written.textContent, exact: rows.Written.title, all: window.__na.text(p) }; })()`);
-            assert.ok(f, 'a facts block'); assert.deepEqual(f.keys, ['Type', 'Title', 'About', 'Tags', 'Written']);
+        await S.run('the front matter is a facts block: type, title, tags as chips and no time of its own (one time format, in the header line, with the exact one on hover), not raw text', async () => {
+            const f = await ev(`(() => { const p = window.__tp.pane(), dl = p.querySelector('.knowledge-facts'); if (!dl) return null; const rows = {}; dl.querySelectorAll('dt').forEach(t => { rows[t.textContent] = t.nextElementSibling; }); return { keys: [...dl.querySelectorAll('dt')].map(t => t.textContent), type: rows.Type.textContent, title: rows.Title.textContent, tags: [...rows.Tags.querySelectorAll('.knowledge-tag')].map(t => t.textContent), sub: p.querySelector('.detail-sub').textContent, exact: p.querySelector('.detail-sub').title, all: window.__na.text(p) }; })()`);
+            assert.ok(f, 'a facts block'); assert.deepEqual(f.keys, ['Type', 'Title', 'About', 'Tags'], 'no Written row: the time is in the header line only');
             assert.equal(f.type, 'Team Knowledge Bundle'); assert.equal(f.title, TEAM); assert.deepEqual(f.tags, ['orchestrator', 'uxux-engineer', 'backend-dev']);
-            assert.ok(f.when && f.exact && f.when !== f.exact, `words ${JSON.stringify(f.when)} with the exact time ${JSON.stringify(f.exact)}`);
+            assert.ok(f.sub && f.exact && !f.sub.startsWith(f.exact) && /^(just now|\d+ min ago|today|yesterday|[A-Z][a-z]{2} \d)/.test(f.sub), `the header line has the time in words (${JSON.stringify(f.sub)}) and the exact time on hover (${JSON.stringify(f.exact)})`);
+            assert.ok(!/Written|2026-10-22|Oct 21/.test(f.all.replace(f.sub, '')), 'the time is shown once, in one format');
             assert.ok(!/tags: \[|type: Team|timestamp:/.test(f.all), 'no raw front matter text in the pane');
             await shot('knowledge-sidebar-desktop');
         });
@@ -115,6 +116,19 @@ const BUNDLE = { exists: true, team_name: TEAM, created_at: '2026-10-25T05:00:00
             assert.equal(p.grip, 'none', 'no handle on a phone'); assert.equal(p.scrollX, false, 'the page does not scroll sideways');
             await ev(`window.__tp.pane().querySelector('.detail-back').click(); true`); await settle(300);
             assert.equal(await ev(`window.__tp.pane() === null`), true, 'the way back closes the view'); assert.ok(await ev(`!!window.__tp.table()`), 'the table is there again');
+        });
+        await S.run('on a phone an entry opened by a tap leaves its title with no focus ring (:focus-visible does not match), and one opened from the keyboard keeps it', async () => {
+            await ev(`window.__tp.pane() && window.__tp.pane().querySelector('.detail-close').click(); document.activeElement.blur(); true`); await settle(200); // the close puts the focus back on the row by script, which would carry its ring to the next focus: a person's tap starts from nothing focused
+            const state = () => ev(`(() => { const h = window.__tp.pane().querySelector('.detail-title'), a = document.activeElement; return { onTitle: a === h, focusVisible: !!a && a.matches(':focus-visible'), outline: getComputedStyle(h).outlineStyle }; })()`);
+            const pt = await ev(`(() => { const b = [...window.__tp.table().querySelectorAll('button')].find(x => /^Index$/.test(window.__na.name(x))); const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+            await client.Input.dispatchTouchEvent({ type: 'touchStart', touchPoints: [pt] }); await client.Input.dispatchTouchEvent({ type: 'touchEnd', touchPoints: [] });
+            await waitFor(`!!window.__tp.pane() && document.activeElement === window.__tp.pane().querySelector('.detail-title')`, 'the title to have the focus after the tap', 8000);
+            const tapped = await state(); assert.deepEqual(tapped, { onTitle: true, focusVisible: false, outline: 'none' }, 'after a tap: ' + JSON.stringify(tapped));
+            await ev(`window.__tp.pane().querySelector('.detail-close').click(); document.activeElement.blur(); true`); await settle(200);
+            await client.Input.dispatchKeyEvent({ type: 'rawKeyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
+            await ev(`[...window.__tp.table().querySelectorAll('button')].find(x => /^Index$/.test(window.__na.name(x))).click(); true`);
+            await waitFor(`!!window.__tp.pane() && document.activeElement === window.__tp.pane().querySelector('.detail-title')`, 'the title to have the focus after the keyboard', 8000);
+            const keyed = await state(); assert.deepEqual([keyed.onTitle, keyed.focusVisible, keyed.outline !== 'none'], [true, true, true], 'after the keyboard: ' + JSON.stringify(keyed));
         });
         await removeBoards(ev, [TEAM]); S.finish(); // finish() exits the process, so the board goes first
     } finally { await removeBoards(ev, [TEAM]); await client.close(); }

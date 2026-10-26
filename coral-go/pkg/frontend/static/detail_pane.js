@@ -3,7 +3,7 @@
  * a title (17/700) with one line under it, key facts as a label and a value, the document, and the actions pinned at the bottom, the primary first. Escape and the close button close it and give the focus back to the row that opened it
  * (found again by its key if the table was drawn again meanwhile); choosing another row replaces the content; opening a tab clears it.
  *
- *   openDetailPane({ key, title, sub, facts: [[label, value]], body(el, { signal, isStale }), actions: [{ label, primary, run(button) | href, download }], opener, onClose, resizable, backLabel, focus })
+ *   openDetailPane({ key, title, sub, facts: [[label, value]], body(el, { signal, isStale }), actions: [{ label, primary, run(button) | href, download }], opener, onClose, resizable, backLabel, focus, subTitle })
  *   resizable: the pane is a right sidebar like a goal page's task column (#7702): a handle on its left edge, dragged or moved with the keys, the width remembered (dock_resize.js). backLabel: the phone's way back ("Knowledge" -> "<- Knowledge"), shown only where the pane is a sheet. focus: false leaves the focus where it is (the pane opened by itself).
  *   closeDetailPane({ restoreFocus: true })      isDetailOpen()      detailKey()
  * `body` fills the document into an element; it is passed an AbortSignal and a staleness check, and everything it draws is its own (text from an artifact is data: textContent or the sanitising renderers only). */
@@ -48,7 +48,7 @@ function addResizeHandle(aside) {
     attachDockResize(grip, { panel: aside, row, key: 'coral-detail-width', apply: (w) => { aside.style.setProperty('--detail-w', w ? `${w}px` : ''); value(); } }).restore();
 }
 
-export function openDetailPane({ key, title, sub = '', facts = [], body = null, actions = [], opener = null, onClose = null, host = null, resizable = false, backLabel = '', focus = true }) {
+export function openDetailPane({ key, title, sub = '', facts = [], body = null, actions = [], opener = null, onClose = null, host = null, resizable = false, backLabel = '', focus = true, subTitle = '' }) {
     const aside = host || pane(); // host: a pane of its own, a sheet over a panel (the agent's Artifacts), not the team page's aside
     if (!aside) return false;
     if (current && current.aside !== aside) closeDetailPane(); // one document at a time: the other pane is put away
@@ -70,7 +70,7 @@ export function openDetailPane({ key, title, sub = '', facts = [], body = null, 
     }
     const h = el('h2', 'detail-title', title); h.id = 'detail-pane-title'; h.tabIndex = -1;
     text.append(h);
-    if (sub) text.append(el('p', 'detail-sub', sub));
+    if (sub) { const p = el('p', 'detail-sub', sub); if (subTitle) p.title = subTitle; text.append(p); } // subTitle: the exact time behind a time in words
     if (backLabel && !host) foldWayBack(text, '.detail-back', '.detail-title');
     const close = el('button', 'detail-close');
     close.type = 'button'; close.setAttribute('aria-label', 'Close details');
