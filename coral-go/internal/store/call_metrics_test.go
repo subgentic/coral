@@ -293,3 +293,55 @@ func TestCallMetricRowCapDropsNewRowsOnly(t *testing.T) {
 	require.NoError(t, db.FlushCallMetrics(ctx))
 	assert.Equal(t, 3, countCallMetrics(t, db))
 }
+
+// CallMetricSeries is the summary over time: its buckets add up to the summary's rows, an agent's are that agent's, and a day's are its hours'.
+func TestCallMetricSeriesAddsUpToTheSummary(t *testing.T) {
+	db := openTestDB(t)
+	ctx := context.Background()
+	now := time.Now().UTC().Truncate(time.Hour)
+	raw := func(op, agent string, ago time.Duration, isErr int, ms int) {
+		_, err := db.Exec(`INSERT INTO call_metrics(call_type, operation, agent_name, is_error, duration_ms, created_at) VALUES('tool', ?, ?, ?, ?, ?)`, op, agent, isErr, ms, now.Add(-ago).Add(7*time.Minute).Format(time.RFC3339Nano))
+		require.NoError(t, err)
+	}
+	raw("Read", "alpha", 2*time.Hour, 0, 100)
+	raw("Read", "alpha", 2*time.Hour, 1, 300)
+	raw("Edit", "alpha", time.Hour, 0, 50)
+	raw("Read", "beta", time.Hour, 0, 10)
+	// a rolled-up hour two days ago: 4 calls of beta's, one failed, 40 ms in all
+	_, err := db.Exec(`INSERT INTO call_metrics_hourly(hour, call_type, operation, agent_name, session_id, board_name, calls, errors, duration_sum_ms, duration_n, p50_ms, p95_ms) VALUES(?, 'tool', 'Read', 'beta', '', '', 4, 1, 40, 4, 10, 10)`,
+		now.Add(-48*time.Hour).Format("2006-01-02T15"))
+	require.NoError(t, err)
+
+	since := now.Add(-72 * time.Hour)
+	rows, err := db.CallMetricSummary(ctx, since)
+	require.NoError(t, err)
+	var calls, errs int
+	for _, r := range rows {
+		calls += r.Calls
+		errs += r.Errors
+	}
+	for _, interval := range []string{"1h", "1d"} {
+		buckets, err := db.CallMetricSeries(ctx, since, interval, "")
+		require.NoError(t, err)
+		var c, e int
+		for _, b := range buckets {
+			c += b.Calls
+			e += b.Errors
+		}
+		assert.Equal(t, []int{calls, errs}, []int{c, e}, interval+": the buckets add up to the summary")
+	}
+	hourly, err := db.CallMetricSeries(ctx, since, "1h", "")
+	require.NoError(t, err)
+	require.Len(t, hourly, 3, "the rolled-up hour, and the two hours with calls")
+	assert.Equal(t, now.Add(-48*time.Hour).Format("2006-01-02T15")+":00:00Z", hourly[0].Bucket)
+	assert.Equal(t, []int{4, 1}, []int{hourly[0].Calls, hourly[0].Errors})
+	assert.Equal(t, []int{2, 1}, []int{hourly[1].Calls, hourly[1].Errors})
+	assert.InDelta(t, 200, hourly[1].AvgDurationMs, 1e-9)
+	alpha, err := db.CallMetricSeries(ctx, since, "1h", "alpha")
+	require.NoError(t, err)
+	require.Len(t, alpha, 2)
+	assert.Equal(t, 3, alpha[0].Calls+alpha[1].Calls, "one agent's calls only")
+	none, err := db.CallMetricSeries(ctx, since, "1h", "nobody")
+	require.NoError(t, err)
+	assert.Empty(t, none)
+}

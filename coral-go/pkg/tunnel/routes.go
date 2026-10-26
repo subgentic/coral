@@ -215,7 +215,7 @@ var routeTable = cat(
 		// A distillation run's status (#3518): fixed keys, bounded text, no paths.
 		"/api/teams/detail/{name}/distill-knowledge",
 		"/api/token-usage", "/api/token-usage/summary", "/api/token-usage/timeseries",
-		"/api/token-usage/by-team", "/api/token-usage/by-branch", "/api/token-usage/session/{id}/turns",
+		"/api/token-usage/by-team", "/api/token-usage/by-branch", "/api/token-usage/session/{id}/turns", "/api/token-usage/turns",
 		"/api/goals/metrics", "/api/call-metrics/summary",
 		"/api/goals", // every board's goals in one call (#7260): the Operator's, redacted like the per-board read
 		"/api/tags", "/api/folder-tags", "/api/folder-tags/{name}", "/api/pinned-folders",

@@ -181,10 +181,15 @@ func (h *TokenUsageHandler) SessionTurns(w http.ResponseWriter, r *http.Request)
 
 	// Compute cumulative cost
 	type turnWithCumulative struct {
-		Turn           int     `json:"turn"`
-		CostUSD        float64 `json:"cost_usd"`
-		CumulativeCost float64 `json:"cumulative_cost"`
-		Timestamp      string  `json:"timestamp"`
+		Turn             int     `json:"turn"`
+		CostUSD          float64 `json:"cost_usd"`
+		CumulativeCost   float64 `json:"cumulative_cost"`
+		InputTokens      int64   `json:"input_tokens"`
+		OutputTokens     int64   `json:"output_tokens"`
+		CacheReadTokens  int64   `json:"cache_read_tokens"`
+		CacheWriteTokens int64   `json:"cache_write_tokens"`
+		Model            string  `json:"model"`
+		Timestamp        string  `json:"timestamp"`
 	}
 
 	result := make([]turnWithCumulative, len(turns))
@@ -192,18 +197,68 @@ func (h *TokenUsageHandler) SessionTurns(w http.ResponseWriter, r *http.Request)
 	for i, t := range turns {
 		cumulative += t.CostUSD
 		result[i] = turnWithCumulative{
-			Turn:           i + 1,
-			CostUSD:        t.CostUSD,
-			CumulativeCost: cumulative,
-			Timestamp:      t.RecordedAt,
+			Turn:             i + 1,
+			CostUSD:          t.CostUSD,
+			CumulativeCost:   cumulative,
+			InputTokens:      t.InputTokens,
+			OutputTokens:     t.OutputTokens,
+			CacheReadTokens:  t.CacheReadTokens,
+			CacheWriteTokens: t.CacheWriteTokens,
+			Model:            t.Model,
+			Timestamp:        t.RecordedAt,
 		}
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{"turns": result})
 }
 
+// UsageTurns lists the turns that made up a window of usage.
+// GET /api/token-usage/turns?agent=...&session_id=...&since=...&until=...&order=cost|time&limit=N
+// It names agents, so an agent's token is not given it (as it is not given by_agent). until is exclusive, an RFC 3339 time.
+func (h *TokenUsageHandler) UsageTurns(w http.ResponseWriter, r *http.Request) {
+	if _, isAgent := VerifiedSession(r.Context()); isAgent {
+		errForbidden(w, "an agent's token cannot read the turns of every agent")
+		return
+	}
+	q := r.URL.Query()
+	until := q.Get("until")
+	if until != "" {
+		t, err := time.Parse(time.RFC3339Nano, until)
+		if err != nil {
+			errBadRequest(w, "until must be an RFC 3339 time")
+			return
+		}
+		until = t.UTC().Format("2006-01-02T15:04:05.000Z")
+	}
+	order := q.Get("order")
+	if order != "" && order != "cost" && order != "time" {
+		errBadRequest(w, "order must be cost or time")
+		return
+	}
+	limit := 0
+	if v := q.Get("limit"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 {
+			errBadRequest(w, "limit must be a positive number")
+			return
+		}
+		limit = n
+	}
+	turns, err := h.ts.GetUsageTurns(r.Context(), store.UsageTurnsQuery{Agent: q.Get("agent"), Session: q.Get("session_id"), Since: q.Get("since"), Until: until, Order: order, Limit: limit})
+	if err != nil {
+		errInternalServer(w, err.Error())
+		return
+	}
+	if turns == nil {
+		turns = []store.UsageTurn{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"turns": turns})
+}
+
 // UsageTimeSeries returns bucketed time-series cost data.
-// GET /api/token-usage/timeseries?since=...&interval=5m|1h|1d
+// GET /api/token-usage/timeseries?since=...&until=...&interval=5m|1h|1d&board=...&group_by=team|agent|provider|model
+// until is exclusive (an RFC 3339 time: the prior period is since=A&until=B beside since=B); group_by adds, to each bucket, the series that had usage in it (the bucket's own
+// figures stay the sum of all of them). The agent's token is not given group_by=agent (it names the agents of every board, as by_agent does).
 func (h *TokenUsageHandler) UsageTimeSeries(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	since := q.Get("since")
@@ -211,8 +266,26 @@ func (h *TokenUsageHandler) UsageTimeSeries(w http.ResponseWriter, r *http.Reque
 	if interval == "" {
 		interval = "1h"
 	}
+	until := q.Get("until")
+	if until != "" {
+		t, err := time.Parse(time.RFC3339Nano, until)
+		if err != nil {
+			errBadRequest(w, "until must be an RFC 3339 time")
+			return
+		}
+		until = t.UTC().Format("2006-01-02T15:04:05.000Z")
+	}
+	groupBy := q.Get("group_by")
+	if !store.ValidUsageGroup(groupBy) {
+		errBadRequest(w, "group_by must be team, agent, provider or model")
+		return
+	}
+	if _, isAgent := VerifiedSession(r.Context()); isAgent && groupBy == "agent" {
+		errForbidden(w, "an agent's token cannot read the usage of every agent")
+		return
+	}
 
-	buckets, err := h.ts.GetUsageTimeSeries(r.Context(), since, interval)
+	buckets, err := h.ts.GetUsageTimeSeriesGrouped(r.Context(), store.TimeSeriesQuery{Since: since, Until: until, Interval: interval, Board: q.Get("board"), GroupBy: groupBy})
 	if err != nil {
 		errInternalServer(w, err.Error())
 		return
@@ -220,14 +293,15 @@ func (h *TokenUsageHandler) UsageTimeSeries(w http.ResponseWriter, r *http.Reque
 
 	// Compute cumulative cost
 	type bucketWithCumulative struct {
-		Bucket           string  `json:"bucket"`
-		CostUSD          float64 `json:"cost_usd"`
-		CumulativeCost   float64 `json:"cumulative_cost"`
-		InputTokens      int64   `json:"input_tokens"`
-		OutputTokens     int64   `json:"output_tokens"`
-		CacheReadTokens  int64   `json:"cache_read_tokens"`
-		CacheWriteTokens int64   `json:"cache_write_tokens"`
-		NumRequests      int     `json:"num_requests"`
+		Bucket           string                   `json:"bucket"`
+		CostUSD          float64                  `json:"cost_usd"`
+		CumulativeCost   float64                  `json:"cumulative_cost"`
+		InputTokens      int64                    `json:"input_tokens"`
+		OutputTokens     int64                    `json:"output_tokens"`
+		CacheReadTokens  int64                    `json:"cache_read_tokens"`
+		CacheWriteTokens int64                    `json:"cache_write_tokens"`
+		NumRequests      int                      `json:"num_requests"`
+		Series           []store.TimeSeriesSeries `json:"series,omitempty"`
 	}
 
 	result := make([]bucketWithCumulative, len(buckets))
@@ -243,10 +317,15 @@ func (h *TokenUsageHandler) UsageTimeSeries(w http.ResponseWriter, r *http.Reque
 			CacheReadTokens:  b.CacheReadTokens,
 			CacheWriteTokens: b.CacheWriteTokens,
 			NumRequests:      b.NumRequests,
+			Series:           b.Series,
 		}
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{"buckets": result, "interval": interval})
+	out := map[string]any{"buckets": result, "interval": interval}
+	if groupBy != "" {
+		out["group_by"] = groupBy
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 // UsageSummaryByBranch returns per-branch usage breakdown.

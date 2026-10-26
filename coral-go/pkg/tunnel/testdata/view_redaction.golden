@@ -107,6 +107,7 @@ GET /api/token-usage/by-team redact
 GET /api/token-usage/session/{id}/turns redact
 GET /api/token-usage/summary redact
 GET /api/token-usage/timeseries redact
+GET /api/token-usage/turns redact
 GET /api/views redact
 GET /api/views/{id} redact
 GET /ws/coral redact

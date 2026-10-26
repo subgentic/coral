@@ -112,6 +112,8 @@ GET /api/sessions/{sessionID}/changes.diff | unbound
 GET /api/sessions/{sessionID}/resolve | token-session
 GET /api/sessions/{sessionID}/status | unbound
 GET /api/token-usage/summary | token-session
+GET /api/token-usage/timeseries | token-session
+GET /api/token-usage/turns | token-session | operator-only
 PATCH /api/agent/tasks/{taskID} | token-bound
 PATCH /api/artifacts/{id}/comments/{cid} | token-session | operator-only
 PATCH /api/board/{project} | board-claims | operator-only

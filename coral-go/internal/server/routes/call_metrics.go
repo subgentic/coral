@@ -37,7 +37,25 @@ func (h *CallMetricsHandler) Summary(w http.ResponseWriter, r *http.Request) {
 	if hours > maxHours {
 		hours = maxHours
 	}
-	rows, err := h.db.CallMetricSummary(r.Context(), time.Now().Add(-time.Duration(hours)*time.Hour))
+	since := time.Now().Add(-time.Duration(hours) * time.Hour)
+	// interval=1h|1d answers the same window over time: buckets of calls, errors and average duration (agent=NAME for one agent, by the name the rows show).
+	if interval := r.URL.Query().Get("interval"); interval != "" {
+		if interval != "1h" && interval != "1d" {
+			errBadRequest(w, "interval must be 1h or 1d")
+			return
+		}
+		buckets, err := h.db.CallMetricSeries(r.Context(), since, interval, r.URL.Query().Get("agent"))
+		if err != nil {
+			errInternalServer(w, err.Error())
+			return
+		}
+		if buckets == nil {
+			buckets = []store.CallMetricBucket{}
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"hours": hours, "interval": interval, "buckets": buckets})
+		return
+	}
+	rows, err := h.db.CallMetricSummary(r.Context(), since)
 	if err != nil {
 		errInternalServer(w, err.Error())
 		return

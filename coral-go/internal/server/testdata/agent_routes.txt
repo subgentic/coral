@@ -221,6 +221,7 @@ c GET /api/token-usage/by-team
 c GET /api/token-usage/session/{sessionID}/turns
 c GET /api/token-usage/summary
 c GET /api/token-usage/timeseries
+b GET /api/token-usage/turns
 c GET /api/views
 c GET /api/views/{id}
 b GET /api/workflows

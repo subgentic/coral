@@ -527,6 +527,7 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 	r.Get("/api/token-usage/summary", tokenHandler.UsageSummary)
 	r.Get("/api/token-usage/session/{sessionID}/turns", tokenHandler.SessionTurns)
 	r.Get("/api/token-usage/timeseries", tokenHandler.UsageTimeSeries)
+	r.Get("/api/token-usage/turns", tokenHandler.UsageTurns)
 	r.Get("/api/token-usage/by-team", tokenHandler.UsageSummaryByBoard)
 	r.Get("/api/token-usage/by-branch", tokenHandler.UsageSummaryByBranch)
 

@@ -392,6 +392,49 @@ func (s *DB) CallMetricSummary(ctx context.Context, since time.Time) ([]CallMetr
 	return out, err
 }
 
+// CallMetricBucket is one hour (or day) of calls: how many, how many failed, how long they took on average.
+type CallMetricBucket struct {
+	Bucket        string  `db:"bucket" json:"bucket"`
+	Calls         int     `db:"calls" json:"calls"`
+	Errors        int     `db:"errors" json:"errors"`
+	AvgDurationMs float64 `db:"avg_duration_ms" json:"avg_duration_ms"`
+}
+
+// CallMetricSeries is CallMetricSummary over time: the calls (all of them, or one agent's by the name the summary shows) in 1h or 1d buckets from since, oldest first. A bucket
+// with no call is not listed. Like the summary it reads raw rows for the last day and hourly rollups before, so a window starting mid-hour counts that whole hour.
+func (s *DB) CallMetricSeries(ctx context.Context, since time.Time, interval, agent string) ([]CallMetricBucket, error) {
+	if err := s.FlushCallMetrics(ctx); err != nil {
+		return nil, err
+	}
+	rawBucket, hourBucket := `substr(cm.created_at, 1, 13) || ':00:00Z'`, `h.hour || ':00:00Z'`
+	if interval == "1d" {
+		rawBucket, hourBucket = `substr(cm.created_at, 1, 10) || 'T00:00:00Z'`, `substr(h.hour, 1, 10) || 'T00:00:00Z'`
+	}
+	query := `SELECT bucket, SUM(calls) AS calls, SUM(errors) AS errors,
+		CASE WHEN SUM(duration_n) > 0 THEN CAST(SUM(duration_sum_ms) AS REAL) / SUM(duration_n) ELSE 0 END AS avg_duration_ms
+		FROM (
+			SELECT ` + rawBucket + ` AS bucket, COALESCE(NULLIF(ls.display_name, ''), cm.agent_name, '') AS agent_name,
+				1 AS calls, cm.is_error AS errors, COALESCE(cm.duration_ms, 0) AS duration_sum_ms, CASE WHEN cm.duration_ms IS NULL THEN 0 ELSE 1 END AS duration_n
+			FROM call_metrics cm LEFT JOIN live_sessions ls ON ls.session_id = cm.session_id
+			WHERE cm.created_at >= ? AND cm.operation NOT IN (?, ?, ?)
+			UNION ALL
+			SELECT ` + hourBucket + ` AS bucket, COALESCE(NULLIF(ls.display_name, ''), h.agent_name) AS agent_name,
+				h.calls, h.errors, h.duration_sum_ms, h.duration_n
+			FROM call_metrics_hourly h LEFT JOIN live_sessions ls ON ls.session_id = NULLIF(h.session_id, '')
+			WHERE h.hour >= ? AND h.operation NOT IN (?, ?, ?)
+		)`
+	args := []interface{}{since.UTC().Format(time.RFC3339Nano), internalMetricOperations[0], internalMetricOperations[1], internalMetricOperations[2],
+		hourPrefix(since), internalMetricOperations[0], internalMetricOperations[1], internalMetricOperations[2]}
+	if agent != "" {
+		query += ` WHERE agent_name = ?`
+		args = append(args, agent)
+	}
+	query += ` GROUP BY bucket ORDER BY bucket ASC`
+	var out []CallMetricBucket
+	err := s.Reader().SelectContext(ctx, &out, query, args...)
+	return out, err
+}
+
 // Retention (#3261). Raw call metrics are kept for CallMetricsRetentionDays
 // (the call_metrics_retention_days setting); the summary never reads further
 // back than that.

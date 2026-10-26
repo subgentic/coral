@@ -252,6 +252,7 @@ var operatorOnlyRoutes = map[string]string{
 	"GET /api/sessions/history/search":                   "search every session's history",
 	"GET /api/token-usage":                               "list every session's token usage",
 	"GET /api/token-usage/by-branch":                     "read token usage by branch",
+	"GET /api/token-usage/turns":                         "list the turns of a window of token usage (names agents)",
 	"GET /api/goals/metrics":                             "read the goal generator's metrics (every session's goal text)", // #5041
 	"GET /api/system/identity-report":                    "read the identity report (every session's calls and mismatches)",
 	"GET /api/board/tasks":                               "list the tasks of every board",

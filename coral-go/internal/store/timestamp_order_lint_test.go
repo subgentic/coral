@@ -40,7 +40,7 @@ var nanoWriters = map[string]nanoWriter{
 	"store/saved_messages.go":      {calls: 2, tables: []string{"saved_messages"}},    // created_at, done_at (listed by id)
 	"store/sessions_tags.go":       {calls: 1, tables: []string{"pinned_folders"}},    // pinned_at (listed by rowid)
 	"store/ui_requests.go":         {calls: 3, tables: []string{"agent_ui_requests"}}, // created_at, updated_at (only a retention cutoff compares them)
-	"store/call_metrics.go":        {calls: 4, tables: []string{"call_metrics"}},      // created_at (hour-prefix ranges and a prune cutoff)
+	"store/call_metrics.go":        {calls: 5, tables: []string{"call_metrics"}},      // created_at (hour-prefix ranges, a prune cutoff, and the summary's and the series' window start)
 	"store/cloud_enrollment.go":    {calls: 1, tables: []string{"cloud_enrollment"}},  // parsed to time.Time, never compared as text
 	"tracking/milestones.go":       {calls: 1, why: "a JSON file, parsed"},
 	"server/routes/token_usage.go": {calls: 1, why: "a response field, not stored"},
