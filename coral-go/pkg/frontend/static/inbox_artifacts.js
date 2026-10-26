@@ -4,6 +4,8 @@
 import { importOnce } from './import_once.js';
 const DT = await importOnce('./data_table.js');
 const { createArtifactsList } = await importOnce('./team_artifacts_page.js');
+const { inboxBarSpec } = await importOnce('./team_artifact_bar.js');
+const IT = await importOnce('./inbox_toolbar.js'); // the folders' toolbar on the shared list bar (#8596)
 
 const KEY = '@inbox'; // the key the folder keeps its filters under, beside the teams' own (the team page's showArtifacts takes it as its project)
 const list = createArtifactsList({ inbox: true });
@@ -32,7 +34,21 @@ export function setArtifactSearch(text) {
 }
 
 let pageHost = null;
-const hooks = () => ({ detailHost: pageHost && pageHost.querySelector('.inbox-detail-pane'), onCount: n => { if (n !== count) { count = n; onCount(); } const c = pageHost && pageHost.querySelector('.inbox-artifacts-count'); if (c) c.textContent = String(n); } });
+const hooks = () => ({ detailHost: pageHost && pageHost.querySelector('.inbox-detail-pane'), onCount: n => { count = n; onCount(); const c = pageHost && pageHost.querySelector('.inbox-artifacts-count'); if (c) c.textContent = String(n); } });
+
+let folderBar = null;
+/** The folder's toolbar (the shared one every Inbox folder has): the search, the Filters icon beside it (Team, Type, Origin, Uploaded by, Kept only, dates, Sort), the chips of what is on. The list uses this bar as its own. */
+export function artifactsToolbar(redraw) {
+    if (!folderBar) {
+        folderBar = IT.folderToolbar(inboxBarSpec(), next => list.setFilters(next));
+        list.useBar(folderBar.bar, KEY);
+    }
+    if (redraw) onCount = redraw; // the list tells the folder when it has read (its count, its teams, its names): the toolbar is drawn again
+    const teams = list.teams();
+    const node = folderBar.draw({ filters: list.filters(), options: { team: { values: teams.map(t => t.board_id), labels: Object.fromEntries(teams.map(t => [t.board_id, `${t.team || t.board_id} (${t.all})`])) } } });
+    folderBar.bar.names(list.names());
+    return { node, signature: JSON.stringify([list.filters(), teams.map(t => [t.board_id, t.all])]) };
+}
 
 /** The folder's page for the group table: its own title row, the list and the detail pane. */
 export function artifactsSpec() {
@@ -40,7 +56,7 @@ export function artifactsSpec() {
         const row = DT.el('div', 'inbox-artifacts-row');
         const main = DT.el('div', 'inbox-artifacts-main');
         const head = DT.el('div', 'group-table-head');
-        const h = DT.el('h2', null, 'Artifacts'); h.id = 'group-table-title'; // not focusable: the page opens on its search box (focusSel), and no ring is drawn round words (#7404)
+        const h = DT.el('h2', null, 'Artifacts'); h.id = 'group-table-title'; // not focusable: the page opens on its search box (the group table's focus), and no ring is drawn round words (#7404)
         const n = DT.el('span', 'session-group-count inbox-artifacts-count', count == null ? '' : String(count));
         head.append(h, n);
         const body = DT.el('div', 'inbox-artifacts-list team-panel'); // the team page's list rules (its bar, its table) apply by .team-panel

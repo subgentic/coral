@@ -31,6 +31,12 @@ const specFor = (personal, page = false, teams = false) => {
     };
 };
 
+/** The Inbox's Artifacts folder's bar spec for the folder toolbar (inbox_toolbar.js): the team list's fields with the Team field first, on the Inbox's filters; the toolbar adds the shared parts. */
+export function inboxBarSpec() {
+    const { idp, noun, sorts, fields, model } = specFor(false, true, true);
+    return { idp, noun, searchLabel: 'Search artifacts', sorts, fields, model };
+}
+
 /** onChange(filters) is called with the new, clean filters when the person changes anything (typing after a short pause). personal: the bar of one agent's Artifacts tab. */
 export function buildBar(onChange, { personal = false, page = false, teams = false, more = null, moreNoun = '', hooks = {} } = {}) {
     return buildListBar({ ...specFor(personal, page, teams), ...(more ? { more, moreNoun } : {}) }, onChange, hooks); // more: the list's other actions behind the More icon (#7686)

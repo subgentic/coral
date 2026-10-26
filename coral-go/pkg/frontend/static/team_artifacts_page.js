@@ -187,7 +187,7 @@ export function createArtifactsList({ inbox = false } = {}) {
     // ── drawing ──────────────────────────────────────────────────────────────
 
     function ensureBar() {
-        if (bar && barKey === model.key) return;
+        if (external || (bar && barKey === model.key)) return;
         barKey = model.key;
         const panel = inbox ? 'inbox-artifacts' : model.scope ? 'artifacts' : 'team-artifacts';
         const plain = !!(model.scope && model.scope.standalone); // an agent with no team: its list has no search or filters, only the More icon
@@ -271,7 +271,7 @@ export function createArtifactsList({ inbox = false } = {}) {
         const a = document.activeElement;
         const held = a && body.contains(a) && !bar.node.contains(a) ? (a.dataset.artifactId || (a.classList.contains('dt-more') ? '#load-more' : a.classList.contains('team-artifacts-retry') ? '#retry' : '')) : '';
         for (const c of [...body.children]) if (c !== bar.node) c.remove();
-        if (bar.node.parentElement !== body) body.prepend(bar.node);
+        if (!external && bar.node.parentElement !== body) body.prepend(bar.node);
         const counting = !model.error && !model.loading && model.items.length > 0; // the count is not a line above the table: a screen reader hears it (sr-only), and "Showing 100 of 163" is under the table with Load more (#7729)
         const status = el('p', counting ? 'sr-only team-count-line' : `goals-note team-count-line${model.error ? ' team-artifacts-error' : !model.loading && !model.items.length ? ' team-empty-line' : ''}`, statusLine());
         status.setAttribute('role', model.error ? 'alert' : 'status');
@@ -395,14 +395,25 @@ export function createArtifactsList({ inbox = false } = {}) {
     }
 
     /** Show the team's artifacts in `host`; with `scope` ({ session, server, standalone, name }) one agent's (standalone: it has no team, its list has no search). hooks: onCount(n). */
+    let external = false; // the Inbox folder draws this list's bar itself, on the folder toolbar (inbox_toolbar.js): useBar
+    function initModel(project, scope, key) {
+        artifactState = DT.tableState();
+        model.controller?.abort();
+        Object.assign(model, { project, scope, key, loaded: false, items: [], hasMore: false, cursor: '', counts: null, truncated: false, loading: false, error: '', loadingMore: false, filters: scope && scope.standalone ? { ...F.EMPTY } : F.load(scope ? `${project}::agent::${scope.session}` : project), kept: new Set() });
+        if (!external) bar = null;
+    }
+    /** The Inbox folder's bar (a list bar built by the folder toolbar) is this list's bar: the list neither builds nor places one, and tells it what it holds (names, counts, filters). */
+    function useBar(b, project) {
+        external = true; bar = b;
+        if (project !== model.key) initModel(project, null, project);
+        barKey = model.key;
+    }
+
     function showArtifacts(host, project, h = {}, scope = null) {
         const key = scope ? `${project}|${scope.session}` : project;
         const sameKey = key === model.key;
         if (!sameKey) {
-            artifactState = DT.tableState();
-            model.controller?.abort();
-            Object.assign(model, { project, scope, key, loaded: false, items: [], hasMore: false, cursor: '', counts: null, truncated: false, loading: false, error: '', loadingMore: false, filters: scope && scope.standalone ? { ...F.EMPTY } : F.load(scope ? `${project}::agent::${scope.session}` : project), kept: new Set() });
-            bar = null;
+            initModel(project, scope, key);
         } else if (scope) model.scope = scope;
         hooks = h;
         if (!host.dataset.built) {
@@ -411,7 +422,7 @@ export function createArtifactsList({ inbox = false } = {}) {
             const status = el('div', 'team-artifacts-status-live sr-only'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
             page.append(status, el('div', 'team-artifacts-body'));
             host.replaceChildren(page);
-            bar = null;
+            if (!external) bar = null;
         }
         root = host.firstChild;
         watch();
@@ -420,7 +431,7 @@ export function createArtifactsList({ inbox = false } = {}) {
         return loadArtifacts();
     }
 
-    return { loadArtifacts, showArtifacts, setFilters: next => setFilters(next), filters: () => model.filters };
+    return { loadArtifacts, showArtifacts, useBar, setFilters: next => setFilters(next), filters: () => model.filters, teams: () => model.teams, names: () => [...new Set(model.items.flatMap(i => [i.produced_by, i.sent_by]).filter(n => typeof n === 'string' && n))].sort().slice(0, 50) };
 }
 
 const teamList = createArtifactsList(); // the team page's and the agent tab's: one at a time on screen
