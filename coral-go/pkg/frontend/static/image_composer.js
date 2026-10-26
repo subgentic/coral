@@ -7,11 +7,15 @@ import { blockedReason } from './hub_access.js';
 import { prepareImage, artifactErrorText, PICKER_ACCEPT, parseUploadReply, uploadStatusFailure, uploadCodeFailure, UPLOAD_UNFINISHED } from './image_attach.js';
 import { responseErrorText } from './server_status.js';
 import { sleepingBlocked } from './control_runtime.js';
+import { registerUnsavedWork } from './update_banner.js';
 
 // Active upload promises scoped by session_id
 export const activeUploadPromisesBySession = new Map(); // session_id -> Promise[]
 // Attached image paths scoped by session_id (cleared on send)
 const pendingAttachmentsBySession = new Map(); // session_id -> [{ path, filename, previewUrl }]
+
+// An image attached or on its way is unsent work: a reload after a server update waits for it, as for typed text (update_banner.js; an empty composer with a picture in it is not an idle tab, #8735).
+registerUnsavedWork(() => activeUploadPromisesBySession.size > 0 || [...pendingAttachmentsBySession.values()].some(list => list.length > 0));
 
 export function getPendingAttachments(session = state.currentSession) {
     const sid = session?.session_id;

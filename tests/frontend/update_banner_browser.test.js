@@ -122,6 +122,25 @@ const NEW_BUILD = 'ffffffffffff';
         await waitFor(`window.__marker === undefined`, 'the reload once the draft is gone', 6000);
         console.log('   ✓ a draft holds the reload for as long as it exists, and the reload follows when it is gone');
 
+        console.log('3b. An image attached to an empty composer is unsent work too (#8735)');
+        spoof = null;
+        await load(true);
+        await ev(`sessionStorage.removeItem('coral-update-reloaded'); true`);
+        await waitFor(`!!document.getElementById('command-input') && !document.getElementById('command-input').disabled`, 'the composer', 8000);
+        assert.equal(await ev(`document.getElementById('command-input').value`), '', 'the box is empty');
+        await ev(`(async () => { const c = document.createElement('canvas'); c.width = 120; c.height = 80; const x = c.getContext('2d'); x.fillStyle = '#39c'; x.fillRect(0, 0, 120, 80); const b = await new Promise(r => c.toBlob(r, 'image/png')); const f = new File([b], 'shot.png', { type: 'image/png' }); const S = window.__coralStatic || '/static/'; const m = await import(S + 'image_composer.js'); const st = (await import(S + 'state.js')).state; return m.uploadAndInsertImage(f, st.currentSession); })()`);
+        await waitFor(`document.querySelectorAll('#image-attachments .image-attachment').length === 1`, 'the image attached', 8000);
+        spoof = NEW_BUILD;
+        await poke();
+        await waitFor(`!!document.getElementById('update-banner') && document.getElementById('update-banner-text').textContent !== ''`, 'the banner with an image attached', 3000);
+        await sleep(1500); // sleep-ok: several reload ticks pass with the image attached; nothing may happen (no condition to wait for)
+        assert.equal(await ev(`window.__marker`), 'old-page', 'the tab did not reload over the attached image');
+        assert.equal(await ev(`document.querySelectorAll('#image-attachments .image-attachment').length`), 1, 'the image is still attached');
+        assert.match((await banner()).text, /Your unsent text is kept/, 'the banner waits');
+        await ev(`(async () => { const S = window.__coralStatic || '/static/'; const m = await import(S + 'image_composer.js'); const st = (await import(S + 'state.js')).state; m.removeAttachment(0, st.currentSession); return true; })()`);
+        await waitFor(`window.__marker === undefined`, 'the reload once the image is gone', 6000);
+        console.log('   ✓ an attached image holds the reload, and the reload follows when it is removed');
+
         console.log('4. Unsaved work a module reports holds the reload too');
         spoof = null;
         await load(false);
