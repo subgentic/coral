@@ -51,7 +51,7 @@ const TEAM = `qa-a11y-pass-${Date.now() % 100000}`;
             await ev(`document.activeElement && document.activeElement.blur(); true`); await settle(300);
             const idle = await line(); await ev(`document.querySelector('.goal-side-grip').focus({ focusVisible: true }); true`); await settle(300);
             const focused = await line(), highlight = await ev(`(() => { const t = document.createElement('i'); t.style.background = 'Highlight'; document.body.append(t); const c = getComputedStyle(t).backgroundColor; t.remove(); return c; })()`); await shot('goal-grip-forced-colors');
-            assert.equal(idle, 'rgba(0, 0, 0, 0)', 'nothing is drawn while it has no keyboard: ' + idle); assert.equal(focused, highlight, `drawn in Highlight when focused: ${focused} against ${highlight}`);
+            assert.match(idle, /^rgba\(\d+, \d+, \d+, 0\)$/, 'nothing is drawn while it has no keyboard (fully transparent, whatever colour the theme gives it): ' + idle); assert.equal(focused, highlight, `drawn in Highlight when focused: ${focused} against ${highlight}`);
         });
         await S.run("the agent dock's divider is drawn in forced colors (ButtonText) and in Highlight while it is dragged", async () => {
             await ev(`window.__m.add('dock-a', 'A', 3, { sleeping: false, session_id: 'dock-a-id' }); window.selectLiveSession('dock-a', 'claude', 'dock-a-id', 'local'); true`);
