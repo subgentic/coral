@@ -103,6 +103,7 @@ func TestBuildGoalPrompt(t *testing.T) {
 // goalFixture is one live Claude session with a transcript on disk and a
 // generator whose CLI is faked.
 type goalFixture struct {
+	db      *store.DB
 	cli     string // the signed-in stand-in claude (signedInClaude): a bare "claude" asked the machine's own CLI whether it is signed in (#5469)
 	ctx     context.Context
 	ss      *store.SessionStore
@@ -128,6 +129,7 @@ func newGoalFixture(t *testing.T, ls store.LiveSession) *goalFixture {
 	t.Helper()
 	db := setupTestDB(t)
 	f := &goalFixture{
+		db:      db,
 		ctx:     context.Background(),
 		ss:      store.NewSessionStore(db),
 		ts:      store.NewTaskStore(db),
