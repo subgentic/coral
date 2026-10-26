@@ -96,6 +96,11 @@ const { connect } = require('./agent_view_harness');
         console.log('5. refresh');
         await ev(`{ const t = document.querySelector('#acf-t .acf-agent-type'); t.value = 'claude'; t.dispatchEvent(new Event('change', { bubbles: true })); window.__delay = 0; true }`);
         await waitFor(`document.querySelector('#acf-t .acf-model-select').options.length === 5`, 'the claude list again', 4000);
+        // a list that loads as the form opens, with the server refreshing it in the background, says nothing: "Updating the list…" is for a refresh the person pressed (#7912)
+        await ev(`{ window.__calls.length = 0; window.__serve.claude = { models: [${JSON.stringify(OPUS)}, ${JSON.stringify(SONNET)}, ${JSON.stringify(HAIKU)}], refreshing: true }; const t = document.querySelector('#acf-t .acf-agent-type'); t.value = 'codex'; t.dispatchEvent(new Event('change', { bubbles: true })); t.value = 'claude'; t.dispatchEvent(new Event('change', { bubbles: true })); true }`);
+        await waitFor(`window.__calls.filter(c => c === 'GET /api/agents/models?type=claude').length >= 1`, 'the claude list loaded again', 4000);
+        await sleep(700); // sleep-ok: the answer has no completion event
+        assert.equal(await ev(`document.querySelector('#acf-t .acf-model-note').textContent`), '', 'a list that loads as the form opens is not announced as updating');
         await ev(`window.__calls.length = 0; window.__serve.claude = { models: [${JSON.stringify(OPUS)}, ${JSON.stringify(SONNET)}], refreshing: true }; document.querySelector('#acf-t .acf-model-refresh').click(); true`);
         await waitFor(`window.__calls.includes('POST /api/agents/models/refresh?type=claude')`, 'the refresh POST', 3000);
         await ev(`setTimeout(() => { window.__serve.claude = { models: [${JSON.stringify(OPUS)}, ${JSON.stringify(SONNET)}, ${JSON.stringify(HAIKU)}], refreshing: false }; }, 4000); true`);

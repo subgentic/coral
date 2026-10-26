@@ -4165,7 +4165,8 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
     .sd-modal-content .settings-panes { padding: .8rem 1rem 1.2rem; }
     .sd-modal-content .settings-pane :is(select, input[type="text"], textarea, .btn, .perm-chip) { min-height: 44px; }
     .sd-modal-content .modal-footer .btn { min-height: 44px; }
-    .sd-modal-content .modal-header .sd-sub, .sd-step-header .sd-sub { display: none; }
+    .sd-modal-content .modal-header .sd-sub:not(.launch-stage-sub), .sd-step-header .sd-sub:not(.launch-stage-sub) { display: none; } /* the pane's sub-title goes on a phone (#6012); the step line ("Step 2 of 2") stays under the title (#7912) */
+    .sd-step-header .launch-stage-sub { font-size: .75rem; font-weight: 400; color: var(--text-secondary); }
     .sd-step-header { padding: 16px 16px 10px; }
     .sd-modal-content .launch-modal-step > .modal-actions { padding: 12px 16px; }
     .sd-modal-content .launch-modal-step > .modal-actions .btn { min-height: 44px; }
