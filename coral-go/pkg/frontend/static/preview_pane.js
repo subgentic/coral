@@ -375,6 +375,9 @@ async function _render(tab) {
                 } else comments = null;
             } catch (e) { comments = null; console.error('[coral] comments', e); } // the document is shown without them
         }
+        if (hex && tab.options && tab.options.tagging) { // the file's tags in the head (#8594): chips with an x and + Tag, as in the team page's sheet
+            try { const { tagEditor } = await importOnce('./artifact_tags.js'); if (current()) document.getElementById('preview-toolbar')?.append(tagEditor({ ...tab.options.tagging, hex })); } catch (e) { console.error('[coral] tags', e); }
+        }
         await renderArtifact(body, tab.filepath, tab.options, {
             signal: tab.abort.signal,
             isStale: () => !current(),

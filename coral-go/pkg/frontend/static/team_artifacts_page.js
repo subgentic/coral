@@ -14,15 +14,17 @@ let artifactState = DT.tableState();
 const { el } = DT; // lazy modules load the others they need through importOnce, so a failed load is retried
 const { openDetailPane, closeDetailPane, detailKey } = await importOnce('./detail_pane.js');
 const { buildBar } = await importOnce('./team_artifact_bar.js');
-const { loadFilters, saveFilters, toParams, isFiltered, noteChoices, forgetChoices, EMPTY } = await importOnce('./team_artifact_filters.js');
+const { loadFilters, saveFilters, toParams, isFiltered, noteChoices, forgetChoices, TAG_KEY, EMPTY } = await importOnce('./team_artifact_filters.js');
 const { loadPanelOpen, savePanelOpen, buildMoreMenu } = await importOnce('./list_bar.js');
 const { isOwnerLabelRefusal, OWNER_LABEL_TEXT } = await importOnce('./owner_label.js');
 const { readersAllowed, readersBlock } = await importOnce('./artifact_readers.js');
 const { HEX_RE, managedHex, itemKey, isUnverified, readableName, sizeText, typeText, createdText, taskText, linkOfItem, renderText, orderByGroup, groupHead } = await importOnce('./artifact_item.js');
 const linkOf = (item) => linkOfItem(item, { server: server(), project: model.project }); // where the bytes are, for the list this page shows
 
+const Tags = await importOnce('./artifact_tags.js');
+const { REVIEW, STARTER } = await importOnce('./artifact_tag_rules.js');
 const PAGE = 100;
-const model = { project: '', scope: null, key: '', loaded: false, items: [], hasMore: false, cursor: '', counts: null, truncated: false, loading: false, error: '', loadingMore: false, filters: { ...EMPTY }, kept: new Set(), gen: 0, controller: null };
+const model = { project: '', scope: null, key: '', loaded: false, items: [], hasMore: false, cursor: '', counts: null, truncated: false, loading: false, error: '', loadingMore: false, filters: { ...EMPTY }, kept: new Set(), tagCounts: {}, gen: 0, controller: null };
 let root = null, hooks = {}, bar = null, barKey = '';
 const btn = (cls, text, onClick) => { const b = el('button', cls, text); b.type = 'button'; if (onClick) b.addEventListener('click', onClick); return b; };
 const say = (t) => { const s = root && root.querySelector('.team-artifacts-status-live'); if (s) { s.textContent = ''; s.textContent = t; } };
@@ -117,6 +119,7 @@ export async function loadArtifacts({ append = false, keep = false } = {}) {
         if ((!(scope && scope.standalone) && data.project !== splitKey(project).name) || !Array.isArray(data.artifacts) || (scope && data.session_id !== scope.session)) throw new Error('Unable to load artifacts: unexpected response scope.');
         const rows = data.artifacts.filter(a => a && (a.uri || a.id || a.name));
         model.items = append ? model.items.concat(rows) : rows;
+        if (!append) model.tagCounts = data.tag_counts && typeof data.tag_counts === 'object' ? data.tag_counts : {}; // the team's tags with how many files carry each (the whole list, not the page)
         model.hasMore = !!data.has_more; model.truncated = !!data.truncated; model.cursor = typeof data.next_cursor === 'string' ? data.next_cursor : '';
         const matched = Number.isSafeInteger(data.total) ? data.total : model.items.length;
         model.counts = { matched, all: Number.isSafeInteger(data.all) ? Math.max(data.all, matched) : matched, truncated: !!data.truncated };
@@ -201,6 +204,18 @@ function artifactBulkActions() {
                 } catch { failed++; } }
             } catch { failed = items.length; } finally { model.bulkBusy = false; finish(key, ok, failed, 'Downloaded'); }
         } },
+        ...(local() ? ['Tag', 'Untag'].map(label => ({ label, disabled: rows => rows.every(item => !managedHex(item)),
+            choose: { label: `${label} with`, options: () => [...new Set([...(label === 'Tag' ? STARTER : []), ...teamTags().map(([t]) => t)])].map(t => ({ value: t, label: t })) },
+            run: async (rows, _keys, tag) => {
+                if (model.bulkBusy || !tag) return;
+                model.bulkBusy = true; const key = model.key;
+                const { ok, failed } = await Tags.bulkTag(model.project, rows.filter(it => managedHex(it)).map(it => ({ hex: managedHex(it), tags: it.tags })), tag, label === 'Tag');
+                model.bulkBusy = false;
+                if (key !== model.key) return;
+                for (const [hex, tags] of ok) for (const it of model.items) if (managedHex(it) === hex) it.tags = tags.length ? tags : undefined;
+                loadArtifacts({ keep: true });
+                showToast(`${label === 'Tag' ? 'Tagged' : 'Untagged'} ${ok.size} artifact${ok.size === 1 ? '' : 's'} ${tag}${failed ? `; ${failed} could not be changed` : ''}`, !!failed);
+            } })) : []),
         ...(local() ? [{ label: 'Delete', danger: true, disabled: rows => rows.some(item => !managedHex(item) || !linkOf(item)?.preview),
             confirm: n => `Delete ${n} artifacts? Their links will become unavailable. This cannot be undone.`, run: async rows => {
                 if (model.bulkBusy || !local() || rows.some(item => !managedHex(item) || !linkOf(item)?.preview)) return;
@@ -235,11 +250,16 @@ function draw() {
     const toolbarRow = bar.node.querySelector('.list-bar-search-row');
     toolbarRow?.querySelector('.dt-select-toggle')?.remove();
     Toolbar.mountSelection(toolbarRow, null);
+    if (!model.scope && toolbarRow) { // All | For review N (#8594): the one tag people look for, one press away; nothing while the team has none
+        const n = Number(model.tagCounts[REVIEW]) || 0, on = model.filters.tag === REVIEW;
+        Toolbar.adopt(toolbarRow, n || on ? { pills: { label: 'Show artifacts', items: [{ key: 'all', label: 'All', count: model.counts ? model.counts.all : model.items.length }, { key: 'review', label: 'For review', count: n }], current: on ? 'review' : 'all',
+            onPick: key => setFilters({ ...model.filters, tag: key === 'review' ? REVIEW : '' }) } } : {});
+    }
     if (model.items.length || artifactState.selected.size) {
         const by = !model.scope ? model.filters.group : ''; // the team's list read by task or goal: a head per group, its files together (an agent's list is not grouped)
         const shown = by ? orderByGroup(model.items, by) : model.items;
         const table = DT.dataTable({
-            label: `Artifacts, ${model.items.length}`, bare: !!model.scope, compact: !!model.scope, foldAt: model.scope ? 'fit' : 40, rows: shown, groupBy: by ? (it) => groupHead(it, by, shown, !model.hasMore) : undefined, rowKey: itemKey, current: detailKey(), sortBar: false, state: artifactState, rowName: readableName,
+            label: `Artifacts, ${model.items.length}`, bare: !!model.scope, compact: !!model.scope, foldAt: model.scope ? 'fit' : 40, rows: shown, groupBy: by ? (it) => groupHead(it, by, shown, !model.hasMore) : undefined, rowKey: itemKey, current: detailKey(), sortBar: false, state: artifactState, rowName: item => Tags.nameWithTags(readableName(item), item.tags),
             selectable: model.scope ? null : { contextKey: model.key, canSelect: item => !!linkOf(item)?.preview, actions: artifactBulkActions(), onChange: keys => Toolbar.mountSelection(toolbarRow, keys.size ? table.bar : null) },
             open: (item, tr) => openArtifact(item, tr.querySelector('.dt-primary')),
             columns: [
@@ -249,6 +269,7 @@ function draw() {
                         const b = DT.primaryButton(readableName(item)); b.dataset.artifactId = itemKey(item); first.append(b);
                         const badge = originBadge(item);
                         if (badge) { const note = DT.tag(badge); note.classList.add('dt-note', 'team-artifact-badge', `team-artifact-badge-${isUnverified(item) ? 'unverified' : item.source === 'shared' ? 'shared' : 'received'}`); if (isUnverified(item)) note.classList.add('dt-warning'); first.append(note); }
+                        const tagged = Tags.rowTags(item.tags); if (tagged) first.append(tagged);
                         return first;
                     } },
                 { key: 'type', label: 'Type', line: 2, tone: 'tertiary', cell: item => isUnverified(item) ? '—' : DT.tag(typeText(item)) },
@@ -268,6 +289,10 @@ function draw() {
         if (!model.scope && matchMedia('(max-width: 760px)').matches) toolbarRow?.append(table.selectButton);
     }
     if (model.truncated) body.append(el('p', 'goals-note', 'Some older artifacts are not included in this list.'));
+    if (!model.scope) {
+        const names = Object.entries(model.tagCounts).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([t]) => t);
+        bar.setOptions(TAG_KEY, names, Object.fromEntries(names.map(t => [t, `${t} (${model.tagCounts[t]})`])));
+    }
     if (!model.scope) { const seen = noteChoices(model.items); bar.setOptions('task', seen.tasks.map(([id]) => id), Object.fromEntries(seen.tasks)); bar.setOptions('goal', seen.goals.map(([id]) => id), Object.fromEntries(seen.goals)); }
     bar.names([...new Set(model.items.flatMap(i => [i.produced_by, i.sent_by]).filter(n => typeof n === 'string' && n))].sort().slice(0, 50)); // the names on screen, offered in the Uploaded by field
     bar.set(model.filters, model.counts ? model.counts : model.items.length || !model.loading ? { matched: model.items.length, all: model.items.length } : null);
@@ -296,11 +321,25 @@ function openArtifact(item, opener) {
         importOnce('./preview_pane.js').then(m => m.openArtifactTab(link.hex ? `coral://artifacts/${link.hex}` : item.uri || '', {
             server: link.server, filename: name, mediaType: item.media_type,
             contentURL: link.contentURL, externalURL: link.preview ? undefined : link.url,
+            tagging: link.hex ? { project: model.project, tags: item.tags, editable: local(), offer: teamTags, onChange: tags => retag(link.hex, tags) } : undefined, // the tags in the preview's head (#8594)
         }));
         root?.querySelectorAll('tr[data-key]').forEach(r => { if (r.dataset.key === key) r.setAttribute('aria-current', 'true'); else r.removeAttribute('aria-current'); });
         return;
     }
     openArtifactSheet(item, opener);
+}
+
+/** The team's tags with how many files carry each, for the editor's offer. */
+const teamTags = () => Object.entries(model.tagCounts).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+
+/** A file's tags changed (in its sheet or the selection bar): the list's rows and the team's counts say so without another read. */
+function retag(hex, tags) {
+    for (const it of model.items) if (managedHex(it) === hex) it.tags = tags.length ? tags : undefined;
+    const counts = {};
+    for (const it of model.items) for (const t of it.tags || []) counts[t] = (counts[t] || 0) + 1;
+    if (model.counts && !isFiltered(model.filters)) model.tagCounts = counts; // the whole list is loaded only when it fits one page; otherwise the next read has the counts
+    else loadArtifacts({ keep: true });
+    draw();
 }
 
 function openArtifactSheet(item, opener) {
@@ -329,8 +368,9 @@ function openArtifactSheet(item, opener) {
             actions.push({ label: 'Delete', danger: true, run: () => deleteArtifact(hex, name, sizeText(item.size)) });
         }
     }
+    const editor = hex ? Tags.tagEditor({ project: model.project, hex, tags: item.tags, editable: local(), offer: teamTags, onChange: tags => retag(hex, tags) }) : null; // a stored file's tags (#8594)
     openDetailPane({
-        key, opener, title: name, host: hooks.detailHost || null,
+        key, opener, title: name, host: hooks.detailHost || null, extra: editor,
         sub: [un ? '' : typeText(item), un ? '' : sizeText(item.size), whenText(item.created_at)].filter(Boolean).join(' · '), subTitle: createdText(item), // the exact time behind the one in words
         facts: facts.filter(([, v]) => v != null && v !== ''),
         details: link && link.preview && hex ? (h, { isStale }) => { // the Operator's "Who can read this" (#5577) is behind Details with the facts, for a stored artifact
@@ -352,7 +392,7 @@ export function showArtifacts(host, project, h = {}, scope = null) {
         artifactState = DT.tableState();
         forgetChoices();
         model.controller?.abort();
-        Object.assign(model, { project, scope, key, loaded: false, items: [], hasMore: false, cursor: '', counts: null, truncated: false, loading: false, error: '', loadingMore: false, filters: scope && scope.standalone ? { ...EMPTY } : loadFilters(scope ? `${project}::agent::${scope.session}` : project, browserLocal), kept: new Set() });
+        Object.assign(model, { project, scope, key, loaded: false, items: [], hasMore: false, cursor: '', counts: null, tagCounts: {}, truncated: false, loading: false, error: '', loadingMore: false, filters: scope && scope.standalone ? { ...EMPTY } : loadFilters(scope ? `${project}::agent::${scope.session}` : project, browserLocal), kept: new Set() });
         bar = null;
     } else if (scope) model.scope = scope;
     hooks = h;

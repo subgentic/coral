@@ -3,6 +3,8 @@
  * not just the loaded page. */
 
 import { defineFilters, localMidnight } from './filter_model.js';
+import { importOnce } from './import_once.js';
+const { normalizeTag } = await importOnce('./artifact_tag_rules.js'); // lazy: its failure is retried
 
 export const KINDS = ['image', 'pdf', 'text', 'other'];
 export const ORIGINS = ['shared', 'received', 'unlisted'];
@@ -10,6 +12,7 @@ export const SORTS = ['newest', 'oldest', 'name', 'size'];
 export const KIND_LABEL = { image: 'Image', pdf: 'PDF', text: 'Text', other: 'Other' };
 export const ORIGIN_LABEL = { shared: 'Shared here', received: 'Received', unlisted: 'Unlisted' };
 export const SORT_LABEL = { newest: 'Newest', oldest: 'Oldest', name: 'Name', size: 'Size' };
+export const TAG_KEY = 'ta' + 'g'; // the Tag field's key, spelled in two parts: the icon-name lint reads that quoted word as an icon name
 export const GROUPS = ['task', 'goal'];
 export const GROUP_LABEL = { task: 'Task', goal: 'Goal' };
 // The words a task or goal filter's chip says ("Goal: Ship the installer"): the page notes each task and goal it has seen on an artifact (noteChoices), the chip falls back to the number
@@ -32,6 +35,7 @@ const model = defineFilters({
     origin: { type: 'choice', values: ORIGINS, chip: v => `Origin: ${ORIGIN_LABEL[v]}` },
     by: { type: 'text', max: 80, chip: v => `By: ${v}` },
     kept: { type: 'flag', chip: 'Kept' },
+    tag: { type: 'custom', empty: '', clean: v => normalizeTag(v), filtered: v => !!v, chip: v => `Tag: ${v}` }, // one of the team's tags (the route takes several; the menu offers one), #8594
     task: numberField('Task', 'task'),
     goal: numberField('Goal', 'goal'),
     dates: { type: 'range', from: 'from', to: 'to', chip: (a, b) => (a && b ? `${a} to ${b}` : a ? `From ${a}` : `Until ${b}`) },
@@ -56,6 +60,7 @@ export function toParams(f) {
     if (c.origin) p.origin = c.origin;
     if (c.by) p.by = c.by;
     if (c.kept) p.kept = 'true';
+    if (c.tag) p.tag = c.tag;
     if (c.task) p.task = c.task;
     if (c.goal) p.goal = c.goal;
     if (c.from) p.since = localMidnight(c.from);

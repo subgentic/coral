@@ -299,3 +299,22 @@
 .dt-box .dt-files .material-icons { font-size: 0.875rem; }
 .dt-box .dt-files:hover { color: var(--accent); }
 @media (max-width: 767px), (pointer: coarse) { .dt-box .dt-files::after { content: ""; position: absolute; inset: -16px -10px; } }
+
+/* Artifact tags (#8594): small outlined chips (11/600, the quiet tone), two on a row then +N; in the sheet each has an x, and "+ Tag" opens the starter set and a box */
+.artifact-tags-row { display: inline-flex; gap: 4px; margin-top: 2px; max-width: 100%; flex-wrap: wrap; }
+.artifact-tag { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; border: 1px solid var(--table-outer); border-radius: var(--radius-md); padding: 0 6px; font-size: 0.6875rem; font-weight: 600; line-height: 1.5; color: var(--table-secondary-color); }
+.artifact-tag-more { border-style: dashed; }
+.artifact-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+.artifact-tag-list { display: contents; list-style: none; margin: 0; padding: 0; }
+.artifact-tag-item { display: inline-flex; }
+.artifact-tag-remove { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; padding: 0; border: 0; background: none; color: inherit; cursor: pointer; border-radius: 50%; }
+.artifact-tag-remove .material-icons { font-size: 0.75rem; }
+.artifact-tag-remove::after { content: ''; position: absolute; inset: -14px; } /* a 44 px target without a taller chip */
+.artifact-tag-add { min-height: 24px; padding: 0 8px; border: 1px dashed var(--table-outer); border-radius: var(--radius-md); background: none; color: var(--text-secondary); font: inherit; font-size: 0.75rem; cursor: pointer; }
+.artifact-tag-box { flex-basis: 100%; display: flex; flex-direction: column; gap: 6px; }
+.artifact-tag-offers { display: flex; flex-wrap: wrap; gap: 6px; }
+.artifact-tag-offer { min-height: 28px; padding: 0 8px; border: 1px solid var(--table-outer); border-radius: var(--radius-md); background: none; color: var(--text-primary); font: inherit; font-size: 0.75rem; cursor: pointer; }
+.artifact-tag-form { display: flex; gap: 6px; }
+.artifact-tag-input { flex: 1 1 auto; min-width: 0; font: inherit; font-size: 0.8125rem; }
+.artifact-tag-status { margin: 0; flex-basis: 100%; font-size: 0.75rem; }
+.artifact-tag-error { color: var(--table-danger); }
