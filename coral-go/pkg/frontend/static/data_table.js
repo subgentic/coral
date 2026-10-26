@@ -262,7 +262,7 @@ export function dataTable(cfg) {
         if (held) thead.querySelector(`.dt-sort[data-key="${CSS.escape(held)}"]`)?.focus({ preventScroll: true });
     }
 
-    function cellOf(c, r) {
+    function cellOf(c, r, tr) {
         const td = el('td', `dt-td dt-tone-${c.tone || (c.primary ? 'primary' : 'secondary')}${c.numeric || c.align === 'end' ? ' dt-end' : ''}${c.nowrap === false ? ' dt-wrap' : ''}`);
         if (c.width === 'grow') td.classList.add('dt-grow');
         if (c.width === 'content') td.classList.add('dt-content');
@@ -272,7 +272,7 @@ export function dataTable(cfg) {
         if (c.foldFirst) td.classList.add('dt-fold-first');
         if (st.sort && st.sort.key === c.key) td.classList.add('dt-fold-key'); // folded 'labeled': the figure the rows are sorted by is the one stronger line (#7738)
         if (c.narrowHide) td.classList.add('dt-narrow-hide'); // folded 'labeled': this figure follows the name, ahead of the other "label value" lines
-        let v = c.cell ? c.cell(r, ctx) : (c.field != null ? r[c.field] : '');
+        let v = c.cell ? c.cell(r, ctx, { open: () => (cfg.open ? cfg.open(r, tr) : undefined), hasOpen: !!cfg.open }) : (c.field != null ? r[c.field] : ''); // a cell's third argument: { open(), hasOpen } is the row's own open, for a button in the cell that opens what the row opens
         if (typeof v === 'string' && c.primary) v = primaryButton(v, `Open ${v}`);
         if (v instanceof Node) td.append(v); else td.textContent = v == null ? '' : String(v);
         if (c.title) { const t = c.title(r); if (t) td.title = t; } // the full name or id on hover
@@ -315,7 +315,7 @@ export function dataTable(cfg) {
                 });
                 td.append(cb); tr.append(td);
             }
-            for (const c of columns) tr.append(cellOf(c, r));
+            for (const c of columns) tr.append(cellOf(c, r, tr));
             if (cfg.open) {
                 tr.classList.add('dt-row-open');
                 tr.addEventListener('click', (e) => {

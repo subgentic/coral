@@ -283,3 +283,9 @@
 
 /* Measuring fit must reserve a readable name, not only fit the metadata. */
 .dt-box.dt-fit:not(.dt-folded) td.dt-grow { min-width: var(--table-fit-name-min); }
+
+/* The "3 files" button of a task row (#8575): the page icon and the count, 12/400 tertiary, always shown; its 44 px target on a phone or a coarse pointer is a pseudo-element, so a row keeps its height. */
+.dt-box .dt-files, .dt-box.dt-folded .dt-files { position: relative; display: inline-flex; align-items: center; gap: 2px; min-height: 0; min-width: 0; font-size: var(--table-tertiary-size); font-weight: var(--table-tertiary-weight); color: var(--table-tertiary-color); }
+.dt-box .dt-files .material-icons { font-size: 0.875rem; }
+.dt-box .dt-files:hover { color: var(--accent); }
+@media (max-width: 767px), (pointer: coarse) { .dt-box .dt-files::after { content: ""; position: absolute; inset: -16px -10px; } }
