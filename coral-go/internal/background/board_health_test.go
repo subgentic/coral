@@ -316,3 +316,30 @@ func TestCheckIsDeliveredAtItsIntervalWhenADeliveryEndsAfterItsTick(t *testing.T
 	h.m.scan(ctx)
 	assert.Equal(t, 5, delivered())
 }
+
+// #7915: the 15 s of slack is pinned from both sides: a tick up to 10 s early (the ticker's own jitter) still delivers, one 20 s early (a real shortfall) does not.
+func TestCheckTickSlackIsAcceptedAndNoMore(t *testing.T) {
+	h := newCheckHarness(t)
+	ctx := context.Background()
+	h.member("Orchestrator", "Orchestrator", 1, 0)
+	h.member("Dev", "Developer", 2, 0)
+	hs := healthOn()
+	hs.IntervalMin = 5
+	_, err := h.s.UpdateBoardSettings(ctx, "team", board.BoardSettingsUpdate{Health: &hs})
+	require.NoError(t, err)
+	delivered := func() int { h.mu.Lock(); defer h.mu.Unlock(); return len(h.sent["Orchestrator"]) }
+
+	tick := h.now
+	h.m.scan(ctx)
+	require.Equal(t, 1, delivered())
+	h.now = tick.Add(5*time.Minute - 20*time.Second)
+	h.m.scan(ctx)
+	assert.Equal(t, 1, delivered(), "20 s early is a real shortfall: not delivered")
+	h.now = tick.Add(5*time.Minute - 10*time.Second)
+	h.m.scan(ctx)
+	assert.Equal(t, 2, delivered(), "10 s early is the ticker's jitter: delivered")
+	// the next check is scheduled from the tick that delivered, so jitter does not accumulate into a drift
+	h.now = tick.Add(10*time.Minute - 10*time.Second - 20*time.Second)
+	h.m.scan(ctx)
+	assert.Equal(t, 2, delivered(), "20 s short of the interval after the last tick")
+}
