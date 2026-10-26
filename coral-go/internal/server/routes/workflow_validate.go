@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -209,8 +210,14 @@ func validateHooks(raw json.RawMessage) string {
 		return "hooks must be a JSON object"
 	}
 
+	events := make([]string, 0, len(hooks))
+	for event := range hooks {
+		events = append(events, event)
+	}
+	sort.Strings(events) // in this order, so two faulty events always give the same error, not whichever a map lists first
 	totalGroups := 0
-	for event, groupsRaw := range hooks {
+	for _, event := range events {
+		groupsRaw := hooks[event]
 		if !validHookEvents[event] {
 			return fmt.Sprintf("unknown hook event %q", event)
 		}
