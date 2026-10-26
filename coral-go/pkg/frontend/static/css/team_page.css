@@ -288,6 +288,14 @@
 .inbox-goal-page > .view-list { display: none; }
 .goal-back-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
 .goal-team-link { font-size: 0.8125rem; font-weight: 500; color: var(--accent); }
+/* A task page's row in the Inbox holds the way back, the team link and the title: the back on the left and the link on the right over the title; on a phone the back is beside the title and the link is under them (the phone way-back rule) */
+.goal-back-row > .goals-back, .goal-back-row > .phone-title-row { order: 1; }
+.goal-back-row > .goal-team-link { order: 2; }
+@media (min-width: 761px) { .goal-back-row .phone-title-row > .goals-back { order: 1; } .goal-back-row .goals-detail-title { order: 3; flex: 0 0 100%; margin-top: 4px; } } /* a descendant: the folded phone-title-row is display: contents here, so the title is a flex item of the row; on a phone it stays beside the way back */
+@media (max-width: 760px) {
+    .goal-back-row > .phone-title-row { flex: 1 1 100%; }
+    .goal-back-row > .goal-team-link { margin-left: auto; }
+}
 @media (max-width: 760px) {
     .inbox-goal-page > .view-list { display: block; padding: 12px 16px 0; }
     .inbox-goal-page > .view-list .view-list-nav { display: none; }
