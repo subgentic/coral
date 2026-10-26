@@ -144,6 +144,10 @@ const hex = i => i.toString(16).padStart(20, '0');
         assert.equal(await ev(`document.querySelector('#saved-table .dt-sortbar').hidden`), true, 'the existing Saved sort control is the only sort bar');
         const dlg = await ev(`(() => { const rows = [...document.querySelectorAll('${ROWS}')]; return { first: rows[0].querySelector('.dt-primary').textContent, saved: rows[0].cells[1].textContent.trim(), state: rows[0].cells[2].textContent.trim(), pressed: [...document.querySelectorAll('#saved-table .group-chip')].map(c => c.getAttribute('aria-pressed')), counts: [...document.querySelectorAll('#saved-table .group-chip-count')].map(c => c.textContent), inside: !!document.activeElement.closest('#agentic-panel-saved') }; })()`);
         assert.match(dlg.first, /^sv-a, /, 'the row is named by its source and its text'); assert.equal(dlg.state, 'Open'); assert.match(dlg.saved, /ago|now/); assert.deepEqual(dlg.pressed, ['true', 'false'], 'Open is the chip on'); assert.deepEqual(dlg.counts, ['2', '0']); assert.ok(dlg.inside, 'the focus is inside the tab');
+        // The table is built detached, initially using the desktop viewport's width.
+        // Its ResizeObserver folds it for the dock's narrow box on the next layout.
+        await waitFor(`!!document.querySelector('#saved-table .dt-box.dt-folded')`, 'the Saved table to fold for its dock width', 6000,
+            `(() => { const box = document.querySelector('#saved-table .dt-box'), b = document.querySelector('#saved-table button.dt-quiet'); return { boxClass: box?.className, boxWidth: box?.clientWidth, viewport: innerWidth, coarse: matchMedia('(pointer: coarse)').matches, minHeight: b && getComputedStyle(b).minHeight, height: b?.getBoundingClientRect().height }; })()`);
         assert.equal(await ev(`Math.round(document.querySelector('#saved-table button.dt-quiet').getBoundingClientRect().height)`), 28, 'fine-pointer secondary actions use the compact shared height');
         await shot('saved-tab-desktop');
 
