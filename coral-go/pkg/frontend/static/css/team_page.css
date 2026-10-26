@@ -125,7 +125,7 @@
 .goals-pinbar .btn { min-height: 36px; }
 
 /* the detail pane: documents only */
-.detail-pane { flex: none; width: 460px; max-width: 100%; display: flex; flex-direction: column; border-left: 1px solid var(--border); background: var(--bg-secondary); min-height: 0; }
+.detail-pane { position: relative; flex: none; width: var(--detail-w, 460px); max-width: 100%; display: flex; flex-direction: column; border-left: 1px solid var(--border); background: var(--bg-secondary); min-height: 0; }
 .detail-pane[hidden] { display: none; }
 .detail-head { flex: none; display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 14px 18px 10px; border-bottom: 1px solid var(--border); }
 .detail-title, .goals-table-page .goals-detail-title { width: fit-content; max-width: 100%; }
@@ -140,6 +140,18 @@
 .detail-facts dt { color: var(--text-secondary); font-size: 0.75rem; font-weight: 500; padding-top: 1px; }
 .detail-facts dd { margin: 0; overflow-wrap: anywhere; }
 .detail-doc { min-width: 0; }
+.detail-grip { position: absolute; top: 0; bottom: 0; left: -4px; width: 8px; z-index: 2; cursor: col-resize; touch-action: none; outline: none; } /* the goal page column's handle (#7702) on the pane's left edge: an 8 px target, the 2 px line drawn in the middle */
+.detail-back { padding: 4px 0; min-height: 36px; gap: 4px; align-items: center; } /* the phone's way back (#7734): shown where the pane is a sheet */
+.detail-back:hover { text-decoration: underline; }
+.team-page.detail-sheet .detail-back { display: inline-flex; min-height: 44px; min-width: 44px; }
+.detail-head-text > .phone-title-row > .detail-back { flex: 0 0 auto; margin: 0; }
+.knowledge-facts { padding: 0 0 12px; border-bottom: 1px solid var(--border); font-size: 0.75rem; } /* the entry's front matter: a quiet block of facts above the text */
+.knowledge-facts dt, .knowledge-facts dd { font-size: 0.75rem; }
+.knowledge-facts dd { color: var(--text-primary); }
+.knowledge-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.knowledge-tag { padding: 1px 8px; border-radius: 999px; background: var(--bg-tertiary); border: 1px solid var(--border); font-size: 0.75rem; color: var(--text-secondary); overflow-wrap: anywhere; }
+.knowledge-md { overflow-wrap: anywhere; font-size: 0.875rem; } /* the entry's text, rendered by the safe renderer (.md rules in components.css) */
+
 .detail-doc pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 .detail-foot { flex: none; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; padding: 12px 18px; border-top: 1px solid var(--border); } /* the one rule of every pinned bar (#7684): right-aligned, secondary buttons, the primary last, a danger button alone at the left edge (the same as .item-bar and .goals-pinbar) */
 .detail-foot .btn { min-height: 36px; }
@@ -183,6 +195,8 @@
     .team-table-agents td:nth-child(5) { vertical-align: middle; }
     .detail-pane { position: fixed; inset: 0; z-index: 30; width: auto; border-left: 0; }
     .detail-close { width: 44px; height: 44px; }
+    .detail-grip { display: none; }
+    .detail-back { min-height: 44px; min-width: 44px; }
     .detail-foot .btn { flex: 1; min-height: 44px; }
     .goals-facts, .detail-facts { grid-template-columns: minmax(0, 1fr); gap: 0; } /* a label above its value: it holds at 200% text */
     .goals-facts dd, .detail-facts dd { margin-bottom: 8px; }
@@ -244,6 +258,7 @@
 /* The pane as a sheet at a large text size (detail_pane.js asSheet): the phone's rules, the sidebar and the page keep their width */
 .team-page.detail-sheet .detail-pane { position: fixed; inset: 0; z-index: 30; width: auto; border-left: 0; }
 .team-page.detail-sheet .detail-close { width: 44px; height: 44px; }
+.team-page.detail-sheet .detail-grip { display: none; }
 .team-page.detail-sheet .detail-foot .btn { flex: 1 1 auto; min-height: 44px; }
 .team-page.detail-sheet .goals-facts, .team-page.detail-sheet .detail-facts { grid-template-columns: minmax(0, 1fr); gap: 0; }
 .team-page.detail-sheet .goals-facts dd, .team-page.detail-sheet .detail-facts dd { margin-bottom: 8px; }
@@ -297,8 +312,8 @@
 .goal-main { min-width: 0; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; padding: 16px 24px 0; } /* the title has its gap under the back link, the state line under the title */
 .goal-side { border-left: 1px solid var(--border); background: var(--bg-secondary); overflow-y: auto; min-height: 0; }
 .goal-side-grip { position: absolute; top: 0; bottom: 0; right: var(--goal-side-w); width: 8px; margin-right: -4px; z-index: 2; cursor: col-resize; touch-action: none; outline: none; } /* an 8 px target on the column's edge, its line drawn in the middle */
-.goal-side-grip::before { content: ''; position: absolute; top: 0; bottom: 0; left: 3px; width: 2px; background: transparent; transition: background 0.15s; } /* the agent dock's handle: the edge turns accent on hover, while dragged and on keyboard focus */
-.goal-side-grip:hover::before, .goal-side-grip.dragging::before, .goal-side-grip:focus-visible::before { background: var(--accent); }
+.goal-side-grip::before, .detail-grip::before { content: ''; position: absolute; top: 0; bottom: 0; left: 3px; width: 2px; background: transparent; transition: background 0.15s; } /* the agent dock's handle: the edge turns accent on hover, while dragged and on keyboard focus */
+.goal-side-grip:hover::before, .goal-side-grip.dragging::before, .goal-side-grip:focus-visible::before, .detail-grip:hover::before, .detail-grip.dragging::before, .detail-grip:focus-visible::before { background: var(--accent); }
 .goals-page.goals-open.goals-table-page { max-width: none; padding: 0; gap: 0; min-height: 0; overflow: hidden; } /* an open goal fills the page area to the window's right edge: the padding belongs to the main pane */
 .goals-page.goals-open .goals-body { gap: 0; }
 .goal-side-head { display: flex; align-items: baseline; gap: 8px; padding: 12px 12px 8px; font-size: 0.875rem; }

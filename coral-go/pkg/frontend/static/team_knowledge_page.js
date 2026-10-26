@@ -1,11 +1,16 @@
-/* The team page's Knowledge tab (#7453 stage 3): what the team knows as a table (Entry, Updated, From), "Distill knowledge" in the bar, and a row opens the documents pane with the entry's text as text.
- * An entry is the team's index or one agent's distilled notes (GET /api/teams/detail/{team}/knowledge). The pane shows the text in a <pre>: distilled from agents' words, it is never run as Markdown or HTML here.
+/* The team page's Knowledge tab (#7453 stage 3): what the team knows as a table (Entry, Updated, From), "Distill knowledge" in the bar, and a row opens the right sidebar with the entry (#7761).
+ * An entry is the team's index or one agent's distilled notes (GET /api/teams/detail/{team}/knowledge), Markdown with a YAML front matter. The pane shows the front matter as a block of facts (type, title, tags as chips, the
+ * time as words with the exact one on hover) and the rest through the safe renderer (safe_markdown.js, as the Inbox and a task's text): distilled from agents' words, it is never run as HTML here, and a link to another
+ * entry (./orchestrator.md) opens that entry in the same pane. When a distillation ends, the entry it wrote opens there. The sidebar is the documents pane with its resize handle (detail_pane.js, the goal page's column).
  * Everything is built with the DOM and textContent. Lazy: team_page.js imports it. */
 import { importOnce } from './import_once.js';
 import { teamFetch } from './server_base.js';
 import { refusedTooLarge } from './utils.js';
 import { whenText } from './when_text.js';
 import { refreshDistill, startDistill, distillJob } from './knowledge_distill.js';
+const { splitFrontMatter, entryForLink } = await importOnce('./knowledge_text.js'); // the entry's front matter and its links (pure)
+const { renderSafe } = await importOnce('./safe_markdown.js'); // the Inbox's renderer: DOM-built, no markup from text
+const { loadSafeMarkdown } = await importOnce('./vendor_loader.js');
 const Toolbar = await importOnce('./team_toolbar.js'); // the one toolbar of the team tabs (#7717)
 const { teamTable, rowButton, rowFocusTarget, el } = await importOnce('./team_table.js'); // lazy modules load the others they need through importOnce, so a failed load is retried
 const { openDetailPane, closeDetailPane, detailKey } = await importOnce('./detail_pane.js');
@@ -37,13 +42,58 @@ async function load() {
     draw();
 }
 
-function openEntry(entry, opener) {
+/** The entry's front matter as a quiet block of facts: type, title, description, tags as chips, and when as words with the exact time in the title. */
+function factsBlock(f) {
+    const dl = el('dl', 'detail-facts knowledge-facts');
+    const row = (k, v) => { dl.append(el('dt', null, k), v); };
+    if (f.type) row('Type', el('dd', null, f.type));
+    if (f.title) row('Title', el('dd', null, f.title));
+    if (f.description) row('About', el('dd', null, f.description));
+    if (f.tags.length) { const dd = el('dd'), box = el('span', 'knowledge-tags'); for (const t of f.tags) box.append(el('span', 'knowledge-tag', t)); dd.append(box); row('Tags', dd); }
+    if (f.timestamp) { const d = new Date(f.timestamp), dd = el('dd', null, whenText(f.timestamp) || f.timestamp); if (!Number.isNaN(d.getTime())) dd.title = d.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }); row('Written', dd); }
+    return dl.children.length ? dl : null;
+}
+
+/** Draws the entry in `host`: the facts, then the Markdown. The text is on screen as plain text first, and the rendered DOM replaces it when the renderer is there (a failed load leaves the plain text, never markup).
+ *  A link to another entry of the team opens it through `open`; any other relative link is plain text. */
+async function showEntry(host, entry, open) {
+    host.replaceChildren();
+    if (!entry.text) { host.append(Object.assign(el('pre', 'team-task-text knowledge-text'), { textContent: 'Nothing written yet.' })); return; }
+    const { facts, body } = splitFrontMatter(entry.text);
+    const block = facts && factsBlock(facts);
+    if (block) host.append(block);
+    const plain = Object.assign(el('pre', 'team-task-text knowledge-text'), { textContent: body });
+    host.append(plain);
+    try {
+        await loadSafeMarkdown().catch(() => {});
+        const entries = entriesOf(model.data);
+        const linkPolicy = (url) => { const e = entryForLink(url, entries); if (e) return { href: `/team-knowledge/${encodeURIComponent(e.key)}`, shown: '', internal: true }; return /^\.{1,2}\//.test(String(url)) ? false : undefined; };
+        const text = body.replace(/\[([^\]\n]*)\]\((\.{1,2}\/[^)\s]*)\)/g, (m, label, url) => (entryForLink(url, entries) ? m : label)); // a link to a file that is no entry of this team is its words, not "[words](./file.md)"
+        const { node, partial } = renderSafe(text, { linkPolicy });
+        if (partial || !host.isConnected || !plain.isConnected) return; // the renderer did not load: the plain text stays; or the pane moved on
+        node.classList.add('knowledge-md');
+        for (const a of node.querySelectorAll('a[href^="/team-knowledge/"]')) { const host2 = a.nextElementSibling; if (host2 && host2.classList.contains('md-host')) host2.remove(); } // the renderer names a link's host after it; an entry of this team needs no host
+        const go = (ev) => {
+            const a = ev.target instanceof Element ? ev.target.closest('a[href^="/team-knowledge/"]') : null;
+            if (!a) return;
+            ev.preventDefault();
+            if (ev.type === 'auxclick') return;
+            const key = decodeURIComponent(a.getAttribute('href').slice('/team-knowledge/'.length));
+            const e = entriesOf(model.data).find(x => x.key === key);
+            if (e) open(e);
+        };
+        node.addEventListener('click', go); node.addEventListener('auxclick', go);
+        plain.replaceWith(node);
+    } catch { /* the plain text stays */ }
+}
+
+function openEntry(entry, opener, { focus = true } = {}) {
     const when = model.data && model.data.created_at;
     const editable = entry.key !== 'index'; // the team's index is written by the distillation; an agent's notes can be changed by hand
     let bodyHost = null, editButton = null, status = null;
     const foot = () => document.querySelector('#detail-pane .detail-foot');
     const say = (t) => { if (status) { status.textContent = ''; status.textContent = t; } };
-    const showText = () => { bodyHost.replaceChildren(Object.assign(el('pre', 'team-task-text knowledge-text'), { textContent: entry.text || 'Nothing written yet.' })); };
+    const showText = () => showEntry(bodyHost, entry, (e) => openEntry(e, opener));
     const toView = (focus = true) => { showText(); foot()?.replaceChildren(status, editButton); if (focus) editButton.focus({ preventScroll: true }); };
     // Edit: the text becomes a box and the pane's bar reads Cancel at the left and Save at the right with a status line; Escape and Cancel ask once, in the bar, when the text was changed.
     function startEdit() {
@@ -76,7 +126,7 @@ function openEntry(entry, opener) {
         box.focus();
     }
     openDetailPane({
-        key: entry.key, opener, title: entry.name, sub: [whenText(when), entry.from].filter(Boolean).join(' · '),
+        key: entry.key, opener, title: entry.name, sub: [whenText(when), entry.from].filter(Boolean).join(' · '), resizable: true, backLabel: 'Knowledge', focus,
         body: (host) => { bodyHost = host; showText(); },
         actions: editable ? [{ label: 'Edit', run: (b) => { editButton = b; startEdit(); } }] : [],
         onClose: () => { root?.querySelectorAll('tr[aria-current="true"]').forEach(r => r.removeAttribute('aria-current')); },
@@ -126,12 +176,24 @@ function draw() {
     if (held) (held === '#distill' ? body.querySelector('.team-distill') : rowFocusTarget(body, held))?.focus({ preventScroll: true });
 }
 
+/** The result of a distillation, in the pane (#7761): the entry it wrote or changed (the team's index first) opens in the sidebar when the tab is on screen. Nothing opens when nothing changed or the person is elsewhere
+ *  (the toast says the knowledge is ready); the focus stays where it is, the pane's announcement says what opened. */
+function openWritten(before) {
+    if (!root || !root.isConnected || !root.getClientRects().length || !model.data) return;
+    const changed = entriesOf(model.data).filter(e => !before.has(e.key) || before.get(e.key) !== e.text);
+    const e = changed.find(x => x.key === 'index') || changed[0];
+    if (e) openEntry(e, null, { focus: false });
+}
+
 // The run's progress: the button says so while it runs, and the table is read again when it ends.
 document.addEventListener('coral:distill-status', (e) => {
     const { team, job, prev } = e.detail || {};
     if (!root || !root.isConnected || team !== model.team) return;
-    if (prev && prev.status === 'running' && job.status !== 'running') { say(job.status === 'complete' ? 'Knowledge is ready.' : job.status === 'failed' ? `Distilling failed${job.error ? `: ${job.error}` : ''}.` : 'Distilling stopped.'); load(); }
-    else draw();
+    if (prev && prev.status === 'running' && job.status !== 'running') {
+        say(job.status === 'complete' ? 'Knowledge is ready.' : job.status === 'failed' ? `Distilling failed${job.error ? `: ${job.error}` : ''}.` : 'Distilling stopped.');
+        const before = new Map(entriesOf(model.data).map(e => [e.key, e.text]));
+        load().then(() => openWritten(before));
+    } else draw();
 });
 
 /** Show the team's knowledge in `host`. hooks: onCount(n). */

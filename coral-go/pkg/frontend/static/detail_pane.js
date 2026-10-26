@@ -3,11 +3,14 @@
  * a title (17/700) with one line under it, key facts as a label and a value, the document, and the actions pinned at the bottom, the primary first. Escape and the close button close it and give the focus back to the row that opened it
  * (found again by its key if the table was drawn again meanwhile); choosing another row replaces the content; opening a tab clears it.
  *
- *   openDetailPane({ key, title, sub, facts: [[label, value]], body(el, { signal, isStale }), actions: [{ label, primary, run(button) | href, download }], opener, onClose })
+ *   openDetailPane({ key, title, sub, facts: [[label, value]], body(el, { signal, isStale }), actions: [{ label, primary, run(button) | href, download }], opener, onClose, resizable, backLabel, focus })
+ *   resizable: the pane is a right sidebar like a goal page's task column (#7702): a handle on its left edge, dragged or moved with the keys, the width remembered (dock_resize.js). backLabel: the phone's way back ("Knowledge" -> "<- Knowledge"), shown only where the pane is a sheet. focus: false leaves the focus where it is (the pane opened by itself).
  *   closeDetailPane({ restoreFocus: true })      isDetailOpen()      detailKey()
  * `body` fills the document into an element; it is passed an AbortSignal and a staleness check, and everything it draws is its own (text from an artifact is data: textContent or the sanitising renderers only). */
 import { importOnce } from './import_once.js';
 const { el } = await importOnce('./team_table.js'); // lazy: its failure is retried
+const { attachDockResize, DOCK_MIN_WIDTH, dockMaxWidth } = await importOnce('./dock_resize.js'); // the goal page column's resize
+const { foldWayBack } = await importOnce('./way_back.js');
 import { trapTab } from './dialog_focus.js';
 
 let current = null; // { key, opener, onClose, abort, gen }
@@ -34,7 +37,18 @@ function modalOpen() {
     return !!document.querySelector('dialog[open]') || [...document.querySelectorAll('.modal[aria-modal="true"]:not([hidden])')].some(m => m.getClientRects().length > 0); // a native dialog (the reminder, the confirmation) closes first on Escape
 }
 
-export function openDetailPane({ key, title, sub = '', facts = [], body = null, actions = [], opener = null, onClose = null, host = null }) {
+/** The resize handle on the pane's left edge: the goal page's handle (goals_view.js) for this pane, with the same limits, keys and double click. */
+function addResizeHandle(aside) {
+    const row = document.getElementById('team-page-row');
+    if (!row) return;
+    const grip = el('div', 'detail-grip');
+    grip.setAttribute('role', 'separator'); grip.setAttribute('aria-orientation', 'vertical'); grip.setAttribute('aria-label', 'Resize the details'); grip.tabIndex = 0; grip.title = 'Drag to resize, double click to reset';
+    const value = () => { grip.setAttribute('aria-valuemin', String(DOCK_MIN_WIDTH)); grip.setAttribute('aria-valuemax', String(dockMaxWidth(row))); grip.setAttribute('aria-valuenow', String(Math.round(aside.getBoundingClientRect().width))); };
+    aside.append(grip);
+    attachDockResize(grip, { panel: aside, row, key: 'coral-detail-width', apply: (w) => { aside.style.setProperty('--detail-w', w ? `${w}px` : ''); value(); } }).restore();
+}
+
+export function openDetailPane({ key, title, sub = '', facts = [], body = null, actions = [], opener = null, onClose = null, host = null, resizable = false, backLabel = '', focus = true }) {
     const aside = host || pane(); // host: a pane of its own, a sheet over a panel (the agent's Artifacts), not the team page's aside
     if (!aside) return false;
     if (current && current.aside !== aside) closeDetailPane(); // one document at a time: the other pane is put away
@@ -47,9 +61,17 @@ export function openDetailPane({ key, title, sub = '', facts = [], body = null, 
     aside.replaceChildren();
     const head = el('div', 'detail-head');
     const text = el('div', 'detail-head-text');
+    if (backLabel && !host) { // the phone's way back: a text link named for where it goes, on the title's line (#7734); a pane that is not a sheet has the close button
+        const back = el('button', 'goals-back detail-back'); back.type = 'button';
+        const arrow = el('span', 'goals-back-arrow', '\u2190'); arrow.setAttribute('aria-hidden', 'true');
+        back.append(arrow, document.createTextNode(` ${backLabel}`));
+        back.addEventListener('click', () => closeDetailPane({ restoreFocus: true }));
+        text.append(back);
+    }
     const h = el('h2', 'detail-title', title); h.id = 'detail-pane-title'; h.tabIndex = -1;
     text.append(h);
     if (sub) text.append(el('p', 'detail-sub', sub));
+    if (backLabel && !host) foldWayBack(text, '.detail-back', '.detail-title');
     const close = el('button', 'detail-close');
     close.type = 'button'; close.setAttribute('aria-label', 'Close details');
     close.append(el('span', 'material-icons', 'close')); close.firstChild.setAttribute('aria-hidden', 'true');
@@ -79,6 +101,7 @@ export function openDetailPane({ key, title, sub = '', facts = [], body = null, 
     }
     aside.append(head, main);
     if (actions.length) aside.append(foot);
+    if (resizable && !host) addResizeHandle(aside); else aside.style.removeProperty('--detail-w'); // a pane that is not resizable has its own width, not the last one's
     aside.hidden = false;
     if (!host) {
         page()?.classList.add('detail-open');
@@ -87,7 +110,7 @@ export function openDetailPane({ key, title, sub = '', facts = [], body = null, 
         rail(true);
     }
     if (body) { try { body(doc, { signal: abort.signal, isStale: () => current === null || current.gen !== mine }); } catch (e) { doc.textContent = 'This document could not be shown.'; } }
-    h.focus({ preventScroll: true }); // keyboard and screen reader: the pane's title (the row's own button keeps the way back)
+    if (focus) h.focus({ preventScroll: true }); // keyboard and screen reader: the pane's title (the row's own button keeps the way back)
     live(`${title}, details`);
     return true;
 }
