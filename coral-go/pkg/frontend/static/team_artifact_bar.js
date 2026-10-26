@@ -10,6 +10,7 @@ const specFor = (personal, page = false) => {
     return {
         idp,
         noun: 'artifact',
+        hideCount: personal,
         label: personal ? 'Search and filter this agent\'s artifacts' : 'Search and filter team artifacts',
         searchLabel: personal ? 'Search this agent\'s artifacts' : 'Search team artifacts',
         placeholder: 'Search artifacts',

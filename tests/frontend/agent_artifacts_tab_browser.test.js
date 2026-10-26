@@ -13,7 +13,7 @@ const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
 const HEX = n => n.toString(16).padStart(2, '0').repeat(32);
 const TEAM = 'aa-team-' + Date.now().toString(36);
 const DATA = ['alpha.png', 'bravo.pdf', 'charlie.txt', 'delta.zip', 'echo.png', 'zebra-plan.md', 'foxtrot.txt'].map((name, i) => ({ id: HEX(i + 1), name, media_type: ['image/png', 'application/pdf', 'text/plain', 'application/zip', 'image/png', 'text/markdown', 'text/plain'][i], size: (i + 1) * 300,
-    task_id: 100 + i, task_title: 'Task ' + (i + 1), created_at: new Date(Date.UTC(2026, 9, 10 - i, 10)).toISOString(), uri: 'coral://artifacts/' + HEX(i + 1), available: true, inline: false, reference_count: 1, source: 'task', produced_by: 'Dev One' }));
+    task_id: i ? 100 + i : null, task_title: 'Task ' + (i + 1), created_at: new Date(Date.UTC(2026, 9, 10 - i, 10)).toISOString(), uri: 'coral://artifacts/' + HEX(i + 1), available: true, inline: false, reference_count: 1, source: 'task', produced_by: 'Dev One' }));
 
 const STUB = `(() => {
     const R = window.fetch; window.__req = []; window.__data = ${JSON.stringify(DATA)};
@@ -28,7 +28,8 @@ const STUB = `(() => {
             if (q.get('kind')) { const k = q.get('kind'); items = items.filter(i => (i.media_type.startsWith('image/') ? 'image' : i.media_type === 'application/pdf' ? 'pdf' : i.media_type.startsWith('text/') ? 'text' : 'other') === k); }
             const sort = q.get('sort') || 'newest';
             items.sort((a, b) => sort === 'name' ? a.name.localeCompare(b.name) : sort === 'oldest' ? a.created_at.localeCompare(b.created_at) : b.created_at.localeCompare(a.created_at));
-            const body = { project: decodeURIComponent(m[1]), artifacts: items, has_more: false, truncated: false };
+            const total = items.length, offset = Number(q.get('cursor') || q.get('offset') || 0), pageSize = window.__pageSize || items.length;
+            const body = { project: decodeURIComponent(m[1]), artifacts: items.slice(offset, offset + pageSize), has_more: offset + pageSize < total, next_cursor: offset + pageSize < total ? String(offset + pageSize) : '', truncated: false };
             if (q.get('session_id')) body.session_id = q.get('session_id');
             if (q.has('sort')) { body.total = items.length; body.all = window.__data.length; }
             return json(body);
@@ -88,8 +89,8 @@ const STUB = `(() => {
             await showAgent({ board_project: TEAM }, 'artifacts'); await settled();
             let r = await last();
             check(`${tag}: the agent's list is asked for with its session, the newest first, and the board's route (${JSON.stringify(r.query)})`, r.kind === 'board' && r.query.session_id === 'aa-1' && r.query.sort === 'newest' && r.project === TEAM);
-            const head = await ev(`(() => { const p = document.querySelector('${panel}'); const q = s => p.querySelector(s); const vis = e => !!e && e.getClientRects().length > 0; return { search: vis(q('.list-bar-search')), filters: vis(q('.list-bar-toggle')), more: vis(q('.list-bar-more-btn')), refresh: !!q('.team-artifacts-refresh'), rows: p.querySelectorAll('tbody tr').length, heads: [...p.querySelectorAll('thead th')].map(h => h.textContent), count: (q('.list-bar-count') || {}).textContent }; })()`);
-            check(`${tag}: the tab is a table with the search, the filter icon and the More icon, no Refresh (${JSON.stringify(head)})`, head.search && head.filters && head.more && !head.refresh && head.rows === 7 && head.heads[0] === 'Name' && /^7 artifact/.test(head.count || ''));
+            const head = await ev(`(() => { const p = document.querySelector('${panel}'); const q = s => p.querySelector(s); const vis = e => !!e && e.getClientRects().length > 0; return { search: vis(q('.list-bar-search')), filters: vis(q('.list-bar-toggle')), more: vis(q('.list-bar-more-btn')), refresh: !!q('.team-artifacts-refresh'), rows: p.querySelectorAll('tbody tr').length, heads: [...p.querySelectorAll('thead th')].map(h => h.textContent), count: (q('.list-bar-count') || {}).textContent, countVisible: vis(q('.list-bar-count')) }; })()`);
+            check(`${tag}: the tab is a table with the search, the filter icon and the More icon, no Refresh (${JSON.stringify(head)})`, head.search && head.filters && head.more && !head.refresh && head.rows === 7 && !head.countVisible && head.heads[0] === 'Name' && /^7 artifact/.test(head.count || ''));
             await ev(`document.querySelector('${panel} .list-bar-search').focus(); true`); await type('zebra'); await settle(900, 450);
             r = await last();
             check(`${tag}: a search is the server's, scoped to the agent (${JSON.stringify(r.query)}), and the count says N of M`, r.query.q === 'zebra' && r.query.session_id === 'aa-1' && (await ev(`document.querySelector('${panel} .list-bar-count').textContent`)).includes('1 of 7'));
@@ -126,10 +127,29 @@ const STUB = `(() => {
             const cols = await ev(`(() => { const p = document.querySelector('${panel}'); const vis = e => e.getClientRects().length > 0; const w = p.getBoundingClientRect().width; return { w, th: [...p.querySelectorAll('thead th')].filter(vis).map(h => h.textContent), phone: !!p.querySelector('.dt-box.dt-folded'), facts: [...p.querySelectorAll('tbody tr:first-child [data-key=type], tbody tr:first-child [data-key=size]')].every(vis) }; })()`);
             const folded = cols.phone;
             check(`${tag}: ${folded ? 'a narrow panel folds the shared rows with their description' : 'a wide panel shows every column'} (${JSON.stringify(cols)})`, folded ? cols.facts && cols.th.length === 0 : cols.th.length === 5 && cols.facts);
+            if (!view.phone) {
+                for (const width of [620, 900]) {
+                    await ev(`document.getElementById('agentic-state').style.width = '${width}px'; true`);
+                    await waitFor(`(() => { const box = document.querySelector('${panel} .dt-box'); return box && Math.abs(document.getElementById('agentic-state').getBoundingClientRect().width - ${width}) < 1 && box.classList.contains('dt-folded') === (box.clientWidth < 40 * parseFloat(getComputedStyle(document.documentElement).fontSize)); })()`, 'the artifact table follows the shared 40rem threshold');
+                    const layout = await ev(`(() => { const box = document.querySelector('${panel} .dt-box'), missing = box.querySelector('tbody tr [data-key=task]'); return { folded: box.classList.contains('dt-folded'), width: box.clientWidth, missingVisible: missing.getBoundingClientRect().width > 0, facts: [...box.querySelectorAll('tbody tr:first-child [data-key=type], tbody tr:first-child [data-key=size]')].every(c => c.classList.contains('dt-tone-tertiary')) }; })()`);
+                    check(`${tag}: shared threshold at ${width}px, with quiet facts and no empty folded task (${JSON.stringify(layout)})`, layout.folded === (width === 620) && layout.facts && (!layout.folded || !layout.missingVisible));
+                }
+                await ev(`document.getElementById('agentic-state').style.width = '680px'; true`);
+            }
             const un = await axUnnamed(`#agentic-panel-artifacts-view`);
             const au = await auditRegion(ev, [`#agentic-panel-artifacts-view`]);
             check(`${tag}: every control has a name (${JSON.stringify(un)}) and the text has 4.5:1 contrast (${JSON.stringify((au.fails || []).slice(0, 2))})`, un.length === 0 && (au.fails || []).length === 0);
             await shot(`${tag} artifacts`);
+
+            if (!view.phone && view.theme === 'dark') {
+                await ev(`window.__originalData = window.__data; window.__data = Array.from({length: 75}, (_, i) => ({...window.__originalData[i % 7], id: String(i + 100).padStart(64, '0'), name: 'Paged artifact ' + i})); window.__pageSize = 50; true`);
+                await showAgent({ board_project: TEAM, session_id: 'aa-pages', name: 'paged-agent' }, 'artifacts');
+                await waitFor(`document.querySelectorAll('${panel} tbody tr').length === 50`, 'the first artifact page');
+                await ev(`document.querySelector('${panel} .dt-foot').scrollIntoView({block:'center'}); true`);
+                await waitFor(`document.querySelectorAll('${panel} tbody tr').length === 75`, 'scrolling the shared footer reads the next artifact page');
+                check(`${tag}: automatic paging uses the cursor and stops after the last page`, await ev(`window.__req.some(r => r.query?.session_id === 'aa-pages' && r.query.cursor === '50') && !document.querySelector('${panel} .dt-more')`));
+                await ev(`window.__data = window.__originalData; delete window.__pageSize; true`);
+            }
 
             // ═══ an agent with no team: the table of the files it uploaded, no search (the standalone route has no query)
             await showAgent({ board_project: null, session_id: 'solo-1', name: 'solo' }, 'artifacts'); await settled();
