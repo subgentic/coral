@@ -104,6 +104,7 @@ func NewService(find func(agentType string) (string, error)) *Service {
 }
 
 // SetFetcher replaces how a CLI is run (tests).
+// SetFetcher has no production caller: it is exported for tests in server/routes.
 func (s *Service) SetFetcher(f Fetcher) { s.fetch = f }
 
 // cliKey identifies a build of the CLI at path.
