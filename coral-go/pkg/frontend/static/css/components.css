@@ -2836,6 +2836,7 @@ button.subscriber-history-link {
 .mb-view-header.mb-has-board #messageboard-title { font-size: 0.75rem; font-weight: 500; color: var(--text-muted); }
 .mb-view-header.mb-has-board #messageboard-project-badge { order: 2; font-size: var(--type-page-size); font-weight: 600; color: var(--text-primary); background: none; padding: 0; border-radius: 0; text-transform: none; letter-spacing: 0; overflow-wrap: anywhere; }
 
+.mb-header-end { display: contents; } /* a unit only on a phone (mobile.css) */
 .mb-header-actions {
     display: flex;
     gap: 4px;

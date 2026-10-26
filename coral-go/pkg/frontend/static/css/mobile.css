@@ -547,6 +547,7 @@
         min-width: 0;
         max-width: 100%;
     }
+    #messageboard-view .mb-header-end { display: inline-flex; align-items: center; gap: 4px; flex: none; } /* Members and More wrap together (#7988) */
     #messageboard-view.mb-has-board .mb-more { display: inline-block; position: relative; }
     #messageboard-view.mb-has-board .mb-more-btn { display: inline-flex; }
     #messageboard-view .mb-more-menu {

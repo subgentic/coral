@@ -13,6 +13,8 @@
                 <button type="button" class="mb-action-btn mb-face-btn" id="mb-face-goals" data-on-click="mb-face" data-face="goals" aria-pressed="false" title="What this board is working toward">Goals</button>
             </div>
             <!-- At phone width the sidebar is an overlay: this opens the same list as a sheet (#3610). -->
+            <!-- Members and More are one unit when the header wraps: never More alone on a row (#7988) -->
+            <div class="mb-header-end">
             <button type="button" class="mb-action-btn mb-subscribers-btn" id="mb-subscribers-btn" data-on-click="mb-subscribers" aria-haspopup="dialog" aria-controls="mb-subscribers-sheet" aria-expanded="false">Members</button>
             <!-- On a phone Select, Export, Pause and Delete sit in a More menu (#4538, UX #4536): the toolbar keeps one row at
                  any text size. On a wider screen the group is laid out inline as before (display: contents). -->
@@ -25,6 +27,7 @@
             <button class="mb-action-btn" id="mb-export-btn" style="display:none" data-on-click="mb-export" title="Export — download board messages as Markdown">Export</button>
             <button class="mb-action-btn" id="mb-pause-btn" style="display:none" data-on-click="mb-pause" title="Pause Board — stops agents from receiving new messages until resumed">Pause Board</button>
             <button class="mb-action-btn mb-action-danger" id="mb-delete-btn" style="display:none" data-on-click="mb-delete-board">Delete</button>
+            </div>
             </div>
             </div>
         </div>
