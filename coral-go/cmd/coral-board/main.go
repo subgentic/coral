@@ -135,6 +135,14 @@ Commands:
                                Post a short message (@mention agents);
                                --task N answers task N (a person's reply on it);
                                use -- before text that starts with '-'
+  post --ask "@Name <question>"
+                               A question that needs an answer from the members
+                               it @mentions (no work to produce). It stays open
+                               until each answers (post --reply-to N "...", or a
+                               post that @mentions you); whoever has not is
+                               reminded once after 15 min (a team setting)
+  post --reply-to N "<text>"   Answer message N: what closes a question asked of
+                               you ('read' prints its number)
   post --assign "Name" [--goal N] [--title T] [--priority P] "<text>"
                                Work to produce (code, tests, docs, a review) is
                                a task: this creates it (title from --title or

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/subgentic/coral/internal/clierr"
+	"github.com/subgentic/coral/internal/clitext"
 	"io"
 	"net/http"
 	"net/url"
@@ -110,7 +111,8 @@ func cmdPost() {
 	}
 
 	// Parse --to flag and collect remaining args as the message
-	var toNames, filePath, taskArg, assignArg, goalArg, titleArg, priorityArg string
+	var toNames, filePath, taskArg, assignArg, goalArg, titleArg, priorityArg, replyArg string
+	ask := false
 	var msgParts []string
 	literal := false
 	for i := 2; i < len(os.Args); i++ {
@@ -128,6 +130,11 @@ func cmdPost() {
 			i++
 		} else if opt == "--task" && i+1 < len(os.Args) {
 			taskArg = os.Args[i+1]
+			i++
+		} else if opt == "--ask" {
+			ask = true
+		} else if opt == "--reply-to" && i+1 < len(os.Args) {
+			replyArg = os.Args[i+1]
 			i++
 		} else if (opt == "--assign" || opt == "--goal" || opt == "--title" || opt == "--priority") && i+1 < len(os.Args) {
 			switch opt {
@@ -174,6 +181,10 @@ func cmdPost() {
 		fmt.Fprintln(os.Stderr, "Error: --goal, --title and --priority are for --assign: post --assign \"Name\" [--goal N] [--title T] [--priority P] \"text\"")
 		os.Exit(2)
 	}
+	if ask && assignArg != "" {
+		fmt.Fprintln(os.Stderr, "Error: --ask is a question (no work to produce); --assign makes work a task: use one of them")
+		os.Exit(2)
+	}
 	var assigned *postAssignment
 	if assignArg != "" {
 		if taskArg != "" {
@@ -201,6 +212,17 @@ func cmdPost() {
 	subscriberID := resolveSubscriberID()
 
 	body := map[string]any{"subscriber_id": subscriberID, "content": message}
+	if ask {
+		body["ask"] = true // a question to the members it @mentions, open until each has answered (#7794)
+	}
+	if replyArg != "" { // --reply-to N: an answer to message N, which closes a question asked of the sender
+		n, convErr := strconv.ParseInt(replyArg, 10, 64)
+		if convErr != nil || n <= 0 {
+			fmt.Fprintf(os.Stderr, "Error: --reply-to needs a message number (got %q)\n", replyArg)
+			os.Exit(2)
+		}
+		body["reply_to"] = n
+	}
 	if assigned != nil { // --assign: the task is made now, and the post carries its link (#7791)
 		n := assigned.create(st, subscriberID)
 		body["task_id"] = n
@@ -224,6 +246,9 @@ func cmdPost() {
 	}
 	if id, ok := result["id"]; ok {
 		fmt.Printf("Message #%.0f posted to '%s'\n", id, st.Project)
+		if a, ok := result["ask"].(map[string]any); ok {
+			fmt.Printf("  A question to %s: open until each has answered (they answer with  coral-board post --reply-to %.0f \"...\"  or a post that @mentions you).\n", joinAnyStrings(a["to"]), id)
+		}
 		printMentionWarnings(os.Stderr, result)
 	} else {
 		fmt.Fprintln(os.Stderr, "Error: Coral accepted the request but returned no message id")
@@ -372,6 +397,7 @@ func printMessages(messages []map[string]any) {
 		}
 		content, _ := m["content"].(string)
 		fmt.Printf("[%s] %s: %s\n", ts, role, content)
+		printAskLines(m)
 		if n, ok := m["task_id"].(float64); ok && n > 0 { // a person's reply on a task (#7703): say how the answer reaches the person
 			fmt.Printf("  (a reply on task #%.0f: answer it on the task with  coral-board post --task %.0f \"...\")\n", n, n)
 		}
@@ -585,4 +611,44 @@ func cmdDelete() {
 	}
 	deleteState()
 	fmt.Printf("Deleted board '%s'\n", st.Project)
+}
+
+// joinAnyStrings is a JSON array of names as "A, B", each without terminal controls.
+func joinAnyStrings(v any) string {
+	list, _ := v.([]any)
+	var names []string
+	for _, x := range list {
+		if s, ok := x.(string); ok && s != "" {
+			names = append(names, clitext.CleanName(s))
+		}
+	}
+	return strings.Join(names, ", ")
+}
+
+// printAskLines says under a message that it is a question (post --ask, #7794) or an answer to one. The message's id is only shown here: it is what answers it (--reply-to).
+func printAskLines(m map[string]any) {
+	id, _ := m["id"].(float64)
+	if ask, ok := m["ask"].(map[string]any); ok {
+		open := joinAnyStrings(ask["open"])
+		me := resolveSubscriberID()
+		owing := false
+		if list, ok := ask["open"].([]any); ok {
+			for _, x := range list {
+				if s, _ := x.(string); s != "" && strings.EqualFold(s, me) {
+					owing = true
+				}
+			}
+		}
+		switch {
+		case owing:
+			fmt.Printf("  (a question for you, message #%.0f, with no answer from you yet: answer it with  coral-board post --reply-to %.0f \"...\")\n", id, id)
+		case open == "":
+			fmt.Printf("  (a question, message #%.0f: answered)\n", id)
+		default:
+			fmt.Printf("  (a question, message #%.0f: waiting on %s)\n", id, open)
+		}
+	}
+	if to, ok := m["reply_to"].(float64); ok && to > 0 {
+		fmt.Printf("  (a reply to message #%.0f)\n", to)
+	}
 }

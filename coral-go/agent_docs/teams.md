@@ -538,6 +538,7 @@ values are clamped: times are 5 to 1440 minutes, and nudges are 1 to 5.
 | `status_nudge` | on, `after_min` 20, `escalate_after_min` 10 | ask for a status after no activity; escalate if still silent |
 | `mention_renudge` | on, `after_min` 10 | remind the orchestrator of an unanswered mention |
 | `held_notice` | on, `after_min` 10 | tell the Operator, on the board, about an agent whose messages have waited at a dialog that long: its name and "waiting at a dialog" only, once per hold |
+| `ask_reminder` | on, `after_min` 15 | remind a member, once, of a question (`post --ask`) that @mentions them and that they have not answered; runs whether or not the check is on, and the check lists questions open that long |
 | `busy_no_task` | on, `after_min` 10 | a line of the orchestrator's check for an agent that has been in a turn that long with no task in progress (once per turn; the orchestrator itself is left out) |
 | `post_no_task` | on | a line of the check for a commit, SHA or patch an agent posted with no task number in the post and no task in progress when it posted (once per post) |
 | `upload_no_task` | on | a line of the check for an artifact an agent uploaded with no task in progress, unless it said `--no-task` (once per upload) |

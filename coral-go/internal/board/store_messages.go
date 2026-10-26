@@ -112,13 +112,15 @@ func (s *Store) insertMessage(ctx context.Context, project, subscriberID, conten
 // explicitly tagged (or @all / @notify-all) are returned.
 // For orchestrators or when readAll is true, all unread messages from others are returned.
 func (s *Store) ReadMessages(ctx context.Context, project, subscriberID string, limit int, readAll ...bool) ([]Message, error) {
-	return s.readMessages(ctx, project, subscriberID, limit, true, readAll...)
+	msgs, err := s.readMessages(ctx, project, subscriberID, limit, true, readAll...)
+	return s.withAsks(ctx, project, msgs, err)
 }
 
 // PeekMessages is ReadMessages that does not move the member's read position: what a person's page lists of an agent's unread messages (#7727's Waiting page), which must leave
 // them unread for the agent. The same selection, so what it lists is what the agent's next read returns.
 func (s *Store) PeekMessages(ctx context.Context, project, subscriberID string, limit int, readAll ...bool) ([]Message, error) {
-	return s.readMessages(ctx, project, subscriberID, limit, false, readAll...)
+	msgs, err := s.readMessages(ctx, project, subscriberID, limit, false, readAll...)
+	return s.withAsks(ctx, project, msgs, err)
 }
 
 func (s *Store) readMessages(ctx context.Context, project, subscriberID string, limit int, advance bool, readAll ...bool) ([]Message, error) {
@@ -289,7 +291,7 @@ func (s *Store) ListMessages(ctx context.Context, project string, limit, offset 
 			 ) sub ORDER BY id ASC`,
 			project, limit)
 	}
-	return messages, err
+	return s.withAsks(ctx, project, messages, err)
 }
 
 // listMessagesSelect is the dashboard message row; callers append the WHERE.
@@ -327,7 +329,7 @@ const beforeCountTail = 5000
 func (s *Store) ListMessagesBefore(ctx context.Context, project string, beforeID int64, limit int) ([]Message, error) {
 	var messages []Message
 	err := s.reader().SelectContext(ctx, &messages, listMessagesBeforeSQL, project, beforeID, limit)
-	return messages, err
+	return s.withAsks(ctx, project, messages, err)
 }
 
 // ListMessagesAfter returns the oldest limit messages with id > afterID,
@@ -335,7 +337,7 @@ func (s *Store) ListMessagesBefore(ctx context.Context, project string, beforeID
 func (s *Store) ListMessagesAfter(ctx context.Context, project string, afterID int64, limit int) ([]Message, error) {
 	var messages []Message
 	err := s.reader().SelectContext(ctx, &messages, listMessagesAfterSQL, project, afterID, limit)
-	return messages, err
+	return s.withAsks(ctx, project, messages, err)
 }
 
 // CountMessagesBefore counts the project's messages with id < beforeID.
@@ -374,7 +376,11 @@ func (s *Store) GetMessageByID(ctx context.Context, project string, id int64) (*
 	if err != nil {
 		return nil, err
 	}
-	return &msg, nil
+	one := []Message{msg}
+	if err := s.fillAsks(ctx, project, one); err != nil {
+		return nil, err
+	}
+	return &one[0], nil
 }
 
 // ExistingMessageIDs is which of these message ids are on the board: one query for all of them (a board's message ids are numbered across every board, so an id of another

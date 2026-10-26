@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/subgentic/coral/internal/claudeartifact"
+	"log/slog"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -86,9 +87,43 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 		}
 		answer = &taskReply{taskID: task.ID} // no creator: no mention is added, and the post is stored with its task_id
 	}
+	// An ask (post --ask, #7794) needs someone to ask, and a reply_to a message of this board: both are checked before anything is posted.
+	var asked []string
+	if derr == nil && body.Ask {
+		to, err := h.bs.AskTargets(r.Context(), project, body.SubscriberID, clitext.Clean(unescapeLineBreaks(body.Content)))
+		if err != nil {
+			errBadRequest(w, err.Error())
+			return
+		}
+		asked = to
+	}
+	if derr == nil && body.ReplyTo != 0 {
+		if body.ReplyTo < 0 || h.bs.CheckReplyTo(r.Context(), project, body.ReplyTo) != nil {
+			errBadRequest(w, "reply_to is not a message of this board")
+			return
+		}
+	}
 	msg, warnings, ok := h.postMessageCore(w, r, project, derr, body, answer)
 	if !ok {
 		return
+	}
+	if len(asked) > 0 {
+		// The sender is known now (the request proved it): who is asked is decided again from what was stored, so the asker is never among them.
+		if to, err := h.bs.AskTargets(r.Context(), project, msg.SubscriberID, msg.Content); err == nil {
+			if err := h.bs.RecordAsk(r.Context(), project, msg, to); err != nil {
+				slog.Warn("board ask not recorded", "board", project, "message", msg.ID, "error", err)
+			}
+		}
+	}
+	if body.ReplyTo > 0 {
+		if err := h.bs.RecordReply(r.Context(), project, msg.ID, body.ReplyTo); err != nil {
+			slog.Warn("board reply not recorded", "board", project, "message", msg.ID, "error", err)
+		}
+	}
+	if len(asked) > 0 || body.ReplyTo > 0 {
+		if filled, err := h.bs.GetMessageByID(r.Context(), project, msg.ID); err == nil {
+			msg = filled // the answer carries ask and reply_to
+		}
 	}
 	// A mention that names no member is warned about, never refused (#4583): the post is already made.
 	if len(warnings) > 0 {
@@ -109,7 +144,10 @@ type postMessageBody struct {
 	As            string  `json:"as,omitempty"` // display name for auto-subscribe (e.g. "Operator")
 	// TaskID makes the post an answer on that task (#7703): the agent's reply to a person's reply, listed with it by GET .../messages?task_id=N. The task must be on this board;
 	// no mention is added (the person reads the task's page), the sender is the one the request proves, exactly as for any post.
-	TaskID json.RawMessage `json:"task_id,omitempty"` // raw, so a task_id that is not a whole number is answered as that (invalid task_id), not as a body that failed to decode ("content required")
+	// Ask makes the post a question to the members it @mentions (#7794), open until each has answered; ReplyTo makes it an answer to that message of the board.
+	Ask     bool            `json:"ask,omitempty"`
+	ReplyTo int64           `json:"reply_to,omitempty"`
+	TaskID  json.RawMessage `json:"task_id,omitempty"` // raw, so a task_id that is not a whole number is answered as that (invalid task_id), not as a body that failed to decode ("content required")
 }
 
 // taskReply makes a post a reply to a task (#5463): the task's id and creator in, and what the server did with the creator's mention out.

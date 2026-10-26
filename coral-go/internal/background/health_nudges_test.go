@@ -298,3 +298,52 @@ func TestHealthNudgesFollowTheTeamSettings(t *testing.T) {
 	n.run(30 * time.Minute)
 	assert.Len(t, n.sentTo("Dev"), 1)
 }
+
+// #7794: a question (post --ask) that @mentions a member who has not answered it reminds that member once, after the team's N minutes (15 by default), for the check on or off; an answer
+// ends it; nobody else is told.
+func TestAnUnansweredAskRemindsTheAskedMemberOnce(t *testing.T) {
+	n := newNudgeHarness(t, "")
+	n.agent("Lead", "11111111-0000-4000-8000-000000000001")
+	n.agent("Dev A", "11111111-0000-4000-8000-000000000002")
+	n.agent("Dev B", "11111111-0000-4000-8000-000000000003")
+	ctx := context.Background()
+	q, err := n.bs.PostMessage(ctx, "team", "Lead", "@Dev A @Dev B which parser do we keep?", nil)
+	require.NoError(t, err)
+	to, err := n.bs.AskTargets(ctx, "team", "Lead", q.Content)
+	require.NoError(t, err)
+	require.NoError(t, n.bs.RecordAsk(ctx, "team", q, to))
+
+	n.h.RunOnce(ctx)
+	assert.Empty(t, n.sentTo("Dev A"), "not yet: the ask is new")
+	n.now = n.now.Add(16 * time.Minute)
+	n.h.RunOnce(ctx)
+	require.Len(t, n.sentTo("Dev A"), 1, "reminded after 15 minutes")
+	require.Len(t, n.sentTo("Dev B"), 1)
+	assert.Contains(t, n.sentTo("Dev A")[0], "Lead asked you a question 16 min ago")
+	assert.Contains(t, n.sentTo("Dev A")[0], fmt.Sprintf("coral-board post --reply-to %d", q.ID), "it says how to answer so the answer is seen")
+	assert.NotContains(t, n.sentTo("Dev A")[0], "@", "the reminder mentions no one: it is no new ask")
+	assert.Empty(t, n.sentTo("Lead"), "the asker is not reminded")
+
+	n.now = n.now.Add(20 * time.Minute)
+	n.h.RunOnce(ctx)
+	assert.Len(t, n.sentTo("Dev A"), 1, "once, however long it stays open")
+
+	// the check does not have to be on: a team with it off is reminded too (a reminder to one agent costs nothing)
+	require.NoError(t, n.bs.SetHealthOn(ctx, "team", false))
+	q2, err := n.bs.PostMessage(ctx, "team", "Lead", "@Dev A second question?", nil)
+	require.NoError(t, err)
+	require.NoError(t, n.bs.RecordAsk(ctx, "team", q2, []string{"Dev A"}))
+	n.now = n.now.Add(16 * time.Minute)
+	n.h.RunOnce(ctx)
+	assert.Len(t, n.sentTo("Dev A"), 2, "the second question is reminded once, with the check off")
+
+	// an answered question is not reminded
+	q3, err := n.bs.PostMessage(ctx, "team", "Lead", "@Dev B third question?", nil)
+	require.NoError(t, err)
+	require.NoError(t, n.bs.RecordAsk(ctx, "team", q3, []string{"Dev B"}))
+	_, err = n.bs.PostMessage(ctx, "team", "Dev B", "@Lead yes", nil)
+	require.NoError(t, err)
+	n.now = n.now.Add(16 * time.Minute)
+	n.h.RunOnce(ctx)
+	assert.Len(t, n.sentTo("Dev B"), 1, "Dev B answered the third: only the first reminder")
+}

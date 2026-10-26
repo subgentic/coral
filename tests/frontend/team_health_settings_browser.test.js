@@ -58,7 +58,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             const unlabelled = [...f.querySelectorAll('input, select')].filter(e => !((e.labels && e.labels.length) || e.getAttribute('aria-label') || e.getAttribute('aria-labelledby'))).map(e => e.name);
             return { on: v('on').checked, allClear: v('all_clear').checked, rcpt: v('recipient').value, opts: [...v('recipient').options].map(o => o.value + '=' + o.textContent), nums, unlabelled, rev: v('default_reviewers').value, rules: ['auto_delegate', 'claim_nudge', 'status_nudge', 'mention_renudge', 'busy_no_task', 'post_no_task', 'upload_no_task', 'goal_size'].map(r => v(r + '_on').checked), order: [...f.querySelectorAll('.sv-row')].map(r => r.dataset.key).filter(k => /^(mention_renudge|busy_no_task|post_no_task|upload_no_task|goal_size)/.test(k)), held: !!v('held_notice_on'), save: document.querySelector('#team-settings-workspace .sv-save').disabled }; })()`);
         assert.equal(form.on, false, 'a new team has the check off (#4962)'); assert.equal(form.allClear, true); assert.equal(form.rcpt, '');
-        assert.deepEqual(form.nums, [['interval_min', '10', '5', '1440'], ['claim_nudge_after_min', '10', '5', '1440'], ['claim_nudge_nudges', '2', '1', '5'], ['status_nudge_after_min', '20', '5', '1440'], ['status_nudge_escalate_after_min', '10', '5', '1440'], ['held_notice_after_min', '10', '5', '1440'], ['mention_renudge_after_min', '10', '5', '1440'], ['busy_no_task_after_min', '10', '5', '1440'], ['goal_size_limit', '15', '5', '500']]); // the server returns held_notice since Lead's #4225: its card is in the defaults
+        assert.deepEqual(form.nums, [['interval_min', '10', '5', '1440'], ['claim_nudge_after_min', '10', '5', '1440'], ['claim_nudge_nudges', '2', '1', '5'], ['status_nudge_after_min', '20', '5', '1440'], ['status_nudge_escalate_after_min', '10', '5', '1440'], ['held_notice_after_min', '10', '5', '1440'], ['mention_renudge_after_min', '10', '5', '1440'], ['busy_no_task_after_min', '10', '5', '1440'], ['goal_size_limit', '15', '5', '500'], ['ask_reminder_after_min', '15', '5', '1440']]); // the server returns held_notice since Lead's #4225: its card is in the defaults
         assert.deepEqual(form.unlabelled, [], 'every control has a label');
         assert.deepEqual(form.rules, [true, true, true, true, true, true, true, true], 'the off-the-books signals and the goal-size line are on by default (#7793, #7808)');
         assert.deepEqual(form.order, ['mention_renudge_on', 'mention_renudge_after_min', 'busy_no_task_on', 'busy_no_task_after_min', 'post_no_task_on', 'upload_no_task_on', 'goal_size_on', 'goal_size_limit'], 'under Automatic rules, after the mention reminder');
@@ -74,7 +74,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         const axPairs = axNodes.map(n => [n.name && n.name.value, n.description && n.description.value]).filter(([name]) => name);
         assert.deepEqual(axPairs.filter(([name]) => /min|nudges|^Default reviewers$|tasks in a goal/.test(name)).map(([name, d]) => [name, /^Names of agents/.test(d) ? 'Names of agents' : d]), [
             ['Every minutes', '5 to 1440'], ['Default reviewers', 'Names of agents'], ['After minutes idle', '5 to 1440'], ['Nudges before telling the orchestrator nudges', '1 to 5'],
-            ['Ask after minutes quiet', '5 to 1440'], ['Tell the orchestrator minutes later', '5 to 1440'], ['After minutes held', '5 to 1440'], ['After minutes', '5 to 1440'], ['Working with no task for minutes', '5 to 1440'], ['More than tasks in a goal', '5 to 500']]);
+            ['Ask after minutes quiet', '5 to 1440'], ['Tell the orchestrator minutes later', '5 to 1440'], ['After minutes held', '5 to 1440'], ['After minutes', '5 to 1440'], ['Working with no task for minutes', '5 to 1440'], ['More than tasks in a goal', '5 to 500'], ['After minutes', '5 to 1440']]);
         ok('every number box is named by its label and unit and described by its limits; the reviewers box by its label, described by its sentence');
 
         // 3. an out-of-range number is refused before any request
@@ -136,10 +136,11 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await open(); await clickHealthTab();
         const held = await ev(`(() => { const c = document.querySelector('${P} .sv-row[data-key=held_notice_on]'); const i = window.__h('held_notice_after_min'); return c ? { title: c.querySelector('.sv-label').textContent.trim(), after: i.value, lo: i.min, hi: i.max } : null; })()`);
         assert.deepEqual(held, { title: 'Tell the Operator about a held delivery', after: '15', lo: '5', hi: '1440' });
-        await ev(`{ window.__fire('held_notice_after_min', '30'); document.querySelector('#team-settings-workspace .sv-save').click(); } true`);
+        await ev(`{ window.__fire('held_notice_after_min', '30'); window.__fire('ask_reminder_after_min', '25'); document.querySelector('#team-settings-workspace .sv-save').click(); } true`);
         await waitFor(`!!window.__putBody`, 'the PUT', 5000);
         const body = await ev(`window.__putBody`);
         assert.equal(body.subscriber_id, 'Operator'); assert.equal(body.health.held_notice.after_min, 30); assert.deepEqual(body.health.future_rule, { on: true, x: 3 }, 'a field the form does not know goes back as it was');
+        assert.deepEqual(body.health.ask_reminder, { on: true, after_min: 25 }, 'the question reminder (#7794) is a field: its minutes are saved with the rest');
         // Reset to defaults fills the held card with the design's 10 minutes (Lead's #4225 default).
         await ev(`[...document.querySelectorAll('${P} button')].find(b => b.textContent === 'Reset to defaults').click(); true`);
         assert.equal(await ev(`window.__h('held_notice_after_min').value`), '10', 'the held-delivery default is 10 minutes');

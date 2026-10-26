@@ -32,6 +32,9 @@ type HealthSettings struct {
 	UploadNoTask HealthRuleOn       `json:"upload_no_task"`
 	// GoalSize tells the orchestrator when a goal has more than Limit tasks (#7808, goal #21 part 6), counting its open and its done ones: once per crossing, and again at each further Limit.
 	GoalSize HealthGoalSize `json:"goal_size"`
+	// AskReminder reminds a member, once, of a question (post --ask, asks.go) that @mentions them and that they have not answered for AfterMin (#7794). It runs for a team whether or not the
+	// orchestrator's check is on: a reminder to one agent costs the team nothing.
+	AskReminder HealthMentionNudge `json:"ask_reminder"`
 }
 
 // HealthGoalSize: say it once a goal's tasks pass Limit (then again at 2 x Limit, 3 x Limit ...).
@@ -79,6 +82,7 @@ func DefaultHealthSettings() HealthSettings {
 		PostNoTask:     HealthRuleOn{On: true},
 		UploadNoTask:   HealthRuleOn{On: true},
 		GoalSize:       HealthGoalSize{On: true, Limit: 15},
+		AskReminder:    HealthMentionNudge{On: true, AfterMin: 15},
 	}
 }
 
@@ -104,6 +108,7 @@ func (h HealthSettings) Clamp() HealthSettings {
 	h.HeldNotice.AfterMin = clampInt(h.HeldNotice.AfterMin, 5, 1440)
 	h.BusyNoTask.AfterMin = clampInt(h.BusyNoTask.AfterMin, 5, 1440)
 	h.GoalSize.Limit = clampInt(h.GoalSize.Limit, 5, 500)
+	h.AskReminder.AfterMin = clampInt(h.AskReminder.AfterMin, 5, 1440)
 	h.Recipient = strings.TrimSpace(h.Recipient)
 	var revs []string
 	for _, r := range h.DefaultReviewers {

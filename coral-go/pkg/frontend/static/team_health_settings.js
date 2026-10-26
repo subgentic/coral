@@ -25,6 +25,7 @@ export const HEALTH_DEFAULTS = {
     held_notice: { on: true, after_min: 10 },
     busy_no_task: { on: true, after_min: 10 }, post_no_task: { on: true }, upload_no_task: { on: true }, // work done off the books (#7793)
     goal_size: { on: true, limit: 15 }, // a goal with too many tasks (#7808)
+    ask_reminder: { on: true, after_min: 15 }, // a question (post --ask) the member it asks has not answered (#7794): reminded whether or not the check is on
 };
 
 const [MIN_LO, MIN_HI] = HEALTH_LIMITS.minutes;

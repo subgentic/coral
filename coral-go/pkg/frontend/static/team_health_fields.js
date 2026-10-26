@@ -9,7 +9,7 @@ const { refusalOf, answeredLocally } = await importOnce('./owner_refusal.js'); /
 const [LO, HI] = HEALTH_LIMITS.minutes;
 const [N_LO, N_HI] = HEALTH_LIMITS.nudges;
 const [G_LO, G_HI] = HEALTH_LIMITS.goalTasks;
-const RULES = ['claim_nudge', 'status_nudge', 'mention_renudge', 'held_notice', 'busy_no_task', 'post_no_task', 'upload_no_task', 'goal_size'];
+const RULES = ['claim_nudge', 'status_nudge', 'mention_renudge', 'held_notice', 'busy_no_task', 'post_no_task', 'upload_no_task', 'goal_size', 'ask_reminder'];
 
 /** The health object as the flat values of the fields. */
 export function healthToValues(h) {
@@ -30,6 +30,7 @@ export function valuesToHealth(v, base) {
     h.claim_nudge = { ...h.claim_nudge, on: !!v.claim_nudge_on, after_min: v.claim_nudge_after_min, nudges: v.claim_nudge_nudges };
     h.status_nudge = { ...h.status_nudge, on: !!v.status_nudge_on, after_min: v.status_nudge_after_min, escalate_after_min: v.status_nudge_escalate_after_min };
     h.mention_renudge = { ...h.mention_renudge, on: !!v.mention_renudge_on, after_min: v.mention_renudge_after_min };
+    if (h.ask_reminder && v.ask_reminder_on !== undefined) h.ask_reminder = { ...h.ask_reminder, on: !!v.ask_reminder_on, after_min: v.ask_reminder_after_min };
     if (h.held_notice && v.held_notice_on !== undefined) h.held_notice = { ...h.held_notice, on: !!v.held_notice_on, after_min: v.held_notice_after_min };
     if (h.busy_no_task && v.busy_no_task_on !== undefined) h.busy_no_task = { ...h.busy_no_task, on: !!v.busy_no_task_on, after_min: v.busy_no_task_after_min };
     if (h.post_no_task && v.post_no_task_on !== undefined) h.post_no_task = { ...h.post_no_task, on: !!v.post_no_task_on };
@@ -81,6 +82,9 @@ export function healthFields(ctx) {
         { key: 'upload_no_task_on', type: 'toggle', label: 'Tell the orchestrator about an artifact uploaded with no task', help: 'An artifact uploaded by an agent with no task in progress (and not sent with --no-task) is named in the next health check, once.' },
         { key: 'goal_size_on', type: 'toggle', label: 'Tell the orchestrator when a goal has too many tasks', help: 'A goal that is not closed and has more tasks than the limit (open and done together) is named in the next health check, and again at each further limit.' },
         { key: 'goal_size_limit', type: 'number', label: 'More than', unit: 'tasks in a goal', min: G_LO, max: G_HI, integer: true, disabledWhen: v => !v.goal_size_on },
+        { key: 'health_questions', type: 'heading', label: 'Questions', help: 'Works whether or not the health check is on.' },
+        { key: 'ask_reminder_on', type: 'toggle', label: 'Remind about unanswered questions', help: 'When an agent asks a question and the member it asks has not answered, remind that member once.' },
+        minutes('ask_reminder_after_min', 'After', 'minutes', 'ask_reminder_on'),
         { key: 'health_defaults', type: 'custom', label: 'Defaults', help: 'Put every health setting back to the defaults. Save to apply them.', action: { label: 'Reset to defaults', run: view => ctx.onReset(view) } },
     ];
 }

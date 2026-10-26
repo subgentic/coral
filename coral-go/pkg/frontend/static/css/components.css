@@ -277,6 +277,7 @@
     background: var(--bg-secondary);
     white-space: nowrap;
 }
+.mb-ask-badge.is-answered { border-style: dashed; } /* an answered question: the same mark, quieter (the word says so too) */
 .mb-hub-user-badge { border-color: var(--border); color: var(--text-secondary); }
 .mb-hub-user-badge.is-unknown { border-style: dashed; }
 .mb-hub-user-badge.is-operator { border-color: var(--accent, var(--border)); color: var(--accent, var(--text-secondary)); }

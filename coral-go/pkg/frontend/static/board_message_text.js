@@ -26,6 +26,16 @@ export function externalMessageBadge(m) {
     return `<span class="mb-external-badge${outbound ? ' is-outbound' : ''}" title="${escapeAttr(title)}">${outbound ? 'to' : 'from'} ${escapeHtml(board)}</span>`;
 }
 
+/** A question (post --ask, #7794): a small "Question" mark on the message, "answered" once each member it asks has answered; the title says who it still waits on. Words, not colour alone. */
+export function askBadge(m) {
+    const ask = m && m.ask;
+    if (!ask || typeof ask !== 'object') return '';
+    const open = Array.isArray(ask.open) ? ask.open.map(String) : [];
+    const done = ask.answered === true || open.length === 0;
+    const title = done ? 'A question to the members it names: every one of them has answered' : `A question: waiting on ${open.join(', ')}`;
+    return `<span class="mb-external-badge mb-ask-badge${done ? ' is-answered' : ''}" title="${escapeAttr(title)}">Question${done ? ' \u00b7 answered' : ''}</span>`;
+}
+
 /** A board chat message a Coral Hub user sent through the Hub (#3377). origin is set by the
  *  server on tunnel chat posts, never taken from a client and never inferred from the name. */
 export function hubUserBadge(m) {

@@ -24,6 +24,7 @@
 1	board_attachments.js	chips
 1	board_chat.js	_formatTime(m.created_at)
 1	board_chat.js	alignClass
+1	board_chat.js	askBadge(m)
 1	board_chat.js	boardMessageColorStyle(color)
 1	board_chat.js	checkbox
 1	board_chat.js	count
@@ -206,6 +207,7 @@
 1	markdown.js	HL_MARK
 1	message_board.js	BOARD_SAVE_BUTTON(currentProject || '', keyLabel(currentProject || ''), String(m.created_at || ''), String(m.j
 1	message_board.js	alignClass
+1	message_board.js	askBadge(m)
 1	message_board.js	boardMessageColorStyle(color)
 1	message_board.js	checkbox
 1	message_board.js	externalMessageBadge(m)

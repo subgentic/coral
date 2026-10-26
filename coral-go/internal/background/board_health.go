@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -170,6 +171,7 @@ func (m *BoardHealthMonitor) composeCheck(ctx context.Context, project, orch str
 	items = append(items, idle...)
 	items = append(items, m.offBooksItems(ctx, project, orch, subs, bySession, tasks, now)...) // work done off the books (#7793)
 	items = append(items, reviewItems(reviews, reviewers, parked, idleNoWork)...)
+	items = append(items, m.askItems(ctx, project, now)...)
 	// 4. Queue problems (task numbers only).
 	issues, _, _ := taskQueueIssues(tasks)
 	for _, is := range issues {
@@ -431,4 +433,24 @@ func taskQueueIssues(tasks []board.Task) (issues []string, assigned map[string]i
 		issues = append(issues, fmt.Sprintf("%d unblocked tasks can potentially run in parallel", parallel))
 	}
 	return issues, assigned, planned
+}
+
+// askItems lists the open questions (post --ask, #7794) older than the team's reminder time, one item per member still owing: "Asked by Lead, waiting on Dev B, 20 min (message #123)".
+func (m *BoardHealthMonitor) askItems(ctx context.Context, project string, now time.Time) []teamhealth.Item {
+	open, err := m.store.OpenAsks(ctx, project, now)
+	if err != nil || len(open) == 0 {
+		return nil
+	}
+	after := time.Duration(m.store.GetHealthSettings(ctx, project).AskReminder.AfterMin) * time.Minute
+	var items []teamhealth.Item
+	for _, o := range open {
+		waited := now.Sub(o.At)
+		if waited < after {
+			continue
+		}
+		items = append(items, teamhealth.Item{Rank: 4, Agent: "Board", Key: fmt.Sprintf("ask|%d|%s", o.MessageID, strings.ToLower(o.Member)), State: "open",
+			Problem: fmt.Sprintf("Asked by %s, waiting on %s, %d min (message #%d)", teamhealth.Name(o.Asker), teamhealth.Name(o.Member), int(waited.Minutes()), o.MessageID),
+			Said:    teamhealth.ShownText(o.Content, nil)})
+	}
+	return items
 }

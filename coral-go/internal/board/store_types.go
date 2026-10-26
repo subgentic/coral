@@ -117,6 +117,9 @@ type Message struct {
 	IsSystem bool `db:"is_system" json:"is_system"`
 	// TaskID is the task this message replies to (POST .../tasks/{id}/reply, #5463): set by the server only, absent for every other message.
 	TaskID *int64 `db:"task_id" json:"task_id,omitempty"`
+	// Ask: this message is a question (post --ask, asks.go) and who has not answered it; ReplyTo: the message this one answers (post --reply-to). Filled where messages are read, never stored on the row.
+	Ask     *AskInfo `db:"-" json:"ask,omitempty"`
+	ReplyTo *int64   `db:"-" json:"reply_to,omitempty"`
 	// Legacy column — kept for DB compat, mirrors SubscriberID for new rows.
 	SessionID string `db:"session_id" json:"-"`
 }

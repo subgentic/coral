@@ -257,3 +257,27 @@ func TestCheckListsQuestionsWaitingOnTheOperator(t *testing.T) {
 	h.now = h.now.Add(11 * time.Minute)
 	assert.NotContains(t, h.checkTo("Orchestrator"), "Waiting on the operator")
 }
+
+// #7794: the orchestrator's check lists a question that has waited longer than the team's reminder time, once per member still owing: "Asked by Lead, waiting on Dev, 20 min".
+func TestCheckListsOpenAsksOlderThanTheReminderTime(t *testing.T) {
+	h := newCheckHarness(t)
+	ctx := context.Background()
+	h.member("Orchestrator", "Orchestrator", 1, 0)
+	h.member("Lead", "Lead Developer", 2, 0)
+	h.member("Dev", "Developer", 3, 0)
+	q, err := h.s.PostMessage(ctx, "team", "Lead", "@Dev which parser do we keep?", nil)
+	require.NoError(t, err)
+	require.NoError(t, h.s.RecordAsk(ctx, "team", q, []string{"Dev"}))
+
+	assert.NotContains(t, h.checkTo("Orchestrator"), "Asked by", "a new question is not yet a problem")
+	h.now = h.now.Add(20 * time.Minute)
+	out := h.checkTo("Orchestrator")
+	assert.Regexp(t, `Asked by Lead, waiting on Dev, 2[01] min`, out)
+	assert.Contains(t, out, fmt.Sprintf("(message #%d)", q.ID))
+	assert.Contains(t, out, "which parser do we keep?", "what was asked, quoted")
+
+	_, err = h.s.PostMessage(ctx, "team", "Dev", "@Lead the old one", nil)
+	require.NoError(t, err)
+	h.now = h.now.Add(10 * time.Minute)
+	assert.NotContains(t, h.checkTo("Orchestrator"), "Asked by", "an answered question is off the list")
+}

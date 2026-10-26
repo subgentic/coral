@@ -67,5 +67,5 @@ func (s *Store) ListTaskReplies(ctx context.Context, project string, taskID int6
 	err := s.reader().SelectContext(ctx, &messages, listMessagesSelect+`
 	 WHERE m.project = ? AND m.task_id = ?
 	 ORDER BY m.id ASC LIMIT ?`, project, taskID, limit)
-	return messages, err
+	return s.withAsks(ctx, project, messages, err)
 }

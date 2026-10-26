@@ -94,6 +94,7 @@ const (
 	ruleClaimNudge     = "claim-nudge"
 	ruleStatusNudge    = "status-nudge"
 	ruleMentionRenudge = "mention-renudge"
+	ruleAskReminder    = "ask-reminder"
 )
 
 func claimNudgeText(id int64) string {
@@ -126,8 +127,12 @@ func (h *HealthNudges) RunOnce(ctx context.Context) {
 		bySession[naming.SessionName(a.AgentType, a.SessionID)] = a
 	}
 	for _, p := range projects {
-		if hs := h.store.GetHealthSettings(ctx, p.Project); hs.On {
+		hs := h.store.GetHealthSettings(ctx, p.Project)
+		if hs.On {
 			h.runProject(ctx, p.Project, bySession, hs)
+		}
+		if hs.AskReminder.On {
+			h.remindAsks(ctx, p.Project, bySession, hs) // a question's reminder does not wait for the team's check to be on (#7794)
 		}
 	}
 }
@@ -395,5 +400,56 @@ func (h *HealthNudges) renudgeMentions(ctx context.Context, project, orch string
 			h.store.RecordHealthAction(ctx, project, ruleMentionRenudge+"-msg", fmt.Sprint(id), now)
 		}
 		*renudged = append(*renudged, teamhealth.Name(sender))
+	}
+}
+
+// askReminderText is the one reminder a member gets for a question: who asked, how long ago, what, and how to answer it so it is seen as an answer.
+func askReminderText(asker string, minutes int, id int64, text string) string {
+	return fmt.Sprintf("[Coral] %s asked you a question %d min ago and has no answer from you yet (message #%d): \"%s\". Answer with: coral-board post --reply-to %d \"...\"",
+		teamhealth.Name(asker), minutes, id, teamhealth.StoredText(text, nil), id)
+}
+
+// remindAsks reminds each member who still owes an answer to a question (post --ask) asked at least AfterMin ago, once per question and member (#7794). The reminder is delivered as any
+// health nudge is: typed into the agent's terminal at once, or not at all while a prompt or a draft is there (the question stays open and a later run tries again).
+func (h *HealthNudges) remindAsks(ctx context.Context, project string, bySession map[string]AgentInfo, hs board.HealthSettings) {
+	now := h.now()
+	open, err := h.store.OpenAsks(ctx, project, now)
+	if err != nil || len(open) == 0 {
+		return
+	}
+	subs, err := h.store.ListSubscribers(ctx, project)
+	if err != nil {
+		return
+	}
+	r := &healthRun{h: h, project: project, hs: hs, now: now}
+	after := healthMinutes(hs.AskReminder.AfterMin)
+	for _, o := range open {
+		if now.Sub(o.At) < after {
+			continue
+		}
+		key := fmt.Sprintf("%d|%s", o.MessageID, strings.ToLower(o.Member))
+		if done, _ := h.store.HealthActionTaken(ctx, project, ruleAskReminder+"-msg", key); done {
+			continue // reminded once already
+		}
+		var sub *board.Subscriber
+		for i := range subs {
+			if board.SameIdentity(subs[i].SubscriberID, o.Member) {
+				sub = &subs[i]
+			}
+		}
+		if sub == nil {
+			continue
+		}
+		a, live := bySession[sub.SessionName]
+		if !live {
+			continue
+		}
+		if !r.take(ctx, ruleAskReminder, o.Member, time.Minute) {
+			continue
+		}
+		if h.deliver(ctx, a, "health-ask:"+project, askReminderText(o.Asker, int(now.Sub(o.At).Minutes()), o.MessageID, o.Content)) != nil {
+			continue
+		}
+		_ = h.store.RecordHealthAction(ctx, project, ruleAskReminder+"-msg", key, now)
 	}
 }
