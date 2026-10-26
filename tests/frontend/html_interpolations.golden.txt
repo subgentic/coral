@@ -278,7 +278,6 @@
 1	registered_server_view.js	m.cls
 1	registered_server_view.js	online
 1	registered_server_view.js	statusPill(status)
-1	registered_server_view.js	switchRow({ label: 'Allow private network address', name: 'allow_private', checked: cur.allow_private, labelCl
 1	registered_server_view.js	title
 1	registered_server_view.js	value
 1	registered_server_view.js	warningHtml(s.warning)

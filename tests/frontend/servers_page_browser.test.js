@@ -77,7 +77,7 @@ const SERVERS = [
             await waitFor(`!!document.getElementById('servers-page-name') && !document.querySelector('[data-action=test][disabled]')`, 'back on the page after the test');
             await ev(`document.querySelector('.servers-page [data-action=edit]').click(); true`);
             await waitFor(`!!document.getElementById('servers-form') && !!document.getElementById('servers-back')`, 'the edit form on the page');
-            await ev(`document.querySelector('#servers-form [data-action=cancel-form]').click(); true`);
+            await ev(`[...document.querySelectorAll('#servers-form .sv-bar .btn')].find(b => b.textContent.trim() === 'Cancel').click(); true`);
             await waitFor(`!!document.getElementById('servers-page-name') && !document.getElementById('servers-form')`, 'the page again');
             ok(at + 'Test stays on the page; Edit is the form in the page, Cancel returns to the page');
 

@@ -11,7 +11,7 @@ import { rememberFocus } from './dom_morph.js';
 import { importOnce } from './import_once.js';
 import { state } from './state.js';
 import { showToast } from './utils.js';
-import { switchRow } from './switch_row.js';
+import { mountSettingsView } from './settings_view.js'; // the add and edit form (a startup module)
 import {
     statusMeta, escHtml, describeServerError, formatLastSeen, isValidServerId,
     serverVersion, serverAgentCount, updateBadgeHtml, belowMinimumText,
@@ -35,7 +35,7 @@ let load;
 export const serverView = {
     async mount(el, refresh) {
         load = refresh;
-        if (_host !== el) { el.addEventListener('click', onClick); el.addEventListener('submit', onSubmit); }
+        if (_host !== el) el.addEventListener('click', onClick);
         _host = el;
         DT ||= await importOnce('./data_table.js'); _dt ||= DT.tableState();
         _editing = null; _draft = null; _confirmDelete = null; _formError = ''; _loadError = ''; _open = null;
@@ -172,29 +172,36 @@ function formHtml() {
     const adding = _editing === '';
     const cur = { ...(adding ? {} : (_servers.find(s => s.id === _editing) || {})), ...(_draft || {}) };
     const title = adding ? 'Add server' : `Edit ${escHtml(cur.label || cur.id || '')}`;
-    const busy = _busy.has('*');
-    return `<form class="servers-form" id="servers-form" autocomplete="off" novalidate>
+    return `<div class="servers-form" id="servers-form">
         <h4>${title}</h4>
-        ${_formError ? `<div class="servers-form-error" role="alert">${escHtml(_formError)}</div>` : ''}
-        <label><span id="servers-id-t">Server id</span>
-            <input type="text" name="id" value="${escHtml(cur.id || '')}" ${adding ? '' : 'disabled'} placeholder="workstation" maxlength="32" pattern="[a-z0-9-]{1,32}" required aria-labelledby="servers-id-t" aria-describedby="servers-id-d">
-            <span class="servers-help" id="servers-id-d">Lowercase letters, digits and dashes. Cannot be changed later.</span></label>
-        <label>Display name
-            <input type="text" name="label" value="${escHtml(cur.label || '')}" placeholder="Workstation"></label>
-        <label><span id="servers-url-t">URL</span>
-            <input type="url" name="url" value="${escHtml(cur.url || '')}" placeholder="https://coral.example.com:8420" required aria-labelledby="servers-url-t"${_urlError ? ' aria-invalid="true" aria-describedby="servers-url-d servers-url-error"' : ' aria-describedby="servers-url-d"'}>
-            <span class="servers-help" id="servers-url-d">Scheme, host and port only.</span></label>
-        ${_urlError ? `<div class="servers-url-error" id="servers-url-error" role="alert"><span class="material-icons" aria-hidden="true">error</span><span>${escHtml(_urlError)}</span></div>` : ''}
         ${adding ? '' : warningHtml((_servers.find(x => x.id === _editing) || {}).warning)}
-        <label><span id="servers-key-t">API key</span>
-            <input type="password" name="api_key" value="" autocomplete="new-password" spellcheck="false" placeholder="${adding ? 'Paste the remote server\'s API key' : 'Leave blank to keep the current key'}" ${adding ? 'required' : ''} aria-labelledby="servers-key-t" aria-describedby="servers-key-d">
-            <span class="servers-help" id="servers-key-d">Write-only. The key is stored encrypted and is never shown again.</span></label>
-        ${switchRow({ label: 'Allow private network address', name: 'allow_private', checked: cur.allow_private, labelClass: 'servers-check', labelId: 'servers-private-t', desc: 'Only tick this for a server on your LAN, tailnet or localhost that you trust. It lets this hub connect to private and reserved addresses, which is normally blocked to prevent requests being steered at internal services.', descId: 'servers-private-d', descClass: 'servers-help servers-warning', descInside: true })}
-        <div class="servers-form-actions">
-            <button type="button" class="btn" data-action="cancel-form"${busy ? ' disabled' : ''}>Cancel</button>
-            <button type="submit" class="btn btn-primary"${busy ? ' disabled aria-busy="true"' : ''}>${busy ? 'Checking connection...' : (adding ? 'Add server' : 'Save')}</button>
-        </div>
-    </form>`;
+        <div id="servers-form-host"></div>
+    </div>`;
+}
+
+let _formView = null;     // the add and edit form (settings_view in form mode), drawn into the page after each render of it
+
+/** The form of the page being drawn (settings_view in form mode): the id, the name, the URL, the write-only key and the private-address switch. */
+function mountServerForm(host) {
+    const adding = _editing === '';
+    const cur = { ...(adding ? {} : (_servers.find(s => s.id === _editing) || {})), ...(_draft || {}) };
+    const fields = [
+        { key: 'id', type: 'text', id: 'servers-id', label: 'Server id', required: adding, requiredMessage: 'Enter the server id.', readOnly: !adding, placeholder: 'workstation', help: 'Lowercase letters, digits and dashes. Cannot be changed later.',
+            validate: v => (adding && !isValidServerId(String(v || '').trim()) ? 'Server id must be 1 to 32 lowercase letters, digits or dashes, and cannot be "local".' : ''), messageAsIs: true, attrs: { maxlength: '32' } },
+        { key: 'label', type: 'text', id: 'servers-label', label: 'Display name', placeholder: 'Workstation' },
+        { key: 'url', type: 'text', id: 'servers-url', label: 'URL', required: adding, requiredMessage: 'Enter the server URL.', placeholder: 'https://coral.example.com:8420', help: 'Scheme, host and port only.', setup: e => e.setAttribute('type', 'url') },
+        { key: 'api_key', type: 'secret', id: 'servers-key', label: 'API key', required: adding, requiredMessage: "Enter the remote server's API key.", messageAsIs: true,
+            placeholder: adding ? "Paste the remote server's API key" : 'Leave blank to keep the current key', help: 'Write-only. The key is stored encrypted and is never shown again.', setup: e => e.setAttribute('autocomplete', 'new-password') },
+        { key: 'allow_private', type: 'toggle', id: 'servers-private', label: 'Allow private network address', default: false,
+            help: { text: 'Only for a server on your LAN, tailnet or localhost that you trust.', more: 'It lets this hub connect to private and reserved addresses, which is normally refused. Leave it off for a server on the public internet.' } },
+    ];
+    _formView = mountSettingsView(host, { mode: 'form', fields, words: { busy: 'Checking connection...', failed: '' },
+        form: { submit: adding ? 'Add server' : 'Save', cancel: 'Cancel', onSubmit: submitServerForm, onCancel: () => { _editing = null; _formError = ''; _urlError = ''; _draft = null; render(); } } });
+    for (const k of ['id', 'label', 'url']) if (cur[k] !== undefined) _formView.set(k, cur[k]);
+    _formView.set('allow_private', !!cur.allow_private);
+    if (_urlError) _formView.error('url', _urlError);
+    if (_formError) _formView.say(_formError, true);
+    _formView.focus(_urlError ? 'url' : adding ? 'id' : 'label');
 }
 
 function render() {
@@ -241,11 +248,7 @@ function render() {
         const el = where === 'back' ? document.getElementById('servers-back') : (m.querySelector(`.dt-row[data-key="${CSS.escape(where)}"] [data-action="open"]`) || m.querySelector('.dt-table'));
         if (el) el.focus();
     }
-    if (_editing !== null) {
-        const f = m.querySelector('#servers-form');
-        const target = f && (_urlError ? f.elements.url : f.elements[_editing === '' ? 'id' : 'label']);
-        if (target) target.focus();
-    }
+    if (_editing !== null) { const host = m.querySelector('#servers-form-host'); if (host) mountServerForm(host); }
 }
 
 function setBusy(id, on) { if (on) _busy.add(id); else _busy.delete(id); }
@@ -298,38 +301,30 @@ async function doDelete(id) {
     await load();
 }
 
-async function onSubmit(e) {
-    e.preventDefault();
-    const f = e.target;
-    // Not f.id: the form has an input named "id" that shadows the property.
-    if (!f || !f.matches || !f.matches('#servers-form')) return;
+async function submitServerForm(values) {
     const adding = _editing === '';
-    const val = n => (f.elements[n] ? f.elements[n].value : '');
     const body = {};
-    const id = val('id').trim();
-    const url = val('url').trim();
-    const label = val('label').trim();
-    const key = val('api_key');
+    const id = String(values.id || '').trim();
+    const url = String(values.url || '').trim();
+    const label = String(values.label || '').trim();
+    const key = String(values.api_key || '');
+    const allowPrivate = !!values.allow_private;
     if (adding) {
-        if (!isValidServerId(id)) { _formError = 'Server id must be 1 to 32 lowercase letters, digits or dashes, and cannot be "local".'; return render(); }
-        if (!url) { _formError = 'Enter the server URL.'; return render(); }
-        if (!key.trim()) { _formError = 'Enter the remote server\'s API key.'; return render(); }
         body.id = id; body.url = url; body.api_key = key;
         if (label) body.label = label;
-        body.allow_private = !!f.elements.allow_private.checked;
+        body.allow_private = allowPrivate;
     } else {
         const cur = _servers.find(s => s.id === _editing) || {};
         if (label && label !== cur.label) body.label = label;
         if (url && url !== cur.url) body.url = url;
         if (key.trim()) body.api_key = key;       // blank = keep the stored key
-        const ap = !!f.elements.allow_private.checked;
-        if (ap !== !!cur.allow_private) body.allow_private = ap;
-        if (!Object.keys(body).length) { _editing = null; return render(); }
+        if (allowPrivate !== !!cur.allow_private) body.allow_private = allowPrivate;
+        if (!Object.keys(body).length) { _editing = null; render(); return; }
     }
-    _draft = { id, label, url, allow_private: !!f.elements.allow_private.checked };
-    // Drop the key from the DOM immediately; it only lives in `body` for this request.
-    if (f.elements.api_key) f.elements.api_key.value = '';
+    _draft = { id, label, url, allow_private: allowPrivate };
+    _formView.set('api_key', ''); // drop the key from the DOM at once; it only lives in `body` for this request
     setBusy('*', true); _formError = ''; _urlError = '';
+    let failure = '';
     try {
         const resp = await fetch(adding ? '/api/servers' : `/api/servers/${encodeURIComponent(_editing)}`, {
             method: adding ? 'POST' : 'PATCH',
@@ -339,16 +334,18 @@ async function onSubmit(e) {
         const data = await readBody(resp);
         if (!resp.ok) {
             const message = describeServerError(resp.status, data);
-            if (resp.status === 400 && /\burl\b/i.test(data && data.error || '')) _urlError = message; else _formError = message;
+            if (resp.status === 400 && /\burl\b/i.test(data && data.error || '')) { _urlError = message; _formView.error('url', message); _formView.focus('url'); }
+            failure = message;
         } else {
             _editing = null; _draft = null;
             showToast(adding ? 'Server added' : 'Server updated');
         }
     } catch {
-        _formError = 'Could not reach the hub. Try again.';
+        failure = 'Could not reach the hub. Try again.';
     }
     body.api_key = undefined;
     setBusy('*', false);
-    if (_editing === null) await load(); else render();
+    if (failure) { _formError = failure; throw new Error(failure); } // said on the line beside the buttons
+    await load();
 }
 
