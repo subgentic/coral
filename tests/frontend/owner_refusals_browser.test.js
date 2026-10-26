@@ -85,20 +85,20 @@ const CASES = [
         for (const [c, key] of [CASES[1], CASES[2], CASES[3], CASES[7], CASES[9], CASES[12], CASES[13]]) {
             await fresh(); await openTeam({ put: c });
             await ev(`document.querySelector('#team-settings-workspace .settings-tab[data-section=health]').click(); true`);
-            await ev(`(() => { const f = document.querySelector('#team-settings-health form'); const on = f.elements.on; on.checked = !on.checked; on.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
-            await ev(`document.querySelector('#team-settings-health form [type=submit]').click(); true`);
-            await waitFor(`document.querySelector('#team-settings-health .health-state').classList.contains('health-error')`, 'the refusal', 6000);
-            const t = await ev(`document.querySelector('#team-settings-health .health-state').textContent.trim()`);
-            check(`health save refused ${c.status} ${c.code || ''}: "${t}"`, t.startsWith('Could not save the health check. ') && (key === 'unavailable' ? t.endsWith('Unavailable') : SENTENCE[key].test(t)) && !t.includes(LEAK) && !(await ev(`document.querySelector('#team-settings-health form [type=submit]').disabled`)));
+            await ev(`(() => { const on = document.querySelector('#team-settings-health [name=on]'); on.checked = !on.checked; on.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+            await ev(`document.querySelector('#team-settings-workspace .sv-save').click(); true`);
+            await waitFor(`document.querySelector('#team-settings-workspace .sv-status').classList.contains('is-error')`, 'the refusal', 6000);
+            const t = await ev(`document.querySelector('#team-settings-workspace .sv-status').textContent.trim()`);
+            check(`health save refused ${c.status} ${c.code || ''}: "${t}"`, t.startsWith('Could not save: ') && (key === 'unavailable' ? t.endsWith('Unavailable') : SENTENCE[key].test(t)) && !t.includes(LEAK) && !(await ev(`document.querySelector('#team-settings-workspace .sv-save').disabled`)));
         }
         { // this computer's own validation message on a 400 is still shown (UI/UX on #5323: it tells the person which reviewer is wrong)
             await fresh(); await openTeam({ put: { status: 400, message: 'Bob is not a member of this team' } });
             await ev(`document.querySelector('#team-settings-workspace .settings-tab[data-section=health]').click(); true`);
-            await ev(`(() => { const f = document.querySelector('#team-settings-health form'); const on = f.elements.on; on.checked = !on.checked; on.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
-            await ev(`document.querySelector('#team-settings-health form [type=submit]').click(); true`);
-            await waitFor(`document.querySelector('#team-settings-health .health-state').classList.contains('health-error')`, 'the validation message', 6000);
-            const t = await ev(`document.querySelector('#team-settings-health .health-state').textContent.trim()`);
-            check(`a 400 with this computer's plain message keeps it: "${t}"`, t === 'Could not save the health check. Bob is not a member of this team');
+            await ev(`(() => { const on = document.querySelector('#team-settings-health [name=on]'); on.checked = !on.checked; on.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+            await ev(`document.querySelector('#team-settings-workspace .sv-save').click(); true`);
+            await waitFor(`document.querySelector('#team-settings-workspace .sv-status').classList.contains('is-error')`, 'the validation message', 6000);
+            const t = await ev(`document.querySelector('#team-settings-workspace .sv-status').textContent.trim()`);
+            check(`a 400 with this computer's plain message keeps it: "${t}"`, t === 'Could not save: Bob is not a member of this team');
         }
         const failed = results.filter(r => !r).length;
         console.log(`${results.length - failed} of ${results.length} checks passed`);

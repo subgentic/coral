@@ -58,54 +58,6 @@ const EXPECTED = {
     "w": 834,
     "weight": "600"
   },
-  "health advanced | coarse | closed": {
-    "color": "rgb(240, 240, 242)",
-    "cursor": "pointer",
-    "display": "flex",
-    "h": 44,
-    "margin": "0px 0px 0px 0px",
-    "minHeight": "44px",
-    "padding": "4px 8px 4px 0px",
-    "size": "13px",
-    "w": 198,
-    "weight": "600"
-  },
-  "health advanced | coarse | open": {
-    "color": "rgb(240, 240, 242)",
-    "cursor": "pointer",
-    "display": "flex",
-    "h": 44,
-    "margin": "0px 0px 10px 0px",
-    "minHeight": "44px",
-    "padding": "4px 8px 4px 0px",
-    "size": "13px",
-    "w": 198,
-    "weight": "600"
-  },
-  "health advanced | fine | closed": {
-    "color": "rgb(240, 240, 242)",
-    "cursor": "pointer",
-    "display": "list-item",
-    "h": 24,
-    "margin": "0px 0px 0px 0px",
-    "minHeight": "0px",
-    "padding": "4px 8px 4px 0px",
-    "size": "13px",
-    "w": 199,
-    "weight": "600"
-  },
-  "health advanced | fine | open": {
-    "color": "rgb(240, 240, 242)",
-    "cursor": "pointer",
-    "display": "list-item",
-    "h": 24,
-    "margin": "0px 0px 10px 0px",
-    "minHeight": "0px",
-    "padding": "4px 8px 4px 0px",
-    "size": "13px",
-    "w": 199,
-    "weight": "600"
-  },
   "prompt text | coarse | closed": {
     "color": "rgb(160, 160, 168)",
     "cursor": "pointer",
@@ -176,7 +128,6 @@ const EXPECTED = {
         const SUMMARIES = {
             'edit presets': { tab: 'workflow', sel: '.preset-editor > summary', det: '.preset-editor' },
             'prompt text': { tab: 'prompts', sel: '.prompt-inspection-folded > summary', det: '.prompt-inspection-folded' },
-            'health advanced': { tab: 'health', sel: '.health-advanced > summary', det: '.health-advanced' },
         };
         for (const [coarse] of [[false], [true]]) {
             await Emulation.setTouchEmulationEnabled({ enabled: coarse });

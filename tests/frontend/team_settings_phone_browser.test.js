@@ -50,7 +50,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         };
         const insideScreen = (r, what) => assert.ok(r && r.w > 0 && r.h > 0 && r.l >= 0 && r.r <= 390.5 && r.t >= 0 && r.b <= 844.5, `${what} is on the screen: ` + JSON.stringify(r));
         const reach = async theme => {
-            await waitFor(`!!document.querySelector('#team-settings-workspace #team-settings-health form')`, 'the Health check section', 15000);
+            await waitFor(`!!document.querySelector('#team-settings-workspace #team-settings-health [name=on]')`, 'the Health check section', 15000);
             await settle(300);
             insideScreen(await rect('#team-settings-workspace'), `${theme}: the Team settings page`);
             // the main Settings' groups (#7663): on a phone a selector at the top (44 px) opens one group's pane at a time; each heading is on the screen, and nothing scrolls sideways

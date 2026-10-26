@@ -2,13 +2,15 @@
 // shapes it saves, the presets editor, the Health check and Messaging parts (their own forms and Saves, held by the bar) and the read-only prompt preview.
 import { importOnce } from './import_once.js';
 import { escapeHtml, copyText, showToast } from './utils.js';
-import { splitKey, serverUrl, isCloud } from './server_base.js';
+import { splitKey, serverUrl, isCloud, boardFetch } from './server_base.js';
 import { rebaseChanges } from './settings_diff.js';
 const { mountSettingsView } = await importOnce('./settings_view.js');
 const { boardRenameControl } = await importOnce('./board_rename.js');
 const { bindInfo } = await importOnce('./info_toggle.js');
 const { refusalOf, answeredLocally } = await importOnce('./owner_refusal.js');
 const { requireGoalSentence } = await importOnce('./task_goals.js');
+const { healthFields, healthToValues, saveHealth, HEALTH_KEYS } = await importOnce('./team_health_fields.js');
+const { HEALTH_DEFAULTS } = await importOnce('./team_health_settings.js');
 const { jsonError, presetNameText, presetInstructionsText, presetLabel, renderInspection } = await importOnce('./team_working_mode.js');
 
 let _lastSection = 'workflow'; // the group the tab shows, kept when the page is drawn again (Cancel)
@@ -41,12 +43,21 @@ export async function showTeamSettingsPage(team, options = {}) {
     const presetsURL = serverUrl(`/api/board/${board}/working-mode/presets`, teamServer);
     const boardSettingsURL = serverUrl(`/api/board/${board}/settings`, teamServer);
     const inspectionURL = serverUrl(`/api/settings/prompt-inspection?board=${board}`, teamServer);
-    let presets = [], workingMode = null, healthMonitorOn = true, healthApi = null, crossApi = null, view = null;
+    let presets = [], workingMode = null, healthMonitorOn = true, healthBase = null, crossApi = null, view = null;
 
     // One read of everything the tab shows, started now: the mode list and the load both wait for it.
     const dataReady = Promise.all([fetch(workingModeURL), fetch(presetsURL), fetch('/api/settings'), fetch(inspectionURL), fetch(boardSettingsURL).catch(() => null)]);
     dataReady.catch(() => {});
 
+    // The recipient list: the team's active members (just the default and the saved name when the list cannot be read).
+    const membersReady = boardFetch(team, '/subscribers').then(async r => (r.ok ? (await r.json()).filter(m => m.is_active !== 0) : [])).catch(() => []);
+    // Reset to defaults: every health field takes the default and the bar says to save (the held-delivery rule only when the server has it).
+    function resetHealth(v) {
+        const d = { ...HEALTH_DEFAULTS }; if (!healthBase || !healthBase.held_notice) delete d.held_notice;
+        for (const [k, val] of Object.entries(healthToValues(d))) v.set(k, val);
+        v.say('The defaults are filled in. Save to apply them.');
+        q('input[name="on"]')?.focus();
+    }
     const modeOptions = () => (presets.length ? presets.map(p => ({ value: p.id, label: presetNameText(p) })) : DEFAULT_MODES);
     const modeSelect = () => view.host.querySelector('select[name="mode"]');
     const q = sel => view.host.querySelector(sel);
@@ -64,7 +75,7 @@ export async function showTeamSettingsPage(team, options = {}) {
             const h = host.querySelector('.settings-pane:not([hidden]) .settings-pane-title'); if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); } // the button that had the focus is gone: it goes to the open group's heading
         } },
         readOnly: key => (key === 'require_goal' && !answeredLocally(team) ? true : false), // only this computer changes it (the route refuses it through Coral Hub)
-        parts: () => [healthApi && { dirty: () => healthApi.dirty(), save: () => healthApi.save() }, crossApi && { dirty: () => crossApi.dirty(), save: () => crossApi.save() }],
+        parts: () => [crossApi && { dirty: () => crossApi.dirty(), save: () => crossApi.save() }],
         groups: [
             { id: 'workflow', label: 'Workflow', icon: 'account_tree', hint: 'How agents work on this team.', fields: [
                 { key: 'board_name', type: 'custom', label: 'Board name', help: 'Only the label changes: its agents, tasks and history stay.',
@@ -77,7 +88,7 @@ export async function showTeamSettingsPage(team, options = {}) {
                 { key: 'custom_instructions', type: 'textarea', label: 'Additional instructions', help: 'Team-specific conventions, given to agents with each task.', wide: true, rows: 4, placeholder: 'Team-specific conventions' },
                 { key: 'presets', type: 'custom', label: 'Presets', help: 'A preset saves with Save preset, not Save settings.', wide: true, render: slot => { slot.innerHTML = PRESET_EDITOR; } },
             ] },
-            { id: 'health', label: 'Health check', icon: 'notifications', hint: 'When an agent that stopped working is noticed.', render: p => { p.innerHTML = '<div id="team-settings-health"><p class="sv-help ct-loading" role="status">Loading\u2026</p></div>'; } },
+            { id: 'health', domId: 'team-settings-health', label: 'Health check', icon: 'notifications', hint: 'When an agent that stopped working is noticed.', fields: healthFields({ members: () => membersReady, hasHeld: () => Boolean(healthBase && healthBase.held_notice), monitorOff: () => !healthMonitorOn, onReset: resetHealth, openSettings: () => window.showSettingsModal?.('agents') }) },
             { id: 'messaging', label: 'Messaging', icon: 'chat', hint: 'How the team\'s messages reach its agents.', render: p => { p.innerHTML = '<div id="team-settings-messaging"><p class="sv-help ct-loading" role="status">Loading\u2026</p></div>'; } },
             { id: 'prompts', label: 'Prompts', icon: 'description', hint: 'Read-only preview of the prompts agents get.', render: p => { p.innerHTML = '<div class="prompt-inspection-content" aria-live="polite">Loading prompt inspection\u2026</div>'; } },
         ],
@@ -93,7 +104,7 @@ export async function showTeamSettingsPage(team, options = {}) {
             let boardSettings = null;
             if (boardSettingsResponse?.ok) {
                 boardSettings = await boardSettingsResponse.json();
-                if (boardSettings.health && typeof boardSettings.health === 'object') await addHealth(boardSettings.health).catch(() => {}); else view.removeGroup('health'); // only when the settings GET returned a "health" object: not through Coral Hub
+                if (boardSettings.health && typeof boardSettings.health === 'object') healthBase = JSON.parse(JSON.stringify(boardSettings.health)); else view.removeGroup('health'); // only when the settings GET returned a "health" object: not through Coral Hub
                 let crossTeam = null;
                 { // the machine's own answer; through Coral Hub the route may not be served (then null and the switches stay as they were)
                     const stateResponse = await fetch(serverUrl(`/api/board/${board}/cross-team-state`, teamServer)).catch(() => null);
@@ -106,13 +117,13 @@ export async function showTeamSettingsPage(team, options = {}) {
                 await fillMessaging({ refusal: boardSettingsResponse ? await refusalOf(boardSettingsResponse, answeredLocally(team)) : '' });
             }
             q('.prompt-inspection-content').innerHTML = inspectionResponse.ok ? renderInspection(await inspectionResponse.json(), workingMode) : `<p class="sv-help">Prompt inspection: ${escapeHtml(await refusalOf(inspectionResponse, answeredLocally(team)))}</p>`;
-            return { mode: workingMode.mode || 'none', dependency_guidance: Boolean(workingMode.dependency_guidance), custom_instructions: workingMode.custom_instructions || '', require_goal: Boolean(boardSettings?.require_goal) };
+            return { mode: workingMode.mode || 'none', dependency_guidance: Boolean(workingMode.dependency_guidance), custom_instructions: workingMode.custom_instructions || '', require_goal: Boolean(boardSettings?.require_goal), ...(healthBase ? healthToValues(healthBase) : {}) };
         },
         // What changed since the page loaded (the working mode is saved whole: what the server has now, with only the fields changed here, #4423).
         save: async (changes, { before, values }) => {
             const modeChanged = MODE_KEYS.some(k => k in changes);
             const pick = o => Object.fromEntries(MODE_KEYS.map(k => [k, o[k]]));
-            const saved = []; let failure = '';
+            const saved = []; const failures = [];
             if (modeChanged) {
                 try {
                     const current = await fetch(workingModeURL);
@@ -120,21 +131,30 @@ export async function showTeamSettingsPage(team, options = {}) {
                     const fresh = await current.json();
                     const body = rebaseChanges(pick(before), pick(values), { mode: fresh.mode || 'none', dependency_guidance: Boolean(fresh.dependency_guidance), custom_instructions: fresh.custom_instructions || '' });
                     const response = await fetch(workingModeURL, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-                    if (!response.ok) failure = await jsonError(response, 'Could not save working mode.');
+                    if (!response.ok) failures.push(await jsonError(response, 'Could not save working mode.'));
                     else { workingMode = await response.json(); saved.push(...MODE_KEYS); }
-                } catch (error) { failure = error.message; }
+                } catch (error) { failures.push(error.message); }
             }
             if ('require_goal' in changes) {
                 try {
                     const response = await fetch(boardSettingsURL, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Operator', require_goal: values.require_goal }) });
-                    if (!response.ok) failure = await jsonError(response, 'Could not save require a goal.');
+                    if (!response.ok) failures.push(await jsonError(response, 'Could not save require a goal.'));
                     else saved.push('require_goal');
-                } catch (error) { failure = error.message; }
+                } catch (error) { failures.push(error.message); }
             }
-            if (failure) throw Object.assign(new Error(failure), { saved });
-            return { note: modeChanged ? 'Saved. Working mode applies on first claim.' : null };
+            if (HEALTH_KEYS.some(k => k in changes)) {
+                try {
+                    const kept = await saveHealth(team, healthBase, values);
+                    healthBase = JSON.parse(JSON.stringify(kept));
+                    for (const [k, val] of Object.entries(healthToValues(kept))) view.set(k, val); // the server clamps every value: the fields show what it kept
+                    saved.push(...HEALTH_KEYS);
+                } catch (error) { failures.push(error.message); }
+            }
+            if (failures.length) throw Object.assign(new Error(failures[0]), { saved });
+            return { note: modeChanged ? 'Saved. Working mode applies on first claim.' : null, rebase: saved.filter(k => HEALTH_KEYS.includes(k)) };
         },
     });
+    page.view = view; // the page's settings_view (a test reads what changed through it)
     page.hasUnsaved = () => view.isDirty(); // read live by the leave-the-page question (team_working_mode.js)
     view.say('Loading\u2026');
     view.ready.then(() => syncModeDescription()).catch(() => {}); // the line under the list follows the mode the load set
@@ -143,7 +163,7 @@ export async function showTeamSettingsPage(team, options = {}) {
     // -- the Working mode row: the line under it, the docs link in its Learn more --------------------------
     const modeRow = q('.sv-row[data-key="mode"]');
     const modeDesc = document.createElement('p');
-    modeDesc.className = 'sv-help sv-row-note working-mode-desc'; modeDesc.id = 'working-mode-desc';
+    modeDesc.className = 'sv-help sv-row-notice working-mode-desc'; modeDesc.id = 'working-mode-desc';
     modeRow.querySelector('.sv-control').after(modeDesc); // under the select
     modeSelect().setAttribute('aria-describedby', `${modeSelect().getAttribute('aria-describedby') || ''} working-mode-desc`.trim());
     const more = modeRow.querySelector('.sv-more');
@@ -259,29 +279,13 @@ export async function showTeamSettingsPage(team, options = {}) {
     };
 
     // -- the Health check and Messaging groups: their forms, saved by the page's bar ---------------------------
-    async function addHealth(health) {
-        const m = await importOnce('./team_health_settings.js');
-        const slot = q('#team-settings-health');
-        slot.replaceChildren();
-        if (!healthMonitorOn) {
-            const note = document.createElement('p');
-            note.className = 'sv-help health-global-off'; note.setAttribute('role', 'status');
-            note.append('Team health checks are turned off for all of Coral, so this team\'s check will not run. Turn on "Team health checks" in ');
-            const link = document.createElement('button');
-            link.type = 'button'; link.className = 'working-mode-settings-link'; link.textContent = 'Settings';
-            link.addEventListener('click', () => window.showSettingsModal?.('agents'));
-            note.append(link, '. It takes effect after Coral restarts.');
-            slot.before(note);
-        }
-        healthApi = await m.mountHealthSettings(slot, team, health, { embedded: true });
-    }
     async function fillMessaging(info) {
         const slot = q('#team-settings-messaging');
         if (!slot) return;
         const m = await importOnce('./team_cross_team_settings.js');
         crossApi = await m.mountCrossTeamSettings(slot, team, info || {}, { embedded: true });
     }
-    page.addEventListener('health-saved', () => view.refresh()); page.addEventListener('cross-team-saved', () => view.refresh());
+    page.addEventListener('cross-team-saved', () => view.refresh());
 
     // -- the prompt preview: one role at a time, Copy takes the text of the one shown (UI audit #5589, finding 10) ----
     const inspection = q('.prompt-inspection-content');

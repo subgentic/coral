@@ -35,39 +35,39 @@ const TEAM = 'health-bounds-team';
             const lum = bg.match(/\d+/g).slice(0, 3).reduce((a, b) => a + Number(b), 0) / 3;
             assert.equal(theme === 'light', lum > 128, `the ${theme} theme is really on (${bg})`);
             await ev(`document.getElementById('team-settings-workspace')?.remove(); import((window.__coralStatic || '/static/') + 'team_working_mode.js').then(m => m.showTeamWorkingMode(${JSON.stringify(TEAM)}, { page: (document.getElementById('qa-ts-host') || document.body.appendChild(Object.assign(document.createElement('div'), { id: 'qa-ts-host', style: 'position:fixed;inset:0;display:flex;z-index:50;background:var(--bg-primary)' }))) })); true`);
-            await waitFor(`!!document.querySelector('#team-settings-workspace .settings-tab[data-section=health]')`, 'the Health check tab', 15000);
+            await waitFor(`!!document.querySelector('#team-settings-workspace .sv[data-ready]') && !!document.querySelector('#team-settings-workspace .settings-tab[data-section=health]')`, 'the Health check tab', 15000);
             await ev(`document.querySelector('#team-settings-workspace .settings-tab[data-section=health]').click(); true`);
-            await waitFor(`!document.getElementById('team-settings-health').hidden && !!document.querySelector('#team-settings-health form')`, 'the panel', 5000);
+            await waitFor(`!document.getElementById('team-settings-health').hidden && !!document.querySelector('#team-settings-health [name=on]')`, 'the panel', 5000);
 
             // 1. Nothing is clipped by the box it sits in, however deep that box is.
             const clipped = await ev(`(() => {
                 const panel = document.getElementById('team-settings-health');
                 const clipOf = el => { let r = { left: 0, right: innerWidth }; for (let p = el.parentElement; p; p = p.parentElement) { const cs = getComputedStyle(p); if (cs.overflowX !== 'visible') { const b = p.getBoundingClientRect(); r = { left: Math.max(r.left, b.left), right: Math.min(r.right, b.right) }; } } return r; };
-                return [...panel.querySelectorAll('fieldset, .health-rule, label, input, select, button, p, legend')].filter(e => e.getBoundingClientRect().width > 0)
+                return [...panel.querySelectorAll('.sv-row, label, input, select, button, p, h5')].filter(e => e.getBoundingClientRect().width > 0)
                     .filter(e => { const r = e.getBoundingClientRect(), c = clipOf(e); return r.right > c.right + 1 || r.left < c.left - 1; })
                     .map(e => (e.name || e.className.toString() || e.tagName).slice(0, 40) + ' ' + Math.round(e.getBoundingClientRect().right) + '>' + Math.round(clipOf(e).right)); })()`);
             assert.deepEqual(clipped, [], `nothing in the panel is clipped at ${name}: ${JSON.stringify(clipped.slice(0, 6))}`);
 
             // 2. Touch targets: the check rows' labels, the number and text inputs and the select.
-            const small = await ev(`(() => [...document.querySelectorAll('#team-settings-health .health-rule-head, #team-settings-health input[type=number], #team-settings-health input[type=text], #team-settings-health select, #team-settings-health button')]
+            const small = await ev(`(() => [...document.querySelectorAll('#team-settings-health .sv-switch-hit, #team-settings-health input[type=number], #team-settings-health input[type=text], #team-settings-health select, #team-settings-health button')]
                 .filter(e => e.getBoundingClientRect().width > 0).filter(e => { const ps = getComputedStyle(e, '::after'); return !(ps.content !== 'none' && ps.position === 'absolute' && parseFloat(ps.width) >= 43.5 && parseFloat(ps.height) >= 43.5); }) /* the (i) is 24 px with a 44 px ::after target (#6750) */.filter(e => e.getBoundingClientRect().height < 43.5)
                 .map(e => (e.name || e.className.toString() || e.tagName).slice(0, 36) + ' ' + Math.round(e.getBoundingClientRect().height)))()`);
             assert.deepEqual(small, [], `every row and input is at least 44 px tall at ${name}`);
 
             // The unit stays beside its number at 100 percent (it wrapped under the input once, when the input's width was a percentage).
             if (scale === 100) {
-                const wrapped = await ev(`(() => [...document.querySelectorAll('#team-settings-health .health-knob-box')].filter(b => { const i = b.querySelector('input').getBoundingClientRect(); const t = b.lastChild.nodeType === 3 ? b.getBoundingClientRect() : null; return b.getBoundingClientRect().height > i.height + 2; }).map(b => b.textContent.trim()))()`);
+                const wrapped = await ev(`(() => [...document.querySelectorAll('#team-settings-health .sv-control')].filter(b => b.querySelector('input[type=number]')).filter(b => { const i = b.querySelector('input').getBoundingClientRect(); return b.getBoundingClientRect().height > i.height + 2; }).map(b => b.textContent.trim()))()`);
                 assert.deepEqual(wrapped, [], `each unit sits beside its number at ${name}`);
             }
 
             // 3. The reviewers field: a short placeholder, the explanation above it.
-            const rev = await ev(`(() => { const i = document.querySelector('#team-settings-health input[name=default_reviewers]'); return { ph: i.placeholder, hint: i.closest('label').querySelector('.health-limits').textContent }; })()`);
+            const rev = await ev(`(() => { const i = document.querySelector('#team-settings-health input[name=default_reviewers]'); return { ph: i.placeholder, hint: document.getElementById(i.getAttribute('aria-describedby')).textContent }; })()`);
             assert.equal(rev.ph, 'Agent names (up to 8)');
             assert.match(rev.hint, /up to 8/); // the range is the field's description for a screen reader (not drawn); what no reviewers means is behind the (i)
-            assert.match(await ev(`document.getElementById('hr-auto_delegate-w').textContent`), /reviews wait for the orchestrator/);
+            assert.match(await ev(`document.querySelector('#team-settings-health .sv-row[data-key=auto_delegate_on] .sv-help-text').textContent`), /reviews wait for the orchestrator/);
 
             // 4. The explanation scales with the title (the same ratio at 100 and 200 percent).
-            const ratio = await ev(`(() => { const r = document.querySelector('#team-settings-health .health-rule[data-rule=claim_nudge]'); return parseFloat(getComputedStyle(r.querySelector(':scope > .settings-info-text')).fontSize) / parseFloat(getComputedStyle(r.querySelector('.health-rule-head')).fontSize); })()`);
+            const ratio = await ev(`(() => { const r = document.querySelector('#team-settings-health .sv-row[data-key=claim_nudge_on]'); return parseFloat(getComputedStyle(r.querySelector('.sv-help')).fontSize) / parseFloat(getComputedStyle(r.querySelector('.sv-label')).fontSize); })()`);
             assert.ok(ratio > 0.8 && ratio < 1, `the explanation is a little smaller than the title, at every size (${ratio.toFixed(2)} at ${name})`);
             await ev(`document.getElementById('team-settings-workspace')?.remove(); true`);
         }
