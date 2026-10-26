@@ -34,6 +34,11 @@ const { pathToFileURL } = require('node:url');
     assert.deepEqual(m.chips({ ...m.EMPTY, task: '12', goal: '7' }).map(c => c.label), ['Task: #12 Write it', 'Goal: Ship the installer']);
     assert.equal(m.without({ ...m.EMPTY, goal: '7' }, 'goal').goal, ''); m.forgetChoices();
 
+    // Tag (#8594): one of the team's tags, as the server stores it; it is the route's tag parameter and has its chip
+    assert.equal(m.clean({ tag: '  For   Review ' }).tag, 'for review'); assert.equal(m.clean({ tag: 'a'.repeat(25) }).tag, ''); assert.equal(m.clean({ tag: 'no/slash' }).tag, ''); assert.equal(m.clean({ tag: 'ready-2' }).tag, 'ready-2');
+    assert.deepEqual(m.toParams({ ...m.EMPTY, tag: 'for review' }), { tag: 'for review', sort: 'newest' });
+    assert.deepEqual(m.chips({ ...m.EMPTY, tag: 'internal' }).map(c => c.label), ['Tag: internal']); assert.equal(m.isFiltered({ ...m.EMPTY, tag: 'internal' }), true);
+
     // chips and removing them
     assert.deepEqual(m.chips(m.EMPTY), []);
     const f = { ...m.EMPTY, q: 'x', kind: 'pdf', origin: 'unlisted', by: 'Dev', kept: true, from: '2026-10-01', to: '2026-10-02' };

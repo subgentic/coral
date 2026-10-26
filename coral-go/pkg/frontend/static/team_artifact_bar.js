@@ -1,7 +1,7 @@
 /* The Team Artifacts panel's search box, filter menu, sort and chips (#4573): its words, fields and sorts on the shared list bar (list_bar.js, #4744). The server does the work: this only
  * collects what to ask for (team_artifact_filters.js). */
 import { importOnce } from './import_once.js';
-const { EMPTY, KINDS, ORIGINS, SORTS, GROUPS, KIND_LABEL, ORIGIN_LABEL, SORT_LABEL, GROUP_LABEL, clean, chips, isFiltered, without } = await importOnce('./team_artifact_filters.js'); // lazy: its failure is retried
+const { EMPTY, KINDS, ORIGINS, SORTS, GROUPS, TAG_KEY, KIND_LABEL, ORIGIN_LABEL, SORT_LABEL, GROUP_LABEL, clean, chips, isFiltered, without } = await importOnce('./team_artifact_filters.js'); // lazy: its failure is retried
 import { buildListBar } from './list_bar.js';
 
 // The same fields for the team's list and for one agent's list (#5283): only the words and the ids differ, so the two bars (one per panel, both in the page) never share an id.
@@ -26,6 +26,7 @@ const specFor = (personal, page = false) => {
             ...(personal ? [] : [
                 { type: 'select', key: 'group', id: `${idp}-group`, label: 'Group by', values: GROUPS, labels: GROUP_LABEL, any: 'No grouping' },
                 { type: 'select', key: 'task', id: `${idp}-task`, label: 'Task', values: [], labels: {}, any: 'Any task' },
+                { type: 'select', key: TAG_KEY, id: `${idp}-tag`, label: 'Tag', values: [], labels: {}, any: 'Any tag' }, // the team's tags with their counts (bar.setOptions)
                 { type: 'select', key: 'goal', id: `${idp}-goal`, label: 'Goal', values: [], labels: {}, any: 'Any goal' },
             ]),
             { type: 'check', key: 'kept', id: `${idp}-kept`, label: 'Kept only', wrapClass: 'list-bar-field list-bar-kept' },
