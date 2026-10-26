@@ -16,6 +16,7 @@
     --table-head-track: 0.06em;
     --table-head-color: var(--text-muted);
     --table-head-active: var(--text-primary);
+    --table-code-font: var(--font-mono, monospace);
     --table-primary-size: 0.875rem;
     --table-primary-weight: 600;
     --table-primary-color: var(--text-primary);
@@ -74,6 +75,8 @@
 .dt-table tbody tr:last-child td { border-bottom: 0; }
 .dt-table td.dt-grow { width: 45%; max-width: 0; }
 .dt-table td.dt-wrap { white-space: normal; }
+.dt-table td.dt-wrap .dt-chip, .dt-table td.dt-wrap .dt-subtitle { white-space: normal; overflow-wrap: anywhere; }
+.dt-table td.dt-wrap code { font-family: var(--table-code-font); font-size: inherit; white-space: pre-wrap; overflow-wrap: anywhere; }
 .dt-primary { display: inline; max-width: 100%; background: none; border: 0; padding: 0; text-align: left; font: inherit; font-size: var(--table-primary-size); font-weight: var(--table-primary-weight); color: var(--table-primary-color); cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dt-primary:hover { color: var(--accent); text-decoration: underline; }
 .dt-link { background: none; border: 0; padding: 0; font: inherit; color: var(--link-text, var(--accent)); cursor: pointer; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

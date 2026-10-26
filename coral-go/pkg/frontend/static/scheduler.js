@@ -8,7 +8,7 @@ import { pollEvery } from './overload.js';
 import { changedFields, NOTHING_TO_SAVE } from './settings_diff.js';
 import { ensureBuilt } from './lazy_dom.js';
 import { formatDuration as fmtDuration } from './format.js';
-import { runFailure, runFailureTag } from './run_failure.js';
+import { runFailure } from './run_failure.js';
 import { cronWords, atWords, awayWords, whenWords, resultWords, reasonWords, lastWords, limitWords, exitNote, resultLine, runDot } from './job_words.js';
 import { updateJobsSectionCount } from './live_jobs.js';
 import { limitSeconds, limitParts } from './time_limit.js';
@@ -212,15 +212,8 @@ function renderJobDetail(job, runs) {
         ? `Workflow <a href="#" data-on-click="job-workflow" data-workflow-id="${Number(job.workflow_id)}" class="sched-link">${escapeHtml(wfName)}</a>${wf && Array.isArray(wf.steps) ? ` (${wf.steps.length} step${wf.steps.length === 1 ? '' : 's'})` : ''}`
         : `${escapeHtml(AGENT_NAMES[job.agent_type] || job.agent_type || 'Agent')} agent${job.repo_path ? ` in <span class="sched-path">${escapeHtml(job.repo_path)}</span>` : ''}`;
 
-    // Run history: for workflow jobs, show workflow runs; for agent jobs, show scheduled runs
-    let runsHtml = '';
-    if (isWorkflow && job.workflow_runs && job.workflow_runs.length) {
-        runsHtml = renderWorkflowRunsTable(job.workflow_runs);
-    } else if (runs.length) {
-        runsHtml = renderRunsTable(runs);
-    } else {
-        runsHtml = '<p class="runs-empty-line">No runs yet.</p>';
-    }
+    const history = isWorkflow && job.workflow_runs?.length ? job.workflow_runs : runs;
+    const workflowHistory = !!(isWorkflow && job.workflow_runs?.length);
 
     // The failure comes first (#6521): a job that fires on schedule and fails every time otherwise looks fine until the run history is opened.
     const fails = job.consecutive_failures || 0;
@@ -281,7 +274,7 @@ function renderJobDetail(job, runs) {
         </details>
         <div class="sched-runs-section">
             <h3>Runs</h3>
-            ${runsHtml}
+            <div id="sched-run-history"></div>
         </div>
         <div class="item-bar sched-actions">
             <div class="sched-more">
@@ -294,45 +287,41 @@ function renderJobDetail(job, runs) {
             <button class="btn btn-small btn-primary" data-on-click="job-toggle" data-job-id="${Number(job.id)}">${job.enabled ? 'Pause' : 'Enable'}</button>
         </div>
     `;
+    container.querySelector('#sched-run-history').append(renderRunsTable(history, workflowHistory));
     foldWayBack(container, '.sched-back', '.sched-header');
 }
 
 const AGENT_NAMES = { claude: 'Claude', codex: 'Codex', agy: 'Antigravity', antigravity: 'Antigravity', gemini: 'Antigravity', pi: 'Pi' };
 
 function resultCell(r) {
-    const unseen = r.status === 'completed' && r.exit_reason === 'ended_while_coral_was_down'; // done, but Coral did not see the result: neutral like the row's dot, not the green of a pass (#6956)
-    const cls = unseen ? 'status-none' : r.status === 'completed' ? 'status-ok' : r.status === 'failed' || r.status === 'killed' ? 'status-err' : r.status === 'running' ? 'status-running' : '';
-    const line = resultLine(r); // the line under the status where the status words do not already carry it: the exit_reason's sentence, or the server's error for a run that failed to start (#6907, #6956, #7025)
-    return `<span class="sched-status ${cls}">${escapeHtml(resultWords(r))}</span>${runFailureTag(r)}${line ? `<span class="sched-status-note">${escapeHtml(line)}</span>` : ''}`;
+    const unseen = r.status === 'completed' && r.exit_reason === 'ended_while_coral_was_down';
+    const cls = unseen ? '' : r.status === 'completed' ? 'goal-state-task-done' : r.status === 'failed' || r.status === 'killed' ? 'goal-state-task-blocked' : r.status === 'running' ? 'goal-state-task-active' : '';
+    const cell = DT.el('span'), chip = DT.chip(resultWords(r), cls); chip.classList.add('sched-status'); cell.append(chip);
+    const failure = runFailure(r); if (failure) cell.append(' ', DT.tag(`(${failure.short})`));
+    return cell;
 }
 const tookOf = (r) => (r.started_at && r.finished_at ? formatDuration(new Date(r.finished_at) - new Date(r.started_at)) : r.started_at ? 'running...' : '-');
 
-// The runs of a job, one table for both kinds (#6521): when, what came of it in words, how long it took.
-function renderWorkflowRunsTable(runs) {
-    return `<table class="sched-runs-table">
-        <thead><tr><th scope="col">Started</th><th scope="col">Result</th><th scope="col">Duration</th></tr></thead>
-        <tbody>${runs.map(r => `<tr data-on-click="job-run" data-run-id="${Number(r.id)}" style="cursor:pointer">
-                <td><button type="button" class="row-open-btn" data-on-click="job-run" data-run-id="${Number(r.id)}">${escapeHtml(whenWords(r.started_at || r.created_at) || '-')}</button></td>
-                <td>${resultCell(r)}</td>
-                <td>${escapeHtml(tookOf(r))}</td>
-            </tr>`).join('')}</tbody>
-    </table>`;
-}
-
-function renderRunsTable(runs) {
-    return `<table class="sched-runs-table">
-        <thead><tr><th scope="col">Started</th><th scope="col">Result</th><th scope="col">Duration</th></tr></thead>
-        <tbody>${runs.map(r => {
-            const sessionLink = r.session_id
-                ? ` <a href="#" class="run-session-link" title="Open the conversation" data-on-click="job-run-session" data-session-id="${escapeAttr(r.session_id)}">Open the conversation</a>`
-                : '';
-            return `<tr>
-                <td>${escapeHtml(whenWords(r.scheduled_at || r.started_at) || '-')}</td>
-                <td>${resultCell(r)}${sessionLink}</td>
-                <td>${escapeHtml(tookOf(r))}</td>
-            </tr>`;
-        }).join('')}</tbody>
-    </table>`;
+// Both job kinds share the table; workflow runs open their run and agent runs link to their conversation.
+function renderRunsTable(runs, workflowHistory) {
+    const open = r => withId(r.id, id => window.selectWorkflowRun(id));
+    const table = DT.dataTable({ label: 'Job runs', rows: runs, rowKey: r => r.id, bare: true, sortBar: false,
+        open: workflowHistory ? open : undefined, empty: { line: 'No runs yet.' },
+        columns: [
+            { key: 'started', label: 'Started', primary: true, width: 'grow', line: 1, cell: r => {
+                const time = DT.timeCell(workflowHistory ? r.started_at || r.created_at : r.scheduled_at || r.started_at);
+                if (!workflowHistory) return time;
+                const b = DT.primaryButton(time.textContent, `Open run #${r.id}`); b.title = time.title; b.addEventListener('click', () => open(r)); return b;
+            } },
+            { key: 'result', label: 'Result', line: 2, nowrap: false, cell: resultCell, subtitle: resultLine },
+            { key: 'duration', label: 'Duration', line: 2, tone: 'tertiary', cell: tookOf },
+            ...(!workflowHistory ? [{ key: 'conversation', label: 'Conversation', hideLabel: true, line: 2, when: r => !!r.session_id, cell: r => {
+                if (!r.session_id) return '';
+                const b = DT.link('Open the conversation'); b.setAttribute('data-on-click', 'job-run-session'); b.dataset.sessionId = r.session_id; return b;
+            } }] : []),
+        ],
+    });
+    table.el.classList.add('sched-runs-table'); return table.el;
 }
 
 const formatDuration = ms => fmtDuration(ms);
@@ -717,6 +706,5 @@ registerActions({
     'job-delete': el => withId(el.dataset.jobId, deleteScheduledJob),
     'job-more': el => toggleJobMore(el),
     'job-workflow': (el, event) => { event.preventDefault(); withId(el.dataset.workflowId, id => window.selectWorkflow(id)); },
-    'job-run': el => withId(el.dataset.runId, id => window.selectWorkflowRun(id)),
     'job-run-session': (el, event) => { event.preventDefault(); const sid = uuidOf(el.dataset.sessionId); if (sid) window.selectHistorySession(sid); },
 });

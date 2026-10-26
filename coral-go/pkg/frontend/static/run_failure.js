@@ -23,9 +23,3 @@ export function runFailureHtml(rec) {
     const f = runFailure(rec);
     return f ? `<span class="run-failure-text">${escapeHtml(f.text)}.</span> <span class="run-failure-hint">${escapeHtml(f.hint)}</span>` : '';
 }
-
-/** A short tag after a status in a table row ("failed (not signed in)"), or ''. */
-export function runFailureTag(rec) {
-    const f = runFailure(rec);
-    return f ? ` <span class="run-failure-tag">(${escapeHtml(f.short)})</span>` : '';
-}
