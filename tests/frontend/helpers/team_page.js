@@ -63,4 +63,13 @@ async function openTeam(ev, waitFor, team) {
 }
 const goTab = async (ev, settle, name) => { await ev(`(() => { const t = window.__tp.tabs().find(x => window.__tp.tabLabel(x) === ${JSON.stringify(name)}); if (!t) return false; t.click(); return true; })()`); await settle(300); };
 const rect = ev => ev(`(() => { const h = window.__tp.h1(), t = window.__tp.tablist(); return { h1: window.__tp.box(h), tabs: window.__tp.box(t) }; })()`);
-module.exports = { SOURCE, install, TABS, seed, post, openTeam, goTab, rect, scenarios: na.scenarios };
+// The seeded members have no terminal, so the board's status calls them Ended (offline, #8271) and the Agents tab draws no Remind for them. A suite about Remind's place on a row needs them up: the board's /status answer is read
+// as it is, the first offline member made available and the others waiting for input (a team with someone to remind, two statuses and a health icon).
+async function agentsUp(ev) {
+    await ev(`(() => { const R = window.fetch.bind(window); window.fetch = async (u, o = {}) => { const url = new URL(String(u), location.origin); const r = await R(u, o);
+        if (!/^\\/api\\/board\\/[^/]+\\/status$/.test(url.pathname) || !r.ok) return r;
+        const d = await r.clone().json().catch(() => null); if (!d || !Array.isArray(d.agents)) return r;
+        d.agents = d.agents.map((a, i) => (a.availability === 'offline' ? (i === 0 ? { ...a, availability: 'available', available: true, reason: 'Idle' } : { ...a, availability: 'needs_input', available: false, reason: 'Waiting for user input or approval' }) : a));
+        return new Response(JSON.stringify(d), { status: 200, headers: { 'content-type': 'application/json' } }); }; return true; })()`);
+}
+module.exports = { SOURCE, install, TABS, seed, agentsUp, post, openTeam, goTab, rect, scenarios: na.scenarios };

@@ -3,7 +3,7 @@
 // the health icon on the team's row opens this tab. Written failing-first by QA (#7499): by role and accessible name (helpers/team_page.js). Isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
-const { install: installTP, seed, openTeam, goTab, scenarios } = require('./helpers/team_page');
+const { install: installTP, seed, agentsUp, openTeam, goTab, scenarios } = require('./helpers/team_page');
 const BASE = require('./test_base').BASE;
 const { removeBoards } = require('./helpers/board_cleanup');
 
@@ -20,7 +20,7 @@ const TEAM = `qa-agents-${Date.now() % 100000}`;
             console.log(label);
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installTP(ev);
-            await seed(ev, TEAM);
+            await seed(ev, TEAM); await agentsUp(ev);
             if (mobile) await ev(`window.syncMobileAgentList && window.syncMobileAgentList(); true`);
             await openTeam(ev, waitFor, TEAM).catch(() => {});
             await S.run(`${label}: the Agents tab's name carries the count (2) and the tab opens a table with Agent, Status, Doing, Provider, Remind`, async () => {
