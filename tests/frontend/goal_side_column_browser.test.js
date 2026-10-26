@@ -10,7 +10,7 @@ const BASE = require('./test_base').BASE;
     const api = (method, path, body) => ev(`fetch(${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, headers: { 'Content-Type': 'application/json' }, body: ${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'} }).then(async r => ({ status: r.status, body: await r.json().catch(() => null) }))`);
     const B = 'gsc-' + Date.now().toString(36);
     const check = (label, ok, detail) => { console.log(`[${ok ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' — ' + detail : ''}`); if (!ok) process.exitCode = 1; };
-    const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; const fs = require('node:fs'); fs.mkdirSync(d, { recursive: true }); await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); new Promise(r => setTimeout(r, 350))`); /* sleep-ok: a screenshot waits out transitions */ fs.writeFileSync(`${d}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
+    const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR || (process.env.RUNNER_TEMP && require('node:path').join(process.env.RUNNER_TEMP, 'out', 'shots')); if (!d) return; const fs = require('node:fs'); fs.mkdirSync(d, { recursive: true }); await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); new Promise(r => setTimeout(r, 350))`); /* sleep-ok: a screenshot waits out transitions */ fs.writeFileSync(`${d}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const rows = () => ev(`[...document.querySelectorAll('.goal-side .dt-table tbody tr')].map(r => ({ title: r.querySelector('.dt-title-cell').textContent.replace(/^(#\\d+)/, '$1 '), who: (() => { const c = r.querySelector('td[data-key="who"]'), i = c.querySelector('[role=img]'); return i ? i.getAttribute('aria-label') : c.textContent.trim(); })(), circles: r.querySelectorAll('td[data-key="who"] .dt-avatar').length, chip: r.querySelector('.goal-chip').textContent, current: r.getAttribute('aria-current') }))`);
     const openGoal = async (goal, tab = 'goals') => { await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: ${JSON.stringify(tab)}, item: ${goal} }); true`); await waitFor(`!!document.querySelector('.goal-split') && document.querySelectorAll('.dt-primary').length > 0 && document.querySelector('.goal-side').getClientRects().length + document.querySelector('.goal-main').getClientRects().length > 0`, 'the goal page', 15000); };
     try {
@@ -38,6 +38,8 @@ const BASE = require('./test_base').BASE;
         check('Assigned to is the person as one circle, named "Done by dev" (its accessible name and hover text), not the words (#8492)', rs[2].circles === 1 && await ev(`(() => { const i = document.querySelector('.goal-side .dt-table tbody tr:last-child td[data-key="who"] [role=img]'); return !!i && i.title === 'Done by dev' && !i.querySelector('.dt-person-name'); })()`), JSON.stringify(rs[2]));
         check('a done task says who built it, not the orchestrator who completed it ("Done by dev")', rs[2].title === '#' + built + ' Build the column' && rs[2].who === 'Done by dev' && rs[2].chip === 'Done', JSON.stringify(rs[2]));
         check('the title has a gap under its back link', await ev(`(() => { const b = document.querySelector('.goal-main .goals-back').getBoundingClientRect(), t = document.getElementById('goals-detail-title').getBoundingClientRect(); return t.top - b.bottom >= 8; })()`));
+        const compactDesktop = await ev(`[...document.querySelectorAll('.goal-side .dt-row')].map(r => r.getBoundingClientRect().height)`);
+        check('goal Tasks rows are at most 68px', compactDesktop.every(h => h > 0 && h <= 68), JSON.stringify(compactDesktop));
         await shot('goal-column-desktop');
 
         console.log('1b. The column is a right sidebar: flush right, the page height, resized like the dock');
@@ -118,6 +120,8 @@ const BASE = require('./test_base').BASE;
         await waitFor(`!!document.querySelector('.goal-side .dt-box.dt-folded')`, 'the column folds', 5000);
         check('the list is the next screen: the column, a way back to the goal, no main pane; rows are 44 px', await vis('.goal-side-back') && !(await vis('.goal-main')) && await ev(`[...document.querySelectorAll('.goal-side .dt-table tbody tr')].every(b => b.getBoundingClientRect().height >= 43.5)`));
         check('the list screen runs the page\'s whole width', await ev(`(() => { const s = document.querySelector('.goal-side').getBoundingClientRect(), p = document.querySelector('.goal-split').getBoundingClientRect(); return Math.abs(s.width - p.width) <= 1; })()`));
+        const compactPhone = await ev(`[...document.querySelectorAll('.goal-side .dt-row')].map(r => r.getBoundingClientRect().height)`);
+        check('goal Tasks rows are at most 68px', compactPhone.every(h => h > 0 && h <= 68), JSON.stringify(compactPhone));
         await shot('goal-phone-list');
         await ev(`document.querySelector('.dt-primary[data-task-id="${third}"]').click(); true`);
         await waitFor(`!!document.querySelector('#team-panel-item #team-task-title') && document.querySelector('#team-panel-item').getClientRects().length > 0`, 'the canonical task screen');
