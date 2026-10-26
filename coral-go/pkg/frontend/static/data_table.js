@@ -2,6 +2,7 @@
  * is a --table-* token (css/data_table.css) and no surface styles a row, a cell or a header.
  *
  *   dataTable({ label, columns, rows, rowKey, open, current, state, onSort, fold, foldAt, sortBar, bare, empty, footer, selectable, rowName }) -> { el, bar, selectButton, selection(), clear(), state }
+ *   selectable = { contextKey, onChange(keys), actions: [{ label, run(rows, keys, value), danger, confirm, choose: { label, options() -> [{ value, label }] } }] }: a danger action confirms in the bar, a choose action asks for its value there.
  *   Column = { key, label, field | cell(row, ctx), primary, tone: 'primary'|'secondary'|'tertiary', width: 'grow'|'content'|'<n>rem', nowrap, align: 'start'|'end', numeric,
  *              sort: true|'number'|'date'|fn(a, b), sortValue(row), line: 0|1|2, when(row), subtitle(row) }
  *   cell types: chip(word, cls), avatar(name), tag(text), timeCell(stamp), link(text, run), primaryButton(text, label)
@@ -190,28 +191,33 @@ export function dataTable(cfg) {
     function drawBar() {
         const n = st.selected.size;
         bar.hidden = n === 0; bar.replaceChildren();
-        if (!n) { st.confirming = -1; return; }
+        if (!n) { st.confirming = -1; st.choices = null; return; }
         bar.append(el('span', 'dt-bar-count', `${n} selected`));
         const actions = sel.actions || [];
         const chosen = () => rows.filter(r => st.selected.has(keyOf(r)));
         actions.forEach((a, i) => {
-            if (st.confirming === i) return;
-            if (st.confirming >= 0 && st.confirming !== i) return; // while one asks, the others wait
-            const b = button(`btn btn-small dt-bar-action${a.danger ? ' dt-danger' : ''}`, a.label, () => {
+            if (st.confirming >= 0) return; // while one asks, the others wait
+            bar.append(button(`btn btn-small dt-bar-action${a.danger ? ' dt-danger' : ''}`, a.label, async () => {
+                if (a.choose) { st.choices = await a.choose.options(); st.confirming = i; drawBar(); bar.querySelector('.dt-bar-choice')?.focus(); return; } // an action that needs a value (a person, a priority) asks for it here
                 if (a.danger) { st.confirming = i; drawBar(); bar.querySelector('.dt-bar-keep')?.focus(); return; }
                 a.run(chosen(), new Set(st.selected));
-            });
-            bar.append(b);
+            }));
         });
         if (st.confirming >= 0) {
             const a = actions[st.confirming];
-            const ask = el('span', 'dt-bar-confirm', typeof a.confirm === 'function' ? a.confirm(n) : (a.confirm || `${a.label}?`)); ask.setAttribute('role', 'alert');
-            bar.append(ask, button('btn btn-small dt-bar-keep', 'Keep', () => { st.confirming = -1; drawBar(); }), button('btn btn-small dt-danger', a.label, () => { st.confirming = -1; a.run(chosen(), new Set(st.selected)); }));
+            if (a.choose) {
+                const pick = el('select', 'dt-bar-choice'); pick.setAttribute('aria-label', a.choose.label);
+                for (const o of st.choices || []) { const op = el('option', null, o.label); op.value = o.value; pick.append(op); }
+                bar.append(el('span', 'dt-bar-confirm', `${a.label}:`), pick, button('btn btn-small dt-bar-keep', 'Keep', () => { st.confirming = -1; st.choices = null; drawBar(); }), button('btn btn-small dt-bar-apply', 'Apply', () => { const v = pick.value; st.confirming = -1; st.choices = null; a.run(chosen(), new Set(st.selected), v); }));
+            } else {
+                const ask = el('span', 'dt-bar-confirm', typeof a.confirm === 'function' ? a.confirm(n) : (a.confirm || `${a.label}?`)); ask.setAttribute('role', 'alert');
+                bar.append(ask, button('btn btn-small dt-bar-keep', 'Keep', () => { st.confirming = -1; drawBar(); }), button('btn btn-small dt-danger', a.label, () => { st.confirming = -1; a.run(chosen(), new Set(st.selected)); }));
+            }
         }
         bar.append(button('btn btn-small dt-bar-clear', 'Clear', () => clear()));
     }
 
-    function clear() { st.selected.clear(); st.anchor = null; st.confirming = -1; syncSelection(); }
+    function clear() { st.selected.clear(); st.anchor = null; st.confirming = -1; st.choices = null; syncSelection(); }
     function syncSelectMode() { box.classList.toggle('dt-selecting', st.select); selectButton.textContent = st.select ? 'Done' : 'Select'; selectButton.setAttribute('aria-pressed', String(st.select)); }
 
     drawHead(); drawBody(); syncSelectMode();

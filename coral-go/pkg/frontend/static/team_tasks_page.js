@@ -9,6 +9,7 @@ import { importOnce } from './import_once.js';
 const { rowFocusTarget, stateChip, el } = await importOnce('./team_table.js'); // lazy: its failure is retried
 const DT = await importOnce('./data_table.js'); // the one table (#7743)
 const TC = await importOnce('./task_columns.js'); // a task as its columns
+const TB = await importOnce('./task_bulk.js'); // what the selection bar does to the selected tasks
 const Toolbar = await importOnce('./team_toolbar.js'); // the one toolbar of the team tabs (#7717)
 import { goalTitle, refreshGoalTitles, noGoalLabel } from './task_goals.js';
 import { taskStatusWord, statusClass } from './goal_words.js';
@@ -200,7 +201,12 @@ function draw() {
         if (!shown.length) {
             const e = el('div', 'goals-empty'); e.append(el('p', null, 'No tasks match this filter.'), btn('btn', 'Show all', () => { model.filter = 'all'; draw(); })); body.append(e);
         } else {
-            const t = DT.dataTable({ label: `Tasks, ${shown.length}`, columns: TC.taskColumns(rowCtx()), rows: shown, rowKey: TC.taskKey, open: (task) => hooks.openTask?.(task), rowName: (task) => `#${task.id} ${task.title}`, state: model.dt });
+            const row = bar.node.querySelector('.list-bar-search-row');
+            const t = DT.dataTable({ label: `Tasks, ${shown.length}`, columns: TC.taskColumns(rowCtx()), rows: shown, rowKey: TC.taskKey, open: (task) => hooks.openTask?.(task), rowName: (task) => `#${task.id} ${task.title}`, state: model.dt,
+                selectable: { contextKey: model.project, actions: TB.taskBulkActions(model.project, () => { model.dt.selected.clear(); loadTasks(); }), onChange: (keys) => Toolbar.mountSelection(row, keys.size ? t.bar : null) } }); // the selection bar takes the toolbar's line while tasks are selected
+            Toolbar.mountSelection(row, model.dt.selected.size ? t.bar : null);
+            row.querySelectorAll('.dt-select-toggle').forEach(b => b.remove());
+            if (PHONE.matches) { if (newTask && newTask.parentElement === row) newTask.before(t.selectButton); else row.append(t.selectButton); } // a phone enters Select mode from the toolbar line, before the action that stays last
             body.append(t.el);
         }
         if (query ? queryHasMore() : (model.cursor && (model.filter === 'all' || model.filter === 'done'))) body.append(btn('btn goals-more', model.loadingMore ? 'Loading…' : (query ? 'Load more' : 'Load more done tasks'), loadMore));
