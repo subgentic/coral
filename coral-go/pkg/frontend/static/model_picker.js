@@ -49,7 +49,7 @@ function fill(container, agentType, data) {
         + `<option value="${escapeAttr(OTHER)}">Other…</option>`
         + (familyOf(agentType) && peekCanAdd(_acfServer(container)) !== false ? `<option value="${escapeAttr(ADD)}">Add a model…</option>` : '');
     wrap.hidden = false;
-    if (note) note.textContent = data && data.error ? data.error : (data && data.refreshing ? 'Updating the list…' : '');
+    if (note) note.textContent = data && data.error ? data.error : (data && data.refreshing && container._refreshAsked ? 'Updating the list…' : ''); // a status of a list the person asked to refresh, not of the one that loaded as the form opened (#7912)
     syncModelPicker(container);
     if (id) id.hidden = false;
 }
@@ -173,6 +173,7 @@ export function wireModelPicker(container) {
     refresh.addEventListener('click', async () => {
         const agentType = container.querySelector('.acf-agent-type')?.value || 'claude';
         refresh.disabled = true; refresh.setAttribute('aria-busy', 'true');
+        container._refreshAsked = true; // "Updating the list…" is said while the refresh the person pressed runs
         try {
             const got = await fetchList(container, agentType, { refresh: true });
             if (got) {
@@ -180,6 +181,8 @@ export function wireModelPicker(container) {
                 if (got.data.refreshing) await loadModelPicker(container, agentType);
             }
         } catch { showToast('Could not reach Coral to refresh the list.', true); }
+        container._refreshAsked = false;
+        const asked = container.querySelector('.acf-model-note'); if (asked && asked.textContent === 'Updating the list…') asked.textContent = '';
         refresh.disabled = false; refresh.removeAttribute('aria-busy');
     });
 }
