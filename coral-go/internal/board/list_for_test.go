@@ -179,3 +179,81 @@ func TestTheDocksListDoesNotHoldTheBoardsText(t *testing.T) {
 		assert.Less(t, grown, textBytes/2, "%s: the peak heap while listing (%d bytes) stays well under the board's text (%d bytes)", who, grown, textBytes)
 	}
 }
+
+// A search inside an agent's filtered Board tab searches only what that agent reads (#8484): for_subscriber on the search is the same list as the dock's, so a filtered search returns exactly the
+// intersection of the search and the member's list, in the search's order, for every member and several words, and its pages and total agree.
+func TestAFilteredSearchIsTheSearchAndTheMembersList(t *testing.T) {
+	ctx := context.Background()
+	s := testStore(t)
+	for name, spec := range map[string][2]string{"Worker": {"Backend", "all"}, "Quiet": {"Frontend", "mentions"}, "Lead": {"Orchestrator", "all"}, "Poster": {"Developer", "all"}} {
+		_, err := s.Subscribe(ctx, "team", name, spec[0], "claude-"+name, nil, spec[1])
+		require.NoError(t, err)
+	}
+	post := func(who, text string) {
+		_, err := s.PostMessage(ctx, "team", who, text, nil)
+		require.NoError(t, err)
+	}
+	for i := 0; i < 160; i++ {
+		post("Poster", fmt.Sprintf("@Worker item %d for the review", i))
+		post("Poster", fmt.Sprintf("untagged chatter %d about the review", i))
+		if i%7 == 0 {
+			post("Poster", fmt.Sprintf("@all standup %d, review at five", i))
+			post("Worker", fmt.Sprintf("@Poster review done %d", i))
+			post("Quiet", fmt.Sprintf("@Worker the review %d is Quiet's own", i))
+		}
+	}
+	search := func(forWho, text string, limit string) (found []int64, total int) {
+		cursor := ""
+		for page := 0; page < 400; page++ {
+			p := MessageQueryParams{Q: []string{text}, Limit: []string{limit}}
+			if forWho != "" {
+				p.ForSubscriber = []string{forWho}
+			}
+			if cursor != "" {
+				p.Cursor = []string{cursor}
+			}
+			q, err := ParseMessageQuery(p)
+			require.NoError(t, err)
+			q.Project = "team"
+			res, err := s.QueryMessages(ctx, q)
+			require.NoError(t, err)
+			for _, m := range res.Messages {
+				found = append(found, m.ID)
+			}
+			total = res.Total
+			if res.NextCursor == "" {
+				return found, total
+			}
+			cursor = res.NextCursor
+		}
+		t.Fatal("a search that does not end")
+		return nil, 0
+	}
+	for _, who := range []string{"Worker", "Quiet", "Lead", "Poster", "Nobody"} {
+		list, err := s.ReadSetIDs(ctx, "team", who)
+		require.NoError(t, err)
+		inList := map[int64]bool{}
+		for _, id := range list {
+			inList[id] = true
+		}
+		for _, word := range []string{"review", "standup", "chatter", "Quiet's own", "nothing matches this"} {
+			whole, _ := search("", word, "200") // newest first
+			var want []int64
+			for _, id := range whole {
+				if inList[id] {
+					want = append(want, id)
+				}
+			}
+			got, total := search(who, word, "37") // pages of another size: the cursor and the filter agree
+			assert.Equal(t, want, got, "%s searching %q: the search and the member's list, in the search's order", who, word)
+			assert.Equal(t, len(want), total, "%s %q: and the total is theirs", who, word)
+		}
+	}
+	// a bad name is refused as a query error, not an empty list
+	for _, bad := range []string{"", "  ", strings.Repeat("x", 201), "a\x00b"} {
+		_, err := ParseMessageQuery(MessageQueryParams{ForSubscriber: []string{bad}})
+		require.ErrorIs(t, err, ErrMessageQuery, "%q", bad)
+	}
+	_, err := ParseMessageQuery(MessageQueryParams{ForSubscriber: []string{"A", "B"}})
+	require.ErrorIs(t, err, ErrMessageQuery, "given twice")
+}

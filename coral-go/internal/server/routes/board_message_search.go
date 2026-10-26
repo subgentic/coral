@@ -11,11 +11,13 @@ import (
 	"github.com/subgentic/coral/internal/cloud"
 )
 
-var messageSearchParamNames = map[string]bool{"q": true, "from": true, "mentions": true, "since": true, "until": true, "sort": true, "limit": true, "cursor": true}
+var messageSearchParamNames = map[string]bool{"q": true, "from": true, "mentions": true, "since": true, "until": true, "sort": true, "limit": true, "cursor": true, "for_subscriber": true}
 
 // SearchMessages is GET /api/board/{project}/messages/search (#4745), the search the board page's box and its filters use:
 //
-//	?q=<text>&from=<name>[,<name>]&mentions=<member>&since=<RFC 3339>&until=<RFC 3339>&sort=newest|oldest&limit=N&cursor=C
+//	?q=<text>&from=<name>[,<name>]&mentions=<member>&since=<RFC 3339>&until=<RFC 3339>&sort=newest|oldest&limit=N&cursor=C&for_subscriber=<member>
+//
+// for_subscriber searches only that member's list: what its read would deliver and its own posts, the same selection as /messages/all?for_subscriber= (#8484).
 //
 // q is a plain, case-insensitive substring of the message text (% and _ are ordinary characters, at most 200 characters); from the
 // sender's id or name; mentions the messages that tag that member (@name, @all, @notify-all); since is inclusive and until exclusive. The
@@ -44,7 +46,7 @@ func (h *BoardHandler) SearchMessages(w http.ResponseWriter, r *http.Request) {
 	}
 	q, err := board.ParseMessageQuery(board.MessageQueryParams{
 		Q: vals["q"], From: vals["from"], Mentions: vals["mentions"], Since: vals["since"], Until: vals["until"],
-		Sort: vals["sort"], Limit: vals["limit"], Cursor: vals["cursor"],
+		Sort: vals["sort"], Limit: vals["limit"], Cursor: vals["cursor"], ForSubscriber: vals["for_subscriber"],
 	})
 	if err != nil {
 		if errors.Is(err, board.ErrMessageQuery) {

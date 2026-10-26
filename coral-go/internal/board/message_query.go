@@ -42,22 +42,24 @@ func messageQueryErr(format string, a ...any) error {
 // MessageQueryParams are the raw values of a request, one slice per parameter.
 type MessageQueryParams struct {
 	Q, From, Mentions, Since, Until, Sort, Limit, Cursor []string
+	ForSubscriber                                        []string // the member whose list is searched: what its read delivers and its own posts (ReadSetIDs, #8484)
 }
 
 // MessageQuery is a validated query. Build it with ParseMessageQuery; the caller sets Project and, for a request through Coral Hub,
 // Shown (what a viewer sees of a text: the match is made on it; nil is the text as stored).
 type MessageQuery struct {
-	Project  string
-	Text     string   // lower-cased; empty: no text search
-	From     []string // lower-cased sender ids or names
-	Mentions string   // lower-cased: messages that tag this member
-	Since    string   // created_at >= (UTC RFC 3339)
-	Until    string   // created_at <  (UTC RFC 3339)
-	Oldest   bool     // sort=oldest; the default is newest first
-	Limit    int
-	Shown    func(string) string
-	cursor   *messageCursor
-	finger   string
+	Project       string
+	Text          string   // lower-cased; empty: no text search
+	From          []string // lower-cased sender ids or names
+	Mentions      string   // lower-cased: messages that tag this member
+	ForSubscriber string   // the member's id as given: only the messages of its list (ReadSetIDs) are searched
+	Since         string   // created_at >= (UTC RFC 3339)
+	Until         string   // created_at <  (UTC RFC 3339)
+	Oldest        bool     // sort=oldest; the default is newest first
+	Limit         int
+	Shown         func(string) string
+	cursor        *messageCursor
+	finger        string
 }
 
 type messageCursor struct {
@@ -158,6 +160,15 @@ func ParseMessageQuery(p MessageQueryParams) (*MessageQuery, error) {
 	if q.Mentions, err = messageText("mentions", p.Mentions, 200); err != nil {
 		return nil, err
 	}
+	if v, ok, ferr := messageSingle("for_subscriber", p.ForSubscriber); ferr != nil {
+		return nil, ferr
+	} else if ok {
+		v = strings.TrimSpace(v)
+		if v == "" || len(v) > 200 || querypage.HasControl(v) {
+			return nil, messageQueryErr("for_subscriber must name a member, at most 200 characters, without control characters")
+		}
+		q.ForSubscriber = v
+	}
 	if q.Since, err = messageTime("since", p.Since); err != nil {
 		return nil, err
 	}
@@ -187,7 +198,7 @@ func ParseMessageQuery(p MessageQueryParams) (*MessageQuery, error) {
 	}
 	// What a cursor is tied to: every filter and the sort (not the limit, nor the cursor itself).
 	fp := sha256.New()
-	fmt.Fprintf(fp, "%s|%v|%s|%s|%s|%v", q.Text, q.From, q.Mentions, q.Since, q.Until, q.Oldest)
+	fmt.Fprintf(fp, "%s|%v|%s|%s|%s|%v|%s", q.Text, q.From, q.Mentions, q.Since, q.Until, q.Oldest, q.ForSubscriber)
 	q.finger = hex.EncodeToString(fp.Sum(nil))[:16]
 	if v, ok, serr := messageSingle("cursor", p.Cursor); serr != nil {
 		return nil, serr
@@ -238,6 +249,17 @@ func (s *Store) QueryMessages(ctx context.Context, q *MessageQuery) (*MessageQue
 		}
 		numbered = s.numberedNames(ctx, s.reader(), q.Project)
 	}
+	var allowed map[int64]bool // the member's list (ReadSetIDs): a message outside it matches nothing
+	if q.ForSubscriber != "" {
+		ids, err := s.ReadSetIDs(ctx, q.Project, q.ForSubscriber)
+		if err != nil {
+			return nil, err
+		}
+		allowed = make(map[int64]bool, len(ids))
+		for _, id := range ids {
+			allowed[id] = true
+		}
+	}
 	where := []string{"m.project = ?"}
 	args := []any{q.Project}
 	if q.Since != "" {
@@ -282,6 +304,9 @@ func (s *Store) QueryMessages(ctx context.Context, q *MessageQuery) (*MessageQue
 			break
 		}
 		scannedBytes += len(m.Content)
+		if allowed != nil && !allowed[m.ID] {
+			continue
+		}
 		if q.matches(m, mentionID, mentionTitle, numbered) {
 			pg.Add(m)
 		}
