@@ -1,4 +1,5 @@
-// The shared dock Tasks table shows Cost at 680px and omits empty folded cells at 420px and no sideways scroll.
+// The dock's Tasks table shows Status, Task and Agent only (#7962, the operator: "we probably don't need to show priority, type, cost in this side tab view so we can spend more space on the status, task and agent"), at 680 px with real headers
+// and folded at 420 px, with no sideways scroll; priority, type, cost and the time are on the main Tasks tab and in the opened task. (The file keeps its name: it began as the cost column's test.)
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const PANELS = require('./helpers/list_bars_panels');
@@ -15,24 +16,28 @@ const { removeBoards } = require('./helpers/board_cleanup');
         const tasks = PANELS.find(p => p.key === 'tasks');
         await tasks.prepare(ctx);
         await tasks.show(ctx, { w: 1440, theme: 'dark', phone: false }); // the Tasks tab in the dock, 680px wide
-        const measure = () => ev(`(() => { const list = document.getElementById('board-task-list'); const lr = list.getBoundingClientRect();
-            const box = e => { const r = e.getBoundingClientRect(); return { shown: e.getClientRects().length > 0 && r.width > 0, inside: r.left >= lr.left - 1 && r.right <= lr.right + 1, w: Math.round(r.width) }; };
-            const head = list.querySelector('thead [data-key=cost]'), row = list.querySelector('.board-task-item:not(.board-task-header) .board-task-cost');
-            const first = list.querySelector('.board-task-item:not(.board-task-header)'); const desc = first.querySelector('.board-task-desc').getBoundingClientRect(), cost = row.getBoundingClientRect(), id = first.querySelector('.board-task-id').getBoundingClientRect();
-            return { folded: list.querySelector('.dt-box').classList.contains('dt-folded'), list: Math.round(lr.width), head: box(head), row: box(row), sameLine: Math.abs((cost.top + cost.height / 2) - (id.top + id.height / 2)) < 10, titleAbove: desc.top < id.top, scrolls: list.scrollWidth - list.clientWidth }; })()`);
+        const measure = () => ev(`(() => { const list = document.getElementById('board-task-list'), lr = list.getBoundingClientRect();
+            const row = list.querySelector('.board-task-item:not(.board-task-header)');
+            return { folded: list.querySelector('.dt-box').classList.contains('dt-folded'), list: Math.round(lr.width), heads: [...list.querySelectorAll('thead th')].filter(h => h.getClientRects().length).map(h => h.dataset.key),
+                cells: [...row.querySelectorAll('td.dt-td')].filter(c => c.getClientRects().length > 0 && c.getBoundingClientRect().width > 0).map(c => c.dataset.key),
+                gone: ['.board-task-cost', '.board-task-priority-value', '.board-task-source', '.board-task-time'].filter(sel => !!list.querySelector(sel)), scrolls: list.scrollWidth - list.clientWidth,
+                name: !!row.querySelector('.board-task-name'), status: !!row.querySelector('.board-task-status-wrap') }; })()`);
         const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
-        await ev(`document.querySelector('#board-task-bar .list-bar-toggle') && document.querySelector('#board-task-bar .list-bar-menu:not([hidden])') && document.querySelector('#board-task-bar .list-bar-toggle').click(); true`); // the filter menu out of the way of the rows
-        await shot('tasks-dock-680-cost');
+        await ev(`document.querySelector('#board-task-bar .list-bar-toggle') && document.querySelector('#board-task-bar .list-bar-menu:not([hidden])') && document.querySelector('#board-task-bar .list-bar-toggle').click(); true`); // the filter menu out of the way
+        await shot('tasks-dock-680-columns');
         let m = await measure();
         assert.ok(m.list >= 560 && m.list < 790, 'the dock is the width in question: ' + m.list);
-        assert.ok(m.row.shown && m.row.inside, 'Cost is shown and whole inside the list: ' + JSON.stringify(m));
-        assert.ok(m.head.shown && m.head.inside, '680px uses the real headers'); assert.ok(m.sameLine, 'the wide row aligns cost with the id'); assert.equal(m.folded, false, 'the wide row is unfolded'); assert.equal(m.scrolls <= 1, true, 'the list does not scroll sideways: ' + m.scrolls);
+        assert.equal(m.folded, false, 'the wide dock is unfolded');
+        assert.deepEqual(m.heads, ['status', 'id', 'assignee'], '680 px: the heads are Status, Task and Agent: ' + JSON.stringify(m));
+        assert.deepEqual(m.gone, [], 'no priority, type, cost or time cell is drawn in the dock: ' + JSON.stringify(m));
+        assert.ok(m.name && m.status, 'the row has its task and its status'); assert.ok(m.scrolls <= 1, 'and it does not scroll sideways');
         await ev(`document.getElementById('agentic-state').style.width = '420px'; true`);
         await waitFor(`document.getElementById('board-task-list').getBoundingClientRect().width < 460`, 'the narrow dock');
-        await shot('tasks-dock-420-cost');
+        await shot('tasks-dock-420-columns');
         m = await measure();
-        assert.ok(m.list < 560, 'a narrow list: ' + m.list); assert.equal(m.row.shown, false, 'An empty cost is omitted in the narrow shared row: ' + JSON.stringify(m));
+        assert.ok(m.list < 560, 'a narrow list: ' + m.list); assert.equal(m.folded, true, '420 px folds the rows');
+        assert.deepEqual(m.gone, [], 'the folded row has none of them either: ' + JSON.stringify(m)); assert.ok(m.cells.every(k => ['status', 'id', 'assignee'].includes(k)), 'only Status, Task and Agent cells: ' + JSON.stringify(m));
         assert.ok(m.scrolls <= 1, 'and it does not scroll sideways');
-        console.log('PASS task cost column');
+        console.log('PASS dock Tasks columns');
     } finally { await removeBoards(ev, [ctx && ctx.TBOARD, ctx && ctx.BBOARD]); try { await client.close(); } catch (_) {} } // the panel helper's boards (themes-t-, themes-b-)
 })().catch(e => { console.error(e); process.exit(1); });

@@ -86,7 +86,7 @@ async function run() {
     return { sub: el.classList.contains('board-task-subagent'), classes: el.className, subagentId: el.dataset.subagentId || null,
       type: (q('.board-task-source')||{}).textContent, typeIsChip: !!q('.board-task-source.dt-tag'), typeIcon: (q('.board-task-type-subagent .material-icons')||{}).textContent || null, typeTitle: q('.board-task-source') ? q('.board-task-source').getAttribute('title') : null,
       badge: (q('.dt-subtitle')||{}).textContent || null, desc: (q('.board-task-desc')||{}).textContent, descHasImg: !!q('.board-task-desc img'), tooltip: q('.board-task-desc') ? q('.board-task-desc').getAttribute('title') : null,
-      assignee: (q('.board-task-assignee')||{}).textContent, cost: (q('.board-task-cost')||{}).textContent.trim(), costLive: !!q('.dt-estimate'),
+      assignee: (q('.board-task-assignee')||{}).textContent, kind: el.dataset.kind || null,
       spinner: !!q('.task-spinner'), icon: (q('.board-task-status-wrap')||{}).textContent || null, clickable: el.getAttribute('data-on-click') === 'task-subagent-open' || el.hasAttribute('onclick'),
       descW: q('.board-task-desc') ? q('.board-task-desc').closest('td').getBoundingClientRect().width : 0, rowW: el.getBoundingClientRect().width, listScrollW: document.getElementById('board-task-list').scrollWidth,
       boxShadow: cs.boxShadow, bgImage: cs.backgroundImage, chipColor: q('.board-task-source') ? getComputedStyle(q('.board-task-source')).color : null }; })`);
@@ -100,14 +100,13 @@ async function run() {
   check('subagents fetched for the selected session', (await ev(`window.__subagentFetches`)).includes(A));
 
   const done = bySub(rs, 'aca6223d75309e7ca'), running = bySub(rs, 'b7running00000000'), bare = bySub(rs, 'c0nometa000000000');
-  const task = rs.find(r => !r.sub && r.type === 'agent');
+  const task = rs.find(r => !r.sub && r.kind === 'agent');
   check('every subagent row found by data-subagent-id', !!(done && running && bare));
 
   // Shared table styling; the type tag and subtitle carry the subagent metadata.
-  check('subagent type tag', done.typeIsChip && /sub/.test(done.type), done.type);
-  check('type chip names the launching agent', done.typeTitle === 'Subagent launched by Lead Dev', done.typeTitle);
+  check('a subagent row is the row\'s own kind: no type tag in the dock (it shows Status, Task and Agent only, #7962)', done.sub && !done.typeIsChip && done.type === undefined, done.type);
   check('subagent-type badge', done.badge === 'Explore' && running.badge === 'Plan', `${done.badge}, ${running.badge}`);
-  check('ordinary task has none of it', !task.sub && task.typeIsChip && !task.badge && task.type === 'agent' && task.boxShadow === 'none', `${task.type} / ${task.boxShadow}`);
+  check('ordinary task has none of it', !task.sub && !task.badge && task.boxShadow === 'none', `${task.kind} / ${task.boxShadow}`);
 
   // Layout: the description must survive the default (narrow) panel width.
   check('description column keeps a readable width', done.descW >= 160 && task.descW >= 160, `sub=${done.descW} task=${task.descW}`);
@@ -123,9 +122,9 @@ async function run() {
   check('subagent rows are clickable', done.clickable && running.clickable && bare.clickable);
 
   // Status + spend
-  check('completed: check icon, final cost', done.icon === 'Finished' && !done.spinner && done.cost === '$7.42' && !done.costLive, `${done.icon} ${done.cost}`);
-  check('running: spinner, live ~cost', running.icon === 'Open' && running.cost === '~$0.31' && running.costLive, `${running.cost}`);
-  check('stopped: skipped icon, no cost', bare.icon === 'Cancelled' && bare.cost === '—', `${bare.icon} "${bare.cost}"`);
+  check('completed: check icon, final cost', done.icon === 'Finished' && !done.spinner, `${done.icon}`);
+  check('running: spinner, live ~cost', running.icon === 'Open', `${running.icon}`);
+  check('stopped: skipped icon, no cost', bare.icon === 'Cancelled', `${bare.icon}`);
   check('count badge counts subagents', (await ev(`document.getElementById('task-bar-count').textContent`)) === '2/5', await ev(`document.getElementById('task-bar-count').textContent`));
 
   // Escaping
@@ -218,7 +217,7 @@ async function run() {
   await ev(`window.__subagents[${JSON.stringify(A)}][1] = { ...window.__subagents[${JSON.stringify(A)}][1], finished: true, status: 'completed', cost_usd: 1.25, last_activity_at: '2026-09-17T02:25:30Z' }; window.__details.b7running00000000.result = 'The design is done.'; window.__detailFetches.length = 0; true`);
   let flipped = null;
   for (let i = 0; i < 100; i++) { await sleep(50); flipped = bySub(await rows(), 'b7running00000000'); if (flipped && flipped.icon === 'Finished') break; }
-  check('poll refreshes the row without user action', flipped && !flipped.spinner && flipped.icon === 'Finished' && flipped.cost === '$1.25', flipped && `${flipped.icon} ${flipped.cost}`);
+  check('poll refreshes the row without user action', flipped && !flipped.spinner && flipped.icon === 'Finished', flipped && `${flipped.icon}`);
   await until(`/The design is done\\./.test(document.getElementById('task-detail-content').textContent)`, 'the finished result in the open modal');
   m = await modal();
   check('open modal follows: completed, final cost, duration', m.open && m.status === 'Completed' && m.cost === '$1.25' && !m.costLive && m.fields['Duration'] === '5m 30s', JSON.stringify([m.status, m.cost, m.fields['Duration']]));
@@ -229,7 +228,7 @@ async function run() {
   m = await modal();
   check('the agent task modal still works', m.open && m.header === 'Task #11' && m.title === '#11 · Ordinary agent task', m.header + ' / ' + m.title);
   await ev(`window.__subagents[${JSON.stringify(A)}][0] = { ...window.__subagents[${JSON.stringify(A)}][0], cost_usd: 9.99 }; true`);
-  for (let i = 0; i < 100; i++) { await sleep(50); const r = bySub(await rows(), 'aca6223d75309e7ca'); if (r && r.cost === '$9.99') break; }
+  for (let i = 0; i < 20; i++) await sleep(50); // a poll or two: the dock row no longer shows a cost to wait for (#7962)
   m = await modal();
   check('a subagent poll does not overwrite an open agent task modal', m.header === 'Task #11' && m.title === '#11 · Ordinary agent task' && !('Subagent ID' in m.fields), m.header + ' / ' + m.title);
   await ev(`window.hideTaskDetailModal(); true`);

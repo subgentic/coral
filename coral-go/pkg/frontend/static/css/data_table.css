@@ -191,8 +191,6 @@
 .team-panel .list-bar-search-row:has(.dt-bar-step) > .list-bar-search-wrap { margin-top: var(--table-control-pad-y); }
 @container dt (max-width: 64rem) { .dt-box:not(.dt-folded) .dt-narrow-hide { display: none; } } /* a column that can wait: gone from the unfolded table when its box is narrow (a 1280 px window), kept when folded as a labelled line */
 
-.dt-estimate { font-style: italic; }
-.dt-cost-warning { color: var(--table-danger); font-weight: var(--table-primary-weight); }
 
 /* Folded rows with secondary actions reserve the same metadata height for rows without an action. */
 .dt-box.dt-folded button.dt-quiet { min-height: var(--table-quiet-control-h); margin: 0; }

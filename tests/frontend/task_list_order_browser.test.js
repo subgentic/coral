@@ -39,9 +39,9 @@ const open = [
 
         console.log('Columns put Status and the primary Task before the facts');
         assert.deepEqual(await ev(`[...document.querySelectorAll('#board-task-list thead th')].map(h => h.querySelector('.dt-sort > span, .dt-head-text').textContent.trim())`),
-            ['Status', 'Task', 'Priority', 'Type', 'Agent', 'Cost', 'Created']);
+            ['Status', 'Task', 'Agent']); // the dock shows Status, Task and Agent only (#7962)
         assert.deepEqual(await ev(`[...document.querySelector('#board-task-list tbody tr').cells].map(c => c.dataset.key)`),
-            ['status', 'id', 'priority', 'type', 'assignee', 'cost', 'created_at']);
+            ['status', 'id', 'assignee']);
         assert.equal(await ev(`(() => { const row = document.querySelector('#board-task-list tbody tr'); const primary = row.cells[1].querySelector('.dt-primary'); return row.querySelectorAll('.dt-primary').length === 1 && row.cells[1].querySelector('.board-task-id')?.textContent === '#5' && row.cells[1].textContent.startsWith('#5 Draft') && primary?.textContent === 'Draft'; })()`), true,
             'the second cell has one primary action, with ID before the title');
 
@@ -58,31 +58,25 @@ const open = [
         const arrows = () => ev(`[...document.querySelectorAll('#board-task-list th[aria-sort]')].filter(e => e.getAttribute('aria-sort') !== 'none').map(e => e.querySelector('.dt-sort').dataset.key + ':' + (e.getAttribute('aria-sort') === 'descending' ? '▼' : '▲'))`);
         assert.deepEqual(await arrows(), [], 'the default order has no arrow');
         const click = f => ev(`document.querySelector('#board-task-list .dt-sort[data-key="${f}"]').click(); true`);
-        await click('created_at'); assert.deepEqual(await arrows(), ['created_at:▼'], 'first click: newest first, arrow down (the Created column)');
-        assert.deepEqual(await ids(), [...open, ...done].sort(byNewest).map(t => t.id), 'a chosen Created is the plain date order');
-        await click('created_at'); assert.deepEqual((await arrows())[0], 'created_at:▲', 'second click turns it round');
-        await click('created_at');
+        await click('id'); assert.deepEqual(await arrows(), ['id:▼'], 'first click: the largest id first, arrow down (the Task column)');
+        assert.deepEqual((await ids()).slice(0, 3), [139, 138, 137], 'a chosen Task column is the plain id order');
+        await click('id'); assert.deepEqual((await arrows())[0], 'id:▲', 'second click turns it round');
+        await click('id');
         assert.deepEqual(await arrows(), [], 'third click: the arrow is gone');
         assert.deepEqual(await ids(), want, 'and the order is the default again: open first, then done');
-        await click('priority'); assert.deepEqual(await arrows(), ['priority:▲'], 'Priority starts ascending');
         await click('assignee'); assert.deepEqual(await arrows(), ['assignee:▼'], 'another column starts its own count');
-        await click('assignee'); await click('priority');
-        assert.deepEqual(await arrows(), ['priority:▲'], 'a click on another column chooses it, it does not reset');
-        await click('priority'); await click('priority');
+        await click('id'); assert.deepEqual(await arrows(), ['id:▼'], 'a click on another column chooses it, it does not reset');
+        await click('id'); await click('id');
         assert.deepEqual(await arrows(), [], 'three clicks on a column in a row, from any state, give the default back');
         assert.deepEqual(await ids(), want);
         console.log('  ok');
 
-        console.log('A column the person chose sorts the whole list: Created is the plain date order, open and done mixed by date');
-        await ev(`window.__coral._toggleTaskSort('created_at'); true`);
-        const desc = await ids();
-        assert.deepEqual(desc, [...open, ...done].sort(byNewest).map(t => t.id), 'Created descending, chosen, is the plain date order: finished tasks are among the open ones');
-        assert.notDeepEqual(desc, want, 'the chosen order is not the default partition');
-        await ev(`window.__coral._toggleTaskSort('created_at'); true`);
-        const asc = await ids();
-        assert.deepEqual(asc, [...open, ...done].sort((a, b) => a.created_at.localeCompare(b.created_at)).map(t => t.id), 'turned round: the oldest first');
+        console.log('A column the person chose sorts the whole list: Task is the plain id order, open and done mixed');
         await ev(`window.__coral._toggleTaskSort('id'); true`);
-        assert.deepEqual((await ids()).slice(0, 3), [139, 138, 137], 'by id, newest column choice: the largest id first');
+        assert.deepEqual((await ids()).slice(0, 3), [139, 138, 137], 'by id, the largest first: finished tasks are among the open ones');
+        assert.notDeepEqual(await ids(), want, 'the chosen order is not the default partition');
+        await ev(`window.__coral._toggleTaskSort('id'); true`);
+        assert.deepEqual((await ids()).slice(0, 3), [1, 2, 3], 'turned round: the smallest id first');
         console.log('  ok');
 
         console.log('Narrow dock: the Priority and Agent header labels do not touch, and neither is cut');
@@ -99,9 +93,9 @@ const open = [
                 return { folded: box.classList.contains('dt-folded'), scroll: list.scrollWidth, width: list.clientWidth, cells, heads };
             })()`);
             assert.ok(g.scroll <= g.width + 1, `at ${w}px no sideways scroll: ${JSON.stringify(g)}`);
-            for (const key of ['priority', 'assignee', 'type', 'cost', 'created_at']) {
+            for (const key of ['assignee']) {
                 const cell = g.cells.find(c => c.key === key);
-                if (g.folded && ['assignee', 'cost'].includes(key)) assert.equal(cell.shown, false, `empty ${key} is omitted at ${w}px`);
+                if (g.folded && ['assignee'].includes(key)) assert.equal(cell.shown, false, `empty ${key} is omitted at ${w}px`);
                 else assert.ok(cell.shown, `${key} remains visible at ${w}px`);
                 if (!g.folded) assert.ok(Math.abs(cell.left - g.heads.find(h => h.key === key).left) < 1, `${key} aligns with its header at ${w}px`);
             }
