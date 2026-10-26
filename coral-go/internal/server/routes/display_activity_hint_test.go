@@ -24,21 +24,27 @@ type displayHintTerminal struct {
 	displayMu sync.Mutex
 	readErr   error
 	reads     int
+	onRead    func()
 }
 
 func (s *displayHintTerminal) AgentScreen(ctx context.Context, name, agentType, id string) (string, error) {
 	s.displayMu.Lock()
 	s.reads++
 	err := s.readErr
+	onRead := s.onRead
 	s.displayMu.Unlock()
 	if err != nil {
 		return "", err
 	}
-	return s.agentTerm.AgentScreen(ctx, name, agentType, id)
+	screen, err := s.agentTerm.AgentScreen(ctx, name, agentType, id)
+	if onRead != nil {
+		onRead()
+	}
+	return screen, err
 }
 func displayFixture(t *testing.T, name string) string {
 	t.Helper()
-	b, err := os.ReadFile(filepath.Join("..", "..", "ptymanager", "testdata", "screens", "codex", "0.163.0-display", name))
+	b, err := os.ReadFile(filepath.Join("..", "..", "ptymanager", "testdata", "display_activity_hint", "codex-0.163.0", name))
 	require.NoError(t, err)
 	return string(b)
 }
@@ -238,4 +244,63 @@ func TestDisplayActivityHint7974PayloadAndAuthorityInvariants(t *testing.T) {
 	delta := fieldDelta(prev, curr)
 	require.Equal(t, "working", delta["display_activity_hint"])
 	require.Equal(t, "read", delta["display_activity_hint_at"])
+}
+
+// Review round 2: explicit fail-closed cases, including a terminal change during
+// the read rather than only between two payload builds.
+func TestDisplayActivityHint7974ReviewGuards(t *testing.T) {
+	_, h, mock, _ := setupSessionsTestServer(t)
+	term := &displayHintTerminal{agentTerm: &agentTerm{mockSessionTerminal: mock}}
+	h.terminal = term
+	stamp := &stampingBackend{stamp: "before"}
+	h.backend = stamp
+	now := time.Now()
+	events := displayRequest(now.Add(-10 * time.Second))
+	st := displayRequestState(events)
+	working := displayFixture(t, "approved-working.txt")
+	term.show(working)
+	for name, block := range map[string]func(*SessionState){
+		"sleeping":    func(s *SessionState) { s.Sleeping = true },
+		"login":       func(s *SessionState) { s.NeedsLogin = true },
+		"stuck":       func(s *SessionState) { s.Stuck = true },
+		"not started": func(s *SessionState) { s.NotStarted = true },
+		"gone":        func(s *SessionState) { s.Gone = true },
+	} {
+		t.Run(name, func(t *testing.T) {
+			state := st
+			block(&state)
+			hint, at := h.displayActivityHint("codex", "codex-probe", "probe", state, events, now)
+			require.Nil(t, hint)
+			require.Nil(t, at)
+		})
+	}
+	t.Run("requestless snapshot window", func(t *testing.T) {
+		hint, at := h.displayActivityHint("codex", "codex-probe", "probe", st, nil, now)
+		require.Nil(t, hint)
+		require.Nil(t, at)
+	})
+	t.Run("request without a valid timestamp", func(t *testing.T) {
+		e := displayRequest(now.Add(-time.Hour))
+		e[0].CreatedAt = "invalid"
+		hint, at := h.displayActivityHint("codex", "codex-probe", "probe", st, e, now)
+		require.Nil(t, hint)
+		require.Nil(t, at)
+	})
+	t.Run("foreign notification beside own permission", func(t *testing.T) {
+		e := append(append([]store.AgentEvent{}, events...), store.AgentEvent{EventType: "notification", Summary: "An unrelated request needs an answer", CreatedAt: now.Add(-5 * time.Second).Format(time.RFC3339Nano)})
+		hint, at := h.displayActivityHint("codex", "codex-probe", "probe", st, e, now)
+		require.Nil(t, hint)
+		require.Nil(t, at)
+	})
+	t.Run("output stamp changes while screen is read", func(t *testing.T) {
+		h.displayScreens = displayScreenCache{}
+		stamp.set("before")
+		var changed bool
+		term.onRead = func() { stamp.set("after"); changed = true }
+		hint, at := h.displayActivityHint("codex", "codex-probe", "probe", st, events, now)
+		require.True(t, changed)
+		require.Equal(t, 1, term.reads)
+		require.Nil(t, hint)
+		require.Nil(t, at)
+	})
 }
