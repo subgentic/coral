@@ -86,6 +86,8 @@ export function tasksTable(scope, rows, { ctx = {}, tweak, ...table } = {}) {
     const keys = SCOPES[scope];
     if (!keys) throw new Error(`tasksTable: no scope "${scope}"`);
     let columns = taskColumns(ctx, keys);
+    // The Inbox spans teams; do not spend a column on files when no shown task has any.
+    if (scope === 'mine') columns = columns.filter(c => c.key !== 'files' || rows.some(t => c.when(t)));
     if (tweak) columns = tweak(columns) || columns;
     return DT.dataTable({ compact: true, label: `Tasks, ${rows.length}`, rowKey: taskKey, rowName: (t) => `#${t.id} ${t.title}`, ...table, columns, rows });
 }
