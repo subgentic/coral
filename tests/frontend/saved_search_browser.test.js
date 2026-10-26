@@ -103,6 +103,15 @@ async function run() {
             await ev(`document.querySelector('#inbox-saved-bar .list-bar-filter-btn').click(); document.querySelector('#inbox-saved-bar .list-bar-clear-all').click(); true`);
             await settle(`document.querySelector('#inbox-saved-bar .list-bar-count').textContent === '4 messages'`, 'Clear all');
 
+            // a slow answer to an old filter must not overwrite the newer one's list (#7945): the board filter's read is held back 700 ms, the filter is cleared at once
+            await ev(`window.__realFetch = window.__realFetch || window.fetch; window.fetch = (u, o) => { const p = window.__realFetch(u, o); return /\\/api\\/saved\\?.*kind=board/.test(String(u)) ? p.then(r => new Promise(res => setTimeout(() => res(r), 700))) : p; }; true`);
+            await pick('sv-kind', 'board'); await pick('sv-kind', '');
+            await new Promise(r => setTimeout(r, 1200)); // sleep-ok: the held answer has to have arrived before the list is read
+            await settle(`document.querySelector('#inbox-saved-bar .list-bar-count').textContent === '4 messages'`, 'the old read did not win');
+            s = await snap();
+            check(`${dev}: a late answer to an old filter does not overwrite the list (4 messages, no chip)`, s.titles.length === 4 && s.chips.length === 0, JSON.stringify([s.titles.length, s.chips]));
+            await ev(`window.fetch = window.__realFetch; true`);
+
             const order = () => ev(`[...document.querySelectorAll('#group-table-view tbody .dt-primary')].map(r => r.textContent.replace(/\\s+/g, ' ').slice(0, 40))`); // the snippets: a row's Gone sentence is said once for the list (#7122), so the whole text differs by row
             const newest = await order();
             await pick('svi-sort', 'oldest');
