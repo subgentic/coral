@@ -42,7 +42,7 @@ const S = `(window.__coralStatic || '/static/')`;
         await ev(`document.querySelector('.toast-close').click(); true`);
         const after = await ev(`import(${S} + 'notifications.js').then(n => { n.showToast('Restarting agent-7...', false, 600000, { group: { key: 'restarting', text: c => 'Restarting ' + c + ' agents' } }); return document.querySelector('.toast-message').textContent; })`);
         assert.equal(after, 'Restarting agent-7...', 'after the card is dismissed the next restart starts a new one at one');
-        const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', '..', 'coral-go', 'pkg', 'frontend', 'static', 'controls.js'), 'utf8');
+        const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', '..', 'coral-go', 'pkg', 'frontend', 'static', 'restart_flow.js'), 'utf8');
         assert.ok(src.includes("group: { key: 'restarting', text: n => `Restarting ${n} agents` }"), 'Restart sends its toast as the "restarting" group: ' + src.length);
         // an error is never covered by a later ordinary toast: a failed save is not read as "Saved" (QA Reviewer 2, #7690)
         await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); import(${S} + 'notifications.js').then(n => { n.showToast('Could not save: the disk is full', true, 600000); n.showToast('Saved', false, 600000); return true; })`);

@@ -18,9 +18,9 @@ export function syncSendStarting(starting = sendStarting) {
     const hint = document.getElementById("composer-starting-hint"); // the same words as a quiet line above the box (#8242): a phone never shows Send's title
     if (hint) {
         if (starting) { // shown first and worded a frame later: a polite live region that appears with its words says nothing (the live-region census)
-            hint.hidden = false;
+            if (hint.hidden) hint.hidden = false;
             requestAnimationFrame(() => { if (!hint.hidden && hint.textContent !== STARTING_HINT) hint.textContent = STARTING_HINT; }); // written once: a toolbar rebuild calls this again, and a rewritten text is read again by some screen readers (#8298)
-        } else { hint.hidden = true; if (hint.textContent) hint.textContent = ""; }
+        } else { if (!hint.hidden) hint.hidden = true; if (hint.textContent) hint.textContent = ""; }
     }
     document.querySelectorAll(SEND_BUTTONS).forEach(b => {
         if (starting) {

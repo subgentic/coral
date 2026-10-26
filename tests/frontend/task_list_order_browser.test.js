@@ -42,7 +42,7 @@ const open = [
             ['State', 'Task', 'Who']); // the dock is the Tasks view's agent-team scope: State, Task and Who (#7962, #8060)
         assert.deepEqual(await ev(`[...document.querySelector('#board-task-list tbody tr').cells].map(c => c.dataset.key)`),
             ['state', 'task', 'who']);
-        assert.equal(await ev(`(() => { const row = document.querySelector('#board-task-list tbody tr'); const primary = row.cells[1].querySelector('.dt-primary'); return row.querySelectorAll('.dt-primary').length === 1 && row.cells[1].querySelector('.board-task-id')?.textContent === '#5' && row.cells[1].textContent.startsWith('#5 Draft') && primary?.textContent === 'Draft'; })()`), true,
+        assert.equal(await ev(`(() => { const row = document.querySelector('#board-task-list tbody tr'); const primary = row.cells[1].querySelector('.dt-primary'); return row.querySelectorAll('.dt-primary').length === 1 && row.cells[1].querySelector('.board-task-id')?.textContent === '#5' && !!(row.cells[1].querySelector('.board-task-id').compareDocumentPosition(primary) & Node.DOCUMENT_POSITION_FOLLOWING) && primary?.textContent === 'Draft'; })()`), true,
             'the second cell has one primary action, with ID before the title');
 
         console.log('Who is circles, as on the Tasks tab (#8507): the person solid, the reviewers outlined (two, then +N), the whole named and shown on hover, no name beside them');
