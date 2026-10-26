@@ -40,9 +40,11 @@ const BASE = require('./test_base').BASE;
         await ev(`window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('tasks')).then(() => true)`);
         await waitFor(`!!document.querySelector('#group-table-view .dt-primary[data-task-id="${id}"]')`, 'Inbox task row');
         await ev(`document.querySelector('#group-table-view .dt-primary[data-task-id="${id}"]').click(); true`);
-        await landed('Inbox Tasks row');
-        await waitFor(`!!document.querySelector('#team-panel-item .ibx-reply-input')`, 'shared reply box');
-        await ev(`(() => { const t=document.querySelector('#team-panel-item .ibx-reply-input'); t.value='Keep this reply draft'; t.dispatchEvent(new Event('input',{bubbles:true})); return true; })()`);
+        // since #8633 an Inbox row opens the task inside the Inbox, at its own path
+        await waitFor(`location.pathname === ${JSON.stringify(`/inbox/tasks/${B}/${id}`)} && document.querySelector('#inbox-page .team-task-page')?.textContent.includes(${JSON.stringify(title)})`, 'Inbox Tasks row opens in the Inbox', 15000);
+        console.log('PASS Inbox Tasks row');
+        await waitFor(`!!document.querySelector('#inbox-page .ibx-reply-input')`, 'shared reply box');
+        await ev(`(() => { const t=document.querySelector('#inbox-page .ibx-reply-input'); t.value='Keep this reply draft'; t.dispatchEvent(new Event('input',{bubbles:true})); return true; })()`);
         await team('messages');
         await ev(`import(${S}+'task_navigation.js').then(m=>m.openTask(${JSON.stringify(B)},${id})).then(()=>true)`);
         await waitFor(`document.querySelector('#team-panel-item .ibx-reply-input')?.value === 'Keep this reply draft'`, 'draft survives navigation');
