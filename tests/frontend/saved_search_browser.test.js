@@ -100,6 +100,8 @@ async function run() {
             const convState = await pickOption('sv-conv', 'sv-a-1');
             await settle(`document.querySelector('#inbox-saved-bar .list-bar-chip-text')?.textContent === 'From: Frontend Dev' && document.querySelector('#inbox-saved-bar .list-bar-count').textContent === '2 of 4'`, 'From a conversation')
                 .catch(async e => { throw new Error(`${e.message} | case: the option existed but the pick had no effect | ${JSON.stringify(await convState())}`); });
+            // The board filter and this conversation both match two rows. The chip updates before the fetch, so its count alone can still describe the previous answer.
+            await settle(`(() => { const rows = [...document.querySelectorAll('#group-table-view tbody tr')]; return rows.length === 2 && rows.every(r => r.textContent.includes('Frontend Dev')); })()`, 'the selected conversation rows');
             s = await snap();
             check(`${dev}: From a conversation (by its title) leaves that chat's two, and the chip reads the title`, s.titles.length === 2 && s.titles.every(t => /Frontend Dev/.test(t)) && s.chips.join() === 'From: Frontend Dev', JSON.stringify([s.titles, s.chips]));
             await ev(`document.querySelector('#inbox-saved-bar .list-bar-filter-btn').click(); document.querySelector('#inbox-saved-bar .list-bar-clear-all').click(); true`);
