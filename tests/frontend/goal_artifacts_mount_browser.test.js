@@ -67,6 +67,33 @@ const BASE = require('./test_base').BASE;
                 }
             }
         }
+        console.log('The page drawn again keeps the section open; a changed rollup refreshes the count');
+        await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+        await Emulation.setTouchEmulationEnabled({ enabled: false });
+        const G2 = await goal('Redraw me');
+        const done = async (title, names) => { const t2 = await api('POST', `/api/board/${B}/tasks`, { title, body: 'x', assigned_to: 'be', created_by: 'orch', priority: 'medium', goal_id: G2 }); assert.ok(t2.status < 300); const i2 = t2.body.id || t2.body.task.id;
+            assert.ok((await api('POST', `/api/board/${B}/tasks/claim`, { subscriber_id: 'be', task_id: i2 })).status < 300);
+            assert.ok((await api('POST', `/api/board/${B}/tasks/${i2}/complete`, { subscriber_id: 'be', message: 'done', outcome: 'success', artifacts: names.map(n => ({ name: n, content: 'c ' + n })) })).status < 300); };
+        await done('First', ['a.txt', 'b.txt', 'c.txt']);
+        await load(`/team/${B}/goals/${G2}`);
+        await waitFor(`!!document.querySelector('.goal-artifacts:not([hidden]) summary') && document.querySelector('.goal-artifacts summary').textContent === 'Artifacts (3)'`, 'Artifacts (3)', 15000);
+        await ev(`document.querySelector('.goal-artifacts summary').click(); true`);
+        await waitFor(`document.querySelectorAll('.goal-artifacts [data-artifact-id]').length === 3`, 'three files', 10000);
+        // (a) the goal is drawn again (its title changed: the same rollup): the section is the same open one with its rows
+        await ev(`window.__sectionBefore = document.querySelector('.goal-artifacts'); true`);
+        assert.equal((await api('PATCH', `/api/board/${B}/goals/${G2}`, { subscriber_id: 'Operator', title: 'Redrawn goal' })).status, 200);
+        await ev(`window.dispatchEvent(new Event('focus')); true`);
+        await waitFor(`document.getElementById('goals-detail-title').textContent === 'Redrawn goal'`, 'the goal drawn again', 15000);
+        assert.equal(await ev(`document.querySelector('.goal-artifacts') === window.__sectionBefore`), true, 'the same section node, not a new one');
+        assert.equal(await ev(`document.querySelector('.goal-artifacts').open`), true, 'still open');
+        assert.equal(await ev(`document.querySelectorAll('.goal-artifacts [data-artifact-id]').length`), 3, 'with its rows');
+        // (b) the rollup changes (a second task done with two more files): the count and the open list refresh
+        await done('Second', ['d.txt', 'e.txt']);
+        await ev(`window.dispatchEvent(new Event('focus')); true`);
+        await waitFor(`document.querySelector('.goal-artifacts summary').textContent === 'Artifacts (5)'`, 'the count refreshed to 5', 15000);
+        await waitFor(`document.querySelectorAll('.goal-artifacts [data-artifact-id]').length === 5`, 'the open list refreshed to 5 files', 15000);
+        assert.equal(await ev(`document.querySelector('.goal-artifacts').open`), true, 'still open after the refresh');
+        console.log('   ✓');
         console.log('PASS goal artifacts mount: in the goal view on the team page and in the Inbox, closed with a quiet count, grouped by task, Load more on a phone, a name opens the document');
     } finally { await removeBoards(ev, [B]).catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
