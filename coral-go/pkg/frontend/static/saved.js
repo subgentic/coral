@@ -1,3 +1,4 @@
+import { serverMatches } from './inbox_servers.js';
 /* Save for Later (#4510), the list and the jump back: the Saved tab of the right sidebar (Open and Done, newest saved first), which stays open beside the main
  * view while you go back to a saved message. The buttons
  * on the messages and the top bar's count are in saved_marks.js. An agent still running opens in its Chat view and pages up to the message; one that has ended
@@ -80,7 +81,7 @@ async function load() {
     down = others.filter(o => o.failed).map(o => ({ id: o.server, label: o.label }));
     multi = scope.kind === 'all' && remotes.length > 0;
     // Only what a server sent in a usable shape is listed (an id goes into a URL: saved_marks.js validSavedItem).
-    items = answered.flatMap(a => (Array.isArray(a.d.items) ? a.d.items : []).filter(validSavedItem).map(i => ({ ...i, server: a.server }))).filter(i => savedKeeps(i, filters))
+    items = answered.flatMap(a => (Array.isArray(a.d.items) ? a.d.items : []).filter(validSavedItem).map(i => ({ ...i, server: a.server }))).filter(i => savedKeeps(i, filters) && serverMatches(i, filters))
         .sort((a, b) => (filters.sort === 'oldest' ? -1 : 1) * (b.saved_at || '').localeCompare(a.saved_at || ''));
     for (const i of items) if (i.ref && !convTitles.has(i.ref)) convTitles.set(i.ref, i.title || i.ref);
     const open = answered.reduce((n, a) => n + (a.d.open || 0), 0), done = answered.reduce((n, a) => n + (a.d.done || 0), 0);

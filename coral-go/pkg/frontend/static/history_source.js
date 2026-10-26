@@ -4,7 +4,7 @@ import { state } from './state.js';
 import { isCloud, serverFetch, serverUrl, currentServer } from './server_base.js';
 
 export function historyServer() {
-    if (!isCloud()) return 'local';
+    if (!isCloud()) return state.hub && state.historySourceServer ? state.historySourceServer : 'local';
     if (state.historySourceServer) return state.historySourceServer;
     const online = (state.servers || []).filter(s => s.id !== 'local' && s.status === 'online');
     const preferred = online.find(s => s.id === currentServer()) || online[0];
@@ -13,7 +13,8 @@ export function historyServer() {
 }
 
 export function setHistorySource(server) {
-    if (!isCloud()) return !server || server === 'local';
+    if (!isCloud() && !state.hub) return !server || server === 'local';
+    if (!isCloud() && (!server || server === 'local')) { state.historySourceServer = null; return true; }
     if (server && !(state.servers || []).some(s => s.id !== 'local' && s.id === server)) return false;
     state.historySourceServer = server || null;
     return true;
@@ -22,7 +23,7 @@ export function setHistorySource(server) {
 export function historyRoute(id, query = '') {
     const route = id ? { view: 'chats', id } : { view: 'chats', query };
     const server = historyServer();
-    if (isCloud() && server) route.server = server;
+    if (server && (isCloud() || server !== 'local')) route.server = server;
     return route;
 }
 
@@ -37,9 +38,9 @@ export function historyUrl(url) {
 export async function historyFetch(url, options) {
     const server = historyServer();
     if (!server) throw new Error('No computers online.');
-    if (isCloud() && (options?.method || 'GET').toUpperCase() !== 'GET') throw new Error('History is read-only through Coral Hub.');
+    if ((isCloud() || server !== 'local') && (options?.method || 'GET').toUpperCase() !== 'GET') throw new Error('History is read-only through Coral Hub.');
     const response = await serverFetch(server, url, options);
-    if (!isCloud()) return response;
+    if (!isCloud() && !state.hub) return response;
     const checkSource = () => {
         if (server !== historyServer()) throw new DOMException('The selected computer changed.', 'AbortError');
     };

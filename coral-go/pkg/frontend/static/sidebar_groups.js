@@ -164,7 +164,7 @@ function drawTable() {
     const toolbarFocus = bar?.node?.contains(a) ? a : null;
     const toolbarCaret = toolbarFocus && typeof toolbarFocus.selectionStart === 'number' ? [toolbarFocus.selectionStart, toolbarFocus.selectionEnd] : null;
     const folderPage = bar?.node && tables[0] && tables[0].noun ? tables[0] : null;
-    const drawn = html + (folderPage ? `|head:${folderPage.title}:${folderPage.count === undefined ? folderPage.rows.length : folderPage.count}` : '') + (bar?.signature || '') + tables.map(x => (x.node ? `|${x.signature || ''}` : '')).join('') + (lead ? `|${lead.signature}` : ''); // a table with its own rows says what they are (signature): the same rows are not drawn again
+    const drawn = html + (src.signature?.() || '') + (folderPage ? `|head:${folderPage.title}:${folderPage.count === undefined ? folderPage.rows.length : folderPage.count}` : '') + (bar?.signature || '') + tables.map(x => (x.node ? `|${x.signature || ''}` : '')).join('') + (lead ? `|${lead.signature}` : ''); // a table with its own rows says what they are (signature): the same rows are not drawn again
     // A row the keyboard is on keeps it across a redraw (the Inbox's "waiting 4 min" moves on every 30 seconds while the table is the only list, #7004): it is found again by its class and data attributes
     const held = host.contains(a) && a.matches('.group-chip, .dt-primary, .dt-quiet') ? { cls: a.className, data: JSON.stringify(a.dataset) } : null;
     if (host.dataset.drawn !== drawn) {

@@ -1,3 +1,4 @@
+import { serverColumns, serverMatches, syncServerField } from './inbox_servers.js';
 import { needsInputAttention } from './display_activity_hint.js';
 /* The dashboard's own Inbox on the shared sidebar (#7472), loaded the first time the Inbox tab is shown (inbox_tab.js keeps the badge and the counts, which are always there).
  *
@@ -81,7 +82,7 @@ const allNeeds = () => [...waitingSessions(), ...reviewRows()];
 const needsText = s => [s.review?.name || '', needsName(s),resolveSessionIdentity(s), sessionStateInfo(s).label, askOf(s), teamOf(s)].join(' ').toLowerCase();
 let needsFilters = NF.loadFilters(), needsBar = null;
 const needsCtx = { text: needsText, teamOf, nameOf: needsName };
-const filteredNeeds = () => NF.ordered(allNeeds().filter(s => NF.matches(s, needsFilters, needsCtx)), needsFilters);
+const filteredNeeds = () => NF.ordered(allNeeds().filter(s => NF.matches(s, needsFilters, needsCtx) && serverMatches(s, needsFilters)), needsFilters);
 const needsOverflow = () => reviewGroups(filteredNeeds().filter(s => s.review).map(s => s.review)).filter(g => g.more.length);
 const needsRows = () => {
     const all = filteredNeeds(), visible = new Set(reviewGroups(all.filter(s => s.review).map(s => s.review)).flatMap(g => g.rows.map(a => a.reviewKey)));
@@ -152,7 +153,7 @@ const savedState = DT.tableState(); // one word set for a task's state (Queued, 
 const goalsState = DT.tableState();
 const taskText = t => [t.title, t.board, t.priority, stateOf(t), t.created_by].join(' ').toLowerCase();
 let taskFilters = { ...TF.EMPTY }, taskState = 'all', taskBar = null;
-const taskMatches = t => (!queries.tasks || taskText(t).includes(queries.tasks.toLowerCase()))
+const taskMatches = t => serverMatches(t, taskFilters) && (!queries.tasks || taskText(t).includes(queries.tasks.toLowerCase()))
     && (!taskFilters.priority || t.priority === taskFilters.priority)
     && (!taskFilters.from || Date.parse(t.updated_at || t.created_at) >= new Date(taskFilters.from + 'T00:00:00').getTime());
 const taskRows = () => tasks.filter(t => taskMatches(t) && (taskState === 'all' || stateOf(t) === taskState)).sort((a, b) => (RANK[a.priority] ?? 3) - (RANK[b.priority] ?? 3));
@@ -170,6 +171,7 @@ function inboxTaskToolbar() {
         taskBar.node.querySelector('.list-bar-search-row').classList.add('gt-toolbar');
     }
     taskBar.set({ ...taskFilters, q: queries.tasks });
+    syncServerField(taskBar);
     if (!inboxTasksState.selected.size) Toolbar.mountSelection(taskBar.node.querySelector('.list-bar-search-row'), null);
     const states = ['Queued', 'In progress', 'In review', 'Blocked'];
     const rows = tasks.filter(taskMatches);
@@ -197,7 +199,7 @@ let goals = []; // the open goals of every team (GET /api/goals): id, board_id, 
 const goalKey = g => `${g.board_id}#${g.id}`;
 const goalTeam = g => keyLabel(g.board_id);
 let goalFilters = GF.loadFilters(), goalBar = null;
-const goalRows = () => GF.ordered(goals.filter(g => GF.matches(g, goalFilters, goalTeam)), goalFilters);
+const goalRows = () => GF.ordered(goals.filter(g => GF.matches(g, goalFilters, goalTeam) && serverMatches(g, goalFilters)), goalFilters);
 /** The Goals folder's toolbar (#8596): the search, the Filters icon beside it (Team, Driver, Updated since, Sort), the state pills, and the chips of what is on. */
 function inboxGoalsToolbar() {
     if (!goalBar) {
@@ -340,11 +342,11 @@ function savedListSpec(where = '') {
         empty: { line: empty, hint: v.loading || v.error || v.filtered || v.tab === 'done' ? '' : 'Save a message from a chat or a board with its bookmark.' },
         note: [v.query ? 'The search covers every saved message, not only these.' : '', ...v.down.map(d => `${d.label || d.id} did not answer, so its saved messages are not shown.`)].filter(Boolean).join(' '), rows,
         signature: JSON.stringify([multi, rows.map(f => [f.id, f.which, f.saved, f.state, f.gone, f.done, f.serverName])]),
-        node: () => DT.dataTable({ label: `Saved, ${rows.length}`, rows, rowKey: f => f.id, state: dock ? dockSavedState : savedState, sortBar: false, rowName: f => f.which,
+        node: () => DT.dataTable({ label: `Saved, ${rows.length}`, rows, rowKey: f => f.id, state: dock ? dockSavedState : savedState, sortBar: !dock, rowName: f => f.which,
             open: (f, row) => dock ? openDockSavedSheet(f.id, row.querySelector('.dt-primary')) : openSavedPage(f.id),
             columns: [
                 { key: 'message', label: 'Message', primary: true, width: 'grow', nowrap: false, line: 1, cell: f => { const b = DT.primaryButton(f.which); b.dataset.id = f.id; return b; } },
-                ...(multi ? [{ key: 'machine', label: 'Computer', line: dock ? 2 : 0, cell: f => f.serverName || '' }] : []),
+                ...(dock ? (multi ? [{ key: 'machine', label: 'Computer', line: 2, cell: f => f.serverName || '' }] : []) : serverColumns()),
                 { key: 'saved', label: 'Saved', tone: 'tertiary', align: 'end', line: 1, cell: f => f.saved },
                 { key: 'state', label: 'State', line: 2, cell: f => (f.state ? DT.tag(f.state) : '') },
                 { key: 'action', label: 'Action', hideLabel: true, line: 2, cell: f => {
@@ -410,11 +412,14 @@ export function drawDockSaved(host) {
 async function openChat(c) {
     state.inboxFolder = { key: group, label: (groupMeta(group) || {}).label || 'All chats' };
     const isGroup = c.type === 'group' || String(c.session_id || '').startsWith('board:');
-    if (isGroup) { const { historyServer } = await importOnce('./history_source.js'); openItemRoute('boards', identityKey(historyServer(), c.title || String(c.session_id).replace(/^board:/, '')), null, c.session_id); return; }
+    if (isGroup) { const { historyServer } = await importOnce('./history_source.js'); openItemRoute('boards', identityKey(c.server || historyServer(), c.title || String(c.session_id).replace(/^board:/, '')), null, c.session_id); return; }
+    const { setHistorySource } = await importOnce('./history_source.js');
+    if (!setHistorySource(c.server || 'local')) return;
     window.selectHistorySession?.(c.session_id, null, c);
 }
 
 registerGroupSource('hub-inbox', {
+    signature: () => JSON.stringify([state.hub, state.servers]),
     toolbar: key => key === 'needs' ? inboxNeedsToolbar() : key === 'tasks' ? inboxTaskToolbar() : key === 'goals' ? inboxGoalsToolbar() : key === 'saved' ? inboxSavedToolbar() : CH.CHAT_KEY.test(key) ? inboxChatsToolbar(key) : key === 'artifacts' ? IA.artifactsToolbar(() => renderInboxNav(true)) : ({ search: { id: 'inbox-search', label: 'Search the Inbox' } }), // the page's toolbar line, the same shape for Needs you, Tasks and Saved (#7723)
     keys: () => GROUPS.map(g => g.key),
     redraw: () => renderInboxNav(true),
@@ -430,6 +435,7 @@ registerGroupSource('hub-inbox', {
                 node: () => { const wrap = DT.el('div', 'inbox-needs-results'); const table = DT.dataTable({ label: `Needs you, ${rows.length}`, rows, rowKey: s => `${sessionServer(s)}:${s.session_id}`, state: needsState, rowName: s => s.review ? `${s.review.name}, for review, ${teamOf(s)}` : resolveSessionIdentity(s),
                     open: s => { if (s.review) { openReview(s.review); return; } window.switchNavTab?.('agents'); window.selectLiveSession?.(s.name, s.agent_type, s.session_id, sessionServer(s)); },
                     columns: [
+                        ...serverColumns(),
                         { key: 'agent', label: rows.some(s => s.review) ? 'Item' : 'Agent', primary: true, width: rows.some(s => s.review) ? 'grow' : rows.some(askOf) ? undefined : 'grow', sort: true, sortValue: s => resolveSessionIdentity(s), line: 1, cell: s => { if (s.review) { const name = DT.el('span', 'inbox-review-name', s.review.name); name.title = s.review.name; name.dataset.reviewArtifact = s.review.id; return name; } const w = DT.personButton(resolveSessionIdentity(s), `Open ${resolveSessionIdentity(s)}`); Object.assign(w.querySelector('.dt-primary').dataset, { name: s.name, agentType: s.agent_type, sessionId: s.session_id, server: sessionServer(s) }); return w; } },
                         ...(rows.some(askOf) ? [{ key: 'asks', label: 'Waiting for', width: rows.some(s => s.review) ? 'content' : 'grow', line: 2, cell: s => {
                             if (!s.review) return askOf(s) || '';
@@ -456,7 +462,7 @@ registerGroupSource('hub-inbox', {
                 signature: JSON.stringify([rows.map(t => [t.project, t.id, t.title, t.priority, t.status, t.board, t.updated_at, t.artifact_count])]),
                 node: () => {
                     const row = document.querySelector('#group-table-view .gt-toolbar');
-                    const t = TV.tasksTable('mine', rows, { ctx: { teamOf: t => t.board || '' }, rowKey: t => `${t.project}#${t.id}`, // only my tasks: no who; the Team column because the group spans teams
+                    const t = TV.tasksTable('mine', rows, { tweak: columns => [...columns, ...serverColumns()], ctx: { teamOf: t => t.board || '' }, rowKey: t => `${t.project}#${t.id}`, // only my tasks: no who; the Team column because the group spans teams
                         open: t => openItemRoute('tasks', t.project, t.id, `${t.project}#${t.id}`), state: inboxTasksState,
                         selectable: { contextKey: 'inbox-tasks', actions: TB.inboxTaskActions(() => { inboxTasksState.selected.clear(); refreshTasks(); }), onChange: keys => row && Toolbar.mountSelection(row, keys.size ? t.bar : null) } }); // the bar takes the toolbar's line while tasks are selected
                     if (row) { Toolbar.mountSelection(row, inboxTasksState.selected.size ? t.bar : null); row.querySelectorAll('.dt-select-toggle').forEach(b => b.remove()); if (isPhoneLayout()) row.append(t.selectButton); }
@@ -464,7 +470,7 @@ registerGroupSource('hub-inbox', {
                 } };
         }
         if (CH.CHAT_KEY.test(key)) {
-            return CH.chatsSpec(key, { query: chatFiltersOf(key).q, params: CF.toParams(key, chatFiltersOf(key)), redraw: () => refreshGroupTable('hub-inbox'), open: openChat,
+            return CH.chatsSpec(key, { query: chatFiltersOf(key).q, params: CF.toParams(key, chatFiltersOf(key)), server: chatFiltersOf(key).server, redraw: () => refreshGroupTable('hub-inbox'), open: openChat,
                 after: () => { CH.loadChatCounts(() => renderInboxNav(true)); refreshGroupTable('hub-inbox'); } });
         }
         if (key === 'goals') {
@@ -479,7 +485,7 @@ registerGroupSource('hub-inbox', {
                         note(folderRoute);
                         go({ ...folderRoute, id: g.board_id, item: g.id });
                     },
-                    columns: GC.goalColumns({ teamOf: goalTeam }, ['state', 'goal', 'team', 'progress', 'updated']) }).el };
+                    columns: [...serverColumns(), ...GC.goalColumns({ teamOf: goalTeam }, ['state', 'goal', 'team', 'progress', 'updated'])] }).el };
         }
         if (key === 'artifacts') return IA.artifactsSpec();
         if (key === 'saved') return savedListSpec();

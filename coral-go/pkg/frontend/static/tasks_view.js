@@ -1,3 +1,4 @@
+import { serverField, syncServerField } from './inbox_servers.js';
 /* The one Tasks view (#8060, the operator: "shoot for simplicity"): a list of tasks is drawn by tasksTable(scope, rows, options) and nowhere else. A scope says which columns the list has: the team's Tasks tab all of them, a task's
  * follow-ups, the Inbox's own scope ("mine": Team in, Assigned to out, they are all the person's), a goal's side column and a goal's page. One state word set, one chip, who as an avatar and a name, the priority as a word, the update
  * as a relative time. A task is the board's own record (status, review_requested, assigned_to, worked_by, completed_by, goal_id, priority, created_at, updated_at, board).
@@ -136,7 +137,7 @@ const DOCK_SPEC = {
 
 
 // Inbox tasks belong to the person across teams: no assignee or goal field, and no create action.
-const MINE_SPEC = { ...TEAM_SPEC, idp: 'inbox-tk', chipsElsewhere: false, fields: [SPEC.fields[1], SPEC.fields[3]].map(field => ({ ...field, id: field.id.replace('tk-', 'inbox-tk-') })) };
+const MINE_SPEC = { ...TEAM_SPEC, idp: 'inbox-tk', chipsElsewhere: false, fields: [serverField('inbox-tk'), SPEC.fields[1], SPEC.fields[3]].map(field => ({ ...field, id: field.id.replace('tk-', 'inbox-tk-') })) };
 
 const TOOLBAR_SPECS = { mine: MINE_SPEC, team: TEAM_SPEC, agent: DOCK_SPEC, 'agent-team': DOCK_SPEC };
 
@@ -145,7 +146,9 @@ const TOOLBAR_SPECS = { mine: MINE_SPEC, team: TEAM_SPEC, agent: DOCK_SPEC, 'age
 export function tasksToolbar(scope, onChange, hooks = {}) {
     const spec = TOOLBAR_SPECS[scope];
     if (!spec) throw new Error(`tasksToolbar: scope "${scope}" has no toolbar`);
-    return buildListBar(spec, onChange, hooks);
+    const bar = buildListBar(spec, onChange, hooks);
+    if (scope === 'mine') syncServerField(bar);
+    return bar;
 }
 
 /** The one + Task button: the same words, name, tooltip and action on every list of tasks. `small` is the dock's compact size. It opens the create-task dialog (the data-on-click action). */

@@ -1,3 +1,4 @@
+import { serverFilter } from './inbox_servers.js';
 /* The Saved for later panel's search, filters and order (#4778): what they are and how they become GET /api/saved's parameters (q, sort: #4745; kind and conv were there). Pure (no DOM, no
  * imports) so it can be tested on its own; saved.js draws the bar and reads the list again. The server matches the title and the snippet. The Open and Done tabs stay as they are: they say
  * which half of the matches is shown. */
@@ -12,6 +13,7 @@ export const SORT_LABEL = { newest: 'Newest saved', oldest: 'Oldest saved' };
 
 // convLabel turns a stored conversation reference into the title the person reads in its chip
 const filters = convLabel => defineFilters({
+    server: serverFilter,
     q: { type: 'text', max: 200, chip: v => `Search: ${v}` },
     kind: { type: 'choice', values: KINDS, chip: v => `Type: ${KIND_LABEL[v]}` },
     conv: { type: 'text', max: 300, chip: v => `From: ${convLabel(v)}` },

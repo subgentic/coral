@@ -405,7 +405,7 @@ import { setBackLink } from './sidebar_groups.js';
 export function drawChatFlags(entry) {
     const w = document.getElementById('history-flags');
     if (!w) return;
-    w.hidden = !entry || isCloud();
+    w.hidden = !entry || isCloud() || sessionServer(state.currentSession) !== 'local';
     if (w.hidden) return;
     const star = document.getElementById('history-star'), arch = document.getElementById('history-archive');
     const starLabel = entry.starred ? 'Remove the star' : 'Star', archLabel = entry.archived ? 'Unarchive' : 'Archive';
@@ -415,14 +415,15 @@ export function drawChatFlags(entry) {
 export async function toggleChatFlag(flag) {
     const cur = state.currentSession;
     if (!cur || cur.type !== 'history' || (flag !== 'starred' && flag !== 'archived')) return;
-    const entry = state.historySessionsList.find(x => x.session_id === cur.name);
+    const entry = state.historySessionsList.find(x => x.session_id === cur.name && sessionServer(x) === sessionServer(cur));
     if (!entry) return;
     const m = await importOnce('./mailbox_chats.js');
-    if (await m.setChatFlag(cur.name, flag, !entry[flag])) { entry[flag] = !entry[flag]; drawChatFlags(entry); }
+    if (await m.setChatFlag(cur.name, flag, !entry[flag], sessionServer(cur))) { entry[flag] = !entry[flag]; drawChatFlags(entry); }
 }
 
 export async function selectHistorySession(sessionId, locator = null, entry = null) {
     const source = historyServer();
+    const fromSource = x => x.session_id === sessionId && (x.server || (isCloud() ? source : 'local')) === source;
     const route = normalize(historyRoute(sessionId));
     if (!route || (isCloud() && !source)) return false;
     const generation = ++switchGeneration;
@@ -437,9 +438,9 @@ export async function selectHistorySession(sessionId, locator = null, entry = nu
         saveSessionDraft(oldKey, input.value);
     }
 
-    if (entry && !state.historySessionsList.some(x => x.session_id === sessionId)) state.historySessionsList = [entry, ...state.historySessionsList];
+    if (entry && !state.historySessionsList.some(fromSource)) state.historySessionsList = [entry, ...state.historySessionsList];
     // A local Coral reads its chat list the first time a chat's entry is wanted (a link, a saved message, the Resume dialog), not at every start (#8195); the chat's own page waits for it.
-    if (!entry && !isCloud() && !state.historySessionsList.some(x => x.session_id === sessionId)) {
+    if (!entry && !isCloud() && !state.historySessionsList.some(fromSource)) {
         await importOnce('./history_filters.js').then(m => m.ensureHistoryList()).catch(() => {});
         if (generation !== switchGeneration) return false;
     }
@@ -455,7 +456,7 @@ export async function selectHistorySession(sessionId, locator = null, entry = nu
 
     showView("history-session-view");
 
-    const openedEntry = state.historySessionsList.find(x => x.session_id === sessionId);
+    const openedEntry = state.historySessionsList.find(fromSource);
     document.getElementById("history-session-title").textContent = historyLabel(openedEntry); // the chat's title; its id is behind Details (#6200)
     const described = describeChat(openedEntry); // the way back to its group's table, and who, when and how long under the title (#7443)
     setBackLink('history-back', isCloud() ? 'history' : 'hub-inbox', isCloud() ? described.group : (state.inboxFolder || { key: 'chats', label: 'All chats' })); // a local Coral's chat goes back to the Inbox folder it came from
@@ -468,12 +469,12 @@ export async function selectHistorySession(sessionId, locator = null, entry = nu
     const computer = (state.servers || []).find(s => s.id === source);
     const sourceLabel = document.getElementById('history-session-source');
     if (sourceLabel) {
-        sourceLabel.hidden = !isCloud();
+        sourceLabel.hidden = !isCloud() && source === 'local';
         sourceLabel.textContent = computer?.label || source || '';
     }
 
     // Update branch from history sessions data
-    const historyEntry = state.historySessionsList.find(s => s.session_id === sessionId);
+    const historyEntry = state.historySessionsList.find(fromSource);
     const branchEl = document.getElementById("history-session-branch");
     if (historyEntry && historyEntry.branch) {
         const bt = branchEl.querySelector(".branch-text");

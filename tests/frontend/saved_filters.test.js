@@ -9,7 +9,7 @@ const { pathToFileURL } = require('node:url');
     assert.deepEqual(m.clean(undefined), m.EMPTY);
     assert.deepEqual(m.clean({ q: 5, kind: 'video', conv: {}, sort: 'random' }), m.EMPTY);
     assert.equal(m.clean({ q: 'a\u0000b\nc ' + 'x'.repeat(300) }).q.length, 200);
-    assert.deepEqual(m.clean({ kind: 'board', conv: 'team-x', sort: 'oldest' }), { q: '', kind: 'board', conv: 'team-x', team: '', from: '', sort: 'oldest' });
+    assert.deepEqual(m.clean({ kind: 'board', conv: 'team-x', sort: 'oldest' }), { server: '', q: '', kind: 'board', conv: 'team-x', team: '', from: '', sort: 'oldest' });
     assert.equal(m.isFiltered(m.EMPTY), false);
     assert.equal(m.isFiltered({ ...m.EMPTY, sort: 'oldest' }), false, 'the order alone does not narrow');
     for (const [k, v] of [['q', 'x'], ['kind', 'agent'], ['conv', 'r']]) assert.equal(m.isFiltered({ ...m.EMPTY, [k]: v }), true, k);
