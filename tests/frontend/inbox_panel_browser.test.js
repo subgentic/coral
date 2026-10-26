@@ -212,7 +212,11 @@ const STUB = `(() => {
             // sign-out's memory purge drops the drafts
             await ev(`import(${S} + 'local_store.js').then(m => m.forgetAccountMemory()); true`);
             await head(2); await head(2);
-            check(`${dev}: after sign-out's memory purge the unsent draft is gone`, (await ev(`document.querySelectorAll('#inbox-tasks-host .ibx-reply-input')[2].value`)) === '');
+            // DIAGNOSTIC (#8753, not to be merged): the original read first, then the same boxes again 0.5 s and 2 s later, to tell a late redraw from a draft that survived
+            const readBoxes = () => ev(`[...document.querySelectorAll('#inbox-tasks-host .ibx-reply-input')].map(t => [t.value, t.isConnected, !!t.closest('[hidden]'), t.id])`);
+            const purged0 = (await ev(`document.querySelectorAll('#inbox-tasks-host .ibx-reply-input')[2].value`));
+            const snap0 = await readBoxes(); await new Promise(r => setTimeout(r, 500)); const snap1 = await readBoxes(); await new Promise(r => setTimeout(r, 1500)); const snap2 = await readBoxes(); // sleep-ok: the diagnostic waits to see whether the value changes by itself
+            check(`${dev}: after sign-out's memory purge the unsent draft is gone`, purged0 === '', JSON.stringify({ purged0, snap0, snap1, snap2 }));
 
             // touch targets and sideways scroll
             const sizes = await ev(`(() => { const h = [...document.querySelectorAll('#inbox-tasks-host .ibx-task-head, #inbox-tasks-host .ibx-send')].map(e => Math.round(e.getBoundingClientRect().height)).filter(x => x > 0); return { h, over: document.documentElement.scrollWidth - document.documentElement.clientWidth }; })()`);
