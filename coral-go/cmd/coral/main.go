@@ -64,6 +64,61 @@ func setupCrashLogging(coralDir string) {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
 }
 
+// serverFlags are the server's command-line flags, defined on the standard flag set (flag.Visit and flag.CommandLine see them) as main always did.
+type serverFlags struct {
+	homeDir            *string
+	host               *string
+	noAutoLoopback     *bool
+	port               *int
+	noBrowser          *bool
+	backendFlag        *string
+	remoteAccess       *bool
+	hubMode            *bool
+	cloudURL           *string
+	agentPriority      *string
+	debugInput         *bool
+	cloudMaxMode       *string
+	bootstrapFile      *string
+	proofFile          *string
+	cloudConnect       *string
+	tlsCert            *string
+	strictLocalAuth    *bool
+	tlsKey             *string
+	selfTest           *bool
+	showVersion        *bool
+	allowSharedDataDir *bool
+}
+
+// defineServerFlags defines every server flag and returns their values.
+func defineServerFlags() *serverFlags {
+	sf := &serverFlags{}
+	// Parse --home early so config.Load() can use it
+	sf.homeDir = flag.String("home", "", "Data directory (default: ~/.coral)")
+	sf.host = flag.String("host", "", "Address to listen on, or a comma list of them (e.g. 127.0.0.1,100.101.102.103). Default: this computer only. A network address (or 0.0.0.0) is used only when remote access is on (Settings > Privacy, or --remote); otherwise Coral listens on 127.0.0.1")
+	sf.noAutoLoopback = flag.Bool("no-auto-loopback", config.Truthy(os.Getenv("CORAL_NO_AUTO_LOOPBACK")), "When --host names only network addresses, don't also listen on 127.0.0.1 (also CORAL_NO_AUTO_LOOPBACK=1)")
+	sf.port = flag.Int("port", 0, "Port to bind to")
+	sf.noBrowser = flag.Bool("no-browser", false, "Don't open the browser on startup")
+	// "" = not given: Settings > Terminal backend, else the built-in terminal, pty (#3634, #6064).
+	sf.backendFlag = flag.String("backend", "", "Terminal backend: pty or tmux (default: Settings > Terminal backend, else pty: agents stop when you quit Coral)")
+	sf.remoteAccess = flag.Bool("remote", false, "Allow remote (non-loopback) connections without requiring the saved setting")
+	sf.hubMode = flag.Bool("hub", false, "Run as a multi-server hub: manage and view remote Coral servers (also CORAL_HUB=1)")
+	sf.cloudURL = flag.String("cloud-url", "", "Coral Hub origin this server may connect to (also CORAL_CLOUD_URL). Release builds default to https://app.coralhub.dev; \"\" or off disables it. Nothing is sent until you connect")
+	sf.agentPriority = flag.String("agent-priority", "", "Priority of agent processes: low (default, nice +10 / below normal so the server stays responsive) or normal. Also CORAL_AGENT_PRIORITY or the Settings choice")
+	sf.debugInput = flag.Bool("debug-input", false, "Record every write Coral makes to agent terminals in <data dir>/input-debug.log (debug; may contain secrets). Also CORAL_DEBUG_INPUT=1 or the Settings toggle")
+	sf.cloudMaxMode = flag.String("cloud-max-mode", "", "Most Coral Hub may do on this computer: view, interact or launch (also CORAL_CLOUD_MAX_MODE). Sets the same cap as Settings > Coral Hub, at startup, for a machine nobody sits at (a container); an invalid value stops Coral from starting. Unset leaves the saved setting (view by default). Only whoever starts Coral can set it: the hub and the API cannot")
+	sf.bootstrapFile = flag.String("bootstrap-file", "", "One-time Coral Hub credential file to enroll this server with at startup (owned by you, mode 0600, removed after reading). On Linux /run/coral/bootstrap.d/credential is read without the flag")
+	sf.proofFile = flag.String("proof-file", "", "Optional proof file to send with the bootstrap credential (at most 16 KiB of JSON from a provider helper)")
+	sf.cloudConnect = flag.String("cloud-connect", "", "Offer to connect to Coral Hub on a server not yet connected (also CORAL_CLOUD_CONNECT): prompt (the dashboard's first-launch screen, and a prompt in the terminal at startup; without a terminal, log the link and code), auto (the screen, and only log them) or off. Unset: prompt when --cloud-url/CORAL_CLOUD_URL is given, otherwise off (the build's default URL alone offers nothing; Coral Hub stays in Settings, on the home screen and in 'coral cloud connect')")
+	sf.tlsCert = flag.String("tls-cert", os.Getenv("CORAL_TLS_CERT"), "PEM certificate file: serve HTTPS (and WSS) on the port, and accept only HTTPS from other computers. Needs --tls-key (also CORAL_TLS_CERT)")
+	sf.strictLocalAuth = flag.Bool("strict-local-auth", true, "Require a credential for every request from this computer: an agent's session token, the dashboard's sign-in (run 'coral open' to sign in), a command-line signature or the API key ('coral api-key'); refuse an agent acting as someone else. On by default; --strict-local-auth=false turns it off (CORAL_STRICT_LOCAL_AUTH=0 does too, in a dev build only), which lets any program on this computer use Coral without a credential")
+	sf.tlsKey = flag.String("tls-key", os.Getenv("CORAL_TLS_KEY"), "PEM private key file for --tls-cert (also CORAL_TLS_KEY)")
+	sf.selfTest = flag.Bool("encryption-self-test", false, "Run an isolated encrypted database round-trip and exit")
+	sf.showVersion = flag.Bool("version", false, "Print the version and exit (also -v, or coral version)")
+	flag.BoolVar(sf.showVersion, "v", false, "Print the version and exit")
+	sf.allowSharedDataDir = flag.Bool("allow-shared-data-dir", false, "Run even when the data folder can be read by other accounts and Coral can't make it private (Windows: it is owned by someone else, or is a link). By default Coral makes such a folder private to you, or refuses to start (also CORAL_ALLOW_SHARED_DATA_DIR=1)")
+	return sf
+}
+
 func main() {
 	if code, ok := subcommand(os.Args[1:]); ok {
 		os.Exit(code)
@@ -80,29 +135,7 @@ func main() {
 	}()
 
 	// Parse --home early so config.Load() can use it
-	homeDir := flag.String("home", "", "Data directory (default: ~/.coral)")
-	host := flag.String("host", "", "Address to listen on, or a comma list of them (e.g. 127.0.0.1,100.101.102.103). Default: this computer only. A network address (or 0.0.0.0) is used only when remote access is on (Settings > Privacy, or --remote); otherwise Coral listens on 127.0.0.1")
-	noAutoLoopback := flag.Bool("no-auto-loopback", config.Truthy(os.Getenv("CORAL_NO_AUTO_LOOPBACK")), "When --host names only network addresses, don't also listen on 127.0.0.1 (also CORAL_NO_AUTO_LOOPBACK=1)")
-	port := flag.Int("port", 0, "Port to bind to")
-	noBrowser := flag.Bool("no-browser", false, "Don't open the browser on startup")
-	// "" = not given: Settings > Terminal backend, else the built-in terminal, pty (#3634, #6064).
-	backendFlag := flag.String("backend", "", "Terminal backend: pty or tmux (default: Settings > Terminal backend, else pty: agents stop when you quit Coral)")
-	remoteAccess := flag.Bool("remote", false, "Allow remote (non-loopback) connections without requiring the saved setting")
-	hubMode := flag.Bool("hub", false, "Run as a multi-server hub: manage and view remote Coral servers (also CORAL_HUB=1)")
-	cloudURL := flag.String("cloud-url", "", "Coral Hub origin this server may connect to (also CORAL_CLOUD_URL). Release builds default to https://app.coralhub.dev; \"\" or off disables it. Nothing is sent until you connect")
-	agentPriority := flag.String("agent-priority", "", "Priority of agent processes: low (default, nice +10 / below normal so the server stays responsive) or normal. Also CORAL_AGENT_PRIORITY or the Settings choice")
-	debugInput := flag.Bool("debug-input", false, "Record every write Coral makes to agent terminals in <data dir>/input-debug.log (debug; may contain secrets). Also CORAL_DEBUG_INPUT=1 or the Settings toggle")
-	cloudMaxMode := flag.String("cloud-max-mode", "", "Most Coral Hub may do on this computer: view, interact or launch (also CORAL_CLOUD_MAX_MODE). Sets the same cap as Settings > Coral Hub, at startup, for a machine nobody sits at (a container); an invalid value stops Coral from starting. Unset leaves the saved setting (view by default). Only whoever starts Coral can set it: the hub and the API cannot")
-	bootstrapFile := flag.String("bootstrap-file", "", "One-time Coral Hub credential file to enroll this server with at startup (owned by you, mode 0600, removed after reading). On Linux /run/coral/bootstrap.d/credential is read without the flag")
-	proofFile := flag.String("proof-file", "", "Optional proof file to send with the bootstrap credential (at most 16 KiB of JSON from a provider helper)")
-	cloudConnect := flag.String("cloud-connect", "", "Offer to connect to Coral Hub on a server not yet connected (also CORAL_CLOUD_CONNECT): prompt (the dashboard's first-launch screen, and a prompt in the terminal at startup; without a terminal, log the link and code), auto (the screen, and only log them) or off. Unset: prompt when --cloud-url/CORAL_CLOUD_URL is given, otherwise off (the build's default URL alone offers nothing; Coral Hub stays in Settings, on the home screen and in 'coral cloud connect')")
-	tlsCert := flag.String("tls-cert", os.Getenv("CORAL_TLS_CERT"), "PEM certificate file: serve HTTPS (and WSS) on the port, and accept only HTTPS from other computers. Needs --tls-key (also CORAL_TLS_CERT)")
-	strictLocalAuth := flag.Bool("strict-local-auth", true, "Require a credential for every request from this computer: an agent's session token, the dashboard's sign-in (run 'coral open' to sign in), a command-line signature or the API key ('coral api-key'); refuse an agent acting as someone else. On by default; --strict-local-auth=false turns it off (CORAL_STRICT_LOCAL_AUTH=0 does too, in a dev build only), which lets any program on this computer use Coral without a credential")
-	tlsKey := flag.String("tls-key", os.Getenv("CORAL_TLS_KEY"), "PEM private key file for --tls-cert (also CORAL_TLS_KEY)")
-	selfTest := flag.Bool("encryption-self-test", false, "Run an isolated encrypted database round-trip and exit")
-	showVersion := flag.Bool("version", false, "Print the version and exit (also -v, or coral version)")
-	flag.BoolVar(showVersion, "v", false, "Print the version and exit")
-	allowSharedDataDir := flag.Bool("allow-shared-data-dir", false, "Run even when the data folder can be read by other accounts and Coral can't make it private (Windows: it is owned by someone else, or is a link). By default Coral makes such a folder private to you, or refuses to start (also CORAL_ALLOW_SHARED_DATA_DIR=1)")
+	sf := defineServerFlags()
 	// A bad flag gets one line and where to look, not every server flag (#235); --help-all prints them all.
 	flag.Usage = func() {
 		for _, a := range os.Args[1:] {
@@ -134,8 +167,8 @@ func main() {
 		os.Exit(flagParseFailure(os.Stderr, err))
 	}
 	flag.CommandLine.Usage = usage
-	config.SetAllowSharedDataDir(*allowSharedDataDir) // before config.Load, which makes the data folder
-	if *showVersion {
+	config.SetAllowSharedDataDir(*sf.allowSharedDataDir) // before config.Load, which makes the data folder
+	if *sf.showVersion {
 		printVersion(os.Stdout)
 		os.Exit(0)
 	}
@@ -146,11 +179,11 @@ func main() {
 		flag.Usage()
 		os.Exit(2)
 	}
-	if msg := backendchoice.FlagProblem(runtime.GOOS, *backendFlag); msg != "" {
+	if msg := backendchoice.FlagProblem(runtime.GOOS, *sf.backendFlag); msg != "" {
 		fmt.Fprintf(os.Stderr, "coral: %s\n", msg)
 		os.Exit(2)
 	}
-	if *selfTest {
+	if *sf.selfTest {
 		if err := runEncryptionSelfTest(); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
@@ -167,24 +200,24 @@ func main() {
 
 	// The instance lock before anything touches the data folder (#6388): config.Load makes the folder and tightens its modes, the log and the Terms marker are written in it, so a second coral
 	// started against a folder another one holds must lose here, with a line on stderr and a non-zero exit, and leave the folder (modes, files, coral.log) exactly as it was.
-	instance, lockErr := startup.LockInstance(config.ResolveCoralDir(*homeDir))
+	instance, lockErr := startup.LockInstance(config.ResolveCoralDir(*sf.homeDir))
 	if lockErr != nil {
 		fmt.Fprintf(os.Stderr, "coral: %v\n", lockErr)
 		os.Exit(1)
 	}
-	cfg := config.Load(*homeDir)
+	cfg := config.Load(*sf.homeDir)
 	// --hub or CORAL_HUB=1 (read by config.Load) force hub mode on; otherwise the saved
 	// Settings > Run as a hub decides, at startup (#3460).
-	cfg.HubMode = *hubMode || cfg.HubMode
+	cfg.HubMode = *sf.hubMode || cfg.HubMode
 	cfg.HubModeForced = cfg.HubMode
 	// --cloud-url wins over CORAL_CLOUD_URL and the tier default, and --cloud-url "" turns it off.
 	flag.Visit(func(f *flag.Flag) {
 		if f.Name == "cloud-url" {
-			cfg.CloudURL = config.CloudURLSetting(*cloudURL, true)
+			cfg.CloudURL = config.CloudURLSetting(*sf.cloudURL, true)
 			cfg.CloudURLExplicit = cfg.CloudURL != ""
 		}
 	})
-	cfg.BootstrapFile, cfg.ProofFile = *bootstrapFile, *proofFile
+	cfg.BootstrapFile, cfg.ProofFile = *sf.bootstrapFile, *sf.proofFile
 	// The secret detector, built once before anything is logged or served (#3808): every coral.log
 	// line and every Coral Hub reply goes through it. Without it Coral does not start.
 	if err := secrets.Init(); err != nil {
@@ -195,12 +228,12 @@ func main() {
 	log.Printf("[startup] secret redaction: %s", secrets.RulesVersion)
 	flag.Visit(func(f *flag.Flag) {
 		if f.Name == "cloud-connect" {
-			cfg.CloudConnect = strings.ToLower(strings.TrimSpace(*cloudConnect))
+			cfg.CloudConnect = strings.ToLower(strings.TrimSpace(*sf.cloudConnect))
 		}
 	})
 	maxModeGiven := false
 	flag.Visit(func(f *flag.Flag) { maxModeGiven = maxModeGiven || f.Name == "cloud-max-mode" })
-	maxMode, maxModeErr := resolveCloudMaxMode(maxModeGiven, *cloudMaxMode, cfg.CloudMaxMode)
+	maxMode, maxModeErr := resolveCloudMaxMode(maxModeGiven, *sf.cloudMaxMode, cfg.CloudMaxMode)
 	if maxModeErr != nil {
 		fmt.Fprintln(os.Stderr, maxModeErr)
 		os.Exit(2)
@@ -231,20 +264,20 @@ func main() {
 
 	log.Printf("[STARTUP] build tier=%s eula=%v", config.TierName, config.EULARequired())
 
-	if *host != "" {
-		cfg.Host = *host
+	if *sf.host != "" {
+		cfg.Host = *sf.host
 		cfg.HostExplicit = true
 	}
-	cfg.NoAutoLoopback = *noAutoLoopback
+	cfg.NoAutoLoopback = *sf.noAutoLoopback
 	// A build made with the relaunchfixture tag (#5452) listens on this computer only and connects to no hub unless the test names one; in every other build this does nothing.
 	cloudURLGiven := false
 	flag.Visit(func(f *flag.Flag) { cloudURLGiven = cloudURLGiven || f.Name == "cloud-url" })
-	if err := applyRelaunchFixtureBuild(cfg, *host, remoteAccess, cloudURLGiven); err != nil {
+	if err := applyRelaunchFixtureBuild(cfg, *sf.host, sf.remoteAccess, cloudURLGiven); err != nil {
 		fmt.Fprintf(os.Stderr, "coral: %v\n", err)
 		os.Exit(1)
 	}
-	if *port != 0 {
-		cfg.Port = *port
+	if *sf.port != 0 {
+		cfg.Port = *sf.port
 	}
 
 	// Check EULA acceptance (terminal prompt on first launch)
@@ -270,27 +303,27 @@ func main() {
 	// says how to turn it on, and the next interactive start still asks (#3271, #4052).
 	var remotePrompt func() bool
 	if canAskAtTerminal(os.Stdin, os.Stdout) {
-		tlsOn := strings.TrimSpace(*tlsCert) != "" && strings.TrimSpace(*tlsKey) != ""
+		tlsOn := strings.TrimSpace(*sf.tlsCert) != "" && strings.TrimSpace(*sf.tlsKey) != ""
 		remotePrompt = func() bool { return promptRemoteAccess(os.Stdin, os.Stdout, tlsOn) }
 	}
 	// Only a --strict-local-auth given on the command line overrides the default (#3936).
 	var strictFlag *bool
 	flag.Visit(func(f *flag.Flag) {
 		if f.Name == "strict-local-auth" {
-			strictFlag = strictLocalAuth
+			strictFlag = sf.strictLocalAuth
 		}
 	})
 	rs, err := startup.Start(ctx, cfg, startup.Options{
 		Instance:           instance,
-		BackendType:        *backendFlag,
+		BackendType:        *sf.backendFlag,
 		PasswordPrompt:     promptDatabasePassword,
 		UnlockSurface:      "tty",
-		RemoteAccess:       *remoteAccess,
+		RemoteAccess:       *sf.remoteAccess,
 		RemoteAccessPrompt: remotePrompt,
-		DebugInput:         *debugInput,
-		AgentPriority:      *agentPriority,
-		TLSCert:            *tlsCert,
-		TLSKey:             *tlsKey,
+		DebugInput:         *sf.debugInput,
+		AgentPriority:      *sf.agentPriority,
+		TLSCert:            *sf.tlsCert,
+		TLSKey:             *sf.tlsKey,
 		StrictLocalAuth:    strictFlag,
 	})
 	if err != nil {
@@ -329,7 +362,7 @@ func main() {
 		link := fmt.Sprintf("http://localhost:%d/?login_token=%s", cfg.Port, rs.LoginToken)
 		// To the terminal only (stderr), never coral.log: the link is a credential and
 		// coral.log persists and is shared in bug reports (#3387).
-		if *noBrowser || !canOpenBrowser() {
+		if *sf.noBrowser || !canOpenBrowser() {
 			openDashboard(os.Stderr, link, false)
 		} else {
 			go func() {
@@ -338,7 +371,7 @@ func main() {
 				openDashboard(os.Stderr, link, true)
 			}()
 		}
-	} else if !*noBrowser {
+	} else if !*sf.noBrowser {
 		go func() {
 			defer safego.Recover("coral/main:278")
 			time.Sleep(500 * time.Millisecond)
