@@ -66,7 +66,7 @@
 .nav-tab-badge {
     position: absolute;
     top: 2px;
-    left: calc(100% - 4px); /* just past the word's top-right corner: it covers the last letter by 4 px at most, and a pill of three or four characters stays in the tabs' 24 px gap */
+    left: calc(100% - 2px); /* just past the word's top-right corner: it covers the last letter by 2 px at most, and a pill of three or four characters stays in the tabs' 24 px gap */
     box-sizing: border-box;
     padding: 0 4px;
     min-width: 16px;
