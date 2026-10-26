@@ -148,6 +148,9 @@ const hex = i => i.toString(16).padStart(20, '0');
         // Its ResizeObserver folds it for the dock's narrow box on the next layout.
         await waitFor(`!!document.querySelector('#saved-table .dt-box.dt-folded')`, 'the Saved table to fold for its dock width', 6000,
             `(() => { const box = document.querySelector('#saved-table .dt-box'), b = document.querySelector('#saved-table button.dt-quiet'); return { boxClass: box?.className, boxWidth: box?.clientWidth, viewport: innerWidth, coarse: matchMedia('(pointer: coarse)').matches, minHeight: b && getComputedStyle(b).minHeight, height: b?.getBoundingClientRect().height }; })()`);
+        console.log('Saved action after fold:', await ev(`(() => { const b = document.querySelector('#saved-table button.dt-quiet'), s = getComputedStyle(b); return { height: b.getBoundingClientRect().height, minHeight: s.minHeight, transition: s.transition, animations: b.getAnimations().map(a => ({ property: a.transitionProperty, state: a.playState })) }; })()`));
+        // The inherited button transition includes min-height; folding starts its 32 -> 28px transition.
+        await waitFor(`Math.round(document.querySelector('#saved-table button.dt-quiet').getBoundingClientRect().height) === 28`, 'the folded Saved action height to settle', 6000);
         assert.equal(await ev(`Math.round(document.querySelector('#saved-table button.dt-quiet').getBoundingClientRect().height)`), 28, 'fine-pointer secondary actions use the compact shared height');
         await shot('saved-tab-desktop');
 
