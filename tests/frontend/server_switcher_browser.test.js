@@ -311,12 +311,13 @@ const SETTINGS_PRELOAD = `(() => {
         console.log('   ✓ no chevrons; team, folder and workflow headers are buttons with aria-expanded (Enter/Space); a team row has no info icon');
         console.log('   ✓ variant A hierarchy (700/600/600/500, server brightest, agents muted), neutral teams, the picked color kept, unknown not dimmed, folder icons named and aligned');
 
-        console.log('7. Top tabs in the operator\'s order (#3507): Agents, Servers, then the local tabs, Docs last');
+        console.log('7. Top tabs in the operator\'s order (#8704): Agents, the local tabs, Servers after Analytics, Docs last');
         // The scene fakes a hub with servers, so let the page recompute the Servers tab as a live update would.
         await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'servers_tab.js'); m.updateServersTabVisibility(); return true; })()`);
         const tabs = await ev(`(() => { const b = [...document.querySelectorAll('.top-nav-tabs .top-nav-tab')]; return { dom: b.map(x => x.id),
             shown: b.filter(x => !x.hidden && getComputedStyle(x).display !== 'none').map(x => x.textContent.trim()) }; })()`);
-        assert.deepEqual(tabs.dom.slice(0, 2), ['nav-tab-agents', 'nav-tab-servers'], `Servers right after Agents (${tabs.dom})`);
+        assert.equal(tabs.dom.indexOf('nav-tab-servers'), tabs.dom.indexOf('nav-tab-tokens') + 1, `Servers right after Analytics (${tabs.dom})`); // the operator's order (#8704): Agents, Inbox, Workflows, Jobs, Analytics, Servers, Docs
+        assert.ok(tabs.dom.indexOf('nav-tab-servers') < tabs.dom.indexOf('nav-tab-docs'), 'Servers before Docs');
         assert.ok(tabs.dom.indexOf('nav-tab-docs') > tabs.dom.indexOf('nav-tab-tokens'), 'Docs after the local tabs');
         assert.deepEqual(tabs.shown.filter(t => ['Agents', 'Servers', 'Docs'].includes(t)), ['Agents', 'Servers', 'Docs'], `shown in that order (${tabs.shown})`);
         console.log(`   ✓ ${tabs.shown.join(', ')}`);
