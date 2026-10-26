@@ -142,3 +142,16 @@ for (const team of ['release-team', '@odd', 'team with spaces', 'a/b']) {
 assert.deepEqual(parse('/inbox/goals'), {view:'inbox-goals',sub:'goals'});
 assert.equal(build({view:'inbox-goals',sub:'goals'}), '/inbox/goals');
 for (const bad of ['/inbox/goals/x/0','/inbox/goals/x/-1','/inbox/goals/x/NaN','/inbox/goals/%00/1','/inbox/goals/../1','/inbox/goals/%2e%2e/1','/inbox/goals/x/1/extra','/inbox/goals/%ZZ/1']) assert.equal(parse(bad),null,bad);
+
+// #8633: task and board detail paths stay in the Inbox, including qualified team names.
+for (const team of ['release-team', '@m2/remote-team', '@odd', 'team with spaces', 'a/b']) {
+    for (const sub of ['tasks', 'boards']) {
+        const r = {view:'inbox-'+sub,sub,id:team,...(sub==='tasks'?{item:17}:{})};
+        assert.deepEqual(parse(build(r)),r);
+    }
+}
+for (const sub of ['tasks', 'boards']) {
+    assert.deepEqual(parse('/inbox/'+sub),{view:'inbox-'+sub,sub});
+    assert.equal(build({view:'inbox-'+sub,sub}),'/inbox/'+sub);
+}
+for (const bad of ['/inbox/tasks/x/0','/inbox/tasks/x/-1','/inbox/tasks/x/NaN','/inbox/tasks/%00/1','/inbox/tasks/%2e%2e/1','/inbox/tasks/x/1/extra','/inbox/boards/%ZZ','/inbox/boards/%2e%2e','/inbox/boards/x/extra']) assert.equal(parse(bad),null,bad);
