@@ -129,6 +129,7 @@ func init() { installedFallback.Store(true) }
 func SetInstalledToolsFallback(allow bool) { installedFallback.Store(allow) }
 
 // InstalledToolsFallback reports whether falling back to the installed app is allowed.
+// InstalledToolsFallback has no production caller: it is exported for tests in startup.
 func InstalledToolsFallback() bool { return installedFallback.Load() }
 
 // CoralToolsDir returns the directory containing coral-board and the coral-hook-*
