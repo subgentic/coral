@@ -55,18 +55,17 @@ export function highlightBoard(container) {
         if (!ids.has(id)) continue;
         row.classList.add(id === current ? 'mb-message-current' : 'mb-message-match');
         if (!re) continue;
-        for (const holder of [row.querySelector('.mb-message-body'), row.querySelector('.mb-row-snippet')]) { // the table's collapsed row shows the first line of the message: a match in it is marked there too
-            if (!holder) continue;
-            const walker = document.createTreeWalker(holder, NodeFilter.SHOW_TEXT);
-            const nodes = [];
-            for (let n = walker.nextNode(); n; n = walker.nextNode()) if (has.test(n.nodeValue)) nodes.push(n);
-            for (const node of nodes) {
-                const frag = document.createDocumentFragment();
-                let last = 0;
-                node.nodeValue.replace(re, (hit, at) => { frag.append(node.nodeValue.slice(last, at)); frag.append(make('mark', 'mb-hit', hit)); last = at + hit.length; return hit; });
-                frag.append(node.nodeValue.slice(last));
-                node.replaceWith(frag);
-            }
+        const body = row.querySelector('.mb-message-body');
+        if (!body) continue;
+        const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT);
+        const nodes = [];
+        for (let n = walker.nextNode(); n; n = walker.nextNode()) if (has.test(n.nodeValue)) nodes.push(n);
+        for (const node of nodes) {
+            const frag = document.createDocumentFragment();
+            let last = 0;
+            node.nodeValue.replace(re, (hit, at) => { frag.append(node.nodeValue.slice(last, at)); frag.append(make('mark', 'mb-hit', hit)); last = at + hit.length; return hit; });
+            frag.append(node.nodeValue.slice(last));
+            node.replaceWith(frag);
         }
     }
 }

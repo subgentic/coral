@@ -98,10 +98,29 @@ export function dayDividerHtml(iso, { listItem = true } = {}) {
     return label ? `<div class="mb-day"${listItem ? ' role="listitem"' : ''} data-day="${escapeAttr(String(new Date(iso).toDateString()))}">${escapeHtml(label)}</div>` : '';
 }
 
+/** The parts only an open row has, built when it opens (a collapsed row has none: a long board is a lot of rows): the tags again at the top of the message (the phone's folded row hides them in the head), the replies' place and Reply, Copy link and More. */
+function openParts(id, agent, moreLabel, more, tagHtml) {
+    const replyText = `Reply to ${agent}`;
+    return {
+        tagsOpen: tagHtml ? `<div class="mb-row-tags-open">${tagHtml}</div>` : '',
+        actions: `<div class="mb-row-replies" hidden></div><div class="mb-row-actions"><button type="button" class="btn mb-row-btn" data-on-click="mb-msg-reply" data-msg-id="${Number(id)}" data-sender="${escapeAttr(agent)}" aria-label="${escapeAttr(replyText)}">Reply</button><button type="button" class="btn mb-row-btn" data-on-click="mb-msg-copy-link" data-msg-id="${Number(id)}">Copy link</button>${more ? `<button type="button" class="btn mb-row-btn mb-row-more" data-on-click="mb-msg-more" aria-haspopup="dialog" aria-label="${escapeAttr(moreLabel)}">More</button>` : ''}</div>`,
+    };
+}
+
+/** An opened row gets its open parts if it was drawn collapsed. */
+function ensureOpenParts(row) {
+    if (row.querySelector(':scope > .mb-row-actions')) return;
+    const who = row.querySelector(':scope > .mb-row-toggle .mb-row-who');
+    const tags = row.querySelector(':scope > .mb-row-toggle .mb-row-tags');
+    const parts = openParts(Number(row.dataset.messageId), who ? who.getAttribute('title') || who.textContent : '', row.getAttribute('data-more') || '', row.hasAttribute('data-more'), tags ? tags.innerHTML : '');
+    const body = row.querySelector(':scope > .mb-message-body');
+    if (parts.tagsOpen && !row.querySelector(':scope > .mb-row-tags-open')) body?.insertAdjacentHTML('beforebegin', parts.tagsOpen);
+    row.insertAdjacentHTML('beforeend', parts.actions);
+}
+
 /** What a message's row adds to the board's own markup, as strings: `toggle` (the one-button head), `tagsOpen` (the tags again at the top of the open message, for the phone's folded row), `actions` (Reply,
  * Copy link, More) and the row's classes. agent is the sender's name, timeHtml the message's <time>, moreLabel the name of its More button. */
 export function rowParts(m, { agent, timeHtml, moreLabel, replyName = '', self = 'operator', more = true, idp = 'mbd' }) {
-    const replyText = `Reply to ${agent}`;
     const tags = tagsOf(m, { replyName, self });
     const open = isRowOpen(m.id);
     const snippet = snippetOf(m.content);
@@ -111,8 +130,9 @@ export function rowParts(m, { agent, timeHtml, moreLabel, replyName = '', self =
         bodyId: `${idp}-${Number(m.id)}`, // each surface its own ids: the team page and the dock can show the same message at once
         classes: `${open ? ' mb-open' : ''}${tags.ask ? ' mb-q' : ''}${tags.mine ? ' mb-mine' : ''}${replyName ? ' mb-is-reply' : ''}`,
         toggle: `<button type="button" class="mb-row-toggle" data-on-click="mb-row-toggle" aria-expanded="${escapeAttr(String(open))}" aria-controls="${escapeAttr(idp)}-${Number(m.id)}"><span class="mb-row-chev" aria-hidden="true"></span><span class="mb-row-avatar" style="--mb-avatar:${escapeAttr(avatarColor(agent))}" aria-hidden="true">${escapeHtml(initial.toUpperCase())}</span><span class="mb-row-who" title="${escapeAttr(agent)}">${escapeHtml(agent)}</span><span class="mb-row-snippet">${escapeHtml(snippet)}</span><span class="mb-row-tags">${tagHtml}</span>${timeHtml}</button>`,
-        tagsOpen: tagHtml ? `<div class="mb-row-tags-open">${tagHtml}</div>` : '',
-        actions: `<div class="mb-row-replies" hidden></div><div class="mb-row-actions"><button type="button" class="btn mb-row-btn" data-on-click="mb-msg-reply" data-msg-id="${Number(m.id)}" data-sender="${escapeAttr(agent)}" aria-label="${escapeAttr(replyText)}">Reply</button><button type="button" class="btn mb-row-btn" data-on-click="mb-msg-copy-link" data-msg-id="${Number(m.id)}">Copy link</button>${more ? `<button type="button" class="btn mb-row-btn mb-row-more" data-on-click="mb-msg-more" aria-haspopup="dialog" aria-label="${escapeAttr(moreLabel)}">More</button>` : ''}</div>`,
+        tagsOpen: open ? openParts(m.id, agent, moreLabel, more, tagHtml).tagsOpen : '',
+        actions: open ? openParts(m.id, agent, moreLabel, more, tagHtml).actions : '',
+        attrs: more ? ` data-more="${escapeAttr(moreLabel)}"` : '', // what an opened row needs to build its actions (a collapsed row has none: a long board is a lot of rows)
     };
 }
 
@@ -176,7 +196,7 @@ export function toggleRow(row, force) {
     const head = row.querySelector(':scope > .mb-row-toggle');
     if (head) head.setAttribute('aria-expanded', String(want));
     const id = row.dataset.messageId;
-    if (want) { opened.add(String(id)); fillReplies(row); } else opened.delete(String(id));
+    if (want) { opened.add(String(id)); ensureOpenParts(row); fillReplies(row); } else opened.delete(String(id));
 }
 
 /** Expand all or Collapse all: every row on screen (and, for Collapse, every one remembered). */

@@ -35,8 +35,11 @@ assert.ok(!sameDay('x', 'y'));
 const p = rowParts({ id: 7, content: '<img src=x onerror=1> hi @Backend Dev', created_at: '2026-10-26T10:00:00Z' }, { agent: '<b>Bad</b>', timeHtml: '<time>1</time>', moreLabel: 'Actions "x"' });
 assert.ok(!/<img|<b>/.test(p.toggle + p.actions), 'the sender and the words are escaped');
 assert.ok(p.toggle.includes('aria-controls="mbd-7"') && p.toggle.includes('aria-expanded="false"'));
-assert.ok(/data-msg-id="7"/.test(p.actions));
+assert.equal(p.actions, '', 'a collapsed row has no actions (a long board is a lot of rows)'); assert.ok(/data-more="Actions &quot;x&quot;"/.test(p.attrs), p.attrs);
 // open rows are remembered by id (no DOM here: a stand-in row)
-const row = { dataset: { messageId: '7' }, classList: { toggle() {}, contains: () => false }, querySelector: () => null, parentElement: null };
-toggleRow(row, true); assert.equal(isRowOpen(7), true); toggleRow(row, false); assert.equal(isRowOpen(7), false);
+const row = { dataset: { messageId: '7' }, classList: { toggle() {}, contains: () => false }, querySelector: () => null, insertAdjacentHTML() {}, getAttribute: () => null, hasAttribute: () => false, parentElement: null };
+toggleRow(row, true); assert.equal(isRowOpen(7), true);
+const open = rowParts({ id: 7, content: 'hi' }, { agent: 'A', timeHtml: '', moreLabel: 'm' });
+assert.ok(/data-msg-id="7"/.test(open.actions) && /Reply/.test(open.actions) && /mb-open/.test(open.classes), 'an open row has its actions');
+const dock = rowParts({ id: 7, content: 'hi' }, { agent: 'A', timeHtml: '', moreLabel: '', more: false }); assert.ok(!/mb-row-more/.test(dock.actions) && dock.attrs === '', 'the dock has no More'); toggleRow(row, false); assert.equal(isRowOpen(7), false);
 console.log('board_table: ok');
