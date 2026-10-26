@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// ?for_subscriber= on the board's message list holds what that member's read would deliver (#8484): the ids are a peek's, a member and the orchestrator, a bare array or the dashboard's
+// ?for_subscriber= on the board's message list holds what that member's read would deliver plus its own posts (#8484): the ids are a peek's joined with the member's own, a member and the orchestrator, a bare array or the dashboard's
 // page, and its pages by id are slices of the same set. The selection itself is pinned in internal/board (TestTheDocksListIsWhatReadDelivers).
 func TestListAllMessagesForASubscriberIsWhatReadDelivers(t *testing.T) {
 	server, handler := setupBoardTestServer(t)
@@ -33,14 +33,27 @@ func TestListAllMessagesForASubscriberIsWhatReadDelivers(t *testing.T) {
 	for _, who := range []string{"Worker", "Lead", "Poster"} {
 		peek, err := handler.bs.PeekMessages(ctx, "forsub", who, 500)
 		require.NoError(t, err)
-		var want []int64
+		set := map[int64]bool{}
 		for _, m := range peek {
-			want = append(want, m.ID)
+			set[m.ID] = true
+		}
+		everything, err := handler.bs.ListMessages(ctx, "forsub", 500, 0, 0)
+		require.NoError(t, err)
+		for _, m := range everything {
+			if m.SubscriberID == who {
+				set[m.ID] = true
+			}
+		}
+		var want []int64
+		for _, m := range everything { // in id order
+			if set[m.ID] {
+				want = append(want, m.ID)
+			}
 		}
 		require.NotEmpty(t, want, who)
 
 		page := getDashboardPage(t, base+"?format=dashboard&limit=500&for_subscriber="+url.QueryEscape(who))
-		require.Equal(t, want, page.ids(), who+": the dashboard's list is a peek's set")
+		require.Equal(t, want, page.ids(), who+": the dashboard's list is a peek's set and the member's own posts")
 		require.Equal(t, len(want), page.Total, who)
 		require.Equal(t, 25, page.BoardTotal, who+": the whole board's count comes beside it")
 		require.Equal(t, "keyset", page.Paging)
