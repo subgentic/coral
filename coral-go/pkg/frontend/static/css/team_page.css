@@ -261,3 +261,15 @@
     .inbox-tasks-toolbar .team-tb-pills { display: none; }
     .inbox-tasks-toolbar .team-tb-select { display: block; }
 }
+/* The other Inbox folders' toolbar (#8596, inbox_toolbar.js): the search, then the Filters icon right beside it at every width (the search keeps at least 10rem, #8531); the state control is the pills when
+ * the page's own width permits, else one select on a line of its own under them. */
+.inbox-folder-toolbar { container: inboxfolder / inline-size; }
+.inbox-folder-toolbar .team-tb-select { display: none; }
+.inbox-folder-toolbar .list-bar-search-row.gt-toolbar { flex-wrap: wrap; }
+.inbox-folder-toolbar .list-bar-search-row.gt-toolbar > .list-bar-search-wrap { flex: 1 1 10rem; min-width: 10rem; }
+@container inboxfolder (max-width: 40rem) {
+    .inbox-folder-toolbar .team-tb-pills { display: none; }
+    .inbox-folder-toolbar .team-tb-select { display: block; order: 3; flex: 1 1 100%; max-width: none; }
+    .inbox-folder-toolbar .list-bar-toggle { order: 2; }
+}
+

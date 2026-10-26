@@ -30,6 +30,8 @@ const VL = await importOnce('./view_list.js'); // the mailbox's view list (#7785
 const TB = await importOnce('./task_bulk.js'); // what the selection bar does to the selected tasks
 const Toolbar = await importOnce('./team_toolbar.js'); // the selection bar takes the page's toolbar line (mountSelection)
 const GC = await importOnce('./goal_columns.js');
+const GF = await importOnce('./goal_filters.js'); // the Goals folder's search, pills and Filters (#8596)
+const IT = await importOnce('./inbox_toolbar.js'); // the folders' toolbar on the shared list bar
 const CH = await importOnce('./mailbox_chats.js'); // the chat folders (#7776): All chats, Board history, By CLI, Tags
 const { providerName } = await importOnce('./model_labels.js'); // a CLI by its name (Claude, Codex, Antigravity), as the Chats list says it
 const { waitingText } = await importOnce('./waiting_text.js'); // a lazy module imports only what loads at startup (import_hygiene): this one loads with it
@@ -111,7 +113,36 @@ async function refreshTasks() {
 let goals = []; // the open goals of every team (GET /api/goals): id, board_id, title, outcome, state, rollup, updated_at
 const goalKey = g => `${g.board_id}#${g.id}`;
 const goalTeam = g => keyLabel(g.board_id);
-const goalRows = () => goals.filter(g => !queries.goals || [g.title, g.outcome, goalTeam(g), g.state].join(' ').toLowerCase().includes(queries.goals));
+let goalFilters = GF.loadFilters(), goalBar = null;
+const goalRows = () => GF.ordered(goals.filter(g => GF.matches(g, goalFilters, goalTeam)), goalFilters);
+/** The Goals folder's toolbar (#8596): the search, the Filters icon beside it (Team, Driver, Updated since, Sort), the state pills, and the chips of what is on. */
+function inboxGoalsToolbar() {
+    if (!goalBar) {
+        goalBar = IT.folderToolbar({
+            idp: 'inbox-goals', noun: 'goal', searchLabel: 'Search goals',
+            sorts: { values: GF.SORTS, labels: GF.SORT_LABEL, aria: 'Sort goals' },
+            fields: [
+                { type: 'select', key: 'team', id: 'inbox-goals-team', label: 'Team', values: [], labels: {}, any: 'Any team' },
+                { type: 'select', key: 'driver', id: 'inbox-goals-driver', label: 'Driver', values: [], labels: {}, any: 'Any driver' },
+                { type: 'date', key: 'from', id: 'inbox-goals-from', label: 'Updated since' },
+            ],
+            model: { EMPTY: GF.EMPTY, clean: GF.clean, chips: GF.chips, isFiltered: GF.isFiltered, without: GF.without },
+        }, next => { goalFilters = next; GF.saveFilters(next); renderInboxNav(true); });
+    }
+    const teams = [...new Set(goals.map(g => g.board_id))].sort((a, b) => goalTeam({ board_id: a }).localeCompare(goalTeam({ board_id: b })));
+    const drivers = [...new Set(goals.map(g => g.driver).filter(Boolean))].sort();
+    GF.setTeamNames(new Map(teams.map(t => [t, goalTeam({ board_id: t })])));
+    const rows = goals.filter(g => GF.matches(g, { ...goalFilters, state: '' }, goalTeam));
+    const counts = GF.STATES.map(key => rows.filter(g => String(g.state || '').toLowerCase() === key).length);
+    const node = goalBar.draw({
+        filters: goalFilters,
+        options: { team: { values: teams, labels: Object.fromEntries(teams.map(t => [t, goalTeam({ board_id: t })])) }, driver: { values: drivers } },
+        pills: { label: 'Show goals that are', current: goalFilters.state || 'all',
+            items: [{ key: 'all', label: 'All', count: rows.length }, ...GF.STATES.map((key, i) => ({ key, label: GF.STATE_LABEL[key], count: counts[i] }))],
+            onPick: key => { goalFilters = { ...goalFilters, state: key === 'all' ? '' : key }; GF.saveFilters(goalFilters); renderInboxNav(true); } },
+    });
+    return { node, signature: JSON.stringify([goalFilters, teams, drivers, counts, rows.length]) };
+}
 async function refreshGoals() {
     try {
         const r = await fetch('/api/goals?limit=100');
@@ -125,7 +156,7 @@ async function refreshGoals() {
 const savedCounts = () => saved.savedView().totals;
 
 // ── The sidebar list ─────────────────────────────────────────────────────
-const countOf = key => key === 'needs' ? needsRows().length : key === 'tasks' ? taskRows().length : key === 'goals' ? goalRows().length : key === 'saved' ? savedCounts().open : undefined;
+const countOf = key => key === 'needs' ? needsRows().length : key === 'tasks' ? taskRows().length : key === 'goals' ? goals.length : key === 'saved' ? savedCounts().open : undefined;
 /** The folders of the Inbox (#7785, the mailbox mock): one view list, a name and a count each. Needs you, Tasks and Saved open their table in the centre; */
 const folderSections = () => [{ title: 'Needs attention', items: [
     { key: 'needs', label: 'Needs you', count: countOf('needs'), alert: true }, { key: 'tasks', label: 'Tasks', count: countOf('tasks') },
@@ -244,7 +275,7 @@ async function openChat(c) {
 }
 
 registerGroupSource('hub-inbox', {
-    toolbar: key => key === 'tasks' ? inboxTaskToolbar() : ({ search: { id: 'inbox-search', label: 'Search the Inbox' } }), // the page's toolbar line, the same shape for Needs you, Tasks and Saved (#7723)
+    toolbar: key => key === 'tasks' ? inboxTaskToolbar() : key === 'goals' ? inboxGoalsToolbar() : ({ search: { id: 'inbox-search', label: 'Search the Inbox' } }), // the page's toolbar line, the same shape for Needs you, Tasks and Saved (#7723)
     keys: () => GROUPS.map(g => g.key),
     redraw: () => renderInboxNav(true),
     table: key => {
@@ -286,7 +317,7 @@ registerGroupSource('hub-inbox', {
         }
         if (key === 'goals') {
             const rows = goalRows();
-            return { title: 'Goals', rows, empty: { line: queries.goals ? 'No goal matches the search.' : 'No open goals.' },
+            return { title: 'Goals', rows, empty: { line: GF.isFiltered(goalFilters) ? 'No goal matches the search and filters.' : 'No open goals.' },
                 signature: JSON.stringify(rows.map(g => [g.board_id, g.id, g.title, g.outcome, g.state, g.updated_at, g.rollup])),
                 node: () => DT.dataTable({ label: `Goals, ${rows.length}`, rows, rowKey: goalKey, state: goalsState, rowName: g => g.title,
                     open: g => importOnce('./task_goals.js').then(m => m.openGoalOnTeamPage(g.board_id, g.id)).catch(() => {}),
