@@ -435,6 +435,77 @@ func (h *SpendHandler) readTaskTimes(ctx context.Context, project string, fr spe
 	return tr, ""
 }
 
+// agentRows is one row per agent of the board, most tokens first: its names, what its CLI measures (tokens and their share of the measured agents', tool calls), its commits and the tasks it completed
+// (found by display name, role or folder); a measure its CLI has no source for is nil, never zero. Commits no agent owns are one more row, "Unattributed". It answers the rows, how many agents have a
+// token source and how many a tool-call source. tasksByAgent is consumed: a name's tasks are counted once.
+func agentRows(ro *spendRoster, tools *spendToolRows, commitsBy map[string]int, tasksByAgent map[string][]board.TaskTime, unattributed int) ([]spendAgent, int, int) {
+	total := int64(0)
+	for _, id := range ro.order {
+		if a := ro.accs[id]; a.sum != nil && tokenSources[a.sess.AgentType] {
+			total += a.sum.InputTokens + a.sum.OutputTokens
+		}
+	}
+	var rows []spendAgent
+	tokenMeasured, toolMeasured := 0, 0
+	for _, id := range ro.order {
+		a := ro.accs[id]
+		term := naming.SessionName(a.sess.AgentType, id)
+		row := spendAgent{Name: displayOf(a.sess), AgentType: a.sess.AgentType, SessionID: id, Role: ro.roleOf[term], Orchestrator: ro.orchOf[term]}
+		if row.Name == "" {
+			row.Name = row.Role
+		}
+		if row.Name == "" {
+			row.Name = "Agent"
+		}
+		if tokenSources[a.sess.AgentType] {
+			row.Measured = true
+			tokenMeasured++
+			var tok, cr int64
+			if a.sum != nil {
+				tok = a.sum.InputTokens + a.sum.OutputTokens
+				cr = a.sum.CacheReadTokens
+			}
+			row.Tokens, row.CacheReads = &tok, &cr
+			share := 0.0
+			if total > 0 {
+				share = float64(tok) / float64(total)
+			}
+			row.Share = &share
+		}
+		if toolSources[a.sess.AgentType] {
+			row.ToolCallsMeasured = true
+			toolMeasured++
+			n := tools.bySession[id]
+			row.ToolCalls = &n
+		}
+		row.Commits = commitsBy[id]
+		var mine []board.TaskTime
+		for _, k := range []string{spendNameKey(row.Name), spendNameKey(row.Role), spendNameKey(a.sess.AgentName)} {
+			if k != "" {
+				mine = append(mine, tasksByAgent[k]...)
+				delete(tasksByAgent, k)
+			}
+		}
+		st := board.SummarizeTaskTimes(mine)
+		row.TasksDone, row.WorkMedianS = st.Done, st.WorkMedian
+		rows = append(rows, row)
+	}
+	if unattributed > 0 {
+		rows = append(rows, spendAgent{Name: "Unattributed", Commits: unattributed})
+	}
+	sort.SliceStable(rows, func(i, j int) bool {
+		a, b := rows[i].Tokens, rows[j].Tokens
+		switch {
+		case a != nil && b != nil:
+			return *a > *b
+		case a != nil:
+			return true
+		}
+		return false
+	})
+	return rows, tokenMeasured, toolMeasured
+}
+
 // Spend answers GET /api/board/{project}/spend?range=24h|7d.
 func (h *SpendHandler) Spend(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
@@ -461,7 +532,7 @@ func (h *SpendHandler) Spend(w http.ResponseWriter, r *http.Request) {
 		errInternalServer(w, fail)
 		return
 	}
-	accs, order, roleOf, orchOf := roster.accs, roster.order, roster.roleOf, roster.orchOf
+	order := roster.order
 	tok, fail := h.readTokenSeries(ctx, project, fr)
 	if fail != "" {
 		errInternalServer(w, fail)
@@ -476,7 +547,7 @@ func (h *SpendHandler) Spend(w http.ResponseWriter, r *http.Request) {
 		errInternalServer(w, fail)
 		return
 	}
-	toolWin, toolUsual, toolBySession, toolByBucket := tools.window, tools.usual, tools.bySession, tools.byHour
+	toolWin, toolUsual, toolByBucket := tools.window, tools.usual, tools.byHour
 
 	cm := h.readCommits(ctx, project, roster, fr)
 	commitInfo := cm.info
@@ -491,71 +562,10 @@ func (h *SpendHandler) Spend(w http.ResponseWriter, r *http.Request) {
 	winTasks, usualTasks, tasksByAgent, tasksByBucket := tasks.win, tasks.usual, tasks.byAgent, tasks.byHour
 
 	// the agents
-	total := int64(0)
-	for _, id := range order {
-		if a := accs[id]; a.sum != nil && tokenSources[a.sess.AgentType] {
-			total += a.sum.InputTokens + a.sum.OutputTokens
-		}
-	}
 	resp := spendResponse{Board: project, Range: rng, RangeHours: hours, GeneratedAt: f(now), WindowStart: f(start), WindowEnd: f(end),
 		Tokens: map[string]spendTokens{"window": win, "usual": usual}, Commits: commitInfo, OfAgents: len(order)}
-	toolMeasured := 0
-	for _, id := range order {
-		a := accs[id]
-		term := naming.SessionName(a.sess.AgentType, id)
-		row := spendAgent{Name: displayOf(a.sess), AgentType: a.sess.AgentType, SessionID: id, Role: roleOf[term], Orchestrator: orchOf[term]}
-		if row.Name == "" {
-			row.Name = row.Role
-		}
-		if row.Name == "" {
-			row.Name = "Agent"
-		}
-		if tokenSources[a.sess.AgentType] {
-			row.Measured = true
-			resp.MeasuredAgents++
-			var tok, cr int64
-			if a.sum != nil {
-				tok = a.sum.InputTokens + a.sum.OutputTokens
-				cr = a.sum.CacheReadTokens
-			}
-			row.Tokens, row.CacheReads = &tok, &cr
-			share := 0.0
-			if total > 0 {
-				share = float64(tok) / float64(total)
-			}
-			row.Share = &share
-		}
-		if toolSources[a.sess.AgentType] {
-			row.ToolCallsMeasured = true
-			toolMeasured++
-			n := toolBySession[id]
-			row.ToolCalls = &n
-		}
-		row.Commits = commitsBy[id]
-		var mine []board.TaskTime
-		for _, k := range []string{nameKey(row.Name), nameKey(row.Role), nameKey(a.sess.AgentName)} {
-			if k != "" {
-				mine = append(mine, tasksByAgent[k]...)
-				delete(tasksByAgent, k)
-			}
-		}
-		st := board.SummarizeTaskTimes(mine)
-		row.TasksDone, row.WorkMedianS = st.Done, st.WorkMedian
-		resp.Agents = append(resp.Agents, row)
-	}
-	if commitInfo.Unattributed > 0 {
-		resp.Agents = append(resp.Agents, spendAgent{Name: "Unattributed", Commits: commitInfo.Unattributed})
-	}
-	sort.SliceStable(resp.Agents, func(i, j int) bool {
-		a, b := resp.Agents[i].Tokens, resp.Agents[j].Tokens
-		switch {
-		case a != nil && b != nil:
-			return *a > *b
-		case a != nil:
-			return true
-		}
-		return false
-	})
+	var toolMeasured int
+	resp.Agents, resp.MeasuredAgents, toolMeasured = agentRows(roster, tools, commitsBy, tasksByAgent, commitInfo.Unattributed)
 	tc := spendToolCalls{MeasuredAgents: toolMeasured, OfAgents: len(order)}
 	if toolMeasured > 0 {
 		tc.Window, tc.Usual = &toolWin, &toolUsual
