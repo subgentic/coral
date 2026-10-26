@@ -68,3 +68,39 @@ func TestBoardNudge8031TrustedStateChangeRetriesThroughTheGate(t *testing.T) {
 	require.EqualValues(t, 2, kicks.Load(), "a delivered send cleared its skip memo; duplicate hooks do not rescan")
 	require.EqualValues(t, 1, typed.Load())
 }
+
+// Security's #8031 follow-up, carried in #8040: only a board-nudge skip
+// should wake the board notifier. A task reminder can use the same terminal
+// gate and leave a skip memo, but it is not evidence of an undelivered nudge.
+func TestBoardNudge8040TaskReminderMemoDoesNotWakeBoard(t *testing.T) {
+	_, h, mock, ss := setupSessionsTestServer(t)
+	ctx := context.Background()
+	sid := uuid.NewString()
+	name := "codex-" + sid
+	project := "memo-kind-board"
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentName: "probe", AgentType: "codex", WorkingDir: "/fixture", BoardName: &project}))
+	mock.addSession(name, "/fixture")
+	term := &agentTerm{mockSessionTerminal: mock}
+	h.terminal = term
+	t.Cleanup(func() { ptymanager.ForgetSession(name) })
+	var kicks atomic.Int64
+	bh := NewBoardHandler(h.bs)
+	bh.SetNotifyFn(func(string) { kicks.Add(1) })
+	h.SetBoardHandler(bh)
+	for _, what := range []string{"task reminder", "board nudge"} {
+		term.show("Would you like to proceed?\n› 1. Yes\n  2. No\nPress enter to confirm or esc to cancel\n")
+		delivery, err := ptymanager.DeliverAutomated(ctx, ptymanager.AutomatedInput{Term: term, Name: name, AgentType: "codex", SessionID: sid, Key: what, Text: "fixture notification", What: what, Send: func(context.Context) error { t.Error("nothing may be typed through the dialog"); return nil }})
+		require.NoError(t, err)
+		require.Equal(t, ptymanager.Skipped, delivery)
+		memo, ok := ptymanager.SkippedOf(name)
+		require.True(t, ok)
+		require.Equal(t, what, memo.What)
+		term.show("• Working (3s • esc to interrupt)\n› Ask Codex to do anything\n")
+		h.retrySkippedBoardNudge(ctx, sid, name, "request_resolved")
+		if what == "task reminder" {
+			require.Zero(t, kicks.Load())
+		} else {
+			require.EqualValues(t, 1, kicks.Load())
+		}
+	}
+}
