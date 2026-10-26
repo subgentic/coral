@@ -18,13 +18,23 @@ const { connect } = require('./agent_view_harness');
         assert.ok(groups.length >= 5, 'the sections: ' + JSON.stringify(groups));
 
         // #7405: no (i); a row's hint is a visible line under its label and a long one has a Learn more that is a real target. Measured per section.
-        const rows = () => ev(`(() => { const out = []; for (const row of document.querySelectorAll('#settings-modal .settings-pane:not([hidden]) .settings-row')) {
+        const rows = () => ev(`(() => { const out = []; const pane = '#settings-modal .settings-pane:not([hidden])';
+            for (const row of document.querySelectorAll(pane + ' .settings-row')) { // the rows of a group that is not a settings_view yet
             if (!row.getClientRects().length) continue;
             const dt = row.querySelector('dt, :scope > .net-group-head'), label = dt && dt.querySelector('label, .net-group-title'); if (!label) continue;
             const hint = row.querySelector('.settings-hint-line'), learn = row.querySelector('.settings-learn'), l = label.getBoundingClientRect();
             const tog = row.querySelector(':scope > dd > .check-hit input, :scope > .net-group-head > .check-hit input, :scope > .net-group-head > .settings-hub-mode-toggle input'), tb = tog && tog.getBoundingClientRect();
             out.push({ label: label.textContent.trim().slice(0, 30), info: !!row.querySelector('.settings-info-btn'), hint: !!hint && hint.getClientRects().length > 0, under: !hint || !hint.getClientRects().length || hint.getBoundingClientRect().top >= l.bottom - 2, learnH: learn ? Math.round(learn.getBoundingClientRect().height) : null, tog: tb ? tb.top < l.bottom && tb.bottom > l.top : null });
-        } return out; })()`);
+            }
+            for (const row of document.querySelectorAll(pane + ' .sv-row')) { // the rows of a settings_view: its Learn more has its 44 px target in ::after
+            if (!row.getClientRects().length) continue;
+            const label = row.querySelector('.sv-label'); if (!label) continue;
+            const text = row.querySelector('.sv-help-text'), learn = row.querySelector('.sv-learn'), l = label.getBoundingClientRect();
+            const tog = row.querySelector('.sv-switch'), tb = tog && tog.getBoundingClientRect();
+            const hintShown = !!text && text.textContent.trim() !== '' && text.getClientRects().length > 0;
+            out.push({ label: label.textContent.trim().slice(0, 30), info: !!row.querySelector('.settings-info-btn'), hint: hintShown, under: !hintShown || text.getBoundingClientRect().top >= l.bottom - 2, learnH: learn ? Math.round(Math.max(learn.getBoundingClientRect().height, parseFloat(getComputedStyle(learn, '::after').height) || 0)) : null, tog: tb ? tb.top < l.bottom && tb.bottom > l.top : null });
+            }
+            return out; })()`);
         let seen = 0, general = 0, toggles = 0, learns = 0;
         for (const g of groups) {
             await ev(`(() => { const s = document.querySelector('#settings-modal .settings-group-pick select'); s.value = ${JSON.stringify(g)}; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
