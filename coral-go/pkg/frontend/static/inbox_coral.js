@@ -44,7 +44,7 @@ export const coralInboxAdapter = {
             created_by: t.created_by, created_at: t.created_at, updated_at: t.updated_at, revision: t.revision,
             goal: t.goal_id && t.goal_title ? { id: Number(t.goal_id), title: String(t.goal_title) } : null })); // the goal it serves, when the route sends one (#7302)
     },
-    openGoal(task) { return importOnce('./task_goals.js').then(m => m.openGoalOnBoard(task.project, task.goal.id)); },
+    openGoal(task) { return importOnce('./task_goals.js').then(m => m.openGoalOnTeamPage(task.project, task.goal.id)); },
     async getTask(project, id) {
         return json(await fetch(`/api/board/${encodeURIComponent(project)}/tasks/${pathId(id)}`));
     },

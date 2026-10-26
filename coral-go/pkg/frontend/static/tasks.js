@@ -152,7 +152,7 @@ registerActions({
         const box = depContainer(el), id = idOf(el.dataset.taskId);
         if (box && id) box.querySelector(`input[type="checkbox"][value="${id}"]`)?.click();
     },
-    'task-goal-open': el => { const id = idOf(el.dataset.goalId), project = _getBoardProject(); if (!id || !project) return; window.hideTaskDetailModal?.(); importOnce('./task_goals.js').then(m => m.openGoalOnBoard(project, id)); }, // the task's Goal line opens the goal on the Goals face (#7253)
+    'task-goal-open': el => { const id = idOf(el.dataset.goalId), project = _getBoardProject(); if (!id || !project) return; window.hideTaskDetailModal?.(); importOnce('./task_goals.js').then(m => m.openGoalOnTeamPage(project, id)); }, // the task's Goal line opens the goal on the Goals face (#7253)
     'task-complete': el => withId(el.dataset.taskId, id => window.completeAgentTask(id)),
     'task-complete-back': el => withId(el.dataset.taskId, id => window.showAgentTaskDetailModal(id)),
     'task-complete-do': el => withId(el.dataset.taskId, id => window._doCompleteAgentTask(id)),

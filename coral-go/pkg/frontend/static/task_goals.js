@@ -2,7 +2,6 @@
 import { boardFetch, pathId } from './server_base.js';
 import { toGoal, toGoalList } from './goals_adapter.js';
 import { importOnce } from './import_once.js';
-import { browserLocal } from './safe_storage.js';
 
 const OPEN_STATES = 'proposed,active,blocked';
 const ALL_STATES = 'proposed,active,blocked,done,dropped';
@@ -107,15 +106,18 @@ export async function refreshGoalTitles(project) {
     return JSON.stringify([...byId]) !== before;
 }
 
-/** Show a goal on the Goals face of its board: the Messages | Goals choice is set to Goals, the board is selected, the goal opens. */
-export async function openGoalOnBoard(project, id) {
-    if (!project || !id) return;
-    window.switchNavTab?.('board'); // from the Inbox or a task: the board's screen first
-    browserLocal.set('coral.board.face', 'goals');
-    const board = await importOnce('./message_board.js');
-    board.selectBoardProject(project);
-    const view = await importOnce('./goals_view.js');
-    view.openGoalWhenKnown(id);
+/** Show a goal on its team's page: the Goals tab with that goal open, at its own address (/team/<team>/goals/<id>). Never the board's page: every goal link outside the team page comes here. */
+export async function openGoalOnTeamPage(team, id) {
+    if (!team || !id) return;
+    window.switchNavTab?.('agents', { fromHistory: true }); // the team page lives under Agents; the page writes its own address
+    const m = await importOnce('./team_page.js');
+    await m.openTeamPage(team, { tab: 'goals', item: Number(id) });
+    // a person chose the goal: the keyboard starts at its heading once the page has drawn it (the goals are read first when the page is new)
+    for (let i = 0; i < 40; i++) {
+        const heading = document.querySelector('#team-panel-goals #goals-detail-title');
+        if (heading && heading.textContent) { heading.focus({ preventScroll: true }); return; }
+        await new Promise(r => setTimeout(r, 50));
+    }
 }
 
 /** A refusal beside the Goal select: the message in its own alert line, the select marked invalid and described by it; clearGoalInvalid undoes it. */

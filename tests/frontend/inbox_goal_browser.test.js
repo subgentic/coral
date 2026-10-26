@@ -1,5 +1,5 @@
 // A waiting agent or task says which goal it serves (#7302, the Operator: "the task/agent that are waiting can let me know which goal it is a part of"): in the Inbox's Needs you a row shows a quiet link
-// "Goal: <title>" under it when the live row carries a goal (live rows: goal {id, title, board}, #7301), and nothing when it has none; the link opens the goal on its board's Goals face. In the Tasks panel
+// "Goal: <title>" under it when the live row carries a goal (live rows: goal {id, title, board}, #7301), and nothing when it has none; the link opens the goal on its team page's Goals tab. In the Tasks panel
 // an opened task shows the same link when the row carries goal_id and goal_title (goal_id and goal_title come from the route's own answer, #7345). Real board over the API for the goal.
 // Drives Chrome over CDP against the isolated dev server (its rows are removed again).
 const assert = require('node:assert/strict');
@@ -35,10 +35,10 @@ const BASE = require('./test_base').BASE;
         assert.equal(await ev(`document.querySelectorAll('#group-table-view .dt-link').length`), 1);
 
         await shot('inbox-needs-goal');
-        console.log('2. the link opens the goal on its board\'s Goals face');
+        console.log('2. the link opens the goal on its team page\'s Goals tab (#8048)');
         await ev(`document.querySelector('#group-table-view .dt-link').click(); true`);
-        await waitFor(`!!document.querySelector('#mb-goals .goals-detail-title') && document.querySelector('#mb-goals .goals-detail-title').textContent === 'Ship the new installer'`, 'the goal to open', 12000);
-        assert.equal(await ev(`document.activeElement.id`), 'goals-detail', 'the focus is on the goal\'s detail');
+        await waitFor(`!!document.querySelector('#team-panel-goals .goals-detail-title') && document.querySelector('#team-panel-goals .goals-detail-title').textContent === 'Ship the new installer' && location.pathname.startsWith('/team/')`, 'the goal to open on the team page', 12000);
+        await waitFor(`document.activeElement.id === 'goals-detail-title'`, 'the focus on the goal\'s heading (a person chose it)', 6000);
 
         console.log('3. an opened task in the Inbox shows the same link when its row carries a goal, and nothing when it has none');
         await ev(`window.switchNavTab('hub-inbox'); true`);

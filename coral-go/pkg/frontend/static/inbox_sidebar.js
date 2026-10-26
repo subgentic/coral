@@ -229,7 +229,7 @@ registerGroupSource('hub-inbox', {
                         { key: 'cli', label: 'CLI', sort: true, sortValue: s => providerName(s.agent_type) || '', line: 2, cell: s => (s.agent_type ? DT.tag(providerName(s.agent_type)) : '') },
                         ...(rows.some(dirOf) ? [{ key: 'folder', label: 'Folder', sort: true, sortValue: s => dirOf(s) || '', line: 0, cell: s => dirOf(s) || '' }] : []), // the folder an agent works in tells two of one name apart (#7122)
                         { key: 'team', label: 'Team', sort: true, sortValue: s => teamOf(s), line: 0, cell: s => teamOf(s) },
-                        ...(goal ? [{ key: 'goal', label: 'Goal', line: 0, cell: s => { if (!goalOf(s)) return ''; const l = DT.link(s.goal.title, () => importOnce('./task_goals.js').then(m => m.openGoalOnBoard(s.goal.board || s.board_project || '', s.goal.id)).catch(() => {})); l.setAttribute('aria-label', `Goal: ${s.goal.title}`); return l; } }] : []),
+                        ...(goal ? [{ key: 'goal', label: 'Goal', line: 0, cell: s => { if (!goalOf(s)) return ''; const l = DT.link(s.goal.title, () => importOnce('./task_goals.js').then(m => m.openGoalOnTeamPage(s.goal.board || s.board_project || '', s.goal.id)).catch(() => {})); l.setAttribute('aria-label', `Goal: ${s.goal.title}`); return l; } }] : []),
                         { key: 'waiting', label: 'Waiting', tone: 'tertiary', align: 'end', sort: true, sortValue: s => s.waiting_since || '', firstDir: 'desc', line: 1, cell: s => waitingText(s.waiting_since) || '' },
                     ] }).el };
         }
@@ -255,7 +255,7 @@ registerGroupSource('hub-inbox', {
             return { title: 'Goals', rows, empty: { line: queries.goals ? 'No goal matches the search.' : 'No open goals.' },
                 signature: JSON.stringify(rows.map(g => [g.board_id, g.id, g.title, g.outcome, g.state, g.updated_at, g.rollup])),
                 node: () => DT.dataTable({ label: `Goals, ${rows.length}`, rows, rowKey: goalKey, state: goalsState, rowName: g => g.title,
-                    open: g => importOnce('./task_goals.js').then(m => m.openGoalOnBoard(g.board_id, g.id)).catch(() => {}),
+                    open: g => importOnce('./task_goals.js').then(m => m.openGoalOnTeamPage(g.board_id, g.id)).catch(() => {}),
                     columns: GC.goalColumns({ teamOf: goalTeam }, ['state', 'goal', 'team', 'progress', 'updated']) }).el };
         }
         if (key === 'saved') return savedListSpec();
@@ -462,7 +462,7 @@ registerActions({
         const done = !it.done_at;
         if (await saved.savedSetDone(it, done)) sayLive(done ? 'Marked done' : 'Moved back to Open');
     },
-    'inbox-goal-open': el => { const board = textOf(el.dataset.board), id = Number(el.dataset.goalId); if (board && id) importOnce('./task_goals.js').then(m => m.openGoalOnBoard(board, id)).catch(() => {}); },
+    'inbox-goal-open': el => { const board = textOf(el.dataset.board), id = Number(el.dataset.goalId); if (board && id) importOnce('./task_goals.js').then(m => m.openGoalOnTeamPage(board, id)).catch(() => {}); },
     'inbox-phone-back': () => closePage(true, true),
     'inbox-back': () => { const was = page, g = was ? (was.kind === 'task' ? 'tasks' : 'saved') : group; closePage(false); openGroupTable('hub-inbox', g); focusCameFrom(was, false); }, // the link back to the group's table (on a phone too, as the shared back link did), with the focus on the row it came from
 });
