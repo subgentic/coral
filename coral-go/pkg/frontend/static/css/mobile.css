@@ -895,6 +895,7 @@
         background: var(--bg-tertiary); /* quiet (#5123): only the text is warm */
         color: var(--warning);
         font-weight: 600;
+        text-transform: none;
     }
 
     /* "Ready for input" rows carry no chip; with no unread pill either the meta row is
