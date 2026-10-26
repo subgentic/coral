@@ -123,7 +123,10 @@ export function tableMarkup(t) { return tableHtml(t); }
 
 function tableHtml(t, n = 0, lead = '', bar = false) {
     const tid = n ? `group-table-title-${n + 1}` : 'group-table-title'; // a page with several tables (the landing's groups, #7722): one title id each
-    const top = (t.headless ? lead : `<div class="group-table-head">${lead}<h2 id="${escapeAttr(tid)}" tabindex="-1">${escapeHtml(t.title)}</h2>${(t.count === undefined ? t.rows.length : t.count) == null ? '' : `<span class="session-group-count">${t.count === undefined ? t.rows.length : t.count}</span>`}${bar ? '' : extraHtml(t.extra)}</div>`) + (bar && !n ? '' : chipsHtml(t)); // the page's toolbar line has the first table's chips and the create actions
+    const count = t.count === undefined ? t.rows.length : t.count;
+    // An Inbox folder page (t.noun = [one, many]): a phone's folder select already names the folder, so below 768 px the title is only for screen readers and the count reads as one line, "12 goals" (#8681)
+    const countLine = t.noun && count != null ? `<span class="gt-count-line">${count} ${escapeHtml(t.noun[count === 1 ? 0 : 1])}</span>` : '';
+    const top = (t.headless ? lead : `<div class="group-table-head${t.noun ? ' group-table-head-folder' : ''}">${lead}<h2 id="${escapeAttr(tid)}" tabindex="-1">${escapeHtml(t.title)}</h2>${count == null ? '' : `<span class="session-group-count">${count}</span>`}${countLine}${bar ? '' : extraHtml(t.extra)}</div>`) + (bar && !n ? '' : chipsHtml(t)); // the page's toolbar line has the first table's chips and the create actions
     // A group with nothing in it says so in one line (its chips, if it has them, stay: they are how the list is widened)
     if (!t.rows.length && t.empty) return top + `<div class="empty-pane"><p class="empty-line">${escapeHtml(t.empty.line)}</p>${t.empty.hint ? `<p class="empty-hint">${escapeHtml(t.empty.hint)}</p>` : ''}</div>`;
     return top + '<div class="group-table-node"></div>' + (t.note ? `<p class="empty-hint group-table-note">${escapeHtml(t.note)}</p>` : '');

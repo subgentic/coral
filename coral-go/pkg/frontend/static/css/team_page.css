@@ -262,7 +262,10 @@
     .goal-split-column .goal-main, .goal-split:not(.goal-split-column) .goal-side { display: none; } /* the list is a screen of its own: the goal or a task is the other */
     .goal-side { position: static; max-height: none; border: 0; background: none; align-self: stretch; } /* the list screen is the page's whole width */
     .goals-table-page .goal-side-back { display: inline-flex; margin: 0 0 8px; }
-    .goal-tasks-open { display: inline-flex; align-self: flex-start; min-height: 44px; margin-top: 12px; }
+    .goal-tasks-open { display: flex; align-items: center; gap: 8px; align-self: stretch; width: 100%; box-sizing: border-box; min-height: 44px; margin-top: 12px; padding: 0 12px; text-align: left; border: 1px solid var(--control-border, var(--border)); background: var(--bg-secondary); }
+    .goal-tasks-label { font-weight: 600; }
+    .goal-tasks-counts { margin-left: auto; font-size: 0.75rem; font-weight: 400; color: var(--text-secondary); }
+    .goal-tasks-chevron { flex: none; width: 8px; height: 8px; border: solid var(--text-secondary); border-width: 2px 2px 0 0; transform: rotate(45deg); margin-left: 4px; }
     .goal-side-search { min-height: 44px; }
 }
 .goals-note.team-agents-count { margin: 8px 0 4px; } /* the count line: 8 px under the search row, a little above the table (#8271) */
@@ -311,8 +314,20 @@
 .inbox-folder-toolbar { container: inboxfolder / inline-size; }
 .inbox-folder-toolbar .team-tb-select { display: none; }
 .inbox-folder-toolbar .list-bar-search-row.gt-toolbar { flex-wrap: wrap; }
-.inbox-folder-toolbar .list-bar-menu :is(.list-bar-field, .list-bar-sort) > .list-bar-field-label { flex: 0 0 7.5rem; white-space: nowrap; } /* one label column wide enough for the longest label (Updated since): no label wraps (UI/UX on #8596) */
+.inbox-folder-toolbar .list-bar-menu-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; align-items: start; }
+.inbox-folder-toolbar .list-bar-menu :is(.list-bar-field, .list-bar-sort) { flex-direction: column; align-items: stretch; flex-wrap: nowrap; gap: 4px; } /* a field's label above its box, two fields a line (UI/UX on #8681): the panel is two or three lines tall, not one per field */
+.inbox-folder-toolbar .list-bar-menu :is(.list-bar-field, .list-bar-sort) > .list-bar-field-label { flex: none; white-space: nowrap; }
+.inbox-folder-toolbar .list-bar-menu :is(.list-bar-field, .list-bar-sort) > :last-child:not(.list-bar-field-label) { flex: none; width: 100%; max-width: none; }
 .inbox-folder-toolbar .list-bar-search-row.gt-toolbar > .list-bar-search-wrap { flex: 1 1 10rem; min-width: 10rem; }
+@media (max-width: 767px) { /* a phone's panel is a sheet over the list, one column, its own scroll; the page behind keeps its scroll, nothing traps the focus (UI/UX on #8681) */
+    .inbox-folder-toolbar { position: relative; }
+    .inbox-folder-toolbar .list-bar-menu.list-bar-sheet { position: absolute; left: 0; right: 0; z-index: 20; max-height: 60vh; overflow-y: auto; box-sizing: border-box; padding: 12px; background: var(--bg-secondary); border: 1px solid var(--border-light); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); grid-template-columns: minmax(0, 1fr); }
+    .group-table-head-folder h2 { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } /* the folder select names the page: the title is for screen readers (and the focus when there is no search box) */
+    .group-table-head-folder { min-height: 0; margin-bottom: var(--space-md); }
+    .group-table-head-folder .session-group-count { display: none; }
+    .group-table-head-folder .gt-count-line { display: inline; font-size: 0.75rem; font-weight: 400; color: var(--text-secondary); }
+}
+.gt-count-line { display: none; }
 @container inboxfolder (max-width: 40rem) {
     .inbox-folder-toolbar .team-tb-pills { display: none; }
     .inbox-folder-toolbar .team-tb-select { display: block; order: 3; flex: 1 1 100%; max-width: none; }

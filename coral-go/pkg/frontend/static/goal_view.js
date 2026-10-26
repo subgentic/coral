@@ -157,7 +157,9 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         main.append(el('p', 'goals-note goals-updating', rowsAgree(g) ? '' : 'Updating…')); // the column says it too, and is aria-busy
         const tasks = model.tasks.get(g.id);
         if (tasks && tasks.rows) { // on a phone the list is the next screen: its way in
-            const go = btn('btn goal-tasks-open', `Tasks, ${openLeft} open, ${g.rollup.done} done`, () => { model.screen = 'column'; drawPage(); focusHeading('.goal-side-back'); });
+            const go = btn('btn goal-tasks-open', '', () => { model.screen = 'column'; drawPage(); focusHeading('.goal-side-back'); });
+            go.append(el('span', 'goal-tasks-label', 'Tasks'), el('span', 'goal-tasks-counts', `${openLeft} open, ${g.rollup.done} done`), el('span', 'goal-tasks-chevron')); // a phone's way into the list: the button look, the counts beside the label, a chevron at the edge (#8681)
+            go.setAttribute('aria-label', `Tasks, ${openLeft} open, ${g.rollup.done} done`); go.querySelector('.goal-tasks-chevron').setAttribute('aria-hidden', 'true');
             main.append(go);
         }
         // The pinned bar: Add task and Close goal (Reopen for a closed one), always at the bottom of the page.

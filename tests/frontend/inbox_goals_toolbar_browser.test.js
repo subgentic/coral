@@ -55,7 +55,7 @@ const GOALS = [
             await ev(`document.querySelector('.inbox-folder-toolbar .list-bar-toggle').click(); true`); await settle(200);
             const labels = await ev(`[...document.querySelectorAll('.inbox-folder-toolbar .list-bar-field-label')].filter(e => e.getClientRects().length).map(e => e.textContent.trim()).join('|')`);
             check(`${label}: the Filters panel has Team, Driver, Updated since and Sort`, /Team/.test(labels) && /Driver/.test(labels) && /Updated since/.test(labels) && /Sort/.test(labels), labels);
-            check(`${label}: no label of the Filters panel wraps, and they share one wide column (7.5rem)`, await ev(`[...document.querySelectorAll('.inbox-folder-toolbar .list-bar-menu .list-bar-field-label')].filter(e => e.getClientRects().length).every(e => e.getBoundingClientRect().height < 22 && e.getBoundingClientRect().width >= 110)`));
+            check(`${label}: no label of the Filters panel wraps (each sits above its box)`, await ev(`[...document.querySelectorAll('.inbox-folder-toolbar .list-bar-menu .list-bar-field-label')].filter(e => e.getClientRects().length).every(e => e.getBoundingClientRect().height < 22 && e.getBoundingClientRect().width >= 110)`));
             await setField('inbox-goals-team', 'team-b'); await settle(400);
             const chipText = () => ev(`[...document.querySelectorAll('.inbox-folder-toolbar .list-bar-chip-text')].map(e => e.textContent).join('|')`);
             check(`${label}: a Team filter shows only that team's goals, as a chip "Team: team-b"`, JSON.stringify(await titles()) === JSON.stringify(['Close the old board', 'Plan the migration', 'Write the guide']) && (await chipText()) === 'Team: team-b', JSON.stringify([await titles(), await chipText()]));

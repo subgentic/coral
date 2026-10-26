@@ -135,7 +135,7 @@ export function chatsSpec(key, ctx) {
     const L = listOf(key, q, JSON.stringify(extra));
     if (!L.page && !L.busy && !L.done) readMore(key, folder, q, extra, ctx.redraw);
     const rows = L.rows;
-    return { title: folder.title, rows, count: folderCount(key) ?? null, empty: { line: L.busy || !L.page ? 'Loading chats…' : (filtered ? 'No chat matches the search and filters.' : 'No chats here.') },
+    return { title: folder.title, noun: ['chat', 'chats'], rows, count: folderCount(key) ?? null, empty: { line: L.busy || !L.page ? 'Loading chats…' : (filtered ? 'No chat matches the search and filters.' : 'No chats here.') },
         signature: JSON.stringify([key, q, extra, folderCount(key), L.busy, L.done, L.error, rows.map(s => [s.session_id, s.title, s.summary, stampOf(s), s.starred, s.archived, s.active, s.duration_sec])]),
         node: () => DT.dataTable({ label: `${folder.title}, ${folderCount(key) ?? rows.length}`, rows, rowKey: s => s.session_id, state: DT.tableState(), rowName: s => name(s) || historyLabel(s),
             groupBy: s => ({ key: dayOf(stampOf(s)), label: dayOf(stampOf(s)) }),

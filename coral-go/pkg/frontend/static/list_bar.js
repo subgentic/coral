@@ -5,6 +5,7 @@
 
 import { browserLocal } from './safe_storage.js';
 import { importOnce } from './import_once.js';
+import { isPhoneLayout } from './phone_layout.js';
 
 const DEBOUNCE_MS = 300;
 const LIVE_SETTLE_MS = 500; // how long the count must stay as it is before it is announced
@@ -156,6 +157,8 @@ export function buildListBar(spec, onChange, hooks = {}) {
     if (collapsible && fields.some(x => x.wrap.classList.contains('list-bar-group'))) menu.classList.add('list-bar-menu-groups');
     // spec.compactPanel (#7782): the fields sit two to a line (one on a phone) instead of one tall row each, so the panel does not push the list down by a row per field
     if (collapsible && spec.compactPanel) menu.classList.add('list-bar-menu-grid');
+    // spec.sheet (#8681): on a phone the panel is a sheet over the list (not in the flow); a tap outside it shuts it, like Escape and Done. Not modal: no focus trap, the page keeps its scroll.
+    if (collapsible && spec.sheet) menu.classList.add('list-bar-sheet');
 
     const chipList = make('ul', 'list-bar-chips'); chipList.setAttribute('aria-label', 'Active filters'); chipList.hidden = true;
     if (noSearch) node.classList.add('list-bar-nosearch');
@@ -180,6 +183,8 @@ export function buildListBar(spec, onChange, hooks = {}) {
     const setOpen = (open, { focus = false, silent = true } = {}) => {
         if (!tog) return;
         menu.hidden = !open; tog.setAttribute('aria-expanded', String(open));
+        // a sheet sits under the search row (in a flex bar an absolute box would start at the bar's top, over the search row): its top is the row's bottom; no effect where the panel is in the flow
+        if (open && spec.sheet) menu.style.top = `${searchRow.offsetTop + searchRow.offsetHeight + 4}px`;
         if (!silent && hooks.onPanel) hooks.onPanel(open);
         if (open && focus && fields.length) fields[0].input.focus();
     };
@@ -199,7 +204,7 @@ export function buildListBar(spec, onChange, hooks = {}) {
         if (open && fields.length) fields[0].input.focus();
     });
     node.addEventListener('keydown', e => { if (e.key === 'Escape' && !inline && !menu.hidden && !(tog && !menu.contains(e.target))) { e.preventDefault(); e.stopPropagation(); closeMenu(true); } });
-    const outside = e => { if (!inline && !tog && !menu.hidden && !node.contains(e.target)) closeMenu(false); }; // a collapsible panel is in the flow: it stays open until the icon shuts it
+    const outside = e => { if (!inline && (!tog || (spec.sheet && isPhoneLayout())) && !menu.hidden && !node.contains(e.target)) closeMenu(false); }; // a collapsible panel is in the flow: it stays open until the icon shuts it (a phone's sheet shuts on a tap outside too)
     document.addEventListener('click', outside);
     for (const fld of fields) {
         const key = fld.spec.key;
