@@ -54,6 +54,7 @@ const BASE = require('./test_base').BASE;
                 assert.ok(layout.sameLine,'both actions stay on one line');
                 assert.ok(layout.height<=(width===390?90:40),'compact review row: '+JSON.stringify(layout));
                 assert.ok(layout.standard,'standard enabled button treatment');
+                if(width===390)assert.ok(await ev(`[...(${row('Review file 01.txt')}).querySelectorAll('.inbox-review-actions button')].every(b=>b.getBoundingClientRect().height>=44)`),'review actions keep 44px touch targets');
 
                 const dir=process.env.CORAL_SCREENSHOT_DIR||(process.env.RUNNER_TEMP&&path.join(process.env.RUNNER_TEMP,'out'));
                 if(dir){fs.mkdirSync(dir,{recursive:true});for(const theme of ['light','dark']){await ev(`document.documentElement.setAttribute('data-theme','${theme}');true`);fs.writeFileSync(path.join(dir,`inbox-review-${width}-${theme}.png`),Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}}
