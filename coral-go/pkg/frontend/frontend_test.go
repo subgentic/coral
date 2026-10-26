@@ -3,6 +3,7 @@ package frontend
 import (
 	"bytes"
 	"html/template"
+	"io/fs"
 	"regexp"
 	"strings"
 	"testing"
@@ -160,8 +161,20 @@ func TestAssetURLsInheritThePrefix(t *testing.T) {
 	if strings.Contains(string(css), "url(/static/") || !strings.Contains(string(css), "url(../vendor/fonts/") {
 		t.Error("fonts.css must load its fonts with relative url()s")
 	}
-	js, _ := Static.ReadFile("static/preview_pane.js")
+	// Preview responsibilities may live in separate modules; check the whole family.
+	paths, err := fs.Glob(Static, "static/preview_*.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var js []byte
+	for _, path := range paths {
+		part, err := Static.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		js = append(js, part...)
+	}
 	if strings.Contains(string(js), "'/static/css/cm_shadow.css'") || !strings.Contains(string(js), "new URL('./css/cm_shadow.css', import.meta.url)") {
-		t.Error("preview_pane.js must resolve cm_shadow.css from import.meta.url")
+		t.Error("preview modules must resolve cm_shadow.css from import.meta.url")
 	}
 }
