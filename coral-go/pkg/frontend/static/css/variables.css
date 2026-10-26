@@ -389,6 +389,11 @@
    the others whole colours. tests/frontend/css_color_census.test.mjs fails on a new bare colour outside its allowlist: use a
    token here or above, or add one. */
 :root {
+    /* a person's avatar in a table (data_table.js): eight fixed colours, white text on each is 4.5:1 or more, the same in both themes (#7743) */
+    --avatar-1: #4f46c8; --avatar-2: #b04a00; --avatar-3: #0f7665; --avatar-4: #1a7f37; --avatar-5: #1d4ed8; --avatar-6: #7c3aed; --avatar-7: #be123c; --avatar-8: #a21caf;
+    --on-avatar: #fff;
+}
+:root {
     --black-rgb:         0, 0, 0;
     --white-rgb:         255, 255, 255;
     --fx-red-rgb:        248, 81, 73;

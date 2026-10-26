@@ -7,7 +7,8 @@ import { pollEvery } from './overload.js';
 import { whenText } from './when_text.js';
 import { importOnce } from './import_once.js';
 const { rowFocusTarget, stateChip, el } = await importOnce('./team_table.js'); // lazy: its failure is retried
-const TR = await importOnce('./task_row.js'); // the one task row, shared with the Inbox group and the goal column (#7737)
+const DT = await importOnce('./data_table.js'); // the one table (#7743)
+const TC = await importOnce('./task_columns.js'); // a task as its columns
 const Toolbar = await importOnce('./team_toolbar.js'); // the one toolbar of the team tabs (#7717)
 import { goalTitle, refreshGoalTitles, noGoalLabel } from './task_goals.js';
 import { taskStatusWord, statusClass } from './goal_words.js';
@@ -27,7 +28,7 @@ const emptyQuery = () => ({ rows: [], phase: 0, cursor: '', total: null, doneTot
 // Hide completed (the old tab's toggle, same stored key): the Open chip, chosen until the person picks All; kept in this browser (#7453).
 const HIDE_KEY = 'coral-hide-completed';
 const startFilter = () => (browserLocal.get(HIDE_KEY) === 'false' ? 'all' : 'open');
-const model = { noGoal: false, project: '', filters: { ...TF.EMPTY }, q: emptyQuery(), seq: 0, moreLoaded: false, rows: [], cursor: '', totalOpen: null, totalDone: null, filter: startFilter(), loading: false, failed: '', loadingMore: false, moreFailed: '' };
+const model = { dt: DT.tableState(), noGoal: false, project: '', filters: { ...TF.EMPTY }, q: emptyQuery(), seq: 0, moreLoaded: false, rows: [], cursor: '', totalOpen: null, totalDone: null, filter: startFilter(), loading: false, failed: '', loadingMore: false, moreFailed: '' };
 let root = null, hooks = {};
 const say = (t) => { const s = root && root.querySelector('.team-tasks-status'); if (s) { s.textContent = ''; s.textContent = t; } };
 const bucket = (t) => { const w = taskStatusWord(t.status, t.review_requested); return { 'Queued': 'queued', 'In progress': 'active', 'Blocked': 'blocked', 'In review': 'review', 'Done': 'done' }[w] || 'queued'; };
@@ -199,7 +200,8 @@ function draw() {
         if (!shown.length) {
             const e = el('div', 'goals-empty'); e.append(el('p', null, 'No tasks match this filter.'), btn('btn', 'Show all', () => { model.filter = 'all'; draw(); })); body.append(e);
         } else {
-            body.append(TR.taskList(shown, { label: `Tasks, ${shown.length}`, columns: ['state', 'task', 'who', 'goal', 'priority', 'when'], phone: PHONE.matches, ctx: rowCtx() }));
+            const t = DT.dataTable({ label: `Tasks, ${shown.length}`, columns: TC.taskColumns(rowCtx()), rows: shown, rowKey: TC.taskKey, open: (task) => hooks.openTask?.(task), rowName: (task) => `#${task.id} ${task.title}`, state: model.dt });
+            body.append(t.el);
         }
         if (query ? queryHasMore() : (model.cursor && (model.filter === 'all' || model.filter === 'done'))) body.append(btn('btn goals-more', model.loadingMore ? 'Loading…' : (query ? 'Load more' : 'Load more done tasks'), loadMore));
         if (model.moreFailed) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, model.moreFailed)); body.append(f); }
@@ -213,7 +215,7 @@ function draw() {
 }
 
 const rowCtx = () => ({ openTask: (t) => hooks.openTask?.(t), openGoal: (id) => hooks.openGoal?.(id), goalTitleOf: (id) => goalTitle(model.project, id) || `Goal ${id}`, noGoal: noGoalLabel });
-const { doerOf, whoText, priorityWord } = TR; // the task's own page says the same words
+const { doerOf, whoText, priorityWord } = TC; // the task's own page says the same words
 const isDoneTask = (t) => t.status === 'completed';
 
 /** Show the board's tasks in `host`. hooks: openTask(task), openGoal(id), onCount(openCount). */
@@ -235,7 +237,7 @@ function watch() {
 }
 
 export function showTasks(host, project, h = {}) {
-    if (project !== model.project) { bar = null; Object.assign(model, { noGoal: false, project, filters: TF.loadFilters(project, browserLocal), q: emptyQuery(), rows: [], cursor: '', moreLoaded: false, totalOpen: null, totalDone: null, filter: startFilter(), loading: false, failed: '', loadingMore: false, moreFailed: '' }); }
+    if (project !== model.project) { bar = null; Object.assign(model, { dt: DT.tableState(), noGoal: false, project, filters: TF.loadFilters(project, browserLocal), q: emptyQuery(), rows: [], cursor: '', moreLoaded: false, totalOpen: null, totalDone: null, filter: startFilter(), loading: false, failed: '', loadingMore: false, moreFailed: '' }); }
     hooks = h;
     if (h.noGoal) { model.noGoal = true; model.filter = 'open'; } // opened from the Goals table's "N tasks have no goal" row: exactly those tasks, with a chip that removes the filter (#7717)
     if (!host.dataset.built) {

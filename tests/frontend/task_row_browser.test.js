@@ -18,7 +18,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
             await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'tasks' }); true`);
-            await waitFor(`document.querySelectorAll('#team-panel-tasks .task-table tbody tr, #team-panel-tasks .task-col-row').length >= 5`, 'the tasks', 15000);
+            await waitFor(`document.querySelectorAll('#team-panel-tasks .dt-table tbody tr').length >= 5`, 'the tasks', 15000);
         };
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); // the page first: the board is made through its own fetch
         for (const [id, jt] of [['orch', 'Orchestrator'], ['dev', 'Developer']]) assert.equal((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: id, job_title: jt, session_name: id + '-s' })).status, 200);
@@ -28,46 +28,51 @@ const { removeBoards } = require('./helpers/board_cleanup');
         const first = await mk('Build the column', 'dev', 'high'); await mk('Review the patch', 'orch', 'medium'); await mk('A very long title that a table cell cuts with an ellipsis instead of wrapping it onto four lines of text in a narrow window', '', 'low'); await mk('Fourth task', 'dev', 'medium'); await mk('Mine to do', 'Operator', 'high');
         assert.equal((await api('POST', `/api/board/${B}/tasks/claim`, { subscriber_id: 'dev', task_id: first.id || first.task.id })).status, 200); // the server's ids are not ours: this board's first task, whatever number it has
 
-        console.log('1. Desktop: the table');
+        console.log('1. Desktop: the data table');
         await load(1280, false);
-        const t = await ev(`(() => { const tb = document.querySelector('#team-panel-tasks .task-table'); const rows = [...tb.querySelectorAll('tbody tr')].map(tr => ({ cells: [...tr.children].map(td => td.textContent.replace(/\\s+/g, ' ').trim()), idFirst: !!tr.querySelector('.task-title-cell > .task-id + .team-row-btn'), chip: tr.querySelector('.goal-chip') && tr.querySelector('.goal-chip').textContent, key: tr.dataset.key }));
-            const long = tb.querySelector('tbody tr:nth-child(4) .team-row-btn'); const cs = long && getComputedStyle(long);
-            const idCs = getComputedStyle(tb.querySelector('.task-id')), titleCs = getComputedStyle(tb.querySelector('.team-row-btn'));
-            return { heads: [...tb.querySelectorAll('thead th')].map(th => th.textContent.trim()), rows, ellipsis: cs && cs.textOverflow + ' ' + cs.whiteSpace, idSize: idCs.fontSize + ' ' + idCs.fontWeight, titleSize: titleCs.fontSize + ' ' + titleCs.fontWeight, goalLink: !!tb.querySelector('.team-link[data-goal-link]'), whenRight: getComputedStyle(tb.querySelector('tbody td:last-child')).textAlign }; })()`);
+        const t = await ev(`(() => { const tb = document.querySelector('#team-panel-tasks .dt-table'); const rows = [...tb.querySelectorAll('tbody tr')].map(tr => ({ cells: [...tr.querySelectorAll('td')].map(td => td.textContent.replace(/\\s+/g, ' ').trim()), idFirst: !!tr.querySelector('.dt-title-cell > .dt-id + .dt-primary'), chip: tr.querySelector('.goal-chip') && tr.querySelector('.goal-chip').textContent, key: tr.dataset.key }));
+            const long = tb.querySelector('tbody tr:nth-child(4) .dt-primary'); const cs = long && getComputedStyle(long);
+            const idCs = getComputedStyle(tb.querySelector('.dt-id')), titleCs = getComputedStyle(tb.querySelector('.dt-primary'));
+            return { heads: [...tb.querySelectorAll('thead th')].map(th => th.textContent.replace(/[↑↓↕]/g, '').trim()), rows, ellipsis: cs && cs.textOverflow + ' ' + cs.whiteSpace, idSize: idCs.fontSize + ' ' + idCs.fontWeight, titleSize: titleCs.fontSize + ' ' + titleCs.fontWeight, goalLink: !!tb.querySelector('.dt-link[data-goal-link]'), whenRight: getComputedStyle(tb.querySelector('tbody td[data-key="updated"]')).textAlign }; })()`);
         assert.deepEqual(t.heads, ['State', 'Task', 'Assigned to', 'Goal', 'Priority', 'Updated'], 'the columns, in the design\'s order');
         assert.ok(t.rows.every(r => r.idFirst), 'the id comes before the title in every row ' + JSON.stringify(t.rows[0]));
         const words = t.rows.map(r => r.chip);
         assert.ok(words.every(w => ['Queued', 'In progress', 'Blocked', 'In review', 'Done'].includes(w)), 'one word set for state ' + JSON.stringify(words));
         assert.ok(words.includes('In progress') && words.includes('Queued'), 'the claimed task is In progress, the others Queued ' + JSON.stringify(words));
-        assert.ok(t.rows.some(r => r.cells[4] === 'High') && t.rows.some(r => r.cells[4] === 'Low'), 'priority is a word ' + JSON.stringify(t.rows.map(r => r.cells[4])));
-        assert.ok(t.rows.every(r => /ago|just now|today|yesterday|[A-Z][a-z]{2} \\d/.test(r.cells[5])), 'Updated says when ' + JSON.stringify(t.rows.map(r => r.cells[5])));
+        assert.ok(t.rows.some(r => r.cells[5] !== undefined) && t.rows.some(r => r.cells.includes('High')) && t.rows.some(r => r.cells.includes('Low')), 'priority is a word ' + JSON.stringify(t.rows.map(r => r.cells)));
+        assert.ok(t.rows.every(r => /ago|just now|today|yesterday|[A-Z][a-z]{2} \\d/.test(r.cells[r.cells.length - 1])), 'Updated says when ' + JSON.stringify(t.rows.map(r => r.cells)));
         assert.equal(t.ellipsis, 'ellipsis nowrap', 'a long title is cut with an ellipsis');
-        const levels = await ev(`(() => { const r = document.querySelector('#team-panel-tasks .task-table tbody tr'); const c = sel => { const e = r.querySelector(sel), cs = getComputedStyle(e); return cs.fontSize + ' ' + cs.fontWeight + ' ' + cs.color; }; return { title: c('.team-row-btn'), who: c('.task-who'), priority: c('.task-priority'), when: c('.task-when'), heights: [...document.querySelectorAll('#team-panel-tasks .task-table tbody tr')].map(x => Math.round(x.getBoundingClientRect().height)) }; })()`);
+        const levels = await ev(`(() => { const r = document.querySelector('#team-panel-tasks .dt-table tbody tr'); const c = sel => { const e = r.querySelector(sel), cs = getComputedStyle(e); return cs.fontSize + ' ' + cs.fontWeight + ' ' + cs.color; }; return { title: c('.dt-primary'), who: c('td[data-key="who"]'), priority: c('td[data-key="priority"]'), when: c('td[data-key="updated"]'), heights: [...document.querySelectorAll('#team-panel-tasks .dt-table tbody tr')].map(x => Math.round(x.getBoundingClientRect().height)) }; })()`);
         assert.ok(levels.title.startsWith('14px 600') && levels.who.startsWith('13px 400') && levels.priority.startsWith('12px 400') && levels.when.startsWith('12px 400'), 'title 14/600, who 13/400, priority and updated 12/400 ' + JSON.stringify(levels));
         assert.equal(new Set([levels.title.split(' ').slice(2).join(' '), levels.who.split(' ').slice(2).join(' '), levels.priority.split(' ').slice(2).join(' ')]).size, 3, 'three colour levels: primary, secondary, tertiary ' + JSON.stringify(levels));
         assert.ok(levels.heights.every(h => h <= 38), 'every row is one line, not wrapped (dense) ' + JSON.stringify(levels.heights));
         assert.equal(t.idSize, '12px 400', 'the id is 12/400'); assert.equal(t.titleSize, '14px 600', 'the title is 14/600');
         assert.ok(t.goalLink && t.whenRight === 'right', 'the goal is a link and the last column is right-aligned');
         await shot('task-row-desktop');
+        // sort by a head: the Priority head puts High first, a second press reverses it
+        await ev(`document.querySelector('#team-panel-tasks .dt-sort[data-key="priority"]').click(); true`);
+        assert.equal(await ev(`document.querySelector('#team-panel-tasks .dt-table tbody tr td[data-key="priority"]').textContent`), 'High', 'sorted by priority, High is first');
         // the goal link keeps its own click; the rest of the row opens the task
-        await ev(`document.querySelector('#team-panel-tasks .team-link[data-goal-link]').click(); true`);
+        await ev(`document.querySelector('#team-panel-tasks .dt-link[data-goal-link]').click(); true`);
         await waitFor(`!!document.querySelector('.goal-split') || !!document.getElementById('goals-detail-title')`, 'the goal opened', 10000);
         await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'tasks' }); true`);
-        await waitFor(`document.querySelectorAll('#team-panel-tasks .task-table tbody tr').length >= 5`, 'the tasks again', 10000);
-        await ev(`document.querySelector('#team-panel-tasks .task-table tbody tr td:nth-child(3)').click(); true`);
+        await waitFor(`document.querySelectorAll('#team-panel-tasks .dt-table tbody tr').length >= 5`, 'the tasks again', 10000);
+        await ev(`document.querySelector('#team-panel-tasks .dt-table tbody tr td[data-key="who"]').click(); true`);
         await waitFor(`!!document.getElementById('team-task-title')`, 'the task page from a click on the row', 10000);
         console.log('   ✓');
 
-        console.log('2. Phone: the column, two lines in a 44 px row');
+        console.log('2. Phone: the same table folded to two lines in a 44 px row');
         await load(390, true);
-        const p = await ev(`(() => { const rows = [...document.querySelectorAll('#team-panel-tasks .task-col-row')]; return { table: !!document.querySelector('#team-panel-tasks .task-table'), n: rows.length, h: rows.map(r => Math.round(r.getBoundingClientRect().height)), lines: rows.map(r => [r.querySelector('.task-col-line1').textContent.replace(/\\s+/g, ' ').trim(), r.querySelector('.task-col-line2 .goal-chip').textContent, !!r.querySelector('.task-col-priority')]), over: document.documentElement.scrollWidth - innerWidth }; })()`);
-        assert.equal(p.table, false, 'no table on a phone'); assert.ok(p.n >= 5 && p.h.every(h => h >= 44), 'every row is at least 44 px ' + JSON.stringify(p.h));
-        assert.ok(p.lines[0][0].startsWith('#') && p.lines.some(l => l[1] === 'In progress'), 'line 1 is the id and title, line 2 the chip ' + JSON.stringify(p.lines));
-        assert.equal(p.lines.filter(l => l[2]).length, 2, 'the priority shows only for the two High tasks ' + JSON.stringify(p.lines)); assert.ok(p.over <= 1, 'no sideways scroll ' + p.over);
+        await waitFor(`!!document.querySelector('#team-panel-tasks .dt-box').classList.contains('dt-folded')`, 'the table folds on a phone');
+        const p = await ev(`(() => { const rows = [...document.querySelectorAll('#team-panel-tasks .dt-table tbody tr')]; return { head: getComputedStyle(document.querySelector('#team-panel-tasks thead')).display, n: rows.length, h: rows.map(r => Math.round(r.getBoundingClientRect().height)), line1: rows.map(r => r.querySelector('td.dt-line-1').textContent.replace(/\\s+/g, ' ').trim()), chips: rows.map(r => r.querySelector('.goal-chip').textContent), high: rows.filter(r => getComputedStyle(r.querySelector('td[data-key="priority"]')).display !== 'none').length, over: document.documentElement.scrollWidth - innerWidth }; })()`);
+        assert.equal(p.head, 'none', 'no header row on a phone'); assert.ok(p.n >= 5 && p.h.every(h => h >= 44), 'every row is at least 44 px ' + JSON.stringify(p.h));
+        assert.ok(p.line1[0].startsWith('#') && p.chips.includes('In progress'), 'line 1 is the id and title, line 2 the chip ' + JSON.stringify(p));
+        assert.equal(p.high, 2, 'the priority shows only for the two High tasks ' + JSON.stringify(p)); assert.ok(p.over <= 1, 'no sideways scroll ' + p.over);
         await shot('task-row-phone');
-        await ev(`document.querySelector('#team-panel-tasks .task-col-btn').click(); true`);
+        await ev(`document.querySelector('#team-panel-tasks .dt-primary').click(); true`);
         await waitFor(`!!document.getElementById('team-task-title')`, 'the task page from the phone row', 10000);
         console.log('   ✓');
+
         // the same row in the Inbox's Tasks group (my tasks) and in the goal's column
         const word = (rowSel, chip) => `[...document.querySelectorAll('${rowSel}')].map(r => r.querySelector('${chip}').textContent)`;
         for (const [w, mobile, label] of [[1280, false, 'desktop'], [390, true, 'phone']]) {

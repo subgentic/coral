@@ -79,7 +79,7 @@ const BASE = require('./test_base').BASE;
         const nm = await ev(`({ region: document.getElementById('team-panel-item').getAttribute('aria-label'), title: document.getElementById('team-task-title').textContent, focus: document.activeElement.id })`);
         assert.ok(/^Task \d+$/.test(nm.region) && /^#\d+ (Ship the queue|Write the docs)$/.test(nm.title) && nm.focus === 'team-task-title', 'the page is named by its number and its task, the title has the focus: ' + JSON.stringify(nm));
         await ev(`document.querySelector('#team-panel-item .goals-back').focus(); document.querySelector('#team-panel-item .goals-back').click(); true`);
-        await waitFor(`!document.querySelector('#team-panel-item #team-task-title') && document.activeElement && document.activeElement.classList.contains('team-row-btn') && !!document.activeElement.dataset.taskId`, 'the focus back on the task\'s row', 8000);
+        await waitFor(`!document.querySelector('#team-panel-item #team-task-title') && document.activeElement && (document.activeElement.classList.contains('team-row-btn') || document.activeElement.classList.contains('dt-primary')) && !!document.activeElement.dataset.taskId`, 'the focus back on the task\'s row', 8000);
 
         console.log('3. both themes hold 4.5:1 in the dialog and on the page');
         await installAudit(ev);

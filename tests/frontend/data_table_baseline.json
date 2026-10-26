@@ -1,0 +1,28 @@
+{
+  "css": {
+    "agentic.css": 23,
+    "chat.css": 4,
+    "cloud.css": 9,
+    "components.css": 5,
+    "cost_dashboard.css": 23,
+    "docs.css": 4,
+    "layout.css": 37,
+    "output.css": 4,
+    "scheduler.css": 2,
+    "session.css": 2,
+    "team_page.css": 54,
+    "workflows.css": 5
+  },
+  "js": {
+    "actions.js": 1,
+    "analytics_spend.js": 20,
+    "cost_dashboard.js": 125,
+    "scheduler.js": 18,
+    "servers.js": 13,
+    "session_state.js": 43,
+    "sidebar_groups.js": 7,
+    "team_table.js": 5,
+    "token_usage_ui.js": 15,
+    "workflows.js": 20
+  }
+}

@@ -45,7 +45,7 @@ export function teamTable({ label, columns, rows, className = '' }) {
 /** The row of a table that holds `key`, and its button: where the focus goes back to when a page or the pane closes. */
 export function rowFocusTarget(root, key) {
     const tr = root && [...root.querySelectorAll('tr[data-key]')].find(r => r.dataset.key === String(key));
-    return tr ? tr.querySelector('.team-row-btn') || tr : null;
+    return tr ? tr.querySelector('.team-row-btn, .dt-primary') || tr : null;
 }
 
 /** A state as a dot and a word (the dot is decoration: the word says it). */

@@ -1,0 +1,101 @@
+/* The one table (#7743, data_table.js). Every size and colour is a --table-* token: a styling change is one token here or one rule below, and no surface styles a table, a row, a cell or a header (a census test checks that).
+ * The levels are the #7736 scheme: primary 14/600, secondary 13/400, tertiary 12/400, the head 11/600 uppercase. */
+:root {
+    --table-row-h: 36px;
+    --table-pad-x: 12px;
+    --table-radius: var(--radius-lg, 8px);
+    --table-outer: var(--border);
+    --table-border: var(--border-subtle, var(--border));
+    --table-bg: var(--bg-primary);
+    --table-head-bg: var(--bg-secondary);
+    --table-hover: var(--bg-hover);
+    --table-selected: color-mix(in srgb, var(--accent) 14%, transparent);
+    --table-head-size: 0.6875rem;
+    --table-head-weight: 600;
+    --table-head-track: 0.06em;
+    --table-head-color: var(--text-muted);
+    --table-head-active: var(--text-primary);
+    --table-primary-size: 0.875rem;
+    --table-primary-weight: 600;
+    --table-primary-color: var(--text-primary);
+    --table-secondary-size: 0.8125rem;
+    --table-secondary-weight: 400;
+    --table-secondary-color: var(--text-secondary);
+    --table-tertiary-size: 0.75rem;
+    --table-tertiary-weight: 400;
+    --table-tertiary-color: var(--text-muted);
+    --table-check-w: 24px;
+    --table-touch: var(--control-touch-height, 44px);
+    --table-avatar: 20px;
+    --table-danger: var(--danger);
+}
+
+.dt-box { border: 1px solid var(--table-outer); border-radius: var(--table-radius); background: var(--table-bg); overflow-x: clip; container: dt / inline-size; } /* clip, not auto: a scroll box here would keep the sticky header from sticking to the page */
+.dt-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+.dt-table th { position: sticky; top: 0; z-index: 1; background: var(--table-head-bg); border-bottom: 1px solid var(--table-outer); padding: 8px var(--table-pad-x); text-align: left; font-size: var(--table-head-size); font-weight: var(--table-head-weight); letter-spacing: var(--table-head-track); text-transform: uppercase; color: var(--table-head-color); white-space: nowrap; }
+.dt-table th.dt-end, .dt-table td.dt-end { text-align: right; }
+.dt-sort { display: inline-flex; align-items: center; gap: 4px; background: none; border: 0; padding: 0; font: inherit; letter-spacing: inherit; text-transform: inherit; color: inherit; cursor: pointer; }
+.dt-sort:hover { color: var(--table-head-active); }
+.dt-sort:focus-visible, .dt-primary:focus-visible, .dt-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
+.dt-arrow { opacity: 0.5; }
+.dt-table th[aria-sort="ascending"] .dt-sort, .dt-table th[aria-sort="descending"] .dt-sort { color: var(--table-head-active); }
+.dt-table th[aria-sort="ascending"] .dt-arrow, .dt-table th[aria-sort="descending"] .dt-arrow { opacity: 1; }
+.dt-table td { height: var(--table-row-h); padding: 0 var(--table-pad-x); border-bottom: 1px solid var(--table-border); vertical-align: middle; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 16rem; }
+.dt-table tbody tr:last-child td { border-bottom: 0; }
+.dt-table td.dt-grow { width: 45%; max-width: 0; }
+.dt-table td.dt-wrap { white-space: normal; }
+.dt-primary { display: inline; max-width: 100%; background: none; border: 0; padding: 0; text-align: left; font: inherit; font-size: var(--table-primary-size); font-weight: var(--table-primary-weight); color: var(--table-primary-color); cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dt-primary:hover { color: var(--accent); text-decoration: underline; }
+.dt-link { background: none; border: 0; padding: 0; font: inherit; color: var(--link-text, var(--accent)); cursor: pointer; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dt-link:hover { text-decoration: underline; }
+.dt-td.dt-tone-primary { font-size: var(--table-primary-size); font-weight: var(--table-primary-weight); color: var(--table-primary-color); }
+.dt-td.dt-tone-secondary { font-size: var(--table-secondary-size); font-weight: var(--table-secondary-weight); color: var(--table-secondary-color); }
+.dt-td.dt-tone-tertiary { font-size: var(--table-tertiary-size); font-weight: var(--table-tertiary-weight); color: var(--table-tertiary-color); font-variant-numeric: tabular-nums; }
+.dt-subtitle { display: block; font-size: var(--table-tertiary-size); font-weight: var(--table-tertiary-weight); color: var(--table-secondary-color); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dt-time { font-variant-numeric: tabular-nums; }
+.dt-title-cell { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.dt-id { flex: none; font-size: var(--table-tertiary-size); font-weight: var(--table-tertiary-weight); color: var(--table-tertiary-color); font-variant-numeric: tabular-nums; }
+.dt-tag { display: inline-block; border: 1px solid var(--table-outer); border-radius: var(--radius-md); padding: 1px 6px; font-size: var(--table-head-size); font-weight: var(--table-head-weight); color: var(--table-secondary-color); }
+.dt-person { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; }
+.dt-avatar { flex: none; display: inline-flex; align-items: center; justify-content: center; width: var(--table-avatar); height: var(--table-avatar); border-radius: 50%; color: var(--on-avatar); font-size: 0.6875rem; font-weight: 700; }
+.dt-person-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dt-row-open { cursor: pointer; }
+.dt-row:hover td { background: var(--table-hover); }
+.dt-row[aria-current="true"] td { background: var(--table-hover); }
+.dt-row.dt-selected td { background: var(--table-selected); }
+.dt-table .dt-check { width: var(--table-check-w); padding-right: 0; }
+.dt-check input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); cursor: pointer; vertical-align: middle; }
+.dt-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 4px 0; }
+.dt-bar-count { font-size: var(--table-secondary-size); font-weight: 600; color: var(--table-primary-color); }
+.dt-bar-clear { margin-left: auto; }
+.dt-bar-confirm { font-size: var(--table-secondary-size); color: var(--table-primary-color); }
+.dt-danger { color: var(--table-danger); border-color: var(--table-danger); background: none; }
+.dt-sortbar, .dt-select-toggle[hidden] { display: none; }
+.dt-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 8px var(--table-pad-x); border-top: 1px solid var(--table-outer); font-size: var(--table-tertiary-size); color: var(--table-tertiary-color); }
+.dt-empty { padding: 24px var(--table-pad-x); text-align: center; color: var(--table-secondary-color); }
+.dt-empty-line { margin: 0 0 8px; font-size: var(--table-secondary-size); }
+.dt-empty-hint { margin: 0 0 8px; font-size: var(--table-tertiary-size); color: var(--table-tertiary-color); }
+
+/* folded: the table's own box narrower than 40 rem (data_table.js sets the class dt-folded), a phone or 200% text. The header row is gone: the cells carry their labels, and a Sort by select takes its place. */
+.dt-box.dt-folded .dt-sortbar { display: flex; align-items: center; gap: 8px; padding: 8px var(--table-pad-x); border-bottom: 1px solid var(--table-outer); font-size: var(--table-secondary-size); color: var(--table-secondary-color); }
+.dt-box.dt-folded .dt-sortbar select, .dt-box.dt-folded .dt-sortbar .btn { min-height: var(--table-touch); }
+.dt-box.dt-folded .dt-table, .dt-box.dt-folded tbody { display: block; }
+.dt-box.dt-folded thead { display: none; }
+.dt-box.dt-folded tr { display: flex; flex-wrap: wrap; align-items: center; column-gap: 8px; padding: 8px var(--table-pad-x); min-height: var(--table-touch); box-sizing: border-box; border-bottom: 1px solid var(--table-border); }
+.dt-box.dt-folded tbody tr:last-child { border-bottom: 0; }
+.dt-box.dt-folded td { display: block; height: auto; padding: 0; border: 0; max-width: 100%; background: none; }
+.dt-box.dt-folded .dt-row:hover td, .dt-box.dt-folded .dt-row.dt-selected td, .dt-box.dt-folded .dt-row[aria-current="true"] td { background: none; }
+.dt-box.dt-folded .dt-row:hover, .dt-box.dt-folded .dt-row[aria-current="true"] { background: var(--table-hover); }
+.dt-box.dt-folded .dt-row.dt-selected { background: var(--table-selected); }
+.dt-box.dt-folded .dt-check { display: none; }
+.dt-box.dt-folded.dt-selecting .dt-check { display: block; flex: none; width: var(--table-touch); }
+.dt-box.dt-folded.dt-selecting .dt-check input { width: 24px; height: 24px; }
+.dt-box.dt-fold-column.dt-folded td.dt-line-0, .dt-box.dt-fold-column.dt-folded td.dt-when-off { display: none; }
+.dt-box.dt-fold-column.dt-folded td.dt-line-1 { order: 1; }
+.dt-box.dt-fold-column.dt-folded td.dt-line-1.dt-grow { flex: 1 1 0; min-width: 0; }
+.dt-box.dt-fold-column.dt-folded tr::before { content: ""; order: 2; flex-basis: 100%; height: 0; }
+.dt-box.dt-fold-column.dt-folded td.dt-line-2 { order: 3; font-size: var(--table-tertiary-size); font-weight: var(--table-tertiary-weight); }
+.dt-box.dt-fold-labeled.dt-folded tr { flex-direction: column; align-items: stretch; row-gap: 2px; }
+.dt-box.dt-fold-labeled.dt-folded td { display: flex; gap: 6px; white-space: normal; }
+.dt-box.dt-fold-labeled.dt-folded td:not(.dt-tone-primary)::before { content: attr(data-label); color: var(--table-tertiary-color); font-size: var(--table-tertiary-size); font-weight: var(--table-tertiary-weight); flex: none; }
+@media (forced-colors: active) { .dt-row.dt-selected { outline: 2px solid Highlight; } .dt-table th { border-bottom-color: CanvasText; } }
