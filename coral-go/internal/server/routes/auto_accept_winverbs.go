@@ -333,15 +333,8 @@ func winMovesOutside(st winStage, outside func(string) bool) bool {
 }
 
 func winStageRisk(st winStage, outside func(string) bool) string {
-	for _, t := range underCwd(st.cwd, st.redir) {
-		if !isDiscard(t) && gitHookPath(t) {
-			return gitHookWhy(t) // a redirect into a hook or git's config (#186)
-		}
-	}
-	for _, t := range st.redir {
-		if !isDiscard(t) && pathOutside(t, outside) {
-			return "it writes outside the working directory (" + t + ")"
-		}
+	if why := stageRedirectRisk(st, outside); why != "" {
+		return why
 	}
 	if len(st.words) == 0 {
 		return ""
@@ -719,6 +712,21 @@ func winStageRisk(st winStage, outside func(string) bool) string {
 			if pathOutside(p, outside) {
 				return "it runs " + words[0] + " on a path outside the working directory (" + p + ")"
 			}
+		}
+	}
+	return ""
+}
+
+// stageRedirectRisk judges where the stage's redirections write: into a git hook or config, or outside the working directory.
+func stageRedirectRisk(st winStage, outside func(string) bool) string {
+	for _, t := range underCwd(st.cwd, st.redir) {
+		if !isDiscard(t) && gitHookPath(t) {
+			return gitHookWhy(t) // a redirect into a hook or git's config (#186)
+		}
+	}
+	for _, t := range st.redir {
+		if !isDiscard(t) && pathOutside(t, outside) {
+			return "it writes outside the working directory (" + t + ")"
 		}
 	}
 	return ""
