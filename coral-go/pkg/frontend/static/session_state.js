@@ -42,16 +42,20 @@ const GOAL_LINE_MAX = 140;
 }
 
 // Placeholder of the command box: who it goes to, and that an image can be pasted. The agent's type is in the header and the board's name in the sidebar, so neither is repeated here
-// (the board's generated id used to be, #5991); a phone gets the target only, as the full text is cut off mid-word in its box.
+// (the board's generated id used to be, #5991). It is one line, never wrapped (the stylesheet cuts it with an ellipsis), and a name longer than NAME_IN_BOX characters is not put in it: "this agent"
+// (#8206: a 60-character name made the phone's box seven lines tall).
+const NAME_IN_BOX = 24;
+const nameInBox = (identity) => (String(identity).length > NAME_IN_BOX ? 'this agent' : identity);
 export function commandPlaceholder(identity, agentType) {
-    if (isPhoneLayout()) return `Message ${identity}\u2026`;
-    if (agentType === 'terminal') return `Type a command in ${identity}`;
-    return `Message ${identity}, or paste an image`;
+    const name = nameInBox(identity);
+    if (isPhoneLayout()) return 'Message\u2026'; // the phone's box holds about 16 characters beside its buttons, and the header names the agent
+    if (agentType === 'terminal') return `Type a command in ${name}`;
+    return `Message ${name}, or paste an image`;
 }
 
-/** The box's words while a new agent's CLI is not up yet (#6382): it says so, and that a message typed now is held for it. */
+/** The box's words while a new agent's CLI is not up yet (#6382): it says so. That a message typed now is held for it is on Send's own title (agent_starting.js), not in the box. */
 export function startingPlaceholder(identity) {
-    return isPhoneLayout() ? `Starting ${identity}\u2026` : `Starting ${identity}\u2026 you can type now, it is sent when ready`;
+    return isPhoneLayout() ? 'Starting\u2026' : `Starting ${nameInBox(identity)}\u2026`;
 }
 
 /** Shared identity resolver used by row label, avatar, header, terminal label and placeholder. */

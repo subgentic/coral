@@ -65,7 +65,7 @@ const HOOKS = { question: 'Hooks need review: 3 hooks are new or changed', optio
             await ev(`window.__term.open = false; true`);
             await waitFor(`!/Answer Codex/.test(document.getElementById('command-input').placeholder)`, 'the box back to its words', 8000);
             const back = await ev(`document.getElementById('command-input').placeholder`);
-            check(`${tag}: answered, the box has its own words back`, /^Message codex-q/.test(back), back);
+            check(`${tag}: answered, the box has its own words back (a phone's box holds "Message…" and no name, #8206)`, tag.startsWith('390') ? back === 'Message\u2026' : /^Message codex-q/.test(back), back);
             const gone = await hint();
             check(`${tag}: and the line and the description go with it`, !gone.shown && gone.text === '' && !gone.described.includes('hooks'), JSON.stringify(gone));
 

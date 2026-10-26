@@ -24,6 +24,7 @@ export const tableState = () => ({ widths: null, sort: null, selected: new Set()
 /** The row's one real button: its text names the row. */
 export function primaryButton(text, label) {
     const b = el('button', 'dt-primary', text); b.type = 'button';
+    b.title = text; // a name the row cuts with an ellipsis is read whole on hover (#8206); a caller with better words sets its own
     if (label) b.setAttribute('aria-label', label);
     return b;
 }
