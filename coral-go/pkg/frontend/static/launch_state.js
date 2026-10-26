@@ -6,7 +6,8 @@ export const launch = {
     // Which launch mode is active: null (the chooser), 'agent' or 'terminal'.
     mode: null,
     existingTeamBoardNames: new Set(),
-    teamAgentModalRow: null,
+    // Add / Edit member (#7861): the agent step of this dialog in a second mode, over the team form: { row: the member's row (null for a new one), returnTo: the team step it came from, value: the member's values } while open, else null.
+    member: null,
     teamAddress: false, // the team's Machine is "Another computer's address..." (#7407)
     // A launch always runs on exactly one server (multi-server hub, spec section 5). `server` is the Server dropdown of the
     // launch modal; Add agent (addTo, below) runs on the server of the team or folder it starts from.

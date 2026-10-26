@@ -91,16 +91,27 @@ const BASE = require('./test_base').BASE;
 
         console.log('The team-agent dialog: a name is required, Save adds the agent, Edit changes it');
         await ev(`window.showTeamAgentModal(); true`);
-        assert.deepEqual(await ev(`[document.getElementById('team-agent-modal-title').textContent, getComputedStyle(document.getElementById('team-agent-modal')).display]`), ['Add member', 'flex']);
+        assert.deepEqual(await ev(`[document.getElementById('launch-agent-title-text').textContent, (document.getElementById('launch-modal').hasAttribute('data-member') ? 'flex' : 'none')]`), ['Add member', 'flex']);
+        assert.equal(await ev(`document.getElementById('launch-step-agent').dataset.stage`), 'persona', 'a new member opens on its role (the persona step, #7861)');
+        assert.equal(await ev(`getComputedStyle(document.getElementById('launch-step-team')).display`), 'none', 'the team form is behind it, not closed');
         await ev(`window.saveTeamAgentFromModal(); true`);
         assert.ok((await toasts()).some(t => /A member needs a role/.test(t)));
-        await ev(`{ const n = document.querySelector('#team-agent-modal-acf .acf-name'); n.value = 'Scribe'; n.dispatchEvent(new Event('input', { bubbles: true })); } true`);
+        await ev(`{ const n = document.getElementById('launch-agent-name-input'); n.value = 'Scribe'; n.dispatchEvent(new Event('input', { bubbles: true })); } true`);
         await ev(`window.saveTeamAgentFromModal(); true`);
-        assert.equal((await teamRows()).includes('Scribe'), true, 'added'); assert.equal(await ev(`getComputedStyle(document.getElementById('team-agent-modal')).display`), 'none');
+        assert.equal((await teamRows()).includes('Scribe'), true, 'added'); assert.equal(await ev(`(document.getElementById('launch-modal').hasAttribute('data-member') ? 'flex' : 'none')`), 'none');
         await ev(`window.showTeamAgentModal([...document.querySelectorAll('#team-agents-list .team-agent-row')].find(r => r.querySelector('.team-agent-role-name').textContent === 'Scribe')); true`);
-        assert.equal(await ev(`document.getElementById('team-agent-modal-title').textContent`), 'Edit member');
-        await ev(`{ const n = document.querySelector('#team-agent-modal-acf .acf-name'); n.value = 'Editor'; n.dispatchEvent(new Event('input', { bubbles: true })); window.saveTeamAgentFromModal(); } true`);
+        assert.equal(await ev(`document.getElementById('launch-agent-title-text').textContent`), 'Edit member');
+        assert.equal(await ev(`document.getElementById('launch-step-agent').dataset.stage`), 'agent', 'an existing member opens on its settings');
+        assert.equal(await ev(`document.getElementById('launch-agent-name-input').value`), 'Scribe', 'with its own values');
+        assert.equal(await ev(`[document.getElementById('launch-agent-save').hidden, document.getElementById('launch-agent-go').hidden]`).then(a => a.join()), 'false,true', 'Save member, not Launch');
+        // Cancel goes back to the team form and keeps the member as it was
+        await ev(`{ const n = document.getElementById('launch-agent-name-input'); n.value = 'Ghost'; n.dispatchEvent(new Event('input', { bubbles: true })); } window.cancelTeamMember(); true`);
+        rows = await teamRows(); assert.equal(rows.includes('Scribe') && !rows.includes('Ghost'), true, 'cancelled: ' + JSON.stringify(rows));
+        assert.equal(await ev(`getComputedStyle(document.getElementById('launch-step-team')).display !== 'none' && !document.getElementById('launch-modal').hasAttribute('data-member')`), true, 'back on the team form');
+        await ev(`window.showTeamAgentModal([...document.querySelectorAll('#team-agents-list .team-agent-row')].find(r => r.querySelector('.team-agent-role-name').textContent === 'Scribe')); true`);
+        await ev(`{ const n = document.getElementById('launch-agent-name-input'); n.value = 'Editor'; n.dispatchEvent(new Event('input', { bubbles: true })); window.saveTeamAgentFromModal(); } true`);
         rows = await teamRows(); assert.equal(rows.includes('Editor') && !rows.includes('Scribe'), true, 'edited: ' + JSON.stringify(rows));
+        assert.equal(await ev(`window.__teamLaunches.length`), 0, 'adding and editing a member launches nothing');
 
         console.log('Launch Team: the checks, the request, a board that exists, an agent that failed');
         await ev(`document.getElementById('team-board-name').value = ''; window.launchTeam(); true`);

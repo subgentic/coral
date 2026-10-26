@@ -27,7 +27,7 @@ function _syncMobileLaunchSections(step) {
 /** New Agent's three steps (#7391, UI/UX's v4): the folder (and the machine), the persona, the agent. `data-stage` on the step says which one, and CSS shows what belongs to it; the machine row above the dialog is only for the first. */
 export const LAUNCH_STAGES = ['folder', 'persona', 'agent'];
 /** The stages this dialog goes through: Add agent (#7778) knows the folder, so it starts at the persona and has two steps. */
-export const launchStages = () => (launch.addTo && launch.addTo.skipFolder ? LAUNCH_STAGES.slice(1) : LAUNCH_STAGES);
+export const launchStages = () => ((launch.addTo && launch.addTo.skipFolder) || launch.member ? LAUNCH_STAGES.slice(1) : LAUNCH_STAGES); // a member has no folder of its own either (#7861)
 const STAGE_NAMES = { folder: 'Where it launches', persona: 'Persona', agent: 'The agent' };
 export function setLaunchStage(stage) {
     const stages = launchStages();
@@ -41,12 +41,13 @@ export function setLaunchStage(stage) {
     const sub = `Step ${n} of ${total}: ${STAGE_NAMES[stage]}${stage !== 'folder' && dir ? '. In ' + dir : ''}`;
     const subEl = document.getElementById("launch-stage-sub");
     if (subEl) { subEl.textContent = ''; if (stage !== 'folder' && dir) { subEl.append(`Step ${n} of ${total}: ${STAGE_NAMES[stage]}. In `); const b = document.createElement('b'); b.textContent = dir; subEl.append(b); } else subEl.textContent = sub; }
-    const back = document.getElementById("launch-agent-back"), next = document.getElementById("launch-agent-next"), go = document.getElementById("launch-agent-go");
+    const back = document.getElementById("launch-agent-back"), next = document.getElementById("launch-agent-next"), go = document.getElementById("launch-agent-go"), save = document.getElementById("launch-agent-save");
     if (back) back.hidden = stage === stages[0];
     if (next) next.hidden = stage === 'agent';
-    if (go) go.hidden = !(stage === 'agent' || launchFlags.launchFromAnyStep);
+    if (go) go.hidden = !!launch.member || !(stage === 'agent' || launchFlags.launchFromAnyStep); // a member is saved into the team form, not launched (#7861)
+    if (save) save.hidden = !launch.member || stage !== 'agent';
     const recap = document.getElementById("launch-recap");
-    if (recap) recap.hidden = stage === 'folder';
+    if (recap) recap.hidden = stage === 'folder' || !!launch.member;
     const live = document.getElementById("launch-stage-live");
     if (live) live.textContent = '';
     return sub;
@@ -72,7 +73,7 @@ function _showLaunchStep(step) {
         content.classList.toggle("modal-content-wide", !sectioned);
         content.classList.toggle("launch-choosing", step === "chooser"); // four choices in a row (#3630)
         content.classList.toggle("launch-wizard-content", step === "agent" || step === "team"); // one size for every step and tab of New Agent and New team (#7391, #7407)
-        content.classList.toggle("launch-team-content", step === "team"); // the team dialog is 720 high, New Agent 640 (UI/UX)
+        content.classList.toggle("launch-team-content", step === "team" || !!launch.member); // the team dialog is 720 high, New Agent 640 (UI/UX); a member keeps the team's size, it is the team form's own step (#7861)
     }
     _syncMobileLaunchSections(step);
 }
@@ -234,9 +235,11 @@ function _refreshAfterLaunch(server, target) {
 }
 
 export function hideLaunchModal() {
+    if (launch.member && typeof window.cancelTeamMember === 'function') { window.cancelTeamMember(); return; } // Escape and Cancel on a member go back to the team form, not out of the dialog (#7861)
     document.getElementById("launch-modal").style.display = "none";
     launch.addTo = null; // Add agent's preset ends with the dialog (#7778)
     document.getElementById("launch-modal").removeAttribute('data-add-to');
+    document.getElementById("launch-modal").removeAttribute('data-member');
     document.dispatchEvent(new CustomEvent('launch-modal-hidden')); // the team form's step 3 panes are drawn when it opens and gone when it closes (team_launch_settings.js)
     for (const id of ['launch-dir', 'launch-terminal-dir', 'launch-team-base-branch']) clearFieldInvalid(document.getElementById(id));
 }

@@ -20,7 +20,6 @@ const DIALOGS = {
     'job-modal': { ...MODAL('job-modal'), open: `window.showJobModal()` },
     'default-prompts-modal': { ...MODAL('default-prompts-modal'), open: `window.showDefaultPromptsModal()` },
     'create-task-modal': { ...MODAL('create-task-modal'), open: `window.showCreateTaskModal()` },
-    'team-agent-modal': { ...MODAL('team-agent-modal'), open: `(async () => { await __M('modals.js'); await __M('team_dialogs.js'); window.showTeamAgentModal(); })()` },
     'team-wizard-modal': { ...MODAL('team-wizard-modal'), open: `(async () => { await __M('modals.js'); await __M('team_wizard.js'); window.showTeamWizardModal(); })()` },
     'mobile-connect-modal': { ...MODAL('mobile-connect-modal'), open: `(async () => { await __M('modals.js'); await window._showMobileConnectModal(); })()` },
     'wf-create-modal': { ...MODAL('wf-create-modal'), open: `window.showWorkflowCreateModal()` },
