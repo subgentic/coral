@@ -1,7 +1,6 @@
 // The task page and the Tasks tab (#7182, UI/UX's #7180 findings 1, 2 and 5), with a real board on the isolated dev server (four tasks taken through the real routes: open, claimed, submitted for review with a
 // patch, finished; the board is removed again): the review is in words a person reads ("In review", "Submitted by qa, today 08:25", "Waiting for the Orchestrator to pick reviewers", no ISO times, no "slot"); an
 // artifact's link shows its name, the address only as its title; the lifecycle chip wraps with Priority under it and nothing scrolls sideways at 390 px and 200% text; the Tasks tab says "1 of 4 done"; every
-// title in the list is drawn as the link it is; and a priority is not in capitals. Drives Chrome over CDP through agent_view_harness.js.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { openBoardTasksTab } = require('./helpers/board_tasks_tab');
@@ -33,12 +32,10 @@ const S = `(window.__coralStatic || '/static/')`;
             if (font) await ev(`document.documentElement.style.fontSize = '${font}'; true`);
             await openBoardTasksTab({ ev, waitFor }, B); await sleep(600); // sleep-ok: layout settles after the panel draws
             await waitFor(`document.querySelectorAll('#agentic-panel-tasks .board-task-item:not(.board-task-header)').length === 4`, 'four tasks', 12000); await sleep(400); // sleep-ok: layout settles after the panel draws
-            // the tab says how many are done; every title is a link; a priority is not in capitals
             const tab = await ev(`(() => { const rows = [...document.querySelectorAll('#agentic-panel-tasks .board-task-item:not(.board-task-header) .dt-primary')]; const link = getComputedStyle(document.documentElement).getPropertyValue('--table-primary-color').trim(); const probe = document.createElement('span'); probe.style.color = link; document.body.append(probe); const lc = getComputedStyle(probe).color; probe.remove();
-                const pr = document.querySelector('#agentic-panel-tasks .board-task-item:not(.board-task-header) .board-task-priority-value'); return { label: document.getElementById('agentic-tab-tasks').getAttribute('aria-label'), colors: [...new Set(rows.map(r => getComputedStyle(r).color))], link: lc, rows: rows.length, prText: pr.textContent, prTransform: getComputedStyle(pr).textTransform }; })()`);
+                return { label: document.getElementById('agentic-tab-tasks').getAttribute('aria-label'), colors: [...new Set(rows.map(r => getComputedStyle(r).color))], link: lc, rows: rows.length }; })()`);
             assert.match(tab.label, /1 of 4 done/, `${tag}: the Tasks tab says how many are done: ` + JSON.stringify(tab));
             assert.ok(tab.colors.length === 1 && tab.colors[0] === tab.link, `${tag}: every open task's title is the link colour: ` + JSON.stringify(tab));
-            assert.ok(tab.prTransform === 'none' && /^(High|Medium|Low)$/.test(tab.prText), `${tag}: a priority is not in capitals: ` + JSON.stringify(tab));
             // a finished task's title is still text: 4.5:1 on the panel in both themes (a 60% mix of the link colour measured 3.3 and 2.9)
             const fin = await ev(`(() => { const lum = c => { const [r, g, b] = c.match(/[\\d.]+/g).slice(0, 3).map(Number).map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
                 const el = document.querySelector('#agentic-panel-tasks .board-task-item:has(.goal-state-task-done) .dt-primary'); const out = {}; if (!el) return null; el.style.transition = 'none';

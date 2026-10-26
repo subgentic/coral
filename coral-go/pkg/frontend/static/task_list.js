@@ -10,7 +10,7 @@ import { browserLocal } from './safe_storage.js';
 import { showToast, escapeHtml } from './utils.js';
 import { buildTaskBar } from './task_bar.js';
 import { loadPanelOpen, savePanelOpen } from './list_bar.js';
-import { _priorityOrder, _formatCost, _priorityLabel, _agentTaskStatus } from './task_format.js';
+import { _priorityOrder, _agentTaskStatus } from './task_format.js';
 import { morphHtml } from './dom_morph.js';
 import { _verifyMark } from './task_verify_marks.js';
 import { goalTitle, refreshGoalTitles } from './task_goals.js';
@@ -545,33 +545,6 @@ function _taskStatus(t) {
     return statusIcon;
 }
 
-/** A row's cost text and class: a subagent's spend as it runs, an agent's or a finished task's, or a running task's live cost. */
-function _taskRowCost(t, isAgent, isSubagent) {
-    let costText = '';
-    let costClass = 'board-task-cost';
-    if (isSubagent) {
-        // Spend is known while the subagent is still running, so show it
-        // live rather than waiting for completion like a board task.
-        if (t.cost_usd > 0) {
-            costText = (t.status === 'in_progress' ? '~' : '') + _formatCost(t.cost_usd, false);
-            if (t.status === 'in_progress') costClass += ' dt-estimate';
-            if (t.cost_usd >= 1.0) costClass += ' dt-cost-warning';
-        }
-    } else if (isAgent && t.cost_usd > 0) {
-        costText = _formatCost(t.cost_usd, false);
-        if (t.cost_usd >= 1.0) costClass += ' dt-cost-warning';
-    } else if ((t.status === 'completed' || t.status === 'skipped') && t.cost_usd != null) {
-        costText = _formatCost(t.cost_usd, false);
-        if (t.cost_usd >= 1.0) costClass += ' dt-cost-warning';
-    } else if (t.status === 'in_progress' && _liveCosts[t.id]) {
-        const lc = _liveCosts[t.id];
-        costText = '~' + _formatCost(lc.cost_usd, false);
-        costClass += ' dt-estimate';
-        if (lc.cost_usd >= 1.0) costClass += ' dt-cost-warning';
-    }
-    return { costText, costClass };
-}
-
 /** The dock keeps its own task fields; the shared component owns the table layout. */
 function _taskTable(tasks, footer) {
     const span = (cls, value) => DT.el('span', cls, value);
@@ -600,14 +573,8 @@ function _taskTable(tasks, footer) {
                 if (t._source === 'board') { const mark = document.createElement('template'); mark.innerHTML = _verifyMark(t); cell.append(mark.content); }
                 return cell;
             } },
-            { key: 'priority', label: 'Priority', sort: true, line: 2, tone: 'tertiary', cell: t => span('board-task-priority-value', t.priority ? (_priorityLabel[t.priority] || t.priority) : '—') },
-            { key: 'type', label: 'Type', sort: true, firstDir: 'desc', line: 2, cell: t => {
-                const cell = DT.tag(t._source === 'subagent' ? 'sub' : t._source); cell.classList.add('board-task-source');
-                if (t._source === 'subagent') cell.title = `Subagent launched by ${t.assigned_to || '—'}`; return cell;
-            } },
+            // The dock shows Status, Task and Agent only (#7962, the operator): priority, type, cost and the time are on the main Tasks tab and in the opened task
             { key: 'assignee', label: 'Agent', sort: true, firstDir: 'desc', line: 2, when: t => !!t.assigned_to, cell: t => span('board-task-assignee', t.assigned_to || '—') },
-            { key: 'cost', label: 'Cost', sort: true, firstDir: 'desc', numeric: true, line: 2, tone: 'tertiary', when: t => !!_taskRowCost(t, t._source === 'agent', t._source === 'subagent').costText, cell: t => { const cost = _taskRowCost(t, t._source === 'agent', t._source === 'subagent'); return span(cost.costClass, cost.costText || '—'); } },
-            { key: 'created_at', label: 'Created', sort: true, firstDir: 'desc', align: 'end', line: 1, tone: 'tertiary', cell: t => { const cell = DT.timeCell(t.created_at); cell.classList.add('board-task-time'); return cell; } },
         ],
     });
     // Keep the existing action dispatcher and identifiers: opening a board task,

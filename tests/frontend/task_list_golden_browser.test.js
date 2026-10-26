@@ -77,9 +77,9 @@ const SUBAGENTS = [{ id: 'a1', description: 'Search the repo', subagent_type: 'E
         await show('only the agent\'s tasks and subagents', { agent: AGENT, subs: SUBAGENTS });
         await show(null, { tasks: BOARD, team: 'team-a' });
         await ev(`T.tasks.startBoardTaskPoll(); true`);
-        await waitFor(`/~\\$1\\.50/.test(document.getElementById('board-task-list').innerHTML)`, 'a live cost in the list', { timeout: 8000 });
+        await ev(`new Promise(r => setTimeout(r, 900))`); // sleep-ok: the poll's one live-cost read; there is no event for "read" and the dock draws none of it now (#7962)
         await ev(`T.tasks.stopBoardTaskPoll(); true`); await record('a running task with its live cost');
-        assert.match(out['a board of every status'].text, /Task 11/); assert.match(out['a running task with its live cost'].html, /~\$1\.50/);
+        assert.match(out['a board of every status'].text, /Task 11/); assert.doesNotMatch(out['a running task with its live cost'].html, /\$1\.50/, 'the dock shows no cost (#7962)');
         const hashes = {}, lines = {};
         for (const [name, s] of Object.entries(out)) { hashes[name] = sha(JSON.stringify(s)); lines[name] = `ids ${s.ids} | section ${s.section} | label ${s.label} | count ${s.count} | toggle ${(s.toggle || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()} | ${s.text.slice(0, 500)}`; }
         if (process.env.CORAL_UPDATE_GOLDEN) {

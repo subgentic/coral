@@ -78,7 +78,7 @@ const AGENT_TASK = { id: 40, title: 'My own task', agent_name: 'solo', started_a
         for (const [name, task] of Object.entries(TASKS)) {
             if (task.id === 25) { // the running cost is read by the list's poll; the page shows what the poll has read
                 await ev(`T.state.currentBoardTasks = [window.__tasks[${JSON.stringify(name)}]]; T.state.selectedTeam = 'team-a'; T.tasks.startBoardTaskPoll(); true`);
-                await waitFor(`!!document.querySelector('.board-task-cost-live')`, 'the live cost in the list', { timeout: 8000 });
+                await new Promise(r => setTimeout(r, 900)); // sleep-ok: the poll reads the running cost once; the dock no longer draws it (#7962), so there is nothing in the list to wait for
                 await ev(`T.tasks.stopBoardTaskPoll(); T.state.selectedTeam = null; true`);
             }
             await ev(`T.state.currentBoardTasks = [window.__tasks[${JSON.stringify(name)}]]; window.openTeamPage('team-a', { tab: 'tasks', item: ${task.id} }); true`);
