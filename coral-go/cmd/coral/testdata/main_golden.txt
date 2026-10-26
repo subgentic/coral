@@ -1,0 +1,215 @@
+=== coral --help-all
+exit 0
+--- stdout
+Coral: AI agents on this computer, in one dashboard.
+
+Usage:
+  coral [flags]              start the Coral server (the dashboard)
+  coral <command> [flags]    run one command against this computer's Coral
+
+Commands:
+  open             sign in to the dashboard: opens it in your browser (--print: just print the one-time link)
+  api-key          print this Coral's API key (a script sends it as: Authorization: Bearer <key>)
+  set-password     set the dashboard's first password, on a running Coral
+  reset-password   set a new password, or none (--clear); every browser is signed out
+  setup-code       print the one-time code that setting the password from another computer asks for
+  cloud            Coral Hub: connect this Coral, show its status, or disconnect
+  auto-accept      turn auto-accept off for every agent at once
+  artifacts        prune stored artifacts (diffs and objects) to free disk
+  db               compact the database, or rebuild its search index (stop Coral first)
+  version          print the version (also --version, -v)
+  help             this help, or a command's: coral help <command>
+
+Main server flags:
+  --port N         port to listen on (default DEFAULTPORT)
+  --host ADDR      address to listen on (default: this computer only)
+  --home DIR       data folder (default: CORAL_DATA_DIR, else .coral in your home folder)
+  --no-browser     don't open the dashboard in the browser at startup
+  --cloud-url URL  the Coral Hub this server may connect to ("off" disables it)
+
+Run 'coral help <command>' for a command's flags, and 'coral --help-all' for every server flag.
+
+Every server flag:
+  -agent-priority string
+    	Priority of agent processes: low (default, nice +10 / below normal so the server stays responsive) or normal. Also CORAL_AGENT_PRIORITY or the Settings choice
+  -allow-shared-data-dir
+    	Run even when the data folder can be read by other accounts and Coral can't make it private (Windows: it is owned by someone else, or is a link). By default Coral makes such a folder private to you, or refuses to start (also CORAL_ALLOW_SHARED_DATA_DIR=1)
+  -backend string
+    	Terminal backend: pty or tmux (default: Settings > Terminal backend, else pty: agents stop when you quit Coral)
+  -bootstrap-file string
+    	One-time Coral Hub credential file to enroll this server with at startup (owned by you, mode 0600, removed after reading). On Linux /run/coral/bootstrap.d/credential is read without the flag
+  -cloud-connect string
+    	Offer to connect to Coral Hub on a server not yet connected (also CORAL_CLOUD_CONNECT): prompt (the dashboard's first-launch screen, and a prompt in the terminal at startup; without a terminal, log the link and code), auto (the screen, and only log them) or off. Unset: prompt when --cloud-url/CORAL_CLOUD_URL is given, otherwise off (the build's default URL alone offers nothing; Coral Hub stays in Settings, on the home screen and in 'coral cloud connect')
+  -cloud-max-mode string
+    	Most Coral Hub may do on this computer: view, interact or launch (also CORAL_CLOUD_MAX_MODE). Sets the same cap as Settings > Coral Hub, at startup, for a machine nobody sits at (a container); an invalid value stops Coral from starting. Unset leaves the saved setting (view by default). Only whoever starts Coral can set it: the hub and the API cannot
+  -cloud-url string
+    	Coral Hub origin this server may connect to (also CORAL_CLOUD_URL). Release builds default to https://app.coralhub.dev; "" or off disables it. Nothing is sent until you connect
+  -debug-input
+    	Record every write Coral makes to agent terminals in <data dir>/input-debug.log (debug; may contain secrets). Also CORAL_DEBUG_INPUT=1 or the Settings toggle
+  -encryption-self-test
+    	Run an isolated encrypted database round-trip and exit
+  -home string
+    	Data directory (default: ~/.coral)
+  -host string
+    	Address to listen on, or a comma list of them (e.g. 127.0.0.1,100.101.102.103). Default: this computer only. A network address (or 0.0.0.0) is used only when remote access is on (Settings > Privacy, or --remote); otherwise Coral listens on 127.0.0.1
+  -hub
+    	Run as a multi-server hub: manage and view remote Coral servers (also CORAL_HUB=1)
+  -no-auto-loopback
+    	When --host names only network addresses, don't also listen on 127.0.0.1 (also CORAL_NO_AUTO_LOOPBACK=1)
+  -no-browser
+    	Don't open the browser on startup
+  -port int
+    	Port to bind to
+  -proof-file string
+    	Optional proof file to send with the bootstrap credential (at most 16 KiB of JSON from a provider helper)
+  -remote
+    	Allow remote (non-loopback) connections without requiring the saved setting
+  -strict-local-auth
+    	Require a credential for every request from this computer: an agent's session token, the dashboard's sign-in (run 'coral open' to sign in), a command-line signature or the API key ('coral api-key'); refuse an agent acting as someone else. On by default; --strict-local-auth=false turns it off (CORAL_STRICT_LOCAL_AUTH=0 does too, in a dev build only), which lets any program on this computer use Coral without a credential (default true)
+  -test.artifacts
+    	store test artifacts in test.,outputdir
+  -test.bench regexp
+    	run only benchmarks matching regexp
+  -test.benchmem
+    	print memory allocations for benchmarks
+  -test.benchtime d
+    	run each benchmark for duration d or N times if `d` is of the form Nx (default 1s)
+  -test.blockprofile file
+    	write a goroutine blocking profile to file
+  -test.blockprofilerate rate
+    	set blocking profile rate (see runtime.SetBlockProfileRate) (default 1)
+  -test.count n
+    	run tests and benchmarks n times (default 1)
+  -test.coverprofile file
+    	write a coverage profile to file
+  -test.cpu list
+    	comma-separated list of cpu counts to run each test with
+  -test.cpuprofile file
+    	write a cpu profile to file
+  -test.failfast
+    	do not start new tests after the first test failure
+  -test.fullpath
+    	show full file names in error messages
+  -test.fuzz regexp
+    	run the fuzz test matching regexp
+  -test.fuzzcachedir string
+    	directory where interesting fuzzing inputs are stored (for use only by cmd/go)
+  -test.fuzzminimizetime value
+    	time to spend minimizing a value after finding a failing input (default 1m0s)
+  -test.fuzztime value
+    	time to spend fuzzing; default is to run indefinitely
+  -test.fuzzworker
+    	coordinate with the parent process to fuzz random values (for use only by cmd/go)
+  -test.gocoverdir string
+    	write coverage intermediate files to this directory
+  -test.list regexp
+    	list tests, examples, and benchmarks matching regexp then exit
+  -test.memprofile file
+    	write an allocation profile to file
+  -test.memprofilerate rate
+    	set memory allocation profiling rate (see runtime.MemProfileRate)
+  -test.mutexprofile string
+    	write a mutex contention profile to the named file after execution
+  -test.mutexprofilefraction int
+    	if >= 0, calls runtime.SetMutexProfileFraction() (default 1)
+  -test.outputdir dir
+    	write profiles to dir
+  -test.paniconexit0
+    	panic on call to os.Exit(0)
+  -test.parallel n
+    	run at most n tests in parallel (default 18)
+  -test.run regexp
+    	run only tests and examples matching regexp
+  -test.short
+    	run smaller test suite to save time
+  -test.shuffle string
+    	randomize the execution order of tests and benchmarks (default "off")
+  -test.skip regexp
+    	do not list or run tests matching regexp
+  -test.testlogfile file
+    	write test action log to file (for use only by cmd/go)
+  -test.timeout d
+    	panic test binary after duration d (default 0, timeout disabled)
+  -test.trace file
+    	write an execution trace to file
+  -test.v
+    	verbose: print additional output
+  -tls-cert string
+    	PEM certificate file: serve HTTPS (and WSS) on the port, and accept only HTTPS from other computers. Needs --tls-key (also CORAL_TLS_CERT)
+  -tls-key string
+    	PEM private key file for --tls-cert (also CORAL_TLS_KEY)
+  -v	Print the version and exit
+  -version
+    	Print the version and exit (also -v, or coral version)
+--- stderr
+=== coral --no-browser --port abc
+exit 2
+--- stdout
+--- stderr
+coral: invalid value "abc" for flag -port: parse error
+Run 'coral --help' for the commands and main flags, or 'coral --help-all' for every server flag.
+=== coral --no-browser --port
+exit 2
+--- stdout
+--- stderr
+coral: flag needs an argument: -port
+Run 'coral --help' for the commands and main flags, or 'coral --help-all' for every server flag.
+=== coral --no-browser --cloud-max-mode bogus
+exit 2
+--- stdout
+--- stderr
+--cloud-max-mode / CORAL_CLOUD_MAX_MODE must be view, interact or launch, got "bogus"
+=== coral --no-browser --cloud-connect bogus
+exit 2
+--- stdout
+--- stderr
+--cloud-connect (or CORAL_CLOUD_CONNECT) must be prompt, auto or off (got "bogus")
+=== coral --no-browser --agent-priority bogus --encryption-self-test
+exit 1
+--- stdout
+--- stderr
+database encryption is not included in this standard build; experimental encryption requires a build with CGO_ENABLED=1 and -tags sqlcipher,fts5
+=== coral --no-browser stop
+exit 2
+--- stdout
+--- stderr
+coral: unexpected argument "stop"
+Coral runs until you stop it: Ctrl+C in its window, or Quit in the Coral tray (coral-tray --stop stops the tray).
+Run 'coral --help' for the commands and main flags, or 'coral --help-all' for every server flag.
+=== coral --no-browser --no-such-flag
+exit 2
+--- stdout
+--- stderr
+coral: unknown option "--no-such-flag"
+Run 'coral --help' for the commands and main flags, or 'coral --help-all' for every server flag.
+=== coral -h
+exit 0
+--- stdout
+Coral: AI agents on this computer, in one dashboard.
+
+Usage:
+  coral [flags]              start the Coral server (the dashboard)
+  coral <command> [flags]    run one command against this computer's Coral
+
+Commands:
+  open             sign in to the dashboard: opens it in your browser (--print: just print the one-time link)
+  api-key          print this Coral's API key (a script sends it as: Authorization: Bearer <key>)
+  set-password     set the dashboard's first password, on a running Coral
+  reset-password   set a new password, or none (--clear); every browser is signed out
+  setup-code       print the one-time code that setting the password from another computer asks for
+  cloud            Coral Hub: connect this Coral, show its status, or disconnect
+  auto-accept      turn auto-accept off for every agent at once
+  artifacts        prune stored artifacts (diffs and objects) to free disk
+  db               compact the database, or rebuild its search index (stop Coral first)
+  version          print the version (also --version, -v)
+  help             this help, or a command's: coral help <command>
+
+Main server flags:
+  --port N         port to listen on (default DEFAULTPORT)
+  --host ADDR      address to listen on (default: this computer only)
+  --home DIR       data folder (default: CORAL_DATA_DIR, else .coral in your home folder)
+  --no-browser     don't open the dashboard in the browser at startup
+  --cloud-url URL  the Coral Hub this server may connect to ("off" disables it)
+
+Run 'coral help <command>' for a command's flags, and 'coral --help-all' for every server flag.
+--- stderr
