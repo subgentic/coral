@@ -1,0 +1,50 @@
+╭───────────────────────────────────────────────────────────────╮
+│ ✨ Update available! 0.163.0 -> 0.164.0                       │
+│ See https://github.com/openai/codex for installation options. │
+│                                                               │
+│ See full release notes:                                       │
+│ https://github.com/openai/codex/releases/latest               │
+╰───────────────────────────────────────────────────────────────╯
+
+
+  >_ OpenAI Codex (v0.163.0)
+     /isolated/work
+
+
+› For this isolated approval test, run exactly /bin/sh -c 'printf EXPLICIT_APPROVAL_START7896; /bin/sleep 30; printf EXPLICIT_APPROVAL_END7896' using the shell tool with
+  sandbox_permissions=require_escalated and justification 'May I run the isolated approval timing probe?'. Request explicit escalation even though the command is harmless. Do not use coral-board or
+  read files. When it completes, answer APPROVAL_DONE7896.
+
+
+• I’ll run the timing probe with explicit escalation as requested.
+
+✔ You approved codex to run /bin/sh -c 'printf EXPLICIT_APPROVAL_START7896; /bin/sleep 30; printf EXPLICI... this time
+
+• Running /bin/sh -c 'printf EXPLICIT_APPROVAL_START7896; /bin/sleep 30; printf EXPLICIT_APPROVAL_END7896'
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+• Working (6s • esc to interrupt)
+  └ Tip: Switch models or reasoning effort quickly with /model.
+
+
+› Ask Codex to do anything
+
+  GPT-6-Astra medium · /isolated/work · Run approval timing probe
+  ? for shortcuts                                                                                                                                                              ⚠ 1 warning · f2 to view
