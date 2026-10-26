@@ -194,6 +194,9 @@ func TestRoundFourIsLinearOnAdversarialText(t *testing.T) {
 	for name, mk := range shapes {
 		t.Run(name, func(t *testing.T) {
 			requireLinear(t, name, mk, func(text string) { moreKeywordSpans(text) }, small, large)
+			if raceEnabled {
+				return // the budget is a time: not read under -race
+			}
 			start := time.Now()
 			_, err := hubRedactor().Text([]byte(mk(small)))
 			require.NoError(t, err, "within the redactor's budget")
@@ -210,5 +213,7 @@ func TestRoundFourIsCheapOnOrdinaryText(t *testing.T) {
 		_ = moreKeywordSpans(text)
 	}
 	per := time.Since(start) / 20
-	assert.Less(t, per, 30*time.Millisecond, "%d bytes of ordinary text: %v a pass", len(text), per)
+	if !raceEnabled { // the time is not read under -race (race_on_test.go)
+		assert.Less(t, per, 30*time.Millisecond, "%d bytes of ordinary text: %v a pass", len(text), per)
+	}
 }

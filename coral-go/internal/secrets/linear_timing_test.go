@@ -61,6 +61,10 @@ func measureLinearUsing(measure func(func(string), string) time.Duration, mk fun
 // runner is several times slower than a laptop).
 func requireLinear(t *testing.T, name string, mk func(n int) string, f func(string), small, large int) {
 	t.Helper()
+	if raceEnabled { // no time is read under -race (race_on_test.go): the pass still runs over the small text
+		f(mk(small))
+		return
+	}
 	ds, dl, ok := measureLinear(mk, f, small, large, tooQuick, smallBase)
 	require.True(t, ok, "%s: %v for %d bytes, %v for %d: more than 9 times as long for 4 times the text", name, ds, small, dl, large)
 	require.Less(t, dl, 10*time.Second, "%s: %v for %d bytes", name, dl, large)

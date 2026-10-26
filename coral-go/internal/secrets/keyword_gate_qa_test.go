@@ -58,7 +58,7 @@ func TestKeywordGateIsLinearOnTextOfNames(t *testing.T) {
 		text := strings.Repeat(unit, (256<<10)/len(unit))
 		start := time.Now()
 		keywordSpans(text)
-		if d := time.Since(start); d > 1500*time.Millisecond {
+		if d := time.Since(start); !raceEnabled && d > 1500*time.Millisecond { // the time is not read under -race
 			t.Errorf("%q repeated, %d bytes: %v", unit, len(text), d)
 		}
 	}

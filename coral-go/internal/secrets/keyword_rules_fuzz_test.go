@@ -75,6 +75,9 @@ func TestKeywordRulesAreLinearOnAdversarialText(t *testing.T) {
 	for name, mk := range shapes {
 		t.Run(name, func(t *testing.T) {
 			requireLinear(t, name, mk, func(text string) { keywordSpans(text) }, small, large)
+			if raceEnabled {
+				return // the budget is a time: not read under -race
+			}
 			start := time.Now()
 			_, err := hubRedactor().Text([]byte(mk(small)))
 			require.NoError(t, err, "within the redactor's budget")
