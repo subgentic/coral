@@ -1127,3 +1127,16 @@ func TestPinMapOrderedOutputsAreSorted(t *testing.T) {
 		}
 	})
 }
+
+// A reassignment is a message, not a task: its event has no task id, and the Markdown shows a dash where it used to show #0 (#8292). The JSON keeps task_id 0.
+func TestPinMarkdownIdlessEventHasNoTaskNumber(t *testing.T) {
+	msgs := []Message{pinMsg(1, "Orchestrator", "Task 4 reassigned to Dev", 10)}
+	r := Analyze(nil, msgs, nil, ReportFilter{Board: "b"}, pinTime(60))
+	md := FormatMarkdown(r)
+	assert.Contains(t, md, "| — | `reassignment` | Orchestrator | Task 4 reassigned to Dev |")
+	assert.NotContains(t, md, "#0")
+	// a task's own events keep their number
+	c := pinTask(7, "cancelled", 0)
+	md = FormatMarkdown(Analyze([]Task{c}, nil, nil, ReportFilter{}, pinTime(60)))
+	assert.Contains(t, md, "| #7 | `cancellation` |")
+}

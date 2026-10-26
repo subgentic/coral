@@ -99,7 +99,7 @@
 | :---: | :--- | :--- | :--- |
 | #5 | `cancellation` | Orchestrator | superseded by #6 |
 | #6 | `retry` | Orchestrator | Retry of predecessor task |
-| #0 | `reassignment` | Orchestrator | Task 4 reassigned to Dev |
+| — | `reassignment` | Orchestrator | Task 4 reassigned to Dev |
 
 ## 4. Disclosed Unavailable Metrics
 

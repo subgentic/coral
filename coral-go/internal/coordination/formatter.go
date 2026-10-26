@@ -212,7 +212,7 @@ func FormatMarkdown(r Report) string {
 		b.WriteString("| Task ID | Event Type | Actor | Reason / Details |\n")
 		b.WriteString("| :---: | :--- | :--- | :--- |\n")
 		for _, rec := range r.HeuristicSignals.ManualRecoveryEvents {
-			b.WriteString(fmt.Sprintf("| #%d | `%s` | %s | %s |\n", rec.TaskID, rec.EventType, rec.Actor, truncate(rec.Reason, 80)))
+			b.WriteString(fmt.Sprintf("| %s | `%s` | %s | %s |\n", taskRef(rec.TaskID), rec.EventType, rec.Actor, truncate(rec.Reason, 80)))
 		}
 		b.WriteString("\n")
 	}
@@ -240,6 +240,14 @@ func FormatMarkdown(r Report) string {
 	b.WriteString("\n")
 
 	return b.String()
+}
+
+// taskRef is a task's number as the report writes it, a dash for an event that belongs to no task (a reassignment is a message).
+func taskRef(id int64) string {
+	if id == 0 {
+		return "—"
+	}
+	return fmt.Sprintf("#%d", id)
 }
 
 func formatDurationRow(b *strings.Builder, name string, s DurationStats) {
