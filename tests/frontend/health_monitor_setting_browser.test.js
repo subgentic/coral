@@ -41,11 +41,11 @@ const SENTENCE = 'Applies to every team; each team still turns its own check on 
         // Settings > Agents
         await put({ board_health_monitor: '' }); // no saved value: the default
         await load(); await openSettings();
-        const row = await ev(`(() => { const box = document.getElementById('settings-board-health-monitor'); const rowEl = box.closest('.settings-row'); const dt = rowEl.querySelector('dt'); const pane = box.closest('.settings-pane');
-            return { label: dt.querySelector('label').textContent.trim(), desc: rowEl.querySelector('.settings-hint-line').textContent.trim(), info: dt.querySelector('.settings-learn').getAttribute('aria-label'), forId: dt.querySelector('label').getAttribute('for'), checked: box.checked, group: pane.dataset.group, shown: !pane.hidden }; })()`);
-        check('Settings > Agents has "Team health checks" with the operator\'s sentence (its hint line, a Learn more beside it), its label bound to the box', row.group === 'agents' && row.shown && row.label === 'Team health checks' && row.desc === SENTENCE && row.info === 'Learn more about Team health checks' && row.forId === 'settings-board-health-monitor', JSON.stringify(row));
+        const row = await ev(`(() => { const box = document.getElementById('settings-board-health-monitor'); const rowEl = box.closest('.sv-row'); const lab = document.getElementById(box.getAttribute('aria-labelledby')); const pane = box.closest('.settings-pane');
+            return { label: lab.textContent.trim(), desc: rowEl.querySelector('.sv-help-text').textContent.trim(), checked: box.checked, group: pane.dataset.group, shown: !pane.hidden }; })()`);
+        check('Settings > Agents has "Team health checks" with the operator\'s sentence as its hint, its label naming the box', row.group === 'agents' && row.shown && row.label === 'Team health checks' && row.desc === SENTENCE, JSON.stringify(row));
         check('it is on when the server has no value', row.checked === true);
-        await ev(`(() => { const r = document.querySelector('#settings-board-health-monitor').closest('.settings-row'); r.querySelector('.settings-learn').click(); r.scrollIntoView({ block: 'center' }); return true; })()`);
+        await ev(`(() => { document.querySelector('#settings-board-health-monitor').closest('.sv-row').scrollIntoView({ block: 'center' }); return true; })()`);
         for (const th of ['dark', 'light']) { await theme(th); await new Promise(r => setTimeout(r, 350)); await shot(`health-monitor-settings-${th}`); } // sleep-ok: the theme's colour transitions
         await theme('dark');
         await ev(`document.getElementById('settings-board-health-monitor').click(); document.querySelector('[data-on-click="m-apply-settings"]').click(); true`);

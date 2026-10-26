@@ -634,73 +634,10 @@
                     </section>
                     <section class="settings-pane" id="settings-pane-agents" data-group="agents" data-icon="smart_toy" data-title="Agents" role="tabpanel" aria-labelledby="settings-tab-agents" tabindex="-1" hidden>
                         <h4 class="settings-pane-title">Agents</h4>
-                        <section class="settings-subsection" aria-labelledby="settings-agents-defaults">
-                        <h5 class="settings-subhead" id="settings-agents-defaults">Defaults</h5>
-                        <dl class="info-grid settings-grid">
-                <div class="settings-row">
-                <dt><span id="settings-permission-mode-label">Default permission mode</span><span class="settings-hint perm-mode-desc">Everything, with safety checks.</span><span class="settings-hint perm-mode-warn" hidden>Agents cannot start workers in this mode.</span><span class="settings-hint" data-info>With such a default, an orchestrator's launches are refused until you pick Default or start them yourself.</span></dt>
-                <dd>
-                    <select aria-labelledby="settings-permission-mode-label" id="settings-permission-mode" class="settings-select" data-on-change="m-perm-mode-describe">
-                        <option value="" selected>Not set (Auto)</option>
-                        <option value="default">Default</option>
-                        <option value="plan">Plan</option>
-                        <option value="acceptEdits">Accept edits</option>
-                        <option value="auto">Auto</option>
-                        <option value="bypassPermissions">Bypass permissions</option>
-                        <option value="dontAsk">Don't ask</option>
-                    </select>
-                </dd>
-                </div>
-                <div class="settings-row">
-                <dt>Default working directory</dt>
-                <dd>
-                    <input type="text" id="settings-working-dir" class="settings-input" aria-label="Default working directory" data-coral-root="{{ .CoralRoot }}" placeholder="{{ .CoralRoot }}">
-                </dd>
-                </div>
-                <div class="settings-row settings-row-wide">
-                <dt>Default thinking</dt>
-                <dd class="settings-cli-paths">
-                    <label class="settings-cli-row">
-                        <span class="settings-cli-label">Claude</span>
-                        <select id="settings-default-thinking-claude" class="settings-input" aria-label="Claude default thinking">
-                            <option value="">The CLI's own default</option>
-                            <option value="low">Low</option>
-                            <option value="medium">Medium</option>
-                            <option value="high">High</option>
-                            <option value="xhigh">Extra high</option>
-                            <option value="max">Max</option>
-                        </select>
-                    </label>
-                    <span class="settings-hint" data-info>How much Claude thinks before it answers, for agents launched with no choice of their own. A model that does not take a level uses the nearest one it does.</span>
-                </dd>
-                </div>
-                <div class="settings-row settings-row-wide">
-                <dt>Default models</dt>
-                <dd class="settings-cli-paths settings-model-grid">
-                    <label class="settings-cli-row">
-                        <span class="settings-cli-label">Claude</span>
-                        <input type="text" id="settings-default-model-claude" aria-label="Claude default model" class="settings-input settings-mono-input" list="settings-models-claude" placeholder="Leave blank for none" autocomplete="off">
-                        <datalist id="settings-models-claude"></datalist>
-                    </label>
-                    <label class="settings-cli-row">
-                        <span class="settings-cli-label">Codex</span>
-                        <input type="text" id="settings-default-model-codex" aria-label="Codex default model" class="settings-input settings-mono-input" list="settings-models-codex" placeholder="Leave blank for none" autocomplete="off">
-                        <datalist id="settings-models-codex"></datalist>
-                    </label>
-                    <label class="settings-cli-row">
-                        <span class="settings-cli-label">Antigravity</span>
-                        <input type="text" id="settings-default-model-agy" aria-label="Antigravity default model" class="settings-input settings-mono-input" list="settings-models-agy" placeholder="Leave blank for none" autocomplete="off">
-                        <datalist id="settings-models-agy"></datalist>
-                    </label>
-                    <label class="settings-cli-row">
-                        <span class="settings-cli-label">Pi</span>
-                        <input type="text" id="settings-default-model-pi" aria-label="Pi default model" class="settings-input settings-mono-input" list="settings-models-pi" placeholder="Leave blank for none" autocomplete="off">
-                        <datalist id="settings-models-pi"></datalist>
-                    </label>
-                    <span id="settings-default-models-notice" class="settings-hint" role="status"></span>
-                    <span class="settings-hint" data-info>Used when launching an agent without a model specified. Pick from the dropdown or type any model id.</span>
-                </dd>
-                </div>
+                        <div id="settings-agents-rows" data-coral-root="{{ .CoralRoot }}"></div>
+                        <!-- the live parts of this group (filled by settings_dialog.js, shown or hidden by it) sit here until the rows are drawn, then settings_fields.js moves each into place -->
+                        <div id="settings-agents-live" hidden>
+                        <dl class="info-grid settings-grid" id="settings-custom-models-dl">
                 <div class="settings-row settings-row-wide" id="settings-custom-models-row" hidden>
                 <dt>Custom models</dt>
                 <dd>
@@ -708,26 +645,8 @@
                     <span class="settings-hint" data-info>Model ids are passed to the CLI as they are written here. They appear in every model picker, including the one that switches a running agent's model.</span>
                 </dd>
                 </div>
-</dl>
-                        </section>
-                        <section class="settings-subsection" aria-labelledby="settings-agents-behaviour">
-                        <h5 class="settings-subhead" id="settings-agents-behaviour">Behaviour</h5>
-                        <dl class="info-grid settings-grid">                {{ template "includes/toggle_row" (toggle "settings-auto-resume" "Resume after API errors" "When an agent's CLI stops on a rate limit, an overload or another API error, Coral wakes it again after about 2, then 5, then 15 minutes, and stops trying after the third. Waking the agent yourself starts the count again.") }}
-                {{ template "includes/toggle_row" (toggle "settings-auto-goals" "Name each agent's goal" "Coral asks Claude Code's smallest model (Haiku) for a short goal line for each agent, from your requests only: once when the agent first answers, then for a new request at most every 30 minutes. Each one is a short call made with your Claude Code account (about 1,300 input tokens). When off, the goal shows your first prompt.") }}
-                {{ template "includes/toggle_row" (toggle "settings-agent-low-priority" "Run agents at lower priority" "Agents and everything they start (builds, test runs) run below Coral itself (nice +10 on Mac and Linux, below normal on Windows), so the dashboard, Coral Hub and your own apps stay quick while agents use every CPU. It changes scheduling only, never what an agent may do. Applies to agents started after the change.") }}
-</dl>
-                        </section>
-                        <section class="settings-subsection" aria-labelledby="settings-agents-team">
-                        <h5 class="settings-subhead" id="settings-agents-team">Team and board</h5>
-                        <dl class="info-grid settings-grid">                {{ template "includes/toggle_row" (toggle "settings-board-auto-attach" "Attach files linked in posts" "When on, an agent's own board post that links a local image (png, jpg, gif, webp) or Markdown file changed in the last day has it stored as an artifact, so the team and Coral Hub can open it. When off, links stay as written and agents upload with coral-agent artifact upload.") }}
-                {{ template "includes/toggle_row" (toggle "settings-nudge-claude-artifacts" "Coral artifact reminders" "When an agent publishes to claude.ai, Coral types one note into its terminal asking for a Coral artifact instead (coral-agent artifact upload) and a link to it. Once per artifact; Coral never uploads or posts for the agent. When off, nothing is typed.") }}
-                {{ template "includes/toggle_row" (toggle "settings-board-health-monitor" "Team health checks" "Applies to every team; each team still turns its own check on in Team settings. Takes effect after Coral restarts.") }}
-</dl>
-                        </section>
-                        <section class="settings-subsection" aria-labelledby="settings-agents-tools">
-                        <h5 class="settings-subhead" id="settings-agents-tools">Tools</h5>
-                        <dl class="info-grid settings-grid">                {{ template "includes/toggle_row" (toggle "settings-codex-trust-hooks" "Trust Coral's hooks in Codex" "Codex asks you to review new hooks before it runs them, because a trusted hook runs outside its sandbox. When this is on and only an administrator can change Coral's tools folder (an installed Coral), Coral trusts its own hooks for each Codex agent it launches, so the agent starts without that question; your own hooks and a repository's still ask. Off, Codex asks every time. Applies to Codex agents launched after the change, and can only be changed on this computer.") }}
-                        
+                        </dl>
+                        <dl class="info-grid settings-grid" id="settings-cli-paths-dl">
                 <div class="settings-row settings-row-wide">
                 <dt>CLI paths</dt>
                 <dd class="settings-cli-paths">
@@ -757,13 +676,15 @@
                     </div>
                     </details>
                 </dd>
-                </div></dl>
-                        </section>
-
+                </div>
+                        </dl>
+                        <div id="settings-prompts-live">
                         <button class="btn settings-prompts-btn" data-on-click="m-hide-settings-modal-then-show-default-prompts-modal">
                             <span class="material-icons icon-inline" aria-hidden="true">edit</span>
                             Edit Default Prompts
                         </button>
+                        </div>
+                        </div>
                     </section>
                     <section class="settings-pane" id="settings-pane-terminal" data-group="terminal" data-icon="terminal" data-title="Terminal" role="tabpanel" aria-labelledby="settings-tab-terminal" tabindex="-1" hidden>
                         <h4 class="settings-pane-title">Terminal</h4>
@@ -1447,15 +1368,6 @@
     </div>
 
 {{ end }}
-
-{{/* One settings switch: the label names it, the description (id <id>-desc) is tied to it by aria-describedby. toggle (funcs in frontend.go) builds the argument; attrs are extra attributes of the input. */}}
-{{ define "includes/toggle_row" }}<div class="settings-row">
-                <dt class="toggle-dt">
-                    <label for="{{ .ID }}">{{ .Label }}</label>
-                    {{ if .Desc }}<span class="toggle-desc" id="{{ .ID }}-desc">{{ .Desc }}</span>{{ end }}
-                </dt>
-                <dd><label class="check-hit"><input type="checkbox" id="{{ .ID }}"{{ if .Desc }} aria-describedby="{{ .ID }}-desc"{{ end }}{{ .Attrs }}></label></dd>
-                </div>{{ end }}
 
 {{/* One Coral Hub switch in Settings: the label names it, the description (its own id) is tied to it by aria-describedby in inputAttrs. */}}
 {{ define "includes/cloud_switch_row" }}<div id="{{ .RowID }}" class="settings-cloud-switch-row"{{ .RowAttrs }}>

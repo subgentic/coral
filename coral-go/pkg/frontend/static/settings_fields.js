@@ -42,10 +42,43 @@ export const TERMINAL_FIELDS = [
     live('settings-terminal-backend'), live('tb-autowake'), live('settings-tools-folder-dl'), live('settings-engine-more'),
 ];
 
+const PERMISSION_OPTIONS = [{ value: '', label: 'Not set (Auto)' }, { value: 'default', label: 'Default' }, { value: 'plan', label: 'Plan' }, { value: 'acceptEdits', label: 'Accept edits' }, { value: 'auto', label: 'Auto' }, { value: 'bypassPermissions', label: 'Bypass permissions' }, { value: 'dontAsk', label: "Don't ask" }];
+const THINKING_OPTIONS = [{ value: '', label: "The CLI's own default" }, { value: 'low', label: 'Low' }, { value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' }, { value: 'xhigh', label: 'Extra high' }, { value: 'max', label: 'Max' }];
+// One default-model row: the text box with the model list of its provider (filled by the dialog's model fetch into the datalist).
+const modelRow = (provider, label) => ({ key: `default_model_${provider}`, type: 'text', id: `settings-default-model-${provider}`, label, placeholder: 'Leave blank for none',
+    attrs: { list: `settings-models-${provider}`, autocomplete: 'off', 'aria-label': `${label} default model` }, setup: el => { el.classList.add('settings-mono-input'); const dl = document.createElement('datalist'); dl.id = `settings-models-${provider}`; el.after(dl); } });
+const hintOnly = more => ({ text: '', more });
+
+export const AGENTS_FIELDS = host => [
+    { key: 'agents_defaults', type: 'heading', id: 'settings-agents-defaults', label: 'Defaults' },
+    { key: 'permission_mode', type: 'select', id: 'settings-permission-mode', labelId: 'settings-permission-mode-label', label: 'Default permission mode', options: PERMISSION_OPTIONS,
+        help: { text: 'Everything, with safety checks.', about: 'Default permission mode', more: "With such a default, an orchestrator's launches are refused until you pick Default or start them yourself." }, helpTextClass: 'perm-mode-desc',
+        setup: el => { el.setAttribute('data-on-change', 'm-perm-mode-describe'); const warn = document.createElement('span'); warn.className = 'perm-mode-warn sv-help'; warn.hidden = true; warn.textContent = 'Agents cannot start workers in this mode.'; el.closest('.sv-row').querySelector('.sv-text').append(warn); } },
+    { key: 'working_dir', type: 'text', id: 'settings-working-dir', label: 'Default working directory', placeholder: host.dataset.coralRoot || '', attrs: { 'data-coral-root': host.dataset.coralRoot || '' } },
+    { key: 'default_thinking_claude', type: 'select', id: 'settings-default-thinking-claude', label: 'Default thinking', options: THINKING_OPTIONS, attrs: { 'aria-label': 'Claude default thinking' },
+        help: hintOnly('How much Claude thinks before it answers, for agents launched with no choice of their own. A model that does not take a level uses the nearest one it does.') },
+    { key: 'default_models', type: 'heading', id: 'settings-agents-models', label: 'Default models', help: 'Used when launching an agent without a model specified. Pick from the dropdown or type any model id.' },
+    modelRow('claude', 'Claude'), modelRow('codex', 'Codex'), modelRow('agy', 'Antigravity'), modelRow('pi', 'Pi'),
+    { key: 'default_models_notice', type: 'notice', render: slot => { slot.innerHTML = '<span id="settings-default-models-notice" class="settings-hint" role="status"></span>'; } },
+    live('settings-custom-models-dl'),
+    { key: 'agents_behaviour', type: 'heading', id: 'settings-agents-behaviour', label: 'Behaviour' },
+    { key: 'auto_resume', type: 'toggle', id: 'settings-auto-resume', label: 'Resume after API errors', help: hintOnly("When an agent's CLI stops on a rate limit, an overload or another API error, Coral wakes it again after about 2, then 5, then 15 minutes, and stops trying after the third. Waking the agent yourself starts the count again.") },
+    { key: 'auto_goals', type: 'toggle', id: 'settings-auto-goals', label: "Name each agent's goal", help: hintOnly("Coral asks Claude Code's smallest model (Haiku) for a short goal line for each agent, from your requests only: once when the agent first answers, then for a new request at most every 30 minutes. Each one is a short call made with your Claude Code account (about 1,300 input tokens). When off, the goal shows your first prompt.") },
+    { key: 'agent_low_priority', type: 'toggle', id: 'settings-agent-low-priority', label: 'Run agents at lower priority', help: hintOnly('Agents and everything they start (builds, test runs) run below Coral itself (nice +10 on Mac and Linux, below normal on Windows), so the dashboard, Coral Hub and your own apps stay quick while agents use every CPU. It changes scheduling only, never what an agent may do. Applies to agents started after the change.') },
+    { key: 'agents_team', type: 'heading', id: 'settings-agents-team', label: 'Team and board' },
+    { key: 'board_auto_attach', type: 'toggle', id: 'settings-board-auto-attach', label: 'Attach files linked in posts', help: hintOnly("When on, an agent's own board post that links a local image (png, jpg, gif, webp) or Markdown file changed in the last day has it stored as an artifact, so the team and Coral Hub can open it. When off, links stay as written and agents upload with coral-agent artifact upload.") },
+    { key: 'nudge_claude_artifacts', type: 'toggle', id: 'settings-nudge-claude-artifacts', label: 'Coral artifact reminders', help: hintOnly('When an agent publishes to claude.ai, Coral types one note into its terminal asking for a Coral artifact instead (coral-agent artifact upload) and a link to it. Once per artifact; Coral never uploads or posts for the agent. When off, nothing is typed.') },
+    { key: 'board_health_monitor', type: 'toggle', id: 'settings-board-health-monitor', label: 'Team health checks', help: 'Applies to every team; each team still turns its own check on in Team settings. Takes effect after Coral restarts.' },
+    { key: 'agents_tools', type: 'heading', id: 'settings-agents-tools', label: 'Tools' },
+    { key: 'codex_trust_hooks', type: 'toggle', id: 'settings-codex-trust-hooks', label: "Trust Coral's hooks in Codex", help: hintOnly("Codex asks you to review new hooks before it runs them, because a trusted hook runs outside its sandbox. When this is on and only an administrator can change Coral's tools folder (an installed Coral), Coral trusts its own hooks for each Codex agent it launches, so the agent starts without that question; your own hooks and a repository's still ask. Off, Codex asks every time. Applies to Codex agents launched after the change, and can only be changed on this computer.") },
+    live('settings-cli-paths-dl'),
+    live('settings-prompts-live'),
+];
+
 /** Draws the groups that are fields into the Settings modal's panes (once, when the modal is built). mount is mountSettingsView. */
 export function drawSettingsGroups(modal, mount) {
-    for (const [hostId, fields] of [['settings-general-rows', GENERAL_FIELDS], ['settings-notifications-rows', NOTIFICATIONS_FIELDS], ['settings-files-rows', FILES_FIELDS], ['settings-terminal-rows', TERMINAL_FIELDS]]) {
+    for (const [hostId, fields] of [['settings-general-rows', GENERAL_FIELDS], ['settings-notifications-rows', NOTIFICATIONS_FIELDS], ['settings-files-rows', FILES_FIELDS], ['settings-terminal-rows', TERMINAL_FIELDS], ['settings-agents-rows', AGENTS_FIELDS]]) {
         const host = modal.querySelector(`#${hostId}`);
-        if (host && !host.firstChild) mount(host, { mode: 'settings', saveBar: false, fields });
+        if (host && !host.firstChild) mount(host, { mode: 'settings', saveBar: false, fields: typeof fields === 'function' ? fields(host) : fields });
     }
 }

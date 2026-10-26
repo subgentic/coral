@@ -7,7 +7,8 @@ const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 
 const AGENT_PARTS = {
-    'settings-agents-defaults': ['settings-permission-mode', 'settings-working-dir', 'settings-default-model-claude'],
+    'settings-agents-defaults': ['settings-permission-mode', 'settings-working-dir'],
+    'settings-agents-models': ['settings-default-model-claude'],
     'settings-agents-behaviour': ['settings-auto-resume', 'settings-auto-goals', 'settings-agent-low-priority'],
     'settings-agents-team': ['settings-board-auto-attach'],
     'settings-agents-tools': ['settings-cli-path-claude'],
@@ -29,10 +30,10 @@ const AGENT_PARTS = {
 
         console.log('1. Agents: four headed parts, each switch under its own heading');
         await open('agents');
-        const heads = await ev(`[...document.querySelectorAll('#settings-pane-agents .settings-subhead')].map(h => h.id + '=' + h.textContent.trim())`);
-        assert.deepEqual(heads, ['settings-agents-defaults=Defaults', 'settings-agents-behaviour=Behaviour', 'settings-agents-team=Team and board', 'settings-agents-tools=Tools']);
+        const heads = await ev(`[...document.querySelectorAll('#settings-pane-agents .sv-heading')].map(h => h.id + '=' + h.textContent.trim())`);
+        assert.deepEqual(heads, ['settings-agents-defaults=Defaults', 'settings-agents-models=Default models', 'settings-agents-behaviour=Behaviour', 'settings-agents-team=Team and board', 'settings-agents-tools=Tools']);
         for (const [head, ids] of Object.entries(AGENT_PARTS)) {
-            const under = await ev(`${JSON.stringify(ids)}.map(id => { const e = document.getElementById(id); const s = e && e.closest('.settings-subsection'); return s ? s.getAttribute('aria-labelledby') : null; })`);
+            const under = await ev(`${JSON.stringify(ids)}.map(id => { let r = document.getElementById(id); r = r && r.closest('.sv-row'); while (r && !r.querySelector(':scope > .sv-heading')) r = r.previousElementSibling; return r ? r.querySelector('.sv-heading').id : null; })`);
             assert.deepEqual(under, ids.map(() => head), `${head}: ${JSON.stringify(under)}`);
         }
         console.log('2. Terminal has the render engine; General has Customize Theme beside Theme and no About');
