@@ -1,0 +1,30 @@
+⏺ Bash(cd $(cat /tmp/w170c.path); git log --no-merges --format='%h %ae %s'
+      HEAD..2ccca6aba | cut -c1-90)
+  ⎿  2ccca6aba backend-dev@example.invalid board: the dock's read set is
+     kept between polls and
+     ee6e45ba4 frontend-dev@example.invalid The dock list's scan holds a
+     … +11 lines (ctrl+o to expand)
+  ⎿  Shell cwd was reset to /Users/uuuuuuuuuu/Software/coral/coral-go
+
+⏺ Bash(cd $(cat /tmp/w170c.path); bash /tmp/pickgroups.sh 2ccca6aba; git
+      rev-list --count e0dea4ecd..HEAD; git log e0dea4ecd..HEAD
+      --format='%ae|%ce' | sort -u | grep…)
+  ⎿  OK [2ccca6aba]
+     22
+     0
+
+⏺ Bash(export PATH=/Users/uuuuuuuuuu/.local/bin:/opt/homebrew/bin:$PATH;
+      W=$(cat /tmp/w170c.path); cd $W/tests/frontend; ls node_modules
+      >/dev/null 2>&1 || npm ci --ig…)
+  ⎿  rc=0
+     vet-out:[]
+     (1m 7s · timeout 10m)
+     (ctrl+b ctrl+b (twice) to run in background)
+
+✻ Wibbling… (1m 52s · ↓ 3.9k tokens)
+
+──────────────────────────────────────────────────────────────────────────────
+❯ 
+──────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · esc to interrupt
+                                      ✔ Update installed · Restart to update
