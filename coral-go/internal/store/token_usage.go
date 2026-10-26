@@ -413,6 +413,12 @@ func (s *TokenUsageStore) GetUsageSummaryByAgent(ctx context.Context, since stri
 
 // GetUsageSummaryByAgentBoard is GetUsageSummaryByAgent for one board (the board a row was recorded on, else the session's own); board "" is every board (#7525).
 func (s *TokenUsageStore) GetUsageSummaryByAgentBoard(ctx context.Context, since, board string) ([]AgentUsageSummary, error) {
+	return s.GetUsageSummaryByAgentBoardUntil(ctx, since, "", board)
+}
+
+// GetUsageSummaryByAgentBoardUntil is GetUsageSummaryByAgentBoard for a window that ends: rows recorded at or after until (in the series' own form, 2006-01-02T15:04:05, which sorts before every
+// stamp of that second) are left out; until "" is no end (#8235).
+func (s *TokenUsageStore) GetUsageSummaryByAgentBoardUntil(ctx context.Context, since, until, board string) ([]AgentUsageSummary, error) {
 	var summaries []AgentUsageSummary
 	rel, args := usageRelation(ctx, s.db.Reader(), since)
 	// Prefer the session's current display name so renames show; unnamed
@@ -438,6 +444,10 @@ func (s *TokenUsageStore) GetUsageSummaryByAgentBoard(ctx context.Context, since
 	   FROM ` + rel + ` t
 	   LEFT JOIN live_sessions ls ON ls.session_id = t.session_id
 	   WHERE ` + usageDedup("t.")
+	if until != "" {
+		query += ` AND t.recorded_at < ?`
+		args = append(args, until)
+	}
 	if board != "" {
 		query += ` AND COALESCE(NULLIF(t.board_name, ''), ls.board_name) = ?`
 		args = append(args, board)
