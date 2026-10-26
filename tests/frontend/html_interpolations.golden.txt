@@ -33,6 +33,7 @@
 1	board_chat.js	messageAttachmentAttrs(m)
 1	board_chat.js	messageAttachmentsHtml(m)
 1	board_chat.js	parts.actions
+1	board_chat.js	parts.attrs
 1	board_chat.js	parts.classes
 1	board_chat.js	parts.tagsOpen
 1	board_chat.js	parts.toggle
@@ -218,6 +219,7 @@
 2	message_board.js	p.message_count
 1	message_board.js	p.subscriber_count
 1	message_board.js	parts.actions
+1	message_board.js	parts.attrs
 1	message_board.js	parts.classes
 1	message_board.js	parts.tagsOpen
 1	message_board.js	parts.toggle
