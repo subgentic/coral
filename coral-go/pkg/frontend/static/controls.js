@@ -8,6 +8,7 @@ import { mountSettingsView } from './settings_view.js'; // the Add Macro form (a
 import { state, sessionKey, saveSessionDraft } from './state.js';
 import { updateSettingList, removeFirst } from './settings_lists.js';
 import { claimOwnership } from './ownership.js';
+import { sectionFocus } from './section_dialog.js';
 import { popoutTerminalBlocked } from './popout.js';
 import { escapeHtml, escapeAttr, showToast, showView, setRowCurrent } from './utils.js';
 import { registerActions, idOf } from './actions.js';
@@ -626,7 +627,7 @@ export function restartStage(arg) {
     const live = document.getElementById('restart-stage-live'); if (live) live.textContent = sub;
     const modal = document.getElementById('restart-modal');
     if (to === 'agent') importOnce('./quiet_focus.js').then(m => m.quietFocus(modal), () => {}); // the selected tab takes the focus: no ring until a key is pressed (#7391)
-    (to === 'persona' ? modal.querySelector('.acf-prompt') : modal.querySelector('.settings-tab[aria-selected="true"]'))?.focus();
+    (to === 'persona' ? modal.querySelector('.acf-prompt') : sectionFocus(modal))?.focus();
 }
 
 export function hideRestartModal() {

@@ -43,6 +43,23 @@ const BASE = require('./test_base').BASE;
             await click('button', N.next); await waitFor(`/Step 3 of 3/.test(window.__na.dialog().textContent)`, 'step 3', 4000); await settle(200);
             assert.match(await say(), /Step 3 of 3/, 'step 3 is announced');
         });
+        await S.run('on a phone (the sections are a select) Next and Back put the focus on the new step\'s first control, never on the page body (#8432)', async () => {
+            await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+            await ev(`window.hideLaunchModal && window.hideLaunchModal(); true`); await settle(200);
+            await openNewAgent(ev, waitFor);
+            const where = () => ev(`(() => { const a = document.activeElement; const d = window.__na.dialog(); return { inside: !!(d && a && d.contains(a)), body: a === document.body, tag: a ? a.tagName : '', cls: a ? String(a.className) : '', id: a ? a.id : '', visible: !!a && a.getClientRects().length > 0 }; })()`);
+            await ev(`(() => { const i = window.__na.find('input', ${N.folder}); i.value = '/work/payments-app'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+            await click('button', N.next); await waitFor(`/Step 2 of 3/.test(window.__na.dialog().textContent)`, 'step 2', 4000); await settle(200);
+            let w = await where(); assert.ok(w.inside && !w.body && w.visible, 'Next to the persona step: ' + JSON.stringify(w));
+            await click('button', N.next); await waitFor(`/Step 3 of 3/.test(window.__na.dialog().textContent)`, 'step 3', 4000); await settle(200);
+            w = await where(); assert.ok(w.inside && !w.body && w.visible, 'Next to the settings step: the focus is on a visible control of it, not on the page body: ' + JSON.stringify(w));
+            assert.equal(w.tag, 'SELECT', 'where the sections are a select, that select takes the focus: ' + JSON.stringify(w));
+            await click('button', /^Back$/); await waitFor(`/Step 2 of 3/.test(window.__na.dialog().textContent)`, 'back to step 2', 4000); await settle(200);
+            w = await where(); assert.ok(w.inside && !w.body && w.visible, 'Back to the persona step: ' + JSON.stringify(w));
+            await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
+            await ev(`window.hideLaunchModal && window.hideLaunchModal(); true`); await settle(200);
+            await openNewAgent(ev, waitFor); await toStep3();
+        });
         await S.run('step 3 tabs are real tabs: a tablist with three tabs, aria-selected on one, roving tabindex, each tab controls a tabpanel named by it', async () => {
             const t = await ev(`(() => { const tl = window.__na.dialog().querySelector('[role=tablist]'); if (!tl) return null; return { orientation: tl.getAttribute('aria-orientation'), tabs: [...tl.querySelectorAll('[role=tab]')].map(x => ({ name: window.__na.name(x), sel: x.getAttribute('aria-selected'), tab: x.tabIndex, ctrl: (() => { const p = document.getElementById(x.getAttribute('aria-controls') || ''); return p ? { role: p.getAttribute('role'), by: p.getAttribute('aria-labelledby') === x.id } : null; })() })) }; })()`);
             assert.ok(t, 'a role=tablist'); assert.equal(t.tabs.length, 3);

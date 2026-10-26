@@ -13,6 +13,7 @@ const { _effectiveServer, _loadServerSettings, _serverSettings, _settingsFor } =
 const { defaultPermissionMode, syncDefaultPermissionMode, _normalizePermFlagsForAgent, _updatePermModeDescription } = await importOnce('./permission_flags.js');
 const { _checkAgentCLI } = await importOnce('./cli_check.js');
 import { checkTmuxForLaunch } from './prerequisites.js';
+import { sectionFocus } from './section_dialog.js';
 import { showTeamAddress } from './team_form.js';
 import { agentForm as folderForm, setAgentNameMode } from './agent_form.js';
 const { _syncACFModelField, getAgentConfig, renderAgentConfigForm, cliWarningOf } = await importOnce('./agent_config_form.js');
@@ -40,7 +41,7 @@ function _launchStage(arg) {
     syncRecap(); _syncLaunchBlock();
     const live = document.getElementById('launch-stage-live');
     if (live) live.textContent = sub || '';
-    const first = to === 'folder' ? input : to === 'persona' ? document.querySelector('#launch-step-agent .agent-preset-select') : document.querySelector('#launch-step-agent .settings-tab[aria-selected="true"]');
+    const first = to === 'folder' ? input : to === 'persona' ? document.querySelector('#launch-step-agent .agent-preset-select') : sectionFocus(document.getElementById('launch-step-agent'));
     if (to === 'agent') quietFocus(document.getElementById('launch-modal')); // the selected tab takes the focus: no ring until a key is pressed (#7391)
     first?.focus();
 }

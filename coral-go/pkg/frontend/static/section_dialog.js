@@ -65,6 +65,13 @@ export function initSectionDialog(shell) {
     return shell;
 }
 
+/** The section control a person can reach: the selected tab, or the select that stands for the tabs when the list is folded away (a phone, 200% text); a hidden tab cannot take the focus (#8432). */
+export function sectionFocus(root) {
+    const tab = root.querySelector('.settings-tab[aria-selected="true"]');
+    if (tab && tab.getClientRects().length > 0) return tab;
+    return root.querySelector('.settings-group-pick select') || tab;
+}
+
 export function showSection(shell, id, { focus = false } = {}) {
     const panes = panesOf(shell);
     const pane = panes.find(p => p.dataset.section === id) || panes[0];
@@ -78,7 +85,7 @@ export function showSection(shell, id, { focus = false } = {}) {
     const pick = shell.querySelector('.settings-group-pick select');
     if (pick) pick.value = pane.dataset.section;
     (pane.closest('.settings-panes') || pane.parentElement).scrollTop = 0;
-    if (focus) document.getElementById(`${shell._sdUid}-tab-${pane.dataset.section}`)?.focus();
+    if (focus) sectionFocus(shell)?.focus();
     return pane.dataset.section;
 }
 
