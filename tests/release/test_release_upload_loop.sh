@@ -6,6 +6,8 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+# Intentional workflow integration test: execute the upload block that will ship,
+# with fake commands and assets; a copied block would miss live workflow regressions.
 WORKFLOW="$ROOT/.github/workflows/release.yml"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT

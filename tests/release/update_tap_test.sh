@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # tools/devops/update-tap.sh against a local bare repository standing in for the Homebrew tap (release channels, #5559): no network.
+# The cask is a fixed input to these version/URL rewrite cases, not the current
+# shipped cask: changing that config must not silently change the fake tap.
 set -uo pipefail
 export CORAL_TELEMETRY_DISABLED=1 # nothing here runs Coral, but the telemetry census wants it on every script that names the repository
-here="$(cd "$(dirname "$0")" && pwd)"; SCRIPT="$here/../../tools/devops/update-tap.sh"; CASK="$here/../../Casks/coral.rb"
+here="$(cd "$(dirname "$0")" && pwd)"; SCRIPT="$here/../../tools/devops/update-tap.sh"; CASK="$here/fixtures/update-tap-coral.rb"
 T="$(mktemp -d /tmp/utp.XXXX)"; [ -d "$T" ] || exit 1
 trap 'rm -rf "$T"' EXIT
 fail=0

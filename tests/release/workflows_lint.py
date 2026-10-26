@@ -69,6 +69,7 @@ def seam_violations():
 
 
 def main():
+    # Intentional live security-policy lint, not a fixed-fixture unit test.
     bad = []
     for path in sorted(glob.glob(os.path.join(ROOT, ".github", "workflows", "*.yml"))):
         name = os.path.basename(path)

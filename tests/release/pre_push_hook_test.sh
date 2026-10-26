@@ -7,7 +7,10 @@ T=$(mktemp -d /tmp/pph.XXXX); case "$T" in /tmp/pph.????) ;; *) echo "bad temp d
 trap 'rm -rf "$T"' EXIT
 git init -q --bare "$T/remote.git"
 git init -q "$T/w"; cd "$T/w"; git config user.name t; git config user.email t@example.invalid
-mkdir -p tools/devops; cp "$root/tools/devops/check_binaries.py" "$root/tools/devops/binary-allowlist.txt" "$root/tools/devops/pre-push-hook.sh" "$root/tools/devops/install-pre-push-hook.sh" tools/devops/
+mkdir -p tools/devops; cp "$root/tools/devops/check_binaries.py" "$root/tools/devops/pre-push-hook.sh" "$root/tools/devops/install-pre-push-hook.sh" tools/devops/
+# These fake pushes exercise hook behavior, not the shipped allowlist policy.
+# Commit a fixed empty fixture so future production exceptions cannot change them.
+printf '# empty test allowlist\n' > tools/devops/binary-allowlist.txt
 git remote add origin "$T/remote.git"; echo base > a.txt; git add -A; git commit -qm base; git branch -M main; git push -q origin main
 git fetch -q origin
 bash tools/devops/install-pre-push-hook.sh >/dev/null

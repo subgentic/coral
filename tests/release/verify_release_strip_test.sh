@@ -9,6 +9,8 @@ trap 'rm -rf "$T"' EXIT
 mkdir -p "$T/tools"
 { echo "here=\"$(cd "$(dirname "$script")" && pwd)\""; sed -n '/^STRIP_MARKER=/,/^}/p' "$script"; } > "$T/helper.sh"
 [ -s "$T/helper.sh" ] || { echo "FAIL: helper not found in verify-release.sh" >&2; exit 1; }
+# Intentional live marker contract: the verifier and payload must agree with
+# the marker that stripping removes, not with an independent frozen string.
 marker="$(head -n1 "$here/strip_marker.txt")"
 printf 'ELF....clean binary....' > "$T/stripped"
 printf 'ELF....%s....' "$marker" > "$T/mutant"

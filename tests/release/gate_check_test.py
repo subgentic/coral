@@ -132,6 +132,8 @@ class GateTests(unittest.TestCase):
         self.assertTrue(g.matches(["tests/*.sh"], ["tests/b.sh"]))
         self.assertTrue(g.matches(["**/*_windows.go"], ["coral-go/x/y_windows.go"]))
 
+    # Intentional live-policy pin: unlike the fake-API unit cases above, this
+    # integration check must fail when the repository changes its required gates.
     def test_the_real_config_loads_and_names_the_heavy_workflows(self):
         cfg = g.load_config(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".github", "gate.json"))
         self.assertEqual(cfg["always"], ["go-tests", "go-race", "cdp-gate"])

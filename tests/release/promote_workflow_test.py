@@ -10,6 +10,9 @@ import tempfile
 import unittest
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
+
+# Intentional live workflow contract checks; a frozen copy would hide changes to
+# permissions, signing order and release selection. Manifest inputs use env() fixtures.
 with open(os.path.join(ROOT, ".github", "workflows", "promote.yml"), encoding="utf-8") as _f:
     WF = _f.read()
 CODE = "\n".join(re.sub(r"\s+#.*$", "", line) for line in WF.splitlines() if not line.lstrip().startswith("#"))   # the workflow without its comments

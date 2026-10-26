@@ -53,6 +53,8 @@ check() {
   if [ "$want_key" = key ] && ! echo "$flags" | grep -q PostHogKey; then echo "FAIL: $f: no PostHogKey flag"; fail=1; fi
 }
 
+# Intentional live build-contract checks: fixture flags could pass while the
+# actual release silently drops its version or telemetry stamp.
 check .github/workflows/release.yml key
 check .github/workflows/linux-runner-dryrun.yml nokey
 check installers/build-macos.sh key

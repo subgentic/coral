@@ -33,6 +33,8 @@ printf '# no line for this platform\n' > "$T/pins.none"
 out="$(req "$T/fake" "$T/pins.none")"; rc=$?
 [ "$rc" != 0 ] && grep -q "no pin" <<<"$out" || bad "a platform with no pin must stop, not pass (rc=$rc: $out)"
 
+# Intentional live pin-coverage contract; verification/install behavior above and
+# below uses synthetic pin files rather than these shipped digests.
 # The checked-in pins: every platform cosign is built for has a 64-hex line.
 for p in darwin-arm64 darwin-amd64 linux-amd64 linux-arm64; do
   line="$(awk -v n="cosign-$p" '$1 !~ /^#/ && $2==n {print $1}' "$root/tools/devops/cosign.sha256")"
