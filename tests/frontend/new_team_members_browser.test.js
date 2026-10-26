@@ -14,6 +14,7 @@ const BASE = require('./test_base').BASE;
     const roles = () => ev(`window.__nt.roles(window.__nt.dlg(${N.team}))`);
     const rowText = role => ev(`(() => { const b = window.__nt.rows(window.__nt.dlg(${N.team})).find(x => window.__na.name(x).startsWith(${JSON.stringify('Edit ' + '')} + ${JSON.stringify(role)} + ': ')); return b ? window.__na.text(b) : null; })()`);
     const nextOff = () => ev(`(() => { const b = window.__nt.find(window.__nt.dlg(${N.team}), 'button', ${N.next}); return !!b && (b.disabled || b.getAttribute('aria-disabled') === 'true'); })()`);
+    const pressNext = async () => { await t.click('button', N.next); await settle(150); return ev(`(() => { const r = document.getElementById('team-recap'); const a = document.activeElement; return { said: r.textContent.trim(), red: r.classList.contains('launch-recap-error'), focus: a && a.id, step: /Step 2 of 3/.test(window.__na.text(window.__nt.dlg(${N.team}))) }; })()`); };
     const why = () => ev(`(() => { const d = window.__nt.dlg(${N.team}); const b = window.__nt.find(d, 'button', ${N.next}); const dd = (b.getAttribute('aria-describedby') || '').split(/\\s+/).map(i => (document.getElementById(i) || {}).textContent || '').join(' ').trim(); const live = [...d.querySelectorAll('[aria-live=polite],[role=status]')].map(e => window.__na.text(e)).join(' | '); return dd + ' || ' + live; })()`);
     const openRow = async role => { await ev(`(() => { const b = window.__nt.rows(window.__nt.dlg(${N.team})).find(x => window.__na.name(x).startsWith('Edit ' + ${JSON.stringify(role)} + ': ')); b.click(); return true; })()`); await waitFor(`!!window.__nt.dlg(${N.member})`, `the Edit member dialog for ${role}`, 5000); };
     const mtab = name => (name === 'Persona' ? mem.toPersona() : mem.section(name)); // Persona is the page before the settings (#7861)
@@ -33,9 +34,10 @@ const BASE = require('./test_base').BASE;
         await openNewTeam(ev, waitFor);
         await t.to(2, { template: /^Blank/ });
 
-        await S.run('a blank team cannot go on: Next is off, a line says "Add an Orchestrator..." with an Add Orchestrator button, and the footer reason "Add an Orchestrator to continue" is said', async () => {
+        await S.run('a blank team cannot go on: Next is on and says nothing until pressed, then one red line and the focus on Add Orchestrator; a line says "Add an Orchestrator..." with an Add Orchestrator button, and the footer reason "Add an Orchestrator to continue" is said', async () => {
             assert.deepEqual(await roles(), [], 'a blank team has no members');
-            assert.ok(await nextOff(), 'Next is off'); assert.match(await why(), /Add an Orchestrator to continue/, 'the reason in the description and the polite status');
+            assert.ok(!(await nextOff()), 'Next is on (#8476: it is never drawn off)'); assert.doesNotMatch(await why(), /Add an Orchestrator to continue/, 'nothing is said before the first press');
+            const p = await pressNext(); assert.equal(p.step, true, 'pressing Next stays on Members'); assert.equal(p.focus, 'team-add-orchestrator', 'the Add Orchestrator button takes the focus'); assert.equal(p.said, 'Add an Orchestrator to continue', 'one line says what is missing'); assert.equal(p.red, true, 'in the red of step 1');
             assert.match(await ev(`window.__na.text(window.__nt.dlg(${N.team}))`), /Add an Orchestrator\.\s*It plans tasks, runs reviews and receives other teams' requests\. A member counts as the Orchestrator only when its role is exactly/, 'the line says why in words');
             assert.ok(await t.has('button', N.addOrch), 'an Add Orchestrator button');
             assert.ok(!(await t.has('select', N.bulk)), 'no "Set all workers to" while there are no workers');
@@ -57,7 +59,7 @@ const BASE = require('./test_base').BASE;
             const worker = (await roles())[1];
             // rename the first away so the team has workers only
             await openRow('Orchestrator'); await setRole('Lead'); await save();
-            assert.ok(await nextOff(), 'Next is off again with no Orchestrator'); assert.ok(await t.has('button', N.addOrch), 'Add Orchestrator is back');
+            assert.ok(!(await nextOff()), 'Next stays on with no Orchestrator'); assert.ok(await t.has('button', N.addOrch), 'Add Orchestrator is back');
             await t.click('button', N.addOrch); await settle(300);
             const r = await roles(); assert.equal(r[0], 'Orchestrator', 'the new Orchestrator is at the top'); assert.equal(r.length, 3);
             assert.match(await rowText('Orchestrator'), /Gets the first task/);
@@ -66,7 +68,8 @@ const BASE = require('./test_base').BASE;
         await S.run('renaming the only Orchestrator away in Edit member and pressing Save member brings the line, the reason and the off Next back; the rename does it live, not on Next', async () => {
             await openRow('Orchestrator'); await setRole('Planner'); assert.ok(!(await nextOff()), 'nothing changes in the list while the dialog is open (held until Save)');
             await save();
-            assert.ok(await nextOff(), 'Next is off after Save'); assert.match(await why(), /Add an Orchestrator to continue/); assert.ok(await t.has('button', N.addOrch), 'the Add Orchestrator line is back');
+            assert.ok(!(await nextOff()), 'Next stays on after Save'); assert.ok(await t.has('button', N.addOrch), 'the Add Orchestrator line is back');
+            const p = await pressNext(); assert.equal(p.said, 'Add an Orchestrator to continue', 'pressing Next says why'); assert.equal(p.focus, 'team-add-orchestrator');
             assert.ok(!(await roles()).includes('Orchestrator'), 'no member is called Orchestrator');
         });
         await S.run('" orchestrator " in any case and with spaces counts as the Orchestrator (the server reads it the same way)', async () => {

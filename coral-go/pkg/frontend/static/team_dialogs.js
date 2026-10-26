@@ -104,8 +104,9 @@ function _syncTeamMembers() {
 }
 
 let _teamStepPressed = false; // Next was pressed with step 1 wrong: only then does the line under the buttons name the first thing wrong (nothing is said before the first press)
+let _membersPressed = false; // the same for step 2: Next was pressed with no Orchestrator
 
-/** What is wrong on this step, in words, and Next (or Launch team) cannot go on; '' when it can. Step 1 says it only after Next was pressed, and Next is never off there. */
+/** What is wrong on this step, in words, and Next (or Launch team) cannot go on; '' when it can. Steps 1 and 2 say it only after Next was pressed, and Next is never off there. */
 function _teamGateReason() {
     const step = currentTeamStep();
     if (step === 'team') {
@@ -115,7 +116,7 @@ function _teamGateReason() {
         if (boardNameProblem(name)) return boardNameProblem(name);
         if (!dir) return 'Choose a folder for the team';
     } else if (step === 'members') {
-        if (!hasOrchestrator()) return 'Add an Orchestrator to continue';
+        if (_membersPressed && !hasOrchestrator()) return 'Add an Orchestrator to continue';
     }
     return '';
 }
@@ -128,12 +129,12 @@ function _syncTeamGate() {
     const recap = document.getElementById('team-recap');
     for (const b of [next]) {
         if (!b) continue;
-        if (reason && step !== 'team') { b.setAttribute('aria-disabled', 'true'); b.setAttribute('aria-describedby', 'team-recap'); } else { b.removeAttribute('aria-disabled'); b.removeAttribute('aria-describedby'); }
+        if (reason && step !== 'team' && step !== 'members') { b.setAttribute('aria-disabled', 'true'); b.setAttribute('aria-describedby', 'team-recap'); } else { b.removeAttribute('aria-disabled'); b.removeAttribute('aria-describedby'); }
     }
     if (go && !go.disabled) go.removeAttribute('aria-disabled');
     if (!recap) return;
-    recap.classList.toggle('launch-recap-warn', !!reason && step !== 'team');
-    recap.classList.toggle('launch-recap-error', !!reason && step === 'team'); // step 1: one red line naming the first thing wrong, the field errors are under the fields
+    recap.classList.toggle('launch-recap-warn', !!reason && step !== 'team' && step !== 'members');
+    recap.classList.toggle('launch-recap-error', !!reason && (step === 'team' || step === 'members')); // steps 1 and 2: one red line naming the first thing wrong (step 1: the field errors are under the fields)
     recap.replaceChildren();
     if (reason) { recap.append(reason); return; }
     if (step === 'team') return;
@@ -185,7 +186,7 @@ function teamStepMove(dir) {
     if (dir > 0 && step === 'team') {
         if (!teamForm().validate({ focus: true }).ok) { _teamStepPressed = true; _syncTeamGate(); return; } // the first field that is wrong takes the focus and says what is missing
     }
-    if (dir > 0 && step === 'members' && !hasOrchestrator()) { document.getElementById('team-add-orchestrator')?.focus(); _syncTeamGate(); return; }
+    if (dir > 0 && step === 'members' && !hasOrchestrator()) { _membersPressed = true; document.getElementById('team-add-orchestrator')?.focus(); _syncTeamGate(); return; } // the button that fixes it takes the focus, and the one red line says what is missing
     const to = TEAM_STEPS[Math.min(TEAM_STEPS.length - 1, Math.max(0, i + dir))];
     if (to === 'members') _syncTeamMembers();
     showTeamStep(to, { focus: true });
@@ -355,7 +356,7 @@ async function _initTeamForm() {
     const addr = document.getElementById("team-board-server");
     if (addr) { addr.value = ""; addr.disabled = true; } // the machine's own entry reveals it (launch_dialog.js _syncTeamAddress)
     launch.existingTeamBoardNames = new Set();
-    _teamStepPressed = false;
+    _teamStepPressed = false; _membersPressed = false;
     teamForm()?.clearErrors();
     _validateTeamName();
     const tapEl = document.getElementById("team-permission-mode");
