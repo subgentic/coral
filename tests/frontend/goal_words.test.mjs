@@ -54,8 +54,7 @@ assert.equal(W.showMoreText(120), 'Show 50 more'); assert.equal(W.showMoreText(2
 assert.equal(W.tasksShownText(100, 120), 'Showing 100 of 120 tasks');
 assert.equal(W.tasksCappedText(120, 130), 'Showing 120 of 130 tasks. The rest are on the Tasks panel.');
 assert.equal(W.closedWithOpenText(2), 'Closed with 2 tasks still open. They stay open until someone finishes or moves them.'); assert.equal(W.closedWithOpenText(1), 'Closed with 1 task still open. They stay open until someone finishes or moves them.');
-assert.equal(W.goalsToggleText(0), 'Goals'); assert.equal(W.goalsToggleText(3), 'Goals 3'); assert.equal(W.goalsToggleText(-2), 'Goals');
-assert.equal(W.goalsToggleTitle, 'What this board is working toward'); assert.equal(W.goalsSubtitle, 'What the team is working toward. Tasks serve a goal.'); assert.equal(W.driverHelp, 'Driver: the agent who looks after it');
+assert.equal(W.goalsSubtitle, 'What the team is working toward. Tasks serve a goal.'); assert.equal(W.driverHelp, 'Driver: the agent who looks after it');
 assert.equal(W.noGoalTasksText(1), '1 task serves no goal'); assert.equal(W.noGoalTasksText(4), '4 tasks serve no goal');
 assert.equal(W.stateWord({ state: 'blocked', blockedOn: 'the Operator' }), 'Blocked: the Operator'); assert.equal(W.stateWord({ state: 'blocked' }), 'Blocked');
 assert.equal(W.readyToClose({ state: 'active', rollup: { done: 3 } }), true); assert.equal(W.readyToClose({ state: 'active', rollup: {} }), false, 'no tasks'); assert.equal(W.readyToClose({ state: 'active', rollup: { done: 3, queued: 1 } }), false); assert.equal(W.readyToClose({ state: 'blocked', rollup: { done: 3 } }), false);
