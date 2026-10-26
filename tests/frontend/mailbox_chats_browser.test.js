@@ -47,18 +47,29 @@ const BASE = require('./test_base').BASE;
         console.log('   ✓');
 
         console.log('3. Star and Archive call the flags route');
-        await ev(`[...document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)')][0].querySelector('.dt-chat-flags .dt-quiet').click(); true`);
+        const rowFlag = `[...document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)')][0].querySelector('.dt-chat-flags .dt-flag')`;
+        assert.equal(await ev(`getComputedStyle(${rowFlag}).opacity`), '0', 'a row\'s Star and Archive are icons that wait for hover or focus');
+        assert.match(await ev(`${rowFlag}.getAttribute('aria-label')`), /^Star: /, 'the icon button is named for its chat');
+        await Emulation.setFocusEmulationEnabled({ enabled: true }); // a page nobody looks at still has the focus the rules ask for
+        await ev(`${rowFlag}.focus(); true`);
+        await waitFor(`getComputedStyle(${rowFlag}).opacity === '1'`, 'focus shows them (the button\'s own fade)');
+        await ev(`${rowFlag}.click(); true`);
         await waitFor(`window.__flags.length === 1`, 'the star saved');
         assert.deepEqual(await ev(`window.__flags[0]`), ['chat-000', { starred: true }], 'the PATCH names the chat and the flag');
+        // the opened chat carries them too (a phone has no hover): Star there calls the same route and draws the star
+        await ev(`(async () => { const st = (await import((window.__coralStatic || '/static/') + 'state.js')).state, m = await import((window.__coralStatic || '/static/') + 'sessions.js'); st.currentSession = { type: 'history', name: 'chat-001' }; st.historySessionsList = [{ session_id: 'chat-001', starred: false, archived: false }]; m.drawChatFlags(st.historySessionsList[0]); window.__tog = m.toggleChatFlag; return true; })()`);
+        assert.equal(await ev(`document.getElementById('history-flags').hidden`), false, 'the opened chat shows Star and Archive');
+        await ev(`window.__tog('starred').then(() => true)`);
+        await waitFor(`window.__flags.length === 2 && document.getElementById('history-star').classList.contains('dt-flag-on')`, 'the opened chat\'s star saved and drawn');
+        assert.deepEqual(await ev(`window.__flags[1]`), ['chat-001', { starred: true }]);
+        assert.equal(await ev(`document.getElementById('history-star').getAttribute('aria-pressed')`), 'true');
         await waitFor(`document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)').length >= 50`, 'the list read again');
         console.log('   ✓');
 
         console.log('4. Each folder asks for its own filter');
         for (const [key, want] of [['chats-archived', { archived: '1' }], ['chats-cli-codex', { source_types: 'codex', type: 'agent' }], ['chats-tag-7', { tag_ids: '7', type: 'agent' }], ['chats-notes', { with_notes: '1' }], ['chats-active', { active: '1' }], ['chats-starred', { starred: '1' }], ['chats-group', { type: 'group' }]]) {
             await ev(`window.__asked.length = 0; document.querySelector('.view-list-item[data-key="${key}"]').click(); true`);
-            await waitFor(`window.__asked.length >= 1`, `${key} asks`);
-            const a = await ev(`window.__asked[0]`);
-            for (const [p, v] of Object.entries(want)) assert.equal(a[p], v, `${key}: ${p} ${JSON.stringify(a)}`);
+            await waitFor(`window.__asked.some(a => Object.entries(${JSON.stringify(want)}).every(([k, v]) => a[k] === v))`, `${key} asks for its own filter ` + JSON.stringify(want)); // a read of the folder before it may still be arriving
         }
         console.log('   ✓');
 
@@ -66,6 +77,7 @@ const BASE = require('./test_base').BASE;
         await open(390, 844, true);
         await waitFor(`!!document.querySelector('#group-table-view .dt-box.dt-folded')`, 'folds', 5000);
         const p = await ev(`(() => { const rows = [...document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)')]; return { h: rows.slice(0, 5).map(r => Math.round(r.getBoundingClientRect().height)), over: document.documentElement.scrollWidth - innerWidth, select: !!document.querySelector('.view-list-select') && getComputedStyle(document.querySelector('.view-list-select')).display !== 'none' }; })()`);
+        assert.equal(await ev(`getComputedStyle(document.querySelector('#group-table-view .dt-chat-flags')).display`), 'none', 'a phone\'s rows have no hover icons');
         assert.ok(p.h.every(h => h >= 44) && p.over <= 1 && p.select, 'phone rows are 44 px or more, no sideways scroll, folders in a select ' + JSON.stringify(p));
         console.log('   ✓');
         console.log('PASS Mailbox chat folders: counts, the Gmail line, day dividers, reading on, flags, one filter per folder');

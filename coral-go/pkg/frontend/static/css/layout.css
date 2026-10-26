@@ -249,6 +249,9 @@ body.panel-dragging .sidebar {
 /* One pane per tab (#7443): the shared header, the tab's list and its pinned action. It fills the column, so the pinned action sits at the foot of a short list too. */
 .sidebar-pane { display: flex; flex-direction: column; flex: 1 0 auto; min-height: 0; }
 .sidebar-pane[hidden] { display: none; }
+/* A pane whose header (the search) stays put while its own list scrolls (the Inbox's folders: a long list of chat folders and tags is cut at the bottom of the sidebar otherwise) */
+.sidebar-pane-fixed { flex: 1 1 0; }
+.sidebar-pane-fixed > .sidebar-section { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .sidebar-collapse-btn[hidden], .sidebar-rail-btn[hidden] { display: none; }
 
 .sidebar-search {

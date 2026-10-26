@@ -23,7 +23,7 @@ import { loadLiveSessions } from './api.js';
 import { deserializeFromUrl, urlSearchFor } from './search_filters.js';
 import { connectCoralWs } from './websocket.js';
 import { addMacro, hideMacroModal, restartSession, restartStage, hideRestartModal, confirmRestart, editGoal, refreshGoal, requestGoal } from './controls.js';
-import { selectLiveSession, selectHistorySession, editAndResubmit, renameAgent, setAgentIcon } from './sessions.js';
+import { selectLiveSession, selectHistorySession, editAndResubmit, renameAgent, setAgentIcon, toggleChatFlag } from './sessions.js';
 import { KILL_LOG_NOTE_MANY, toggleGroupCollapse, killGroup, killBoard, toggleTeamSleep, toggleAgentSleep, toggleAgentArchive, toggleArchivedSection, shareAgentTeam, saveTeamFromSidebar, killSessionDirect, showInfoDirect, attachDirect, restartDirect, showConfirmModal, hideConfirmModal, showPromptModal, hidePromptModal, showAlertModal, hideAlertModal, copyFolderPath, moveGroupUp, moveGroupDown, toggleGroupByTeam, expandSleepingGroup, setBoardAccentColor, moveSessionUp, moveSessionDown, showTeamTokenUsage, distillTeamKnowledge, toggleSessionSummary, applySessionSummaryPref, filterLiveAgents, agentSearchKey, toggleShowServer, toggleShowBranches, toggleShowProvider, toggleShowModel, toggleShowThinking, toggleGroupByServer, groupHeaderKey, teamHeaderKey } from './render.js';
 import './capture.js';
 import { loadSettings } from './settings_core.js';
@@ -265,6 +265,7 @@ registerActions({
     'tag-create': () => createTag(),
     'summary-generate': () => generateSummary(),
     'resume-show': () => showResumeModal(),
+    'history-flag': el => toggleChatFlag(el.dataset.flag),
     'history-details': el => { const id = document.getElementById('history-session-id'); if (!id) return; id.hidden = !id.hidden; el.setAttribute('aria-expanded', String(!id.hidden)); el.textContent = id.hidden ? 'Details' : 'Hide details'; },
     'history-list': () => {
         state.currentSession = null;

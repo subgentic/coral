@@ -93,13 +93,16 @@ const ran = (sec) => { if (sec == null || !(sec >= 0)) return ''; const m = Math
 const name = (s) => (isGroup(s) ? (s.title || String(s.session_id).replace(/^board:/, '')) : (s.display_name || s.agent_name || ''));
 const snippetOf = (s) => { const t = historyLabel(s); const x = String(s.summary || '').replace(/\s+/g, ' ').trim(); return x && x !== t ? x : ''; };
 
-async function setFlag(s, flag, value, after) {
+/** Star or archive a chat (the flags route): true when it was saved; a failure says so in a toast. */
+export async function setChatFlag(sessionId, flag, value) {
     try {
-        const r = await historyFetch(`/api/sessions/history/${encodeURIComponent(s.session_id)}/flags`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ [flag]: value }) });
+        const r = await historyFetch(`/api/sessions/history/${encodeURIComponent(sessionId)}/flags`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ [flag]: value }) });
         if (!r || !r.ok) throw new Error('not saved');
-    } catch { (await importOnce('./utils.js')).showToast?.('The chat could not be changed', true); return; }
-    resetChatLists(); after();
+    } catch { (await importOnce('./utils.js')).showToast?.('The chat could not be changed', true); return false; }
+    resetChatLists();
+    return true;
 }
+async function setFlag(s, flag, value, after) { if (await setChatFlag(s.session_id, flag, value)) after(); }
 
 /** The table spec of a chat folder. ctx: { query, open(session), redraw(), after() } (open: the chat in the viewer; redraw: draw the table again; after: counts and rows read again). */
 export function chatsSpec(key, ctx) {
@@ -122,8 +125,8 @@ export function chatsSpec(key, ctx) {
                 { key: 'ran', label: 'Ran', tone: 'tertiary', align: 'end', line: 0, cell: s => ran(s.duration_sec) },
                 { key: 'flags', label: 'Star and archive', hideLabel: true, line: 0, cell: s => {
                     const w = DT.el('span', 'dt-chat-flags');
-                    const star = DT.el('button', 'btn btn-small dt-quiet', s.starred ? 'Starred' : 'Star'); star.type = 'button'; star.setAttribute('aria-pressed', String(!!s.starred)); star.addEventListener('click', () => setFlag(s, 'starred', !s.starred, ctx.after));
-                    const arch = DT.el('button', 'btn btn-small dt-quiet', s.archived ? 'Unarchive' : 'Archive'); arch.type = 'button'; arch.addEventListener('click', () => setFlag(s, 'archived', !s.archived, ctx.after));
-                    w.append(star, arch); return w; } },
+                    // icon buttons that show on the row's hover or focus (the star stays drawn when set); a phone has them in the opened chat
+                    const flag = (key, on, icon, label, pressed) => { const b = DT.el('button', `dt-flag${key === 'starred' && on ? ' dt-flag-on' : ''}`); b.type = 'button'; b.title = label; b.setAttribute('aria-label', `${label}: ${name(s) || historyLabel(s)}`); if (pressed) b.setAttribute('aria-pressed', String(!!on)); const i = DT.el('span', 'material-icons', icon); i.setAttribute('aria-hidden', 'true'); b.append(i); b.addEventListener('click', (e) => { e.stopPropagation(); setFlag(s, key, !on, ctx.after); }); return b; };
+                    w.append(flag('starred', s.starred, 'star', s.starred ? 'Remove the star' : 'Star', true), flag('archived', s.archived, s.archived ? 'unarchive' : 'archive', s.archived ? 'Unarchive' : 'Archive', false)); return w; } },
             ] }).el };
 }

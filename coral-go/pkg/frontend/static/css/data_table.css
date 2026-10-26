@@ -96,7 +96,16 @@
 .dt-chat-line { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } /* a chat: its title, then its snippet after it, one line (Gmail's) */
 .dt-chat-title { color: var(--table-primary-color); font-size: var(--table-secondary-size); font-weight: var(--table-secondary-weight); }
 .dt-chat-snippet, .dt-chat-live { color: var(--table-secondary-color); font-size: var(--table-secondary-size); font-weight: var(--table-secondary-weight); }
-.dt-chat-flags { display: inline-flex; gap: 6px; }
+.dt-chat-flags { display: inline-flex; gap: 2px; justify-content: flex-end; }
+.dt-flag { display: inline-flex; align-items: center; justify-content: center; width: var(--control-compact-height); height: var(--control-compact-height); padding: 0; border: 0; border-radius: var(--radius-md); background: none; color: var(--table-tertiary-color); cursor: pointer; }
+.dt-row .dt-flag { opacity: 0; }
+.dt-flag .material-icons { font-size: 1.125rem; }
+.dt-row:hover .dt-flag, .dt-row:focus-within .dt-flag, .dt-row .dt-flag:focus-visible, .dt-row .dt-flag-on { opacity: 1; } /* a chat's Star and Archive show on its row's hover or focus; a starred chat keeps its star drawn */
+.dt-flag-on { color: var(--warning); }
+.dt-flag:hover { color: var(--table-primary-color); }
+.dt-flag-on:hover { color: var(--warning); }
+.dt-flag:focus-visible { outline-offset: -2px; } /* the cell clips what is drawn outside it: the ring sits inside the button */
+.dt-box.dt-folded .dt-chat-flags { display: none; } /* a phone has no hover: the opened chat carries them */
 .dt-td .btn-small { margin: 0; } /* a button in a cell sits in the row's own height, not the page button's 8px 20px margin */
 .dt-row-open { cursor: pointer; }
 .dt-row:hover td { background: var(--table-hover); }
