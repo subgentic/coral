@@ -119,7 +119,10 @@ async function run() {
         await settle(`document.querySelector('#agentic-state-events .event-summary')?.textContent === 'Fix the login bug 0'`, 'oldest first');
         check('Oldest first reverses the results', (await rows())[9] === 'Fix the login bug 9');
         const day = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-        const today = day(new Date()), yesterday = day(new Date(Date.now() - 86400000));
+        // Yesterday is a calendar day, not 24 hours ago: on a 25-hour DST day the latter is still today after 23:00 (#8578).
+        const now = new Date(), previousDay = new Date(now);
+        previousDay.setDate(previousDay.getDate() - 1);
+        const today = day(now), yesterday = day(previousDay);
         await ev(`document.querySelector('#ev-to').value = ${JSON.stringify(yesterday)}; document.querySelector('#ev-to').dispatchEvent(new Event('change', { bubbles: true })); true`);
         await settle(`document.querySelector('#agentic-state-events .event-empty')?.textContent === 'No events match'`, 'nothing until yesterday');
         check('Until yesterday leaves nothing (the events are from today)', (await count()) === '0 events', await count());
