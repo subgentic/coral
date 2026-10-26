@@ -105,7 +105,9 @@ import './app_actions.js';
 
 startChatPrefetch({ cloud: isCloud() });
 
-document.addEventListener("DOMContentLoaded", async () => {
+// Started on DOMContentLoaded, or at once when that has already fired: a module graph with a top-level await finishes evaluating after the browser fired it, and a listener added then never ran, so no
+// startup ran and a pop-out never took its mode (#8538). A deferred module runs while readyState is "interactive", before DOMContentLoaded, so the state alone does not say it has fired: the page's timing does.
+async function startDashboard() {
     beginDashboardAnalytics();
     if (!isPhoneLayout()) buildWelcome(); // a phone starts on the agent list and builds the welcome screen only if it is shown (#4497)
     try {
@@ -153,4 +155,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         dashboardFailed('init_failed');
         throw error;
     }
-});
+}
+
+const domContentLoadedFired = () => document.readyState === 'complete' || (performance.timing?.domContentLoadedEventStart || 0) > 0;
+if (domContentLoadedFired()) startDashboard();
+else document.addEventListener('DOMContentLoaded', startDashboard);
