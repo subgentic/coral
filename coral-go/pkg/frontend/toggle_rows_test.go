@@ -40,8 +40,8 @@ func TestShellSettingsSwitchesAreNamedAndDescribed(t *testing.T) {
 			t.Errorf("id %q is used %d times", m[1], strings.Count(html, `id="`+m[1]+`"`))
 		}
 	}
-	if n < 20 {
-		t.Errorf("found %d Settings switches, expected at least 20: the census regexp no longer matches the markup", n)
+	if n < 12 {
+		t.Errorf("found %d Settings switches, expected at least 12 (the groups that moved to settings_fields.js draw theirs in the browser): the census regexp no longer matches the markup", n)
 	}
 }
 
@@ -57,7 +57,7 @@ func TestToggleRowTemplateMarkup(t *testing.T) {
 	}
 	html := regexp.MustCompile(`\s+`).ReplaceAllString(b.String(), " ")
 	for _, want := range []string{
-		`<div class="settings-row"> <dt class="toggle-dt"> <label for="settings-notify-needs-input">Show notifications in Coral</label> <span class="toggle-desc" id="settings-notify-needs-input-desc">Show a toast when an agent needs input.</span> </dt> <dd><label class="check-hit"><input type="checkbox" id="settings-notify-needs-input" aria-describedby="settings-notify-needs-input-desc"></label></dd>`,
+		`<div class="settings-row"> <dt class="toggle-dt"> <label for="settings-auto-resume">Resume after API errors</label> <span class="toggle-desc" id="settings-auto-resume-desc">When an agent's CLI stops on a rate limit, an overload or another API error, Coral wakes it again after about 2, then 5, then 15 minutes, and stops trying after the third. Waking the agent yourself starts the count again.</span> </dt> <dd><label class="check-hit"><input type="checkbox" id="settings-auto-resume" aria-describedby="settings-auto-resume-desc"></label></dd>`,
 		`<label for="settings-cloud-hub-cross-team" class="settings-cloud-switch-label">Let Coral Hub change cross-team settings</label> <div id="settings-cloud-hub-cross-team-desc" class="settings-hint">`,
 		`<input type="checkbox" id="settings-cloud-hub-cross-team" data-cloud="hub-cross-team" aria-describedby="settings-cloud-hub-cross-team-desc">`,
 		`<div id="settings-cloud-auto-accept-row" class="settings-cloud-switch-row" data-cloud="auto-accept-row" hidden>`,
