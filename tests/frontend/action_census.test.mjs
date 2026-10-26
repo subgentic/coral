@@ -133,7 +133,6 @@ const NOT_POPOUT_RELEVANT = new Map(Object.entries({
     'm-hide-save-template-modal': 'the save-template dialog\'s Cancel: closes it, saves nothing',
     'm-save-current-persona': 'saves a persona (settings)',
     'm-save-default-prompts': 'Settings > default prompts (top bar only)',
-    'm-save-scheduled-job': 'job dialog: saves a scheduled job (Jobs view)',
     'm-save-team-member': 'team builder: saves a row of the unsaved draft',
     'm-save-team-template': 'saves a team template (settings)',
     'm-save-view': 'saves a custom view definition',

@@ -11,7 +11,7 @@ const { connect } = require('./agent_view_harness');
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const call = (path, method = 'GET', body) => ev(`fetch(${JSON.stringify(path)}, ${JSON.stringify({ method, headers: { 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })}).then(async r => ({ status: r.status, body: await r.json().catch(() => null) }))`);
-    const MOD = `import((window.__coralStatic || '/static/') + 'scheduler.js')`;
+    const MOD = `import((window.__coralStatic || '/static/') + 'job_form.js')`;
     const stamp = Date.now();
     let jobId = null, wfId = null;
     try {
@@ -33,14 +33,14 @@ const { connect } = require('./agent_view_harness');
             await ev(`${MOD}.then(m => m.editScheduledJob(${jobId})).then(() => true)`);
             await waitFor(`document.getElementById('job-modal').style.display === 'flex' && document.getElementById('job-modal-workflow').value !== ''`, 'the editor with the job', 10000);
         };
-        const save = async () => { await ev(`window.__jobPuts.length = 0; ${MOD}.then(m => m.saveScheduledJob()).then(() => true)`); };
+        const save = async () => { await ev(`window.__jobPuts.length = 0; document.getElementById('job-modal-submit').click(); true`); };
 
         console.log('1. A change made elsewhere after the page loaded shows; one made while the editor is open survives a Save of the name');
         assert.equal((await call(`/api/scheduled/jobs/${jobId}`, 'PUT', { description: 'changed after the page loaded' })).status, 200);
-        await ev(`${MOD}.then(m => m.switchJobType('prompt')).then(() => true)`); // the editor last showed an agent job
+        await ev(`window.showJobModal(); document.querySelector('.job-type-btn[data-type="prompt"]').click(); true`); // the editor last showed an agent job
         await open();
         assert.equal(await field('job-modal-description'), 'changed after the page loaded', 'the editor opens with the server\'s job');
-        assert.equal(await ev(`document.getElementById('job-modal-workflow-fields').style.display`), '', 'a workflow job opens as one');
+        assert.equal(await ev(`document.getElementById('job-modal-workflow').closest('.sv-row').hidden`), false, 'a workflow job opens as one');
         assert.equal(await field('job-modal-workflow'), String(wfId), 'with its workflow selected');
         assert.equal((await call(`/api/scheduled/jobs/${jobId}`, 'PUT', { description: 'from another client' })).status, 200);
         await ev(`document.getElementById('job-modal-name').value = 'renamed-${stamp}'; true`);

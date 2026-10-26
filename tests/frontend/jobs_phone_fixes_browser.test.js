@@ -57,13 +57,13 @@ const S = `(window.__coralStatic || '/static/')`;
             await waitFor(`document.getElementById('job-modal-flags').getClientRects().length > 0`, 'More options open', 5000);
             await sleep(400); // sleep-ok: the form lays out after the tab and the disclosure change
             const form = await ev(`(() => { const body = document.querySelector('#job-modal .modal-body') || document.querySelector('#job-modal'); const br = body.getBoundingClientRect(); const chips = [...document.querySelectorAll('#job-modal .flag-shortcut-btn')];
-                const lab = document.querySelector('#job-modal .job-cleanup-option'), box = lab.querySelector('input'); const rg = document.createRange(); rg.selectNodeContents(lab.lastChild && lab.lastChild.nodeType === 3 ? lab.lastChild : lab); const tr = rg.getClientRects()[0]; const bx = box.getBoundingClientRect();
+                const box = document.getElementById('job-modal-cleanup'), lab = box.closest('.sv-row').querySelector('.sv-label'); const rg = document.createRange(); rg.selectNodeContents(lab); const tr = rg.getBoundingClientRect(); const bx = box.getBoundingClientRect();
                 return { chips: chips.map(c => c.textContent.trim()), over: chips.filter(c => c.getBoundingClientRect().right > br.right + 0.5).map(c => c.textContent.trim()), sideways: body.scrollWidth - body.clientWidth,
-                    box: { right: Math.round(bx.right), midY: Math.round(bx.top + bx.height / 2) }, text: tr ? { left: Math.round(tr.left), midY: Math.round(tr.top + tr.height / 2), h: Math.round(tr.height) } : null }; })()`);
+                    box: { right: Math.round(bx.right), midY: Math.round(bx.top + bx.height / 2) }, text: tr ? { left: Math.round(tr.left), top: Math.round(tr.top), bottom: Math.round(tr.bottom) } : null }; })()`);
             assert.ok(!form.chips.includes('--dangerously-skip-permissions'), `${tag}: no one-tap chip for --dangerously-skip-permissions: ` + JSON.stringify(form.chips));
             assert.deepEqual(form.over, [], `${tag}: no flag chip passes the dialog's edge: ` + JSON.stringify(form));
             assert.ok(form.sideways <= 1, `${tag}: the form does not scroll sideways: ` + JSON.stringify(form));
-            assert.ok(form.text && form.box.right <= form.text.left + 2 && Math.abs(form.box.midY - form.text.midY) <= form.text.h, `${tag}: the worktree checkbox is beside the first line of its label: ` + JSON.stringify(form));
+            assert.ok(form.text && form.box.midY >= form.text.top - 2 && form.box.midY <= form.text.bottom + 2, `${tag}: the worktree switch is beside its label (within its height, wrapped or not): ` + JSON.stringify(form));
             // the Repository path shows its end when it is not being edited
             const path = await ev(`(() => { const i = document.getElementById('job-modal-repo'); i.value = '/a/very/long/path/that/goes/on/and/on/and/on/and/on/and/on/and/on/and/on/and/on/to/the-folder-name'; i.focus(); i.blur(); i.dispatchEvent(new Event('blur')); return { max: i.scrollWidth - i.clientWidth, left: Math.round(i.scrollLeft) }; })()`);
             assert.ok(path.max <= 0 || path.left >= path.max - 2, `${tag}: the Repository path shows its end (scrolled ${path.left} of ${path.max})`);

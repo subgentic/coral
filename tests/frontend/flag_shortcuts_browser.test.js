@@ -1,6 +1,6 @@
 // The flag shortcut buttons (#4684): a button next to a flags box adds or removes its flag in the box (toggleFlag, reached through the flag-toggle action), the button shows whether its flag is in the
 // box and follows what is typed (the box's own input events), the permission buttons rewrite a box's permission flags for the agent type and mode (_setPermFlagsForInput), and the Job dialog's box
-// is wired once that dialog is built. It was a block of modals.js and is its own module now; this pins what it does. Drives Chrome over CDP through agent_view_harness.js.
+// is wired once that dialog has opened. It was a block of modals.js and is its own module now; this pins what it does. Drives Chrome over CDP through agent_view_harness.js.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
@@ -11,8 +11,8 @@ const BASE = require('./test_base').BASE;
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install();
         await ev(`window.__coralReady.startup('liveList', 'settings')`);
-        // The dialogs' module loads on first use; build the Job dialog too (its box is wired when it is built).
-        await ev(`(async () => { const st = window.__coralStatic || '/static/'; await window.showLaunchModal(); window.hideLaunchModal(); (await import(st + 'lazy_dom.js')).ensureBuilt('job-modal'); return true; })()`);
+        // The dialogs' module loads on first use; open the Job dialog too (its box is drawn when it first opens).
+        await ev(`(async () => { const st = window.__coralStatic || '/static/'; await window.showLaunchModal(); window.hideLaunchModal(); window.showJobModal(); window.hideJobModal(); return true; })()`);
         await waitFor(`!!document.getElementById('job-modal-flags') && !!window._setPermFlagsForInput`, 'the dialogs and the helper');
         const boxes = await ev(`[...new Set([...document.querySelectorAll('.flag-shortcut-btn[data-flag-input]')].map(b => b.dataset.flagInput))].filter(id => document.getElementById(id))`);
         assert.ok(boxes.includes('job-modal-flags'), 'flag boxes with shortcut buttons: ' + JSON.stringify(boxes));

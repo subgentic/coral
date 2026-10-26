@@ -81,27 +81,21 @@
 
 /* ── New job / Edit job (#6540, #6578) ─────────────────────── */
 
-.job-field { display: block; font-size: var(--fs-md); color: var(--text-secondary); font-weight: 500; margin-bottom: 12px; }
-div.job-field#sched-label { margin-bottom: 6px; }
-.job-required, .job-optional { color: var(--text-secondary); font-weight: 400; } /* the words, in the same colour as the label: 4.5:1 on the dialog */
+.sched-cron-field { display: block; font-size: var(--fs-md); color: var(--text-secondary); font-weight: 500; margin-bottom: 12px; }
 .job-help code { margin: 0 .2em; }
 .job-help { font-size: var(--fs-base); color: var(--text-secondary); margin: -6px 0 12px; }
 .job-no-workflows { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: var(--fs-md); color: var(--text-secondary); margin: -4px 0 12px; }
 .job-no-workflows .btn { margin: 0; }
 .job-more { margin-top: 4px; }
 .job-more > summary { color: var(--text-primary); font-weight: 600; }
-.job-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 12px; }
-.job-limit-fields { display: grid; grid-template-columns: 5rem minmax(0, 1fr); gap: 8px; }
-.job-limit-fields > * { margin-top: 4px; }
-.job-limit-fields input, .job-limit-fields select { margin-top: 0; }
+.sched-limit-fields { display: grid; grid-template-columns: 5rem minmax(0, 1fr); gap: 8px; }
+.sched-limit-fields > * { margin-top: 4px; }
+.sched-limit-fields input, .sched-limit-fields select { margin-top: 0; }
 .sched-tz-input { width: 100%; }
 .sched-preview { margin: 0 0 8px; }
 .sched-preview-bad { color: var(--error-text, var(--error)); }
-.job-cleanup-option { display: flex; align-items: center; gap: 8px; }
-.job-cleanup-option input { width: auto; margin: 0; }
 /* A phone: the dialog already has a 16 px edge (its own padding); the body's own 24 px made the fields start 41 px in */
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
-    .job-row { grid-template-columns: 1fr; }
     #job-modal .modal-body, #job-modal .modal-footer { padding-left: 0; padding-right: 0; }
 }
 
@@ -298,7 +292,6 @@ div.job-field#sched-label { margin-bottom: 6px; }
 
 /* The Jobs fixes of #7121: a run's When is the link into the run; the checkbox of an agent job sits beside its label (a phone rule had made the label a block); a phone's job has a back row to the list. */
 #job-modal .flag-shortcut-btn { margin: 0; }
-#job-modal label.job-cleanup-option { display: flex; flex-direction: row; align-items: center; gap: 8px; }
 .sched-back { display: none; }
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
     .sched-back { display: flex; align-items: center; min-height: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); padding: 0; margin: 0 0 4px; background: none; border: 0; color: var(--link-text, var(--accent)); font: 500 var(--fs-md)/1.4 var(--font-sans); cursor: pointer; text-align: left; }

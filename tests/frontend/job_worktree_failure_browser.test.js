@@ -36,21 +36,21 @@ const MISSING = 'The base branch main does not exist in /work/repo. Its branches
             await waitFor(`!!document.querySelector('#scheduled-jobs-list .sched-row')`, 'the job row', 8000);
 
             console.log(`${tag}: the form`);
-            await ev(`window.showJobModal(); window.switchJobType('prompt'); true`);
+            await ev(`window.showJobModal(); document.querySelector('.job-type-btn[data-type="prompt"]').click(); true`);
             const f = await ev(`({ value: document.getElementById('job-modal-branch').value, placeholder: document.getElementById('job-modal-branch').placeholder })`);
             check(`${tag}: Base branch starts empty, and its placeholder says the repo's current branch`, f.value === '' && /current branch/.test(f.placeholder), JSON.stringify(f));
             await ev(`{ const set = (id, v) => { const i = document.getElementById(id); i.value = v; i.dispatchEvent(new Event('input', { bubbles: true })); }; set('job-modal-name', 'agent-job'); set('job-modal-repo', '/work/repo'); set('job-modal-prompt', 'Tidy the repo.'); document.querySelector('.sched-preset').click(); } true`);
             await ev(`window.__saveAnswer = { error: ${JSON.stringify(MISSING)}, code: 'base_branch_missing', field: 'base_branch', branches: ['master'] }; document.querySelectorAll('.toast').forEach(t => t.remove()); document.getElementById('job-modal-more').open = false; true`);
-            await ev(`window.saveScheduledJob(); true`);
-            await waitFor(`!document.getElementById('job-modal-branch-msg').hidden`, 'the inline error', 6000);
+            await ev(`document.getElementById('job-modal-submit').click(); true`);
+            await waitFor(`!document.getElementById('job-modal-branch').closest('.sv-row').querySelector('.sv-error').hidden`, 'the inline error', 6000);
             await sleep(300); // sleep-ok: the absence of a toast
-            const e = await ev(`(() => { const i = document.getElementById('job-modal-branch'), m = document.getElementById('job-modal-branch-msg');
+            const e = await ev(`(() => { const i = document.getElementById('job-modal-branch'), m = document.getElementById('job-modal-branch').closest('.sv-row').querySelector('.sv-error');
                 return { text: m.textContent, role: m.getAttribute('role'), invalid: i.getAttribute('aria-invalid'), open: document.getElementById('job-modal-more').open, focus: document.activeElement === i, toasts: [...document.querySelectorAll('.toast')].map(t => t.textContent.trim()), sent: window.__saves.map(s => s.base_branch) }; })()`);
-            check(`${tag}: a refused branch is said under the field (alert), the field marked, More options opened, the focus on it, no toast`, e.text === MISSING && e.role === 'alert' && e.invalid === 'true' && e.open && e.focus && e.toasts.length === 0, JSON.stringify(e));
-            check(`${tag}: the Base branch field is described by the message (a person who comes back to the field hears it again, not only when it first appears)`, (await ev(`document.getElementById('job-modal-branch').getAttribute('aria-describedby') || ''`)).split(' ').includes('job-modal-branch-msg'));
+            check(`${tag}: a refused branch is said under the field (alert), the field marked, More options opened, the focus on it, no toast`, e.text.endsWith(MISSING) && e.role === 'alert' && e.invalid === 'true' && e.open && e.focus && e.toasts.length === 0, JSON.stringify(e));
+            check(`${tag}: the Base branch field is described by the message (a person who comes back to the field hears it again, not only when it first appears)`, await ev(`(document.getElementById('job-modal-branch').getAttribute('aria-describedby') || '').split(' ').includes(document.getElementById('job-modal-branch').closest('.sv-row').querySelector('.sv-error').id)`));
             check(`${tag}: and the empty field was sent as empty (the server's default, not "main")`, e.sent[0] === '', JSON.stringify(e.sent));
             await ev(`{ const i = document.getElementById('job-modal-branch'); i.value = 'master'; i.dispatchEvent(new Event('input', { bubbles: true })); } true`);
-            check(`${tag}: editing the field takes the line and the mark away`, await ev(`document.getElementById('job-modal-branch-msg').hidden && !document.getElementById('job-modal-branch').hasAttribute('aria-invalid')`));
+            check(`${tag}: editing the field takes the line and the mark away`, await ev(`document.getElementById('job-modal-branch').closest('.sv-row').querySelector('.sv-error').hidden && !document.getElementById('job-modal-branch').hasAttribute('aria-invalid')`));
             await ev(`window.hideJobModal(); true`);
 
             console.log(`${tag}: a run that fails for its worktree`);

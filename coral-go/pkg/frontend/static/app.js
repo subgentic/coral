@@ -53,7 +53,8 @@ import { setLiveViewMode, showTerminalView } from './live_chat.js';
 import { switchAgenticTab } from './agentic_state.js';
 import { copyBranchName, showView, showToast, viewChanges, buildWelcome } from './utils.js';
 import './preview_pane.js';
-import { initScheduler, showJobModal, hideJobModal, validateCronPreview, saveScheduledJob, switchJobType, pickSchedulePreset } from './scheduler.js';
+import { initScheduler } from './scheduler.js';
+import { showJobModal, hideJobModal } from './job_form.js';
 import { initLiveJobs, selectLiveJobRun } from './live_jobs.js';
 import { initMessageBoard, showMessageBoardProjects, selectBoardProject, postBoardMessage, deleteMessageBoardProject, toggleBoardPause, showExportBoardModal, toggleSelectMode, openBoardSubscribers, hideBoardSubscribers } from './message_board.js';
 import { loadAllFolderTags, showFolderTagDropdown, addFolderTag, removeFolderTag, createAndAddFolderTag } from './folder_tags.js';
@@ -162,12 +163,10 @@ registerActions({
     'm-open-folder-backdrop': (el, event) => { if (event.target === el) window.hideOpenFolderModal(); },
     'm-open-folder-key': (el, event) => { if (event.key === 'Enter') { event.preventDefault(); window.submitOpenFolder(); } },
     'm-perm-mode-describe': el => { if (window._updatePermModeDescription) window._updatePermModeDescription(el); },
-    'm-pick-schedule-preset': el => { window.pickSchedulePreset(el); },
     'm-reset-default-prompt': el => { if (["orchestrator", "team_orchestrator", "team_worker", "worker"].includes(el.dataset.arg)) { window.resetDefaultPrompt(el.dataset.arg); } },
     'm-resume-launch-new': el => { window.resumeLaunchNew(); },
     'm-save-current-persona': el => { window._saveCurrentPersona(); },
     'm-save-default-prompts': el => { window.saveDefaultPrompts(); },
-    'm-save-scheduled-job': el => { window.saveScheduledJob(); },
     'm-save-team-member': el => { window.saveTeamAgentFromModal(); },
     'm-save-team-template': el => { window._saveTeamTemplate(); },
     'm-save-view': el => { window._saveView(); },
@@ -179,13 +178,11 @@ registerActions({
     'm-show-team-wizard-modal': el => { window.showTeamWizardModal(); },
     'm-submit-create-task': el => { window.submitCreateTask(); },
     'm-submit-open-folder': el => { window.submitOpenFolder(); },
-    'm-switch-job-type': el => { if (["prompt", "workflow"].includes(el.dataset.arg)) { window.switchJobType(el.dataset.arg); } },
     'm-team-worktree': el => { const r = document.getElementById('team-worktree-branch-row'); if (r) r.style.display = el.checked ? '' : 'none'; },
     'm-test-team-wizard': el => { window.testTeamWizard(); },
     'm-toggle-browser': el => { const ids = String(el.dataset.browser || '').split(' '); if (ids.length === 4 && ids.every(i => /^[a-z0-9-]+$/.test(i))) window.toggleBrowser(...ids); },
     'm-toggle-group-by-team': el => { window.toggleGroupByTeam(); },
     'm-toggle-session-summary': el => { window.toggleSessionSummary(); },
-    'm-validate-cron-preview': el => { window.validateCronPreview(); },
     'm-validate-team-name': () => { if (window._validateTeamName) window._validateTeamName(); },
     'm-verify-all-c-l-is': el => { window._verifyAllCLIs(); },
 });
@@ -376,7 +373,7 @@ Object.assign(window, {
     // live_chat
     setLiveViewMode, showTerminalView,
     // scheduler
-    showJobModal, hideJobModal, validateCronPreview, saveScheduledJob, switchJobType, pickSchedulePreset,
+    showJobModal, hideJobModal,
     // live_jobs
     selectLiveJobRun,
     // preview_pane

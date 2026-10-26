@@ -1,6 +1,5 @@
 /* Moved out of modals.js as it was (#4684): The flag shortcut buttons (toggleFlag, the permission-mode flags of an input, keeping the buttons in step with the text box). No behaviour change. */
 import { importOnce } from './import_once.js';
-import { onBuilt } from './lazy_dom.js';
 const { _normalizePermFlagsForAgent } = await importOnce('./permission_flags.js');
 
 export function toggleFlag(inputId, flag) {
@@ -32,8 +31,8 @@ function _syncFlagButtons(inputId) {
     if (!input) return;
     const flags = input.value.trim() ? input.value.trim().split(/\s+/) : [];
     const container = input.closest("label")?.nextElementSibling;
-    if (!container) return;
-    container.querySelectorAll(".flag-shortcut-btn").forEach(btn => {
+    const buttons = container ? container.querySelectorAll(".flag-shortcut-btn") : document.querySelectorAll(`.flag-shortcut-btn[data-flag-input="${inputId}"]`); // a form's row has no label around the box: the buttons name it
+    buttons.forEach(btn => {
         const flag = btn.textContent.trim();
         btn.classList.toggle("active", flags.includes(flag));
     });
@@ -48,6 +47,6 @@ function _attachFlagSync(id) {
     el.addEventListener("input", () => _syncFlagButtons(id));
 }
 for (const id of ["launch-flags", "restart-flags", "team-flags"]) _attachFlagSync(id);
-onBuilt("job-modal", () => _attachFlagSync("job-modal-flags"));
+document.addEventListener("input", e => { if (e.target && e.target.id === "job-modal-flags") _syncFlagButtons("job-modal-flags"); }, true); // the Job form draws its box when the dialog first opens (#7908), after any one-time attach; capture, because toggleFlag's own input event does not bubble
 
 export { _syncFlagButtons };

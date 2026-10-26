@@ -3,7 +3,7 @@
  * settings_view.css; no surface styles a settings row of its own.
  *
  *   const view = mountSettingsView(host, spec);
- *   a form (mode: 'form') may add form: { submit: 'Add', cancel: 'Cancel', onSubmit(values, view), onCancel?, barHost? }: its own footer (barHost: the dialog's footer element) with the status line; the primary is always enabled, pressing it
+ *   a form (mode: 'form') may add form: { submit: 'Add', cancel: 'Cancel', onSubmit(values, view), onCancel?, barHost?, submitId? }: its own footer (barHost: the dialog's footer element) with the status line; the primary is always enabled, pressing it
  *   checks the form (Required fields, validate), focuses the first invalid field and says what is missing; view.submit() does the same from the caller. Enter in a text input submits.
  *
  *   spec = {
@@ -18,7 +18,7 @@
  *   }
  *   field = { key, type: 'text'|'textarea'|'number'|'select'|'toggle'|'multiselect'|'radio'|'secret'|'path'|'custom', label, help?: string | { text, more },
  *             id?, default?, required?, placeholder?, rows?, min?, max?, step?, unit?, options?: [{ value, label, help? }] | async () => [...], validate?(value, values) => '' | 'message',
- *             visibleWhen?(values), disabledWhen?(values) => bool | 'reason', readOnly?, apply?: 'now', action?: { label, run(view), danger?, confirm? }, wide?, compact?, render?(slot, ctl) => { get, set, onChange? } }
+ *             visibleWhen?(values), disabledWhen?(values) => bool | 'reason', readOnly?, apply?: 'now', action?: { label, run(view), danger?, confirm? }, wide?, compact?, render?(slot, ctl) => { get, invalid?(on) (mark the control's own input), focus?, set, onChange? } }
  *
  * The controller: values() set(key, v) dirty() isDirty() changes() error(key, message) clearErrors() validate({ focus }) save() cancel() showGroup(id) reload() destroy().
  * Events on the host: 'sv-dirty' { dirty }, 'sv-group' { id }, 'sv-saved' { changes }. */
@@ -63,6 +63,7 @@ export function mountSettingsView(host, spec) {
     let baseline = {};             // key -> the loaded value (raw)
     let busy = false, lastSaved = false, status = null, statusError = false, destroyed = false;
     let view = null; // the controller, assigned below (a group's render and a field's action may be called before it exists, and use it later)
+    const folds = [];             // the form's disclosures (heading fields with fold: true)
     let shell = null, bar = null, saveBtn = null, cancelBtn = null, statusEl = null, announce = () => {};
 
     const root = node('div', mode === 'form' ? 'sv sv-form' : 'sv sv-settings');
@@ -120,7 +121,7 @@ export function mountSettingsView(host, spec) {
         if (t === 'custom') {
             const slot = node('div', 'sv-custom'); slot.id = field.id || `${id}-c`;
             const api = field.render ? field.render(slot, { field, host: root }) || {} : {};
-            return { node: slot, get: api.get || (() => undefined), set: api.set || (() => {}), focus: () => (slot.querySelector('input, select, textarea, button') || slot).focus?.(), disable: on => { api.disable?.(on); for (const e of slot.querySelectorAll('input, select, textarea, button')) e.disabled = on; }, onChange: api.onChange, custom: true };
+            return { node: slot, get: api.get || (() => undefined), set: api.set || (() => {}), focus: api.focus || (() => (slot.querySelector('input, select, textarea, button') || slot).focus?.()), disable: on => { api.disable?.(on); for (const e of slot.querySelectorAll('input, select, textarea, button')) e.disabled = on; }, onChange: api.onChange, invalid: api.invalid, custom: true };
         }
         const input = common(node('input', 'sv-input')); input.id = field.id || `${id}-c`; input.name = field.key;
         input.type = t === 'secret' ? 'password' : t === 'number' ? 'number' : 'text';
@@ -146,8 +147,8 @@ export function mountSettingsView(host, spec) {
         const text = node('div', 'sv-text');
         const label = node('label', 'sv-label', field.label); label.id = field.labelId || `${id}-l`; // labelId: a stable id for the label (a test, an aria-labelledby of the caller)
         const ctl = buildControl(field, id);
-        if (ctl.input && !ctl.group && !ctl.custom) label.htmlFor = ctl.input.id; else if (ctl.group || ctl.custom) { label.removeAttribute('for'); ctl.node.setAttribute('aria-labelledby', `${id}-l`); }
-        if (ctl.labelledBy) { ctl.input.setAttribute('aria-labelledby', `${id}-l`); label.removeAttribute('for'); }
+        if (ctl.input && !ctl.group && !ctl.custom) label.htmlFor = ctl.input.id; else if (ctl.group || ctl.custom) { label.removeAttribute('for'); ctl.node.setAttribute('aria-labelledby', label.id); }
+        if (ctl.labelledBy) { ctl.input.setAttribute('aria-labelledby', label.id); label.removeAttribute('for'); }
         text.append(label);
         if (field.required) text.append(node('span', 'sv-required', 'Required'));
         // the help: one line under the label; a long text behind Learn more; "Applies immediately" for a switch that saves at once
@@ -174,7 +175,7 @@ export function mountSettingsView(host, spec) {
         control.append(ctl.node);
         if (field.unit) {
             const unit = node('span', 'sv-unit', field.unit); unit.id = `${id}-u`; control.append(unit);
-            if (ctl.input && !ctl.group && !ctl.custom && ctl.input.tagName === 'INPUT') ctl.input.setAttribute('aria-labelledby', `${id}-l ${unit.id}`); // the name is the label and the unit ("After minutes idle")
+            if (ctl.input && !ctl.group && !ctl.custom && ctl.input.tagName === 'INPUT') ctl.input.setAttribute('aria-labelledby', `${label.id} ${unit.id}`); // the name is the label and the unit ("After minutes idle")
         }
         let actionEl = null;
         if (field.action) {
@@ -225,7 +226,13 @@ export function mountSettingsView(host, spec) {
     if (flat) {
         root.classList.add('sv-flat'); // rows only (no nav, no bar): folded by the pane's own width
         const body = node('div', 'sv-body');
-        for (const g of groups) for (const field of g.fields || []) { if (!field.key) continue; const rec = buildRow(field, g); fields.set(field.key, rec); body.append(rec.row); }
+        let fold = null; // a heading with fold: true starts a disclosure (closed) that holds the rows after it, up to the next heading: a form's optional part
+        for (const g of groups) for (const field of g.fields || []) {
+            if (!field.key) continue;
+            if (field.type === 'heading' && field.fold) { fold = node('details', 'disclosure sv-fold'); if (field.id) fold.id = field.id; fold.append(node('summary', '', field.label)); folds.push(fold); body.append(fold); continue; }
+            if (field.type === 'heading') fold = null;
+            const rec = buildRow(field, g); fields.set(field.key, rec); (fold || body).append(rec.row);
+        }
         inner.append(body);
     } else {
         shell = node('div', 'settings-shell sv-shell');
@@ -257,7 +264,7 @@ export function mountSettingsView(host, spec) {
         statusEl = node('span', 'sv-status'); statusEl.setAttribute('role', 'status'); statusEl.setAttribute('aria-live', 'polite');
         const buttons = node('div', 'sv-bar-buttons');
         cancelBtn = node('button', 'btn sv-cancel', formSpec.cancel); cancelBtn.type = 'button';
-        saveBtn = node('button', 'btn btn-primary sv-save', formSpec.submit); saveBtn.type = 'button';
+        saveBtn = node('button', 'btn btn-primary sv-save', formSpec.submit); saveBtn.type = 'button'; if (formSpec.submitId) saveBtn.id = formSpec.submitId;
         buttons.append(cancelBtn, saveBtn); bar.append(statusEl, buttons); (formSpec.barHost || inner).append(bar);
         cancelBtn.addEventListener('click', () => view.cancel());
         saveBtn.addEventListener('click', () => { view.submit(); });
@@ -325,11 +332,11 @@ export function mountSettingsView(host, spec) {
     function showError(key, message) {
         const r = fields.get(key);
         if (!r) return;
-        if (!message) { errors.delete(key); r.errorEl.hidden = true; r.errorEl.textContent = ''; const t = r.ctl.input || r.ctl.node; t?.removeAttribute?.('aria-invalid'); describe(r, false); }
+        if (!message) { errors.delete(key); r.errorEl.hidden = true; r.errorEl.textContent = ''; const t = r.ctl.input || r.ctl.node; t?.removeAttribute?.('aria-invalid'); describe(r, false); r.ctl.invalid?.(false); }
         else {
-            const text = new RegExp(r.field.label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(message) ? message : /^is required\b/.test(message) ? `${r.field.label} ${message}` : `${r.field.label}: ${message}`; // the message names the field (a verb phrase reads on from the name: "Label is required.")
+            const text = message === r.field.requiredMessage ? message : new RegExp(r.field.label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(message) ? message : /^is required\b/.test(message) ? `${r.field.label} ${message}` : `${r.field.label}: ${message}`; // the message names the field (a verb phrase reads on from the name: "Label is required.")
             errors.set(key, text); r.errorEl.textContent = text; r.errorEl.hidden = false;
-            const t = r.ctl.input || r.ctl.node; t?.setAttribute?.('aria-invalid', 'true'); describe(r, true);
+            const t = r.ctl.input || r.ctl.node; t?.setAttribute?.('aria-invalid', 'true'); describe(r, true); r.ctl.invalid?.(true);
         }
         if (shell) { const p = r.row.closest('.settings-pane[data-section]'); if (p) markSectionError(shell, p.dataset.section, !!p.querySelector('[aria-invalid="true"]')); }
     }
@@ -345,7 +352,7 @@ export function mountSettingsView(host, spec) {
         if (!r || r.row.hidden) return true;
         const v = r.ctl.get();
         let msg = '';
-        if (r.field.required && (v === '' || v === null || v === undefined || (Array.isArray(v) && !v.length))) msg = 'is required.';
+        if (r.field.required && (v === '' || v === null || v === undefined || (Array.isArray(v) && !v.length))) msg = r.field.requiredMessage || 'is required.'; // requiredMessage: the form's own sentence ("Give the job a name."), shown as it is
         if (!msg && r.field.integer && !r.row.hasAttribute('data-disabled')) { const lo = r.field.min, hi = r.field.max; if (v === null || !Number.isInteger(v) || (lo !== undefined && v < lo) || (hi !== undefined && v > hi)) msg = `use a whole number from ${lo} to ${hi}.`; } // field.integer: a whole number in its limits (a disabled row is not checked)
         if (!msg && r.field.validate && !r.row.hasAttribute('data-disabled')) msg = r.field.validate(v, valuesNow()) || '';
         showError(key, msg);
@@ -368,7 +375,7 @@ export function mountSettingsView(host, spec) {
         validate({ focus = false } = {}) {
             let first = null;
             for (const k of fields.keys()) if (!checkField(k) && !first) first = k;
-            if (first && focus) { const r = fields.get(first); if (shell) { const p = r.row.closest('.settings-pane[data-section]'); if (p && p.hidden) showSection(shell, p.dataset.section); } r.ctl.focus(); }
+            if (first && focus) { const r = fields.get(first); const d = r.row.closest('details.sv-fold'); if (d) d.open = true; if (shell) { const p = r.row.closest('.settings-pane[data-section]'); if (p && p.hidden) showSection(shell, p.dataset.section); } r.ctl.focus(); }
             return { ok: !first, first };
         },
         async save() {
@@ -417,12 +424,17 @@ export function mountSettingsView(host, spec) {
             root.dispatchEvent(new CustomEvent('sv-submitted', { bubbles: true, detail: { values: valuesNow() } }));
             return result;
         },
-        cancel() {
+        reset() { // every field back to what it was loaded as (its default when nothing was loaded), no errors, no line
             for (const [k, r] of fields) if (r.field.apply !== 'now') r.ctl.set(baseline[k] === undefined ? r.field.default : baseline[k]);
             view.clearErrors(); status = null; statusError = false; lastSaved = false;
             afterChange();
+        },
+        cancel() {
+            view.reset();
             const closer = barSpec || formSpec; closer && closer.onCancel && closer.onCancel();
         },
+        focus(key) { const r = fields.get(key); if (!r) return; const d = r.row.closest('details.sv-fold'); if (d) d.open = true; r.ctl.focus(); }, // a field of the caller's choosing (a server refusal names it)
+        fold(open) { for (const d of folds) d.open = !!open; }, // the form's optional part: open or closed
         showGroup(id) { if (shell) { showSection(shell, id); announce(); } },
         removeFields(keys) { for (const k of keys) { const r = fields.get(k); if (r) { r.row.remove(); fields.delete(k); errors.delete(k); } } afterChange(); }, // fields that do not apply (known only after the load): their rows go, with their values
         removeGroup(id) { // a group that does not apply (known only after the load): its nav entry and its pane go

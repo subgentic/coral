@@ -21,6 +21,7 @@ const STUB = `(() => {
     const { Input } = client;
     const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); true`); fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const type = async (sel, text) => { await ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); e.focus(); e.select && e.select(); return true; })()`); await Input.insertText({ text }); };
+    const errorOf = id => `document.getElementById('${id}').closest('.sv-row').querySelector('.sv-error')`;
     const vis = sel => `(() => { const e = document.querySelector(${JSON.stringify(sel)}); return !!e && e.checkVisibility(); })()`; // checkVisibility: a closed disclosure's contents count as not shown
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -38,8 +39,8 @@ const STUB = `(() => {
             assert.equal(await ev(vis('#job-modal-name')), true, at + 'Name');
             assert.equal(await ev(vis('#job-modal-workflow')), true, at + 'Workflow');
             for (const id of ['#job-modal-description', '#job-modal-timezone', '#job-modal-timeout', '#job-modal-cleanup', '#job-modal-cron']) assert.equal(await ev(vis(id)), false, at + id + ' is not on the first screen');
-            const labels = await ev(`[...document.querySelectorAll('#job-modal label.job-field, #job-modal #sched-label')].filter(e => e.checkVisibility()).map(e => e.firstChild.textContent.trim() + '|' + (e.querySelector('.job-required') ? 'req' : ''))`);
-            assert.deepEqual(labels, ['Name|req', 'Workflow|req', 'When|'], at + 'labels, in order, with "(required)" in words: ' + JSON.stringify(labels));
+            const labels = await ev(`[...document.querySelectorAll('#job-form .sv-row')].filter(r => r.checkVisibility()).map(r => r.querySelector('.sv-label').textContent.trim() + '|' + (r.querySelector('.sv-required') ? 'req' : ''))`);
+            assert.deepEqual(labels, ['Type|', 'Name|req', 'Workflow|req', 'When|req'], at + 'labels, in order, with Required in words: ' + JSON.stringify(labels));
             assert.deepEqual(await ev(`[...document.querySelectorAll('.sched-preset')].map(b => b.textContent.trim())`), ['Every hour', 'Every 6 hours', 'Every day at 02:00', 'Mondays at 09:00', 'Custom'], at + 'presets say the time');
             const prev = await ev(`document.getElementById('cron-preview').textContent`);
             assert.match(prev, /^Runs every hour \(UTC\)\. Next: (today|tomorrow) \d\d:\d\d, your time\.$/, at + 'the preview is one sentence: ' + prev);
@@ -90,24 +91,25 @@ const STUB = `(() => {
             assert.equal(await ev(`document.getElementById('job-modal-timeout').value + ' ' + document.getElementById('job-modal-timeout-unit').selectedOptions[0].textContent`), '1 hours', at + 'the default is 1 hour');
             assert.equal(await ev(vis('#job-modal-cleanup')), false, at + 'a workflow job has no cleanup choice');
             await type('#job-modal-timeout', '0');
-            assert.match(await ev(`document.getElementById('job-modal-limit-msg').textContent`), /whole number of one or more/, at + 'zero, in words');
+            assert.match(await ev(`${errorOf('job-modal-limit')}.textContent`), /whole number of one or more/, at + 'zero, in words');
             await ev(`(() => { const u = document.getElementById('job-modal-timeout-unit'); u.value = '1'; u.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
             await type('#job-modal-timeout', '30');
-            assert.match(await ev(`document.getElementById('job-modal-limit-msg').textContent`), /at least 1 minute/, at + '30 seconds, in words');
+            assert.match(await ev(`${errorOf('job-modal-limit')}.textContent`), /at least 1 minute/, at + '30 seconds, in words');
             assert.equal(await ev(`document.getElementById('job-modal-timeout').getAttribute('aria-invalid')`), 'true');
             await type('#job-modal-timeout', '90');
             await ev(`(() => { const u = document.getElementById('job-modal-timeout-unit'); u.value = '60'; u.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
-            assert.equal(await ev(`document.getElementById('job-modal-limit-msg').hidden`), true, at + 'a good limit clears the sentence');
+            assert.equal(await ev(`${errorOf('job-modal-limit')}.hidden`), true, at + 'a good limit clears the sentence');
             await type('#job-modal-timezone', 'Mars/Olympus');
-            await waitFor(`!document.getElementById('job-modal-zone-msg').hidden`, 'the zone sentence', 8000);
-            assert.match(await ev(`document.getElementById('job-modal-zone-msg').textContent`), /"Mars\/Olympus" is not a time zone name\. Use one like UTC or Europe\/Berlin\./, at);
+            await waitFor(`!${errorOf('job-modal-timezone')}.hidden`, 'the zone sentence', 8000);
+            assert.match(await ev(`${errorOf('job-modal-timezone')}.textContent`), /"Mars\/Olympus" is not a time zone name\. Use one like UTC or Europe\/Berlin\./, at);
             await shot(`job-form-options-${w}`);
             await type('#job-modal-timezone', 'Europe/Berlin');
-            await waitFor(`document.getElementById('job-modal-zone-msg').hidden`, 'the zone sentence clears', 8000);
+            await waitFor(`${errorOf('job-modal-timezone')}.hidden`, 'the zone sentence clears', 8000);
 
             // 6. Save: Name and Workflow are asked for in words, then the job goes with its time limit in seconds
             await ev(`document.getElementById('job-modal-submit').click(); true`);
             assert.equal(await ev(`document.activeElement.id`), 'job-modal-name', at + 'Save with no name puts focus on Name');
+            assert.equal(await ev(`document.querySelector('#job-footer .sv-status').textContent`), 'Give the job a name.', at + 'and the line beside the buttons says what is missing');
             await type('#job-modal-name', 'nightly-tests');
             await ev(`document.getElementById('job-modal-submit').click(); true`);
             assert.equal(await ev(`document.activeElement.id`), 'job-modal-workflow', at + 'then on Workflow');
@@ -129,7 +131,7 @@ const STUB = `(() => {
 
             // 8. no workflows yet: the field says so and offers to make one
             await ev(`window.__wf = []; window.showJobModal(); true`);
-            await waitFor(`!document.getElementById('job-modal-no-workflows').hidden`, 'the no-workflow line', 8000);
+            await waitFor(`!!document.getElementById('job-modal-no-workflows') && document.getElementById('job-modal-no-workflows').checkVisibility()`, 'the no-workflow line', 8000);
             assert.match(await ev(`document.getElementById('job-modal-no-workflows').textContent.replace(/\\s+/g, ' ').trim()`), /^No workflows yet\. A job runs a workflow on a schedule\. Create a workflow$/, at);
             await shot(`job-form-no-workflows-${w}`);
             await ev(`document.querySelector('#job-modal-no-workflows button').click(); true`);

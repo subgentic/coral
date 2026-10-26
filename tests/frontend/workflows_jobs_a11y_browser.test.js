@@ -50,7 +50,7 @@ const { DATA_WORLD } = require('./helpers/census_world');
             await waitFor(`!!document.querySelector('#scheduler-detail [data-on-click="job-edit"]')`, `${tag}: job`, 10000);
             await ev(`document.querySelector('#scheduler-detail [data-on-click="job-edit"]').click(); true`);
             await waitFor(`!!document.getElementById('job-modal') && document.getElementById('job-modal').style.display === 'flex'`, `${tag}: the job editor`, 10000);
-            const jsave = () => ev(`import(${S} + 'scheduler.js').then(m => m.saveScheduledJob()).then(() => true)`);
+            const jsave = () => ev(`document.getElementById('job-modal-submit').click(); new Promise(r => setTimeout(r, 150)).then(() => true)`); // sleep-ok: the check and the focus settle
             const choices = await ev(`(() => { const g = id => [...document.querySelectorAll(id)].map(b => b.getAttribute('aria-pressed') + ':' + b.classList.contains('active')); const pk = document.getElementById('sched-picker'); return { presets: g('.sched-preset'), types: g('.job-type-btn'), group: pk.getAttribute('role') + ':' + pk.getAttribute('aria-labelledby'), cronName: document.getElementById('job-modal-cron').closest('label').firstChild.textContent.trim() }; })()`);
             assert.ok(choices.presets.every(x => x.split(':')[0] === x.split(':')[1]) && choices.types.every(x => x.split(':')[0] === x.split(':')[1]), `${tag}: schedule presets and the job type say which is on (${JSON.stringify(choices)})`);
             assert.equal(choices.group, 'group:sched-label', `${tag}: the schedule choices are a named group`);
@@ -66,7 +66,7 @@ const { DATA_WORLD } = require('./helpers/census_world');
             const cron = await ev(`(() => { const c = document.getElementById('cron-preview'); return { role: c.getAttribute('role'), described: (document.getElementById('job-modal-cron').getAttribute('aria-describedby') || '').split(' ').includes('cron-preview') }; })()`);
             assert.equal(cron.role, 'status', `${tag}: the Valid / Invalid cron line is a status`);
             assert.ok(cron.described, `${tag}: the cron field is described by it`);
-            await ev(`import(${S} + 'scheduler.js').then(m => m.hideJobModal()).then(() => true)`);
+            await ev(`import(${S} + 'job_form.js').then(m => m.hideJobModal()).then(() => true)`);
             console.log(`   ✓ ${tag}`);
         }
         console.log('PASS Workflows and Jobs: editor errors said and the field marked, cron status described');
