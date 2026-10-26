@@ -20,7 +20,7 @@ var routeQueries = map[string]string{
 	"GET /api/board/{}/artifacts":                 "board,by,cursor,kept,kind,limit,offset,origin,q,session_id,since,sort,task,until",
 	"GET /api/board/{}/goals":                     "cursor,limit,state",
 	"GET /api/board/{}/messages":                  "all,limit,subscriber_id",
-	"GET /api/board/{}/messages/all":              "after_id,before_id,format,id,limit,offset,task_id",
+	"GET /api/board/{}/messages/all":              "after_id,before_id,for_subscriber,format,id,limit,offset,task_id",
 	"GET /api/board/{}/messages/search":           "cursor,from,limit,mentions,q,since,sort,until",
 	"GET /api/board/{}/status":                    "activity,name,subscriber_id",
 	"GET /api/board/{}/tasks":                     "cursor,full,goal,limit,status",

@@ -119,8 +119,16 @@ func (s *Store) PeekMessages(ctx context.Context, project, subscriberID string, 
 	return s.withAsks(ctx, project, msgs, err)
 }
 
-func (s *Store) readMessages(ctx context.Context, project, subscriberID string, limit int, advance bool, readAll ...bool) ([]Message, error) {
-	// Get subscriber cursor and role info
+// readRule is who gets which message: the one selection coral-board read, a peek and the dashboard's "what this agent would read" list all apply (#8484).
+type readRule struct {
+	subscriberID, jobTitle string
+	lastReadID             int64
+	tagged                 bool // only the messages that explicitly tag the subscriber (or @all): every member but an orchestrator, and not read --all
+	none                   bool // receive mode "none": read delivers nothing
+}
+
+// subscriberReadRule reads the subscriber's cursor, role and receive mode; nil when it is not subscribed (read delivers nothing).
+func (s *Store) subscriberReadRule(ctx context.Context, project, subscriberID string, wantAll bool) *readRule {
 	var sub struct {
 		LastReadID  int64  `db:"last_read_id"`
 		JobTitle    string `db:"job_title"`
@@ -131,20 +139,20 @@ func (s *Store) readMessages(ctx context.Context, project, subscriberID string, 
 		"SELECT last_read_id, job_title, receive_mode, can_peek FROM board_subscribers WHERE project = ? AND subscriber_id = ?",
 		project, subscriberID)
 	if err != nil {
-		return nil, nil // Not subscribed
+		return nil // Not subscribed
 	}
-
-	wantAll := len(readAll) > 0 && readAll[0]
-	isOrch := isOrchestrator(subscriberID, sub.JobTitle, sub.CanPeek)
-	filterTagged := !wantAll && !isOrch
-
-	if !wantAll && sub.ReceiveMode == "none" {
-		return nil, nil
+	return &readRule{
+		subscriberID: subscriberID, jobTitle: sub.JobTitle, lastReadID: sub.LastReadID,
+		tagged: !wantAll && !isOrchestrator(subscriberID, sub.JobTitle, sub.CanPeek),
+		none:   !wantAll && sub.ReceiveMode == "none",
 	}
+}
 
-	var messages []Message
-	if filterTagged {
-		terms := mentionTerms(subscriberID, sub.JobTitle)
+// selectRead is the rule applied: the oldest limit messages above afterID that the subscriber would read, in id order. read passes the subscriber's cursor as afterID;
+// the dashboard's list passes where its page starts.
+func (s *Store) selectRead(ctx context.Context, project string, rule *readRule, afterID int64, limit int) (messages []Message, scanned int64, more bool, err error) {
+	if rule.tagged {
+		terms := mentionTerms(rule.subscriberID, rule.jobTitle)
 		patterns := make([]string, len(terms))
 		for i, t := range terms {
 			patterns[i] = "%" + t + "%"
@@ -154,40 +162,55 @@ func (s *Store) readMessages(ctx context.Context, project, subscriberID string, 
 		if fetchLimit < 50 {
 			fetchLimit = 50
 		}
-		candidates, indexed, err := s.indexedMentionCandidates(ctx, project, subscriberID, sub.LastReadID, terms, fetchLimit)
+		candidates, indexed, err := s.indexedMentionCandidates(ctx, project, rule.subscriberID, afterID, terms, fetchLimit)
 		if err != nil {
-			return nil, err
+			return nil, 0, false, err
 		}
 		if !indexed {
-			if candidates, err = s.likeMentionCandidates(ctx, project, subscriberID, sub.LastReadID, patterns, fetchLimit); err != nil {
-				return nil, err
+			if candidates, err = s.likeMentionCandidates(ctx, project, rule.subscriberID, afterID, patterns, fetchLimit); err != nil {
+				return nil, 0, false, err
 			}
 		}
 
 		numbered := s.numberedNamesCached(ctx, project)
+		more = len(candidates) >= fetchLimit
 		for _, msg := range candidates {
-			if containsExplicitTag(msg.Content, subscriberID, sub.JobTitle, numbered) {
+			scanned = msg.ID
+			if containsExplicitTag(msg.Content, rule.subscriberID, rule.jobTitle, numbered) {
 				messages = append(messages, msg)
 				if len(messages) >= limit {
+					more = true
 					break
 				}
 			}
 		}
-	} else {
-		err = s.reader().SelectContext(ctx, &messages,
-			`SELECT m.id, m.project, m.subscriber_id, m.session_id, m.content, m.target_group_id, m.external_json, m.origin, m.hub_user, m.is_system, m.task_id, m.created_at,
-			        COALESCE(s.job_title, m.subscriber_id, 'Unknown') as job_title
-			 FROM board_messages m
-			 LEFT JOIN board_subscribers s ON m.project = s.project AND m.subscriber_id = s.subscriber_id
-			 WHERE m.project = ? AND m.id > ? AND m.subscriber_id != ?
-			 ORDER BY m.id ASC LIMIT ?`,
-			project, sub.LastReadID, subscriberID, limit)
-		if err != nil {
-			return nil, err
-		}
+		return messages, scanned, more, nil
+	}
+	err = s.reader().SelectContext(ctx, &messages,
+		`SELECT m.id, m.project, m.subscriber_id, m.session_id, m.content, m.target_group_id, m.external_json, m.origin, m.hub_user, m.is_system, m.task_id, m.created_at,
+		        COALESCE(s.job_title, m.subscriber_id, 'Unknown') as job_title
+		 FROM board_messages m
+		 LEFT JOIN board_subscribers s ON m.project = s.project AND m.subscriber_id = s.subscriber_id
+		 WHERE m.project = ? AND m.id > ? AND m.subscriber_id != ?
+		 ORDER BY m.id ASC LIMIT ?`,
+		project, afterID, rule.subscriberID, limit)
+	if n := len(messages); n > 0 {
+		scanned = messages[n-1].ID
+	}
+	return messages, scanned, len(messages) >= limit, err
+}
+
+func (s *Store) readMessages(ctx context.Context, project, subscriberID string, limit int, advance bool, readAll ...bool) ([]Message, error) {
+	rule := s.subscriberReadRule(ctx, project, subscriberID, len(readAll) > 0 && readAll[0])
+	if rule == nil || rule.none {
+		return nil, nil
+	}
+	messages, _, _, err := s.selectRead(ctx, project, rule, rule.lastReadID, limit)
+	if err != nil {
+		return nil, err
 	}
 	// Advance cursor past returned messages and own messages
-	newCursor := sub.LastReadID
+	newCursor := rule.lastReadID
 	if len(messages) > 0 {
 		for _, m := range messages {
 			if m.ID > newCursor {
@@ -203,13 +226,83 @@ func (s *Store) readMessages(ctx context.Context, project, subscriberID string, 
 		newCursor = ownMax
 	}
 
-	if advance && newCursor > sub.LastReadID {
+	if advance && newCursor > rule.lastReadID {
 		s.db.ExecContext(ctx,
 			"UPDATE board_subscribers SET last_read_id = ? WHERE project = ? AND subscriber_id = ?",
 			newCursor, project, subscriberID)
 	}
 
 	return messages, nil
+}
+
+// ForPage is a page of ListMessagesFor: the latest Limit, the Limit before BeforeID, or the first Limit after AfterID (HasAfter: 0 is from the start).
+type ForPage struct {
+	Limit     int
+	BeforeID  int64
+	AfterID   int64
+	HasAfter  bool
+	Scanned   int // the messages selected in all (the board's "total" for this reader)
+	Remaining int // those older than the page
+}
+
+// ListMessagesFor lists what subscriberID's read would deliver, taken from the whole board with no cursor and no side effects (#8484): what an agent's dock shows of its board. It is the
+// same selection as read (selectRead), so the two cannot differ: a test pins the list to a peek. Not subscribed, or a receive mode of "none": nothing, as read.
+func (s *Store) ListMessagesFor(ctx context.Context, project, subscriberID string, page ForPage) ([]Message, ForPage, error) {
+	rule := s.subscriberReadRule(ctx, project, subscriberID, false)
+	if rule == nil || rule.none {
+		return nil, page, nil
+	}
+	const batch = 500
+	var all []Message
+	from := int64(0)
+	for i := 0; i < 400; i++ { // a bound on a board of many thousands of selected messages
+		got, scanned, more, err := s.selectRead(ctx, project, rule, from, batch)
+		if err != nil {
+			return nil, page, err
+		}
+		all = append(all, got...)
+		if !more || scanned <= from {
+			break
+		}
+		from = scanned
+	}
+	page.Scanned = len(all)
+	var out []Message
+	switch {
+	case page.HasAfter:
+		for _, m := range all {
+			if m.ID > page.AfterID {
+				out = append(out, m)
+				if len(out) >= page.Limit {
+					break
+				}
+			}
+		}
+	default:
+		for _, m := range all {
+			if page.BeforeID == 0 || m.ID < page.BeforeID {
+				out = append(out, m)
+			}
+		}
+		if len(out) > page.Limit {
+			out = out[len(out)-page.Limit:]
+		}
+	}
+	anchor := page.BeforeID
+	switch {
+	case len(out) > 0:
+		anchor = out[0].ID
+	case page.HasAfter:
+		anchor = page.AfterID + 1
+	}
+	page.Remaining = 0
+	for _, m := range all {
+		if anchor > 0 && m.ID < anchor {
+			page.Remaining++
+		}
+	}
+	msgs, err := s.withAsks(ctx, project, out, nil)
+	return msgs, page, err
 }
 
 // MarkReadThrough moves a subscriber's read position forward to throughID
