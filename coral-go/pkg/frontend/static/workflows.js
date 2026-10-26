@@ -182,7 +182,7 @@ function showListPage() {
 }
 
 export const { launchWorkflowAgent, editWorkflowWithAgent } = WA;
-export const { showWorkflowCreateModal, hideWorkflowCreateModal, editWorkflow, workflowAddStep, workflowStepTypeChanged, saveWorkflow, checkWorkflowLimit } = WE;
+export const { showWorkflowCreateModal, hideWorkflowCreateModal, editWorkflow, saveWorkflow } = WE;
 WE.initWorkflowEditor({ fetchDetail: id => fetchWorkflowDetail(id), saved: editedId => { fetchWorkflows(); if (editedId) selectWorkflow(editedId); } }); // the names the lazy panel hands the page (app.js)
 
 // ── Workflow list ──────────────────────────────────────────────────────

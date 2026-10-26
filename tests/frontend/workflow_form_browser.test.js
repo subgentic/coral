@@ -1,5 +1,6 @@
-// The New workflow form (#6540 mock, #6578): Name (with the allowed characters beside its label), then Steps with one empty step already showing, numbered from 1; Description, Repository path and
-// Time limit behind "More options"; the limit is a number with a unit. Every control of a step has its own name; errors are in words and on the field. 1280 and 390 px, both themes for contrast.
+// The New workflow form (#6540 mock, #6578; a settings_view in form mode since #8450): Name (Required, the allowed characters under its label), then Steps with one empty step already showing, numbered from 1;
+// Description, Repository path and Time limit behind "More options"; the limit is a number with a unit. Every control of a step has its own name; Create is always on, pressing it focuses the first invalid
+// field and says what is missing, on the field and in the line beside the buttons. 1280 and 390 px, both themes for contrast.
 // The save is stood in at the page's fetch.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -42,18 +43,20 @@ const STUB = `(() => {
             assert.equal(await ev(`document.querySelectorAll('#wf-steps-editor .wf-step-editor-item').length`), 1, at + 'one empty step is already there');
             for (const id of ['#wf-input-desc', '#wf-input-repo', '#wf-input-max-dur']) assert.equal(await ev(vis(id)), false, at + id + ' is behind More options');
             assert.equal(await ev(`document.getElementById('wf-more').open`), false);
-            assert.equal(await ev(`document.querySelector('label[for="wf-input-name"]').textContent.replace(/\\s+/g, ' ').trim()`), 'Name (required)');
-            assert.match(await ev(`document.getElementById('wf-name-help').textContent`), /Letters, numbers, hyphens and underscores/);
-            assert.equal(await ev(`document.getElementById('wf-input-name').getAttribute('aria-describedby')`), 'wf-name-help');
+            assert.deepEqual(await ev(`(() => { const r = document.getElementById('wf-input-name').closest('.sv-row'); return [r.querySelector('.sv-label').textContent.replace('Required', '').trim(), !!r.querySelector('.sv-required'), document.getElementById('wf-input-name').getAttribute('aria-required')]; })()`), ['Name', true, 'true'], at + 'Name says Required');
+            assert.match(await ev(`(() => { const d = document.getElementById('wf-input-name').getAttribute('aria-describedby') || ''; return d.split(' ').map(id => (document.getElementById(id) || {}).textContent || '').join(' '); })()`), /Letters, numbers, hyphens and underscores/, at + 'the allowed characters describe the field');
+            assert.equal(await ev(`document.getElementById('wf-modal-save').disabled`), false, at + 'Create is on with nothing filled in');
             assert.equal(await ev(`document.querySelector('.wf-step-num').textContent`), 'Step 1', at + 'steps are numbered from 1');
             const names = await ev(`[...document.querySelectorAll('#wf-steps-editor .wf-step-editor-item [aria-label]')].map(e => e.getAttribute('aria-label'))`);
             assert.deepEqual(names, ['Step 1 type', 'Step 1 name', 'Remove step 1', 'Step 1 command'], at + 'each control of a step has its own name: ' + JSON.stringify(names));
             // the Name label sits right above its field, and Steps starts within the first screen
-            const gap = await ev(`(() => { const l = document.querySelector('label[for="wf-input-name"]').getBoundingClientRect(), i = document.getElementById('wf-input-name').getBoundingClientRect(); return Math.round(i.top - l.bottom); })()`);
-            assert.ok(gap <= 12, at + 'the field sits right under its label (the hint is below the field): ' + gap);
+            const gap = await ev(`(() => { const r = document.getElementById('wf-input-name').closest('.sv-row'), l = r.querySelector('.sv-label').getBoundingClientRect(), i = document.getElementById('wf-input-name').getBoundingClientRect(); return Math.round(i.top - l.bottom); })()`);
+            assert.ok(gap <= 40, at + 'the field sits under its label (the allowed characters between): ' + gap);
             const stepsTop = await ev(`Math.round(document.getElementById('wf-steps-editor').getBoundingClientRect().top)`);
             assert.ok(stepsTop < h - 200, at + 'the steps start on the first screen: ' + stepsTop);
+            await setTheme(ev, mobile ? 'dark' : 'light'); // the shots: 1280 light, 390 dark
             await shot(`wf-form-${w}`);
+            await setTheme(ev, 'dark');
 
             // 2. contrast, both themes
             for (const theme of ['dark', 'light']) {
@@ -71,35 +74,43 @@ const STUB = `(() => {
                 assert.ok(nameRow.h >= 44, at + "the step's name is a 44 px target: " + nameRow.h);
             }
 
-            // 3. steps: add one, numbered; errors in words, on the field
+            // 3. steps: add one, numbered; Create with a gap focuses the first invalid field, says it on the field and beside the buttons
             await click('.wf-add-step-btn');
             assert.deepEqual(await ev(`[...document.querySelectorAll('.wf-step-num')].map(e => e.textContent)`), ['Step 1', 'Step 2']);
+            const said = () => ev(`(() => { const e = document.querySelector('#wf-form .sv-error:not([hidden])'); return { field: e ? e.textContent : '', role: e && e.getAttribute('role'), line: document.querySelector('#wf-footer .sv-status').textContent }; })()`);
+            await click('#wf-modal-save');
+            let say = await said();
+            assert.equal(await ev(`document.activeElement.id`), 'wf-input-name', at + 'the first gap is the Name, and focus is on it');
+            await setTheme(ev, mobile ? 'dark' : 'light'); await shot(`wf-form-error-${w}`); await setTheme(ev, 'dark');
+            assert.equal(say.field, 'Give the workflow a name.'); assert.equal(say.role, 'alert'); assert.equal(say.line, 'Give the workflow a name.', at + 'the line beside the buttons says it too');
+            assert.equal(await ev(`document.getElementById('wf-input-name').getAttribute('aria-invalid')`), 'true', at + 'and the field is marked');
+            await type('#wf-input-name', 'nightly-build');
             await click('#wf-modal-save');
             assert.equal(await ev(`document.activeElement.classList.contains('wf-step-name-input')`), true, at + 'focus is on the step that needs a name');
-            assert.match(await ev(`document.getElementById('wf-modal-error').textContent`), /^Step 1 needs a name\.$/, at + 'the first gap, in words');
+            say = await said();
+            assert.match(say.field, /^Steps: Step 1 needs a name\.$/, at + 'the first gap, in words (the view names the field before it)'); assert.equal(say.line, say.field);
+            assert.equal(await ev(`document.activeElement.getAttribute('aria-invalid')`), 'true', at + 'the step name is marked');
             await type('.wf-step-editor-item:nth-child(1) .wf-step-name-input', 'Install');
+            assert.equal(await ev(`document.querySelector('.wf-step-editor-item:nth-child(1) .wf-step-name-input').hasAttribute('aria-invalid')`), false, at + 'typing in a marked field clears its mark');
             await click('#wf-modal-save');
-            assert.match(await ev(`document.getElementById('wf-modal-error').textContent`), /^Step 1 \(Install\) needs a command\.$/, at);
+            assert.match((await said()).field, /^Steps: Step 1 \(Install\) needs a command\.$/, at);
             await type('.wf-step-editor-item:nth-child(1) .wf-step-content', 'npm ci');
             await type('.wf-step-editor-item:nth-child(2) .wf-step-name-input', 'Test');
             await type('.wf-step-editor-item:nth-child(2) .wf-step-content', 'npm test');
-            await click('#wf-modal-save');
-            assert.match(await ev(`document.getElementById('wf-modal-error').textContent`), /^Give the workflow a name\.$/, at);
-            assert.equal(await ev(`document.activeElement.id`), 'wf-input-name');
-            await type('#wf-input-name', 'nightly-build');
 
             // 4. More options: the time limit in words
             await click('#wf-more > summary');
             assert.equal(await ev(vis('#wf-input-max-dur')), true);
             assert.equal(await ev(`document.getElementById('wf-input-max-dur').value + ' ' + document.getElementById('wf-input-max-dur-unit').selectedOptions[0].textContent`), '1 hours');
             await type('#wf-input-max-dur', '25');
-            assert.match(await ev(`document.getElementById('wf-limit-msg').textContent`), /at most 24 hours/, at + 'over the ceiling, in words');
+            const limitSays = () => ev(`(() => { const e = document.getElementById('wf-input-max-dur').closest('.sv-row').querySelector('.sv-error'); return { text: e.textContent, hidden: e.hidden }; })()`);
+            assert.match((await limitSays()).text, /at most 24 hours/, at + 'over the ceiling, in words');
             await shot(`wf-form-options-${w}`);
             await type('#wf-input-max-dur', '0');
-            assert.match(await ev(`document.getElementById('wf-limit-msg').textContent`), /whole number of one or more/);
+            assert.match((await limitSays()).text, /whole number of one or more/);
             await type('#wf-input-max-dur', '90');
             await ev(`(() => { const u = document.getElementById('wf-input-max-dur-unit'); u.value = '60'; u.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
-            assert.equal(await ev(`document.getElementById('wf-limit-msg').hidden`), true, at + 'a good limit clears the sentence');
+            assert.equal((await limitSays()).hidden, true, at + 'a good limit clears the sentence');
             await type('#wf-input-desc', 'Build and test');
 
             // 5. Save sends steps and the limit in seconds
