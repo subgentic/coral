@@ -10,14 +10,33 @@ export const SORTS = ['newest', 'oldest', 'name', 'size'];
 export const KIND_LABEL = { image: 'Image', pdf: 'PDF', text: 'Text', other: 'Other' };
 export const ORIGIN_LABEL = { shared: 'Shared here', received: 'Received', unlisted: 'Unlisted' };
 export const SORT_LABEL = { newest: 'Newest', oldest: 'Oldest', name: 'Name', size: 'Size' };
+export const GROUPS = ['task', 'goal'];
+export const GROUP_LABEL = { task: 'Task', goal: 'Goal' };
+// The words a task or goal filter's chip says ("Goal: Ship the installer"): the page notes each task and goal it has seen on an artifact (noteChoices), the chip falls back to the number
+const choiceNames = { task: new Map(), goal: new Map() };
+/** The tasks and goals the artifacts in `items` belong to, remembered for the chips and the Task and Goal selects; returns them, oldest-first by number, as { tasks: [[id, label]], goals: [[id, label]] }. */
+export function noteChoices(items) {
+    for (const a of items) {
+        if (Number(a.task_id) > 0) choiceNames.task.set(String(a.task_id), `#${a.task_id}${a.task_title ? ' ' + a.task_title : ''}`);
+        if (Number(a.goal_id) > 0 && a.goal_title) choiceNames.goal.set(String(a.goal_id), String(a.goal_title));
+    }
+    const list = (m) => [...m].sort((x, y) => Number(x[0]) - Number(y[0]));
+    return { tasks: list(choiceNames.task), goals: list(choiceNames.goal) };
+}
+export const forgetChoices = () => { choiceNames.task.clear(); choiceNames.goal.clear(); };
+// a task or goal number: a positive whole number as text, else nothing
+const numberField = (word, kind) => ({ type: 'custom', empty: '', clean: v => (/^\d{1,9}$/.test(String(v ?? '')) && Number(v) > 0 ? String(Number(v)) : ''), filtered: v => !!v, chip: v => `${word}: ${choiceNames[kind].get(v) || '#' + v}` });
 const model = defineFilters({
     q: { type: 'text', max: 200, chip: v => `Search: ${v}` },
     kind: { type: 'choice', values: KINDS, chip: v => `Type: ${KIND_LABEL[v]}` },
     origin: { type: 'choice', values: ORIGINS, chip: v => `Origin: ${ORIGIN_LABEL[v]}` },
     by: { type: 'text', max: 80, chip: v => `By: ${v}` },
     kept: { type: 'flag', chip: 'Kept' },
+    task: numberField('Task', 'task'),
+    goal: numberField('Goal', 'goal'),
     dates: { type: 'range', from: 'from', to: 'to', chip: (a, b) => (a && b ? `${a} to ${b}` : a ? `From ${a}` : `Until ${b}`) },
     sort: { type: 'order', values: SORTS, default: 'newest' },
+    group: { type: 'order', values: ['', ...GROUPS], default: '' }, // how the list is read (heads by task or goal), not what is in it: never a filter or a chip, kept with the rest
 });
 export const { EMPTY, clean, isFiltered, chips, without } = model;
 
@@ -37,6 +56,8 @@ export function toParams(f) {
     if (c.origin) p.origin = c.origin;
     if (c.by) p.by = c.by;
     if (c.kept) p.kept = 'true';
+    if (c.task) p.task = c.task;
+    if (c.goal) p.goal = c.goal;
     if (c.from) p.since = localMidnight(c.from);
     if (c.to) p.until = localMidnight(c.to, 1);
     p.sort = c.sort;

@@ -52,3 +52,22 @@ export function renderText(host, content, path) {
     if (/\.(?:md|markdown|mdown)$/i.test(path || '')) { host.innerHTML = `<div class="preview-pane-markdown artifact-viewer-markdown">${renderMarkdownStrict(content)}</div>`; highlightCodeIn(host); }
     else host.innerHTML = `<pre class="preview-pane-code artifact-viewer-text"><code>${escapeHtml(content)}</code></pre>`;
 }
+
+/** The group an item is in when a list is grouped by 'task' or 'goal': { key, label }; "#101 Task 2" or the goal's title, and "No task" / "No goal" for the files that have none. */
+export function groupOf(item, by) {
+    if (by === 'goal') return { key: `g${Number(item.goal_id) || 0}`, label: item.goal_id && item.goal_title ? String(item.goal_title) : 'No goal' };
+    return { key: `t${Number(item.task_id) || 0}`, label: Number(item.task_id) ? taskText(item) : 'No task' };
+}
+/** The items with each group's together, the groups in the order they first appear (so the list's own sort still decides which group comes first) and each group's items in their order. */
+export function orderByGroup(items, by) {
+    const groups = new Map();
+    for (const it of items) { const k = groupOf(it, by).key; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(it); }
+    return [...groups.values()].flat();
+}
+/** A group head's words: the group, and how many files it holds once every page is read (a count of the loaded ones would be wrong while more are to come). */
+export function groupHead(item, by, items, complete) {
+    const g = groupOf(item, by);
+    if (!complete) return g;
+    const n = items.filter(x => groupOf(x, by).key === g.key).length;
+    return { key: g.key, label: `${g.label}, ${n} ${n === 1 ? 'file' : 'files'}` };
+}

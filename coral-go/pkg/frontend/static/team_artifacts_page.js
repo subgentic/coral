@@ -14,11 +14,11 @@ let artifactState = DT.tableState();
 const { el } = DT; // lazy modules load the others they need through importOnce, so a failed load is retried
 const { openDetailPane, closeDetailPane, detailKey } = await importOnce('./detail_pane.js');
 const { buildBar } = await importOnce('./team_artifact_bar.js');
-const { loadFilters, saveFilters, toParams, isFiltered, EMPTY } = await importOnce('./team_artifact_filters.js');
+const { loadFilters, saveFilters, toParams, isFiltered, noteChoices, forgetChoices, EMPTY } = await importOnce('./team_artifact_filters.js');
 const { loadPanelOpen, savePanelOpen, buildMoreMenu } = await importOnce('./list_bar.js');
 const { isOwnerLabelRefusal, OWNER_LABEL_TEXT } = await importOnce('./owner_label.js');
 const { readersAllowed, readersBlock } = await importOnce('./artifact_readers.js');
-const { HEX_RE, managedHex, itemKey, isUnverified, readableName, sizeText, typeText, createdText, taskText, linkOfItem, renderText } = await importOnce('./artifact_item.js');
+const { HEX_RE, managedHex, itemKey, isUnverified, readableName, sizeText, typeText, createdText, taskText, linkOfItem, renderText, orderByGroup, groupHead } = await importOnce('./artifact_item.js');
 const linkOf = (item) => linkOfItem(item, { server: server(), project: model.project }); // where the bytes are, for the list this page shows
 
 const PAGE = 100;
@@ -236,8 +236,10 @@ function draw() {
     toolbarRow?.querySelector('.dt-select-toggle')?.remove();
     Toolbar.mountSelection(toolbarRow, null);
     if (model.items.length || artifactState.selected.size) {
+        const by = !model.scope ? model.filters.group : ''; // the team's list read by task or goal: a head per group, its files together (an agent's list is not grouped)
+        const shown = by ? orderByGroup(model.items, by) : model.items;
         const table = DT.dataTable({
-            label: `Artifacts, ${model.items.length}`, bare: !!model.scope, compact: !!model.scope, foldAt: model.scope ? 'fit' : 40, rows: model.items, rowKey: itemKey, current: detailKey(), sortBar: false, state: artifactState, rowName: readableName,
+            label: `Artifacts, ${model.items.length}`, bare: !!model.scope, compact: !!model.scope, foldAt: model.scope ? 'fit' : 40, rows: shown, groupBy: by ? (it) => groupHead(it, by, shown, !model.hasMore) : undefined, rowKey: itemKey, current: detailKey(), sortBar: false, state: artifactState, rowName: readableName,
             selectable: model.scope ? null : { contextKey: model.key, canSelect: item => !!linkOf(item)?.preview, actions: artifactBulkActions(), onChange: keys => Toolbar.mountSelection(toolbarRow, keys.size ? table.bar : null) },
             open: (item, tr) => openArtifact(item, tr.querySelector('.dt-primary')),
             columns: [
@@ -266,6 +268,7 @@ function draw() {
         if (!model.scope && matchMedia('(max-width: 760px)').matches) toolbarRow?.append(table.selectButton);
     }
     if (model.truncated) body.append(el('p', 'goals-note', 'Some older artifacts are not included in this list.'));
+    if (!model.scope) { const seen = noteChoices(model.items); bar.setOptions('task', seen.tasks.map(([id]) => id), Object.fromEntries(seen.tasks)); bar.setOptions('goal', seen.goals.map(([id]) => id), Object.fromEntries(seen.goals)); }
     bar.names([...new Set(model.items.flatMap(i => [i.produced_by, i.sent_by]).filter(n => typeof n === 'string' && n))].sort().slice(0, 50)); // the names on screen, offered in the Uploaded by field
     bar.set(model.filters, model.counts ? model.counts : model.items.length || !model.loading ? { matched: model.items.length, all: model.items.length } : null);
     drawnRows = model.items.length;
@@ -347,6 +350,7 @@ export function showArtifacts(host, project, h = {}, scope = null) {
     const sameKey = key === model.key;
     if (!sameKey) {
         artifactState = DT.tableState();
+        forgetChoices();
         model.controller?.abort();
         Object.assign(model, { project, scope, key, loaded: false, items: [], hasMore: false, cursor: '', counts: null, truncated: false, loading: false, error: '', loadingMore: false, filters: scope && scope.standalone ? { ...EMPTY } : loadFilters(scope ? `${project}::agent::${scope.session}` : project, browserLocal), kept: new Set() });
         bar = null;
