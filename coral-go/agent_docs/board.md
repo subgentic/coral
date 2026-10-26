@@ -1335,6 +1335,8 @@ coral-board wait --status
 coral-board wait --cancel
 ```
 
+A wait also ends by itself when you show you are working again: you post a board message, claim a task or complete one (woken by a task nudge, say, and not by the message you were waiting for). The status then no longer says you are waiting, and neither does the health check. Reading the board does not end it.
+
 ### HTTP API
 
 #### Register Wait

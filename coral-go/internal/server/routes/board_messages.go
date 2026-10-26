@@ -265,6 +265,10 @@ func (h *BoardHandler) postMessageCore(w http.ResponseWriter, r *http.Request, p
 	// A message from an assignee is evidence of progress on its active task.
 	// Keep this separate from task state so posting never completes work.
 	_ = h.bs.TouchActiveTask(r.Context(), project, subscriberID)
+	// An agent that posts is not parked on a wait (#7765): the awaited event is no longer what it is waiting for. Only a member agent's own post (its token), never the Operator's or the Hub's.
+	if _, member := callerActor(r).Member(); member && !cloud.Tunneled(r) {
+		h.endOwnWaits(r.Context(), project, subscriberID)
+	}
 
 	// A claude.ai artifact link in an agent's own post reminds that agent once; in anyone else's it is only recorded as seen (#6583).
 	if h.artifactNudge != nil && !cloud.Tunneled(r) {

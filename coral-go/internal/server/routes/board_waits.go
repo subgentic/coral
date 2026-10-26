@@ -270,3 +270,15 @@ func (h *BoardHandler) ResolveCommitWaits(ctx context.Context, project, commitHa
 		}
 	}
 }
+
+// endOwnWaits ends the registered waits of an agent that is plainly not parked: it posted, claimed a task or completed one (#7765). A wait parks an agent until the thing it waits for happens;
+// an agent woken by anything else (a task nudge, the Operator) and working again would otherwise keep "waiting for a message from the Orchestrator" in the status and the health check until it ran
+// coral-board wait --cancel. An error is only logged: the action itself has happened.
+func (h *BoardHandler) endOwnWaits(ctx context.Context, project, subscriberID string) {
+	if subscriberID == "" {
+		return
+	}
+	if err := h.bs.CancelActiveWait(ctx, project, subscriberID); err != nil {
+		slog.Warn("could not end the waits of an agent that is working", "project", project, "subscriber", subscriberID, "error", err)
+	}
+}

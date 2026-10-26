@@ -59,6 +59,7 @@ func (h *BoardHandler) ClaimTask(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]any{"error": "no available tasks", "blocked_tasks": blocked})
 		return
 	}
+	h.endOwnWaits(r.Context(), project, body.SubscriberID) // it has work in hand: a wait it parked on is over (#7765)
 	// Post board notification asynchronously to avoid DB contention
 	h.goBG(func() {
 		notification := fmt.Sprintf("[Task #%d claimed by %s] %s", task.ID, body.SubscriberID, task.Title)
@@ -118,6 +119,7 @@ func (h *BoardHandler) CompleteTaskByID(w http.ResponseWriter, r *http.Request) 
 		writeJSON(w, http.StatusOK, task)
 		return
 	}
+	h.endOwnWaits(r.Context(), project, body.SubscriberID) // it is working, not parked (#7765)
 	h.afterTaskCompleted(project, body.SubscriberID, task, completionMsg, "")
 	writeTaskVetted(w, task, unverified)
 }

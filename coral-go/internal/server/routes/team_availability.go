@@ -471,7 +471,7 @@ func classifyAvailability(a *availableAgent, s store.LiveSession, online, subscr
 	case s.BoardServer != nil && *s.BoardServer != "":
 		a.Availability = "unknown"
 		a.Reason = "Remote board tasks are not observed locally"
-	case wait != nil:
+	case wait != nil && !(active && state.Working): // an agent with a task in progress that is working is not parked, whatever wait is left from before it was woken (#7765)
 		a.Availability = "waiting"
 		a.WaitingOn = wait
 		a.Reason = waitingReason(wait)
