@@ -71,9 +71,9 @@ const { pinnedBarProbe } = require('./helpers/pinned_bar');
         const sorted = await ev(`(async () => { ${MODS}
             const order = () => [...document.querySelectorAll('#board-task-list [data-on-click="task-open"]')].map(r => r.dataset.taskId).join(',');
             const before = order();
-            document.querySelector('#board-task-list [data-on-click="task-sort"][data-sort="id"]').click();
+            document.querySelector('#board-task-list .dt-sort[data-key="id"]').click();
             const a = order();
-            document.querySelector('#board-task-list [data-on-click="task-sort"][data-sort="id"]').click();
+            document.querySelector('#board-task-list .dt-sort[data-key="id"]').click();
             const b = order();
             const bad = document.createElement('span'); bad.setAttribute('data-on-click', 'task-sort'); bad.dataset.sort = '__proto__'; document.body.appendChild(bad); bad.click(); bad.remove();
             return { before, a, b, after: order() };
