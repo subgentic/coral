@@ -338,6 +338,7 @@ func (s *Store) ListAllTasks(ctx context.Context, limit int) ([]Task, error) {
 // populateTaskDeps batch-loads dependencies for a slice of tasks.
 func (s *Store) populateTaskDeps(ctx context.Context, tasks []Task) {
 	s.hydrateWorkflows(ctx, tasks)
+	s.applyExactArtifactCounts(ctx, tasks)
 	s.loadBlockedBy(ctx, tasks)
 }
 

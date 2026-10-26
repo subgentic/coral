@@ -98,6 +98,8 @@ type BoardHandler struct {
 	clearBoardChatFlags func(ctx context.Context, project string) error
 	// uploads caches per-session upload records for the artifact views.
 	uploads uploadDirCache
+	// taskCounts keeps each board's artifact count per task for a few seconds (taskArtifactCounts, #8591).
+	taskCounts taskCountCache
 	// hubOperatorAllowed reports whether a tunnel request may act as the Operator
 	// (#3404); nil means never.
 	hubOperatorAllowed func(*http.Request) bool
@@ -224,7 +226,7 @@ func (h *BoardHandler) persistTaskArtifact(ctx context.Context, task *board.Task
 }
 
 func NewBoardHandler(bs *board.Store) *BoardHandler {
-	return &BoardHandler{
+	h := &BoardHandler{
 		bs:                            bs,
 		paused:                        make(map[string]bool),
 		sleepPaused:                   make(map[string]bool),
@@ -232,6 +234,10 @@ func NewBoardHandler(bs *board.Store) *BoardHandler {
 		subscriberReminderIntervals:   make(map[string]int),
 		subscriberReminderGenerations: make(map[string]uint64),
 	}
+	if bs != nil {
+		bs.SetTaskArtifactCounter(h.taskArtifactCounts) // the lists say the number the task page's section lists (#8591)
+	}
+	return h
 }
 
 // SetTerminal sets the terminal backend for peek functionality.

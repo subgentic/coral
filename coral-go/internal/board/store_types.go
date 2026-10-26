@@ -73,6 +73,8 @@ type Task struct {
 	// Outcome and ReviewRequested repeat Workflow.Outcome and whether Workflow.CompletionReview is set, where the workflow is read (finishWorkflow), so a full row says them under the names a task list item has.
 	Outcome         string `db:"-" json:"outcome,omitempty"`
 	ReviewRequested bool   `db:"-" json:"review_requested,omitempty"`
+	// ArtifactCount repeats the task list item's artifact_count (#8579, #8591) where the workflow is read (finishWorkflow), so a whole row and a field list say it too.
+	ArtifactCount int `db:"-" json:"artifact_count,omitempty"`
 	// UpdatedAt: when the task last changed (updatedAtSQL), read with the lists that span boards and the board's whole-task list; empty where a task is read otherwise.
 	UpdatedAt string `db:"updated_at" json:"updated_at,omitempty"`
 	// Verification: whether a completed task's "done" is backed by an independent check (#4563); set when the workflow is

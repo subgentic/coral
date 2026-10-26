@@ -13,7 +13,7 @@ func TestTaskQueryFieldAllowlist(t *testing.T) {
 	for k := range taskQueryColumns {
 		got = append(got, k)
 	}
-	got = append(got, "board_label", "verification", "goal_title")
+	got = append(got, "board_label", "verification", "goal_title", "artifact_count")
 	sort.Strings(got)
 	assert.Equal(t, TaskQueryFieldNames(), got)
 	for _, f := range TaskQuerySummaryFields {

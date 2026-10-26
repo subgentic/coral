@@ -149,7 +149,7 @@ func (s *Store) queryTasksText(ctx context.Context, q *TaskQuery) (*TaskQueryRes
 	}
 	s.addGoalTitles(ctx, page, q.Fields)
 	if wantVerification {
-		if err := s.addVerification(ctx, page.res.Tasks, page.vTasks); err != nil {
+		if err := s.addVerification(ctx, page.res.Tasks, page.vTasks, page.boards, q.Fields); err != nil {
 			return nil, err
 		}
 	}

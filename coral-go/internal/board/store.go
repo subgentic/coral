@@ -26,7 +26,8 @@ import (
 type Store struct {
 	db                      *sqlx.DB
 	readDB                  *sqlx.DB
-	sessionsDB              *sqlx.DB // optional reference to the main sessions DB for cross-DB queries
+	sessionsDB              *sqlx.DB                            // optional reference to the main sessions DB for cross-DB queries
+	artifactCounter         atomic.Pointer[TaskArtifactCounter] // the exact artifact counts of a board's tasks (#8591), set by the server; none: the workflow's own
 	completionCheckRunner   CompletionCheckRunner
 	completionChecksEnabled bool
 	unreadCounts            unreadCountCache

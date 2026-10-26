@@ -427,6 +427,7 @@ func finishWorkflow(t *Task, w TaskWorkflow) {
 	t.ReviewRequested = w.CompletionReview != nil
 	t.Verification = verificationOf(t)
 	t.WorkedBy = workedBy(t, w)
+	t.ArtifactCount = countDistinctArtifacts(&w)
 }
 
 // workedBy is who did a task's work: the author a review took it from, else (for a finished task) who completed it, else its assignee. A cancelled task has no completer's work to name: the assignee, as nobody finished it.

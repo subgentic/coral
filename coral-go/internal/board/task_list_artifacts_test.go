@@ -82,3 +82,69 @@ func TestTaskGoalsNamesTheGoalOfTheTasksThatHaveOne(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, other, "another board's task id is not answered")
 }
+
+// #8591: the same count on the rows of the task query (the Inbox and the dock read GET /api/board/tasks): in a field list, and on the whole rows.
+func TestTaskQueryRowsCarryTheArtifactCount(t *testing.T) {
+	e := newVerEnv(t)
+	done := func(name string, arts []TaskArtifact) int64 {
+		task, err := e.s.CreateTask(e.ctx, "team", name, "", "medium", "lead", "worker")
+		require.NoError(t, err)
+		_, err = e.s.ClaimTask(e.ctx, "team", "worker", task.ID)
+		require.NoError(t, err)
+		_, err = e.s.CompleteTaskWithArtifacts(e.ctx, "team", task.ID, "worker", nil, "success", arts)
+		require.NoError(t, err)
+		return task.ID
+	}
+	none := done("no files", nil)
+	three := done("three files", []TaskArtifact{{Name: "a", Content: "1"}, {Name: "b", Content: "2"}, {Name: "c", Content: "3"}})
+
+	query := func(fields ...string) map[int64]map[string]any {
+		res, err := e.s.QueryTasks(e.ctx, &TaskQuery{Boards: []string{"team"}, Fields: fields, Limit: 50})
+		require.NoError(t, err)
+		out := map[int64]map[string]any{}
+		for _, row := range res.Tasks {
+			out[row["id"].(int64)] = row
+		}
+		return out
+	}
+	rows := query("id", "artifact_count")
+	assert.EqualValues(t, 3, rows[three]["artifact_count"])
+	assert.NotContains(t, rows[none], "artifact_count", "none: no key")
+	assert.NotContains(t, rows[three], "verification", "a field that was not asked for is not sent")
+
+	both := query("id", "verification", "artifact_count")
+	assert.EqualValues(t, 3, both[three]["artifact_count"])
+	assert.Contains(t, both[three], "verification", "the verification field still comes with it")
+	assert.NotContains(t, query("id", "verification")[three], "artifact_count", "only when asked for")
+	assert.NotContains(t, query("id", "title")[three], "artifact_count")
+
+	text, err := e.s.QueryTasks(e.ctx, &TaskQuery{Boards: []string{"team"}, Text: "files", Fields: []string{"id", "artifact_count"}, Limit: 50})
+	require.NoError(t, err)
+	require.NotEmpty(t, text.Tasks)
+	for _, row := range text.Tasks {
+		if row["id"].(int64) == three {
+			assert.EqualValues(t, 3, row["artifact_count"], "a search answers it too")
+		}
+	}
+
+	whole, _, err := e.s.QueryTaskRows(e.ctx, &TaskQuery{Boards: []string{"team"}, Limit: 50})
+	require.NoError(t, err)
+	var seen int
+	for _, tk := range whole {
+		switch tk.ID {
+		case three:
+			seen++
+			assert.Equal(t, 3, tk.ArtifactCount)
+			raw, err := json.Marshal(tk)
+			require.NoError(t, err)
+			assert.Contains(t, string(raw), `"artifact_count":3`)
+		case none:
+			seen++
+			assert.Zero(t, tk.ArtifactCount)
+		}
+	}
+	assert.Equal(t, 2, seen)
+
+	_, err = ParseTaskQuery(TaskQueryParams{Fields: []string{"artifact_count", "id"}})
+	assert.NoError(t, err, "a field a caller may name")
+}

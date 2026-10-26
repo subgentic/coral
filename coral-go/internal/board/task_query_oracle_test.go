@@ -73,12 +73,12 @@ func pickVals(rng *rand.Rand, good []string, hostile bool) []string {
 	return out
 }
 
-// oracleFieldNames are the field names the frozen old implementation knew: goal_title (#7345) is new and has its own test, so the old-vs-new oracles
-// do not draw it.
+// oracleFieldNames are the field names the frozen old implementation knew: goal_title (#7345) and artifact_count (#8591) are new and have their own tests, so the old-vs-new oracles
+// do not draw them.
 func oracleFieldNames() []string {
 	var out []string
 	for _, n := range TaskQueryFieldNames() {
-		if n != "goal_title" {
+		if n != "goal_title" && n != "artifact_count" {
 			out = append(out, n)
 		}
 	}

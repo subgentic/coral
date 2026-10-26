@@ -45,7 +45,7 @@ var taskQueryColumns = map[string]string{
 
 // TaskQueryFieldNames lists every field a caller may name (besides the word summary), sorted for the docs and the 400 message.
 func TaskQueryFieldNames() []string {
-	return []string{"assigned_to", "board_id", "board_label", "body", "claimed_at", "completed_at", "completed_by", "completion_message",
+	return []string{"artifact_count", "assigned_to", "board_id", "board_label", "body", "claimed_at", "completed_at", "completed_by", "completion_message",
 		"created_at", "created_by", "goal_id", "goal_title", "id", "parked_reason", "parked_until", "priority", "remind_at", "revision", "status", "title", "updated_at", "verification"}
 }
 
@@ -328,7 +328,7 @@ func parseQueryFields(vals []string) ([]string, error) {
 			}
 			continue
 		}
-		if _, ok := taskQueryColumns[n]; !ok && n != "board_label" && n != "verification" && n != "goal_title" {
+		if _, ok := taskQueryColumns[n]; !ok && n != "board_label" && n != "verification" && n != "goal_title" && n != "artifact_count" {
 			bad = append(bad, n)
 			continue
 		}
@@ -492,7 +492,7 @@ func (s *Store) QueryTasks(ctx context.Context, q *TaskQuery) (*TaskQueryResult,
 	}
 	s.addGoalTitles(ctx, page, q.Fields)
 	if wantVerification {
-		if err := s.addVerification(ctx, page.res.Tasks, page.vTasks); err != nil {
+		if err := s.addVerification(ctx, page.res.Tasks, page.vTasks, page.boards, q.Fields); err != nil {
 			return nil, err
 		}
 	}
@@ -530,13 +530,17 @@ func taskQueryStatement(q *TaskQuery) (stmt string, args []any, wantVerification
 }
 
 // taskQueryColumnList is the columns asked for, each under its field's name, then the hidden ones every page needs
-// (_id, _board, _sort), for verification _status and _completed, and for goal_title _goal. board_label, goal_title and verification are not columns.
+// (_id, _board, _sort), for verification and artifact_count _status and _completed, and for goal_title _goal. board_label, goal_title, verification and artifact_count are not columns.
 func taskQueryColumnList(fields []string, sortExpr string) (cols []string, wantVerification bool) {
 	for _, f := range fields {
 		if f == "board_label" || f == "goal_title" {
 			continue
 		}
 		if f == "verification" {
+			wantVerification = true
+			continue
+		}
+		if f == "artifact_count" { // read from the workflow, as verification is (#8591)
 			wantVerification = true
 			continue
 		}
@@ -770,8 +774,10 @@ func (s *Store) addGoalTitles(ctx context.Context, p *taskQueryPage, fields []st
 	}
 }
 
-// addVerification sets each row's verification state from its stored workflow (vTasks[i] is row i's).
-func (s *Store) addVerification(ctx context.Context, tasks []map[string]any, vTasks []Task) error {
+// addVerification sets what the stored workflow gives each row (vTasks[i] is row i's): its verification state when that was asked for, and its artifact_count (omitted for none, as in the whole rows).
+func (s *Store) addVerification(ctx context.Context, tasks []map[string]any, vTasks []Task, boards []string, fields []string) error {
+	wantState, wantCount := slices.Contains(fields, "verification"), slices.Contains(fields, "artifact_count")
+	exact := map[string]map[int64]int{}
 	ids := make([]int64, len(vTasks))
 	for i := range vTasks {
 		ids[i] = vTasks[i].ID
@@ -789,7 +795,23 @@ func (s *Store) addVerification(ctx context.Context, tasks []map[string]any, vTa
 				state = t.Verification
 			}
 		}
-		tasks[i]["verification"] = state
+		if wantState {
+			tasks[i]["verification"] = state
+		}
+		count := t.ArtifactCount
+		if wantCount && s.artifactCounter.Load() != nil && i < len(boards) { // the exact count, a board at a time
+			counts, seen := exact[boards[i]]
+			if !seen {
+				counts, _ = s.exactArtifactCounts(ctx, boards[i])
+				exact[boards[i]] = counts
+			}
+			if counts != nil {
+				count = counts[t.ID]
+			}
+		}
+		if wantCount && count > 0 {
+			tasks[i]["artifact_count"] = count
+		}
 	}
 	return nil
 }

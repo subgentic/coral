@@ -279,6 +279,20 @@ func fillListReviewers(items []TaskListItem) {
 // fillListArtifactCounts sets ArtifactCount on the items that hold artifact rows: one batched read of their workflows, then each distinct stored object or link counted once, and a
 // piece of inline content once for its place (the task page's list collapses the same way, #8579).
 func (s *Store) fillListArtifactCounts(ctx context.Context, items []TaskListItem) {
+	if s.artifactCounter.Load() != nil { // the exact counts, a board at a time (a list is of one board; a goal's page too)
+		byBoard := map[string]map[int64]int{}
+		for i := range items {
+			counts, seen := byBoard[items[i].BoardID]
+			if !seen {
+				counts, _ = s.exactArtifactCounts(ctx, items[i].BoardID)
+				byBoard[items[i].BoardID] = counts
+			}
+			if counts != nil {
+				items[i].ArtifactCount = counts[items[i].ID]
+			}
+		}
+		return
+	}
 	var ids []int64
 	for i := range items {
 		if items[i].ArtifactRows > 0 {
