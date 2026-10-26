@@ -106,10 +106,13 @@ const DOCK_SPEC = {
 };
 
 
-const TOOLBAR_SPECS = { team: TEAM_SPEC, agent: DOCK_SPEC, 'agent-team': DOCK_SPEC };
+// Inbox tasks belong to the person across teams: no assignee or goal field, and no create action.
+const MINE_SPEC = { ...TEAM_SPEC, idp: 'inbox-tk', chipsElsewhere: false, fields: [SPEC.fields[1], SPEC.fields[3]].map(field => ({ ...field, id: field.id.replace('tk-', 'inbox-tk-') })) };
+
+const TOOLBAR_SPECS = { mine: MINE_SPEC, team: TEAM_SPEC, agent: DOCK_SPEC, 'agent-team': DOCK_SPEC };
 
 /** The Tasks list's search box, Filters panel and chips on the shared list bar, for a scope: onChange(filters) is called with the new, clean filters when the person changes anything (typing after a short pause). The team tab
- *  adds its state pills and chips to the bar's row (team_toolbar.js adopt); the dock puts + Task in the bar's header slot; both end the row with newTaskButton. A scope with no toolbar (a goal's column, the Inbox's own list) throws. */
+ *  adds its state pills and chips to the bar's row (team_toolbar.js adopt); the dock puts + Task in the bar's header slot; both end the row with newTaskButton. A scope with no toolbar (a goal's column) throws. */
 export function tasksToolbar(scope, onChange, hooks = {}) {
     const spec = TOOLBAR_SPECS[scope];
     if (!spec) throw new Error(`tasksToolbar: scope "${scope}" has no toolbar`);
