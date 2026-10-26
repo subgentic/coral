@@ -274,9 +274,13 @@ func (s *Store) ReadSetIDs(ctx context.Context, project, subscriberID string) ([
 	}
 	var read []int64
 	if !rule.none {
-		const batch = 500
+		// The tagged rule reads each batch's candidates in full to apply the rule, so the batch is small (its text is what is held at once); the others' are ids.
+		batch := 100
+		if !rule.tagged {
+			batch = 5000
+		}
 		from := int64(0)
-		for i := 0; i < 400; i++ { // a bound on a board of many thousands of selected messages
+		for i := 0; i < 2000; i++ { // a bound on a board of many thousands of selected messages (200,000 tagged ones)
 			got, scanned, more, err := s.selectReadIDs(ctx, project, rule, from, batch)
 			if err != nil {
 				return nil, err
