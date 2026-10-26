@@ -209,8 +209,6 @@ func (s *Server) newRouteHandlers() *routeHandlers {
 	runTagStore := store.NewSessionStore(s.db)
 	ptymanager.SetRunTagLookup(func(sessionID string) string { return runTagStore.RunTagOf(context.Background(), sessionID) })
 	s.sessHandler = sessHandler
-	// The automated-input gate reads agents' state through it (#3431).
-	sessHandler.InstallAutomatedInputHooks()
 	// Coral's own data folder (wherever --home or CORAL_DATA_DIR put it) is never served by Browse or a file read (#4531).
 	routes.ProtectDataDir(s.cfg.CoralDir())
 	sysHandler := routes.NewSystemHandler(s.db, s.cfg)
@@ -305,8 +303,8 @@ func (s *Server) registerSessions(r *chi.Mux, h *routeHandlers) {
 	r.Post("/api/sessions/live/{name}/keys", sessHandler.Keys)
 	r.Post("/api/sessions/live/{name}/resize", sessHandler.Resize)
 	r.Post("/api/sessions/live/{name}/kill", sessHandler.Kill)
-	r.Get("/api/sessions/live/{name}/held", sessHandler.ListHeld)          // what the gate holds for the agent (#7554)
-	r.Post("/api/sessions/live/{name}/held/send", sessHandler.SendHeldNow) // Send now (#7554)
+	r.Get("/api/sessions/live/{name}/waiting", sessHandler.ListWaiting)          // what waits for the agent: its unread board messages and the last send not typed (#7727)
+	r.Post("/api/sessions/live/{name}/waiting/send", sessHandler.SendWaitingNow) // Send now (#7727)
 	r.Post("/api/sessions/live/{name}/restart", sessHandler.Restart)
 	r.Post("/api/sessions/live/{name}/model", sessHandler.SwitchModel) // the live model and thinking-level switch (#4969)
 	r.Post("/api/sessions/live/{name}/resume", sessHandler.Resume)

@@ -172,12 +172,11 @@ func (n *BoardNotifier) signal() {
 	}
 }
 
-// watchResets forgets what a session was told when its agent's process is replaced: DropHeld discards a
-// nudge held for it, and a nudge typed to the old process is gone with it, yet notified would hold the
-// next nudge back until the reminder window (#6544: a Sleep/Wake lost a held nudge for up to 15 minutes).
+// watchResets forgets what a session was told when its agent's process is replaced: a nudge typed to the old process is gone with it, yet notified would hold the
+// next nudge back until the reminder window (#6544: a Sleep/Wake lost a nudge for up to 15 minutes).
 // The next pass nudges what is still unread. It returns the function that stops watching.
 func (n *BoardNotifier) watchResets() (stop func()) {
-	return ptymanager.OnHeldDropped(func(name, _ string) {
+	return ptymanager.OnSessionForgotten(func(name string) {
 		n.notifiedMu.Lock()
 		delete(n.notified, name)
 		n.notifiedMu.Unlock()
@@ -438,13 +437,6 @@ func (n *BoardNotifier) nudgeAgent(ctx context.Context, pass *notifyPass, a Agen
 		n.notifiedMu.Lock()
 		delete(n.notified, sessName)
 		n.notifiedMu.Unlock()
-		// The agent read what a held nudge for this board announces (a nudge that
-		// arrives mid-turn waits for the turn's end): retire it, so it is never
-		// typed into an agent with nothing to read (#3482).
-		rctx, cancel := context.WithTimeout(ctx, 200*time.Millisecond)
-		key := "board-unread:" + sub.Project
-		ptymanager.TakeHeld(rctx, sessName, "read already", func(k string) bool { return k == key })
-		cancel()
 		return
 	}
 	latestID, err := n.boardStore.LatestUnreadMessageID(ctx, sub.Project, subscriberID)
@@ -575,7 +567,7 @@ func nudgeText(project string, unread int, health bool) string {
 	if health {
 		return fmt.Sprintf("[Coral health check] Team health check for %s: %d unread message%s include a health-monitor summary. Review team status, assignments, progress, and blockers, then run 'coral-board read' to see the authoritative full content.", project, unread, plural)
 	}
-	return fmt.Sprintf("You have %d unread message%s on the message board. Run 'coral-board read' to see them.", unread, plural)
+	return board.NudgeText(unread)
 }
 
 // lacksSubscriber reports whether a session subscribed to the pass's boards is missing from

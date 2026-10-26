@@ -17,7 +17,7 @@ const S = `(window.__coralStatic || '/static/')`;
         await ev(`window.__m.add('rep', 'R', 4, { sleeping: false }); window._coralSetLiveSessions && window._coralSetLiveSessions(Object.values(window.__m.agents).map(a => window.__m.entry(a))); localStorage.setItem('coral-live-view-mode', 'chat'); true`);
         await select('rep');
         await waitFor(`window.__rendered().length >= 4`, 'the chat to render', 15000);
-        await waitFor(`!!document.getElementById('composer-held-notice') && document.getElementById('composer-held-notice').parentElement.getClientRects().length > 0`, 'the composer', 10000);
+        await waitFor(`!!document.getElementById('composer-waiting-notice') && document.getElementById('composer-waiting-notice').parentElement.getClientRects().length > 0`, 'the composer', 10000);
         await watch(ev);
         // two regions JS makes, hidden, in the page before anything happens
         await ev(`(() => { for (const id of ['js-silent', 'js-fixed']) { const el = document.createElement('div'); el.id = id; el.setAttribute('role', 'status'); el.hidden = true; document.body.append(el); } return true; })()`);

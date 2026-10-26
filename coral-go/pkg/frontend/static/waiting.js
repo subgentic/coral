@@ -1,0 +1,122 @@
+/* What waits for an agent (#7727). Coral types an agent's board nudges at once and holds nothing: when a prompt or menu is open, or the input box holds a draft, the text is not typed, and the unread
+ * message stays on the board. The agent view says what is there (the row's board_unread and skipped_send), lists it on request (GET /waiting) and has Send now, the Operator's own action: the server
+ * types the board nudge into the agent's input box whether or not it is in the middle of a turn, and never into a prompt that is open or over a draft. */
+import { registerActions } from './actions.js';
+import { state } from './state.js';
+import { showToast } from './utils.js';
+import { serverFetch, currentServer } from './server_base.js';
+import { responseErrorText } from './server_status.js';
+
+/** A safe non-negative integer from a row's board_unread. */
+export function waitingCount(row) {
+    const n = Number(row && row.board_unread);
+    return Number.isFinite(n) && n > 0 ? Math.min(Math.floor(n), 999) : 0;
+}
+
+/** { why, what } of the row's last skipped send, or null. Strings only: payloads are untrusted. */
+export function skippedOf(row) {
+    const k = row && row.skipped_send;
+    if (!k || typeof k.why !== 'string' || !k.why) return null;
+    return { why: k.why, what: typeof k.what === 'string' ? k.what : '' };
+}
+
+/** The line for the agent view and the row: '' when nothing waits and nothing was skipped. */
+export function waitingText(row) {
+    if (!row || row.sleeping) return '';
+    const n = waitingCount(row), k = skippedOf(row);
+    const unread = n > 0 ? `${n} unread board message${n === 1 ? '' : 's'} for this agent` : '';
+    if (unread && k) return `${unread}. The last send was not typed: ${k.why}`;
+    if (unread) return unread;
+    return k ? `The last automated message was not typed: ${k.why}` : '';
+}
+
+/** What is said after a Send now, from the server's answer. */
+export function sendNowToast(r) {
+    if (r && r.nothing_waiting) return 'No unread board messages wait for this agent.';
+    if (r && r.draft_in_box) return 'There is a draft in the agent\'s input box: nothing was sent. Send or clear it first.';
+    if (r && r.prompt_open) return 'A prompt is open in the agent\'s terminal: nothing was sent into it. Answer it first.';
+    if (r && r.sent) return 'Sent now.';
+    return 'Not sent' + (r && typeof r.why === 'string' && r.why ? ': ' + r.why : '.');
+}
+
+/** The agent view's line, its What waits and Send now buttons, and the list when open. Written only on a change (#5010's budget). */
+export function syncWaitingNotice(row) {
+    const el = document.getElementById('composer-waiting-notice');
+    if (!el) return;
+    const text = waitingText(row), on = text !== '';
+    const t = document.getElementById('composer-waiting-text');
+    if (t && t.textContent !== text) t.textContent = text;
+    if (el.classList.contains('composer-waiting-empty') === on) el.classList.toggle('composer-waiting-empty', !on);
+    for (const b of el.querySelectorAll('button')) if (b.hidden === on) b.hidden = !on;
+    const send = document.getElementById('composer-waiting-send');
+    const canSend = on && waitingCount(row) > 0;
+    if (send && send.hidden === canSend) send.hidden = !canSend;
+    if (!on) closeList();
+}
+
+function closeList() {
+    const d = document.getElementById('composer-waiting-detail'), b = document.getElementById('composer-waiting-list');
+    if (d && !d.hidden) d.hidden = true;
+    if (b && b.getAttribute('aria-expanded') !== 'false') b.setAttribute('aria-expanded', 'false');
+}
+
+const url = (s, tail) => `/api/sessions/live/${encodeURIComponent(s.name)}/waiting${tail}`;
+
+function listNode(r) {
+    const root = document.createElement('div');
+    const ms = Array.isArray(r && r.messages) ? r.messages : [];
+    if (!ms.length) { root.textContent = 'No unread board messages.'; }
+    for (const m of ms) {
+        const d = document.createElement('details');
+        const sum = document.createElement('summary');
+        sum.textContent = `${String(m.sender || '')} · ${String(m.at || '')}`;
+        const p = document.createElement('p');
+        p.className = 'composer-waiting-body';
+        p.textContent = String(m.text || '') + (m.truncated ? ' …' : '');
+        d.append(sum, p);
+        root.append(d);
+    }
+    const k = r && r.skipped;
+    if (k && k.why) {
+        const p = document.createElement('p');
+        p.textContent = `The last automated send (${String(k.what || '')}) was not typed since ${String(k.since || '')}: ${String(k.why)}`;
+        root.append(p);
+    }
+    return root;
+}
+
+async function toggleList() {
+    const s = state.currentSession, d = document.getElementById('composer-waiting-detail'), b = document.getElementById('composer-waiting-list');
+    if (!s || !d || !b) return;
+    if (!d.hidden) { closeList(); return; }
+    try {
+        const resp = await serverFetch(currentServer(), url(s, `?agent_type=${encodeURIComponent(s.agent_type)}&session_id=${encodeURIComponent(s.session_id)}`));
+        if (!resp.ok) { showToast(await responseErrorText(resp, currentServer(), `The list could not be read (HTTP ${resp.status}).`)); return; }
+        d.replaceChildren(listNode(await resp.json()));
+        d.hidden = false;
+        b.setAttribute('aria-expanded', 'true');
+    } catch (e) {
+        showToast('The list could not be read: ' + (e && e.message ? e.message : 'the server did not answer.'));
+    }
+}
+
+let busy = false;
+
+async function sendNow() {
+    const s = state.currentSession;
+    if (!s || busy) return;
+    busy = true;
+    try {
+        const resp = await serverFetch(currentServer(), url(s, '/send'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ agent_type: s.agent_type, session_id: s.session_id }),
+        });
+        if (!resp.ok) { showToast(await responseErrorText(resp, currentServer(), `Not sent (HTTP ${resp.status}).`)); return; }
+        showToast(sendNowToast(await resp.json()));
+    } catch (e) {
+        showToast('Not sent: ' + (e && e.message ? e.message : 'the server did not answer.'));
+    } finally { busy = false; }
+}
+
+registerActions({ 'waiting-toggle': () => toggleList(), 'waiting-send-now': () => sendNow() });

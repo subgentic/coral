@@ -225,7 +225,7 @@ func (p *PTYSessionTerminal) SendQuietLaunchToTarget(ctx context.Context, o term
 }
 
 func (p *PTYSessionTerminal) sendLaunch(_ context.Context, o terminalinput.Origin, target, command string, quiet bool) error {
-	DropHeld(target, "a launch command is typed") // nothing held for the old process is typed into a new one (#3431)
+	ForgetSession(target) // what Coral remembers of the old process is not true of a new one
 	resolved := p.resolveSessionKey(target)
 	if quiet {
 		p.backend.ArmReplayClear(resolved) // the script's clear restarts the replay, this once
@@ -259,7 +259,7 @@ func (p *PTYSessionTerminal) HumanInputSince(name, sessionID string, t time.Time
 }
 
 func (p *PTYSessionTerminal) CreateSession(_ context.Context, name, workDir string) error {
-	DropHeld(name, "a new terminal") // nothing held for the old process is typed into a new one (#3431)
+	ForgetSession(name) // what Coral remembers of the old process is not true of a new one
 	// Parse agent type from session name
 	agentType := "agent"
 	sessionID := name
@@ -271,12 +271,12 @@ func (p *PTYSessionTerminal) CreateSession(_ context.Context, name, workDir stri
 }
 
 func (p *PTYSessionTerminal) KillSession(ctx context.Context, name, agentType, sessionID string) error {
-	DropHeld(name, "killed") // nothing held for the old process is typed into a new one (#3431)
+	ForgetSession(name) // what Coral remembers of the old process is not true of a new one
 	return p.killByAnyKey(ctx, name, agentType, sessionID)
 }
 
 func (p *PTYSessionTerminal) KillSessionOnly(ctx context.Context, name, agentType, sessionID string) error {
-	DropHeld(name, "killed") // nothing held for the old process is typed into a new one (#3431)
+	ForgetSession(name) // what Coral remembers of the old process is not true of a new one
 	return p.killByAnyKey(ctx, name, agentType, sessionID)
 }
 
@@ -302,7 +302,7 @@ func isSessionName(name string) bool {
 }
 
 func (p *PTYSessionTerminal) RestartPane(_ context.Context, target, _ string) error {
-	DropHeld(target, "restarted") // nothing held for the old process is typed into a new one (#3431)
+	ForgetSession(target) // what Coral remembers of the old process is not true of a new one
 	return p.backend.Restart(p.resolveSessionKey(target), "")
 }
 

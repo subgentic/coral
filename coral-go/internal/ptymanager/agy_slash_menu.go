@@ -1,6 +1,7 @@
 package ptymanager
 
 import (
+	at "github.com/subgentic/coral/internal/agenttypes"
 	"regexp"
 	"strings"
 )
@@ -48,3 +49,5 @@ func AgySlashMenuFor(agentType, text, screen string) bool {
 	m := agySlashItemRe.FindStringSubmatch(rest[n-3])
 	return m != nil && m[1] == typed[0] && rest[n-5] == "> "+strings.TrimSpace(text)
 }
+
+func isAgyType(agentType string) bool { return agentType == at.Agy || agentType == at.Antigravity }

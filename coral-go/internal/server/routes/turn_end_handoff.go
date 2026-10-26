@@ -1,11 +1,9 @@
 package routes
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
-	"time"
 
 	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/ptymanager"
@@ -17,10 +15,6 @@ import (
 // an agent with no board, which a person drives, never gets it.
 const TurnEndHandoffSetting = "turn_end_handoff"
 
-// turnEndHandoffWait bounds how long the hand-off waits for a send in progress to the
-// agent before it gives up (and hands nothing off): the agent's Stop hook is waiting.
-const turnEndHandoffWait = 1500 * time.Millisecond
-
 // lastDelivered is when a send with a key was last typed into a session, zero if never
 // (ptymanager); a variable so tests can set it.
 var lastDelivered = ptymanager.LastDelivered
@@ -29,8 +23,7 @@ var lastDelivered = ptymanager.LastDelivered
 // #3475 3A). If the agent has unread board messages, the answer tells the hook to keep
 // the agent going with them: Claude Code continues with the hook's reason and context,
 // so nothing is typed into its terminal and no prompt can be answered by mistake (a turn
-// ends with no request open). The nudges Coral holds for the same messages are retired
-// at the same time (ptymanager.TakeHeld), so they are never typed afterwards.
+// ends with no request open).
 //
 // Only the agent's own hook may call it (its session token, in every mode), once per
 // stop chain (stop_hook_active: Claude's own guard against a hook that always blocks).
@@ -81,20 +74,11 @@ func (h *SessionsHandler) TurnEndHandoff(w http.ResponseWriter, r *http.Request)
 			return
 		}
 	}
-	waitCtx, cancel := context.WithTimeout(ctx, turnEndHandoffWait)
-	defer cancel()
-	taken, ok := ptymanager.TakeHeld(waitCtx, owner.SessionName, "handed off", func(key string) bool { return key == nudgeKey })
-	if !ok {
-		// A send to the agent was in progress and didn't finish in time: the nudge is
-		// about to be typed anyway, so no hand-off (it would be a second copy).
-		writeJSON(w, http.StatusOK, none)
-		return
-	}
 	plural := "s"
 	if unread == 1 {
 		plural = ""
 	}
-	slog.Info("turn-end hand-off: the agent goes on with its board messages", "session", owner.SessionName, "board", board, "unread", unread, "retired_nudges", len(taken))
+	slog.Info("turn-end hand-off: the agent goes on with its board messages", "session", owner.SessionName, "board", board, "unread", unread)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"handoff": true,
 		// Claude shows the reason as "Stop hook error: <reason>" whatever it says

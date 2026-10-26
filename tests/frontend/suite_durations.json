@@ -406,7 +406,6 @@
  "actions_modals_browser.test.js": 0.3,
  "chat_render_guard_browser.test.js": 0.3,
  "feed_field_diff_browser.test.js": 0.3,
- "gate_held_indicator_browser.test.js": 0.3,
  "lists_stale_save_browser.test.js": 0.3,
  "startup_sequence_golden_browser.test.js": 0.3,
  "task_status_hover.test.js": 0.3,

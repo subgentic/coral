@@ -23,8 +23,8 @@ func TestExitMemosForgottenAtSessionEnd(t *testing.T) {
 		terminalLogged.Store("terminal-4057-bg-"+fmt.Sprint(i), true)
 	}
 	for i := 0; i < 50; i++ {
-		ptymanager.DropHeld(fmt.Sprintf("claude-4057-bg-%d", i), "killed")
-		ptymanager.DropHeld("terminal-4057-bg-"+fmt.Sprint(i), "killed")
+		ptymanager.ForgetSession(fmt.Sprintf("claude-4057-bg-%d", i))
+		ptymanager.ForgetSession("terminal-4057-bg-" + fmt.Sprint(i))
 	}
 	if size(&exitLogged) != startExit || size(&terminalLogged) != startTerm {
 		t.Fatalf("after the sessions ended: exitLogged %d (want %d), terminalLogged %d (want %d)",

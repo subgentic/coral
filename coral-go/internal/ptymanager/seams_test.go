@@ -8,8 +8,7 @@ import (
 )
 
 // setWaits replaces the gate's and the prompt's waits for the test: f edits a copy of the ones in force, and the cleanup puts them back.
-// Race-free against a goroutine an earlier test left running (see waitTimings). The gate's retry loop is stopped before they are put
-// back, so the loop of this test does not outlive its timings into the next test.
+// Race-free against a goroutine an earlier test left running (see waitTimings).
 func setWaits(t *testing.T, f func(w *waitTimings)) {
 	t.Helper()
 	old := waitsP.Load()
@@ -17,20 +16,16 @@ func setWaits(t *testing.T, f func(w *waitTimings)) {
 	f(&n)
 	waitsP.Store(&n)
 	t.Cleanup(func() {
-		StopGate(5 * time.Second)
 		waitsP.Store(old)
 	})
 }
 
-// setNow replaces the gate's clock for the test (the cleanup puts the old one back, after the retry loop is stopped).
+// setNow replaces the gate's clock for the test (the cleanup puts the old one back).
 func setNow(t *testing.T, g *inputGate, f func() time.Time) {
 	t.Helper()
 	old := g.nowFn.Load()
 	g.nowFn.Store(&f)
 	t.Cleanup(func() {
-		if g == gate {
-			StopGate(5 * time.Second)
-		}
 		g.nowFn.Store(old)
 	})
 }

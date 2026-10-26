@@ -93,7 +93,6 @@ GET /api/sessions/live/{name}/file-content | unbound
 GET /api/sessions/live/{name}/file-original | unbound
 GET /api/sessions/live/{name}/files | unbound
 GET /api/sessions/live/{name}/git | unbound
-GET /api/sessions/live/{name}/held | unbound | operator-only
 GET /api/sessions/live/{name}/history/context | token-bound
 GET /api/sessions/live/{name}/history/search | token-bound
 GET /api/sessions/live/{name}/info | unbound
@@ -106,6 +105,7 @@ GET /api/sessions/live/{name}/search-files | unbound
 GET /api/sessions/live/{name}/subagents | unbound
 GET /api/sessions/live/{name}/subagents/{subagentID} | unbound
 GET /api/sessions/live/{name}/tasks | unbound
+GET /api/sessions/live/{name}/waiting | unbound | operator-only
 GET /api/sessions/resolve | unbound
 GET /api/sessions/{sessionID}/changes | unbound
 GET /api/sessions/{sessionID}/changes.diff | unbound
@@ -196,7 +196,6 @@ POST /api/sessions/live/{name}/context-window | token-bound
 POST /api/sessions/live/{name}/events | token-session
 POST /api/sessions/live/{name}/files/refresh | unbound
 POST /api/sessions/live/{name}/goal | unbound | operator-only
-POST /api/sessions/live/{name}/held/send | unbound | operator-only
 POST /api/sessions/live/{name}/keys | unbound | operator-only
 POST /api/sessions/live/{name}/kill | unbound | operator-only
 POST /api/sessions/live/{name}/model | unbound | operator-only
@@ -211,6 +210,7 @@ POST /api/sessions/live/{name}/tasks | token-bound
 POST /api/sessions/live/{name}/tasks/reorder | token-bound
 POST /api/sessions/live/{name}/token-usage | token-bound
 POST /api/sessions/live/{name}/turn-end | token-session
+POST /api/sessions/live/{name}/waiting/send | unbound | operator-only
 POST /api/sessions/live/{sessionID}/archive | unbound | operator-only
 POST /api/sessions/live/{sessionID}/refresh-hooks | unbound | operator-only
 POST /api/sessions/live/{sessionID}/sleep | unbound | operator-only

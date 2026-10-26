@@ -28,6 +28,9 @@ type waitTimings struct {
 	promptSubmitDelay time.Duration
 	// rawKeyGap separates the keys of one /keys request.
 	rawKeyGap time.Duration
+	// launchWait, launchFallback and launchEvery: how long a RequireInputBox send waits in all (an open prompt or a blank screen), how long for an agent whose input
+	// box Coral does not recognise, and how often it looks again.
+	launchWait, launchFallback, launchEvery time.Duration
 }
 
 var waitsP atomic.Pointer[waitTimings]
@@ -43,6 +46,9 @@ func init() {
 		surveyRetryGap:        30 * time.Second,
 		promptSubmitDelay:     150 * time.Millisecond,
 		rawKeyGap:             100 * time.Millisecond,
+		launchWait:            15 * time.Minute,
+		launchFallback:        2 * time.Minute,
+		launchEvery:           time.Second,
 	})
 }
 

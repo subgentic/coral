@@ -10,7 +10,7 @@ import { isStaleSession, staleReason, serversShown } from './server_status.js';
 import { sessionServer, keyLabel, sessionTeamKey } from './server_base.js';
 import { redrawLiveList } from './list_hooks.js';
 import { state } from './state.js';
-import { heldNotice } from './held_inputs.js';
+import { skippedOf } from './waiting.js';
 import { modelName, providerName, sessionLevel, typeName } from './model_labels.js';
 import { terminalGoneChip } from './terminal_gone.js';
 import { hooksMissingChip } from './hooks_missing.js';
@@ -306,8 +306,8 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
     // The unread count on agent rows was not useful to users, so no chip is rendered.
     void unreadCount;
     const unreadChip = '';
-    const held = heldNotice(s); // automated messages held for over a minute (#6473)
-    const heldLine = held ? `<div class="session-held-line" title="${escapeAttr(held.text)}">${escapeHtml(held.text)}</div>` : '';
+    const skipped = s.sleeping ? null : skippedOf(s); // the last automated message Coral did not type (#7727)
+    const heldLine = skipped ? `<div class="session-held-line" title="${escapeAttr(skipped.why)}">Not typed: ${escapeHtml(skipped.why)}</div>` : '';
     const kebabMenuContent = _rowMenuContent(s, sid);
     // The menu's items (about 50 elements a row) are drawn when it opens (#4611): the row holds an empty menu and this module the text for it.
     rememberRowMenu(s, kebabMenuContent);

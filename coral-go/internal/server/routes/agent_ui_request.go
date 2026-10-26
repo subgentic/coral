@@ -208,9 +208,9 @@ func (h *SessionsHandler) agentUIRequest(w http.ResponseWriter, r *http.Request)
 		Term: h.terminal, Name: terminalName, AgentType: ls.AgentType, SessionID: ls.SessionID,
 		Key: "ui-request:" + body.RequestID, Text: notification, What: "agent UI request notification", Send: send,
 	})
-	if delivery == ptymanager.Held {
-		writeJSON(w, http.StatusAccepted, map[string]any{"ok": true, "delivered": false, "held": true, "recorded": true, "request_id": body.RequestID, "panel_id": panelID, "session_id": sid,
-			"note": "the agent is waiting on a prompt for the user; the request is delivered once that prompt is answered"})
+	if delivery == ptymanager.Skipped {
+		writeJSON(w, http.StatusAccepted, map[string]any{"ok": true, "delivered": false, "skipped": true, "recorded": true, "request_id": body.RequestID, "panel_id": panelID, "session_id": sid,
+			"note": "the request is recorded but nothing was typed to the agent: " + skippedWhy(terminalName) + "; send it again once that is over"})
 		return
 	}
 	sendErr = err

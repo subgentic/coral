@@ -1,7 +1,6 @@
 package ptymanager
 
 import (
-	"context"
 	"strings"
 	"testing"
 	"time"
@@ -55,97 +54,4 @@ func TestAgyQuotaOnTheLiveScreen(t *testing.T) {
 		}
 		assert.False(t, ok, name)
 	}
-}
-
-func TestAgySurveyIsOnlyThingOnScreen(t *testing.T) {
-	assert.True(t, agySurveyOnlyOnScreen(agyQuotaScreen), "the live screen: the survey is the last block")
-
-	// A draft in the input box: a digit would join it.
-	draft := strings.Replace(agyQuotaScreen, "\n? for shortcuts", "\n> deploy the fix to staging\n? for shortcuts", 1)
-	assert.False(t, agySurveyOnlyOnScreen(draft), "a person's draft")
-	empty := strings.Replace(agyQuotaScreen, "\n? for shortcuts", "\n> \n? for shortcuts", 1)
-	assert.True(t, agySurveyOnlyOnScreen(empty), "an empty box under the survey")
-
-	for name, s := range map[string]string{
-		"text under it":  strings.Replace(agyQuotaScreen, "\n? for shortcuts", "\nthe agent is writing\n? for shortcuts", 1),
-		"no question":    strings.Replace(agyQuotaScreen, " How's the CLI experience so far? Help us improve:\n", "", 1),
-		"other choices":  strings.Replace(agyQuotaScreen, "[1] Good  [2] Fine  [3] Bad  [0] Skip", "[1] Yes  [2] No  [0] Skip", 1),
-		"a permission":   "Allow this command?\n [1] Yes  [2] No  [0] Skip\n\n? for shortcuts\n",
-		"quoted, above":  agyQuotaScreen + strings.Repeat("later output\n", 6),
-		"claude survey":  "● How is Claude doing this session? (optional)\n  1: Bad    2: Fine   3: Good   0: Dismiss\n\n",
-		"just the quota": "⚠ Individual quota reached.\nError ID: x\n\n? for shortcuts\n",
-	} {
-		assert.False(t, agySurveyOnlyOnScreen(s), name)
-	}
-}
-
-// agyTerm shows agy's survey screen until a 0 is pressed, then an idle screen; keys and pastes are recorded.
-type agyTerm struct {
-	*surveyTerm
-	box string // what the screen's input box holds, if it draws one
-}
-
-func (a *agyTerm) AgentScreen(context.Context, string, string, string) (string, error) {
-	a.dialogTerm.mu.Lock()
-	defer a.dialogTerm.mu.Unlock()
-	if a.dialogTerm.dialog {
-		s := agyQuotaScreen
-		if a.box != "" {
-			s = strings.Replace(s, "\n? for shortcuts", "\n> "+a.box+"\n? for shortcuts", 1)
-		}
-		return s, nil
-	}
-	return "● Done.\n\n> \n", nil // the survey gone: a plain box (agy's own idle footer is not asserted here, no capture of it exists)
-}
-
-func agyInput(term *agyTerm, name, text string) AutomatedInput {
-	in := dialogInput(term.dialogTerm, name, "k", text, false)
-	in.Term = term
-	in.AgentType = "agy"
-	return in
-}
-
-// agy's survey is dismissed like Claude's (#5229): one 0, never 1, 2 or 3, and the held nudge goes in only after it is gone.
-func TestAgySurveyIsDismissedWithZeroThenTheNudgeIsDelivered(t *testing.T) {
-	surveyGate(t, time.Hour)
-	term := &agyTerm{surveyTerm: newSurveyTerm(true, false)}
-	name := uniqueName("agy-survey-dismiss")
-	t.Cleanup(func() { DropHeld(name, "test"); waitHeldLoopEnd(t) })
-	text := "2 unread messages on the message board."
-	_, _ = DeliverAutomated(context.Background(), agyInput(term, name, text))
-	waitFor(t, "the nudge is typed after the survey is gone", func() bool {
-		for _, e := range term.log() {
-			if e == "paste:"+text {
-				return true
-			}
-		}
-		return false
-	})
-	assert.Equal(t, []string{"0"}, term.keys(), "one 0, never a rating")
-	log := term.log()
-	require.GreaterOrEqual(t, len(log), 2)
-	assert.Equal(t, "key:0", log[0], "the 0 came before the nudge")
-}
-
-// A person's draft in the box: nothing is sent into it.
-func TestAgySurveyIsLeftAloneOverADraft(t *testing.T) {
-	surveyGate(t, time.Hour)
-	term := &agyTerm{surveyTerm: newSurveyTerm(true, false), box: "deploy the fix"}
-	name := uniqueName("agy-survey-draft")
-	t.Cleanup(func() { DropHeld(name, "test"); waitHeldLoopEnd(t) })
-	_, _ = DeliverAutomated(context.Background(), agyInput(term, name, "a nudge"))
-	time.Sleep(200 * time.Millisecond)
-	assert.Empty(t, term.keys(), "no key into a draft")
-}
-
-// waitHeldLoopEnd waits for the gate's retry loop to end after the last held send was dropped. DropHeld does not wait for it: a loop still in the middle of a retry reads the
-// paste timings (pasteAndEnter) while the gate's own cleanup puts them back, which the race detector reports (#5229). Registered after the gate helper, so it runs before the
-// helper's cleanup.
-func waitHeldLoopEnd(t *testing.T) {
-	t.Helper()
-	require.Eventually(t, func() bool {
-		gate.mu.Lock()
-		defer gate.mu.Unlock()
-		return !gate.running
-	}, 5*time.Second, 5*time.Millisecond, "the gate's loop ends once nothing is held")
 }

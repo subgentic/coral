@@ -47,6 +47,5 @@ func TestMain(m *testing.M) {
 	// Enter (production keeps it for agent TUIs).
 	tmux.SetSendKeysSettleForTest(20 * time.Millisecond)
 	code := m.Run()
-	StopGate(10 * time.Second)    // the gate's retry loop, asleep after a held send
 	os.Exit(testleak.Check(code)) // no goroutine left running (#4167)
 }

@@ -181,9 +181,10 @@ func (h *SessionsHandler) sendAutomatedHTTP(w http.ResponseWriter, r *http.Reque
 		writeTerminalError(w, err)
 		return true
 	}
-	if delivery == ptymanager.Held {
-		writeJSON(w, http.StatusAccepted, map[string]any{"ok": true, "held": true,
-			"note": "the agent is waiting on a prompt for the user; this input is typed once that prompt is answered"})
+	if delivery == ptymanager.Skipped {
+		// Nothing was typed (a prompt or menu is open, the input box holds a person's text, or the screen could not be read): the caller is told, and nothing is kept.
+		writeJSON(w, http.StatusAccepted, map[string]any{"ok": true, "skipped": true,
+			"note": "nothing was typed: " + skippedWhy(name)})
 		return true
 	}
 	return false

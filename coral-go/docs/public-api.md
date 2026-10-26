@@ -104,25 +104,23 @@ Content-Type: application/json
 {"input": "your command here"}
 ```
 
-#### Held messages, and Send now
+#### What waits for an agent, and Send now
 ```
-GET /api/sessions/live/{name}/held?agent_type=claude&session_id=uuid
-POST /api/sessions/live/{name}/held/send
+GET /api/sessions/live/{name}/waiting?agent_type=claude&session_id=uuid
+POST /api/sessions/live/{name}/waiting/send
 Content-Type: application/json
 
-{"agent_type": "claude", "session_id": "uuid", "id": ""}
+{"agent_type": "claude", "session_id": "uuid"}
 ```
-Coral holds an agent's automated messages (board nudges and messages) while it judges the agent busy,
-asking or drafting. The GET lists what is held: `{"held": [{"id", "what", "since", "reason"}]}` (who sent
-it, since when and why it waits; never the text; `reason` is one of `turn`, `prompt`, `dialog`, `draft`,
-`box`, `other`). The POST types the held message named by `id`, or all of them when `id` is empty, at once:
-the agent may be in the middle of a turn, and the text goes into its input box. The answer is
-`{"ok": true, "sent": n, "held_again": n, "dropped": n, "left": n}`; a message goes once, so a second call finds
-nothing, and one the normal release took first is not typed again. A prompt or menu that is open on the
-agent's terminal holds everything (`"prompt_open": true`, nothing typed), and so does text in the agent's input box that is not
-Coral's, a draft (`"draft_in_box": true`). Nothing else holds it: it is typed even when Coral cannot see the input box. Both routes are the Operator's:
-an agent's token gets 403 `forbidden_for_agent`, and they are never reachable through Coral Hub. The same from
-the command line: `coral-board held "<agent>"` and `coral-board held send "<agent>" [--id ID]`.
+Coral types an agent's automated messages (board nudges and messages) at once and holds nothing: when a prompt or menu is open,
+or the input box holds a draft, or the screen cannot be read, nothing is typed and the board message stays unread. The GET lists
+what waits: `{"board", "unread", "messages": [{"id", "sender", "at", "text", "truncated"}], "skipped": {"why", "what", "at", "since"} | null}`
+(the agent's unread board messages, and the last automated send that was not typed, with the reason). The same `skipped` object is
+the live-session row's `skipped_send`. The POST types the board nudge now, a person's own action: it answers
+`{"ok": true, "sent": true}`, or `"sent": false` with `"prompt_open": true` (a prompt or menu is open, nothing typed), `"draft_in_box": true`
+(text in the box that is not Coral's) or `"nothing_waiting": true`. Both routes are the Operator's: an agent's token gets 403
+`forbidden_for_agent`, and they are never reachable through Coral Hub. The same from the command line: `coral-board waiting "<agent>"`
+and `coral-board waiting send "<agent>"`.
 
 #### Kill a session
 ```

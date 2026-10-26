@@ -2,7 +2,7 @@ package ptymanager
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"strings"
 	"sync"
 	"testing"
@@ -14,22 +14,59 @@ import (
 	"github.com/subgentic/coral/internal/tmux"
 )
 
+// Automated input (#7727): one look at the screen, then the text and its Enter at once, or nothing and nothing kept.
+
 const (
+	// A Yes-highlighted permission frame: Enter takes "Yes".
 	permissionMenu = " Do you want to proceed?\n ❯ 1. Yes\n   2. Yes, and don't ask again\n   3. No\n\n Esc to cancel · Tab to amend\n"
-	idleInputBox   = "⏺ Done.\n\n╭────────╮\n│ >      │\n╰────────╯\n  ? for shortcuts\n"
+	idleInputBox   = "⏺ Done.\n\n──────────────────────────────────────────\n❯ \n──────────────────────────────────────────\n  ? for shortcuts\n"
+
+	// The DevOps Engineer's terminal on 2026-10-26 (#7727), names scrubbed: the turn is over, one background shell runs, and the box is empty. Held for ten minutes by the old rules.
+	claudeIdleWithShell = "⏺ Noted: batch 3 so far is the three commits. I'll apply it on batch 2's head once batch 2 lands.\n\n" +
+		"✻ Cogitated for 4s · done 5:38 PM · 1 shell still running\n\n" +
+		"──────────────────────────────────────────────────────────────────────────\n" +
+		"❯ \n" +
+		"──────────────────────────────────────────────────────────────────────────\n" +
+		"  ⏵⏵ bypass permissions on · 1 shell · ↓ to manage\n" +
+		"                                  ✔ Update installed · Restart to update\n"
+
+	// UI Accessibility's, the same night: a monitor in the footer, and "Read the board" typed in the box with no Enter.
+	claudeMonitorWithText = "✻ Crunched for 53s · done 5:45 PM · 1 monitor still running\n\n" +
+		"────────────────────────────────────────────────────────────────────────────────────\n" +
+		"❯ Read the board\n" +
+		"────────────────────────────────────────────────────────────────────────────────────\n" +
+		"  ⏵⏵ bypass permissions on · 1 monitor · ↓ to manage\n" +
+		"                                            ✔ Update installed · Restart to update\n"
+
+	// Claude mid-turn: a working line above an empty box, the footer saying what the keys do.
+	claudeMidTurn = "⏺ Bash(go test ./...)\n  ⎿  Running…\n\n✻ Thinking… (12s · esc to interrupt)\n\n" +
+		"──────────────────────────────────────────────────────────────────────\n" +
+		"❯ \n" +
+		"──────────────────────────────────────────────────────────────────────\n" +
+		"  ⏵⏵ bypass permissions on · ↓ to manage\n"
+
+	trustDialog = " Do you trust the files in this folder?\n\n /work/project\n\n ❯ 1. Yes, proceed\n   2. No, exit\n\n Enter to confirm · Esc to exit\n"
 )
 
-// fakeAgent is a terminal whose screen the test sets, recording what is typed.
+// fakeAgent is a terminal whose screen the test sets, recording what is typed and the Enters pressed.
 type fakeAgent struct {
-	mu     sync.Mutex
-	screen string
-	typed  []string
+	mu      sync.Mutex
+	screen  string
+	readErr error
+	typed   []string
+	enters  int
 }
 
 func (f *fakeAgent) AgentScreen(context.Context, string, string, string) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return f.screen, nil
+	return f.screen, f.readErr
+}
+func (f *fakeAgent) SendEnter(context.Context, string, string, string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.enters++
+	return nil
 }
 func (f *fakeAgent) show(s string) { f.mu.Lock(); f.screen = s; f.mu.Unlock() }
 func (f *fakeAgent) sent() []string {
@@ -42,454 +79,240 @@ func (f *fakeAgent) input(name, key, text string, requireBox bool) AutomatedInpu
 		Send: func(context.Context) error {
 			f.mu.Lock()
 			defer f.mu.Unlock()
-			// A send typed into an open menu answers it: the test fails then.
-			if open, _ := PromptOnScreen(f.screen); open {
-				f.typed = append(f.typed, "ANSWERED THE PROMPT WITH: "+text)
-				return nil
-			}
 			f.typed = append(f.typed, text)
 			return nil
 		}}
 }
 
-func fastGate(t *testing.T) {
+func quickLaunchWaits(t *testing.T) {
 	t.Helper()
-	prev := gate.setTimings(gateTimings{tooLong: time.Hour, expiry: 24 * time.Hour, every: 20 * time.Millisecond})
-	t.Cleanup(func() { gate.setTimings(prev); SetNeedsInputFunc(nil); SetHeldTooLongFunc(nil); SetHeldEndedFunc(nil) })
+	setWaits(t, func(w *waitTimings) {
+		w.launchWait, w.launchFallback, w.launchEvery = 400*time.Millisecond, 120*time.Millisecond, 10*time.Millisecond
+	})
 }
 
-// The operator's report (#3431): a board message, a task notification and a
-// nudge arrive while the agent shows a permission menu. Nothing is typed (the
-// menu stays open, no option chosen); once the menu is answered each is typed
-// exactly once, in order.
-func TestAutomatedInputIsHeldWhileAPermissionMenuIsOpen(t *testing.T) {
-	fastGate(t)
-	ctx := context.Background()
-	a := &fakeAgent{screen: permissionMenu}
-	name := "claude-gate-held"
-
-	for _, in := range []AutomatedInput{
-		a.input(name, "", "[board] Lead: please review #12", false),
-		a.input(name, "", "You have a new task in Coral (#7: fix it)", false),
-		a.input(name, "board-unread:team", "You have 1 unread message on the message board.", false),
-	} {
-		d, err := DeliverAutomated(ctx, in)
-		require.NoError(t, err)
-		assert.Equal(t, Held, d)
-	}
-	time.Sleep(100 * time.Millisecond) // several retries while the menu is open
-	assert.Empty(t, a.sent(), "nothing typed into the open menu")
-	assert.Equal(t, 3, HeldCount(name))
-
-	a.show(idleInputBox) // the user answered the menu
-	require.Eventually(t, func() bool { return len(a.sent()) == 3 }, 5*time.Second, 10*time.Millisecond)
-	time.Sleep(100 * time.Millisecond)
-	assert.Equal(t, []string{"[board] Lead: please review #12", "You have a new task in Coral (#7: fix it)", "You have 1 unread message on the message board."}, a.sent(), "each once, in order")
-	assert.Zero(t, HeldCount(name))
-}
-
-// A newer send with the same key replaces the held one: the newest unread
-// count is typed, once.
-func TestAHeldSendIsSupersededByTheSameKey(t *testing.T) {
-	fastGate(t)
-	ctx := context.Background()
-	a := &fakeAgent{screen: permissionMenu}
-	name := "claude-gate-supersede"
-	_, _ = DeliverAutomated(ctx, a.input(name, "board-unread:team", "You have 1 unread message", false))
-	_, _ = DeliverAutomated(ctx, a.input(name, "board-unread:team", "You have 3 unread messages", false))
-	assert.Equal(t, 1, HeldCount(name))
-	a.show(idleInputBox)
-	require.Eventually(t, func() bool { return len(a.sent()) == 1 }, 5*time.Second, 10*time.Millisecond)
-	time.Sleep(60 * time.Millisecond)
-	assert.Equal(t, []string{"You have 3 unread messages"}, a.sent())
-}
-
-// With no prompt open the send is typed at once, and a later send waits behind
-// ones still held so order is kept.
-func TestAutomatedInputIsTypedAtOnceWhenNothingWaits(t *testing.T) {
-	fastGate(t)
-	a := &fakeAgent{screen: idleInputBox}
-	d, err := DeliverAutomated(context.Background(), a.input("claude-gate-now", "", "hello", false))
+func deliver(t *testing.T, a *fakeAgent, name, text string) Delivery {
+	t.Helper()
+	d, err := DeliverAutomated(context.Background(), a.input(name, "", text, false))
 	require.NoError(t, err)
-	assert.Equal(t, Sent, d)
+	return d
+}
+
+// The night's two agents: a turn that is over with a shell or a monitor still running is an ordinary prompt: the text and its Enter go at once.
+func TestAnIdleAgentWithABackgroundShellOrMonitorGetsTheText(t *testing.T) {
+	a := &fakeAgent{screen: claudeIdleWithShell}
+	assert.Equal(t, Sent, deliver(t, a, "claude-t-shell", "nudge one"))
+	assert.Equal(t, []string{"nudge one"}, a.sent())
+	_, ok := SkippedOf("claude-t-shell")
+	assert.False(t, ok, "nothing was skipped")
+	for _, footer := range []string{"1 shell · ↓ to manage", "1 monitor · ↓ to manage", "2 shells · ↓ to manage"} {
+		open, why := PromptOnScreen(strings.Replace(claudeIdleWithShell, "1 shell · ↓ to manage", footer, 1))
+		assert.False(t, open, "%q is not a prompt (%s)", footer, why)
+	}
+}
+
+// Mid-turn text is the harness's to queue: a working agent gets it too.
+func TestAMidTurnAgentGetsTheText(t *testing.T) {
+	a := &fakeAgent{screen: claudeMidTurn}
+	assert.Equal(t, Sent, deliver(t, a, "claude-t-mid", "a message mid-turn"))
+	assert.Equal(t, []string{"a message mid-turn"}, a.sent())
+}
+
+// A readable screen Coral does not recognise gets the text: "ambiguous" is not a reason to skip.
+func TestAScreenCoralDoesNotRecogniseGetsTheText(t *testing.T) {
+	a := &fakeAgent{screen: "Some new CLI v9 :: type here\nstatus: working"}
+	assert.Equal(t, Sent, deliver(t, a, "claude-t-unknown", "hello"))
 	assert.Equal(t, []string{"hello"}, a.sent())
 }
 
-// The state can say "needs input" while the screen is plainly at its input box
-// (a hook was missed): the screen wins, so notifications aren't stuck. With an
-// open prompt on screen the state doesn't matter.
-func TestStateNeedsInputDefersToAVisibleInputBox(t *testing.T) {
-	fastGate(t)
-	SetNeedsInputFunc(func(context.Context, string, string, string) bool { return true })
-	a := &fakeAgent{screen: idleInputBox}
-	d, _ := DeliverAutomated(context.Background(), a.input("claude-gate-state", "", "x", false))
-	assert.Equal(t, Sent, d)
+// The reason for it all (#3431): typing into a menu answers it. A Yes-highlighted permission frame, a selection list and a trust dialog each get nothing, and nothing is kept for later.
+func TestAnOpenPromptOrMenuGetsNothingAndNothingIsKept(t *testing.T) {
+	for name, screen := range map[string]string{
+		"a Yes-highlighted permission frame": permissionMenu,
+		"a trust dialog":                     trustDialog,
+		"a selection list":                   " Select model\n\n ❯ 1. Default (recommended)\n   2. Opus\n   3. Haiku\n\n Enter to select · Esc to exit\n",
+	} {
+		a := &fakeAgent{screen: screen}
+		n := "claude-t-prompt"
+		assert.Equal(t, Skipped, deliver(t, a, n, "You have 1 unread message"), name)
+		assert.Empty(t, a.sent(), name)
+		assert.Zero(t, a.enters, "%s: no Enter either", name)
+		s, ok := SkippedOf(n)
+		require.True(t, ok, name)
+		assert.True(t, strings.HasPrefix(s.Why, SkipPrompt), "%s: %s", name, s.Why)
 
-	b := &fakeAgent{screen: "some output with no box"}
-	d, _ = DeliverAutomated(context.Background(), b.input("claude-gate-state2", "", "y", false))
-	assert.Equal(t, Held, d, "state says needs input and the screen doesn't show the input box")
-	assert.Empty(t, b.sent())
-}
-
-// A launch's first prompt (RequireInputBox) waits through the trust-this-folder
-// screen and a blank starting screen, and is typed once the input box shows.
-func TestFirstPromptWaitsForTheInputBox(t *testing.T) {
-	fastGate(t)
-	a := &fakeAgent{screen: ""}
-	name := "claude-gate-launch"
-	d, _ := DeliverAutomated(context.Background(), a.input(name, "initial-prompt", "Build the feature", true))
-	assert.Equal(t, Held, d, "nothing on screen yet")
-	a.show(" Do you trust the files in this folder?\n\n ❯ 1. Yes, proceed\n   2. No, exit\n\n Enter to confirm · Esc to exit\n")
-	time.Sleep(100 * time.Millisecond)
-	assert.Empty(t, a.sent(), "the prompt never answers the trust screen")
-	a.show(idleInputBox)
-	require.Eventually(t, func() bool { return len(a.sent()) == 1 }, 5*time.Second, 10*time.Millisecond)
-	assert.Equal(t, []string{"Build the feature"}, a.sent())
-}
-
-// A send held too long is reported once, so the dashboard can
-// show the agent needs the user.
-func TestASendHeldTooLongIsReportedOnce(t *testing.T) {
-	fastGate(t)
-	gate.setTimings(gateTimings{tooLong: 50 * time.Millisecond, expiry: 24 * time.Hour, every: 20 * time.Millisecond})
-	var mu sync.Mutex
-	var reports []string
-	SetHeldTooLongFunc(func(name, _, _, what, kind string) {
-		prompt := kind != ""
-		mu.Lock()
-		reports = append(reports, fmt.Sprintf("%s/%s/%v", name, what, prompt))
-		mu.Unlock()
-	})
-	a := &fakeAgent{screen: permissionMenu}
-	name := "claude-gate-long"
-	_, _ = DeliverAutomated(context.Background(), a.input(name, "", "waiting", false))
-	require.Eventually(t, func() bool { mu.Lock(); defer mu.Unlock(); return len(reports) == 1 }, 5*time.Second, 10*time.Millisecond)
-	time.Sleep(150 * time.Millisecond)
-	mu.Lock()
-	assert.Equal(t, []string{name + "/test/true"}, reports, "reported once, as a prompt")
-	mu.Unlock()
-	a.show(idleInputBox)
-	require.Eventually(t, func() bool { return len(a.sent()) == 1 }, 5*time.Second, 10*time.Millisecond)
-}
-
-// A first prompt whose agent never shows a box Coral recognises isn't held for
-// ever: after the held-too-long time it is typed once no prompt is open. While
-// a prompt is open it still waits.
-func TestFirstPromptFallsBackWhenTheBoxIsNeverRecognised(t *testing.T) {
-	fastGate(t)
-	gate.setTimings(gateTimings{tooLong: 150 * time.Millisecond, expiry: 24 * time.Hour, every: 20 * time.Millisecond})
-	a := &fakeAgent{screen: " Do you trust the files in this folder?\n ❯ 1. Yes, proceed\n   2. No, exit\n"}
-	name := "claude-gate-unknown-box"
-	d, _ := DeliverAutomated(context.Background(), a.input(name, "initial-prompt", "Build it", true))
-	assert.Equal(t, Held, d)
-	time.Sleep(400 * time.Millisecond)
-	assert.Empty(t, a.sent(), "past the fallback time an open prompt still holds it")
-	a.show("Some new CLI v9 :: type here")
-	require.Eventually(t, func() bool { return len(a.sent()) == 1 }, 5*time.Second, 10*time.Millisecond)
-	assert.Equal(t, []string{"Build it"}, a.sent())
-}
-
-// enterAgent is a fakeAgent whose send behaves like tmux's: text, a pause in
-// which a permission prompt opens, then the Enter only if tmux.EnterAllowed.
-type enterAgent struct {
-	*fakeAgent
-	enters int
-}
-
-func (e *enterAgent) SendEnter(context.Context, string, string, string) error {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	if open, _ := PromptOnScreen(e.screen); open {
-		e.typed = append(e.typed, "ENTER ANSWERED THE PROMPT")
-		return nil
+		a.show(idleInputBox)              // the menu is answered: nothing is typed by itself afterwards
+		time.Sleep(60 * time.Millisecond) // sleep-ok: nothing is queued, so nothing may arrive
+		assert.Empty(t, a.sent(), name+": nothing queued")
+		assert.Equal(t, Sent, deliver(t, a, n, "next"), name)
+		_, ok = SkippedOf(n)
+		assert.False(t, ok, name+": a send typed clears the skip")
+		ForgetSession(n)
 	}
-	e.enters++
-	e.typed = append(e.typed, "<Enter>")
-	return nil
 }
 
-// A prompt that opens between a send's text and its Enter doesn't take the
-// Enter (Backend's #3431 review, (a)): the Enter is withheld, held on its own,
-// and pressed once after the prompt is answered.
+// A person's draft counts like a menu: the nudge would be added to it and sent with it (UI Accessibility's "Read the board").
+func TestAPersonsDraftGetsNothing(t *testing.T) {
+	n := "claude-t-draft"
+	defer ForgetSession(n)
+	a := &fakeAgent{screen: claudeMonitorWithText}
+	assert.Equal(t, Skipped, deliver(t, a, n, "You have 1 unread message"), "text Coral did not type is a draft")
+	assert.Empty(t, a.sent())
+	assert.Zero(t, a.enters)
+	s, _ := SkippedOf(n)
+	assert.Equal(t, SkipDraft, s.Why)
+}
+
+// Coral's own leftover (its text typed, the Enter not taken) is decided by an exact match with the last text Coral typed to the session: it is sent, and the new text is not typed after it.
+func TestCoralsOwnLeftoverIsSentAndAnythingElseIsADraft(t *testing.T) {
+	n := "claude-t-leftover"
+	defer ForgetSession(n)
+	a := &fakeAgent{screen: idleInputBox}
+	assert.Equal(t, Sent, deliver(t, a, n, "Read the board"))
+	assert.Equal(t, []string{"Read the board"}, a.sent())
+
+	// its Enter did not take: the box still holds exactly that text
+	a.show(claudeMonitorWithText)
+	assert.Equal(t, Skipped, deliver(t, a, n, "You have 2 unread messages"), "the new text is not typed after the old one")
+	assert.Equal(t, []string{"Read the board"}, a.sent(), "nothing typed")
+	assert.Equal(t, 1, a.enters, "the old text's Enter is pressed")
+	a.show(idleInputBox) // the Enter took: the box is empty
+	assert.Equal(t, Sent, deliver(t, a, n, "You have 2 unread messages"), "the next send types into the box (the leftover is forgotten once sent)")
+
+	// the person added words to Coral's text: a draft
+	b := &fakeAgent{screen: idleInputBox}
+	assert.Equal(t, Sent, deliver(t, b, n, "Read the board"))
+	b.show(strings.Replace(claudeMonitorWithText, "Read the board", "Read the board and then fix it", 1))
+	assert.Equal(t, Skipped, deliver(t, b, n, "more"))
+	assert.Zero(t, b.enters, "a draft is never sent")
+	s, _ := SkippedOf(n)
+	assert.Equal(t, SkipDraft, s.Why)
+
+	// Coral lost its record (a restart): treated as a draft, once; the next nudge types into an empty box
+	ForgetSession(n)
+	c := &fakeAgent{screen: claudeMonitorWithText}
+	assert.Equal(t, Skipped, deliver(t, c, n, "x"))
+	assert.Zero(t, c.enters)
+}
+
+// A screen that cannot be read, or is empty, gets nothing; DeliverNow (a person's button) is not stopped by it.
+func TestAnUnreadableScreenGetsNothing(t *testing.T) {
+	n := "claude-t-unreadable"
+	defer ForgetSession(n)
+	a := &fakeAgent{screen: idleInputBox, readErr: errors.New("capture failed")}
+	assert.Equal(t, Skipped, deliver(t, a, n, "x"))
+	assert.Empty(t, a.sent())
+	s, _ := SkippedOf(n)
+	assert.Equal(t, SkipUnreadable, s.Why)
+
+	b := &fakeAgent{screen: "  \n \n"}
+	assert.Equal(t, Skipped, deliver(t, b, n, "x"), "an empty screen")
+	assert.Empty(t, b.sent())
+
+	d, err := DeliverNow(context.Background(), a.input(n, "", "now", false))
+	require.NoError(t, err)
+	assert.Equal(t, Sent, d, "a person's Send now types where the screen cannot be read")
+	assert.Equal(t, []string{"now"}, a.sent())
+
+	// ...but never into an open prompt or over a draft
+	p := &fakeAgent{screen: permissionMenu}
+	d, _ = DeliverNow(context.Background(), p.input(n, "", "now", false))
+	assert.Equal(t, Skipped, d)
+	assert.Empty(t, p.sent())
+	dr := &fakeAgent{screen: claudeMonitorWithText}
+	d, _ = DeliverNow(context.Background(), dr.input(n, "", "now", false))
+	assert.Equal(t, Skipped, d)
+	assert.Empty(t, dr.sent())
+}
+
+// A terminal that has no screen to read is typed to (there is nothing to look at).
+func TestATerminalWithNoScreenIsTypedTo(t *testing.T) {
+	var typed []string
+	d, err := DeliverAutomated(context.Background(), AutomatedInput{Term: struct{}{}, Name: "claude-t-noscreen", Text: "hi", What: "test",
+		Send: func(context.Context) error { typed = append(typed, "hi"); return nil }})
+	require.NoError(t, err)
+	assert.Equal(t, Sent, d)
+	assert.Equal(t, []string{"hi"}, typed)
+}
+
+// A prompt that opens between the text and its Enter does not take the Enter: it is not pressed, and nothing is kept.
 func TestAPromptOpeningBeforeTheEnterWithholdsIt(t *testing.T) {
-	fastGate(t)
-	e := &enterAgent{fakeAgent: &fakeAgent{screen: idleInputBox}}
-	name := "claude-gate-enter"
-	in := AutomatedInput{Term: e, Name: name, Text: "hello", What: "test",
+	n := "claude-t-enter"
+	defer ForgetSession(n)
+	a := &fakeAgent{screen: idleInputBox}
+	in := AutomatedInput{Term: a, Name: n, Text: "hello", What: "test",
 		Send: func(ctx context.Context) error {
-			e.mu.Lock()
-			e.typed = append(e.typed, "hello")
-			e.screen = permissionMenu // the agent asks for permission right now
-			e.mu.Unlock()
+			a.mu.Lock()
+			a.typed = append(a.typed, "hello")
+			a.screen = permissionMenu // the agent asks for permission right now
+			a.mu.Unlock()
 			if !tmux.EnterAllowed(ctx) {
 				return tmux.ErrEnterWithheld
 			}
-			e.mu.Lock()
-			e.typed = append(e.typed, "<Enter>")
-			e.mu.Unlock()
+			a.mu.Lock()
+			a.typed = append(a.typed, "<Enter>")
+			a.mu.Unlock()
 			return nil
 		}}
 	d, err := DeliverAutomated(context.Background(), in)
 	require.NoError(t, err)
-	assert.Equal(t, Held, d, "the Enter is held")
-	time.Sleep(100 * time.Millisecond)
-	assert.Equal(t, []string{"hello"}, e.sent(), "no Enter into the open prompt")
-	e.show(idleInputBox)
-	require.Eventually(t, func() bool { return len(e.sent()) == 2 }, 5*time.Second, 10*time.Millisecond)
-	time.Sleep(100 * time.Millisecond)
-	assert.Equal(t, []string{"hello", "<Enter>"}, e.sent(), "the text once, then its Enter once")
+	assert.Equal(t, Skipped, d)
+	assert.Equal(t, []string{"hello"}, a.sent(), "no Enter into the open prompt")
+	s, _ := SkippedOf(n)
+	assert.Equal(t, SkipEnter, s.Why)
 }
 
-// Held nudges and notifications expire (1 h by default); a first prompt waits
-// for as long as its agent lives (Backend's #3431 review, (b)).
-func TestHeldNudgesExpireButAFirstPromptDoesNot(t *testing.T) {
-	fastGate(t)
-	gate.setTimings(gateTimings{tooLong: time.Hour, expiry: 100 * time.Millisecond, every: 20 * time.Millisecond})
-	a := &fakeAgent{screen: permissionMenu}
-	_, _ = DeliverAutomated(context.Background(), a.input("claude-gate-expire", "n", "old nudge", false))
-	_, _ = DeliverAutomated(context.Background(), a.input("claude-gate-expire", "initial-prompt", "first prompt", true))
-	require.Eventually(t, func() bool { return HeldCount("claude-gate-expire") == 1 }, 5*time.Second, 10*time.Millisecond, "the nudge expired")
-	time.Sleep(200 * time.Millisecond)
-	assert.Equal(t, 1, HeldCount("claude-gate-expire"), "the first prompt is still held")
-	DropHeld("claude-gate-expire", "test cleanup")
-}
-
-// Everything held for a session goes when its terminal is killed, restarted or
-// relaunched (Backend's #3431 review, required 2): a held first prompt is never
-// typed into the next launch in that terminal.
-func TestDropHeldDiscardsASessionsHeldSends(t *testing.T) {
-	fastGate(t)
+// A launch's first prompt is the one send that waits: for the input box, through a blank screen and a trust dialog; and for an agent whose box is never recognised, it falls back
+// to the usual look once the fallback time has passed.
+func TestAFirstPromptWaitsForTheInputBox(t *testing.T) {
+	quickLaunchWaits(t)
 	a := &fakeAgent{screen: ""}
-	name := "claude-gate-relaunch"
-	_, _ = DeliverAutomated(context.Background(), a.input(name, "initial-prompt", "old launch's prompt", true))
-	require.Equal(t, 1, HeldCount(name))
-	DropHeld(name+".0", "a launch command is typed") // a pane target names the same session
-	assert.Zero(t, HeldCount(name))
-
-	// Every form of tmux target names the session (QA's #3431 v3 live check:
-	// "claude-x:0.0" from the restart path used to leave the held send).
-	b := &fakeAgent{screen: permissionMenu}
-	for _, target := range []string{name, name + ".0", name + ":0", name + ":0.0"} {
-		_, _ = DeliverAutomated(context.Background(), b.input(name, "", "stale nudge", false))
-		require.Equal(t, 1, HeldCount(name), target)
-		DropHeld(target, "restarted")
-		assert.Zero(t, HeldCount(name), "DropHeld(%q) drops %q's held sends", target, name)
-	}
+	n := "claude-t-launch"
+	done := make(chan Delivery, 1)
+	go func() {
+		d, _ := DeliverAutomated(context.Background(), a.input(n, "initial-prompt", "Build the feature", true))
+		done <- d
+	}()
+	time.Sleep(30 * time.Millisecond) // sleep-ok: a blank screen, then a trust dialog: the prompt never answers it
+	a.show(trustDialog)
+	time.Sleep(30 * time.Millisecond) // sleep-ok: still waiting
+	assert.Empty(t, a.sent())
 	a.show(idleInputBox)
-	time.Sleep(150 * time.Millisecond)
-	assert.Empty(t, a.sent(), "nothing from the old launch")
-}
+	select {
+	case d := <-done:
+		assert.Equal(t, Sent, d)
+	case <-time.After(3 * time.Second):
+		t.Fatal("the first prompt never went")
+	}
+	assert.Equal(t, []string{"Build the feature"}, a.sent())
 
-// #3468 (the Lead's live data): agy shows "esc to cancel" while it runs a command.
-// The footer alone holds sends (the safe side) but is not reported as a prompt; a
-// selection menu is.
-func TestAFooterAloneIsNotReportedAsAPrompt(t *testing.T) {
-	fastGate(t)
-	gate.setTimings(gateTimings{tooLong: 50 * time.Millisecond, expiry: 24 * time.Hour, every: 20 * time.Millisecond})
-	var mu sync.Mutex
-	reports := map[string]bool{}
-	SetHeldTooLongFunc(func(name, _, _, _, kind string) { prompt := kind != ""; mu.Lock(); reports[name] = prompt; mu.Unlock() })
-	footer := &fakeAgent{screen: "⠋ Running npm test (esc to cancel, 12s)\n  Gemini 3.8 Flash · high\n"}
-	menu := &fakeAgent{screen: permissionMenu}
-	_, _ = DeliverAutomated(context.Background(), footer.input("agy-footer", "", "nudge", false))
-	_, _ = DeliverAutomated(context.Background(), menu.input("claude-menu", "", "nudge", false))
-	require.Eventually(t, func() bool { mu.Lock(); defer mu.Unlock(); return len(reports) == 2 }, 5*time.Second, 10*time.Millisecond)
-	mu.Lock()
-	assert.False(t, reports["agy-footer"], "a footer alone: held, not a prompt")
-	assert.True(t, reports["claude-menu"], "a selection menu is a prompt")
-	mu.Unlock()
-	assert.Empty(t, footer.sent(), "still held")
-	DropHeld("agy-footer", "test done")
-	DropHeld("claude-menu", "test done")
-
-	// #3472: agy's live busy screen (a spinner above its box, the footer under it).
-	rule := strings.Repeat("─", 40)
-	busy := &fakeAgent{screen: "⠙  Running command...\n" + rule + "\n>\n" + rule + "\nesc to cancel      Gemini 3.8 Flash · high\n"}
-	_, _ = DeliverAutomated(context.Background(), busy.input("agy-busy", "", "nudge", false))
-	require.Eventually(t, func() bool { mu.Lock(); defer mu.Unlock(); _, ok := reports["agy-busy"]; return ok }, 5*time.Second, 10*time.Millisecond)
-	mu.Lock()
-	assert.False(t, reports["agy-busy"], "busy: held, not a prompt")
-	mu.Unlock()
-	assert.Empty(t, busy.sent())
-	busy.show(rule + "\n>\n" + rule + "\n? for shortcuts      Gemini 3.8 Flash · high\n")
-	require.Eventually(t, func() bool { return len(busy.sent()) == 1 }, 5*time.Second, 10*time.Millisecond, "delivered once its turn ends")
-	DropHeld("agy-busy", "test done")
-}
-
-// eventLog records the gate's held-too-long and held-ended calls, in order.
-type eventLog struct {
-	mu     sync.Mutex
-	events []string
-}
-
-// install records the calls for sessions named claude-end-* only: the gate is shared,
-// and other tests' sessions may still end while this one runs.
-func (e *eventLog) install() {
-	mine := func(name string) bool { return strings.HasPrefix(name, "claude-end-") }
-	SetHeldTooLongFunc(func(name, _, _, _, kind string) {
-		prompt := kind != ""
-		if mine(name) {
-			e.add(fmt.Sprintf("report %s %v", name, prompt))
-		}
-	})
-	SetHeldEndedFunc(func(name, _, _ string) {
-		if mine(name) {
-			e.add("ended " + name)
-		}
-	})
-}
-func (e *eventLog) add(s string) { e.mu.Lock(); e.events = append(e.events, s); e.mu.Unlock() }
-func (e *eventLog) get() []string {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	return append([]string(nil), e.events...)
-}
-
-// #3471's clearing (#3468 v1): once a session's reported sends are all gone, the
-// gate says so, once, after the report: delivered, dropped or expired. A send that
-// was never reported ends silently.
-func TestHeldEndedFollowsTheReport(t *testing.T) {
-	fastGate(t)
-	gate.setTimings(gateTimings{tooLong: 50 * time.Millisecond, expiry: 24 * time.Hour, every: 20 * time.Millisecond})
-	var ev eventLog
-	ev.install()
-	ctx := context.Background()
-
-	delivered := &fakeAgent{screen: permissionMenu}
-	_, _ = DeliverAutomated(ctx, delivered.input("claude-end-delivered", "", "a", false))
-	require.Eventually(t, func() bool { return len(ev.get()) == 1 }, 5*time.Second, 10*time.Millisecond)
-	time.Sleep(100 * time.Millisecond) // more turns while it is still held: no end yet
-	assert.Equal(t, []string{"report claude-end-delivered true"}, ev.get())
-	delivered.show(idleInputBox)
-	require.Eventually(t, func() bool { return len(delivered.sent()) == 1 }, 5*time.Second, 10*time.Millisecond)
-	require.Eventually(t, func() bool { return len(ev.get()) == 2 }, 5*time.Second, 10*time.Millisecond)
-	time.Sleep(100 * time.Millisecond)
-	assert.Equal(t, []string{"report claude-end-delivered true", "ended claude-end-delivered"}, ev.get(), "ended once, after the report")
-
-	dropped := &fakeAgent{screen: permissionMenu}
-	_, _ = DeliverAutomated(ctx, dropped.input("claude-end-dropped", "", "b", false))
-	require.Eventually(t, func() bool { return len(ev.get()) == 3 }, 5*time.Second, 10*time.Millisecond)
-	DropHeld("claude-end-dropped", "agent killed")
-	require.Eventually(t, func() bool { return len(ev.get()) == 4 }, 5*time.Second, 10*time.Millisecond)
-	assert.Equal(t, "ended claude-end-dropped", ev.get()[3])
-
-	quick := &fakeAgent{screen: permissionMenu}
-	gate.setTimings(gateTimings{tooLong: time.Hour, expiry: 24 * time.Hour, every: 20 * time.Millisecond})
-	_, _ = DeliverAutomated(ctx, quick.input("claude-end-quick", "", "c", false))
-	quick.show(idleInputBox)
-	require.Eventually(t, func() bool { return len(quick.sent()) == 1 }, 5*time.Second, 10*time.Millisecond)
-	time.Sleep(100 * time.Millisecond)
-	assert.Len(t, ev.get(), 4, "never reported: no end")
-
-	gate.setTimings(gateTimings{tooLong: 30 * time.Millisecond, expiry: 150 * time.Millisecond, every: 20 * time.Millisecond})
-	expired := &fakeAgent{screen: permissionMenu}
-	_, _ = DeliverAutomated(ctx, expired.input("claude-end-expired", "", "d", false))
-	require.Eventually(t, func() bool { return len(ev.get()) == 6 }, 5*time.Second, 10*time.Millisecond)
-	assert.Equal(t, []string{"report claude-end-expired true", "ended claude-end-expired"}, ev.get()[4:])
-	assert.Zero(t, HeldCount("claude-end-expired"))
-}
-
-// #3468 v2: a turn that took a send off the queue just before DropHeld (the agent
-// was killed or restarted) holds it again just after; it belongs to the old process
-// and is dropped, never held for the new one. A send after the drop is held as usual.
-func TestASendInFlightDuringDropHeldIsNotHeldAgain(t *testing.T) {
-	fastGate(t)
-	name := "claude-gen-drop"
-	a := &fakeAgent{screen: permissionMenu}
-	in := a.input(name, "", "old", false)
-	gate.mu.Lock()
-	in.gen = gate.gens[name] // as DeliverAutomated records it
-	gate.mu.Unlock()
-	DropHeld(name, "agent restarted") // meanwhile
-	gate.holdPaste(in, whyDraft, false, "")
-	gate.hold(in, "a prompt", kindPrompt)
-	gate.holdEnter(in, kindPrompt)
-	assert.Zero(t, HeldCount(name), "the old process's send is dropped")
-
-	d, err := DeliverAutomated(context.Background(), a.input(name, "", "new", false))
+	// an agent whose box is not recognised: the fallback
+	u := &fakeAgent{screen: "Some new CLI v9 :: type here"}
+	d, err := DeliverAutomated(context.Background(), u.input("claude-t-launch2", "initial-prompt", "Build it", true))
 	require.NoError(t, err)
-	assert.Equal(t, Held, d)
-	assert.Equal(t, 1, HeldCount(name), "the new process's send is held")
-	DropHeld(name, "test done")
+	assert.Equal(t, Sent, d)
+	assert.Equal(t, []string{"Build it"}, u.sent())
+
+	// a prompt that stays open is never answered, and the send gives up after the wait
+	o := &fakeAgent{screen: trustDialog}
+	d, err = DeliverAutomated(context.Background(), o.input("claude-t-launch3", "initial-prompt", "Build it", true))
+	require.NoError(t, err)
+	assert.Equal(t, Skipped, d)
+	assert.Empty(t, o.sent())
 }
 
-// QA (after #3478): a send first held for a calm reason (only a footer on screen,
-// agy working) that a real prompt then holds must say so. Its reason is refreshed on
-// every turn, and a send reported as calm is reported again, once, as a prompt.
-func TestAHeldSendsReasonFollowsTheScreen(t *testing.T) {
-	fastGate(t)
-	gate.setTimings(gateTimings{tooLong: 50 * time.Millisecond, expiry: 24 * time.Hour, every: 20 * time.Millisecond})
-	var mu sync.Mutex
-	var prompts []bool
-	SetHeldTooLongFunc(func(name, _, _, _, kind string) {
-		prompt := kind != ""
-		if name == "agy-reason" {
-			mu.Lock()
-			prompts = append(prompts, prompt)
-			mu.Unlock()
-		}
-	})
-	got := func() []bool { mu.Lock(); defer mu.Unlock(); return append([]bool(nil), prompts...) }
-	a := &fakeAgent{screen: "esc to cancel      Gemini 3.8 Flash · high\n"}
-	_, _ = DeliverAutomated(context.Background(), a.input("agy-reason", "", "nudge", false))
-	require.Eventually(t, func() bool { return len(got()) == 1 }, 5*time.Second, 10*time.Millisecond)
-	assert.Equal(t, []bool{false}, got(), "a footer alone: calm")
-
-	a.show(permissionMenu) // agy opens its permission menu
-	require.Eventually(t, func() bool { return len(got()) == 2 }, 5*time.Second, 10*time.Millisecond, "reported again once a prompt holds it")
-	time.Sleep(150 * time.Millisecond) // more turns: no repeat
-	assert.Equal(t, []bool{false, true}, got())
-	assert.Empty(t, a.sent(), "still held")
-	DropHeld("agy-reason", "test done")
-}
-
-// #3510: LastDelivered is when a send with a key was actually typed into the session:
-// set by a send typed at once and by a held send's later turn; not by a hold, a
-// hand-off (TakeHeld) or a drop; forgotten when the session's held sends are dropped.
-func TestLastDeliveredIsOnlyWhenTyped(t *testing.T) {
-	fastGate(t)
-	ctx := context.Background()
-	const key = "board-unread:team"
-	name := "claude-last-delivered"
-	t.Cleanup(func() { DropHeld(name, "test done") })
-	assert.True(t, LastDelivered(name, key).IsZero(), "never")
-
+// LastDelivered still says when a key was typed, and ForgetSession (the agent was killed or restarted) forgets it, the skip and the last text.
+func TestDeliveredKeysAndForgetSession(t *testing.T) {
+	n := "claude-t-forget"
 	a := &fakeAgent{screen: idleInputBox}
 	before := time.Now()
-	d, err := DeliverAutomated(ctx, a.input(name, key, "You have 1 unread message", false))
+	_, err := DeliverAutomated(context.Background(), a.input(n, "board-unread:team", "nudge", false))
 	require.NoError(t, err)
-	require.Equal(t, Sent, d)
-	typed := LastDelivered(name, key)
-	assert.False(t, typed.Before(before), "typed at once: recorded")
-	assert.True(t, LastDelivered(name, "other").IsZero(), "per key")
-
-	a.show(permissionMenu)
-	d, _ = DeliverAutomated(ctx, a.input(name, key, "You have 2 unread messages", false))
-	require.Equal(t, Held, d)
-	time.Sleep(60 * time.Millisecond) // several of the gate's turns, still held
-	assert.Equal(t, typed, LastDelivered(name, key), "a hold doesn't change it")
-
-	taken, ok := TakeHeld(ctx, name, "handed off", func(k string) bool { return k == key })
-	require.True(t, ok)
-	require.Len(t, taken, 1)
-	assert.Equal(t, typed, LastDelivered(name, key), "a hand-off doesn't change it")
-
-	_, _ = DeliverAutomated(ctx, a.input(name, key, "You have 3 unread messages", false))
-	afterHold := time.Now()
-	a.show(idleInputBox)
-	require.Eventually(t, func() bool { return len(a.sent()) == 2 }, 5*time.Second, 10*time.Millisecond)
-	// Not .After(afterHold): on Windows' coarse clock the record can read exactly afterHold
-	// (#4096). It is new (not the first send's time, 60 ms and more earlier) and not before
-	// afterHold, so it was recorded by the held send's later turn.
-	require.Eventually(t, func() bool {
-		got := LastDelivered(name, key)
-		return !got.Equal(typed) && !got.Before(afterHold)
-	}, 5*time.Second, 10*time.Millisecond, "a held send typed on a later turn: recorded")
-
-	a.show(permissionMenu)
-	_, _ = DeliverAutomated(ctx, a.input(name, key, "You have 4 unread messages", false))
-	last := LastDelivered(name, key)
-	DropHeld(name, "agent restarted")
-	assert.True(t, LastDelivered(name, key).IsZero(), "a drop (session ended) forgets it, and never records the dropped send")
-	_ = last
+	assert.False(t, LastDelivered(n, "board-unread:team").Before(before))
+	forgotten := make(chan string, 1)
+	stop := OnSessionForgotten(func(name string) { forgotten <- name })
+	defer stop()
+	ForgetSession(n)
+	assert.True(t, LastDelivered(n, "board-unread:team").IsZero())
+	assert.Equal(t, n, <-forgotten)
 }

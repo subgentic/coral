@@ -45,7 +45,6 @@ var settingRows = map[string]struct{ good, bad string }{
 	"board_health_monitor":        {`"true"`, `"nope"`},
 	"artifact_comments_hub_write": {`"true"`, `"nope"`},
 	"auto_summarize":              {`"1"`, `"nope"`},
-	"gate_signals_claude":         {`"off"`, `"nope"`},
 	"nudge_claude_artifacts":      {`"off"`, `"nope"`},
 	"turn_end_handoff":            {`"off"`, `"later"`},
 	"update_channel":              {`"agentic"`, `"nightly"`},

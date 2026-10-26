@@ -1,4 +1,4 @@
-// What the gate remembers per session: ended sessions, delivered keys, and the held-send failure log (moved out of automated_input.go, #5091; no behaviour change).
+// What is remembered per session: ended sessions, delivered keys, and the last send skipped (#7727).
 
 package ptymanager
 
@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/subgentic/coral/internal/logdedupe"
 	"github.com/subgentic/coral/internal/tmux"
 )
 
@@ -23,7 +22,7 @@ func sessionOfTarget(target string) string {
 }
 
 // sessionEndHooks clear what other packages remember per session (a log line already
-// written for it, and the like) when DropHeld ends that session's state, so those memos
+// written for it, and the like) when ForgetSession ends that session's state, so those memos
 // don't grow with every session the server has ever run (#4057).
 var (
 	sessionEndMu    sync.Mutex
@@ -31,7 +30,7 @@ var (
 )
 
 // OnSessionEnd registers f to be called with a session's terminal name ("<type>-<id>")
-// whenever its agent is killed, restarted, resumed or launched again (DropHeld). Register
+// whenever its agent is killed, restarted, resumed or launched again (ForgetSession). Register
 // once, at package init: hooks are never removed.
 func OnSessionEnd(f func(name string)) {
 	sessionEndMu.Lock()
@@ -49,82 +48,19 @@ func forgetSessionMemos(name string) {
 	}
 }
 
-// HeldCount is the number of sends held for a session, the one the retry loop is trying now included (the sessions list, tests and diagnostics).
-func HeldCount(name string) int {
+// ForgetSession is called when a session's agent is killed, restarted, resumed or launched again: what Coral remembers of the old process
+// (the text it typed last, the keys it delivered, the send it skipped) is not true of a new one.
+func ForgetSession(name string) {
+	name = sessionOfTarget(name)
+	forgotten.notify(name)
 	gate.mu.Lock()
-	defer gate.mu.Unlock()
-	n := len(gate.held[name])
-	if gate.inflight[name] != nil {
-		n++
-	}
-	return n
-}
-
-// HeldSince is when the oldest automated send held for a session was first held (the one the retry loop is trying now included), the zero time when none is: the live list's held_since, so a
-// page that opens late can say how long a send has waited (#6503). It starts again when the count returns to zero.
-func HeldSince(name string) time.Time {
-	gate.mu.Lock()
-	defer gate.mu.Unlock()
-	var oldest time.Time
-	for _, h := range gate.held[name] {
-		if oldest.IsZero() || h.heldAt.Before(oldest) {
-			oldest = h.heldAt
-		}
-	}
-	if in := gate.inflight[name]; in != nil && (oldest.IsZero() || in.heldAt.Before(oldest)) {
-		oldest = in.heldAt
-	}
-	return oldest
-}
-
-// The words of HeldReason, a closed list (#7433): why the oldest held send is held. The dashboard says a different true thing for each; it must never call a normal long turn "Coral can't see the input
-// box".
-const (
-	HeldTurn   = "turn"   // the agent is in a turn: its sends go when the turn ends (a mention goes at once)
-	HeldPrompt = "prompt" // a request to the user is open (a question, a permission, a trust screen)
-	HeldDialog = "dialog" // a dialog is drawn over the input box
-	HeldDraft  = "draft"  // someone's own text is in the input box
-	HeldBox    = "box"    // the input box is not on the screen
-	HeldOther  = "other"  // anything else (the agent is starting, its state is unknown)
-)
-
-// HeldReasons are the words HeldReason may answer, for the tests and the docs.
-var HeldReasons = []string{HeldTurn, HeldPrompt, HeldDialog, HeldDraft, HeldBox, HeldOther}
-
-// heldReasonOf names the reason of one hold: what the gate decided (why, a sentence for the log) and its kind (a request to the user, "" otherwise).
-func heldReasonOf(why, kind string) string {
-	switch {
-	case kind == KindDialog:
-		return HeldDialog
-	case kind != "":
-		return HeldPrompt
-	case why == whyDraft:
-		return HeldDraft
-	case strings.Contains(why, "input box isn't on screen"):
-		return HeldBox
-	case why == "signals: in turn" || strings.HasPrefix(why, busyWhy):
-		return HeldTurn
-	case why == "state: needs input" || strings.HasPrefix(why, "selection menu") || strings.HasPrefix(why, "prompt question:"):
-		return HeldPrompt
-	}
-	return HeldOther
-}
-
-// HeldReason is why the oldest automated send held for a session is held, one of HeldReasons, or "" when none is held. The send being tried now counts as the oldest; a send queued behind an earlier
-// one is held for what holds the head, so the head's reason is the session's.
-func HeldReason(name string) string {
-	gate.mu.Lock()
-	defer gate.mu.Unlock()
-	var head *heldInput
-	if in := gate.inflight[name]; in != nil {
-		head = in
-	} else if q := gate.held[name]; len(q) > 0 {
-		head = q[0]
-	}
-	if head == nil {
-		return ""
-	}
-	return heldReasonOf(head.why, head.kind)
+	delete(gate.delivered, name)
+	delete(gate.lastTyped, name)
+	gate.mu.Unlock()
+	skipped.Lock()
+	delete(skipped.m, name)
+	skipped.Unlock()
+	forgetSessionMemos(name)
 }
 
 // deliveredKeysPerSession bounds LastDelivered's record for one session.
@@ -134,7 +70,6 @@ const deliveredKeysPerSession = 64
 func (g *inputGate) noteDelivered(name, key string) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	delete(g.dialogHeld, name) // delivered: no dialog in the way any more (#4104)
 	m := g.delivered[name]
 	if m == nil {
 		m = map[string]time.Time{}
@@ -152,12 +87,8 @@ func (g *inputGate) noteDelivered(name, key string) {
 	m[key] = g.now()
 }
 
-// LastDelivered returns when a send with key was last typed into the session name, or
-// the zero time if never: recorded when the gate actually writes it (at once, or on a
-// held send's turn), never for a send that is held, handed off (TakeHeld) or dropped;
-// DropHeld (the session ended or restarted) forgets it. The turn-end hand-off uses it
-// to stand down when a nudge was typed during the turn, so it is already queued in the
-// agent's input (#3510).
+// LastDelivered returns when a send with key was last typed into the session name, or the zero time if never. The turn-end hand-off
+// uses it to stand down when a nudge was typed during the turn, so it is already queued in the agent's input (#3510).
 func LastDelivered(name, key string) time.Time {
 	name = sessionOfTarget(name)
 	gate.mu.Lock()
@@ -165,19 +96,109 @@ func LastDelivered(name, key string) time.Time {
 	return gate.delivered[name][key]
 }
 
-// heldSendFailures coalesces the held-send failure warning (#4112 part 2, Security's #4107 audit:
-// 100 failed sends to a pane that was gone gave a warning each): the same session, sender and
-// error log once, then once every 5 minutes with how many were held back.
-var heldSendFailures = logdedupe.New(5 * time.Minute)
+// SkippedSend is the last automated send Coral did not type into a session, and why (SkipPrompt, SkipDraft, ...): what the person sees
+// beside the agent's unread board messages, which is all that waits for it.
+type SkippedSend struct {
+	Why  string    `json:"why"`
+	What string    `json:"what"` // the sender ("board message", "task notification", ...); never the text
+	At   time.Time `json:"at"`
+	// Since is when this reason began: the first of the skips in a row with it.
+	Since time.Time `json:"since"`
+}
 
-func logHeldSendFailure(name, what string, err error) {
-	ok, heldBack := heldSendFailures.Allow(name + "\x00" + what + "\x00" + err.Error())
-	if !ok {
-		return
+var skipped struct {
+	sync.Mutex
+	m map[string]SkippedSend
+}
+
+// SkippedOf returns the last send skipped for the session name, until a send is typed to it again (ok false: none).
+func SkippedOf(name string) (SkippedSend, bool) {
+	name = sessionOfTarget(name)
+	skipped.Lock()
+	defer skipped.Unlock()
+	s, ok := skipped.m[name]
+	return s, ok
+}
+
+func noteSkipped(in AutomatedInput, why string) {
+	skipped.Lock()
+	if skipped.m == nil {
+		skipped.m = map[string]SkippedSend{}
 	}
-	if heldBack > 0 {
-		slog.Warn("automated input: a held send failed", "session", name, "sender", what, "error", err, "more_like_it", heldBack, "in_the_last", "5m")
-		return
+	since := gate.now()
+	if prev, ok := skipped.m[in.Name]; ok && prev.Why == why {
+		since = prev.Since // the same reason as the last skip: one streak, counted from its first
 	}
-	slog.Warn("automated input: a held send failed", "session", name, "sender", what, "error", err)
+	skipped.m[in.Name] = SkippedSend{Why: why, What: in.What, At: gate.now(), Since: since}
+	skipped.Unlock()
+	slog.Info("automated input: not typed", "session", in.Name, "sender", in.What, "why", why)
+}
+
+func clearSkipped(name string) {
+	skipped.Lock()
+	delete(skipped.m, name)
+	skipped.Unlock()
+}
+
+// SkippedAtPrompt returns, by session name, since when automated input to that session has not been typed because a prompt or menu is
+// open, for the health check's notice to the Operator (#4175 step 3). Only the time is given: nothing of the screen or of any text.
+func SkippedAtPrompt() map[string]time.Time {
+	return skippedSince(func(why string) bool { return strings.HasPrefix(why, SkipPrompt) })
+}
+
+// SkippedAtDraft is SkippedAtPrompt for text in the input box that Coral did not type (a person's draft, #247).
+func SkippedAtDraft() map[string]time.Time {
+	return skippedSince(func(why string) bool { return why == SkipDraft })
+}
+
+func skippedSince(match func(why string) bool) map[string]time.Time {
+	skipped.Lock()
+	defer skipped.Unlock()
+	out := map[string]time.Time{}
+	for name, s := range skipped.m {
+		if match(s.Why) {
+			out[name] = s.Since
+		}
+	}
+	return out
+}
+
+// OnSessionForgotten registers f to be called with a session's terminal name when ForgetSession ends its state (the board notifier forgets what
+// it nudged). It returns the function that removes it.
+func OnSessionForgotten(f func(name string)) (stop func()) { return forgotten.add(f) }
+
+var forgotten hookList
+
+type hookList struct {
+	mu   sync.Mutex
+	next int
+	fns  map[int]func(name string)
+}
+
+func (h *hookList) add(f func(name string)) func() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.fns == nil {
+		h.fns = map[int]func(string){}
+	}
+	id := h.next
+	h.next++
+	h.fns[id] = f
+	return func() {
+		h.mu.Lock()
+		delete(h.fns, id)
+		h.mu.Unlock()
+	}
+}
+
+func (h *hookList) notify(name string) {
+	h.mu.Lock()
+	fns := make([]func(string), 0, len(h.fns))
+	for _, f := range h.fns {
+		fns = append(fns, f)
+	}
+	h.mu.Unlock()
+	for _, f := range fns {
+		f(name)
+	}
 }

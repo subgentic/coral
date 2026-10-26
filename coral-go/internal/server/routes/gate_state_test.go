@@ -84,13 +84,8 @@ func TestGateStateFromTheAgentsSignals(t *testing.T) {
 	assert.Equal(t, ptymanager.StateIdle, st.State, "the transcript's end of turn clears the denied request")
 	assert.False(t, st.LastStop.IsZero())
 
-	// SessionEnd: gone, and a send Coral held for the old process is dropped.
-	_, err = ptymanager.DeliverAutomated(ctx, ptymanager.AutomatedInput{Term: menuOnScreen{}, Name: name, AgentType: "claude", SessionID: sid,
-		Key: "test-3481", Text: "a nudge", What: "test", Send: func(context.Context) error { return nil }})
-	require.NoError(t, err)
-	require.Equal(t, 1, ptymanager.HeldCount(name))
+	// SessionEnd: gone.
 	post(`{"event_type":"session_end","summary":"Session ended: other","detail_json":{"reason":"other"}}`)
 	st, _ = state()
 	assert.Equal(t, ptymanager.StateGone, st.State)
-	assert.Zero(t, ptymanager.HeldCount(name), "held sends dropped when the session ended")
 }

@@ -141,7 +141,6 @@ GET /api/sessions/live/{name}/file-content view
 GET /api/sessions/live/{name}/file-original view
 GET /api/sessions/live/{name}/files view
 GET /api/sessions/live/{name}/git view
-GET /api/sessions/live/{name}/held never
 GET /api/sessions/live/{name}/history/context view
 GET /api/sessions/live/{name}/history/search view
 GET /api/sessions/live/{name}/info view
@@ -154,6 +153,7 @@ GET /api/sessions/live/{name}/search-files view
 GET /api/sessions/live/{name}/subagents view
 GET /api/sessions/live/{name}/subagents/{subagentID} view
 GET /api/sessions/live/{name}/tasks view
+GET /api/sessions/live/{name}/waiting never
 GET /api/sessions/resolve never
 GET /api/sessions/{sessionID}/changes view
 GET /api/sessions/{sessionID}/changes.diff view
@@ -339,7 +339,6 @@ POST /api/sessions/live/{name}/context-window never
 POST /api/sessions/live/{name}/events never
 POST /api/sessions/live/{name}/files/refresh interact
 POST /api/sessions/live/{name}/goal interact
-POST /api/sessions/live/{name}/held/send never
 POST /api/sessions/live/{name}/keys interact
 POST /api/sessions/live/{name}/kill launch
 POST /api/sessions/live/{name}/model launch
@@ -354,6 +353,7 @@ POST /api/sessions/live/{name}/tasks interact
 POST /api/sessions/live/{name}/tasks/reorder never
 POST /api/sessions/live/{name}/token-usage never
 POST /api/sessions/live/{name}/turn-end never
+POST /api/sessions/live/{name}/waiting/send never
 POST /api/sessions/live/{sessionID}/archive interact
 POST /api/sessions/live/{sessionID}/refresh-hooks launch
 POST /api/sessions/live/{sessionID}/sleep launch

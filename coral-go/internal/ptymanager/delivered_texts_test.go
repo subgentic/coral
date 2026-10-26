@@ -70,28 +70,23 @@ func TestEachDeliveryFlagsOneTurn(t *testing.T) {
 	assert.Equal(t, []bool{false, true}, got, "a turn stamped before the delivery is the operator's")
 }
 
-// Only a text that was actually typed is recorded: through the gate, held while a prompt is open, then once it is delivered.
+// Only a text that was actually typed is recorded: not one skipped behind an open menu, and recorded at once when it is typed.
 func TestOnlyDeliveredSendsAreRecorded(t *testing.T) {
-	fastGate(t)
 	ctx := context.Background()
 	a := &fakeAgent{screen: permissionMenu}
 	name := "claude-delivered-gate"
-	in := a.input(name, "", taskNotice, false)
-	d, err := DeliverAutomated(ctx, in)
+	d, err := DeliverAutomated(ctx, a.input(name, "", taskNotice, false))
 	require.NoError(t, err)
-	require.Equal(t, Held, d)
-	assert.False(t, HasDeliveredTexts(name), "held behind a menu: not typed, not recorded")
+	require.Equal(t, Skipped, d)
+	assert.False(t, HasDeliveredTexts(name), "skipped behind a menu: not typed, not recorded")
 
 	a.show(idleInputBox)
-	require.Eventually(t, func() bool { return len(a.sent()) == 1 }, 3*time.Second, 10*time.Millisecond)
-	require.Eventually(t, func() bool { return HasDeliveredTexts(name) }, time.Second, 10*time.Millisecond, "recorded when the held send is delivered")
-	assert.Equal(t, []bool{true}, turns(name, taskNotice))
-
 	next := "You have 1 unread message on the message board. Run 'coral-board read' to see it."
 	d, err = DeliverAutomated(ctx, a.input(name, "", next, false))
 	require.NoError(t, err)
 	require.Equal(t, Sent, d)
-	assert.Equal(t, []bool{true}, turns(name, next), "recorded at once when typed at once")
+	assert.Equal(t, []bool{true}, turns(name, next), "recorded at once when typed")
+	assert.Equal(t, []bool{false}, turns(name, taskNotice), "the skipped one never was")
 }
 
 // Memory stays bounded: a session remembers its last deliveredTextsPerSession texts, and the number of sessions is capped.

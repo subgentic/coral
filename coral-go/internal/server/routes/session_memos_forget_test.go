@@ -37,7 +37,7 @@ func TestSessionMemosForgottenAtSessionEnd(t *testing.T) {
 	}
 	for i := 0; i < 50; i++ {
 		n, _ := name(i)
-		ptymanager.DropHeld(n, "killed")
+		ptymanager.ForgetSession(n)
 	}
 	for k, m := range maps {
 		if got := size(m); got != start[k] {

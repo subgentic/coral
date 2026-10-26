@@ -145,9 +145,6 @@ func (rs *RunningServer) Shutdown(timeout time.Duration) {
 	if rs.scheduler != nil && !rs.scheduler.WaitWatchers(3*time.Second) {
 		log.Printf("[shutdown] a job run's goroutine was still running after 3s")
 	}
-	// The input gate's retry loop sleeps between tries: wake it and wait for it to end, so it doesn't
-	// outlive the server (held sends are not delivered after Coral exits either way).
-	ptymanager.StopGate(5 * time.Second)
 	if rs.Server != nil {
 		rs.Server.CloseCloud()       // no command-line token outlives the server (#3285)
 		rs.Server.RemoveLoginToken() // nor the sign-in token's file (#3628 F7)

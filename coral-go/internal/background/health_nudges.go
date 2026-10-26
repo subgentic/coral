@@ -74,7 +74,7 @@ func hookSignal(ts *store.TaskStore) func(ctx context.Context, sessionID string)
 func NewHealthNudges(bs *board.Store, ts *store.TaskStore, rt AgentRuntime, discover func(context.Context) ([]AgentInfo, error)) *HealthNudges {
 	h := &HealthNudges{
 		store: bs, runtime: rt, logger: slog.Default(), discover: discover, now: time.Now,
-		Interval: 5 * time.Minute, TeamBudget: 20, heldDialogs: ptymanager.HeldAtDialog, heldDrafts: ptymanager.HeldAtDraft,
+		Interval: 5 * time.Minute, TeamBudget: 20, heldDialogs: ptymanager.SkippedAtPrompt, heldDrafts: ptymanager.SkippedAtDraft,
 	}
 	h.signal = hookSignal(ts)
 	h.deliver = func(ctx context.Context, a AgentInfo, key, text string) error {

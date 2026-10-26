@@ -69,7 +69,7 @@ var ErrTmuxBackend = errors.New("tmux")
 var ErrStartCommand = errors.New("Coral could not hand the agent its start command (its temporary folder is not usable), so the agent was not started")
 
 func (b *TmuxBackend) Spawn(name, agentType, workDir, sessionID, command string, cols, rows uint16) error {
-	DropHeld(name, "spawned") // nothing held for the old process is typed into a new one (#3431)
+	ForgetSession(name) // what Coral remembers of the old process is not true of a new one
 	ctx := context.Background()
 	tmuxName := naming.SessionName(agentType, sessionID)
 	logPath := naming.LogFile(b.logDir, agentType, sessionID)
@@ -135,7 +135,7 @@ func (b *TmuxBackend) SessionPID(ctx context.Context, name string) (int, error) 
 }
 
 func (b *TmuxBackend) Kill(name string) error {
-	DropHeld(name, "killed") // nothing held for the old process is typed into a new one (#3431)
+	ForgetSession(name) // what Coral remembers of the old process is not true of a new one
 	ctx := context.Background()
 
 	// Stop any active tail for this session
@@ -164,7 +164,7 @@ func (b *TmuxBackend) Kill(name string) error {
 }
 
 func (b *TmuxBackend) Restart(name, command string) error {
-	DropHeld(name, "restarted") // nothing held for the old process is typed into a new one (#3431)
+	ForgetSession(name) // what Coral remembers of the old process is not true of a new one
 	ctx := context.Background()
 
 	// Stop tail during respawn

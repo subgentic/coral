@@ -24,7 +24,7 @@ func TestBoardNotifier_ProcessReplacedNudgesAgainAtOnce(t *testing.T) {
 	require.NoError(t, n.RunOnce(ctx))
 	assert.Len(t, sentTo(rt), 2, "a nudge that went out is not repeated inside the reminder window")
 
-	ptymanager.DropHeld("claude-aaaa-0001", "spawned") // Wake: a new process
+	ptymanager.ForgetSession("claude-aaaa-0001") // Wake: a new process
 	require.NoError(t, n.RunOnce(ctx))
 	assert.Equal(t, []string{"claude-aaaa-0001", "claude-bbbb-0001", "claude-aaaa-0001"}, sentTo(rt), "the woken agent is nudged on the next pass, and only it")
 }
@@ -36,7 +36,7 @@ func TestBoardNotifier_NewMessageAfterADropNudges(t *testing.T) {
 	require.NoError(t, n.RunOnce(ctx))
 	base := len(sentTo(rt))
 
-	ptymanager.DropHeld("claude-aaaa-0001", "killed")
+	ptymanager.ForgetSession("claude-aaaa-0001")
 	_, err := n.boardStore.PostMessage(ctx, "a", "PosterA", "probe 2, no tag", nil)
 	require.NoError(t, err)
 	require.NoError(t, n.RunOnce(ctx))
@@ -50,7 +50,7 @@ func TestBoardNotifier_StoppedWatchIgnoresDrops(t *testing.T) {
 	stop()
 	require.NoError(t, n.RunOnce(ctx))
 	base := len(sentTo(rt))
-	ptymanager.DropHeld("claude-aaaa-0001", "spawned")
+	ptymanager.ForgetSession("claude-aaaa-0001")
 	n.now = func() time.Time { return time.Now() }
 	require.NoError(t, n.RunOnce(ctx))
 	assert.Equal(t, base, len(sentTo(rt)), "a stopped notifier no longer listens")

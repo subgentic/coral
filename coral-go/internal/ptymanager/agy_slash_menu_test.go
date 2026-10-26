@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -88,8 +87,7 @@ func TestAgySlashMenuIsMatchedByPositionNotPresence(t *testing.T) {
 // The #210 report end to end:"/help" is typed, agy opens its completion menu, and the Enter that confirms it is pressed, once. A trust
 // prompt that opens in its place still withholds it.
 func TestAgySlashCommandEnterIsSentThroughItsOwnCompletionMenu(t *testing.T) {
-	fastGate(t)
-	e := &enterAgent{fakeAgent: &fakeAgent{screen: agyScreen(t, "agy_idle.txt")}}
+	e := &fakeAgent{screen: agyScreen(t, "agy_idle.txt")}
 	name := "agy-gate-slash"
 	in := AutomatedInput{Term: e, Name: name, AgentType: "agy", Text: "/help", What: "test",
 		Send: func(ctx context.Context) error {
@@ -107,13 +105,12 @@ func TestAgySlashCommandEnterIsSentThroughItsOwnCompletionMenu(t *testing.T) {
 		}}
 	d, err := DeliverAutomated(context.Background(), in)
 	require.NoError(t, err)
-	assert.Equal(t, Sent, d, "the Enter is not held")
+	assert.Equal(t, Sent, d, "the Enter is pressed")
 	assert.Equal(t, []string{"/help", "<Enter>"}, e.sent())
 }
 
 func TestAgyTrustPromptOpeningBeforeTheEnterStillWithholdsIt(t *testing.T) {
-	fastGate(t)
-	e := &enterAgent{fakeAgent: &fakeAgent{screen: agyScreen(t, "agy_idle.txt")}}
+	e := &fakeAgent{screen: agyScreen(t, "agy_idle.txt")}
 	name := "agy-gate-trust"
 	in := AutomatedInput{Term: e, Name: name, AgentType: "agy", Text: "/help", What: "test",
 		Send: func(ctx context.Context) error {
@@ -131,8 +128,7 @@ func TestAgyTrustPromptOpeningBeforeTheEnterStillWithholdsIt(t *testing.T) {
 		}}
 	d, err := DeliverAutomated(context.Background(), in)
 	require.NoError(t, err)
-	assert.Equal(t, Held, d)
-	time.Sleep(100 * time.Millisecond)
+	assert.Equal(t, Skipped, d)
 	assert.Equal(t, []string{"/help"}, e.sent(), "no Enter into the trust prompt")
-	DropHeld(name, "test cleanup")
+	ForgetSession(name)
 }

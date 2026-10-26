@@ -1,0 +1,138 @@
+// What waits for a live agent, and Send now (#7727, replacing the held queue of #7554): with no queue, what waits for an agent is its unread board messages and the last
+// automated send Coral did not type, and why. Operator-only (an agent's token is refused: an agent cannot push text into another), never through the Hub.
+
+package routes
+
+import (
+	"context"
+	"net/http"
+	"time"
+
+	"github.com/go-chi/chi/v5"
+
+	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/clitext"
+	"github.com/subgentic/coral/internal/ptymanager"
+	"github.com/subgentic/coral/internal/terminalinput"
+)
+
+// maxWaitingMessages and maxWaitingText bound the list: the page shows the newest messages and expands one to its text.
+const (
+	maxWaitingMessages = 50
+	maxWaitingText     = 4000
+)
+
+type waitingMessage struct {
+	ID     int64  `json:"id"`
+	Sender string `json:"sender"`
+	At     string `json:"at"`
+	Text   string `json:"text"`
+	// Truncated: the text was cut at maxWaitingText.
+	Truncated bool `json:"truncated,omitempty"`
+}
+
+type skippedRow struct {
+	Why   string `json:"why"`
+	What  string `json:"what"`
+	At    string `json:"at"`
+	Since string `json:"since"`
+}
+
+// skippedWhy is why the last send to the session was not typed, for the 202 answers of the automated HTTP senders.
+func skippedWhy(name string) string {
+	if s, ok := ptymanager.SkippedOf(name); ok {
+		return s.Why
+	}
+	return "the agent's screen showed a prompt, a draft or could not be read"
+}
+
+// ListWaiting lists what waits for one live agent: its unread board messages (sender, time, text) and the last automated send that was not typed, with why.
+// GET /api/sessions/live/{name}/waiting?agent_type=..&session_id=..
+//
+//	{"board": "team", "unread": N, "messages": [{"id", "sender", "at", "text", "truncated"?}], "skipped": {"why", "what", "at", "since"} | null}
+func (h *SessionsHandler) ListWaiting(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+	if _, status, message := h.validateExactLiveTarget(r.Context(), name, r.URL.Query().Get("agent_type"), r.URL.Query().Get("session_id"), false); status != 0 {
+		writeExactTargetError(w, status, message)
+		return
+	}
+	out := map[string]any{"board": nil, "unread": 0, "messages": []waitingMessage{}, "skipped": nil}
+	if s, ok := ptymanager.SkippedOf(name); ok {
+		out["skipped"] = skippedRow{Why: s.Why, What: s.What, At: s.At.UTC().Format(time.RFC3339), Since: s.Since.UTC().Format(time.RFC3339)}
+	}
+	if h.bs != nil {
+		if sub, err := h.bs.GetSubscriptionBySessionName(r.Context(), name); err == nil && sub != nil {
+			out["board"] = sub.Project
+			if n, err := h.bs.CheckUnread(r.Context(), sub.Project, sub.SubscriberID); err == nil {
+				out["unread"] = n
+			}
+			if msgs, err := h.bs.ReadMessages(r.Context(), sub.Project, sub.SubscriberID, maxWaitingMessages); err == nil {
+				rows := make([]waitingMessage, 0, len(msgs))
+				for _, m := range msgs {
+					text, cut := clitext.Clean(m.Content), false
+					if len(text) > maxWaitingText {
+						text, cut = text[:maxWaitingText], true
+					}
+					rows = append(rows, waitingMessage{ID: m.ID, Sender: m.SubscriberID, At: m.CreatedAt, Text: text, Truncated: cut})
+				}
+				out["messages"] = rows
+			}
+		}
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// SendWaitingNow types the board nudge for one live agent at once, as a person's own action: the one look at the screen of an automated send is not made, except that nothing is typed
+// into a prompt that is open or added to text in the input box that is not Coral's (the agent may be in the middle of a turn: the text is typed into its input box and the CLI queues it).
+// POST /api/sessions/live/{name}/waiting/send  {"agent_type":..,"session_id":..}
+func (h *SessionsHandler) SendWaitingNow(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+	var body struct {
+		AgentType string `json:"agent_type"`
+		SessionID string `json:"session_id"`
+	}
+	if err := decodeJSON(r, &body); err != nil {
+		errBadRequest(w, "invalid JSON")
+		return
+	}
+	ls, status, message := h.validateExactLiveTarget(r.Context(), name, body.AgentType, body.SessionID, false)
+	if status != 0 {
+		writeExactTargetError(w, status, message)
+		return
+	}
+	if h.bs == nil {
+		errBadRequest(w, "no board")
+		return
+	}
+	sub, err := h.bs.GetSubscriptionBySessionName(r.Context(), name)
+	if err != nil || sub == nil {
+		errBadRequest(w, "this agent is not on a board")
+		return
+	}
+	unread, _ := h.bs.CheckUnread(r.Context(), sub.Project, sub.SubscriberID)
+	if unread <= 0 {
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "sent": false, "nothing_waiting": true})
+		return
+	}
+	text := board.NudgeText(unread)
+	delivery, err := ptymanager.DeliverNow(r.Context(), ptymanager.AutomatedInput{
+		Term: h.terminal, Name: name, AgentType: ls.AgentType, SessionID: ls.SessionID,
+		Key: "board-unread:" + sub.Project, Text: text, What: "Send now", Paste: true,
+		Send: func(ctx context.Context) error {
+			return h.terminal.SendInput(ctx, terminalinput.Coral, name, text, ls.AgentType, ls.SessionID)
+		},
+	})
+	if err != nil {
+		errInternalServer(w, err.Error())
+		return
+	}
+	out := map[string]any{"ok": true, "sent": delivery == ptymanager.Sent}
+	if delivery == ptymanager.Skipped {
+		if s, ok := ptymanager.SkippedOf(name); ok {
+			out["why"] = s.Why
+			out["prompt_open"] = len(s.Why) >= len(ptymanager.SkipPrompt) && s.Why[:len(ptymanager.SkipPrompt)] == ptymanager.SkipPrompt
+			out["draft_in_box"] = s.Why == ptymanager.SkipDraft
+		}
+	}
+	writeJSON(w, http.StatusOK, out)
+}

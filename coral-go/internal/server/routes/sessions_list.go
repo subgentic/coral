@@ -496,9 +496,7 @@ func (h *SessionsHandler) agentRow(trace *phaseTrace, agent AgentInfo, lv liveIn
 		"board_project":         boardProject(d.boardSubs, lv.boardNames, tmuxName, sid),
 		"board_job_title":       boardJobTitle(d.boardSubs, lv.boardNames, tmuxName, sid),
 		"board_unread":          boardUnread,
-		"held_inputs":           ptymanager.HeldCount(tmuxName), // automated sends the gate holds (#3578)
-		"held_since":            heldSinceField(tmuxName),       // when the oldest of them was first held, UTC, null at none (#6503)
-		"held_reason":           heldReasonField(tmuxName),      // why the oldest is held: turn, prompt, dialog, draft, box or other; null at none (#7433)
+		"skipped_send":          skippedSendField(tmuxName), // the last automated send Coral did not type and why ({why, what, at, since}), null at none (#7727)
 		"board_is_orchestrator": boardSubscriberFlag(boardSub),
 		"log_path":              agent.LogPath,
 		"sleeping":              lv.sleeping[sid],
@@ -982,18 +980,11 @@ func (h *SessionsHandler) terminalOfAgent(launchPath string) string {
 	return terminalKind(h.backend)
 }
 
-// heldSinceField is the live row's held_since: the UTC time (RFC 3339) the oldest held automated send was first held, or nil when none is held (#6503).
-func heldSinceField(name string) any {
-	if t := ptymanager.HeldSince(name); !t.IsZero() {
-		return t.UTC().Format(time.RFC3339)
-	}
-	return nil
-}
-
-// heldReasonField is the live row's held_reason: one of ptymanager.HeldReasons, why the oldest held automated send is held, or nil when none is held (#7433).
-func heldReasonField(name string) any {
-	if r := ptymanager.HeldReason(name); r != "" {
-		return r
+// skippedSendField is the live row's skipped_send: the last automated send Coral did not type into the agent and why, or nil when none is pending (#7727). The unread board messages that
+// wait for it are board_unread; the page lists them (GET .../waiting).
+func skippedSendField(name string) any {
+	if s, ok := ptymanager.SkippedOf(name); ok {
+		return skippedRow{Why: s.Why, What: s.What, At: s.At.UTC().Format(time.RFC3339), Since: s.Since.UTC().Format(time.RFC3339)}
 	}
 	return nil
 }

@@ -150,7 +150,7 @@ c GET /api/sessions/live/{name}/file-content
 c GET /api/sessions/live/{name}/file-original
 c GET /api/sessions/live/{name}/files
 c GET /api/sessions/live/{name}/git
-b GET /api/sessions/live/{name}/held
+b GET /api/sessions/live/{name}/waiting
 c GET /api/sessions/live/{name}/history/context
 c GET /api/sessions/live/{name}/history/search
 c GET /api/sessions/live/{name}/info
@@ -355,7 +355,7 @@ a POST /api/sessions/live/{name}/context-window
 a POST /api/sessions/live/{name}/events
 c POST /api/sessions/live/{name}/files/refresh
 b POST /api/sessions/live/{name}/goal
-b POST /api/sessions/live/{name}/held/send
+b POST /api/sessions/live/{name}/waiting/send
 b POST /api/sessions/live/{name}/keys
 b POST /api/sessions/live/{name}/kill
 b POST /api/sessions/live/{name}/model

@@ -543,7 +543,7 @@ func (h *SessionsHandler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 		// The agent's process ended (Claude's SessionEnd): nothing held for it may be
 		// typed into whatever runs in that terminal next (#3481). Not on SessionStart:
 		// a launch's first prompt is a held send waiting for that very start.
-		ptymanager.DropHeld(owner.SessionName, "the agent's session ended")
+		ptymanager.ForgetSession(owner.SessionName)
 		h.liveModes.Delete(body.SessionID) // an ended session keeps no mode (and the map no id for the life of the process)
 	}
 	// Only the agent's own (token-verified) notification wakes auto-accept early; the sweep

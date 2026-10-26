@@ -139,10 +139,8 @@ func TestSpaceTeamNoTeamAndCancel(t *testing.T) {
 	assert.Error(t, SpaceTeam(cancelled, "fresh"), "a cancelled send doesn't go")
 }
 
-// A send whose team slot is over MaxTeamWait away is held, not dropped and not parked: the
-// gate's loop types it once the slot is near.
-func TestABusyTeamSendIsHeldThenTyped(t *testing.T) {
-	fastGate(t)
+// A send whose team slot is over MaxTeamWait away is not typed and not kept: it is skipped, with its reason, and the next send (a nudge repeats) types once the slot is near.
+func TestABusyTeamSendIsSkippedThenTheNextIsTyped(t *testing.T) {
 	s := newTeamSpacer()
 	s.gap = func() time.Duration { return 0 }
 	useSpacer(t, s)
@@ -155,15 +153,19 @@ func TestABusyTeamSendIsHeldThenTyped(t *testing.T) {
 	a := &fakeAgent{screen: idleInputBox}
 	d, err := DeliverAutomated(context.Background(), a.input("claude-gate-busy", "", "hello", false))
 	require.NoError(t, err)
-	assert.Equal(t, Held, d, "not now")
-	time.Sleep(100 * time.Millisecond) // sleep-ok: several gate passes, still busy
+	assert.Equal(t, Skipped, d, "not now")
 	assert.Empty(t, a.sent(), "nothing typed while the team is busy")
+	sk, _ := SkippedOf("claude-gate-busy")
+	assert.Equal(t, SkipTeamBusy, sk.Why)
 
 	s.mu.Lock()
 	delete(s.next, "busy-team")
 	s.mu.Unlock()
-	require.Eventually(t, func() bool { return len(a.sent()) == 1 }, 5*time.Second, 10*time.Millisecond)
-	assert.Equal(t, []string{"hello"}, a.sent(), "typed once, when the slot came")
+	d, err = DeliverAutomated(context.Background(), a.input("claude-gate-busy", "", "hello again", false))
+	require.NoError(t, err)
+	assert.Equal(t, Sent, d)
+	assert.Equal(t, []string{"hello again"}, a.sent(), "typed once, when the slot came")
+	ForgetSession("claude-gate-busy")
 }
 
 func TestJitterAroundBounds(t *testing.T) {

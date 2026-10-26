@@ -1,6 +1,5 @@
 /* Live updates to the open agent's header: its folder, branch, waiting state, goal and status (moved out of render.js, #4996; no behaviour change). */
-import { syncHeldNotice } from './held_inputs.js';
-import './held_send_now.js'; // Send now on the held notice (#7554)
+import { syncWaitingNotice } from './waiting.js'; // what waits for the open agent, with Send now (#7727)
 import { syncQueuedFromRow, paint as paintQueued } from './held_sends.js';
 import { _shortPath, _gitStateSummary, _repoBranch, deriveSessionState } from './session_state.js';
 import { startupSignedOut } from './signin_line.js';
@@ -73,7 +72,7 @@ export function updateSessionBranch(branch, repoName, gitState) {
 
 export function updateWaitingIndicator(s) {
     syncAgentKeys(s); // Stop in place of Send, and the strip that a question opens (#6802)
-    syncHeldNotice(s); // automated messages held for over a minute: the agent view says so (#6473)
+    syncWaitingNotice(s);
     syncQueuedFromRow(s); paintQueued(); // the person's own messages held behind a question (#6611)
     const dot = document.getElementById("session-status-dot");
     const banner = document.getElementById("waiting-banner");

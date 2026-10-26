@@ -24,7 +24,7 @@ import (
 const (
 	gateSID        = "3b1c9d2e-7f40-4a8b-9c1d-2e3f4a5b6c7d"
 	permissionMenu = " Do you want to proceed?\n ❯ 1. Yes\n   2. Yes, and don't ask again\n   3. No\n\n Esc to cancel · Tab to amend\n"
-	idleInputBox   = "⏺ Done.\n\n╭────────╮\n│ >      │\n╰────────╯\n  ? for shortcuts\n"
+	idleInputBox   = "⏺ Done.\n\n──────────────────────────────────────────\n❯ \n──────────────────────────────────────────\n  ? for shortcuts\n"
 )
 
 // screenTerminal is the mock terminal with a screen the test sets (#3431): the
@@ -49,9 +49,9 @@ func (s *screenTerminal) show(screen string) {
 
 // The operator's report (#3431): with Claude's permission menu open, a board
 // message, a task notification and a board nudge arrive. Nothing is typed (the
-// menu stays open, no option is chosen). Once the user answers the menu, each
-// is typed exactly once, in order.
-func TestAutomatedMessagesAreHeldWhileAPermissionMenuIsOpen(t *testing.T) {
+// menu stays open, no option is chosen) and nothing is kept (#7727). Once the
+// user answers the menu, the next ones are typed at once, in order.
+func TestAutomatedMessagesAreNotTypedWhileAPermissionMenuIsOpen(t *testing.T) {
 	t.Parallel() // no shared state: these ran one after another (#5622)
 	_, handler, mock, ss := setupSessionsTestServer(t)
 	term := &screenTerminal{fgSessionTerminal: newFGTerminal(mock), screen: permissionMenu}
@@ -73,15 +73,17 @@ func TestAutomatedMessagesAreHeldWhileAPermissionMenuIsOpen(t *testing.T) {
 	assert.Empty(t, term.sentTo(name), "nothing typed while the permission menu is open")
 
 	term.show(idleInputBox) // the user answered the menu
-	require.Eventually(t, func() bool { return len(term.sentTo(name)) == 3 }, 10*time.Second, 50*time.Millisecond)
 	time.Sleep(300 * time.Millisecond)
-	assert.Equal(t, []string{"[Lead] please review the patch", prompt, "You have 2 unread messages on the message board."}, term.sentTo(name), "each typed once, in order")
+	assert.Empty(t, term.sentTo(name), "what was skipped is not kept and typed later")
+	require.NoError(t, board.sendAutomated(ctx, "team", name, "[Lead] please review the patch"))
+	require.NoError(t, board.sendAutomated(ctx, "team", name, "You have 2 unread messages on the message board."))
+	assert.Equal(t, []string{"[Lead] please review the patch", "You have 2 unread messages on the message board."}, term.sentTo(name), "typed at once, in order")
 }
 
 // /send from anything but a person (here: no dashboard, Hub or signed-CLI
 // classification) is automation: held while a prompt is open, answering 202.
 // The dashboard's own /send is a person typing and is sent at once.
-func TestSendFromAScriptIsHeldButTheDashboardTypes(t *testing.T) {
+func TestSendFromAScriptIsSkippedAtAPromptButTheDashboardTypes(t *testing.T) {
 	t.Parallel() // no shared state: these ran one after another (#5622)
 	_, handler, mock, ss := setupSessionsTestServer(t)
 	term := &screenTerminal{fgSessionTerminal: newFGTerminal(mock), screen: permissionMenu}
@@ -106,7 +108,7 @@ func TestSendFromAScriptIsHeldButTheDashboardTypes(t *testing.T) {
 
 	rec := post("", "1")
 	assert.Equal(t, http.StatusAccepted, rec.Code, rec.Body.String())
-	assert.Contains(t, rec.Body.String(), `"held":true`)
+	assert.Contains(t, rec.Body.String(), `"skipped":true`)
 	rec = post(callerAPIKey, "yes")
 	assert.Equal(t, http.StatusAccepted, rec.Code, "an API-key caller is automation")
 	assert.Empty(t, term.sentTo(name), "a script can't answer the menu")
@@ -116,8 +118,11 @@ func TestSendFromAScriptIsHeldButTheDashboardTypes(t *testing.T) {
 	assert.Equal(t, []string{"2"}, term.sentTo(name))
 
 	term.show(idleInputBox)
-	require.Eventually(t, func() bool { return len(term.sentTo(name)) == 3 }, 10*time.Second, 50*time.Millisecond)
-	assert.Equal(t, []string{"2", "1", "yes"}, term.sentTo(name))
+	time.Sleep(300 * time.Millisecond)
+	assert.Equal(t, []string{"2"}, term.sentTo(name), "what a script sent at the prompt is not kept")
+	rec = post(callerAPIKey, "yes")
+	assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	assert.Equal(t, []string{"2", "yes"}, term.sentTo(name))
 }
 
 // Who counts as a person for /send and /keys (#3431), through the real identity

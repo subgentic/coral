@@ -7,13 +7,11 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/subgentic/coral/internal/board"
-	"github.com/subgentic/coral/internal/ptymanager"
 )
 
 type timeoutAgeLogs struct {
@@ -87,33 +85,6 @@ func TestWaitTimeoutInsideAgeWindowRetriesAndBoundaryIsAllowed(t *testing.T) {
 			require.NotContains(t, logs.text(), "dropped stale board wait timeout")
 		})
 	}
-}
-
-func TestHeldWaitTimeoutExpiresBeforePromptCloses(t *testing.T) {
-	_, h := setupBoardTestServer(t)
-	ctx := context.Background()
-	logs := captureTimeoutAgeLogs(t)
-	const name = "claude-71460000-0000-4000-8000-000000000003"
-	mock := newMockTerminal()
-	mock.addSession(name, "/tmp/age-held")
-	term := &screenTerminal{fgSessionTerminal: newFGTerminal(mock), screen: permissionMenu}
-	term.setFG(name, "node")
-	h.SetTerminal(term)
-	t.Cleanup(func() { ptymanager.DropHeld(name, "test complete") })
-	expiry := setupTimeoutAgeWait(t, h, name, "Lead")
-	var nanos atomic.Int64
-	nanos.Store(expiry.Add(time.Minute).UnixNano())
-	clock := func() time.Time { return time.Unix(0, nanos.Load()) }
-	h.dispatchWaitTimeoutsWithClock(ctx, clock)
-	require.Equal(t, 1, ptymanager.HeldCount(name))
-	require.Empty(t, mock.sentTo(name))
-	nanos.Store(expiry.Add(16 * time.Minute).UnixNano())
-	term.show(idleInputBox)
-	require.Eventually(t, func() bool { return ptymanager.HeldCount(name) == 0 }, 10*time.Second, 10*time.Millisecond)
-	require.Empty(t, mock.sentTo(name))
-	require.Equal(t, 1, strings.Count(logs.text(), "dropped stale board wait timeout"))
-	h.dispatchWaitTimeoutsWithClock(ctx, clock)
-	require.Equal(t, 1, strings.Count(logs.text(), "dropped stale board wait timeout"))
 }
 
 func TestWaitTimeoutCleansTargetNameBeforeTyping(t *testing.T) {

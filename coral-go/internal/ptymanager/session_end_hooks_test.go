@@ -5,9 +5,9 @@ import (
 	"testing"
 )
 
-// #4057: DropHeld (a session's kill, restart, resume or new launch) calls every registered
+// #4057: ForgetSession (a session's kill, restart, resume or new launch) calls every registered
 // session-end hook with the session's name, its tmux target suffix removed.
-func TestDropHeldCallsTheSessionEndHooks(t *testing.T) {
+func TestForgetSessionCallsTheSessionEndHooks(t *testing.T) {
 	var mu sync.Mutex
 	got := map[string]int{}
 	OnSessionEnd(func(name string) {
@@ -15,8 +15,8 @@ func TestDropHeldCallsTheSessionEndHooks(t *testing.T) {
 		got[name]++
 		mu.Unlock()
 	})
-	DropHeld("claude-4057-hook", "killed")
-	DropHeld("claude-4057-hook:0.0", "restarted")
+	ForgetSession("claude-4057-hook")
+	ForgetSession("claude-4057-hook:0.0")
 	mu.Lock()
 	defer mu.Unlock()
 	if got["claude-4057-hook"] != 2 {

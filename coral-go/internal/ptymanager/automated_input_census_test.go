@@ -27,7 +27,7 @@ var sendCalls = map[string]bool{
 }
 
 // A sender declares the guard that decides when it may type (#5254). guard is one of:
-//   - guardGate: it types only through the automated-input gate, which waits for nothing to be open on the screen and no draft in the box
+//   - guardGate: it types only through the automated-input gate, which types nothing while a prompt or menu is open on the screen or the box holds text that is not Coral's
 //   - guardHuman: a person's own action; the route is operator-only (no agent token), or it is the dashboard terminal
 //   - guardScreen: it reads the agent's screen first and types nothing unless the screen is what it expects; proof names a test that
 //     shows it sends nothing for a draft in the box or a look-alike screen
@@ -58,10 +58,13 @@ var allowedSenders = map[string]sender{
 	"internal/background/agent_exited.go\tdeliverAutomatedIfWanted\tSendInput":               {guardGate, "gate", ""},
 	"internal/server/routes/agent_exited.go\tdeliverAutomatedWhile\tSendInput":               {guardGate, "gate", ""},
 	"internal/server/routes/agent_ui_request.go\tSessionsHandler.agentUIRequest\tSendPrompt": {guardGate, "gate (its send closure)", ""},
-	"internal/ptymanager/automated_input_deliver.go\tinputGate.holdEnter\tSendEnter":         {guardGate, "gate (a withheld Enter, sent once the prompt is gone)", ""},
 	// AgentLauncher.SendPrompt, which goes through the gate itself.
 	"internal/background/launcher.go\tAgentLauncher.startPromptDelivery\tSendPrompt":            {guardGate, "gated launcher prompt", ""},
 	"internal/background/workflow_steps.go\tWorkflowRunner.executeAgentInteractive\tSendPrompt": {guardGate, "gated launcher prompt", ""},
+	// #7727: the gate's own sends: one look at the screen, then the text and its Enter at once; nothing into an open prompt or over a draft.
+	"internal/ptymanager/automated_input_deliver.go\tinputGate.typeNow\tSendPrompt":            {guardGate, "gate (the paste with its Enter: the screen is looked at once before, and again just before the Enter)", ""},
+	"internal/ptymanager/automated_input_deliver.go\tAutomatedInput.submitLeftover\tSendEnter": {guardGate, "gate (the Enter of Coral's own earlier text: the box holds exactly the last text Coral typed)", ""},
+	"internal/server/routes/sessions_waiting.go\tSessionsHandler.SendWaitingNow\tSendInput":    {guardHuman, "human: the Operator's Send now (Operator-only), through ptymanager.DeliverNow, which still refuses an open prompt and a draft", ""},
 	// The opt-in auto-accept feature, through its named exemption.
 	"internal/server/routes/auto_accept.go\tAutoAcceptor.check\tAutoAcceptSend": {guardAutoAccept, "auto-accept exemption", ""},
 	"internal/server/routes/auto_accept.go\tAutoAcceptor.check\tSendRawInput":   {guardAutoAccept, "inside AutoAcceptSend", ""},
@@ -120,26 +123,17 @@ var allowedSenders = map[string]sender{
 	"internal/ptymanager/tmux_backend.go\tTmuxBackend.sendInput\tSendTerminalInputToTarget":                          {guardPrimitive, "primitive: SendInput, and SendHumanInput for a person's keystrokes (#60)", ""},
 	"internal/ptymanager/prompt_screen.go\tTmuxSessionTerminal.SendEnter\tSendRawKeys":                               {guardPrimitive, "primitive", ""},
 	"internal/background/runtime_tmux.go\tTmuxRuntime.SendEnter\tSendRawKeys":                                        {guardPrimitive, "primitive", ""},
-	"internal/background/runtime_tmux.go\tTmuxRuntime.SendRawInput\tSendRawKeys":                                     {guardPrimitive, "primitive: what the gate's survey dismissal types through a runtime (#6974)", ""},
-	"internal/background/runtime_pty.go\tPTYRuntime.SendRawInput\tSendRawInput":                                      {guardPrimitive, "primitive: what the gate's survey dismissal types through a runtime (#6974)", ""},
-	// #5114: the one 0 that dismisses Claude's session survey (never a rating), only when it is the only thing open.
-	"internal/ptymanager/survey_dismiss.go\tinputGate.dismissSurvey\tSendRawInput": {guardScreen, "gate (a single 0, only for the exact session survey directly above the input box; waits for it to go; at most once per 30 s; #5114)", "TestSurveyWithADraftInTheInputBoxGetsNoZero"},
-	// #3457: automated text as a bracketed paste.
-	"internal/ptymanager/automated_input_deliver.go\tinputGate.pasteAndEnter\tSendPrompt": {guardGate, "gate (the paste, Enter only after the re-check)", ""},
-	// #7579: Send now's forced typing: the Operator chose it, so the box is not looked for, but a real prompt on the screen and a draft in the box still refuse (held_force.go).
-	"internal/ptymanager/held_force.go\tinputGate.forcePaste\tSendPrompt":                     {guardGate, "gate (Send now: the paste, never into a prompt open on the screen or over a draft; Enter only after the prompt re-check)", ""},
-	"internal/ptymanager/held_force.go\tinputGate.forcePaste\tSendEnter":                      {guardGate, "gate (Send now: the Enter of a paste already made, after the screen shows no prompt and no draft was seen)", ""},
-	"internal/ptymanager/paste_check.go\tinputGate.enterAndConfirm\tSendEnter":                {guardGate, "gate (a held paste's Enter, once its text is in the box and no prompt is open; confirmed, #4104)", ""},
-	"internal/ptymanager/paste_check.go\tinputGate.submitLeftover\tSendEnter":                 {guardGate, "gate (the Enter of Coral's own earlier paste left in the box, an exact match; never a person's draft, #4104)", ""},
-	"internal/background/runtime_tmux.go\tTmuxRuntime.SendPrompt\tSendPrompt":                 {guardPrimitive, "primitive", ""},
-	"internal/background/runtime_pty.go\tPTYRuntime.SendPrompt\tSendPrompt":                   {guardPrimitive, "primitive", ""},
-	"internal/background/runtime_pty.go\tPTYRuntime.SendEnter\tSendInput":                     {guardPrimitive, "primitive", ""},
-	"internal/ptymanager/session_terminal_pty.go\tPTYSessionTerminal.SendEnter\tSendInput":    {guardPrimitive, "primitive", ""},
-	"internal/ptymanager/session_terminal_pty.go\tPTYSessionTerminal.SendArrow\tSendInput":    {guardPrimitive, "primitive", ""},
-	"internal/ptymanager/prompt_screen.go\tTmuxSessionTerminal.SendArrow\tSendRawKeys":        {guardPrimitive, "primitive", ""},
-	"internal/tmux/send_keys.go\tClient.typeCommand\tpasteToTarget":                           {guardPrimitive, "primitive", ""}, // SendKeys (text) and SendKeysToTarget (a launch command) type through it (#4361)
-	"internal/tmux/send_keys.go\tClient.SendTerminalInputToTarget\tpasteToTarget":             {guardPrimitive, "primitive", ""},
-	"internal/tmux/send_keys.go\tClient.SendTerminalInputToTarget\tSendTerminalInputToTarget": {guardPrimitive, "primitive", ""},
+	"internal/background/runtime_tmux.go\tTmuxRuntime.SendRawInput\tSendRawKeys":                                     {guardPrimitive, "primitive: a raw key through a runtime", ""},
+	"internal/background/runtime_pty.go\tPTYRuntime.SendRawInput\tSendRawInput":                                      {guardPrimitive, "primitive: a raw key through a runtime", ""},
+	"internal/background/runtime_tmux.go\tTmuxRuntime.SendPrompt\tSendPrompt":                                        {guardPrimitive, "primitive", ""},
+	"internal/background/runtime_pty.go\tPTYRuntime.SendPrompt\tSendPrompt":                                          {guardPrimitive, "primitive", ""},
+	"internal/background/runtime_pty.go\tPTYRuntime.SendEnter\tSendInput":                                            {guardPrimitive, "primitive", ""},
+	"internal/ptymanager/session_terminal_pty.go\tPTYSessionTerminal.SendEnter\tSendInput":                           {guardPrimitive, "primitive", ""},
+	"internal/ptymanager/session_terminal_pty.go\tPTYSessionTerminal.SendArrow\tSendInput":                           {guardPrimitive, "primitive", ""},
+	"internal/ptymanager/prompt_screen.go\tTmuxSessionTerminal.SendArrow\tSendRawKeys":                               {guardPrimitive, "primitive", ""},
+	"internal/tmux/send_keys.go\tClient.typeCommand\tpasteToTarget":                                                  {guardPrimitive, "primitive", ""}, // SendKeys (text) and SendKeysToTarget (a launch command) type through it (#4361)
+	"internal/tmux/send_keys.go\tClient.SendTerminalInputToTarget\tpasteToTarget":                                    {guardPrimitive, "primitive", ""},
+	"internal/tmux/send_keys.go\tClient.SendTerminalInputToTarget\tSendTerminalInputToTarget":                        {guardPrimitive, "primitive", ""},
 }
 
 func TestEveryTerminalSendIsReviewed(t *testing.T) {

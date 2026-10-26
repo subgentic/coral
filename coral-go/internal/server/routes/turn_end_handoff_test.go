@@ -53,14 +53,6 @@ func TestTurnEndHandoff(t *testing.T) {
 
 	_, err = h.bs.PostMessage(ctx, board, "Lead", "@Worker please review #12", nil)
 	require.NoError(t, err)
-	// Coral holds the nudge for it (the agent's screen shows a prompt), and an unrelated send.
-	for _, key := range []string{"board-unread:" + board, "ui-request:9"} {
-		_, err := ptymanager.DeliverAutomated(ctx, ptymanager.AutomatedInput{Term: menuOnScreen{}, Name: name, AgentType: "claude", SessionID: sid,
-			Key: key, Text: "held " + key, What: "test", Send: func(context.Context) error { return nil }})
-		require.NoError(t, err)
-	}
-	require.Equal(t, 2, ptymanager.HeldCount(name))
-
 	_, out = ask(`{"stop_hook_active":true}`, tok)
 	assert.Equal(t, false, out["handoff"], "at most once per stop chain")
 
@@ -69,8 +61,6 @@ func TestTurnEndHandoff(t *testing.T) {
 	assert.Equal(t, "New board messages", out["reason"])
 	assert.Contains(t, out["context"], "1 new message on "+board)
 	assert.Contains(t, out["context"], "coral-board read")
-	assert.Equal(t, 1, ptymanager.HeldCount(name), "the board nudge is retired; the other send stays held")
-	ptymanager.DropHeld(name, "test done")
 
 	// The setting off, or an agent with no board (a person drives it): no hand-off.
 	require.NoError(t, ss.SetSetting(ctx, TurnEndHandoffSetting, "off"))
@@ -87,49 +77,7 @@ func TestTurnEndHandoff(t *testing.T) {
 type idleBox struct{}
 
 func (idleBox) AgentScreen(context.Context, string, string, string) (string, error) {
-	return "⏺ Done.\n\n╭────────╮\n│ >      │\n╰────────╯\n  ? for shortcuts\n", nil
-}
-
-// #3481 1B with #3482's TakeHeld (taken, ok): when a send to the agent is in progress
-// and doesn't finish within the hand-off's wait, nothing is handed off. That send is
-// about to reach the agent; a hand-off too would be a second copy.
-func TestTurnEndHandoffSkipsWhileASendIsInProgress(t *testing.T) {
-	t.Parallel() // no shared state: these ran one after another (#5622)
-	server, h, _, ss := setupSessionsTestServer(t)
-	ctx := context.Background()
-	sid := "eeeeeeee-3481-1b00-0000-000000000007"
-	name := "claude-" + sid
-	board := "team-3481b"
-	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: "foxtrot", WorkingDir: "/w", BoardName: &board}))
-	tok := agentToken(t, h, sid, name)
-	_, err := h.bs.Subscribe(ctx, board, "Worker", "Worker", name, nil, "all")
-	require.NoError(t, err)
-	_, err = h.bs.Subscribe(ctx, board, "Lead", "Lead", "", nil, "all")
-	require.NoError(t, err)
-	_, err = h.bs.PostMessage(ctx, board, "Lead", "@Worker news", nil)
-	require.NoError(t, err)
-
-	// A send that is being typed holds the agent's send lock until it finishes.
-	started, release := make(chan struct{}), make(chan struct{})
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		_, _ = ptymanager.DeliverAutomated(ctx, ptymanager.AutomatedInput{Term: idleBox{}, Name: name, AgentType: "claude", SessionID: sid,
-			Key: "board-unread:" + board, Text: "You have 1 unread message", What: "test",
-			Send: func(context.Context) error { close(started); <-release; return nil }})
-	}()
-	<-started
-	defer func() { close(release); <-done }()
-
-	req, _ := http.NewRequest("POST", server.URL+"/api/sessions/live/foxtrot/turn-end", strings.NewReader(`{}`))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set(store.SessionTokenHeader, tok)
-	resp, err := http.DefaultClient.Do(req)
-	require.NoError(t, err)
-	defer resp.Body.Close()
-	var out map[string]any
-	require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
-	assert.Equal(t, false, out["handoff"], "a send in progress: no second copy through the hand-off")
+	return "⏺ Done.\n\n──────────────────────────────────────────\n❯ \n──────────────────────────────────────────\n  ? for shortcuts\n", nil
 }
 
 // #3510 (QA's bug bash): with the screen rule (the default), a nudge isn't held during a
@@ -218,7 +166,7 @@ func TestTurnEndHandoffAfterARealTypedNudge(t *testing.T) {
 	require.NoError(t, err)
 	_, err = h.bs.Subscribe(ctx, board, "Lead", "Lead", "", nil, "all")
 	require.NoError(t, err)
-	t.Cleanup(func() { ptymanager.DropHeld(name, "test done") })
+	t.Cleanup(func() { ptymanager.ForgetSession(name) })
 
 	_, err = h.ts.InsertAgentEvent(ctx, &store.AgentEvent{AgentName: "hotel", SessionID: &sid, EventType: "prompt_submit", Summary: "User submitted prompt",
 		CreatedAt: time.Now().UTC().Add(-2 * time.Second).Format(store.ISOFormat)})

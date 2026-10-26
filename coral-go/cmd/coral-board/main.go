@@ -90,8 +90,8 @@ func main() {
 		cmdExport()
 	case "peek":
 		cmdPeek()
-	case "held":
-		cmdHeld()
+	case "waiting":
+		cmdWaiting()
 	case "task":
 		cmdTask()
 	case "goal":
@@ -158,8 +158,8 @@ Commands:
   health ack <id>              Mark a health-check item handled: the item that ends
                                with [ack <id>] (orchestrator or Operator)
   peek "<agent>" [--lines N]   Peek at agent's terminal (orchestrator only)
-  held "<agent>"               List the messages Coral is holding for an agent (the Operator)
-  held send "<agent>" [--id ID]  Type them into the agent now (the Operator; it may be mid-turn)
+  waiting "<agent>"            List what waits for an agent: its unread board messages and the last send not typed (the Operator)
+  waiting send "<agent>"       Type the board nudge into the agent now (the Operator; it may be mid-turn)
   send --board <target> [--to <orchestrator>] [--attach coral://artifacts/<id> ...] "<message>"
        (or --file <path> instead of the message: a UTF-8 file, as for post)
                                Message another team's Orchestrator on this Coral

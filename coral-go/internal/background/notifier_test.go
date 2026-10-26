@@ -677,34 +677,6 @@ func (heldScreenTerm) AgentScreen(context.Context, string, string, string) (stri
 	return " Do you want to proceed?\n ❯ 1. Yes\n   2. No\n\n Esc to cancel\n", nil
 }
 
-// #3482: a nudge held while the agent works (signals mode holds mid-turn) is retired
-// once the notifier sees the agent read its board, instead of being typed later into
-// an agent with nothing to read. Other held sends stay.
-func TestBoardNotifier_RetiresAHeldNudgeOnceRead(t *testing.T) {
-	bs := testBoardStore(t)
-	rt := &mockRuntime{}
-	ctx := context.Background()
-	notifier := NewBoardNotifier(bs, rt, 10*time.Second)
-	notifier.SetIsPausedFn(func(_ string) bool { return false })
-	_, err := bs.Subscribe(ctx, "board-X", "Worker", "Worker", "claude-xxxx-0001", nil, "")
-	require.NoError(t, err)
-	notifier.SetDiscoverFn(func(_ context.Context) ([]AgentInfo, error) {
-		return []AgentInfo{{AgentName: "worker-agent", AgentType: "claude", SessionID: "xxxx-0001", DisplayName: "Worker"}}, nil
-	})
-	name := "claude-xxxx-0001"
-	t.Cleanup(func() { ptymanager.DropHeld(name, "test done") })
-	for _, key := range []string{"board-unread:board-X", "agent-ui"} {
-		d, err := ptymanager.DeliverAutomated(ctx, ptymanager.AutomatedInput{Term: heldScreenTerm{}, Name: name, Key: key, Text: key, What: "test",
-			Send: func(context.Context) error { t.Error("typed while a menu is open"); return nil }})
-		require.NoError(t, err)
-		require.Equal(t, ptymanager.Held, d)
-	}
-	require.Equal(t, 2, ptymanager.HeldCount(name))
-
-	require.NoError(t, notifier.RunOnce(ctx)) // nothing unread
-	assert.Equal(t, 1, ptymanager.HeldCount(name), "the board's stale nudge is retired, the other send stays")
-}
-
 // The reminder window is spread per agent (#3613): never before 0.8 x remindAfter, always by
 // 1.2 x, so reminders set in one pass don't all come due in the same one.
 func TestBoardNotifier_ReminderWindowIsJittered(t *testing.T) {

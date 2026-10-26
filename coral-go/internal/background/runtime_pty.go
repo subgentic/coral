@@ -35,7 +35,7 @@ func NewPTYRuntime(backend *ptymanager.PTYBackend) *PTYRuntime {
 }
 
 func (r *PTYRuntime) SpawnAgent(ctx context.Context, name, workDir, logFile, command string) error {
-	ptymanager.DropHeld(name, "spawned") // nothing held for the old process is typed into a new one (#3431)
+	ptymanager.ForgetSession(name) // what Coral remembers of the old process is not true of a new one
 	// Extract agent type and session ID from name format "{type}-{uuid}"
 	agentType, sessionID := parseSessionName(name)
 	if agentType == "" {
@@ -70,7 +70,7 @@ func (r *PTYRuntime) SendRawInput(ctx context.Context, o terminalinput.Origin, n
 }
 
 func (r *PTYRuntime) KillAgent(ctx context.Context, name string) error {
-	ptymanager.DropHeld(name, "killed") // nothing held for the old process is typed into a new one (#3431)
+	ptymanager.ForgetSession(name) // what Coral remembers of the old process is not true of a new one
 	return r.backend.Kill(name)
 }
 

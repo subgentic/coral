@@ -5,7 +5,6 @@ import (
 	"time"
 
 	at "github.com/subgentic/coral/internal/agenttypes"
-	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/safego"
 	"github.com/subgentic/coral/internal/store"
 )
@@ -87,13 +86,12 @@ func (s *JobScheduler) settleOnTurn(ctx context.Context, run store.ScheduledRun,
 	return true, agentGone
 }
 
-// endRunSession ends the agent a run started, by its own session name, drops the input held for it and reports whether it is gone. It says no when it cannot tell (no runtime) or the kill did not take.
+// endRunSession ends the agent a run started, by its own session name, reports whether it is gone. It says no when it cannot tell (no runtime) or the kill did not take.
 func (s *JobScheduler) endRunSession(ctx context.Context, run store.ScheduledRun, job store.ScheduledJob) bool {
 	if s.runtime == nil || run.SessionID == nil || *run.SessionID == "" {
 		return false
 	}
 	name := s.runAgentType(ctx, run, job.AgentType) + "-" + *run.SessionID
-	ptymanager.DropHeld(name, "the scheduled run finished")
 	if err := s.runtime.KillAgent(ctx, name); err != nil {
 		s.logger.Warn("could not end the finished run's agent", "run_id", run.ID, "session", name, "error", err)
 	}

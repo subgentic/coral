@@ -68,7 +68,7 @@ func deliverAutomatedIfWanted(ctx context.Context, rt AgentRuntime, logger *slog
 	}
 	_, err = ptymanager.DeliverAutomated(ctx, ptymanager.AutomatedInput{
 		Term: rt, Name: name, AgentType: agentType, SessionID: sessionID,
-		Key: key, Text: text, What: what, RequireInputBox: requireInputBox, Mention: mention,
+		Key: key, Text: text, What: what, RequireInputBox: requireInputBox,
 		// As a bracketed paste where the agent takes one: a menu ignores it (#3457).
 		Paste: true,
 		Ready: func(ctx context.Context) error {

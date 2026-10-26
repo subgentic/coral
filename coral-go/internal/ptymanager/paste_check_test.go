@@ -8,7 +8,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -100,7 +99,6 @@ func (n *noPasteTerm) AgentScreen(context.Context, string, string, string) (stri
 
 // Where the agent hasn't turned bracketed paste on, the send is typed, as before.
 func TestPasteFallsBackToTypingWithoutBracketedPaste(t *testing.T) {
-	fastGate(t)
 	term := &noPasteTerm{}
 	d, err := DeliverAutomated(context.Background(), AutomatedInput{Term: term, Name: "claude-fallback", Text: "hi", What: "nudge", Paste: true,
 		Send: func(context.Context) error { term.typed = append(term.typed, "hi"); return nil }})
@@ -196,7 +194,6 @@ func (f *fixtureTerm) got() ([]string, int) {
 // bright-blue ">" between grey rules. A person's draft there is held, never joined
 // by Coral's paste; the empty box takes the paste.
 func TestAnAgyDraftIsNeverAddedTo(t *testing.T) {
-	fastGate(t)
 	read := func(f string) string {
 		b, err := os.ReadFile(filepath.Join("testdata", f))
 		require.NoError(t, err)
@@ -219,12 +216,11 @@ func TestAnAgyDraftIsNeverAddedTo(t *testing.T) {
 		return d
 	}
 	drafted := &fixtureTerm{styled: draft}
-	assert.Equal(t, Held, send(drafted, "agy-draft", "agy"))
-	time.Sleep(200 * time.Millisecond) // several of the gate's turns
+	assert.Equal(t, Skipped, send(drafted, "agy-draft", "agy"))
 	pasted, enters := drafted.got()
 	assert.Empty(t, pasted, "nothing pasted onto the draft")
 	assert.Zero(t, enters, "and nothing submitted")
-	DropHeld("agy-draft", "test done")
+	ForgetSession("agy-draft")
 
 	empty := &fixtureTerm{styled: idle}
 	assert.Equal(t, Sent, send(empty, "agy-idle", "agy"))
@@ -234,8 +230,8 @@ func TestAnAgyDraftIsNeverAddedTo(t *testing.T) {
 	// Fail closed for an agent type whose box isn't listed: an input line holding
 	// other text still holds the send.
 	other := &fixtureTerm{styled: strings.Replace(draft, "my agy draft QA1", "half-typed question", 1)}
-	assert.Equal(t, Held, send(other, "pi-draft", "pi"))
+	assert.Equal(t, Skipped, send(other, "pi-draft", "pi"))
 	pasted, _ = other.got()
 	assert.Empty(t, pasted)
-	DropHeld("pi-draft", "test done")
+	ForgetSession("pi-draft")
 }

@@ -1,4 +1,4 @@
-// Delivering an automated input: the checked send and paste, the retries, and holding what cannot go yet (moved out of automated_input.go, #5091; no behaviour change).
+// Delivering an automated input: one look at the screen, then the text and its Enter at once, or nothing (#7727).
 
 package ptymanager
 
@@ -7,24 +7,29 @@ import (
 	"errors"
 	"log/slog"
 	"strings"
-	"sync/atomic"
 	"time"
 
-	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/inputlog"
 	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/terminalinput"
 	"github.com/subgentic/coral/internal/tmux"
 )
 
-// DeliverAutomated types an automated send now if the agent is not waiting on
-// the user, and holds it otherwise. A held send is retried until the prompt is
-// gone and then typed once.
-// ErrNotWanted is returned by a send's Ready or Send when what it was about is over by the time
-// it would be typed (a board nudge whose messages the agent has read since, #4362): nothing is
-// typed, and the gate drops it quietly instead of reporting a failed send.
+// ErrNotWanted is returned by a send's Ready or Send when what it was about is over by the time it would be typed (a board nudge whose
+// messages the agent has read since, #4362): nothing is typed, and it is dropped quietly instead of reported as a failed send.
 var ErrNotWanted = errors.New("automated input no longer wanted")
 
+// The reasons a send is skipped (SkippedSend.Why): what the person sees on the agent's page.
+const (
+	SkipPrompt     = "a prompt or menu is open in the agent's terminal"
+	SkipDraft      = "there is text in the agent's input box that Coral did not type (a draft)"
+	SkipUnreadable = "the agent's screen could not be read"
+	SkipEnter      = "a prompt opened before the Enter, so it was not pressed"
+	SkipTeamBusy   = "this team's automated input is spaced out and the next slot is too far away"
+)
+
+// DeliverAutomated types an automated send now, with its Enter, unless the screen shows that typing would be a wrong answer
+// (see the package comment): then it types nothing, keeps nothing and says so (SkippedOf).
 func DeliverAutomated(ctx context.Context, in AutomatedInput) (Delivery, error) {
 	if in.Send == nil {
 		return Sent, errors.New("automated input without a send function")
@@ -34,439 +39,199 @@ func DeliverAutomated(ctx context.Context, in AutomatedInput) (Delivery, error) 
 	}
 	unlock := gate.lockSession(in.Name)
 	defer unlock()
-	gate.mu.Lock()
-	in.gen = gate.gens[in.Name]
-	gate.mu.Unlock()
-	if waiting, why, kind := in.waiting(ctx); waiting {
-		gate.hold(in, why, kind)
-		return Held, nil
+	if in.Ready != nil {
+		if err := in.Ready(ctx); err != nil {
+			return Sent, err
+		}
 	}
-	// Anything already held for this agent goes first, so order is kept. A mention lets a
-	// stuck paste of Coral's ahead of it give up sooner (#3708).
-	fctx := ctx
-	if in.Mention {
-		fctx = context.WithValue(ctx, mentionWaitingKey{}, true)
+	v := in.look(ctx)
+	if in.RequireInputBox {
+		// A first prompt is not repeated by anything, so it waits for the agent's normal input box (the one wait there is): while a prompt is open (a
+		// trust screen) or the screen is still blank, up to launchWait; and for an agent whose box Coral does not recognise, up to launchFallback (waits()).
+		w := waits()
+		start := time.Now()
+		for {
+			elapsed := time.Since(start)
+			ready := v.skip == "" && !v.leftover && (v.boxShown || elapsed >= w.launchFallback)
+			if ready || elapsed >= w.launchWait {
+				break
+			}
+			select {
+			case <-ctx.Done():
+				return Sent, ctx.Err()
+			case <-time.After(w.launchEvery):
+			}
+			v = in.look(ctx)
+		}
 	}
-	if gate.flush(fctx, in.Name) {
-		// The flush found the agent waiting again: queue behind what it held.
-		gate.hold(in, "earlier sends still held", "")
-		return Held, nil
+	if v.leftover {
+		// Coral's own earlier text is still in the box (its Enter did not take): it is sent, and this one is not typed after it, which
+		// would join the two. The next send types into an empty box.
+		in.submitLeftover(ctx)
+		noteSkipped(in, "Coral's earlier text was still in the input box; it was sent")
+		return Skipped, nil
 	}
-	enterHeld, err := gate.sendChecked(ctx, in)
-	if enterHeld {
-		return Held, nil
+	if v.skip != "" {
+		noteSkipped(in, v.skip)
+		return Skipped, nil
 	}
+	enterWithheld, err := gate.typeNow(ctx, in)
 	if errors.Is(err, ErrTeamBusy) {
-		// The team's next slot is over MaxTeamWait away (#3613): held, and the loop tries again.
-		gate.hold(in, whyTeamSpaced, "")
-		return Held, nil
+		noteSkipped(in, SkipTeamBusy)
+		return Skipped, nil
 	}
-	gate.shadowForget(in.Name, in.Key)
+	if enterWithheld {
+		noteSkipped(in, SkipEnter)
+		return Skipped, nil
+	}
 	if err == nil {
 		gate.noteDelivered(in.Name, in.Key)
 		noteDeliveredText(in.Name, in.Text)
+		clearSkipped(in.Name)
 	}
 	return Sent, err
 }
 
-// sendChecked runs in.Send with the screen re-checked just before its final
-// Enter. If a prompt opened after the text was typed, the Enter is withheld and
-// held on its own, ahead of anything else held for the agent; it reports true
-// then. Any other error is returned.
-func (g *inputGate) sendChecked(ctx context.Context, in AutomatedInput) (enterHeld bool, err error) {
-	// Coral's automated sends to one team are spaced (#3613): the first goes at once, the next
-	// 2-3 s after. Only here, where a send really goes: a held send waits nothing until it's due.
-	if !in.force {
-		if err := SpaceTeam(ctx, teamFor(in.Name)); err != nil {
-			return false, err
+// DeliverNow is DeliverAutomated for a person's own Send now (the Operator's button on the agent's page): the same look, except that a screen that cannot be read does not stop it.
+// A prompt or menu that is open, or text in the box that is not Coral's, still does: the text and its Enter would answer the one or be sent with the other.
+func DeliverNow(ctx context.Context, in AutomatedInput) (Delivery, error) {
+	in.force = true
+	return DeliverAutomated(ctx, in)
+}
+
+// verdict is what the one look at the screen decided.
+type verdict struct {
+	skip     string // why nothing is typed, "" when the text goes
+	leftover bool   // the box holds exactly what Coral typed last: its Enter is what is missing
+	boxShown bool   // the agent's normal input box is on the screen (RequireInputBox)
+}
+
+// look reads the agent's screen once. A terminal that has no screen to read is typed to (there is nothing to look at); one whose
+// screen cannot be read, or is empty, is not.
+func (in AutomatedInput) look(ctx context.Context) verdict {
+	r, ok := in.Term.(ScreenReader)
+	if !ok {
+		return verdict{boxShown: true}
+	}
+	agentType, sessionID := in.identity()
+	screen, err := r.AgentScreen(ctx, in.Name, agentType, sessionID)
+	if err != nil || strings.TrimSpace(screenText(screen)) == "" {
+		if in.force {
+			return verdict{boxShown: true} // a person chose to send: only a prompt or a draft that is seen stops it
+		}
+		return verdict{skip: SkipUnreadable}
+	}
+	open, why := PromptOnScreen(screen)
+	if open && isPromptHold(why) && !AgySlashMenuFor(agentType, in.Text, screen) { // a footer alone, or one drawn while the agent works, is not a menu: the text goes
+		return verdict{skip: SkipPrompt + " (" + why + ")"}
+	}
+	box, haveBox := inputBoxText(screen)
+	v := verdict{boxShown: haveBox || InputBoxOnScreen(screen)}
+	if !haveBox {
+		return v // a readable screen with no box Coral recognises: the text goes (the harness queues it)
+	}
+	if emptyBox(box, in.styledSuggestionOnly(ctx, agentType, sessionID)) {
+		return v
+	}
+	if memo, ok := gate.typedFor(in.Name); ok && ownBox(box, memo) {
+		v.leftover = true
+		return v
+	}
+	v.skip = SkipDraft
+	return v
+}
+
+// emptyBox: nothing in the box, the agent's own placeholder, or Claude's faint prompt suggestion.
+func emptyBox(box string, suggestionOnly bool) bool {
+	return strings.TrimSpace(box) == "" || (boxPlaceholder(box) && !strings.Contains(box, pastePlaceholder)) || suggestionOnly
+}
+
+// ownBox reports whether the box holds exactly the text Coral typed last (decided by an exact match of the squeezed texts, or by the
+// placeholder an agent shows for a long paste of Coral's): anything else, a person's words added to ours included, is a draft.
+func ownBox(box string, memo typedMemo) bool {
+	if memo.text == "" {
+		return false
+	}
+	if strings.Contains(box, pastePlaceholder) {
+		return memo.paste && collapsible(memo.text)
+	}
+	return squeeze(box) == memo.text
+}
+
+// styledSuggestionOnly: Claude's faint prompt suggestion is an empty box (#3468); read from the styled screen when the terminal has one.
+func (in AutomatedInput) styledSuggestionOnly(ctx context.Context, agentType, sessionID string) bool {
+	if ss, ok := in.Term.(StyledScreenReader); ok {
+		if styled, err := ss.AgentScreenStyled(ctx, in.Name, agentType, sessionID); err == nil {
+			return suggestionOnly(styled)
 		}
 	}
-	if !strings.HasSuffix(in.Key, "#enter") {
-		// what the gate types is Coral's, if it is found in the box later (#247): a paste (its Enter is confirmed from the screen) for hours, a typed send for two minutes
-		if in.Paste {
-			g.noteOwnText(in.Name, in.Text)
-		} else {
-			g.noteOwnTyped(in.Name, in.Text)
-		}
+	return false
+}
+
+// submitLeftover presses the Enter Coral's own earlier text is missing.
+func (in AutomatedInput) submitLeftover(ctx context.Context) {
+	es, ok := in.Term.(EnterSender)
+	if !ok {
+		return
 	}
-	if in.Paste {
-		if held, err, done := g.pasteChecked(ctx, in); done {
-			return held, err
-		}
-		// Not pasted (bracketed paste off or unconfirmed, or a terminal that only types): the text is typed below and its Enter is not
-		// confirmed from the screen, so it is Coral's only for ownTypedMaxAge, whatever told the gate to type (#112).
-		g.markTyped(in.Name, in.Text)
+	agentType, sessionID := in.identity()
+	if err := es.SendEnter(ctx, in.Name, agentType, sessionID); err != nil {
+		slog.Warn("automated input: could not send the Enter of Coral's earlier text", "session", in.Name, "sender", in.What, "error", err)
+		return
 	}
-	var footerOnly atomic.Bool // the prompt seen was only a footer (isPromptHold)
+	gate.forgetTyped(in.Name)
+}
+
+// typeNow types the text and its Enter in one write (a bracketed paste with its Enter where the terminal can, else the caller's Send),
+// with the screen looked at once more just before the Enter: if a prompt opened since the look, the Enter is not pressed.
+func (g *inputGate) typeNow(ctx context.Context, in AutomatedInput) (enterWithheld bool, err error) {
+	// Coral's automated sends to one team are spaced (#3613): the first goes at once, the next 2-3 s after.
+	if err := SpaceTeam(ctx, teamFor(in.Name)); err != nil {
+		return false, err
+	}
+	agentType, sessionID := in.identity()
 	check := func(ctx context.Context) bool {
 		r, ok := in.Term.(ScreenReader)
 		if !ok {
 			return true
 		}
-		screen, err := r.AgentScreen(ctx, in.Name, in.AgentType, in.SessionID)
+		screen, err := r.AgentScreen(ctx, in.Name, agentType, sessionID)
 		if err != nil {
-			return true
+			return false // cannot look: the Enter is not pressed
 		}
 		open, why := PromptOnScreen(screen)
-		if at, _ := in.identity(); open && AgySlashMenuFor(at, in.Text, screen) {
-			return true // agy's own completion of the command just typed: its Enter confirms that command (#210)
-		}
-		footerOnly.Store(open && !isPromptHold(why))
-		return !open
+		return !(open && isPromptHold(why)) || AgySlashMenuFor(agentType, in.Text, screen)
 	}
-	sctx := tmux.WithBeforeEnter(ctx, check) // Coral's own text: the closure of the send names its origin (terminalinput.Coral)
-	if _, known := BracketedPasteHint(ctx); !known {
-		at, sid := in.identity()
-		if enabled, known := BracketedPasteFromLog(naming.DefaultLogDir(), at, sid); known {
-			sctx = WithBracketedPasteHint(sctx, enabled) // tmux flattens a multi-line text only when the pane is known not to take a paste
+	pctx := tmux.WithBeforeEnter(ctx, check)
+	if _, known := BracketedPasteHint(pctx); !known {
+		if enabled, known := BracketedPasteFromLog(naming.DefaultLogDir(), agentType, sessionID); known {
+			pctx = WithBracketedPasteHint(pctx, enabled) // tmux flattens a multi-line text only when the pane is known not to take a paste
 		}
 	}
-	err = in.Send(sctx)
+	paste := false
+	if ps, ok := in.Term.(PromptSender); ok && in.Paste {
+		if enabled, known := BracketedPasteHint(pctx); !known || enabled {
+			paste = true
+			g.noteTyped(in.Name, in.Text, true)
+			err = ps.SendPrompt(pctx, terminalinput.Coral, in.Name, in.Text, agentType, sessionID)
+			if errors.Is(err, ErrBracketedPasteUnavailable) {
+				paste = false
+				err = nil
+			}
+		}
+	}
+	if !paste {
+		g.noteTyped(in.Name, in.Text, false)
+		err = in.Send(pctx)
+	}
 	if errors.Is(err, tmux.ErrEnterWithheld) {
-		kind := kindPrompt
-		if footerOnly.Load() {
-			kind = ""
-		}
-		g.holdEnter(in, kind)
 		return true, nil
 	}
 	return false, err
 }
 
-// pasteChecked sends in as a bracketed paste and its Enter. Enter goes only when no
-// prompt is open and (on a rendered screen) the input box shows the text; otherwise
-// the send is held first in the agent's queue, and on its turn sends just its Enter
-// if the text is in the box, or pastes again (once) if a menu dropped it. done is
-// false when the paste can't be used (no PromptSender, bracketed paste off or
-// unknown): the caller falls back to typing.
-func (g *inputGate) pasteChecked(ctx context.Context, in AutomatedInput) (enterHeld bool, err error, done bool) {
-	ps, ok := in.Term.(PromptSender)
-	if !ok {
-		return false, nil, false
-	}
-	if in.Ready != nil {
-		if err := in.Ready(ctx); err != nil {
-			return false, err, true
-		}
-	}
-	if in.force {
-		return g.forcePaste(ctx, in, ps)
-	}
-	agentType, sessionID := in.identity()
-	sr, _ := in.Term.(ScreenReader)
-	rendered := false
-	if rs, ok := in.Term.(RenderedScreen); ok && sr != nil {
-		rendered = rs.HasRenderedScreen()
-	}
-	if in.pasteRetry > 0 && sr != nil {
-		if held, err, decided := g.pasteRetryTurn(ctx, in, sr, rendered, agentType, sessionID); decided {
-			return held, err, true
-		}
-	}
-	if in.pasteRetry == 0 && rendered {
-		if held, err, decided := g.boxBeforeFirstPaste(ctx, &in, sr, rendered, agentType, sessionID); decided {
-			return held, err, true
-		}
-	}
-	return g.pasteAndEnter(ctx, in, ps, sr, rendered, agentType, sessionID)
-}
-
-// pasteRetryTurn is a held paste's turn again (#3457 v2): what is in the input box decides. Our text: only
-// its Enter. Empty (or a placeholder): a menu dropped the paste, so paste
-// again, at most maxPasteRetries times (decided false: the caller pastes). Anything else (a person's draft, or
-// text Coral can't recognise): never added to; held, and reported.
-func (g *inputGate) pasteRetryTurn(ctx context.Context, in AutomatedInput, sr ScreenReader, rendered bool, agentType, sessionID string) (held bool, err error, decided bool) {
-	screen, serr := sr.AgentScreen(ctx, in.Name, agentType, sessionID)
-	if serr != nil {
-		if g.pasteStuck(in) {
-			return false, g.giveUpPaste(in, "the screen couldn't be read"), true
-		}
-		g.holdPaste(in, "the screen couldn't be read", false, "")
-		return true, nil, true
-	}
-	if open, why := PromptOnScreen(screen); open {
-		g.holdPaste(in, "a prompt is still open", false, promptKind(why))
-		return true, nil, true
-	}
-	state := boxOurs // a PTY's raw output can't show the box: Enter only, never paste again
-	if rendered {
-		state = in.boxState(ctx, screen, agentType, sessionID)
-	} else {
-		slog.Info("automated input: unconfirmed delivery (the terminal's box can't be read; sending only the Enter)",
-			"session", in.Name, "sender", in.What)
-	}
-	switch state {
-	case boxOurs:
-		held, err := g.enterAndConfirm(ctx, in, sr, rendered, agentType, sessionID)
-		return held, err, true
-	case boxEmpty:
-		if in.entered {
-			// Its Enter took effect after the last look: delivered, never pasted again.
-			g.setLastPasted(in.Name, "")
-			return false, nil, true
-		}
-		if in.pasteRetry > maxPasteRetries {
-			if g.pasteStuck(in) {
-				return false, g.giveUpPaste(in, "pasted again but it never reached the input box"), true
-			}
-			g.holdPaste(in, "pasted again but it never reached the input box", false, "")
-			return true, nil, true
-		}
-		return false, nil, false
-	case boxOther:
-		// Text Coral can't place is in the box after Coral's own paste: never Entered (it
-		// could be a person's draft), and given up once stuck rather than blocking (#3708).
-		if g.pasteStuck(in) {
-			return false, g.giveUpPaste(in, "the input box holds text Coral can't place"), true
-		}
-		g.holdPaste(in, whyDraft, false, "")
-		return true, nil, true
-	default:
-		if agentType == at.Codex && in.signalsSayEnded(ctx) {
-			// The same signal rule as before the first paste (#6466): a Codex that has stopped and whose composer the screen reader cannot find has either our paste in it or nothing, and an
-			// Enter on nothing submits nothing; held for ever it blocks every later send.
-			slog.Info("automated input: the input box isn't on the rendered screen but the agent's signals say its turn ended; sending only the Enter", "session", in.Name, "sender", in.What)
-			held, err := g.enterAndConfirm(ctx, in, sr, rendered, agentType, sessionID)
-			return held, err, true
-		}
-		if g.pasteStuck(in) {
-			return false, g.giveUpPaste(in, "the input box couldn't be found on screen"), true
-		}
-		g.holdPaste(in, "the input box isn't on screen", false, "")
-		return true, nil, true
-	}
-}
-
-// boxBeforeFirstPaste looks at the input box before the first paste (#3457 v3): a box holding someone else's text
-// (a person's draft, or their own paste) is never added to, so it is never
-// submitted with ours; the send waits. Our text already there (an earlier
-// attempt): only its Enter. Checked for every agent type (#3478: agy's
-// drafts were skipped because its box wasn't listed as known): an input
-// line holding other text holds the send whatever the agent. It notes in in whether the box showed a paste
-// placeholder; decided false: the caller pastes.
-func (g *inputGate) boxBeforeFirstPaste(ctx context.Context, in *AutomatedInput, sr ScreenReader, rendered bool, agentType, sessionID string) (held bool, err error, decided bool) {
-	screen, serr := sr.AgentScreen(ctx, in.Name, agentType, sessionID)
-	if serr != nil {
-		return false, nil, false
-	}
-	in.hadPlaceholder = hasPlaceholder(screen)
-	switch in.boxState(ctx, screen, agentType, sessionID) {
-	case boxOther:
-		if held, err, own := g.submitLeftover(ctx, *in, sr, screen, agentType, sessionID); own {
-			if held || err != nil {
-				return held, err, true
-			}
-			return false, nil, false // Coral's earlier text was sent: now ours
-		}
-		g.holdPaste(*in, whyDraft, false, "")
-		return true, nil, true
-	case boxOurs:
-		held, err := g.enterAndConfirm(ctx, *in, sr, rendered, agentType, sessionID)
-		return held, err, true
-	case boxUnknown:
-		if agentType == at.Codex && in.signalsSayEnded(ctx) {
-			// Its own signals say the turn has ended (#6466): a composer drawn without the marker the gate looks for (the soak's idle Codex showed only "Ask Codex to do anything")
-			// is not a Codex mid-turn, so the send goes (the paste is checked and Entered below as for any agent). The hold below is for a Codex whose signals do not say so.
-			slog.Info("automated input: the input box isn't on the rendered screen but the agent's signals say its turn ended; pasting", "session", in.Name, "sender", in.What)
-		} else if agentType == at.Codex {
-			// Never pasted blind into Codex (#247): with no input box on screen it is most likely mid-turn (streaming
-			// output hides its box on the rendered screen), and what is pasted then stays in its composer. Held until
-			// the box shows (after a long reply the rendered screen can miss it: Codex is asked to redraw); reported as
-			// held too long if it never does.
-			g.repaintIfDue(ctx, *in, agentType, sessionID)
-			g.holdPaste(*in, "the input box isn't on screen", false, "")
-			return true, nil, true
-		}
-	}
-	return false, nil, false
-}
-
-// pasteAndEnter pastes in's text and presses its Enter once the text shows in the box (looked for up to
-// pasteVerifyWait) with no prompt open; then confirms it was submitted. A withheld Enter holds the send; done is
-// false when bracketed paste is unavailable (the caller types instead).
-func (g *inputGate) pasteAndEnter(ctx context.Context, in AutomatedInput, ps PromptSender, sr ScreenReader, rendered bool, agentType, sessionID string) (enterHeld bool, err error, done bool) {
-	pctx := ctx
-	if _, known := BracketedPasteHint(ctx); !known {
-		if enabled, known := BracketedPasteFromLog(naming.DefaultLogDir(), agentType, sessionID); known {
-			pctx = WithBracketedPasteHint(ctx, enabled)
-		}
-	}
-	var promptOpened atomic.Bool
-	check := func(ctx context.Context) bool {
-		if sr == nil {
-			return true
-		}
-		// The agent repaints its box a moment after the paste: look for the text for
-		// up to pasteVerifyWait before deciding it didn't land (#3457 v2).
-		w := waits()
-		deadline := time.Now().Add(w.pasteVerifyWait)
-		for {
-			screen, err := sr.AgentScreen(ctx, in.Name, agentType, sessionID)
-			if err != nil {
-				return true
-			}
-			if open, why := PromptOnScreen(screen); open && !AgySlashMenuFor(agentType, in.Text, screen) {
-				promptOpened.Store(isPromptHold(why))
-				return false
-			}
-			if !rendered || inputBoxState(screen, in.Text, in.hadPlaceholder) == boxOurs {
-				return true
-			}
-			if time.Now().After(deadline) || ctx.Err() != nil {
-				return false
-			}
-			time.Sleep(w.pasteVerifyEvery)
-		}
-	}
-	g.setLastPasted(in.Name, in.Text) // Coral's, until its Enter is seen to submit it (#4104)
-	err = ps.SendPrompt(tmux.WithBeforeEnter(pctx, check), terminalinput.Coral, in.Name, in.Text, agentType, sessionID)
-	if err == nil {
-		held, err := g.confirmSubmitted(ctx, in, sr, rendered, agentType, sessionID)
-		return held, err, true
-	}
-	switch {
-	case errors.Is(err, ErrBracketedPasteUnavailable):
-		return false, nil, false
-	case errors.Is(err, tmux.ErrEnterWithheld):
-		if promptOpened.Load() {
-			g.holdPaste(in, "a prompt opened before its Enter", true, kindPrompt)
-		} else {
-			g.holdPaste(in, "the paste didn't reach the input box", true, "")
-		}
-		return true, nil, true
-	}
-	return false, err, true
-}
-
-// whyDraft: a paste send held because the input box holds text that isn't Coral's.
-const whyDraft = "a draft is in the input box (someone else's text); not adding to it"
-
-// releasedBecause says what ended a hold, from its last reason, for the delivery's log
-// line: a draft hold ends when the draft is cleared, not when a prompt closes (#3520).
-// whyTeamSpaced: a send held because its team's next slot was over MaxTeamWait away (#3613).
-const whyTeamSpaced = "the team's sends are spaced"
-
-func releasedBecause(why string) string {
-	switch {
-	case why == whyTeamSpaced:
-		return "the team's slot came"
-	case why == whyDraft:
-		return "the draft cleared"
-	case strings.Contains(why, "input box"):
-		return "the input box was ready"
-	case why == "earlier sends still held":
-		return "the earlier sends were typed"
-	case strings.HasPrefix(why, "signals: starting"):
-		return "the agent started"
-	case why == "signals: in turn":
-		return "the turn ended"
-	case strings.HasPrefix(why, busyWhy):
-		return "the agent stopped working"
-	}
-	return "the prompt closed"
-}
-
-// boxState is inputBoxState for this send, where a box that seems to hold someone
-// else's text is checked once more on the styled screen: Claude's faint prompt
-// suggestion is an empty box (#3468). A "[Pasted" placeholder is never one.
-func (in AutomatedInput) boxState(ctx context.Context, screen, agentType, sessionID string) boxState {
-	st := inputBoxState(screen, in.Text, in.hadPlaceholder)
-	if st != boxOther || hasPlaceholder(screen) {
-		return st
-	}
-	if ss, ok := in.Term.(StyledScreenReader); ok {
-		if styled, err := ss.AgentScreenStyled(ctx, in.Name, agentType, sessionID); err == nil && suggestionOnly(styled) {
-			return boxEmpty
-		}
-	}
-	return st
-}
-
-// maxPasteRetries bounds pasting a send again into an empty box: after that it stays
-// held (and is reported) rather than pasted once more.
-const maxPasteRetries = 1
-
-// pasteVerifyWait and pasteVerifyEvery (fields of waits(), seams.go): how long, and how often, the gate looks
-// for pasted text in the input box before deciding the paste didn't land.
-
-// holdPaste holds a paste send whose Enter was withheld, first in the agent's queue.
-// pasted says the text was just pasted (a later turn may paste it once more); prompt
-// that an open prompt holds it (HeldTooLongFunc).
-func (g *inputGate) holdPaste(in AutomatedInput, why string, pasted bool, kind string) {
-	if pasted {
-		in.pasteRetry++
-	}
-	g.mu.Lock()
-	if g.staleLocked(in) {
-		g.mu.Unlock()
-		return
-	}
-	heldAt := in.heldSince
-	if heldAt.IsZero() {
-		heldAt = g.now()
-	}
-	in.heldSince = heldAt
-	again := in.heldWhy == why
-	in.heldWhy = why
-	g.held[in.Name] = append([]*heldInput{{in: in, heldAt: heldAt, why: why, kind: kind, reported: in.heldReported, reportedPrompt: in.heldReportedPrompt}}, g.held[in.Name]...)
-	delete(g.inflight, in.Name) // held again: it is counted there, not twice
-	g.noteDialogLocked(in.Name, kind)
-	start := !g.running
-	g.running = true
-	g.mu.Unlock()
-	if !again {
-		g.logHeld(in, why, "paste held")
-	}
-	if start {
-		g.startLoop()
-	}
-}
-
-// holdEnter holds the Enter of a send whose text was typed but whose Enter was
-// withheld, first in the agent's queue: it belongs to the text already typed.
-func (g *inputGate) holdEnter(in AutomatedInput, kind string) {
-	enter := AutomatedInput{Term: in.Term, Name: in.Name, AgentType: in.AgentType, SessionID: in.SessionID,
-		Key: in.Key + "#enter", Text: "[Enter] " + in.Text, What: in.What + " (its Enter)",
-		Send: func(ctx context.Context) error {
-			// Its text may already be in the box, but the original notice can
-			// have been cancelled while this Enter was held.
-			if in.Ready != nil {
-				if err := in.Ready(ctx); err != nil {
-					return err
-				}
-			}
-			es, ok := in.Term.(EnterSender)
-			if !ok {
-				return errors.New("this terminal can't press Enter on its own")
-			}
-			return es.SendEnter(ctx, in.Name, in.AgentType, in.SessionID)
-		}}
-	enter.gen = in.gen
-	g.mu.Lock()
-	if g.staleLocked(in) {
-		g.mu.Unlock()
-		return
-	}
-	heldAt := in.heldSince // a held send's Enter keeps its age and report
-	if heldAt.IsZero() {
-		heldAt = g.now()
-	}
-	enter.heldSince, enter.heldReported, enter.heldReportedPrompt = heldAt, in.heldReported, in.heldReportedPrompt
-	g.held[in.Name] = append([]*heldInput{{in: enter, heldAt: heldAt, why: "a prompt opened before its Enter", kind: kind, reported: in.heldReported, reportedPrompt: in.heldReportedPrompt}}, g.held[in.Name]...)
-	delete(g.inflight, in.Name) // held again: it is counted there, not twice
-	start := !g.running
-	g.running = true
-	g.mu.Unlock()
-	g.logHeld(enter, "a prompt opened between its text and its Enter", "Enter withheld")
-	if start {
-		g.startLoop()
-	}
-}
-
-// AutoAcceptSend is the one automated path allowed to type into an open
-// prompt: the opt-in auto-accept feature answering an approval it judged safe.
-// It is logged in the input debug log. Nothing else may call it (a test
-// enforces that).
+// AutoAcceptSend is the one automated path allowed to type into an open prompt: the opt-in auto-accept feature answering an approval
+// it judged safe. It is logged in the input debug log. Nothing else may call it (a test enforces that).
 func AutoAcceptSend(ctx context.Context, name string, send func(ctx context.Context) error) error {
 	inputlog.Note(name, inputlog.Keys, "[auto-accept answers an approval prompt]")
 	return send(ctx)

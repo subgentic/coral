@@ -322,8 +322,8 @@ var reviewedOrigins = map[string]bool{
 	"internal/background/runtime_tmux.go	TmuxRuntime.SendPrompt	SendPrompt	o":                                        true,
 	"internal/background/runtime_tmux.go	TmuxRuntime.SpawnAgent	SendKeysToTarget	Internal":                           true,
 	"internal/background/workflow_steps.go	WorkflowRunner.executeAgentInteractive	SendPrompt	?":                      true, // AgentLauncher.SendPrompt, a method of its own that hands the prompt to the automated-input gate (Coral's text)
-	"internal/ptymanager/held_force.go	inputGate.forcePaste	SendPrompt	Coral":                                        true, // Send now (#7579): Coral's text, the Operator's choice
-	"internal/ptymanager/automated_input_deliver.go	inputGate.pasteAndEnter	SendPrompt	Coral":                        true,
+	"internal/ptymanager/automated_input_deliver.go	inputGate.typeNow	SendPrompt	Coral":                              true,
+	"internal/server/routes/sessions_waiting.go	SessionsHandler.SendWaitingNow	SendInput	Coral":                      true, // the Operator's Send now (#7727): Coral's nudge text, a person's choice
 	"internal/ptymanager/manager.go	PTYBackend.SendHumanInput	SendInput	Person":                                      true,
 	"internal/ptymanager/manager.go	PTYBackend.SendLine	SendLineCtx	o":                                               true,
 	"internal/ptymanager/manager.go	PTYBackend.SendLineCtx	SendInput	Internal":                                       true,
@@ -343,7 +343,6 @@ var reviewedOrigins = map[string]bool{
 	"internal/ptymanager/session_terminal_tmux.go	TmuxSessionTerminal.SendRawInput	SendRawKeys	o":                    true,
 	"internal/ptymanager/session_terminal_tmux.go	TmuxSessionTerminal.SendTerminalInput	SendTerminalInputToTarget	o": true,
 	"internal/ptymanager/session_terminal_tmux.go	TmuxSessionTerminal.SendToTarget	SendKeysToTarget	o":               true,
-	"internal/ptymanager/survey_dismiss.go	inputGate.dismissSurvey	SendRawInput	Internal":                            true,
 	"internal/ptymanager/tmux_backend.go	TmuxBackend.Restart	SendKeysToTarget	Internal":                              true,
 	"internal/ptymanager/tmux_backend.go	TmuxBackend.sendInput	SendTerminalInputToTarget	o":                          true,
 	"internal/ptymanager/tmux_backend.go	TmuxBackend.Spawn	SendKeysToTarget	Internal":                                true,
