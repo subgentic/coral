@@ -25,6 +25,8 @@ const SPEC = {
 const TEAM_SPEC = {
     ...SPEC,
     compactPanel: true,
+    sorts: null, // one sort on this tab: the table's own sortable heads (the order it opens in is Open first); the panel has none (#7883)
+    doneButton: true, // a phone's panel closes with Done (#7883)
     chipsElsewhere: true, // the page puts every filter that is on as a chip on its toolbar line
     fields: [
         SPEC.fields[1],

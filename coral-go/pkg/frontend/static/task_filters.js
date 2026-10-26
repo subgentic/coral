@@ -119,11 +119,10 @@ export function toQuery(f) {
     if (c.priority) p.set('priority', c.priority);
     if (c.q) p.set('q', c.q);
     if (c.from) p.set('from', c.from);
-    if (c.sort !== 'open') p.set(SORT_PARAM, c.sort);
-    return p.toString();
+    return p.toString(); // no sort: the team Tasks tab sorts in its table (#7883)
 }
 /** The filters an address's query holds (the keys toQuery writes; clean() checks every value again), on top of the empty ones. */
 export function fromQuery(search) {
     const p = new URLSearchParams(search || '');
-    return clean({ ...EMPTY, goal: p.get('goal') || '', assignee: p.get('agent') || '', priority: p.get('priority') || '', q: p.get('q') || '', from: p.get('from') || '', sort: p.get(SORT_PARAM) || 'open' });
+    return clean({ ...EMPTY, goal: p.get('goal') || '', assignee: p.get('agent') || '', priority: p.get('priority') || '', q: p.get('q') || '', from: p.get('from') || '' });
 }

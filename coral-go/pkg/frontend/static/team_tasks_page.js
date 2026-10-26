@@ -271,7 +271,7 @@ function watch() {
 }
 
 export function showTasks(host, project, h = {}) {
-    if (project !== model.project) { bar = null; Object.assign(model, { dt: DT.tableState(), choices: null, project, filters: TF.loadFilters(project, browserLocal), q: emptyQuery(), rows: [], cursor: '', moreLoaded: false, totalOpen: null, totalDone: null, filter: startFilter(), loading: false, failed: '', loadingMore: false, moreFailed: '' }); }
+    if (project !== model.project) { bar = null; Object.assign(model, { dt: DT.tableState(), choices: null, project, filters: { ...TF.loadFilters(project, browserLocal), sort: 'open' }, q: emptyQuery(), rows: [], cursor: '', moreLoaded: false, totalOpen: null, totalDone: null, filter: startFilter(), loading: false, failed: '', loadingMore: false, moreFailed: '' }); }
     hooks = h;
     if (!model.choices || Date.now() - (model.choicesAt || 0) > CHOICES_MS) loadChoices();
     if (h.query) model.filters = TF.fromQuery(h.query); // an address with filters in it (a link): they are the view, over what this browser kept

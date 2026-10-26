@@ -2250,10 +2250,11 @@ body.panel-dragging .agentic-state {
 .list-bar-panel > * { flex: 0 0 auto; } /* the dropdown's rule gives each child a whole line of the box's height; in a column, which is as tall as its rows, that stretched the rows */
 /* The compact panel (#7782, the team Tasks tab): fields two to a line, one line on a phone; Clear filters spans the line */
 .list-bar-menu-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 16px; align-items: center; }
-.list-bar-menu-grid > .list-bar-clear-all { grid-column: 1 / -1; }
+.list-bar-menu-grid > .list-bar-clear-all, .list-bar-menu-grid > .list-bar-done { grid-column: 1 / -1; }
+.list-bar-done { display: none; } /* a phone only (#7883) */
 .list-bar-menu-grid .list-bar-field > :last-child:not(.list-bar-field-label) { flex: 1 1 6rem; }
 .list-bar-menu-grid .list-bar-field > .list-bar-field-label { flex: 0 0 5.75rem; }
-@media (max-width: 767px) { .list-bar-menu-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 767px) { .list-bar-menu-grid { grid-template-columns: minmax(0, 1fr); } .list-bar-done { display: block; min-height: var(--control-touch-height, 44px); } }
 /* The activity bars' panel (#7653): the tool-group boxes go two to a line in it as they did in the dropdown; the other fields, the count and Clear filters are a line each. */
 .list-bar-menu-groups { flex-direction: row; flex-wrap: wrap; align-items: center; column-gap: 8px; }
 .list-bar-menu-groups > :not(.list-bar-group) { flex: 0 0 100%; }

@@ -150,7 +150,7 @@ export function tasksQuery(search) {
     const out = new URLSearchParams();
     const ok = {
         goal: v => v === 'none' || /^[1-9]\d{0,11}$/.test(v), agent: v => v.length <= 80 && !/[\u0000-\u001f\u007f]/.test(v), priority: v => ['critical', 'high', 'medium', 'low'].includes(v),
-        q: v => v.length <= 200 && !/[\u0000-\u001f\u007f]/.test(v), from: v => /^\d{4}-\d{2}-\d{2}$/.test(v), sort: v => ['newest', 'oldest', 'updated'].includes(v),
+        q: v => v.length <= 200 && !/[\u0000-\u001f\u007f]/.test(v), from: v => /^\d{4}-\d{2}-\d{2}$/.test(v),
     };
     for (const k of Object.keys(ok)) { const v = p.get(k); if (v !== null && v.trim() !== '' && ok[k](v)) out.set(k, v); }
     return out.toString();

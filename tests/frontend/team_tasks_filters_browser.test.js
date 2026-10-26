@@ -40,6 +40,20 @@ const G1 = 'Explore goals with two teams', G2 = 'Plan the release notes';
                 assert.ok(!labels.includes('Status'), 'the state pills above are the status: ' + JSON.stringify(labels));
                 assert.equal(await ev(`document.getElementById('tk-assignee').tagName`), 'SELECT', 'the agent is a select');
             });
+            await S.run(`${label}: one sort on the tab: the panel has none (the table's heads sort), and a phone's panel closes with Done`, async () => {
+                assert.equal(await ev(`!!document.getElementById('tk-sort')`), false, 'no Sort in the panel');
+                assert.ok((await ev(`[...document.querySelectorAll('${panel} .dt-sort, ${panel} th[aria-sort], ${panel} .dt-head button')].length`)) > 0, 'the table\'s heads sort');
+                const done = await ev(`(() => { const b = document.querySelector('#tk-menu .list-bar-done'); return b ? { shown: b.getClientRects().length > 0, h: Math.round(b.getBoundingClientRect().height) } : null; })()`);
+                assert.ok(done, 'the panel has a Done button');
+                assert.equal(done.shown, mobile, 'Done is a phone\'s button');
+                if (mobile) {
+                    assert.ok(done.h >= 44, 'Done is a 44 px target: ' + done.h);
+                    await ev(`document.querySelector('#tk-menu .list-bar-done').click(); true`); await settle(300);
+                    assert.equal(await ev(`document.getElementById('tk-menu').hidden`), true, 'Done shuts the panel');
+                    assert.equal(await ev(`document.activeElement.id`), 'tk-toggle', 'with the keyboard back on the Filters icon');
+                    await ev(`document.getElementById('tk-toggle').click(); true`); await settle(300);
+                }
+            });
             await S.run(`${label}: the Goal select: Any goal, No goal, the open goals with their task counts`, async () => {
                 await waitFor(`document.querySelectorAll('#tk-goal option').length >= 4`, 'the goals read', 8000);
                 const opts = await ev(`[...document.querySelectorAll('#tk-goal option')].map(o => o.textContent + (o.parentElement.tagName === 'OPTGROUP' ? ' [' + o.parentElement.label + ']' : ''))`);
@@ -50,7 +64,7 @@ const G1 = 'Explore goals with two teams', G2 = 'Plan the release notes';
             await shot(`tasks-filters-open-${label}`);
             await S.run(`${label}: the fields sit two to a line (one on a phone), so the panel is short`, async () => {
                 const g = await ev(`(() => { const m = document.getElementById('tk-menu'), f = [...m.querySelectorAll('.list-bar-field')].filter(e => e.getClientRects().length).map(e => Math.round(e.getBoundingClientRect().top)); return { tops: [...new Set(f)].length, n: f.length, h: Math.round(m.getBoundingClientRect().height) }; })()`);
-                assert.equal(g.n >= 5, true, JSON.stringify(g));
+                assert.equal(g.n >= 4, true, JSON.stringify(g));
                 if (mobile) assert.equal(g.tops, g.n, 'one field a line: ' + JSON.stringify(g)); else assert.ok(g.tops < g.n && g.h < 150, 'two fields share a line, and the panel is short: ' + JSON.stringify(g));
             });
             await S.run(`${label}: a goal shows only its tasks, with a chip on the toolbar line that removes it`, async () => {
@@ -84,7 +98,7 @@ const G1 = 'Explore goals with two teams', G2 = 'Plan the release notes';
                 await waitFor(`document.querySelectorAll('${panel} .dt-primary').length === 3`, 'the link opens the goal\'s three tasks', 15000);
                 assert.deepEqual(await chips(), [`Goal: ${G1} ×`]);
                 assert.equal(await ev(`location.search`), `?goal=${id}`);
-                await Page.navigate({ url: BASE + `/team/${TEAM}/tasks?goal=0&agent=%00&sort=bogus&q=${'x'.repeat(250)}` }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+                await Page.navigate({ url: BASE + `/team/${TEAM}/tasks?goal=0&agent=%00&q=${'x'.repeat(250)}` }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
                 await waitFor(`document.querySelectorAll('${panel} .dt-primary').length === 5`, 'a bad query is dropped: every task', 15000);
                 assert.equal(await ev(`location.search`), '', 'and the address says so');
                 await installTP(ev); await seed(ev, TEAM); await openTeam(ev, waitFor, TEAM).catch(() => {}); await goTab(ev, settle, 'Tasks');
