@@ -41,7 +41,9 @@ async function load() {
         set('calls', read(`/api/call-metrics/summary?interval=${r.interval === '1d' ? '1d' : '1h'}&hours=${r.hours}&agent=${encodeURIComponent(agentName(row))}`)),
     ]);
     if (my !== st.seq) return; // another agent was opened meanwhile
-    st.turns = (turns && turns.turns) || [];
+    // the turns of the range, their running cost starting at nothing where the range starts: the line ends on the Cost tile, which is the range's too (the route sends the whole session)
+    let run = 0;
+    st.turns = ((turns && turns.turns) || []).filter(t => Date.parse(t.timestamp) >= sinceMs).map((t, i) => ({ ...t, turn: i + 1, cumulative_cost: (run += t.cost_usd || 0) }));
     st.buckets = ts ? (ts.buckets || []).map(b => ({ t: Date.parse(b.bucket), s: (b.series || []).find(x => x.key === agentKey(row)) })).filter(b => b.s) : [];
     st.calls = calls ? calls.buckets || [] : null;
     await loadBiggest();
@@ -82,10 +84,10 @@ function draw() {
     h.append(tiles);
 
     // 1. cost over the session, turn by turn
-    const c1 = card('Cost over the session, turn by turn');
+    const c1 = card(`Cost turn by turn, ${r.word}`);
     if (!row.session_id) c1.append(msg('This row has no session to read turns from.'));
     else if (st.error.turns) c1.append(msg('The turns are unavailable.'));
-    else if (st.turns.length < 2) c1.append(msg(st.loaded ? 'Fewer than two turns are recorded for this session.' : 'Loading…'));
+    else if (st.turns.length < 2) c1.append(msg(st.loaded ? 'Fewer than two turns are recorded for this session in this range.' : 'Loading…'));
     else {
         const chart = el('div', 'viz-chart'); c1.append(chart);
         const turns = st.turns, line = { key: 'cost', label: 'Running cost', other: false, plot: turns.map(t => t.cumulative_cost), vals: turns.map(t => t.cost_usd) };

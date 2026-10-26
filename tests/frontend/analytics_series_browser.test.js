@@ -75,6 +75,7 @@ const series = (rows, key) => Array.from({ length: 24 }, (_, h) => ({ cost_usd: 
         await view('team'); await waitFor(`document.querySelectorAll('#cost-series-team .viz-svg path.viz-line').length === 8`, 'the team chart again', 8000);
         console.log('   ✓');
 
+        assert.equal(await ev(`document.getElementById('cost-compare-text').textContent`), '', 'the comparison with the prior period is the Overview\'s: no other view says it');
         console.log('2. Metrics: any of them together, one chart each; the rows add up to every chart; the last one cannot be switched off');
         const metric = name => ev(`[...document.querySelectorAll('#cost-series-team .viz-seg')[0].querySelectorAll('button')].find(b => b.textContent === ${JSON.stringify(name)}).click(); true`);
         const titles = () => ev(`[...document.querySelectorAll('#cost-series-team .viz-title')].map(h => h.textContent)`);

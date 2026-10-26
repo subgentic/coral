@@ -566,7 +566,10 @@ async function _refreshOverview() {
     series.drawOverviewPanel(host, { phone: isPhoneLayout() });
 }
 
-document.addEventListener('cost-view-change', e => { if (SERIES_VIEWS[e.detail]) _refreshSeries(e.detail); else if (e.detail === 'overview') _refreshOverview(); else _setText('cost-compare-text', ''); });
+document.addEventListener('cost-view-change', e => {
+    if (e.detail !== 'overview') _setText('cost-compare-text', ''); // the comparison is the Overview's: no other view says it
+    if (SERIES_VIEWS[e.detail]) _refreshSeries(e.detail); else if (e.detail === 'overview') _refreshOverview();
+});
 let _resizeTimer = null;
 window.addEventListener('resize', () => { clearTimeout(_resizeTimer); _resizeTimer = setTimeout(() => { const v = _currentView(); if (SERIES_VIEWS[v] && document.getElementById(`cost-series-${v}`)?.firstChild) _drawSeries(v); }, 150); });
 
