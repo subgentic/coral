@@ -55,7 +55,6 @@ const open = [
         console.log('  ok');
 
         console.log('The default order shows no sort arrow; a column\'s third click gives the default back and clears the arrow');
-        assert.equal(await ev(`document.querySelector('#board-task-list .dt-sortbar-select').selectedOptions[0].textContent`), 'Open first, newest first');
         const arrows = () => ev(`[...document.querySelectorAll('#board-task-list th[aria-sort]')].filter(e => e.getAttribute('aria-sort') !== 'none').map(e => e.querySelector('.dt-sort').dataset.key + ':' + (e.getAttribute('aria-sort') === 'descending' ? '▼' : '▲'))`);
         assert.deepEqual(await arrows(), [], 'the default order has no arrow');
         const click = f => ev(`document.querySelector('#board-task-list .dt-sort[data-key="${f}"]').click(); true`);
@@ -109,12 +108,11 @@ const open = [
         }
         console.log('  ok');
         if (process.env.QA_WIDTHS) process.exitCode = 1; // measuring: print
-        await ev(`document.getElementById('qa-dock').style.width = '360px'; window.__coral._toggleTaskSort('cost'); window.__coral._toggleTaskSort('cost'); window.__coral._toggleTaskSort('cost'); true`);
-        await waitFor(`document.querySelector('#board-task-list .dt-box.dt-folded')`, 'folded sort controls');
-        await ev(`(() => { const s = document.querySelector('#board-task-list .dt-sortbar-select'); s.focus(); s.value = 'priority'; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
-        for (let i = 0; i < 2; i++) await ev(`(() => { const b = document.querySelector('#board-task-list .dt-sortbar-dir'); b.focus(); b.click(); })()`);
-        assert.equal(await ev(`document.activeElement === document.querySelector('#board-task-list .dt-sortbar-select')`), true, 'resetting the sort returns focus to its visible selector');
-        assert.equal(await ev(`document.querySelector('#board-task-list .dt-sortbar-select').selectedOptions[0].textContent`), 'Open first, newest first');
+        await ev(`document.getElementById('qa-dock').style.width = '360px'; true`);
+        await waitFor(`document.querySelector('#board-task-list .dt-box.dt-folded')`, 'folded');
+        // one sort, inside Filters only (#7924): a folded dock has no "Sort by" row of its own
+        assert.equal(await ev(`[...document.querySelectorAll('#board-task-list .dt-sortbar')].every(e => e.hidden || !e.getClientRects().length)`), true, 'no Sort by row in the dock: the Filters panel has the sort');
+        assert.equal(await ev(`!!document.querySelector('#board-task-bar #tk-sort')`), true, 'the Filters panel holds it');
         await ev(`window.__heldTaskRow = document.querySelector('#board-task-list tbody tr'); T.tasks.renderBoardTaskList(); true`);
         assert.equal(await ev(`window.__heldTaskRow === document.querySelector('#board-task-list tbody tr')`), true, 'an unchanged refresh keeps row nodes');
         console.log('PASS task list order');

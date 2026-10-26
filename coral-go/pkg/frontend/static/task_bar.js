@@ -38,6 +38,9 @@ const TEAM_SPEC = {
 };
 
 /** onChange(filters) is called with the new, clean filters when the person changes anything (typing after a short pause). team: the team page's Tasks tab's panel. */
-export function buildTaskBar(onChange, hooks = {}, { team = false } = {}) {
-    return buildListBar(team ? TEAM_SPEC : SPEC, onChange, hooks);
+// The dock's Tasks panel (#7924): the one top row (the search, the Filters icon, + Task), so the bar has a slot for the owner's button after the icon; Hide done is the owner's extra in the panel.
+const DOCK_SPEC = { ...SPEC, headerSlots: true };
+
+export function buildTaskBar(onChange, hooks = {}, { team = false, dock = false } = {}) {
+    return buildListBar(team ? TEAM_SPEC : dock ? DOCK_SPEC : SPEC, onChange, hooks);
 }

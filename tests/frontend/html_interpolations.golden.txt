@@ -454,7 +454,6 @@
 1	task_detail_html.js	uriDisplay ? `<div>${uriDisplay}</div>` : ''
 2	task_detail_html.js	warningClass
 1	task_detail_html.js	workflow.artifacts.map(artifactHtml).join('')
-1	task_list.js	completedCount
 1	task_verify_marks.js	v.icon
 1	task_verify_marks.js	v.state
 1	team_artifacts_page.js	renderMarkdownStrict(content)
