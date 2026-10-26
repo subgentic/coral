@@ -198,6 +198,7 @@ c GET /api/tags
 c GET /api/tasks/active
 c GET /api/tasks/runs
 c GET /api/tasks/runs/{runID}
+b GET /api/team-artifacts
 c GET /api/teams/all
 c GET /api/teams/detail/{name}
 c GET /api/teams/detail/{name}/availability

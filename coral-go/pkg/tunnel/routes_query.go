@@ -63,6 +63,7 @@ var routeQueries = map[string]string{
 	"GET /api/sessions/live/{}/tasks":             "limit,session_id",
 	"GET /api/settings/prompt-inspection":         "board",
 	"GET /api/system/cli-check":                   "signin,source=cli_recheck,type=claude|agy|antigravity|gemini|codex|pi",
+	"GET /api/team-artifacts":                     "board,by,cursor,goal,kept,kind,limit,offset,origin,q,since,sort,tag,task,team,until",
 	"GET /api/teams/all":                          "status",
 	"GET /api/teams/detail/{}/availability":       "activity,project,subscriber_id",
 	"GET /api/token-usage":                        "board_name,session_id,since",
