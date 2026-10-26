@@ -11,6 +11,7 @@
  * Folded (the table's own box narrower than foldAt rem, 40 by default; also at 200% text): fold 'column' is the two-line row (line 1 and line 2 cells), fold 'labeled' is the name, then "label value" lines
  * (the Analytics tables); scroll: a table of many columns scrolls sideways inside its box, shaded where more is to come, rather than being cut off; the header row is hidden and a "Sort by" select takes its place. Everything is built with the DOM and textContent: titles and names are written by agents. */
 import { whenText } from './when_text.js';
+import { browserLocal } from './safe_storage.js';
 
 export const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const button = (cls, text, onClick) => { const b = el('button', cls, text); b.type = 'button'; if (onClick) b.addEventListener('click', onClick); return b; };
@@ -118,13 +119,13 @@ export function dataTable(cfg) {
     const minOf = (c) => c.minWidth || MIN_W;
     function readWidths() {
         try {
-            const o = JSON.parse(localStorage.getItem(wkey) || 'null') || {}, out = {};
+            const o = JSON.parse(browserLocal.get(wkey) || 'null') || {}, out = {};
             for (const c of columns) { const v = Number(o[c.key]); if (Number.isFinite(v) && v >= minOf(c) && v <= MAX_W) out[c.key] = Math.round(v); }
             return out;
         } catch { return {}; }
     }
     function saveWidths() {
-        try { if (Object.keys(st.widths).length) localStorage.setItem(wkey, JSON.stringify(st.widths)); else localStorage.removeItem(wkey); } catch { /* a convenience: the widths last until the page closes */ }
+        if (Object.keys(st.widths).length) browserLocal.set(wkey, JSON.stringify(st.widths)); else browserLocal.remove(wkey); // a convenience: the store is guarded, and the widths last until the page closes without it
     }
     st.widths ||= readWidths();
     function applyWidths() {
