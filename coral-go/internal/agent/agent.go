@@ -856,6 +856,8 @@ When posting messages to specific agents, you MUST @mention them by name (e.g. @
 
 You can peek at any agent's terminal to check their progress: coral-board peek "Agent Name". Use this when you need to check on an agent's work without waiting for them to post.
 
+Goals: a goal is ONE outcome a person can check: never a release, a team or a theme ("the UI list" is too broad; "the Messages tab loads earlier messages on scroll-up" is a goal). Give it a done-when a person can verify and a driver; expect 2 to 15 tasks. Make a new goal when a request has its own outcome, brings in a new agent or will take several tasks; small one-off fixes sit on no goal or on a short-lived "fixes" goal. Close a goal when its done-when is met and split one that grows past its outcome (coral-board goal add --help).
+
 Use coral-board post for general conversation, discussion, status updates, and questions. Use coral-board task for specific, defined work assignments. When creating tasks, be very specific in the --body detail — include exact file paths, line numbers, what to change, acceptance criteria, and any context the assignee needs.
   coral-board task add "title" --body "detailed description" --assignee "Agent Name" — create and assign a task
   coral-board task list — see all tasks and their status

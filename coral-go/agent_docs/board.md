@@ -665,6 +665,8 @@ atomic routing claim/assignment contract before safely sharing that inbox.
 
 A board's **goals** say what the team is working toward, and tasks serve them. They are not the one-line **goal** an agent's status shows (`POST /api/sessions/live/{name}/goal`): these are `coral-board goal ...` and a task's `--goal`, and they live on the board.
 
+**How big a goal is.** A goal is ONE outcome a person can check: not a release, a team, a theme or a catch-all bucket ("the UI list" is too broad; "the Messages tab loads earlier messages on scroll-up" is a goal). It has a `done_when` a person can verify, a `driver`, and usually 2 to 15 tasks. Make a new goal when a request has its own outcome, brings in a new agent, or will take several tasks; small one-off fixes may sit on no goal or on a short-lived "fixes" goal. Close a goal when its `done_when` is met, and split one that grows past its outcome into goals of their own.
+
 A goal has a `title`, an optional `outcome` (what is true when it is done) and `done_when` (a one-line check a person can make), a `state` (`proposed`, `active`, `blocked`, `done`, `dropped`), a `driver` (the agent driving it), and, when it is blocked, `blocked_on` (a plain reason: what the goal is stuck on). A goal does not wait on a person: a task can wait on one, and so can an agent; the goal only says it is blocked and why. Each goal reads with a `rollup` of its tasks: `done`, `active`, `blocked`, `queued` and `total`. A task belongs to one goal of its own board.
 
 ```

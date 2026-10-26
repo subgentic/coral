@@ -32,6 +32,8 @@ Subcommands:
   requests [--status pending|accepted|declined|expired] [--json]   The goal requests other teams sent this board (default: all)
   request-decline <id> --reason "why"   Decline a request another team sent (accept one with: task add "title" --goal-from <id>)
 
+A goal is ONE outcome a person can check, with a done-when to verify it, a driver, and usually 2 to 15 tasks. Not a release, a team or a theme: too broad is "the UI list"; right is "the Messages tab loads earlier messages on scroll-up". A request with its own outcome, a new agent or several tasks gets a new goal; small one-off fixes sit on no goal. Close a goal when its done-when is met; split one that outgrows its outcome.
+
 A task joins a goal when it is added (task add --goal <id>) or later (task goal <task> <goal|none>); task list --goal <id> lists a goal's tasks.`
 
 // goalTextFlags are the goal options whose values are free text.
