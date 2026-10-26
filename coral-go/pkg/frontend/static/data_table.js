@@ -274,7 +274,7 @@ export function dataTable(cfg) {
         if (cfg.empty.hint) e.append(el('p', 'dt-empty-hint', cfg.empty.hint));
         if (cfg.empty.action) e.append(button('btn', cfg.empty.action.label, cfg.empty.action.run));
         box.replaceChildren(e);
-    } else if (cfg.footer) {
+    } else if (cfg.footer && !(cfg.footer.auto && !cfg.footer.more)) { // footer.auto (#7937): a count line that says all rows are shown says nothing, so with nothing more to load the footer is not drawn
         const foot = el('div', 'dt-foot'); foot.append(el('span', 'dt-foot-text', cfg.footer.text || ''));
         if (cfg.footer.more) { const m = button('btn dt-more', cfg.footer.more.busy ? 'Loading…' : cfg.footer.more.label, cfg.footer.more.run); if (cfg.footer.more.busy) m.setAttribute('aria-busy', 'true'); foot.append(m); }
         box.append(foot);

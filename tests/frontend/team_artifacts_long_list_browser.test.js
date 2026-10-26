@@ -40,6 +40,8 @@ const items = Array.from({ length: N }, (_, i) => ({ name: `report-${String(i).p
         const names = await rowsNow();
         check('all 300 are there, once each, in the list\'s order, and Load more is gone', names.length === N && new Set(names).size === N && names.every((n, i) => n === `report-${String(i).padStart(3, '0')}.md`) && (await more()) === null, `${names.slice(0, 2)} ... ${names.slice(-1)}`);
 
+        check('with all 300 shown the footer is gone: no Showing 300 of 300 line (#7937)', await ev(`!document.querySelector('#agentic-panel-artifacts .dt-foot')`));
+
         console.log('2. refreshed twice quickly: no stale or doubled rows');
         await ev(`window.__delay = 150; import((window.__coralStatic || '/static/') + 'team_artifacts_page.js').then(m => m.loadArtifacts({ keep: true })); true`);
         await ev(`import((window.__coralStatic || '/static/') + 'team_artifacts_page.js').then(m => m.loadArtifacts({ keep: true })); true`); // again, while the first is still on its way

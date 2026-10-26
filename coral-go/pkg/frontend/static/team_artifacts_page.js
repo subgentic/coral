@@ -292,7 +292,7 @@ function draw() {
                 { key: 'task', label: 'Task', line: 2, tone: 'tertiary', cell: taskText },
                 { key: 'created', label: 'Created', line: 1, tone: 'tertiary', align: 'end', cell: item => DT.timeCell(item.created_at) },
             ],
-            footer: { text: `Showing ${model.items.length} of ${model.counts?.matched ?? model.items.length}${model.truncated ? '+' : ''}`,
+            footer: { auto: !model.truncated, text: `Showing ${model.items.length} of ${model.counts?.matched ?? model.items.length}${model.truncated ? '+' : ''}`,
                 more: model.hasMore ? { label: 'Load more', busy: model.loadingMore, run: () => { if (!model.loadingMore) loadArtifacts({ append: true }); } } : null },
         });
         body.append(table.el); Toolbar.mountSelection(toolbarRow, artifactState.selected.size ? table.bar : null);
