@@ -869,65 +869,7 @@
                     </section>
                     <section class="settings-pane" id="settings-pane-files" data-group="files" data-icon="account_tree" data-title="Files and Git" role="tabpanel" aria-labelledby="settings-tab-files" tabindex="-1" hidden>
                         <h4 class="settings-pane-title">Files and Git</h4>
-                        <dl class="info-grid settings-grid">
-                <div class="settings-row">
-                <dt>
-                    <label for="settings-file-search-mode">File search mode</label>
-                    <span class="toggle-desc">How @ mentions and file browser search for files</span>
-                </dt>
-                <dd>
-                    <select id="settings-file-search-mode" class="settings-select">
-                        <option value="directory">Directory Browsing</option>
-                        <option value="fuzzy">Fuzzy Matching</option>
-                    </select>
-                </dd>
-                </div>
-                <div class="settings-row">
-                <dt>
-                    <label for="settings-file-search-limit">File search limit</label>
-                    <span class="toggle-desc">Max number of files returned in search results</span>
-                </dt>
-                <dd>
-                    <select id="settings-file-search-limit" class="settings-select">
-                        <option value="50">50</option>
-                        <option value="100">100</option>
-                        <option value="200">200</option>
-                        <option value="500" selected>500</option>
-                        <option value="1000">1,000</option>
-                    </select>
-                </dd>
-                </div>
-                <div class="settings-row">
-                <dt>
-                    <label for="settings-git-diff-mode">Git diff mode</label>
-                    <span class="toggle-desc">What to compare changed files against</span>
-                </dt>
-                <dd>
-                    <select id="settings-git-diff-mode" class="settings-select">
-                        <option value="branch_point">Branch Point (merge-base)</option>
-                        <option value="previous_commit">Previous Commit (HEAD~1)</option>
-                        <option value="main_head">Main Branch (vs main)</option>
-                    </select>
-                </dd>
-                </div>
-                <div class="settings-row">
-                <dt>
-                    <label for="settings-git-poll-interval">Git scan interval</label>
-                    <span class="toggle-desc">How often Coral rescans git for changed files. Scanning a large repository is slow — stretch this out, or turn it off and use the refresh button.</span>
-                </dt>
-                <dd>
-                    <select id="settings-git-poll-interval" class="settings-select">
-                        <option value="30">Every 30 seconds</option>
-                        <option value="60">Every minute</option>
-                        <option value="120">Every 2 minutes</option>
-                        <option value="300">Every 5 minutes</option>
-                        <option value="600">Every 10 minutes</option>
-                        <option value="1800">Every 30 minutes</option>
-                        <option value="0">Off &mdash; refresh manually</option>
-                    </select>
-                </dd>
-                </div>
-                        </dl>
+                        <div id="settings-files-rows"></div>
                     </section>
                     <section class="settings-pane" id="settings-pane-cleanup" data-group="cleanup" data-icon="inventory_2" data-title="Storage and cleanup" role="tabpanel" aria-labelledby="settings-tab-cleanup" tabindex="-1" hidden>
                         <h4 class="settings-pane-title">Storage and cleanup</h4>
