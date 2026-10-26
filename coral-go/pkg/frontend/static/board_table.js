@@ -253,6 +253,18 @@ function rowIn(from, id) {
     return box ? box.querySelector(`:scope > .mb-message[data-message-id="${CSS.escape(String(id))}"]`) : null;
 }
 
+/** An opened row that starts under the sticky day line is scrolled down to 8 px below it (the line is on top of what scrolls under it, so the row's tags would be cut). */
+function keepBelowDay(row) {
+    const box = row.parentElement;
+    if (!box) return;
+    const edge = box.getBoundingClientRect().top;
+    const lines = [...box.querySelectorAll(':scope > .mb-day')].filter(d => d.getBoundingClientRect().top <= edge + 1);
+    const line = lines[lines.length - 1];
+    const floor = (line ? line.getBoundingClientRect().bottom : edge) + 8;
+    const top = row.getBoundingClientRect().top;
+    if (top < floor) box.scrollTop -= floor - top;
+}
+
 const surfaces = [];
 /** A surface that draws the table says what Reply and Copy link do in it: box is the selector of its messages box, hooks { reply(id, name), link(id) }. */
 export function onRowActions(box, hooks) { surfaces.push({ box, ...hooks }); }
@@ -260,7 +272,7 @@ const surfaceOf = (el) => surfaces.find(s => el.closest(s.box));
 
 // The head's press and a reply's jump: the same on every surface that draws the table (the team page's Board tab, the agent dock's).
 registerActions({
-    'mb-row-toggle': el => { const row = el.closest('.mb-message'); if (row) toggleRow(row); },
+    'mb-row-toggle': el => { const row = el.closest('.mb-message'); if (!row) return; toggleRow(row); if (row.classList.contains('mb-open')) keepBelowDay(row); },
     'mb-msg-reply': el => withId(el.dataset.msgId, id => { const n = textOf(el.dataset.sender), s = surfaceOf(el); if (n && s) s.reply(id, n); }),
     'mb-msg-copy-link': el => withId(el.dataset.msgId, id => surfaceOf(el)?.link(id)),
     'mb-jump-msg': el => withId(el.dataset.msgId, id => {

@@ -134,6 +134,13 @@ const BASE = require('./test_base').BASE;
             const q = await ev(`(() => { const r = document.querySelectorAll('#mb-messages > .mb-message')[1]; return { tagsOpen: r.querySelector(':scope > .mb-row-tags-open') && r.querySelector(':scope > .mb-row-tags-open').getClientRects().length > 0, buttons: [...r.querySelectorAll('.mb-row-actions button, .mb-row-reply')].map(b => Math.round(b.getBoundingClientRect().height)), wide: Math.round(r.querySelector('.mb-message-body').getBoundingClientRect().width) }; })()`);
             assert.ok(q.tagsOpen && q.buttons.length >= 4 && q.buttons.every(h => h >= 44), `${theme}: the tags are with the open message and its buttons are 44 px: ` + JSON.stringify(q));
             await shot(`board-table-open-390-${theme}`);
+            // The open row's tags are not under the sticky day line: a row opened while its top is scrolled under the line is brought into view with 8 px or more below the line.
+            await ev(`document.querySelectorAll('#mb-messages > .mb-message')[1].querySelector('.mb-row-toggle').click(); true`); await settle(200);
+            await ev(`(() => { const box = document.getElementById('mb-messages'), r = document.querySelectorAll('#mb-messages > .mb-message')[1]; box.scrollTop = r.offsetTop - box.offsetTop + 12; return true; })()`); await settle(200);
+            await ev(`document.querySelectorAll('#mb-messages > .mb-message')[1].querySelector('.mb-row-toggle').click(); true`); await settle(300);
+            const under = await ev(`(() => { const r = document.querySelectorAll('#mb-messages > .mb-message')[1], d = document.querySelector('#mb-messages > .mb-day').getBoundingClientRect(); return { open: r.classList.contains('mb-open'), gap: Math.round(r.getBoundingClientRect().top - d.bottom) }; })()`);
+            assert.ok(under.open && under.gap >= 8, `${theme}: the opened row starts 8 px or more below the day line: ` + JSON.stringify(under));
+            await shot(`board-table-open-below-day-390-${theme}`);
         }
         console.log('PASS the Board as a table');
     } finally { await removeBoards(ev, [B]).catch(() => {}); await client.close(); }
