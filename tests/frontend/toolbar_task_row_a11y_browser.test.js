@@ -41,6 +41,9 @@ const TEAM = `qa-tbr-${Date.now() % 100000}`;
                 const tabs = await ev(`(() => { const t = [...document.querySelectorAll('.team-tab')].filter(b => b.getClientRects().length); const hl = (() => { const i = document.createElement('i'); i.style.color = 'Highlight'; document.body.append(i); const c = getComputedStyle(i).color; i.remove(); return c; })(); return { hl, on: t.filter(b => b.getAttribute('aria-selected') === 'true').map(b => getComputedStyle(b).borderBottomColor), off: t.filter(b => b.getAttribute('aria-selected') !== 'true').map(b => getComputedStyle(b).borderBottomColor) }; })()`);
                 assert.deepEqual(tabs.on, [tabs.hl], `${tab}: the open tab's underline is Highlight: ` + JSON.stringify(tabs)); assert.ok(tabs.off.every(c => c !== tabs.hl), 'and no other tab: ' + JSON.stringify(tabs));
             }
+            await goTab(ev, settle, 'Tasks'); await settle(500);
+            const dot = await ev(`(() => { const d = [...document.querySelectorAll('[role=tabpanel]:not([hidden]) .goal-chip .goal-dot')].find(e => e.getClientRects().length); const i = document.createElement('i'); i.style.background = 'ButtonText'; document.body.append(i); const bt = getComputedStyle(i).backgroundColor; i.remove(); return { dot: d && getComputedStyle(d).backgroundColor, bt, w: d && Math.round(d.getBoundingClientRect().width) }; })()`);
+            assert.ok(dot.dot && dot.w > 0 && dot.dot === dot.bt, 'the state chip dot is filled in ButtonText, not empty space: ' + JSON.stringify(dot));
             await Emulation.setEmulatedMedia({ features: [] });
         });
         await S.run('a More menu opens on Enter (the keyboard on its first item), ArrowDown moves, Escape closes it and returns to the button', async () => {
