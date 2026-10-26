@@ -1,5 +1,5 @@
 /* Moved out of tasks.js as it was (#3837): the task list and dialog format helpers; no behaviour change. */
-import { formatMonthDayHourMinute, formatMonthDayTime, formatCost, compactCount } from './format.js';
+import { formatMonthDayTime, formatCost, compactCount } from './format.js';
 
 export const _priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
 // Priority as the words people choose it by (the create dialog and the CLI), not its sort rank.
@@ -13,13 +13,6 @@ export function _formatCost(usd, precise) {
 export function _formatTokenCount(n) {
     if (n == null) return '0';
     return n >= 1000 ? compactCount(n, 'k') : n.toLocaleString();
-}
-
-export function _formatTaskTime(ts) {
-    if (!ts) return '';
-    try {
-        return formatMonthDayHourMinute(new Date(ts));
-    } catch { return ''; }
 }
 
 export function _agentTaskStatus(t) {

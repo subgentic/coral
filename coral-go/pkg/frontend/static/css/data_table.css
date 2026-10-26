@@ -31,6 +31,7 @@
     --table-value-width: 14rem;
     --table-value-gap: 8px;
     --table-control-h: 32px;
+    --table-quiet-control-h: 28px;
     --table-control-pad-y: 4px;
     --table-control-pad-x: 8px;
     --table-track-border-w: 1px;
@@ -183,3 +184,11 @@
 
 .dt-estimate { font-style: italic; }
 .dt-cost-warning { color: var(--table-danger); font-weight: var(--table-primary-weight); }
+
+/* Folded rows with secondary actions reserve the same metadata height for rows without an action. */
+.dt-box.dt-folded button.dt-quiet { min-height: var(--table-quiet-control-h); margin: 0; }
+.dt-box.dt-folded:has(button.dt-quiet) td.dt-line-2 { min-height: var(--table-quiet-control-h); align-content: center; }
+@media (pointer: coarse) {
+    .dt-box.dt-folded button.dt-quiet { min-height: var(--table-touch); }
+    .dt-box.dt-folded:has(button.dt-quiet) td.dt-line-2 { min-height: var(--table-touch); }
+}

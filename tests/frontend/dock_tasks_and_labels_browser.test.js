@@ -26,7 +26,7 @@ const B = 'dock-tasks-' + Date.now().toString(36);
         for (const width of [420, 680, 980]) {
             await ev(`(() => { const d = document.getElementById('agentic-state'); d.style.transition = 'none'; d.style.width = '${width}px'; return d.offsetWidth; })()`);
             // #7800: the same columns must start at the same edge, regardless of header/row element types.
-            await waitFor(`document.querySelector('#board-task-list .dt-box').classList.contains('dt-folded') === ${width < 800}`, 'responsive table layout');
+            await waitFor(`document.querySelector('#board-task-list .dt-box').classList.contains('dt-folded') === ${width < 640}`, 'responsive table layout');
             const edges = await ev(`(() => {
                 const head = document.querySelector('#board-task-list thead tr');
                 const rows = [...document.querySelectorAll('#board-task-list tbody tr')];
