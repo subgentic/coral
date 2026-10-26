@@ -21,7 +21,7 @@ import { routeHref } from './markdown.js';
  * Returns the toast element. Text is set with textContent only.
  */
 /** How long a toast with no duration of its own stays (#6727): a short one 4 s; an error at least 8 s, and either longer by the length of its words (40 ms a character past 80, at most 20 s): a person has to be able to read what went wrong. */
-export function toastMs(text, error) {
+function toastMs(text, error) {
     const extra = Math.max(0, String(text || "").length - 80) * 40;
     return Math.min(20000, (error ? 8000 : 4000) + extra);
 }
@@ -158,7 +158,7 @@ function toastHost() {
 
 // On a phone the notices and the short toasts start below the top bar (the Agents picker, home, bookmarks, panel, settings), never over it: css reads --notice-top, set here from the bar's own bottom edge on the column
 // itself (not on <html>, where the theme code treats every inline custom property as a theme colour) and kept current when the window changes.
-export function placeNotices() {
+function placeNotices() {
     const bar = document.querySelector("header.top-bar");
     const banner = document.getElementById("local-auth-banner");
     const top = `${Math.max(bar ? Math.round(bar.getBoundingClientRect().bottom) : 0, banner ? Math.round(banner.getBoundingClientRect().bottom) : 0, 0) + 8}px`;

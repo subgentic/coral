@@ -54,7 +54,7 @@ export const loadDefaultPromptsDialog = panel('this dialog', './default_prompts_
 // The first use of a lazy module waits for its request. On a slow link that is a pause with nothing to say it is working: after BUSY_AFTER_MS the control that was clicked is marked busy
 // (aria-busy, and .lazy-loading: a progress cursor and a dimmed row, no animation) until the module has loaded or failed. On a fast link it never shows. The control is the click's own
 // [data-on-click] element: the stub runs inside the click's dispatch, so window.event is the click (a call from elsewhere has no control to mark and marks none).
-export const BUSY_AFTER_MS = 150;
+const BUSY_AFTER_MS = 150;
 function markBusyWhile(promise) {
     const ev = window.event;
     const host = ev && ev.target && ev.target.closest ? ev.target.closest('[data-on-click]') : null;

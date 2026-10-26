@@ -25,7 +25,7 @@ export function relaunchOffered(s) {
 }
 
 /** What the control says, and the name a screen reader reads. */
-export function pillWords(s) {
+function pillWords(s) {
     const days = s.staged.days, tier = ageTier(days);
     const age = tier === 'fresh' ? '' : plural(days, 'day');
     const ago = days < 1 ? 'earlier today' : `${plural(days, 'day')} ago`;
@@ -97,7 +97,7 @@ function renderBanner() {
 
 /** The one-time notice (#6292): a verified update that this install can apply now, said once per version in this browser. Review opens the confirmation; Later closes the notice and changes nothing (the control stays). Never drawn where the control is not (Homebrew, unsupported, no run record, Coral Hub off), and never in a hidden tab (it would be marked seen unread). */
 const READY_SEEN_KEY = 'coral-update-ready-seen';
-export function readyNotice(s) {
+function readyNotice(s) {
     if (!relaunchOffered(s) || s.relaunch.reason === 'no_run_record' || !canStart(s)) return null;
     return { key: s.staged.version, lead: `Coral ${s.staged.version} is ready.`, rest: ' It is downloaded and checked. Nothing is installed until you say yes.' };
 }
@@ -153,7 +153,7 @@ export async function resumeAfterSignIn() {
     return false;
 }
 
-export function openUpdatesSettings() { window.showSettingsModal && window.showSettingsModal('updates'); }
+function openUpdatesSettings() { window.showSettingsModal && window.showSettingsModal('updates'); }
 
 /** Wire the controls and start asking. Safe to call twice. */
 export function startUpdateUi() {

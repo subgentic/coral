@@ -3,8 +3,8 @@
  * the button that opened it.
  * The instruction is ONE line: the server delivers everything Coral types into an agent through board.OneLine (a line break would be Enter in the terminal), so the box is a single-line field and the text is
  * normalised the same way here. Enter in either box starts the reminder. A refusal from the server is said in the dialog and the dialog stays open. */
-export const REMINDER_MIN_SECONDS = 30;
-export const REMINDER_MAX_SECONDS = 86400;
+const REMINDER_MIN_SECONDS = 30;
+const REMINDER_MAX_SECONDS = 86400;
 const MAX_MESSAGE = 1000;
 
 const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
@@ -17,7 +17,7 @@ export function oneLine(text, trim = true) {
 }
 
 /** The minutes a person typed, as seconds, or an error sentence: a number from half a minute to 24 hours. */
-export function reminderSeconds(raw) {
+function reminderSeconds(raw) {
     const text = String(raw == null ? '' : raw).trim();
     const minutes = Number(text);
     if (!text || !Number.isFinite(minutes)) return { error: 'Enter how many minutes, for example 5.' };
@@ -28,7 +28,7 @@ export function reminderSeconds(raw) {
 }
 
 /** An interval in words: "every minute", "every 5 minutes", "every 2.5 minutes", "every 30 seconds", "every 2 hours". */
-export function everyWords(seconds) {
+function everyWords(seconds) {
     const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
     if (seconds < 60) return `every ${plural(seconds, 'second')}`;
     if (seconds === 60) return 'every minute';

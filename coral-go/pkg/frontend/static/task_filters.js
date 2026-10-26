@@ -62,7 +62,7 @@ export function saveFilters(board, f, store) {
 /** The goals' titles by number, for the goal chip's words (the page sets them when it has read the board's goals; a number it does not know reads "Goal 12"). */
 let goalNames = new Map();
 export function setGoalNames(map) { goalNames = map instanceof Map ? map : new Map(); }
-export const goalChipLabel = goal => (goal === NO_GOAL ? 'No goal' : `Goal: ${goalNames.get(Number(goal)) || `Goal ${goal}`}`);
+const goalChipLabel = goal => (goal === NO_GOAL ? 'No goal' : `Goal: ${goalNames.get(Number(goal)) || `Goal ${goal}`}`);
 
 /** The active filters as chips: {key, label}; removing a chip clears that key. */
 export function chips(f) {

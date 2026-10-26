@@ -783,4 +783,4 @@ async function _openLaunchedTeam(server, boardName, goal, agents, seen, boardSet
 }
 window.launchTeam = launchTeam;
 
-export { _openLaunchedTeam, _addTeamAgent, _applyACFPresetFor, _checkTeamGitDir, _initTeamForm, _loadExistingTeamBoards, _moveTeamAgent, _renderTeamTemplateSelector, _removeTeamAgent, _undoTeamAgentRemoval, _syncTeamMembers, _pickTeamTemplate, _setAllWorkers, _addOrchestrator, _renderTeamDirRecents, teamStepMove };
+export { _openLaunchedTeam, _addTeamAgent, _applyACFPresetFor, _checkTeamGitDir, _initTeamForm, _loadExistingTeamBoards, _moveTeamAgent, _renderTeamTemplateSelector, _removeTeamAgent, _undoTeamAgentRemoval, _syncTeamMembers, _pickTeamTemplate, _setAllWorkers, _addOrchestrator, teamStepMove };

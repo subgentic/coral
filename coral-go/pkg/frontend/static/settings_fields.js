@@ -5,7 +5,7 @@
 const THEME_OPTIONS = [{ value: 'dark', label: 'Dark' }, { value: 'light', label: 'Light' }, { value: 'system', label: 'System' }];
 const AGENT_TYPE_OPTIONS = [{ value: 'claude', label: 'Claude' }, { value: 'agy', label: 'Antigravity (agy)' }, { value: 'codex', label: 'Codex' }, { value: 'pi', label: 'Pi' }];
 
-export const GENERAL_FIELDS = [
+const GENERAL_FIELDS = [
     { key: 'theme', type: 'select', id: 'settings-theme', labelId: 'settings-theme-label', label: 'Theme', options: THEME_OPTIONS,
         action: { label: 'Customize Theme', icon: 'palette', small: true, className: 'settings-theme-btn', setup: el => el.setAttribute('data-on-click', 'm-hide-settings-modal-then-show-theme-configurator') } },
     { key: 'default_agent_type', type: 'select', id: 'settings-agent-type', labelId: 'settings-agent-type-label', label: 'Default agent type', options: AGENT_TYPE_OPTIONS },
@@ -15,13 +15,13 @@ export const GENERAL_FIELDS = [
     { key: 'check_updates', type: 'toggle', id: 'settings-check-updates', label: 'Tell me when a new version is out', help: { text: '', more: 'A notice in this browser. Downloading and installing are under Updates.' } },
 ];
 
-export const NOTIFICATIONS_FIELDS = [
+const NOTIFICATIONS_FIELDS = [
     { key: 'notify_needs_input', type: 'toggle', id: 'settings-notify-needs-input', label: 'Show notifications in Coral', help: 'Show a toast when an agent needs input.' },
     { key: 'desktop_notify', type: 'toggle', id: 'settings-desktop-notify', label: 'Desktop alerts',
         help: { text: '', more: 'This browser only: alert while this tab is in the background. Shows the agent and server names (your OS may keep them in its notification history), never agent output. May duplicate a local alert.' } },
 ];
 
-export const FILES_FIELDS = [
+const FILES_FIELDS = [
     { key: 'file_search_mode', type: 'select', id: 'settings-file-search-mode', label: 'File search mode', help: 'How @ mentions and file browser search for files', options: [{ value: 'directory', label: 'Directory Browsing' }, { value: 'fuzzy', label: 'Fuzzy Matching' }] },
     { key: 'file_search_limit', type: 'select', id: 'settings-file-search-limit', label: 'File search limit', help: 'Max number of files returned in search results', default: '500',
         options: [{ value: '50', label: '50' }, { value: '100', label: '100' }, { value: '200', label: '200' }, { value: '500', label: '500' }, { value: '1000', label: '1,000' }] },
@@ -34,7 +34,7 @@ export const FILES_FIELDS = [
 // A live part of a group (filled by its own module, shown or hidden by it): moved from where the template holds it into its place among the rows.
 const live = id => ({ key: `live_${id}`, type: 'notice', render: slot => { const el = document.getElementById(id); if (el) slot.append(el); } });
 const px = n => ({ value: String(n), label: `${n}px` });
-export const TERMINAL_FIELDS = [
+const TERMINAL_FIELDS = [
     { key: 'terminal_font_size', type: 'select', id: 'settings-terminal-font-size', labelId: 'settings-terminal-font-size-label', label: 'Terminal font size', default: '13', options: [10, 11, 12, 13, 14, 16, 18].map(px) },
     { key: 'terminal_scrollback', type: 'select', id: 'settings-terminal-scrollback', labelId: 'settings-terminal-scrollback-label', label: 'Terminal scrollback', default: '20000',
         options: [{ value: '1000', label: '1,000 lines' }, { value: '5000', label: '5,000 lines' }, { value: '10000', label: '10,000 lines' }, { value: '20000', label: '20,000 lines' }, { value: '50000', label: '50,000 lines' }, { value: '100000', label: 'Unlimited (100k)' }] },
@@ -49,7 +49,7 @@ const modelRow = (provider, label) => ({ key: `default_model_${provider}`, type:
     attrs: { list: `settings-models-${provider}`, autocomplete: 'off', 'aria-label': `${label} default model` }, setup: el => { el.classList.add('settings-mono-input'); const dl = document.createElement('datalist'); dl.id = `settings-models-${provider}`; el.after(dl); } });
 const hintOnly = more => ({ text: '', more });
 
-export const AGENTS_FIELDS = host => [
+const AGENTS_FIELDS = host => [
     { key: 'agents_defaults', type: 'heading', id: 'settings-agents-defaults', label: 'Defaults' },
     { key: 'permission_mode', type: 'select', id: 'settings-permission-mode', labelId: 'settings-permission-mode-label', label: 'Default permission mode', options: PERMISSION_OPTIONS,
         help: { text: 'Everything, with safety checks.', about: 'Default permission mode', more: "With such a default, an orchestrator's launches are refused until you pick Default or start them yourself." }, helpTextClass: 'perm-mode-desc',

@@ -45,8 +45,8 @@ const accessDetails = new Set();
 const relinkOpen = new Set(); // ids whose "Owner not confirmed" explanation is open (#6110)
 /** The words for a machine the hub says cannot confirm its owner yet (GET /api/servers needs_relink, #6110). The step is owner_label.js's, the same one the message on that computer says (#6108); the Servers row names the machine,
  *  because it is not the computer in the person's hand. */
-export const RELINK_BUTTON = 'Owner not confirmed';
-export const relinkHelp = label => `${label || 'This machine'} can't confirm its owner yet. On that computer, ${OWNER_LABEL_STEP}.`;
+const RELINK_BUTTON = 'Owner not confirmed';
+const relinkHelp = label => `${label || 'This machine'} can't confirm its owner yet. On that computer, ${OWNER_LABEL_STEP}.`;
 const relinkId = s => `${rowId(s.id)}-relink`;
 
 /** Open the Servers tab, optionally at one server's row. */

@@ -52,7 +52,7 @@ function post(method, url, body) {
 const cleanLabel = v => String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069]/g, '').trim().slice(0, 80); // display text: no control or bidi characters, bounded
 
 /** "Turned on from Coral Hub by <user>, <time>" / "Turned off on this computer, <time>" from the status; '' when it was never changed. The state is the switch's own: the last change set it. */
-export function autoAcceptChangedText(st) {
+function autoAcceptChangedText(st) {
     const c = st && st.allow_hub_auto_accept_changed;
     if (!c || typeof c !== 'object' || (c.by !== 'hub' && c.by !== 'local')) return '';
     const d = typeof c.at === 'string' ? new Date(c.at) : null;

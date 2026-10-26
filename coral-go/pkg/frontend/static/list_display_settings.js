@@ -33,7 +33,7 @@ export function toggleShowBranches() {
     redrawLiveList();
 }
 
-export function toggleAgentLine(part) {
+function toggleAgentLine(part) {
     setAgentLineShown(part, !isAgentLineShown(part));
     redrawLiveList();
 }

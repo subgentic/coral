@@ -24,7 +24,7 @@ const say = (t) => { const s = root && root.querySelector('.team-knowledge-statu
 const btn = (cls, text, onClick) => { const b = el('button', cls, text); b.type = 'button'; if (onClick) b.addEventListener('click', onClick); return b; };
 
 /** The table's entries: the team's index first, then each agent's notes by name. */
-export function entriesOf(data) {
+function entriesOf(data) {
     if (!data || !data.exists) return [];
     const out = [];
     if (data.index) out.push({ key: 'index', name: 'Index', text: data.index, from: 'The whole team' });

@@ -146,7 +146,7 @@ const _emptyBoardList = board => ({ board, first: [], older: [], nextCursor: '',
 
 let _boardList = _emptyBoardList(null);
 
-export async function _boardTasksFetch(boardName, suffix) {
+async function _boardTasksFetch(boardName, suffix) {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), boardTaskFetchHooks.timeoutMs);
     try {

@@ -28,7 +28,7 @@ const rows = (p) => (Array.isArray(draft[p]) ? draft[p] : (draft[p] = []));
 const levelsOf = (p) => (Array.isArray(limits.efforts && limits.efforts[p]) ? limits.efforts[p] : []);
 
 /** The reason an id is not accepted for a provider, or '' (the row being edited is not a duplicate of itself). */
-export function idProblem(provider, value, skipIndex = -1) {
+function idProblem(provider, value, skipIndex = -1) {
     if (!value) return 'Enter the model id the CLI takes after --model.';
     if (!VALID_ID.test(value)) return 'Use letters, numbers and . _ : / @ [ ] + - only, starting with a letter or number, up to 128 characters.';
     if (rows(provider).some((m, i) => i !== skipIndex && m.value === value)) return `${value} is already in the list for ${label(provider)}.`;
