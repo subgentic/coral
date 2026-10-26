@@ -82,7 +82,7 @@ const LIMITS = `(() => {
             window.__lim.rules.push({ method: 'POST', re: '^/api/board/${BOARD}/messages$', left: 1, status: 429,
                 headers: { 'Retry-After': '20', 'X-Coral-Limit': 'action' }, body: { error: ${JSON.stringify(RATE)} } });
             return true; })()`);
-        await waitFor(`!!document.getElementById('mb-post-input')`, 'the board composer');
+        await waitFor(`!!document.querySelector('#team-page-view #mb-post-input') && document.getElementById('team-page-view').getClientRects().length > 0`, 'the board composer (on the team page: the board page is the team page\'s Messages tab, #8129)');
         await ev(`(async () => { document.getElementById('mb-post-input').value = 'hello other team';
             await (await import((window.__coralStatic || '/static/') + 'message_board.js')).postBoardMessage(); return true; })()`);
         await waitFor(`${toasts}.some(t => t.includes(${JSON.stringify(RATE)}))`, 'the rate limit reason', 3000);

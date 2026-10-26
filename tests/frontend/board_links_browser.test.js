@@ -42,11 +42,12 @@ const HEX = 'c'.repeat(64);
         await api('POST', `/api/board/${board}/subscribe`, { subscriber_id: 'Links QA', job_title: 'Links QA' });
         await api('POST', `/api/board/${board}/messages`, { subscriber_id: 'Links QA',
             content: `See [the docs](https://example.test/docs), [the agents](/agents) and [the report](coral://artifacts/${HEX}).` });
+        await ev(`localStorage.setItem('coral.board.view', 'chat'); true`); // the chat rows: the team page's Board tab is the table by default
         const l2 = Page.loadEventFired();
         await Page.navigate({ url: `${BASE}/board/${board}` });
         await l2;
         await coralReady();
-        const POST = '#messageboard-view .mb-message-body';
+        const POST = '#team-page-view .mb-message-body'; // /board/<team> opens the team page (#8129)
         await until(`document.querySelectorAll('${POST} a').length >= 3 && !!document.querySelector('#mb-subscribers-sheet-list .subscriber-history-link, .subscriber-history-link')`, 'the post and the subscriber');
 
         const themes = async theme => {
@@ -86,16 +87,10 @@ const HEX = 'c'.repeat(64);
             return getComputedStyle(a).textDecorationLine; })()`);
         check('post links are not underlined until hovered', hover === 'none', hover);
 
-        // The Subscribers list is the Members sheet (the board's page has no side panel, #7457): open it.
-        await ev(`document.getElementById('mb-subscribers-btn').click(); true`);
-        await until(`getComputedStyle(document.getElementById('mb-subscribers-sheet')).display !== 'none' && document.querySelector('#mb-subscribers-sheet-list .subscriber-history-link').getClientRects().length > 0`, 'the Members sheet open');
-        const focus = await ev(`(() => { const out = {};
-            for (const [k, sel] of [['link', '${POST} a'], ['subscriber', '#mb-subscribers-sheet-list .subscriber-history-link']]) {
-                const el = document.querySelector(sel); el.focus({ focusVisible: true });
-                const cs = getComputedStyle(el); out[k] = { focused: document.activeElement === el, outline: cs.outlineStyle, width: cs.outlineWidth };
-            } return out; })()`);
-        check('keyboard focus is visible on a post link and on a subscriber name',
-            focus.link.focused && focus.link.outline !== 'none' && focus.subscriber.focused && focus.subscriber.outline !== 'none', JSON.stringify(focus));
+        // The post link's focus ring. The members are the team page's Agents tab now (#8129): a subscriber's name there is the agents page's, with its own checks.
+        const focus = await ev(`(() => { const el = document.querySelector('${POST} a'); el.focus({ focusVisible: true });
+            const cs = getComputedStyle(el); return { focused: document.activeElement === el, outline: cs.outlineStyle, width: cs.outlineWidth }; })()`);
+        check('keyboard focus is visible on a post link', focus.focused && focus.outline !== 'none', JSON.stringify(focus));
     } catch (e) {
         check('no error', false, e.message);
     } finally {
