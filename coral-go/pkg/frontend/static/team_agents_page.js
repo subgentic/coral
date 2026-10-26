@@ -110,7 +110,7 @@ function visibleAgents() {
     const all = (model.data && model.data.agents) || [];
     const byState = model.filter === 'all' ? all : all.filter(a => (a.availability || 'unknown') === model.filter);
     const q = model.search.trim().toLowerCase();
-    const shown = q ? byState.filter(a => `${a.name || ''} ${a.job_title || ''}`.toLowerCase().includes(q)) : byState;
+    const shown = q ? byState.filter(a => `${a.name || ''} ${a.role || ''}`.toLowerCase().includes(q)) : byState;
     return [...shown].sort((x, y) => (isOrchestrator(y) - isOrchestrator(x)) || (rank(x) - rank(y)) || (sidebarIndex(x) - sidebarIndex(y)));
 }
 
