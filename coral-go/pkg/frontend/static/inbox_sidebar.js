@@ -302,7 +302,7 @@ function savedListSpec(where = '') {
     const dock = where === 'dock-tab';
     const multi = rows.some(f => f.serverName);
     const empty = v.loading ? 'Loading saved items' : v.error ? v.error : v.filtered ? 'No saved messages match this search.' : v.scoped || (v.tab === 'done' ? 'Nothing is marked done.' : 'Nothing is saved for later.');
-    return { title: 'Saved', headless: dock, chipsLabel: 'Show',
+    return { title: 'Saved', noun: ['item', 'items'], headless: dock, chipsLabel: 'Show',
         chips: !dock ? [] : [{ action: 'inbox-saved-chip', data: { tab: 'open' }, label: 'Open', count: v.totals.open, pressed: v.tab === 'open' }, { action: 'inbox-saved-chip', data: { tab: 'done' }, label: 'Done', count: v.totals.done, pressed: v.tab === 'done' }],
         empty: { line: empty, hint: v.loading || v.error || v.filtered || v.tab === 'done' ? '' : 'Save a message from a chat or a board with its bookmark.' },
         note: [v.query ? 'The search covers every saved message, not only these.' : '', ...v.down.map(d => `${d.label || d.id} did not answer, so its saved messages are not shown.`)].filter(Boolean).join(' '), rows,
@@ -391,7 +391,7 @@ registerGroupSource('hub-inbox', {
             const rows = needsRows(), dirOf = s => String(s.working_directory || '').replace(/[\\/]+$/, '').split(/[\\/]/).pop();
             const goalOf = s => s.goal && s.goal.id && s.goal.title;
             const goal = rows.some(goalOf);
-            return { title: 'Needs you', rows, empty: { line: NF.isFiltered(needsFilters) ? 'No agent that needs you matches the search and filters.' : 'Nothing needs your input.' },
+            return { title: 'Needs you', noun: ['agent', 'agents'], rows, empty: { line: NF.isFiltered(needsFilters) ? 'No agent that needs you matches the search and filters.' : 'Nothing needs your input.' },
                 signature: JSON.stringify(rows.map(s => [sessionServer(s), s.session_id, s.display_name, s.waiting_kind, s.waiting_since, waitingText(s.waiting_since), teamOf(s), askOf(s), goalOf(s) ? s.goal.id : 0, dirOf(s)])), // the words move on with the clock: they are part of what was drawn
                 node: () => DT.dataTable({ label: `Needs you, ${rows.length}`, rows, rowKey: s => `${sessionServer(s)}:${s.session_id}`, state: needsState, rowName: s => resolveSessionIdentity(s),
                     open: s => { window.switchNavTab?.('agents'); window.selectLiveSession?.(s.name, s.agent_type, s.session_id, sessionServer(s)); },
@@ -407,7 +407,7 @@ registerGroupSource('hub-inbox', {
         }
         if (key === 'tasks') {
             const rows = taskRows();
-            return { title: 'Tasks', rows, empty: { line: queries.tasks || TF.isFiltered(taskFilters) || taskState !== 'all' ? 'No task matches the filters.' : 'No assigned tasks.' },
+            return { title: 'Tasks', noun: ['task', 'tasks'], rows, empty: { line: queries.tasks || TF.isFiltered(taskFilters) || taskState !== 'all' ? 'No task matches the filters.' : 'No assigned tasks.' },
                 signature: JSON.stringify([rows.map(t => [t.project, t.id, t.title, t.priority, t.status, t.board, t.updated_at])]),
                 node: () => {
                     const row = document.querySelector('#group-table-view .gt-toolbar');
@@ -424,7 +424,7 @@ registerGroupSource('hub-inbox', {
         }
         if (key === 'goals') {
             const rows = goalRows();
-            return { title: 'Goals', rows, empty: { line: GF.isFiltered(goalFilters) ? 'No goal matches the search and filters.' : 'No open goals.' },
+            return { title: 'Goals', noun: ['goal', 'goals'], rows, empty: { line: GF.isFiltered(goalFilters) ? 'No goal matches the search and filters.' : 'No open goals.' },
                 signature: JSON.stringify(rows.map(g => [g.board_id, g.id, g.title, g.outcome, g.state, g.updated_at, g.rollup])),
                 node: () => DT.dataTable({ label: `Goals, ${rows.length}`, rows, rowKey: goalKey, state: goalsState, rowName: g => g.title,
                     open: g => {

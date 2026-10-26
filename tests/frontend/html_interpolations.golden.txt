@@ -364,6 +364,9 @@
 1	sidebar_groups.js	TOOLBAR_ACTION_ATTR[i.name]
 2	sidebar_groups.js	attrs
 1	sidebar_groups.js	bar ? '' : extraHtml(t.extra)
+2	sidebar_groups.js	count
+1	sidebar_groups.js	count == null ? '' : `<span class="session-group-count">${count}</span>`
+1	sidebar_groups.js	countLine
 1	sidebar_groups.js	dataAttrs(c.data)
 1	sidebar_groups.js	html
 1	sidebar_groups.js	items.map(i => `<button type="button" role="menuitem" ${TOOLBAR_ACTION_ATTR[i.name]}>${escapeHtml(i.label)}</b
