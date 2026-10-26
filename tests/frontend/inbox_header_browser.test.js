@@ -70,6 +70,7 @@ const FOLDERS = [['needs', '/inbox/needs', 'Needs you'], ['tasks', '/inbox/tasks
                     } else {
                         await ev(`document.querySelector('#group-table-view .inbox-folder-toolbar .list-bar-toggle').click(); true`); await settle(300);
                         const f = await ev(`(() => { const f = document.querySelector('#group-table-view .inbox-folder-toolbar .inbox-pill-field'); return f ? { shown: f.getClientRects().length > 0 } : null; })()`);
+                        if (key === 'goals' || key === 'tasks') await shot(`inbox-header-${key}-390-sheet-dark`, 'dark');
                         check(`${name}: the choice is a select in the Filters sheet`, f && f.shown, JSON.stringify(f));
                         await ev(`document.querySelector('#group-table-view .inbox-folder-toolbar .list-bar-toggle').click(); true`);
                     }
