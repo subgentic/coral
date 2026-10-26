@@ -29,6 +29,7 @@ const BASE = require('./test_base').BASE;
         })();` });
         await Page.navigate({ url: BASE });
         await Page.loadEventFired();
+        await ev(`import((window.__coralStatic || '/static/') + 'history_filters.js').then(m => m.ensureHistoryList()).then(() => true)`); // a local Coral reads its chat list when an entry is wanted, not at start (#8195)
         for (let i = 0; i < 100 && !(await ev('window.__historyListLoaded === true')); i++) await new Promise(r => setTimeout(r, 50));
         assert.equal(await ev('window.__historyListLoaded === true'), true, "the page's own history list loaded before the fixtures go in");
 

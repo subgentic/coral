@@ -835,7 +835,8 @@ function loadInitialData(popout) {
     if (!popout) loadUpdatesFlag().then(on => on && importOnce('./update_ui.js').then(m => { m.startUpdateUi(); openUpdatesFromLink(); })).catch(() => {}); // the auto-update control, shown when the server says the updater is on (#5275, #5280)
     pollStartupStatus();
     if (!popout) {
-        startHistoryList().finally(() => markReady('history'));
+        if (isCloud()) startHistoryList().finally(() => markReady('history')); // the hub's Chats tab; a local Coral reads its chat list when an opened chat, the Resume dialog or a search wants an entry (#8195)
+        else markReady('history');
         initScheduler();
         initLiveJobs();
         initMessageBoard();
