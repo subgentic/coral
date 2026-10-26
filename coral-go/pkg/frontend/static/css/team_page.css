@@ -43,7 +43,8 @@
 #team-panel-messages > .mb-board { flex: 1; min-height: 0; }
 
 /* the tables of the tabs and the pages that hold them (the goals engine's classes, now a table and a page) */
-.goals-table-page { padding: 16px 24px 0; max-width: 1100px; width: 100%; box-sizing: border-box; flex: 1; display: flex; flex-direction: column; gap: 12px; min-height: 100%; }
+.goals-page.goals-table-page { max-width: none; margin-inline: 0; } /* the team page's tabs fill the page area at every width: the board's 1100 px and 1440 px caps (goals.css .goals-page) are not theirs (#7729) */
+.goals-table-page { padding: 16px 24px 0; width: 100%; box-sizing: border-box; flex: 1; display: flex; flex-direction: column; gap: 12px; min-height: 100%; }
 .goals-body, .team-tasks-body, .team-artifacts-body, .team-knowledge-body { display: flex; flex-direction: column; gap: 12px; flex: 1; min-height: 0; }
 .goals-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .goals-table-page .goals-chips-row { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; min-width: 0; flex: 1; gap: 6px; } /* one line that scrolls sideways, its scrollbar hidden: the Goals and Tasks chips are alike */
@@ -54,6 +55,8 @@
 .goals-table-page .goals-back { display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; padding: 4px 0; min-height: 36px; }
 .goals-table-page .goals-back:hover { text-decoration: underline; }
 .team-count-line { margin: 0; }
+.team-table-foot { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 4px 0 12px; font-size: 0.8125rem; color: var(--text-secondary); } /* under a paged table: how many are shown of how many, and Load more (#7729) */
+.team-table-foot .goals-more { margin: 0; }
 .team-empty { display: flex; flex-direction: column; gap: 2px; } /* the one empty line of the team page's tabs: the sentence at 14/400, an optional hint at 12/400, no box (UI/UX 170 consistency, item 5) */
 .goals-note.team-empty-line, .team-empty-line { margin: 0; font-size: 0.875rem; font-weight: 400; line-height: 1.5; color: var(--text-primary); }
 .team-empty-hint { margin: 0; font-size: 0.75rem; font-weight: 400; line-height: 1.5; color: var(--text-secondary); }
