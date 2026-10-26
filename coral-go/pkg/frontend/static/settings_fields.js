@@ -15,9 +15,15 @@ export const GENERAL_FIELDS = [
     { key: 'check_updates', type: 'toggle', id: 'settings-check-updates', label: 'Tell me when a new version is out', help: { text: '', more: 'A notice in this browser. Downloading and installing are under Updates.' } },
 ];
 
+export const NOTIFICATIONS_FIELDS = [
+    { key: 'notify_needs_input', type: 'toggle', id: 'settings-notify-needs-input', label: 'Show notifications in Coral', help: 'Show a toast when an agent needs input.' },
+    { key: 'desktop_notify', type: 'toggle', id: 'settings-desktop-notify', label: 'Desktop alerts',
+        help: { text: '', more: 'This browser only: alert while this tab is in the background. Shows the agent and server names (your OS may keep them in its notification history), never agent output. May duplicate a local alert.' } },
+];
+
 /** Draws the groups that are fields into the Settings modal's panes (once, when the modal is built). mount is mountSettingsView. */
 export function drawSettingsGroups(modal, mount) {
-    for (const [hostId, fields] of [['settings-general-rows', GENERAL_FIELDS]]) {
+    for (const [hostId, fields] of [['settings-general-rows', GENERAL_FIELDS], ['settings-notifications-rows', NOTIFICATIONS_FIELDS]]) {
         const host = modal.querySelector(`#${hostId}`);
         if (host && !host.firstChild) mount(host, { mode: 'settings', saveBar: false, fields });
     }
