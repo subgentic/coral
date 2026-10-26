@@ -5359,7 +5359,7 @@
       "what": "checkbox \"\"",
       "source": "running page (team:agent)",
       "status": "moved",
-      "newHome": "team page: Settings tab, Workflow section: the switch 'Include dependent-queue guidance' (name dependency_guidance; saved in the same PUT /api/board/<project>/working-mode as the old panel, board.WorkingMode.DependencyGuidance)",
+      "newHome": "team page: Settings tab, Workflow section: the switch 'Guidance for dependent tasks' (name dependency_guidance; saved in the same PUT /api/board/<project>/working-mode as the old panel, board.WorkingMode.DependencyGuidance)",
       "proof": {
         "file": "static/team_settings_page.js",
         "needle": "key: 'dependency_guidance'"
