@@ -149,7 +149,7 @@ func TestMockSandboxStubsEveryAgentCLI(t *testing.T) {
 		}
 		want[v] = "agenttypes type"
 	}
-	for _, v := range binaryValues(t, filepath.Join(root, "coral-go/internal/agent/agent.go")) {
+	for _, v := range binaryValues(t, filepath.Join(root, "coral-go/internal/agent/agent_cli.go")) {
 		want[v] = "agentCLIs binary"
 	}
 
