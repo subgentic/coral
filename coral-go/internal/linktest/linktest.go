@@ -87,6 +87,7 @@ func Symlink(t *testing.T, target, link string) {
 // RequireSymlinks skips the test (fails it on CI) where this account can't create symbolic links,
 // for a test whose links are made by something else (a script's ln -s), which would otherwise
 // quietly make a plain file and leave the test checking nothing.
+// RequireSymlinks has no production caller: it is exported for tests in background, server/routes.
 func RequireSymlinks(t *testing.T) {
 	t.Helper()
 	dir := t.TempDir()
