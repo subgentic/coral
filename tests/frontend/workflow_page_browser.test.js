@@ -38,6 +38,8 @@ const BASE = require('./test_base').BASE;
             assert.equal(page.badge, 'none', at + 'no count badge on a workflow page');
             assert.deepEqual(page.steps, [['1', 'npm ci'], ['2', 'npm test -- --ci']], at + 'steps from 1 with their commands');
             assert.deepEqual(page.head, ['Started', 'Result', 'Duration', 'Trigger'], at);
+            assert.equal(await ev(`document.querySelectorAll('#wf-detail .dt-table').length`), 2, at + 'steps and runs use the shared table');
+            assert.equal(await ev(`document.querySelectorAll('#wf-detail .wf-runs-table tbody tr .dt-primary').length`), 3, at + 'each run has one native primary action');
             assert.match(page.rows[0], /Failed: step 2 \(Test\).*exit code 3.*1m 40s/, at + page.rows[0]);
             assert.match(page.rows[1], /Passed.*10s?.*manual/, at + page.rows[1]);
             assert.match(page.rows[2], /Passed.*under 1s.*api/, at + 'a run under a second says so, not 0s: ' + page.rows[2]);

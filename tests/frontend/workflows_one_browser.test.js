@@ -177,7 +177,7 @@ const STUB = `(() => { const real = window.fetch; const J = b => Promise.resolve
             await shot(`workflows-one-page-${w}`);
 
             // a run's page
-            await ev(`document.querySelector('#wf-detail .wf-runs-table .row-open-btn').click(); true`);
+            await ev(`document.querySelector('#wf-detail .wf-runs-table .dt-primary').click(); true`);
             await waitFor(`!!document.querySelector('#wf-run-detail .wf-run-title') && !!document.querySelector('#wf-run-detail .item-bar')`, at + "the run's page", 8000);
             assert.equal(await ev(`document.getElementById('wf-run-back').textContent`), '← nightly-build', at + 'back goes to its workflow');
             assert.deepEqual(await ev(`(() => { const t = getComputedStyle(document.querySelector('#wf-run-detail .wf-run-title')); return [t.fontSize, t.fontWeight]; })()`), ['17px', '700'], at + 'Run #2 is 17/700');

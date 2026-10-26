@@ -261,7 +261,6 @@
 1	sandbox_frame.js	content
 2	saved_marks.js	BOOKMARK_SVG
 1	scheduler.js	backLinkHtml('jobs', group.key, group.label)
-1	scheduler.js	cls
 1	scheduler.js	doesHtml
 1	scheduler.js	dot
 1	scheduler.js	failBadge
@@ -271,12 +270,6 @@
 1	scheduler.js	k
 1	scheduler.js	paused
 1	scheduler.js	promptHtml
-2	scheduler.js	resultCell(r)
-1	scheduler.js	runFailureTag(r)
-1	scheduler.js	runs.map(r => `<tr data-on-click="job-run" data-run-id="${Number(r.id)}" style="cursor:pointer"> <td><button t
-1	scheduler.js	runs.map(r => { const sessionLink = r.session_id ? ` <a href="#" class="run-session-link" title="Open the conv
-1	scheduler.js	runsHtml
-1	scheduler.js	sessionLink
 1	scheduler.js	settingsRows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')
 1	scheduler.js	v
 1	server_status.js	count
@@ -584,7 +577,7 @@
 1	workflows.js	formatDuration(elapsed)
 1	workflows.js	formatTime(run.finished_at)
 1	workflows.js	formatTime(run.started_at)
-2	workflows.js	i + 1
+1	workflows.js	i + 1
 1	workflows.js	icon
 2	workflows.js	iconClass
 1	workflows.js	killBtn
@@ -595,17 +588,12 @@
 1	workflows.js	progressBarHtml
 1	workflows.js	progressPct
 1	workflows.js	retriggerBtn
-1	workflows.js	rowsHtml
 1	workflows.js	run.finished_at ? `<span><span class="material-icons" aria-hidden="true">check_circle</span> ${formatTime(run.
 1	workflows.js	run.id
 1	workflows.js	run.started_at ? `<span><span class="material-icons" aria-hidden="true">schedule</span> ${formatTime(run.start
-1	workflows.js	runResult(r)
-1	workflows.js	runsHtml
 1	workflows.js	s.exit_code
 1	workflows.js	signInFailure
 1	workflows.js	signInFailure ? `<span class="wf-run-error" style="color:var(--error-text)"><span class="material-icons" aria-
-1	workflows.js	statusIconHtml(r.status)
-1	workflows.js	steps.map((s, i) => { const stepType = s.type || 'shell'; const what = stepType === 'shell' ? s.command : s.pr
-2	workflows.js	stepsHtml
+1	workflows.js	stepsHtml
 1	workflows.js	timingHtml
 1	workflows.js	totalSteps

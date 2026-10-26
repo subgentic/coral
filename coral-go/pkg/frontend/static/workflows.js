@@ -8,13 +8,14 @@ import { pollEvery } from './overload.js';
 import { note, currentRoute } from './nav.js';
 import { KILL_LOG_NOTE } from './render.js';
 import { formatDuration as fmtDuration } from './format.js';
-import { runFailureHtml, runFailureTag } from './run_failure.js';
+import { runFailureHtml, runFailure } from './run_failure.js';
 import { whenWords, resultWords, limitWords, stepWords, runDot } from './job_words.js'; // the Jobs pages' words: one set for both
 import { limitSeconds, limitParts } from './time_limit.js';
 import { registerGroupSource, groupHeaderHtml, isGroupFolded, syncPaneGroupToggle, refreshGroupTable, openFirstGroupTable, backLinkHtml, foldWayBack } from './sidebar_groups.js';
 import { onViewShown } from './view_switch.js';
 import { isPhoneLayout } from './phone_layout.js';
 import { importOnce } from './import_once.js';
+import { whenText } from './when_text.js';
 
 const DT = await importOnce('./data_table.js');
 const workflowTableStates = new Map();
@@ -327,13 +328,33 @@ export async function selectWorkflow(id) {
 
 /** A run's result for the runs table and the last-run line: "Passed", "Failed: step 2 (Test)", with the one-line reason from the server underneath. Step numbers come from 1 (#6530). */
 function runResult(r) {
-    const tag = runFailureTag(r);
-    if (r.status === 'failed' || r.status === 'killed') {
-        const fs = r.failed_step;
-        const head = r.status === 'killed' ? 'Stopped' : fs ? `Failed: step ${Number(fs.number)} (${esc(fs.name)})` : 'Failed';
-        return `${head}${tag}${r.failure_reason ? `<div class="wf-run-reason">${esc(r.failure_reason)}</div>` : ''}`;
-    }
-    return esc(resultWords(r)) + tag;
+    const failed = r.status === 'failed' || r.status === 'killed';
+    const name = r.status === 'killed' ? 'Stopped' : failed && r.failed_step ? `Failed: step ${Number(r.failed_step.number)} (${r.failed_step.name})` : resultWords(r);
+    const cell = DT.el('span'); cell.append(DT.chip(name, failed ? 'goal-state-task-blocked' : r.status === 'completed' ? 'goal-state-task-done' : r.status === 'running' ? 'goal-state-task-active' : ''));
+    const failure = runFailure(r); if (failure) cell.append(' ', DT.tag(`(${failure.short})`));
+    return cell;
+}
+
+function workflowStepsTable(steps) {
+    const table = DT.dataTable({ label: 'Workflow steps', rows: steps.map((s, i) => ({ ...s, position: i + 1 })), rowKey: s => s.position, bare: true, sortBar: false, empty: { line: 'No steps yet.' },
+        columns: [
+            { key: 'step', label: 'Step', primary: true, width: 'grow', line: 1, cell: s => { const cell = DT.el('span'); cell.append(DT.el('span', 'sr-only', `Step ${s.position}: `), document.createTextNode(s.name || `Step ${s.position}`)); return cell; } },
+            { key: 'type', label: 'Type', line: 2, cell: s => DT.tag(s.type || 'shell') },
+            { key: 'command', label: 'Command', line: 2, nowrap: false, cell: s => { const what = (s.type || 'shell') === 'shell' ? s.command : s.prompt; return what ? DT.el('code', 'wf-step-what', String(what).slice(0, 300)) : '—'; } },
+        ],
+    }); table.el.classList.add('wf-steps-table'); return table.el;
+}
+
+function workflowRunsTable(runs) {
+    const open = r => withId(r.id, selectWorkflowRun);
+    const table = DT.dataTable({ label: 'Workflow runs', rows: runs, rowKey: r => r.id, bare: true, sortBar: false, open, empty: { line: 'No runs yet.' },
+        columns: [
+            { key: 'started', label: 'Started', primary: true, width: 'grow', line: 1, cell: r => { const time = DT.timeCell(r.started_at); const b = DT.primaryButton(time.textContent, `Open run #${r.id}`); b.title = time.title; b.addEventListener('click', () => open(r)); return b; } },
+            { key: 'result', label: 'Result', line: 2, nowrap: false, cell: runResult, subtitle: r => (r.status === 'failed' || r.status === 'killed') ? r.failure_reason : '' },
+            { key: 'duration', label: 'Duration', line: 2, tone: 'tertiary', cell: r => r.duration_seconds != null ? (r.duration_seconds < 1 ? 'under 1s' : formatDuration(Math.round(r.duration_seconds))) : '—' },
+            { key: 'trigger', label: 'Trigger', line: 2, tone: 'tertiary', when: r => !!r.trigger_type, cell: r => r.trigger_type || '—' },
+        ],
+    }); table.el.classList.add('wf-runs-table'); return table.el;
 }
 
 function renderWorkflowDetail(wf, runs) {
@@ -341,36 +362,10 @@ function renderWorkflowDetail(wf, runs) {
     if (!container) return;
 
     const steps = wf.steps || [];
-    // The steps are a table (Step, Type, Command): a command is code, so it is the one cell in the code font
-    const stepsHtml = steps.length ? `<table class="wf-steps-table">
-        <thead><tr><th scope="col">Step</th><th scope="col">Type</th><th scope="col">Command</th></tr></thead>
-        <tbody>${steps.map((s, i) => {
-            const stepType = s.type || 'shell';
-            const what = stepType === 'shell' ? s.command : s.prompt;
-            return `<tr><td><span class="sr-only">Step ${i + 1}: </span>${esc(s.name)}</td><td>${esc(stepType)}</td><td>${what ? `<code class="wf-step-what">${esc(String(what).slice(0, 300))}</code>` : '\u2014'}</td></tr>`;
-        }).join('')}</tbody>
-    </table>` : '<p class="runs-empty-line">No steps yet.</p>';
-
     const last = runs[0];
     const lastHtml = last && (last.status === 'failed' || last.status === 'killed') ? `<p class="wf-last-failed" role="status">
-            The last run ${last.status === 'killed' ? 'was stopped' : 'failed'}${last.started_at ? ' ' + esc(whenWords(last.started_at)) : ''}${last.failed_step ? `: step ${Number(last.failed_step.number)} (${esc(last.failed_step.name)})${last.failure_reason ? ': ' + esc(last.failure_reason) : ''}` : ''}.
+            The last run ${last.status === 'killed' ? 'was stopped' : 'failed'}${last.started_at ? ' ' + esc(whenText(last.started_at)) : ''}${last.failed_step ? `: step ${Number(last.failed_step.number)} (${esc(last.failed_step.name)})${last.failure_reason ? ': ' + esc(last.failure_reason) : ''}` : ''}.
             <button class="btn-link" data-on-click="wf-run" data-run-id="${Number(last.id)}">Open the failed run</button></p>` : '';
-
-    let runsHtml = '';
-    if (runs.length) {
-        const rowsHtml = runs.map(r => `<tr data-on-click="wf-run" data-run-id="${Number(r.id)}">
-                <td><button type="button" class="row-open-btn" data-on-click="wf-run" data-run-id="${Number(r.id)}">${r.started_at ? esc(whenWords(r.started_at)) : '\u2014'}</button></td>
-                <td>${statusIconHtml(r.status)} ${runResult(r)}</td>
-                <td>${r.duration_seconds != null ? (r.duration_seconds < 1 ? 'under 1s' : esc(formatDuration(Math.round(r.duration_seconds)))) : '\u2014'}</td>
-                <td>${esc(r.trigger_type || '')}</td>
-            </tr>`).join('');
-        runsHtml = `<table class="wf-runs-table">
-            <thead><tr><th scope="col">Started</th><th scope="col">Result</th><th scope="col">Duration</th><th scope="col">Trigger</th></tr></thead>
-            <tbody>${rowsHtml}</tbody>
-        </table>`;
-    } else {
-        runsHtml = '<p class="runs-empty-line">No runs yet.</p>';
-    }
 
     const group = groupOfWorkflow(wf);
     // One facts line under the name (folder, time limit, when it was made, and that it is off)
@@ -384,11 +379,11 @@ function renderWorkflowDetail(wf, runs) {
         ${lastHtml}
         <div class="wf-steps-section">
             <h3>Steps (${steps.length})</h3>
-            ${stepsHtml}
+            <div id="wf-step-table"></div>
         </div>
         <div class="wf-runs-section">
             <h3>Runs</h3>
-            ${runsHtml}
+            <div id="wf-run-table"></div>
         </div>
         <div class="item-bar wf-detail-actions">
             <div class="wf-more">
@@ -406,6 +401,8 @@ function renderWorkflowDetail(wf, runs) {
             </button>
         </div>
     `;
+    container.querySelector('#wf-step-table').append(workflowStepsTable(steps));
+    container.querySelector('#wf-run-table').append(workflowRunsTable(runs));
     foldWayBack(container, '.wf-phone-back', '#wf-title');
 }
 
@@ -896,10 +893,6 @@ function formatTime(ts) {
     } catch (_) {
         return ts.slice(0, 16);
     }
-}
-
-function statusIconHtml(status) {
-    return `<span class="wf-status-dot ${esc(status)}"></span>`;
 }
 
 // A step's state in words, for a reader: the mark beside it is a glyph (#6639).

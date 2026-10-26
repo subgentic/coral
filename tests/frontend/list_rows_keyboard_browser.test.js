@@ -44,10 +44,10 @@ const S = `(window.__coralStatic || '/static/')`;
         await ev(`document.querySelectorAll('#scheduled-jobs-list .sched-row')[0].querySelector('.row-btn').click(); true`);
         await waitFor(`!!document.querySelector('#scheduler-detail .sched-runs-section') && /nightly/.test(document.getElementById('scheduler-detail').textContent)`, 'the first job again', 6000);
         // its Runs table: the first cell holds a real button; Enter on it opens the run (the table keeps its rows)
-        await waitFor(`!!document.querySelector('.sched-runs-table tbody tr button.row-open-btn')`, 'the run row button', 6000);
-        const btn = await ev(`(() => { const b = document.querySelector('.sched-runs-table tbody tr button.row-open-btn'); return b ? { tag: b.tagName, name: b.textContent.trim() } : null; })()`);
+        await waitFor(`!!document.querySelector('.sched-runs-table tbody tr button.dt-primary')`, 'the run row button', 6000);
+        const btn = await ev(`(() => { const b = document.querySelector('.sched-runs-table tbody tr button.dt-primary'); return b ? { tag: b.tagName, name: b.textContent.trim() } : null; })()`);
         assert.ok(btn && btn.tag === 'BUTTON' && btn.name, 'a run row has a real button in its first cell: ' + JSON.stringify(btn));
-        assert.equal(await ev(`document.querySelector('.sched-runs-table tbody tr').getAttribute('role')`), null, 'the row keeps its table semantics (no button role on the tr)');
+        assert.equal(await ev(`document.querySelector('.sched-runs-table tbody tr').getAttribute('role')`), 'row', 'the row keeps its table semantics (no button role on the tr)');
         // Chats: a row is an li holding a button, and aria-current follows the open chat wherever the highlight moves (#7006)
         await ev(`window.switchNavTab('history'); (async () => { const m = await import(${S} + 'history_list.js'); window.__st = (await import(${S} + 'state.js')).state; window.__ctl = await import(${S} + 'controls.js');
             const rows = [1, 2, 3].map(i => ({ session_id: 'aaaaaa' + i, title: 'Chat ' + i, source_type: 'claude', display_name: 'Ada', last_timestamp: new Date().toISOString() })).concat([{ type: 'group', session_id: 'board:team-a', title: 'team-a', updated_at: new Date().toISOString(), message_count: 2, subscriber_count: 1 }]);
