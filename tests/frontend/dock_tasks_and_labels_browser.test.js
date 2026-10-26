@@ -68,13 +68,13 @@ const B = 'dock-tasks-' + Date.now().toString(36);
         const ring = await ev(`[...document.querySelectorAll('#board-task-list *')].filter(e => { const c = getComputedStyle(e); return c.outlineStyle !== 'none' && parseFloat(c.outlineWidth) > 0; }).map(e => e.className)`);
         assert.deepEqual(ring, [], 'no element of the list wears a ring after a mouse click and the page being left');
 
-        console.log('9. no colons on the Restart and Add Macro labels');
+        console.log('9. no colons on the Restart and Add Macro labels (Restart: the Permission mode is a settings_view row since #8462, so its label is the row label)');
         await ev(`import((window.__coralStatic || '/static/') + 'controls.js').then(m => { m.showMacroModal(); return true; })`); // the form is drawn when the dialog opens
         const macro = await ev(`['macro-label-input', 'macro-command-input'].map(id => document.querySelector('label[for="' + id + '"]').textContent.trim())`);
         assert.deepEqual(macro, ['Label', 'Command'], 'the Add Macro labels');
         await ev(`window.selectLiveSession && true; window.restartSession(); true`);
         await waitFor(`!!document.querySelector('#restart-acf .acf-permission-mode')`, 'the Restart form', 10000);
-        const restart = await ev(`document.querySelector('#restart-acf .acf-permission-mode').closest('label').firstChild.textContent.trim()`);
+        const restart = await ev(`document.querySelector('#restart-acf .acf-permission-mode').closest('.sv-row').querySelector('.sv-label').textContent.trim()`);
         assert.equal(restart, 'Permission mode', 'the Restart label');
         console.log('PASS dock tasks and labels');
     } finally { await removeBoards(ev, [B]); await client.close(); }
