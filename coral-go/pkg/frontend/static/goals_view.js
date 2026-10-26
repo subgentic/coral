@@ -1,3 +1,4 @@
+import { openTask } from './task_navigation.js';
 /* The local Goals view (#7113, UI/UX's #7091 design, layout A): the second face of a board's screen, beside Messages. A list on the left (filter chips, Waiting on you, one card per goal), the open goal
  * on the right (outcome, done when, the rollup, its tasks with Open task and Open the agent); on a phone the two are two screens with a back row. First cut: read, plus New goal.
  * The routes' JSON becomes the model in goals_adapter.js, the words come from goal_words.js; everything drawn here is built with the DOM and textContent (no text from a goal or a task is read as markup).
@@ -21,7 +22,7 @@ const TV = await importOnce('./tasks_view.js'); // the one Tasks view
 const PAGE = 50; // a goal's tasks are drawn this many at a time
 import * as W from './goal_words.js';
 
-const model = { followUps: new Map(), followKey: new Map(), project: '', sig: '', goals: [], requireGoal: false, noGoalOpen: null, filter: 'all', openId: 0, tasks: new Map(), loading: false, failed: '', asOf: '', creating: false, taskId: 0, taskSearch: '', goalSearch: '', screen: 'goal' };
+const model = { followUps: new Map(), followKey: new Map(), project: '', sig: '', goals: [], requireGoal: false, noGoalOpen: null, filter: 'all', openId: 0, tasks: new Map(), loading: false, failed: '', asOf: '', creating: false, taskSearch: '', goalSearch: '', screen: 'goal' };
 const PHONE = matchMedia('(max-width: 760px)'); // the team page's phone layout (team_page.css): a goal, its task list and a task are three screens
 let root = null;
 let layout = 'cards'; // 'cards': the board's Goals face (cards and the goal beside them); 'page': the team page's Goals tab (a table, and a goal's own page, #7453)
@@ -65,7 +66,7 @@ export async function loadGoals() {
         if (layout === 'page') hooks.onCount?.(list.goals.length, list.goals.filter(x => W.isOpenGoal(x)).length);
         model.sig = sig; model.goals = list.goals; model.requireGoal = list.requireGoal; model.noGoalOpen = list.noGoalOpen; model.failed = ''; model.asOf = clock();
         if (model.wantOpen) { const want = model.wantOpen; model.wantOpen = 0; if (model.goals.some(g => g.id === want)) { model.openId = want; same = false; focusOpened = true; } }
-        if (model.openId && !model.goals.some(g => g.id === model.openId)) { model.openId = 0; model.taskId = 0; same = false; }
+        if (model.openId && !model.goals.some(g => g.id === model.openId)) { model.openId = 0; same = false; }
     } catch (e) {
         if (project !== model.project) return;
         model.failed = W.failedText(e && e.message); model.sig = '';
@@ -218,7 +219,7 @@ function detailTasks(g, rows) {
         } });
     };
     return TV.tasksTable('goal-page', rows.map(taskOf), { label: `Tasks of ${g.title}`, tweak, sortBar: false, rowName: undefined,
-        open: t => { const task = byId.get(t.id), raw = task.raw || task; if (hooks.openTask) hooks.openTask(raw, goalById(raw.goal_id)); else window.openTeamPage?.(model.project, { tab: 'tasks', item: t.id }); } }).el;
+        open: t => openTask(model.project, t.id) }).el;
 }
 
 /** Focus goes to the detail as a whole when a goal opens (its name is read: the goal's title), not to a heading that cannot be typed in: no ring is drawn round words (#7404). */
@@ -496,43 +497,11 @@ function taskOf(t) {
 
 /** A group of the column (Open, Done): the one table, folded to its two-line row in the column's narrow box. */
 function sideTable(g, name, rows) {
-    const byId = new Map(rows.map(t => [t.id, t]));
     return TV.tasksTable('goal', rows.map(taskOf), { label: `${name} tasks of ${g.title}`, ctx: { goalTitleOf: (gid) => (goalById(gid) || {}).title || `Goal ${gid}` },
-        open: (task) => openGoalTask(g, byId.get(task.id)), current: model.taskId ? `t${model.taskId}` : null, sortBar: false, bare: true, state: sideState(g.id, name) });
+        open: task => openTask(model.project, task.id), sortBar: false, bare: true, state: sideState(g.id, name) });
 }
 const sideStates = new Map();
 const sideState = (gid, name) => { const k = `${gid}:${name}`; if (!sideStates.has(k)) sideStates.set(k, DT.tableState()); return sideStates.get(k); };
-
-function openGoalTask(g, t) {
-    model.taskId = t.id; model.screen = 'task';
-    drawPage();
-    root.querySelector('#team-task-title')?.focus({ preventScroll: true });
-}
-
-function closeGoalTask() {
-    const id = model.taskId;
-    model.taskId = 0; model.screen = PHONE.matches ? 'column' : 'goal';
-    drawPage();
-    (root.querySelector(`.dt-primary[data-task-id="${id}"]`) || root.querySelector('#goals-detail-title'))?.focus({ preventScroll: true });
-}
-
-/** The picked task, as the task page (#7644), in the main pane; the column beside it stays. */
-async function showTaskInMain(main, g) {
-    const id = model.taskId;
-    main.replaceChildren(el('p', 'goals-note', 'Loading the task…'));
-    const m = await importOnce('./team_tasks_page.js');
-    const row = (model.tasks.get(g.id)?.rows || []).find(t => t.id === id);
-    const full = (await m.readTask(model.project, id)) || (row && row.raw);
-    if (model.taskId !== id || !main.isConnected) return; // another task, or another page, was chosen while it was read
-    if (!full) { main.replaceChildren(el('p', 'goals-note', 'This task could not be read.'), backButton(`Goal: ${g.title}`, () => closeGoalTask())); return; }
-    m.renderTaskPage(main, full, {
-        project: model.project, backLabel: PHONE.matches ? 'Tasks' : `Goal: ${g.title}`, goalTitleOf: (gid) => (goalById(gid) || {}).title,
-        openGoal: (gid) => { if (gid === g.id) closeGoalTask(); else hooks.openGoal?.(gid); },
-        onBack: () => closeGoalTask(),
-        openTask: (t) => openGoalTask(g, t), // a follow-up listed on the task's page
-        onChanged: () => { loadTasks(g.id); loadGoals(); },
-    });
-}
 
 /** The separator's value for a screen reader: the column's width and its limits (the dock's, dock_resize.js). */
 function gripValue(grip, split, side) {
@@ -542,21 +511,14 @@ function gripValue(grip, split, side) {
 
 function drawGoalPageRaw(col) {
     const g = goalById(model.openId);
-    const same = col.querySelector('.goal-split');
-    if (model.taskId && same && same.dataset.goal === String(g.id) && same.dataset.task === String(model.taskId)) { // a task is open and being read or edited in the main pane: only the column is drawn again
-        same.classList.toggle('goal-split-column', model.screen === 'column');
-        drawGoalSide(same.querySelector('.goal-side'), g);
-        return;
-    }
     const keep = document.activeElement && document.activeElement.id === 'goals-detail-title';
     col.replaceChildren();
-    const split = el('div', 'goal-split'); split.dataset.goal = String(g.id); split.dataset.task = String(model.taskId); split.classList.toggle('goal-split-column', model.screen === 'column');
+    const split = el('div', 'goal-split'); split.dataset.goal = String(g.id); split.classList.toggle('goal-split-column', model.screen === 'column');
     const main = el('div', 'goal-main'), side = el('aside', 'goal-side'); side.setAttribute('aria-label', `Tasks of ${g.title}`);
     const grip = el('div', 'goal-side-grip'); grip.setAttribute('role', 'separator'); grip.setAttribute('aria-orientation', 'vertical'); grip.setAttribute('aria-label', 'Resize the task list'); grip.tabIndex = 0; grip.title = 'Drag to resize, double click to reset';
     split.append(main, side, grip); col.append(split);
     attachDockResize(grip, { panel: side, row: split, key: 'coral-goal-side-width', apply: (w) => { split.style.setProperty('--goal-side-w', w ? `${w}px` : ''); gripValue(grip, split, side); } }).restore();
     drawGoalSide(side, g);
-    if (model.taskId) { showTaskInMain(main, g); return; }
     const h = drawGoalMain(main, g);
     if (keep) h.focus();
 }
@@ -577,7 +539,7 @@ export function openGoalWhenKnown(id) {
 }
 
 export function openGoal(id, focus = false) {
-    if (model.openId !== id) { model.taskId = 0; model.taskSearch = ''; }
+    if (model.openId !== id) { model.taskSearch = ''; }
     model.openId = id; model.screen = 'goal';
     if (layout === 'page') hooks.onItem?.(id);
     draw();
@@ -587,7 +549,7 @@ export function openGoal(id, focus = false) {
 
 export function closeGoal() {
     const id = model.openId;
-    model.openId = 0; model.taskId = 0; model.screen = 'goal';
+    model.openId = 0; model.screen = 'goal';
     if (layout === 'page') hooks.onItem?.(0);
     draw();
     (root.querySelector(`.goal-card[data-goal-id="${id}"]`) || root.querySelector(`.dt-primary[data-goal-id="${id}"]`))?.focus();
@@ -722,7 +684,7 @@ function openClose(g, preset) {
 
 /** Show the board's goals in `host` (the page's #mb-goals) and read them. */
 export function showGoals(host, project, opts = {}) {
-    if (project !== model.project) { goalsTableState = DT.tableState(); Object.assign(model, { project, sig: '', goals: [], requireGoal: false, noGoalOpen: null, filter: 'all', openId: 0, tasks: new Map(), failed: '', asOf: '', loading: false, taskId: 0, taskSearch: '', screen: 'goal' }); }
+    if (project !== model.project) { goalsTableState = DT.tableState(); Object.assign(model, { project, sig: '', goals: [], requireGoal: false, noGoalOpen: null, filter: 'all', openId: 0, tasks: new Map(), failed: '', asOf: '', loading: false, taskSearch: '', screen: 'goal' }); }
     layout = opts.page ? 'page' : 'cards';
     hooks = opts.page ? (opts.hooks || {}) : {};
     const kind = opts.page ? 'page' : 'cards';

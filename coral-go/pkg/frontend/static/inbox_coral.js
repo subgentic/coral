@@ -2,10 +2,10 @@
  * (the Inbox tab's "Tasks for you" and the "Read the whole message" control of a Saved for later item). The component itself is inbox_panel.js; Coral Hub mounts the same file with its own adapter. */
 import { importOnce } from './import_once.js';
 import { makeLinkPolicy } from './safe_markdown.js';
-import { build as buildRoute } from './routes.js';
+import { openTask, taskHref } from './task_navigation.js';
 import { onAccountForgotten } from './local_store.js';
 import { loadSafeMarkdown } from './vendor_loader.js';
-import { keyLabel, pathId, serverFetch } from './server_base.js';
+import { keyLabel, pathId, serverFetch, boardFetch } from './server_base.js';
 import { setInboxCount } from './inbox_tab.js'; // the count on the Tasks tab
 const { mountInbox, clearInboxDrafts, INBOX_CONTRACT } = await importOnce('./inbox_panel.js'); // the component (shared with the hub); this file is the one that is Coral's
 
@@ -46,14 +46,14 @@ export const coralInboxAdapter = {
     },
     openGoal(task) { return importOnce('./task_goals.js').then(m => m.openGoalOnTeamPage(task.project, task.goal.id)); },
     async getTask(project, id) {
-        return json(await fetch(`/api/board/${encodeURIComponent(project)}/tasks/${pathId(id)}`));
+        return json(await boardFetch(project, `/tasks/${pathId(id)}`));
     },
     async replyToTask({ project, taskId, content }) {
-        const d = await json(await fetch(`/api/board/${encodeURIComponent(project)}/tasks/${pathId(taskId)}/reply`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content }) }));
+        const d = await json(await boardFetch(project, `/tasks/${pathId(taskId)}/reply`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content }) }));
         return { ok: !!d.ok, notified: d.notified || [], warnings: d.warnings || [] };
     },
     async listTaskMessages(project, taskId) { // the task's conversation (#7703): the person's replies and the agents' answers posted with --task, oldest first
-        const d = await json(await fetch(`/api/board/${encodeURIComponent(project)}/messages/all?task_id=${pathId(taskId)}&limit=200`));
+        const d = await json(await boardFetch(project, `/messages/all?task_id=${pathId(taskId)}&limit=200`));
         return (Array.isArray(d) ? d : []).map(m => ({ id: m.id, from: m.hub_user || m.subscriber_id || '', mine: m.subscriber_id === 'Operator' && !m.hub_user, content: m.content, created_at: m.created_at }));
     },
     canReply() { return { ok: true }; }, // the Operator of this computer; a Coral Hub viewer's adapter says why not
@@ -62,7 +62,8 @@ export const coralInboxAdapter = {
         const d = await json(await serverFetch(item.server, `/api/saved/${pathId(item.id)}/message`));
         return { text: typeof d.text === 'string' ? d.text : '', partial: !!d.partial, reason: typeof d.reason === 'string' ? d.reason : '' };
     },
-    taskHref(task) { return buildRoute({ view: 'board', id: task.project }); }, // the task's board (the panel keeps it only as a same-origin path)
+    taskHref(task) { return taskHref(task.project, task.id); },
+    openTask(task) { return openTask(task.project, task.id); },
     linkPolicy: makeLinkPolicy({}), // without a lookup, artifact links stay plain text
     // Before the text is drawn: the renderer is loaded on first use (a failed load leaves the text as plain text, renderSafe's own fallback), then the artifact lookups.
     async prepareLinks(text) { await loadSafeMarkdown().catch(() => {}); return artifactLinkPolicy(text); },

@@ -1,3 +1,4 @@
+import { openTask } from './task_navigation.js';
 /* Token Usage Dashboard — token usage and cost UI */
 
 import { modelDisplayName } from './model_names.js';
@@ -674,7 +675,7 @@ let _costTaskCache = [];
 function _showCostTaskDetail(taskId) {
     const task = _costTaskCache.find(t => t.id === taskId);
     const board = task && task.board_id || state.selectedTeam;
-    if (board) window.openTeamPage?.(board, { tab: 'tasks', item: taskId }); // the task's own page on its team's page (#7644)
+    if (board) openTask(board, taskId); // the task's own page on its team's page (#7644)
 }
 
 function _renderTaskTable(tasks) {

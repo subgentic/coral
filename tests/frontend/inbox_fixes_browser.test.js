@@ -40,12 +40,12 @@ const { removeBoards } = require('./helpers/board_cleanup');
         assert.equal(tasks.count, '3', 'the table says 3 tasks: ' + JSON.stringify(tasks));
         // a task opens: the reply box says the task stays open, and Open the task is a button
         await ev(`document.querySelector('#group-table-view .dt-primary').click(); true`);
-        await waitFor(`!!document.querySelector('#inbox-page .ibx-reply-label')`, 'the reply box', 8000);
-        const reply = await ev(`(() => { const o = document.querySelector('#inbox-page .ibx-open'); return { label: document.querySelector('#inbox-page .ibx-reply-label').textContent, oldNote: !!document.querySelector('#inbox-page .ibx-note'), openTag: o && o.tagName, openBtn: o && o.classList.contains('btn'), openH: o && Math.round(o.getBoundingClientRect().height) }; })()`);
+        await waitFor(`!!document.querySelector('#team-panel-item .ibx-reply-label')`, 'the reply box', 8000);
+        const reply = await ev(`(() => { const o = document.querySelector('#team-panel-item .ibx-open'); return { label: document.querySelector('#team-panel-item .ibx-reply-label').textContent, oldNote: !!document.querySelector('#team-panel-item .ibx-note'), openTag: o && o.tagName, openBtn: o && o.classList.contains('btn'), openH: o && Math.round(o.getBoundingClientRect().height) }; })()`);
         assert.ok(/task stays open/.test(reply.label) && !reply.oldNote, 'the reply box says the task stays open (once): ' + JSON.stringify(reply));
-        assert.ok(!reply.openBtn && reply.openH >= 24, 'on a task page Open the task is a plain link under the title line, 24 px or more to hit (#7572; a list keeps the button: inbox_open_link): ' + JSON.stringify(reply));
+        assert.equal(reply.openTag, null, 'already on the task page: no redundant Open task link');
         // Saved: a message whose transcript is gone says Gone in the table (one word, not a sentence on every row) and says why once, on its own page
-        await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('saved')); true`);
+        await ev(`window.switchNavTab('hub-inbox'); import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('saved')); true`);
         await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 3`, 'three saved', 10000);
         await waitFor(`[...document.querySelectorAll('#group-table-view tbody tr')].every(tr => tr.cells[2].textContent.trim() === 'Gone')`, 'the rows are marked gone from the list\'s own answer', 10000);
         const saved = await ev(`({ gone: [...document.querySelectorAll('#group-table-view tbody tr')].filter(tr => tr.cells[2].textContent.trim() === 'Gone').length, sentences: document.querySelectorAll('#group-table-view .inbox-saved-why, #group-table-view .why').length, buttons: document.querySelectorAll('#group-table-view .dt-quiet').length })`);

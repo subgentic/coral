@@ -1,5 +1,5 @@
 /* The team page's Tasks tab and a task's page (#7453): the right panel's Tasks tab moves here. The tab is a table of the whole team's tasks (Task, State, Assigned to, Goal, Priority) under filter chips with counts; a row's title opens the
- * task's own page (state, who, goal as a link, priority, description, when it started and ended), with a back link to the list (or to the goal it was opened from) and a pinned bar. Everything drawn is built with the DOM and
+ * task's own page (state, who, goal as a link, priority, description, when it started and ended), with a back link to the Tasks list and a pinned bar. Everything drawn is built with the DOM and
  * textContent: titles, bodies and names are written by agents. The task's own actions (Edit, Complete, Cancel, Publish, Nudge) stay in the task dialog for now ("Task actions"): they move onto this page with the Tasks build. Lazy: team_page.js imports it. */
 import { boardFetch, pathId, serverUrl, splitKey } from './server_base.js';
 import { browserLocal } from './safe_storage.js';
@@ -345,6 +345,8 @@ function followUpOfLine(parentId, ctx) {
 }
 
 export function renderTaskPage(host, task, ctx, mode = 'view') {
+    host._taskConversation?.destroy({ keepDrafts: true });
+    host._taskConversation = null;
     host.replaceChildren();
     host.setAttribute('aria-label', `Task ${task.id}`);
     const acts = { project: ctx.project, redraw: (t, m) => renderTaskPage(host, t || task, ctx, m), reload: (message) => reloadTask(host, task.id, ctx, message) };
@@ -357,6 +359,9 @@ export function renderTaskPage(host, task, ctx, mode = 'view') {
     const word = taskStatusWord(task.status, task.review_requested || (task.workflow && task.workflow.completion_review));
     const line = el('div', 'goals-detail-line'); line.append(stateChip(word, statusClass(word)));
     page.append(back, h, line);
+    page.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && !e.defaultPrevented && !e.target.closest('input, textarea, select, [contenteditable="true"]')) { e.preventDefault(); e.stopPropagation(); ctx.onBack(); }
+    });
     const parentId = task.workflow && Number(task.workflow.parent_task_id);
     if (parentId > 0) page.append(followUpOfLine(parentId, ctx)); // a follow-up says which task it is the follow-up of (#7829)
     const bar = el('div', 'goals-pinbar');
@@ -387,6 +392,16 @@ export function renderTaskPage(host, task, ctx, mode = 'view') {
     importOnce('./team_task_artifacts.js').then(m => m.taskArtifactsSection(ctx.project, task)).then(section => { // the artifacts an agent uploaded for the task, and the ones on its result (#7739); none: no section
         if (section && page.isConnected) bar.before(section);
     }).catch(() => {});
+    if (mode === 'view' && task.assigned_to === 'Operator') {
+        const conversation = el('div', 'inbox-task-mount');
+        page.append(conversation);
+        Promise.all([importOnce('./inbox_panel.js'), importOnce('./inbox_coral.js')]).then(([I, C]) => {
+            if (!conversation.isConnected) return;
+            const row = { ...task, project: ctx.project };
+            const adapter = { ...C.coralInboxAdapter, listTasks: async () => [row] };
+            host._taskConversation = I.mountInbox(conversation, adapter, { region: false, only: { project: ctx.project, id: task.id }, conversationOnly: true, poll: pollEvery });
+        }).catch(() => { if (conversation.isConnected) conversation.textContent = 'The conversation could not be shown. Reload the page and try again.'; });
+    }
     const session = agentOf(ctx.project, task);
     if (mode === 'cancel') {
         page.append(bar);

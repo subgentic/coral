@@ -21,7 +21,8 @@ const STUB = `(() => { const real = window.fetch; const J = (b, s) => Promise.re
     window.__saved = ${JSON.stringify(SAVED)}; window.__tasks = ${JSON.stringify(TASKS)}; window.__savedQs = [];
     window.fetch = (u, o) => { const url = new URL(String(u && u.url || u), location.origin), p = url.pathname, m = (o && o.method) || 'GET';
         if (p === '/api/board/tasks' && m === 'GET') return J({ tasks: window.__tasks });
-        let t = /^\\/api\\/board\\/([^/]+)\\/tasks\\/(\\d+)$/.exec(p); if (t && m === 'GET') return J({ body: 'Please check the plan and say what is missing.', created_by: 'Orchestrator', status: 'pending' });
+        const teamTasks = /^\\/api\\/board\\/([^/]+)\\/tasks$/.exec(p); if (teamTasks && m === 'GET') return J({ tasks: window.__tasks.filter(t => t.board_id === decodeURIComponent(teamTasks[1])), total_open: window.__tasks.filter(t => t.board_id === decodeURIComponent(teamTasks[1])).length });
+        let t = /^\\/api\\/board\\/([^/]+)\\/tasks\\/(\\d+)$/.exec(p); if (t && m === 'GET') return J({ ...window.__tasks.find(x => x.id === Number(t[2])), assigned_to: 'Operator', body: 'Please check the plan and say what is missing.' });
         t = /^\\/api\\/saved\\/(\\d+)\\/message$/.exec(p); if (t) return J({ text: 'The whole message, in full: the plan needs a rollback step before Tuesday.', partial: false });
         t = /^\\/api\\/saved\\/(\\d+)$/.exec(p);
         if (t && m === 'PATCH') { const it = window.__saved.find(i => i.id === Number(t[1])); const body = JSON.parse(o.body); it.done_at = body.done ? new Date().toISOString() : null; return J({ ok: true }); }
@@ -69,21 +70,21 @@ const AGENTS = (waiting) => waiting ? [
             const click = async (what, sel) => { const ok = await ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return false; e.click(); return true; })()`); assert.ok(ok, `${what}: no ${sel}`); };
             const escape = () => ev(`(document.activeElement || document.body).dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); true`);
             if (!mobile) await step('a task page starts at its title and Back puts the focus on the task row', async () => {
-                await click('Tasks', `${pane} .view-list-item[data-key="tasks"]`); await settle(300);
+                await ev(`window.switchNavTab('hub-inbox'); true`); await click('Tasks', `${pane} .view-list-item[data-key="tasks"]`); await settle(300);
                 await click('the task', '#group-table-view .dt-primary[data-task-id="12"]');
-                await waitFor(`!!document.querySelector('#inbox-page .ibx-reply-input')`, 'the task page', 8000); await settle(300);
-                assert.equal((await active()).cls.includes('wf-item-title'), true, 'the title has the focus');
-                await click('Back', '#inbox-page > .group-back'); await settle(400);
+                await waitFor(`!!document.querySelector('#team-panel-item .ibx-reply-input')`, 'the task page', 8000); await settle(300);
+                assert.equal((await active()).id, 'team-task-title', 'the title has the focus');
+                await click('Back', '#team-panel-item .goals-back'); await settle(400);
                 const a = await active(); assert.equal(a.data.taskId, '12', 'Back: the row the task was opened from (' + JSON.stringify(a) + ')');
             });
             if (!mobile) await step('Escape on a task page is one level back, on the same row', async () => {
-                await click('Tasks', `${pane} .view-list-item[data-key="tasks"]`); await settle(300);
+                await ev(`window.switchNavTab('hub-inbox'); true`); await click('Tasks', `${pane} .view-list-item[data-key="tasks"]`); await settle(300);
                 await click('the task', '#group-table-view .dt-primary[data-task-id="13"]'); await settle(500);
                 await escape(); await settle(500);
                 const a = await active(); assert.equal(a.data.taskId, '13', 'Escape (' + JSON.stringify(a) + ')');
             });
             if (!mobile) await step('a saved message page starts at its title; Escape goes back to the Saved table with the focus on that message, not to another tab', async () => {
-                await click('Saved', `${pane} .view-list-item[data-key="saved"]`); await settle(400);
+                await ev(`window.switchNavTab('hub-inbox'); true`); await click('Saved', `${pane} .view-list-item[data-key="saved"]`); await settle(400);
                 const id = await ev(`document.querySelectorAll('#group-table-view .dt-primary')[1].dataset.id`);
                 await click('the message', `#group-table-view .dt-primary[data-id="${id}"]`); await settle(500);
                 assert.equal((await active()).cls.includes('wf-item-title'), true, 'a message page starts at its title');
@@ -95,8 +96,8 @@ const AGENTS = (waiting) => waiting ? [
             if (mobile) await step('the phone: a task opens at its title and Back puts the focus on its row in the table', async () => {
                 await ev(`document.querySelector('${pane} .view-list-item[data-key="tasks"]').click(); true`); await settle(400);
                 await ev(`document.querySelector('#group-table-view .dt-primary').click(); true`); await settle(600);
-                assert.equal((await active()).cls.includes('wf-item-title'), true, 'the title has the focus');
-                await ev(`document.querySelector('#inbox-page .inbox-phone-back').click(); true`); await settle(500);
+                assert.equal((await active()).id, 'team-task-title', 'the title has the focus');
+                await ev(`document.querySelector('#team-panel-item .goals-back').click(); true`); await settle(500);
                 const a = await active(); assert.ok(a.cls.includes('dt-primary') && a.data.taskId, 'the task row in the table has the focus (' + JSON.stringify(a) + ')');
             });
             if (mobile) await step('the Saved table stacks: the message has the row, its state and action are under it, nothing is behind a sideways scroll', async () => {

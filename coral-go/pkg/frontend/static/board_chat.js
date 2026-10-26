@@ -1,3 +1,4 @@
+import { openTask } from './task_navigation.js';
 /* Moved out of render.js as it was (#3795): no behaviour change. */
 import { formatHourMinute } from './format.js';
 import { morphHtml } from './dom_morph.js';
@@ -507,7 +508,7 @@ async function _boardChatCopyLink(id) {
     try { await navigator.clipboard.writeText(`${location.origin}${build(keyRoute('team', _activeBoardChat, 'messages', Number(id)))}`); showToast('Link copied'); } catch { showToast('Could not copy the link', true); }
 }
 
-onRowActions('.board-chat-messages', { reply: _boardChatReply, link: _boardChatCopyLink });
+onRowActions('.board-chat-messages', { reply: _boardChatReply, link: _boardChatCopyLink, task: id => openTask(_activeBoardChat, id) });
 
 async function _sendBoardChat(boardName) {
     const inputEl = document.getElementById('board-panel-input');

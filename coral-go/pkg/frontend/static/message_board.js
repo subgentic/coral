@@ -1,3 +1,4 @@
+import { openTask } from './task_navigation.js';
 /* Message Board: project list, messages, subscribers, posting */
 
 import { OPERATOR_ID, isOperatorId, escapeHtml, escapeAttr, showView, getAgentColor, showToast, askBadge, externalMessageBadge, hubUserBadge, renderBoardMessageBody, setBoardMentionNames, highlightMentionsIn, boardMessageColorStyle } from './utils.js';
@@ -623,7 +624,7 @@ async function copyMessageLink(id) {
     try { await navigator.clipboard.writeText(url); showToast('Link copied'); } catch { showToast('Could not copy the link', true); }
 }
 
-onRowActions('.mb-messages-scroll', { reply: replyToMessage, link: copyMessageLink });
+onRowActions('.mb-messages-scroll', { reply: replyToMessage, link: copyMessageLink, task: id => openTask(currentProject, id) });
 
 function renderMessages(messages, { keepAnchor = false, prepended = 0 } = {}) {
     const container = document.getElementById('mb-messages');
