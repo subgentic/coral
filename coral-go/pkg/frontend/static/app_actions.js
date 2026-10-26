@@ -38,7 +38,7 @@ import { _handleTeamFolderImport, _importTeamFromFolder } from './team_folder_im
 import { closeSidebarKebabs, closeTopBarSettings, toggleSidebarKebab, toggleTopBarSettings } from './sidebar_menus.js';
 import { loadHistoryPage } from './history_filters.js';
 import { switchNavTab } from './app_navigation.js';
-import { showWorkflowsTab, selectWorkflow, selectWorkflowRun, showWorkflowCreateModal, hideWorkflowCreateModal, workflowAddStep, saveWorkflow, launchWorkflowAgent, checkWorkflowLimit, showCostDashboard, _refreshCostDashboard, _costTimeRangeChanged, openTeamPage, exitTeamPage, showTeamWorkingModeWorkspace, showDocsTab, selectDoc, showThemeConfigurator, hideThemeConfigurator, showLaunchModal, hideLaunchModal, launchSession, hideInfoModal, copyInfoCommand, showSettingsModal, hideSettingsModal, applySettings, toggleFlag, showAddAgentToBoard, launchTerminalToBoard, launchDefaultAgent, showAddStandaloneAgent, launchStandaloneTerminal, exportPersonas, importPersonas, importTeamTemplates, showResumeModal, hideResumeModal, resumeLaunchNew, showDefaultPromptsModal, hideDefaultPromptsModal, resetDefaultPrompt, saveDefaultPrompts } from './app_panels.js';
+import { showWorkflowsTab, selectWorkflow, selectWorkflowRun, showWorkflowCreateModal, hideWorkflowCreateModal, launchWorkflowAgent, showCostDashboard, _refreshCostDashboard, _costTimeRangeChanged, openTeamPage, exitTeamPage, showTeamWorkingModeWorkspace, showDocsTab, selectDoc, showThemeConfigurator, hideThemeConfigurator, showLaunchModal, hideLaunchModal, launchSession, hideInfoModal, copyInfoCommand, showSettingsModal, hideSettingsModal, applySettings, toggleFlag, showAddAgentToBoard, launchTerminalToBoard, launchDefaultAgent, showAddStandaloneAgent, launchStandaloneTerminal, exportPersonas, importPersonas, importTeamTemplates, showResumeModal, hideResumeModal, resumeLaunchNew, showDefaultPromptsModal, hideDefaultPromptsModal, resetDefaultPrompt, saveDefaultPrompts } from './app_panels.js';
 
 registerActions({
     'mb-select-mode': () => toggleSelectMode(),
@@ -221,9 +221,6 @@ registerActions({
     'job-create-workflow': () => { hideJobModal(); showWorkflowCreateModal(); }, // New job with no workflow to run
     'wf-modal-backdrop': (el, event) => { if (event.target === el) hideWorkflowCreateModal(); },
     'wf-modal-close': () => hideWorkflowCreateModal(),
-    'wf-add-step': () => workflowAddStep(),
-    'wf-limit-check': () => checkWorkflowLimit(),
-    'wf-save': () => saveWorkflow(),
 });
 
 registerActions({

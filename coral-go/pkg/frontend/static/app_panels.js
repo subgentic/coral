@@ -4,11 +4,9 @@ import { lazyFns, loadTeamPage, loadTeamSettings, loadWorkflows, loadCostDashboa
 
 export const {
     showWorkflowsTab, selectWorkflow, selectWorkflowRun, killWorkflowRun, deleteWorkflow,
-    showWorkflowCreateModal, hideWorkflowCreateModal, editWorkflowWithAgent, workflowAddStep,
-    workflowStepTypeChanged, saveWorkflow, workflowsBackToList, launchWorkflowAgent, checkWorkflowLimit,
+    showWorkflowCreateModal, hideWorkflowCreateModal, editWorkflowWithAgent, workflowsBackToList, launchWorkflowAgent,
 } = lazyFns(loadWorkflows, ['showWorkflowsTab', 'selectWorkflow', 'selectWorkflowRun', 'killWorkflowRun', 'deleteWorkflow',
-    'showWorkflowCreateModal', 'hideWorkflowCreateModal', 'editWorkflowWithAgent', 'workflowAddStep',
-    'workflowStepTypeChanged', 'saveWorkflow', 'workflowsBackToList', 'launchWorkflowAgent', 'checkWorkflowLimit']);
+    'showWorkflowCreateModal', 'hideWorkflowCreateModal', 'editWorkflowWithAgent', 'workflowsBackToList', 'launchWorkflowAgent']);
 
 export const { showCostDashboard, _refreshCostDashboard, _costTimeRangeChanged } =
     lazyFns(loadCostDashboard, ['showCostDashboard', '_refreshCostDashboard', '_costTimeRangeChanged']);
