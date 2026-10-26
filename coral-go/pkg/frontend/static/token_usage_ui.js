@@ -3,8 +3,9 @@ import { historyFetch } from './history_source.js';
 import { serverFetch, serverForSession, teamFetch, keyLabel } from './server_base.js';
 import { formatTokens } from './format.js';
 import { _formatCost } from './session_state.js';
-import { formatDurationSec as formatDuration, escapeHtml } from './utils.js';
+import { formatDurationSec as formatDuration } from './utils.js';
 import { importOnce } from './import_once.js';
+const { dataTable, tableState } = await importOnce('./data_table.js'); // the shared table (#7743)
 
 export async function updateTokenUsage(sessionId) {
     const el = document.getElementById('session-token-usage');
@@ -121,28 +122,15 @@ export async function showTeamTokenUsage(boardName) {
         ${executionTimeRow}
     </div>`;
 
-    html += `<table class="cost-table" style="font-size:0.75rem">
-        <thead><tr>
-            <th>Agent</th>
-            <th style="text-align:right">Input</th>
-            <th style="text-align:right">Output</th>
-            <th style="text-align:right">Cache R</th>
-            <th style="text-align:right">Cache W</th>
-            <th style="text-align:right">Cost</th>
-        </tr></thead><tbody>`;
-
-    for (const a of agents.sort((x, y) => (y.total_cost_usd || 0) - (x.total_cost_usd || 0))) {
-        html += `<tr>
-            <td style="font-weight:500">${escapeHtml(a.name)}</td>
-            <td style="text-align:right">${formatTokens(a.total_input_tokens || 0)}</td>
-            <td style="text-align:right">${formatTokens(a.total_output_tokens || 0)}</td>
-            <td style="text-align:right">${formatTokens(a.total_cache_read_tokens || 0)}</td>
-            <td style="text-align:right">${formatTokens(a.total_cache_write_tokens || 0)}</td>
-            <td style="text-align:right;font-weight:600;color:var(--accent)">${_formatCost(a.total_cost_usd || 0)}</td>
-        </tr>`;
-    }
-    html += '</tbody></table>';
+    // The members' table is data_table, with By agent's column order (Agent, Cost, then the tokens) and its K/M/B figures; the dearest member first.
     content.innerHTML = html;
+    const num = (key, label, extra) => ({ key, label, numeric: true, sort: 'number', firstDir: 'desc', sortValue: r => r[key] || 0, cell: r => formatTokens(r[key] || 0), ...extra });
+    const state = tableState(); state.sort = { key: 'total_cost_usd', dir: 'desc' };
+    content.append(dataTable({ label: 'Token usage by member', fold: 'labeled', scroll: true, state, rows: agents, rowKey: r => r.name, columns: [
+        { key: 'name', label: 'Agent', tone: 'primary', sort: true, sortValue: r => r.name || '', cell: r => r.name || '' },
+        num('total_cost_usd', 'Cost', { cell: r => _formatCost(r.total_cost_usd || 0), foldFirst: true }),
+        num('total_input_tokens', 'Input'), num('total_output_tokens', 'Output'), num('total_cache_read_tokens', 'Cache read'), num('total_cache_write_tokens', 'Cache write'),
+    ] }).el);
 }
 
 export async function distillTeamKnowledge(boardName) {

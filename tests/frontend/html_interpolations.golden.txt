@@ -535,14 +535,9 @@
 1	theme_config.js	groups
 1	theme_config.js	rows
 1	theme_config.js	themeOptions
-1	token_usage_ui.js	_formatCost(a.total_cost_usd || 0)
 1	token_usage_ui.js	_formatCost(totalCost)
 1	token_usage_ui.js	executionTimeRow
 1	token_usage_ui.js	formatDuration(usageData.totals.execution_time_sec)
-1	token_usage_ui.js	formatTokens(a.total_cache_read_tokens || 0)
-1	token_usage_ui.js	formatTokens(a.total_cache_write_tokens || 0)
-1	token_usage_ui.js	formatTokens(a.total_input_tokens || 0)
-1	token_usage_ui.js	formatTokens(a.total_output_tokens || 0)
 1	token_usage_ui.js	formatTokens(totalCacheR)
 1	token_usage_ui.js	formatTokens(totalCacheW)
 1	token_usage_ui.js	formatTokens(totalIn)
