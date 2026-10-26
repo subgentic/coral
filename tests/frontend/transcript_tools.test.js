@@ -381,7 +381,7 @@ async function run() {
   const dlg = await ev(`(() => { const vis = (id) => { const e = document.getElementById(id); return !!e && !e.hidden && getComputedStyle(e).display !== 'none'; };
     return { heading: document.getElementById('create-task-heading').textContent, boardFields: vis('create-task-board-fields'), sendRow: vis('create-task-send-row'), sendChecked: document.getElementById('create-task-send').checked }; })()`);
   check('the Create Task dialog for a solo agent hides board fields and offers sending it to the agent', dlg.heading === 'New task for Lead Dev' && !dlg.boardFields && dlg.sendRow && dlg.sendChecked, JSON.stringify(dlg));
-  await ev(`window.__posts = []; document.getElementById('create-task-title').value = 'Add a battle log'; document.getElementById('create-task-body').value = 'Log each round.'; window.submitCreateTask(); true`);
+  await ev(`window.__posts = []; document.getElementById('create-task-title').value = 'Add a battle log'; document.getElementById('create-task-body').value = 'Log each round.'; document.getElementById('create-task-submit').click(); true`);
   await until(`(window.__posts || []).some(p => /\\/tasks$/.test(p[1])) && document.getElementById('create-task-modal').style.display === 'none'`, 'the task POST and the dialog to close');
   await nextFrame();
   const made = await ev(`({ posts: window.__posts, modalOpen: document.getElementById('create-task-modal').style.display !== 'none', pending: Array.from(${C}.querySelectorAll('.chat-bubble.pending .message-text')).map(e => e.textContent.trim()).pop() || '' })`);

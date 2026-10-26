@@ -38,7 +38,7 @@ import { toggleAgenticPanel, toggleSidebarRail, showSidebarPane, focusSidebarSea
 import { connectTerminalWs, disconnectTerminalWs } from './xterm_renderer.js';
 import { saveNotes, generateSummary, toggleNotesEdit, cancelNotesEdit, switchHistoryTab } from './notes.js';
 import { addTagToSession, removeTagFromSession, showTagDropdown, hideTagDropdown, createTag } from './tags.js';
-import { hideTaskDetailModal, showCreateTaskModal, hideCreateTaskModal, submitCreateTask, completeAgentTask, _doCompleteAgentTask, showAgentTaskDetailModal } from './tasks.js';
+import { hideTaskDetailModal, showCreateTaskModal, hideCreateTaskModal, completeAgentTask, _doCompleteAgentTask, showAgentTaskDetailModal } from './tasks.js';
 import { openFilePreview, openFileEdit, refreshChangedFiles, copyFilePath } from './changed_files.js';
 import './file_mention.js';
 import './command_mention.js';
@@ -176,7 +176,6 @@ registerActions({
     'm-show-open-folder-modal': el => { window.showOpenFolderModal(); },
     'm-show-team-agent-modal': el => { window.showTeamAgentModal(); },
     'm-show-team-wizard-modal': el => { window.showTeamWizardModal(); },
-    'm-submit-create-task': el => { window.submitCreateTask(); },
     'm-submit-open-folder': el => { window.submitOpenFolder(); },
     'm-team-worktree': el => { const r = document.getElementById('team-worktree-branch-row'); if (r) r.style.display = el.checked ? '' : 'none'; },
     'm-test-team-wizard': el => { window.testTeamWizard(); },
@@ -365,7 +364,7 @@ Object.assign(window, {
     copyFilePath, 
     // tasks
     hideTaskDetailModal,
-    showCreateTaskModal, hideCreateTaskModal, submitCreateTask,
+    showCreateTaskModal, hideCreateTaskModal,
     completeAgentTask, _doCompleteAgentTask, showAgentTaskDetailModal,
     // agent_notes
     // agentic_state

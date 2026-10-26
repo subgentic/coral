@@ -30,7 +30,7 @@ import './task_reminders.js';
 import { _boardTaskPollTick, _boardTaskPollTimer, _toggleHideCompleted, _toggleTaskSort, renderBoardTaskList } from './task_list.js';
 import { lazyFns, loadTaskDetail } from './lazy_panels.js';
 export { boardTaskFetchHooks, boardTaskPollHooks, loadAgentTasks, loadBoardTasks, renderBoardTaskList, renderTaskList, startBoardTaskPoll, stopBoardTaskPoll } from './task_list.js';
-export { hideCreateTaskModal, showCreateTaskModal, submitCreateTask } from './task_create.js';
+export { hideCreateTaskModal, showCreateTaskModal } from './task_create.js';
 // The task detail dialog is loaded the first time a task is opened (#5364: 43 KB the page does not need to start). Its functions are stubs until then (lazy_panels.js); closing one that was never opened has nothing to do.
 const detail = lazyFns(loadTaskDetail, ['_doCompleteAgentTask', 'completeAgentTask', 'showAgentTaskDetailModal']);
 export const { _doCompleteAgentTask, completeAgentTask, showAgentTaskDetailModal } = detail;

@@ -395,7 +395,7 @@ export function mountSettingsView(host, spec) {
         validate({ focus = false } = {}) {
             let first = null;
             for (const k of fields.keys()) if (!checkField(k) && !first) first = k;
-            if (first && focus) { const r = fields.get(first); const d = r.row.closest('details.sv-fold'); if (d) d.open = true; if (shell) { const p = r.row.closest('.settings-pane[data-section]'); if (p && p.hidden) showSection(shell, p.dataset.section); } r.ctl.focus(); }
+            if (first && focus) { const r = fields.get(first); const d = r.row.closest('details.sv-fold'); if (d) d.open = true; if (shell) { const p = r.row.closest('.settings-pane[data-section]'); if (p && p.hidden) showSection(shell, p.dataset.section); } r.ctl.focus(); if (!r.errorEl.hidden) r.errorEl.scrollIntoView?.({ block: 'nearest' }); } // the refusal under the field is on the screen too (large text on a phone puts it below the fold of the dialog)
             return { ok: !first, first };
         },
         async save() {

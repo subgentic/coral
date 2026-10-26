@@ -1113,72 +1113,8 @@
                 <h3 id="create-task-heading">Create Task</h3>
                 <button class="modal-close-btn" data-on-click="m-hide-create-task-modal" aria-label="Close dialog"><span class="material-icons" aria-hidden="true">close</span></button>
             </div>
-            <div class="modal-body">
-                <div id="create-task-error" class="modal-error" role="alert" style="display:none"></div>
-                <label for="create-task-title">Title
-                    <input type="text" id="create-task-title" placeholder="Task title (required)" aria-required="true">
-                </label>
-                <label for="create-task-body">Description
-                    <textarea id="create-task-body" rows="3" placeholder="Optional description"></textarea>
-                </label>
-                <label for="create-task-priority">Priority
-                    <select id="create-task-priority">
-                        <option value="critical">Critical</option>
-                        <option value="high">High</option>
-                        <option value="medium" selected>Medium</option>
-                        <option value="low">Low</option>
-                    </select>
-                </label>
-                <!-- Board tasks only (hidden for an agent that is not on a board) -->
-                <div id="create-task-board-fields">
-                <label for="create-task-assignee">Assigned To
-                    <select id="create-task-assignee">
-                        <option value="">Unassigned</option>
-                    </select>
-                </label>
-                <label for="create-task-goal" id="create-task-goal-row" hidden>Goal
-                    <select id="create-task-goal"></select>
-                </label>
-                <p id="create-task-goal-error" class="task-goal-error modal-error" role="alert" hidden></p>
-                <details class="disclosure task-workflow-options">
-                <summary>Workflow and prerequisites</summary>
-                <label>Blocked By <span class="text-muted-sm">(optional)</span></label>
-                <div id="create-task-deps" class="dep-picker"></div>
-                <label for="create-task-condition">Proceed when prerequisites
-                    <select id="create-task-condition"><option value="success">Succeed</option><option value="failure">Fail</option><option value="termination">Finish (any outcome)</option></select>
-                </label>
-                <label for="create-task-inputs">Required upstream artifacts
-                    <input id="create-task-inputs" placeholder="build, test_report (comma separated)">
-                </label>
-                <label for="create-task-workflow">Workflow
-                    <input id="create-task-workflow" placeholder="Build → Test → Release">
-                </label>
-                <label for="create-task-stage">Stage
-                    <input id="create-task-stage" placeholder="Build, Test, or Release">
-                </label>
-                <label for="create-task-outputs">Required completion artifacts
-                    <input id="create-task-outputs" placeholder="build, test_report (comma separated)">
-                </label>
-                <label for="create-task-instructions">Additional workflow instructions
-                    <textarea id="create-task-instructions" rows="3" placeholder="Project-specific checks and hand-off requirements"></textarea>
-                </label>
-                <p class="text-muted-sm">Coral adds default instructions to every task: consume the specified inputs, publish evidence, report failures honestly, and keep completed stages immutable.</p>
-                </details>
-                <label class="create-task-draft-toggle">
-                    <input type="checkbox" id="create-task-draft">
-                    <span>Create as draft <span class="text-muted-sm">— not visible to agents until published</span></span>
-                </label>
-                </div>
-                <!-- Agent without a board: the task goes to this agent -->
-                <label class="create-task-draft-toggle" id="create-task-send-row" hidden>
-                    <input type="checkbox" id="create-task-send" checked>
-                    <span>Tell the agent to claim it <span class="text-muted-sm">— a short prompt to run <code>coral-agent task claim</code> (queued if it is busy)</span></span>
-                </label>
-            </div>
-            <div class="modal-actions modal-footer">
-                <button class="btn" data-on-click="m-hide-create-task-modal">Cancel</button>
-                <button class="btn btn-primary" data-on-click="m-submit-create-task">Create</button>
-            </div>
+            <div class="modal-body" id="create-task-form"></div>
+            <div class="modal-actions modal-footer" id="create-task-footer"></div>
         </div>
     </div>
     </template>

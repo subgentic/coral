@@ -37,9 +37,9 @@ const BASE = require('./test_base').BASE;
 
         console.log('2. Create Task: the Goal select lists the open goals; the task is made under the chosen one');
         await ev(`document.querySelector('#board-task-bar .btn-create-task').click(); true`);
-        await waitFor(`getComputedStyle(document.getElementById('create-task-modal')).display !== 'none' && !document.getElementById('create-task-goal-row').hidden`, 'the dialog with its Goal select', 8000);
+        await waitFor(`getComputedStyle(document.getElementById('create-task-modal')).display !== 'none' && !document.getElementById('create-task-goal').closest('.sv-row').hidden`, 'the dialog with its Goal select', 8000);
         assert.deepEqual(await ev(`[...document.getElementById('create-task-goal').options].map(o => o.textContent)`), ['No goal', 'Fix the flaky suites', 'Ship the new installer']); // newest activity first, as the Goals view lists them
-        await ev(`document.getElementById('create-task-title').value = 'Stabilise CI'; document.getElementById('create-task-goal').value = '${g2}'; document.querySelector('#create-task-modal [data-on-click="m-submit-create-task"]').click(); true`);
+        await ev(`document.getElementById('create-task-title').value = 'Stabilise CI'; document.getElementById('create-task-goal').value = '${g2}'; document.getElementById('create-task-submit').click(); true`);
         await waitFor(`!document.getElementById('create-task-modal') || getComputedStyle(document.getElementById('create-task-modal')).display === 'none'`, 'the dialog to close', 8000);
         const made = (await api('GET', `/api/board/${B}/tasks?limit=50`)).json;
         const mine = (made.tasks || made).find(t => t.title === 'Stabilise CI');
@@ -70,20 +70,20 @@ const BASE = require('./test_base').BASE;
         console.log('5. a board that requires a goal: the empty choice says "Choose a goal" and Create refuses without one');
         assert.equal((await api('PUT', `/api/board/${B}/settings`, { subscriber_id: 'Operator', require_goal: true })).status, 200);
         await ev(`document.querySelector('#board-task-bar .btn-create-task').click(); true`);
-        await waitFor(`getComputedStyle(document.getElementById('create-task-modal')).display !== 'none' && !document.getElementById('create-task-goal-row').hidden && document.getElementById('create-task-goal').options[0].textContent === 'Choose a goal'`, 'the required Goal select', 8000);
-        await ev(`document.getElementById('create-task-title').value = 'No goal here'; document.querySelector('#create-task-modal [data-on-click="m-submit-create-task"]').click(); true`);
-        await waitFor(`/Choose a goal/.test(document.getElementById('create-task-goal-error').textContent) && !document.getElementById('create-task-goal-error').hidden`, 'the refusal beside the select', 6000);
-        assert.deepEqual(await ev(`(() => { const sel = document.getElementById('create-task-goal'), line = document.getElementById('create-task-goal-error'); return { required: sel.required, ariaRequired: sel.getAttribute('aria-required'), invalid: sel.getAttribute('aria-invalid'), by: sel.getAttribute('aria-describedby'), role: line.getAttribute('role'), beside: sel.closest('label').nextElementSibling === line, focus: document.activeElement.id }; })()`),
+        await waitFor(`getComputedStyle(document.getElementById('create-task-modal')).display !== 'none' && !document.getElementById('create-task-goal').closest('.sv-row').hidden && document.getElementById('create-task-goal').options[0].textContent === 'Choose a goal'`, 'the required Goal select', 8000);
+        await ev(`document.getElementById('create-task-title').value = 'No goal here'; document.getElementById('create-task-submit').click(); true`);
+        await waitFor(`/Choose a goal/.test(document.getElementById('create-task-goal').closest('.sv-row').querySelector('.sv-error').textContent) && !document.getElementById('create-task-goal').closest('.sv-row').querySelector('.sv-error').hidden`, 'the refusal beside the select', 6000);
+        assert.deepEqual(await ev(`(() => { const sel = document.getElementById('create-task-goal'), line = document.getElementById('create-task-goal').closest('.sv-row').querySelector('.sv-error'); return { required: sel.required, ariaRequired: sel.getAttribute('aria-required'), invalid: sel.getAttribute('aria-invalid'), by: (sel.getAttribute('aria-describedby') || '').split(' ').includes(line.id) ? 'create-task-goal-error' : sel.getAttribute('aria-describedby'), role: line.getAttribute('role'), beside: sel.closest('.sv-row').contains(line), focus: document.activeElement.id }; })()`),
             { required: true, ariaRequired: 'true', invalid: 'true', by: 'create-task-goal-error', role: 'alert', beside: true, focus: 'create-task-goal' }, 'the select is required, marked invalid and described by the refusal beside it (#7313)');
         await ev(`const sel = document.getElementById('create-task-goal'); sel.value = sel.options[1].value; sel.dispatchEvent(new Event('change', { bubbles: true })); true`);
-        assert.equal(await ev(`document.getElementById('create-task-goal').getAttribute('aria-invalid') + ':' + document.getElementById('create-task-goal-error').hidden`), 'null:true', 'choosing a goal takes the refusal away');
+        assert.equal(await ev(`document.getElementById('create-task-goal').getAttribute('aria-invalid') + ':' + document.getElementById('create-task-goal').closest('.sv-row').querySelector('.sv-error').hidden`), 'null:true', 'choosing a goal takes the refusal away');
         // at 390 px and 200% text the refusal is scrolled into view, not left behind the dialog's footer (#7313)
         await ev(`document.getElementById('create-task-goal').value = ''; true`);
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 700, deviceScaleFactor: 1, mobile: true });
-        await ev(`document.documentElement.style.fontSize = '32px'; document.querySelector('#create-task-modal [data-on-click="m-submit-create-task"]').click(); true`);
-        await waitFor(`!document.getElementById('create-task-goal-error').hidden`, 'the refusal at large text', 6000);
+        await ev(`document.documentElement.style.fontSize = '32px'; document.getElementById('create-task-submit').click(); true`);
+        await waitFor(`!document.getElementById('create-task-goal').closest('.sv-row').querySelector('.sv-error').hidden`, 'the refusal at large text', 6000);
         await ev(`new Promise(r => setTimeout(r, 400))`); // sleep-ok: the scroll settles
-        const seen = await ev(`(() => { const r = document.getElementById('create-task-goal-error').getBoundingClientRect(), f = document.querySelector('#create-task-modal .modal-footer, #create-task-modal .modal-actions, #create-task-modal [data-on-click="m-submit-create-task"]').getBoundingClientRect(); return { top: Math.round(r.top), bottom: Math.round(r.bottom), vh: innerHeight, footerTop: Math.round(f.top) }; })()`);
+        const seen = await ev(`(() => { const r = document.getElementById('create-task-goal').closest('.sv-row').querySelector('.sv-error').getBoundingClientRect(), f = document.querySelector('#create-task-modal .modal-footer, #create-task-modal .modal-actions, #create-task-submit').getBoundingClientRect(); return { top: Math.round(r.top), bottom: Math.round(r.bottom), vh: innerHeight, footerTop: Math.round(f.top) }; })()`);
         assert.ok(seen.top >= 0 && seen.bottom <= seen.vh, `the refusal is on the screen: ${JSON.stringify(seen)}`);
         await ev(`document.documentElement.style.fontSize = ''; true`); await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         assert.equal(((await api('GET', `/api/board/${B}/tasks?limit=50`)).json.tasks || []).some(t => t.title === 'No goal here'), false, 'nothing was created');

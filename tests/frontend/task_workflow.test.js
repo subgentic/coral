@@ -30,10 +30,11 @@ const { removeBoards } = require('./helpers/board_cleanup');
             document.getElementById('create-task-stage').value = 'Build';
             document.getElementById('create-task-outputs').value = 'build';
             document.getElementById('create-task-instructions').value = 'Use revision-specific evidence.';
-            await tasks.submitCreateTask();
+            document.getElementById('create-task-submit').click();
+            for (let i = 0; i < 100 && getComputedStyle(document.getElementById('create-task-modal')).display !== 'none'; i++) await new Promise(r => setTimeout(r, 50));
             // Worker board rows live in the filtered dock view, not the old board-wide state array.
             const ownTask = [...document.querySelectorAll('#board-task-list .board-task-item[data-kind="board"]')].find(row => row.querySelector('.board-task-name')?.textContent === 'Build candidate');
-            if (!ownTask) throw new Error('created task missing from the worker dock: ' + document.getElementById('create-task-error').textContent);
+            if (!ownTask) throw new Error('created task missing from the worker dock: ' + document.querySelector('#create-task-footer .sv-status').textContent);
             window.testTaskID = Number(ownTask.dataset.taskId);
             // the task's own page on the team page (#7644: the task dialog is gone for a board's task)
             window.openTeamPage('workflow-browser', { tab: 'tasks', item: window.testTaskID });

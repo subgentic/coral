@@ -8,50 +8,78 @@ import { _renderDepPicker, _getSelectedDeps } from './task_dep_picker.js';
 import { showToast } from './utils.js';
 import { addPendingMessage } from './live_chat.js';
 import { loadBoardTasks, loadAgentTasks } from './task_list.js';
-import { readOpenGoals, fillGoalSelect, showGoalInvalid, clearGoalInvalid, chooseGoalLabel } from './task_goals.js';
+import { readOpenGoals, fillGoalSelect, chooseGoalLabel } from './task_goals.js';
+import { mountSettingsView } from './settings_view.js'; // the dialog's fields (a startup module)
 
 let _requireGoal = false; // the board asks for a goal on every task: the Goal select has no empty choice to stay on
+let _solo = false;        // an agent without a board: the task goes to this agent, and the board's fields are not shown
+let _goalShown = false;   // the board has open goals (or asks for one): the Goal select is shown
+let view = null;          // the dialog's form (settings_view in form mode), drawn when the dialog is first opened
+
+const PRIORITIES = [{ value: 'critical', label: 'Critical' }, { value: 'high', label: 'High' }, { value: 'medium', label: 'Medium' }, { value: 'low', label: 'Low' }];
+const board = () => !_solo;
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
+const names = text => String(text || '').split(',').map(s => s.trim()).filter(Boolean);
+
+function taskFields() {
+    return [
+        { key: 'title', type: 'text', id: 'create-task-title', label: 'Title', required: true, requiredMessage: 'Title is required', placeholder: 'Task title' },
+        { key: 'body', type: 'textarea', id: 'create-task-body', label: 'Description', rows: 3, placeholder: 'Optional description' },
+        { key: 'priority', type: 'select', id: 'create-task-priority', label: 'Priority', default: 'medium', options: PRIORITIES },
+        // Board tasks only (hidden for an agent that is not on a board)
+        { key: 'assigned_to', type: 'select', id: 'create-task-assignee', label: 'Assigned To', default: '', options: [{ value: '', label: 'Unassigned' }], visibleWhen: board },
+        { key: 'goal_id', type: 'select', id: 'create-task-goal', label: 'Goal', default: '', options: [], visibleWhen: () => board() && _goalShown, messageAsIs: true,
+            validate: v => (board() && _goalShown && _requireGoal && !v ? `${chooseGoalLabel}: this board needs a goal on every task.` : '') },
+        { key: 'draft', type: 'toggle', id: 'create-task-draft', label: 'Create as draft', default: false, help: 'Not visible to agents until published.', visibleWhen: board },
+        // Agent without a board: the task goes to this agent
+        { key: 'send', type: 'toggle', id: 'create-task-send', label: 'Tell the agent to claim it', default: true, help: 'A short prompt to run coral-agent task claim (queued if it is busy).', visibleWhen: () => _solo },
+        { key: 'flow', type: 'heading', fold: true, id: 'create-task-flow', label: 'Workflow and prerequisites' },
+        { key: 'blocked_by', type: 'custom', id: 'create-task-deps-field', label: 'Blocked by', default: [], visibleWhen: board,
+            render: slot => { const d = el('div', 'dep-picker'); d.id = 'create-task-deps'; slot.append(d); return { get: () => _getSelectedDeps('create-task-deps'), set: ids => _renderDepPicker('create-task-deps', (ids || []).map(Number)) }; } },
+        { key: 'condition', type: 'select', id: 'create-task-condition', label: 'Proceed when prerequisites', default: 'success', visibleWhen: board,
+            options: [{ value: 'success', label: 'Succeed' }, { value: 'failure', label: 'Fail' }, { value: 'termination', label: 'Finish (any outcome)' }] },
+        { key: 'inputs', type: 'text', id: 'create-task-inputs', label: 'Required upstream artifacts', placeholder: 'build, test_report (comma separated)', default: '', visibleWhen: board },
+        { key: 'workflow', type: 'text', id: 'create-task-workflow', label: 'Workflow', placeholder: 'Build -> Test -> Release', default: '', visibleWhen: board },
+        { key: 'stage', type: 'text', id: 'create-task-stage', label: 'Stage', placeholder: 'Build, Test, or Release', default: '', visibleWhen: board },
+        { key: 'outputs', type: 'text', id: 'create-task-outputs', label: 'Required completion artifacts', placeholder: 'build, test_report (comma separated)', default: '', visibleWhen: board },
+        { key: 'instructions', type: 'textarea', id: 'create-task-instructions', label: 'Additional workflow instructions', rows: 3, placeholder: 'Project-specific checks and hand-off requirements', default: '', visibleWhen: board },
+        { key: 'flow_note', type: 'notice', visibleWhen: board, render: slot => slot.append(el('p', 'sv-help', 'Coral adds default instructions to every task: consume the specified inputs, publish evidence, report failures honestly, and keep completed stages immutable.')) },
+    ];
+}
+
+function taskView(modal) {
+    if (view) return view;
+    const footer = modal.querySelector('#create-task-footer');
+    footer.replaceChildren();
+    view = mountSettingsView(modal.querySelector('#create-task-form'), {
+        mode: 'form', fields: taskFields(),
+        form: { submit: 'Create', submitId: 'create-task-submit', cancel: 'Cancel', barHost: footer, onSubmit: submitValues, onCancel: hideCreateTaskModal },
+    });
+    return view;
+}
 
 export async function showCreateTaskModal(preset = {}) {
     const modal = ensureBuilt('create-task-modal'); // built on first open (#4500)
     if (!modal) return;
-
-    // A fresh task starts with its optional workflow controls folded.
-    modal.querySelector('.task-workflow-options')?.removeAttribute('open');
-
-    // Reset form
-    document.getElementById('create-task-title').value = '';
-    document.getElementById('create-task-body').value = '';
-    for (const field of ['workflow', 'stage', 'outputs', 'inputs', 'instructions']) {
-        const el = document.getElementById(`create-task-${field}`);
-        if (el) el.value = '';
-    }
-    const condition = document.getElementById('create-task-condition');
-    if (condition) condition.value = 'success';
-    document.getElementById('create-task-priority').value = 'medium';
-    const draftCheck = document.getElementById('create-task-draft');
-    if (draftCheck) draftCheck.checked = false;
-    const errEl = document.getElementById('create-task-error');
-    if (errEl) errEl.style.display = 'none';
-    clearTitleInvalid(document.getElementById('create-task-title'));
+    const v = taskView(modal);
 
     // Solo agent: no board fields; offer to send the task to the agent
-    const solo = _isSoloAgent();
-    const boardFields = document.getElementById('create-task-board-fields');
-    if (boardFields) boardFields.hidden = solo;
-    const sendRow = document.getElementById('create-task-send-row');
-    if (sendRow) sendRow.hidden = !solo;
-    const sendCheck = document.getElementById('create-task-send');
-    if (sendCheck) sendCheck.checked = true;
+    _solo = _isSoloAgent();
+    _goalShown = false; _requireGoal = false;
+    v.reset(); // a fresh task: every field at its default, the optional workflow part folded, no mark, an empty status line
+    v.fold(false);
+    const flow = document.getElementById('create-task-flow');
+    if (flow) flow.hidden = _solo;
     const heading = document.getElementById('create-task-heading');
-    if (heading) heading.textContent = solo
+    if (heading) heading.textContent = _solo
         ? `New task for ${state.currentSession.display_name || state.currentSession.name}`
         : 'Create Task';
+    v.refresh();
 
     // Populate assignee dropdown from board subscribers
     const assigneeSelect = document.getElementById('create-task-assignee');
-    assigneeSelect.innerHTML = '<option value="">Unassigned</option>';
-    const boardProject = solo ? null : _getBoardProject();
+    assigneeSelect.replaceChildren(new Option('Unassigned', ''));
+    const boardProject = _solo ? null : _getBoardProject();
     if (boardProject) {
         try {
             const resp = await boardFetch(boardProject, `/subscribers`);
@@ -59,53 +87,35 @@ export async function showCreateTaskModal(preset = {}) {
                 const subs = await resp.json();
                 (subs || []).forEach(s => {
                     const name = s.subscriber_id || s.name;
-                    if (name) {
-                        const opt = document.createElement('option');
-                        opt.value = name;
-                        opt.textContent = name;
-                        assigneeSelect.appendChild(opt);
-                    }
+                    if (name) assigneeSelect.append(new Option(name, name));
                 });
             }
         } catch { /* ignore */ }
     }
-
     assigneeSelect.value = preset.assigned_to ?? agentTaskAssignee();
 
     // The Goal select lists the board's open goals; it stays hidden when the board has none (and does not require one), so a board without goals sees no new control (#7253).
-    const goalRow = document.getElementById('create-task-goal-row');
-    if (goalRow) {
-        goalRow.hidden = true; _requireGoal = false;
-        const goalSelect = document.getElementById('create-task-goal');
-        if (!goalSelect.dataset.bound) { goalSelect.dataset.bound = 'true'; goalSelect.addEventListener('change', () => clearGoalInvalid(goalSelect)); } // choosing a goal takes the refusal away
-        if (boardProject) {
-            const read = await readOpenGoals(boardProject);
-            _requireGoal = read.requireGoal;
-            fillGoalSelect(document.getElementById('create-task-goal'), { goals: read.goals, requireGoal: read.requireGoal, selectedId: preset.goal_id });
-            goalRow.hidden = !read.goals.length && !read.requireGoal;
-        }
+    if (boardProject) {
+        const read = await readOpenGoals(boardProject);
+        _requireGoal = read.requireGoal;
+        fillGoalSelect(document.getElementById('create-task-goal'), { goals: read.goals, requireGoal: read.requireGoal, selectedId: preset.goal_id });
+        _goalShown = read.goals.length > 0 || read.requireGoal;
     }
 
     // A template or duplicate can supply workflow/prerequisites. Reveal those values.
-    if (!solo) {
+    if (!_solo) {
         const deps = preset.blocked_by || [];
-        _renderDepPicker('create-task-deps', deps.map(d => d.task_id));
+        v.set('blocked_by', deps.map(d => d.task_id));
         const workflow = preset.workflow || {};
         const values = { workflow: workflow.name, stage: workflow.stage,
             outputs: workflow.required_outputs?.join(', '), instructions: workflow.instructions,
             inputs: deps[0]?.required_artifacts?.join(', ') };
-        for (const [field, value] of Object.entries(values)) {
-            if (value) document.getElementById(`create-task-${field}`).value = value;
-        }
-        if (condition) condition.value = deps[0]?.condition || preset.condition || 'success';
-        const details = modal.querySelector('.task-workflow-options');
-        details.open = deps.length > 0 || condition?.value !== 'success' || Object.values(values).some(Boolean);
-        // Native constraint validation must reveal a field before the browser focuses it.
-        if (!details.dataset.invalidBound) {
-            details.addEventListener('invalid', () => { details.open = true; }, { capture: true });
-            details.dataset.invalidBound = 'true';
-        }
+        for (const [field, value] of Object.entries(values)) if (value) v.set(field, value);
+        const condition = deps[0]?.condition || preset.condition || 'success';
+        v.set('condition', condition);
+        v.fold(deps.length > 0 || condition !== 'success' || Object.values(values).some(Boolean));
     }
+    v.refresh();
 
     modal.style.display = '';
     document.getElementById('create-task-title').focus();
@@ -120,73 +130,22 @@ export function hideCreateTaskModal() {
     releaseEscape(modal);
 }
 
-// A refusal in the dialog is a role=alert line, so it is spoken when it shows; one about the title also marks the title invalid and ties the box to the line.
-function showCreateError(errEl, message, titleInvalid = false) {
-    const title = document.getElementById('create-task-title');
-    if (title) {
-        if (titleInvalid) { title.setAttribute('aria-invalid', 'true'); title.setAttribute('aria-describedby', 'create-task-error'); title.focus(); }
-        else clearTitleInvalid(title);
-    }
-    if (errEl) { errEl.style.display = ''; errEl.textContent = ''; errEl.textContent = message; }
-}
-function clearTitleInvalid(title) { title.removeAttribute('aria-invalid'); title.removeAttribute('aria-describedby'); }
-
-export async function submitCreateTask() {
-    const title = document.getElementById('create-task-title').value.trim();
-    const errEl = document.getElementById('create-task-error');
-
-    if (!title) {
-        showCreateError(errEl, 'Title is required', true);
-        return;
-    }
-
-    const body = document.getElementById('create-task-body').value.trim();
-    if (_isSoloAgent()) {
-        await _createSoloAgentTask(title, body, errEl);
-        return;
-    }
-    const priority = document.getElementById('create-task-priority').value;
-    const assignedTo = document.getElementById('create-task-assignee').value;
+/** The form's values to the board's or the agent's task list (the dialog's Create). A refusal is thrown and said on the line beside the buttons; one the server names opens the workflow part. */
+async function submitValues(values) {
+    const title = String(values.title || '').trim();
+    const body = String(values.body || '').trim();
+    if (_isSoloAgent()) { await _createSoloAgentTask(title, body, values); return; }
     const boardProject = _getBoardProject();
-    if (!boardProject) {
-        showCreateError(errEl, 'No board project found');
-        return;
-    }
-
-    const goalId = document.getElementById('create-task-goal-row')?.hidden ? '' : document.getElementById('create-task-goal')?.value;
-    if (_requireGoal && !goalId) {
-        showGoalInvalid(document.getElementById('create-task-goal'), document.getElementById('create-task-goal-error'), `${chooseGoalLabel}: this board needs a goal on every task.`);
-        return;
-    }
-    const blockedBy = _getSelectedDeps('create-task-deps');
-    const isDraft = document.getElementById('create-task-draft')?.checked || false;
-
+    if (!boardProject) throw new Error('No board project found');
+    const goalId = _goalShown ? values.goal_id : '';
+    const blockedBy = values.blocked_by || [];
     try {
-        const payload = {
-            title,
-            body,
-            priority,
-            assigned_to: assignedTo,
-            created_by: 'Operator',
-        };
-        const names = id => (document.getElementById(id)?.value || '').split(',').map(s => s.trim()).filter(Boolean);
-        if (blockedBy.length > 0) payload.blocked_by = blockedBy.map(task_id => ({
-            task_id, condition: document.getElementById('create-task-condition')?.value || 'success',
-            required_artifacts: names('create-task-inputs'),
-        }));
-        payload.workflow = {
-            name: document.getElementById('create-task-workflow')?.value.trim() || '',
-            stage: document.getElementById('create-task-stage')?.value.trim() || '',
-            required_outputs: names('create-task-outputs'),
-            instructions: document.getElementById('create-task-instructions')?.value.trim() || '',
-        };
-        if (isDraft) payload.draft = true;
+        const payload = { title, body, priority: values.priority, assigned_to: values.assigned_to, created_by: 'Operator' };
+        if (blockedBy.length > 0) payload.blocked_by = blockedBy.map(task_id => ({ task_id, condition: values.condition || 'success', required_artifacts: names(values.inputs) }));
+        payload.workflow = { name: String(values.workflow || '').trim(), stage: String(values.stage || '').trim(), required_outputs: names(values.outputs), instructions: String(values.instructions || '').trim() };
+        if (values.draft) payload.draft = true;
         if (goalId) payload.goal_id = Number(goalId);
-        const resp = await boardFetch(boardProject, `/tasks`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-        });
+        const resp = await boardFetch(boardProject, `/tasks`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
         if (!resp.ok) {
             const data = await resp.json().catch(() => ({}));
             throw new Error(data.error || `HTTP ${resp.status}`);
@@ -195,12 +154,8 @@ export async function submitCreateTask() {
         await loadBoardTasks(boardProject);
         showToast('Task created');
     } catch (e) {
-        // Server validation can name a workflow or prerequisite field; keep all of them visible.
-        document.querySelector('#create-task-modal .task-workflow-options').open = true;
-        if (errEl) {
-            errEl.textContent = e.message || 'Failed to create task';
-            errEl.style.display = '';
-        }
+        view.fold(true); // server validation can name a workflow or prerequisite field; keep all of them visible
+        throw e;
     }
 }
 
@@ -208,28 +163,21 @@ export async function submitCreateTask() {
 // (title and details). Unless unchecked, the agent gets a short prompt to
 // claim it with `coral-agent task claim`, which marks it in progress and
 // shows the details; `coral-agent task complete <id>` marks it done.
-async function _createSoloAgentTask(title, body, errEl) {
+async function _createSoloAgentTask(title, body, values) {
     const session = state.currentSession;
-    const notify = document.getElementById('create-task-send')?.checked ?? true;
-    try {
-        // With notify, the server types the claim prompt into the agent's
-        // terminal and returns it (see claimPrompt in routes/agent_tasks.go).
-        const resp = await serverFetch(sessionServer(session), `/api/sessions/live/${encodeURIComponent(session.name)}/tasks`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title, body, priority: document.getElementById('create-task-priority')?.value || 'medium', session_id: session.session_id, notify }),
-        });
-        const task = await resp.json().catch(() => ({}));
-        if (!resp.ok) throw new Error(task.error || `HTTP ${resp.status}`);
-        if (task.notify_error) throw new Error(`The task was added, but telling the agent failed: ${task.notify_error}`);
-        if (task.notified) addPendingMessage(session.session_id, task.notified);
-        hideCreateTaskModal();
-        await loadAgentTasks(session.name, session.session_id);
-        showToast(notify ? 'Task added; the agent was told to claim it' : 'Task added');
-    } catch (e) {
-        if (errEl) {
-            errEl.textContent = e.message || 'Failed to create task';
-            errEl.style.display = '';
-        }
-    }
+    const notify = values.send !== false;
+    // With notify, the server types the claim prompt into the agent's
+    // terminal and returns it (see claimPrompt in routes/agent_tasks.go).
+    const resp = await serverFetch(sessionServer(session), `/api/sessions/live/${encodeURIComponent(session.name)}/tasks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, body, priority: values.priority || 'medium', session_id: session.session_id, notify }),
+    });
+    const task = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(task.error || `HTTP ${resp.status}`);
+    if (task.notify_error) throw new Error(`The task was added, but telling the agent failed: ${task.notify_error}`);
+    if (task.notified) addPendingMessage(session.session_id, task.notified);
+    hideCreateTaskModal();
+    await loadAgentTasks(session.name, session.session_id);
+    showToast(notify ? 'Task added; the agent was told to claim it' : 'Task added');
 }

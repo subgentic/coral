@@ -1136,23 +1136,6 @@ body.panel-dragging .agentic-state {
     text-align: center;
 }
 
-.modal-content label.create-task-draft-toggle {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 0.8125rem;
-    cursor: pointer;
-    margin-top: 16px;
-    flex-direction: row;
-}
-
-.modal-content .create-task-draft-toggle input[type="checkbox"] {
-    display: inline-block;
-    width: auto;
-    margin: 0;
-    cursor: pointer;
-}
-
 .task-detail-section {
     margin-bottom: 16px;
 }
@@ -1883,11 +1866,6 @@ body.panel-dragging .agentic-state {
     text-align: center;
 }
 
-/* Create Task dialog: board-only fields and the solo-agent send option */
-#create-task-board-fields[hidden],
-#create-task-send-row[hidden] {
-    display: none;
-}
 /* Title and close button on one line */
 #create-task-modal .modal-header {
     display: flex;

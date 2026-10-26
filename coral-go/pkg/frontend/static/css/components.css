@@ -4317,10 +4317,6 @@ body:has(#launch-modal[style*="flex"] :is(#launch-tmux-slot, #team-tmux-slot)[da
 .telemetry-install-id { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; width: 100%; max-width: 28rem; grid-column: 1 / -1; }
 .telemetry-install-id code { min-width: 0; flex: 1 1 12rem; overflow-wrap: anywhere; text-align: left; } /* the id keeps a readable width and Copy drops under it when the row is narrow (#7041: one letter per line at 200%) */
 .telemetry-install-id .btn { flex: none; }
-.task-workflow-options > summary { display: flex; align-items: center; gap: 4px; list-style: none; }
-.task-workflow-options > summary::-webkit-details-marker { display: none; }
-.task-workflow-options > summary::before { content: '▸' / ''; }
-.task-workflow-options[open] > summary::before { content: '▾' / ''; }
 
 /* An agent whose hook programs are gone (#6089): a quiet chip on its row, the fix in its tooltip. */
 .hooks-missing-chip { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: var(--radius-lg); font-size: var(--fs-xs, 0.6875rem); line-height: 16px; color: var(--text-primary); background: color-mix(in srgb, var(--warning) 22%, var(--bg-secondary)); border: 1px solid color-mix(in srgb, var(--warning) 55%, var(--border)); white-space: nowrap; }
