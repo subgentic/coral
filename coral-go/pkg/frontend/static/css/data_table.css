@@ -246,4 +246,5 @@
 /* Name buttons keep their full accessible name and tooltip; folded rows expose two lines. */
 .dt-box:not(.dt-folded) .dt-title-cell > .dt-primary:has(.dt-name-text) { min-width: 0; }
 .dt-name-text { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-inline-size: 32rem; }
-.dt-box.dt-folded .dt-name-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: normal; overflow-wrap: anywhere; max-inline-size: 100%; }
+.dt-box.dt-folded .dt-primary:has(.dt-name-text) { display: flex; align-items: center; }
+.dt-box.dt-folded .dt-name-text { line-height: 1.35; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: normal; overflow-wrap: anywhere; max-inline-size: 100%; }
