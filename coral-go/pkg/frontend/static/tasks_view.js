@@ -7,6 +7,8 @@ import { boardFetch } from './server_base.js';
 import { taskStatusWord, statusClass } from './goal_words.js';
 import * as DT from './data_table.js'; // static: a top-level await on a lazy import here would hold up every module that imports this one (the shape that froze startup in #7844 and #7904)
 import { buildListBar } from './list_bar.js';
+import { isCloud } from './server_base.js';
+import { openTask } from './task_navigation.js';
 import { EMPTY, STATUSES, PRIORITIES, SORTS, STATUS_LABEL, PRIORITY_LABEL, SORT_LABEL, clean, chips, isFiltered, without } from './task_filters.js';
 
 export const taskWord = (t) => taskStatusWord(t.status, t.review_requested);
@@ -26,6 +28,29 @@ const PRIORITY_RANK = { high: 0, medium: 1, low: 2 };
 /** The Who cell: the person as circles named in words (DT.avatars), or "Nobody yet" in words when no one has the task. The dock's list draws the same one (#8507). */
 export const whoCell = (t) => (doerOf(t) ? DT.avatars([{ name: doerOf(t) }, ...reviewersOf(t).map(name => ({ name, review: true }))], whoWords(t)) : whoText(t));
 
+/** The "3 files" button of a task row: a paperclip-like page icon and the count, named "3 artifacts, open"; it opens the task as its row does, then scrolls to the task page's Artifacts. */
+function filesButton(t, row) {
+    const n = Number(t.artifact_count) || 0;
+    const b = DT.link('', () => { if (row.hasOpen) row.open(); else openTask(t.board_id || t.board || t.project || '', t.id); scrollToTaskArtifacts(t.id); }); // a list with no row open (the dock's) opens the task page itself
+    b.classList.add('dt-files');
+    const icon = DT.el('span', 'material-icons', 'description'); icon.setAttribute('aria-hidden', 'true');
+    b.append(icon, DT.el('span', 'dt-files-count', `${n} ${n === 1 ? 'file' : 'files'}`));
+    b.setAttribute('aria-label', `${n} ${n === 1 ? 'artifact' : 'artifacts'}, open`);
+    b.dataset.taskFiles = String(t.id);
+    return b;
+}
+
+/** The task page opens (the row's open) and loads its Artifacts section after it: wait for the section's heading, then bring it to the top. Gives up after 8 s (a task with nothing readable has no section). */
+function scrollToTaskArtifacts(id) {
+    const find = () => document.getElementById(`team-task-artifacts-head-${Number(id)}`);
+    const go = (head) => { head.scrollIntoView({ block: 'start' }); head.tabIndex = -1; head.focus({ preventScroll: true }); };
+    const now = find();
+    if (now) { go(now); return; }
+    const watch = new MutationObserver(() => { const head = find(); if (head) { watch.disconnect(); clearTimeout(stop); go(head); } });
+    const stop = setTimeout(() => watch.disconnect(), 8000);
+    watch.observe(document.body, { childList: true, subtree: true });
+}
+
 export function taskColumns(ctx, keys = ['state', 'task', 'who', 'goal', 'priority', 'updated']) {
     const all = {
         state: { key: 'state', label: 'State', cell: (t) => DT.chip(taskWord(t), statusClass(taskWord(t))), sort: true, sortValue: (t) => STATE_RANK[taskWord(t)] ?? 9, line: 2 },
@@ -36,6 +61,9 @@ export function taskColumns(ctx, keys = ['state', 'task', 'who', 'goal', 'priori
             cell: (t) => { if (!t.goal_id) return ctx.noGoal || 'No goal'; const l = DT.link(ctx.goalTitleOf(t.goal_id), () => ctx.openGoal?.(t.goal_id)); l.dataset.goalLink = String(t.goal_id); return l; } },
         team: { key: 'team', label: 'Team', sort: true, sortValue: (t) => (ctx.teamOf ? ctx.teamOf(t) : t.board || ''), line: 0, cell: (t) => (ctx.teamOf ? ctx.teamOf(t) : t.board || '') },
         priority: { key: 'priority', label: 'Priority', tone: 'tertiary', sort: true, sortValue: (t) => PRIORITY_RANK[String(t.priority || '').toLowerCase()] ?? 3, line: 2, when: (t) => String(t.priority || '').toLowerCase() === 'high', cell: (t) => priorityWord(t.priority) },
+        // How many artifacts the task's results reference (the server's artifact_count, #8575): a quiet "3 files" that opens the task page at its Artifacts. Not through Coral Hub: the team's artifacts are the owner's alone there.
+        files: { key: 'files', label: 'Files', tone: 'tertiary', line: 2, when: (t) => Number(t.artifact_count) > 0 && !isCloud(),
+            cell: (t, _ctx, row) => (Number(t.artifact_count) > 0 && !isCloud() ? filesButton(t, row) : '') },
         updated: { key: 'updated', label: 'Updated', tone: 'tertiary', align: 'end', sort: 'date', sortValue: (t) => t.updated_at || t.created_at || '', line: 1, firstDir: 'desc', cell: (t) => DT.timeCell(t.updated_at || t.created_at) },
     };
     return keys.map(k => all[k]);
@@ -43,13 +71,13 @@ export function taskColumns(ctx, keys = ['state', 'task', 'who', 'goal', 'priori
 
 /** The columns of each scope, in order; a narrow box (the goal's column, a task's follow-ups) folds them to the two-line row, so the order is also the order of the lines. */
 export const SCOPES = {
-    team: ['state', 'task', 'who', 'goal', 'priority', 'updated'],
-    mine: ['state', 'task', 'priority', 'team', 'updated'],
-    goal: ['state', 'task', 'who', 'priority'],
+    team: ['state', 'task', 'who', 'goal', 'priority', 'files', 'updated'],
+    mine: ['state', 'task', 'priority', 'files', 'team', 'updated'],
+    goal: ['state', 'task', 'who', 'priority', 'files'],
     'goal-page': ['task', 'state'],
     'follow-ups': ['state', 'task', 'who'],
-    agent: ['state', 'task'], // an agent's own dock: every row is that agent's, so no Assigned to
-    'agent-team': ['state', 'task', 'who'], // the dock of a team lead lists several agents' tasks
+    agent: ['state', 'task', 'files'], // an agent's own dock: every row is that agent's, so no Assigned to
+    'agent-team': ['state', 'task', 'who', 'files'], // the dock of a team lead lists several agents' tasks
 };
 
 /** A task list as the shared table: the scope's columns, the task's own key and name, and everything else (open, state, selectable, bare, sortBar, ...) as the data_table takes it. `tweak(columns)` lets a surface add a column of
