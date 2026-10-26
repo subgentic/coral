@@ -63,10 +63,10 @@ const BASE = require('./test_base').BASE;
 
         console.log('3. A chat open under the Inbox and the other pages: no sidebar at all; Saved for everything is its own page, which the top bar bookmark opens');
         await ev(`switchNavTab('history'); true`);
-        // The board created above is a chat even with no indexed agent history (#7809, #7953): it is in the Inbox's Group chats folder.
-        await waitFor(`!!document.querySelector('.view-list-item[data-key="chats-group"]')`, 'the Group chats folder');
+        // The board created above is a chat even with no indexed agent history (#7809, #7953): it is in the Inbox's Board history folder.
+        await waitFor(`!!document.querySelector('.view-list-item[data-key="chats-group"]')`, 'the Board history folder');
         await ev(`document.querySelector('.view-list-item[data-key="chats-group"]').click(); true`); // the boards' chats have their own folder, All chats is the agents' (#8038)
-        await waitFor(`(() => { const list = document.getElementById('group-table-view'); return list.getClientRects().length > 0 && list.dataset.group === 'hub-inbox:chats-group' && [...list.querySelectorAll('.dt-primary')].some(b => b.textContent.trim() === ${JSON.stringify(BOARD)}); })()`, 'Group chats with the seeded board chat');
+        await waitFor(`(() => { const list = document.getElementById('group-table-view'); return list.getClientRects().length > 0 && list.dataset.group === 'hub-inbox:chats-group' && [...list.querySelectorAll('.dt-primary')].some(b => b.textContent.trim() === ${JSON.stringify(BOARD)}); })()`, 'Board history with the seeded board chat');
         await ev(`import((window.__coralStatic || '/static/') + 'utils.js').then(u => { u.showView('history-session-view'); return true; })`); // a chat open under the Inbox (#7776): its page is the chat's
         await waitFor(`getComputedStyle(document.getElementById('history-session-view')).display !== 'none'`, 'Chats');
         d = await dock();

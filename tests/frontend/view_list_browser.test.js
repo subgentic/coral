@@ -6,7 +6,7 @@ const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 
 const VIEWS = [['1280x800', 1280, 800, false], ['390x844', 390, 844, true]];
-const SECTIONS = `[{ title: 'Views', items: [{ key: 'all', label: 'All chats', count: 183, alert: true }, { key: 'groups', label: 'Group chats', count: 0, alert: true }, { key: 'active', label: 'Active now', soon: true }] },
+const SECTIONS = `[{ title: 'Views', items: [{ key: 'all', label: 'All chats', count: 183, alert: true }, { key: 'groups', label: 'Board history', count: 0, alert: true }, { key: 'active', label: 'Active now', soon: true }] },
     { title: 'Tags', items: [{ key: 'tag:1', label: 'release', count: 14, dot: '#be185d' }, { key: 'tag:2', label: 'bad', count: 1, dot: 'url(javascript:1)' }] }]`;
 
 (async () => {
@@ -46,13 +46,13 @@ const SECTIONS = `[{ title: 'Views', items: [{ key: 'all', label: 'All chats', c
                 assert.deepEqual(p.alerts, ['183'], 'only a count above 0 that asks for it is the red pill: ' + JSON.stringify(p));
                 assert.deepEqual(p.groups, ['Views', 'Tags'], 'the sections are the select\'s groups: ' + JSON.stringify(p));
                 assert.deepEqual(p.dots, ['#be185d'], 'a colour that is not a hex draws no dot: ' + JSON.stringify(p));
-                assert.deepEqual(p.options, ['All chats (183)*', 'Group chats (0)', 'release (14)', 'bad (1)'], 'the select holds the views that can be picked: ' + JSON.stringify(p));
+                assert.deepEqual(p.options, ['All chats (183)*', 'Board history (0)', 'release (14)', 'bad (1)'], 'the select holds the views that can be picked: ' + JSON.stringify(p));
             });
             await check(`${label}: picking calls back once, a disabled view never, and an update moves the current view and keeps the keyboard`, async () => {
                 if (mobile) await ev(`(() => { const s = window.__root.querySelector('.view-list-select'); s.value = 'groups'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
                 else await ev(`(() => { const b = k => window.__root.querySelector('.view-list-item[data-key="' + k + '"]'); b('active').click(); b('groups').click(); return true; })()`);
                 assert.deepEqual(await ev(`window.__picked`), ['groups']);
-                await ev(`(() => { const b = window.__root.querySelector('.view-list-item[data-key="tag:1"]'); if (!${mobile}) b.focus(); window.__vl.update(window.__root, { sections: [{ title: 'Views', items: [{ key: 'all', label: 'All chats', count: 184 }, { key: 'groups', label: 'Group chats', count: 12 }] }, { title: 'Tags', items: [{ key: 'tag:1', label: 'release', count: 14, dot: '#be185d' }] }], current: 'groups' }); return true; })()`);
+                await ev(`(() => { const b = window.__root.querySelector('.view-list-item[data-key="tag:1"]'); if (!${mobile}) b.focus(); window.__vl.update(window.__root, { sections: [{ title: 'Views', items: [{ key: 'all', label: 'All chats', count: 184 }, { key: 'groups', label: 'Board history', count: 12 }] }, { title: 'Tags', items: [{ key: 'tag:1', label: 'release', count: 14, dot: '#be185d' }] }], current: 'groups' }); return true; })()`);
                 const after = await ev(`({ current: [...window.__root.querySelectorAll('[aria-current="true"]')].map(b => b.dataset.key), focus: document.activeElement.dataset ? document.activeElement.dataset.key || '' : '', n: window.__root.querySelectorAll('.view-list-item').length })`);
                 assert.deepEqual(after.current, ['groups']); assert.equal(after.n, 3);
                 if (!mobile) assert.equal(after.focus, 'tag:1', 'the keyboard stays on the item it was on');

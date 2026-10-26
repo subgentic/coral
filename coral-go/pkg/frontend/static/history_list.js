@@ -114,7 +114,7 @@ function dayGroup(iso, now = new Date()) {
 
 function groupOfChat(s) {
     if (chatsGroupBy() === 'agent') {
-        if (isGroupChat(s)) return { key: 'group-chats', label: 'Group chats' };
+        if (isGroupChat(s)) return { key: 'group-chats', label: 'Board history' };
         const name = s.display_name || s.agent_name || '';
         return name ? { key: 'agent:' + name, label: name } : { key: 'no-agent', label: 'No agent' };
     }

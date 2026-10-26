@@ -29,7 +29,7 @@ const VL = await importOnce('./view_list.js'); // the mailbox's view list (#7785
 const TB = await importOnce('./task_bulk.js'); // what the selection bar does to the selected tasks
 const Toolbar = await importOnce('./team_toolbar.js'); // the selection bar takes the page's toolbar line (mountSelection)
 const GC = await importOnce('./goal_columns.js');
-const CH = await importOnce('./mailbox_chats.js'); // the chat folders (#7776): All chats, Group chats, By CLI, Tags
+const CH = await importOnce('./mailbox_chats.js'); // the chat folders (#7776): All chats, Board history, By CLI, Tags
 const { providerName } = await importOnce('./model_labels.js'); // a CLI by its name (Claude, Codex, Antigravity), as the Chats list says it
 const { waitingText } = await importOnce('./waiting_text.js'); // a lazy module imports only what loads at startup (import_hygiene): this one loads with it
 

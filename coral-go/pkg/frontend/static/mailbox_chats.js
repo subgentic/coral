@@ -1,4 +1,4 @@
-/* The mailbox's chat folders (#7776, UI/UX's mock #7773): All chats, Group chats, With notes, Starred, Active now and Archived; by CLI (Claude, Codex, Antigravity, Pi); and the chat tags. One chat is one line of
+/* The mailbox's chat folders (#7776, UI/UX's mock #7773): All chats, Board history, With notes, Starred, Active now and Archived; by CLI (Claude, Codex, Antigravity, Pi); and the chat tags. One chat is one line of
  * the one table (data_table.js): the agent, the chat's title with a snippet after it, when it last spoke and how long it ran; the days are its dividers, the list grows as it is read (the footer scrolls into view),
  * and the folders' counts come from one grouped read (GET /api/sessions/history/counts). A chat is starred or archived with its own two quiet buttons (PATCH /api/sessions/history/{id}/flags: only the person).
  *   chatSections(counts)        -> the view list's sections for the chat folders
@@ -16,7 +16,7 @@ export const CHAT_KEY = /^chats(-|$)/;
 const CLIS = [['claude', 'Claude'], ['codex', 'Codex'], ['agy', 'Antigravity'], ['pi', 'Pi']];
 const FOLDERS = [
     { key: 'chats', label: 'All chats', params: { type: 'agent' }, count: 'all' }, // the agents' chats: the boards' have their own folder
-    { key: 'chats-group', label: 'Group chats', params: { type: 'group' }, count: 'group' },
+    { key: 'chats-group', label: 'Board history', params: { type: 'group' }, count: 'group' },
     { key: 'chats-notes', label: 'With notes', params: { type: 'agent', with_notes: '1' }, count: 'notes' },
     { key: 'chats-starred', label: 'Starred', params: { starred: '1' }, count: 'starred' },
     { key: 'chats-active', label: 'Active now', params: { type: 'agent', active: '1' }, count: 'active' },
@@ -139,7 +139,7 @@ export function chatsSpec(key, ctx) {
             footer: (L.done && !L.error) ? undefined : { text: L.error || (L.done ? '' : (L.total != null ? `Showing ${rows.length} of ${L.total}` : '')), auto: !L.done && !L.error, more: L.done ? null : { label: 'Load more', busy: L.busy, run: () => readMore(key, folder, q, ctx.redraw) } },
             columns: [
                 { key: 'agent', label: 'Agent', primary: true, line: 1, cell: s => { const n = name(s); const w = isGroup(s) ? DT.primaryButton(n || 'Group chat') : DT.personButton(n || 'Agent', `Open the chat of ${n || 'the agent'}`); const b = w.matches('button') ? w : w.querySelector('.dt-primary'); b.dataset.sessionId = s.session_id; if (isGroup(s)) { const wrap = DT.el('span', 'dt-person'); wrap.append(b, DT.tag('Group')); return wrap; } return w; } },
-                { key: 'chat', label: 'Chat', width: 'grow', line: 2, cell: s => { /* a board's name is the agent column's: its line says only what happened in it */ const c = DT.el('span', 'dt-chat-line'); const sn = snippetOf(s); if (isGroup(s)) { if (sn) c.append(DT.el('span', 'dt-chat-snippet', sn)); } else { c.append(DT.el('span', 'dt-chat-title', historyLabel(s))); if (sn) c.append(DT.el('span', 'dt-chat-snippet', ` \u2013 ${sn}`)); } if (s.active) { const live = DT.el('span', 'dt-chat-live', ' · active now'); c.append(live); } /* an archived board stays in Group chats, marked */ if (s.archived && key !== 'chats-archived') c.append(DT.tag('Archived')); return c; } },
+                { key: 'chat', label: 'Chat', width: 'grow', line: 2, cell: s => { /* a board's name is the agent column's: its line says only what happened in it */ const c = DT.el('span', 'dt-chat-line'); const sn = snippetOf(s); if (isGroup(s)) { if (sn) c.append(DT.el('span', 'dt-chat-snippet', sn)); } else { c.append(DT.el('span', 'dt-chat-title', historyLabel(s))); if (sn) c.append(DT.el('span', 'dt-chat-snippet', ` \u2013 ${sn}`)); } if (s.active) { const live = DT.el('span', 'dt-chat-live', ' · active now'); c.append(live); } /* an archived board stays in Board history, marked */ if (s.archived && key !== 'chats-archived') c.append(DT.tag('Archived')); return c; } },
                 { key: 'when', label: 'When', tone: 'tertiary', align: 'end', line: 1, cell: s => DT.timeCell(stampOf(s)) },
                 { key: 'ran', label: 'Ran', tone: 'tertiary', align: 'end', line: 0, cell: s => ran(s.duration_sec) },
                 { key: 'flags', label: 'Star and archive', hideLabel: true, line: 0, cell: s => {

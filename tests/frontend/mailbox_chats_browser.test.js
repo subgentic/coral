@@ -36,7 +36,7 @@ const BASE = require('./test_base').BASE;
         assert.ok(f.dot, 'a tag has its colour dot');
         // the column for a screen reader and the keyboard (#8022): each view's name and count read apart and once, one Tab stop for the column, the arrows move between the views
         const names = await ev(`[...document.querySelectorAll('.view-list-item')].map(b => [b.getAttribute('aria-label'), b.textContent.replace(/\\s+/g, ' ').trim()])`);
-        assert.ok(names.some(([a]) => a === 'All chats, 119') && names.some(([a]) => a === 'Group chats, 1') && names.some(([a]) => a === 'Pi'), 'name and count apart: ' + JSON.stringify(names.slice(0, 8)));
+        assert.ok(names.some(([a]) => a === 'All chats, 119') && names.some(([a]) => a === 'Board history, 1') && names.some(([a]) => a === 'Pi'), 'name and count apart: ' + JSON.stringify(names.slice(0, 8)));
         assert.equal(await ev(`[...document.querySelectorAll('.view-list-item')].filter(b => b.tabIndex === 0).map(b => b.dataset.key).join()`), 'chats', 'one Tab stop: the current view');
         await ev(`document.querySelector('.view-list-item[data-key="chats"]').focus(); true`);
         const key = async k => { await client.Input.dispatchKeyEvent({ type: 'keyDown', key: k, code: k }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: k, code: k }); };
@@ -89,11 +89,11 @@ const BASE = require('./test_base').BASE;
             // the heading's number is the folder's total (what the folder says), never the rows loaded
             await waitFor(`(document.querySelector('#group-table-view .session-group-count') || {}).textContent === String(window.__folderN['${key}'])`, `${key}: the heading says the folder's count ` + (await ev(`window.__folderN['${key}']`)));
         }
-        // the boards' chats live in Group chats: the name once, "1 message"
+        // the boards' chats live in Board history: the name once, "1 message"
         await ev(`document.querySelector('.view-list-item[data-key="chats-group"]').click(); true`);
-        await waitFor(`document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)').length === 1 && !!document.querySelector('#group-table-view .dt-tag')`, 'the Group chats folder: the one board');
+        await waitFor(`document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)').length === 1 && !!document.querySelector('#group-table-view .dt-tag')`, 'the Board history folder: the one board');
         assert.deepEqual(await ev(`(() => { const r = document.querySelector('#group-table-view .dt-table tbody tr:not(.dt-group)'); return [r.querySelector('.dt-primary').textContent, !!r.querySelector('.dt-chat-title'), r.querySelector('.dt-chat-snippet').textContent.trim(), r.querySelector('.dt-tag').textContent]; })()`), ['release-crew', false, '1 message, 0 participants', 'Group'], 'a group chat says its name once (the agent column\'s), and one message is "1 message"');
-        assert.equal(await ev(`[...document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group) .dt-tag')].map(t => t.textContent).join()`), 'Group,Archived', 'an archived board stays in Group chats, marked');
+        assert.equal(await ev(`[...document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group) .dt-tag')].map(t => t.textContent).join()`), 'Group,Archived', 'an archived board stays in Board history, marked');
         console.log('   ✓');
 
         console.log('5. Phone: two-line rows, the folders as one select');

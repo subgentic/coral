@@ -1,5 +1,5 @@
 /* The one "view list" of the mailbox (#7785, goal #20; UI/UX's mock #7773): a column of named views with a count each, one of them current, at the left of a list: Needs you, Tasks, Goals, Saved, and the chat
- * folders (All chats, Group chats, By CLI, Tags). Workflows and Jobs reuse it later. Below the phone width the same views are ONE select (44 px) at the top, so the list is never squeezed beside a column.
+ * folders (All chats, Board history, By CLI, Tags). Workflows and Jobs reuse it later. Below the phone width the same views are ONE select (44 px) at the top, so the list is never squeezed beside a column.
  * An item is a button (a view is not a link); the current one says aria-current and is marked by a bar and weight, not by colour alone; a view that is not built yet is disabled and says "soon" in words.
  * A colour dot (a tag's colour) is a hex colour only. Text is set with textContent only.
  *
@@ -23,7 +23,7 @@ function draw(root, { sections, current }) {
             if (it.dot && HEX.test(it.dot)) { const d = el('i', 'view-list-dot'); d.style.setProperty('--view-list-dot', it.dot); d.setAttribute('aria-hidden', 'true'); lab.append(d); }
             lab.append(el('span', 'view-list-name', it.label));
             b.append(lab);
-            b.setAttribute('aria-label', it.soon ? `${it.label}, soon` : (it.count != null ? `${it.label}, ${it.count}` : it.label)); // the name and the count are read apart ("Group chats, 1"), the count once (it is not in the name's text twice)
+            b.setAttribute('aria-label', it.soon ? `${it.label}, soon` : (it.count != null ? `${it.label}, ${it.count}` : it.label)); // the name and the count are read apart ("Board history, 1"), the count once (it is not in the name's text twice)
             if (it.soon) { b.disabled = true; b.classList.add('view-list-soon'); b.append(el('span', 'view-list-count', 'soon')); }
             else if (it.count != null) b.append(el('span', it.alert && Number(it.count) > 0 ? 'view-list-count view-list-alert' : 'view-list-count', it.count)); // alert: the one count that is a red pill (Needs you), and only while it is above 0; every other count stays quiet
             if (it.key === current) { b.setAttribute('aria-current', 'true'); b.classList.add('view-list-current'); }
