@@ -57,7 +57,11 @@ const SCAN = `(() => {
             const listed = await ev(`[...document.querySelectorAll('#settings-tabs [role=tab]')].map(t => t.id.replace('settings-tab-', ''))`);
             if (!hub) allGroups = listed;
             assert.ok(allGroups.length >= 8, `${label}: the groups are listed (${allGroups}; the dialog has ${listed})`);
-            const groups = hub ? allGroups.filter(g => g === 'network' || g === 'updates') : allGroups;
+            // in hub mode a group whose rows are all machine settings is empty and its tab hidden: walk the groups the hub dialog still shows (Network and Hub and Updates are the ones its changes touch)
+            const shown = hub ? await ev(`[...document.querySelectorAll('#settings-tabs [role=tab]:not([hidden])')].map(t => t.id.replace('settings-tab-', ''))`) : allGroups;
+            if (hub && process.env.WALK_LOG) fs.appendFileSync(process.env.WALK_LOG, `${label} groups shown by the hub dialog: ${shown}\n`);
+            const groups = hub ? shown.filter(g => g === 'network' || g === 'updates' || g === 'general') : allGroups;
+            assert.ok(!hub || groups.length > 0, `${label}: the hub dialog shows a group to walk (${shown})`);
             for (const g of groups) {
                 await ev(`(async () => { await window.showSettingsModal(${JSON.stringify(g)}); return true; })()`);
                 await waitFor(`[...document.querySelectorAll('#settings-modal .settings-pane')].some(p => !p.hidden && p.dataset.group === ${JSON.stringify(g)})`, `${label}: the ${g} pane`, 10000);
