@@ -122,8 +122,45 @@ func startBackgroundServices(ctx context.Context, db *store.DB, cfg *config.Conf
 	schedStore := store.NewScheduleStore(db)
 	rbStore := store.NewRemoteBoardStore(db)
 
-	// Shared agent discovery function — enriches runtime agents with display names from the DB.
-	discoverFn := func(ctx context.Context) ([]background.AgentInfo, error) {
+	discoverFn := agentDiscovery(agentRT, sessStore)
+
+	// Coral Hub connector. Release builds offer https://app.coralhub.dev unless --cloud-url /
+	// CORAL_CLOUD_URL say otherwise (off disables it). Nothing is sent to the hub until the
+	// user connects; when off it opens no outbound connection and starts no goroutine.
+	// "Trust Coral's hooks in Codex", read on each Codex launch (#153).
+	agent.SetCodexHookTrust(routes.CodexTrustFromSettings(sessStore))
+	// The version of the Codex a launch uses decides which of Coral's hooks it gets (#6615: PermissionRequest only for one that has it). Read from the CLI's own --version, remembered per binary.
+	agent.CodexVersionProbe = func(cliPath string) string {
+		return agent.CLIVersion(map[string]string{agent.CLIPathSettingKey("codex"): cliPath}, "codex")
+	}
+
+	startCloudConnector(ctx, db, cfg, srv, sessStore)
+
+	startIndexingServices(ctx, cfg, srv, agentRT, gitStore, sessStore)
+
+	scheduler, launcher := startScheduler(ctx, cfg, srv, agentRT, sessStore, schedStore, taskStore)
+
+	startBoardServices(ctx, cfg, srv, agentRT, sessStore, taskStore, rbStore, discoverFn)
+
+	startAgentServices(ctx, db, srv, agentRT, sessStore, taskStore)
+
+	startUsageServices(ctx, db, sessStore)
+
+	startMaintenanceServices(ctx, db, cfg, srv, sessStore, taskStore)
+
+	// Workflow runner — executes multi-step workflows (shell + agent)
+	wfStore := store.NewWorkflowStore(db)
+	wfRunner := background.NewWorkflowRunner(wfStore, launcher, agentRT, nil, nil, cfg.CoralDir(), cfg.AgentHost(), cfg.Port)
+	srv.SetWorkflowRunner(wfRunner)
+	scheduler.SetWorkflowRunner(wfRunner, wfStore)
+
+	log.Printf("Started 8 background services + workflow runner (git poller, indexer, scheduler, board notifier, remote board poller, batch summarizer, session reconciler, token poller)")
+	return wfRunner, scheduler
+}
+
+// agentDiscovery is the agent discovery the board services share: the runtime's agents, enriched with the display names of their live sessions (one query, not one per agent).
+func agentDiscovery(agentRT background.AgentRuntime, sessStore *store.SessionStore) func(context.Context) ([]background.AgentInfo, error) {
+	return func(ctx context.Context) ([]background.AgentInfo, error) {
 		agents, err := agentRT.ListAgents(ctx)
 		if err != nil {
 			return nil, err
@@ -145,19 +182,10 @@ func startBackgroundServices(ctx context.Context, db *store.DB, cfg *config.Conf
 		}
 		return agents, nil
 	}
+}
 
-	// Coral Hub connector. Release builds offer https://app.coralhub.dev unless --cloud-url /
-	// CORAL_CLOUD_URL say otherwise (off disables it). Nothing is sent to the hub until the
-	// user connects; when off it opens no outbound connection and starts no goroutine.
-	// "Trust Coral's hooks in Codex", read on each Codex launch (#153).
-	agent.SetCodexHookTrust(routes.CodexTrustFromSettings(sessStore))
-	// The version of the Codex a launch uses decides which of Coral's hooks it gets (#6615: PermissionRequest only for one that has it). Read from the CLI's own --version, remembered per binary.
-	agent.CodexVersionProbe = func(cliPath string) string {
-		return agent.CLIVersion(map[string]string{agent.CLIPathSettingKey("codex"): cliPath}, "codex")
-	}
-
-	startCloudConnector(ctx, db, cfg, srv, sessStore)
-
+// startIndexingServices starts what keeps the session and git views current: the remote agent poller (hub mode), the git poller and the session indexer.
+func startIndexingServices(ctx context.Context, cfg *config.Config, srv *server.Server, agentRT background.AgentRuntime, gitStore *store.GitStore, sessStore *store.SessionStore) {
 	// Multi-server hub: remote agent poller and feed relay. Hub mode only;
 	// a standalone server has nothing to poll.
 	if srv.HasRemoteAgents() {
@@ -186,7 +214,10 @@ func startBackgroundServices(ctx context.Context, db *store.DB, cfg *config.Conf
 	)
 	safeGo(ctx, "session_indexer", func() { indexer.Run(ctx) })
 	srv.SetIndexer(indexer)
+}
 
+// startScheduler starts the job scheduler with the launcher it and the workflow runner use, and hands the scheduler to the server.
+func startScheduler(ctx context.Context, cfg *config.Config, srv *server.Server, agentRT background.AgentRuntime, sessStore *store.SessionStore, schedStore *store.ScheduleStore, taskStore *store.TaskStore) (*background.JobScheduler, *background.AgentLauncher) {
 	// Job scheduler
 	scheduler := background.NewJobScheduler(schedStore, 30*time.Second)
 	launcher := background.NewAgentLauncher(agentRT, sessStore, cfg.Port)
@@ -207,7 +238,11 @@ func startBackgroundServices(ctx context.Context, db *store.DB, cfg *config.Conf
 	scheduler.SetWorktreeRoot(coralnames.WorktreesRoot(cfg.CoralDir()))
 	safeGo(ctx, "job_scheduler", func() { scheduler.Run(ctx) })
 	srv.SetScheduler(scheduler)
+	return scheduler, launcher
+}
 
+// startBoardServices starts the board's services: the notifier, the health monitor and nudges, the task reminders and the remote board poller.
+func startBoardServices(ctx context.Context, cfg *config.Config, srv *server.Server, agentRT background.AgentRuntime, sessStore *store.SessionStore, taskStore *store.TaskStore, rbStore *store.RemoteBoardStore, discoverFn func(context.Context) ([]background.AgentInfo, error)) {
 	// Board notifier
 	boardNotifier := background.NewBoardNotifier(srv.BoardStore(), agentRT, time.Duration(cfg.BoardNotifierIntervalS)*time.Second)
 	boardNotifier.SetDiscoverFn(discoverFn)
@@ -245,7 +280,10 @@ func startBackgroundServices(ctx context.Context, db *store.DB, cfg *config.Conf
 	remotePoller := background.NewRemoteBoardPoller(rbStore, agentRT, 30*time.Second)
 	remotePoller.SetDiscoverFn(discoverFn)
 	safeGo(ctx, "remote_board_poller", func() { remotePoller.Run(ctx) })
+}
 
+// startAgentServices starts the services that watch agents: the batch summarizer (when enabled), the goal generator and the session reconciler.
+func startAgentServices(ctx context.Context, db *store.DB, srv *server.Server, agentRT background.AgentRuntime, sessStore *store.SessionStore, taskStore *store.TaskStore) {
 	// Batch summarizer — only runs if auto_summarize setting is enabled
 	summarizeFn := background.BuildSummarizeFn(sessStore)
 	settings, _ := sessStore.GetSettings(ctx)
@@ -266,7 +304,10 @@ func startBackgroundServices(ctx context.Context, db *store.DB, cfg *config.Conf
 	reconciler := background.NewSessionReconciler(sessStore, agentRT, 30*time.Second)
 	reconciler.SetOnSlept(srv.AgentsSlept) // the exit notice and auto-resume (#3613)
 	safeGo(ctx, "session_reconciler", func() { reconciler.Run(ctx) })
+}
 
+// startUsageServices starts the token poller and the retention and aggregation of call metrics and token usage.
+func startUsageServices(ctx context.Context, db *store.DB, sessStore *store.SessionStore) {
 	// Token poller — extracts token usage from Codex/Claude transcripts for cost tracking
 	tokenUsageStore := store.NewTokenUsageStore(db)
 	// Reprice rows recorded before provider aliases (Codex/Antigravity model
@@ -288,7 +329,10 @@ func startBackgroundServices(ctx context.Context, db *store.DB, cfg *config.Conf
 	// The Cost view's hourly aggregate of token usage, recomputed for the hours that changed (#4752).
 	tokenHourAgg := background.NewTokenUsageHourAgg(db)
 	safeGo(ctx, "token_usage_hour_agg", func() { tokenHourAgg.Run(ctx) })
+}
 
+// startMaintenanceServices starts database care (optimize, integrity check), the after-restart wake, the uploads and artifact retention and the thinking tracker.
+func startMaintenanceServices(ctx context.Context, db *store.DB, cfg *config.Config, srv *server.Server, sessStore *store.SessionStore, taskStore *store.TaskStore) {
 	// PRAGMA optimize on both databases, a little after startup and every few hours (#4142).
 	optimizeTargets := map[string]background.Optimizer{"sessions.db": db}
 	if bs := srv.BoardStore(); bs != nil {
@@ -326,15 +370,6 @@ func startBackgroundServices(ctx context.Context, db *store.DB, cfg *config.Conf
 	// and their durations are read from Claude transcripts into the activity stream
 	thinkingTracker := background.NewThinkingTracker(sessStore, taskStore, 2*time.Second)
 	safeGo(ctx, "thinking_tracker", func() { thinkingTracker.Run(ctx) })
-
-	// Workflow runner — executes multi-step workflows (shell + agent)
-	wfStore := store.NewWorkflowStore(db)
-	wfRunner := background.NewWorkflowRunner(wfStore, launcher, agentRT, nil, nil, cfg.CoralDir(), cfg.AgentHost(), cfg.Port)
-	srv.SetWorkflowRunner(wfRunner)
-	scheduler.SetWorkflowRunner(wfRunner, wfStore)
-
-	log.Printf("Started 8 background services + workflow runner (git poller, indexer, scheduler, board notifier, remote board poller, batch summarizer, session reconciler, token poller)")
-	return wfRunner, scheduler
 }
 
 // startCloudConnector wires the optional Cloud Hub connector. A bad --cloud-url is
