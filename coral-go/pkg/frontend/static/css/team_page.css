@@ -247,4 +247,4 @@
     .goal-tasks-open { display: inline-flex; align-self: flex-start; min-height: 44px; margin-top: 12px; }
     .goal-side-search { min-height: 44px; }
 }
-
+.goals-note.team-agents-count { margin: 8px 0 4px; } /* the count line: 8 px under the search row, a little above the table (#8271) */

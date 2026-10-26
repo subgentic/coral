@@ -32,7 +32,7 @@ const btn = (cls, text, onClick) => { const b = el('button', cls, text); b.type 
 
 const statusWord = (a) => WORD[a.availability] || 'No signal yet';
 const providerOf = (a) => PROVIDER[a.agent_type] || (a.agent_type ? a.agent_type.charAt(0).toUpperCase() + a.agent_type.slice(1) : 'Claude');
-const canRemind = (a) => a.agent_type !== 'terminal' || a.reminder; // a terminal is not an agent: a reminder to it does nothing (UI audit #5589)
+const canRemind = (a) => a.availability !== 'offline' && (a.agent_type !== 'terminal' || a.reminder); // a reminder to an ended agent does nothing (#8271) // a terminal is not an agent: a reminder to it does nothing (UI audit #5589)
 const taskLine = (t) => `#${Number(t.id)} ${String(t.status || '').replaceAll('_', ' ')}: ${t.title}`;
 /** What the agent is doing: its first task as one line, else the reason its status gives. */
 const doingOf = (a) => (a.tasks && a.tasks.length ? taskLine(a.tasks[0]) + (a.tasks.length > 1 ? ` (+${a.tasks.length - 1} more)` : '') : (a.reason || ''));
