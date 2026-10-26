@@ -335,6 +335,7 @@ func (h *HistoryHandler) listSessionsBefore4713(w http.ResponseWriter, r *http.R
 				"summary":            s.Summary,
 				"first_user_message": s.FirstUserMessage, // the one field added since (#6207): the refactor is otherwise the same rows
 				"summary_title":      s.SummaryTitle,
+				"title":              chatTitle(s.SummaryTitle, s.FirstUserMessage, s.DisplayName, s.AgentName), // the other field added since (#7756)
 				"has_notes":          s.HasNotes,
 				"tags":               s.Tags,
 				"branch":             s.Branch,

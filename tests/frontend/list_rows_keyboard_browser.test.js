@@ -50,7 +50,7 @@ const S = `(window.__coralStatic || '/static/')`;
         assert.equal(await ev(`document.querySelector('.sched-runs-table tbody tr').getAttribute('role')`), null, 'the row keeps its table semantics (no button role on the tr)');
         // Chats: a row is an li holding a button, and aria-current follows the open chat wherever the highlight moves (#7006)
         await ev(`window.switchNavTab('history'); (async () => { const m = await import(${S} + 'history_list.js'); window.__st = (await import(${S} + 'state.js')).state; window.__ctl = await import(${S} + 'controls.js');
-            const rows = [1, 2, 3].map(i => ({ session_id: 'aaaaaa' + i, summary_title: 'Chat ' + i, source_type: 'claude', display_name: 'Ada', last_timestamp: new Date().toISOString() })).concat([{ type: 'group', session_id: 'board:team-a', title: 'team-a', updated_at: new Date().toISOString(), message_count: 2, subscriber_count: 1 }]);
+            const rows = [1, 2, 3].map(i => ({ session_id: 'aaaaaa' + i, title: 'Chat ' + i, source_type: 'claude', display_name: 'Ada', last_timestamp: new Date().toISOString() })).concat([{ type: 'group', session_id: 'board:team-a', title: 'team-a', updated_at: new Date().toISOString(), message_count: 2, subscriber_count: 1 }]);
             m.renderHistorySessions(rows, rows.length, 1, 50); return true; })()`);
         await waitFor(`document.querySelectorAll('#history-sessions-list li:not(.session-group-header)').length === 4`, 'four chat rows', 8000);
         const chat = await ev(`[...document.querySelectorAll('#history-sessions-list li:not(.session-group-header)')].map(li => ({ role: li.getAttribute('role'), tab: li.getAttribute('tabindex'), buttons: li.querySelectorAll('button.row-btn').length }))`);

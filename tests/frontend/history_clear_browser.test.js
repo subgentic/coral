@@ -23,7 +23,7 @@ const { setTheme } = require('./helpers/contrast');
             const json=x=>new Response(JSON.stringify(x),{headers:{'content-type':'application/json'}});
             window.fetch=(u,o)=>{
                 const p=new URL(String(u),location.origin);
-                if(p.pathname==='/api/sessions/history')return Promise.resolve(json({sessions:window.__empty?[]:[{session_id:'clear-history',summary_title:'Restored history row',source_type:'claude'}],total:window.__empty?0:1,page:1,page_size:50}));
+                if(p.pathname==='/api/sessions/history')return Promise.resolve(json({sessions:window.__empty?[]:[{session_id:'clear-history',title:'Restored history row',source_type:'claude'}],total:window.__empty?0:1,page:1,page_size:50}));
                 if(p.pathname==='/api/sessions/history/search'){
                     const q=p.searchParams.get('q');window.__searchRequests.push(q);
                     if(q.startsWith('hold'))return new Promise((resolve,reject)=>window.__held.push({q,release:()=>resolve(json(result)),fail:()=>reject(new Error('Late search failure'))}));

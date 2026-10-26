@@ -16,6 +16,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/subgentic/coral/internal/agent"
 	"github.com/subgentic/coral/internal/background"
 	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/httputil"
@@ -365,8 +366,8 @@ func InjectKnowledgeIntoPrompt(coralDir, teamName, agentName, prompt string) str
 	}
 
 	// Also try loading by the team store's team name
-	knowledgeSection := "\n\n---\n\n## Your Institutional Knowledge\n\n" +
-		"The following is distilled knowledge from your previous sessions. " +
+	knowledgeSection := "\n\n---\n\n" + agent.KnowledgeSectionHeading + "\n\n" +
+		agent.KnowledgeSectionIntro + " " +
 		"Use this to maintain continuity across restarts.\n\n" +
 		knowledge
 

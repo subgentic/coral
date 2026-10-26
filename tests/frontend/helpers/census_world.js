@@ -56,7 +56,7 @@ const DATA_WORLD = `(() => {
             if (path === '/api/scheduled/jobs') return json({ jobs: [${JSON.stringify(JOB)}, ${JSON.stringify(JOB2)}, ${JSON.stringify(JOB3)}] });
             if (path === '/api/scheduled/jobs/5') return json(${JSON.stringify(JOB)});
             if (/^\\/api\\/scheduled\\/jobs\\/5\\/runs/.test(path)) return json({ runs: [] });
-            if (path === '/api/sessions/history') return json({ sessions: [{ session_id: 'census-chat', summary_title: 'Release notes chat', source_type: 'claude' }, { session_id: 'census-chat-2', summary_title: 'Build fix chat', source_type: 'claude' }, { session_id: 'census-chat-3', summary_title: 'Planning chat', source_type: 'codex' }], total: 3, page: 1, page_size: 50 });
+            if (path === '/api/sessions/history') return json({ sessions: [{ session_id: 'census-chat', title: 'Release notes chat', source_type: 'claude' }, { session_id: 'census-chat-2', title: 'Build fix chat', source_type: 'claude' }, { session_id: 'census-chat-3', title: 'Planning chat', source_type: 'codex' }], total: 3, page: 1, page_size: 50 });
             if (path === '/api/cloud/status' && window.__cloudStatus) return json(window.__cloudStatus);
             if (path === '/api/token-usage/summary') return json(${JSON.stringify(TOKEN_USAGE)});
             if (path === '/api/token-usage/timeseries') return json(${JSON.stringify(TOKEN_TIMESERIES)});

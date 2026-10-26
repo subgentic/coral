@@ -5,8 +5,8 @@ const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 
 const SESSIONS = [
-    { session_id: 'bbbbbbbb-0001', summary_title: 'Planning chat', display_name: 'Lead', agent_name: 'Lead', source_type: 'codex', last_timestamp: '2026-10-03T10:00:00Z', duration_sec: 120 },
-    { session_id: 'bbbbbbbb-0002', summary_title: 'A rather long chat title that goes on and on about the release and the build and the weekly planning', display_name: 'Lead', agent_name: 'Lead', source_type: 'codex', last_timestamp: '2026-10-02T10:00:00Z', duration_sec: 300 },
+    { session_id: 'bbbbbbbb-0001', title: 'Planning chat', display_name: 'Lead', agent_name: 'Lead', source_type: 'codex', last_timestamp: '2026-10-03T10:00:00Z', duration_sec: 120 },
+    { session_id: 'bbbbbbbb-0002', title: 'A rather long chat title that goes on and on about the release and the build and the weekly planning', display_name: 'Lead', agent_name: 'Lead', source_type: 'codex', last_timestamp: '2026-10-02T10:00:00Z', duration_sec: 300 },
 ];
 
 (async () => {

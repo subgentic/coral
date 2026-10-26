@@ -43,6 +43,7 @@ Paginated, filterable list of historical sessions. Supports both agent sessions 
       "message_count": 42,
       "summary": "AI-generated summary of the session",
       "summary_title": "Short title",
+      "title": "Short title",
       "has_notes": true,
       "tags": [{"id": 1, "name": "feature", "color": "#58a6ff"}],
       "branch": "feature/new-thing",

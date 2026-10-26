@@ -17,7 +17,7 @@ const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
             const json = x => Promise.resolve(new Response(JSON.stringify(x), {headers:{'content-type':'application/json'}}));
             window.fetch = (u, o) => {
                 const p = new URL(String(u),location.origin); const sid='phone-history-fixture';
-                if(p.pathname==='/api/sessions/history') return json({sessions:window.__historyEmpty?[]:[{session_id:sid,summary_title:'Phone history example',source_type:'claude',last_timestamp:'2026-10-21T10:00:00Z'}],total:window.__historyEmpty?0:1,page:1,page_size:50});
+                if(p.pathname==='/api/sessions/history') return json({sessions:window.__historyEmpty?[]:[{session_id:sid,title:'Phone history example',source_type:'claude',last_timestamp:'2026-10-21T10:00:00Z'}],total:window.__historyEmpty?0:1,page:1,page_size:50});
                 if(p.pathname==='/api/sessions/history/search') { window.__historyRequests.push(p.search); return json({status:'complete',total:1,results:[{session_id:sid,type:'agent',hits:[{role:'user',excerpt:'Find the phone needle',match_offsets:[[15,21]],locator:{session_id:sid,message_index:0}}]}]}); }
                 if(p.pathname==='/api/sessions/history/'+sid) return json({session_id:sid,agent_type:'claude',messages:[{type:'user',content:'Find the phone needle'}],total:1,start:0});
                 if(p.pathname.startsWith('/api/sessions/history/'+sid+'/')) return json([]);

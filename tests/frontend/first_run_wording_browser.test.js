@@ -12,9 +12,9 @@ const HISTORY = `(() => {
         const u = String(url && url.url || url).replace(/^https?:\\/\\/[^/]+/, ''), path = u.split('?')[0], m = (opts.method || 'GET').toUpperCase();
         if (m === 'GET') {
             if (path === '/api/sessions/history') return json({ sessions: [
-                { session_id: '${SID}', summary_title: '', summary: "I'm working in \`/private/tmp/ct6194-audit/browser-home/my-first-project\`.", source_type: 'codex', agent_name: 'my-first-project' },
-                { session_id: 'titled-chat', summary_title: 'Release notes chat', first_user_message: 'typed after the title', summary: 'x', source_type: 'claude' },
-                { session_id: 'typed-chat', summary_title: '', first_user_message: 'Fix the login redirect in /work/acme/web-app/src', summary: 'I changed the router.', source_type: 'claude', agent_name: 'web-agent', repo_name: 'coral', branch: 'feat/jobs-page', last_timestamp: '${new Date().toISOString()}', duration_sec: 1260 }] });
+                { session_id: '${SID}', title: 'my-first-project', summary: "I'm working in \`/private/tmp/ct6194-audit/browser-home/my-first-project\`.", source_type: 'codex', agent_name: 'my-first-project' },
+                { session_id: 'titled-chat', title: 'Release notes chat', summary: 'x', source_type: 'claude' },
+                { session_id: 'typed-chat', title: 'Fix the login redirect in /work/acme/web-app/src', summary: 'I changed the router.', source_type: 'claude', agent_name: 'web-agent', repo_name: 'coral', branch: 'feat/jobs-page', last_timestamp: '${new Date().toISOString()}', duration_sec: 1260 }] });
             if (path === '/api/sessions/history/${SID}') return json({ agent_type: 'codex', messages: [{ type: 'user', content: 'Hello' }, { type: 'assistant', text: 'Hi there.' }], total: 2, start: 0 });
             if (new RegExp('^/api/sessions/history/${SID}/(notes|git|tags|events|tasks|agent-notes|files)$').test(path) || path === '/api/tags') return json(path.endsWith('/notes') ? { notes_md: '' } : []);
         }
@@ -50,9 +50,9 @@ const HISTORY = `(() => {
         await ev(`window.switchNavTab('history'); true`);
         await waitFor(`document.querySelectorAll('#history-sessions-list [data-on-click="history-open"]').length === 3`, 'the chats', 10000);
         const labels = await ev(`[...document.querySelectorAll('#history-sessions-list .session-label')].map(e => e.textContent)`);
-        check('a chat with no title leads with its first reply, the path cut to its last folder, no backticks', labels[0] === "I'm working in my-first-project." && !/\/private|`/.test(labels[0]), JSON.stringify(labels));
+        check('a chat with no title and no first message of its own is the agent\'s name alone (#7756), not its first reply', labels[0] === 'my-first-project', JSON.stringify(labels));
         check('a chat with a title keeps it, whatever was typed first', labels[1] === 'Release notes chat', JSON.stringify(labels));
-        check('a chat with no title leads with what the person typed first (path cut to its last folder), not the reply (#6251)', labels[2] === 'Fix the login redirect in src' && labels[0] === "I'm working in my-first-project.", JSON.stringify(labels));
+        check('a chat with no title leads with what the person typed first (path cut to its last folder), not the reply (#6251)', labels[2] === 'Fix the login redirect in src' && labels[0] === 'my-first-project', JSON.stringify(labels));
         // a row is its title, then one line of facts (#6580): who, the branch (not the usual one), when in words and how long it ran; the provider only where it is not Claude
         const rows = await ev(`[...document.querySelectorAll('#history-sessions-list li[data-session-id]')].map(li => ({ first: (li.querySelector(':scope > .row-btn') || li).firstElementChild.className, badge: [...li.querySelectorAll('.badge')].map(b => b.textContent), facts: (li.querySelector('.chat-row-facts') || {}).textContent || '', time: !!li.querySelector('time[datetime][title]'), lines: li.querySelectorAll('.session-row-top, .sidebar-source-type').length }))`);
         check('a Claude chat shows no provider (no badge, no "claude" line) and the chat from Codex shows a CODEX badge', rows[2].badge.length === 0 && !/claude/i.test(rows[2].facts) && rows[0].badge.join() === 'codex' && rows.every(r => r.lines === 0), JSON.stringify(rows));
@@ -63,7 +63,7 @@ const HISTORY = `(() => {
         await ev(`document.querySelector('#history-sessions-list [data-session-id="${SID}"]').click(); true`);
         await waitFor(`document.getElementById('history-messages').textContent.includes('Hi there')`, 'the chat', 10000);
         const h = await ev(`(() => { const t = document.getElementById('history-session-title').textContent, id = document.getElementById('history-session-id'), b = document.getElementById('history-session-details'); return { t, idShown: id.getClientRects().length > 0, expanded: b.getAttribute('aria-expanded'), label: b.textContent }; })()`);
-        check('the header is the title, not "Session: <id>", and the id is not on screen', h.t === "I'm working in my-first-project." && !h.t.includes('Session:') && !h.t.includes('22531c16') && !h.idShown && h.expanded === 'false', JSON.stringify(h));
+        check('the header is the title, not "Session: <id>", and the id is not on screen', h.t === 'my-first-project' && !h.t.includes('Session:') && !h.t.includes('22531c16') && !h.idShown && h.expanded === 'false', JSON.stringify(h));
         await ev(`document.getElementById('history-session-details').click(); true`);
         const o = await ev(`(() => { const id = document.getElementById('history-session-id'), b = document.getElementById('history-session-details'); return { text: id.textContent, shown: id.getClientRects().length > 0, expanded: b.getAttribute('aria-expanded'), label: b.textContent }; })()`);
         check('Details shows the id (and says Hide details); the button has aria-expanded', o.shown && o.text === SID && o.expanded === 'true' && o.label === 'Hide details', JSON.stringify(o));

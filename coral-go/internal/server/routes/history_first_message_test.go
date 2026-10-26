@@ -38,9 +38,13 @@ func TestTheHistoryListCarriesTheFirstUserMessage(t *testing.T) {
 		Sessions []map[string]any `json:"sessions"`
 	}
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
-	got := map[string]any{}
+	got, titles := map[string]any{}, map[string]any{}
 	for _, row := range out.Sessions {
 		got[row["session_id"].(string)] = row["first_user_message"]
+		titles[row["session_id"].(string)] = row["title"]
 	}
 	assert.Equal(t, map[string]any{"new": "which folder are you in?", "old": ""}, got)
+	// #7756: the one title the list and the sidebar read: the first message, and for a row that kept none the agent's name alone.
+	assert.Equal(t, "which folder are you in?", titles["new"])
+	assert.NotContains(t, titles["old"], "Chat")
 }

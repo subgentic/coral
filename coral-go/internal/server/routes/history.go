@@ -216,6 +216,7 @@ func agentHistoryRows(sessions []store.SessionListItem) []map[string]any {
 			"summary":            s.Summary,
 			"first_user_message": s.FirstUserMessage,
 			"summary_title":      s.SummaryTitle,
+			"title":              chatTitle(s.SummaryTitle, s.FirstUserMessage, s.DisplayName, s.AgentName),
 			"has_notes":          s.HasNotes,
 			"tags":               s.Tags,
 			"branch":             s.Branch,

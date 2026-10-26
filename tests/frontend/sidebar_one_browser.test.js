@@ -14,9 +14,9 @@ const BASE = require('./test_base').BASE;
 const STUB = `(() => {
     const real = window.fetch; const json = o => Promise.resolve(new Response(JSON.stringify(o), { status: 200, headers: { 'Content-Type': 'application/json' } }));
     const at = (dd, hh) => { const d = new Date(); d.setDate(d.getDate() - dd); d.setHours(hh, 0, 0, 0); return d.toISOString(); };
-    const rows = [ { session_id: 'aaaaaa1', summary_title: 'The newest chat', source_type: 'claude', display_name: 'Ada', last_timestamp: at(0, 12) },
-        { session_id: 'aaaaaa2', summary_title: 'The second chat', source_type: 'claude', display_name: 'Ada', last_timestamp: at(0, 9) },
-        { session_id: 'bbbbbb1', summary_title: 'Yesterday\\'s chat', source_type: 'claude', display_name: 'Grace', last_timestamp: at(1, 15) } ];
+    const rows = [ { session_id: 'aaaaaa1', title: 'The newest chat', source_type: 'claude', display_name: 'Ada', last_timestamp: at(0, 12) },
+        { session_id: 'aaaaaa2', title: 'The second chat', source_type: 'claude', display_name: 'Ada', last_timestamp: at(0, 9) },
+        { session_id: 'bbbbbb1', title: 'Yesterday\\'s chat', source_type: 'claude', display_name: 'Grace', last_timestamp: at(1, 15) } ];
     const base = { description: '', timezone: 'UTC', agent_type: 'claude', repo_path: '/work/project', base_branch: 'main', prompt: 'Do it.', enabled: 1, max_duration_s: 3600, cleanup_worktree: 0, flags: '', job_type: 'prompt', workflow_id: null, created_at: at(3, 1), updated_at: at(3, 1), paused_reason: '', consecutive_failures: 0 };
     const jobs = [ { ...base, id: 1, name: 'nightly-build', cron_expr: '0 2 * * *', next_fire_at: new Date(Date.now() + 7200000).toISOString(), last_run: null },
         { ...base, id: 2, name: 'summarize-the-day', cron_expr: '0 18 * * 1-5', next_fire_at: new Date(Date.now() + 9000000).toISOString(), last_run: null },

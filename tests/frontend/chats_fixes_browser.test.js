@@ -19,9 +19,9 @@ const S = `(window.__coralStatic || '/static/')`;
             if (font) await ev(`document.documentElement.style.fontSize = '${font}'; true`);
             await ev(`(() => { const real = window.fetch; const json = o => Promise.resolve(new Response(JSON.stringify(o), { status: 200, headers: { 'Content-Type': 'application/json' } }));
                 const at = (dd, hh) => { const d = new Date(); d.setDate(d.getDate() - dd); d.setHours(hh, 0, 0, 0); return d.toISOString(); };
-                const rows = [ { session_id: 'aaaaaa1', summary_title: 'The newest chat', source_type: 'claude', display_name: 'Ada', last_timestamp: at(0, 14), branch: 'feat/flaky' },
-                    { session_id: 'aaaaaa2', summary_title: 'An older chat', source_type: 'claude', display_name: 'Ada', last_timestamp: at(1, 9), branch: 'feat/flaky' },
-                    { session_id: 'eeeeee1', summary_title: 'An extremely long chat title that goes on and on and on, well past what one row of the sidebar can hold at any size at all', source_type: 'codex', display_name: 'A-long-agent-name', last_timestamp: at(6, 11) } ];
+                const rows = [ { session_id: 'aaaaaa1', title: 'The newest chat', source_type: 'claude', display_name: 'Ada', last_timestamp: at(0, 14), branch: 'feat/flaky' },
+                    { session_id: 'aaaaaa2', title: 'An older chat', source_type: 'claude', display_name: 'Ada', last_timestamp: at(1, 9), branch: 'feat/flaky' },
+                    { session_id: 'eeeeee1', title: 'An extremely long chat title that goes on and on and on, well past what one row of the sidebar can hold at any size at all', source_type: 'codex', display_name: 'A-long-agent-name', last_timestamp: at(6, 11) } ];
                 const chat = sid => json({ session_id: sid, agent_type: 'claude', messages: [{ type: 'user', content: 'Hello' }, { type: 'assistant', text: 'Hi' }], total: 2, start: 0 });
                 window.fetch = (u, o) => { const p = new URL(String(u), location.href).pathname;
                     if (p === '/api/sessions/history') return json({ sessions: rows, total: rows.length, page: 1, page_size: 50 });

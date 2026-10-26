@@ -123,8 +123,8 @@ type IndexedSession struct {
 }
 
 // HistoryIndexVersion is the version of the History parsers: a session indexed with an older one is read again once (its row has no first user message, #6207). Every scanner stamps it on the rows it
-// writes; store.GetHistoryMtimes is given it, so the next pass re-reads the files of older rows whatever their mtime. Version 1 was the guardian-aware Codex parser (#6081).
-const HistoryIndexVersion = 3
+// writes; store.GetHistoryMtimes is given it, so the next pass re-reads the files of older rows whatever their mtime. Version 1 was the guardian-aware Codex parser (#6081); version 4 keeps the launch prompt out of the first user message (#7756).
+const HistoryIndexVersion = 4
 
 // firstMessageLimit is how much of the first user message is kept.
 const firstMessageLimit = 200
@@ -195,6 +195,20 @@ func typedText(text string) (string, bool) {
 // ideTrailingCloseR is the closing tag of an IDE context block at the very end of the text.
 var ideTrailingCloseR = regexp.MustCompile(`</(ide_[a-z_]+)>$`)
 
+// Markers of the text Coral itself puts in a chat's launch prompt: the board action prompts say this, and the distilled-knowledge section opens with this heading and sentence (routes.InjectKnowledgeIntoPrompt).
+const (
+	launchPromptBoardMarker     = "You were automatically joined to message board"
+	KnowledgeSectionHeading     = "## Your Institutional Knowledge"
+	KnowledgeSectionIntro       = "The following is distilled knowledge from your previous sessions."
+	launchPromptKnowledgeMarker = KnowledgeSectionHeading + "\n\n" + KnowledgeSectionIntro
+)
+
+// IsLaunchPromptText reports whether a user entry's text is the launch prompt Coral gave the agent (its role prompt with the knowledge section and the board's action text after it), not something a person typed (#7756).
+// A launch prompt that has neither the knowledge section nor the board text (a role prompt alone) cannot be told from a typed message here.
+func IsLaunchPromptText(text string) bool {
+	return strings.Contains(text, launchPromptBoardMarker) || strings.Contains(text, launchPromptKnowledgeMarker)
+}
+
 // injectedUserText reports whether a user entry's text is the CLI's own and not something the person typed: a slash command's tags, the output of one, or a system reminder or environment block.
 func injectedUserText(text string) bool {
 	t := strings.TrimSpace(text)
@@ -203,7 +217,7 @@ func injectedUserText(text string) bool {
 			return true
 		}
 	}
-	return t == ""
+	return t == "" || IsLaunchPromptText(t)
 }
 
 // ftsBodyLimit caps how much of one session's text enters the search index.

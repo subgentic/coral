@@ -29,8 +29,8 @@ const STUB = `(() => { const inner = window.fetch; const json = b => Promise.res
         if (m === 'GET' && path === '/api/workflows/1') return json(${JSON.stringify({ ...WORKFLOWS[0], steps: [{ id: 1, name: 'build', agent_type: 'claude', prompt: 'Build it' }] })});
         return inner(url, opts); }; })();`;
 const HISTORY = `(async () => { const m = await import(${S} + 'history_list.js'); const at = (dd, hh, mm) => { const d = new Date(); d.setDate(d.getDate() - dd); d.setHours(hh, mm, 0, 0); return d.toISOString(); };
-    const rows = [{ session_id: 'aaaaaa1', summary_title: 'Fix the flaky test', source_type: 'claude', display_name: 'Ada', last_timestamp: at(0, 14, 32), duration_sec: 21 * 60 },
-        { session_id: 'eeeeee1', summary_title: 'An extremely long chat title that goes on and on and on, well past what one row of the sidebar can hold at any size at all', source_type: 'codex', display_name: 'A-long-agent-name', last_timestamp: at(1, 17, 20) },
+    const rows = [{ session_id: 'aaaaaa1', title: 'Fix the flaky test', source_type: 'claude', display_name: 'Ada', last_timestamp: at(0, 14, 32), duration_sec: 21 * 60 },
+        { session_id: 'eeeeee1', title: 'An extremely long chat title that goes on and on and on, well past what one row of the sidebar can hold at any size at all', source_type: 'codex', display_name: 'A-long-agent-name', last_timestamp: at(1, 17, 20) },
         { session_id: 'bbbbbb1', source_type: 'claude', display_name: 'Ada', last_timestamp: at(2, 8, 0) },
         { type: 'group', session_id: 'board:team-a', title: 'a-team-with-a-long-name', updated_at: at(0, 13, 5), message_count: 23, subscriber_count: 4 }];
     m.renderHistorySessions(rows, rows.length, 1, 50); return true; })()`;

@@ -20,14 +20,14 @@ const S = `(window.__coralStatic || '/static/')`;
             await ev(`${font ? `document.documentElement.style.fontSize = '${font}';` : ''} window.switchNavTab('history'); true`);
             await ev(`(async () => { const m = await import(${S} + 'history_list.js'); const at = (dd, hh, mm) => { const d = new Date(); d.setDate(d.getDate() - dd); d.setHours(hh, mm, 0, 0); return d.toISOString(); };
                 const rows = [
-                    { session_id: 'aaaaaa1', summary_title: 'Fix the flaky test', source_type: 'claude', display_name: 'Ada', last_timestamp: at(0, 14, 32), duration_sec: 21 * 60 },
-                    { session_id: 'aaaaaa2', summary_title: 'Review the plan', source_type: 'claude', display_name: 'Ada', last_timestamp: at(0, 9, 10), duration_sec: 5 * 60 },
-                    { session_id: 'aaaaaa3', summary_title: 'Yesterday afternoon', source_type: 'claude', display_name: 'Ada', last_timestamp: at(1, 17, 20), duration_sec: 60 },
-                    { session_id: 'aaaaaa4', summary_title: 'Last week', source_type: 'claude', display_name: 'Ada', last_timestamp: at(10, 11, 0), duration_sec: 15 * 60 },
+                    { session_id: 'aaaaaa1', title: 'Fix the flaky test', source_type: 'claude', display_name: 'Ada', last_timestamp: at(0, 14, 32), duration_sec: 21 * 60 },
+                    { session_id: 'aaaaaa2', title: 'Review the plan', source_type: 'claude', display_name: 'Ada', last_timestamp: at(0, 9, 10), duration_sec: 5 * 60 },
+                    { session_id: 'aaaaaa3', title: 'Yesterday afternoon', source_type: 'claude', display_name: 'Ada', last_timestamp: at(1, 17, 20), duration_sec: 60 },
+                    { session_id: 'aaaaaa4', title: 'Last week', source_type: 'claude', display_name: 'Ada', last_timestamp: at(10, 11, 0), duration_sec: 15 * 60 },
                     { session_id: 'bbbbbb1', source_type: 'claude', display_name: 'Ada', last_timestamp: at(2, 8, 0) },
                     { session_id: 'cccccc2', source_type: 'claude', display_name: 'Ada', last_timestamp: at(3, 8, 0) },
-                    { session_id: 'dddddd1', summary_title: 'A chat whose indexing never kept its time', source_type: 'claude', display_name: 'Ada' },
-                    { session_id: 'eeeeee1', summary_title: 'An extremely long chat title that goes on and on and on, well past what one row of the sidebar can hold at any size at all', source_type: 'codex', display_name: 'A-long-agent-name' },
+                    { session_id: 'dddddd1', title: 'A chat whose indexing never kept its time', source_type: 'claude', display_name: 'Ada' },
+                    { session_id: 'eeeeee1', title: 'An extremely long chat title that goes on and on and on, well past what one row of the sidebar can hold at any size at all', source_type: 'codex', display_name: 'A-long-agent-name' },
                     { type: 'group', session_id: 'board:team-a', title: 'team-a', updated_at: at(0, 13, 5), message_count: 23, subscriber_count: 4 } ];
                 const w = await import(${S} + 'when_text.js'); window.__exp = { fix: w.whenText(rows[0].last_timestamp), rev: w.whenText(rows[1].last_timestamp), yest: w.whenText(rows[2].last_timestamp), grp: w.whenText(rows[8].updated_at) };
                 m.renderHistorySessions(rows, rows.length, 1, 50); return true; })()`);
