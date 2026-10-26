@@ -16,7 +16,7 @@
  *   }
  *   field = { key, type: 'text'|'textarea'|'number'|'select'|'toggle'|'multiselect'|'radio'|'secret'|'path'|'custom', label, help?: string | { text, more },
  *             id?, default?, required?, placeholder?, rows?, min?, max?, step?, unit?, options?: [{ value, label, help? }] | async () => [...], validate?(value, values) => '' | 'message',
- *             visibleWhen?(values), disabledWhen?(values) => bool | 'reason', readOnly?, apply?: 'now', action?: { label, run(view), danger?, confirm? }, wide?, render?(slot, ctl) => { get, set, onChange? } }
+ *             visibleWhen?(values), disabledWhen?(values) => bool | 'reason', readOnly?, apply?: 'now', action?: { label, run(view), danger?, confirm? }, wide?, compact?, render?(slot, ctl) => { get, set, onChange? } }
  *
  * The controller: values() set(key, v) dirty() isDirty() changes() error(key, message) clearErrors() validate({ focus }) save() cancel() showGroup(id) reload() destroy().
  * Events on the host: 'sv-dirty' { dirty }, 'sv-group' { id }, 'sv-saved' { changes }. */
@@ -133,7 +133,7 @@ export function mountSettingsView(host, spec) {
     function buildRow(field, group) {
         const id = `${uid}-${fields.size}`;
         const t = field.type || 'text';
-        const row = node('div', `sv-row sv-row-${t}${field.wide ? ' sv-row-wide' : ''}`);
+        const row = node('div', `sv-row sv-row-${t}${field.wide ? ' sv-row-wide' : ''}${field.compact ? ' sv-row-compact' : ''}`);
         row.dataset.key = field.key;
         if (t === 'heading' || t === 'notice') { // a row that holds no value: a sub-heading with its line, or text the caller draws (a note with a link)
             const help = typeof field.help === 'string' ? field.help : '';
