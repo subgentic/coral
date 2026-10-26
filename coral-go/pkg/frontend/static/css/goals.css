@@ -28,7 +28,7 @@
 .goal-item > .goal-card { flex-direction: column; align-items: stretch; gap: 6px; padding: 10px 12px; }
 .goal-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .goal-card-title { font-weight: 600; overflow-wrap: anywhere; min-width: 0; }
-.goal-card-meta, .goal-card-sentence, .goal-task-sub { color: var(--text-secondary); font-size: 0.8125rem; overflow-wrap: anywhere; }
+.goal-card-meta, .goal-card-sentence { color: var(--text-secondary); font-size: 0.8125rem; overflow-wrap: anywhere; }
 
 .goal-chip { --goal-hue: var(--text-muted); display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border: 1px solid var(--goal-hue); border-radius: 999px; font-size: 0.75rem; white-space: nowrap; color: var(--text-primary); }
 .goal-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--goal-hue); flex: none; }
@@ -47,12 +47,6 @@
 .goals-detail-title { margin: 0; font-size: 1.0625rem; overflow-wrap: anywhere; }
 .goals-detail-line { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 
-.goal-tasks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.goal-task { display: flex; flex-direction: column; gap: 4px; padding: 8px 0; border-top: 1px solid var(--border-subtle); }
-.goal-task-head { display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap; }
-.goal-task-id { color: var(--text-muted); }
-.goal-task-title { flex: 1 1 12rem; min-width: 0; overflow-wrap: anywhere; }
-.goal-task-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
 .goals-failed { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 12px; border: 1px dashed var(--border-light); border-radius: var(--radius-lg); color: var(--text-secondary); }
 .goals-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin: 0; padding: 0; color: var(--text-primary); font-size: 0.875rem; font-weight: 400; line-height: 1.5; } /* the one empty line (14/400, no box; UI/UX 170 consistency pass 2): Goals, Tasks, Agents, as Artifacts and Knowledge */
@@ -75,7 +69,7 @@
     .goals-page.goals-open .goals-list-col { display: none; }
     .goals-detail-col { border: none; padding: 0; background: none; }
     .goals-back { display: inline-flex; align-items: center; min-width: 44px; }
-    .goals-chip, .goals-dialog .btn, .goals-new, .goal-task-actions .btn, .goals-failed .btn, .goals-empty .btn { min-height: var(--control-touch-height, 44px); }
+    .goals-chip, .goals-dialog .btn, .goals-new, .goals-failed .btn, .goals-empty .btn { min-height: var(--control-touch-height, 44px); }
     .goals-dialog { width: 100vw; height: 100dvh; max-width: none; max-height: none; border-radius: 0; margin: 0; }
     .goals-field input, .goals-field select { min-height: var(--control-touch-height, 44px); }
     .goals-page.goals-open .goals-head, .goals-page.goals-open .goals-require { display: none; } /* an open goal is a screen of its own, the back row first (UI/UX #7113) */
@@ -133,18 +127,7 @@
 @media (min-width: 768px) {
     .goals-cols { grid-template-columns: minmax(280px, 360px) minmax(0, 1fr); gap: 20px; }
     .goals-detail-col { padding: 18px 22px 22px; gap: 16px; }
-    .goal-task { display: grid; align-items: center; column-gap: 12px; row-gap: 2px; }
-    .goal-task-head { display: contents; }
-    .goal-task-title { flex: none; min-width: 0; }
-    .goal-task-id, .goal-task-title, .goal-task .goal-chip, .goal-task-sub, .goal-task-actions { grid-row: 1; }
-    .goal-task-id { grid-column: 1; }
-    .goal-task-title { grid-column: 2; }
-    .goal-task-sub { grid-column: 3; max-width: 24ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .goal-task .goal-chip { grid-column: 4; }
-    .goal-task-actions { grid-column: 5; justify-content: flex-end; }
-    .goal-task { grid-template-columns: 3rem minmax(0, 1fr) auto auto auto; } /* the number has a column of its own, so the titles line up (#101 and #7414 alike) */
 }
-@container (max-width: 559px) { .goal-task-sub { grid-column: 2 / -1; grid-row: 2; max-width: none; white-space: normal; } }
 @container (max-width: 879px) { .goals-cols { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 767px) { .goals-page.goals-open .goals-chips-host { display: none; } } /* an open goal is a screen of its own: the filter row belongs to the list */
 

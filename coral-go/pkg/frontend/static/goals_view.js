@@ -108,7 +108,7 @@ async function showMoreTasks(id) {
     t.shown = Math.min(t.rows.length, t.shown + PAGE);
     drawDetail();
     say(W.tasksShownText(t.shown, taskTotal(goalById(id), t)));
-    const first = root.querySelectorAll('.goal-task')[before]; // focus goes to the first task that was not there before
+    const first = root.querySelectorAll('.goals-detail-col .dt-primary')[before]; // focus goes to the first task that was not there before
     if (first) first.focus();
 }
 
@@ -200,23 +200,24 @@ function drawListRaw() {
     col.append(ul);
 }
 
-function taskRow(t) {
-    const li = el('li', 'goal-task'); li.tabIndex = -1; // focus goes to the first task a Show more adds
-    const head = el('span', 'goal-task-head');
-    head.append(el('span', 'goal-task-id', `#${t.id}`), el('span', 'goal-task-title', t.title));
-    const chip = el('span', `goal-chip goal-state-task-${W.taskStateWord(t.state).toLowerCase()}`); chip.append(el('span', 'goal-dot'), document.createTextNode(W.taskStateWord(t.state)));
-    head.append(chip);
-    li.append(head);
-    const sub = [t.assignee, t.statusLine].filter(Boolean).join(' · ');
-    if (sub) li.append(el('span', 'goal-task-sub', sub));
-    const acts = el('span', 'goal-task-actions');
-    const openT = btn('btn btn-small goal-open-task', 'Open task', () => { const raw = t.raw || t; if (hooks.openTask) hooks.openTask(raw, goalById(raw.goal_id)); else window.openTeamPage?.(model.project, { tab: 'tasks', item: t.id }); }); openT.setAttribute('aria-label', `Open task #${t.id}: ${t.title}`); // three rows, three names (the visible words start the name); the click opens the task's own page (#7644)
-    acts.append(openT);
-    if (W.taskStateWord(t.state) === 'Done') { li.append(acts); return li; } // a finished task has no agent to open: a long done list is not 120 repeats of "Not running here" (#7142)
-    const session = agentFor(t);
-    if (session) { const ob = btn('btn btn-small goal-open-agent', 'Open the agent', () => openAgent(session)); ob.setAttribute('aria-label', `Open the agent for task #${t.id}`); acts.append(ob); } // no agent here: no disabled button and no line on the row; the list says it once (#7224)
-    li.append(acts);
-    return li;
+/** The board detail uses the shared task title and table sizing, including its narrow layout. */
+function detailTasks(g, rows) {
+    const byId = new Map(rows.map(t => [t.id, t]));
+    const columns = TC.taskColumns({}, ['task', 'state']);
+    const taskCell = columns[0].cell;
+    columns[0].cell = t => { const cell = taskCell(t); cell.querySelector('.dt-primary').classList.add('goal-open-task'); return cell; };
+    columns.splice(1, 0, { key: 'who', label: 'Assigned to', line: 2, cell: t => {
+        const task = byId.get(t.id), text = [task.assignee, task.statusLine].filter(Boolean).join(' · ');
+        return text ? DT.el('span', 'dt-secondary', text) : '';
+    } });
+    columns.push({ key: 'agent', label: 'Agent', line: 2, cell: t => {
+        const task = byId.get(t.id), session = W.taskStateWord(task.state) !== 'Done' && agentFor(task);
+        if (!session) return '';
+        const action = btn('btn btn-small dt-action goal-open-agent', 'Open the agent', () => openAgent(session));
+        action.setAttribute('aria-label', `Open the agent for task #${t.id}`); return action;
+    } });
+    return DT.dataTable({ label: `Tasks of ${g.title}`, columns, rows: rows.map(taskOf), rowKey: TC.taskKey, sortBar: false,
+        open: t => { const task = byId.get(t.id), raw = task.raw || task; if (hooks.openTask) hooks.openTask(raw, goalById(raw.goal_id)); else window.openTeamPage?.(model.project, { tab: 'tasks', item: t.id }); } }).el;
 }
 
 /** Focus goes to the detail as a whole when a goal opens (its name is read: the goal's title), not to a heading that cannot be typed in: no ring is drawn round words (#7404). */
@@ -257,7 +258,7 @@ function drawDetailRaw() {
     else {
         const live = tasks.rows.filter(t => W.taskStateWord(t.state) !== 'Done'), idle = live.filter(t => W.taskStateWord(t.state) === 'Queued' && !t.assignee); // nobody has taken these: a task whose agent runs on another computer is not one of them (UI/UX's review of #7404)
         if (idle.length) col.append(el('p', 'goals-note goals-nobody', W.nobodyWorkingText(idle.length, live.length)));
-        const ul = el('ul', 'goal-tasks'); ul.setAttribute('aria-label', `Tasks of ${g.title}`); for (const t of tasks.rows.slice(0, tasks.shown)) ul.append(taskRow(t)); col.append(ul);
+        col.append(detailTasks(g, tasks.rows.slice(0, tasks.shown)));
         const total = taskTotal(g, tasks), left = Math.max(tasks.rows.length - tasks.shown, 0) || (tasks.cursor ? Math.max(total - tasks.shown, 1) : 0);
         if (left) col.append(btn('btn goals-more', W.showMoreText(left, PAGE), () => showMoreTasks(g.id)));
         if (tasks.moreFailed) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, tasks.moreFailed)); col.append(f); }
