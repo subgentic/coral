@@ -504,8 +504,32 @@ function finishAcfControls(container, opts) {
         if (mode && launchFlags.modeCards) segmentSelect(mode, { label: 'Permission mode', cards: true, className: 'seg-modes' });
         _syncEnforcement(container);
     }
-    if (opts.sections) mountAgentRows(container); // the Agent pane's rows (the provider of a member, Model, Thinking) are fields of settings_view
+    if (opts.sections) { mountAgentRows(container); mountPermissionRows(container); } // the Agent and Permissions panes' rows are fields of settings_view
     if (opts.sections) { const shell = container.closest('.settings-shell'); if (shell) initSectionDialog(shell); } // the panes are in: build the section list
+}
+
+/** Move the controls of a built label/wrapper into a field's slot (their listeners and classes come along) and name the selects and inputs by the field's label. */
+function adoptChildren(from, keep, slot, labelId) {
+    slot.classList.add('acf-agent-slot');
+    for (const n of [...from.children]) if (!keep.some(k => n.matches(k))) { slot.append(n); for (const c of [n, ...n.querySelectorAll('select, input:not([type=hidden])')]) if (c.matches && c.matches('select, input') && !c.hasAttribute('aria-label')) c.setAttribute('aria-labelledby', labelId); }
+    return {};
+}
+
+/** The Permissions pane's rows as fields of settings_view (#8462): the Mode (its select or cards, its sentence and the line that says what an override does) and the tool permissions (the closed disclosure with the chips and the shell patterns) are moved in as they were built. */
+function mountPermissionRows(container) {
+    const pane = container.querySelector('.settings-pane[data-section="permissions"]');
+    if (!pane) return;
+    const uid = container.dataset.acfUid || 'acf';
+    const modeLabel = pane.querySelector('.acf-permission-mode')?.closest('label');
+    const tools = pane.querySelector('.acf-tools-details');
+    const fields = [];
+    if (modeLabel) fields.push({ key: 'mode', type: 'custom', label: 'Permission mode', labelId: `${uid}-mode-l`, render: slot => adoptChildren(modeLabel, [], slot, `${uid}-mode-l`) });
+    if (tools) fields.push({ key: 'tools', type: 'notice', render: slot => slot.append(tools) });
+    if (!fields.length) return;
+    const host = document.createElement('div'); host.className = 'acf-agent-rows';
+    pane.prepend(host);
+    mountSettingsView(host, { mode: 'form', fields });
+    modeLabel?.remove();
 }
 
 /** The Agent pane's rows as fields of settings_view (#8457): the controls the form built move into them (their listeners and classes come along, so every read of the form is unchanged), and the label, the optional mark and the spacing are the form's. A control the code hides (Model for a terminal, Thinking for a provider with no levels) hides its row. */
@@ -516,11 +540,7 @@ function mountAgentRows(container) {
     const uid = container.dataset.acfUid || 'acf';
     const provider = top.querySelector('.acf-provider-label:not([hidden])'); // Add/Edit member: the provider as segments (New agent adopts its own provider group; Restart says it in a line)
     const modelWrap = top.querySelector('.acf-model-wrap'), thinkingWrap = top.querySelector('.acf-thinking-wrap');
-    const adopt = (from, keep) => (slot, labelId) => {
-        slot.classList.add('acf-agent-slot');
-        for (const n of [...from.children]) if (!keep.some(k => n.matches(k))) { slot.append(n); for (const c of [n, ...n.querySelectorAll('select, input:not([type=hidden])')]) if (c.matches && c.matches('select, input') && !c.hasAttribute('aria-label')) c.setAttribute('aria-labelledby', labelId); }
-        return {};
-    };
+    const adopt = (from, keep) => (slot, labelId) => adoptChildren(from, keep, slot, labelId);
     const fields = [];
     if (provider) fields.push({ key: 'provider', type: 'custom', label: 'Provider', labelId: `${uid}-provider-l`, render: slot => adopt(provider, ['.acf-provider-head'])(slot, `${uid}-provider-l`) });
     if (modelWrap) fields.push({ key: 'model', type: 'custom', label: 'Model', optional: true, labelId: `${uid}-model-l`, render: slot => adopt(modelWrap, ['.launch-optional'])(slot, `${uid}-model-l`) });
