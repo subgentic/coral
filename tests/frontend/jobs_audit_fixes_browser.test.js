@@ -46,9 +46,9 @@ const S = `(window.__coralStatic || '/static/')`;
             await ev(`document.querySelector('#scheduled-jobs-list .sched-row[data-job-id="2"]').click(); true`);
             await waitFor(`!!document.querySelector('.sched-runs-section .sched-status')`, 'the runs table', 6000); await sleep(300); // sleep-ok: the runs answer replaces the first draw
             const cells = await ev(`[...document.querySelectorAll('.sched-runs-section .sched-status')].map(s => ({ text: s.textContent.trim(), cls: s.className, cellText: s.closest('td').textContent.replace(/\\s+/g, ' ').trim() }))`);
-            assert.ok(!/status-ok/.test(cells[0].cls), at + 'the unseen result is not drawn in the green of a pass: ' + JSON.stringify(cells[0]));
+            assert.ok(!/goal-state-task-done/.test(cells[0].cls), at + 'the unseen result is not drawn in the green of a pass: ' + JSON.stringify(cells[0]));
             assert.match(cells[0].cellText, /Coral was stopped when this run's agent ended/, at + 'its sentence is text in the table: ' + JSON.stringify(cells[0]));
-            assert.ok(/status-ok/.test(cells[1].cls), at + 'a real pass stays green');
+            assert.ok(/goal-state-task-done/.test(cells[1].cls), at + 'a real pass stays green');
             await shot(`jobs-runs-${w}`);
             console.log('PASS ' + at.trim());
         }

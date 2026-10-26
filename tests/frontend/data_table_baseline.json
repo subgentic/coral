@@ -2,14 +2,10 @@
   "css": {
     "cloud.css": 10,
     "components.css": 1,
-    "layout.css": 11,
-    "scheduler.css": 4,
-    "workflows.css": 5
+    "layout.css": 11
   },
   "js": {
     "cloud_servers.js": 13,
-    "scheduler.js": 18,
-    "sidebar_groups.js": 7,
-    "workflows.js": 20
+    "sidebar_groups.js": 7
   }
 }

@@ -53,7 +53,7 @@ const BASE = require('./test_base').BASE;
             await ev(`document.querySelector('.wf-detail-actions [data-on-click="wf-trigger"]').focus(); true`);
             const left = await ev(`({ hidden: document.querySelector('.wf-more-menu').hidden, expanded: document.querySelector('.wf-more-btn').getAttribute('aria-expanded') })`);
             assert.deepEqual(left, { hidden: true, expanded: 'false' }, `${tag}: moving the focus out of More closes its menu: ` + JSON.stringify(left));
-            await ev(`document.querySelector('.wf-runs-table .row-open-btn').click(); true`);
+            await ev(`document.querySelector('.wf-runs-table .dt-primary').click(); true`);
             await waitFor(`!!document.querySelector('.wf-run-step')`, 'the run page', 8000); await sleep(400); // sleep-ok: the page draws after the click
             const run = await ev(`(() => { const steps = [...document.querySelectorAll('.wf-run-step')]; const pass = steps[0], fail = steps[1]; const vis = e => !!e && e.getClientRects().length > 0 && !e.closest('details:not([open]) > :not(summary)');
                 return { title: document.querySelector('.wf-run-title').textContent.replace(/\\s+/g, ' ').trim(), error: (document.querySelector('.wf-run-error') || {}).textContent || '', peek: (pass.querySelector('.wf-run-step-peek') || {}).textContent || '', peekFailed: !!fail.querySelector('.wf-run-step-peek') && getComputedStyle(fail.querySelector('.wf-run-step-peek')).display !== 'none',

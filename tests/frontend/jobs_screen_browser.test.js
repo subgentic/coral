@@ -104,6 +104,7 @@ const S = `(window.__coralStatic || '/static/')`;
             assert.match(await text('#scheduler-detail .sched-settings'), /Time limit\s*1 hour/);
             assert.match(await text('#scheduler-detail .sched-settings'), /Folder\s*\/work\/project/);
             assert.deepEqual(await ev(`[...document.querySelectorAll('#scheduler-detail .sched-runs-table th')].map(t => t.textContent.trim())`), ['Started', 'Result', 'Duration']);
+            assert.equal(await ev(`document.querySelectorAll('#scheduler-detail .dt-table').length`), 1, 'job history uses the shared table');
             assert.match(await ev(`document.querySelector('#scheduler-detail .sched-runs-table tbody tr').textContent.replace(/\\s+/g, ' ')`), /Failed: step 2 \(Test\) exited with 3/);
             assert.match(await ev(`document.querySelectorAll('#scheduler-detail .sched-runs-table tbody tr')[1].textContent.replace(/\\s+/g, ' ')`), /Passed/);
 
