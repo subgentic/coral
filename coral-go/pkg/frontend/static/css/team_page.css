@@ -67,7 +67,7 @@
 @media (max-width: 760px) {
     .team-panel .list-bar-search-row { flex-wrap: wrap; }
     .team-panel .list-bar-search-wrap, .team-panel .list-bar-search-row:has(.team-tb-pills) .list-bar-search-wrap { flex: 1 1 8em; max-width: none; }
-    .team-panel .team-tb-chip { min-height: var(--control-touch-height, 44px); }
+    .team-panel .team-tb-chip, .team-panel .goals-chip.team-tb-chip { min-height: var(--control-touch-height, 44px); } /* the second: a chip in the Tasks table page (.goals-table-page .goals-chip, below) was 32 px on a phone (#8244) */
     .team-panel .list-bar-search, .team-panel .team-tb-select, .team-panel .team-tb-action, .team-panel .list-bar-toggle, .team-panel .list-bar-more-btn { min-height: var(--control-touch-height, 44px); }
     .team-panel .list-bar-toggle, .team-panel .list-bar-more-btn { min-width: var(--control-touch-height, 44px); }
     .team-panel .team-tb-select { flex: 1 1 7em; max-width: 11em; }

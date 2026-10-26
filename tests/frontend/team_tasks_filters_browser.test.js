@@ -79,6 +79,7 @@ const G1 = 'Explore goals with two teams', G2 = 'Plan the release notes';
                 await waitFor(`document.querySelectorAll('${panel} .dt-primary').length === 3`, 'only the three tasks of the goal', 8000);
                 assert.deepEqual((await rows()).map(r => r.replace(/^#\d+\s*/, '')).sort(), ['Add the goal filter', 'Check the Settings dialog', 'Review the filter']);
                 assert.deepEqual(await chips(), [`Goal: ${G1} ×`]);
+                if (mobile) { const chipH = await ev(`Math.round(document.querySelector('${panel} .team-tb-chip').getBoundingClientRect().height)`); assert.ok(chipH >= 44, 'the chip that removes the filter is a 44 px target on a phone: ' + chipH); }
                 await ev(`document.querySelector('${panel} .team-tb-chip').click(); true`);
                 await waitFor(`document.querySelectorAll('${panel} .dt-primary').length === 5 && !document.querySelector('${panel} .team-tb-chip')`, 'every task again', 8000);
             });
