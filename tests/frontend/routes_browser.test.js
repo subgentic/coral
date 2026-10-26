@@ -67,22 +67,22 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         await open('/agents');
         const len0 = await ev('history.length');
         await ev(`window.switchNavTab('history'); true`);
-        await atUrl('/chats');
+        await atUrl('/inbox/chats/all'); // the Inbox's folder path replaces /chats once the folder opens (#8652)
         await ev(`document.getElementById('nav-tab-workflows').click(); true`);
         await atUrl('/workflows');
         check('two tab clicks are two entries', (await ev('history.length')) === len0 + 2, `${len0} -> ${await ev('history.length')}`);
         await ev('history.back(); true');
-        await atUrl('/chats');
+        await atUrl('/inbox/chats/all'); // the Inbox's folder path replaces /chats once the folder opens (#8652)
         await until(`(document.querySelector('.top-nav-tab.active') || {}).id === 'nav-tab-hub-inbox'`, 'the Chats tab');
-        check('Back shows Chats', (await url()) === '/chats' && (await tab()) === 'nav-tab-hub-inbox', `${await url()} ${await tab()}`);
+        check('Back shows Chats', (await url()) === '/inbox/chats/all' && (await tab()) === 'nav-tab-hub-inbox', `${await url()} ${await tab()}`);
         await ev('history.back(); true');
         await atUrl('/agents');
         await until(`(document.querySelector('.top-nav-tab.active') || {}).id === 'nav-tab-agents'`, 'the Agents tab');
         check('Back again shows Agents', (await url()) === '/agents' && (await tab()) === 'nav-tab-agents', `${await url()} ${await tab()}`);
         await ev('history.forward(); true');
-        await atUrl('/chats');
+        await atUrl('/inbox/chats/all'); // the Inbox's folder path replaces /chats once the folder opens (#8652)
         await until(`(document.querySelector('.top-nav-tab.active') || {}).id === 'nav-tab-hub-inbox'`, 'the Chats tab');
-        check('Forward shows Chats', (await url()) === '/chats' && (await tab()) === 'nav-tab-hub-inbox', `${await url()} ${await tab()}`);
+        check('Forward shows Chats', (await url()) === '/inbox/chats/all' && (await tab()) === 'nav-tab-hub-inbox', `${await url()} ${await tab()}`);
 
         console.log('3. The Chats filters are the URL: a link, a reload, and Back from another tab');
         await open('/chats?q=routesqa');
@@ -101,6 +101,7 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
             ['#workflows', '/workflows', 'nav-tab-workflows'], ['#agents', '/agents', 'nav-tab-agents']]) {
             await open('/' + hash);
             await until(`(document.querySelector('.top-nav-tab.active') || {}).id === ${JSON.stringify(tabId)}`, tabId);
+            await until(`location.pathname === ${JSON.stringify(path)}`, path).catch(() => {}); // the Inbox notes its folder's path a moment after its tab opens
             check(`/${hash} is ${path}`, (await url()) === path && (await tab()) === tabId, `${await url()} ${await tab()}`);
         }
 
