@@ -42,8 +42,8 @@ for thinking (Claude's `thinking_tokens`, the difference of Codex's cumulative
 every row kept from before the model was in the key (the table was rebuilt with
 those rows under `""`, none lost or guessed). Each agent type and model also has a
 row with `thinking` `""` ("Not reported") for the rest of that model's usage:
-calls whose turn recorded no level, a CLI that writes none (agy, Pi), and
-everything from before levels were tracked. It is the model's total in `by_model`
+calls whose turn recorded no level, a CLI that writes no thinking level in its transcript (`agy`, `pi`), and
+everything from before levels were tracked. (Antigravity `agy` 1.4.7 writes `input_tokens`, `cache_read_tokens`, and `output_tokens` on `PLANNER_RESPONSE` entries in `~/.gemini/antigravity-cli/brain/<agy-conversation-id>/.system_generated/logs/transcript.jsonl` and `transcript_full.jsonl`, `internal/agent/agy.go` and `internal/jsonl/transcript_paths.go`, but `TokenPoller` in `internal/background/token_poller.go` currently polls `claude`, `codex`, and `pi` transcripts only.) It is the model's total in `by_model`
 less the tracked levels, and never the level an agent was launched with. The
 tracked rows with model `""` come out of the type's remainders (the model-less
 remainder first, then the models' largest first), so a type's rows add up to its
@@ -52,7 +52,7 @@ totals and nothing is counted twice or attributed to a model. By provider is
 
 A live session's `model` (the sidebar feed and `GET /api/sessions/live`) is the
 model the agent uses now: the transcript's latest (Claude, Codex), else the one
-agy's hooks last reported (`modelName`), else the one it was launched with.
+agy's hooks last reported (`modelName` on `SessionStart` and turn-opening `PreInvocation` in `cmd/coral-hook-agentic-state/main.go`), else the one it was launched with.
 `model_source` says which: `transcript`, `hook` or `launch`. The field is absent
 when none is known.
 

@@ -41,15 +41,15 @@ A hooks object maps event names to arrays of hook groups. Each group has an opti
 
 ## Events
 
-### Agent-Native Events (Claude only)
+### Agent-Native Events
 
-These events are handled natively by Claude Code via the settings.json hooks system. They fire inside the agent process and can intercept tool execution.
+These events fire inside the agent process. Claude Code reads user and Coral hooks from `settings.json` (`internal/agent/claude.go`); Antigravity (`agy`) reads Coral's `coral-hook-agentic-state --agy <event>` hooks (`SessionStart`, `PreInvocation`, `PreToolUse`, `PostToolUse`, `Stop`) from `<tmp>/coral_agyhooks_<session>_*/.agents/hooks.json` passed via `--add-dir` (`internal/agent/agy.go`, `cmd/coral-hook-agentic-state/main.go`); Codex receives Coral's `coral-hook-agentic-state` hooks (`SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`) via `-c hooks.<Event>=...` (`internal/agent/codex.go`). User-defined workflow and team `hooks` in `settings.json` format are injected into Claude sessions; for workflow steps on other agent types, `Stop`, `StepComplete`, and `StepFailed` are run by Coral's workflow runner.
 
 | Event | When it fires | Notes |
 |-------|---------------|-------|
-| `PreToolUse` | Before a tool executes | Exit code 2 blocks the tool call |
-| `PostToolUse` | After a tool executes | Use `matcher` to filter by tool name |
-| `Stop` | When the agent session stops | Also fired by Coral runner for Antigravity/Codex |
+| `PreToolUse` | Before a tool executes | Native in Claude (`settings.json`), Antigravity (`--add-dir` `.agents/hooks.json`), and Codex (`-c hooks.PreToolUse`); exit code 2 blocks the tool call in Claude |
+| `PostToolUse` | After a tool executes | Native in Claude, Antigravity, and Codex via `coral-hook-agentic-state`; use `matcher` to filter by tool name |
+| `Stop` | When the agent turn or session stops | Native in Claude, Antigravity, and Codex via `coral-hook-agentic-state`; also fired by Coral's workflow runner after a step process exits |
 | `Notification` | On notification events | Claude-only |
 | `SubagentStop` | When a subagent completes | Claude-only |
 
@@ -68,16 +68,16 @@ These events are managed by Coral's workflow runner. They work for all step type
 
 | Event | Claude | Antigravity (agy) | Codex | Shell Steps |
 |-------|--------|-------------------|-------|-------------|
-| `PreToolUse` | Native | -- | -- | -- |
-| `PostToolUse` | Native | -- | -- | -- |
-| `Stop` | Native | Runner-managed | Runner-managed | -- |
+| `PreToolUse` | Native | Native (`coral-hook-agentic-state` via `--add-dir`) | Native (`coral-hook-agentic-state` via `-c`) | -- |
+| `PostToolUse` | Native | Native (`coral-hook-agentic-state` via `--add-dir`) | Native (`coral-hook-agentic-state` via `-c`) | -- |
+| `Stop` | Native | Native (`coral-hook-agentic-state`) / Runner-managed (workflows) | Native (`coral-hook-agentic-state`) / Runner-managed (workflows) | -- |
 | `Notification` | Native | -- | -- | -- |
 | `SubagentStop` | Native | -- | -- | -- |
 | `StepComplete` | Runner-managed | Runner-managed | Runner-managed | Runner-managed |
 | `StepFailed` | Runner-managed | Runner-managed | Runner-managed | Runner-managed |
 
-**Native** means the agent CLI handles the hook internally (full tool-level granularity).
-**Runner-managed** means Coral's workflow runner executes the hook command after the process exits.
+**Native** means the agent CLI fires the hook inside its own lifecycle (for Antigravity, Coral writes `<tmp>/coral_agyhooks_<session>_*/.agents/hooks.json` and passes `--add-dir`, `internal/agent/agy.go`; for Codex, Coral passes `-c hooks.<Event>=...`, `internal/agent/codex.go`; user-defined `hooks` in team/workflow configs are injected into Claude's `settings.json`).
+**Runner-managed** means Coral's workflow runner executes the hook command after the step process exits.
 
 ---
 
@@ -225,15 +225,15 @@ curl -H "Authorization: Bearer $(coral api-key)" -X POST http://localhost:8420/a
 
 ## Coral System Hooks
 
-Coral automatically injects these hooks into every Claude session. They cannot be removed or overridden by user-defined hooks.
+Coral automatically injects system hooks into agent sessions so the dashboard tracks tool calls, turn boundaries, and state. They cannot be removed or overridden by user-defined hooks.
 
 The hook programs come from the folder Coral puts first on the agent's PATH: `CORAL_HOOK_DIR` when set, else next to the `coral` binary (the installed app's own folder for a release install). A dev or test server never falls back to the installed app's; its startup log names the folder (see Troubleshooting).
 
-| Hook | Event | Purpose |
-|------|-------|---------|
-| `coral-hook-task-sync` | PostToolUse (TaskCreate\|TaskUpdate) | Syncs task changes to Coral |
-| `coral-hook-agentic-state` | PostToolUse, Stop, Notification | Updates agent state in Coral UI |
-| `coral-hook-message-check` | PostToolUse | Checks for new board messages |
+| Hook | Agent Types | Events | Purpose |
+|------|-------------|--------|---------|
+| `coral-hook-task-sync` | Claude | `PostToolUse` (`TaskCreate\|TaskUpdate`) | Syncs task changes to Coral |
+| `coral-hook-agentic-state` | Claude, Antigravity (`agy`), Codex | Claude: `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `PermissionRequest`, `Elicitation`, `ElicitationResult`, `Stop`, `StopFailure`, `Notification`, `SessionEnd`<br>Antigravity (`--agy <event>` in `<tmp>/coral_agyhooks_<session>_*/.agents/hooks.json` via `--add-dir`, `internal/agent/agy.go`): `SessionStart`, `PreInvocation`, `PreToolUse`, `PostToolUse`, `Stop`<br>Codex (`-c hooks.<Event>=...`, `internal/agent/codex.go`): `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop` | Updates agent state, pending tools, model (`modelName` on `agy`), and activity timeline in Coral UI (`cmd/coral-hook-agentic-state/main.go`) |
+| `coral-hook-message-check` | Claude | `PostToolUse` | Checks for new board messages |
 
 ### Codex: trusting Coral's hooks
 
