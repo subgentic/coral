@@ -42,7 +42,9 @@ export async function buildAgentPick({ group, form, server, implicitDefault }) {
         input.name = 'launch-agent-pick';
         input.value = type;
         input.addEventListener('change', () => { if (!input.checked) return; chosen = true; select.value = type; select.dispatchEvent(new Event('change', { bubbles: true })); });
-        wrap.append(input, document.createTextNode(label));
+        const name = document.createElement('span'); name.className = 'launch-agent-name'; name.textContent = label;
+        const miss = document.createElement('span'); miss.className = 'launch-agent-missing'; // always there: the tile's second line is reserved, so the answer moves nothing (#8033)
+        wrap.append(input, name, miss);
         group.append(wrap);
         labels.set(type, wrap);
     }
@@ -53,8 +55,7 @@ export async function buildAgentPick({ group, form, server, implicitDefault }) {
     const found = await Promise.all(TYPES.map(([t]) => Promise.race([probe(server, t), new Promise(r => setTimeout(() => r(null), PROBE_MS))])));
     if (group._pickToken !== token || !group.isConnected) return; // another New Agent opened meanwhile
     TYPES.forEach(([type], i) => {
-        if (found[i] !== false || labels.get(type).querySelector('.launch-agent-missing')) return;
-        const miss = document.createElement('span'); miss.className = 'launch-agent-missing'; miss.textContent = ' not installed'; labels.get(type).append(miss);
+        if (found[i] === false) labels.get(type).querySelector('.launch-agent-missing').textContent = ' not installed';
     });
     const order = TYPES.map((_, i) => i).sort((a, b) => (found[b] === true) - (found[a] === true) || a - b); // installed first, then the rest as they were
     if (!chosen && !group.contains(document.activeElement)) for (const i of order) group.append(labels.get(TYPES[i][0])); // moving a label would drop the keyboard from it: only when nobody is on the group
