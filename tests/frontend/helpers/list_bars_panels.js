@@ -87,7 +87,7 @@ PANELS.push({
         await pick(ctx, '#sv-kind', 'agent');
         await ctx.settle(`!!document.querySelector('#saved-bar .list-bar-chip')`, 'a chip');
         await openMenu(ctx, '#saved-bar');
-        return { roots: ['#agentic-panel-saved'], focus: ['#sv-search', '#saved-bar .list-bar-filter-btn'] };
+        return { roots: ['#agentic-panel-saved'], focus: ['#sv-search', '#saved-bar .list-bar-toggle'] };
     },
 });
 
