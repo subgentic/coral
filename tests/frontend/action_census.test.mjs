@@ -120,7 +120,6 @@ const NOT_POPOUT_RELEVANT = new Map(Object.entries({
     'theme-delete': 'theme editor (top bar only), after showConfirmModal',
     'theme-reset': 'theme editor: reverts unsaved colour edits',
     'wf-delete': 'Workflows view (dashboard nav only), after confirm',
-    'wf-step-remove': 'removes a step from the workflow editor\'s unsaved draft',
     // QA's list: launch, import, save, apply settings (dialogs opened from the top bar, sidebar or views)
     'm-launch-session': 'launch dialog: starts a new agent',
     'm-launch-team': 'launch dialog: starts a new team',
@@ -140,7 +139,6 @@ const NOT_POPOUT_RELEVANT = new Map(Object.entries({
     'team-save': 'team settings: saves the team\'s settings',
     'theme-import': 'theme editor (top bar only)',
     'theme-save': 'theme editor (top bar only)',
-    'wf-save': 'Workflows view (dashboard nav only)',
 }));
 const RISKY = /(^|-)(restart|kill|rename|delete|reset|remove|stop|cancel)(-|$)/;
 const MUST_REVIEW = /^m-launch-|(^|-)import(-|$)|(^|-)save(-|$)|^m-apply-settings$/;
