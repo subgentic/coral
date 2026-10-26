@@ -15,6 +15,7 @@ const BASE = require('./test_base').BASE;
         await ev(`localStorage.removeItem('coral.inbox.tab'); window.switchNavTab('hub-inbox'); true`);
         await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m => m.selectInboxTab('tasks')).then(() => true)`);
         await waitFor(`document.querySelectorAll('#group-table-view .dt-table tbody tr').length === 3 && document.getElementById('group-table-view').getClientRects().length > 0`, 'the three tasks', 10000);
+        await waitFor(`!!document.querySelector('#group-table-view .dt-box.dt-folded')`, 'the table has folded to its phone rows', 5000); // the fold is the table's own box: it settles after the first paint (#7868)
         const m = await ev(`(() => { const v = document.getElementById('group-table-view'), sel = v.querySelector('.view-list-select'), sc = v.querySelector('.dt-box'), back = v.querySelector('.group-table-back'), h = v.querySelector('#group-table-title');
             const rect = e => e ? e.getBoundingClientRect() : null; const b = rect(back), t = rect(h);
             return { select: sel && { h: Math.round(sel.getBoundingClientRect().height), top: Math.round(sel.getBoundingClientRect().top), current: sel.options[sel.selectedIndex].text.replace(/ \\(\\d+\\)$/, '') }, back: !!back, scroll: sc ? [sc.scrollWidth, sc.clientWidth] : null, page: [document.documentElement.scrollWidth, document.documentElement.clientWidth], backTop: b && Math.round(b.top), titleTop: t && Math.round(t.top), backH: b && Math.round(b.height), titleH: t && Math.round(t.height),
