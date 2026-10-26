@@ -28,6 +28,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             window.fetch = async (u, o = {}) => { const resp = await real(u, o); const url = new URL(String(u && u.url || u), location.origin), m = String((o && o.method) || 'GET').toUpperCase(); if (m !== 'GET') return resp;
                 let r = /^\\/api\\/board\\/[^/]+\\/tasks\\/(\\d+)$/.exec(url.pathname);
                 if (r && Number(r[1]) === ${parent}) { const j = await resp.clone().json(); j.follow_ups = [{ id: ${f1}, title: 'Fix what the review found', status: 'pending', assigned_to: 'dev' }, { id: ${f2}, title: 'Add the missing test', status: 'completed', assigned_to: 'dev' }]; return new Response(JSON.stringify(j), { status: resp.status, headers: { 'content-type': 'application/json' } }); }
+                if (r && Number(r[1]) === ${f1}) { const j = await resp.clone().json(); j.workflow = { ...(j.workflow || {}), parent_task_id: ${parent} }; return new Response(JSON.stringify(j), { status: resp.status, headers: { 'content-type': 'application/json' } }); }
                 r = /^\\/api\\/board\\/[^/]+\\/goals\\/(\\d+)$/.exec(url.pathname);
                 if (r && Number(r[1]) === ${goal}) { const j = await resp.clone().json(); if (window.__fuOpen) j.follow_ups_open = window.__fuOpen; return new Response(JSON.stringify(j), { status: resp.status, headers: { 'content-type': 'application/json' } }); }
                 return resp; }; return true; })()`);
@@ -44,6 +45,13 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(`document.querySelector('.team-task-followups .dt-primary').click(); true`);
             await waitFor(`/^#${f1} /.test((document.getElementById('team-task-title') || {}).textContent || '')`, `${label}: the follow-up's own page`, 8000);
             check(`${label}: a follow-up opens its own task page`, true);
+            await waitFor(`!!document.querySelector('.team-task-follow-up-of')`, `${label}: the follow-up's link to its parent`, 6000);
+            await waitFor(`/Build the thing/.test((document.querySelector('.team-task-follow-up-of') || {}).textContent || '')`, `${label}: the parent's title`, 6000);
+            check(`${label}: a follow-up's page says "Follow-up of task #${parent}: <title>"`, await ev(`document.querySelector('.team-task-follow-up-of').textContent`) === `Follow-up of task #${parent}: Build the thing`, await ev(`document.querySelector('.team-task-follow-up-of').textContent`));
+            await shot(`follow-up-of-${mobile ? 390 : 1280}`);
+            await ev(`document.querySelector('.team-task-follow-up-of button').click(); true`);
+            await waitFor(`/^#${parent} /.test((document.getElementById('team-task-title') || {}).textContent || '')`, `${label}: the parent's page`, 8000);
+            check(`${label}: the link opens the parent's page, which lists the follow-up`, await ev(`!!document.querySelector('.team-task-followups')`));
             await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'tasks', item: ${lonely} }); true`);
             await waitFor(`/^#${lonely} /.test((document.getElementById('team-task-title') || {}).textContent || '')`, `${label}: the other task`, 8000);
             check(`${label}: a task nobody followed up has no section`, await ev(`!document.querySelector('.team-task-followups')`));

@@ -333,6 +333,17 @@ function followUpsSection(task, ctx) {
     return sec;
 }
 
+/** "Follow-up of task #P: <title>" under a follow-up's state line (#7829): the parent's number at once (the task's own read carries workflow.parent_task_id), its title when the parent has been read; a link to the parent's page when the page can open one. */
+function followUpOfLine(parentId, ctx) {
+    const p = el('p', 'goals-note team-task-follow-up-of');
+    const label = `#${parentId}`;
+    const link = ctx.openTask ? el('button', 'team-link', label) : el('span', null, label);
+    if (ctx.openTask) { link.type = 'button'; link.addEventListener('click', () => ctx.openTask({ id: parentId })); }
+    p.append(document.createTextNode('Follow-up of task '), link);
+    readTask(ctx.project, parentId).then(parent => { if (parent && parent.title && link.isConnected) link.textContent = `${label}: ${parent.title}`; }).catch(() => { /* the number alone */ });
+    return p;
+}
+
 export function renderTaskPage(host, task, ctx, mode = 'view') {
     host.replaceChildren();
     host.setAttribute('aria-label', `Task ${task.id}`);
@@ -346,6 +357,8 @@ export function renderTaskPage(host, task, ctx, mode = 'view') {
     const word = taskStatusWord(task.status, task.review_requested || (task.workflow && task.workflow.completion_review));
     const line = el('div', 'goals-detail-line'); line.append(stateChip(word, statusClass(word)));
     page.append(back, h, line);
+    const parentId = task.workflow && Number(task.workflow.parent_task_id);
+    if (parentId > 0) page.append(followUpOfLine(parentId, ctx)); // a follow-up says which task it is the follow-up of (#7829)
     const bar = el('div', 'goals-pinbar');
     let focus = h;
     if (mode === 'edit') {
