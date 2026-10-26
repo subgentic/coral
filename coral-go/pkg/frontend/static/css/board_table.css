@@ -1,0 +1,84 @@
+/* The board as a table (#7921, goal #33; UI/UX's mock #7916). One row a message (an arrow, the sender, one line of the message, quiet tags, the time); a row opens in place to the whole
+   message in an 80-character column with its Reply, Copy link and More. The same message rows serve the Chat view: there the table's parts (the head, the tags, the actions, the day lines)
+   are not drawn. A narrow box (a phone, the agent dock) folds the row to two lines. board_table.js builds the parts. */
+
+.mb-messages-scroll { container: mbtable / inline-size; }
+.mb-messages-scroll:not(.mb-table) :is(.mb-row-toggle, .mb-row-tags-open, .mb-row-actions, .mb-row-replies, .mb-day) { display: none; }
+
+/* ── The controls: the pills at the left, the Table | Chat switch at the right ── */
+.mb-table-tools { display: flex; align-items: center; gap: 0.5rem 0.75rem; flex-wrap: wrap; padding: 0.25rem 0 0.5rem; }
+.mb-table-tools .mb-pills { flex: 1 1 auto; min-width: 0; }
+.mb-view-switch { display: inline-flex; margin-inline-start: auto; border: 1px solid var(--control-border); border-radius: var(--radius-md, 6px); overflow: hidden; }
+.mb-view-btn { min-height: 2rem; padding: 0 0.875rem; border: 0; background: var(--bg-secondary); color: var(--text-secondary); font: inherit; font-size: 0.8125rem; cursor: pointer; }
+.mb-view-btn + .mb-view-btn { border-inline-start: 1px solid var(--control-border); }
+.mb-view-btn[aria-pressed="true"] { background: var(--accent-dim); color: var(--text-on-accent); font-weight: 600; }
+@media (pointer: coarse) { .mb-view-btn { min-height: var(--control-touch-height, 44px); } }
+
+/* ── The table ── */
+.mb-table { padding: 0 0 0.75rem; }
+.mb-table .mb-message { display: block; margin: 0; padding: 0; border-radius: 0; border-bottom: 1px solid var(--border); }
+.mb-table .mb-queue-run { margin: 0; padding: 0.5rem 0.875rem; border-bottom: 1px solid var(--border); }
+
+/* The row's own header is the chat's: the table shows only the Select checkbox from it (the head says who and when, the actions are under the open message). */
+.mb-table .mb-message-header { position: absolute; inset: 0 auto auto 0; margin: 0; min-height: 2.25rem; padding-inline-start: 0.5rem; display: flex; align-items: center; z-index: 1; pointer-events: none; }
+.mb-table .mb-message-header > :not(.mb-select-checkbox) { display: none; }
+.mb-table .mb-message-header .mb-select-checkbox { pointer-events: auto; }
+.mb-table .mb-message:has(.mb-select-checkbox) .mb-row-toggle { padding-inline-start: 2.25rem; }
+
+/* The head: ONE button, so a row is one Tab stop; its name is the sender, the words and the tags. */
+.mb-row-toggle { display: grid; grid-template-columns: 0.875rem 1.25rem 11rem minmax(0, 1fr) auto 3.5rem; align-items: center; gap: 0.5rem 0.875rem; width: 100%; min-height: 2.25rem; padding: 0.375rem 0.875rem; border: 0; border-radius: 0; background: none; color: var(--text-primary); font: inherit; text-align: start; cursor: pointer; }
+.mb-row-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.mb-row-chev { width: 0; height: 0; border-style: solid; border-width: 0.3125rem 0 0.3125rem 0.4375rem; border-color: transparent transparent transparent var(--text-secondary); justify-self: center; }
+.mb-open > .mb-row-toggle .mb-row-chev { transform: rotate(90deg); }
+.mb-row-avatar { width: 1.25rem; height: 1.25rem; border-radius: 50%; display: grid; place-items: center; background: var(--mb-tint); color: var(--mb-color); font-size: 0.6875rem; font-weight: 700; line-height: 1; }
+.mb-row-who { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.875rem; font-weight: 600; }
+.mb-row-snippet { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8125rem; color: var(--text-secondary); }
+.mb-open > .mb-row-toggle .mb-row-snippet { visibility: hidden; } /* the whole message is under it */
+.mb-row-tags { display: flex; align-items: center; justify-content: flex-end; gap: 0.375rem; min-width: 0; }
+.mb-row-toggle .message-time { margin: 0; opacity: 1; font-size: 0.75rem; color: var(--text-secondary); text-align: end; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* The tags: quiet marks, never louder text. */
+.mb-row-tag, .mb-row-tags .mb-external-badge, .mb-row-tags-open .mb-external-badge { display: inline-flex; align-items: center; min-height: 1.25rem; padding: 0 0.4375rem; border: 1px solid var(--control-border); border-radius: 0.375rem; font-size: 0.6875rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap; background: none; }
+.mb-row-mention { border-radius: 999px; color: var(--link-text, var(--accent)); }
+.mb-row-mention.is-self { border-color: var(--accent); }
+.mb-row-task { font-variant-numeric: tabular-nums; }
+
+/* The open message: the whole text in an 80-character column; the head's snippet gives way to it. */
+.mb-table .mb-message:not(.mb-open) > :not(.mb-row-toggle):not(.mb-message-header) { display: none; }
+.mb-table .mb-message.mb-open { background: color-mix(in srgb, var(--accent) 8%, var(--bg-secondary)); }
+.mb-table .mb-message.mb-open > :not(.mb-row-toggle):not(.mb-message-header) { margin-inline: 3.0625rem 0.875rem; max-width: 80ch; }
+.mb-table .mb-message.mb-open > .mb-message-body { padding-top: 0.25rem; }
+.mb-row-tags-open { display: none; flex-wrap: wrap; gap: 0.375rem; padding-top: 0.5rem; }
+.mb-row-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; padding: 0.625rem 0 0.875rem; }
+.mb-row-btn { min-height: 1.75rem; padding: 0 0.625rem; font-size: 0.75rem; }
+.mb-row-replies { margin-block: 0.75rem 0; padding-inline-start: 0.75rem; border-inline-start: 2px solid var(--border); }
+.mb-row-replies-title { font-size: 0.75rem; color: var(--text-secondary); padding-bottom: 0.25rem; }
+.mb-row-reply { display: flex; gap: 0.5rem; align-items: baseline; width: 100%; min-height: 2rem; padding: 0.25rem 0; border: 0; background: none; color: var(--text-primary); font: inherit; font-size: 0.8125rem; text-align: start; cursor: pointer; }
+.mb-row-reply b { font-weight: 600; white-space: nowrap; }
+.mb-row-reply-time { color: var(--text-secondary); font-size: 0.75rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.mb-row-reply-words { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-secondary); }
+.mb-table .mb-message.mb-is-reply > .mb-row-toggle { padding-inline-start: 2.25rem; }
+
+/* The day lines stay at the top while their day's rows pass under them. */
+.mb-day { position: sticky; top: 0; z-index: 2; padding: 0.375rem 0.875rem; font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-secondary); background: var(--bg-primary); border-bottom: 1px solid var(--border); }
+
+/* The pills. */
+.mb-table[data-pill="questions"] > :is(.mb-message:not(.mb-q), .mb-queue-run, .mb-day),
+.mb-table[data-pill="mentions"] > :is(.mb-message:not(.mb-mine), .mb-queue-run, .mb-day) { display: none; }
+
+/* ── A narrow box (a phone, the dock): two lines a row, the tags with the open message ── */
+@container mbtable (max-width: 40rem) {
+    .mb-row-toggle { grid-template-columns: 0.875rem 1.25rem minmax(0, 1fr) auto; grid-template-areas: "chev avatar who time" ". snippet snippet snippet"; align-items: center; row-gap: 0.125rem; min-height: var(--control-touch-height, 44px); padding-block: 0.5rem; }
+    .mb-row-chev { grid-area: chev; }
+    .mb-row-avatar { grid-area: avatar; }
+    .mb-row-who { grid-area: who; }
+    .mb-row-toggle .message-time { grid-area: time; }
+    .mb-row-snippet { grid-area: snippet; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; white-space: normal; }
+    .mb-row-tags { display: none; }
+    .mb-open > .mb-row-toggle .mb-row-snippet { display: none; }
+    .mb-table .mb-message.mb-open > .mb-row-tags-open { display: flex; }
+    .mb-table .mb-message.mb-open > :not(.mb-row-toggle):not(.mb-message-header) { margin-inline: 0.875rem; max-width: none; }
+    .mb-row-btn { min-height: var(--control-touch-height, 44px); padding-inline: 0.875rem; }
+    .mb-row-reply { min-height: var(--control-touch-height, 44px); }
+    .mb-table .mb-message.mb-is-reply > .mb-row-toggle { padding-inline-start: 1.5rem; }
+}

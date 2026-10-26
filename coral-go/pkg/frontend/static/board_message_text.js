@@ -148,6 +148,15 @@ export function setBoardMentionNames(names) {
 }
 setBoardMentionNames([]);
 
+/** The members a text mentions, each once, in the order written, the way the author wrote them (the board table's tags). Code is not looked into: a mention in a code block is the code's, so a text with fences is read without them. */
+export function mentionedNames(text) {
+    const plain = String(text || '').replace(/```[\s\S]*?```/g, ' ').replace(/`[^`\n]*`/g, ' ');
+    if (!_mentionRe || !plain.includes('@')) return [];
+    const re = new RegExp(_mentionRe.source, _mentionRe.flags), out = [], seen = new Set();
+    for (let m = re.exec(plain); m; m = re.exec(plain)) { const k = m[2].toLowerCase(); if (!seen.has(k)) { seen.add(k); out.push(m[2]); } }
+    return out;
+}
+
 /** Wrap the member mentions in the text nodes under `root` (a fragment or an element) in place; true when anything changed. Skips code, pre, links and what is already a mention. */
 function wrapMentionsIn(root) {
     if (!_mentionRe) return false;

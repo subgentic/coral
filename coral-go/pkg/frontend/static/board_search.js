@@ -145,7 +145,8 @@ export function mountBoardSearch(host, project, hooks) {
         _status = null;
     }
     if (!_bar) {
-        _bar = buildListBar({ ...SPEC, moreNoun: 'board', more: [{ label: 'Jump to first message', run: () => _hooks.first() }, { label: 'Jump to latest message', run: () => _hooks.latest() }] }, run);
+        _bar = buildListBar({ ...SPEC, moreNoun: 'board', more: [{ label: 'Expand all', run: () => _hooks.expandAll() }, { label: 'Collapse all', run: () => _hooks.collapseAll() }, { label: 'Jump to first message', run: () => _hooks.first() }, { label: 'Jump to latest message', run: () => _hooks.latest() }] }, run);
+        for (const b of _bar.node.querySelectorAll('.list-bar-more-menu button')) if (b.textContent === 'Expand all' || b.textContent === 'Collapse all') b.dataset.tableOnly = '1'; // shown with the table (board_table.js applyView)
         _status = make('div', 'mb-search-status'); _status.hidden = true;
         _results = make('span', 'mb-search-results'); _results.setAttribute('role', 'status'); _results.setAttribute('aria-live', 'polite');
         const icon = (name, label, stepName) => { const b = make('button', 'list-bar-filter-btn mb-search-step'); b.type = 'button'; b.dataset.step = stepName; b.setAttribute('aria-label', label); b.title = label;
