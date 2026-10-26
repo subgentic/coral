@@ -44,7 +44,7 @@ export const HEALTH_KEYS = Object.keys(healthToValues({ ...HEALTH_DEFAULTS, held
 
 /** The fields of the Health check group. ctx: { members: () => Promise<[{ subscriber_id, job_title }]>, hasHeld: () => bool, monitorOff: () => bool, onReset(view), openSettings() }. */
 export function healthFields(ctx) {
-    const minutes = (key, label, unit, ruleOn) => ({ key, type: 'number', label, unit, min: LO, max: HI, integer: true, disabledWhen: v => !v[ruleOn] });
+    const minutes = (key, label, unit, ruleOn) => ({ key, type: 'number', label, unit, min: LO, max: HI, integer: true, compact: true, disabledWhen: v => !v[ruleOn] });
     return [
         { key: 'health_global_off', type: 'notice', visibleWhen: () => ctx.monitorOff(), render: slot => {
             const note = document.createElement('p'); note.className = 'sv-help health-global-off'; note.setAttribute('role', 'status');
@@ -54,7 +54,7 @@ export function healthFields(ctx) {
             note.append(link, '. It takes effect after Coral restarts.'); slot.append(note);
         } },
         { key: 'on', type: 'toggle', label: 'Send health check', help: 'Checks on stuck or idle agents. Uses tokens each time.' },
-        { key: 'interval_min', type: 'number', label: 'Check every', unit: 'minutes', min: LO, max: HI, integer: true, disabledWhen: v => !v.on },
+        { key: 'interval_min', type: 'number', label: 'Check every', unit: 'minutes', min: LO, max: HI, integer: true, compact: true, disabledWhen: v => !v.on },
         { key: 'recipient', type: 'select', label: 'Send it to', disabledWhen: v => !v.on, options: async () => {
             const members = await ctx.members();
             return [{ value: '', label: 'The orchestrator (default)' }, ...members.map(m => ({ value: m.subscriber_id, label: `${m.subscriber_id}${m.job_title ? ` (${m.job_title})` : ''}` }))];
@@ -67,7 +67,7 @@ export function healthFields(ctx) {
         { key: 'health_rules', type: 'heading', label: 'Automatic rules', help: 'Run only while the health check is on.' },
         { key: 'claim_nudge_on', type: 'toggle', label: 'Nudge an idle agent to claim its work', help: 'An agent that is idle with ready work gets a reminder; past the count, the orchestrator is told.' },
         minutes('claim_nudge_after_min', 'After', 'minutes idle', 'claim_nudge_on'),
-        { key: 'claim_nudge_nudges', type: 'number', label: 'Nudges before telling the orchestrator', unit: 'nudges', min: N_LO, max: N_HI, integer: true, disabledWhen: v => !v.claim_nudge_on },
+        { key: 'claim_nudge_nudges', type: 'number', label: 'Nudges before telling the orchestrator', unit: 'nudges', min: N_LO, max: N_HI, integer: true, compact: true, disabledWhen: v => !v.claim_nudge_on },
         { key: 'status_nudge_on', type: 'toggle', label: 'Ask a quiet agent for a status', help: 'An agent that has done nothing for a while is asked where it stands; if it stays quiet, the orchestrator is told.' },
         minutes('status_nudge_after_min', 'Ask after', 'minutes quiet', 'status_nudge_on'),
         minutes('status_nudge_escalate_after_min', 'Tell the orchestrator', 'minutes later', 'status_nudge_on'),
@@ -76,12 +76,13 @@ export function healthFields(ctx) {
         { ...minutes('held_notice_after_min', 'After', 'minutes held', 'held_notice_on'), visibleWhen: () => ctx.hasHeld() },
         { key: 'mention_renudge_on', type: 'toggle', label: 'Remind the orchestrator of an unanswered mention', help: 'A message that @mentions the orchestrator and has had no reply gets a reminder.' },
         minutes('mention_renudge_after_min', 'After', 'minutes', 'mention_renudge_on'),
+        { key: 'health_offbooks', type: 'heading', label: 'Work done off the books', help: 'Named to the orchestrator in the next health check, once each.' },
         { key: 'busy_no_task_on', type: 'toggle', label: 'Tell the orchestrator about an agent working with no task', help: 'An agent that has been working for a while with no task in progress is named in the next health check, once.' },
         minutes('busy_no_task_after_min', 'Working with no task for', 'minutes', 'busy_no_task_on'), // a short unit: a longer one runs past the edge of a phone at 200% text
         { key: 'post_no_task_on', type: 'toggle', label: 'Tell the orchestrator about a commit posted with no task', help: 'A commit, SHA or patch posted on the board with no task number, by an agent with no task in progress, is named in the next health check, once.' },
-        { key: 'upload_no_task_on', type: 'toggle', label: 'Tell the orchestrator about an artifact uploaded with no task', help: 'An artifact uploaded by an agent with no task in progress (and not sent with --no-task) is named in the next health check, once.' },
+        { key: 'upload_no_task_on', type: 'toggle', label: 'Tell the orchestrator about an artifact uploaded with no task', help: 'An artifact uploaded by an agent with no task in progress (and not marked as having no task) is named in the next health check, once.' },
         { key: 'goal_size_on', type: 'toggle', label: 'Tell the orchestrator when a goal has too many tasks', help: 'A goal that is not closed and has more tasks than the limit (open and done together) is named in the next health check, and again at each further limit.' },
-        { key: 'goal_size_limit', type: 'number', label: 'More than', unit: 'tasks in a goal', min: G_LO, max: G_HI, integer: true, disabledWhen: v => !v.goal_size_on },
+        { key: 'goal_size_limit', type: 'number', label: 'More than', unit: 'tasks in a goal', min: G_LO, max: G_HI, integer: true, compact: true, disabledWhen: v => !v.goal_size_on },
         { key: 'health_questions', type: 'heading', label: 'Questions', help: 'Works whether or not the health check is on.' },
         { key: 'ask_reminder_on', type: 'toggle', label: 'Remind about unanswered questions', help: 'When an agent asks a question and the member it asks has not answered, remind that member once.' },
         minutes('ask_reminder_after_min', 'After', 'minutes', 'ask_reminder_on'),
