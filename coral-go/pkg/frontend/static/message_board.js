@@ -28,7 +28,7 @@ import { mountBoardSearch, highlightBoard, setBoardMembers, resetBoardSearch } f
 import { PAGE_SIZE, fetchAllBoardMessages, fetchAllHistory, fetchAllLiveChat, fetchMessages, fetchProjects, fetchSubscribers, mergeMessages } from './board_fetch.js';
 import { navigateToAgentSession } from './board_agent_links.js';
 import { initGrowingTextarea } from './growing_textarea.js';
-import { onRowActions, boardView, saveBoardView, rowParts, toggleRow, setAllRows, refreshReplies, retagMentions, applyView, mountTableTools, forgetOpenRows, sameDay, dayDividerHtml, watchFold } from './board_table.js'; // the board as a table (#7921)
+import { onRowActions, boardView, saveBoardView, rowParts, toggleRow, setAllRows, refreshReplies, retagMentions, revealRow, applyView, mountTableTools, forgetOpenRows, sameDay, dayDividerHtml, watchFold } from './board_table.js'; // the board as a table (#7921)
 export { fetchAllBoardMessages, fetchAllHistory, fetchAllLiveChat } from './board_fetch.js';
 import { connectBoard, isSelectMode, isSelected, resetSelection, toggleMessageSelect, doExportBoard, hideExportBoardModal, selectAllMessages, selectNoneMessages, exportSelectedAsMarkdown, cancelSelectMode } from './board_export.js';
 export { showExportBoardModal, doExportBoard, toggleSelectMode, toggleMessageSelect, selectAllMessages, selectNoneMessages, cancelSelectMode, exportSelectedAsMarkdown } from './board_export.js';
@@ -523,13 +523,15 @@ function prependEarlier(container, count) {
 }
 
 // The jump's landing: the message in the middle of the board with the focus on it (Save for Later's jump and the search's, #4510, #4771); the one before it loses its mark.
-function revealMessage(target) {
+/** instant: the jump came after pages were loaded above it (the rows moved under it, a smooth scroll would be cut short by the page's own scroll adjustments, and a row near the top loads one more page): it lands at once. */
+function revealMessage(target, instant = false) {
     for (const old of document.querySelectorAll('#mb-messages .chat-search-target')) if (old !== target) old.classList.remove('chat-search-target');
     const run = target.closest('details');
     if (run) run.open = true; // a task-queue line inside a collapsed row
     if (target.classList.contains('mb-message')) toggleRow(target, true); // a jump (a search hit, a saved message, a link) lands on the whole message
     target.classList.add('chat-search-target');
-    target.scrollIntoView({ block: 'center', behavior: scrollBehavior() });
+    if (target.classList.contains('mb-message') && target.parentElement && target.parentElement.classList.contains('mb-table')) revealRow(target, instant ? 'auto' : scrollBehavior());
+    else target.scrollIntoView({ block: 'center', behavior: instant ? 'auto' : scrollBehavior() });
     target.setAttribute('tabindex', '-1'); // the focus goes to the message
     target.focus({ preventScroll: true });
 }
@@ -660,7 +662,7 @@ function renderMessages(messages, { keepAnchor = false, prepended = 0 } = {}) {
     if (pendingMessageId) {
         const target = container.querySelector(`[data-message-id="${CSS.escape(pendingMessageId)}"]`);
         if (target) {
-            revealMessage(target);
+            revealMessage(target, true);
             pendingMessageId = null;
             highlightBoard(container);
             return; // the jump decides the scroll position

@@ -12,6 +12,7 @@ assert.equal(snippetOf('## Heading\n\nSome **bold** and `code` with [a link](htt
 assert.equal(snippetOf('Run #7740 is green'), 'Run #7740 is green', 'a task number keeps its #');
 assert.equal(Array.from(snippetOf('é'.repeat(500))).length, 300, 'cut by characters');
 assert.equal(snippetOf(null), '');
+assert.equal(snippetOf('## Report 7\n\nA table:\n\n| name | value |\n|------|-------|\n| a | 1 |\n\n---\n\nAnd the end.'), 'Report 7 A table: And the end.', 'a Markdown table and a rule are no words');
 
 assert.deepEqual(taskRefs('See #7740, #7757 and #7740 again; not C#, not a#b, not http://x/#12, not #123456789'), ['7740', '7757']);
 assert.deepEqual(taskRefs('```\n#99\n```'), []);

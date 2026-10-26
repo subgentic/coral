@@ -33,6 +33,8 @@ function avatarColor(name) {
 export function snippetOf(content) {
     const text = String(content || '')
         .replace(/```[\s\S]*?```/g, ' ')
+        .replace(/^[ \t]*\|.*$/gm, ' ') // a Markdown table's lines (the pipes and dashes are no words)
+        .replace(/^[ \t]*(?:[-*_][ \t]*){3,}$/gm, ' ')
         .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
         .replace(/(^|\n)\s{0,3}#{1,6}\s+/g, '$1')
         .replace(/[`*_>~]+/g, '')
@@ -283,6 +285,19 @@ function keepBelowDay(row) {
     const floor = (line ? line.getBoundingClientRect().bottom : edge) + 8;
     const top = row.getBoundingClientRect().top;
     if (top < floor) box.scrollTop -= floor - top;
+}
+
+/** Scroll a row into view for a jump (a search hit, a saved message, a link). A row shorter than the box is centred; an open message taller than the box starts 8 px below the sticky day line, so the sender and
+ * the first lines are what is seen (centred, the middle of a long message was, with its head under the line). behavior is the page's own (smooth, or instant for reduced motion). */
+export function revealRow(row, behavior = 'auto') {
+    const box = row.parentElement;
+    if (!box) return;
+    const b = box.getBoundingClientRect(), r = row.getBoundingClientRect();
+    const line = box.querySelector(':scope > .mb-day');
+    const lineH = line ? line.getBoundingClientRect().height : 0;
+    const tall = r.height + lineH + 16 > box.clientHeight;
+    const want = tall ? (r.top - b.top) - lineH - 8 : (r.top - b.top) - (box.clientHeight - r.height) / 2;
+    box.scrollTo({ top: Math.max(0, box.scrollTop + want), behavior });
 }
 
 const surfaces = [];
