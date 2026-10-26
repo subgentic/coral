@@ -41,12 +41,12 @@ const BASE = require('./test_base').BASE;
                 const wrapper = row.querySelector('.board-task-status-wrap');
                 return {
                     id: row.querySelector('.board-task-id')?.textContent.trim(),
-                    text: wrapper?.querySelector('.board-task-status-label')?.textContent.trim() || '',
+                    text: wrapper?.textContent.trim() || '',
                     title: wrapper?.getAttribute('title'),
                     aria: wrapper?.getAttribute('aria-label'),
                     tabIndex: wrapper?.tabIndex,
                     role: wrapper?.getAttribute('role'),
-                    label: Boolean(wrapper?.querySelector('.board-task-status-label')),
+                    label: Boolean(wrapper?.classList.contains('dt-chip')),
                     spinner: Boolean(wrapper?.querySelector('.task-spinner')),
                     hourglass: wrapper?.querySelector('.material-icons')?.textContent.trim() || '',
                     desc: row.querySelector('.board-task-desc')?.textContent.trim() || '',
@@ -60,16 +60,16 @@ const BASE = require('./test_base').BASE;
         assert.equal(working.title, 'Open · Working');
         assert.equal(working.aria, 'Open · Working');
         assert.equal(working.tabIndex, -1, 'the status is not a tab stop (#5813): its words are in the Open button\'s name');
-        assert.equal(working.role, 'img');
+        assert.equal(working.role, null);
         assert.equal(working.label, true);
-        assert.equal(working.spinner, true);
+        assert.equal(working.spinner, false);
         assert.equal(blocked.text, 'Blocked', 'a blocked task reads Blocked (#3170)');
         assert.equal(blocked.title, 'Blocked: waiting for prerequisites');
         assert.equal(blocked.aria, 'Blocked: waiting for prerequisites');
         assert.equal(blocked.tabIndex, -1, 'the status is not a tab stop (#5813): its words are in the Open button\'s name');
-        assert.equal(blocked.role, 'img');
+        assert.equal(blocked.role, null);
         assert.equal(blocked.label, true);
-        assert.equal(blocked.hourglass, 'hourglass_empty');
+        assert.equal(blocked.hourglass, '');
         assert.equal(blocked.badge, false);
 
         const finished = status.find(row => row.id === '#1499');

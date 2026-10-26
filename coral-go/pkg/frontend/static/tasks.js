@@ -136,13 +136,11 @@ registerTaskView({ renderBoardTaskList, hideTaskDetailModal });
 // the same function the inline handler did, after checking its values (a bad one does nothing).
 // Cancelling and completing a task still go through their confirm footers (task-cancel shows
 // "Yes, Cancel"; task-complete shows the completion form), as before.
-const TASK_SORTS = new Set(['id', 'priority', 'type', 'assignee', 'created_at', 'cost']);
 const openTaskPage = (id, board = _getBoardProject()) => { if (board) window.openTeamPage?.(board, { tab: 'tasks', item: id }); };
 const depContainer = el => { const id = tokenOf(el.dataset.container); return id ? document.getElementById(id) : null; };
 registerActions({
     'task-close': () => window.hideTaskDetailModal(),
     'task-hide-done': () => _toggleHideCompleted(),
-    'task-sort': el => { if (TASK_SORTS.has(el.dataset.sort)) window.__coral._toggleTaskSort(el.dataset.sort); },
     'task-open': el => withId(el.dataset.taskId, id => (el.dataset.kind === 'agent' ? window.showAgentTaskDetailModal(id) : openTaskPage(id))), // an agent's own task is the dialog's; a board's is the team page's task page (#7644)
     'task-subagent-open': el => { const sid = textOf(el.dataset.subagentId); if (sid) showSubagentDetailModal(sid); },
     'task-load-more': () => window.loadMoreBoardTasks(),

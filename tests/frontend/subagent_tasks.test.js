@@ -84,12 +84,12 @@ async function run() {
     await settledHtml('#board-task-list', 'the task list'); };
   const rows = () => ev(`Array.from(document.querySelectorAll('#board-task-list .board-task-item:not(.board-task-header)')).map(el => { const q = s => el.querySelector(s); const cs = getComputedStyle(el);
     return { sub: el.classList.contains('board-task-subagent'), classes: el.className, subagentId: el.dataset.subagentId || null,
-      type: (q('.board-task-type')||{}).textContent, typeIsChip: !!q('.board-task-type-subagent'), typeIcon: (q('.board-task-type-subagent .material-icons')||{}).textContent || null, typeTitle: q('.board-task-type') ? q('.board-task-type').getAttribute('title') : null,
-      badge: (q('.board-task-subagent-badge')||{}).textContent || null, desc: (q('.board-task-desc')||{}).textContent, descHasImg: !!q('.board-task-desc img'), tooltip: q('.board-task-desc') ? q('.board-task-desc').getAttribute('title') : null,
-      assignee: (q('.board-task-assignee')||{}).textContent, cost: (q('.board-task-cost')||{}).textContent.trim(), costLive: !!q('.board-task-cost-live'),
-      spinner: !!q('.task-spinner'), icon: (q('.board-task-status-icon')||{}).textContent || null, clickable: el.getAttribute('data-on-click') === 'task-subagent-open' || el.hasAttribute('onclick'),
-      descW: q('.board-task-desc') ? q('.board-task-desc').getBoundingClientRect().width : 0, rowW: el.getBoundingClientRect().width, listScrollW: document.getElementById('board-task-list').scrollWidth,
-      boxShadow: cs.boxShadow, bgImage: cs.backgroundImage, chipColor: q('.board-task-type') ? getComputedStyle(q('.board-task-type')).color : null }; })`);
+      type: (q('.board-task-source')||{}).textContent, typeIsChip: !!q('.board-task-source.dt-tag'), typeIcon: (q('.board-task-type-subagent .material-icons')||{}).textContent || null, typeTitle: q('.board-task-source') ? q('.board-task-source').getAttribute('title') : null,
+      badge: (q('.dt-subtitle')||{}).textContent || null, desc: (q('.board-task-desc')||{}).textContent, descHasImg: !!q('.board-task-desc img'), tooltip: q('.board-task-desc') ? q('.board-task-desc').getAttribute('title') : null,
+      assignee: (q('.board-task-assignee')||{}).textContent, cost: (q('.board-task-cost')||{}).textContent.trim(), costLive: !!q('.dt-estimate'),
+      spinner: !!q('.task-spinner'), icon: (q('.board-task-status-wrap')||{}).textContent || null, clickable: el.getAttribute('data-on-click') === 'task-subagent-open' || el.hasAttribute('onclick'),
+      descW: q('.board-task-desc') ? q('.board-task-desc').closest('td').getBoundingClientRect().width : 0, rowW: el.getBoundingClientRect().width, listScrollW: document.getElementById('board-task-list').scrollWidth,
+      boxShadow: cs.boxShadow, bgImage: cs.backgroundImage, chipColor: q('.board-task-source') ? getComputedStyle(q('.board-task-source')).color : null }; })`);
   const bySub = (rs, id) => rs.find(r => r.subagentId === id);
 
   // ── Agent A: subagents mixed into the task list ──
@@ -103,21 +103,18 @@ async function run() {
   const task = rs.find(r => !r.sub && r.type === 'agent');
   check('every subagent row found by data-subagent-id', !!(done && running && bare));
 
-  // Flair
-  check('subagent row: violet left rail', /163,\s*113,\s*247/.test(done.boxShadow) && /inset/.test(done.boxShadow), done.boxShadow);
-  check('subagent row: tinted gradient background', /gradient/.test(done.bgImage), done.bgImage);
-  check('subagent type chip with icon', done.typeIsChip && done.typeIcon === 'account_tree' && /sub/.test(done.type), `${done.typeIcon} / ${done.type}`);
-  check('type chip is violet', /163,\s*113,\s*247/.test(done.chipColor), done.chipColor);
+  // Shared table styling; the type tag and subtitle carry the subagent metadata.
+  check('subagent type tag', done.typeIsChip && /sub/.test(done.type), done.type);
   check('type chip names the launching agent', done.typeTitle === 'Subagent launched by Lead Dev', done.typeTitle);
   check('subagent-type badge', done.badge === 'Explore' && running.badge === 'Plan', `${done.badge}, ${running.badge}`);
-  check('ordinary task has none of it', !task.sub && !task.typeIsChip && !task.badge && task.type === 'agent' && task.boxShadow === 'none', `${task.type} / ${task.boxShadow}`);
+  check('ordinary task has none of it', !task.sub && task.typeIsChip && !task.badge && task.type === 'agent' && task.boxShadow === 'none', `${task.type} / ${task.boxShadow}`);
 
   // Layout: the description must survive the default (narrow) panel width.
   check('description column keeps a readable width', done.descW >= 160 && task.descW >= 160, `sub=${done.descW} task=${task.descW}`);
   check('row fits within the full scrollable width (rail and tint are not cut off)', done.rowW <= done.listScrollW + 1, `row=${done.rowW} list=${done.listScrollW}`);
 
   // Content
-  check('description is the title', done.desc === 'ExploreMap Coral task-board UI code', done.desc);
+  check('description is the title', done.desc === 'Map Coral task-board UI code', done.desc);
   check('assigned to the launching main agent', done.assignee === 'Lead Dev' && running.assignee === 'Lead Dev', done.assignee);
   check('tooltip: type, model, calls, tokens', /Subagent \(Explore\)/.test(done.tooltip) && /claude-opus-5/.test(done.tooltip) && /25 API calls/.test(done.tooltip) && /tokens/.test(done.tooltip), done.tooltip);
   check('tooltip singular "1 API call"', /1 API call(?!s)/.test(running.tooltip), running.tooltip);
@@ -126,9 +123,9 @@ async function run() {
   check('subagent rows are clickable', done.clickable && running.clickable && bare.clickable);
 
   // Status + spend
-  check('completed: check icon, final cost', done.icon === 'check_circle' && !done.spinner && done.cost === '$7.42' && !done.costLive, `${done.icon} ${done.cost}`);
-  check('running: spinner, live ~cost', running.spinner && running.cost === '~$0.31' && running.costLive, `${running.cost}`);
-  check('stopped: skipped icon, no cost', bare.icon === 'cancel' && bare.cost === '', `${bare.icon} "${bare.cost}"`);
+  check('completed: check icon, final cost', done.icon === 'Finished' && !done.spinner && done.cost === '$7.42' && !done.costLive, `${done.icon} ${done.cost}`);
+  check('running: spinner, live ~cost', running.icon === 'Open' && running.cost === '~$0.31' && running.costLive, `${running.cost}`);
+  check('stopped: skipped icon, no cost', bare.icon === 'Cancelled' && bare.cost === '—', `${bare.icon} "${bare.cost}"`);
   check('count badge counts subagents', (await ev(`document.getElementById('task-bar-count').textContent`)) === '2/5', await ev(`document.getElementById('task-bar-count').textContent`));
 
   // Escaping
@@ -220,8 +217,8 @@ async function run() {
   // ── Live update via the poll, with the modal open ──
   await ev(`window.__subagents[${JSON.stringify(A)}][1] = { ...window.__subagents[${JSON.stringify(A)}][1], finished: true, status: 'completed', cost_usd: 1.25, last_activity_at: '2026-09-17T02:25:30Z' }; window.__details.b7running00000000.result = 'The design is done.'; window.__detailFetches.length = 0; true`);
   let flipped = null;
-  for (let i = 0; i < 100; i++) { await sleep(50); flipped = bySub(await rows(), 'b7running00000000'); if (flipped && !flipped.spinner) break; }
-  check('poll refreshes the row without user action', flipped && !flipped.spinner && flipped.icon === 'check_circle' && flipped.cost === '$1.25', flipped && `${flipped.icon} ${flipped.cost}`);
+  for (let i = 0; i < 100; i++) { await sleep(50); flipped = bySub(await rows(), 'b7running00000000'); if (flipped && flipped.icon === 'Finished') break; }
+  check('poll refreshes the row without user action', flipped && !flipped.spinner && flipped.icon === 'Finished' && flipped.cost === '$1.25', flipped && `${flipped.icon} ${flipped.cost}`);
   await until(`/The design is done\\./.test(document.getElementById('task-detail-content').textContent)`, 'the finished result in the open modal');
   m = await modal();
   check('open modal follows: completed, final cost, duration', m.open && m.status === 'Completed' && m.cost === '$1.25' && !m.costLive && m.fields['Duration'] === '5m 30s', JSON.stringify([m.status, m.cost, m.fields['Duration']]));

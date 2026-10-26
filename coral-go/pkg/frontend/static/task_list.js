@@ -5,24 +5,20 @@ import { platform } from './platform/detect.js';
 import { loadSubagents, _claimedFor, _subagentTooltip, subagentToTaskRow } from './subagents.js';
 import { _currentBoardKey, agentTaskScope } from './task_board_context.js';
 import { pathId, boardFetch, serverFetch, serverForSession, fetchValidated, dropBody, isCloud, serverUrl, splitKey } from './server_base.js';
-import { EMPTY as TASK_EMPTY, isQuery, loadFilters as loadTaskFilters, phases as taskPhases, toParams as taskParams, saveFilters as saveTaskFilters } from './task_filters.js';
+import { EMPTY as TASK_EMPTY, SORT_LABEL as taskSortLabel, isQuery, loadFilters as loadTaskFilters, phases as taskPhases, toParams as taskParams, saveFilters as saveTaskFilters } from './task_filters.js';
 import { browserLocal } from './safe_storage.js';
-import { showToast, escapeHtml, escapeAttr } from './utils.js';
+import { showToast, escapeHtml } from './utils.js';
 import { buildTaskBar } from './task_bar.js';
 import { loadPanelOpen, savePanelOpen } from './list_bar.js';
-import { _priorityOrder, _formatCost, _formatTaskTime, _priorityLabel, formatTaskDate, _agentTaskStatus } from './task_format.js';
+import { _priorityOrder, _formatCost, _formatTaskTime, _priorityLabel, _agentTaskStatus } from './task_format.js';
 import { morphHtml } from './dom_morph.js';
 import { _verifyMark } from './task_verify_marks.js';
 import { goalTitle, refreshGoalTitles } from './task_goals.js';
+import * as DT from './data_table.js';
+
+const dockTaskTableState = DT.tableState();
 
 let _goalBoard = ''; // the board whose goal titles the chips read (the one the list was last loaded for)
-
-/** A quiet chip naming the task's goal on its row (#7253): nothing for a task with no goal or a goal whose title is not read yet. */
-function _goalChip(t) {
-    if (!t || !t.goal_id || t._source === 'agent' || t._source === 'subagent') return '';
-    const title = goalTitle(_goalBoard, t.goal_id);
-    return title ? ` <span class="board-task-goal" title="Goal"><span class="sr-only">Goal: </span>${escapeHtml(title)}</span>` : '';
-}
 
 // ── Board task polling ───────────────────────────────────────────────
 export let _boardTaskPollTimer = null;
@@ -506,53 +502,29 @@ function _renderTaskListChrome(section, completedCount, querying = false) {
     if (headerLabel && headerLabel.textContent !== 'Tasks') headerLabel.textContent = 'Tasks';
 }
 
-/** The table header, with the sort arrow on the column in use. */
-function _taskListHeaderHtml() {
-    const arrow = (field) => _taskSortExplicit && _taskSortField === field ? (_taskSortAsc ? ' ▲' : ' ▼') : ''; // the default order shows no arrow (#4737)
-
-    const header = `
-        <div class="board-task-item board-task-header">
-            <span class="board-task-status-col">Status</span>
-            <span class="board-task-id board-task-sort" role="button" tabindex="0" data-key-click data-on-click="task-sort" data-sort="id">ID${arrow('id')}</span>
-            <span class="board-task-priority board-task-sort" role="button" tabindex="0" data-key-click data-on-click="task-sort" data-sort="priority">Priority${arrow('priority')}</span>
-            <span class="board-task-type board-task-sort" role="button" tabindex="0" data-key-click data-on-click="task-sort" data-sort="type">Type${arrow('type')}</span>
-            <span class="board-task-assignee board-task-sort" role="button" tabindex="0" data-key-click data-on-click="task-sort" data-sort="assignee">Agent${arrow('assignee')}</span>
-            <span class="board-task-desc board-task-sort" role="button" tabindex="0" data-key-click data-on-click="task-sort" data-sort="created_at">Task${arrow('created_at')}</span>
-            <span class="board-task-cost board-task-sort" role="button" tabindex="0" data-key-click data-on-click="task-sort" data-sort="cost">Cost${arrow('cost')}</span>
-            <span class="board-task-time board-task-sort" role="button" tabindex="0" data-key-click data-on-click="task-sort" data-sort="created_at">Created${arrow('created_at')}</span>
-        </div>`;
-    return header;
-}
-
 /** A row's status icon and label. */
 function _taskStatus(t) {
-    const statusWrap = (className, detail, icon, label) => ({ className, detail, icon, label });
+    const statusWrap = (className, detail, label) => ({ className, detail, label });
     const activelyClaimed = t.status === 'in_progress' && Boolean(t.claimed_at);
     const workingDetail = activelyClaimed ? 'Claimed · Working' : 'Open · Working';
     const statusIcon = (t.outcome || t.workflow?.outcome) === 'failed'
-        ? statusWrap('completed', 'Finished', '<span class="material-icons board-task-status-icon completed" aria-hidden="true">check_circle</span>', 'Finished')
+        ? statusWrap('completed', 'Finished', 'Finished')
         : t.status === 'completed'
-        ? statusWrap('completed', 'Finished', '<span class="material-icons board-task-status-icon completed" aria-hidden="true">check_circle</span>', 'Finished')
+        ? statusWrap('completed', 'Finished', 'Finished')
         : t.status === 'review_pending'
-        ? statusWrap('blocked', 'Open · Review pending', '<span class="material-icons board-task-status-icon blocked" aria-hidden="true">rate_review</span>', '<b>Review</b>')
+        ? statusWrap('blocked', 'Open · Review pending', 'Review')
         : _reviewRequested(t) && t.status === 'in_progress'
-        ? statusWrap('blocked', 'Open · Review requested', '<span class="material-icons board-task-status-icon blocked" aria-hidden="true">rate_review</span>', 'Open <b>· Review requested</b>')
+        ? statusWrap('blocked', 'Open · Review requested', 'Open · Review requested')
         : t.status === 'in_progress'
-        ? statusWrap('in-progress', workingDetail, '<span class="task-spinner" aria-hidden="true"></span>', activelyClaimed ? 'Claimed' : 'Open')
+        ? statusWrap('in-progress', workingDetail, activelyClaimed ? 'Claimed' : 'Open')
         : t.status === 'skipped'
-        ? statusWrap('cancelled', 'Cancelled', '<span class="material-icons board-task-status-icon cancelled" aria-hidden="true">cancel</span>', 'Cancelled')
+        ? statusWrap('cancelled', 'Cancelled', 'Cancelled')
         : t.status === 'blocked'
-        ? statusWrap('blocked', 'Blocked: waiting for prerequisites', '<span class="material-icons board-task-status-icon blocked" aria-hidden="true">hourglass_empty</span>', 'Blocked')
+        ? statusWrap('blocked', 'Blocked: waiting for prerequisites', 'Blocked')
         : t.status === 'draft'
-        ? statusWrap('pending', 'Open · Draft', '<span class="material-icons board-task-status-icon draft" aria-hidden="true">edit_note</span>', 'Open <b>· Draft</b>')
-        : statusWrap('pending', 'Open', '<span class="material-icons board-task-status-icon pending" aria-hidden="true">radio_button_unchecked</span>', 'Open');
+        ? statusWrap('pending', 'Open · Draft', 'Open · Draft')
+        : statusWrap('pending', 'Open', 'Open');
     return statusIcon;
-}
-
-/** The status cell. Not a tab stop (#5813): a focusable image is a known anti-pattern; the status is spoken as part of the row's Open button (_taskStatus(t).detail) and is its title for the mouse. */
-function _taskStatusIconHtml(t) {
-    const { className, detail, icon, label } = _taskStatus(t);
-    return `<span class="board-task-status-wrap ${className}" title="${escapeAttr(detail)}" aria-label="${escapeAttr(detail)}" role="img">${icon}<span class="board-task-status-label">${label}</span></span>`;
 }
 
 /** A row's cost text and class: a subagent's spend as it runs, an agent's or a finished task's, or a running task's live cost. */
@@ -564,76 +536,71 @@ function _taskRowCost(t, isAgent, isSubagent) {
         // live rather than waiting for completion like a board task.
         if (t.cost_usd > 0) {
             costText = (t.status === 'in_progress' ? '~' : '') + _formatCost(t.cost_usd, false);
-            if (t.status === 'in_progress') costClass += ' board-task-cost-live';
-            if (t.cost_usd >= 1.0) costClass += ' board-task-cost-warning';
+            if (t.status === 'in_progress') costClass += ' dt-estimate';
+            if (t.cost_usd >= 1.0) costClass += ' dt-cost-warning';
         }
     } else if (isAgent && t.cost_usd > 0) {
         costText = _formatCost(t.cost_usd, false);
-        if (t.cost_usd >= 1.0) costClass += ' board-task-cost-warning';
+        if (t.cost_usd >= 1.0) costClass += ' dt-cost-warning';
     } else if ((t.status === 'completed' || t.status === 'skipped') && t.cost_usd != null) {
         costText = _formatCost(t.cost_usd, false);
-        if (t.cost_usd >= 1.0) costClass += ' board-task-cost-warning';
+        if (t.cost_usd >= 1.0) costClass += ' dt-cost-warning';
     } else if (t.status === 'in_progress' && _liveCosts[t.id]) {
         const lc = _liveCosts[t.id];
         costText = '~' + _formatCost(lc.cost_usd, false);
-        costClass += ' board-task-cost-live';
-        if (lc.cost_usd >= 1.0) costClass += ' board-task-cost-warning';
+        costClass += ' dt-estimate';
+        if (lc.cost_usd >= 1.0) costClass += ' dt-cost-warning';
     }
     return { costText, costClass };
 }
 
-/** The rows of the table. */
-function _taskRowsHtml(tasks) {
-    const rows = tasks.map(t => {
-        const isAgent = t._source === 'agent';
-        const isSubagent = t._source === 'subagent';
-        const statusClass = t.status === 'completed' ? 'completed'
-            : t.status === 'in_progress' ? 'in-progress'
-            : t.status === 'skipped' ? 'cancelled'
-            : t.status === 'blocked' ? 'blocked'
-            : t.status === 'draft' ? 'draft' : '';
-        const priorityClass = t.priority ? 'board-task-priority-' + t.priority : 'board-task-priority-none';
-        const assignee = t.assigned_to || '\u2014';
-        const taskIdLabel = t.id != null ? `#${t.id}` : '\u2014';
-        const title = escapeHtml(t.title || t.description || '');
-        const tooltip = isSubagent ? ` title="${escapeAttr(_subagentTooltip(t))}"`
-            : (t.body || t.body_preview) ? ` title="${escapeAttr(t.body || t.body_preview)}"` : '';
-        const timeStr = _formatTaskTime(t.created_at);
-        const statusIcon = _taskStatusIconHtml(t);
-        const { costText, costClass } = _taskRowCost(t, isAgent, isSubagent);
-        // The row is not a button (#5813): a button holding other controls hides them from some screen readers and gives the row three tab stops. Its one keyboard control is the real button in the id
-        // cell (Enter or Space on it is a click, which bubbles to the row's action); a click anywhere else on the row still opens the task for the mouse. The subagent id stays in its
-        // data-subagent-id attribute; the action reads it from there.
-        const clickHandler = isSubagent ? ` data-on-click="task-subagent-open" style="cursor:pointer"`
-            : isAgent ? ` data-on-click="task-open" data-kind="agent" data-task-id="${Number(t.id)}" style="cursor:pointer"`
-            : ` data-on-click="task-open" data-kind="board" data-task-id="${Number(t.id)}" style="cursor:pointer"`;
-        // A board task's name is the row's one real button, as on the team page's Tasks tab (#7639); its id is text. An agent's task and a subagent keep the id as the button.
-        const toPage = !isAgent && !isSubagent;
-        const openLabel = `${isSubagent ? 'Open subagent' : `Open task ${taskIdLabel}`}: ${t.title || t.description || ''}, ${_taskStatus(t).detail}`;
-        const typeCell = isSubagent
-            ? `<span class="board-task-type board-task-type-subagent" title="Subagent launched by ${escapeAttr(assignee)}"><span class="material-icons" aria-hidden="true">account_tree</span>sub</span>`
-            : `<span class="board-task-type">${isAgent ? 'agent' : 'board'}</span>`;
-        const subagentBadge = isSubagent && t.subagent_type
-            ? `<span class="board-task-subagent-badge">${escapeHtml(t.subagent_type)}</span>` : '';
-        const claimedFor = !isAgent && !isSubagent ? _claimedFor(t) : null;
-        const claimedBadge = claimedFor
-            ? `<span class="board-task-claimed" title="Claimed ${escapeAttr(formatTaskDate(t.claimed_at))}"><span class="material-icons" aria-hidden="true">schedule</span>${claimedFor}</span>` : '';
-        // Blocked is conveyed by the status icon and its focusable detail;
-        // avoid repeating a red text badge in the task description column.
-        const blockedBadge = '';
-        return `
-        <div class="board-task-item ${statusClass}${isSubagent ? ' board-task-subagent' : ''}"${clickHandler}${isSubagent ? ` data-subagent-id="${escapeAttr(t.subagent_id || '')}"` : ''}>
-            ${statusIcon}
-            ${toPage ? `<span class="board-task-id" title="Task ID">${escapeHtml(taskIdLabel)}</span>` : `<button type="button" class="board-task-id board-task-open" title="${isSubagent ? 'Open the subagent' : 'Task ID'}" aria-label="${escapeAttr(openLabel)}">${escapeHtml(taskIdLabel)}</button>`}
-            <span class="board-task-priority ${priorityClass}" title="Claim priority: ${escapeAttr(t.priority || 'none')}">${t.priority ? (_priorityLabel[t.priority] || escapeHtml(t.priority)) : '\u2014'}</span>
-            ${typeCell}
-            <span class="board-task-assignee">${escapeHtml(assignee)}</span>
-            <span class="board-task-desc"${tooltip}>${subagentBadge}${claimedBadge}${blockedBadge}${toPage ? `<button type="button" class="board-task-open board-task-name" aria-label="${escapeAttr(openLabel)}">${title}</button>` : title}${isSubagent || isAgent ? '' : _verifyMark(t)}${_goalChip(t)}</span>
-            <span class="${costClass}">${costText}</span>
-            <span class="board-task-time">${timeStr}</span>
-        </div>`;
-    }).join('');
-    return rows;
+/** The dock keeps its own task fields; the shared component owns the table layout. */
+function _taskTable(tasks) {
+    const span = (cls, value) => DT.el('span', cls, value);
+    const key = t => `${t._source}:${t.subagent_id || t.id}`;
+    const details = t => [t._source === 'subagent' ? t.subagent_type : '',
+        t._source === 'board' ? _claimedFor(t) : '',
+        t._source === 'board' && t.goal_id ? `Goal: ${goalTitle(_goalBoard, t.goal_id)}` : ''].filter(Boolean).join(' · ');
+    dockTaskTableState.sort = _taskSortExplicit ? { key: _taskSortField, dir: _taskSortAsc ? 'asc' : 'desc' } : null;
+    const table = DT.dataTable({ label: 'Agent tasks', rows: tasks, rowKey: key, rowName: t => t.title || t.description || '',
+        state: dockTaskTableState, onSort: field => _toggleTaskSort(field), bare: true, foldAt: 50, defaultSortLabel: _queryActive() && _taskFilters.sort !== 'open' ? taskSortLabel[_taskFilters.sort] : 'Open first, newest first',
+        columns: [
+            { key: 'status', label: 'Status', line: 2, cell: t => {
+                const st = _taskStatus(t), cls = st.className === 'completed' ? 'goal-state-task-done' : st.className === 'in-progress' ? 'goal-state-task-active' : st.className === 'blocked' ? 'goal-state-task-blocked' : '';
+                const chip = DT.chip(st.label, cls);
+                chip.classList.add('board-task-status-wrap'); chip.title = st.detail; chip.setAttribute('aria-label', st.detail); return chip;
+            } },
+            { key: 'id', label: 'ID', sort: true, firstDir: 'desc', line: 2, tone: 'tertiary', cell: t => span('board-task-id', t.id != null ? `#${t.id}` : '—') },
+            { key: 'priority', label: 'Priority', sort: true, line: 2, tone: 'tertiary', cell: t => span('board-task-priority-value', t.priority ? (_priorityLabel[t.priority] || t.priority) : '—') },
+            { key: 'type', label: 'Type', sort: true, firstDir: 'desc', line: 2, cell: t => {
+                const cell = DT.tag(t._source === 'subagent' ? 'sub' : t._source); cell.classList.add('board-task-source');
+                if (t._source === 'subagent') cell.title = `Subagent launched by ${t.assigned_to || '—'}`; return cell;
+            } },
+            { key: 'assignee', label: 'Agent', sort: true, firstDir: 'desc', line: 2, cell: t => span('board-task-assignee', t.assigned_to || '—') },
+            { key: 'task', label: 'Task', primary: true, width: 'grow', line: 1, subtitle: details, cell: t => {
+                const cell = span('board-task-desc');
+                const name = t.title || t.description || '';
+                const b = DT.primaryButton(name, `${t._source === 'subagent' ? 'Open subagent' : `Open task #${t.id}`}: ${name}, ${_taskStatus(t).detail}`);
+                b.classList.add('board-task-open', 'board-task-name');
+                cell.title = t._source === 'subagent' ? _subagentTooltip(t) : t.body || t.body_preview || '';
+                cell.append(b);
+                if (t._source === 'board') { const mark = document.createElement('template'); mark.innerHTML = _verifyMark(t); cell.append(mark.content); }
+                return cell;
+            } },
+            { key: 'cost', label: 'Cost', sort: true, firstDir: 'desc', numeric: true, line: 2, tone: 'tertiary', cell: t => { const cost = _taskRowCost(t, t._source === 'agent', t._source === 'subagent'); return span(cost.costClass, cost.costText || '—'); } },
+            { key: 'created_at', label: 'Created', sort: true, firstDir: 'desc', align: 'end', line: 1, tone: 'tertiary', cell: t => span('board-task-time', _formatTaskTime(t.created_at)) },
+        ],
+    });
+    // Keep the existing action dispatcher and identifiers: opening a board task,
+    // personal task or subagent still takes the same route as before.
+    const byKey = new Map(tasks.map(t => [key(t), t]));
+    for (const row of table.el.querySelectorAll('tbody tr')) {
+        const t = byKey.get(row.dataset.key); if (!t) continue;
+        row.classList.add('board-task-item', 'dt-row-open');
+        if (t._source === 'subagent') { row.setAttribute('data-on-click', 'task-subagent-open'); row.dataset.subagentId = t.subagent_id || ''; row.classList.add('board-task-subagent'); }
+        else { row.setAttribute('data-on-click', 'task-open'); row.dataset.kind = t._source; row.dataset.taskId = Number(t.id); }
+    }
+    return table.el;
 }
 
 /** The "Load more" button of a filtered list: the next page of what matches. */
@@ -729,13 +696,21 @@ export function renderBoardTaskList() {
     _renderTaskListChrome(section, completedCount, querying && (!scope || isQuery(_taskFilters)));
     _syncTaskBar(hasBoard, barCounts);
 
-    const header = _taskListHeaderHtml();
-
-    const rows = _taskRowsHtml(tasks);
-
     // Older done tasks come a page at a time (#3269).
     const more = querying ? (scope && _hideCompleted && !isQuery(_taskFilters) && !_filteredList.cursor ? '' : _filteredMoreHtml()) : _taskLoadMoreHtml(boardDoneTotal, boardDoneLoaded);
-    // Unchanged rows keep their nodes: the list was rebuilt on every poll, a layout each time (#3881).
-    morphHtml(container, header + rows + more);
+    const signature = JSON.stringify([tasks, _liveCosts, _taskFilters.sort, _taskSortField, _taskSortAsc, _taskSortExplicit, more,
+        tasks.map(t => [t._source === 'board' ? _claimedFor(t) : '', t.goal_id ? goalTitle(_goalBoard, t.goal_id) : ''])]);
+    if (container.dataset.drawn === signature && container.querySelector('.dt-table')) return;
+    const active = container.contains(document.activeElement) ? document.activeElement : null;
+    const held = active && { row: active.closest('tr')?.dataset.key, sort: active.dataset.key, sortbar: active.closest('.dt-sortbar') ? active.tagName : '' };
+    const table = _taskTable(tasks), footer = document.createElement('template'); footer.innerHTML = more || '';
+    // Keep the visible sort controls while the new table's ResizeObserver catches up.
+    table.classList.toggle('dt-folded', !!container.querySelector('.dt-box.dt-folded'));
+    container.replaceChildren(table, footer.content); container.dataset.drawn = signature;
+    if (held) {
+        const target = held.row ? [...container.querySelectorAll('tbody tr')].find(r => r.dataset.key === held.row)?.querySelector('.dt-primary')
+            : held.sortbar ? container.querySelector(`.dt-sortbar ${held.sortbar.toLowerCase()}`) : [...container.querySelectorAll('.dt-sort')].find(b => b.dataset.key === held.sort);
+        (target?.hidden ? container.querySelector('.dt-sortbar-select') : target || container.querySelector('.dt-primary, button'))?.focus({ preventScroll: true });
+    }
 
 }
