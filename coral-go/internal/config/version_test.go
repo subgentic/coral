@@ -55,3 +55,11 @@ func TestReportedVersionPrefersReleaseVersion(t *testing.T) {
 	// the flavor of a relaunchfixture build (#5452) is the one thing a build adds to it
 	assert.Regexp(t, `^\d+\.\d+\.\d+-dev(\+[0-9a-f]{1,8}(\.dirty)?)?$`, strings.TrimSuffix(ReportedVersion(), BuildFlavor))
 }
+
+// #8544: the dev build after the first major release is 2.0.1-dev, and a release build of it reports 2.0.0 as it is.
+func TestDevVersionAfterAMajorRelease(t *testing.T) {
+	const rev = "8f406daea75d473877f5e9d2bbe6798f77a41ee9"
+	assert.Equal(t, "2.0.1-dev+8f406dae", devVersion("v2.0.0", buildInfo("vcs.revision", rev)))
+	assert.Equal(t, "10.0.1-dev+8f406dae", devVersion("v10.0.0", buildInfo("vcs.revision", rev)))
+	assert.Equal(t, "1.4.171-dev+8f406dae", devVersion("v1.4.170", buildInfo("vcs.revision", rev)), "the old line is unchanged")
+}
