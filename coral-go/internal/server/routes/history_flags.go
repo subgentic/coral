@@ -86,7 +86,7 @@ func (h *HistoryHandler) ChatCounts(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, counts)
 }
 
-func (h *HistoryHandler) filterBoardChatRows(r *http.Request, rows []map[string]any, params store.SessionListParams) ([]map[string]any, error) {
+func (h *HistoryHandler) filterBoardChatRows(r *http.Request, rows []map[string]any, params store.SessionListParams, chatType string) ([]map[string]any, error) {
 	ids := make([]string, len(rows))
 	for i, row := range rows {
 		ids[i] = strings.TrimPrefix(row["session_id"].(string), "board:")
@@ -98,13 +98,26 @@ func (h *HistoryHandler) filterBoardChatRows(r *http.Request, rows []map[string]
 	out := rows[:0]
 	for i, row := range rows {
 		f := flags[ids[i]]
-		if f.Archived != params.Archived || params.Starred && !f.Starred || params.Active && !f.Active || params.WithNotes {
+		if skipBoardChat(f, params, chatType) {
 			continue
 		}
 		row["starred"], row["archived"], row["active"] = f.Starred, f.Archived, f.Active
 		out = append(out, row)
 	}
 	return out, nil
+}
+
+// skipBoardChat is whether a board is left out of a list. Active now and Archived are the agent chats' folders: a list of
+// both kinds (no type) holds no board under either; the Group chats list (type=group) holds every board, an archived one
+// flagged archived, so it stays reachable. Without either, a list of both kinds shows only the boards that are not archived.
+func skipBoardChat(f store.ChatFlags, params store.SessionListParams, chatType string) bool {
+	if params.WithNotes || params.Starred && !f.Starred || params.Active && !f.Active {
+		return true
+	}
+	if chatType == "group" {
+		return false
+	}
+	return params.Archived || params.Active || f.Archived
 }
 
 // Preserve the empty-install response without dropping group-only histories.

@@ -47,10 +47,18 @@ func TestChatFlagsDeletedBoardStartsFresh(t *testing.T) {
 		} `json:"sessions"`
 	}
 	require.NoError(t, json.Unmarshal(got.Body.Bytes(), &out))
-	require.Len(t, out.Sessions, 1, "the recreated board is visible; the other board stays archived")
-	assert.Equal(t, "board:doomed", out.Sessions[0].ID)
-	assert.False(t, out.Sessions[0].Starred)
-	assert.False(t, out.Sessions[0].Archived)
+	require.Len(t, out.Sessions, 2, "Group chats lists every board: the recreated one and the archived one")
+	for _, row := range out.Sessions {
+		switch row.ID {
+		case "board:doomed":
+			assert.False(t, row.Starred, "the recreated board starts fresh")
+			assert.False(t, row.Archived)
+		case "board:kept":
+			assert.True(t, row.Archived, "the other board stays archived, flagged")
+		default:
+			t.Fatalf("unexpected row %s", row.ID)
+		}
+	}
 	flags, err := ss.ChatFlagsForBoards(ctx, []string{"kept"})
 	require.NoError(t, err)
 	assert.Equal(t, store.ChatFlags{Starred: true, Archived: true}, flags["kept"])
