@@ -1,10 +1,10 @@
 /* The one table (#7743): every list or table surface passes what to show, the component owns how it looks and behaves. The operator's rule: a styling change is one token or one rule, so every size and colour here
  * is a --table-* token (css/data_table.css) and no surface styles a row, a cell or a header.
  *
- *   dataTable({ label, columns, rows, rowKey, open, current, state, onSort, layout, fold, foldAt, sortBar, defaultSortLabel, bare, empty, footer, selectable, rowName, quiet, scroll }) -> { el, bar, selectButton, selection(), clear(), state }
+ *   dataTable({ label, columns, rows, rowKey, groupBy(row) -> { key, label }, open, current, state, onSort, layout, fold, foldAt, sortBar, defaultSortLabel, bare, empty, footer, selectable, rowName, quiet, scroll }) -> { el, bar, selectButton, selection(), clear(), state }
  *   selectable = { contextKey, onChange(keys), actions: [{ label, run(rows, keys, value), danger, confirm, choose: { label, options() -> [{ value, label }] } }] }: a danger action confirms in the bar, a choose action asks for its value there.
  *   Column = { key, label, field | cell(row, ctx), primary, tone: 'primary'|'secondary'|'tertiary', width: 'grow'|'content'|'<n>rem', nowrap, align: 'start'|'end', numeric,
- *              sort: true|'number'|'date'|fn(a, b), sortValue(row), firstDir: 'asc'|'desc', foldFirst, narrowHide, line: 0|1|2, when(row), subtitle(row), title(row), filter: { label, active(), open(button) } }
+ *              sort: true|'number'|'date'|fn(a, b), sortValue(row), firstDir: 'asc'|'desc', foldFirst, narrowHide, line: 0|1|2, when(row), subtitle(row), hideLabel, title(row), filter: { label, active(), open(button) } }
  *   cell types: chip(word, cls), avatar(name), personButton(name, label), tag(text), timeCell(stamp), link(text, run), primaryButton(text, label)
  *   state: tableState(), kept by the caller across redraws: the sort, and the selection (a set of row keys, kept while the rows are filtered or paged, cleared when selectable.contextKey changes).
  * Folded (the table's own box narrower than foldAt rem, 40 by default; also at 200% text): fold 'column' is the two-line row (line 1 and line 2 cells), fold 'labeled' is the name, then "label value" lines
@@ -129,7 +129,7 @@ export function dataTable(cfg) {
                 const b = button('dt-sort', null, () => sortBy(c)); b.dataset.key = c.key; b.setAttribute('aria-label', `${c.label}, ${cfg.label}`); // named for its column and its table: "Cost" is not six buttons that read the same (#6432)
                 b.append(el('span', null, c.label), el('span', 'dt-arrow', on ? (st.sort.dir === 'desc' ? '↓' : '↑') : '↕')); b.lastChild.setAttribute('aria-hidden', 'true');
                 th.append(b);
-            } else th.append(el('span', 'dt-head-text', c.label));
+            } else th.append(el('span', c.hideLabel ? 'sr-only' : 'dt-head-text', c.label));
             if (c.filter) { // a column the rows are narrowed by: filter = { label, active() -> bool, open(button) }; the surface owns the choice list, the header owns the button
                 const f = button(`dt-filter${c.filter.active() ? ' dt-filter-on' : ''}`, null, (e) => { e.stopPropagation(); c.filter.open(f); });
                 f.setAttribute('aria-label', c.filter.label); f.title = 'Filter';
@@ -144,7 +144,7 @@ export function dataTable(cfg) {
 
     function drawSortBar() {
         sortBar.replaceChildren();
-        if (!sortable.length) return;
+        if (!sortable.length) { sortBar.hidden = true; return; } // nothing to sort by (a list in its own order, the chats): no empty bar above the rows
         const id = `dt-sort-${Math.random().toString(36).slice(2, 8)}`;
         const label = el('label', 'dt-sortbar-label', 'Sort by'); label.htmlFor = id;
         const select = el('select', 'dt-sortbar-select'); select.id = id;
@@ -186,7 +186,13 @@ export function dataTable(cfg) {
     function drawBody() {
         tbody.replaceChildren();
         const list = sortedRows();
+        const cols = columns.length + (sel ? 1 : 0);
+        let lastGroup = null;
         list.forEach((r, i) => {
+            if (cfg.groupBy && !st.sort) { // the rows come in the caller's order: a divider where their group changes (a day), none once the person has sorted
+                const g = cfg.groupBy(r);
+                if (g && g.key !== lastGroup) { lastGroup = g.key; const gr = el('tr', 'dt-group'); gr.setAttribute('role', 'row'); const gh = el('th', null, g.label); gh.colSpan = cols; gh.scope = 'rowgroup'; gh.setAttribute('role', 'rowheader'); gr.append(gh); tbody.append(gr); }
+            }
             const k = keyOf(r), tr = el('tr', 'dt-row'); tr.setAttribute('role', 'row'); tr.dataset.key = k;
             if (cfg.quiet && cfg.quiet(r)) tr.classList.add('dt-quiet'); // a row that is not a finding (usage whose level was not recorded): quieter than the rest
             if (sel) {
@@ -276,10 +282,16 @@ export function dataTable(cfg) {
         box.replaceChildren(e);
     } else if (cfg.footer) {
         const foot = el('div', 'dt-foot'); foot.append(el('span', 'dt-foot-text', cfg.footer.text || ''));
-        if (cfg.footer.more) { const m = button('btn dt-more', cfg.footer.more.busy ? 'Loading…' : cfg.footer.more.label, cfg.footer.more.run); if (cfg.footer.more.busy) m.setAttribute('aria-busy', 'true'); foot.append(m); }
+        if (cfg.footer.more) {
+            const m = button('btn dt-more', cfg.footer.more.busy ? 'Loading…' : cfg.footer.more.label, cfg.footer.more.run); if (cfg.footer.more.busy) m.setAttribute('aria-busy', 'true'); foot.append(m);
+            // footer.auto: more rows come when the footer scrolls into view (a long list that is read, not paged by hand); the button stays for the keyboard
+            if (cfg.footer.auto && !cfg.footer.more.busy && typeof IntersectionObserver === 'function') { const io = new IntersectionObserver((es) => { if (es.some(e => e.isIntersecting)) { io.disconnect(); cfg.footer.more.run(); } }, { rootMargin: '300px' }); io.observe(foot); }
+        }
         box.append(foot);
     }
 
+    // before the box has a width (it is built apart from the page) a window that is a phone, or narrower than the fold, starts folded: a first paint of the wide table would scroll the page sideways (#7868); the observer below then settles it
+    if (cfg.fold !== 'none') { const root0 = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16; if (cfg.fold === 'always' || window.innerWidth <= 760 || window.innerWidth < foldAt * root0) box.classList.add('dt-folded'); }
     // folded: the table's own box narrower than foldAt rem (the root font size is read, so a larger text size folds sooner); set before the first paint
     if (cfg.fold !== 'none' && typeof ResizeObserver === 'function') {
         const root = () => parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;

@@ -32,3 +32,13 @@ export function taskBulkActions(project, after) {
         { label: 'Cancel tasks', danger: true, confirm: n => `Cancel ${n} task${n === 1 ? '' : 's'}?`, run: async (rows) => { const f = await eachTask(rows, t => boardFetch(project, `/tasks/${pathId(t.id)}/cancel`, { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify({ subscriber_id: 'Operator' }) })); said('Cancelled', rows, f); after(); } },
     ];
 }
+
+/** The Inbox's Tasks folder: the tasks assigned to the person. Mark done is the task's own Complete (success, no message), once per task; `after()` reads the list again. */
+export function inboxTaskActions(after) {
+    return [
+        { label: 'Mark done', run: async (rows) => {
+            const f = await eachTask(rows, t => boardFetch(t.project, `/tasks/${pathId(t.id)}/complete`, { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify({ subscriber_id: 'Operator', outcome: 'success', expected_revision: Number(t.revision || 1) }) }));
+            said('Marked done', rows, f); after();
+        } },
+    ];
+}

@@ -26,19 +26,26 @@ const saved = await importOnce('./saved.js');
 const DT = await importOnce('./data_table.js'); // the one table (#7743): the Tasks group's page is its Tasks columns
 const TC = await importOnce('./task_columns.js');
 const VL = await importOnce('./view_list.js'); // the mailbox's view list (#7785)
+const TB = await importOnce('./task_bulk.js'); // what the selection bar does to the selected tasks
+const Toolbar = await importOnce('./team_toolbar.js'); // the selection bar takes the page's toolbar line (mountSelection)
+const GC = await importOnce('./goal_columns.js');
+const CH = await importOnce('./mailbox_chats.js'); // the chat folders (#7776): All chats, Group chats, By CLI, Tags
+const { providerName } = await importOnce('./model_labels.js'); // a CLI by its name (Claude, Codex, Antigravity), as the Chats list says it
 const { waitingText } = await importOnce('./waiting_text.js'); // a lazy module imports only what loads at startup (import_hygiene): this one loads with it
 
 const $ = id => document.getElementById(id);
 const GROUPS = [
     { key: 'needs', label: 'Needs you', search: 'Search needs you', short: 'Search' },
     { key: 'tasks', label: 'Tasks', search: 'Search tasks', short: 'Search' },
-    { key: 'goals', label: 'Goals', search: 'Search goals', short: 'Search' }, // its table is Frontend Dev's (#7776, table('goals')); until it answers the folder says soon
+    { key: 'goals', label: 'Goals', search: 'Search goals', short: 'Search' }, // the open goals of every team the person runs (GET /api/goals): the team page's goal row plus a Team column (#7776)
     { key: 'saved', label: 'Saved', search: 'Search saved messages', short: 'Search' }, // the box beside Display options and Expand is narrow: its placeholder is the short words, its name the whole ones
 ];
 const GROUP_KEY = 'coral.inbox.tab'; // the group last on screen, kept in this browser
 let tasks = [];
-let group = (() => { const v = browserLocal.get(GROUP_KEY); return GROUPS.some(g => g.key === v) ? v : 'needs'; })();
-const queries = { needs: '', tasks: '', goals: '', saved: '' }; // each group's own search text (lower case; Saved's goes to the server as typed)
+/** A folder's name and its search words: the groups above, or a chat folder (its title comes from the chat folders' own list). */
+const groupMeta = key => GROUPS.find(g => g.key === key) || (CH.CHAT_KEY.test(key) && CH.chatFolder(key) ? { key, label: CH.chatFolder(key).title, search: 'Search chats', short: 'Search' } : null);
+let group = (() => { const v = browserLocal.get(GROUP_KEY); return groupMeta(v) ? v : 'needs'; })();
+const queries = { needs: '', tasks: '', goals: '', saved: '' }; // a chat folder keeps its search as typed under its own key // each group's own search text (lower case; Saved's goes to the server as typed)
 let page = null; // { kind: 'task', project, id } | { kind: 'saved', id }: the item on screen, or null
 
 // ── Needs you ────────────────────────────────────────────────────────────
@@ -54,7 +61,8 @@ const stateOf = t => TC.taskWord(t);
 const inboxTasksState = DT.tableState();
 const needsState = DT.tableState();
 const dockSavedState = DT.tableState();
-const savedState = DT.tableState(); // one word set for a task's state (Queued, In progress, Blocked, In review, Done), here as everywhere
+const savedState = DT.tableState();
+const goalsState = DT.tableState();
 const taskText = t => [t.title, t.board, t.priority, stateOf(t), t.created_by].join(' ').toLowerCase();
 const taskRows = () => tasks.filter(t => !queries.tasks || taskText(t).includes(queries.tasks)).sort((a, b) => (RANK[a.priority] ?? 3) - (RANK[b.priority] ?? 3));
 async function refreshTasks() {
@@ -65,16 +73,30 @@ async function refreshTasks() {
     renderInboxNav(true);
 }
 
+// ── Goals ────────────────────────────────────────────────────────────────
+let goals = []; // the open goals of every team (GET /api/goals): id, board_id, title, outcome, state, rollup, updated_at
+const goalKey = g => `${g.board_id}#${g.id}`;
+const goalTeam = g => keyLabel(g.board_id);
+const goalRows = () => goals.filter(g => !queries.goals || [g.title, g.outcome, goalTeam(g), g.state].join(' ').toLowerCase().includes(queries.goals));
+async function refreshGoals() {
+    try {
+        const r = await fetch('/api/goals?limit=100');
+        const d = r.ok ? await r.json() : { goals: [] };
+        goals = Array.isArray(d.goals) ? d.goals : [];
+    } catch { goals = []; }
+    renderInboxNav(true);
+}
+
 // ── Saved ────────────────────────────────────────────────────────────────
 const savedCounts = () => saved.savedView().totals;
 
 // ── The sidebar list ─────────────────────────────────────────────────────
-const countOf = key => key === 'needs' ? needsRows().length : key === 'tasks' ? taskRows().length : key === 'saved' ? savedCounts().open : undefined;
-/** The folders of the Inbox (#7785, the mailbox mock): one view list, a name and a count each. Needs you, Tasks and Saved open their table in the centre; Goals is not built yet. */
+const countOf = key => key === 'needs' ? needsRows().length : key === 'tasks' ? taskRows().length : key === 'goals' ? goalRows().length : key === 'saved' ? savedCounts().open : undefined;
+/** The folders of the Inbox (#7785, the mailbox mock): one view list, a name and a count each. Needs you, Tasks and Saved open their table in the centre; */
 const folderSections = () => [{ title: 'Needs attention', items: [
     { key: 'needs', label: 'Needs you', count: countOf('needs'), alert: true }, { key: 'tasks', label: 'Tasks', count: countOf('tasks') },
-    { key: 'goals', label: 'Goals', soon: true }, // Frontend Dev removes soon with table('goals') (#7776)
-    { key: 'saved', label: 'Saved', count: countOf('saved') }] }];
+    { key: 'goals', label: 'Goals', count: countOf('goals') },
+    { key: 'saved', label: 'Saved', count: countOf('saved') }] }, ...CH.chatSections()];
 let _navKey = null, _folders = null, _poll = 0;
 /** A folder was picked: a page that is open gives way, and the folder's table opens with the keyboard at its heading. */
 function pickFolder(key) {
@@ -120,7 +142,7 @@ function savedListSpec(where = '') {
                 ...(multi ? [{ key: 'machine', label: 'Computer', line: dock ? 2 : 0, cell: f => f.serverName || '' }] : []),
                 { key: 'saved', label: 'Saved', tone: 'tertiary', align: 'end', line: 1, cell: f => f.saved },
                 { key: 'state', label: 'State', line: 2, cell: f => (f.state ? DT.tag(f.state) : '') },
-                { key: 'action', label: 'Action', line: 2, cell: f => {
+                { key: 'action', label: 'Action', hideLabel: true, line: 2, cell: f => {
                     if (f.gone) return '';
                     const b = DT.el('button', 'btn btn-small dt-quiet', f.done ? 'Reopen' : 'Done'); b.type = 'button'; b.setAttribute('aria-label', `${f.done ? 'Reopen, move back to Open' : 'Mark done'}: ${f.which}`);
                     b.addEventListener('click', async () => { const it = saved.findSavedItem(f.id); if (!it) return; const done = !it.done_at; if (await saved.savedSetDone(it, done)) sayLive(done ? 'Marked done' : 'Moved back to Open'); });
@@ -179,6 +201,13 @@ export function drawDockSaved(host) {
 
 }
 
+/** A chat of a folder opens in the chat viewer as it does from the Chats list (the way back to the folder comes with the Chats tab's removal, step 3). */
+async function openChat(c) {
+    const isGroup = c.type === 'group' || String(c.session_id || '').startsWith('board:');
+    if (isGroup) { const { historyServer } = await importOnce('./history_source.js'); window.selectBoardProject?.(identityKey(historyServer(), c.title || String(c.session_id).replace(/^board:/, ''))); return; }
+    window.selectHistorySession?.(c.session_id);
+}
+
 registerGroupSource('hub-inbox', {
     toolbar: () => ({ search: { id: 'inbox-search', label: 'Search the Inbox' } }), // the page's toolbar line, the same shape for Needs you, Tasks and Saved (#7723)
     keys: () => GROUPS.map(g => g.key),
@@ -194,9 +223,9 @@ registerGroupSource('hub-inbox', {
                 node: () => DT.dataTable({ label: `Needs you, ${rows.length}`, rows, rowKey: s => `${sessionServer(s)}:${s.session_id}`, state: needsState, rowName: s => resolveSessionIdentity(s),
                     open: s => { window.switchNavTab?.('agents'); window.selectLiveSession?.(s.name, s.agent_type, s.session_id, sessionServer(s)); },
                     columns: [
-                        { key: 'agent', label: 'Agent', primary: true, sort: true, sortValue: s => resolveSessionIdentity(s), line: 1, cell: s => { const w = DT.personButton(resolveSessionIdentity(s), `Open ${resolveSessionIdentity(s)}`); Object.assign(w.querySelector('.dt-primary').dataset, { name: s.name, agentType: s.agent_type, sessionId: s.session_id, server: sessionServer(s) }); return w; } },
-                        { key: 'asks', label: 'Waiting for', width: 'grow', line: 2, cell: s => askOf(s) || '' },
-                        { key: 'cli', label: 'CLI', sort: true, sortValue: s => s.agent_type || '', line: 2, cell: s => (s.agent_type ? DT.tag(s.agent_type) : '') },
+                        { key: 'agent', label: 'Agent', primary: true, width: rows.some(askOf) ? undefined : 'grow', sort: true, sortValue: s => resolveSessionIdentity(s), line: 1, cell: s => { const w = DT.personButton(resolveSessionIdentity(s), `Open ${resolveSessionIdentity(s)}`); Object.assign(w.querySelector('.dt-primary').dataset, { name: s.name, agentType: s.agent_type, sessionId: s.session_id, server: sessionServer(s) }); return w; } },
+                        ...(rows.some(askOf) ? [{ key: 'asks', label: 'Waiting for', width: 'grow', line: 2, cell: s => askOf(s) || '' }] : []), // no row has a question: no empty column
+                        { key: 'cli', label: 'CLI', sort: true, sortValue: s => providerName(s.agent_type) || '', line: 2, cell: s => (s.agent_type ? DT.tag(providerName(s.agent_type)) : '') },
                         ...(rows.some(dirOf) ? [{ key: 'folder', label: 'Folder', sort: true, sortValue: s => dirOf(s) || '', line: 0, cell: s => dirOf(s) || '' }] : []), // the folder an agent works in tells two of one name apart (#7122)
                         { key: 'team', label: 'Team', sort: true, sortValue: s => teamOf(s), line: 0, cell: s => teamOf(s) },
                         ...(goal ? [{ key: 'goal', label: 'Goal', line: 0, cell: s => { if (!goalOf(s)) return ''; const l = DT.link(s.goal.title, () => importOnce('./task_goals.js').then(m => m.openGoalOnBoard(s.goal.board || s.board_project || '', s.goal.id)).catch(() => {})); l.setAttribute('aria-label', `Goal: ${s.goal.title}`); return l; } }] : []),
@@ -207,8 +236,26 @@ registerGroupSource('hub-inbox', {
             const rows = taskRows(), openKey = page && page.kind === 'task' ? `${page.project}#${page.id}` : '';
             return { title: 'Tasks', rows, empty: { line: queries.tasks ? 'No task matches the search.' : 'No assigned tasks.' },
                 signature: JSON.stringify([openKey, rows.map(t => [t.project, t.id, t.title, t.priority, t.status, t.board, t.updated_at])]),
-                node: () => DT.dataTable({ label: `Tasks, ${rows.length}`, columns: TC.taskColumns({ teamOf: t => t.board || '' }, ['state', 'task', 'priority', 'team', 'updated']), rows, rowKey: t => `${t.project}#${t.id}`, // only my tasks: no who; the Team column because the group spans teams
-                    open: t => openTaskPage(t.project, t.id), current: openKey, rowName: t => `#${t.id} ${t.title}`, state: inboxTasksState }).el };
+                node: () => {
+                    const row = document.querySelector('#group-table-view .gt-toolbar');
+                    const t = DT.dataTable({ label: `Tasks, ${rows.length}`, columns: TC.taskColumns({ teamOf: t => t.board || '' }, ['state', 'task', 'priority', 'team', 'updated']), rows, rowKey: t => `${t.project}#${t.id}`, // only my tasks: no who; the Team column because the group spans teams
+                        open: t => openTaskPage(t.project, t.id), current: openKey, rowName: t => `#${t.id} ${t.title}`, state: inboxTasksState,
+                        selectable: { contextKey: 'inbox-tasks', actions: TB.inboxTaskActions(() => { inboxTasksState.selected.clear(); refreshTasks(); }), onChange: keys => row && Toolbar.mountSelection(row, keys.size ? t.bar : null) } }); // the bar takes the toolbar's line while tasks are selected
+                    if (row) { Toolbar.mountSelection(row, inboxTasksState.selected.size ? t.bar : null); row.querySelectorAll('.dt-select-toggle').forEach(b => b.remove()); if (isPhoneLayout()) row.append(t.selectButton); }
+                    return t.el;
+                } };
+        }
+        if (CH.CHAT_KEY.test(key)) {
+            return CH.chatsSpec(key, { query: queries[key] || '', redraw: () => refreshGroupTable('hub-inbox'), open: openChat,
+                after: () => { CH.loadChatCounts(() => renderInboxNav(true)); refreshGroupTable('hub-inbox'); } });
+        }
+        if (key === 'goals') {
+            const rows = goalRows();
+            return { title: 'Goals', rows, empty: { line: queries.goals ? 'No goal matches the search.' : 'No open goals.' },
+                signature: JSON.stringify(rows.map(g => [g.board_id, g.id, g.title, g.outcome, g.state, g.updated_at, g.rollup])),
+                node: () => DT.dataTable({ label: `Goals, ${rows.length}`, rows, rowKey: goalKey, state: goalsState, rowName: g => g.title,
+                    open: g => importOnce('./task_goals.js').then(m => m.openGoalOnBoard(g.board_id, g.id)).catch(() => {}),
+                    columns: GC.goalColumns({ teamOf: goalTeam }, ['state', 'goal', 'team', 'progress', 'updated']) }).el };
         }
         if (key === 'saved') return savedListSpec();
         return null;
@@ -221,13 +268,13 @@ registerGroupSource('hub-inbox', {
 
 /** Which group is on screen: the search box is named for it and holds its text, and Display options (Saved's Filters and Sort) is there for Saved only. */
 function setGroup(key) {
-    if (!GROUPS.some(g => g.key === key)) key = 'needs';
+    if (!groupMeta(key)) key = 'needs';
     const was = group;
     group = key;
     browserLocal.set(GROUP_KEY, key);
-    const input = $('inbox-search'), g = GROUPS.find(x => x.key === key);
+    const input = $('inbox-search'), g = groupMeta(key);
     if (input) {
-        const text = key === 'saved' ? (saved.savedView().query || queries.saved) : queries[key];
+        const text = key === 'saved' ? (saved.savedView().query || queries.saved) : (queries[key] || '');
         if (input.placeholder !== (g.short || g.search)) input.placeholder = g.short || g.search;
         if (input.getAttribute('aria-label') !== g.search) input.setAttribute('aria-label', g.search); // the name stays whole whatever the placeholder says (a placeholder as short as the box's default no longer skips it)
         if (input.value !== text) input.value = text;
@@ -253,7 +300,7 @@ onViewShown(id => {
 export function filterInbox(value) {
     const text = String(value || '').trim();
     if (group === 'saved') { queries.saved = text; saved.setSavedQuery(text); return; }
-    queries[group] = text.toLowerCase();
+    queries[group] = CH.CHAT_KEY.test(group) ? text : text.toLowerCase(); // a chat search goes to the server as typed
     renderInboxNav(true);
 }
 
@@ -374,6 +421,8 @@ export async function showInbox() {
     setGroup(group);
     renderInboxNav(true);
     refreshTasks();
+    refreshGoals();
+    CH.loadChatCounts(() => renderInboxNav(true));
     saved.loadSaved(); // everything's list (the Inbox is the all scope), read for the table and the count
     if (page) { if (isPhoneLayout()) $('inbox-view')?.setAttribute('data-phone-item', ''); return; } // a task or a message is open: the tab returns to it
     $('inbox-view')?.removeAttribute('data-phone-item');
@@ -382,11 +431,11 @@ export async function showInbox() {
 }
 
 /** The group the Inbox opens on the next time it is shown, with nothing drawn (the Saved button names it before it switches to the tab, so the last group is not on screen first). */
-export function rememberGroup(name) { if (GROUPS.some(g => g.key === name)) { group = name; browserLocal.set(GROUP_KEY, name); } }
+export function rememberGroup(name) { if (groupMeta(name)) { group = name; browserLocal.set(GROUP_KEY, name); } }
 
 /** A group wanted on screen from elsewhere (the Saved button of the top bar): its table opens. */
 export async function openInboxGroup(name) {
-    if (!GROUPS.some(g => g.key === name)) name = 'needs';
+    if (!groupMeta(name)) name = 'needs';
     $('inbox-local') && ($('inbox-local').hidden = false);
     page = null;
     $('inbox-page') && ($('inbox-page').hidden = true);
