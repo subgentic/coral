@@ -2,6 +2,7 @@
  * (team_artifacts_page.js) and a goal's Artifacts section (goal_artifacts.js) both read an item through these (moved out of team_artifacts_page.js, #8592; no behaviour change). Lazy: the modules above import it. */
 import { serverUrl, artifactPath, splitKey } from './server_base.js';
 import { importOnce } from './import_once.js';
+import { renderMarkdownStrict, highlightCodeIn, escapeHtml } from './utils.js';
 const { inlineArtifactPath } = await importOnce('./artifact_paths.js');
 
 export const HEX_RE = /^[a-f0-9]{64}$/;
@@ -45,3 +46,9 @@ export function typeText(item) {
 }
 export const createdText = (item) => { const d = item.created_at ? new Date(item.created_at) : null; return d && !Number.isNaN(d.getTime()) ? d.toLocaleString() : ''; };
 export const taskText = (item) => (item.task_id ? `#${item.task_id}${item.task_title ? ' ' + item.task_title : ''}` : 'No task');
+
+/** The artifact's text: Markdown through the strict renderer (raw HTML shown as text, then the sanitizer), anything else as plain text. */
+export function renderText(host, content, path) {
+    if (/\.(?:md|markdown|mdown)$/i.test(path || '')) { host.innerHTML = `<div class="preview-pane-markdown artifact-viewer-markdown">${renderMarkdownStrict(content)}</div>`; highlightCodeIn(host); }
+    else host.innerHTML = `<pre class="preview-pane-code artifact-viewer-text"><code>${escapeHtml(content)}</code></pre>`;
+}
