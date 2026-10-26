@@ -89,6 +89,9 @@
     .sv-switch-hit { min-width: var(--sv-control-height-touch); min-height: var(--sv-control-height-touch); }
     .sv-switch { width: 44px; } /* the switch itself is a 44 px target on a touch screen: 40 px wide was the census's red */
     .sv-switch:checked::before { transform: translateX(24px); }
+    .sv-row-toggle { align-items: start; } /* the switch's 44 px target starts at the row's top: the label's line is level with the switch, however many lines the hint has below it */
+    .sv-row-toggle .sv-text { min-height: var(--sv-control-height-touch); display: flex; flex-wrap: wrap; align-content: center; align-items: baseline; } /* and a short row's words are centred on it (the label and an inline Learn more stay on one line) */
+    .sv-row-toggle .sv-text > p.sv-help, .sv-row-toggle .sv-text > .sv-more { flex: 0 0 100%; }
 }
 
 /* narrow, in rem as the main Settings' fold is: the nav becomes a select at the top and the rows stack. The ONE fold breakpoint of the component (a container query: a variable cannot hold it). */
