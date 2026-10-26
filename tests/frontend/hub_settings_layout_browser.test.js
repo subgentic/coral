@@ -28,8 +28,8 @@ const BASE = require('./test_base').BASE;
                     noteClipped: !!note && note.scrollWidth > note.clientWidth + 1, vw: innerWidth, contentLeft: Math.round(content.left), contentRight: Math.round(content.right) };
             })()`);
             const tag = `${w}px`;
-            // The machine's own settings stay hidden in hub mode, also after a redraw of their group's rows (a change in a field redraws them): the API key, Database encryption, Usage analytics, Log terminal input and Browser sign-in (#8218)
-            const machine = ['settings-api-key', 'settings-database-encryption', 'settings-telemetry-enabled', 'settings-debug-input-log', 'settings-security'];
+            // The machine's own settings stay hidden in hub mode, also after a redraw of their group's rows (a change in a field redraws them): the API key, Database encryption, Usage analytics, its Install ID, Log terminal input and Browser sign-in (#8218, #8256)
+            const machine = ['settings-api-key', 'settings-database-encryption', 'settings-telemetry-enabled', 'settings-telemetry-install-id', 'settings-debug-input-log', 'settings-security'];
             const hiddenNow = () => ev(`${JSON.stringify(machine)}.map(id => { const e = document.getElementById(id); const row = e && e.closest('.sv-row'); return !row || getComputedStyle(row).display === 'none'; })`);
             assert.deepEqual(await hiddenNow(), machine.map(() => true), `${tag}: the machine's rows are hidden in hub mode`);
             await ev(`for (const id of ['settings-telemetry-enabled', 'settings-database-encryption', 'settings-debug-input-log']) document.getElementById(id).dispatchEvent(new Event('change', { bubbles: true })); true`); // each change redraws its group's rows
