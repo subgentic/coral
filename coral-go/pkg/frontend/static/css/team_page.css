@@ -270,16 +270,8 @@
 }
 .goals-note.team-agents-count { margin: 8px 0 4px; } /* the count line: 8 px under the search row, a little above the table (#8271) */
 
-/* Inbox shares the task toolbar outside .team-panel. One state control: the
- * pills when its own width permits, the select alone below 40rem. */
-.inbox-tasks-toolbar { container: inboxtasks / inline-size; }
-.inbox-tasks-toolbar .team-tb-select { display: none; }
+/* The Inbox's Tasks folder shares the folder toolbar below (its pills and select are adoptPills', its container is .inbox-folder-toolbar). */
 .inbox-tasks-toolbar .list-bar-search-row.gt-toolbar > .list-bar-search-wrap { min-width: 10rem; }
-@container inboxtasks (max-width: 40rem) {
-    .inbox-tasks-toolbar .list-bar-search-row.gt-toolbar > .list-bar-search-wrap { flex: 1 1 100%; }
-    .inbox-tasks-toolbar .team-tb-pills { display: none; }
-    .inbox-tasks-toolbar .team-tb-select { display: block; }
-}
 
 /* The Inbox hosts the same goal split; only its folder select and team link are new. */
 .inbox-local:has(> .inbox-goal-page:not([hidden])) { height: 100%; min-height: 0; }
@@ -317,11 +309,19 @@
     .inbox-board-head { padding: 12px 16px; }
     .inbox-board-body { padding: 0 16px; }
 }
-/* The other Inbox folders' toolbar (#8596, inbox_toolbar.js): the search, then the Filters icon right beside it at every width (the search keeps at least 10rem, #8531); the state control is the pills when
- * the page's own width permits, else one select on a line of its own under them. */
+/* An Inbox folder page's header is ONE row (#8700, the operator's layout): the title and its count, the search, the quick-filter pills where the page's width permits, the Filters icon at the right.
+ * Nothing wraps: when the width runs out the pills become a select in the Filters panel first (adoptPills), then the search narrows to its minimum. */
 .inbox-folder-toolbar { container: inboxfolder / inline-size; }
-.inbox-folder-toolbar .team-tb-select { display: none; }
-.inbox-folder-toolbar .list-bar-search-row.gt-toolbar { flex-wrap: wrap; }
+.inbox-folder-toolbar .list-bar-search-row.gt-toolbar { flex-wrap: nowrap; align-items: center; gap: 8px; }
+.inbox-folder-toolbar .list-bar-search-row.gt-toolbar > .team-tb-select { display: none; }
+.inbox-folder-toolbar .inbox-pill-field { display: none; }
+.inbox-folder-toolbar .inbox-pill-field .team-tb-select { display: block; max-width: none; }
+.inbox-folder-head { display: flex; align-items: baseline; gap: var(--space-md, 8px); flex: 0 1 auto; min-width: 0; max-width: 40%; margin-right: 4px; }
+.inbox-folder-head h2 { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 1.25rem; font-weight: 700; line-height: 1.3; color: var(--text-primary); }
+.inbox-folder-head h2:focus { outline: none; }
+.inbox-folder-head h2:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm, 2px); }
+.inbox-folder-head .session-group-count { flex: none; font-weight: 600; }
+.inbox-folder-toolbar .list-bar-search-row.gt-toolbar > .team-tb-pills { flex: 0 0 auto; }
 .inbox-folder-toolbar .list-bar-menu-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; align-items: start; }
 .inbox-folder-toolbar .list-bar-menu :is(.list-bar-field, .list-bar-sort) { flex-direction: column; align-items: stretch; flex-wrap: nowrap; gap: 4px; } /* a field's label above its box, two fields a line (UI/UX on #8681): the panel is two or three lines tall, not one per field */
 .inbox-folder-toolbar .list-bar-menu :is(.list-bar-field, .list-bar-sort) > .list-bar-field-label { flex: none; white-space: nowrap; }
@@ -330,16 +330,11 @@
 @media (max-width: 767px) { /* a phone's panel is a sheet over the list, one column, its own scroll; the page behind keeps its scroll, nothing traps the focus (UI/UX on #8681) */
     .inbox-folder-toolbar { position: relative; }
     .inbox-folder-toolbar .list-bar-menu.list-bar-sheet { position: absolute; left: 0; right: 0; z-index: 20; max-height: 60vh; overflow-y: auto; box-sizing: border-box; padding: 12px; background: var(--bg-secondary); border: 1px solid var(--border-light); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); grid-template-columns: minmax(0, 1fr); }
-    .group-table-head-folder h2 { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } /* the folder select names the page: the title is for screen readers (and the focus when there is no search box) */
-    .group-table-head-folder { min-height: 0; margin-bottom: var(--space-md); }
-    .group-table-head-folder .session-group-count { display: none; }
-    .group-table-head-folder .gt-count-line { display: inline; font-size: 0.75rem; font-weight: 400; color: var(--text-secondary); }
+    .inbox-folder-head { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); } /* the folder select names the page and carries its count: the title is for screen readers (and the focus when there is no search box) */
 }
-.gt-count-line { display: none; }
-@container inboxfolder (max-width: 40rem) {
+@container inboxfolder (max-width: 46rem) { /* the title, the search at its minimum, the pills and the icon no longer fit one line: the pills are the panel's select */
     .inbox-folder-toolbar .team-tb-pills { display: none; }
-    .inbox-folder-toolbar .team-tb-select { display: block; order: 3; flex: 1 1 100%; max-width: none; }
-    .inbox-folder-toolbar .list-bar-toggle { order: 2; }
+    .inbox-folder-toolbar .inbox-pill-field { display: flex; }
 }
 
 /* The Inbox's Artifacts folder (Goal #62): the list and, to its right, the document pane (a sheet over the page on a phone, like the team page's) */

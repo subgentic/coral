@@ -37,15 +37,10 @@ const path = require('node:path');
             await ev(`try { localStorage.removeItem('coral-inbox-goals-filters'); } catch {} true`);
             await waitFor(`document.querySelectorAll('#group-table-view button.dt-primary').length >= 1 && !!document.querySelector('.inbox-folder-toolbar')`, 'the Goals page', 15000); await settle(300);
 
-            // the folder name
-            const head = await ev(`(() => { const h = document.querySelector('.group-table-head h2'), l = document.querySelector('.gt-count-line'), c = document.querySelector('.group-table-head .session-group-count');
-                const box = e => { if (!e) return null; const r = e.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), shown: e.getClientRects().length > 0 && getComputedStyle(e).display !== 'none' }; };
-                return { h2: h && h.textContent, h2box: box(h), line: l && l.textContent, lineShown: !!l && getComputedStyle(l).display !== 'none', countShown: !!c && getComputedStyle(c).display !== 'none' }; })()`);
-            if (mobile) {
-                check(`${label}: the page title is only for screen readers (in the page, one pixel)`, head.h2 === 'Goals' && head.h2box.w <= 1 && head.h2box.h <= 1, JSON.stringify(head));
-                check(`${label}: the count is one line naming what is counted ("N goals"), the bare number is gone`, /^\d+ goals?$/.test(head.line) && head.lineShown && !head.countShown, JSON.stringify(head));
-            } else check(`${label}: the title and its number stay, the count line is not shown`, head.h2 === 'Goals' && head.h2box.w > 20 && head.countShown && !head.lineShown, JSON.stringify(head));
-
+            // the folder name (the page's header is one row since #8700: inbox_header_browser measures the line)
+            const head = await ev(`(() => { const e = document.querySelector('.inbox-folder-head'), h = e && e.querySelector('h2'), r = e && e.getBoundingClientRect(); return { h2: h && h.textContent, w: r && Math.round(r.width), h: r && Math.round(r.height) }; })()`);
+            if (mobile) check(`${label}: the page title is only for screen readers (in the page, one pixel)`, head.h2 === 'Goals' && head.w <= 1 && head.h <= 1, JSON.stringify(head));
+            else check(`${label}: the title stays beside the search`, head.h2 === 'Goals' && head.w > 20, JSON.stringify(head));
             await shot(`inbox-polish-closed-${label}-dark`, 'dark');
             await shot(`inbox-polish-closed-${label}-light`, 'light');
             // the Filters panel
