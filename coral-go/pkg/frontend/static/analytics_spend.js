@@ -4,7 +4,7 @@
  *  - task time: tasks done, median and slowest 1 in 10 from claimed to done, the wait before claimed, review time (assignment to approval), sent back 2 or more times, tasks done a day or an hour, and by agent. A measure the endpoint does not return is left out.
  * One read feeds both: GET /api/board/<team>/spend?range=24h|7d sends counts and seconds, not ratios; the page divides. Everything is built with the DOM and textContent: agent names are written by agents. Lazy: cost_dashboard.js imports it. */
 import { state } from './state.js';
-import { boardFetch, keyLabel } from './server_base.js';
+import { boardFetch, keyLabel, sessionTeamKey } from './server_base.js';
 import { browserLocal } from './safe_storage.js';
 import { importOnce } from './import_once.js';
 
@@ -40,10 +40,10 @@ function fmtDur(s) {
 const tokensOf = (t) => (typeof t === 'number' ? t : t && typeof t.tokens === 'number' ? t.tokens : t ? (Number(t.input) || 0) + (Number(t.output) || 0) : 0); // input plus output (a day's row has the sum already): the cache is beside it
 const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 
-/** The teams on this computer the person can look at: those with an agent on the list, then the one chosen last. */
+/** The teams the person can look at, on this computer or through a hub: those with an agent on the list, then the one chosen last. */
 function teams() {
     const names = new Set();
-    for (const s of state.liveSessions || []) if (s && s.board_project) names.add(s.board_project);
+    for (const s of state.liveSessions || []) { const key = sessionTeamKey(s); if (key) names.add(key); } // the team's key (@server/name for another machine), so boardFetch reads it there: through a hub the bare name asked the hub itself (404, #8693)
     return [...names].sort((a, b) => keyLabel(a).localeCompare(keyLabel(b)));
 }
 
