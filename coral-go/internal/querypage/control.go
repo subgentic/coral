@@ -15,6 +15,7 @@ func HasControl(s string) bool {
 }
 
 // ControlCases are the text values a search parameter must refuse (#4806), for the tests of every route that has one: every C0 byte and DEL, and a C1 one, at the start, in the middle and at the end.
+// ControlCases has no production caller: it is exported for tests in board, server/routes, store.
 func ControlCases() []string {
 	var out []string
 	bytes := []rune{0x7f, 0x85}
