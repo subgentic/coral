@@ -320,43 +320,6 @@
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
 }
-
-.agent-cost-chart-tooltip {
-    display: none;
-    position: fixed;
-    z-index: 1000;
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border-light);
-    border-radius: var(--radius-lg);
-    padding: 12px;
-    box-shadow: 0 4px 16px rgba(var(--black-rgb), 0.3);
-    pointer-events: none;
-}
-.agent-cost-chart-tooltip .chart-title {
-    font-size: 0.6875rem;
-    color: var(--text-muted);
-    margin-bottom: 6px;
-}
-.agent-cost-chart-tooltip svg {
-    display: block;
-}
-.agent-cost-chart-tooltip .chart-axis-label {
-    font-size: 0.625rem;
-    fill: var(--text-muted);
-}
-.agent-cost-chart-tooltip .chart-line {
-    fill: none;
-    stroke: var(--accent);
-    stroke-width: 1.5;
-}
-.agent-cost-chart-tooltip .chart-area {
-    fill: rgba(var(--accent-rgb), 0.1);
-}
-.agent-cost-chart-tooltip .chart-grid {
-    stroke: var(--border-light);
-    stroke-width: 0.5;
-}
-
 /* By Model shows a readable name ("Opus 5.5"), not an id, so it is not set in the code font (#4589). */
 
 
@@ -439,10 +402,11 @@
 .viz-check b { color: var(--text-primary); }
 .viz-check-bad b { color: var(--danger); }
 .cost-lead { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; }
-.cost-swatch { flex: none; width: 14px; height: 14px; padding: 0; border: 2px solid transparent; border-radius: var(--radius-xs); cursor: pointer; background-clip: padding-box; box-sizing: border-box; }
-.cost-swatch[aria-pressed="true"] { outline: 2px solid var(--text-primary); outline-offset: 1px; }
-.cost-swatch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-@media (pointer: coarse) { .cost-swatch { width: 18px; height: 18px; } .viz-seg button { min-height: var(--control-touch-height, 44px); padding: 0 12px; } }
+.cost-toggle { flex: none; display: inline-flex; align-items: center; justify-content: center; min-width: 24px; min-height: 24px; padding: 0; background: none; border: 0; border-radius: var(--radius-sm); cursor: pointer; }
+.cost-toggle .cost-swatch { width: 14px; height: 14px; border: 2px solid transparent; border-radius: var(--radius-xs); box-sizing: border-box; background-clip: padding-box; }
+.cost-toggle-front .cost-swatch { outline: 2px solid var(--text-primary); outline-offset: 1px; }
+.cost-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 0; }
+@media (pointer: coarse) { .cost-toggle { min-width: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); } .viz-seg button { min-height: var(--control-touch-height, 44px); padding: 0 12px; } }
 @media (forced-colors: active) {
     .viz-line-0 { stroke-dasharray: none; } .viz-line-1 { stroke-dasharray: 8 4; } .viz-line-2 { stroke-dasharray: 2 4; } .viz-line-3 { stroke-dasharray: 12 4 2 4; }
     .viz-line-4 { stroke-dasharray: 6 2; } .viz-line-5 { stroke-dasharray: 1 3; } .viz-line-6 { stroke-dasharray: 16 6; } .viz-line-o { stroke-dasharray: 3 3; }
@@ -479,5 +443,15 @@
 .viz-more { margin: 12px 0 0; }
 .viz-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .viz-pick { stroke: var(--text-secondary); stroke-dasharray: 3 3; }
-.cost-swatch-off { background: transparent; border-color: var(--text-muted); } /* a row not checked: its line is not drawn */
 .viz-legend-item { display: flex; align-items: center; gap: 8px; min-height: 28px; padding: 0 4px; font-size: 0.8125rem; color: var(--text-secondary); }
+.cost-swatch { flex: none; display: inline-block; width: 14px; height: 14px; border-radius: var(--radius-xs); }
+.cost-swatch-off, .cost-toggle .cost-swatch-off { border: 2px solid var(--text-muted); box-sizing: border-box; background: transparent; } /* a row left out: its line is not drawn */
+.viz-multi button[aria-pressed="true"]::before { content: "\2713" / ""; margin-right: 4px; font-weight: 700; } /* a chosen metric wears a check: this is a set, not a choice of one */
+.viz-seg[data-more="end"] { mask-image: linear-gradient(to right, currentColor calc(100% - 1.5rem), transparent); }
+.viz-seg[data-more="start"] { mask-image: linear-gradient(to left, currentColor calc(100% - 1.5rem), transparent); }
+.viz-seg[data-more="both"] { mask-image: linear-gradient(to right, transparent, currentColor 1.5rem, currentColor calc(100% - 1.5rem), transparent); }
+.viz-linkbtn { background: none; border: 0; padding: 0; font: inherit; color: var(--link-text, var(--accent)); cursor: pointer; }
+.viz-linkbtn:hover { text-decoration: underline; }
+.viz-linkbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
+@media (pointer: coarse) { .viz-linkbtn { min-height: var(--control-touch-height, 44px); } }
+.viz-legend-plain { grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); }

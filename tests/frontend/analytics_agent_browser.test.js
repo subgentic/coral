@@ -45,6 +45,10 @@ const CALLS = Array.from({ length: 24 }, (_, h) => ({ bucket: hourIso(23 - h), c
         await open(1280, 900, false);
 
         console.log('1. Charts on a By agent row opens that agent');
+        // the rows have no floating chart any more (#7970): a pointer over a row draws nothing
+        await ev(`document.querySelector('#cost-by-agent tbody tr').dispatchEvent(new MouseEvent('mouseenter', { bubbles: true })); true`);
+        assert.equal(await ev(`document.querySelectorAll('.agent-cost-chart-tooltip').length`), 0, 'no floating chart over a row');
+        await shot('agent-table');
         const links = await ev(`[...document.querySelectorAll('#cost-by-agent tbody tr .dt-link')].filter(b => /^Charts/.test(b.getAttribute('aria-label') || '')).map(b => b.getAttribute('aria-label'))`);
         assert.deepEqual(links, ['Charts for Frontend Dev', 'Charts for QA Engineer']);
         await ev(`document.querySelector('#cost-by-agent tbody tr .dt-link[aria-label="Charts for Frontend Dev"]').click(); true`);

@@ -481,13 +481,6 @@ function _rowsTotal(view, field, keys) {
     return rows.reduce((a, r) => a + (Number(r[field]) || 0), 0);
 }
 
-/** The keys of the rows checked in a view's table. */
-function _selectedKeys(view) {
-    const st = _tables[view], v = SERIES_VIEWS[view];
-    if (!st || !st.selected.size) return [];
-    return (_rawData[view] || []).filter(r => st.selected.has(String(v.rowKey(r)))).map(v.key);
-}
-
 function _drawSeries(view) {
     const host = document.getElementById(`cost-series-${view}`);
     if (!host) return;
@@ -510,39 +503,39 @@ async function _refreshSeries(view = _currentView()) {
     _rerender(view); // the swatches
 }
 
-/** Paints a row's swatch for its view's current lines: its line's colour, Other's, or an empty ring when rows are checked and this one is not; pressed when its line is the one brought forward. */
-function _paintSwatch(b, view, r) {
-    const v = SERIES_VIEWS[view], color = series.swatchColor(view, v.key(r)), line = series.lineKeyOf(view, v.key(r)), on = series.highlighted(view) === line;
-    b.classList.toggle('cost-swatch-off', color === 'off'); b.style.background = color === 'off' ? '' : color;
-    if (b.tagName === 'BUTTON') b.setAttribute('aria-pressed', String(on)); else if (on) b.setAttribute('aria-pressed', 'true'); else b.removeAttribute('aria-pressed');
+/** Paints a row's switch for its view's current lines: filled in its line's colour (pressed), filled grey when it is part of Other (not pressed), an empty ring when rows are chosen and this one is not. */
+function _paintSwatch(btn, view, r) {
+    const v = SERIES_VIEWS[view], color = series.swatchColor(view, v.key(r)), sw = btn.firstChild;
+    sw.classList.toggle('cost-swatch-off', color === 'off'); sw.style.background = color === 'off' ? '' : color;
+    btn.setAttribute('aria-pressed', String(series.hasLine(view, v.key(r))));
+    btn.classList.toggle('cost-toggle-front', series.highlighted(view) === series.lineKeyOf(view, v.key(r)) && !!series.highlighted(view));
 }
-/** The swatches of a view's table painted again, in place: a check or a click does not rebuild the table, so the keyboard stays where it was. */
+/** The switches of a view's table painted again, in place: a click does not rebuild the table, so the keyboard stays where it was. */
 function _refreshSwatches(view) {
     const v = SERIES_VIEWS[view], box = document.getElementById(`cost-by-${view}`);
     if (!box) return;
     const byKey = new Map((_rawData[view] || []).map(r => [String(v.rowKey(r)), r]));
-    for (const tr of box.querySelectorAll('tr.dt-row')) { const sw = tr.querySelector('.cost-swatch'), r = byKey.get(tr.dataset.key); if (sw && r) _paintSwatch(sw, view, r); }
+    for (const tr of box.querySelectorAll('tr.dt-row')) { const sw = tr.querySelector('.cost-toggle'), r = byKey.get(tr.dataset.key); if (sw && r) _paintSwatch(sw, view, r); }
 }
 const _highlight = (view, r) => { series.setHighlight(view, series.lineKeyOf(view, SERIES_VIEWS[view].key(r))); _drawSeries(view); _refreshSwatches(view); };
-const _selectionChanged = view => { series.setSelected(view, _selectedKeys(view)); _drawSeries(view); _refreshSwatches(view); };
+const _toggle = (view, r) => { series.toggleLine(view, SERIES_VIEWS[view].key(r)); _drawSeries(view); _refreshSwatches(view); };
 
-/** A row's key in the table's first column: a swatch (a button for a pointer, only the colour for a finger) in its line's colour, then what the cell says. */
+/** A row's switch in the table's first column: its line's swatch, a button (aria-pressed): pressed and filled when the row has a line, a ring when it is left out. It is the only control of the row's line; a click on the
+ *  row itself brings the line forward. */
 function _swatched(view, cell) {
     return r => {
         const inner = cell(r);
         if (!series.swatchColor(view, SERIES_VIEWS[view].key(r))) return inner;
         const wrap = document.createElement('span'); wrap.className = 'cost-lead';
-        // a pointer has a button (a small target); a finger has the row, which is 44 px and does the same, so the swatch is only its colour
-        const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
-        const b = document.createElement(coarse ? 'span' : 'button'); b.className = 'cost-swatch';
-        if (coarse) b.setAttribute('aria-hidden', 'true');
-        else { b.type = 'button'; b.setAttribute('aria-label', `Bring ${SERIES_VIEWS[view].name(r)}'s line forward`); b.addEventListener('click', () => _highlight(view, r)); }
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'cost-toggle'; b.setAttribute('aria-label', `Show ${SERIES_VIEWS[view].name(r)}'s line`);
+        b.append(document.createElement('i')); b.firstChild.className = 'cost-swatch'; b.firstChild.setAttribute('aria-hidden', 'true');
+        b.addEventListener('click', () => _toggle(view, r));
         _paintSwatch(b, view, r);
         wrap.append(b, inner instanceof Node ? inner : document.createTextNode(String(inner == null ? '' : inner)));
         return wrap;
     };
 }
-const _seriesOpts = view => ({ open: r => _highlight(view, r), rowName: r => SERIES_VIEWS[view].name(r), rowKey: SERIES_VIEWS[view].rowKey, selectable: { contextKey: view, actions: [], onChange: () => _selectionChanged(view) } });
+const _seriesOpts = view => ({ open: r => _highlight(view, r), rowName: r => SERIES_VIEWS[view].name(r), rowKey: SERIES_VIEWS[view].rowKey });
 
 
 // ── The Overview over time (#7930): the change against the period before, and cost by team stacked ──
@@ -581,9 +574,8 @@ function _drawTable(container, table, columns, rows, empty, extra) {
     const st = _tables[table] || (_tables[table] = tableState());
     if (!st.sort) st.sort = { key: 'cost_usd', dir: 'desc' };
     if (!rows.length) { emptyState(container, empty || NO_DATA, 'cost-empty'); return; }
-    if (SERIES_VIEWS[table]) series.setSelected(table, _selectedKeys(table)); // the rows checked before keep their lines through a refresh
     const t = dataTable({ label: TABLE_TITLES[table], columns, rows, rowKey: r => rows.indexOf(r), state: st, fold: 'labeled', scroll: true, ...extra });
-    container.replaceChildren(...(extra && extra.selectable ? [t.bar, ...(isPhoneLayout() ? [t.selectButton] : [])] : []), t.el);
+    container.replaceChildren(t.el);
     if (SERIES_VIEWS[table]) _drawSeries(table); // the line under the chart compares its total with these rows
 }
 
@@ -671,90 +663,6 @@ function _renderAgentTable(rows) {
         _tokCol('input_tokens', 'Input'), _tokCol('output_tokens', 'Output'), ..._cacheCols(),
         { key: 'details', label: 'Details', tone: 'secondary', cell: r => { const b = dtLink('Charts', () => agentDetail.openAgent(r, document.getElementById('cost-time-range')?.value || 'day')); b.setAttribute('aria-label', `Charts for ${r.display_name || r.agent_name || 'agent'}`); return b; } }, // one agent over the range (#7930)
     ], filtered, NO_DATA, _seriesOpts('agent'));
-    _attachAgentChartHovers(container, new Set(filtered.map(r => r.session_id).filter(Boolean)));
-}
-
-// ── Turns-vs-Cost Hover Chart ─────────────────────────────────
-
-const _turnsCache = {};
-let _chartTooltip = null;
-
-function _ensureChartTooltip() {
-    if (_chartTooltip) return _chartTooltip;
-    _chartTooltip = document.createElement('div');
-    _chartTooltip.className = 'agent-cost-chart-tooltip';
-    document.body.appendChild(_chartTooltip);
-    return _chartTooltip;
-}
-
-function _attachAgentChartHovers(container, ids) {
-    for (const row of container.querySelectorAll('tr.dt-row')) {
-        const sessionId = row.dataset.key;
-        if (!ids.has(sessionId)) continue;
-
-        row.addEventListener('mouseenter', async (e) => {
-            const tooltip = _ensureChartTooltip();
-
-            // Fetch turns data (cached)
-            if (!_turnsCache[sessionId]) {
-                try {
-                    const resp = await fetch(`/api/token-usage/session/${encodeURIComponent(sessionId)}/turns`);
-                    if (resp.ok) {
-                        const data = await resp.json();
-                        _turnsCache[sessionId] = data.turns || [];
-                    } else {
-                        _turnsCache[sessionId] = [];
-                    }
-                } catch { _turnsCache[sessionId] = []; }
-            }
-
-            const turns = _turnsCache[sessionId];
-            if (turns.length < 2) { tooltip.style.display = 'none'; return; }
-
-            tooltip.innerHTML = `<div class="chart-title">Cumulative Cost over ${turns.length} turns</div>` + _renderCostSVG(turns);
-
-            // Position near cursor
-            const x = Math.min(e.clientX + 16, window.innerWidth - 340);
-            const y = Math.min(e.clientY - 100, window.innerHeight - 220);
-            tooltip.style.left = x + 'px';
-            tooltip.style.top = Math.max(8, y) + 'px';
-            tooltip.style.display = 'block';
-        });
-
-        row.addEventListener('mouseleave', () => {
-            const tooltip = _ensureChartTooltip();
-            tooltip.style.display = 'none';
-        });
-    }
-}
-
-function _renderCostSVG(turns) {
-    const W = 300, H = 160, PAD = 32;
-    const plotW = W - PAD * 2, plotH = H - PAD * 2;
-
-    const maxCost = turns[turns.length - 1].cumulative_cost || 1;
-    const maxTurn = turns.length;
-
-    // Build polyline points
-    const points = turns.map((t, i) => {
-        const x = PAD + (i / (maxTurn - 1)) * plotW;
-        const y = PAD + plotH - (t.cumulative_cost / maxCost) * plotH;
-        return `${x.toFixed(1)},${y.toFixed(1)}`;
-    });
-
-    // Area fill points (close path at bottom)
-    const areaPoints = [...points, `${(PAD + plotW).toFixed(1)},${(PAD + plotH).toFixed(1)}`, `${PAD.toFixed(1)},${(PAD + plotH).toFixed(1)}`];
-
-    return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
-        <line class="chart-grid" x1="${PAD}" y1="${PAD}" x2="${PAD}" y2="${PAD + plotH}" />
-        <line class="chart-grid" x1="${PAD}" y1="${PAD + plotH}" x2="${PAD + plotW}" y2="${PAD + plotH}" />
-        <polygon class="chart-area" points="${areaPoints.join(' ')}" />
-        <polyline class="chart-line" points="${points.join(' ')}" />
-        <text class="chart-axis-label" x="${PAD - 4}" y="${PAD + 4}" text-anchor="end">${_formatCost(maxCost)}</text>
-        <text class="chart-axis-label" x="${PAD - 4}" y="${PAD + plotH + 4}" text-anchor="end">$0</text>
-        <text class="chart-axis-label" x="${PAD}" y="${PAD + plotH + 16}" text-anchor="start">1</text>
-        <text class="chart-axis-label" x="${PAD + plotW}" y="${PAD + plotH + 16}" text-anchor="end">${maxTurn}</text>
-    </svg>`;
 }
 
 // Cached tasks for click-to-detail

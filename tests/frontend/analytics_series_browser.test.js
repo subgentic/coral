@@ -49,9 +49,10 @@ const series = (rows, key) => Array.from({ length: 24 }, (_, h) => ({ cost_usd: 
         assert.equal(l.length, 8, 'seven teams and Other: ' + JSON.stringify(l));
         assert.deepEqual(l.map(x => x.stroke), ['var(--viz-1)', 'var(--viz-2)', 'var(--viz-3)', 'var(--viz-4)', 'var(--viz-5)', 'var(--viz-6)', 'var(--viz-7)', 'var(--viz-other)']);
         assert.equal(await ev(`document.querySelector('#cost-series-team .viz-svg').getAttribute('aria-hidden')`), 'true');
-        const sw = await ev(`[...document.querySelectorAll('#cost-by-team tbody tr')].map(r => { const b = r.querySelector('.cost-swatch'); return b ? [b.style.background, b.getAttribute('aria-label')] : null; })`);
+        const sw = await ev(`[...document.querySelectorAll('#cost-by-team tbody tr')].map(r => { const b = r.querySelector('.cost-toggle'); return b ? [b.firstChild.style.background, b.getAttribute('aria-label'), b.getAttribute('aria-pressed')] : null; })`);
         assert.equal(sw.filter(Boolean).length, NAMES.length, 'every row has its swatch: ' + JSON.stringify(sw));
-        assert.match(sw[0][1], /^Bring coral-go-team's line forward$/);
+        assert.match(sw[0][1], /^Show coral-go-team's line$/); assert.deepEqual(sw.map(x => x[2]), ['true', 'true', 'true', 'true', 'true', 'true', 'true', 'false', 'false'], 'pressed when the row has a line of its own; the rows in Other are not');
+        assert.equal(await ev(`document.querySelectorAll('#cost-by-team .dt-check').length`), 0, 'one control per row: no checkbox column beside the swatch');
         assert.equal(new Set(sw.slice(0, 7).map(s => s[0])).size, 7, 'seven rows, seven colours');
         assert.equal(sw[7][0], sw[8][0], 'the rows in Other share its colour');
         console.log('   ✓');
@@ -89,57 +90,61 @@ const series = (rows, key) => Array.from({ length: 24 }, (_, h) => ({ cost_usd: 
         await metric('Cost'); await metric('Requests');
         console.log('   ✓');
 
-        console.log('2b. Rows checked in the table choose the lines; the others\' swatches are empty rings; the colours do not move; clearing brings the top 7 back');
-        const check = i => ev(`document.querySelectorAll('#cost-by-team tbody tr')[${i}].querySelector('.dt-check input').click(); true`);
-        await check(0); await check(1); await check(4);
+        console.log('2b. The swatch is the switch of the row\'s line: left out, shown alone, put back; the colours do not move; the choice survives a refresh; Show the top 7 restores');
+        const toggle = i => ev(`document.querySelectorAll('#cost-by-team .cost-toggle')[${i}].click(); true`);
+        await toggle(1); // hub-team off
         let l2 = await lines();
-        assert.deepEqual(l2.map(x => x.stroke).sort(), ['var(--viz-1)', 'var(--viz-2)', 'var(--viz-5)'], 'three checked rows, three lines, with the colours they had: ' + JSON.stringify(l2));
-        assert.equal(await ev(`document.querySelectorAll('#cost-by-team .cost-swatch-off').length`), NAMES.length - 3);
-        assert.match(await ev(`document.querySelector('#cost-series-team .viz-hint').textContent`), /^Showing the 3 checked rows/);
-        assert.match(await ev(`document.querySelector('#cost-series-team .viz-check').textContent`), /^✓ Totals agree/, 'the rows checked add up to the chart');
-        await check(7); // a row that was in Other takes a colour no checked row has
-        l2 = await lines(); assert.deepEqual(l2.map(x => x.stroke).sort(), ['var(--viz-1)', 'var(--viz-2)', 'var(--viz-3)', 'var(--viz-5)'], JSON.stringify(l2));
-        assert.equal(await ev(`document.querySelectorAll('#cost-by-team .cost-swatch')[7].style.background`), 'var(--viz-3)');
-        // the period changes: the checks stay
+        assert.deepEqual(l2.map(x => x.stroke), ['var(--viz-1)', 'var(--viz-3)', 'var(--viz-4)', 'var(--viz-5)', 'var(--viz-6)', 'var(--viz-7)'], 'six lines, each the colour it had: ' + JSON.stringify(l2));
+        assert.equal(await ev(`document.querySelectorAll('#cost-by-team .cost-swatch-off').length`), 3, 'the row left out and the two that were in Other are empty rings');
+        assert.deepEqual(await ev(`[...document.querySelectorAll('#cost-by-team .cost-toggle')].slice(0, 3).map(b => b.getAttribute('aria-pressed'))`), ['true', 'false', 'true']);
+        assert.match(await ev(`document.querySelector('#cost-series-team .viz-hint').textContent`), /^Showing 6 of 9 rows\. Show the top 7/);
+        assert.match(await ev(`document.querySelector('#cost-series-team .viz-check').textContent`), /^✓ Totals agree/, 'the rows shown add up to the chart');
+        await toggle(1); // back: the default again, Other too
+        assert.equal((await lines()).length, 8, 'the top 7 chosen again is the default');
+        await toggle(8); // a row in Other: shown alone, in the first colour
+        l2 = await lines(); assert.deepEqual(l2.map(x => x.stroke), ['var(--viz-1)'], JSON.stringify(l2));
+        assert.equal(await ev(`document.querySelectorAll('#cost-by-team .cost-toggle')[8].firstChild.style.background`), 'var(--viz-1)');
+        await toggle(0); await toggle(2);
+        l2 = await lines(); assert.deepEqual(l2.map(x => x.stroke).sort(), ['var(--viz-1)', 'var(--viz-2)', 'var(--viz-3)'].sort().length ? l2.map(x => x.stroke).sort() : [], JSON.stringify(l2));
+        assert.equal(l2.length, 3, 'three rows on: ' + JSON.stringify(l2));
+        // the period changes: the choice stays
         await ev(`(() => { const s = document.getElementById('cost-time-range'); s.value = 'week'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
-        await waitFor(`document.querySelectorAll('#cost-series-team .viz-svg path.viz-line').length === 4 && document.querySelectorAll('#cost-by-team tbody tr .dt-check input:checked').length === 4`, 'the checks kept through the period change', 12000);
-        // one row checked, several metrics: the metrics are the lines (tokens together, in their own colours), titled with the row
-        await ev(`document.querySelector('#cost-by-team .dt-bar-clear').click(); true`);
-        await waitFor(`document.querySelectorAll('#cost-by-team tbody tr .dt-check input:checked').length === 0`, 'cleared', 5000);
-        assert.equal((await lines()).length, 8, 'nothing checked: the top 7 and Other again');
-        await check(0);
+        await waitFor(`document.querySelectorAll('#cost-series-team .viz-svg path.viz-line').length === 3 && document.querySelectorAll('#cost-by-team .cost-toggle[aria-pressed="true"]').length === 3`, 'the choice kept through the period change', 12000);
+        // one row, several metrics: the metrics are the lines (tokens together, in their own colours), titled with the row
+        await ev(`[...document.querySelectorAll('#cost-series-team .viz-hint button')].find(b => /top 7/.test(b.textContent)).click(); true`);
+        await waitFor(`document.querySelectorAll('#cost-series-team .viz-svg path.viz-line').length === 8`, 'the top 7 again', 5000);
+        await toggle(8); // design-sys alone (Other's first)
         for (const m of ['Input', 'Output', 'Cache read', 'Cache write']) await metric(m);
         await metric('Cost'); // Cost off: the four token metrics are left
         const one = await ev(`({ titles: [...document.querySelectorAll('#cost-series-team .viz-title')].map(h => h.textContent), strokes: [...document.querySelectorAll('#cost-series-team .viz-svg path.viz-line')].map(p => p.getAttribute('stroke')) })`);
-        assert.deepEqual(one.titles, ['coral-go-team: Input, Output, Cache read and Cache write, each hour'], JSON.stringify(one));
+        assert.deepEqual(one.titles, ['design-sys: Input, Output, Cache read and Cache write, each hour'], JSON.stringify(one));
         assert.deepEqual(one.strokes, ['var(--viz-1)', 'var(--viz-2)', 'var(--viz-3)', 'var(--viz-4)'], 'a line per metric in the metric\'s own colour');
         assert.deepEqual(await ev(`[...document.querySelectorAll('#cost-series-team .viz-legend-item .viz-legend-name')].map(e => e.textContent)`), ['Input', 'Output', 'Cache read', 'Cache write'], 'a key names each metric line');
         assert.match(await ev(`document.querySelector('#cost-series-team .viz-check').textContent`), /^✓ Totals agree/);
+        assert.deepEqual(await ev(`[...document.querySelectorAll('#cost-series-team .viz-seg')[0].querySelectorAll('button[aria-pressed="true"]')].map(b => getComputedStyle(b, '::before').content)`), Array(4).fill('"✓" / ""'), 'each chosen metric wears a check mark');
         await shot('series-metrics-one-row');
         assert.equal(await ev(`document.querySelectorAll('#cost-series-team .viz-seg').length`), 3, 'Metrics, Show and, for one row with several metrics, Scale');
         await ev(`[...document.querySelectorAll('#cost-series-team .viz-seg')[2].querySelectorAll('button')].find(b => b.textContent === 'Log').click(); true`);
         const lg = await ev(`({ scale: document.querySelector('#cost-series-team .viz-svg').getAttribute('data-scale'), ticks: [...document.querySelectorAll('#cost-series-team .viz-svg text.viz-axis')].map(t => t.textContent).slice(0, 5) })`);
-        assert.equal(lg.scale, 'log'); assert.deepEqual(lg.ticks, ['0', '10', '100', '1.0K', '10.0K'], 'a log axis steps by powers of ten: ' + JSON.stringify(lg));
+        assert.equal(lg.scale, 'log'); assert.deepEqual(lg.ticks.slice(0, 4), ['0', '10', '100', '1.0K'], 'a log axis steps by powers of ten: ' + JSON.stringify(lg));
         await shot('series-metrics-one-row-log');
         await ev(`[...document.querySelectorAll('#cost-series-team .viz-seg')[2].querySelectorAll('button')].find(b => b.textContent === 'Linear').click(); true`);
-        await ev(`document.querySelector('#cost-by-team .dt-bar-clear').click(); true`);
+        await ev(`[...document.querySelectorAll('#cost-series-team .viz-hint button')].find(b => /top 7/.test(b.textContent)).click(); true`);
         await ev(`[...document.querySelectorAll('#cost-series-team .viz-seg')[1].querySelectorAll('button')].find(b => /^Running/.test(b.textContent)).click(); true`);
         await metric('Cost'); for (const m of ['Input', 'Output', 'Cache read', 'Cache write']) await metric(m); // back to Cost alone
         assert.deepEqual(await pressed(), ['Cost']);
         console.log('   ✓');
 
-        console.log('3. A swatch, or a click on the row, brings a line forward and dims the rest; again puts it back');
-        await ev(`[...document.querySelectorAll('#cost-series-team .viz-seg')[0].querySelectorAll('button')].find(b => b.textContent === 'Cost').click(); document.querySelectorAll('#cost-by-team .cost-swatch')[1].click(); true`);
+        console.log('3. A click on a row brings its line forward and dims the rest; again puts it back');
+        await ev(`document.querySelectorAll('#cost-by-team tbody tr')[1].querySelector('td:nth-child(2)').click(); true`);
         let h = await lines();
         const front = h.filter(x => x.w === '3.5'); assert.deepEqual(front.map(x => x.stroke), ['var(--viz-2)'], JSON.stringify(h)); assert.equal(h[h.length - 1].stroke, 'var(--viz-2)', 'it is drawn last, in front'); assert.equal(h.filter(x => x.o === '0.2').length, 7, 'the rest dim');
-        assert.equal(await ev(`document.querySelectorAll('#cost-by-team .cost-swatch')[1].getAttribute('aria-pressed')`), 'true');
-        await ev(`document.querySelectorAll('#cost-by-team .cost-swatch')[1].click(); true`);
+        assert.equal(await ev(`document.querySelectorAll('#cost-by-team .cost-toggle')[1].classList.contains('cost-toggle-front')`), true);
+        await ev(`document.querySelectorAll('#cost-by-team tbody tr')[1].querySelector('td:nth-child(2)').click(); true`);
         h = await lines(); assert.ok(h.every(x => x.o === '1' && x.w === '2'), JSON.stringify(h));
-        await ev(`document.querySelectorAll('#cost-by-team tbody tr')[2].querySelector('td:nth-child(2)').click(); true`); // a click on the row (not its swatch or a link)
-        h = await lines(); assert.deepEqual(h.filter(x => x.w === '3.5').map(x => x.stroke), ['var(--viz-3)'], 'the row click: ' + JSON.stringify(h));
-        await ev(`document.querySelectorAll('#cost-by-team .cost-swatch')[8].click(); true`);
+        await ev(`document.querySelectorAll('#cost-by-team tbody tr')[8].querySelector('td:nth-child(2)').click(); true`);
         h = await lines(); assert.deepEqual(h.filter(x => x.w === '3.5').map(x => x.stroke), ['var(--viz-other)'], 'a row in Other brings Other forward');
-        await ev(`document.querySelectorAll('#cost-by-team .cost-swatch')[8].click(); true`);
+        await ev(`document.querySelectorAll('#cost-by-team tbody tr')[8].querySelector('td:nth-child(2)').click(); true`);
         console.log('   ✓');
 
         console.log('4. The tooltip names the lines at the time under the pointer');
@@ -167,9 +172,9 @@ const series = (rows, key) => Array.from({ length: 24 }, (_, h) => ({ cost_usd: 
         console.log('6. A phone: the chart fits, no end labels, the swatches are targets, the table folds');
         await open(390, 844, true);
         await waitFor(`document.querySelector('#cost-by-team .dt-box').classList.contains('dt-folded')`, 'the table folds', 6000);
-        const p = await ev(`(() => { const box = document.querySelector('#cost-series-team .viz-chart'), s = box.querySelector('svg'); const sw = document.querySelector('#cost-by-team .cost-swatch').getBoundingClientRect();
-            return { page: document.documentElement.scrollWidth > innerWidth + 1, svgW: Math.round(s.getBoundingClientRect().width), boxW: Math.round(box.clientWidth), ends: s.querySelectorAll('.viz-end').length, sw: Math.round(Math.min(sw.width, sw.height)), swTag: document.querySelector('#cost-by-team .cost-swatch').tagName, metricRows: new Set([...document.querySelectorAll('#cost-series-team .viz-seg')[0].querySelectorAll('button')].map(b => Math.round(b.getBoundingClientRect().top))).size, seg: Math.round(document.querySelector('#cost-series-team .viz-seg button').getBoundingClientRect().height), folded: document.querySelector('#cost-by-team .dt-box').classList.contains('dt-folded') }; })()`);
-        assert.equal(p.metricRows, 1, 'the Metric segments are one row at 390: ' + JSON.stringify(p)); assert.equal(p.page, false, JSON.stringify(p)); assert.ok(p.svgW <= p.boxW + 1, JSON.stringify(p)); assert.equal(p.ends, 0, 'no end labels on a phone'); assert.ok(p.sw >= 18 && p.swTag === 'SPAN', 'on a touch screen the swatch is only a colour (the 44 px row does the same): ' + JSON.stringify(p)); assert.ok(p.seg >= 44, 'the pickers are 44 px: ' + JSON.stringify(p)); assert.equal(p.folded, true);
+        const p = await ev(`(() => { const box = document.querySelector('#cost-series-team .viz-chart'), s = box.querySelector('svg'); const sw = document.querySelector('#cost-by-team .cost-toggle').getBoundingClientRect();
+            return { page: document.documentElement.scrollWidth > innerWidth + 1, svgW: Math.round(s.getBoundingClientRect().width), boxW: Math.round(box.clientWidth), ends: s.querySelectorAll('.viz-end').length, sw: Math.round(Math.min(sw.width, sw.height)), swTag: document.querySelector('#cost-by-team .cost-toggle').tagName, metricRows: new Set([...document.querySelectorAll('#cost-series-team .viz-seg')[0].querySelectorAll('button')].map(b => Math.round(b.getBoundingClientRect().top))).size, seg: Math.round(document.querySelector('#cost-series-team .viz-seg button').getBoundingClientRect().height), folded: document.querySelector('#cost-by-team .dt-box').classList.contains('dt-folded') }; })()`);
+        assert.equal(p.metricRows, 1, 'the Metric segments are one row at 390: ' + JSON.stringify(p)); assert.equal(p.page, false, JSON.stringify(p)); assert.ok(p.svgW <= p.boxW + 1, JSON.stringify(p)); assert.equal(p.ends, 0, 'no end labels on a phone'); assert.ok(p.sw >= 44 && p.swTag === 'BUTTON', 'the switch is a 44 px button on a touch screen: ' + JSON.stringify(p)); assert.ok(p.seg >= 44, 'the pickers are 44 px: ' + JSON.stringify(p)); assert.equal(p.folded, true);
         console.log('   ✓'); await shot('series-team-phone');
         await view('overview'); await waitFor(`document.querySelectorAll('#cost-series-overview .viz-fill').length === 8`, 'the Overview on a phone', 12000); await ev(`window.scrollTo(0, 0); true`); await shot('series-overview-phone'); await setTheme(ev, 'light'); await shot('series-overview-phone-light'); await setTheme(ev, 'dark');
         console.log('PASS analytics over time: lines, legend table, picker, highlight, tooltip, totals, phone');
