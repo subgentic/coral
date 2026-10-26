@@ -34,11 +34,6 @@
     "js": 0,
     "html": 1
   },
-  "pw-input-row": {
-    "css": 1,
-    "js": 1,
-    "html": 0
-  },
   "net-group-head": {
     "css": 6,
     "js": 2,
