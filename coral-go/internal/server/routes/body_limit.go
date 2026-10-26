@@ -39,6 +39,9 @@ func BodyLimitKeys() []string {
 	return keys
 }
 
+// remoteProxyPattern is the hub's reverse proxy route (pkg/hubproxy mounts it): the whole path after the server id is its "*".
+const remoteProxyPattern = "/api/remote/{server}/*"
+
 // bodyLimitFor is r's limit: its route's entry, else the default.
 func bodyLimitFor(r *http.Request) int64 {
 	if len(bodyLimits) > 0 {
@@ -47,6 +50,11 @@ func bodyLimitFor(r *http.Request) int64 {
 			if rc.Routes.Match(tctx, r.Method, routedPath(r)) {
 				if n, ok := bodyLimits[r.Method+" "+tctx.RoutePattern()]; ok {
 					return n
+				}
+				// A hub's proxy hands the request on as it is: the image upload to another computer (POST /api/remote/{server}/api/upload) is the upload route's own size, not the default 8 MiB the
+				// catch-all would give it, or the dashboard's 20 MB image is refused 413 at the hub for a computer that would take it (#8725). The computer's own limit still applies on arrival.
+				if r.Method == http.MethodPost && tctx.RoutePattern() == remoteProxyPattern && tctx.URLParam("*") == "api/upload" {
+					return bodyLimits["POST /api/upload"]
 				}
 			}
 		}
