@@ -645,34 +645,7 @@
                     <div class="settings-panes">
                     <section class="settings-pane" id="settings-pane-general" data-group="general" data-icon="tune" data-title="General" role="tabpanel" aria-labelledby="settings-tab-general" tabindex="-1">
                         <h4 class="settings-pane-title">General</h4>
-                        <dl class="info-grid settings-grid">
-                <div class="settings-row">
-                <dt id="settings-theme-label">Theme</dt>
-                <dd>
-                    <select aria-labelledby="settings-theme-label" id="settings-theme" class="settings-select">
-                        <option value="dark">Dark</option>
-                        <option value="light">Light</option>
-                        <option value="system">System</option>
-                    </select>
-                    <button class="btn btn-small settings-theme-btn" data-on-click="m-hide-settings-modal-then-show-theme-configurator"> <span class="material-icons icon-inline" aria-hidden="true">palette</span> Customize Theme </button>
-                </dd>
-                </div>
-                <div class="settings-row">
-                <dt id="settings-agent-type-label">Default agent type</dt>
-                <dd>
-                    <select aria-labelledby="settings-agent-type-label" id="settings-agent-type" class="settings-select">
-                        <option value="claude">Claude</option>
-                        <option value="agy">Antigravity (agy)</option>
-                        <option value="codex">Codex</option>
-                        <option value="pi">Pi</option>
-                    </select>
-                </dd>
-                </div>
-                {{ template "includes/toggle_row" (toggle "settings-group-by-team" "Group agents by board or team" "" "data-on-change=\"m-toggle-group-by-team\"") }}
-                {{ template "includes/toggle_row" (toggle "settings-show-summary" "Summary under each agent" "The agent's goal, in one line." "data-on-change=\"m-toggle-session-summary\"") }}
-                {{ template "includes/toggle_row" (toggle "settings-show-scrollbars" "Show scrollbars" "Terminal and chat views." "checked") }}
-                {{ template "includes/toggle_row" (toggle "settings-check-updates" "Tell me when a new version is out" "A notice in this browser. Downloading and installing are under Updates.") }}
-                        </dl>
+                        <div id="settings-general-rows"></div>
 
                         <div id="tier-branding-label" class="tier-branding" style="display:none"></div>
                     </section>

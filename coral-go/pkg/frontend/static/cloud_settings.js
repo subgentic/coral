@@ -46,7 +46,7 @@ export function applyCloudSettingsDialog() {
     const shell = modal && modal.querySelector('.settings-shell');
     if (!shell || shell.dataset.cloud === '1') return;
     shell.dataset.cloud = '1';
-    for (const row of modal.querySelectorAll('.settings-row')) {
+    for (const row of modal.querySelectorAll('.settings-row, .sv-row')) {
         const ids = Array.from(row.querySelectorAll('[id]')).map(c => c.id);
         if (!ids.some(id => SHOWN_CONTROLS.has(id))) row.hidden = true;
     }
