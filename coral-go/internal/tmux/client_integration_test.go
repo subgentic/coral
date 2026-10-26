@@ -226,7 +226,7 @@ func TestClient_SendKeys_CapturePane(t *testing.T) {
 	time.Sleep(500 * time.Millisecond)
 
 	// Capture pane content
-	content, err := c.CapturePaneTarget(ctx, "send-capture:0.0", 200)
+	content, err := c.capturePaneTarget(ctx, "send-capture:0.0", 200)
 	require.NoError(t, err)
 	assert.Contains(t, content, "TMUX_MARKER_42")
 }
@@ -242,7 +242,7 @@ func TestClient_SendKeys_MultiLine(t *testing.T) {
 	require.NoError(t, err)
 	time.Sleep(500 * time.Millisecond)
 
-	content, err := c.CapturePaneTarget(ctx, "multiline-test:0.0", 200)
+	content, err := c.capturePaneTarget(ctx, "multiline-test:0.0", 200)
 	require.NoError(t, err)
 	assert.Contains(t, content, "LINE_A")
 	assert.Contains(t, content, "LINE_B")
@@ -270,7 +270,7 @@ func TestClient_RespawnPane(t *testing.T) {
 	c.SendKeysToTarget(ctx, terminalinput.Unclassified, "respawn-test:0.0", "echo AFTER_RESPAWN")
 	time.Sleep(500 * time.Millisecond)
 
-	content, err := c.CapturePaneTarget(ctx, "respawn-test:0.0", 200)
+	content, err := c.capturePaneTarget(ctx, "respawn-test:0.0", 200)
 	require.NoError(t, err)
 	assert.Contains(t, content, "AFTER_RESPAWN")
 }
@@ -382,7 +382,7 @@ func TestClient_ClearHistory(t *testing.T) {
 	var captureErr error
 	ok := false
 	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
-		before, captureErr = c.CapturePaneTarget(ctx, "clear-hist:0.0", 500)
+		before, captureErr = c.capturePaneTarget(ctx, "clear-hist:0.0", 500)
 		if captureErr == nil && strings.Count(before, "SCROLLBACK_LINE\n") >= 50 {
 			ok = true
 			break
@@ -403,7 +403,7 @@ func TestClient_ClearHistory(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// After clearing, capture with scrollback should be shorter
-	after, err := c.CapturePaneTarget(ctx, "clear-hist:0.0", 500)
+	after, err := c.capturePaneTarget(ctx, "clear-hist:0.0", 500)
 	require.NoError(t, err)
 	assert.Less(t, len(strings.TrimSpace(after)), len(strings.TrimSpace(before)),
 		"scrollback should be shorter after clear-history")
@@ -476,7 +476,7 @@ func TestClient_SendTerminalInputToTarget_LiteralText(t *testing.T) {
 	require.NoError(t, err)
 	time.Sleep(300 * time.Millisecond)
 
-	content, err := c.CapturePaneTarget(ctx, "literal-test:0.0", 200)
+	content, err := c.capturePaneTarget(ctx, "literal-test:0.0", 200)
 	require.NoError(t, err)
 	assert.Contains(t, content, "hello world")
 }
@@ -549,7 +549,7 @@ func TestClient_SendTerminalInputToTarget_SubmitsTrailingCR(t *testing.T) {
 	// A line that starts with the prompt: the typed command's echo holds "ZSH> " too, behind the
 	// old shell's prompt, before zsh is running (#3788).
 	require.Eventually(t, func() bool {
-		out, _ := c.CapturePaneTarget(ctx, target, 50)
+		out, _ := c.capturePaneTarget(ctx, target, 50)
 		for _, line := range strings.Split(out, "\n") {
 			if strings.HasPrefix(line, "ZSH>") { // the capture drops the trailing space
 				return true
@@ -566,7 +566,7 @@ func TestClient_SendTerminalInputToTarget_SubmitsTrailingCR(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			require.NoError(t, c.SendTerminalInputToTarget(ctx, terminalinput.Unclassified, target, tc.data))
 			require.Eventually(t, func() bool {
-				out, _ := c.CapturePaneTarget(ctx, target, 100)
+				out, _ := c.capturePaneTarget(ctx, target, 100)
 				for _, line := range strings.Split(out, "\n") {
 					if strings.TrimSpace(line) == tc.want {
 						return true

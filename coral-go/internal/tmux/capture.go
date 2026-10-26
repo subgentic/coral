@@ -92,8 +92,8 @@ func (c *Client) forgetCaptureTargets(sessionID string) {
 	}
 }
 
-// CapturePaneTarget captures pane content by target address.
-func (c *Client) CapturePaneTarget(ctx context.Context, target string, lines int) (string, error) {
+// capturePaneTarget captures pane content by target address.
+func (c *Client) capturePaneTarget(ctx context.Context, target string, lines int) (string, error) {
 	stdout, err := c.run(ctx, "capture-pane", "-t", target, "-p", fmt.Sprintf("-S-%d", lines))
 	if err != nil {
 		return "", nil

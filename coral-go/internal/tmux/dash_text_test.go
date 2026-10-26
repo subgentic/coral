@@ -36,7 +36,7 @@ func TestDashLeadingTextIsTyped(t *testing.T) {
 	want := append(lines, "-l raw")
 	var out string
 	assert.Eventually(t, func() bool {
-		out, _ = c.CapturePaneTarget(ctx, target, 50)
+		out, _ = c.capturePaneTarget(ctx, target, 50)
 		for _, l := range want {
 			if strings.Count(out, l) < 2 { // typed, and cat's echo of it
 				return false

@@ -25,7 +25,7 @@ func longLaunch(marker string) string {
 
 func paneText(t *testing.T, c *Client, target string) string {
 	t.Helper()
-	s, err := c.CapturePaneTarget(context.Background(), target, 200)
+	s, err := c.capturePaneTarget(context.Background(), target, 200)
 	require.NoError(t, err)
 	return s
 }

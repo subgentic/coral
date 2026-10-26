@@ -96,7 +96,7 @@ func TestBundledPayloadSmoke(t *testing.T) {
 	// 4. Send text and capture it back.
 	require.NoError(t, c.SendKeysToTarget(ctx, terminalinput.Unclassified, target, "payload smoke ok"))
 	time.Sleep(300 * time.Millisecond)
-	captured, err := c.CapturePaneTarget(ctx, target, 50)
+	captured, err := c.capturePaneTarget(ctx, target, 50)
 	require.NoError(t, err)
 	assert.Contains(t, captured, "payload smoke ok")
 
