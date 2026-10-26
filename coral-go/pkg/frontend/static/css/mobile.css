@@ -1442,6 +1442,7 @@
     .mobile-send-btn.is-stop .stop-icon { display: block; }
     .mobile-send-btn.is-stop[aria-disabled="true"] { opacity: .6; }
     .command-pane.hub-view-only :is(.keys-chip, .agent-key-strip) { display: none !important; }
+    #command-pane.chat-mode .agent-key-strip { display: none !important; } /* the strip belongs to the terminal view, where its Keys chip is: in the chat view it had no toggle and stayed up above the message box (#8728) */
 }
 
 /* The phone already places the state below; attention names use the same end ellipsis as the sidebar. */
