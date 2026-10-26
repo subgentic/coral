@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/board/boardtest"
 	"github.com/subgentic/coral/internal/gitutil"
@@ -294,4 +295,14 @@ func TestSpendRefusesWhatItDoesNotKnowAndAnswersNoRepositoryInWords(t *testing.T
 	assert.NotEmpty(t, commits["reason"])
 	assert.Nil(t, commits["window"])
 	assert.Nil(t, out["per_hour"].([]any)[0].(map[string]any)["commits"])
+}
+
+// #7764: agy's tokens are measured (the token poller reads the PLANNER_RESPONSE rows of its transcript); Gemini writes none.
+func TestSpendMeasuresTheTokensOfTheCLIsTheTokenPollerReads(t *testing.T) {
+	for _, typ := range []string{agenttypes.Claude, agenttypes.Codex, agenttypes.Pi, agenttypes.Agy} {
+		assert.True(t, tokenSources[typ], typ)
+	}
+	for _, typ := range []string{agenttypes.Gemini, agenttypes.Terminal} {
+		assert.False(t, tokenSources[typ], typ)
+	}
 }

@@ -17,7 +17,7 @@ import (
 // The Analytics view's data for one team (#7525): tokens, commits that reached main, tool calls and task times for a board, over a window and the seven days before it ("the usual"). One read:
 // GET /api/board/{project}/spend?range=24h|7d. NEVER through Coral Hub for now (no row in the tunnel table, a census line): it names agents and counts their work.
 //
-// Tokens are measured for Claude, Codex and Pi (the token poller reads their transcripts) and not for Gemini and agy, which write no rows: those agents are null, never zero. Tool calls come from the
+// Tokens are measured for Claude, Codex, Pi and agy (the token poller reads their transcripts) and not for Gemini, which writes no rows: those agents are null, never zero. Tool calls come from the
 // tool_use events the hooks record (Claude, Codex, agy), not Gemini or Pi. Commits are read from the repository's own history (internal/landedcommits): the board's live agents' most common git root and
 // the repository's default branch, the author name is the agent, a commit that matches no agent is "Unattributed". Task times are what the board stores (store: board/task_times.go).
 
@@ -45,7 +45,7 @@ func (h *SpendHandler) clock() time.Time {
 
 // tokenSources and toolSources are the CLIs that have a source for each measure.
 var (
-	tokenSources = map[string]bool{agenttypes.Claude: true, agenttypes.Codex: true, agenttypes.Pi: true}
+	tokenSources = map[string]bool{agenttypes.Claude: true, agenttypes.Codex: true, agenttypes.Pi: true, agenttypes.Agy: true}
 	toolSources  = map[string]bool{agenttypes.Claude: true, agenttypes.Codex: true, agenttypes.Agy: true}
 )
 

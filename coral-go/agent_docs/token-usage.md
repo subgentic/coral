@@ -43,7 +43,7 @@ every row kept from before the model was in the key (the table was rebuilt with
 those rows under `""`, none lost or guessed). Each agent type and model also has a
 row with `thinking` `""` ("Not reported") for the rest of that model's usage:
 calls whose turn recorded no level, a CLI that writes no thinking level in its transcript (`agy`, `pi`), and
-everything from before levels were tracked. (Antigravity `agy` 1.4.7 writes `input_tokens`, `cache_read_tokens`, and `output_tokens` on `PLANNER_RESPONSE` entries in `~/.gemini/antigravity-cli/brain/<agy-conversation-id>/.system_generated/logs/transcript.jsonl` and `transcript_full.jsonl`, `internal/agent/agy.go` and `internal/jsonl/transcript_paths.go`, but `TokenPoller` in `internal/background/token_poller.go` currently polls `claude`, `codex`, and `pi` transcripts only.) It is the model's total in `by_model`
+everything from before levels were tracked. (Antigravity `agy` 1.4.7 writes `input_tokens`, `cache_read_tokens`, and `output_tokens` on the `PLANNER_RESPONSE` rows of its transcript, `~/.gemini/antigravity-cli/brain/<agy-conversation-id>/.system_generated/logs/transcript.jsonl`; `TokenPoller` records them per model call (`internal/background/token_poller_agy.go`), finding the transcript by the conversation agy's own hook named for the session (`transcriptlink.BindAgy`, `jsonl.ResolveAgyTranscript`).) It is the model's total in `by_model`
 less the tracked levels, and never the level an agent was launched with. The
 tracked rows with model `""` come out of the type's remainders (the model-less
 remainder first, then the models' largest first), so a type's rows add up to its
