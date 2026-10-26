@@ -119,23 +119,9 @@ func defineServerFlags() *serverFlags {
 	return sf
 }
 
-func main() {
-	if code, ok := subcommand(os.Args[1:]); ok {
-		os.Exit(code)
-	}
-	// Runs last on a normal return: the terminal gets "[SHUTDOWN] done".
-	defer logexit.Flush()
-
-	// Global panic recovery — log the full stack trace before exiting
-	defer func() {
-		if r := recover(); r != nil {
-			log.Printf("[FATAL] panic in main: %v\n%s", r, debug.Stack())
-			logexit.Exit(1)
-		}
-	}()
-
-	// Parse --home early so config.Load() can use it
-	sf := defineServerFlags()
+// parseServerFlags parses the command line (exiting for --help-all, --help and a bad flag, as main always did) and tells config whether a shared data
+// folder is allowed.
+func parseServerFlags(sf *serverFlags) {
 	// A bad flag gets one line and where to look, not every server flag (#235); --help-all prints them all.
 	flag.Usage = func() {
 		for _, a := range os.Args[1:] {
@@ -168,6 +154,11 @@ func main() {
 	}
 	flag.CommandLine.Usage = usage
 	config.SetAllowSharedDataDir(*sf.allowSharedDataDir) // before config.Load, which makes the data folder
+}
+
+// answeredBeforeStart answers what needs no server: --version, a stray word, a refused backend and the encryption self-test. It exits for the first
+// three and returns true after the self-test (main then returns normally, so its deferred flush runs).
+func answeredBeforeStart(sf *serverFlags) bool {
 	if *sf.showVersion {
 		printVersion(os.Stdout)
 		os.Exit(0)
@@ -189,6 +180,30 @@ func main() {
 			os.Exit(1)
 		}
 		fmt.Println("encrypted database self-test passed")
+		return true
+	}
+	return false
+}
+
+func main() {
+	if code, ok := subcommand(os.Args[1:]); ok {
+		os.Exit(code)
+	}
+	// Runs last on a normal return: the terminal gets "[SHUTDOWN] done".
+	defer logexit.Flush()
+
+	// Global panic recovery — log the full stack trace before exiting
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("[FATAL] panic in main: %v\n%s", r, debug.Stack())
+			logexit.Exit(1)
+		}
+	}()
+
+	// Parse --home early so config.Load() can use it
+	sf := defineServerFlags()
+	parseServerFlags(sf)
+	if answeredBeforeStart(sf) {
 		return
 	}
 
