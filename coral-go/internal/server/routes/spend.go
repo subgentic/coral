@@ -146,10 +146,36 @@ type spendResponse struct {
 
 const spendReviewLabel = "review time (from assignment to approval)"
 
-// Spend answers GET /api/board/{project}/spend?range=24h|7d.
-func (h *SpendHandler) Spend(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Cache-Control", "no-store")
-	project := urlParam(r, "project")
+// spendFrame is the time the read is about: the window, and the seven days before it ("the usual"). A 24 h window is whole hours ending at the next hour; a 7 d window is whole UTC days ending tonight.
+type spendFrame struct {
+	rng                         string
+	hourly                      bool // range 24h
+	hours                       int
+	now, start, end, usualStart time.Time
+}
+
+func newSpendFrame(rng string, now time.Time) spendFrame {
+	fr := spendFrame{rng: rng, hourly: rng == "24h", now: now}
+	if fr.hourly {
+		fr.end = now.Truncate(time.Hour).Add(time.Hour)
+		fr.hours = 24
+		fr.start = fr.end.Add(-24 * time.Hour)
+	} else {
+		day := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+		fr.end = day.Add(24 * time.Hour)
+		fr.hours = 7 * 24
+		fr.start = fr.end.Add(-7 * 24 * time.Hour)
+	}
+	fr.usualStart = fr.start.Add(-7 * 24 * time.Hour)
+	return fr
+}
+
+// spendStamp is a time in the replies and in the token store's queries (RFC 3339); spendDBStamp is the form the event table keeps.
+func spendStamp(t time.Time) string   { return t.UTC().Format(time.RFC3339) }
+func spendDBStamp(t time.Time) string { return t.UTC().Format("2006-01-02T15:04:05") }
+
+// spendRange reads the one query parameter the read takes, and answers a bad request itself.
+func spendRange(w http.ResponseWriter, r *http.Request) (string, bool) {
 	rng := r.URL.Query().Get("range")
 	if rng == "" {
 		rng = "24h"
@@ -157,11 +183,22 @@ func (h *SpendHandler) Spend(w http.ResponseWriter, r *http.Request) {
 	for k := range r.URL.Query() {
 		if k != "range" {
 			errBadRequest(w, "this read takes range only")
-			return
+			return "", false
 		}
 	}
 	if rng != "24h" && rng != "7d" {
 		errBadRequest(w, "range is 24h or 7d")
+		return "", false
+	}
+	return rng, true
+}
+
+// Spend answers GET /api/board/{project}/spend?range=24h|7d.
+func (h *SpendHandler) Spend(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	project := urlParam(r, "project")
+	rng, ok := spendRange(w, r)
+	if !ok {
 		return
 	}
 	id, _, err := h.bs.ResolveBoard(r.Context(), project) // an id, or a label that names one board
@@ -172,22 +209,10 @@ func (h *SpendHandler) Spend(w http.ResponseWriter, r *http.Request) {
 	project = id
 
 	now := h.clock()
-	var start, end time.Time
-	var hours int
-	if rng == "24h" {
-		end = now.Truncate(time.Hour).Add(time.Hour)
-		hours = 24
-		start = end.Add(-24 * time.Hour)
-	} else {
-		day := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
-		end = day.Add(24 * time.Hour)
-		hours = 7 * 24
-		start = end.Add(-7 * 24 * time.Hour)
-	}
-	usualStart := start.Add(-7 * 24 * time.Hour)
+	fr := newSpendFrame(rng, now)
+	start, end, usualStart, hours, hourly := fr.start, fr.end, fr.usualStart, fr.hours, fr.hourly
 	ctx := r.Context()
-	f := func(t time.Time) string { return t.UTC().Format(time.RFC3339) }
-	g := func(t time.Time) string { return t.UTC().Format("2006-01-02T15:04:05") }
+	f, g := spendStamp, spendDBStamp
 
 	sessions, err := h.ss.GetBoardSessions(ctx, project)
 	if err != nil {
@@ -269,7 +294,6 @@ func (h *SpendHandler) Spend(w http.ResponseWriter, r *http.Request) {
 			toolSessions = append(toolSessions, id)
 		}
 	}
-	hourly := rng == "24h"
 	const bucketLen = 13 // hourly always: the day series is made from the hours
 	var toolRows []store.ToolCallBucket
 	if len(toolSessions) > 0 {
