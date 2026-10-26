@@ -148,3 +148,4 @@
     .sv-bar { position: static; }
     .sv .wt-item { padding: 8px; gap: 2px 8px; } /* a kept-worktree row (a live part of Storage and cleanup) on a narrow pane: the card's own padding gives the words the room */
 }
+.sv .sv-row-wide.sv-row textarea.sv-textarea, .sv .sv-row-wide.sv-row input.sv-input[type="text"] { max-width: none; } /* a wide field (a long text) spans its row under its label, not the 38rem a dialog's legacy rule gives a text box (#8479); the extra classes outweigh that rule */
