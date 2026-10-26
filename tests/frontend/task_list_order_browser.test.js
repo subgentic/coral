@@ -39,9 +39,9 @@ const open = [
 
         console.log('Columns put Status and the primary Task before the facts');
         assert.deepEqual(await ev(`[...document.querySelectorAll('#board-task-list thead th')].map(h => h.querySelector('.dt-sort > span, .dt-head-text').textContent.trim())`),
-            ['Status', 'Task', 'Agent']); // the dock shows Status, Task and Agent only (#7962)
+            ['State', 'Task', 'Assigned to']); // the dock is the Tasks view's agent-team scope: State, Task and Assigned to (#7962, #8060)
         assert.deepEqual(await ev(`[...document.querySelector('#board-task-list tbody tr').cells].map(c => c.dataset.key)`),
-            ['status', 'id', 'assignee']);
+            ['state', 'task', 'who']);
         assert.equal(await ev(`(() => { const row = document.querySelector('#board-task-list tbody tr'); const primary = row.cells[1].querySelector('.dt-primary'); return row.querySelectorAll('.dt-primary').length === 1 && row.cells[1].querySelector('.board-task-id')?.textContent === '#5' && row.cells[1].textContent.startsWith('#5 Draft') && primary?.textContent === 'Draft'; })()`), true,
             'the second cell has one primary action, with ID before the title');
 
@@ -58,15 +58,15 @@ const open = [
         const arrows = () => ev(`[...document.querySelectorAll('#board-task-list th[aria-sort]')].filter(e => e.getAttribute('aria-sort') !== 'none').map(e => e.querySelector('.dt-sort').dataset.key + ':' + (e.getAttribute('aria-sort') === 'descending' ? '▼' : '▲'))`);
         assert.deepEqual(await arrows(), [], 'the default order has no arrow');
         const click = f => ev(`document.querySelector('#board-task-list .dt-sort[data-key="${f}"]').click(); true`);
-        await click('id'); assert.deepEqual(await arrows(), ['id:▼'], 'first click: the largest id first, arrow down (the Task column)');
+        await click('task'); assert.deepEqual(await arrows(), ['task:▼'], 'first click: the largest id first, arrow down (the Task column)');
         assert.deepEqual((await ids()).slice(0, 3), [139, 138, 137], 'a chosen Task column is the plain id order');
-        await click('id'); assert.deepEqual((await arrows())[0], 'id:▲', 'second click turns it round');
-        await click('id');
+        await click('task'); assert.deepEqual((await arrows())[0], 'task:▲', 'second click turns it round');
+        await click('task');
         assert.deepEqual(await arrows(), [], 'third click: the arrow is gone');
         assert.deepEqual(await ids(), want, 'and the order is the default again: open first, then done');
-        await click('assignee'); assert.deepEqual(await arrows(), ['assignee:▼'], 'another column starts its own count');
-        await click('id'); assert.deepEqual(await arrows(), ['id:▼'], 'a click on another column chooses it, it does not reset');
-        await click('id'); await click('id');
+        await click('who'); assert.deepEqual(await arrows(), ['who:▼'], 'another column starts its own count');
+        await click('task'); assert.deepEqual(await arrows(), ['task:▼'], 'a click on another column chooses it, it does not reset');
+        await click('task'); await click('task');
         assert.deepEqual(await arrows(), [], 'three clicks on a column in a row, from any state, give the default back');
         assert.deepEqual(await ids(), want);
         console.log('  ok');
@@ -93,9 +93,9 @@ const open = [
                 return { folded: box.classList.contains('dt-folded'), scroll: list.scrollWidth, width: list.clientWidth, cells, heads };
             })()`);
             assert.ok(g.scroll <= g.width + 1, `at ${w}px no sideways scroll: ${JSON.stringify(g)}`);
-            for (const key of ['assignee']) {
+            for (const key of ['who']) {
                 const cell = g.cells.find(c => c.key === key);
-                if (g.folded && ['assignee'].includes(key)) assert.equal(cell.shown, false, `empty ${key} is omitted at ${w}px`);
+                if (g.folded && ['who'].includes(key)) assert.equal(cell.shown, false, `empty ${key} is omitted at ${w}px`);
                 else assert.ok(cell.shown, `${key} remains visible at ${w}px`);
                 if (!g.folded) assert.ok(Math.abs(cell.left - g.heads.find(h => h.key === key).left) < 1, `${key} aligns with its header at ${w}px`);
             }

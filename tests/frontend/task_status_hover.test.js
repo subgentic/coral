@@ -56,7 +56,7 @@ const BASE = require('./test_base').BASE;
         })()`);
         const working = status.find(row => row.id === '#1497');
         const blocked = status.find(row => row.id === '#1498');
-        assert.equal(working.text, 'Open');
+        assert.equal(working.text, 'In progress', 'the dock says the Tasks view words (#8060); the old Open is in the tooltip');
         assert.equal(working.title, 'Open · Working');
         assert.equal(working.aria, 'Open · Working');
         assert.equal(working.tabIndex, -1, 'the status is not a tab stop (#5813): its words are in the Open button\'s name');
@@ -73,26 +73,26 @@ const BASE = require('./test_base').BASE;
         assert.equal(blocked.badge, false);
 
         const finished = status.find(row => row.id === '#1499');
-        assert.equal(finished.text, 'Finished');
+        assert.equal(finished.text, 'Done');
         assert.equal(finished.title, 'Finished');
         assert.equal(finished.aria, 'Finished');
         assert.equal(finished.tabIndex, -1, 'the status is not a tab stop (#5813): its words are in the Open button\'s name');
         assert.equal(finished.label, true);
 
         const claimed = status.find(row => row.id === '#1500');
-        assert.equal(claimed.text, 'Claimed');
+        assert.equal(claimed.text, 'In progress');
         assert.equal(claimed.title, 'Claimed · Working');
         assert.equal(claimed.aria, 'Claimed · Working');
         assert.equal(claimed.tabIndex, -1, 'the status is not a tab stop (#5813): its words are in the Open button\'s name');
         assert.equal(claimed.label, true);
 
         const assignedOpen = status.find(row => row.id === '#1501');
-        assert.equal(assignedOpen.text, 'Open');
+        assert.equal(assignedOpen.text, 'Queued');
         assert.equal(assignedOpen.title, 'Open');
 
         const review = status.find(row => row.id === '#1502');
         // The visible label is short so it fits the fixed status column; the full status stays in the tooltip.
-        assert.equal(review.text, 'Review');
+        assert.equal(review.text, 'In review');
         assert.equal(review.title, 'Open · Review pending');
 
         // the row's one keyboard control says the task and its status (#5813): "Open task #N: title, Open · Working"

@@ -15,6 +15,8 @@ import { morphHtml } from './dom_morph.js';
 import { _verifyMark } from './task_verify_marks.js';
 import { goalTitle, refreshGoalTitles } from './task_goals.js';
 import * as DT from './data_table.js';
+import * as TV from './tasks_view.js';
+import { taskStatusWord, statusClass } from './goal_words.js';
 import { whenText } from './when_text.js';
 
 const dockTaskTableState = DT.tableState();
@@ -570,31 +572,32 @@ function _taskTable(tasks, footer) {
     const details = t => [t._source === 'subagent' ? t.subagent_type : '',
         t._source === 'board' ? _claimedFor(t) : '',
         t._source === 'board' && t.goal_id ? `Goal: ${goalTitle(_goalBoard, t.goal_id)}` : ''].filter(Boolean).join(' · ');
-    dockTaskTableState.sort = _taskSortExplicit ? { key: _taskSortField, dir: _taskSortAsc ? 'asc' : 'desc' } : null;
-    const table = DT.dataTable({ label: 'Agent tasks', rows: tasks, rowKey: key, rowName: t => t.title || t.description || '',
-        footer, state: dockTaskTableState, onSort: field => _toggleTaskSort(field), bare: true, sortBar: false, defaultSortLabel: _queryActive() && _taskFilters.sort !== 'open' ? taskSortLabel[_taskFilters.sort] : 'Open first, newest first',
-        columns: [
-            { key: 'status', label: 'Status', width: 'content', line: 2, cell: t => {
-                const st = _taskStatus(t), cls = st.className === 'completed' ? 'goal-state-task-done' : st.className === 'in-progress' ? 'goal-state-task-active' : st.className === 'blocked' ? 'goal-state-task-blocked' : '';
-                const chip = DT.chip(st.label, cls);
-                chip.classList.add('board-task-status-wrap'); chip.title = st.detail; chip.setAttribute('aria-label', st.detail); return chip;
-            } },
-            { key: 'id', label: 'Task', sort: true, firstDir: 'desc', primary: true, width: 'grow', line: 1, subtitle: details, cell: t => {
-                const cell = DT.el('span'), description = span('board-task-desc');
-                const name = t.title || t.description || '';
-                const b = DT.primaryButton(name, `${t._source === 'subagent' ? 'Open subagent' : `Open task #${t.id}`}: ${name}, ${_taskStatus(t).detail}`);
-                b.classList.add('board-task-open', 'board-task-name');
-                cell.title = t._source === 'subagent' ? _subagentTooltip(t) : t.body || t.body_preview || '';
-                description.title = cell.title;
-                description.append(b);
-                cell.append(span('board-task-id', t.id != null ? `#${t.id}` : '—'), ' ', description);
-                if (t._source === 'board') { const mark = document.createElement('template'); mark.innerHTML = _verifyMark(t); cell.append(mark.content); }
-                return cell;
-            } },
-            // The dock shows Status, Task and Agent only (#7962, the operator): priority, type, cost and the time are on the main Tasks tab and in the opened task
-            { key: 'assignee', label: 'Agent', width: 'content', sort: true, firstDir: 'desc', line: 2, when: t => !!t.assigned_to, cell: t => (t.assigned_to ? span('board-task-assignee', t.assigned_to) : '') }, // an empty Agent is an empty cell, not a dash (#8003)
-        ].filter(c => !(c.key === 'assignee' && agentTaskScope())), // an agent's own dock lists only that agent's tasks: an Agent column would say the same name on every row (#8035)
-    });
+    // The dock is the Tasks view scoped to an agent (#8060): the shared columns (State, Task, and Assigned to when the list spans agents), with the dock's own words on them: the state's detail as its tooltip, the verify mark, the subagent
+    // tooltip and the second line. A column's sort field is the server's name for it.
+    const FIELD = { task: 'id', who: 'assignee' }, COLUMN = { id: 'task', assignee: 'who' };
+    dockTaskTableState.sort = _taskSortExplicit ? { key: COLUMN[_taskSortField] || _taskSortField, dir: _taskSortAsc ? 'asc' : 'desc' } : null;
+    const tweak = columns => {
+        const [stateCol, taskCol, whoCol] = columns;
+        stateCol.sort = false;
+        stateCol.width = 'content'; // the dock knows a review is asked for from the task's workflow, which the shared word reads from review_requested
+        stateCol.cell = t => { const word = taskStatusWord(t.status, _reviewRequested(t)), chip = DT.chip(word, statusClass(word)), st = _taskStatus(t); chip.classList.add('board-task-status-wrap'); chip.title = st.detail; chip.setAttribute('aria-label', st.detail); return chip; };
+        taskCol.firstDir = 'desc'; taskCol.subtitle = details;
+        taskCol.cell = t => {
+            const cell = DT.el('span'), description = span('board-task-desc');
+            const name = t.title || t.description || '';
+            const b = DT.primaryButton(name, `${t._source === 'subagent' ? 'Open subagent' : `Open task #${t.id}`}: ${name}, ${_taskStatus(t).detail}`);
+            b.classList.add('board-task-open', 'board-task-name');
+            cell.title = t._source === 'subagent' ? _subagentTooltip(t) : t.body || t.body_preview || '';
+            description.title = cell.title;
+            description.append(b);
+            cell.append(span('board-task-id', t.id != null ? `#${t.id}` : '—'), ' ', description);
+            if (t._source === 'board') { const mark = document.createElement('template'); mark.innerHTML = _verifyMark(t); cell.append(mark.content); }
+            return cell;
+        };
+        if (whoCol) { whoCol.firstDir = 'desc'; whoCol.when = t => !!t.assigned_to; whoCol.width = 'content'; whoCol.cell = t => (t.assigned_to ? span('board-task-assignee', t.assigned_to) : ''); } // an empty Agent is an empty cell, not a dash (#8003)
+    };
+    const table = TV.tasksTable(agentTaskScope() ? 'agent' : 'agent-team', tasks, { label: 'Agent tasks', tweak, rowKey: key, rowName: t => t.title || t.description || '',
+        footer, state: dockTaskTableState, onSort: field => _toggleTaskSort(FIELD[field] || field), bare: true, sortBar: false, defaultSortLabel: _queryActive() && _taskFilters.sort !== 'open' ? taskSortLabel[_taskFilters.sort] : 'Open first, newest first' });
     // Keep the existing action dispatcher and identifiers: opening a board task,
     // personal task or subagent still takes the same route as before.
     const byKey = new Map(tasks.map(t => [key(t), t]));
