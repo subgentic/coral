@@ -82,9 +82,9 @@ const A = 'a'.repeat(64), B = 'b'.repeat(64), C = 'c'.repeat(64);
         // The panel is rebuilt on every change, which once dropped the keyboard focus (team_artifacts.js keeps it): a guard the old keyboard suite held, now for the team page (#7457).
         await S.run('a reload and automatic paging keep the keyboard focus in the list, not on the page', async () => {
             const inList = `!!document.activeElement && document.activeElement !== document.body && !!document.activeElement.closest('#team-panel-artifacts')`;
-            await ev(`window.__paged = true; true`);
-            await ev(`document.querySelector('#team-panel-artifacts tbody .dt-primary').focus(); import((window.__coralStatic || '/static/') + 'team_artifacts_page.js').then(m => m.loadArtifacts({ keep: true })); true`); // a reload with the focus on a row
-            await waitFor(`document.querySelectorAll('#team-panel-artifacts tbody tr').length === 3`, 'automatic paging appends the next page', 6000);
+            await ev(`window.__paged = true; window.__req = []; true`);
+            await ev(`(async () => { document.querySelector('#team-panel-artifacts tbody .dt-primary').focus(); const m = await import((window.__coralStatic || '/static/') + 'team_artifacts_page.js'); await m.loadArtifacts({ keep: true }); return true; })()`); // await the reload, so the old three rows cannot satisfy the paging check
+            await waitFor(`window.__req.some(q => /cursor=c1/.test(q)) && document.querySelectorAll('#team-panel-artifacts tbody tr').length === 3`, 'automatic paging fetches and appends the next page', 6000);
             assert.ok((await ev(`window.__req`)).some(q => /cursor=c1/.test(q)), 'the next page was fetched');
             await waitFor(inList, 'the focus stays in the list after automatic paging', 3000).catch(async e => { throw new Error(e.message + ' (focus is on ' + JSON.stringify(await ev(`(() => { const a = document.activeElement; return a ? a.tagName + '.' + a.className + ' ' + (a.textContent || '').slice(0, 30) : null; })()`)) + ')'); });
         });
