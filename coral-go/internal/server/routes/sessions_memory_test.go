@@ -25,13 +25,12 @@ import (
 // #7454 (the design of #7452, Security's rules): an agent's instruction and memory files. The list issues opaque ids; the read takes only such an id; no path from the client; symlinks and traversal give
 // nothing; ids belong to one session and expire.
 type memRig struct {
-	h         *SessionsHandler
-	r         chi.Router
-	home      string
-	proj      string
-	sid       string
-	otherSid  string
-	secretOut string
+	h        *SessionsHandler
+	r        chi.Router
+	home     string
+	proj     string
+	sid      string
+	otherSid string
 }
 
 func newMemRig(t *testing.T) *memRig {

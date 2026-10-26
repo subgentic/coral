@@ -108,11 +108,6 @@ func (h *BoardHandler) plannerActor(w http.ResponseWriter, r *http.Request, proj
 	return actor, true
 }
 
-// requireGoalPlanner is requireTaskPlanner for a goal write, in a goal's words.
-func (h *BoardHandler) requireGoalPlanner(w http.ResponseWriter, r *http.Request, project, actor string) bool {
-	return h.requirePlanner(w, r, project, actor, goalWriteWords)
-}
-
 // goalActor is who writes a goal. It answers the refusal itself.
 func (h *BoardHandler) goalActor(w http.ResponseWriter, r *http.Request, project, claim string) (string, bool) {
 	return h.plannerActor(w, r, project, claim, goalWriteWords)

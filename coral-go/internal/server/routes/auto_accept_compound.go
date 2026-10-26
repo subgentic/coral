@@ -94,10 +94,6 @@ func (r *riskRun) separated(command, workDir, dir string) string {
 	return shellRiskCore(separatedCompound(command), workDir, dir, r.from)
 }
 
-// compoundRisk, parsedRisk and separatedRisk are the readings in a run of their own (the tests run each alone).
-func compoundRisk(command, workDir, dir string) string {
-	return newRiskRun().compound(command, workDir, dir)
-}
 func parsedRisk(command, workDir, dir string) string {
 	return newRiskRun().parsed(command, workDir, dir)
 }

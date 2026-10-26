@@ -21,17 +21,9 @@ import (
 	"github.com/subgentic/coral/internal/store/storetest"
 )
 
-// #5469 / #5472, the callers of this package: team generation (the import dialog's "describe your team") and theme generation each run `claude --print` from a
-// request. While Claude is not signed in that run takes the CLI's login flow and blocks the user's own login, so neither may start one: each must answer within a few
-// seconds, start no print-mode run and no login flow (the stand-in's call log says), and say Claude is not signed in. See internal/background for the other callers.
-const failFastRoutes = 3 * time.Second
-
 // grossly is the one wall-clock ceiling kept in these tests (#5924): a call that took a minute is broken however busy the machine. Holds are found by what the stand-in recorded (no print run, no
 // login grab) and by claudestub.NoSlower / agentsignin's differential test, not by seconds.
 const grossly = 60 * time.Second
-
-// hangBoundRoutes is the ceiling when the status command does not answer: its limit (shortened to 1 s by shortHang; production 6 s) passes, then the run is skipped as "did not answer", never as signed out.
-const hangBoundRoutes = 4 * time.Second
 
 // shortHang makes the status command's limit one second for this test when the stand-in hangs on purpose (claudestub.HangingAuth): what is tested, a run skipped as "did not answer" and never
 // as signed out, does not need the production 6 s (#5604; agentsignin's own test pins the 6 s).
@@ -44,13 +36,6 @@ func shortHang(t *testing.T, state claudestub.State) {
 	if state == claudestub.HangingAuth {
 		t.Cleanup(agentsignin.SetCheckTimeoutForTests(time.Second))
 	}
-}
-
-func boundFor(state claudestub.State) time.Duration {
-	if state == claudestub.HangingAuth {
-		return hangBoundRoutes
-	}
-	return failFastRoutes
 }
 
 // saysFor is what a refusal must say in a state: not signed in, or (the status command hung) that it did not answer, and then never "not signed in".

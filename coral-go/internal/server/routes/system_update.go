@@ -19,8 +19,6 @@ var githubReleasesAPI = updatecheck.ReleasesAPI
 // githubReleasesListAPI is the Agentic channel's feed (tests point it at their own server too).
 var githubReleasesListAPI = updatecheck.ReleasesListAPI
 
-const githubReleasesURL = updatecheck.ReleasesURL
-
 // releaseFeeds are the two feed URLs this server asks: the channel only chooses between them (#5557).
 func releaseFeeds() updatecheck.Feeds {
 	return updatecheck.Feeds{Approved: githubReleasesAPI, Agentic: githubReleasesListAPI}
@@ -35,14 +33,6 @@ func updateChannel(m map[string]string) updatecheck.Channel {
 // that isn't a 200, too large, or a tag that isn't a version (updatecheck, #3660).
 func FetchLatestVersion() string {
 	v, _ := updatecheck.Default.Latest(context.Background(), githubReleasesAPI)
-	return v
-}
-
-// fetchLatestVersionRefresh is FetchLatestVersion for a person's "Check for Updates": it asks
-// GitHub again when the cached answer is over a minute old (updatecheck.RefreshAfter), else it
-// returns the cached one, so the button can't be used to hammer GitHub (#4133).
-func fetchLatestVersionRefresh() string {
-	v, _ := updatecheck.Default.Refresh(context.Background(), githubReleasesAPI)
 	return v
 }
 
