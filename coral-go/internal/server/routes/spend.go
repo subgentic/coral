@@ -242,6 +242,50 @@ func (h *SpendHandler) readRoster(ctx context.Context, project string, fr spendF
 	return ro, ""
 }
 
+// spendTokenSeries is the board's tokens by hour (key "2006-01-02T15", for both series) and the window against the usual.
+type spendTokenSeries struct {
+	win, usual                    spendTokens
+	winCW, usualCW                int64
+	hourTokens, hourCache, hourCW map[string]int64
+}
+
+// readTokenSeries reads the board's hourly token buckets from the start of the usual period.
+func (h *SpendHandler) readTokenSeries(ctx context.Context, project string, fr spendFrame) (*spendTokenSeries, string) {
+	buckets, err := h.ts.GetUsageTimeSeriesBoard(ctx, spendStamp(fr.usualStart), "1h", project)
+	if err != nil {
+		return nil, "could not read token usage"
+	}
+	return bucketTokens(buckets, fr), ""
+}
+
+// bucketTokens sorts the hourly buckets into the window and the usual; a bucket at or after the window's end is left out. The cache write is null (nil) until some agent reports one.
+func bucketTokens(buckets []store.TimeSeriesBucket, fr spendFrame) *spendTokenSeries {
+	ts := &spendTokenSeries{hourTokens: map[string]int64{}, hourCache: map[string]int64{}, hourCW: map[string]int64{}}
+	for _, b := range buckets {
+		t, err := time.Parse(time.RFC3339, b.Bucket)
+		if err != nil || !t.Before(fr.end) {
+			continue
+		}
+		key := t.Format("2006-01-02T15")
+		ts.hourTokens[key] += b.InputTokens + b.OutputTokens
+		ts.hourCache[key] += b.CacheReadTokens
+		ts.hourCW[key] += b.CacheWriteTokens
+		acc := &ts.usual
+		cw := &ts.usualCW
+		if !t.Before(fr.start) {
+			acc, cw = &ts.win, &ts.winCW
+		}
+		acc.Input += b.InputTokens
+		acc.Output += b.OutputTokens
+		acc.CacheRead += b.CacheReadTokens
+		*cw += b.CacheWriteTokens
+	}
+	if ts.winCW > 0 || ts.usualCW > 0 {
+		ts.win.CacheWrite, ts.usual.CacheWrite = &ts.winCW, &ts.usualCW
+	}
+	return ts
+}
+
 // Spend answers GET /api/board/{project}/spend?range=24h|7d.
 func (h *SpendHandler) Spend(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
@@ -269,38 +313,14 @@ func (h *SpendHandler) Spend(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	accs, order, roleOf, orchOf := roster.accs, roster.order, roster.roleOf, roster.orchOf
-	buckets, err := h.ts.GetUsageTimeSeriesBoard(ctx, f(usualStart), "1h", project)
-	if err != nil {
-		errInternalServer(w, "could not read token usage")
+	tok, fail := h.readTokenSeries(ctx, project, fr)
+	if fail != "" {
+		errInternalServer(w, fail)
 		return
 	}
-
-	// tokens, window against the usual, from the hourly buckets
-	win, usual := spendTokens{}, spendTokens{}
-	var winCW, usualCW int64
-	hourTokens, hourCache, hourCW := map[string]int64{}, map[string]int64{}, map[string]int64{} // by hour, "2006-01-02T15", for both series
-	for _, b := range buckets {
-		t, err := time.Parse(time.RFC3339, b.Bucket)
-		if err != nil || !t.Before(end) {
-			continue
-		}
-		key := t.Format("2006-01-02T15")
-		hourTokens[key] += b.InputTokens + b.OutputTokens
-		hourCache[key] += b.CacheReadTokens
-		hourCW[key] += b.CacheWriteTokens
-		acc := &usual
-		cw := &usualCW
-		if !t.Before(start) {
-			acc, cw = &win, &winCW
-		}
-		acc.Input += b.InputTokens
-		acc.Output += b.OutputTokens
-		acc.CacheRead += b.CacheReadTokens
-		*cw += b.CacheWriteTokens
-	}
-	if winCW > 0 || usualCW > 0 {
-		win.CacheWrite, usual.CacheWrite = &winCW, &usualCW
-	}
+	win, usual := tok.win, tok.usual
+	winCW, usualCW := tok.winCW, tok.usualCW
+	hourTokens, hourCache, hourCW := tok.hourTokens, tok.hourCache, tok.hourCW
 
 	// tool calls
 	var toolSessions []string
