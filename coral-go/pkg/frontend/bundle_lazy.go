@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/evanw/esbuild/pkg/api"
+	"github.com/subgentic/coral/internal/safego"
 )
 
 // The lazy modules of the bundled family (#8670, plan (c) of #8663).
@@ -262,6 +263,7 @@ func buildLazyModules(static fs.FS, startup map[string]bool, alias map[string]st
 		wg.Add(1)
 		sem <- struct{}{}
 		go func(j job) {
+			defer safego.Recover("lazy-bundle") // a panic in a build is a module served as the original (below), not the server's end
 			defer wg.Done()
 			defer func() { <-sem }()
 			out, e := buildLazy(static, j.entry, j.name, plugin)
@@ -279,6 +281,11 @@ func buildLazyModules(static fs.FS, startup map[string]bool, alias map[string]st
 		}(j)
 	}
 	wg.Wait()
+	for _, j := range jobs {
+		if _, built := files[j.name]; !built && skipped[j.name] == nil {
+			skipped[j.name] = fmt.Errorf("bundle: the build of %s panicked", j.name)
+		}
+	}
 	// A member's URL is a stub that re-exports the group file's instance.
 	for gi, g := range LazyGroups {
 		if _, bad := skipped[g.Main]; bad {

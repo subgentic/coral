@@ -283,6 +283,7 @@ var joinSites = map[string]joinEntry{
 	"internal/transcriptlink/codex.go\trolloutPath":                                          {1, joinContained, "safefs.Within and Resolve against the sessions folder; the thread id is a canonical UUID"},
 	"internal/uploads/uploads.go\tDelete":                                                    {1, joinOwn, "a name made safe (base name, safeNameRE, safefs.CheckName) before the join"},
 	"internal/uploads/uploads.go\tlist":                                                      {1, joinFixed, "names from a directory listing or numbers and hashes the program makes"},
+	"pkg/frontend/bundle_lazy.go\tlazyPlugin":                                                {1, joinOwn, "an import specifier of the embedded dashboard source resolved against its importer inside the in-memory tree; a name that leaves the tree is refused on the next lines"},
 	"pkg/frontend/bundle.go\tembeddedFiles":                                                  {1, joinOwn, "a fixed or program-made name in its own folder"},
 	"pkg/frontend/startup_modules.go\tmoduleGraph":                                           {1, joinOwn, "a fixed or program-made name in its own folder"},
 	"pkg/secretbox/secretbox.go\tKeyFilePath":                                                {1, joinFixed, "names from a directory listing or numbers and hashes the program makes"},
