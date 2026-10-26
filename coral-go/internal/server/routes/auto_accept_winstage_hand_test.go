@@ -279,6 +279,19 @@ var winStageHand = []string{
 
 // winStageTargeted: lines written to kill the mutants the first corpus left alive (#8337): one per rule of winStageRisk.
 var winStageTargeted = []string{
+	`for %f in (*) DO del C:\x`,
+	`FOR %f IN (*) DO DEL C:\x`,
+	`forfiles /C "cmd /c del C:\x"`,
+	`FORFILES /C "cmd /c del C:\x"`,
+	`else del C:\x`,
+	`cmd /cecho hi^&del x`,
+	`cmd /kecho hi^&del x`,
+	`start /d`,
+	`start /D`,
+	`start /abcdefg del C:\x`,
+	`start /abcdefgh del C:\x`,
+	`start /abcdefghi del C:\x`,
+	`start /abcdefghi`,
 	`echo x > .git/hooks/pre-commit`,
 	`cd sub && echo x > ../.git/hooks/post-commit`,
 	`echo x >> .git/config`,
