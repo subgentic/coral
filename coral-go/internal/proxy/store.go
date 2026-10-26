@@ -141,34 +141,6 @@ type ProxyRequest struct {
 	UpstreamURL              *string `db:"upstream_url" json:"upstream_url,omitempty"`
 }
 
-// ListRequests returns recent proxy requests with optional filtering.
-func (s *Store) ListRequests(ctx context.Context, sessionID string, limit, offset int) ([]ProxyRequest, int, error) {
-	where := "1=1"
-	args := []any{}
-	if sessionID != "" {
-		where += " AND pr.session_id = ?"
-		args = append(args, sessionID)
-	}
-
-	var total int
-	countArgs := make([]any, len(args))
-	copy(countArgs, args)
-	err := s.db.GetContext(ctx, &total, "SELECT COUNT(*) FROM proxy_requests pr WHERE "+where, countArgs...)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	query := `SELECT pr.*, COALESCE(pr.display_name, ls.display_name, sm.display_name, pr.agent_name) as display_name
-		FROM proxy_requests pr
-		LEFT JOIN live_sessions ls ON ls.session_id = pr.session_id
-		LEFT JOIN session_meta sm ON sm.session_id = pr.session_id
-		WHERE ` + where + ` ORDER BY pr.started_at DESC, pr.id DESC LIMIT ? OFFSET ?`
-	args = append(args, limit, offset)
-	var rows []ProxyRequest
-	err = s.db.SelectContext(ctx, &rows, query, args...)
-	return rows, total, err
-}
-
 // Stats returns aggregated cost stats for a time period.
 type StatsResult struct {
 	TotalRequests         int     `db:"total_requests" json:"total_requests"`
@@ -220,21 +192,6 @@ func (s *Store) GetStats(ctx context.Context, since string, sessionID string) (S
 	return stats, byModel, err
 }
 
-// SessionCost returns cost summary for a single session.
-func (s *Store) SessionCost(ctx context.Context, sessionID string) (StatsResult, []ModelStats, error) {
-	return s.GetStats(ctx, "1970-01-01", sessionID)
-}
-
-// GetRequestByID returns a single proxy request by its UUID request_id.
-func (s *Store) GetRequestByID(ctx context.Context, requestID string) (*ProxyRequest, error) {
-	var req ProxyRequest
-	err := s.db.GetContext(ctx, &req, "SELECT * FROM proxy_requests WHERE request_id = ?", requestID)
-	if err != nil {
-		return nil, err
-	}
-	return &req, nil
-}
-
 // AgentStats holds per-agent (session) aggregates.
 type AgentStats struct {
 	SessionID        string  `db:"session_id" json:"session_id"`
@@ -257,30 +214,6 @@ type TaskRunCost struct {
 	TotalCostUSD      float64 `db:"total_cost_usd" json:"total_cost_usd"`
 	TotalInputTokens  int     `db:"total_input_tokens" json:"total_input_tokens"`
 	TotalOutputTokens int     `db:"total_output_tokens" json:"total_output_tokens"`
-}
-
-// GetStatsByAgent returns per-agent cost breakdown for a time period.
-func (s *Store) GetStatsByAgent(ctx context.Context, since string) ([]AgentStats, error) {
-	var byAgent []AgentStats
-	err := s.db.SelectContext(ctx, &byAgent,
-		`SELECT pr.session_id, pr.agent_name,
-		 COALESCE(pr.display_name, ls.display_name, sm.display_name, pr.agent_name) as display_name,
-		 (ls.session_id IS NOT NULL) as is_live,
-		 COUNT(*) as requests, COALESCE(SUM(pr.cost_usd),0) as cost_usd,
-		 COALESCE(SUM(pr.input_tokens),0) as input_tokens, COALESCE(SUM(pr.output_tokens),0) as output_tokens,
-		 COALESCE(SUM(pr.cache_read_tokens),0) as cache_read_tokens, COALESCE(SUM(pr.cache_write_tokens),0) as cache_write_tokens
-		 FROM proxy_requests pr
-		 LEFT JOIN live_sessions ls ON ls.session_id = pr.session_id
-		 LEFT JOIN session_meta sm ON sm.session_id = pr.session_id
-		 WHERE pr.started_at >= ?
-		 GROUP BY pr.session_id ORDER BY cost_usd DESC`, since)
-	if err != nil {
-		return nil, err
-	}
-	if byAgent == nil {
-		byAgent = []AgentStats{}
-	}
-	return byAgent, nil
 }
 
 // GetTaskRunCost returns proxy cost totals for one scheduled/task run.
