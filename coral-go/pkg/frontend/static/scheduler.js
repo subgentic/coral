@@ -78,6 +78,7 @@ function jobTableRow(job) {
 }
 
 registerGroupSource('jobs', {
+    landing: true, // the page it opens on lists every group the sidebar has (#7722)
     keys: () => jobGroups().map(g => g.key),
     redraw: () => renderJobsSidebar(),
     table: key => { const g = jobGroups().find(x => x.key === key); return g ? { title: g.label, columns: ['Job', 'Schedule', 'Last run', 'Next'], rows: g.jobs.map(jobTableRow) } : null; },

@@ -15,6 +15,7 @@ import { setHidden, setTitle, setAttr, setData } from './dom_write.js';
 import { isPhoneLayout } from './phone_layout.js';
 
 const sources = new Map();
+const LANDING = '*'; // the key of the page that lists every group (a source with landing: true)
 const KEY = kind => `coral-sidebar-groups-${kind}`;
 
 export function registerGroupSource(kind, source) { sources.set(kind, source); }
@@ -109,25 +110,29 @@ function chipsHtml(t) {
 /** A table drawn somewhere other than the centre (the dock's Saved tab): `headless` leaves out its title row, the chips and the rows are the same. */
 export function tableMarkup(t) { return tableHtml(t, '', ''); }
 
-function tableHtml(t, kind, key) {
+function tableHtml(t, kind, key, n = 0, lead = '', several = false) {
+    const tid = n ? `group-table-title-${n + 1}` : 'group-table-title'; // a page with several tables (the landing's groups, #7722): one title id each
     // A table that stacks its rows on a phone (the Inbox's Saved: the message over its state and action) says it is a table in its roles, since a display other than table-* loses the native ones.
     const st = !!t.stack;
     const head = t.columns.map(c => `<th scope="col"${st ? ' role="columnheader"' : ''}>${escapeHtml(c)}</th>`).join('');
     const rows = t.rows.map(r => `<tr${st ? ' role="row"' : ''}><td${st ? ' role="cell"' : ''}><button type="button" class="group-table-link" ${ROW_ACTION_ATTR[r.action] || ''} ${dataAttrs(r.data)}>${escapeHtml(r.title)}</button></td>`
         + r.cells.map(c => (st ? cellHtml(c).replace('<td>', '<td role="cell">') : cellHtml(c))).join('') + '</tr>').join('');
-    const top = (t.headless ? '' : `<div class="group-table-head"><h2 id="group-table-title" tabindex="-1">${escapeHtml(t.title)}</h2><span class="session-group-count">${t.rows.length}</span>${extraHtml(t.extra)}</div>`) + chipsHtml(t);
+    const top = (t.headless ? lead : `<div class="group-table-head">${lead}<h2 id="${escapeAttr(tid)}" tabindex="-1">${escapeHtml(t.title)}</h2><span class="session-group-count">${t.rows.length}</span>${extraHtml(t.extra)}</div>`) + chipsHtml(t);
     // A group with nothing in it says so in one line (its chips, if it has them, stay: they are how the list is widened)
     if (!t.rows.length && t.empty) return top + `<div class="empty-pane"><p class="empty-line">${escapeHtml(t.empty.line)}</p>${t.empty.hint ? `<p class="empty-hint">${escapeHtml(t.empty.hint)}</p>` : ''}</div>`;
-    return top + `<div class="group-table-scroll"><table class="group-table${st ? ' group-table-stack' : ''}"${st ? ' role="table"' : ''} ${t.headless ? 'aria-label="' + escapeAttr(t.title) + '"' : 'aria-labelledby="group-table-title"'}><thead${st ? ' role="rowgroup"' : ''}><tr${st ? ' role="row"' : ''}>${head}</tr></thead><tbody${st ? ' role="rowgroup"' : ''}>${rows}</tbody></table></div>`
+    return top + `<div class="group-table-scroll"><table class="group-table${st ? ' group-table-stack' : ''}${several ? ' group-table-aligned' : ''}"${st ? ' role="table"' : ''} ${t.headless ? 'aria-label="' + escapeAttr(t.title) + '"' : 'aria-labelledby="${escapeAttr(tid)}"'}><thead${st ? ' role="rowgroup"' : ''}><tr${st ? ' role="row"' : ''}>${head}</tr></thead><tbody${st ? ' role="rowgroup"' : ''}>${rows}</tbody></table></div>`
         + (t.note ? `<p class="empty-hint group-table-note">${escapeHtml(t.note)}</p>` : '');
 }
 
 function drawTable() {
     const host = document.getElementById('group-table-view');
     const src = open && sources.get(open.kind);
-    const t = src && src.table(open.key);
-    if (!host || !t) return false;
-    const html = (isPhoneLayout() ? `<button type="button" class="btn btn-small group-table-back" data-on-click="sgroup-list" data-kind="${escapeAttr(open.kind)}">Back to the list</button>` : '') + tableHtml(t, open.kind, open.key);
+    // the landing ('*') of a tab that says so (landing: true): every group's table, one under the other, each with its own head and count, so the page and the sidebar count the same items (#7722)
+    const tables = !src ? [] : open.key === LANDING ? src.keys().map(k => src.table(k)).filter(Boolean).map((x, i) => (i ? { ...x, extra: undefined } : x)) : [src.table(open.key)].filter(Boolean);
+    if (!host || !tables.length) return false;
+    // a phone's way back to the list is in the table's own title row, not a row of its own above it (#7722)
+    const back = isPhoneLayout() ? `<button type="button" class="btn btn-small group-table-back" data-on-click="sgroup-list" data-kind="${escapeAttr(open.kind)}">Back to the list</button>` : '';
+    const html = tables.map((x, i) => tableHtml(x, open.kind, open.key, i, i ? '' : back, tables.length > 1)).join('');
     host.dataset.group = open.kind + ':' + open.key; // which table is on screen (saved.js asks for the Inbox's Saved)
     if (host.dataset.drawn !== html) { host.innerHTML = html; host.dataset.drawn = html; } // a redraw of what is there would drop the focus from a row the keyboard is on
     return true;
@@ -161,6 +166,7 @@ export function refreshGroupTable(kind) {
 /** The tab opens on its first group's table, when it has one. */
 export function openFirstGroupTable(kind) {
     const src = sources.get(kind);
+    if (src && src.landing) return src.keys().length ? openGroupTable(kind, LANDING) : false;
     const first = src && src.keys()[0];
     return first != null ? openGroupTable(kind, first) : false;
 }

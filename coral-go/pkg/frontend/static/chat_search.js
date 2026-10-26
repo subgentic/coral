@@ -91,6 +91,9 @@ async function openSearchHit(result, hit) {
 // What a screen reader hears: one short line (the results list is not a live region, so a list is not read out whole on every keystroke).
 function say(text) { const el = document.getElementById('chat-search-status'); if (el) el.textContent = text; }
 
+// The Chats page's table lists the chats the search found (history_list.js), asked lazily: this file's pure helpers are used on their own too.
+function publishMatches(ids) { importOnce('./history_list.js').then(m => m.setChatSearchMatches(ids)).catch(() => {}); }
+
 export async function searchChats(query, page = 1) {
     const container = document.getElementById('chat-search-results');
     const list = document.getElementById('history-sessions-list');
@@ -98,7 +101,7 @@ export async function searchChats(query, page = 1) {
     const q = String(query || '').trim();
     const generation = ++requestGeneration;
     const source = historyServer();
-    if (!q) { container.hidden = true; container.replaceChildren(); list.hidden = false; say(''); return; }
+    if (!q) { container.hidden = true; container.replaceChildren(); list.hidden = false; say(''); publishMatches(null); return; }
     container.hidden = false; list.hidden = true;
     container.replaceChildren(Object.assign(document.createElement('div'), { className: 'loading-indicator', textContent: 'Searching chats…' }));
     try {
@@ -114,12 +117,13 @@ export async function searchChats(query, page = 1) {
             container.textContent = 'Search is temporarily unavailable.'; say(container.textContent);
             return;
         }
-        if (!data.results?.length) { container.textContent = 'No matching chats.'; say('No matching chats.'); return; }
+        if (!data.results?.length) { container.textContent = 'No matching chats.'; say('No matching chats.'); publishMatches([]); return; }
         if (data.status === 'partial') {
             const note = document.createElement('div'); note.className = 'chat-search-status';
             note.textContent = 'Some chat sources are unavailable.'; container.appendChild(note);
         }
         data.results.forEach((result, i) => container.appendChild(renderResult(result, i)));
+        publishMatches(data.results.map(r => r.type === 'group' ? 'board:' + (r.project || '') : r.session_id));
         const n = data.results.length;
         say(`${n} ${n === 1 ? 'chat matches' : 'chats match'}.${data.status === 'partial' ? ' Some chat sources are unavailable.' : ''}`);
     } catch (error) {

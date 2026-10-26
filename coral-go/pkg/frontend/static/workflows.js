@@ -38,6 +38,7 @@ function lastResult(lr) {
 }
 
 registerGroupSource('workflows', {
+    landing: true, // the page it opens on lists every group the sidebar has (#7722)
     keys: () => wfGroups().map(g => g.key),
     redraw: () => renderWorkflowList(),
     table: key => {

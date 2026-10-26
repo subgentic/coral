@@ -13,6 +13,7 @@
 #wf-detail, #wf-run-detail { flex: 1; display: flex; flex-direction: column; }
 #wf-detail > *, #wf-run-detail > * { flex-shrink: 0; } /* a section keeps its height: a column that shrank them would let their content spill under the bar */
 .wf-page .item-bar { margin-top: auto; bottom: -20px; margin-bottom: -20px; padding-bottom: calc(var(--space-lg) + 20px); }
+.wf-page .item-bar.wf-run-actions { margin-top: var(--space-2xl); } /* a run's bar follows its steps: pinned to the foot it left a wide gap on a short page; sticky still keeps it in view on a long one (#7722) */
 .wf-page > .wf-list-container > .empty-pane { padding: var(--space-lg) 0; }
 .wf-empty-actions { margin-top: var(--space-md); }
 .wf-empty-actions .btn { display: inline-flex; align-items: center; gap: 6px; margin: 0; }

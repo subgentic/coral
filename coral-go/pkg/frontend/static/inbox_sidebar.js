@@ -163,12 +163,12 @@ registerGroupSource('hub-inbox', {
             const goalOf = s => s.goal && s.goal.id && s.goal.title;
             const opt = [['Folder', rows.some(dirOf), s => dirOf(s) || ''], ['Asks', rows.some(askOf), s => askOf(s)]];
             const goal = rows.some(goalOf);
-            return { title: 'Needs you', columns: ['Item', 'Team', ...opt.filter(o => o[1]).map(o => o[0]), 'When', ...(goal ? ['Goal'] : [])], empty: { line: 'Nothing needs your input.' },
+            return { title: 'Needs you', stack: true, columns: ['Item', 'Team', ...opt.filter(o => o[1]).map(o => o[0]), 'When', ...(goal ? ['Goal'] : [])], empty: { line: 'Nothing needs your input.' },
                 rows: rows.map(s => ({ title: resolveSessionIdentity(s), action: 'inbox-agent-open', data: { name: s.name, 'agent-type': s.agent_type, 'session-id': s.session_id, server: sessionServer(s) },
                     cells: [teamOf(s), ...opt.filter(o => o[1]).map(o => o[2](s)), waitingText(s.waiting_since) || '', ...(goal ? [goalOf(s) ? { link: true, action: 'inbox-goal-open', data: { board: s.goal.board || s.board_project || '', 'goal-id': s.goal.id }, label: s.goal.title, aria: `Goal: ${s.goal.title}` } : ''] : [])] })) };
         }
         if (key === 'tasks') {
-            return { title: 'Tasks', columns: ['Task', 'Priority', 'State', 'Team'], empty: { line: queries.tasks ? 'No task matches the search.' : 'No assigned tasks.' },
+            return { title: 'Tasks', stack: true, columns: ['Task', 'Priority', 'State', 'Team'], empty: { line: queries.tasks ? 'No task matches the search.' : 'No assigned tasks.' },
                 rows: taskRows().map(t => ({ title: t.title || '(no title)', action: 'inbox-task-open', data: { project: t.project, 'task-id': t.id }, cells: [PRIORITY_WORDS[t.priority] || t.priority || '', stateOf(t), t.board || ''] })) };
         }
         if (key === 'saved') return savedTableSpec();

@@ -173,7 +173,7 @@ const STUB = `(() => {
             // Jobs: the table, the job's page and its pinned bar
             await openTab('jobs');
             await waitFor(`document.getElementById('group-table-view').checkVisibility() && document.querySelector('#group-table-title').textContent === 'Active'`, at + 'Jobs opens on Active as a table', 8000);
-            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view th')].map(h => h.textContent)`), ['Job', 'Schedule', 'Last run', 'Next'], at + 'the jobs table columns');
+            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view table')[0].querySelectorAll('th')].map(h => h.textContent)`), ['Job', 'Schedule', 'Last run', 'Next'], at + 'the jobs table columns (of the first table: the page lists every group, #7722)');
             assert.deepEqual(await ev(`(${ON_SCALE})(document.getElementById('group-table-view'), [11, 12, 13, 14, 17, 20])`), [], at + 'every text of the jobs table is on the scale');
             await ev(`document.querySelector('#group-table-view .group-table-link').click(); true`);
             await waitFor(`!!document.querySelector('#scheduler-detail .item-bar') && document.querySelector('#scheduler-detail .group-back').checkVisibility()`, at + "the job's page", 8000);

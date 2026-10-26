@@ -516,6 +516,7 @@
 1	sidebar_groups.js	dataAttrs(r.data)
 1	sidebar_groups.js	extraHtml(t.extra)
 1	sidebar_groups.js	head
+1	sidebar_groups.js	lead
 1	sidebar_groups.js	rows
 1	sidebar_groups.js	t.chips.filter(c => CHIP_ACTION_ATTR[c.action]).map(c => `<button type="button" class="group-chip" ${CHIP_ACTI
 1	sidebar_rail.js	_RAIL_ICONS[g.kind]

@@ -43,7 +43,7 @@ const S = `(window.__coralStatic || '/static/')`;
             // the long title wraps with the badge below it (a phone)
             if (mobile) {
                 const row = await ev(`(() => { const li = document.querySelector('#history-sessions-list li[data-session-id="eeeeee1"]'); const l = li.querySelector('.session-label'), b = li.querySelector('.badge'); const lr = l.getBoundingClientRect(), br = b.getBoundingClientRect(); const lh = parseFloat(getComputedStyle(l).lineHeight) || parseFloat(getComputedStyle(l).fontSize) * 1.3; return { lines: Math.round(lr.height / lh), cut: getComputedStyle(l).textOverflow === 'ellipsis' && l.scrollWidth > l.clientWidth + 1, badgeBelow: br.top >= lr.bottom - 2 }; })()`);
-                assert.ok(row.lines === 2 && !row.cut && row.badgeBelow, `${tag}: a long title wraps to two lines with the badge under it: ` + JSON.stringify(row));
+                assert.ok(row.lines === 2 && !row.cut && !row.badgeBelow, `${tag}: a long title wraps to two lines with the badge beside it, not under it (#7722): ` + JSON.stringify(row));
             }
             // Resume: primary only on the newest chat; the copy-branch icon is a 44 px target on a phone
             await ev(`window.selectHistorySession('aaaaaa1'); true`);

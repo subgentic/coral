@@ -160,10 +160,20 @@ export function describeChat(entry) {
     return { group: groupOfChat(entry), meta };
 }
 
+// The chats the sidebar's search found (their session ids; a group chat is 'board:<name>'), or null with no search on: the page's table lists the same chats, so its counts agree with the sidebar's (#7722).
+let searchMatches = null;
+export function setChatSearchMatches(ids) { searchMatches = ids ? new Set(ids) : null; refreshGroupTable('history'); }
+const matched = g => searchMatches ? g.sessions.filter(s => searchMatches.has(s.session_id)) : g.sessions;
+
 registerGroupSource('history', {
-    keys: () => drawn.map(g => g.key),
+    keys: () => drawn.filter(g => matched(g).length || !searchMatches).map(g => g.key),
     redraw: redrawHistoryGroups,
-    table: key => { const g = drawn.find(x => x.key === key); return g ? { title: g.label, columns: ['Chat', 'Agent', 'When', 'Ran'], rows: g.sessions.map(chatTableRow) } : null; },
+    table: key => {
+        const g = drawn.find(x => x.key === key);
+        if (!g) return null;
+        const rows = matched(g).map(chatTableRow);
+        return { title: g.label, columns: ['Chat', 'Agent', 'When', 'Ran'], rows, empty: searchMatches ? { line: 'No matching chats.' } : undefined };
+    },
     isEmpty: () => document.getElementById('chats-empty-view')?.style.display === 'flex' && document.body.getAttribute('data-nav-tab') === 'history',
     showList: () => window.switchNavTab?.('history'),
     empty: () => window.switchNavTab?.('history'),
