@@ -183,6 +183,7 @@ func Validate(overlayPath, staticDir string) error {
 }
 
 // CheckOutDir accepts an -out folder only when it is a real (not symlinked), empty folder named coral-static-*, so -clean can remove it and nothing else is in it.
+// CheckOutDir is called by tools/strip-static (the dashboard build for the gates and the release), so it stays exported; its test is in this package.
 func CheckOutDir(dir string) error {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
