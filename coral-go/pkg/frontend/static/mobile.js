@@ -258,7 +258,7 @@ function syncMobileDocsList() {
 
     window.selectLiveSession = function(name, agentType, sessionId, server) {
         // Call original
-        orig(name, agentType, sessionId, server);
+        const selection = orig(name, agentType, sessionId, server);
 
         // On mobile, hide agent list to show full session view and reset panel overlay
         if (isMobile()) {
@@ -276,6 +276,7 @@ function syncMobileDocsList() {
         const backdrop = document.querySelector('.tablet-sidebar-backdrop');
         if (sidebar) sidebar.classList.remove('tablet-open');
         if (backdrop) backdrop.classList.remove('active');
+        return selection; // preserve the async team-exit/navigation contract for callers
     };
 }
 
