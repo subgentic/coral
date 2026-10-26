@@ -121,9 +121,12 @@ func TestPinWorkflowValidateHooks(t *testing.T) {
 	} {
 		assert.Equal(t, c.want, validateHooks(json.RawMessage(c.in)), c.name)
 	}
-	// two faults in two events: which is reported depends on the map's order (quirk, pinned as a set)
-	got := validateHooks(json.RawMessage(`{"Nope":[],"Stop":{}}`))
-	assert.Contains(t, []string{`unknown hook event "Nope"`, "hooks.Stop must be an array of hook groups"}, got)
+	// two faults in two events: the event named first in alphabetical order is the one reported, every time (#8351: it was the map's order)
+	for i := 0; i < 60; i++ {
+		require.Equal(t, `unknown hook event "Nope"`, validateHooks(json.RawMessage(`{"Stop":{},"Nope":[]}`)), "run %d", i)
+		require.Equal(t, "hooks.PreToolUse must be an array of hook groups", validateHooks(json.RawMessage(`{"Stop":{},"PostToolUse":[`+group+`],"PreToolUse":{},"StepFailed":{}}`)), "run %d", i)
+		require.Equal(t, "hooks.Notification[0]: hooks array is required", validateHooks(json.RawMessage(`{"Stop":[{"hooks":[]}],"Notification":[{"hooks":[]}]}`)), "run %d", i)
+	}
 }
 
 func TestPinWorkflowValidateTemplateRefs(t *testing.T) {
