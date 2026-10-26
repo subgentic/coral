@@ -60,6 +60,7 @@ export function mountSettingsView(host, spec) {
     const applied = new Map();     // key -> the value an apply-now field last had (a click fires input and change: one call, not two)
     let baseline = {};             // key -> the loaded value (raw)
     let busy = false, lastSaved = false, status = null, statusError = false, destroyed = false;
+    let view = null; // the controller, assigned below (a group's render and a field's action may be called before it exists, and use it later)
     let shell = null, bar = null, saveBtn = null, cancelBtn = null, statusEl = null, announce = () => {};
 
     const root = node('div', mode === 'form' ? 'sv sv-form' : 'sv sv-settings');
@@ -69,6 +70,8 @@ export function mountSettingsView(host, spec) {
     const reasonOf = r => (typeof r === 'string' ? r : '');
     const globalReadOnly = typeof spec.readOnly === 'string' || spec.readOnly === true ? spec.readOnly : false;
     if (typeof globalReadOnly === 'string' && globalReadOnly) root.append(node('p', 'sv-lead', globalReadOnly));
+    else if (spec.lead) root.append(node('p', 'sv-lead', spec.lead));
+    const partsDirty = () => (spec.parts ? spec.parts() : []).filter(p => p && p.dirty());  // parts: pieces the caller draws and saves itself (a group's own form); they count in the bar
 
     // -- the controls, one builder per type: each returns { get, set, node, focus, disable(on) } ----------
     function optionsOf(field, apply) {
@@ -149,7 +152,8 @@ export function mountSettingsView(host, spec) {
             if (help && help.more) {
                 const more = node('div', 'sv-more'); more.id = `${id}-m`; more.hidden = true; more.append(...paragraphs(help.more));
                 const btn = node('button', 'sv-learn', 'Learn more'); btn.type = 'button'; btn.setAttribute('aria-expanded', 'false'); btn.setAttribute('aria-controls', more.id);
-                btn.addEventListener('click', () => { more.hidden = !more.hidden; btn.setAttribute('aria-expanded', String(!more.hidden)); btn.textContent = more.hidden ? 'Learn more' : 'Show less'; });
+                const named = () => { if (help.about) btn.setAttribute('aria-label', `${btn.textContent} about ${help.about}`); }; named(); // help.about: what it is about, for the screen reader ("Learn more about working modes")
+                btn.addEventListener('click', () => { more.hidden = !more.hidden; btn.setAttribute('aria-expanded', String(!more.hidden)); btn.textContent = more.hidden ? 'Learn more' : 'Show less'; named(); });
                 helpEl.append(' ', btn); text.append(helpEl, more);
             } else text.append(helpEl);
         }
@@ -208,7 +212,7 @@ export function mountSettingsView(host, spec) {
         shell = node('div', 'settings-shell sv-shell');
         const label = spec.label || 'Settings sections';
         const nav = node('nav', 'settings-nav'); nav.setAttribute('aria-label', label);
-        const pick = node('div', 'settings-group-pick'); const sel = node('select', 'settings-select'); sel.setAttribute('aria-label', `${label} group`); pick.append(sel);
+        const pick = node('div', 'settings-group-pick'); const sel = node('select', 'settings-select'); sel.setAttribute('aria-label', spec.groupLabel || `${label} group`); pick.append(sel);
         const tabs = node('div', 'settings-tabs'); tabs.setAttribute('role', 'tablist'); tabs.setAttribute('aria-orientation', 'vertical'); tabs.setAttribute('aria-label', label);
         nav.append(pick, tabs);
         const panes = node('div', 'settings-panes');
@@ -230,6 +234,7 @@ export function mountSettingsView(host, spec) {
         root.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !saveBtn.disabled) { e.preventDefault(); view.save(); } });
     }
     host.append(root);
+    if (spec.parts) for (const ev of ['input', 'change']) root.addEventListener(ev, () => setTimeout(() => { if (!destroyed) afterChange(); }, 0)); // a part's own controls: the bar follows them after the part's handlers have run
     if (shell) {
         initSectionDialog(shell);
         const remember = spec.remember ? storeKey(`sv-group-${spec.remember}`) : null;
@@ -260,8 +265,7 @@ export function mountSettingsView(host, spec) {
         }
     }
     function paintBar() {
-        const n = dirtyKeys().size;
-        const dirty = n > 0;
+        const dirty = dirtyKeys().size > 0 || partsDirty().length > 0;
         if (saveBtn) { saveBtn.disabled = !dirty || busy || !!globalReadOnly; cancelBtn.disabled = !dirty || busy; }
         if (statusEl) {
             const text = busy ? words.busy : status !== null ? status : dirty ? words.dirty : lastSaved ? words.saved : words.none;
@@ -297,7 +301,9 @@ export function mountSettingsView(host, spec) {
     }
     function describe(r, on) {
         const t = r.ctl.input || r.ctl.node; if (!t || !t.setAttribute) return;
-        const ids = [r.helpEl && r.helpEl.id, on && r.errorEl.id].filter(Boolean);
+        const own = new Set([r.helpEl && r.helpEl.id, r.errorEl.id].filter(Boolean));
+        const extra = (t.getAttribute('aria-describedby') || '').split(/\s+/).filter(x => x && !own.has(x)); // what the caller added (a line of its own) stays
+        const ids = [r.helpEl && r.helpEl.id, ...extra, on && r.errorEl.id].filter(Boolean);
         if (ids.length) t.setAttribute('aria-describedby', ids.join(' ')); else t.removeAttribute('aria-describedby');
     }
     function checkField(key) {
@@ -312,12 +318,14 @@ export function mountSettingsView(host, spec) {
     }
 
     // -- the controller ------------------------------------------------------------------------------------
-    const view = {
+    view = {
         host: root,
         values: valuesNow,
         set(key, value) { const r = fields.get(key); if (r) { r.ctl.set(value); afterChange(); } },
         dirty: dirtyKeys,
-        isDirty: () => dirtyKeys().size > 0,
+        isDirty: () => dirtyKeys().size > 0 || partsDirty().length > 0,
+        refresh: afterChange,
+        say(text, isError = false) { status = text || null; statusError = !!isError && !!text; paintBar(); }, // a line of the caller's own in the bar (a part saved elsewhere, a load that failed)
         changes() { const o = {}; for (const k of dirtyKeys()) if (!(readOnlyOf(k) || fields.get(k).field.readOnly || fields.get(k).row.hidden)) o[k] = fields.get(k).ctl.get(); return o; },
         error: showError,
         clearErrors() { for (const k of [...errors.keys()]) showError(k, ''); },
@@ -332,25 +340,34 @@ export function mountSettingsView(host, spec) {
             const v = view.validate({ focus: true });
             if (!v.ok) { status = `${errors.size === 1 ? '1 field needs' : `${errors.size} fields need`} attention.`; statusError = true; paintBar(); return null; }
             const changes = view.changes();
-            if (!Object.keys(changes).length) { status = words.none; statusError = false; paintBar(); return null; }
+            const owing = partsDirty();
+            if (!Object.keys(changes).length && !owing.length) { status = words.none; statusError = false; paintBar(); return null; }
             busy = true; status = null; statusError = false; paintBar();
-            try {
-                const before = { ...baseline };
-                const result = (await spec.save(changes, { before, values: valuesNow() })) || {};
-                for (const k of Object.keys(changes)) baseline[k] = fields.get(k).ctl.get();
-                lastSaved = true; status = result.note || null; statusError = false;
-                busy = false; afterChange();
-                root.dispatchEvent(new CustomEvent('sv-saved', { bubbles: true, detail: { changes } }));
-                return result;
-            } catch (e) {
-                busy = false;
-                const named = e && e.fields ? Object.entries(e.fields) : [];
+            const failures = []; let result = {}; let named = [];
+            if (Object.keys(changes).length) {
+                try {
+                    const before = { ...baseline };
+                    result = (await spec.save(changes, { before, values: valuesNow() })) || {};
+                    for (const k of Object.keys(changes)) baseline[k] = fields.get(k).ctl.get();
+                } catch (e) {
+                    for (const k of (e && e.saved) || []) if (fields.has(k)) baseline[k] = fields.get(k).ctl.get(); // what was saved before the failure is no longer a change
+                    named = e && e.fields ? Object.entries(e.fields) : [];
+                    failures.push((e && (e.userMessage || e.message)) || 'no answer');
+                }
+            }
+            for (const part of owing) { try { const why = await part.save(); if (why) failures.push(why); } catch (e) { failures.push((e && e.message) || 'no answer'); } }
+            busy = false;
+            if (failures.length) {
                 for (const [k, m] of named) showError(k, m);
-                status = `${words.failed}${(e && (e.userMessage || e.message)) || 'no answer'}`; statusError = true;
-                paintBar();
+                status = `${words.failed}${spec.failure ? spec.failure(failures[0]) : failures[0]}`; statusError = true;
+                afterChange();
                 if (named.length) fields.get(named[0][0])?.ctl.focus();
                 return null;
             }
+            lastSaved = true; status = result.note || null; statusError = false;
+            afterChange();
+            root.dispatchEvent(new CustomEvent('sv-saved', { bubbles: true, detail: { changes } }));
+            return result;
         },
         cancel() {
             for (const [k, r] of fields) if (r.field.apply !== 'now') r.ctl.set(baseline[k] === undefined ? r.field.default : baseline[k]);

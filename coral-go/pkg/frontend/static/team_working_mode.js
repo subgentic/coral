@@ -23,7 +23,8 @@ function settingsFormSnapshot(form) {
 
 export function hasUnsavedTeamSettings() {
     // The main form, and the Health check tab's own (#4230): either with changes asks before leaving.
-    return [...document.querySelectorAll('#team-settings-workspace form, #team-working-mode-dialog form')].some(form => Boolean(form.dataset.initialState && settingsFormSnapshot(form) !== form.dataset.initialState));
+    if (document.querySelector('#team-settings-workspace .sv[data-dirty]')) return true; // the team page's Settings tab (settings_view): any part holding a change
+    return [...document.querySelectorAll('#team-working-mode-dialog form')].some(form => Boolean(form.dataset.initialState && settingsFormSnapshot(form) !== form.dataset.initialState));
 }
 
 /** Resolves true when leaving the team settings panel may go ahead: nothing unsaved, or the user
@@ -39,21 +40,21 @@ export function showTeamWorkingModeWorkspace(team, options = {}) {
     return importOnce('./team_page.js').then(m => m.openTeamPage(team, { tab: 'settings', replace: !!options.restore }));
 }
 
-function jsonError(response, fallback) {
+export function jsonError(response, fallback) {
     return response.json().catch(() => ({})).then(data => data.error || fallback);
 }
 
 // What the preset form shows for a preset's name and instructions.
-const presetNameText = preset => preset.name || PRESET_NAMES[preset.id] || preset.id;
-const presetInstructionsText = preset => preset.overridden
+export const presetNameText = preset => preset.name || PRESET_NAMES[preset.id] || preset.id;
+export const presetInstructionsText = preset => preset.overridden
     ? (preset.instructions ?? '')
     : (preset.instructions ?? preset.default_instructions ?? '');
 
-function presetLabel(preset) {
+export function presetLabel(preset) {
     return `${preset.name || PRESET_NAMES[preset.id] || preset.id}${preset.builtin ? ' · built in' : ''}`;
 }
 
-function renderInspection(data, workingMode) {
+export function renderInspection(data, workingMode) {
     const roles = [['orchestrator', 'Orchestrator'], ['worker', 'Agent / worker'], ['task', 'Task defaults']];
     // Keep every prompt available without expanding the page until a reader asks for it.
     const folded = (role, name, title, text) => `<details class="disclosure prompt-inspection-fragment prompt-inspection-folded"><summary>${title}</summary><pre>${escapeHtml(text ?? (role[name] || 'Not configured'))}</pre></details>`;
@@ -257,6 +258,7 @@ function _wireSettingsTabs(dialog, form) {
 }
 
 export async function showTeamWorkingMode(team, options = {}) {
+    if (options.page) return (await importOnce('./team_settings_page.js')).showTeamSettingsPage(team, options); // the team page's Settings tab is a settings_view (#7744)
     const pageHost = options.page || null; // the team page's Settings tab: one page of sections and its own bar
     const dialog = pageHost ? _teamSettingsPageShell() : _teamSettingsShell();
     if (pageHost) dialog.dataset.team = team; // which team this page is for: the tab keeps a page with unsaved changes when it is opened again

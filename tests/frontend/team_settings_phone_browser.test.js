@@ -60,7 +60,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 insideScreen(await rect('#team-settings-workspace .settings-pane:not([hidden]) .settings-pane-title'), `${theme}: the ${id} heading`);
             }
             assert.equal(await ev(`document.querySelector('#team-settings-workspace .settings-panes').scrollWidth - document.querySelector('#team-settings-workspace .settings-panes').clientWidth`), 0, `${theme}: nothing scrolls sideways`);
-            for (const sel of ['.ts-cancel', '.ts-save']) { const r = await rect(`#team-settings-workspace ${sel}`); assert.ok(r && r.h >= 44, `${theme}: ${sel} is 44 px tall (${r && r.h})`); }
+            for (const sel of ['.sv-cancel', '.sv-save']) { const r = await rect(`#team-settings-workspace ${sel}`); assert.ok(r && r.h >= 44, `${theme}: ${sel} is 44 px tall (${r && r.h})`); }
             const audit = await auditRegion(ev, ['#team-settings-workspace']);
             assert.deepEqual(audit.fails, [], `${theme}: contrast of the Team settings page: ` + JSON.stringify(audit.fails.slice(0, 3)));
         };
