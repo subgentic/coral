@@ -369,7 +369,7 @@ export function renderTaskPage(host, task, ctx, mode = 'view') {
         const links = el('div', 'goal-back-row'), teamLink = el('a', 'goal-team-link inbox-team-link', 'Open on team page');
         teamLink.href = ctx.teamLink; teamLink.setAttribute('data-route', '');
         teamLink.setAttribute('aria-label', `Open task ${task.id} on its team page`);
-        links.append(back, teamLink); page.append(links, h, line);
+        links.append(back, teamLink, h); page.append(links, line); // the title is in the row: a phone puts the way back beside it (foldWayBack below), the team link on the line under (team_page.css)
     } else page.append(back, h, line);
     page.addEventListener('keydown', e => {
         if (e.key === 'Escape' && !e.defaultPrevented && !e.target.closest('input, textarea, select, [contenteditable="true"]')) { e.preventDefault(); e.stopPropagation(); ctx.onBack(); }
