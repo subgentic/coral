@@ -29,7 +29,7 @@ export function noteChoices(items) {
 export const forgetChoices = () => { choiceNames.task.clear(); choiceNames.goal.clear(); };
 // a task or goal number: a positive whole number as text, else nothing
 const numberField = (word, kind) => ({ type: 'custom', empty: '', clean: v => (/^\d{1,9}$/.test(String(v ?? '')) && Number(v) > 0 ? String(Number(v)) : ''), filtered: v => !!v, chip: v => `${word}: ${choiceNames[kind].get(v) || '#' + v}` });
-const model = defineFilters({
+const FIELDS = {
     q: { type: 'text', max: 200, chip: v => `Search: ${v}` },
     kind: { type: 'choice', values: KINDS, chip: v => `Type: ${KIND_LABEL[v]}` },
     origin: { type: 'choice', values: ORIGINS, chip: v => `Origin: ${ORIGIN_LABEL[v]}` },
@@ -41,7 +41,8 @@ const model = defineFilters({
     dates: { type: 'range', from: 'from', to: 'to', chip: (a, b) => (a && b ? `${a} to ${b}` : a ? `From ${a}` : `Until ${b}`) },
     sort: { type: 'order', values: SORTS, default: 'newest' },
     group: { type: 'order', values: ['', ...GROUPS], default: '' }, // how the list is read (heads by task or goal), not what is in it: never a filter or a chip, kept with the rest
-});
+};
+const model = defineFilters(FIELDS);
 export const { EMPTY, clean, isFiltered, chips, without } = model;
 
 const kept = model.persist(team => `coral-team-artifacts-filters:${team}`);
@@ -50,12 +51,20 @@ export const { storageKey } = kept;
 export const loadFilters = kept.load;
 export const saveFilters = kept.save;
 
+/** The Inbox's list across teams (Goal #62): the same filters plus the team (a team's id), kept under its own key. The task, goal and group choices are numbers of one team, so the Inbox's bar does not offer them. */
+export const INBOX = (() => {
+    const m = defineFilters({ q: FIELDS.q, team: { type: 'text', max: 200, chip: v => `Team: ${v}` }, ...Object.fromEntries(Object.entries(FIELDS).filter(([k]) => k !== 'q')) });
+    const p = m.persist(key => `coral-team-artifacts-filters:${key}`);
+    return { EMPTY: m.EMPTY, clean: m.clean, isFiltered: m.isFiltered, chips: m.chips, without: m.without, load: p.load, save: p.save };
+})();
+
 /** The query parameters for the list route (the names are the server's: team_artifacts.go ListTeamArtifacts: q, kind, origin, by, kept, since, until, sort). Empty filters send nothing;
  *  sort is always sent, which makes it a query: the reply then carries the filtered total and a cursor for the next page. */
 export function toParams(f) {
-    const c = clean(f);
+    const c = f && typeof f.team === 'string' ? INBOX.clean(f) : clean(f); // the Inbox's filters carry a team
     const p = {};
     if (c.q) p.q = c.q;
+    if (c.team) p.team = c.team;
     if (c.kind) p.kind = c.kind;
     if (c.origin) p.origin = c.origin;
     if (c.by) p.by = c.by;
