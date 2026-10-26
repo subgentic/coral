@@ -1,7 +1,7 @@
 // The lines over time (#7857): the axis has a point for every interval (a time with no usage is a zero), the colours follow the ranking by cost (not the metric shown), the top 7 are their own lines and the
 // rest are one Other, a running total ends on the sum, and "Totals agree" is a comparison a float cannot break.
 import assert from 'node:assert/strict';
-import { axis, bucketStart, rankKeys, buildSeries, agrees, changeText, bucketTotals, priorWord, TOP, OTHER, METRICS } from '../../coral-go/pkg/frontend/static/analytics_series.js';
+import { axis, bucketStart, rankKeys, buildSeries, agrees, changeText, bucketTotals, priorWord, cacheHit, bucketWindow, TOP, OTHER, METRICS } from '../../coral-go/pkg/frontend/static/analytics_series.js';
 
 const H = 3600000, t0 = Date.UTC(2026, 9, 25, 10, 0, 0);
 assert.equal(bucketStart(t0 + 1234, '1h'), t0);
@@ -55,4 +55,8 @@ assert.equal(changeText(0, 0, 'x'), '');
 assert.equal(changeText(0, 10, 'the prior 24 hours'), '\u2212100% vs the prior 24 hours');
 assert.equal(priorWord('week'), 'the prior 7 days'); assert.equal(priorWord('nothing'), 'the prior 24 hours');
 assert.deepEqual(bucketTotals([{ cost_usd: 1, input_tokens: 5, num_requests: 2 }, { cost_usd: 2.5, output_tokens: 7 }]), { cost_usd: 3.5, input_tokens: 5, output_tokens: 7, cache_read_tokens: 0, cache_write_tokens: 0, num_requests: 2 });
+// the agent drill-down: the cache hit is read / (input + read), none without input; a clicked bar is its bucket to the next one (the end exclusive, as the server reads it)
+assert.equal(cacheHit(100, 900), 0.9); assert.equal(cacheHit(0, 0), null); assert.equal(cacheHit(50, 0), 0);
+assert.deepEqual(bucketWindow(Date.UTC(2026, 9, 25, 10), '1h'), { since: '2026-10-25T10:00:00.000Z', until: '2026-10-25T11:00:00.000Z' });
+assert.deepEqual(bucketWindow(Date.UTC(2026, 9, 25), '1d'), { since: '2026-10-25T00:00:00.000Z', until: '2026-10-26T00:00:00.000Z' });
 console.log('analytics_series: ok');

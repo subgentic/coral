@@ -461,3 +461,20 @@
 @media (pointer: coarse) { .viz-legend-btn { min-height: var(--control-touch-height, 44px); } }
 @media (forced-colors: active) { .viz-fill { stroke: Canvas; } }
 #cost-summary-cards .cost-card { grid-row: span 4; } /* label, figure, the change against the period before (#7930), sparkline */
+/* the agent drill-down (analytics_agent.js, #7930) */
+.viz-back { margin: 0 0 8px; }
+.viz-sub { margin: 0 0 12px; font-size: 0.75rem; color: var(--text-muted); }
+.viz-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 0 0 12px; }
+@media (max-width: 40rem) { .viz-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.viz-tile { background: var(--bg-primary); border: 1px solid var(--border); border-radius: var(--radius-lg, 8px); padding: 10px 12px; }
+.viz-tile-label { font-size: 0.75rem; color: var(--text-muted); }
+.viz-tile-value { font-size: 1.25rem; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text-primary); }
+.viz-tile-sub { font-size: 0.75rem; color: var(--text-muted); }
+.viz-card-stack { margin: 0 0 12px; position: relative; }
+.viz-hint { margin: 0 0 8px; font-size: 0.75rem; color: var(--text-muted); }
+.viz-select { min-height: 32px; max-width: 100%; background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border); border-radius: var(--radius-md, 6px); font: inherit; font-size: 0.75rem; padding: 0 8px; }
+@media (pointer: coarse) { .viz-select { min-height: var(--control-touch-height, 44px); } }
+.viz-table-title { margin: 4px 0 6px; }
+.viz-more { margin: 12px 0 0; }
+.viz-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.viz-pick { stroke: var(--text-secondary); stroke-dasharray: 3 3; }

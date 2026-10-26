@@ -69,7 +69,7 @@ const niceMax = v => { if (!(v > 0)) return 1; const p = 10 ** Math.floor(Math.l
 const colorOf = (line, i) => (line.other ? 'var(--viz-other)' : `var(--viz-${(i % 7) + 1})`);
 export const lineColor = (view, key, ranked) => { const i = ranked.indexOf(key); return i < 0 || i >= TOP ? 'var(--viz-other)' : `var(--viz-${i + 1})`; };
 
-function timeLabel(ms, interval) {
+export function timeLabel(ms, interval) {
     const d = new Date(ms);
     if (interval === '1d') return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
     if (interval === '5m') return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
@@ -77,16 +77,17 @@ function timeLabel(ms, interval) {
 }
 
 /** The lines as one SVG (aria-hidden: the table is the text alternative), with a crosshair and a tooltip that names every line at the time, the end labels of the top two and a dash pattern per line for forced colours. */
-export function drawChart(host, { times, lines, metric, interval, hi, phone }) {
+export function drawChart(host, { times, lines, metric, interval, hi, phone, xLabel, when, fmt }) {
+    const label = xLabel || (i => timeLabel(times[i], interval)), heading = when || label;
     host.replaceChildren();
     const W = Math.max(280, Math.round(host.clientWidth || (phone ? 340 : 880))), H = phone ? 200 : 250, L = 48, R = phone ? 12 : 104, T = 10, B = 24, pw = W - L - R, ph = H - T - B, N = times.length;
-    const m = METRICS.find(x => x.key === metric) || METRICS[0];
+    const m = { ...(METRICS.find(x => x.key === metric) || METRICS[0]), ...(fmt ? { fmt } : {}) };
     const max = niceMax(Math.max(0, ...lines.flatMap(l => l.plot)));
     const x = i => L + (N > 1 ? (i / (N - 1)) * pw : pw / 2), y = v => T + ph - (v / max) * ph;
     const s = svg('svg', { viewBox: `0 0 ${W} ${H}`, width: W, height: H, 'aria-hidden': 'true', focusable: 'false', class: 'viz-svg' });
     for (let g = 0; g <= 4; g++) { const v = (max / 4) * g; s.append(svg('line', { x1: L, x2: W - R, y1: y(v), y2: y(v), class: 'viz-grid' }), svg('text', { x: L - 6, y: y(v) + 4, 'text-anchor': 'end', class: 'viz-axis' }, m.fmt(v))); }
     const ticks = N <= 1 ? [0] : [0, Math.round((N - 1) / 3), Math.round(((N - 1) * 2) / 3), N - 1].filter((v, i, a) => a.indexOf(v) === i);
-    for (const i of ticks.slice(0, phone ? 3 : 4)) s.append(svg('text', { x: x(i), y: H - 6, 'text-anchor': i === 0 ? 'start' : i === N - 1 ? 'end' : 'middle', class: 'viz-axis' }, timeLabel(times[i], interval)));
+    for (const i of ticks.slice(0, phone ? 3 : 4)) s.append(svg('text', { x: x(i), y: H - 6, 'text-anchor': i === 0 ? 'start' : i === N - 1 ? 'end' : 'middle', class: 'viz-axis' }, label(i)));
     const order = lines.map((l, k) => k).sort((a, b) => (hi === lines[a].key) - (hi === lines[b].key)); // the highlighted line is drawn last, so in front
     for (const k of order) {
         const l = lines[k], dim = hi && hi !== l.key;
@@ -109,7 +110,7 @@ export function drawChart(host, { times, lines, metric, interval, hi, phone }) {
         const i = Math.max(0, Math.min(N - 1, Math.round(N > 1 ? ((px - L) / pw) * (N - 1) : 0)));
         cross.setAttribute('x1', x(i)); cross.setAttribute('x2', x(i)); cross.setAttribute('visibility', 'visible');
         dots.forEach((c, k) => { c.setAttribute('cx', x(i)); c.setAttribute('cy', y(lines[k].plot[i])); c.setAttribute('visibility', 'visible'); });
-        tip.replaceChildren(el('div', 'viz-tip-when', timeLabel(times[i], interval)));
+        tip.replaceChildren(el('div', 'viz-tip-when', heading(i)));
         const rows = lines.map((l, k) => ({ l, k, v: l.plot[i] })).sort((a, b) => b.v - a.v).slice(0, 6);
         for (const e of rows) { const row = el('div', 'viz-tip-row'); const key = el('i'); key.style.background = colorOf(e.l, e.k); const name = el('span'); name.append(key, document.createTextNode(e.l.label)); row.append(name, el('b', null, m.fmt(e.v))); tip.append(row); }
         if (lines.length > 6) tip.append(el('div', 'viz-tip-when', `+${lines.length - 6} more in the table`));
@@ -256,4 +257,49 @@ export function drawOverviewPanel(host, { phone }) {
     });
     card.append(ul); host.append(card);
     drawArea(chart, { times, lines, metric: 'cost_usd', interval, hi: st.hi, phone });
+}
+
+
+// ── bars, for the agent drill-down ───────────────────────────────────────
+
+/** Whether the share of the input that came from the cache: read / (input + read), as a number from 0 to 1, or null when there was no input. */
+export function cacheHit(input, cacheRead) { const i = Number(input) || 0, r = Number(cacheRead) || 0; return i + r > 0 ? r / (i + r) : null; }
+
+/** The window a clicked bar stands for: its bucket's start and the next one's (the end is exclusive), as the server reads them. */
+export function bucketWindow(startMs, interval) { return { since: new Date(startMs).toISOString(), until: new Date(startMs + (STEP_MS[interval] || STEP_MS['1h'])).toISOString() }; }
+
+/** Stacked bars (the parts of one bar, bottom to top, 2 px of surface between them, the top rounded), one per time of the axis; a tooltip per bar; a click on a bar picks it (onPick(i)), the picked one outlined
+ *  (sel). parts = [{ name, color, vals }]. The chart is aria-hidden: whatever it says is also a table or a control beside it. */
+export function drawBars(host, { times, parts, fmt, interval, sel, onPick, phone, xLabel }) {
+    host.replaceChildren();
+    const W = Math.max(280, Math.round(host.clientWidth || (phone ? 340 : 880))), H = phone ? 150 : 170, L = 48, R = 8, T = 10, B = 22, pw = W - L - R, ph = H - T - B, N = times.length;
+    const label = xLabel || (i => timeLabel(times[i], interval));
+    const sums = times.map((_, i) => parts.reduce((a, p) => a + p.vals[i], 0));
+    const max = niceMax(Math.max(0, ...sums) * 1.05), y = v => T + ph - (v / max) * ph, bw = Math.max(2, pw / Math.max(N, 1) - 2);
+    const s = svg('svg', { viewBox: `0 0 ${W} ${H}`, width: W, height: H, 'aria-hidden': 'true', focusable: 'false', class: 'viz-svg' });
+    for (let g = 0; g <= 3; g++) { const v = (max / 3) * g; s.append(svg('line', { x1: L, x2: W - R, y1: y(v), y2: y(v), class: 'viz-grid' }), svg('text', { x: L - 6, y: y(v) + 4, 'text-anchor': 'end', class: 'viz-axis' }, fmt(v))); }
+    const tip = el('div', 'viz-tip'); tip.hidden = true;
+    const ticks = N <= 1 ? [0] : [0, Math.round((N - 1) / 3), Math.round(((N - 1) * 2) / 3), N - 1].filter((v, i, a) => a.indexOf(v) === i).slice(0, phone ? 3 : 4);
+    for (let i = 0; i < N; i++) {
+        const x0 = L + (i / N) * pw + 1, g = svg('g');
+        let acc = 0;
+        const live = parts.filter(p => p.vals[i] > 0);
+        live.forEach((p, k) => {
+            const y1 = y(acc + p.vals[i]), y0 = y(acc) - (k > 0 ? 2 : 0), rh = Math.max(1, y0 - y1), top = k === live.length - 1, r = Math.min(4, rh, bw / 2);
+            g.append(svg('path', { d: top ? `M${x0} ${y0} V${y1 + r} Q${x0} ${y1} ${x0 + r} ${y1} H${x0 + bw - r} Q${x0 + bw} ${y1} ${x0 + bw} ${y1 + r} V${y0} Z` : `M${x0} ${y0} V${y1} H${x0 + bw} V${y0} Z`, fill: p.color, class: 'viz-bar', opacity: sel != null && sel !== i ? 0.45 : 1 }));
+            acc += p.vals[i];
+        });
+        if (sel === i) g.append(svg('rect', { x: x0 - 2, y: T, width: bw + 4, height: ph, class: 'viz-pick', rx: 4, fill: 'none' }));
+        const hit = svg('rect', { x: x0 - 1, y: T, width: bw + 2, height: ph, fill: 'transparent' }); if (onPick) hit.style.cursor = 'pointer';
+        hit.addEventListener('pointermove', ev => {
+            tip.replaceChildren(el('div', 'viz-tip-when', label(i)));
+            for (const p of parts) { const row = el('div', 'viz-tip-row'), key = el('i'); key.style.background = p.color; const name = el('span'); name.append(key, document.createTextNode(p.name)); row.append(name, el('b', null, fmt(p.vals[i]))); tip.append(row); }
+            tip.hidden = false; const hr = host.getBoundingClientRect(); let tx = ev.clientX - hr.left + 14; if (tx + 200 > hr.width) tx = ev.clientX - hr.left - 214; tip.style.left = `${Math.max(4, tx)}px`; tip.style.top = '4px';
+        });
+        hit.addEventListener('pointerleave', () => { tip.hidden = true; });
+        if (onPick) hit.addEventListener('click', () => onPick(i));
+        g.append(hit); s.append(g);
+        if (ticks.includes(i)) s.append(svg('text', { x: x0 + bw / 2, y: H - 6, 'text-anchor': i === 0 ? 'start' : i === N - 1 ? 'end' : 'middle', class: 'viz-axis' }, label(i)));
+    }
+    host.classList.add('viz-host'); host.append(s, tip);
 }
