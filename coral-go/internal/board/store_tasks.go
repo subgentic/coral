@@ -606,9 +606,9 @@ func (s *Store) SnoozeTaskReminder(ctx context.Context, project string, taskID i
 	return err
 }
 
-// IdleTasks returns active tasks that have had no recorded activity since the
+// idleTasks returns active tasks that have had no recorded activity since the
 // supplied time. Older databases use claimed_at until activity is recorded.
-func (s *Store) IdleTasks(ctx context.Context, project string, before time.Time) ([]Task, error) {
+func (s *Store) idleTasks(ctx context.Context, project string, before time.Time) ([]Task, error) {
 	var tasks []Task
 	err := s.reader().SelectContext(ctx, &tasks, `SELECT id, revision, board_id, title, body, status, priority,
 		created_by, assigned_to, completed_by, completion_message, created_at, claimed_at,
@@ -624,6 +624,7 @@ func (s *Store) IdleTasks(ctx context.Context, project string, before time.Time)
 // CompleteTask marks a task as completed. Pending tasks can be completed
 // without being claimed first: the operator is never prompted to claim the
 // tasks assigned to them, and just marks them done.
+// CompleteTask has no production caller: it is exported for tests in background, cmd/coral-board, server, server/routes.
 func (s *Store) CompleteTask(ctx context.Context, project string, taskID int64, subscriberID string, message *string) (*Task, error) {
 	return s.CompleteTaskWithArtifacts(ctx, project, taskID, subscriberID, message, "success", nil)
 }

@@ -938,9 +938,9 @@ func (s *Store) inheritedGoal(ctx context.Context, board string, retryOf int64) 
 	return &id.Int64
 }
 
-// GoalSummary is what the feed carries for a board (no text): how many goals are open (proposed, active or blocked) and the board's change counter, which moves on every goal write and every
+// goalSummary is what the feed carries for a board (no text): how many goals are open (proposed, active or blocked) and the board's change counter, which moves on every goal write and every
 // task change that touches a goal. A board with no goals reads 0 and 0.
-func (s *Store) GoalSummary(ctx context.Context, board string) (open int, seq int64, err error) {
+func (s *Store) goalSummary(ctx context.Context, board string) (open int, seq int64, err error) {
 	err = s.reader().QueryRowxContext(ctx, `SELECT
 		(SELECT COUNT(*) FROM board_goals WHERE board_id = ?1 AND state IN ('proposed', 'active', 'blocked')),
 		COALESCE((SELECT seq FROM board_goal_meta WHERE board_id = ?1), 0)`, board).Scan(&open, &seq)

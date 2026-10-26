@@ -22,8 +22,8 @@ import (
 // TaskQuerySummaryFields is what fields=summary stands for: the minimal set, no long text.
 var TaskQuerySummaryFields = []string{"id", "title", "status", "priority", "assigned_to", "board_id", "board_label", "parked_reason", "parked_until", "created_at", "updated_at"}
 
-// TaskQueryLargeFields can be long: they come back only when fields names them (or with no fields at all, which is the whole row).
-var TaskQueryLargeFields = []string{"body", "completion_message"}
+// taskQueryLargeFields can be long: they come back only when fields names them (or with no fields at all, which is the whole row).
+var taskQueryLargeFields = []string{"body", "completion_message"}
 
 // updatedAtSQL: a task has no updated_at column; the newest of its creation, claim, completion, last activity and last edit (its body, title, priority or assignee: edited_at,
 // #5819) says when it last changed. All are UTC RFC 3339 text written by nowUTC, so they compare as text. An edit moves this and neither the revision (amendments and

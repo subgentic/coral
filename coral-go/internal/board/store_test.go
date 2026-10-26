@@ -447,12 +447,12 @@ func TestTaskActivityTouchAndIdleTasks(t *testing.T) {
 	old := time.Now().UTC().Add(-2 * time.Hour).Format(time.RFC3339)
 	_, err = s.db.ExecContext(ctx, "UPDATE board_tasks SET last_activity_at = ? WHERE id = ?", old, claimed.ID)
 	require.NoError(t, err)
-	idle, err := s.IdleTasks(ctx, "proj", time.Now().UTC().Add(-time.Hour))
+	idle, err := s.idleTasks(ctx, "proj", time.Now().UTC().Add(-time.Hour))
 	require.NoError(t, err)
 	require.Len(t, idle, 1)
 
 	require.NoError(t, s.TouchActiveTask(ctx, "proj", "bob"))
-	idle, err = s.IdleTasks(ctx, "proj", time.Now().UTC().Add(-time.Hour))
+	idle, err = s.idleTasks(ctx, "proj", time.Now().UTC().Add(-time.Hour))
 	require.NoError(t, err)
 	require.Empty(t, idle)
 }

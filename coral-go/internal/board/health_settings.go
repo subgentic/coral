@@ -122,6 +122,7 @@ func (s *Store) GetHealthSettings(ctx context.Context, project string) HealthSet
 }
 
 // SetHealthSettings stores a board's health settings, clamped (the settings route's own save goes through BoardSettingsUpdate; this is for the rest of the server and tests).
+// SetHealthSettings has no production caller: it is exported for tests in background, server/routes.
 func (s *Store) SetHealthSettings(ctx context.Context, project string, h HealthSettings) error {
 	return s.setHealthSettings(ctx, project, h)
 }

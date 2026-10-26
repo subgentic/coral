@@ -78,16 +78,19 @@ func (s *Store) SetSessionsDB(db *sqlx.DB) {
 
 // SetCompletionCheckRunner installs the trusted registered-check runner. A
 // nil runner makes registered checks fail explicitly as unavailable.
+// SetCompletionCheckRunner has no production caller: it is exported for tests in server/routes.
 func (s *Store) SetCompletionCheckRunner(runner CompletionCheckRunner) {
 	s.completionCheckRunner = runner
 }
 
 // SetCompletionChecksEnabled is trusted server configuration used by tests and
 // an explicit future rollout. Callers cannot enable checks through task input.
+// SetCompletionChecksEnabled has no production caller: it is exported for tests in server/routes.
 func (s *Store) SetCompletionChecksEnabled(enabled bool) {
 	s.completionChecksEnabled = enabled
 }
 
+// CompletionChecksEnabled has no production caller: it is exported for tests in server/routes.
 func (s *Store) CompletionChecksEnabled() bool { return s.completionChecksEnabled }
 
 // NewStoreWithKey opens the board database with SQLCipher when key is set.

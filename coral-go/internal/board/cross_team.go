@@ -141,6 +141,7 @@ const settingPausedBy = "paused_by"
 const PausedBySleep = "sleep"
 
 // SetBoardPaused stores whether a board is paused, as a person's pause; unpausing also forgets who paused it.
+// SetBoardPaused has no production caller: it is exported for tests in server/routes.
 func (s *Store) SetBoardPaused(ctx context.Context, project string, paused bool) error {
 	return s.SetBoardPausedBy(ctx, project, paused, "")
 }

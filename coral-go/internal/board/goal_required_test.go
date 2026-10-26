@@ -152,7 +152,7 @@ func TestProjectsListCarriesTheGoalsBrief(t *testing.T) {
 	require.NoError(t, err)
 	_ = g
 	list, _ = s.ListProjects(ctx)
-	open, seq, err := s.GoalSummary(ctx, "team")
+	open, seq, err := s.goalSummary(ctx, "team")
 	require.NoError(t, err)
 	assert.Equal(t, GoalsBrief{Open: open, Seq: seq}, *list[0].Goals)
 	assert.Equal(t, 1, list[0].Goals.Open)

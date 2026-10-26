@@ -17,6 +17,6 @@ func TestTaskQueryFieldAllowlist(t *testing.T) {
 	sort.Strings(got)
 	assert.Equal(t, TaskQueryFieldNames(), got)
 	for _, f := range TaskQuerySummaryFields {
-		assert.NotContains(t, TaskQueryLargeFields, f, "the default set has no long text")
+		assert.NotContains(t, taskQueryLargeFields, f, "the default set has no long text")
 	}
 }

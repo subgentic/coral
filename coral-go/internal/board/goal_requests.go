@@ -451,6 +451,7 @@ func (s *Store) ApplyGoalRequestReply(ctx context.Context, board, requestID, fro
 }
 
 // GoalRequestsOut lists the requests a goal made (newest first, at most limit), with the count of all of them in each status.
+// GoalRequestsOut has no production caller: it is exported for tests in server/routes.
 func (s *Store) GoalRequestsOut(ctx context.Context, board string, goalID int64, limit int) ([]GoalRequestOut, error) {
 	if limit <= 0 || limit > 200 {
 		limit = 100
