@@ -93,17 +93,21 @@ function renderDatabaseEncryptionStatus(status, loadError = false) {
     if (!select || !hint) return;
     // A build without database encryption has nothing to choose: the row is not shown (UI audit #5589, finding 17),
     // and a save leaves the setting alone (the select is disabled).
-    const row = select.closest('.settings-row');
-    if (row) row.hidden = loadError || !status || status.encryption_compiled === false;
+    const unsupported = loadError || !status || status.encryption_compiled === false;
+    select.dataset.unsupported = unsupported ? '1' : ''; // the field's visibleWhen reads it, so a redraw of the rows keeps the row hidden
+    const row = select.closest('.sv-row');
+    if (row) row.hidden = unsupported;
     if (loadError || !status) {
-        select.disabled = true;
+        select.disabled = true; select.dataset.locked = '1';
         hint.textContent = 'Database encryption settings are unavailable in this server build.';
         return;
     }
     const mode = status.saved_mode || status.effective_mode || 'disabled';
     select.value = mode;
     select.dataset.shown = mode; // what Save compares with, to tell a changed choice from none
-    select.disabled = status.feature_available === false || status.encryption_compiled === false;
+    const locked = status.feature_available === false || status.encryption_compiled === false;
+    select.disabled = locked;
+    select.dataset.locked = locked ? '1' : ''; // the field's disabledWhen reads it: a redraw of the rows keeps the choice off
     const effective = status.effective_mode || 'disabled';
     const restart = status.restart_required === true;
     const surface = status.unlock_surface || 'unknown';

@@ -94,9 +94,20 @@ export const CLEANUP_FIELDS = [
     { key: 'worktrees_list', type: 'notice', render: slot => { slot.id = 'settings-worktrees-row'; const el = document.getElementById('settings-worktrees-live'); if (el) slot.append(el); } },
 ];
 
+export const SECURITY_FIELDS = [
+    { key: 'api_key', type: 'custom', id: 'settings-api-key-group', label: 'API key', render: slot => { const el = document.getElementById('settings-api-key-live'); if (el) slot.append(el); } },
+    live('settings-security'),
+    { key: 'database_encryption', type: 'select', id: 'settings-database-encryption', labelId: 'settings-database-encryption-label', label: 'Database encryption', live: ['settings-database-encryption-status'], visibleWhen: () => { const e = document.getElementById('settings-database-encryption'); return !e || e.dataset.unsupported !== '1'; }, disabledWhen: () => { const e = document.getElementById('settings-database-encryption'); return !!e && e.dataset.locked === '1'; },
+        help: { text: 'Applies after restart.', more: 'Coral never stores a database password in browser storage, URLs, logs, or ordinary settings.' },
+        options: [{ value: 'disabled', label: 'Off (plaintext database)' }, { value: 'key_file', label: 'Local key file (~/.coral/.db_key)' }, { value: 'password', label: 'Password at startup' }] },
+    { key: 'telemetry_enabled', type: 'toggle', id: 'settings-telemetry-enabled', label: 'Usage analytics', help: 'Anonymous product events only. No prompts, transcripts, or secrets are sent. Applies immediately.' },
+    { key: 'install_id', type: 'custom', id: 'settings-install-id-group', label: 'Install ID', live: ['settings-telemetry-install-hint', 'settings-telemetry-install-status'], render: slot => { const el = document.getElementById('settings-telemetry-install-box'); if (el) slot.append(el); } },
+    { key: 'debug_input_log', type: 'toggle', id: 'settings-debug-input-log', label: 'Log terminal input (debug)', disabledWhen: () => { const e = document.getElementById('settings-debug-input-log'); return !!e && e.dataset.locked === '1'; }, live: ['settings-debug-input-log-status', { id: 'settings-debug-input-log-delete', describes: false }], help: { text: '', more: 'Record everything Coral sends to agent terminals, for troubleshooting. Applies immediately.' } },
+];
+
 /** Draws the groups that are fields into the Settings modal's panes (once, when the modal is built). mount is mountSettingsView. */
 export function drawSettingsGroups(modal, mount) {
-    for (const [hostId, fields] of [['settings-general-rows', GENERAL_FIELDS], ['settings-notifications-rows', NOTIFICATIONS_FIELDS], ['settings-files-rows', FILES_FIELDS], ['settings-terminal-rows', TERMINAL_FIELDS], ['settings-agents-rows', AGENTS_FIELDS], ['settings-cleanup-rows', CLEANUP_FIELDS]]) {
+    for (const [hostId, fields] of [['settings-general-rows', GENERAL_FIELDS], ['settings-notifications-rows', NOTIFICATIONS_FIELDS], ['settings-files-rows', FILES_FIELDS], ['settings-terminal-rows', TERMINAL_FIELDS], ['settings-agents-rows', AGENTS_FIELDS], ['settings-cleanup-rows', CLEANUP_FIELDS], ['settings-security-rows', SECURITY_FIELDS]]) {
         const host = modal.querySelector(`#${hostId}`);
         if (host && !host.firstChild) mount(host, { mode: 'settings', saveBar: false, fields: typeof fields === 'function' ? fields(host) : fields });
     }

@@ -18,7 +18,7 @@
  *   }
  *   field = { key, type: 'text'|'textarea'|'number'|'select'|'toggle'|'multiselect'|'radio'|'secret'|'path'|'custom', label, help?: string | { text, more },
  *             id?, default?, required?, placeholder?, rows?, min?, max?, step?, unit?, options?: [{ value, label, help? }] | async () => [...], validate?(value, values) => '' | 'message',
- *             live?: [element ids or { id, wide }] (page elements a module fills, moved under the help, or under the whole row; the control is described by them),
+ *             live?: [element ids or { id, wide?, describes?: false }] (page elements a module fills, moved under the help, or under the whole row; the control is described by them),
  *             visibleWhen?(values), disabledWhen?(values) => bool | 'reason', readOnly?, apply?: 'now', action?: { label, run(view), danger?, confirm? }, wide?, compact?, render?(slot, ctl) => { get, invalid?(on) (mark the control's own input), focus?, set, onChange? } }
  *
  * The controller: values() set(key, v) dirty() isDirty() changes() error(key, message) clearErrors() validate({ focus }) save() cancel() showGroup(id) reload() destroy().
@@ -187,7 +187,7 @@ export function mountSettingsView(host, spec) {
         for (const item of field.live || []) { // an id, or { id, wide: true } for a part that takes the row's whole width (under both columns)
             const lid = typeof item === 'string' ? item : item.id, e = document.getElementById(lid); if (!e) continue;
             if (typeof item === 'object' && item.wide) { e.classList.add('sv-live-wide'); wideLive.push(e); } else text.append(e);
-            liveIds.push(lid);
+            if (!(typeof item === 'object' && item.describes === false)) liveIds.push(lid); // a button under the field (Delete the log) is not part of what describes the control
         }
         const describedBy = [descId, ...liveIds].filter(Boolean);
         if (describedBy.length && target && target.setAttribute) target.setAttribute('aria-describedby', describedBy.join(' '));
@@ -313,8 +313,7 @@ export function mountSettingsView(host, spec) {
     function refreshRows() {
         const values = valuesNow();
         for (const [k, r] of fields) {
-            const vis = r.field.visibleWhen ? !!r.field.visibleWhen(values) : true;
-            r.row.hidden = !vis;
+            if (r.field.visibleWhen) r.row.hidden = !r.field.visibleWhen(values); // only a field that has a rule of its own: a row the page hides (the hub's machine settings) stays hidden through a redraw
             const ro = readOnlyOf(k) || r.field.readOnly || false;
             const dis = r.field.disabledWhen ? r.field.disabledWhen(values) : false;
             const off = !!(globalReadOnly || ro || dis);
