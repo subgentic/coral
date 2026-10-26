@@ -42,7 +42,7 @@ const S = `(window.__coralStatic || '/static/')`;
             assert.equal(await ev(`document.querySelector('.sched-runs-section h3').textContent`), 'Workflow runs', `${tag}: history comes from the workflow runs route`);
             // a run's When is a link to the run; a click anywhere on its row opens it
             const run = await ev(`(() => { const b = document.querySelector('.sched-runs-table .dt-primary'); const cs = getComputedStyle(b); window.__opened = []; window.selectWorkflowRun = id => window.__opened.push(id); const tr = b.closest('tr'); const took = tr.children[2]; const r = took.getBoundingClientRect(); took.scrollIntoView({ block: 'center' }); const r2 = took.getBoundingClientRect(); const hit = document.elementFromPoint(r2.left + 4, r2.top + r2.height / 2); hit.click(); return { primary: b.classList.contains('dt-primary'), weight: cs.fontWeight, color: cs.color, accent: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim(), opened: window.__opened.length }; })()`);
-            assert.ok(run.primary && run.weight === '600', `${tag}: a run uses the shared primary action: ` + JSON.stringify(run));
+            assert.ok(run.primary && run.weight === '500', `${tag}: a run uses the shared primary action (500 in a folded row, #8496): ` + JSON.stringify(run));
             assert.equal(run.opened, 1, `${tag}: a click on the run's row (its Took cell) opens the run: ` + JSON.stringify(run));
             // a phone: a back row to the list
             if (mobile) {
