@@ -3,7 +3,7 @@
  * on every window, and the fit-to-width floors (xterm_renderer.js, #6231) are unchanged. Its one import is phone_layout.js (no imports of its own). */
 import { isPhoneLayout } from './phone_layout.js';
 export const DESKTOP_FONT = 13;
-export const PHONE_FONT = 10;
+const PHONE_FONT = 10;
 
 /** Is this window a phone's (phone_layout.js, #6683)? A narrow window, or a touch screen at most 500 px high: a phone turned to landscape is wider than the breakpoint and gets the phone's layout, follows the
  *  shared pane's size and never sets it (#6675), and draws the phone's font. A tablet (touch, taller) and a desktop window (a mouse) are not phones. */

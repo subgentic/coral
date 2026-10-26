@@ -38,7 +38,7 @@ const taskLine = (t) => `#${Number(t.id)} ${String(t.status || '').replaceAll('_
 const doingOf = (a) => (a.tasks && a.tasks.length ? taskLine(a.tasks[0]) + (a.tasks.length > 1 ? ` (+${a.tasks.length - 1} more)` : '') : (a.reason || ''));
 
 /** The statuses with at least one agent, in the order of the chips, with their counts. */
-export function chipCounts(agents) {
+function chipCounts(agents) {
     const count = {};
     for (const a of agents) count[a.availability || 'unknown'] = (count[a.availability || 'unknown'] || 0) + 1;
     const keys = [...FIRST, ...Object.keys(count).filter(k => !FIRST.includes(k))].filter(k => count[k] || k === 'available');

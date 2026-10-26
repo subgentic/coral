@@ -271,7 +271,7 @@ const activeNavTab = () => document.querySelector('.top-nav-tab.active')?.datase
 
 /** The dashboard's own Inbox was shown (switchNavTab('hub-inbox')): the Saved list is moved into it and read. */
 let viewLoad = null, viewAgain = false;
-export function showSavedView() {
+function showSavedView() {
     if (viewLoad) { if (changedSince) viewAgain = true; return viewLoad; } // the nav tab's switch and the top bar's button can both ask at once: one read, and one more after it when the list changed since it began (#7955)
     placeUi();
     wire();

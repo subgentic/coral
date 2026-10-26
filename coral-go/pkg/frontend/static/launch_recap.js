@@ -6,7 +6,7 @@ const container = () => document.getElementById('launch-agent-acf');
 const TYPE = { claude: 'Claude', codex: 'Codex', agy: 'Antigravity', antigravity: 'Antigravity', gemini: 'Antigravity', pi: 'Pi' };
 
 /** The recap's parts: the person's name for the agent, then the provider, the folder, the model and the mode, each as words. */
-export function recapParts() {
+function recapParts() {
     const acf = container();
     if (!acf) return null;
     const type = acf.querySelector('.acf-agent-type')?.value || 'claude';

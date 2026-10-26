@@ -48,7 +48,7 @@ export function groupHeaderKey(event, header = event.currentTarget) {
 
 /** Collapse every team and folder group in the list, or open them all (the header's one toggle). A group the person
  *  opened or closed by hand keeps its state until one of these is used; the result is stored the way a single collapse is. */
-export function setAllGroupsCollapsed(collapsed) {
+function setAllGroupsCollapsed(collapsed) {
     if (!collapsed) browserLocal.set('coral_collapsed_groups', '[]');
     else {
         const names = new Set(_getCollapsedGroups());

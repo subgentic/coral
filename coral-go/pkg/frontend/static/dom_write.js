@@ -42,7 +42,7 @@ export function setData(el, key, value) {
 // An overlay pill (the "waiting for input" and "server unreachable" notices, #5287): it takes no layout space (css .live-pills), appears only after
 // PILL_SHOW_DELAY_MS of being wanted, and goes at once when it is not. The wait is not restarted by the feed updates that repeat the same state, so a
 // quick drop and return never flashes it, and a lasting one shows once. The text is read when it shows, and set at once while it is shown.
-export const PILL_SHOW_DELAY_MS = 1500;
+const PILL_SHOW_DELAY_MS = 1500;
 const _pills = new WeakMap();
 export function setPill(el, show, text) {
     if (!el) return;

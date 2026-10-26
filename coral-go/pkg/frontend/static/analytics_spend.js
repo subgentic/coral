@@ -243,7 +243,7 @@ function drawTime() {
 
 function draw() { drawSpend(); drawTime(); }
 
-export async function loadSpend() {
+async function loadSpend() {
     if (!model.team) { draw(); return; }
     const seq = ++model.seq, team = model.team;
     model.loading = !model.data; model.error = '';

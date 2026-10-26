@@ -18,7 +18,7 @@ function button(cls, label, text) {
     return b;
 }
 
-export function dismissWorktreeDock() {
+function dismissWorktreeDock() {
     const had = $() && $().contains(document.activeElement);
     items.length = 0; open = false;
     paint();

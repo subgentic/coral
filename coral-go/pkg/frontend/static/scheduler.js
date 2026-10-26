@@ -65,7 +65,7 @@ async function fetchJobRuns(jobId) {
 
 let jobsQuery = ''; // the search box's text, lower case
 const matchesQuery = job => !jobsQuery || String(job.name || '').toLowerCase().includes(jobsQuery);
-export function filterJobs(value) { jobsQuery = String(value || '').trim().toLowerCase(); renderJobsSidebar(); }
+function filterJobs(value) { jobsQuery = String(value || '').trim().toLowerCase(); renderJobsSidebar(); }
 
 const JOB_GROUPS = [{ key: 'active', label: 'Active', has: job => job.enabled }, { key: 'paused', label: 'Paused', has: job => !job.enabled }];
 const jobGroups = () => JOB_GROUPS.map(g => ({ ...g, jobs: scheduledJobs.filter(matchesQuery).filter(g.has) })).filter(g => g.jobs.length);
@@ -324,7 +324,7 @@ const formatDuration = ms => fmtDuration(ms);
 
 // ── CRUD operations ──────────────────────────────────────────────────────
 
-export async function toggleScheduledJob(jobId) {
+async function toggleScheduledJob(jobId) {
     try {
         await fetch(`/api/scheduled/jobs/${jobId}/toggle`, { method: 'POST' });
         await fetchJobs();
@@ -334,7 +334,7 @@ export async function toggleScheduledJob(jobId) {
     }
 }
 
-export function deleteScheduledJob(jobId) {
+function deleteScheduledJob(jobId) {
     window.showConfirmModal('Delete Job', 'Delete this scheduled job and all its run history?', async () => {
         try {
             await fetch(`/api/scheduled/jobs/${jobId}`, { method: 'DELETE' });

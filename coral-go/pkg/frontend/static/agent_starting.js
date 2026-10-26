@@ -6,7 +6,7 @@ export function agentIsStarting(row) {
     return !!row && row.starting === true && row.agent_type !== "terminal" && !row.sleeping;
 }
 
-export const SEND_STARTING_TITLE = "This agent is still starting: your message is held until it is ready";
+const SEND_STARTING_TITLE = "This agent is still starting: your message is held until it is ready";
 const SEND_BUTTONS = '.btn-send, .mobile-send-btn[data-on-click="cmd-send"]';
 
 let sendStarting = false; // the last answer, kept because the toolbar's buttons are rebuilt (controls.js) after it is given

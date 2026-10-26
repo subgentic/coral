@@ -161,7 +161,7 @@ export function drawChart(host, { times, lines, metric, interval, hi, phone, xLa
 export const OTHER = '\u0000other';
 const state = {}; // per view: metrics, cumulative, hi, selected, data ({ buckets, interval, sinceMs, untilMs }), ranked
 
-export const seriesState = view => (state[view] ||= { metrics: ['cost_usd'], cumulative: true, hi: '', selected: new Set(), data: null, ranked: [], error: '' });
+const seriesState = view => (state[view] ||= { metrics: ['cost_usd'], cumulative: true, hi: '', selected: new Set(), data: null, ranked: [], error: '' });
 /** The line colour of a table row's key (a swatch): its line's, Other's when it is folded into it, 'off' when rows are checked and this one is not, '' when nothing is read yet. */
 export function swatchColor(view, key) {
     const st = state[view]; if (!st || !st.data) return '';
@@ -190,7 +190,7 @@ export function toggleLine(view, key) {
     if (st.hi && st.hi !== OTHER && st.selected.size && !st.selected.has(st.hi)) st.hi = '';
 }
 /** Back to the top 7 and Other. */
-export function resetLines(view) { seriesState(view).selected = new Set(); }
+function resetLines(view) { seriesState(view).selected = new Set(); }
 /** Sets what the view has read (null while it loads or after an error) and keeps the colours' order. */
 export function setData(view, data, error) { const st = seriesState(view); st.data = data; st.error = error || ''; st.ranked = data ? rankKeys(data.buckets) : []; }
 
@@ -287,7 +287,7 @@ export function bucketTotals(buckets) {
 }
 
 /** The lines stacked, each fill one line (2 px of the surface between fills), the daily or hourly total the height; a crosshair and a tooltip that lists the fills at the time and their total. */
-export function drawArea(host, { times, lines, metric, interval, hi, phone }) {
+function drawArea(host, { times, lines, metric, interval, hi, phone }) {
     host.replaceChildren();
     const W = Math.max(280, Math.round(host.clientWidth || (phone ? 340 : 880))), H = phone ? 190 : 230, L = 52, R = 12, T = 10, B = 24, pw = W - L - R, ph = H - T - B, N = times.length;
     const m = METRICS.find(x => x.key === metric) || METRICS[0];

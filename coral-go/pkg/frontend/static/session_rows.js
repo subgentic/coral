@@ -428,7 +428,7 @@ export function setAgentLineShown(part, on) {
 /** The words of the line for a row, by the options that are on: only what the agent has on record (a terminal has none of the three, an agent with no level shows no level). The provider is the
  *  start of the line, not a line of its own: a row with no model and no level on record has no line (as before the options, so the list does not grow a line per agent), except that with
  *  Show model and Show thinking level both off the provider is all that was asked for and is shown. */
-export function agentLineText(s) {
+function agentLineText(s) {
     const model = isAgentLineShown('model') ? modelName(s.agent_type, s.model, sessionServer(s)) : '';
     const level = isAgentLineShown('thinking') ? sessionLevel(s) : null;
     const provider = isAgentLineShown('provider') ? providerName(s.agent_type) : '';
@@ -480,7 +480,7 @@ onBuilt('settings-modal', () => applySessionSummaryPref()); // its Show summarie
 
 /** What the Display panel says under its options when 'Show branches' or 'Show agent type' is on and some agents have nothing to show for it (#5237): an option that
  *  seems to do nothing for a row is explained, not silent. "" when neither option is on or every agent has its data. A terminal has no model, so it is not counted for that. */
-export function displayHintText() {
+function displayHintText() {
     const model = isAgentLineShown('model'), thinking = isAgentLineShown('thinking'), branch = isBranchShown();
     if (!model && !thinking && !branch) return '';
     const live = (state.liveSessions || []).filter(s => !s.archived);

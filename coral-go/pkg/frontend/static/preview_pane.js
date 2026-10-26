@@ -527,7 +527,7 @@ function _disposeTab(tab) {
 
 // A tab with unsaved edits asks first, in the confirm dialog; the tab is looked up again once
 // answered, since tabs can change while the dialog is open.
-export function closeTab(tabId) {
+function closeTab(tabId) {
     const tab = _tabs.find(t => t.id === tabId);
     if (!tab) return;
     if (_isDirty(tab)) {

@@ -18,10 +18,10 @@
 import { updatesUiOn } from './update_flag.js';
 import { serverBase } from './server_base.js';
 
-export const BADGE_TEXT = 'Updating';
-export const BADGE_NAME = 'Updating: Coral on this machine is restarting into an update. It reconnects on its own.'; // the accessible name starts with the visible word (UI/UX on #5355: label in name)
-export const BADGE_TIP = 'Coral on this machine is restarting into an update. It reconnects on its own.';
-export const AGE_OUT_MS = 5 * 60 * 1000;
+const BADGE_TEXT = 'Updating';
+const BADGE_NAME = 'Updating: Coral on this machine is restarting into an update. It reconnects on its own.'; // the accessible name starts with the visible word (UI/UX on #5355: label in name)
+const BADGE_TIP = 'Coral on this machine is restarting into an update. It reconnects on its own.';
+const AGE_OUT_MS = 5 * 60 * 1000;
 
 const reads = new Map();   // server id -> { flag, at }: the latest read (flag is true only for relaunching: true), and when
 const sent = new Map();    // server id -> { at, cleared, timer }: this dashboard's own relaunch
@@ -31,12 +31,12 @@ let seenTab = false;
 let onChange = () => {};
 
 /** Whether a parsed reply says the machine is relaunching: the strict boolean on a single JSON object, nothing else. */
-export function relaunchingOf(body) {
+function relaunchingOf(body) {
     return !!body && typeof body === 'object' && !Array.isArray(body) && body.relaunching === true;
 }
 
 /** One read of the machine's status through the hub: true only for the strict flag; false for anything else, a failure included. */
-export async function readRelaunching(id) {
+async function readRelaunching(id) {
     let flag = false;
     try {
         const resp = await fetch(`${serverBase(id)}/api/system/update`, { headers: { Accept: 'application/json' }, cache: 'no-store' });

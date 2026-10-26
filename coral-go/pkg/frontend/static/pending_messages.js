@@ -425,7 +425,7 @@ function agentIsWorking(session) {
 const agentIsBusy = agentIsWorking;
 
 /** "12 s", "1 min 05 s": the elapsed time as short digits. */
-export function workingElapsedText(secs) {
+function workingElapsedText(secs) {
     if (secs < 60) return `${secs} s`;
     return `${Math.floor(secs / 60)} min ${String(secs % 60).padStart(2, "0")} s`;
 }

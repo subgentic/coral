@@ -23,7 +23,7 @@ export const forgetOpenRows = () => opened.clear();
 
 // The sender's circle: a solid fill with the initial in white, from the eight avatar tokens the tables' people use (variables.css, each 4.5:1 or more against white, the same in both themes). A name always gets the same one.
 /** The fill of a sender's circle. */
-export function avatarColor(name) {
+function avatarColor(name) {
     let h = 0;
     for (const c of String(name || '')) h = (h * 31 + c.codePointAt(0)) >>> 0;
     return `var(--avatar-${h % 8 + 1})`;

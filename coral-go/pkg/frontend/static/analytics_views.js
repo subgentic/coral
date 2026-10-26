@@ -32,7 +32,7 @@ function shown() {
 }
 
 /** The sidebar's list: one button per view, the open one marked. */
-export function drawViews() {
+function drawViews() {
     const list = document.getElementById('cost-nav-list');
     if (!list) return;
     const held = list.contains(document.activeElement) ? document.activeElement.dataset.view : null; // the list is drawn again: the keyboard stays on its row

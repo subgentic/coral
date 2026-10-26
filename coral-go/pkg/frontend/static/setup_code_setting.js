@@ -70,7 +70,7 @@ function syncRemoteNote() {
 }
 
 /** Read the code (it is not shown until asked for), or take the group away when the server has none for this page. */
-export async function loadSetupCode() {
+async function loadSetupCode() {
     const mine = ++_token;
     try {
         const r = await serverFetch('local', '/api/auth/setup-code/show', { cache: 'no-store' });

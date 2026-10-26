@@ -36,7 +36,7 @@ function parts() {
 }
 
 /** What the chips say for a row: { model: {text, state}, thinking: {text, state, shown}, note } (state: '', 'pending', 'failed', 'requested'; note is plain text). */
-export function chipView(s, server) {
+function chipView(s, server) {
     const base = modelLabel(s.agent_type, s.model, server) || 'CLI default'; // no model set: the chip reads "Model: CLI default", never "Model: Model" (#7063)
     const sw = s.model_switch;
     const lvl = s.thinking_actual ? levelName(s.thinking_actual) : (s.thinking ? levelName(s.thinking) : '');
@@ -368,7 +368,7 @@ async function _submitAdd() {
 }
 
 /** Wire the chips once: open and close each menu, choose an item. */
-export function wireModelChip() {
+function wireModelChip() {
     const p = parts();
     const first = p.model.chip;
     if (!first || first.dataset.wired) return;

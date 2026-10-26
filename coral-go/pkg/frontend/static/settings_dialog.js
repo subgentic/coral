@@ -853,7 +853,7 @@ const formKey = () => { try { return JSON.stringify(readSettingsForm().payload);
 const payloadNow = () => { try { return readSettingsForm().payload; } catch { return null; } };
 /** The part of a saved payload the person changed since the dialog opened (or was last saved). */
 const changedSince = payload => Object.fromEntries(Object.entries(payload).filter(([k, v]) => !_payloadAtOpen || JSON.stringify(_payloadAtOpen[k]) !== JSON.stringify(v)));
-export async function refreshUnsavedNote() {
+async function refreshUnsavedNote() {
     const note = document.getElementById('settings-unsaved');
     if (!note) return;
     let dirty = _formAtOpen !== null && formKey() !== _formAtOpen;

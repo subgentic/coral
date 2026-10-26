@@ -245,7 +245,7 @@ function _wireHeader() {
 
 function _isPhone() { return isPhoneLayout(); }
 
-export function togglePopoutPanel() {
+function togglePopoutPanel() {
     toggleAgenticPanel();
 }
 

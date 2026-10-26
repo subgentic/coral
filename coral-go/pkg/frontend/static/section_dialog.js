@@ -104,7 +104,7 @@ export function markSectionError(shell, id, on) {
     if (o) o.textContent = on ? `${name(pane)} (has a problem)` : name(pane);
 }
 
-export function refreshSectionErrors(shell) {
+function refreshSectionErrors(shell) {
     if (!shell._sdUid) return;
     for (const p of panesOf(shell)) markSectionError(shell, p.dataset.section, !!p.querySelector('[aria-invalid="true"]'));
 }
@@ -115,4 +115,4 @@ const watch = new MutationObserver(records => {
     for (const r of records) { const s = r.target.closest?.('.settings-shell'); if (s && s._sdUid) shells.add(s); }
     for (const s of shells) refreshSectionErrors(s);
 });
-export function watchSectionErrors(shell) { watch.observe(shell, { subtree: true, attributes: true, attributeFilter: ['aria-invalid'] }); }
+function watchSectionErrors(shell) { watch.observe(shell, { subtree: true, attributes: true, attributeFilter: ['aria-invalid'] }); }

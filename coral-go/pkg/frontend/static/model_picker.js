@@ -219,7 +219,7 @@ export function setThinkingActual(container, stored, actual) {
 }
 
 /** Show the levels this type and model take; keep the choice when it is still offered, else fall back to Default and say so. */
-export function syncThinking(container) {
+function syncThinking(container) {
     const { wrap, select, note, ran } = thinkingParts(container);
     if (!wrap || !select) return;
     if (ran) ran.textContent = ranNote(container._thinkingRan);

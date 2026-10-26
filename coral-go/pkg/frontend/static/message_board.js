@@ -997,7 +997,7 @@ export async function toggleBoardPause() {
     window.showConfirmModal('Delete Message', `Delete ${what}? This cannot be undone.`, () => deleteBoardMessage(messageId));
 }
 
-export async function deleteBoardMessage(messageId) {
+async function deleteBoardMessage(messageId) {
     if (!currentProject) return;
     try {
         const resp = await boardFetch(currentProject, `/messages/${pathId(messageId)}`, {

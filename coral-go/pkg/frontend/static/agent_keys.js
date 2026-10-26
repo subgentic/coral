@@ -33,13 +33,13 @@ const say = text => {
 };
 
 /** The question the agent is asking now, as a key (a different question is a different key), or '' when it is not asking one a person answers with keys (a sign-in is answered in its terminal). */
-export function questionKey(row) {
+function questionKey(row) {
     if (!row || deriveSessionState(row) !== 'needs_input' || row.waiting_kind === 'login') return '';
     return `${row.session_id || ''}|${row.waiting_kind || ''}|${row.waiting_summary || ''}`;
 }
 
 /** Whether Send is Stop now: the agent works, the box is empty, and this is a phone's layout for a person who may send. */
-export function stopWanted({ working, text, pictures, viewOnly, phone }) {
+function stopWanted({ working, text, pictures, viewOnly, phone }) {
     return !!working && !!phone && !viewOnly && !String(text || '').trim() && !pictures;
 }
 

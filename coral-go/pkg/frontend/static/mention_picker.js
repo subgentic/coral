@@ -8,13 +8,13 @@ let seq = 0;
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
 /** The "@query" the cursor is at the end of (at the start of the text or after a space), or null. */
-export function mentionQuery(text, cursor) {
+function mentionQuery(text, cursor) {
     const m = /(^|\s)@([\w-]*)$/.exec(text.slice(0, cursor));
     return m ? { query: m[2], at: cursor - m[2].length - 1 } : null;
 }
 
 /** The names the list offers for a query: "all" first, then the members whose name holds the query (a name that starts with it first). */
-export function mentionChoices(query, names) {
+function mentionChoices(query, names) {
     const q = query.toLowerCase();
     const members = [...new Set((names || []).filter(n => typeof n === 'string' && n))].filter(n => n.toLowerCase().includes(q))
         .sort((a, b) => (b.toLowerCase().startsWith(q) - a.toLowerCase().startsWith(q)));

@@ -19,7 +19,7 @@ export function healthToValues(h) {
 }
 
 /** The values as a health object: what the fields show over what was read (so a field the page does not know goes back as it was). */
-export function valuesToHealth(v, base) {
+function valuesToHealth(v, base) {
     const h = JSON.parse(JSON.stringify(base));
     h.on = !!v.on;
     h.interval_min = Number.isInteger(v.interval_min) ? v.interval_min : base.interval_min; // a number that is not a whole number keeps what was read

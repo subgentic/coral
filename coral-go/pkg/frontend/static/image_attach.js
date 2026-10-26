@@ -6,25 +6,25 @@
 import { OUTCOME_UNKNOWN_LINE } from './outcome_unknown.js';
 
 const MiB = 1024 * 1024;
-export const SERVER_CAP = 20 * MiB; // the server's limit for one image (uploads.go maxFileSize)
-export const DOWNSCALE_OVER = 2 * MiB;
-export const LONG_SIDE = 2560;
-export const JPEG_QUALITY = 0.85;
+const SERVER_CAP = 20 * MiB; // the server's limit for one image (uploads.go maxFileSize)
+const DOWNSCALE_OVER = 2 * MiB;
+const LONG_SIDE = 2560;
+const JPEG_QUALITY = 0.85;
 // The picker offers these types and not SVG (it is kept for the agent only, never shown) or HEIC. A library photo is handed over as a JPEG when HEIC is not listed.
 export const PICKER_ACCEPT = 'image/png,image/jpeg,image/gif,image/webp,image/bmp,image/tiff';
 
-export const HEIC_REFUSAL = "Coral can't read HEIC photos. Send it as a JPEG or PNG (on an iPhone: Settings > Camera > Formats > Most Compatible, or pick the photo again from Photos).";
+const HEIC_REFUSAL = "Coral can't read HEIC photos. Send it as a JPEG or PNG (on an iPhone: Settings > Camera > Formats > Most Compatible, or pick the photo again from Photos).";
 
 const isHeic = f => /^image\/(heic|heif|heics|avif)$/i.test(f.type || '') || /\.(heic|heif|heics|avif)$/i.test(f.name || '');
 const mb = n => `${Math.round(n / MiB)} MB`;
 
 /** A photo is made smaller when it is over 2 MB and is not a PNG or a GIF (those are screenshots and animations: kept whole). */
-export function shouldDownscale(file) {
+function shouldDownscale(file) {
     return file.size > DOWNSCALE_OVER && /^image\/(jpeg|webp|bmp|tiff)$/i.test(file.type || '');
 }
 
 /** The size a picture is drawn at: its long side at most LONG_SIDE, the shape kept. */
-export function scaledSize(w, h) {
+function scaledSize(w, h) {
     const k = Math.min(1, LONG_SIDE / Math.max(w, h));
     return { width: Math.max(1, Math.round(w * k)), height: Math.max(1, Math.round(h * k)) };
 }

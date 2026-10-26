@@ -21,7 +21,7 @@ const LABEL = { goals: 'Goals', messages: 'Board', tasks: 'Tasks', agents: 'Agen
 const S = { team: '', tab: 'goals', item: null, counts: {}, built: false, countSeq: 0, noGoal: false }; // noGoal: the next Tasks tab opens filtered to the tasks that serve no goal (the Goals table's last row, #7717)
 const $ = (id) => document.getElementById(id);
 
-export const currentTeamPage = () => (S.team && $('team-page-view') && $('team-page-view').style.display !== 'none' ? { team: S.team, tab: S.tab } : null);
+const currentTeamPage = () => (S.team && $('team-page-view') && $('team-page-view').style.display !== 'none' ? { team: S.team, tab: S.tab } : null);
 
 // ── the shell ────────────────────────────────────────────────────────────
 
@@ -294,7 +294,7 @@ async function openAgentPage(agent) {
     m.renderAgentPage(host, agent, { onBack: () => closeItem(true) });
 }
 
-export function closeItem(restoreFocus) {
+function closeItem(restoreFocus) {
     if (!S.item) return;
     const { origin, id, from, kind } = S.item;
     S.item = null;
@@ -358,7 +358,7 @@ export async function applyTeamRoute(team, tab, item, query = '') {
 }
 
 /** Leave the page: the board's column goes back to its own page and the dock's panels back to the dock. */
-export function leaveTeamPage() {
+function leaveTeamPage() {
     closeDetailPane();
     releaseBoardActions();
     importOnce('./message_board.js').then(m => m.leaveBoardPage?.()).catch(() => {});

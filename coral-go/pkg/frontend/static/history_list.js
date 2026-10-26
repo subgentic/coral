@@ -81,7 +81,7 @@ function chatRowHtml(s) {
 // ── Groups (#7443): the list is grouped by day (the default) or by agent; a group's name opens it as a table in the centre, its chevron folds it ──
 
 const GROUP_BY_KEY = 'coral-chats-group-by';
-export function chatsGroupBy() { return browserLocal.get(GROUP_BY_KEY) === 'agent' ? 'agent' : 'day'; }
+function chatsGroupBy() { return browserLocal.get(GROUP_BY_KEY) === 'agent' ? 'agent' : 'day'; }
 export function setChatsGroupBy(by) {
     browserLocal.set(GROUP_BY_KEY, by === 'agent' ? 'agent' : 'day');
     syncGroupByButtons();
@@ -98,7 +98,7 @@ export function syncGroupByButtons() {
 
 const isGroupChat = s => s.type === 'group' || (s.session_id && s.session_id.startsWith('board:'));
 /** The day a chat last spoke, as a group: Today, Yesterday, or Earlier. */
-export function dayGroup(iso, now = new Date()) {
+function dayGroup(iso, now = new Date()) {
     const d = new Date(iso);
     if (!iso || isNaN(d)) return { key: 'day-earlier', label: 'Earlier' };
     const day0 = x => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();

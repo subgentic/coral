@@ -18,7 +18,7 @@ const open = new Set();      // `${sid}|${held id}` of the queued lines the pers
 const wholeText = text => String(text || '').replace(/\s+/g, ' ').trim();
 
 /** First words of a message, for the line and for Cancel's name. */
-export function firstWords(text) {
+function firstWords(text) {
     const t = String(text || '').replace(/\s+/g, ' ').trim();
     const c = [...t];
     return c.length > WORDS ? c.slice(0, WORDS).join('') + '…' : t;
@@ -83,7 +83,7 @@ export function syncQueuedFromRow(row) {
 function sessionOf(sid) { return (state.liveSessions || []).find(s => s && s.session_id === sid) || (state.currentSession && state.currentSession.session_id === sid ? state.currentSession : null); }
 
 /** Ask the server to drop one held message (DELETE .../held/{held id}). Its refusal comes by the composer's frame id: that one is the person's own doing, not an error. */
-export async function cancelQueued(sid, heldId) {
+async function cancelQueued(sid, heldId) {
     const s = sessionOf(sid);
     if (!s) return;
     const e = queued.get(sid) && queued.get(sid).get(heldId);

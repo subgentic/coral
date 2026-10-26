@@ -4,7 +4,7 @@ import { makeDraggable } from './draggable.js';
 import { browserLocal } from './safe_storage.js';
 
 export const DOCK_MIN_WIDTH = 280;
-export const DOCK_MAIN_MIN_WIDTH = 240; // what the page beside it keeps
+const DOCK_MAIN_MIN_WIDTH = 240; // what the page beside it keeps
 
 /** The widest the column may be in `row` (the window's width when the row has not been laid out). */
 export function dockMaxWidth(row) {
