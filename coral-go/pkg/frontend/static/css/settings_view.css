@@ -39,7 +39,7 @@
 .sv input.sv-input, .sv .sv-textarea { padding: 6px 10px; }
 .sv-input::placeholder { color: var(--text-secondary); opacity: 1; } /* the browser's own placeholder grey is 3.4:1 on the dark theme's field: the secondary text colour is 4.5:1 or more on both */
 .sv-unit { flex: none; font-size: var(--sv-help-size); color: var(--sv-help-color); }
-.sv-row-compact .sv-control { justify-content: flex-start; } /* a compact number (a field with compact: true): a box a fixed 6 rem wide with its unit after it, so a column of them lines up (#7858) */
+.sv-row-compact .sv-control { justify-content: flex-start; flex-wrap: wrap; } /* a unit too long to sit beside the box at 200% text on a phone goes under it, never past the edge */ /* a compact number (a field with compact: true): a box a fixed 6 rem wide with its unit after it, so a column of them lines up (#7858) */
 .sv-row-compact .sv-control > .sv-input { flex: none; width: 6rem; }
 .sv-input[aria-invalid="true"] { border-color: var(--sv-error-color); }
 .sv-error { grid-column: 1 / -1; margin: 4px 0 0; font-size: var(--sv-help-size); font-weight: var(--sv-label-weight); color: var(--sv-error-color); }
