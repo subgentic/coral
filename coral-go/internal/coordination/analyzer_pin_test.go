@@ -2,8 +2,8 @@ package coordination
 
 // Pinning tests for the analyzer (#8279, from the #8180 split proposal): what Analyze reports today, finding by finding, over small seeded boards, so a later split of
 // analyzer.go (or a rewrite of one detector) is proved by tests and not by reading. Each table row is one rule or one threshold, with the value on both sides of it. A rule
-// that depends on map order (the order of subscriber loads outside the status, of churn incidents, of the agents of a handoff loop, of the shared words of a duplicate pair) is
-// compared as a set, and the quirks the code has today are pinned under a name that says so. They are named TestPin... so `go test -run TestPin` runs just these.
+// that used to depend on map order (subscriber loads outside the status, churn incidents, the agents of a handoff loop, the shared words of a duplicate pair) is sorted now (#8292) and
+// asked many times in TestPinMapOrderedOutputsAreSorted; the quirks the code has are pinned under a name that says so. They are named TestPin... so `go test -run TestPin` runs just these.
 
 import (
 	"fmt"
@@ -1064,4 +1064,66 @@ func assertGolden(t *testing.T, path, got string) {
 	want, err := os.ReadFile(path)
 	require.NoError(t, err)
 	assert.Equal(t, strings.ReplaceAll(string(want), "\r\n", "\n"), got)
+}
+
+// The four outputs that used to depend on map order (#8292, from #8279's pinning) are now in a fixed order: a report of the same board is the same every time. Each is asked 60 times
+// (a map's order differs from call to call), with enough entries that an unsorted result could not be the same 60 times by chance.
+func TestPinMapOrderedOutputsAreSorted(t *testing.T) {
+	const runs = 60
+
+	t.Run("subscribers outside the status are listed by id", func(t *testing.T) {
+		var tasks []Task
+		for i, who := range []string{"Echo", "Alpha", "Delta", "Bravo", "Charlie"} {
+			tk := pinTask(int64(i+1), "in_progress", 0)
+			tk.AssignedTo = strPtr(who)
+			tasks = append(tasks, tk)
+		}
+		for i := 0; i < runs; i++ {
+			load := Analyze(tasks, nil, nil, ReportFilter{}, pinTime(10)).ObservableFacts.ActiveVsPlannedLoad.SubscriberLoad
+			var ids []string
+			for _, l := range load {
+				ids = append(ids, l.SubscriberID)
+			}
+			require.Equal(t, []string{"Alpha", "Bravo", "Charlie", "Delta", "Echo"}, ids, "run %d", i)
+		}
+	})
+
+	t.Run("churn incidents are listed by task id", func(t *testing.T) {
+		var msgs []Message
+		for _, id := range []int{5, 3, 9, 1, 7, 2} {
+			msgs = append(msgs, pinMsg(int64(id*10), "L", fmt.Sprintf("please #%d", id), 0), pinMsg(int64(id*10+1), "L", fmt.Sprintf("please #%d", id), 10))
+		}
+		for i := 0; i < runs; i++ {
+			var ids []int64
+			for _, in := range detectNotificationChurn(msgs, nil) {
+				ids = append(ids, in.TaskID)
+			}
+			require.Equal(t, []int64{1, 2, 3, 5, 7, 9}, ids, "run %d", i)
+		}
+	})
+
+	t.Run("the agents of a handoff loop are sorted, and so is its summary", func(t *testing.T) {
+		var msgs []Message
+		for i := 0; i < 6; i++ {
+			msgs = append(msgs, pinMsg(int64(i+1), []string{"Zed", "Amy"}[i%2], "ping", i*20))
+		}
+		for i := 0; i < runs; i++ {
+			got := detectRepetitiveHandoffs(msgs)
+			require.Len(t, got, 1)
+			require.Equal(t, []string{"Amy", "Zed"}, got[0].Agents, "run %d", i)
+			require.Equal(t, "Rapid 6-message back-and-forth between Amy & Zed within 100s", got[0].Summary, "run %d", i)
+		}
+	})
+
+	t.Run("the shared words of a duplicate pair are sorted", func(t *testing.T) {
+		a := pinTask(1, "pending", 0)
+		a.Title = "zulu yankee xray whiskey victor uniform"
+		b := pinTask(2, "pending", 0)
+		b.Title = "uniform victor whiskey xray yankee zulu"
+		for i := 0; i < runs; i++ {
+			got := detectDuplicateScopeCandidates([]Task{a, b})
+			require.Len(t, got, 1)
+			require.Equal(t, []string{"uniform", "victor", "whiskey", "xray", "yankee", "zulu"}, got[0].SharedWords, "run %d", i)
+		}
+	})
 }

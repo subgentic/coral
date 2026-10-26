@@ -2,6 +2,7 @@ package coordination
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -82,7 +83,13 @@ func detectNotificationChurn(messages []Message, tasks []Task) []NotificationChu
 		}
 	}
 
-	for id, msgs := range taskNotices {
+	ids := make([]int64, 0, len(taskNotices))
+	for id := range taskNotices {
+		ids = append(ids, id)
+	}
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] }) // by task id, after the stale reminders: a map's order differs from call to call
+	for _, id := range ids {
+		msgs := taskNotices[id]
 		if staleHandled[id] {
 			continue // Already captured with deeper detail above
 		}
