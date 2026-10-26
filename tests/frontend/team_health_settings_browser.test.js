@@ -79,7 +79,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         const axPairs = axNodes.map(n => [n.name && n.name.value, n.description && n.description.value]).filter(([name]) => name);
         assert.deepEqual(axPairs.filter(([name]) => /min|nudges|^Default reviewers$|tasks in a goal/.test(name)).map(([name, d]) => [name, /^Names of agents/.test(d) ? 'Names of agents' : d]), [
             ['Check every minutes', '5 to 1440'], ['Default reviewers', 'Names of agents'], ['After minutes idle', '5 to 1440'], ['Nudges before telling the orchestrator nudges', '1 to 5'],
-            ['Ask after minutes quiet', '5 to 1440'], ['Tell the orchestrator minutes later', '5 to 1440'], ['After minutes held', '5 to 1440'], ['After minutes', '5 to 1440'], ['Working with no task for minutes', '5 to 1440'], ['More than tasks in a goal', '5 to 500'], ['After minutes', '5 to 1440']]);
+            ['Ask after minutes quiet', '5 to 1440'], ['Tell the orchestrator minutes later', '5 to 1440'], ['After minutes held', '5 to 1440'], ['Remind the orchestrator after minutes', '5 to 1440'], ['Working with no task for minutes', '5 to 1440'], ['More than tasks in a goal', '5 to 500'], ['Remind the member after minutes', '5 to 1440']]);
         ok('every number box is named by its label and unit and described by its limits; the reviewers box by its label, described by its sentence');
 
         // 3. an out-of-range number is refused before any request
