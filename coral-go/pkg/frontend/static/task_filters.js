@@ -1,5 +1,5 @@
 /* The Tasks panel's search, filters and sort (#4744): what they are, how they are kept per board and how they become the task query's parameters. Pure (no DOM, no imports) so it can be tested on
- * its own; task_bar.js draws the controls (on the shared list bar) and tasks.js asks the server (GET /api/board/tasks, #4540 and #4745). The server does the matching: a search covers every task of
+ * its own; tasks_view.js draws the controls (on the shared list bar) and tasks.js asks the server (GET /api/board/tasks, #4540 and #4745). The server does the matching: a search covers every task of
  * the board, not just the loaded page. */
 
 import { defineFilters, localMidnight as dayStart, SORT_PARAM } from './filter_model.js';
