@@ -79,8 +79,8 @@ func indexFor(key string) *imageIndex {
 	return ix
 }
 
-// ForgetImageIndex drops what is known of one transcript (a session that ended).
-func ForgetImageIndex(path, agentType string) {
+// forgetImageIndex drops what is known of one transcript (a session that ended).
+func forgetImageIndex(path, agentType string) {
 	indexMu.Lock()
 	defer indexMu.Unlock()
 	key := agentType + "\x00" + path

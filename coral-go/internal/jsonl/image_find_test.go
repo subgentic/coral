@@ -229,10 +229,10 @@ func BenchmarkFindImage20Images(b *testing.B) {
 		}
 		b.Run(name, func(b *testing.B) {
 			for n := 0; n < b.N; n++ {
-				ForgetImageIndex(path, "claude")
+				forgetImageIndex(path, "claude")
 				for _, ref := range refs {
 					if forgetEach {
-						ForgetImageIndex(path, "claude")
+						forgetImageIndex(path, "claude")
 					}
 					if _, err := FindImage(context.Background(), path, "claude", ref); err != nil {
 						b.Fatal(err)

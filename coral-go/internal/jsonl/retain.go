@@ -27,6 +27,7 @@ func (r *SessionReader) Retain(keep func(sessionID string) bool) int {
 
 // CachedSessions returns the number of sessions with cached transcript state
 // (parsed messages or a first prompt).
+// CachedSessions has no production caller: it is exported for tests in server/routes.
 func (r *SessionReader) CachedSessions() int {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -40,6 +41,7 @@ func (r *SessionReader) CachedSessions() int {
 }
 
 // IsCached reports whether sessionID's parsed transcript is in the cache.
+// IsCached has no production caller: it is exported for tests in server/routes.
 func (r *SessionReader) IsCached(sessionID string) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()

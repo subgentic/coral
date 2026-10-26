@@ -129,10 +129,10 @@ func (r *SessionReader) ReadNewMessages(sessionID, workingDirectory, agentType s
 	return r.readNewMessages(sessionID, workingDirectory, agentType, false)
 }
 
-// ReadNewMessagesForLive reads a live session with strict Coral identity
+// readNewMessagesForLive reads a live session with strict Coral identity
 // matching for Antigravity transcripts. Native history callers should use
 // ReadNewMessages, which preserves conversation-ID lookup semantics.
-func (r *SessionReader) ReadNewMessagesForLive(sessionID, workingDirectory, agentType string) ([]map[string]any, int) {
+func (r *SessionReader) readNewMessagesForLive(sessionID, workingDirectory, agentType string) ([]map[string]any, int) {
 	return r.readNewMessages(sessionID, workingDirectory, agentType, true)
 }
 

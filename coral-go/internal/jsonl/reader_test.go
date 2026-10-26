@@ -1262,7 +1262,7 @@ func TestSessionReader_AgyDoesNotKeepPoisonedPath(t *testing.T) {
 	if c.offset == 0 || len(c.messages) == 0 {
 		t.Fatal("stale cache was not populated")
 	}
-	if _, total := r.ReadNewMessagesForLive(coralID, "/workspace/shared", at.Agy); total != 0 {
+	if _, total := r.readNewMessagesForLive(coralID, "/workspace/shared", at.Agy); total != 0 {
 		t.Fatalf("strict live read retained unrelated transcript, total=%d", total)
 	}
 	if len(c.messages) != 0 || c.offset != 0 || len(c.toolUseNames) != 0 {
@@ -1272,7 +1272,7 @@ func TestSessionReader_AgyDoesNotKeepPoisonedPath(t *testing.T) {
 	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
 		t.Fatal(err)
 	}
-	msgs, total := r.ReadNewMessagesForLive(coralID, "/workspace/shared", at.Agy)
+	msgs, total := r.readNewMessagesForLive(coralID, "/workspace/shared", at.Agy)
 	if total != 1 || len(msgs) != 1 || !strings.Contains(msgs[0]["content"].(string), "fresh") {
 		t.Fatalf("expected exact transcript to be discovered after replacement, total=%d msgs=%#v", total, msgs)
 	}
