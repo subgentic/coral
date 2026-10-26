@@ -5,99 +5,19 @@ import { showToast } from './utils.js';
 import { splitKey, isHub, normServer, LOCAL_SERVER, keyLabel } from './server_base.js';
 import { serverLabel, bareBoardName } from './launch_server.js';
 const { launch } = await importOnce('./launch_state.js');
-const { _effectiveServer, _loadServerSettings, _serverSettings, _settingsFor } = await importOnce('./launch_models.js');
-const { defaultPermissionMode, _getPermissionFlagsForAgentMode, _normalizePermFlagsForAgent } = await importOnce('./permission_flags.js');
-const { getAgentConfig, renderAgentConfigForm } = await importOnce('./agent_config_form.js');
-const { _checkPermissionFlag } = await importOnce('./cli_dialogs.js');
-const { _launchBlocked, _launchOn, _onServerSuffix, _refreshAfterLaunch, _withServerSettings } = await importOnce('./launch_core.js');
+const { _effectiveServer, _loadServerSettings, _settingsFor } = await importOnce('./launch_models.js');
+const { defaultPermissionMode, _getPermissionFlagsForAgentMode } = await importOnce('./permission_flags.js');
+const { _launchBlocked, _launchOn, _onServerSuffix, _refreshAfterLaunch } = await importOnce('./launch_core.js');
 
 // ── Add Agent to Board ───────────────────────────────────────────────────
 // Launches started from inside a board / folder group inherit that group's
 // server (the key is "@server/name" for remotes) and cannot be redirected: the
 // working directory shown belongs to that server.
+// Add agent is New Agent's own dialog with the team (or the folder) preset (#7778, launch_dialog.js showAddAgentFlow): persona, Next, the agent with its permissions.
 
-export function showAddAgentToBoard(boardName, workDir) {
-    const server = _effectiveServer(splitKey(boardName).server);
-    if (_launchBlocked(server)) return;
-    launch.addAgentServer = server;
-    _serverSettings.delete(server);
-    const modal = document.getElementById("add-agent-board-modal");
-    document.getElementById("add-agent-board-name").value = boardName;
-    document.getElementById("add-agent-board-workdir").value = workDir;
-    document.getElementById("add-agent-board-subtitle").textContent =
-        `Board: ${keyLabel(boardName)}${_onServerSuffix(server)}`;
-
-    const open = () => {
-        renderAgentConfigForm('add-agent-board-acf', {
-            showPreset: true,
-            showName: true,
-            nameLabel: 'Role', // as in Edit member
-            sections: true, // the same panes as New Agent's step 3 and Edit member (#7407)
-            value: { agentType: _settingsFor(server).default_agent_type || 'claude' },
-        });
-        modal.style.display = "flex";
-    };
-    _withServerSettings(server, open);
-}
-
-
-export function hideAddAgentBoardModal() {
-    document.getElementById("add-agent-board-modal").style.display = "none";
-}
-
-
-export async function launchAgentToBoard() {
-    const boardKey = document.getElementById("add-agent-board-name").value;
-    const workDir = document.getElementById("add-agent-board-workdir").value;
-    const server = _effectiveServer(launch.addAgentServer);
-    if (_launchBlocked(server)) return;
-    const config = getAgentConfig('add-agent-board-acf');
-
-    if (!config.name) {
-        showToast("Agent name is required", "error");
-        return;
-    }
-
-    // Permission flag check
-    let flagsStr = config.flags;
-    const permResult = await _checkPermissionFlag(flagsStr, config.agentType, server, config.permissionMode);
-    if (permResult === null) return;
-    if (permResult === 'enable') {
-        const mode = defaultPermissionMode(_settingsFor(server), config.agentType);
-        flagsStr = _normalizePermFlagsForAgent(flagsStr, config.agentType, mode);
-    }
-
-    const flags = flagsStr ? flagsStr.split(/\s+/) : [];
-
-    // Disable launch button to prevent double-clicks
-    const launchBtn = document.querySelector('#add-agent-board-modal .btn-primary');
-    if (launchBtn) { launchBtn.disabled = true; launchBtn.textContent = 'Launching...'; }
-
-    try {
-        const boardName = bareBoardName(boardKey);
-        const launchBody = {
-            working_dir: workDir,
-            agent_type: config.agentType,
-            display_name: config.name,
-            flags,
-            prompt: config.prompt,
-        };
-        // Standalone (no board) when opened from a folder group; a board joins by its id (#3536).
-        if (boardName) launchBody.board_id = launchBody.board_name = boardName;
-        if (config.model) launchBody.model = config.model;
-        if (config.thinking !== undefined) launchBody.thinking = config.thinking; // #4969
-        if (config.capabilities) launchBody.capabilities = config.capabilities;
-        const result = await _launchOn(server, "/api/sessions/launch", launchBody, config.agentType);
-        if (result) {
-            showToast(boardName ? `Launched ${config.name} on board ${keyLabel(boardKey)}${_onServerSuffix(server)}` : `Launched ${config.name}${_onServerSuffix(server)}`);
-            hideAddAgentBoardModal();
-            _refreshAfterLaunch(server, { sessionName: result.session_name, sessionId: result.session_id });
-        }
-    } catch (e) {
-        showToast("Could not start the agent. Check that the folder exists and that the agent is installed, then try again.", "error");
-    } finally {
-        if (launchBtn) { launchBtn.disabled = false; launchBtn.textContent = 'Launch'; }
-    }
+export async function showAddAgentToBoard(boardName, workDir) {
+    const { showAddAgentFlow } = await importOnce('./launch_dialog.js');
+    showAddAgentFlow({ board: boardName, workDir, server: splitKey(boardName).server });
 }
 
 // ── Launch Terminal to Board ─────────────────────────────────────────────
@@ -158,20 +78,9 @@ export async function launchDefaultAgent(workDir, server) {
     }
 }
 
-export function showAddStandaloneAgent(workDir, server) {
-    server = _effectiveServer(server);
-    if (_launchBlocked(server)) return;
-    launch.addAgentServer = server;
-    _serverSettings.delete(server);
-    const modal = document.getElementById('add-agent-board-modal');
-    document.getElementById('add-agent-board-name').value = '';
-    document.getElementById('add-agent-board-workdir').value = workDir;
-    document.getElementById('add-agent-board-subtitle').textContent = `Directory: ${workDir}${_onServerSuffix(server)}`;
-
-    _withServerSettings(server, () => {
-        renderAgentConfigForm('add-agent-board-acf', { showPreset: true, showName: true });
-        modal.style.display = 'flex';
-    });
+export async function showAddStandaloneAgent(workDir, server) {
+    const { showAddAgentFlow } = await importOnce('./launch_dialog.js');
+    showAddAgentFlow({ board: '', workDir, server }); // a folder group's agent: no team
 }
 
 /**

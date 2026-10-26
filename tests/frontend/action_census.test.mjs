@@ -122,7 +122,6 @@ const NOT_POPOUT_RELEVANT = new Map(Object.entries({
     'wf-delete': 'Workflows view (dashboard nav only), after confirm',
     'wf-step-remove': 'removes a step from the workflow editor\'s unsaved draft',
     // QA's list: launch, import, save, apply settings (dialogs opened from the top bar, sidebar or views)
-    'm-launch-agent-to-board': 'launch dialog: starts a new agent (opened from the sidebar or top bar)',
     'm-launch-session': 'launch dialog: starts a new agent',
     'm-launch-team': 'launch dialog: starts a new team',
     'm-import-personas': 'launch dialog: imports persona files into the form',

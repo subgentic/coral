@@ -10,6 +10,7 @@ import { isHub, normServer, LOCAL_SERVER, noteBoardLabels } from './server_base.
 import { chooseBoard, retryPayload, isBoardNameExists } from './board_choice.js';
 import { serverLabel, launchBlockReason, postLaunch, waitForLaunched } from './launch_server.js';
 const { launchFlags } = await importOnce('./launch_flags.js');
+const { launch } = await importOnce('./launch_state.js');
 const { _loadServerSettings } = await importOnce('./launch_models.js');
 const { _showCLINotFoundModal } = await importOnce('./cli_dialogs.js');
 const { revealField } = await importOnce('./section_dialog.js');
@@ -25,20 +26,23 @@ function _syncMobileLaunchSections(step) {
 
 /** New Agent's three steps (#7391, UI/UX's v4): the folder (and the machine), the persona, the agent. `data-stage` on the step says which one, and CSS shows what belongs to it; the machine row above the dialog is only for the first. */
 export const LAUNCH_STAGES = ['folder', 'persona', 'agent'];
+/** The stages this dialog goes through: Add agent (#7778) knows the folder, so it starts at the persona and has two steps. */
+export const launchStages = () => (launch.addTo && launch.addTo.skipFolder ? LAUNCH_STAGES.slice(1) : LAUNCH_STAGES);
 const STAGE_NAMES = { folder: 'Where it launches', persona: 'Persona', agent: 'The agent' };
 export function setLaunchStage(stage) {
-    if (!LAUNCH_STAGES.includes(stage)) stage = 'folder';
+    const stages = launchStages();
+    if (!stages.includes(stage)) stage = stages[0];
     const step = document.getElementById("launch-step-agent");
     if (!step) return;
     step.dataset.stage = stage;
     const modal = document.getElementById("launch-modal");
     if (modal) modal.setAttribute('data-agent-stage', stage);
-    const n = LAUNCH_STAGES.indexOf(stage) + 1, dir = (document.getElementById("launch-dir")?.value || '').trim();
-    const sub = `Step ${n} of 3: ${STAGE_NAMES[stage]}${stage !== 'folder' && dir ? '. In ' + dir : ''}`;
+    const n = stages.indexOf(stage) + 1, total = stages.length, dir = (document.getElementById("launch-dir")?.value || '').trim();
+    const sub = `Step ${n} of ${total}: ${STAGE_NAMES[stage]}${stage !== 'folder' && dir ? '. In ' + dir : ''}`;
     const subEl = document.getElementById("launch-stage-sub");
-    if (subEl) { subEl.textContent = ''; if (stage !== 'folder' && dir) { subEl.append(`Step ${n} of 3: ${STAGE_NAMES[stage]}. In `); const b = document.createElement('b'); b.textContent = dir; subEl.append(b); } else subEl.textContent = sub; }
+    if (subEl) { subEl.textContent = ''; if (stage !== 'folder' && dir) { subEl.append(`Step ${n} of ${total}: ${STAGE_NAMES[stage]}. In `); const b = document.createElement('b'); b.textContent = dir; subEl.append(b); } else subEl.textContent = sub; }
     const back = document.getElementById("launch-agent-back"), next = document.getElementById("launch-agent-next"), go = document.getElementById("launch-agent-go");
-    if (back) back.hidden = stage === 'folder';
+    if (back) back.hidden = stage === stages[0];
     if (next) next.hidden = stage === 'agent';
     if (go) go.hidden = !(stage === 'agent' || launchFlags.launchFromAnyStep);
     const recap = document.getElementById("launch-recap");
@@ -231,6 +235,8 @@ function _refreshAfterLaunch(server, target) {
 
 export function hideLaunchModal() {
     document.getElementById("launch-modal").style.display = "none";
+    launch.addTo = null; // Add agent's preset ends with the dialog (#7778)
+    document.getElementById("launch-modal").removeAttribute('data-add-to');
     document.dispatchEvent(new CustomEvent('launch-modal-hidden')); // the team form's step 3 panes are drawn when it opens and gone when it closes (team_launch_settings.js)
     for (const id of ['launch-dir', 'launch-terminal-dir', 'launch-team-base-branch']) clearFieldInvalid(document.getElementById(id));
 }

@@ -38,7 +38,6 @@ const DIALOGS = Object.assign(Object.create(null), { // no prototype: an element
     'team-agent-modal': { hide: byWindow('hideTeamAgentModal') },
     'default-prompts-modal': { hide: byWindow('hideDefaultPromptsModal') },
     'team-wizard-modal': { hide: byWindow('hideTeamWizardModal') },
-    'add-agent-board-modal': { hide: byWindow('hideAddAgentBoardModal') },
     'mobile-connect-modal': { hide: () => window._hideMobileConnectModal() },
 });
 

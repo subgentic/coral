@@ -18,15 +18,15 @@ const { _checkPermissionFlag } = await importOnce('./cli_dialogs.js');
 const { _checkTeamGitDir, _initTeamForm, _loadExistingTeamBoards } = await importOnce('./team_dialogs.js');
 const { _initAgentPresets } = await importOnce('./persona_io.js');
 const { quietFocus } = await importOnce('./quiet_focus.js');
-const { markFieldInvalid, _launchBlocked, _launchOn, _refreshAfterLaunch, _resetDirInputs, _showLaunchStep, _syncMobileLaunchSections, hideLaunchModal, setLaunchMore, setLaunchStage, LAUNCH_STAGES } = await importOnce('./launch_core.js');
+const { markFieldInvalid, _launchBlocked, _launchOn, _refreshAfterLaunch, _resetDirInputs, _showLaunchStep, _syncMobileLaunchSections, _withServerSettings, hideLaunchModal, setLaunchMore, setLaunchStage, LAUNCH_STAGES, launchStages } = await importOnce('./launch_core.js');
 const { wireRecap, syncRecap } = await importOnce('./launch_recap.js');
 
 /** New Agent's three steps (#7391): Next goes from the folder to the persona to the agent (a folder is needed first), Back returns. `arg` is a stage name, "next" or "back" (the old "details" is the persona step). Focus follows, and a screen reader hears which step. */
 function _launchStage(arg) {
     const step = document.getElementById('launch-step-agent');
-    const cur = step?.dataset.stage || 'folder', at = LAUNCH_STAGES.indexOf(cur);
-    const to = arg === 'details' ? 'persona' : arg === 'next' ? LAUNCH_STAGES[Math.min(at + 1, 2)] : arg === 'back' ? LAUNCH_STAGES[Math.max(at - 1, 0)] : arg;
-    if (!LAUNCH_STAGES.includes(to)) return;
+    const stages = launchStages(), cur = step?.dataset.stage || stages[0], at = Math.max(0, stages.indexOf(cur));
+    const to = arg === 'details' ? 'persona' : arg === 'next' ? stages[Math.min(at + 1, stages.length - 1)] : arg === 'back' ? stages[Math.max(at - 1, 0)] : arg;
+    if (!stages.includes(to)) return;
     const input = document.getElementById('launch-dir');
     if (to !== 'folder' && (!input || !input.value.trim())) { // a folder is the one thing a launch needs: said where it is, on the folder's own step
         setLaunchStage('folder');
@@ -55,6 +55,10 @@ function _selectLaunchType(type) {
     if (type === "agent") setLaunchMore(false); // New Agent always opens on step 1, the folder (#7391)
     _showLaunchStep(type);
     if (type === "agent") {
+        if (!launch.addTo) { // New Agent: its own title and no team (Add agent sets both below, #7778)
+            document.getElementById('launch-modal')?.removeAttribute('data-add-to');
+            const t = document.getElementById('launch-agent-title-text'); if (t) t.textContent = 'New agent';
+        }
         _loadAgentBoardProjects();
         document.getElementById('agent-preset-selector')?.replaceChildren(); // a new dialog starts from Blank again (#7391)
         const help = document.getElementById('launch-name-help'); if (help) help.textContent = 'Choose a persona above and its name goes here, or type your own.';
@@ -74,7 +78,7 @@ function _selectLaunchType(type) {
         _wireDirNote(); _syncDirNote(); _syncLaunchBlock(); _renderDirRecents();
         wireRecap(); syncRecap(); _syncLaunchBlock();
         _checkTmuxHere(); // tmux missing: said once, Launch off (#6046)
-        document.getElementById('launch-dir')?.focus(); // the one thing most launches need: the folder
+        if (launch.addTo) _applyAddTo(); else document.getElementById('launch-dir')?.focus(); // the one thing most launches need: the folder
     } else if (type === "team") {
         launch.teamAddress = false;
         _renderServerPicker(); // the Machine list, with its address entry for a team (#7407)
@@ -94,6 +98,7 @@ window._selectLaunchType = _selectLaunchType;
  */
 export function showLaunchModal(server, lock = false) {
     launch.mode = null;
+    launch.addTo = null; // a New Agent dialog is not an Add agent one (#7778)
     _serverSettings.clear();
     launch.serverLocked = !!lock && isHub();
     launch.server = _effectiveServer(coerceSelection(server, isHub(), state.servers));
@@ -323,6 +328,35 @@ function _wireDirNote() {
 }
 
 
+/**
+ * Add agent (#7778, the operator: "the same flow as New Agent"): New Agent's own dialog with the team (or the folder group) it starts from preset. The folder is the one the team or group works in, so the dialog starts
+ * at the persona and has two steps, persona then the agent (Next, Back); the team is named in the title, joined by id as the Message Board field of step 3 would, and cannot be changed (the field is not shown).
+ * With no folder (a team that has none) the folder step stays. `board` is the team's key ("@server/name" for a remote), '' for an agent of a folder group; `server` is the one the team or folder is on.
+ */
+export function showAddAgentFlow({ board = '', workDir = '', server } = {}) {
+    server = _effectiveServer(server);
+    if (_launchBlocked(server)) return;
+    _serverSettings.delete(server);
+    _withServerSettings(server, () => {
+        showLaunchModal(server, true);
+        launch.addTo = { board, workDir, skipFolder: !!workDir };
+        _selectLaunchType('agent');
+    });
+}
+
+/** The parts of Add agent that the dialog shows: the title, the folder, and where it starts. */
+function _applyAddTo() {
+    const a = launch.addTo;
+    if (!a) return;
+    document.getElementById('launch-modal')?.setAttribute('data-add-to', a.board ? 'team' : 'folder');
+    const title = document.getElementById('launch-agent-title-text');
+    if (title) title.textContent = a.board ? `Add agent to ${keyLabel(a.board)}` : 'Add agent';
+    const dir = document.getElementById('launch-dir');
+    if (dir && a.workDir) dir.value = a.workDir;
+    _syncDirNote(); syncRecap(); _syncLaunchBlock();
+    _launchStage(a.skipFolder ? 'persona' : 'folder');
+}
+
 export async function launchSession() {
     let dir, type, agentName, flagsStr, backend, permPick;
     if (launch.mode !== 'terminal' && _cliBlock()) return; // the CLI it needs is missing: the message under the folder says so
@@ -366,7 +400,7 @@ export async function launchSession() {
 
     const payload = { working_dir: dir, agent_type: type };
     if (agentName) payload.display_name = agentName;
-    if (backend) payload.backend = backend;
+    if (backend && !launch.addTo) payload.backend = backend; // Add agent sends what it always sent: the server's own default backend (#7778)
 
     if (flagsStr) {
         payload.flags = flagsStr.split(/\s+/);
@@ -413,11 +447,13 @@ export async function launchSession() {
             recordRecentDir(dir, server);
             // The agent as the list names it (its name, else its folder or CLI, or "Terminal"), not the session's raw id (#5895)
             const shown = agentName || (type === 'terminal' ? 'Terminal' : defaultAgentName(dir, type));
-            showToast(server === LOCAL_SERVER ? `Launched: ${shown}` : `Launched on ${serverLabel(server, state.servers)}: ${shown}`);
+            const addedTo = launch.addTo && launch.addTo.board ? ` on board ${keyLabel(launch.addTo.board)}` : '';
+            const added = !!launch.addTo; // Add agent opens nothing: the person is on the team's page (#7778)
+            showToast(server === LOCAL_SERVER ? `Launched: ${shown}${addedTo}` : `Launched on ${serverLabel(server, state.servers)}: ${shown}${addedTo}`);
             hideLaunchModal();
             setTimeout(loadLiveSessions, 2000);
             _refreshAfterLaunch(server, { sessionName: result.session_name, sessionId: result.session_id });
-            if (normServer(server) === LOCAL_SERVER) _openLaunched(result, type);
+            if (normServer(server) === LOCAL_SERVER && !added) _openLaunched(result, type);
         }
     } catch (e) {
         showToast("Could not start the agent. Check that the folder exists and that the agent is installed, then try again.", true);
@@ -443,6 +479,20 @@ async function _loadAgentBoardProjects() {
     const select = document.getElementById("launch-board-select");
     if (!select) return;
     select.innerHTML = '<option value="">None</option><option value="__new__">Create new board...</option>';
+    // Add agent (#7778): the team is the one it was opened from: it is the select's value, and the field is not shown (nor is anything that would change it).
+    const preset = launch.addTo && launch.addTo.board ? bareBoardName(launch.addTo.board) : '';
+    const label = select.closest('label');
+    if (label) label.hidden = !!(launch.addTo && launch.addTo.board);
+    const serverRowEl = document.getElementById('launch-board-server-row'); if (serverRowEl) serverRowEl.hidden = false; // New Agent shows it as before (its own style decides)
+    if (preset) {
+        const opt = document.createElement('option');
+        opt.value = preset;
+        opt.textContent = keyLabel(launch.addTo.board);
+        select.appendChild(opt);
+        select.value = preset;
+        _onAgentBoardChange();
+        const serverRow = document.getElementById('launch-board-server-row'); if (serverRow) serverRow.hidden = true; // a team on this Coral: no remote server to name
+    }
     try {
         // Boards that exist on the server the agent will launch on.
         const server = _effectiveServer(launch.server);
@@ -451,6 +501,7 @@ async function _loadAgentBoardProjects() {
         if (!Array.isArray(projects) || server !== _effectiveServer(launch.server)) return;
         noteBoardLabels(projects, 'project', server);
         for (const p of projects) {
+            if (preset && p.project === preset) continue; // already the one option, and selected
             const opt = document.createElement("option");
             opt.value = p.project;
             opt.textContent = keyLabel(identityKey(server, p.project)); // its label, with a short id when two share it

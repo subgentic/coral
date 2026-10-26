@@ -130,7 +130,6 @@ registerActions({
     'm-export-personas': el => { window.exportPersonas(); },
     'm-generate-team-from-wizard': el => { window.generateTeamFromWizard(); },
     'm-handle-team-folder-import': el => { _handleTeamFolderImport(el); },
-    'm-hide-add-agent-board-modal': el => { window.hideAddAgentBoardModal(); },
     'm-hide-confirm-modal': el => { window.hideConfirmModal(); },
     'm-hide-create-task-modal': el => { window.hideCreateTaskModal(); },
     'm-hide-default-prompts-modal': el => { window.hideDefaultPromptsModal(); },
@@ -156,7 +155,6 @@ registerActions({
     'm-import-personas': el => { window.importPersonas(); },
     'm-import-team-from-folder': el => { _importTeamFromFolder(); },
     'm-import-team-templates': el => { window.importTeamTemplates(); },
-    'm-launch-agent-to-board': el => { window.launchAgentToBoard(); },
     'm-launch-session': el => { window.launchSession(); },
     'm-launch-team': el => { window.launchTeam(); },
     'm-mobile-connect-backdrop': (el, event) => { if (event.target === el) window._hideMobileConnectModal(); },
@@ -312,10 +310,10 @@ const { showThemeConfigurator, hideThemeConfigurator } = lazyFns(loadThemeConfig
 const {
     showLaunchModal, hideLaunchModal, launchSession, hideInfoModal, copyInfoCommand,
     showSettingsModal, hideSettingsModal, applySettings,
-    toggleFlag, showAddAgentToBoard, hideAddAgentBoardModal, launchAgentToBoard, launchTerminalToBoard, launchDefaultAgent,
+    toggleFlag, showAddAgentToBoard, launchTerminalToBoard, launchDefaultAgent,
     showAddStandaloneAgent, launchStandaloneTerminal, exportPersonas, importPersonas, importTeamTemplates,
 } = lazyFns(loadModals, [
-    'showLaunchModal', 'hideLaunchModal', 'launchSession', 'hideInfoModal', 'copyInfoCommand', 'showSettingsModal', 'hideSettingsModal', 'applySettings', 'toggleFlag', 'showAddAgentToBoard', 'hideAddAgentBoardModal', 'launchAgentToBoard', 'launchTerminalToBoard', 'launchDefaultAgent', 'showAddStandaloneAgent', 'launchStandaloneTerminal', 'exportPersonas', 'importPersonas', 'importTeamTemplates']);
+    'showLaunchModal', 'hideLaunchModal', 'launchSession', 'hideInfoModal', 'copyInfoCommand', 'showSettingsModal', 'hideSettingsModal', 'applySettings', 'toggleFlag', 'showAddAgentToBoard', 'launchTerminalToBoard', 'launchDefaultAgent', 'showAddStandaloneAgent', 'launchStandaloneTerminal', 'exportPersonas', 'importPersonas', 'importTeamTemplates']);
 const { showResumeModal, hideResumeModal, resumeLaunchNew } = lazyFns(loadResumeDialog, ['showResumeModal', 'hideResumeModal', 'resumeLaunchNew']);
 const { showDefaultPromptsModal, hideDefaultPromptsModal, resetDefaultPrompt, saveDefaultPrompts } = lazyFns(loadDefaultPromptsDialog, ['showDefaultPromptsModal', 'hideDefaultPromptsModal', 'resetDefaultPrompt', 'saveDefaultPrompts']);
 // Called from the home view's buttons before any dialog has loaded; modals.js sets them on window itself.
@@ -358,7 +356,7 @@ Object.assign(window, {
     showLaunchModal, hideLaunchModal, launchSession, toggleFlag,
     hideInfoModal, copyInfoCommand,
     hideResumeModal, resumeLaunchNew,
-    showAddAgentToBoard, hideAddAgentBoardModal, launchAgentToBoard, launchTerminalToBoard,
+    showAddAgentToBoard, launchTerminalToBoard,
     launchDefaultAgent, showAddStandaloneAgent, launchStandaloneTerminal,
     exportPersonas, importPersonas, importTeamTemplates,
     // sessions

@@ -44,7 +44,6 @@ export async function _loadServerSettings(server, { fresh = false } = {}) {
 /** Server an Agent Config Form container launches on. */
 export function _acfServer(container) {
     const id = container && container.id;
-    if (id === 'add-agent-board-acf') return _effectiveServer(launch.addAgentServer);
     if (id === 'restart-acf') return _effectiveServer(currentServer());
     return _effectiveServer(launch.server);
 }
