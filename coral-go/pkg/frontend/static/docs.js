@@ -9,6 +9,10 @@ import { registerGroupSource, groupHeaderHtml, isGroupFolded, syncPaneGroupToggl
 import { onViewShown } from './view_switch.js';
 import { isPhoneLayout } from './phone_layout.js';
 import { foldWayBack } from './way_back.js';
+import { importOnce } from './import_once.js';
+
+const DT = await importOnce('./data_table.js');
+const docTableStates = new Map();
 
 /** The line the "Copy docs line for agents" button copies: what a user pastes to an agent so it can read
  *  these docs. The agent prompt says the same (internal/agent DocsPromptLine; a Go test keeps them equal). */
@@ -36,7 +40,20 @@ export function filterDocs(value) { docsQuery = String(value || '').trim().toLow
 registerGroupSource('docs', {
     keys: () => docGroups().map(g => g.key),
     redraw: () => renderDocNav(),
-    table: key => { const g = docGroups().find(x => x.key === key); return g ? { title: g.label, columns: ['Topic'], rows: g.docs.map(d => ({ title: titleOf(d), action: 'doc-open', data: { doc: d.name }, cells: [] })), extra: { action: 'docs-copy-agent-line', label: 'Copy docs line for agents', icon: 'content_copy', title: 'Copies one line you can paste to an agent so it can read these docs' } } : null; },
+    table: key => {
+        const g = docGroups().find(x => x.key === key);
+        if (!g) return null;
+        if (!docTableStates.has(key)) docTableStates.set(key, DT.tableState());
+        return { title: g.label, rows: g.docs, signature: JSON.stringify(g.docs),
+            node: () => DT.dataTable({
+                label: `${g.label} topics, ${g.docs.length}`, rows: g.docs,
+                rowKey: d => d.name, rowName: titleOf, state: docTableStates.get(key),
+                open: d => selectDoc(d.name, { focusHeading: true }),
+                columns: [{ key: 'doc-name', label: 'Topic', primary: true, width: 'grow', line: 1, sort: true, sortValue: titleOf, cell: d => DT.primaryButton(titleOf(d)) }],
+            }).el,
+            extra: { action: 'docs-copy-agent-line', label: 'Copy docs line for agents', icon: 'content_copy', title: 'Copies one line you can paste to an agent so it can read these docs' },
+        };
+    },
     isEmpty: () => false, // the tab opens its first table itself (showDocsTab)
     showList: () => { selectedDoc = null; window.switchNavTab?.('docs'); },
     empty: () => { selectedDoc = null; window.switchNavTab?.('docs'); },

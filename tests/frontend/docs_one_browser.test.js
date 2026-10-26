@@ -79,12 +79,12 @@ const BASE = require('./test_base').BASE;
             assert.ok(await rect(`${pane('docs')} [data-group-toggle]`), at + 'Expand or collapse all is there');
 
             // the tab opens on its first group's table
-            await waitFor(`!!document.querySelector('#group-table-view table.group-table') && document.getElementById('group-table-view').checkVisibility()`, at + 'the first group as a table', 10000);
+            await waitFor(`!!document.querySelector('#group-table-view table.dt-table') && document.getElementById('group-table-view').checkVisibility()`, at + 'the first group as a table', 10000);
             assert.equal(await ev(`document.querySelector('#group-table-title').textContent`), 'Getting started', at + 'the first group is Getting started');
             // UI/UX's #7588 item 8: the group head is one fixed row (36 px, 44 on a phone) with a header button or without, so the title is where every other tab has it
             assert.equal(await ev(`(() => { const v = document.getElementById('group-table-view'), t = document.querySelector('#group-table-title').getBoundingClientRect(), h = document.querySelector('#group-table-view .group-table-head').getBoundingClientRect(); const m = innerWidth < 768 || matchMedia('(pointer: coarse)').matches ? 44 : 36;
                 return Math.round(h.height) === m && Math.abs(t.top - (v.getBoundingClientRect().top + parseFloat(getComputedStyle(v).paddingTop) + (m - t.height) / 2)) < 1.5; })()`), true, at + 'the title row is one fixed height');
-            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view th')].map(h => [h.textContent, h.getAttribute('scope')])`), [['Topic', 'col']], at + 'a one-column table of topics');
+            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view th')].map(h => [h.querySelector('.dt-sort > span').textContent, h.getAttribute('scope')])`), [['Topic', 'col']], at + 'a one-column table of topics');
             assert.equal(await ev(`document.querySelectorAll('#group-table-view tbody tr').length`), counts[0], at + "one row per topic of the group");
             assert.deepEqual(await ev(`(() => { const t = getComputedStyle(document.querySelector('#group-table-title')), c = getComputedStyle(document.querySelector('#group-table-view .group-table-head .session-group-count')); return [t.fontSize, t.fontWeight, c.fontSize, c.fontWeight]; })()`), ['20px', '700', '11px', '600'], at + "the title is 20/700 and its count 11/600");
             assert.deepEqual(await ev(`(${ON_SCALE})(document.getElementById('group-table-view'), ${SCALE})`), [], at + 'every text of the topics table is on the scale');
@@ -92,8 +92,9 @@ const BASE = require('./test_base').BASE;
             await shot(`docs-one-table-${w}`);
 
             // a topic: the page, its way back, the document at its reading scale, and the copy button in the header
-            await ev(`document.querySelector('#group-table-view .group-table-link').click(); true`);
+            await ev(`document.querySelector('#group-table-view .dt-primary').click(); true`);
             await waitFor(`document.getElementById('docs-view').checkVisibility() && !!document.querySelector('#docs-content h1') && document.getElementById('docs-back').checkVisibility()`, at + 'the topic page', 10000);
+            await waitFor(`document.activeElement === document.querySelector('#docs-content h1')`, at + 'opening a table topic focuses its heading', 4000);
             assert.equal(await ev(`document.getElementById('docs-back').textContent`), '← Getting started', at + 'back names the group');
             assert.deepEqual((await ev(`(() => { const s = sel => { const e = document.querySelector(sel); if (!e) return null; const c = getComputedStyle(e); return c.fontSize + '/' + c.fontWeight; }; return [s('#docs-content h1'), s('#docs-content h2'), s('#docs-content th'), s('#docs-content p strong, #docs-content li strong'), s('#docs-content p')]; })()`)).slice(0, 2), ['20px/700', '17px/700'], at + 'headings 20/700 and 17/700');
             assert.equal(await ev(`(() => { const e = document.querySelector('#docs-content th'); if (!e) return '12px/500'; const c = getComputedStyle(e); return c.fontSize + '/' + c.fontWeight; })()`), '12px/500', at + 'a table header is 12/500');
@@ -131,7 +132,8 @@ const BASE = require('./test_base').BASE;
                 await waitFor(`document.getElementById('group-table-view').checkVisibility()`, how + 'the table', 8000);
                 const au = await auditRegion(ev, ['.sidebar', '#group-table-view']);
                 assert.deepEqual(au.fails.map(f => `${f.sel} ${f.what} ${f.ratio}`), [], how + 'the sidebar and the table: contrast');
-                await ev(`document.querySelector('#group-table-view .group-table-link').click(); true`);
+                await shot(`docs-table-${theme}${zoom ? '-200' : ''}`);
+                await ev(`document.querySelector('#group-table-view .dt-primary').click(); true`);
                 await waitFor(`!!document.querySelector('#docs-content h1')`, how + 'a topic', 8000);
                 const au2 = await auditRegion(ev, ['#docs-page']);
                 assert.deepEqual(au2.fails.map(f => `${f.sel} ${f.what} ${f.ratio}`), [], how + "a topic's page: contrast");
