@@ -1,0 +1,14 @@
+{
+  "session_id": "8471-session",
+  "turn_id": "8471-turn",
+  "transcript_path": "/isolated/rollout.jsonl",
+  "cwd": "/isolated/work",
+  "hook_event_name": "PermissionRequest",
+  "model": "gpt-6.1-sol",
+  "permission_mode": "default",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "printf CT8471_AUTO_RUN",
+    "description": "Print a harmless regression marker"
+  }
+}
