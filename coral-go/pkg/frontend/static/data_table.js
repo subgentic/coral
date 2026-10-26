@@ -152,6 +152,12 @@ export function dataTable(cfg) {
         table.style.tableLayout = was.layout; table.style.width = was.width; colgroup.replaceChildren(...was.cols.childNodes); box.classList.toggle('dt-sized', Object.keys(st.widths).length > 0);
         return Math.min(800, natural);
     }
+    /** Fit the column to its content: when that is the width it has, nothing changed and nothing is kept (no Reset appears for it). */
+    function fitTo(c, th) {
+        const w = fitWidth(c, th);
+        if (Math.abs(w - Math.round(th.getBoundingClientRect().width)) <= 1) return;
+        freezeWidths(); setWidth(c, w, th); saveWidths();
+    }
     function resizeHandle(c, th) {
         const h = el('span', 'dt-resize'); h.setAttribute('role', 'separator'); h.setAttribute('aria-orientation', 'vertical'); h.tabIndex = 0; h.dataset.key = c.key;
         h.setAttribute('aria-label', `Resize ${c.label} column`); h.setAttribute('aria-valuemin', String(minOf(c))); h.setAttribute('aria-valuemax', String(MAX_W));
@@ -162,16 +168,16 @@ export function dataTable(cfg) {
             if (e.button !== 0) return;
             e.preventDefault(); e.stopPropagation();
             h.setPointerCapture(e.pointerId); h.classList.add('dt-resizing');
-            freezeWidths(); const startX = e.clientX, start = now(); let moved = false;
-            const move = (ev) => { moved = true; setWidth(c, start + (ev.clientX - startX), th); };
-            const up = () => { h.removeEventListener('pointermove', move); h.removeEventListener('pointerup', up); h.removeEventListener('pointercancel', up); h.classList.remove('dt-resizing'); if (moved) saveWidths(); else applyWidths(); };
+            const startX = e.clientX, start = now(); let moved = false;
+            const move = (ev) => { if (!moved) { if (Math.abs(ev.clientX - startX) < 2) return; moved = true; freezeWidths(); } setWidth(c, start + (ev.clientX - startX), th); }; // a press that does not move changes nothing: no frozen widths, no Reset
+            const up = () => { h.removeEventListener('pointermove', move); h.removeEventListener('pointerup', up); h.removeEventListener('pointercancel', up); h.classList.remove('dt-resizing'); if (moved) saveWidths(); };
             h.addEventListener('pointermove', move); h.addEventListener('pointerup', up); h.addEventListener('pointercancel', up);
         });
-        h.addEventListener('dblclick', (e) => { e.preventDefault(); e.stopPropagation(); freezeWidths(); setWidth(c, fitWidth(c, th), th); saveWidths(); }); // fit the column to its content
+        h.addEventListener('dblclick', (e) => { e.preventDefault(); e.stopPropagation(); fitTo(c, th); }); // fit the column to its content
         h.addEventListener('keydown', (e) => {
             const step = e.shiftKey ? STEP * 3 : STEP;
             if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); freezeWidths(); setWidth(c, now() + (e.key === 'ArrowRight' ? step : -step), th); saveWidths(); }
-            else if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); freezeWidths(); setWidth(c, fitWidth(c, th), th); saveWidths(); }
+            else if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); fitTo(c, th); }
         });
         return h;
     }

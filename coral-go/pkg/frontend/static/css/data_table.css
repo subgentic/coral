@@ -204,8 +204,10 @@
 
 /* Column widths (#7949): a handle on each header's right edge, the bar that resets them, and the box scrolling sideways when the widths are wider than it */
 .dt-resize { position: absolute; top: 0; right: 0; bottom: 0; width: 10px; cursor: col-resize; touch-action: none; user-select: none; }
-.dt-resize::after { content: ""; position: absolute; top: 25%; bottom: 25%; right: 4px; width: 2px; border-radius: 1px; background: var(--control-border); } /* the handle is a control: its mark is the controls' 3:1 colour, short and thin so a head is not a row of bars */
+.dt-resize::after { content: ""; position: absolute; top: 25%; bottom: 25%; right: 4px; width: 2px; border-radius: 1px; background: var(--control-border); opacity: 0; transition: opacity 0.12s; } /* the handle is a control: its mark is the controls' 3:1 colour, short and thin so a head is not a row of bars */
+.dt-table th:hover .dt-resize::after, .dt-resize:focus-visible::after, .dt-resize.dt-resizing::after { opacity: 1; } /* the divider shows when the header is hovered or the handle has the keyboard, not as a row of bars at rest (#7968) */
 .dt-resize:hover::after, .dt-resize.dt-resizing::after { background: var(--accent); }
+@media (prefers-reduced-motion: reduce) { .dt-resize::after { transition: none; } }
 .dt-resize:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .dt-widthbar { display: flex; justify-content: flex-end; padding: 4px var(--table-pad-x); border-bottom: 1px solid var(--table-border); }
 .dt-widthbar[hidden] { display: none; }
