@@ -1655,11 +1655,11 @@
 .team-availability-dialog li { margin: 8px 0; }
 @media(max-width: 600px) { .team-availability-dialog { padding: 16px; } .team-view-details { grid-template-columns:1fr 1fr; } .availability-agent { grid-template-columns:1fr auto; } .availability-agent > p, .availability-agent > ul { grid-column:1 / -1; } }
 
-:is(.working-mode-form, .team-launch-health, .preset-editor) { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; overflow: auto; min-height: 0; padding: 2px 4px 2px 0; }
-:is(.working-mode-form, .team-launch-health, .preset-editor)[hidden] { display: none; }
-:is(.working-mode-form, .team-launch-health, .preset-editor) label { display: block; font: 500 var(--fs-md)/1.4 var(--font-sans); }
-:is(.working-mode-form, .team-launch-health, .preset-editor) select, :is(.working-mode-form, .team-launch-health, .preset-editor) textarea { display: block; box-sizing: border-box; width: 100%; margin-top: 8px; padding: 10px; border: 1px solid var(--control-border); border-radius: var(--radius-md); background: var(--bg-primary); color: var(--text-primary); font: inherit; }
-:is(.working-mode-form, .team-launch-health, .preset-editor) p { font-size: 0.8125rem; color: var(--text-secondary); margin: 0; }
+.preset-editor { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; overflow: auto; min-height: 0; padding: 2px 4px 2px 0; }
+.preset-editor[hidden] { display: none; }
+.preset-editor label { display: block; font: 500 var(--fs-md)/1.4 var(--font-sans); }
+.preset-editor select, .preset-editor textarea { display: block; box-sizing: border-box; width: 100%; margin-top: 8px; padding: 10px; border: 1px solid var(--control-border); border-radius: var(--radius-md); background: var(--bg-primary); color: var(--text-primary); font: inherit; }
+.preset-editor p { font-size: 0.8125rem; color: var(--text-secondary); margin: 0; }
 .team-settings-section { border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 12px; margin: 0; display: grid; gap: 12px; }
 .team-settings-section legend { font-size: var(--fs-md); font-weight: 600; color: var(--text-primary); padding: 0 4px; }
 .working-mode-hint { font-size: 0.75rem !important; color: var(--text-secondary); margin: 0; line-height: 1.4; }
@@ -1669,7 +1669,7 @@
 .working-mode-docs-link:hover { text-decoration: underline; }
 .team-settings-section { min-width: 0; } /* a fieldset is as wide as its widest content by default: on a phone the form scrolled sideways */
 .workflow-preset-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-:is(.working-mode-form, .team-launch-health, .preset-editor) input[name="preset_name"] { display: block; box-sizing: border-box; width: 100%; margin-top: 8px; padding: 10px; border: 1px solid var(--control-border); border-radius: var(--radius-md); background: var(--bg-primary); color: var(--text-primary); font: inherit; }
+.preset-editor input[name="preset_name"] { display: block; box-sizing: border-box; width: 100%; margin-top: 8px; padding: 10px; border: 1px solid var(--control-border); border-radius: var(--radius-md); background: var(--bg-primary); color: var(--text-primary); font: inherit; }
 .prompt-inspection-content { display: grid; gap: 10px; }
 .prompt-inspection-card { min-width: 0; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-tertiary); }
 .prompt-inspection-card h4 { margin: 0 0 6px; font-size: 0.875rem; }
@@ -1688,46 +1688,10 @@
 .prompt-inspection-bar label { margin: 0; }
 .prompt-inspection-card[hidden] { display: none; }
 .prompt-inspection-fragment pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 4px 0 0; padding: 8px; border-radius: 5px; background: var(--bg-primary); color: var(--text-primary); font: 0.75rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
-.team-settings-actions { position: sticky; bottom: 0; z-index: 2; display: flex; align-items: center; gap: 12px; padding: 12px 0 2px; background: linear-gradient(var(--bg-secondary), var(--bg-secondary)); }
-.team-settings-actions button { flex: 0 0 auto; }
-.team-settings-actions span { color: var(--text-secondary); font-size: 0.75rem; line-height: 1.35; }
-/* On a phone the footer is one row (Save and a one-line caption, the whole caption in its title): three lines of caption under a full-width button covered a sixth of the screen; and what scrolls into view or takes the focus stops above it (UI audit #5589, finding 13). */
-@media(max-width: 600px) {
-    .team-settings-actions { align-items: center; flex-direction: row; flex-wrap: wrap; } /* two buttons (the health tab) wrap at large text */
-    .team-settings-actions span { flex: 1 1 8rem; min-width: 0; } /* the one sentence may take a second line: never cut with an ellipsis */
-    .working-mode-form { scroll-padding-bottom: 4.5rem; }
-}
 
-/* Team settings, Health check tab (#4230): the check, then one card per automatic rule with its numbers and the server's limits under each. */
-.health-line { display: flex; align-items: flex-start; gap: 6px; }
-.health-line > label { flex: 0 1 auto; min-width: 0; }
-/* Reset to defaults is the quiet action next to Save health check, not the brightest button on the tab while Save is dimmed (#6042). */
-.health-actions .health-reset, .team-availability-dialog .health-actions .health-reset { background: none; border-color: transparent; color: var(--link-text, var(--accent)); text-decoration: underline; text-underline-offset: 2px; }
-.health-actions .health-reset:hover, .team-availability-dialog .health-actions .health-reset:hover { background: none; color: var(--text-primary); }
 /* The (i) is a circle in Team settings as in Settings (#6042): the dialog's generic button rule (padding, radius, min-height) must not reshape it. */
 .team-availability-dialog .settings-info-btn { min-height: 0; padding: 0; border-radius: 50%; width: 1.5rem; height: 1.5rem; }
 .team-availability-dialog .settings-info-btn:not([aria-expanded="true"]) { background: none; color: var(--text-secondary); }
-.health-form .settings-info-text { margin: 0 0 0 26px; font-size: calc(var(--fs-md) * .9); color: var(--text-secondary); }
-.health-form .health-rule-head { display: flex; align-items: flex-start; gap: 8px; font-weight: 600; }
-.health-form .health-rule-head input { margin-top: 3px; flex: none; }
-.health-form .health-why { display: block; color: var(--text-secondary); font-size: calc(var(--fs-md) * .9); font-weight: 400; margin: 0; } /* from the title's own size token, so it scales with the title (#4259) */
-.health-rule { border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 10px 12px; display: grid; gap: 6px; background: var(--bg-primary); }
-.health-rule > .health-why { margin-left: 26px; }
-.health-knobs { display: flex; flex-wrap: wrap; gap: 10px 16px; margin: 2px 0 0 26px; }
-.health-knobs:empty { display: none; }
-.health-row.off, .health-line.off > :not(.settings-info-btn) { opacity: .55; } /* the (i) stays at full contrast and usable while the check is off */
-.health-row { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: flex-end; }
-:is(.working-mode-form, .team-launch-health, .preset-editor) label.health-knob { display: flex; flex-direction: column; gap: 3px; font-size: 0.75rem; color: var(--text-secondary); font-weight: 500; }
-.health-knob-box { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.health-limits { font-weight: 400; font-size: 0.75rem; color: var(--text-secondary); }
-.health-form input[type="number"], .health-form input[type="text"] { box-sizing: border-box; min-height: var(--control-height, 32px); background: var(--bg-tertiary, var(--bg-primary)); color: var(--text-primary); border: 1px solid var(--control-border); border-radius: var(--radius-md); padding: 4px 8px; font: inherit; }
-.health-form input[type="number"] { width: 7em; max-width: 100%; } /* (not min(7em, 100%): a percentage width collapses the shrink-wrapped box and drops the unit under the input) */
-.health-knob.health-wide, .health-knobs .health-wide { flex: 1 1 100%; }
-.health-form input[type="text"] { width: 100%; }
-.health-wide-select { flex: 1 1 11em; min-width: min(11em, 100%); }
-.health-wide-select select { margin-top: 4px; }
-.health-rule.off .health-why, .health-rule.off .health-knobs { opacity: .55; }
-.health-form input:focus-visible, .health-form select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 /* Team settings, Messaging tab (#5572): one status line and one button, two switches, the linked teams, "How this works". */
 .xt-head { display: flex; align-items: center; gap: 10px; }
@@ -1754,7 +1718,7 @@
 }
 
 .team-availability-dialog .modal-close-btn { padding: 0; background: transparent; border-color: transparent; }
-:is(.working-mode-form, .team-launch-health, .preset-editor) select, :is(.working-mode-form, .team-launch-health, .preset-editor) input[name="preset_name"] { min-height: var(--control-height); }
+.preset-editor select, .preset-editor input[name="preset_name"] { min-height: var(--control-height); }
 
 /* Knowledge distillation */
 .spin { animation: spin 1s linear infinite; }
@@ -2100,16 +2064,6 @@
 
 /* At 200% text on a phone the panel was wider than its box and clipped on the right: a fieldset is as wide as its content unless told otherwise, and the 11em
    select and 7em number box did not shrink. Nothing in the form is wider than its container (#4259). */
-.health-form, .health-form fieldset, .health-form label, .health-rule, .health-knobs, .health-row { min-width: 0; max-width: 100%; }
-.health-form select, .health-form input[type="text"] { max-width: 100%; }
-/* A phone or a touch screen: the check rows and the inputs are touch-size targets. */
-@media (max-width: 767px), (pointer: coarse) {
-    .health-line > .settings-info-btn, .prompt-inspection-meta .settings-info-btn { border-radius: 50%; } /* the 44 px is the invisible ::after of .settings-info-btn (#6750) */
-    .health-line > .settings-info-btn { margin-top: calc((var(--control-touch-height, 44px) - 1.5rem) / 2); } /* the check's label is a 44 px row here: the circle sits on its middle line */
-    .health-form .health-rule-head { min-height: var(--control-touch-height, 44px); align-items: center; }
-    .health-form .health-rule-head input { margin-top: 0; }
-    .health-form input[type="number"], .health-form input[type="text"], .health-form select { min-height: var(--control-touch-height, 44px); }
-}
 
 /* The agent's model under its row in the list: "Claude · Opus 4.1" (#4066) */
 .session-model { margin-top: 1px; font-size: var(--fs-sm, 11px); color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
