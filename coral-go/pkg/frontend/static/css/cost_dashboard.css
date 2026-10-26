@@ -1,76 +1,8 @@
-/* Cost Dashboard Styles */
 
-/* ── Sort & Filter ──────────────────────────────────────── */
-
-.cost-th-sort {
-    cursor: pointer;
-    user-select: none;
-    white-space: nowrap;
-    position: relative;
-}
-
-.cost-th-sort:hover {
-    color: var(--text-primary);
-    background: var(--bg-hover);
-}
-
-/* The label of a sortable header is a button (#5042): it looks as the header text did and shows a focus ring. */
-.cost-sort-btn {
-    font: inherit;
-    color: inherit;
-    letter-spacing: inherit;
-    text-transform: inherit;
-    text-align: inherit;
-    background: none;
-    border: 0;
-    padding: 0;
-    cursor: pointer;
-}
-
-.cost-sort-btn:focus-visible,
-.cost-col-filter:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-    border-radius: var(--radius-xs);
-}
-
-/* Filter icon inside column header */
-.cost-col-filter {
-    display: inline-flex;
-    align-items: center;
-    margin-left: 3px;
-    padding: 1px;
-    border-radius: var(--radius-xs);
-    vertical-align: middle;
-    cursor: pointer;
-    color: inherit;
-    background: none;
-    border: 0;
-    opacity: 0.4;
-    transition: opacity 0.15s;
-}
-
-.cost-col-filter:hover {
-    opacity: 1;
-    background: var(--bg-hover);
-}
-
-.cost-col-filter.cost-filter-active {
-    opacity: 1;
-    color: var(--accent);
-}
 
 /* On a touch screen the header's two controls are 44 px (#5053): the label button fills the header's height, and the filter icon is a 44 px button with the glyph centred.
  * The header row grows from 33 to 44 px; a fine pointer keeps the compact sizes above. */
-@media (pointer: coarse) {
-    .cost-table thead th.cost-th-sort { padding-top: 0; padding-bottom: 0; } /* the buttons carry the height: the cell's own padding would add 18 px to them */
-    .cost-sort-btn { min-width: 44px; min-height: 44px; vertical-align: middle; white-space: normal; max-width: 6em; } /* a long heading ("Thinking level") takes two lines inside the button, the filter stays beside it (#5056); in em so it grows with large text: 72 px was narrower than "Provider" at 200% (#5058) */
-    .cost-col-filter { min-width: 44px; min-height: 44px; justify-content: center; margin: 0 -8px; } /* its 44 px hit area overlaps the label's end and the cell's padding, so the column is no wider than before and Cost stays on screen (#5056) */
-}
-
-/* On a phone the columns sit closer, so more of them fit before the card scrolls (#5056). */
-@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
-    .cost-table thead th, .cost-table tbody td { padding-left: 4px; padding-right: 4px; }
+@media (pointer: coarse) { /* its 44 px hit area overlaps the label's end and the cell's padding, so the column is no wider than before and Cost stays on screen (#5056) */
 }
 
 /* Filter dropdown */
@@ -257,136 +189,14 @@
 #cost-dashboard-view:not([data-view="overview"]) > .cost-page > .cost-section > .cost-section-title { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 [data-cview][hidden] { display: none !important; }
 
-.cost-table-container {
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    overflow-x: auto; /* a wide table scrolls inside its box on a phone instead of being cut off (#4589) */
-    overflow-y: hidden;
-}
-
 .cost-note { margin: 0 0 12px; font-size: var(--fs-md); line-height: 1.45; color: var(--text-secondary); max-width: 70ch; }
 .cost-help { margin: 0 0 12px; }
 .cost-help .cost-note { margin: 8px 0 0; }
-.cost-scroll-hint { margin: 0 0 12px; font-size: var(--fs-sm); color: var(--text-secondary); }
-.cost-scroll-hint[hidden] { display: none; }
-/* A table wider than its box on a phone: while more columns are to the right, the clipped edge fades out, so a column is not cut off as if it ended there (#6975) */
-.cost-table-container[data-more="right"] { -webkit-mask-image: linear-gradient(to right, rgb(var(--black-rgb)) calc(100% - 32px), transparent); mask-image: linear-gradient(to right, rgb(var(--black-rgb)) calc(100% - 32px), transparent); }
 .cost-empty {
     padding: 24px;
     text-align: center;
     color: var(--text-muted);
     font-size: 0.8125rem;
-}
-
-/* Tables */
-.cost-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.75rem;
-}
-
-.cost-table thead th {
-    background: var(--bg-secondary);
-    padding: 8px 12px;
-    text-align: left;
-    font-weight: 500;
-    font-size: var(--fs-base);
-    color: var(--text-secondary);
-    border-bottom: 1px solid var(--border);
-    white-space: nowrap;
-}
-
-.cost-table tbody td {
-    padding: 6px 12px;
-    border-bottom: 1px solid var(--border-subtle);
-    color: var(--text-primary);
-    white-space: nowrap;
-}
-
-.cost-table tbody tr:last-child td {
-    border-bottom: none;
-}
-
-.cost-table tbody tr:hover {
-    background: var(--hover-bg);
-}
-
-.cost-col-right {
-    text-align: right !important;
-    font-variant-numeric: tabular-nums;
-}
-
-.cost-cost-cell {
-    font-weight: 600;
-    color: var(--accent);
-}
-
-.cost-agent-name {
-    font-weight: 500;
-    max-width: 160px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.cost-agent-link {
-    color: var(--accent);
-    text-decoration: none;
-    cursor: pointer;
-}
-
-.cost-agent-link:hover {
-    text-decoration: underline;
-}
-
-.cost-agent-terminated {
-    opacity: 0.7;
-}
-
-.cost-agent-ended {
-    font-size: var(--fs-sm);
-    color: var(--text-muted);
-    font-weight: 400;
-}
-
-.cost-date {
-    color: var(--text-secondary);
-    font-size: var(--fs-base);
-}
-
-/* Agent type badges */
-
-/* Model name */
-.cost-model-name {
-    font-family: var(--font-mono, monospace);
-    font-size: 0.6875rem;
-    max-width: 200px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-/* Status badges */
-.cost-status {
-    font-size: var(--fs-base);
-    font-weight: 600;
-    padding: 1px 6px;
-    border-radius: var(--radius-xs);
-    text-transform: uppercase;
-}
-
-.cost-status-ok {
-    background: rgba(var(--fx-green-rgb), 0.15);
-    color: var(--success);
-}
-
-.cost-status-error {
-    background: rgba(var(--fx-red-rgb), 0.15);
-    color: var(--error);
-}
-
-.cost-status-pending {
-    background: rgba(var(--fx-grey-rgb), 0.12);
-    color: var(--text-muted);
 }
 
 /* ── Live Indicator ──────────────────────────────────────── */
@@ -511,13 +321,6 @@
     white-space: nowrap;
 }
 
-.cost-agent-team {
-    color: var(--text-muted);
-    max-width: 120px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
 .agent-cost-chart-tooltip {
     display: none;
     position: fixed;
@@ -555,10 +358,7 @@
 }
 
 /* By Model shows a readable name ("Opus 5.5"), not an id, so it is not set in the code font (#4589). */
-#cost-by-model .cost-model-name, #cost-by-thinking .cost-model-name { font-family: inherit; font-size: inherit; } /* its neighbours' size: 13 px, not the code font's 11 (#7719) */
 
-/* The usage with no thinking level recorded (#4969): not a level, so quieter than the rows that are. */
-#cost-by-thinking .cost-table tr.cost-row-unreported td { color: var(--text-muted); }
 
 /* Tokens per commit (analytics_spend.js, #7526) */
 .spend-head { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; }
@@ -578,12 +378,8 @@
 .spend-bar-high { background: var(--warning); }
 .spend-usual { position: absolute; left: 0; right: 0; border-top: 2px dashed var(--text-secondary); pointer-events: none; }
 .spend-axis { display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px; }
-.spend-not-measured, .spend-muted { color: var(--text-secondary); }
 .spend-who { margin-bottom: 16px; }
 @media (max-width: 760px) { .spend-grid { grid-template-columns: minmax(0, 1fr); } .spend-bars { height: 120px; gap: 6px; } }
-.spend-table tbody th[scope=row] { text-align: left; font-weight: 600; padding: 6px 12px; border-bottom: 1px solid var(--border-subtle); color: var(--text-primary); white-space: nowrap; } /* the agent's name sits in the cell like the other cells, as far in as the AGENT header */
-.spend-table tbody tr:last-child th[scope=row] { border-bottom: 0; }
-@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .spend-table tbody th[scope=row] { padding-left: 4px; padding-right: 4px; } }
 
 .spend-chart-head { display: flex; align-items: center; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; margin-bottom: 8px; }
 .spend-chart-head .spend-box-title { margin: 0; }
@@ -606,27 +402,7 @@
     #cost-dashboard-view .cost-phone-back { display: inline-flex; align-items: center; min-height: var(--control-touch-height, 44px); }
     #cost-dashboard-view .cost-header-left { flex-wrap: wrap; row-gap: 0; } /* the way back stays on the title's line (a row saved) and goes over it only when the title would not have 10 rem beside it: at 200% text it wrapped to a word a line */
     #cost-dashboard-view .cost-title-block { flex: 1 1 10rem; min-width: 10rem; }
-    #cost-dashboard-view .cost-agent-link { display: inline-block; max-width: 100%; min-height: var(--control-touch-height, 44px); line-height: var(--control-touch-height, 44px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; } /* an agent's name in a table row is a 44 px target */
     #mobile-analytics-list .sidebar-hide-btn { display: none; } /* the page is the whole screen: there is no column to hide */
     #mobile-analytics-list .sidebar-header { padding: 12px; }
     .cost-page { padding: 12px; }
-}
-
-/* The tables fold when the page is narrow (#7738): a phone, and a desktop at 200% text (40 rem is 640 px at 100%). Each row is its name over its figures as "label value" (the labels come from
-   the cells' data-label; Cost or Calls first), so no table scrolls sideways; the header row is not drawn, the "Sort by" select above the table stands in for its sort buttons. */
-.cost-page { container: costpage / inline-size; }
-.cost-fold-sort { display: none; }
-@container costpage (max-width: 40rem) {
-    .cost-fold-sort { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 8px; color: var(--text-secondary); font-size: 0.8125rem; }
-    .cost-fold-sort select, .cost-fold-sort .cost-fold-dir { min-height: var(--control-touch-height, 44px); }
-    .cost-table-container .cost-table thead { display: none; }
-    .cost-table-container .cost-table, .cost-table-container .cost-table tbody { display: block; width: 100%; }
-    .cost-table-container .cost-table tbody tr { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 14px; padding: 12px; border-bottom: 1px solid var(--border); }
-    .cost-table-container .cost-table tbody tr:last-child { border-bottom: 0; }
-    .cost-table-container .cost-table td { display: block; padding: 0; border: 0; text-align: left; max-width: 100%; font-size: 0.75rem; font-weight: 400; color: var(--text-secondary); font-variant-numeric: tabular-nums; } /* the figures under the name: 12/400, the label tertiary, the value secondary (UI/UX #7738) */
-    .cost-table-container .cost-table td.cost-fold-name { order: -2; font-size: 0.8125rem; font-weight: 600; color: var(--text-primary); }
-    .cost-table-container .cost-table td.cost-fold-name:first-child { flex: 1 1 100%; }
-    .cost-table-container .cost-table td.cost-fold-first { order: -1; }
-    .cost-table-container .cost-table td.cost-fold-key { font-size: 0.8125rem; font-weight: 600; color: var(--text-primary); } /* the one stronger figure: the sort key's value, 13/600 primary (UI/UX #7738) */
-    .cost-table-container .cost-table td[data-label]:not(.cost-fold-name)::before { content: attr(data-label) " "; color: var(--text-muted); font-weight: 400; }
 }

@@ -47,12 +47,12 @@ const { connect } = require('./agent_view_harness');
         await ev(`window.switchNavTab('tokens'); true`);
         await waitFor(`document.querySelectorAll('#cost-by-thinking tbody tr').length === 5`, 'the thinking table', 8000);
 
-        const table = () => ev(`[...document.querySelectorAll('#cost-by-thinking tbody tr')].map(tr => ({ cells: [...tr.children].map(td => td.textContent.trim()), dim: tr.classList.contains('cost-row-unreported') }))`);
+        const table = () => ev(`[...document.querySelectorAll('#cost-by-thinking tbody tr')].map(tr => ({ cells: [...tr.children].map(td => td.textContent.trim()), dim: tr.classList.contains('dt-quiet') }))`);
         const run = async (label) => {
             console.log(`${label}: the levels recorded and the Not reported rows`);
             let rows = await table();
             // columns: Provider, Model, Thinking level, Calls, Input, Output, Cache Read, Cache Write, Thinking, Cost, Share (the phone moves Cost and Share up, by cell index, so read by heading)
-            const cols = await ev(`[...document.querySelectorAll('#cost-by-thinking thead th')].map(th => th.textContent.replace(/[\\u25B2\\u25BC]|filter_list/g, '').trim())`);
+            const cols = await ev(`[...document.querySelectorAll('#cost-by-thinking thead th')].map(th => th.textContent.replace(/[\\u25B2\\u25BC\\u2191\\u2193\\u2195]|filter_list/g, '').trim())`);
             const at = h => cols.indexOf(h);
             assert.ok(['Provider', 'Model', 'Thinking level', 'Calls', 'Input', 'Output', 'Thinking', 'Cost', 'Share'].every(h => at(h) >= 0), 'the columns: ' + JSON.stringify(cols));
             const cell = (r, h) => r.cells[at(h)];
@@ -67,7 +67,7 @@ const { connect } = require('./agent_view_harness');
             console.log('   ✓ rows, shares, Not reported');
 
             console.log(`${label}: By Provider and By Model, the same columns`);
-            const tbl = id => ev(`(() => { const heads = [...document.querySelectorAll('#${id} thead th')].map(th => th.textContent.replace(/[\\u25B2\\u25BC]|filter_list/g, '').trim());
+            const tbl = id => ev(`(() => { const heads = [...document.querySelectorAll('#${id} thead th')].map(th => th.textContent.replace(/[\\u25B2\\u25BC\\u2191\\u2193\\u2195]|filter_list/g, '').trim());
                 return { heads, rows: [...document.querySelectorAll('#${id} tbody tr')].map(tr => [...tr.children].map(td => td.textContent.trim())) }; })()`);
             const prov = await tbl('cost-by-provider'), mod = await tbl('cost-by-model');
             for (const t of [prov, mod]) assert.ok(['Requests', 'Input', 'Output', 'Cost', 'Share'].every(h => t.heads.includes(h)), 'the columns: ' + JSON.stringify(t.heads));
@@ -81,11 +81,9 @@ const { connect } = require('./agent_view_harness');
 
             console.log(`${label}: sorting by level`);
             const levelAt = cols.indexOf('Thinking level');
-            const header = `[...document.querySelectorAll('#cost-by-thinking th.cost-th-sort')].find(th => th.textContent.trim().startsWith('Thinking level'))`;
+            const header = `[...document.querySelectorAll('#cost-by-thinking th .dt-sort')].find(b => b.textContent.trim().startsWith('Thinking level'))`;
             await ev(`${header}.click(); true`);
-            await waitFor(`/[\\u25B2\\u25BC]/.test(${header}.textContent)`, 'the sort arrow', 4000);
-            await ev(`${header}.click(); true`);
-            await waitFor(`/\\u25B2/.test(${header}.textContent)`, 'ascending', 4000);
+            await waitFor(`/\\u2191/.test(${header}.textContent)`, 'ascending', 4000); // a first click on a text column sorts A to Z
             rows = await table();
             assert.equal(rows[rows.length - 1].cells[levelAt], 'Not reported', 'Not reported sorts after the levels: ' + JSON.stringify(rows.map(r => r.cells[levelAt])));
             await ev(`${header}.click(); ${header}.click(); true`); // back to a known order is not needed: the next scene re-reads

@@ -4,7 +4,6 @@
     "chat.css": 4,
     "cloud.css": 9,
     "components.css": 5,
-    "cost_dashboard.css": 23,
     "docs.css": 4,
     "layout.css": 38,
     "output.css": 4,
@@ -14,9 +13,6 @@
     "workflows.css": 5
   },
   "js": {
-    "actions.js": 1,
-    "analytics_spend.js": 20,
-    "cost_dashboard.js": 125,
     "scheduler.js": 18,
     "servers.js": 13,
     "session_state.js": 43,

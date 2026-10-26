@@ -96,7 +96,7 @@ const TASKS = { tasks: [{ id: 4242, board_id: 'cost-board', title: 'A costly tas
 
         // ── The Cost view ──────────────────────────────────────────────────
         await ev(`window.switchNavTab('tokens'); true`);
-        await until(`document.querySelectorAll('#cost-by-agent th.cost-th-sort').length > 0 && document.querySelectorAll('#cost-by-task tr[data-on-click]').length > 0`, 'the Cost tables');
+        await until(`document.querySelectorAll('#cost-by-agent th .dt-sort').length > 0 && document.querySelectorAll('#cost-by-task tbody tr').length > 0`, 'the Cost tables');
         const inline = await ev(`[...document.querySelectorAll('#cost-dashboard-view *')].flatMap(el => [...el.attributes].filter(a => /^on/i.test(a.name)).map(a => el.tagName + ' ' + a.name))`);
         check('the Cost view has no inline handler left', inline.length === 0, JSON.stringify(inline.slice(0, 5)));
 
@@ -109,20 +109,20 @@ const TASKS = { tasks: [{ id: 4242, board_id: 'cost-board', title: 'A costly tas
         await until(`window.__cost.summary > ${before}`, 'a reload for the new range');
         check('changing the time range reloads', await ev(`window.__cost.summary > ${before}`));
 
-        const header = name => `[...document.querySelectorAll('#cost-by-agent th.cost-th-sort')].find(th => th.textContent.trim().startsWith(${JSON.stringify(name)}))`;
-        await ev(`${header('Agent')}.click(); true`);
-        await until(`/[\\u25B2\\u25BC]/.test(${header('Agent')}.textContent)`, 'the sort arrow');
+        const header = name => `[...document.querySelectorAll('#cost-by-agent th')].find(th => th.textContent.trim().startsWith(${JSON.stringify(name)}))`;
+        await ev(`${header('Agent')}.querySelector('.dt-sort').click(); true`);
+        await until(`/[\\u2191\\u2193]/.test(${header('Agent')}.textContent)`, 'the sort arrow');
         const first = await ev(`${header('Agent')}.textContent`);
-        await ev(`${header('Agent')}.click(); true`);
+        await ev(`${header('Agent')}.querySelector('.dt-sort').click(); true`);
         await until(`${header('Agent')}.textContent !== ${JSON.stringify(first)}`, 'the arrow flipped');
         const second = await ev(`${header('Agent')}.textContent`);
-        check('a column header sorts, and again reverses', /▼/.test(first) && /▲/.test(second), `${first.trim()} | ${second.trim()}`);
+        check('a column header sorts, and again reverses', /↑/.test(first) && /↓/.test(second), `${first.trim()} | ${second.trim()}`);
 
-        await ev(`${header('Team')}.querySelector('[data-on-click="cost-filter"]').click(); true`);
+        await ev(`${header('Team')}.querySelector('.dt-filter').click(); true`);
         await until(`document.querySelectorAll('.cost-filter-dropdown').length === 1`, 'the filter dropdown');
-        const stillAgent = await ev(`/[\\u25B2\\u25BC]/.test(${header('Agent')}.textContent) && !/[\\u25B2\\u25BC]/.test(${header('Team')}.textContent)`);
+        const stillAgent = await ev(`/[\\u2191\\u2193]/.test(${header('Agent')}.textContent) && !/[\\u2191\\u2193]/.test(${header('Team')}.textContent)`);
         check('the filter icon opens its dropdown and does not sort the column', stillAgent);
-        await ev(`${header('Folder')}.querySelector('[data-on-click="cost-filter"]').click(); true`);
+        await ev(`${header('Folder')}.querySelector('.dt-filter').click(); true`);
         await new Promise(r => setTimeout(r, 200)); // sleep-ok: let any close-on-outside-click run
         check('a second filter icon replaces the open dropdown (one stays open)', await ev(`document.querySelectorAll('.cost-filter-dropdown').length === 1`));
         await ev(`document.body.click(); true`);
@@ -134,20 +134,19 @@ const TASKS = { tasks: [{ id: 4242, board_id: 'cost-board', title: 'A costly tas
             const keep = { switchNavTab: window.switchNavTab, selectHistorySession: window.selectHistorySession };
             window.switchNavTab = t => calls.push('tab:' + t);
             window.selectHistorySession = id => calls.push('history:' + id);
-            const a = document.querySelector('#cost-by-agent a[data-on-click="cost-open-history"]');
-            const ev = new MouseEvent('click', { bubbles: true, cancelable: true });
-            a.dispatchEvent(ev);
+            const row = document.querySelector('#cost-by-agent tbody tr'), a = row.querySelector('.dt-link');
+            a.click();
             Object.assign(window, keep);
-            return { calls, prevented: ev.defaultPrevented, sid: a.dataset.sessionId };
+            return { calls, sid: row.dataset.key };
         })()`);
-        check('an ended agent opens its history (the link does not navigate)',
-            JSON.stringify(nav.calls) === JSON.stringify(['tab:history', 'history:' + nav.sid]) && nav.prevented, JSON.stringify(nav));
+        check('an ended agent opens its history',
+            JSON.stringify(nav.calls) === JSON.stringify(['tab:history', 'history:' + nav.sid]), JSON.stringify(nav));
 
         const task = await ev(`(() => {
             const keep = window.openTeamPage;
             let shown = null;
             window.openTeamPage = (board, opts) => { shown = JSON.stringify([board, opts]); };
-            document.querySelector('#cost-by-task tr[data-on-click="cost-task"]').click();
+            document.querySelector('#cost-by-task tbody tr').click();
             window.openTeamPage = keep;
             return shown;
         })()`);

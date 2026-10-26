@@ -5,11 +5,11 @@
  * Markup names an action per event, and passes its arguments as data attributes, which are
  * HTML-escaped values, never code:
  *
- *   <th data-on-click="cost-sort" data-table="agent" data-field="cost_usd">
+ *   <button data-on-click="cost-refresh" data-range="week">
  *
  * A module registers what each name does:
  *
- *   registerActions({ 'cost-sort': (el, event) => sortBy(el.dataset.table, el.dataset.field) });
+ *   registerActions({ 'cost-refresh': (el, event) => refresh(el.dataset.range) });
  *
  * One listener per event type on document runs the actions from the event's target up through its
  * ancestors, innermost first, as inline handlers ran. event.stopPropagation() in an action stops

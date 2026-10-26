@@ -172,16 +172,16 @@ const UNDERSIZED = `(() => {
             const t0 = Date.now();
             while (document.querySelectorAll('#cost-by-thinking tbody tr').length < 2 && Date.now() - t0 < 10000) await new Promise(r => setTimeout(r, 100));
             await ${framesJs(2)};
-            const heads = document.querySelectorAll('#cost-by-thinking th .cost-sort-btn').length, filters = document.querySelectorAll('.cost-table .cost-col-filter').length;
+            const heads = document.querySelectorAll('#cost-by-thinking th .dt-sort').length, filters = document.querySelectorAll('.dt-table .dt-filter').length;
             // The sweep skips what is off screen: each table is scrolled to in turn.
             const small = new Set();
-            for (const table of document.querySelectorAll('#view-cost .cost-table, #cost-view .cost-table, .cost-table')) {
+            for (const table of document.querySelectorAll('#view-cost .dt-table, #cost-view .dt-table, .dt-table')) {
                 table.scrollIntoView({ block: 'center' });
                 await ${framesJs(2)};
                 for (const s of ${UNDERSIZED}) small.add(s);
             }
             window.fetch = real;
-            return { heads, filters, tables: document.querySelectorAll('.cost-table').length, small: [...small] };
+            return { heads, filters, tables: document.querySelectorAll('.dt-table').length, small: [...small] };
         })()`);
         assert.ok(costSmall.heads >= 7 && costSmall.filters >= 2 && costSmall.tables >= 3, 'the Cost view shows its sort headers and filter icons: ' + JSON.stringify(costSmall));
         assert.deepEqual(costSmall.small, [], 'phone 390, Cost tables: every control, the header buttons and filter icons too, is at least 44x44: ' + JSON.stringify(costSmall.small));

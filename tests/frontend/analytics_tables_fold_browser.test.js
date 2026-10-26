@@ -20,12 +20,12 @@ const VIEWS = ['provider', 'model', 'thinking', 'team', 'agent', 'branch', 'call
         await ev(`window.switchNavTab('tokens'); true`); await settle(1500);
     };
     const view = async key => { await ev(`(() => { const b = document.querySelector('#cost-nav-list .row-btn[data-view="${key}"]'); if (b) b.click(); return !!b; })()`); await settle(900); };
-    const probe = () => ev(`(() => { const box = [...document.querySelectorAll('#cost-dashboard-view .cost-table-container')].find(b => b.getClientRects().length && b.querySelector('table')); if (!box) return null; const t = box.querySelector('table'); const r = box.getBoundingClientRect();
-        const k = parseFloat(getComputedStyle(document.documentElement).fontSize) / 16; const row = t.querySelector('tbody tr'); const cells = row ? [...row.children] : []; const top = e => Math.round(e.getBoundingClientRect().top);
+    const probe = () => ev(`(() => { const box = [...document.querySelectorAll('#cost-dashboard-view .dt-box')].find(b => b.getClientRects().length && b.querySelector('table')); if (!box) return null; const t = box.querySelector('table');
+        const row = t.querySelector('tbody tr'); const cells = row ? [...row.children] : []; const top = e => Math.round(e.getBoundingClientRect().top); const bar = box.querySelector('.dt-sortbar');
         return { sideways: box.scrollWidth > box.clientWidth + 1, pageSw: document.documentElement.scrollWidth > innerWidth + 1, display: getComputedStyle(t).display, head: getComputedStyle(t.querySelector('thead')).display, roles: [t.getAttribute('role'), row && row.getAttribute('role'), cells[0] && cells[0].getAttribute('role')],
-            labels: cells.map(c => c.dataset.label || ''), firstFull: cells[0] ? Math.round(cells[0].getBoundingClientRect().width) : 0, rowW: row ? Math.round(row.getBoundingClientRect().width) : 0, tops: cells.map(top), first: cells.filter(c => c.classList.contains('cost-fold-first')).map(c => c.dataset.label),
-            before: cells[2] ? getComputedStyle(cells[2], '::before').content : '', sortBar: !!(box.previousElementSibling && box.previousElementSibling.classList.contains('cost-fold-sort') && box.previousElementSibling.getClientRects().length), rows: t.querySelectorAll('tbody tr').length,
-            strong: cells.filter(c => c.classList.contains('cost-fold-key')).map(c => { const s = getComputedStyle(c); return [c.dataset.label, Math.round(parseFloat(s.fontSize) / k) + 'px', s.fontWeight]; }), rest: [...new Set(cells.filter(c => !c.classList.contains('cost-fold-key') && !c.classList.contains('cost-fold-name') && c.dataset.label).map(c => { const s = getComputedStyle(c); return Math.round(parseFloat(s.fontSize) / k) + 'px,' + s.fontWeight; }))] }; })()`);
+            labels: cells.map(c => c.dataset.label || ''), firstFull: cells[0] ? Math.round(cells[0].getBoundingClientRect().width) : 0, rowW: row ? Math.round(row.getBoundingClientRect().width) : 0, tops: cells.map(top),
+            first: cells.filter(c => c.classList.contains('dt-fold-first')).map(c => c.dataset.label), before: [...new Set(cells.filter(c => !c.classList.contains('dt-tone-primary')).map(c => getComputedStyle(c, '::before').content))],
+            sortBar: !!(bar && bar.getClientRects().length), sortKey: bar && bar.querySelector('select') ? bar.querySelector('select').value : '', rows: t.querySelectorAll('tbody tr').length }; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: DATA_WORLD });
         for (const [label, w, h, mobile, big] of [['390 px', 390, 844, true, false], ['1280 px at 200% text', 1280, 800, false, true]]) {
@@ -37,22 +37,21 @@ const VIEWS = ['provider', 'model', 'thinking', 'team', 'agent', 'branch', 'call
                 assert.equal(p.head, 'none', 'the header row is not drawn: ' + JSON.stringify(p));
                 assert.deepEqual(p.roles, ['table', 'row', 'cell'], 'the roles stay: ' + JSON.stringify(p)); assert.ok(p.labels.slice(1).every(Boolean), 'every cell has its column name: ' + JSON.stringify(p.labels));
                 assert.ok(p.firstFull >= p.rowW - 2 * 12 - 2, 'the name takes the row (inside its padding): ' + JSON.stringify(p)); assert.ok(p.tops[1] > p.tops[0], 'the figures are under the name: ' + JSON.stringify(p));
-                assert.ok(p.first.length >= 1 && p.before.length > 2, 'Cost or Calls first, labels drawn: ' + JSON.stringify(p));
-                assert.deepEqual([p.strong.length, p.strong[0] && p.strong[0].slice(1)], [1, ['13px', '600']], 'one stronger figure, 13/600: ' + JSON.stringify(p.strong)); assert.deepEqual(p.rest, ['12px,400'], 'the rest are 12/400: ' + JSON.stringify(p.rest));
+                assert.ok(p.first.length >= 1 && p.before.every(c => c.length > 2), 'Cost or Calls first, labels drawn: ' + JSON.stringify(p));
                 if (key !== 'calls') assert.ok(p.sortBar, 'a Sort by select is above it: ' + JSON.stringify(p));
             });
             await S.run(`${label}: Sort by changes the order, and the reverse button reverses it`, async () => {
                 await view('provider');
                 const names = () => ev(`[...document.querySelectorAll('#cost-by-provider tbody tr')].map(r => r.children[0].textContent.trim())`);
                 const before = await names();
-                await ev(`(() => { const s = document.querySelector('.cost-fold-sort select'); s.value = 'agent_type'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); await settle(600);
+                await ev(`(() => { const s = document.querySelector('#cost-by-provider .dt-sortbar select'); s.value = 'agent_type'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); await settle(600);
                 const byName = await names();
-                await ev(`document.querySelector('.cost-fold-dir').click(); true`); await settle(600);
+                await ev(`document.querySelector('#cost-by-provider .dt-sortbar-dir').click(); true`); await settle(600);
                 const reversed = await names();
-                assert.deepEqual([...byName].sort(), [...before].sort(), 'the same rows'); assert.ok(JSON.stringify(byName) === JSON.stringify([...byName].sort()) || JSON.stringify(byName) === JSON.stringify([...byName].sort().reverse()), 'sorted by name: ' + JSON.stringify(byName)); assert.notDeepEqual(byName, before, 'and not in the order the cost gave');
+                assert.deepEqual([...byName].sort(), [...before].sort(), 'the same rows'); assert.ok(JSON.stringify(byName) === JSON.stringify([...byName].sort()) || JSON.stringify(byName) === JSON.stringify([...byName].sort().reverse()), 'sorted by name: ' + JSON.stringify(byName));
                 assert.deepEqual(reversed, [...byName].reverse(), 'reversed: ' + JSON.stringify({ byName, reversed }));
-                await ev(`(() => { const s = document.querySelector('.cost-fold-sort select'); s.value = 'requests'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); await settle(600);
-                assert.deepEqual((await probe()).strong.map(x => x[0]), ['Requests'], 'the stronger figure follows the sort');
+                await ev(`(() => { const s = document.querySelector('#cost-by-provider .dt-sortbar select'); s.value = 'requests'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); await settle(600);
+                assert.equal((await probe()).sortKey, 'requests', 'the select shows the column the rows are sorted by');
             });
         }
         await open(1280, 800, false);

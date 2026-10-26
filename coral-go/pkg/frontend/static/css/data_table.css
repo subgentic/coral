@@ -50,6 +50,7 @@
 }
 
 .dt-box { border: 1px solid var(--table-outer); border-radius: var(--table-radius); background: var(--table-bg); overflow-x: clip; container: dt / inline-size; } /* clip, not auto: a scroll box here would keep the sticky header from sticking to the page */
+.dt-box.dt-scroll { overflow-x: auto; --dt-fade: color-mix(in srgb, var(--text-primary) 16%, transparent); background: linear-gradient(to right, var(--table-bg) 30%, transparent) left / 24px 100% no-repeat local, linear-gradient(to left, var(--table-bg) 30%, transparent) right / 24px 100% no-repeat local, linear-gradient(to right, var(--dt-fade), transparent) left / 12px 100% no-repeat scroll, linear-gradient(to left, var(--dt-fade), transparent) right / 12px 100% no-repeat scroll, var(--table-bg); } /* a wide table: the shade at an edge says there is more that way */
 .dt-box.dt-bare { border: 0; border-radius: 0; background: none; } /* a table that is a column of its page (a goal's tasks): no card around it */
 .dt-table { width: 100%; border-collapse: separate; border-spacing: 0; }
 .dt-table th { position: sticky; top: 0; z-index: 1; background: var(--table-head-bg); border-bottom: 1px solid var(--table-outer); padding: 8px var(--table-pad-x); text-align: left; font-size: var(--table-head-size); font-weight: var(--table-head-weight); letter-spacing: var(--table-head-track); text-transform: uppercase; color: var(--table-head-color); white-space: nowrap; }
@@ -57,6 +58,10 @@
 .dt-sort { display: inline-flex; align-items: center; gap: 4px; background: none; border: 0; padding: 0; font: inherit; letter-spacing: inherit; text-transform: inherit; color: inherit; cursor: pointer; }
 .dt-sort:hover { color: var(--table-head-active); }
 .dt-sort:focus-visible, .dt-primary:focus-visible, .dt-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
+.dt-filter { display: inline-flex; align-items: center; margin-left: 4px; padding: 0; background: none; border: 0; color: var(--table-head-color); cursor: pointer; vertical-align: middle; }
+.dt-filter .material-icons { font-size: 0.8125rem; }
+.dt-filter:hover, .dt-filter-on { color: var(--accent); }
+.dt-filter:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
 .dt-arrow { opacity: 0.5; }
 .dt-table th[aria-sort="ascending"] .dt-sort, .dt-table th[aria-sort="descending"] .dt-sort { color: var(--table-head-active); }
 .dt-table th[aria-sort="ascending"] .dt-arrow, .dt-table th[aria-sort="descending"] .dt-arrow { opacity: 1; }
@@ -83,6 +88,7 @@
 .dt-row-open { cursor: pointer; }
 .dt-row:hover td { background: var(--table-hover); }
 .dt-row[aria-current="true"] td { background: var(--table-hover); }
+.dt-row.dt-quiet td { color: var(--table-tertiary-color); }
 .dt-row.dt-selected td { background: var(--table-selected); }
 .dt-table .dt-check { width: var(--table-check-w); padding-right: 0; }
 .dt-check input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); cursor: pointer; vertical-align: middle; }
@@ -110,6 +116,7 @@
 .dt-box.dt-folded .dt-row:hover td, .dt-box.dt-folded .dt-row.dt-selected td, .dt-box.dt-folded .dt-row[aria-current="true"] td { background: none; }
 .dt-box.dt-folded .dt-row:hover, .dt-box.dt-folded .dt-row[aria-current="true"] { background: var(--table-hover); }
 .dt-box.dt-folded .dt-row.dt-selected { background: var(--table-selected); }
+.dt-box.dt-folded .dt-link { display: inline-flex; align-items: center; min-height: var(--table-touch); } /* a name that opens something is a 44 px target on a phone */
 .dt-box.dt-folded .dt-check { display: none; }
 .dt-box.dt-folded .dt-primary, .dt-box.dt-folded .dt-link, .dt-box.dt-folded .dt-quiet { min-height: var(--table-touch); display: inline-flex; align-items: center; } /* a 44 px target when the table is the phone's two-line row */
 .dt-box.dt-folded.dt-selecting .dt-check { display: block; flex: none; width: var(--table-touch); }
@@ -121,6 +128,8 @@
 .dt-box.dt-fold-column.dt-folded td.dt-line-2 { order: 3; font-size: var(--table-tertiary-size); font-weight: var(--table-tertiary-weight); }
 .dt-box.dt-fold-labeled.dt-folded tr { flex-direction: column; align-items: stretch; row-gap: 2px; }
 .dt-box.dt-fold-labeled.dt-folded td { display: flex; gap: 6px; white-space: normal; }
+.dt-box.dt-fold-labeled.dt-folded td.dt-tone-primary { order: -2; }
+.dt-box.dt-fold-labeled.dt-folded td.dt-fold-first { order: -1; }
 .dt-box.dt-fold-labeled.dt-folded td:not(.dt-tone-primary)::before { content: attr(data-label); color: var(--table-tertiary-color); font-size: var(--table-tertiary-size); font-weight: var(--table-tertiary-weight); flex: none; }
 @media (forced-colors: active) { .dt-row.dt-selected { outline: 2px solid Highlight; } .dt-table th { border-bottom-color: CanvasText; } }
 

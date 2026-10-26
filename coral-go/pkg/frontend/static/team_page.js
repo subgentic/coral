@@ -173,7 +173,7 @@ function drawTabEdges() {
     const t = $('team-tabs'); if (!t) return;
     const start = t.scrollLeft > 1, end = t.scrollLeft + t.clientWidth < t.scrollWidth - 1;
     const v = start && end ? 'both' : start ? 'start' : end ? 'end' : '';
-    if (v) t.dataset.more = v; else delete t.dataset.more;
+    if (v) t.setAttribute('data-more', v); else t.removeAttribute('data-more'); // (the stylesheet's [data-more] rules)
 }
 
 function markTab(tab) {

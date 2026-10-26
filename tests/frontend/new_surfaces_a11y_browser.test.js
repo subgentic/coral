@@ -145,34 +145,35 @@ const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
             await ev(`window.switchNavTab('tokens'); true`);
             await ev(`import(${MOD} + 'analytics_views.js').then(m => { m.selectView('thinking'); return true; })`); // the page shows one view at a time (#7473)
             await waitFor(`document.querySelectorAll('#cost-by-thinking tbody tr').length === 2`, 'the thinking table', 8000);
-            const ths = await ev(`[...document.querySelectorAll('#cost-by-thinking th')].map(t => ({ sort: t.getAttribute('aria-sort'), btn: !!t.querySelector('button.cost-sort-btn'), filter: [...t.querySelectorAll('button.cost-col-filter')].map(b => b.getAttribute('aria-label')) }))`);
+            const ths = await ev(`[...document.querySelectorAll('#cost-by-thinking th')].map(t => ({ sort: t.getAttribute('aria-sort'), btn: !!t.querySelector('button.dt-sort'), filter: [...t.querySelectorAll('button.dt-filter')].map(b => b.getAttribute('aria-label')) }))`);
             assert.ok(ths.length === 11 && ths.every(t => t.btn && ['none', 'ascending', 'descending'].includes(t.sort)), 'every column header is a sort button with aria-sort: ' + JSON.stringify(ths));
             assert.ok(ths[0].filter[0] && /Filter/.test(ths[0].filter[0]), 'a filter button has a name: ' + JSON.stringify(ths[0]));
             assert.equal(ths.filter(t => t.sort !== 'none').length, 1, 'exactly one column is the sort');
-            const lvl = `#cost-by-thinking th[data-field="level"] button.cost-sort-btn`;
-            const before = await ev(`document.querySelector('#cost-by-thinking th[data-field="level"]').getAttribute('aria-sort')`);
-            if (await ev(`getComputedStyle(document.querySelector('#cost-by-thinking thead')).display === 'none'`)) {
-                // the table is folded (a phone, #7738): its header row is not drawn, so the sort is the "Sort by" select above it, and the column filters are a desktop control
-                const sel = '.cost-fold-sort select';
-                assert.match(await ev(`document.querySelector(${JSON.stringify(sel)}).closest('label').textContent`), /^Sort by/, 'the select is named Sort by');
-                await focus(sel);
-                await ev(`(() => { const s = document.querySelector(${JSON.stringify(sel)}); s.value = 'level'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
-                await waitFor(`document.querySelector('#cost-by-thinking th[data-field="level"]').getAttribute('aria-sort') !== ${JSON.stringify(before)}`, 'the Sort by select sorts by the column', 4000);
+            // folded (a phone): the header row is not drawn, and the "Sort by" select, labelled, takes its place (the keyboard steps below are the header's)
+            if (mobile) await waitFor(`document.querySelector('#cost-by-thinking .dt-box').classList.contains('dt-folded')`, 'the table folds on a phone', 4000);
+            const folded = await ev(`getComputedStyle(document.querySelector('#cost-by-thinking thead')).display === 'none'`);
+            if (folded) {
+                const sel = await ax('#cost-by-thinking .dt-sortbar-select'); assert.match(sel.name, /sort by/i, 'the select is named: ' + sel.name);
+                await ev(`(() => { const s = document.querySelector('#cost-by-thinking .dt-sortbar-select'); s.value = 'level'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+                await waitFor(`document.querySelector('#cost-by-thinking th[data-key="level"]').getAttribute('aria-sort') === 'ascending'`, 'the select sorts by the column', 4000);
+            } else {
+                const lvl = `#cost-by-thinking th[data-key="level"] button.dt-sort`;
+                const before = await ev(`document.querySelector('#cost-by-thinking th[data-key="level"]').getAttribute('aria-sort')`);
+                await focus(lvl); await key('Enter');
+                await waitFor(`document.querySelector('#cost-by-thinking th[data-key="level"]').getAttribute('aria-sort') !== ${JSON.stringify(before)}`, 'Enter sorts by the column', 4000);
+                let sb = await ax(lvl);
+                for (let i = 0; i < 10 && sb.role !== 'button'; i++) { await new Promise(r => setTimeout(r, 200)); sb = await ax(lvl); } // sleep-ok: the accessibility tree follows the table's redraw
+                assert.equal(sb.role, 'button'); assert.match(sb.name, /^thinking level/i, sb.name);
                 assert.equal(await ev(`document.querySelectorAll('#cost-by-thinking th[aria-sort]:not([aria-sort="none"])').length`), 1);
-                continue;
+                assert.equal(await ev(`document.activeElement.classList.contains('dt-sort') && document.activeElement.closest('th') === document.querySelector('#cost-by-thinking th[data-key="level"]')`), true, 'after a sort the keyboard is still on that column\'s button (the table is drawn again)');
+                // the filter buttons of the headings open a list and filter the rows (they opened nothing)
+                const rowsBefore = await ev(`document.querySelectorAll('#cost-by-thinking tbody tr').length`);
+                await ev(`document.querySelector('#cost-by-thinking th[data-key="level"] button.dt-filter').click(); true`);
+                await waitFor(`document.querySelectorAll('.cost-filter-dropdown .cost-filter-item input').length >= 2`, 'the Thinking level filter list', 4000);
+                await ev(`document.querySelector('.cost-filter-dropdown .cost-filter-item input').click(); true`);
+                await waitFor(`document.querySelectorAll('#cost-by-thinking tbody tr').length < ${rowsBefore}`, 'unticking a level hides its rows', 4000);
+                await ev(`document.body.click(); true`);
             }
-            await focus(lvl); await key('Enter');
-            await waitFor(`document.querySelector('#cost-by-thinking th[data-field="level"]').getAttribute('aria-sort') !== ${JSON.stringify(before)}`, 'Enter sorts by the column', 4000);
-            const sb = await ax(lvl); assert.equal(sb.role, 'button'); assert.match(sb.name, /^thinking level/i, sb.name);
-            assert.equal(await ev(`document.querySelectorAll('#cost-by-thinking th[aria-sort]:not([aria-sort="none"])').length`), 1);
-            assert.equal(await ev(`document.activeElement.classList.contains('cost-sort-btn') && document.activeElement.closest('th') === document.querySelector('#cost-by-thinking th[data-field="level"]')`), true, 'after a sort the keyboard is still on that column\'s button (the table is drawn again)');
-            // the filter buttons of the headings open a list and filter the rows (they opened nothing)
-            const rowsBefore = await ev(`document.querySelectorAll('#cost-by-thinking tbody tr').length`);
-            await ev(`document.querySelector('#cost-by-thinking th[data-field="level"] button.cost-col-filter').click(); true`);
-            await waitFor(`document.querySelectorAll('.cost-filter-dropdown .cost-filter-item input').length >= 2`, 'the Thinking level filter list', 4000);
-            await ev(`document.querySelector('.cost-filter-dropdown .cost-filter-item input').click(); true`);
-            await waitFor(`document.querySelectorAll('#cost-by-thinking tbody tr').length < ${rowsBefore}`, 'unticking a level hides its rows', 4000);
-            await ev(`document.body.click(); true`);
         }
 
         for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) {
@@ -265,7 +266,7 @@ const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
         await ev(`window.switchNavTab('tokens'); true`); await ev(`import(${MOD} + 'analytics_views.js').then(m => { m.selectView('thinking'); return true; })`); await waitFor(`document.querySelectorAll('#cost-by-thinking tbody tr').length === 2`, 'cost table', 8000);
         for (const theme of ['light', 'dark']) {
             await setTheme(ev, theme);
-            const r = await auditRegion(ev, ['#cost-by-thinking'], { focus: ['#cost-by-thinking button.cost-sort-btn'] });
+            const r = await auditRegion(ev, ['#cost-by-thinking'], { focus: ['#cost-by-thinking button.dt-sort'] });
             assert.deepEqual(r.fails, [], `${theme}: the cost table reaches contrast: ` + JSON.stringify(r.fails));
         }
         console.log('PASS new surfaces: roles, names, keyboard and contrast of the chip, sectioned dialogs, Display panel, health icon, cost table and thumbnails');

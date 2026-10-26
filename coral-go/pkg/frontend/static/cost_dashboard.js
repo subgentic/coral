@@ -1,130 +1,20 @@
 /* Token Usage Dashboard — token usage and cost UI */
 
-import { PHONE_QUERY } from './phone_layout.js';
 import { modelDisplayName } from './model_names.js';
 import { showView, escapeHtml, escapeAttr } from './utils.js';
-import { registerActions, idOf, uuidOf, tokenOf, textOf } from './actions.js';
 import { state } from './state.js';
 import { emptyState } from './dom_write.js';
 import { pollEvery } from './overload.js';
 import { keyLabel } from './server_base.js';
 import { formatTokens, formatDuration, formatCost } from './format.js';
 import { importOnce } from './import_once.js';
+const { dataTable, tableState, link: dtLink, chip, tag, avatar } = await importOnce('./data_table.js'); // the shared table (#7743)
 const { showViews, syncRangeLine } = await importOnce('./analytics_views.js'); // the sidebar's list of views and the page's title (#7473)
 const { showSpend } = await importOnce('./analytics_spend.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried
 
 // What an empty table says: where the numbers come from and what to try (#6975), not just that there are none.
 const NO_DATA = 'No data in this range yet. It appears once an agent has used tokens; try a longer range.';
 const _formatCost = c => formatCost(c, { zeroAsTwo: true });
-
-// ── Column order on a phone (#5056) ──────────────────────────────────────
-// The tables scroll sideways inside their card, and Cost, the figure the page is opened for, was the last column: off screen at 390 px. On a phone Cost (and Share, where
-// the table has it) follow the columns that name the row, so they are on screen first; everything else keeps its order after them. Each cell remembers its own index
-// (data-ci), so a wider window puts the original order back. A row that does not have one cell per heading (the empty state, an agent's turns) is left as it is.
-const COST_NAME_COLUMNS = { provider: 1, model: 2, thinking: 2, agent: 1, task: 1, request: 1, team: 1, branch: 1 }; // how many leading columns name the row, by the headings' data-table
-// By Thinking Level has three columns that name its rows, each with its 44 px buttons: all three do not fit before Cost at 390 px (#5120). On a phone the model and the level come first (a
-// model's name says its provider; the Provider column follows Share), so the figure is on screen.
-const COST_PHONE_NAMES = { thinking: ['model', 'level'] };
-// By Agent has eleven columns: at 1280 px it scrolled sideways with its sort column, Cost, cut off at the edge, so Cost follows the name there too (#7719).
-const ALWAYS_COST_SECOND = new Set(['agent']);
-// The calls table has no Cost: on a phone its figures follow the operation, in the order the rest of the page reads them (Calls first, then Errors, Avg ms), and the type, agent and team come after.
-const PHONE_FIRST = { calls: ['operation', 'calls', 'errors', 'avg_ms'] };
-const _phone = typeof matchMedia === 'function' ? matchMedia(PHONE_QUERY) : null;
-
-function placeCostColumns(root) {
-    const narrow = !!(_phone && _phone.matches);
-    for (const table of root.querySelectorAll('table.cost-table')) {
-        const head = table.querySelector('thead tr');
-        if (!head) continue;
-        const ths = [...head.children];
-        const names = COST_NAME_COLUMNS[ths[0] && ths[0].dataset.table] ?? 1;
-        const at = field => ths.findIndex(th => th.dataset.field === field);
-        const cost = at('cost_usd'), share = at('cost_pct');
-        let order = ths.map((_, i) => i);
-        const lead = (COST_PHONE_NAMES[ths[0] && ths[0].dataset.table] || []).map(at);
-        const first = (PHONE_FIRST[ths[0] && ths[0].dataset.table] || []).map(at);
-        if (narrow && first.length && first.every(i => i >= 0)) {
-            order = [...first, ...order.filter(i => !first.includes(i))];
-        } else if (narrow && cost >= 0 && lead.length && lead.every(i => i >= 0)) {
-            const moved = [...lead, cost, ...(share >= 0 ? [share] : [])];
-            order = [...moved, ...order.filter(i => !moved.includes(i))];
-        } else if ((narrow || ALWAYS_COST_SECOND.has(ths[0] && ths[0].dataset.table)) && cost >= names) {
-            const moved = share >= names ? [cost, share] : [cost];
-            order = [...order.slice(0, names), ...moved, ...order.slice(names).filter(i => !moved.includes(i))];
-        }
-        for (const tr of table.querySelectorAll('tr')) {
-            const cells = [...tr.children];
-            if (cells.length !== ths.length) continue;
-            cells.forEach((c, i) => { if (c.dataset.ci === undefined) c.dataset.ci = String(i); });
-            const byIndex = new Map(cells.map(c => [Number(c.dataset.ci), c]));
-            for (const i of order) tr.appendChild(byIndex.get(i));
-        }
-    }
-    foldCostTables(root);
-}
-
-// ── The tables on a phone and at large text (#7738) ──────────────────────
-// A table that does not fit its page folds (css, a container query in rem on the page: 40 rem is a phone, and a desktop at 200% text): each row is its name, then its figures as "label value"
-// under it, Cost or Calls first, so nothing is behind a sideways scroll. The header row is not drawn then, so each cell carries its column's name (data-label, drawn by css and read as part of the
-// cell), the table keeps its roles (a display other than table drops them from the page's structure), and a "Sort by" select with a reverse button above the table makes the sort the header's buttons make.
-const FOLD_FIRST = new Set(['cost_usd', 'calls']);
-function foldCostTables(root) {
-    for (const table of root.querySelectorAll('table.cost-table')) {
-        const head = table.querySelector('thead tr');
-        if (!head) continue;
-        const ths = [...head.children];
-        const names = COST_NAME_COLUMNS[ths[0] && ths[0].dataset.table] ?? 1;
-        const label = th => { const n = [...(th.querySelector('.cost-sort-btn') || th).childNodes].find(x => x.nodeType === 3); return (n ? n.textContent : th.textContent).trim(); };
-        // the one stronger figure of a row: the column the table is sorted by (Cost, or Calls, when the sort is on a name or on nothing)
-        const sorted = ths.findIndex((th, i) => i >= names && /ascending|descending/.test(th.getAttribute('aria-sort') || ''));
-        const key = sorted >= 0 ? sorted : ths.findIndex(th => FOLD_FIRST.has(th.dataset.field));
-        table.setAttribute('role', 'table');
-        for (const group of table.children) group.setAttribute('role', 'rowgroup');
-        for (const tr of table.querySelectorAll('tr')) {
-            tr.setAttribute('role', 'row');
-            const cells = [...tr.children];
-            if (cells.length !== ths.length) { for (const c of cells) c.setAttribute('role', 'cell'); continue; }
-            cells.forEach((c, i) => {
-                if (c.tagName === 'TH') { c.setAttribute('role', 'columnheader'); return; }
-                c.setAttribute('role', 'cell'); c.dataset.label = label(ths[i]); c.classList.toggle('cost-fold-name', i < names);
-                c.classList.toggle('cost-fold-first', FOLD_FIRST.has(ths[i].dataset.field)); c.classList.toggle('cost-fold-key', i === key);
-            });
-        }
-        // the sort, for a table whose header is not drawn
-        let bar = root.previousElementSibling && root.previousElementSibling.classList.contains('cost-fold-sort') ? root.previousElementSibling : null;
-        const sortable = ths.filter(th => th.querySelector('.cost-sort-btn'));
-        if (!sortable.length) { if (bar) bar.remove(); continue; }
-        if (!bar) { bar = document.createElement('div'); bar.className = 'cost-fold-sort'; root.before(bar); }
-        const current = sortable.find(th => /ascending|descending/.test(th.getAttribute('aria-sort') || ''));
-        const text = document.createElement('label'); text.textContent = 'Sort by ';
-        const select = document.createElement('select'); select.className = 'cost-time-select';
-        for (const th of sortable) { const o = document.createElement('option'); o.value = th.dataset.field; o.textContent = label(th); o.selected = th === current; select.append(o); }
-        text.append(select);
-        const reverse = document.createElement('button'); reverse.type = 'button'; reverse.className = 'btn btn-sm cost-fold-dir';
-        const desc = current && current.getAttribute('aria-sort') === 'descending';
-        reverse.textContent = desc ? 'Descending' : 'Ascending'; reverse.setAttribute('aria-label', `Order: ${desc ? 'descending' : 'ascending'}, press to reverse`);
-        const press = field => { const th = sortable.find(x => x.dataset.field === field); if (th) th.querySelector('.cost-sort-btn').click(); };
-        select.addEventListener('change', () => press(select.value));
-        reverse.addEventListener('click', () => press(select.value));
-        bar.replaceChildren(text, reverse);
-    }
-}
-if (_phone) _phone.addEventListener('change', () => placeCostColumns(document.getElementById('cost-dashboard-view') || document));
-
-function _formatLatency(ms) {
-    if (ms == null) return '\u2014';
-    if (ms >= 1000) return (ms / 1000).toFixed(1) + 's';
-    return ms + 'ms';
-}
-
-function _formatDate(isoStr) {
-    if (!isoStr) return '\u2014';
-    try {
-        const d = new Date(isoStr);
-        return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-            + ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-    } catch { return isoStr; }
-}
 
 function _formatTime(isoStr) {
     if (!isoStr) return '\u2014';
@@ -146,16 +36,6 @@ function _formatDuration(startStr, endStr) {
     } catch { return '\u2014'; }
 }
 
-function _formatPRLink(prNumber, remoteURL) {
-    if (!prNumber) return '—';
-    if (!remoteURL) return `#${prNumber}`;
-    let base = remoteURL.replace(/\.git$/, '');
-    if (base.startsWith('git@')) {
-        const parts = base.split(':');
-        if (parts.length === 2) base = 'https://' + parts[0].slice(4) + '/' + parts[1];
-    }
-    return `<a href="${escapeAttr(base)}/pull/${escapeAttr(prNumber)}" target="_blank" rel="noopener">#${prNumber}</a>`;
-}
 
 function _findSession(sessionId) {
     if (!sessionId || !state.liveSessions) return null;
@@ -166,39 +46,17 @@ let _costRefreshTimer = null;
 
 // ── Sort & Filter State ─────────────────────────────────────
 
-const _sortState = {
-    provider: { field: 'cost_usd', asc: false },
-    model:   { field: 'cost_usd', asc: false },
-    thinking: { field: 'cost_usd', asc: false },
-    agent:   { field: 'cost_usd', asc: false },
-    team:    { field: 'cost_usd', asc: false },
-    branch:  { field: 'cost_usd', asc: false },
-    task:    { field: 'cost_usd', asc: false },
-    request: { field: 'started_at', asc: false },
-};
-
 // Per-column dropdown filters: { "table:field": Set of selected values }
 // Empty set = show all (no filter active)
 const _colFilters = {};
 
 // Raw data caches — populated on fetch, re-rendered on sort/filter
 const _rawData = {
-    provider: [], model: [], thinking: [], agent: [], team: [], branch: [], task: [], request: [],
+    provider: [], model: [], thinking: [], agent: [], team: [], branch: [], task: [],
 };
 
 // Currently open dropdown (only one at a time)
 let _openDropdown = null;
-
-function _toggleSort(table, field) {
-    const s = _sortState[table];
-    if (s.field === field) {
-        s.asc = !s.asc;
-    } else {
-        s.field = field;
-        s.asc = false;
-    }
-    _rerender(table);
-}
 
 function _rerender(table) {
     switch (table) {
@@ -209,32 +67,7 @@ function _rerender(table) {
         case 'team':    _renderTeamTable(_rawData.team); break;
         case 'branch':  _renderBranchTable(_rawData.branch); break;
         case 'task':    _renderTaskTable(_rawData.task); break;
-        case 'request': _renderRequestLog(_rawData.request); break;
     }
-}
-
-function _sortArrow(table, field) {
-    const s = _sortState[table];
-    if (s.field !== field) return '';
-    return s.asc ? ' \u25B2' : ' \u25BC';
-}
-
-function _sortRows(rows, table, fieldAccessor) {
-    const s = _sortState[table];
-    const sorted = [...rows];
-    sorted.sort((a, b) => {
-        const va = fieldAccessor(a, s.field);
-        const vb = fieldAccessor(b, s.field);
-        if (va == null && vb == null) return 0;
-        if (va == null) return 1;
-        if (vb == null) return -1;
-        if (typeof va === 'string') {
-            const cmp = va.localeCompare(vb);
-            return s.asc ? cmp : -cmp;
-        }
-        return s.asc ? va - vb : vb - va;
-    });
-    return sorted;
 }
 
 // Apply all active column filters for a table
@@ -258,21 +91,6 @@ function _hasActiveFilter(table, field) {
 
 // What each table is called, as its section's heading says (#6432): a sort or filter button is named for its column and its table, so "Cost" is not six buttons that read the same.
 const TABLE_TITLES = { provider: 'By Provider', model: 'By Model', thinking: 'By Thinking Level', agent: 'By Agent', team: 'By Team', branch: 'By Branch', task: 'By Task' };
-
-// Sort header with optional filter icon
-function _sortHeader(table, field, label, extraClass, filterable, valueExtractor) {
-    const cls = extraClass ? `${extraClass} cost-th-sort` : 'cost-th-sort';
-    const state = _sortState[table];
-    const ariaSort = state.field === field ? (state.asc ? 'ascending' : 'descending') : 'none';
-    // The label is a button, so the keyboard reaches the sort (a bare <th> with a click handler is not focusable), and aria-sort says which column the rows are in the order of (#5042).
-    const arrow = state.field === field ? `<span aria-hidden="true">${_sortArrow(table, field)}</span>` : '';
-    let filterIcon = '';
-    if (filterable) {
-        const active = _hasActiveFilter(table, field) ? ' cost-filter-active' : '';
-        filterIcon = `<button type="button" class="cost-col-filter${escapeAttr(active)}" data-on-click="cost-filter" data-table="${escapeAttr(table)}" data-field="${escapeAttr(field)}" title="Filter" aria-label="Filter ${escapeAttr(label)}${escapeAttr(TABLE_TITLES[table] ? ', ' + TABLE_TITLES[table] : '')}"><span class="material-icons" style="font-size:0.8125rem" aria-hidden="true">filter_list</span></button>`;
-    }
-    return `<th class="${escapeAttr(cls)}" aria-sort="${escapeAttr(ariaSort)}" data-on-click="cost-sort" data-table="${escapeAttr(table)}" data-field="${escapeAttr(field)}"><button type="button" class="cost-sort-btn"${TABLE_TITLES[table] ? ` aria-label="${escapeAttr(label + ', ' + TABLE_TITLES[table])}"` : ''}>${label}${arrow}</button>${filterIcon}</th>`;
-}
 
 // Open/close the column filter dropdown
 function _openFilter(table, field, anchorEl) {
@@ -402,75 +220,13 @@ function _getFilterExtractor(table, field) {
         'branch:board_name': r => r.board_name || '(no team)',
         'task:assigned_to': r => r.assigned_to || '',
         'task:priority': r => r.priority || 'medium',
-        'request:model_used': r => r.model_used || '',
-        'request:status': r => r.status || '',
     };
     return extractors[`${table}:${field}`] || (() => '');
-}
-
-// Expose to window for onclick handlers
-// A sort or filter header's table and column: one this view has.
-function _sortable(el) {
-    const { table, field } = el.dataset;
-    return Object.prototype.hasOwnProperty.call(_sortState, table) && /^[a-z_]{1,40}$/.test(field || '');
-}
-
-// The table's actions (#3645): its markup carries data-on-click names, never code.
-registerActions({
-    // Only the tables and columns this view has (an unknown one would make a new sort state).
-    'cost-sort': el => {
-        if (!_sortable(el)) return;
-        const keep = el.contains(document.activeElement); // the keyboard was on this heading's button: the table is drawn again, so it is found again (#5042)
-        _toggleSort(el.dataset.table, el.dataset.field);
-        if (keep) document.querySelector(`th[data-table="${el.dataset.table}"][data-field="${el.dataset.field}"] .cost-sort-btn`)?.focus({ preventScroll: true });
-    },
-    'cost-filter': (el, event) => { event.stopPropagation(); if (_sortable(el)) _openFilter(el.dataset.table, el.dataset.field, el); },
-    'cost-open-live': (el, event) => {
-        event.preventDefault();
-        const name = textOf(el.dataset.name), type = tokenOf(el.dataset.agentType), sid = uuidOf(el.dataset.sessionId);
-        if (!name || !type || !sid) return;
-        window.switchNavTab('agents');
-        window.selectLiveSession(name, type, sid);
-    },
-    'cost-open-history': (el, event) => {
-        event.preventDefault();
-        const sid = uuidOf(el.dataset.sessionId);
-        if (!sid) return;
-        window.switchNavTab('history');
-        window.selectHistorySession(sid);
-    },
-    'cost-task': el => { const id = idOf(el.dataset.taskId); if (id) _showCostTaskDetail(id); },
-});
-
-// A table wider than its box scrolls sideways inside it (#4589); on a phone the clipped edge cut a column in half with nothing saying there was more (#6975). While more columns are to the right the box is
-// marked (data-more="right": the CSS fades the clipped edge) and one line for the page says so in words; it goes when the table is scrolled to its end or fits. Kept in step as tables are drawn, scrolled and resized.
-let _scrollCues = false;
-function _markScrollables() {
-    let any = false;
-    for (const box of document.querySelectorAll('#cost-dashboard-view .cost-table-container')) {
-        const more = box.scrollWidth > box.clientWidth + 1 && box.scrollLeft + box.clientWidth < box.scrollWidth - 1;
-        if (more) { box.setAttribute('data-more', 'right'); any = true; } else box.removeAttribute('data-more');
-    }
-    const hint = document.getElementById('cost-scroll-hint'); // one line for the page (#6997), not one above every table; it goes when no table has more to the right
-    if (hint && hint.hidden === any) hint.hidden = !any;
-}
-function _watchScrollCues() {
-    if (_scrollCues) return;
-    const view = document.getElementById('cost-dashboard-view');
-    if (!view) return;
-    _scrollCues = true;
-    let queued = false;
-    const soon = () => { if (queued) return; queued = true; requestAnimationFrame(() => { queued = false; _markScrollables(); }); };
-    new MutationObserver(soon).observe(view, { childList: true, subtree: true });
-    view.addEventListener('scroll', soon, true); // scroll does not bubble: the capture phase hears every box's own
-    window.addEventListener('resize', soon);
-    soon();
 }
 
 export async function showCostDashboard() {
     showView('cost-dashboard-view');
     showViews();
-    _watchScrollCues();
     await _refreshCostDashboard();
     stopCostDashboard(); // clear any existing timer
     _costRefreshTimer = pollEvery(_refreshCostDashboard, 15000);
@@ -496,8 +252,19 @@ async function _refreshCallMetrics(period, hours) {
         // The server keeps calls for a limited time (#3261) and answers with the window it used: a longer range says so.
         const kept = data.hours > 0 && data.hours < hours ? `<p class="cost-empty">Calls are kept for ${Math.round(data.hours / 24)} days, so this shows the last ${Math.round(data.hours / 24)} days.</p>` : '';
         if (!rows.length) { emptyState(el, `No tool calls in the ${label} yet. They appear once an agent has used a tool.`, 'cost-empty'); if (kept + dropped) el.insertAdjacentHTML('beforeend', kept + dropped); return; }
-        el.innerHTML = kept + dropped + `<table class="cost-table"><thead><tr><th data-table="calls" data-field="operation">Operation</th><th data-field="call_type">Type</th><th data-field="agent">Agent</th><th data-field="team">Team</th><th data-field="calls">Calls</th><th data-field="errors">Errors</th><th data-field="avg_ms">Avg ms</th></tr></thead><tbody>${rows.map(r => `<tr><td>${escapeHtml(r.operation)}</td><td>${escapeHtml(r.call_type)}</td><td>${escapeHtml(r.agent_name || '—')}</td><td>${escapeHtml(r.board_name || '—')}</td><td>${r.calls}</td><td>${r.errors}</td><td>${Math.round(r.avg_duration_ms || 0)}</td></tr>`).join('')}</tbody></table>`;
-        placeCostColumns(el);
+        el.innerHTML = kept + dropped;
+        const st = _tables.calls || (_tables.calls = tableState());
+        if (!st.sort) st.sort = { key: 'calls', dir: 'desc' };
+        const dash = v => v || '—';
+        el.append(dataTable({ label: 'Tool and API calls', fold: 'labeled', scroll: true, state: st, rows, rowKey: r => `${r.operation}|${r.call_type}|${r.agent_name}|${r.board_name}`, columns: [
+            { key: 'operation', label: 'Operation', sort: true, tone: 'primary', field: 'operation' },
+            { key: 'call_type', label: 'Type', sort: true, field: 'call_type' },
+            { key: 'agent', label: 'Agent', sort: true, sortValue: r => r.agent_name || '', cell: r => dash(r.agent_name) },
+            { key: 'team', label: 'Team', sort: true, sortValue: r => r.board_name || '', cell: r => dash(r.board_name) },
+            _numCol('calls', 'Calls', r => r.calls || 0, String, { foldFirst: true }),
+            _numCol('errors', 'Errors', r => r.errors || 0, String, { foldFirst: true }),
+            _numCol('avg_ms', 'Avg ms', r => Math.round(r.avg_duration_ms || 0), String, { foldFirst: true }),
+        ] }).el);
     } catch { emptyState(el, 'Call metrics unavailable', 'cost-empty'); }
 }
 
@@ -672,6 +439,29 @@ function _setText(id, text) {
     if (el) el.textContent = text;
 }
 
+// ── The tables are data_table (#7743) ────────────────────────────────────
+// A table here is its columns and its rows: the component draws it, folds it under 40 rem (name first, then "label value" lines) and sorts it. What stays on this page: the rows' own filters (the header's
+// filter button opens the choice list below), and each table's sort, kept across the refresh.
+const _tables = {};
+const _numCol = (key, label, get, show, extra) => ({ key, label, numeric: true, sort: 'number', firstDir: 'desc', sortValue: get, cell: r => show(get(r)), ...extra });
+const _tokCol = (key, label) => _numCol(key, label, r => r[key] || 0, formatTokens);
+const _costCol = () => _numCol('cost_usd', 'Cost', r => r.cost_usd || 0, _formatCost, { foldFirst: true }); // the figure the page is opened for: on a phone it follows the name (#5056)
+const _shareCol = () => _numCol('cost_pct', 'Share', r => r.cost_pct || 0, v => `${Math.round(v * 100)}%`, { foldFirst: true });
+// Team's and branch's Share: the share of the whole table (not of the filtered rows), drawn as a bar with its figure.
+const _shareBarCol = total => _numCol('cost_pct', 'Share', r => r.cost_usd || 0, () => '', { foldFirst: true, cell: r => {
+    const pct = (((r.cost_usd || 0) / total) * 100).toFixed(1), wrap = document.createElement('div'), bar = document.createElement('div'), label = document.createElement('span');
+    wrap.className = 'cost-share-bar-wrapper'; bar.className = 'cost-share-bar'; bar.style.width = `${Math.max(2, ((r.cost_usd || 0) / total) * 100)}%`; label.className = 'cost-share-label'; label.textContent = `${pct}%`;
+    wrap.append(bar, label); return wrap;
+} });
+const _textCol = (table, key, label, get, extra) => ({ key, label, sort: true, sortValue: get, cell: get, tone: 'primary', filter: { label: `Filter ${label}, ${TABLE_TITLES[table]}`, active: () => _hasActiveFilter(table, key), open: btn => _openFilter(table, key, btn) }, ...extra });
+function _drawTable(container, table, columns, rows, empty, extra) {
+    const st = _tables[table] || (_tables[table] = tableState());
+    if (!st.sort) st.sort = { key: 'cost_usd', dir: 'desc' };
+    if (!rows.length) { emptyState(container, empty || NO_DATA, 'cost-empty'); return; }
+    const t = dataTable({ label: TABLE_TITLES[table], columns, rows, rowKey: r => rows.indexOf(r), state: st, fold: 'labeled', scroll: true, ...extra });
+    container.replaceChildren(t.el);
+}
+
 function _renderProviderTable(rows) {
     const total = rows.reduce((n, r) => n + (r.cost_usd || 0), 0);
     rows.forEach(r => { r.cost_pct = total > 0 ? (r.cost_usd || 0) / total : 0; });
@@ -679,37 +469,12 @@ function _renderProviderTable(rows) {
     const container = document.getElementById('cost-by-provider');
     if (!container) return;
     const filtered = _applyColFilters(rows, 'provider', { agent_type: r => r.agent_type || '' });
-    const sorted = _sortRows(filtered, 'provider', (r, f) => f === 'agent_type' ? (r.agent_type || '') : (r[f] || 0));
-    if (sorted.length === 0) {
-        emptyState(container, NO_DATA, 'cost-empty');
-        return;
-    }
-    let html = `<table class="cost-table">
-        <thead><tr>
-            ${_sortHeader('provider', 'agent_type', 'Provider', '', true)}
-            ${_sortHeader('provider', 'requests', 'Requests', 'cost-col-right')}
-            ${_sortHeader('provider', 'input_tokens', 'Input', 'cost-col-right')}
-            ${_sortHeader('provider', 'output_tokens', 'Output', 'cost-col-right')}
-            ${_sortHeader('provider', 'cache_read_tokens', 'Cache read', 'cost-col-right')}
-            ${_sortHeader('provider', 'cache_write_tokens', 'Cache write', 'cost-col-right')}
-            ${_sortHeader('provider', 'cost_usd', 'Cost', 'cost-col-right')}
-            ${_sortHeader('provider', 'cost_pct', 'Share', 'cost-col-right')}
-        </tr></thead><tbody>`;
-    for (const r of sorted) {
-        html += `<tr>
-            <td>${escapeHtml(r.agent_type)}</td>
-            <td class="cost-col-right">${r.requests}</td>
-            <td class="cost-col-right">${formatTokens(r.input_tokens || 0)}</td>
-            <td class="cost-col-right">${formatTokens(r.output_tokens || 0)}</td>
-            <td class="cost-col-right">${formatTokens(r.cache_read_tokens || 0)}</td>
-            <td class="cost-col-right">${formatTokens(r.cache_write_tokens || 0)}</td>
-            <td class="cost-col-right cost-cost-cell">${_formatCost(r.cost_usd)}</td>
-            <td class="cost-col-right">${Math.round((r.cost_pct || 0) * 100)}%</td>
-        </tr>`;
-    }
-    html += '</tbody></table>';
-    container.innerHTML = html;
-    placeCostColumns(container);
+    _drawTable(container, 'provider', [
+        _textCol('provider', 'agent_type', 'Provider', r => r.agent_type || ''),
+        _numCol('requests', 'Requests', r => r.requests || 0, String),
+        _tokCol('input_tokens', 'Input'), _tokCol('output_tokens', 'Output'), _tokCol('cache_read_tokens', 'Cache read'), _tokCol('cache_write_tokens', 'Cache write'),
+        _costCol(), _shareCol(),
+    ], filtered);
 }
 
 function _renderModelTable(rows) {
@@ -718,49 +483,14 @@ function _renderModelTable(rows) {
     _rawData.model = rows;
     const container = document.getElementById('cost-by-model');
     if (!container) return;
-
     const filtered = _applyColFilters(rows, 'model', { model: r => r.model || '', agent_type: r => r.agent_type || '' });
-    const sorted = _sortRows(filtered, 'model', (r, f) => {
-        if (f === 'model') return r.model || '';
-        if (f === 'agent_type') return r.agent_type || '';
-        return r[f] || 0;
-    });
-
-    if (sorted.length === 0) {
-        emptyState(container, NO_DATA, 'cost-empty');
-        return;
-    }
-
-    let html = `<table class="cost-table">
-        <thead><tr>
-            ${_sortHeader('model', 'agent_type', 'Provider', '', true)}
-            ${_sortHeader('model', 'model', 'Model', '', true)}
-            ${_sortHeader('model', 'requests', 'Requests', 'cost-col-right')}
-            ${_sortHeader('model', 'input_tokens', 'Input', 'cost-col-right')}
-            ${_sortHeader('model', 'output_tokens', 'Output', 'cost-col-right')}
-            ${_sortHeader('model', 'cache_read_tokens', 'Cache read', 'cost-col-right')}
-            ${_sortHeader('model', 'cache_write_tokens', 'Cache write', 'cost-col-right')}
-            ${_sortHeader('model', 'cost_usd', 'Cost', 'cost-col-right')}
-            ${_sortHeader('model', 'cost_pct', 'Share', 'cost-col-right')}
-        </tr></thead><tbody>`;
-
-    for (const r of sorted) {
-        html += `<tr>
-            <td>${escapeHtml(r.agent_type)}</td>
-            <td class="cost-model-name" title="${escapeAttr(r.model_id || '')}">${escapeHtml(r.model)}</td>
-            <td class="cost-col-right">${r.requests}</td>
-            <td class="cost-col-right">${formatTokens(r.input_tokens || 0)}</td>
-            <td class="cost-col-right">${formatTokens(r.output_tokens || 0)}</td>
-            <td class="cost-col-right">${formatTokens(r.cache_read_tokens || 0)}</td>
-            <td class="cost-col-right">${formatTokens(r.cache_write_tokens || 0)}</td>
-            <td class="cost-col-right cost-cost-cell">${_formatCost(r.cost_usd)}</td>
-            <td class="cost-col-right">${Math.round((r.cost_pct || 0) * 100)}%</td>
-        </tr>`;
-    }
-
-    html += '</tbody></table>';
-    container.innerHTML = html;
-    placeCostColumns(container);
+    _drawTable(container, 'model', [
+        _textCol('model', 'agent_type', 'Provider', r => r.agent_type || ''),
+        _textCol('model', 'model', 'Model', r => r.model || '', { title: r => r.model_id || '' }),
+        _numCol('requests', 'Requests', r => r.requests || 0, String),
+        _tokCol('input_tokens', 'Input'), _tokCol('output_tokens', 'Output'), _tokCol('cache_read_tokens', 'Cache read'), _tokCol('cache_write_tokens', 'Cache write'),
+        _costCol(), _shareCol(),
+    ], filtered);
 }
 
 const _THINKING_NAMES = { low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Extra high', max: 'Max' };
@@ -775,129 +505,47 @@ function _renderThinkingTable(rows) {
     const container = document.getElementById('cost-by-thinking');
     if (!container) return;
     const filtered = _applyColFilters(rows, 'thinking', { agent_type: r => r.agent_type || '', model: r => r.model || '', level: r => r.level || '' }); // the three filter buttons of the headings (#5042: they opened nothing)
-    const sorted = _sortRows(filtered, 'thinking', (r, f) => {
-        if (f === 'level') return r.level_key ? r.level : 'zzzz Not reported'; // after the named levels when ascending (localeCompare puts '~' first)
-        if (f === 'agent_type') return r.agent_type || '';
-        if (f === 'model') return r.model_id ? r.model : 'zzzz Not reported'; // after the named models when ascending
-        return r[f] || 0;
-    });
-    if (sorted.length === 0) {
-        emptyState(container, NO_DATA, 'cost-empty');
-        return;
-    }
-    let html = `<table class="cost-table">
-        <thead><tr>
-            ${_sortHeader('thinking', 'agent_type', 'Provider', '', true)}
-            ${_sortHeader('thinking', 'model', 'Model', '', true)}
-            ${_sortHeader('thinking', 'level', 'Thinking level', '', true)}
-            ${_sortHeader('thinking', 'requests', 'Calls', 'cost-col-right')}
-            ${_sortHeader('thinking', 'input_tokens', 'Input', 'cost-col-right')}
-            ${_sortHeader('thinking', 'output_tokens', 'Output', 'cost-col-right')}
-            ${_sortHeader('thinking', 'cache_read_tokens', 'Cache read', 'cost-col-right')}
-            ${_sortHeader('thinking', 'cache_write_tokens', 'Cache write', 'cost-col-right')}
-            ${_sortHeader('thinking', 'thinking_tokens', 'Thinking', 'cost-col-right')}
-            ${_sortHeader('thinking', 'cost_usd', 'Cost', 'cost-col-right')}
-            ${_sortHeader('thinking', 'cost_pct', 'Share', 'cost-col-right')}
-        </tr></thead><tbody>`;
-    for (const r of sorted) {
-        html += `<tr${r.level_key ? '' : ' class="cost-row-unreported"'}>
-            <td>${escapeHtml(r.agent_type)}</td>
-            <td class="cost-model-name" title="${escapeAttr(r.model_id || '')}">${escapeHtml(r.model)}</td>
-            <td>${escapeHtml(r.level)}</td>
-            <td class="cost-col-right">${r.requests ? r.requests : '–'}</td>
-            <td class="cost-col-right">${formatTokens(r.input_tokens || 0)}</td>
-            <td class="cost-col-right">${formatTokens(r.output_tokens || 0)}</td>
-            <td class="cost-col-right">${formatTokens(r.cache_read_tokens || 0)}</td>
-            <td class="cost-col-right">${formatTokens(r.cache_write_tokens || 0)}</td>
-            <td class="cost-col-right">${r.thinking_tokens === null ? '–' : formatTokens(r.thinking_tokens)}</td>
-            <td class="cost-col-right cost-cost-cell">${_formatCost(r.cost_usd)}</td>
-            <td class="cost-col-right">${Math.round((r.cost_pct || 0) * 100)}%</td>
-        </tr>`;
-    }
-    html += '</tbody></table>';
-    container.innerHTML = html;
-    placeCostColumns(container);
+    _drawTable(container, 'thinking', [
+        _textCol('thinking', 'agent_type', 'Provider', r => r.agent_type || ''),
+        _textCol('thinking', 'model', 'Model', r => r.model || '', { sortValue: r => (r.model_id ? r.model : 'zzzz Not reported'), title: r => r.model_id || '' }), // after the named models when ascending
+        _textCol('thinking', 'level', 'Thinking level', r => r.level || '', { sortValue: r => (r.level_key ? r.level : 'zzzz Not reported') }), // after the named levels when ascending (localeCompare puts '~' first)
+        _numCol('requests', 'Calls', r => r.requests || 0, v => (v ? String(v) : '–')),
+        _tokCol('input_tokens', 'Input'), _tokCol('output_tokens', 'Output'), _tokCol('cache_read_tokens', 'Cache read'), _tokCol('cache_write_tokens', 'Cache write'),
+        _numCol('thinking_tokens', 'Thinking', r => r.thinking_tokens, v => (v === null ? '–' : formatTokens(v)), { sortValue: r => r.thinking_tokens || 0 }),
+        _costCol(), _shareCol(),
+    ], filtered, null, { quiet: r => !r.level_key }); // the usage with no thinking level recorded (#4969) is not a level: quieter than the rows that are
 }
 
 function _renderAgentTable(rows) {
     _rawData.agent = rows;
     const container = document.getElementById('cost-by-agent');
     if (!container) return;
-
-    const filtered = _applyColFilters(rows, 'agent', {
-        agent_name: r => r.display_name || r.agent_name || '',
-        board_name: r => r.board_name || '',
-        folder: r => r.folder || '',
-    });
-    const sorted = _sortRows(filtered, 'agent', (r, f) => {
-        if (f === 'agent_name') return r.display_name || r.agent_name || '';
-        if (f === 'board_name') return r.board_name || '';
-        if (f === 'folder') return r.folder || '';
-        if (f === 'first_seen') return r.first_seen || '';
-        return r[f] || 0;
-    });
-
-    if (sorted.length === 0) {
-        emptyState(container, NO_DATA, 'cost-empty');
-        return;
-    }
-
-    let html = `<table class="cost-table">
-        <thead><tr>
-            ${_sortHeader('agent', 'agent_name', 'Agent', '', true)}
-            ${_sortHeader('agent', 'board_name', 'Team', '', true)}
-            ${_sortHeader('agent', 'folder', 'Folder', '', true)}
-            ${_sortHeader('agent', 'first_seen', 'Launched', '')}
-            ${_sortHeader('agent', 'duration', 'Duration', 'cost-col-right')}
-            ${_sortHeader('agent', 'requests', 'Requests', 'cost-col-right')}
-            ${_sortHeader('agent', 'input_tokens', 'Input', 'cost-col-right')}
-            ${_sortHeader('agent', 'output_tokens', 'Output', 'cost-col-right')}
-            ${_sortHeader('agent', 'cache_read_tokens', 'Cache read', 'cost-col-right')}
-            ${_sortHeader('agent', 'cache_write_tokens', 'Cache write', 'cost-col-right')}
-            ${_sortHeader('agent', 'cost_usd', 'Cost', 'cost-col-right')}
-        </tr></thead><tbody>`;
-
-    for (const r of sorted) {
+    const nameOf = r => r.display_name || r.agent_name || '';
+    const filtered = _applyColFilters(rows, 'agent', { agent_name: nameOf, board_name: r => r.board_name || '', folder: r => r.folder || '' });
+    const start = r => r.launched_at || r.first_seen, end = r => r.stopped_at || r.last_seen;
+    const span = r => { const a = Date.parse(start(r)), b = end(r) ? Date.parse(end(r)) : Date.now(); return Number.isFinite(a) && Number.isFinite(b) ? b - a : -1; };
+    // a name opens the live agent, or the ended one's history (the mouse over a row draws its cost over its turns)
+    const nameCell = r => {
         const session = _findSession(r.session_id);
-        const displayName = r.display_name || (session && session.display_name) || r.agent_name || r.session_id || '\u2014';
-        let nameHtml;
-        if (session) {
-            nameHtml = `<a href="#" class="cost-agent-link" data-on-click="cost-open-live" data-name="${escapeAttr(session.name)}" data-agent-type="${escapeAttr(session.agent_type)}" data-session-id="${escapeAttr(session.session_id)}">${escapeHtml(displayName)}</a>`;
-        } else if (r.session_id) {
-            const endedSuffix = r.is_live === false ? ' <span class="cost-agent-ended">(ended)</span>' : '';
-            nameHtml = `<a href="#" class="cost-agent-link cost-agent-terminated" data-on-click="cost-open-history" data-session-id="${escapeAttr(r.session_id)}">${escapeHtml(displayName)}</a>${endedSuffix}`;
-        } else {
-            nameHtml = escapeHtml(displayName);
-        }
-        const teamHtml = r.board_name ? escapeHtml(keyLabel(r.board_name)) : '\u2014'; // the key's label (#3536)
-        const folderHtml = r.folder
-            ? `<span title="${escapeAttr(r.working_dir || r.folder)}">${escapeHtml(r.folder)}</span>`
-            : '\u2014';
-        const launchTime = r.launched_at || r.first_seen;
-        const endTime = r.stopped_at || r.last_seen;
-        const launchedHtml = _formatTime(launchTime);
-        const durationHtml = _formatDuration(launchTime, endTime);
-        html += `<tr data-session-id="${escapeAttr(r.session_id || '')}">
-            <td class="cost-agent-name">${nameHtml}</td>
-            <td class="cost-agent-team">${teamHtml}</td>
-            <td class="cost-agent-team">${folderHtml}</td>
-            <td>${launchedHtml}</td>
-            <td class="cost-col-right">${durationHtml}</td>
-            <td class="cost-col-right">${r.requests}</td>
-            <td class="cost-col-right">${formatTokens(r.input_tokens || 0)}</td>
-            <td class="cost-col-right">${formatTokens(r.output_tokens || 0)}</td>
-            <td class="cost-col-right">${formatTokens(r.cache_read_tokens || 0)}</td>
-            <td class="cost-col-right">${formatTokens(r.cache_write_tokens || 0)}</td>
-            <td class="cost-col-right cost-cost-cell">${_formatCost(r.cost_usd)}</td>
-        </tr>`;
-    }
-
-    html += '</tbody></table>';
-    container.innerHTML = html;
-    placeCostColumns(container);
-
-    // Attach hover chart handlers
-    _attachAgentChartHovers(container);
+        const name = r.display_name || (session && session.display_name) || r.agent_name || r.session_id || '—';
+        if (session) return dtLink(name, () => { window.switchNavTab('agents'); window.selectLiveSession(session.name, session.agent_type, session.session_id); });
+        if (!r.session_id) return name;
+        const wrap = document.createElement('span');
+        wrap.append(dtLink(name, () => { window.switchNavTab('history'); window.selectHistorySession(r.session_id); }));
+        if (r.is_live === false) wrap.append(document.createTextNode(' (ended)'));
+        return wrap;
+    };
+    _drawTable(container, 'agent', [
+        _textCol('agent', 'agent_name', 'Agent', nameOf, { cell: nameCell }),
+        _costCol(), // right after the name: eleven columns do not all fit a desktop page, and Cost is the figure the page is opened for (#7719)
+        _textCol('agent', 'board_name', 'Team', r => r.board_name || '', { cell: r => (r.board_name ? keyLabel(r.board_name) : '—'), tone: 'secondary' }), // the key's label (#3536)
+        _textCol('agent', 'folder', 'Folder', r => r.folder || '', { cell: r => r.folder || '—', title: r => r.working_dir || r.folder || '', tone: 'secondary' }),
+        { key: 'first_seen', label: 'Launched', sort: true, sortValue: r => start(r) || '', cell: r => _formatTime(start(r)), tone: 'secondary' },
+        _numCol('duration', 'Duration', span, () => '', { cell: r => _formatDuration(start(r), end(r)) }),
+        _numCol('requests', 'Requests', r => r.requests || 0, String),
+        _tokCol('input_tokens', 'Input'), _tokCol('output_tokens', 'Output'), _tokCol('cache_read_tokens', 'Cache read'), _tokCol('cache_write_tokens', 'Cache write'),
+    ], filtered, NO_DATA, { rowKey: r => r.session_id || `${r.agent_name}:${start(r)}` });
+    _attachAgentChartHovers(container, new Set(filtered.map(r => r.session_id).filter(Boolean)));
 }
 
 // ── Turns-vs-Cost Hover Chart ─────────────────────────────────
@@ -913,11 +561,10 @@ function _ensureChartTooltip() {
     return _chartTooltip;
 }
 
-function _attachAgentChartHovers(container) {
-    const rows = container.querySelectorAll('tr[data-session-id]');
-    for (const row of rows) {
-        const sessionId = row.getAttribute('data-session-id');
-        if (!sessionId) continue;
+function _attachAgentChartHovers(container, ids) {
+    for (const row of container.querySelectorAll('tr.dt-row')) {
+        const sessionId = row.dataset.key;
+        if (!ids.has(sessionId)) continue;
 
         row.addEventListener('mouseenter', async (e) => {
             const tooltip = _ensureChartTooltip();
@@ -1005,129 +652,21 @@ function _renderTaskTable(tasks) {
         assigned_to: t => t.assigned_to || '',
         priority: t => t.priority || 'medium',
     });
+    _costTaskCache = filtered;
     const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
-    const sorted = _sortRows(filtered, 'task', (t, f) => {
-        if (f === 'title') return t.title || '';
-        if (f === 'assigned_to') return t.assigned_to || '';
-        if (f === 'priority') return priorityOrder[t.priority] ?? 2;
-        if (f === 'claimed_at') return t.claimed_at || '';
-        return t[f] || 0;
-    });
-
-    _costTaskCache = sorted;
-
-    if (sorted.length === 0) {
-        emptyState(container, 'No task costs in this range yet. They appear once an agent has worked on a board task.', 'cost-empty');
-        return;
-    }
-
-    const statusIcon = (status) => {
-        if (status === 'completed') return '<span class="material-icons board-task-status-icon completed" style="font-size:0.875rem" aria-hidden="true">check_circle</span>';
-        if (status === 'in_progress') return '<span class="task-spinner" title="In progress"></span>';
-        if (status === 'skipped') return '<span class="material-icons board-task-status-icon skipped" style="font-size:0.875rem" aria-hidden="true">block</span>';
-        return '<span class="material-icons board-task-status-icon pending" style="font-size:0.875rem" aria-hidden="true">radio_button_unchecked</span>';
-    };
-
-    let html = `<table class="cost-table">
-        <thead><tr>
-            <th style="width:24px"></th>
-            <th>ID</th>
-            ${_sortHeader('task', 'title', 'Task', '')}
-            ${_sortHeader('task', 'assigned_to', 'Agent', '', true)}
-            ${_sortHeader('task', 'priority', 'Priority', '', true)}
-            ${_sortHeader('task', 'claimed_at', 'Start time', '')}
-            ${_sortHeader('task', 'duration', 'Duration', 'cost-col-right')}
-            ${_sortHeader('task', 'input_tokens', 'Input', 'cost-col-right')}
-            ${_sortHeader('task', 'output_tokens', 'Output', 'cost-col-right')}
-            ${_sortHeader('task', 'cache_read_tokens', 'Cache read', 'cost-col-right')}
-            ${_sortHeader('task', 'cache_write_tokens', 'Cache write', 'cost-col-right')}
-            ${_sortHeader('task', 'cost_usd', 'Cost', 'cost-col-right')}
-        </tr></thead><tbody>`;
-
-    for (const t of sorted) {
-        const priorityClass = 'board-task-priority-' + (t.priority || 'medium');
-        const startTime = t.claimed_at ? _formatTime(t.claimed_at) : '\u2014';
-        const duration = _formatDuration(t.claimed_at, t.completed_at);
-        html += `<tr data-on-click="cost-task" data-task-id="${Number(t.id)}" style="cursor:pointer">
-            <td>${statusIcon(t.status)}</td>
-            <td class="cost-task-id">#${t.id}</td>
-            <td><button type="button" class="row-open-btn" data-on-click="cost-task" data-task-id="${Number(t.id)}">${escapeHtml(t.title || '')}</button></td>
-            <td class="cost-agent-name">${escapeHtml(t.assigned_to || '\u2014')}</td>
-            <td><span class="board-task-priority ${priorityClass}">${escapeHtml(t.priority || 'medium')}</span></td>
-            <td>${startTime}</td>
-            <td class="cost-col-right">${duration}</td>
-            <td class="cost-col-right">${formatTokens(t.input_tokens || 0)}</td>
-            <td class="cost-col-right">${formatTokens(t.output_tokens || 0)}</td>
-            <td class="cost-col-right">${formatTokens(t.cache_read_tokens || 0)}</td>
-            <td class="cost-col-right">${formatTokens(t.cache_write_tokens || 0)}</td>
-            <td class="cost-col-right cost-cost-cell">${_formatCost(t.cost_usd || 0)}</td>
-        </tr>`;
-    }
-
-    html += '</tbody></table>';
-    container.innerHTML = html;
-    placeCostColumns(container);
-}
-
-function _renderRequestLog(requests) {
-    _rawData.request = requests;
-    const container = document.getElementById('cost-request-log');
-    if (!container) return;
-
-    const filtered = _applyColFilters(requests, 'request', {
-        model_used: r => r.model_used || '',
-        status: r => r.status || '',
-    });
-    const sorted = _sortRows(filtered, 'request', (r, f) => {
-        if (f === 'model_used') return r.model_used || '';
-        if (f === 'agent_name') return r.agent_name || '';
-        if (f === 'status') return r.status || '';
-        if (f === 'started_at') return r.started_at || '';
-        return r[f] || 0;
-    });
-
-    if (sorted.length === 0) {
-        emptyState(container, 'No requests yet', 'cost-empty');
-        return;
-    }
-
-    let html = `<table class="cost-table">
-        <thead><tr>
-            ${_sortHeader('request', 'model_used', 'Model', '', true)}
-            ${_sortHeader('request', 'agent_name', 'Agent', '')}
-            ${_sortHeader('request', 'input_tokens', 'Input', 'cost-col-right')}
-            ${_sortHeader('request', 'output_tokens', 'Output', 'cost-col-right')}
-            ${_sortHeader('request', 'cache_read_tokens', 'Cache R', 'cost-col-right')}
-            ${_sortHeader('request', 'cache_write_tokens', 'Cache W', 'cost-col-right')}
-            ${_sortHeader('request', 'cost_usd', 'Cost', 'cost-col-right')}
-            ${_sortHeader('request', 'latency_ms', 'Latency', 'cost-col-right')}
-            ${_sortHeader('request', 'status', 'Status', '', true)}
-            ${_sortHeader('request', 'started_at', 'Time', '')}
-        </tr></thead><tbody>`;
-
-    for (const r of sorted) {
-        const session = _findSession(r.session_id);
-        const agentName = r.display_name || (session && session.display_name) || r.agent_name || '\u2014';
-        const statusClass = r.status === 'completed' ? 'cost-status-ok'
-            : r.status === 'error' ? 'cost-status-error'
-            : 'cost-status-pending';
-        html += `<tr>
-            <td class="cost-model-name">${escapeHtml(r.model_used)}</td>
-            <td class="cost-agent-name">${escapeHtml(agentName)}</td>
-            <td class="cost-col-right">${formatTokens(r.input_tokens)}</td>
-            <td class="cost-col-right">${formatTokens(r.output_tokens)}</td>
-            <td class="cost-col-right">${formatTokens(r.cache_read_tokens || 0)}</td>
-            <td class="cost-col-right">${formatTokens(r.cache_write_tokens || 0)}</td>
-            <td class="cost-col-right cost-cost-cell">${_formatCost(r.cost_usd)}</td>
-            <td class="cost-col-right">${_formatLatency(r.latency_ms)}</td>
-            <td><span class="cost-status ${statusClass}">${escapeHtml(r.status)}</span></td>
-            <td class="cost-date">${_formatDate(r.started_at)}</td>
-        </tr>`;
-    }
-
-    html += '</tbody></table>';
-    container.innerHTML = html;
-    placeCostColumns(container);
+    const STATUS = { completed: 'Done', in_progress: 'In progress', skipped: 'Skipped' };
+    const span = t => { const a = Date.parse(t.claimed_at); if (!Number.isFinite(a)) return -1; const b = t.completed_at ? Date.parse(t.completed_at) : Date.now(); return b - a; };
+    _drawTable(container, 'task', [
+        { key: 'status', label: 'Status', cell: t => chip(STATUS[t.status] || 'Waiting', `status-${String(t.status || 'pending').replace('_', '-')}`), tone: 'secondary' },
+        { key: 'id', label: 'ID', cell: t => `#${t.id}`, tone: 'tertiary' },
+        { key: 'title', label: 'Task', primary: true, sort: true, sortValue: t => t.title || '', cell: t => t.title || '', width: 'grow' },
+        _textCol('task', 'assigned_to', 'Agent', t => t.assigned_to || '', { cell: t => avatar(t.assigned_to, '—'), tone: 'secondary' }),
+        _textCol('task', 'priority', 'Priority', t => t.priority || 'medium', { sortValue: t => priorityOrder[t.priority] ?? 2, cell: t => tag(t.priority || 'medium'), tone: 'secondary', firstDir: 'asc' }),
+        { key: 'claimed_at', label: 'Start time', sort: true, sortValue: t => t.claimed_at || '', cell: t => (t.claimed_at ? _formatTime(t.claimed_at) : '—'), tone: 'secondary' },
+        _numCol('duration', 'Duration', span, () => '', { cell: t => _formatDuration(t.claimed_at, t.completed_at) }),
+        _tokCol('input_tokens', 'Input'), _tokCol('output_tokens', 'Output'), _tokCol('cache_read_tokens', 'Cache read'), _tokCol('cache_write_tokens', 'Cache write'),
+        _costCol(),
+    ], filtered, 'No task costs in this range yet. They appear once an agent has worked on a board task.', { rowKey: t => t.id, open: t => _showCostTaskDetail(t.id), rowName: t => t.title || '' });
 }
 
 // ── Live Indicator ───────────────────────────────────────────
@@ -1292,122 +831,47 @@ function _renderTeamTable(teams) {
     _rawData.team = teams;
     const container = document.getElementById('cost-by-team');
     if (!container) return;
-
     const filtered = _applyColFilters(teams, 'team', { board_name: t => t.board_name || '(no team)' });
-    const sorted = _sortRows(filtered, 'team', (t, f) => {
-        if (f === 'board_name') return t.board_name || '';
-        return t[f] || 0;
-    });
-
-    if (sorted.length === 0) {
-        emptyState(container, NO_DATA, 'cost-empty');
-        return;
-    }
-
-    let html = `<table class="cost-table">
-        <thead><tr>
-            ${_sortHeader('team', 'board_name', 'Team', '', true)}
-            ${_sortHeader('team', 'num_agents', 'Agents', 'cost-col-right')}
-            ${_sortHeader('team', 'input_tokens', 'Input', 'cost-col-right')}
-            ${_sortHeader('team', 'output_tokens', 'Output', 'cost-col-right')}
-            ${_sortHeader('team', 'cache_read_tokens', 'Cache read', 'cost-col-right')}
-            ${_sortHeader('team', 'cache_write_tokens', 'Cache write', 'cost-col-right')}
-            ${_sortHeader('team', 'cost_usd', 'Cost', 'cost-col-right')}
-            <th class="cost-col-right" style="width:100px">Share</th>
-        </tr></thead><tbody>`;
-
-    const totalCost = teams.reduce((s, t) => s + (t.cost_usd || 0), 0) || 1;
-
-    for (const t of sorted) {
-        const name = t.board_name ? keyLabel(t.board_name) : '(no team)';
-        const pct = ((t.cost_usd / totalCost) * 100).toFixed(1);
-        const barWidth = Math.max(2, (t.cost_usd / totalCost) * 100);
-        html += `<tr>
-            <td class="cost-agent-name">${escapeHtml(name)}</td>
-            <td class="cost-col-right">${t.num_agents || 0}</td>
-            <td class="cost-col-right">${formatTokens(t.input_tokens || 0)}</td>
-            <td class="cost-col-right">${formatTokens(t.output_tokens || 0)}</td>
-            <td class="cost-col-right">${formatTokens(t.cache_read_tokens || 0)}</td>
-            <td class="cost-col-right">${formatTokens(t.cache_write_tokens || 0)}</td>
-            <td class="cost-col-right cost-cost-cell">${_formatCost(t.cost_usd || 0)}</td>
-            <td class="cost-col-right">
-                <div class="cost-share-bar-wrapper">
-                    <div class="cost-share-bar" style="width:${barWidth}%"></div>
-                    <span class="cost-share-label">${pct}%</span>
-                </div>
-            </td>
-        </tr>`;
-    }
-
-    html += '</tbody></table>';
-    container.innerHTML = html;
-    placeCostColumns(container);
+    const total = teams.reduce((n, t) => n + (t.cost_usd || 0), 0) || 1;
+    _drawTable(container, 'team', [
+        _textCol('team', 'board_name', 'Team', t => t.board_name || '', { cell: t => (t.board_name ? keyLabel(t.board_name) : '(no team)') }),
+        _numCol('num_agents', 'Agents', t => t.num_agents || 0, String),
+        _tokCol('input_tokens', 'Input'), _tokCol('output_tokens', 'Output'), _tokCol('cache_read_tokens', 'Cache read'), _tokCol('cache_write_tokens', 'Cache write'),
+        _costCol(), _shareBarCol(total),
+    ], filtered);
 }
 
 // ── Branch Table ────────────────────────────────────────────
+
+/** A pull request's number, linked to it when the repository's address is known. */
+function _prCell(prNumber, remoteURL) {
+    if (!prNumber) return '—';
+    if (!remoteURL) return `#${prNumber}`;
+    let base = remoteURL.replace(/\.git$/, '');
+    if (base.startsWith('git@')) {
+        const parts = base.split(':');
+        if (parts.length === 2) base = 'https://' + parts[0].slice(4) + '/' + parts[1];
+    }
+    const a = document.createElement('a'); a.href = `${base}/pull/${prNumber}`; a.target = '_blank'; a.rel = 'noopener'; a.textContent = `#${prNumber}`;
+    return a;
+}
 
 function _renderBranchTable(branches) {
     _rawData.branch = branches;
     const container = document.getElementById('cost-by-branch');
     if (!container) return;
-
+    const branchName = b => (b.repo_name && b.branch ? `${b.repo_name} : ${b.branch}` : b.branch) || '';
     const filtered = _applyColFilters(branches, 'branch', {
-        branch: b => (b.repo_name && b.branch ? `${b.repo_name} : ${b.branch}` : b.branch) || '(unknown)',
+        branch: b => branchName(b) || '(unknown)',
         board_name: b => b.board_name || '(no team)',
     });
-    const sorted = _sortRows(filtered, 'branch', (b, f) => {
-        if (f === 'branch') return (b.repo_name && b.branch ? `${b.repo_name} : ${b.branch}` : b.branch) || '';
-        if (f === 'board_name') return b.board_name || '';
-        return b[f] || 0;
-    });
-
-    if (sorted.length === 0) {
-        emptyState(container, NO_DATA, 'cost-empty');
-        return;
-    }
-
-    let html = `<table class="cost-table">
-        <thead><tr>
-            ${_sortHeader('branch', 'branch', 'Branch', '', true)}
-            ${_sortHeader('branch', 'board_name', 'Team', '', true)}
-            ${_sortHeader('branch', 'pr_number', 'PR', 'cost-col-right')}
-            ${_sortHeader('branch', 'num_agents', 'Agents', 'cost-col-right')}
-            ${_sortHeader('branch', 'input_tokens', 'Input', 'cost-col-right')}
-            ${_sortHeader('branch', 'output_tokens', 'Output', 'cost-col-right')}
-            ${_sortHeader('branch', 'cache_read_tokens', 'Cache read', 'cost-col-right')}
-            ${_sortHeader('branch', 'cache_write_tokens', 'Cache write', 'cost-col-right')}
-            ${_sortHeader('branch', 'cost_usd', 'Cost', 'cost-col-right')}
-            <th class="cost-col-right" style="width:100px">Share</th>
-        </tr></thead><tbody>`;
-
-    const totalCost = branches.reduce((s, b) => s + (b.cost_usd || 0), 0) || 1;
-
-    for (const b of sorted) {
-        const name = b.repo_name && b.branch ? `${b.repo_name} : ${b.branch}` : (b.branch || '(unknown)');
-        const teamHtml = b.board_name ? escapeHtml(keyLabel(b.board_name)) : '—';
-        const prCell = _formatPRLink(b.pr_number, b.remote_url);
-        const pct = ((b.cost_usd / totalCost) * 100).toFixed(1);
-        const barWidth = Math.max(2, (b.cost_usd / totalCost) * 100);
-        html += `<tr>
-            <td class="cost-agent-name">${escapeHtml(name)}</td>
-            <td class="cost-agent-team">${teamHtml}</td>
-            <td class="cost-col-right">${prCell}</td>
-            <td class="cost-col-right">${b.num_agents || 0}</td>
-            <td class="cost-col-right">${formatTokens(b.input_tokens || 0)}</td>
-            <td class="cost-col-right">${formatTokens(b.output_tokens || 0)}</td>
-            <td class="cost-col-right">${formatTokens(b.cache_read_tokens || 0)}</td>
-            <td class="cost-col-right">${formatTokens(b.cache_write_tokens || 0)}</td>
-            <td class="cost-col-right cost-cost-cell">${_formatCost(b.cost_usd || 0)}</td>
-            <td class="cost-col-right">
-                <div class="cost-share-bar-wrapper">
-                    <div class="cost-share-bar" style="width:${barWidth}%"></div>
-                    <span class="cost-share-label">${pct}%</span>
-                </div>
-            </td>
-        </tr>`;
-    }
-
-    html += '</tbody></table>';
-    container.innerHTML = html;
-    placeCostColumns(container);
+    const total = branches.reduce((n, b) => n + (b.cost_usd || 0), 0) || 1;
+    _drawTable(container, 'branch', [
+        _textCol('branch', 'branch', 'Branch', branchName, { cell: b => branchName(b) || '(unknown)' }),
+        _textCol('branch', 'board_name', 'Team', b => b.board_name || '', { cell: b => (b.board_name ? keyLabel(b.board_name) : '—'), tone: 'secondary' }),
+        _numCol('pr_number', 'PR', b => b.pr_number || 0, () => '', { cell: b => _prCell(b.pr_number, b.remote_url) }),
+        _numCol('num_agents', 'Agents', b => b.num_agents || 0, String),
+        _tokCol('input_tokens', 'Input'), _tokCol('output_tokens', 'Output'), _tokCol('cache_read_tokens', 'Cache read'), _tokCol('cache_write_tokens', 'Cache write'),
+        _costCol(), _shareBarCol(total),
+    ], filtered);
 }

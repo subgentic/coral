@@ -35,8 +35,8 @@ const CALLS = [{ operation: '/api/board/{project}/messages', call_type: 'api', a
         await ev(`window.switchNavTab('tokens'); true`);
         await waitFor(`['cost-by-provider', 'cost-by-model', 'cost-by-agent'].every(id => document.querySelectorAll('#' + id + ' tbody tr').length >= 2) && document.querySelectorAll('#call-metrics-summary tbody tr').length >= 1`, 'the tables');
     };
-    const heads = id => ev(`[...document.querySelectorAll('#${id} thead th')].map(th => th.textContent.replace(/[▲▼]|filter_list/g, '').trim())`);
-    const column = (id, name) => ev(`(() => { const t = document.getElementById('${id}'); const i = [...t.querySelectorAll('thead th')].findIndex(th => th.textContent.replace(/[▲▼]|filter_list/g, '').trim() === ${JSON.stringify(name)}); return [...t.querySelectorAll('tbody tr')].map(tr => tr.children[i].textContent.trim()); })()`);
+    const heads = id => ev(`[...document.querySelectorAll('#${id} thead th')].map(th => th.textContent.replace(/[▲▼↑↓↕]|filter_list/g, '').trim())`);
+    const column = (id, name) => ev(`(() => { const t = document.getElementById('${id}'); const i = [...t.querySelectorAll('thead th')].findIndex(th => th.textContent.replace(/[▲▼↑↓↕]|filter_list/g, '').trim() === ${JSON.stringify(name)}); return [...t.querySelectorAll('tbody tr')].map(tr => tr.children[i].textContent.trim()); })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await open(1280, 800, false);
@@ -76,19 +76,20 @@ const CALLS = [{ operation: '/api/board/{project}/messages', call_type: 'api', a
         assert.ok((await column('cost-by-agent', 'Cost')).every(x => /^\$/.test(x)), 'and the cells under it are costs');
         console.log('   ✓');
 
-        console.log('8. The Model column is the size of its neighbours');
-        const sizes = await ev(`(() => { const out = {}; for (const id of ['cost-by-model']) { const tr = document.querySelector('#' + id + ' tbody tr'); out[id] = [...tr.children].map(td => getComputedStyle(td).fontSize); } return out; })()`);
-        assert.equal(new Set(sizes['cost-by-model']).size, 1, 'every cell of a By model row has one size: ' + JSON.stringify(sizes));
+        console.log('8. The Model column is in its neighbours font');
+        const sizes = await ev(`(() => { const out = {}; for (const id of ['cost-by-model']) { const tr = document.querySelector('#' + id + ' tbody tr'); out[id] = [...tr.children].map(td => getComputedStyle(td).fontFamily); } return out; })()`);
+        assert.equal(new Set(sizes['cost-by-model']).size, 1, 'every cell of a By model row has one font (the model is not in the code font): ' + JSON.stringify(sizes));
         console.log('   ✓');
 
         console.log('6. On a phone the calls table lists Calls, Errors, Avg ms right after the operation');
         await open(390, 844, true);
         await ev(`import((window.__coralStatic || '/static/') + 'analytics_views.js').then(m => { m.selectView('calls'); return true; })`);
         await waitFor(`document.querySelectorAll('#call-metrics-summary tbody tr').length > 0 && document.querySelector('#call-metrics-summary').getClientRects().length > 0`, 'the calls view');
-        assert.deepEqual(await heads('call-metrics-summary'), ['Operation', 'Calls', 'Errors', 'Avg ms', 'Type', 'Agent', 'Team'], 'phone order');
-        assert.deepEqual(await column('call-metrics-summary', 'Calls'), ['30', '7'], 'the cells moved with their headings');
+        const order = await ev(`[...document.querySelectorAll('#call-metrics-summary tbody tr:first-child td')].filter(td => td.getClientRects().length).sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top).map(td => td.dataset.label)`);
+        assert.deepEqual(order, ['Operation', 'Calls', 'Errors', 'Avg ms', 'Type', 'Agent', 'Team'], 'phone order');
+        assert.deepEqual(await ev(`[...document.querySelectorAll('#call-metrics-summary td[data-key="calls"]')].map(td => td.textContent.trim())`), ['30', '7'], 'the cells hold their column\'s figures');
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
-        await waitFor(`[...document.querySelectorAll('#call-metrics-summary thead th')].map(th => th.textContent.trim()).join() === 'Operation,Type,Agent,Team,Calls,Errors,Avg ms'`, 'the wide order back');
+        await waitFor(`[...document.querySelectorAll('#call-metrics-summary thead th')].map(th => th.dataset.key).join() === 'operation,call_type,agent,team,calls,errors,avg_ms'`, 'the wide order back');
         console.log('   ✓');
         console.log('PASS Analytics audit: Requests add up, the calls view honours the range and drops dashboard routes, Cost second in By agent, calls columns on a phone, one Model size');
     } finally { await client.close(); }

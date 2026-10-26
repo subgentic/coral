@@ -1,14 +1,14 @@
 /* The one table (#7743): every list or table surface passes what to show, the component owns how it looks and behaves. The operator's rule: a styling change is one token or one rule, so every size and colour here
  * is a --table-* token (css/data_table.css) and no surface styles a row, a cell or a header.
  *
- *   dataTable({ label, columns, rows, rowKey, open, current, state, onSort, layout, fold, foldAt, sortBar, bare, empty, footer, selectable, rowName }) -> { el, bar, selectButton, selection(), clear(), state }
+ *   dataTable({ label, columns, rows, rowKey, open, current, state, onSort, layout, fold, foldAt, sortBar, bare, empty, footer, selectable, rowName, quiet, scroll }) -> { el, bar, selectButton, selection(), clear(), state }
  *   selectable = { contextKey, onChange(keys), actions: [{ label, run(rows, keys, value), danger, confirm, choose: { label, options() -> [{ value, label }] } }] }: a danger action confirms in the bar, a choose action asks for its value there.
  *   Column = { key, label, field | cell(row, ctx), primary, tone: 'primary'|'secondary'|'tertiary', width: 'grow'|'content'|'<n>rem', nowrap, align: 'start'|'end', numeric,
- *              sort: true|'number'|'date'|fn(a, b), sortValue(row), line: 0|1|2, when(row), subtitle(row) }
+ *              sort: true|'number'|'date'|fn(a, b), sortValue(row), firstDir: 'asc'|'desc', foldFirst, line: 0|1|2, when(row), subtitle(row), title(row), filter: { label, active(), open(button) } }
  *   cell types: chip(word, cls), avatar(name), personButton(name, label), tag(text), timeCell(stamp), link(text, run), primaryButton(text, label)
  *   state: tableState(), kept by the caller across redraws: the sort, and the selection (a set of row keys, kept while the rows are filtered or paged, cleared when selectable.contextKey changes).
  * Folded (the table's own box narrower than foldAt rem, 40 by default; also at 200% text): fold 'column' is the two-line row (line 1 and line 2 cells), fold 'labeled' is the name, then "label value" lines
- * (the Analytics tables); the header row is hidden and a "Sort by" select takes its place. Everything is built with the DOM and textContent: titles and names are written by agents. */
+ * (the Analytics tables); scroll: a table of many columns scrolls sideways inside its box, shaded where more is to come, rather than being cut off; the header row is hidden and a "Sort by" select takes its place. Everything is built with the DOM and textContent: titles and names are written by agents. */
 import { whenText } from './when_text.js';
 
 export const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
@@ -87,7 +87,7 @@ export function dataTable(cfg) {
     const columns = cfg.columns, sel = cfg.selectable || null, ctx = cfg.ctx || {};
     const foldKind = cfg.fold || 'column', foldAt = cfg.foldAt || 40;
     if (sel && sel.contextKey !== undefined && st.ctx !== String(sel.contextKey)) { st.selected.clear(); st.rowCache?.clear(); st.confirming = -1; st.choices = null; st.anchor = null; st.ctx = String(sel.contextKey); }
-    const box = el('div', `dt-box${cfg.bare ? ' dt-bare' : ''} ${foldKind === 'labeled' ? 'dt-fold-labeled' : foldKind === 'always' ? 'dt-fold-column' : foldKind === 'none' ? 'dt-fold-none' : 'dt-fold-column'}`);
+    const box = el('div', `dt-box${cfg.bare ? ' dt-bare' : ''}${cfg.scroll ? ' dt-scroll' : ''} ${foldKind === 'labeled' ? 'dt-fold-labeled' : foldKind === 'always' ? 'dt-fold-column' : foldKind === 'none' ? 'dt-fold-none' : 'dt-fold-column'}`);
     const bar = el('div', 'dt-bar'); bar.hidden = true;
     const selectButton = button('btn btn-small dt-select-toggle', 'Select', () => { st.select = !st.select; syncSelectMode(); });
     selectButton.setAttribute('aria-pressed', 'false'); selectButton.hidden = !sel;
@@ -125,10 +125,16 @@ export function dataTable(cfg) {
             if (c.sort) {
                 const on = st.sort && st.sort.key === c.key;
                 th.setAttribute('aria-sort', on ? (st.sort.dir === 'desc' ? 'descending' : 'ascending') : 'none');
-                const b = button('dt-sort', null, () => sortBy(c)); b.dataset.key = c.key;
+                const b = button('dt-sort', null, () => sortBy(c)); b.dataset.key = c.key; b.setAttribute('aria-label', `${c.label}, ${cfg.label}`); // named for its column and its table: "Cost" is not six buttons that read the same (#6432)
                 b.append(el('span', null, c.label), el('span', 'dt-arrow', on ? (st.sort.dir === 'desc' ? '↓' : '↑') : '↕')); b.lastChild.setAttribute('aria-hidden', 'true');
                 th.append(b);
             } else th.append(el('span', 'dt-head-text', c.label));
+            if (c.filter) { // a column the rows are narrowed by: filter = { label, active() -> bool, open(button) }; the surface owns the choice list, the header owns the button
+                const f = button(`dt-filter${c.filter.active() ? ' dt-filter-on' : ''}`, null, (e) => { e.stopPropagation(); c.filter.open(f); });
+                f.setAttribute('aria-label', c.filter.label); f.title = 'Filter';
+                const icon = el('span', 'material-icons', 'filter_list'); icon.setAttribute('aria-hidden', 'true'); f.append(icon);
+                th.append(f);
+            }
             tr.append(th);
         }
         thead.append(tr);
@@ -163,9 +169,11 @@ export function dataTable(cfg) {
         td.setAttribute('role', 'cell'); td.dataset.label = c.label; td.dataset.key = c.key;
         td.classList.add(c.line === 1 ? 'dt-line-1' : c.line === 2 ? 'dt-line-2' : 'dt-line-0');
         if (c.when && !c.when(r)) td.classList.add('dt-when-off');
+        if (c.foldFirst) td.classList.add('dt-fold-first'); // folded 'labeled': this figure follows the name, ahead of the other "label value" lines
         let v = c.cell ? c.cell(r, ctx) : (c.field != null ? r[c.field] : '');
         if (typeof v === 'string' && c.primary) v = primaryButton(v, `Open ${v}`);
         if (v instanceof Node) td.append(v); else td.textContent = v == null ? '' : String(v);
+        if (c.title) { const t = c.title(r); if (t) td.title = t; } // the full name or id on hover
         if (c.subtitle) { const s = c.subtitle(r); if (s) td.append(el('span', 'dt-subtitle', s)); }
         return td;
     }
@@ -175,6 +183,7 @@ export function dataTable(cfg) {
         const list = sortedRows();
         list.forEach((r, i) => {
             const k = keyOf(r), tr = el('tr', 'dt-row'); tr.setAttribute('role', 'row'); tr.dataset.key = k;
+            if (cfg.quiet && cfg.quiet(r)) tr.classList.add('dt-quiet'); // a row that is not a finding (usage whose level was not recorded): quieter than the rest
             if (sel) {
                 const td = el('td', 'dt-check'); td.setAttribute('role', 'cell');
                 const cb = el('input'); cb.type = 'checkbox'; cb.setAttribute('aria-label', `Select ${nameOf(r)}`); cb.dataset.idx = String(i); cb.disabled = !eligible(r); if (cb.disabled) cb.hidden = true;

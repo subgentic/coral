@@ -152,7 +152,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 await ev(`window.switchNavTab('tokens'); true`);
                 await waitFor(`document.querySelectorAll('#cost-by-thinking tbody tr').length >= 2 && document.querySelectorAll('#cost-by-team tbody tr').length >= 1`, 'the Cost tables', 15000);
                 await ev(`document.getElementById('cost-by-thinking').scrollIntoView({ block: 'center' }); true`); // (the scan covers the whole view; the scroll is for a screenshot)
-            }, '#cost-dashboard-view', `[...document.querySelectorAll('#cost-dashboard-view .cost-sort-btn')].filter(b => b.getClientRects().length && b.scrollWidth > b.clientWidth + 1).map(b => 'heading text runs out of its button: ' + b.textContent.trim() + ' (' + b.scrollWidth + ' in ' + b.clientWidth + ')')`);
+            }, '#cost-dashboard-view', `[...document.querySelectorAll('#cost-dashboard-view .dt-sort')].filter(b => b.getClientRects().length && b.scrollWidth > b.clientWidth + 1).map(b => 'heading text runs out of its button: ' + b.textContent.trim() + ' (' + b.scrollWidth + ' in ' + b.clientWidth + ')')`);
             await ev(`window.fetch = window.__realFetch || window.fetch; window.switchNavTab('agents'); true`);
             await probe('Restart dialog', async () => { await openAgent(); await ev(`window.restartSession(); true`);
                 await waitFor(`getComputedStyle(document.getElementById('restart-modal')).display === 'flex' && !!document.querySelector('#restart-modal .acf-thinking-wrap')`, 'the Restart dialog', 8000); await settle(800); }, '#restart-modal');

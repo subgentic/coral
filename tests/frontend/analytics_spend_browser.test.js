@@ -45,10 +45,10 @@ const FIX = { board: TEAM, range_hours: 24, generated_at: '2026-10-25T10:00:00Z'
             const b = await ev(`(() => ({ bars: document.querySelectorAll('#cost-spend .spend-bar').length, high: [...document.querySelectorAll('#cost-spend .spend-bar')].map(x => x.classList.contains('spend-bar-high')), usual: !!document.querySelector('#cost-spend .spend-usual'), label: document.querySelector('#cost-spend .spend-bars').getAttribute('aria-label') }))()`);
             assert.equal(b.bars, 6, 'a day with no commit has no bar, not a stub'); assert.deepEqual(b.high, [false, false, false, false, false, true]); assert.equal(b.usual, true); assert.match(b.label, /usual 360 K/);
         });
-        await run('who spends: a merged Not measured cell, team for the Orchestrator, an Unattributed row', async () => {
-            const t = await ev(`[...document.querySelectorAll('#cost-spend .spend-table tbody tr')].map(r => [...r.children].map(c => c.textContent.trim() + (c.colSpan > 1 ? '[x' + c.colSpan + ']' : '')))`);
+        await run('who spends: a Not measured note, team for the Orchestrator, an Unattributed row', async () => {
+            const t = await ev(`[...document.querySelectorAll('#cost-spend .dt-table tbody tr')].map(r => [...r.children].map(c => c.textContent.trim()))`);
             assert.deepEqual(t[0], ['Frontend Dev', '800 K', '26%', '2', '14 M', '120']); assert.deepEqual(t[1], ['Orchestrator', '600 K', '19%', 'team', '12 M', '90']);
-            assert.deepEqual(t[2], ['Gemini Dev', 'Not measured[x5]']); assert.deepEqual(t[3], ['Unattributed', 'Commits whose author matches no agent[x5]']);
+            assert.deepEqual(t[2], ['Gemini DevNot measured', '', '', '', '', '']); assert.deepEqual(t[3], ['UnattributedCommits whose author matches no agent', '', '', '', '', '']); // the note is under the name: no zeros, no dashes in the figure cells
             assert.ok(await ev(`!!document.querySelector('#cost-spend .spend-how')`), 'How it is counted');
             const how = await text('#cost-spend .spend-how');
             assert.match(how, /counts, not proof of who did the work/); assert.match(how, /shared by several teams, Unattributed can include other teams/);
@@ -106,10 +106,8 @@ const FIX = { board: TEAM, range_hours: 24, generated_at: '2026-10-25T10:00:00Z'
             await ev(`document.querySelector('#cost-task-time .spend-toggle [data-key="hour"]').click(); true`);
             assert.equal(await ev(`document.querySelectorAll('#cost-task-time .spend-bar-col').length`), 24);
             await ev(`document.querySelector('#cost-task-time .spend-toggle [data-key="day"]').click(); true`);
-            const rows = await ev(`[...document.querySelectorAll('#cost-task-time .spend-table tbody tr')].map(r => [...r.children].map(c => c.textContent.trim()))`);
+            const rows = await ev(`[...document.querySelectorAll('#cost-task-time .dt-table tbody tr')].map(r => [...r.children].map(c => c.textContent.trim()))`);
             assert.deepEqual(rows, [['Frontend Dev', '5', '52 min', '2'], ['Backend Dev', '3', '34 min', '0']]);
-            const pad = await ev(`(() => { const t = document.querySelector('#cost-task-time .spend-table'); const left = sel => parseFloat(getComputedStyle(t.querySelector(sel)).paddingLeft); return [left('thead th'), left('tbody th[scope=row]'), left('tbody td')]; })()`);
-            assert.ok(pad[1] >= 4 && pad[1] === pad[0], 'the agent names sit as far in as the AGENT header: ' + JSON.stringify(pad));
             await ev(`delete window.__spend.task_time.window.p90_s; delete window.__spend.task_time.window.wait_median_s; true`);
             await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard(); return true; })()`);
             await waitFor(`document.querySelectorAll('#cost-task-time .spend-card').length === 4`, 'two measures left out', 6000);

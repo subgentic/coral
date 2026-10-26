@@ -17,7 +17,7 @@ const { DATA_WORLD } = require('./helpers/census_world');
             await waitFor(`['cost-by-provider', 'cost-by-model', 'cost-by-thinking', 'cost-by-agent', 'cost-by-team', 'cost-by-branch'].every(id => document.querySelectorAll('#' + id + ' tbody tr').length > 0) && !!document.querySelector('#cost-spend-chart svg')`, `${tag}: the analytics data`, 15000);
             const d = await ev(`(() => {
                 const name = e => e.getAttribute('aria-label') || e.textContent.replace(/\\s+/g, ' ').trim();
-                const sorts = [...document.querySelectorAll('#cost-dashboard-view .cost-sort-btn')].map(name), filters = [...document.querySelectorAll('#cost-dashboard-view .cost-col-filter')].map(name);
+                const sorts = [...document.querySelectorAll('#cost-dashboard-view .dt-sort')].map(name), filters = [...document.querySelectorAll('#cost-dashboard-view .dt-filter')].map(name);
                 const dup = l => l.filter((n, i) => l.indexOf(n) !== i);
                 const svg = document.querySelector('#cost-spend-chart svg');
                 const tables = [...document.querySelectorAll('#cost-dashboard-view .cost-section')].map(sec => { const t = sec.querySelector('table'), h = sec.querySelector('.cost-section-title'); if (!t || !h) return null; const l = t.getAttribute('aria-labelledby'); return { heading: h.textContent.trim(), named: l ? (document.getElementById(l) || {}).textContent.trim() : null }; }).filter(Boolean);
@@ -30,7 +30,7 @@ const { DATA_WORLD } = require('./helpers/census_world');
             assert.ok(d.sparks.length >= 3 && d.sparks.every(a => a === 'true'), `${tag}: the sparklines are hidden from a screen reader (${JSON.stringify(d.sparks)})`);
             assert.ok(d.tables.length >= 5 && d.tables.every(t => t.named === t.heading), `${tag}: each table is named by its heading (${JSON.stringify(d.tables)})`);
             // a sort still sorts and keeps its place
-            await ev(`document.querySelector('#cost-by-provider .cost-sort-btn').click(); true`);
+            await ev(`document.querySelector('#cost-by-provider .dt-sort').click(); true`);
             await new Promise(r => setTimeout(r, 300)); // sleep-ok: the table redraws
             assert.equal(await ev(`document.querySelector('#cost-by-provider th[aria-sort="ascending"], #cost-by-provider th[aria-sort="descending"]') !== null`), true, `${tag}: aria-sort says which column is sorted`);
             assert.ok(await ev(`document.querySelector('#cost-by-provider table').getAttribute('aria-labelledby') === document.querySelector('#cost-by-provider').closest('.cost-section').querySelector('.cost-section-title').id`), `${tag}: a redrawn table is named again`);

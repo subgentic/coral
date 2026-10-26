@@ -43,7 +43,7 @@ const SUMMARY = {
         console.log('2. By Model: a Provider and a Model column, one row per model and provider');
         await ev(`(async () => { const m = await import(${MOD} + 'cost_dashboard.js'); m.showCostDashboard(); return true; })()`);
         await waitFor(`document.querySelectorAll('#cost-by-model tbody tr').length === 5`, 'the table');
-        const table = () => ev(`(() => ({ head: [...document.querySelectorAll('#cost-by-model thead th')].map(th => th.textContent.replace(/[▲▼↑↓]/g, '').trim().replace(/\\s*filter_list|\\s*filter_alt/g, '')), rows: [...document.querySelectorAll('#cost-by-model tbody tr')].map(tr => [tr.children[0].textContent.trim(), tr.children[1].textContent.trim(), tr.children[1].getAttribute('title')]) }))()`);
+        const table = () => ev(`(() => ({ head: [...document.querySelectorAll('#cost-by-model thead th')].map(th => th.textContent.replace(/[▲▼↑↓↕]/g, '').trim().replace(/\\s*filter_list|\\s*filter_alt/g, '')), rows: [...document.querySelectorAll('#cost-by-model tbody tr')].map(tr => [tr.children[0].textContent.trim(), tr.children[1].textContent.trim(), tr.children[1].getAttribute('title')]) }))()`);
         let t = await table();
         assert.deepEqual(t.head.slice(0, 3), ['Provider', 'Model', 'Requests'], 'columns: ' + t.head);
         const byCost = t.rows.map(r => r.slice(0, 2).join(' / '));
@@ -54,16 +54,16 @@ const SUMMARY = {
 
         console.log('3. Sort by Provider and by Model; filter by Provider');
         const cmp = (a, b) => a.localeCompare(b);
-        const click = f => ev(`document.querySelector('#cost-by-model th[data-field=${f}]').click(); true`);
+        const click = f => ev(`document.querySelector('#cost-by-model th[data-key=${f}] .dt-sort').click(); true`);
         await click('agent_type'); t = await table(); let col = t.rows.map(r => r[0]);
-        assert.deepEqual(col, [...col].sort(cmp).reverse(), 'a first click sorts the new column high to low (the table\'s rule): ' + col);
+        assert.deepEqual(col, [...col].sort(cmp), 'a first click sorts a new text column A to Z (the table component\'s rule): ' + col);
         await click('agent_type'); t = await table(); col = t.rows.map(r => r[0]);
-        assert.deepEqual(col, [...col].sort(cmp), 'a second click reverses it: ' + col);
+        assert.deepEqual(col, [...col].sort(cmp).reverse(), 'a second click reverses it: ' + col);
         await click('model'); t = await table(); col = t.rows.map(r => r[1]);
-        assert.deepEqual(col, [...col].sort(cmp).reverse(), 'Model sorts by the name shown: ' + col);
+        assert.deepEqual(col, [...col].sort(cmp), 'Model sorts by the name shown: ' + col);
         await click('model'); t = await table(); col = t.rows.map(r => r[1]);
-        assert.deepEqual(col, [...col].sort(cmp), 'and back: ' + col);
-        await ev(`document.querySelector('#cost-by-model th[data-field=agent_type] .cost-col-filter').click(); true`);
+        assert.deepEqual(col, [...col].sort(cmp).reverse(), 'and back: ' + col);
+        await ev(`document.querySelector('#cost-by-model th[data-key=agent_type] .dt-filter').click(); true`);
         await waitFor(`!!document.querySelector('.cost-filter-dropdown')`, 'the Provider filter');
         const opts = await ev(`[...document.querySelectorAll('.cost-filter-dropdown .cost-filter-items label, .cost-filter-dropdown .cost-filter-items li, .cost-filter-dropdown .cost-filter-items div')].map(e => e.textContent.trim()).filter(Boolean)`);
         assert.ok(['agy', 'claude', 'codex'].every(p => opts.some(o => o.includes(p))), 'the Provider filter lists the providers: ' + opts);

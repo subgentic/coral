@@ -27,7 +27,7 @@ const TEAM = `qa-a11y-pass-${Date.now() % 100000}`;
         const view = async key => { await ev(`(() => { const b = document.querySelector('#cost-nav-list .row-btn[data-view="${key}"]'); if (b) b.click(); return !!b; })()`); await settle(900); };
         await S.run('a phone: an agent name in a By agent row is a 44 px target', async () => {
             await view('agent');
-            const links = await ev(`[...document.querySelectorAll('#cost-dashboard-view .cost-agent-link')].filter(e => e.getClientRects().length).map(e => { const b = e.getBoundingClientRect(); return [e.textContent.trim(), Math.round(b.height)]; })`);
+            const links = await ev(`[...document.querySelectorAll('#cost-by-agent .dt-link')].filter(e => e.getClientRects().length).map(e => { const b = e.getBoundingClientRect(); return [e.textContent.trim(), Math.round(b.height)]; })`);
             assert.ok(links.length >= 2, 'the By agent table has agent links: ' + JSON.stringify(links)); for (const [n, h] of links) assert.ok(h >= 44, `${n} is ${h} px high`);
         });
         await S.run('a phone: the way back is on the title\'s line at normal text (no row spent) and over it at 200% text, where the title would be a word a line', async () => {

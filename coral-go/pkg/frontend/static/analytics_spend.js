@@ -6,6 +6,9 @@
 import { state } from './state.js';
 import { boardFetch, keyLabel } from './server_base.js';
 import { browserLocal } from './safe_storage.js';
+import { importOnce } from './import_once.js';
+
+const { dataTable } = await importOnce('./data_table.js'); // the shared table (#7743)
 
 const TEAM_KEY = 'coral-spend-team';
 const HOURLY_WHY = 'Hourly is for the last 24 hours.';
@@ -143,26 +146,17 @@ function chart(data, f) {
 }
 
 function table(data) {
-    const t = el('table', 'cost-table spend-table'); t.setAttribute('aria-label', 'Who spends');
-    const head = el('tr');
-    for (const h of ['Agent', 'Tokens', 'Share', 'Commits', 'Cache reads', 'Tool calls']) { const th = el('th', null, h); th.scope = 'col'; head.append(th); }
-    const thead = el('thead'); thead.append(head); t.append(thead);
-    const body = el('tbody');
     const agents = (Array.isArray(data.agents) ? data.agents : []).slice().sort((a, b) => (a.name === 'Unattributed') - (b.name === 'Unattributed') || (a.tokens == null) - (b.tokens == null) || (b.tokens || 0) - (a.tokens || 0));
-    for (const a of agents) {
-        const tr = el('tr');
-        const name = el('th', null, a.name || ''); name.scope = 'row'; tr.append(name);
-        if (a.name === 'Unattributed') {
-            const td = el('td', 'spend-not-measured', 'Commits whose author matches no agent'); td.colSpan = 5; tr.append(td); // one cell, no dashes
-        } else if (a.tokens == null) {
-            const td = el('td', 'spend-not-measured', 'Not measured'); td.colSpan = 5; tr.append(td); // one cell, not five zeros
-        } else {
-            tr.append(el('td', null, fmtTokens(a.tokens)), el('td', null, a.share == null ? '' : `${Math.round(a.share * 100)}%`), el('td', a.orchestrator || a.commits == null ? 'spend-muted' : null, a.orchestrator ? 'team' : a.commits == null ? '—' : a.commits === 0 ? 'none' : String(a.commits)), el('td', null, a.cache_reads == null ? '—' : fmtTokens(a.cache_reads)), el('td', null, a.tool_calls == null ? (a.tool_calls_measured === false ? 'Not measured' : '—') : String(a.tool_calls)));
-        }
-        body.append(tr);
-    }
-    t.append(body);
-    return t;
+    const none = a => a.name === 'Unattributed' || a.tokens == null; // one note under the name, not five empty or zero cells
+    const figure = fn => a => (none(a) ? '' : fn(a));
+    return dataTable({ label: 'Who spends', fold: 'labeled', rows: agents, rowKey: a => a.name || '', columns: [
+        { key: 'name', label: 'Agent', tone: 'primary', cell: a => a.name || '', subtitle: a => (a.name === 'Unattributed' ? 'Commits whose author matches no agent' : a.tokens == null ? 'Not measured' : '') },
+        { key: 'tokens', label: 'Tokens', numeric: true, cell: figure(a => fmtTokens(a.tokens)) },
+        { key: 'share_pct', label: 'Share', numeric: true, cell: figure(a => (a.share == null ? '' : `${Math.round(a.share * 100)}%`)) },
+        { key: 'commits', label: 'Commits', numeric: true, cell: figure(a => (a.orchestrator ? 'team' : a.commits == null ? '—' : a.commits === 0 ? 'none' : String(a.commits))) },
+        { key: 'cache_reads', label: 'Cache reads', numeric: true, cell: figure(a => (a.cache_reads == null ? '—' : fmtTokens(a.cache_reads))) },
+        { key: 'tool_calls', label: 'Tool calls', numeric: true, cell: figure(a => (a.tool_calls == null ? (a.tool_calls_measured === false ? 'Not measured' : '—') : String(a.tool_calls))) },
+    ] }).el;
 }
 
 function drawSpend() {
@@ -186,7 +180,7 @@ function drawSpend() {
     const chartBox = el('section', 'spend-box'); chartBox.append(chart(data, f));
     const how = SHAPE_HOW('Tokens are input plus output. Cache writes and cache reads are shown beside, never hidden in the total. A commit counts once when it reaches main; its author is the agent, and one that matches no agent is Unattributed. A commit is credited to the author name its committer typed, so these are counts, not proof of who did the work. In a repository shared by several teams, Unattributed can include other teams\' commits. Review and orchestration tokens belong to the team, not to one commit. An agent with no token record is Not measured, not zero.');
     const who = el('section', 'spend-who'); who.append(el('h4', 'spend-box-title', 'Who spends'));
-    const scroll = el('div', 'cost-table-container'); scroll.append(table(data)); who.append(scroll);
+    who.append(table(data));
     if (data.measured_agents != null && data.of_agents != null && data.measured_agents < data.of_agents) who.append(el('p', 'spend-note', `${data.measured_agents} of ${data.of_agents} agents measured.`));
     shape(body, { sub: `Team ${keyLabel(model.team)} · last ${f.windowWord} against the 7 days before`, headline: headline(f), cards, chart: chartBox, how, table: who });
 }
@@ -236,16 +230,13 @@ function drawTime() {
     const agents = Array.isArray(tt.agents) ? tt.agents : [];
     if (agents.length) {
         sec = el('section', 'spend-who'); sec.append(el('h4', 'spend-box-title', 'By agent'));
-        const t = el('table', 'cost-table spend-table'); t.setAttribute('aria-label', 'Task time by agent');
-        const head = el('tr'); for (const h of ['Agent', 'Tasks done', 'Median time', 'Sent back']) { const th = el('th', null, h); th.scope = 'col'; head.append(th); }
-        const thead = el('thead'); thead.append(head); t.append(thead);
-        const tb = el('tbody');
-        for (const a of agents.slice().sort((x, y) => (y.done || 0) - (x.done || 0))) {
-            const tr = el('tr'); const n = el('th', null, a.name || ''); n.scope = 'row';
-            tr.append(n, el('td', null, String(a.done || 0)), el('td', null, num(a.median_s) != null ? fmtDur(a.median_s) : '—'), el('td', null, num(a.sent_back) != null ? String(a.sent_back) : '—'));
-            tb.append(tr);
-        }
-        t.append(tb); const scroll = el('div', 'cost-table-container'); scroll.append(t); sec.append(scroll);
+        const rows = agents.slice().sort((x, y) => (y.done || 0) - (x.done || 0));
+        sec.append(dataTable({ label: 'Task time by agent', fold: 'labeled', rows, rowKey: a => a.name || '', columns: [
+            { key: 'name', label: 'Agent', tone: 'primary', cell: a => a.name || '' },
+            { key: 'done', label: 'Tasks done', numeric: true, cell: a => String(a.done || 0) },
+            { key: 'median', label: 'Median time', numeric: true, cell: a => (num(a.median_s) != null ? fmtDur(a.median_s) : '—') },
+            { key: 'sent_back', label: 'Sent back', numeric: true, cell: a => (num(a.sent_back) != null ? String(a.sent_back) : '—') },
+        ] }).el);
     }
     shape(body, { sub: `Team ${keyLabel(model.team)} · ${word} against the 7 days before`, headline: timeHeadline(w, u, word), cards, chart: box, how: SHAPE_HOW(TIME_HOW), table: sec });
 }
