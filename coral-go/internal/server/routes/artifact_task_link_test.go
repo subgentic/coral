@@ -196,7 +196,11 @@ func TestTheTeamListShowsAnUploadsTaskOnlyWhenItIsTheTeamsAndFiltersByIt(t *test
 		require.NoError(t, os.WriteFile(path, raw, 0o644))
 	}
 	setTask(linked, task)
-	setTask(foreign, 99999) // a number that is not a task of this team (another board's, or one that is gone)
+	setTask(foreign, 99999) // a number that is not a task of any board
+	elsewhere, err := e.h.bs.CreateTask(context.Background(), "beta", "Another team's secret task", "", "medium", "lead")
+	require.NoError(t, err)
+	otherBoard := e.upload(sessAlice, "otherboard.md", "other board bytes", "text/markdown", "2026-10-09T12:00:00Z")
+	setTask(otherBoard, elsewhere.ID) // a real task, of another board: its number is the team's to know, its title is not
 
 	code, r, raw := e.get("")
 	require.Equal(t, 200, code, taJSON(raw))
@@ -207,6 +211,8 @@ func TestTheTeamListShowsAnUploadsTaskOnlyWhenItIsTheTeamsAndFiltersByIt(t *test
 	assert.Equal(t, task, byName["linked.md"].TaskID)
 	assert.Equal(t, "The linked task", byName["linked.md"].TaskTitle)
 	assert.Zero(t, byName["foreign.md"].TaskID, "a task the team does not have is not shown")
+	assert.Zero(t, byName["otherboard.md"].TaskID, "another board's real task is not shown either")
+	assert.Empty(t, byName["otherboard.md"].TaskTitle, "and its title never reaches this team's list")
 	assert.Zero(t, byName["a_b.md"].TaskID, "an upload with no link is as before")
 
 	assert.Equal(t, []string{"linked.md"}, e.names("?task="+strconv.FormatInt(task, 10)))
