@@ -1,0 +1,1283 @@
+{
+  "a payload over the size bound records nothing": {
+    "requests": []
+  },
+  "agy PreToolUse ask_question is a wait": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/coral-hook-agentic-state/pending-tool",
+        "body": {
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "tool_input": {
+            "Questions": [
+              {
+                "Options": [
+                  "PostgreSQL",
+                  "SQLite"
+                ],
+                "Question": "Which database should we use?"
+              }
+            ],
+            "toolAction": "Asking a question",
+            "toolSummary": "Question to the user"
+          },
+          "tool_name": "ask_question",
+          "tool_use_id": "agy-step-4"
+        }
+      },
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/coral-hook-agentic-state/events",
+        "body": {
+          "detail_json": {
+            "kind": "question",
+            "tool_name": "ask_question"
+          },
+          "event_type": "permission_request",
+          "hooks_rev": 3,
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Waiting for the user: question (ask_question)",
+          "tool_name": "ask_question",
+          "tool_use_id": "agy-step-4"
+        }
+      }
+    ]
+  },
+  "agy event Coral does not record is dropped": {
+    "requests": []
+  },
+  "an agy Stop is not handed board messages, whatever the session is called": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/coral-hook-agentic-state/events",
+        "body": {
+          "event_type": "stop",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Agent stopped: no_tool_call"
+        }
+      }
+    ]
+  },
+  "an agy event carries no permission_mode, whatever the session is called": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/coral-hook-agentic-state/events",
+        "body": {
+          "detail_json": {
+            "command": "cat sample.txt"
+          },
+          "event_type": "tool_use",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Ran: cat sample.txt",
+          "tool_name": "run_command",
+          "tool_use_id": "agy-step-2"
+        }
+      }
+    ]
+  },
+  "an empty stdin records nothing": {
+    "requests": []
+  },
+  "claude --hooks-rev is on the event": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/events",
+        "body": {
+          "detail_json": {
+            "file_path": "/work/dev/a.go"
+          },
+          "event_type": "tool_use",
+          "hooks_rev": 7,
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Read a.go",
+          "tool_name": "Read"
+        }
+      }
+    ]
+  },
+  "claude --hooks-rev that is not a number is ignored": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/events",
+        "body": {
+          "detail_json": {
+            "file_path": "/work/dev/a.go"
+          },
+          "event_type": "tool_use",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Read a.go",
+          "tool_name": "Read"
+        }
+      }
+    ]
+  },
+  "claude --session-clear marks the clear": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/events",
+        "body": {
+          "event_type": "session_reset",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Session reset: /clear"
+        }
+      }
+    ]
+  },
+  "claude Notification": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/events",
+        "body": {
+          "event_type": "notification",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Notification: Claude is waiting for your input"
+        }
+      }
+    ]
+  },
+  "claude PermissionRequest": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/events",
+        "body": {
+          "detail_json": {
+            "kind": "permission",
+            "tool_name": "Bash",
+            "wants": "Wants to run: go test ./..."
+          },
+          "event_type": "permission_request",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Waiting for the user: permission (Bash)",
+          "tool_name": "Bash"
+        }
+      }
+    ]
+  },
+  "claude PostToolUse is an activity event": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/events",
+        "body": {
+          "detail_json": {
+            "command": "go test ./..."
+          },
+          "event_type": "tool_use",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Ran: go test ./...",
+          "tool_name": "Bash",
+          "tool_use_id": "toolu_1"
+        }
+      }
+    ]
+  },
+  "claude PostToolUse when Coral refuses the event": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/events",
+        "body": {
+          "detail_json": {
+            "command": "go test ./..."
+          },
+          "event_type": "tool_use",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Ran: go test ./...",
+          "tool_name": "Bash"
+        }
+      }
+    ]
+  },
+  "claude PostToolUseFailure": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/events",
+        "body": {
+          "detail_json": {
+            "command": "go test ./...",
+            "error": "exit status 1",
+            "failed": true
+          },
+          "event_type": "tool_use",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Failed: Ran: go test ./...",
+          "tool_name": "Bash"
+        }
+      }
+    ]
+  },
+  "claude PreToolUse records the pending tool": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/pending-tool",
+        "body": {
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "tool_input": {
+            "command": "go test ./..."
+          },
+          "tool_name": "Bash",
+          "tool_use_id": "toolu_1"
+        }
+      }
+    ]
+  },
+  "claude PreToolUse without a tool name records nothing": {
+    "requests": []
+  },
+  "claude SessionStart": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/events",
+        "body": {
+          "event_type": "session_reset",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Session started"
+        }
+      }
+    ]
+  },
+  "claude Stop a hand-off without a reason is not one": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/turn-end",
+        "body": {
+          "stop_hook_active": false
+        }
+      },
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/events",
+        "body": {
+          "event_type": "stop",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Agent stopped: unknown"
+        }
+      }
+    ]
+  },
+  "claude Stop already handed over is an event, with no question to Coral": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/events",
+        "body": {
+          "event_type": "stop",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Agent stopped: unknown"
+        }
+      }
+    ]
+  },
+  "claude Stop forwards the token usage": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/turn-end",
+        "body": {
+          "stop_hook_active": false
+        }
+      },
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/events",
+        "body": {
+          "event_type": "stop",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Agent stopped: unknown"
+        }
+      },
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/token-usage",
+        "body": {
+          "cost_usd": 0.0421,
+          "input_tokens": 1200,
+          "num_turns": 3,
+          "output_tokens": 340,
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d"
+        }
+      }
+    ]
+  },
+  "claude Stop hands over board messages and records no stop": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/turn-end",
+        "body": {
+          "stop_hook_active": false
+        }
+      }
+    ],
+    "stdout": "{\"decision\":\"block\",\"hookSpecificOutput\":{\"additionalContext\":\"Coral board: 2 new messages on team. Run coral-board read to read them, then carry on.\",\"hookEventName\":\"Stop\"},\"reason\":\"New board messages\"}"
+  },
+  "claude Stop is an event": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/turn-end",
+        "body": {
+          "stop_hook_active": false
+        }
+      },
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/events",
+        "body": {
+          "event_type": "stop",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Agent stopped: unknown"
+        }
+      }
+    ]
+  },
+  "claude Stop when Coral answers the events post with a 500: the usage still follows (a status is not a failure to the hook)": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/turn-end",
+        "body": {
+          "stop_hook_active": false
+        }
+      },
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/events",
+        "body": {
+          "event_type": "stop",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Agent stopped: unknown"
+        }
+      },
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/token-usage",
+        "body": {
+          "cost_usd": null,
+          "input_tokens": 10,
+          "num_turns": null,
+          "output_tokens": null,
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d"
+        }
+      }
+    ]
+  },
+  "claude Stop with only a cost forwards the usage": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/turn-end",
+        "body": {
+          "stop_hook_active": false
+        }
+      },
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/events",
+        "body": {
+          "event_type": "stop",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Agent stopped: unknown"
+        }
+      },
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/token-usage",
+        "body": {
+          "cost_usd": 1.5,
+          "input_tokens": null,
+          "num_turns": null,
+          "output_tokens": null,
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d"
+        }
+      }
+    ]
+  },
+  "claude UserPromptSubmit": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/events",
+        "body": {
+          "event_type": "prompt_submit",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "User submitted prompt"
+        }
+      }
+    ]
+  },
+  "claude permission_mode is on the event": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/events",
+        "body": {
+          "detail_json": {
+            "file_path": "/work/dev/a.go"
+          },
+          "event_type": "tool_use",
+          "permission_mode": "plan",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Read a.go",
+          "tool_name": "Read"
+        }
+      }
+    ]
+  },
+  "claude permission_mode that is not a mode is dropped": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/events",
+        "body": {
+          "detail_json": {
+            "file_path": "/work/dev/a.go"
+          },
+          "event_type": "tool_use",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Read a.go",
+          "tool_name": "Read"
+        }
+      }
+    ]
+  },
+  "codex PostToolUse with arguments instead of tool_input (#8389)": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/events",
+        "body": {
+          "detail_json": null,
+          "event_type": "tool_use",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Used shell",
+          "tool_name": "shell",
+          "tool_use_id": "call_1"
+        }
+      }
+    ]
+  },
+  "codex PreToolUse with arguments instead of tool_input (#8389)": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/pending-tool",
+        "body": {
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "tool_input": {
+            "command": [
+              "ls",
+              "-la"
+            ]
+          },
+          "tool_name": "shell",
+          "tool_use_id": "call_1"
+        }
+      }
+    ]
+  },
+  "codex PreToolUse with input": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/pending-tool",
+        "body": {
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "tool_input": {
+            "patch": "*** Begin Patch"
+          },
+          "tool_name": "apply_patch",
+          "tool_use_id": ""
+        }
+      }
+    ]
+  },
+  "codex Stop is an event with no turn-end question": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/events",
+        "body": {
+          "event_type": "stop",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Agent stopped: unknown"
+        }
+      }
+    ]
+  },
+  "codex permission_mode is not sent": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/events",
+        "body": {
+          "detail_json": {
+            "file_path": "/work/dev/a.go"
+          },
+          "event_type": "tool_use",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Read a.go",
+          "tool_name": "Read"
+        }
+      }
+    ]
+  },
+  "corpus agy-1.4.2/PostToolUse-read_url_content": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/coral-hook-agentic-state/events",
+        "body": {
+          "detail_json": {
+            "url": "https://example.com"
+          },
+          "event_type": "tool_use",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Fetched https://example.com",
+          "tool_name": "read_url_content",
+          "tool_use_id": "agy-step-2"
+        }
+      }
+    ]
+  },
+  "corpus agy-1.4.2/PostToolUse-replace_file_content": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/coral-hook-agentic-state/events",
+        "body": {
+          "detail_json": {
+            "file_path": "/tmp/test_collector_write.txt"
+          },
+          "event_type": "tool_use",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Edited test_collector_write.txt",
+          "tool_name": "replace_file_content",
+          "tool_use_id": "agy-step-2"
+        }
+      }
+    ]
+  },
+  "corpus agy-1.4.2/PostToolUse-run_command-failed": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/coral-hook-agentic-state/events",
+        "body": {
+          "detail_json": {
+            "command": "exit 1"
+          },
+          "event_type": "tool_use",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Ran: exit 1",
+          "tool_name": "run_command",
+          "tool_use_id": "agy-step-2"
+        }
+      }
+    ]
+  },
+  "corpus agy-1.4.2/PostToolUse-run_command-ok": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/coral-hook-agentic-state/events",
+        "body": {
+          "detail_json": {
+            "command": "echo 'EXIT_ZERO_TEST'"
+          },
+          "event_type": "tool_use",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Ran: echo 'EXIT_ZERO_TEST'",
+          "tool_name": "run_command",
+          "tool_use_id": "agy-step-2"
+        }
+      }
+    ]
+  },
+  "corpus agy-1.4.2/PostToolUse-search_web": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/coral-hook-agentic-state/events",
+        "body": {
+          "detail_json": {
+            "query": "golang"
+          },
+          "event_type": "tool_use",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Searched: golang",
+          "tool_name": "search_web",
+          "tool_use_id": "agy-step-2"
+        }
+      }
+    ]
+  },
+  "corpus agy-1.4.2/PostToolUse-view_file": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/coral-hook-agentic-state/events",
+        "body": {
+          "detail_json": {
+            "file_path": "/tmp/test_collector_write.txt"
+          },
+          "event_type": "tool_use",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Read test_collector_write.txt",
+          "tool_name": "view_file",
+          "tool_use_id": "agy-step-2"
+        }
+      }
+    ]
+  },
+  "corpus agy-1.4.2/PostToolUse-write_to_file": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/coral-hook-agentic-state/events",
+        "body": {
+          "detail_json": {
+            "file_path": "/tmp/test_collector_write.txt"
+          },
+          "event_type": "tool_use",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Wrote test_collector_write.txt",
+          "tool_name": "write_to_file",
+          "tool_use_id": "agy-step-2"
+        }
+      }
+    ]
+  },
+  "corpus agy-1.4.2/PreToolUse-ask_question": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/coral-hook-agentic-state/pending-tool",
+        "body": {
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "tool_input": {
+            "Questions": [
+              {
+                "Options": [
+                  "PostgreSQL",
+                  "SQLite"
+                ],
+                "Question": "Which database should we use?"
+              }
+            ],
+            "toolAction": "Asking a question",
+            "toolSummary": "Question to the user"
+          },
+          "tool_name": "ask_question",
+          "tool_use_id": "agy-step-4"
+        }
+      },
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/coral-hook-agentic-state/events",
+        "body": {
+          "detail_json": {
+            "kind": "question",
+            "tool_name": "ask_question"
+          },
+          "event_type": "permission_request",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Waiting for the user: question (ask_question)",
+          "tool_name": "ask_question",
+          "tool_use_id": "agy-step-4"
+        }
+      }
+    ]
+  },
+  "corpus agy-1.4.2/PreToolUse-run_command": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/coral-hook-agentic-state/pending-tool",
+        "body": {
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "tool_input": {
+            "CommandLine": "ls -la",
+            "Cwd": "/WORK/coral_agyhooks",
+            "toolAction": "Running shell command",
+            "toolSummary": "Shell command execution"
+          },
+          "tool_name": "run_command",
+          "tool_use_id": "agy-step-2"
+        }
+      }
+    ]
+  },
+  "corpus agy-1.4.2/SessionStart": {
+    "requests": []
+  },
+  "corpus agy-1.4.7/PostInvocation-0": {
+    "requests": []
+  },
+  "corpus agy-1.4.7/PostInvocation-1": {
+    "requests": []
+  },
+  "corpus agy-1.4.7/PostToolUse-0": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/coral-hook-agentic-state/events",
+        "body": {
+          "detail_json": {
+            "command": "cat sample.txt"
+          },
+          "event_type": "tool_use",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Ran: cat sample.txt",
+          "tool_name": "run_command",
+          "tool_use_id": "agy-step-2"
+        }
+      }
+    ]
+  },
+  "corpus agy-1.4.7/PreInvocation-0": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/coral-hook-agentic-state/context-window",
+        "body": {
+          "model": "gemini-4-argon-medium",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d"
+        }
+      },
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/coral-hook-agentic-state/events",
+        "body": {
+          "event_type": "prompt_submit",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "User submitted prompt"
+        }
+      }
+    ]
+  },
+  "corpus agy-1.4.7/PreInvocation-1": {
+    "requests": []
+  },
+  "corpus agy-1.4.7/PreToolUse-0": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/coral-hook-agentic-state/pending-tool",
+        "body": {
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "tool_input": {
+            "CommandLine": "cat sample.txt",
+            "WaitMsBeforeAsync": 5000,
+            "toolSummary": "Read sample.txt contents"
+          },
+          "tool_name": "run_command",
+          "tool_use_id": "agy-step-2"
+        }
+      }
+    ]
+  },
+  "corpus agy-1.4.7/SessionStart-0": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/coral-hook-agentic-state/context-window",
+        "body": {
+          "model": "gemini-4-argon-medium",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d"
+        }
+      },
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/coral-hook-agentic-state/events",
+        "body": {
+          "event_type": "session_reset",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Session started"
+        }
+      }
+    ]
+  },
+  "corpus agy-1.4.7/Stop-0": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/coral-hook-agentic-state/events",
+        "body": {
+          "event_type": "stop",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Agent stopped: no_tool_call"
+        }
+      }
+    ]
+  },
+  "corpus claude-2.1.300/Notification-permission_prompt": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/WORK/events",
+        "body": {
+          "detail_json": {
+            "notification_type": "permission_prompt"
+          },
+          "event_type": "notification",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Notification: Claude needs your permission"
+        }
+      }
+    ]
+  },
+  "corpus claude-2.1.300/PermissionRequest-AskUserQuestion": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/WORK/events",
+        "body": {
+          "detail_json": {
+            "kind": "question",
+            "tool_name": "AskUserQuestion",
+            "wants": "Wants to use AskUserQuestion"
+          },
+          "event_type": "permission_request",
+          "permission_mode": "default",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Waiting for the user: question (AskUserQuestion)",
+          "tool_name": "AskUserQuestion"
+        }
+      }
+    ]
+  },
+  "corpus claude-2.1.300/PermissionRequest-Bash": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/WORK/events",
+        "body": {
+          "detail_json": {
+            "kind": "permission",
+            "tool_name": "Bash",
+            "wants": "Wants to run: touch p0-deny-test.txt"
+          },
+          "event_type": "permission_request",
+          "permission_mode": "default",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Waiting for the user: permission (Bash)",
+          "tool_name": "Bash"
+        }
+      }
+    ]
+  },
+  "corpus claude-2.1.300/PermissionRequest-ExitPlanMode": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/WORK/events",
+        "body": {
+          "detail_json": {
+            "kind": "plan",
+            "tool_name": "ExitPlanMode",
+            "wants": "Wants to use ExitPlanMode"
+          },
+          "event_type": "permission_request",
+          "permission_mode": "plan",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Waiting for the user: plan (ExitPlanMode)",
+          "tool_name": "ExitPlanMode"
+        }
+      }
+    ]
+  },
+  "corpus claude-2.1.300/PostToolBatch": {
+    "requests": []
+  },
+  "corpus claude-2.1.300/PostToolUse-AskUserQuestion": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/WORK/events",
+        "body": {
+          "detail_json": null,
+          "duration_ms": 1,
+          "event_type": "tool_use",
+          "permission_mode": "default",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Used AskUserQuestion",
+          "tool_name": "AskUserQuestion",
+          "tool_use_id": "toolu_012MBq9fM4xtNEjfnpLdREtq"
+        }
+      }
+    ]
+  },
+  "corpus claude-2.1.300/PostToolUse-ToolSearch": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/WORK/events",
+        "body": {
+          "detail_json": {
+            "response": {
+              "total_deferred_tools": 84
+            }
+          },
+          "duration_ms": 1,
+          "event_type": "tool_use",
+          "permission_mode": "plan",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Used ToolSearch",
+          "tool_name": "ToolSearch",
+          "tool_use_id": "toolu_01AZwLp5Z5TdkquBsqF2hPtc"
+        }
+      }
+    ]
+  },
+  "corpus claude-2.1.300/PostToolUse-Write": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/WORK/events",
+        "body": {
+          "detail_json": {
+            "file_path": "/HOME/.claude/plans/plan-how-to-create-delegated-tome.md",
+            "response": {
+              "type": "create",
+              "userModified": false
+            }
+          },
+          "duration_ms": 6,
+          "event_type": "tool_use",
+          "permission_mode": "plan",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Created plan-how-to-create-delegated-tome.md",
+          "tool_name": "Write",
+          "tool_use_id": "toolu_01ECrGrDnpZL3u2vSXtN41BU"
+        }
+      }
+    ]
+  },
+  "corpus claude-2.1.300/PreToolUse-AskUserQuestion": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/WORK/pending-tool",
+        "body": {
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "tool_input": {
+            "questions": [
+              {
+                "header": "Color",
+                "multiSelect": false,
+                "options": [
+                  {
+                    "description": "Choose red",
+                    "label": "Red"
+                  },
+                  {
+                    "description": "Choose blue",
+                    "label": "Blue"
+                  }
+                ],
+                "question": "Pick a color:"
+              }
+            ]
+          },
+          "tool_name": "AskUserQuestion",
+          "tool_use_id": "toolu_012MBq9fM4xtNEjfnpLdREtq"
+        }
+      }
+    ]
+  },
+  "corpus claude-2.1.300/PreToolUse-Bash": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/WORK/pending-tool",
+        "body": {
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "tool_input": {
+            "command": "touch p0-deny-test.txt",
+            "description": "Create empty file p0-deny-test.txt"
+          },
+          "tool_name": "Bash",
+          "tool_use_id": "toolu_01D4e9svbsDv2mwn775owhgp"
+        }
+      }
+    ]
+  },
+  "corpus claude-2.1.300/PreToolUse-ExitPlanMode": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/WORK/pending-tool",
+        "body": {
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "tool_input": {
+            "plan": "1. Create /WORK/p0-plan.txt with the Write tool, containing the text \"hello\".\n2. Verify by reading the file back to confirm its contents.\n",
+            "planFilePath": "/HOME/.claude/plans/plan-how-to-create-delegated-tome.md"
+          },
+          "tool_name": "ExitPlanMode",
+          "tool_use_id": "toolu_01S7d8ocYET3MtY8TcLnU75W"
+        }
+      }
+    ]
+  },
+  "corpus claude-2.1.300/PreToolUse-ToolSearch": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/WORK/pending-tool",
+        "body": {
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "tool_input": {
+            "max_results": 1,
+            "query": "select:ExitPlanMode"
+          },
+          "tool_name": "ToolSearch",
+          "tool_use_id": "toolu_01AZwLp5Z5TdkquBsqF2hPtc"
+        }
+      }
+    ]
+  },
+  "corpus claude-2.1.300/PreToolUse-Write": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/WORK/pending-tool",
+        "body": {
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "tool_input": {
+            "content": "1. Create /WORK/p0-plan.txt with the Write tool, containing the text \"hello\".\n2. Verify by reading the file back to confirm its contents.\n",
+            "file_path": "/HOME/.claude/plans/plan-how-to-create-delegated-tome.md"
+          },
+          "tool_name": "Write",
+          "tool_use_id": "toolu_01ECrGrDnpZL3u2vSXtN41BU"
+        }
+      }
+    ]
+  },
+  "corpus claude-2.1.300/SessionStart": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/WORK/events",
+        "body": {
+          "event_type": "session_reset",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Session started"
+        }
+      }
+    ]
+  },
+  "corpus claude-2.1.300/Stop": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/WORK/turn-end",
+        "body": {
+          "stop_hook_active": false
+        }
+      },
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/WORK/events",
+        "body": {
+          "event_type": "stop",
+          "permission_mode": "default",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Agent stopped: unknown"
+        }
+      }
+    ]
+  },
+  "corpus claude-2.1.300/Stop-active": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/WORK/events",
+        "body": {
+          "event_type": "stop",
+          "permission_mode": "plan",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Agent stopped: unknown"
+        }
+      }
+    ]
+  },
+  "corpus claude-2.1.300/UserPromptSubmit": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/WORK/events",
+        "body": {
+          "event_type": "prompt_submit",
+          "permission_mode": "default",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "User submitted prompt"
+        }
+      }
+    ]
+  },
+  "corpus codex-0.155.1/PostToolUse-failed": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/proj/events",
+        "body": {
+          "detail_json": {
+            "command": "printf approved-x; exit 1"
+          },
+          "event_type": "tool_use",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Ran: printf approved-x; exit 1",
+          "tool_name": "Bash",
+          "tool_use_id": "call_1"
+        }
+      }
+    ]
+  },
+  "corpus codex-0.155.1/PostToolUse-ok": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/proj/events",
+        "body": {
+          "detail_json": {
+            "command": "printf ok-x"
+          },
+          "event_type": "tool_use",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Ran: printf ok-x",
+          "tool_name": "Bash",
+          "tool_use_id": "call_2"
+        }
+      }
+    ]
+  },
+  "corpus codex-0.155.1/SessionStart": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/proj/events",
+        "body": {
+          "event_type": "session_reset",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Session started"
+        }
+      }
+    ]
+  },
+  "corpus codex-0.155.1/Stop": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/proj/events",
+        "body": {
+          "event_type": "stop",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Agent stopped: unknown"
+        }
+      }
+    ]
+  },
+  "corpus codex-0.163.0/PermissionRequest-approval": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/\u003cTEST_WORKDIR\u003e/events",
+        "body": {
+          "detail_json": {
+            "kind": "permission",
+            "tool_name": "Bash",
+            "wants": "Wants to run: python3 -c \"print('[FAKE_GITHUB_TOKEN_REDACTED]', '~/APPROVE6621.txt')\""
+          },
+          "event_type": "permission_request",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Waiting for the user: permission (Bash)",
+          "tool_name": "Bash"
+        }
+      }
+    ]
+  },
+  "corpus codex-0.163.0/PermissionRequest-cancel": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/\u003cTEST_WORKDIR\u003e/events",
+        "body": {
+          "detail_json": {
+            "kind": "permission",
+            "tool_name": "Bash",
+            "wants": "Wants to run: python3 -c \"print('[FAKE_GITHUB_TOKEN_REDACTED]', '~/DENY6621.txt')\""
+          },
+          "event_type": "permission_request",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Waiting for the user: permission (Bash)",
+          "tool_name": "Bash"
+        }
+      }
+    ]
+  },
+  "no agent name drops the event": {
+    "requests": []
+  },
+  "not JSON records nothing": {
+    "requests": []
+  },
+  "the event is named by event before event_name": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/events",
+        "body": {
+          "event_type": "notification",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Notification: m"
+        }
+      }
+    ]
+  },
+  "the event is named by hook_event_name before type": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/turn-end",
+        "body": {
+          "stop_hook_active": false
+        }
+      },
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/events",
+        "body": {
+          "event_type": "stop",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "Agent stopped: unknown"
+        }
+      }
+    ]
+  },
+  "the event is named by type when there is no hook_event_name": {
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/api/sessions/live/dev/events",
+        "body": {
+          "event_type": "prompt_submit",
+          "session_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "summary": "User submitted prompt"
+        }
+      }
+    ]
+  }
+}
