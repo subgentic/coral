@@ -10,6 +10,11 @@ assert.deepEqual(templatesOf({ agents: [1] }), [1]);
 assert.deepEqual(templatesOf({ commands: [2] }), [2]);
 assert.deepEqual(templatesOf([3]), [3]);
 assert.deepEqual(templatesOf({ agents: [1], commands: [2] }), [1], 'agents come first');
+for (const bad of [{}, null, undefined, 'oops', 7, { error: 'x' }, { categories: 'x' }, { agents: {} }]) {
+    assert.deepEqual(categoriesOf(bad), [], `a malformed answer (${JSON.stringify(bad)}) has no categories`);
+    assert.deepEqual(templatesOf(bad), [], `a malformed answer (${JSON.stringify(bad)}) has no templates`);
+}
+assert.deepEqual(categoriesOf({ categories: 'x', commands: ['b'] }), ['b'], 'a key that is not a list is skipped');
 
 assert.equal(categoryName({ name: 'dev-tools' }), 'dev-tools');
 assert.equal(categoryName('plain'), 'plain');
