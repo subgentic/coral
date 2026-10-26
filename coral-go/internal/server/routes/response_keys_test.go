@@ -120,6 +120,11 @@ func TestGoalListsSendTheKeysTheFrontendReads(t *testing.T) {
 	allGoals, _ := all["goals"].([]any)
 	require.NotEmpty(t, allGoals)
 	requireKeys(t, "a goal of the all-boards list", allGoals[0].(map[string]any), "id", "board_id", "title", "outcome", "state", "rollup.done", "rollup.total", "updated_at")
+
+	// every team's artifacts (inbox_artifacts.js, Goal #62): the team route's keys, the team each row belongs to, and the teams the Team filter offers
+	code, teamArts := call("GET", "/api/team-artifacts?limit=5", nil)
+	require.Equal(t, http.StatusOK, code)
+	requireKeys(t, "GET /api/team-artifacts", teamArts, "artifacts", "total", "all", "teams", "limit", "offset", "has_more", "truncated")
 }
 
 // History (api.js loadHistorySessionsPaged, mailbox_chats.js readMore/chatSections, history_list.js, board_agent_links.js): GET /api/sessions/history and /history/counts.

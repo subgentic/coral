@@ -253,6 +253,8 @@ var routeTable = cat(
 		"/api/board/{project}/tasks/{id}/artifact-content",
 		"/api/board/{project}/artifacts",
 		"/api/session-artifacts",
+		// Every team's artifacts in one list (Goal #62, the Inbox's Artifacts folder): the team route's query plus team, one cursor, the owner's alone like the per-team read.
+		"/api/team-artifacts",
 	)),
 	// A comment, a reply (the same route with a parent_id) and a resolve or reopen, through the Hub (#7052, the Hub's #7039 request): the OWNER's alone, as the artifact reads are (#5575). A comment changes state on this
 	// computer and runs nothing, so Interact; the machine's own mode still caps it. Edit and delete (PATCH, DELETE), send (hands a thread to an agent), the lock and an agent's reply (POST .../{id}/reply, which is never a person's

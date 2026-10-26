@@ -112,6 +112,7 @@ GET /api/sessions/{sessionID}/changes | unbound
 GET /api/sessions/{sessionID}/changes.diff | unbound
 GET /api/sessions/{sessionID}/resolve | token-session
 GET /api/sessions/{sessionID}/status | unbound
+GET /api/team-artifacts | token-session | operator-only
 GET /api/token-usage/summary | token-session
 GET /api/token-usage/timeseries | token-session
 GET /api/token-usage/turns | token-session | operator-only

@@ -191,6 +191,7 @@ GET /api/tags view
 GET /api/tasks/active view
 GET /api/tasks/runs never
 GET /api/tasks/runs/{runID} never
+GET /api/team-artifacts view
 GET /api/teams/all view
 GET /api/teams/detail/{name} view
 GET /api/teams/detail/{name}/availability view
