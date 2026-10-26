@@ -339,33 +339,9 @@ func winStageRisk(st winStage, outside func(string) bool) string {
 	if len(st.words) == 0 {
 		return ""
 	}
-	words := splitGlued(st.words)
-	if strings.Contains(words[0], "^") {
-		return "its command is written with cmd escapes (^)"
-	}
-	// cmd's echo-off prefix (@format C:) and the call operator glued to its command (&cmd /c ...): the command is what follows.
-	if len(words[0]) > 1 && (words[0][0] == '@' || words[0][0] == '&') {
-		words = append([]string{words[0][1:]}, words[1:]...)
-		words = splitGlued(words)
-	}
-	// A command held in a variable (%COMSPEC% /c format C:, $env:ComSpec ...) cannot be read; an assignment ($x = 1, $x=1) is not a command.
-	if first := words[0]; winVarCommandRe.MatchString(first) && !(len(words) > 1 && winAssignRe.MatchString(words[1])) {
-		return "its command (" + first + ") comes from a variable Coral can't read"
-	}
-	words[0] = moduleQualified(words[0])
-	// The call operator and dot-sourcing: & 'path' args, . .\script.ps1.
-	if words[0] == "&" || words[0] == "." {
-		if len(words) == 1 {
-			return ""
-		}
-		words = splitGlued(words[1:])
-		words[0] = moduleQualified(words[0])
-		if !strings.Contains(words[0], groupMark) && !winKnownCommand(words[0]) && pathOutside(words[0], outside) {
-			return "it runs a script outside the working directory (" + words[0] + ")"
-		}
-		if strings.Contains(words[0], groupMark) {
-			return "" // a script block: its text was judged as a command
-		}
+	words, why, done := normalizeWinWords(st, outside)
+	if done {
+		return why
 	}
 	name := cmdName(words[0])
 	args := words[1:]
@@ -715,6 +691,39 @@ func winStageRisk(st winStage, outside func(string) bool) string {
 		}
 	}
 	return ""
+}
+
+// normalizeWinWords reads the stage's words as the command that will run: the cmd escapes, the echo-off and call prefixes, a command held in a variable, the module qualifier, and the call operator or dot-sourcing. It returns the words to judge, or done with the reason (possibly none) when the stage is already decided.
+func normalizeWinWords(st winStage, outside func(string) bool) (words []string, why string, done bool) {
+	words = splitGlued(st.words)
+	if strings.Contains(words[0], "^") {
+		return nil, "its command is written with cmd escapes (^)", true
+	}
+	// cmd's echo-off prefix (@format C:) and the call operator glued to its command (&cmd /c ...): the command is what follows.
+	if len(words[0]) > 1 && (words[0][0] == '@' || words[0][0] == '&') {
+		words = append([]string{words[0][1:]}, words[1:]...)
+		words = splitGlued(words)
+	}
+	// A command held in a variable (%COMSPEC% /c format C:, $env:ComSpec ...) cannot be read; an assignment ($x = 1, $x=1) is not a command.
+	if first := words[0]; winVarCommandRe.MatchString(first) && !(len(words) > 1 && winAssignRe.MatchString(words[1])) {
+		return nil, "its command (" + first + ") comes from a variable Coral can't read", true
+	}
+	words[0] = moduleQualified(words[0])
+	// The call operator and dot-sourcing: & 'path' args, . .\script.ps1.
+	if words[0] == "&" || words[0] == "." {
+		if len(words) == 1 {
+			return nil, "", true
+		}
+		words = splitGlued(words[1:])
+		words[0] = moduleQualified(words[0])
+		if !strings.Contains(words[0], groupMark) && !winKnownCommand(words[0]) && pathOutside(words[0], outside) {
+			return nil, "it runs a script outside the working directory (" + words[0] + ")", true
+		}
+		if strings.Contains(words[0], groupMark) {
+			return nil, "", true // a script block: its text was judged as a command
+		}
+	}
+	return words, "", false
 }
 
 // stageRedirectRisk judges where the stage's redirections write: into a git hook or config, or outside the working directory.
