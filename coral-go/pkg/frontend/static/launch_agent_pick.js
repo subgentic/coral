@@ -17,43 +17,52 @@ async function probe(server, type) {
     } catch { return null; }
 }
 
-/** Fill `group` (the element) with the radios for the agent select of `form`. */
+/** Fill `group` (the element) with the radios for the agent select of `form`. The four are drawn at once, in their usual order and usable; when the CLI probes answer (up to PROBE_MS later) the missing ones are marked, the installed ones
+ *  move first and an installed agent is selected when nothing was chosen and Claude is missing: none of it while a person is on the group or has chosen (the order and the selection never move under them, #8024). group.dataset.probed says the answers are in. */
 export async function buildAgentPick({ group, form, server, implicitDefault }) {
     const select = form && form.querySelector('.acf-agent-type');
     if (!group || !select) return;
     const token = (group._pickToken = (group._pickToken || 0) + 1);
-    group.hidden = true;
-    form.classList.remove('has-agent-pick');
+    delete group.dataset.probed;
     group.querySelectorAll('.launch-agent-opt').forEach(e => e.remove()); // the "Agent:" label stays
-    const found = await Promise.all(TYPES.map(([t]) => Promise.race([probe(server, t), new Promise(r => setTimeout(() => r(null), PROBE_MS))])));
-    if (group._pickToken !== token || !group.isConnected) return; // another New Agent opened meanwhile
-    const order = TYPES.map((_, i) => i).sort((a, b) => (found[b] === true) - (found[a] === true) || a - b); // installed first, then the rest as they were
     const note = document.getElementById('launch-codex-note'); // Codex stops on Coral's hooks question the first time (hooks_review.js, #6409): said once, here, for this computer's Codex
     const sync = () => { const v = ALIAS[select.value] || select.value; for (const r of group.querySelectorAll('input')) r.checked = r.value === v; if (note) { note.hidden = !(v === 'codex' && normServer(server) === LOCAL_SERVER); describeBy(note); } };
     const describeBy = note => { // the agent radios (the group and each choice) are described by the note while it shows: a hidden note would still be read, so the link is only there then
         const on = !note.hidden;
         for (const el of [group, ...group.querySelectorAll('input')]) { if (on) el.setAttribute('aria-describedby', note.id); else el.removeAttribute('aria-describedby'); }
     };
-    for (const i of order) {
-        const [type, label] = TYPES[i];
+    let chosen = false; // a person picked an agent here, or the select moved some other way: the probes' answers leave the selection alone
+    const start = select.value;
+    const labels = new Map();
+    for (const [type, label] of TYPES) {
         const wrap = document.createElement('label');
         wrap.className = 'launch-agent-opt';
         const input = document.createElement('input');
         input.type = 'radio';
         input.name = 'launch-agent-pick';
         input.value = type;
-        input.addEventListener('change', () => { if (!input.checked) return; select.value = type; select.dispatchEvent(new Event('change', { bubbles: true })); });
+        input.addEventListener('change', () => { if (!input.checked) return; chosen = true; select.value = type; select.dispatchEvent(new Event('change', { bubbles: true })); });
         wrap.append(input, document.createTextNode(label));
-        if (found[i] === false) { const miss = document.createElement('span'); miss.className = 'launch-agent-missing'; miss.textContent = ' not installed'; wrap.append(miss); }
         group.append(wrap);
+        labels.set(type, wrap);
     }
-    select.addEventListener('change', sync);
-    // nothing was ever chosen and the built-in default is not here: start on the first agent that is
-    if (implicitDefault && (ALIAS[select.value] || select.value) === 'claude' && found[0] === false) {
-        const first = order.find(i => found[i] === true);
-        if (first !== undefined) { select.value = TYPES[first][0]; select.dispatchEvent(new Event('change', { bubbles: true })); }
-    }
+    select.addEventListener('change', () => { if (select.value !== start) chosen = true; sync(); });
     sync();
     group.hidden = false;
     form.classList.add('has-agent-pick'); // the group is the one place that names the agent: the form's own select stays (hidden by css) and follows it (#6407)
+    const found = await Promise.all(TYPES.map(([t]) => Promise.race([probe(server, t), new Promise(r => setTimeout(() => r(null), PROBE_MS))])));
+    if (group._pickToken !== token || !group.isConnected) return; // another New Agent opened meanwhile
+    TYPES.forEach(([type], i) => {
+        if (found[i] !== false || labels.get(type).querySelector('.launch-agent-missing')) return;
+        const miss = document.createElement('span'); miss.className = 'launch-agent-missing'; miss.textContent = ' not installed'; labels.get(type).append(miss);
+    });
+    const order = TYPES.map((_, i) => i).sort((a, b) => (found[b] === true) - (found[a] === true) || a - b); // installed first, then the rest as they were
+    if (!chosen && !group.contains(document.activeElement)) for (const i of order) group.append(labels.get(TYPES[i][0])); // moving a label would drop the keyboard from it: only when nobody is on the group
+    // nothing was ever chosen and the built-in default is not here: start on the first agent that is
+    if (!chosen && implicitDefault && (ALIAS[select.value] || select.value) === 'claude' && found[0] === false) {
+        const first = order.find(i => found[i] === true);
+        if (first !== undefined) { select.value = TYPES[first][0]; select.dispatchEvent(new Event('change', { bubbles: true })); chosen = false; }
+    }
+    sync();
+    group.dataset.probed = '1';
 }

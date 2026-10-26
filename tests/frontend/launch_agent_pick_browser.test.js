@@ -10,13 +10,14 @@ const BASE = require('./test_base').BASE;
     const S = `(window.__coralStatic || '/static/')`;
     const results = [];
     const check = (label, cond, detail) => { results.push(!!cond); console.log(`[${cond ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' - ' + detail : ''}`); };
-    const stub = installed => ev(`(() => { if (!window.__realFetch) window.__realFetch = window.fetch; const real = window.__realFetch; window.fetch = async (u, o = {}) => { const p = String(u), m = /\\/api\\/system\\/cli-check\\?(?:.*&)?type=([a-z]+)/.exec(p);
-        if (m) { const found = ${JSON.stringify(installed)}.includes(m[1]); return new Response(JSON.stringify({ found, agent_type: m[1], status: found ? 'available' : 'missing' }), { headers: { 'Content-Type': 'application/json' } }); } return real(u, o); }; return true; })()`);
-    const open = async () => {
+    const stub = (installed, delay = 0) => ev(`(() => { if (!window.__realFetch) window.__realFetch = window.fetch; const real = window.__realFetch; window.fetch = async (u, o = {}) => { const p = String(u), m = /\\/api\\/system\\/cli-check\\?(?:.*&)?type=([a-z]+)/.exec(p);
+        if (m) { if (${delay}) await new Promise(r => setTimeout(r, ${delay})); const found = ${JSON.stringify(installed)}.includes(m[1]); return new Response(JSON.stringify({ found, agent_type: m[1], status: found ? 'available' : 'missing' }), { headers: { 'Content-Type': 'application/json' } }); } return real(u, o); }; return true; })()`);
+    const open = async (probed = true) => {
         await ev(`(async () => { await window.showLaunchModal(); document.querySelector('#launch-step-chooser [data-arg="agent"]').click(); return true; })()`);
         await waitFor(`getComputedStyle(document.getElementById('launch-step-agent')).display !== 'none' && !!document.getElementById('launch-agent-next')`, 'the folder step', 8000);
         await ev(`(() => { const i = document.getElementById('launch-dir'); if (!i.value) i.value = '/tmp'; document.getElementById('launch-agent-next').click(); document.getElementById('launch-agent-next').click(); return true; })()`); // the agent is chosen in the third step: Next twice (#7391)
         await waitFor(`!document.getElementById('launch-agent-pick').hidden && getComputedStyle(document.getElementById('launch-agent-pick')).display !== 'none'`, 'the agent choice', 8000);
+        if (probed) await waitFor(`document.getElementById('launch-agent-pick').dataset.probed === '1'`, 'the CLI checks answered', 8000);
     };
     const state = () => ev(`(() => { const g = document.getElementById('launch-agent-pick'); const sel = document.querySelector('#launch-agent-acf .acf-agent-type'); return { labels: [...g.querySelectorAll('label')].map(l => l.textContent.trim()), checked: (g.querySelector('input:checked') || {}).value || null, select: sel.value, inMore: !!g.closest('#launch-agent-more'), shown: g.getClientRects().length > 0, role: g.getAttribute('role'), name: (document.getElementById(g.getAttribute('aria-labelledby')) || {}).textContent }; })()`);
     try {
@@ -60,6 +61,26 @@ const BASE = require('./test_base').BASE;
             await open();
             s = await state();
             check(`${tag}: when the check cannot answer, nothing is marked and Claude stays the default`, s.labels.every(l => !/not installed/.test(l)) && s.checked === 'claude', JSON.stringify([s.labels, s.checked]));
+            await ev(`window.hideLaunchModal(); true`);
+            // the probes are slow (1 s): the four choices are there at once and usable; a late answer marks them and does not undo a choice (#8024)
+            await stub(['codex', 'pi'], 1000);
+            const t0 = Date.now(); await open(false);
+            s = await state();
+            check(`${tag}: slow CLI checks: the group is shown at once, four choices in the usual order, nothing marked yet`, Date.now() - t0 < 900 && JSON.stringify(s.labels) === JSON.stringify(['Claude', 'Codex', 'Antigravity', 'Pi']) && s.checked === 'claude', JSON.stringify([Date.now() - t0, s.labels, s.checked]));
+            const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
+            await shot(`agent-pick-at-once-${w}`);
+            await ev(`document.querySelector('#launch-agent-pick input[value="agy"]').click(); true`);
+            await waitFor(`document.getElementById('launch-agent-pick').dataset.probed === '1'`, 'the late answers', 8000);
+            await shot(`agent-pick-after-probes-${w}`);
+            s = await state();
+            check(`${tag}: the late answers mark the missing ones and leave the choice a person made (Antigravity, which they marked missing)`, s.checked === 'agy' && s.select === 'agy' && s.labels.filter(l => /not installed/.test(l)).length === 2, JSON.stringify([s.checked, s.select, s.labels]));
+            await ev(`window.hideLaunchModal(); true`);
+            // nobody chose: the late answers put the installed first and select the first installed one (Claude is missing)
+            await stub(['codex', 'pi'], 600);
+            await open(false);
+            await waitFor(`document.getElementById('launch-agent-pick').dataset.probed === '1'`, 'the late answers', 8000);
+            s = await state();
+            check(`${tag}: nobody chose: the late answers order the installed first and start on Codex`, JSON.stringify(s.labels) === JSON.stringify(['Codex', 'Pi', 'Claude not installed', 'Antigravity not installed']) && s.checked === 'codex', JSON.stringify([s.labels, s.checked]));
             await ev(`window.hideLaunchModal(); true`);
         }
     } finally { /* the harness closes the page */ }
