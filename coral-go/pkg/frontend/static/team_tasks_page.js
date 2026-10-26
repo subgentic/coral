@@ -289,6 +289,19 @@ function fact(dl, label, value) {
 }
 
 /** Draw a task's page into `host`. ctx: { backLabel, onBack(), openGoal(id), project }. mode: 'view', 'edit' (the form), 'complete' (the completion form) or 'cancel' (the bar asks). */
+/** The task's follow-ups (#7816, follow_ups[] of the task's own read: id, title, status, assigned_to): the tasks made from it, in the shared task table, each opening its own page; none: no section. */
+function followUpsSection(task, ctx) {
+    const list = Array.isArray(task.follow_ups) ? task.follow_ups : [];
+    if (!list.length) return null;
+    const open = list.filter(f => f.status !== 'completed' && f.status !== 'cancelled').length;
+    const sec = el('div', 'team-task-followups');
+    sec.append(el('h3', 'goals-sub', `Follow-ups (${list.length}${open ? `, ${open} open` : ''})`));
+    const rows = list.map(f => ({ id: f.id, title: f.title, status: f.status, assigned_to: f.assigned_to }));
+    const table = DT.dataTable({ label: `Follow-ups of task ${task.id}`, columns: TC.taskColumns({}, ['state', 'task', 'who']), rows, rowKey: TC.taskKey, open: (f) => ctx.openTask?.(f), rowName: (f) => `#${f.id} ${f.title}`, sortBar: false, bare: true });
+    sec.append(table.el);
+    return sec;
+}
+
 export function renderTaskPage(host, task, ctx, mode = 'view') {
     host.replaceChildren();
     host.setAttribute('aria-label', `Task ${task.id}`);
@@ -321,6 +334,7 @@ export function renderTaskPage(host, task, ctx, mode = 'view') {
     }
     page.append(factsOf(task, ctx));
     if (task.body) { const b = el('div', 'team-task-body'), doc = Object.assign(el('pre', 'team-task-text'), { textContent: task.body }); b.append(el('h3', 'goals-sub', 'Description'), doc); page.append(b); renderTaskText(doc, task.body); }
+    const followUps = followUpsSection(task, ctx); if (followUps) page.append(followUps);
     Promise.all([importOnce('./task_detail_html.js'), importOnce('./task_list.js')]).then(([m, list]) => { // the dialog's other sections, escaped as it escaped them
         if (!page.isConnected) return;
         const extra = el('div', 'team-task-extra'); extra.innerHTML = m.taskExtraHtml(task, task.status === 'in_progress' ? list._liveCosts[task.id] : null); // the running cost of a task in progress

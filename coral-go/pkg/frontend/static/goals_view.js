@@ -21,7 +21,7 @@ const TC = await importOnce('./task_columns.js');
 const PAGE = 50; // a goal's tasks are drawn this many at a time
 import * as W from './goal_words.js';
 
-const model = { project: '', sig: '', goals: [], requireGoal: false, noGoalOpen: null, filter: 'all', openId: 0, tasks: new Map(), loading: false, failed: '', asOf: '', creating: false, taskId: 0, taskSearch: '', goalSearch: '', screen: 'goal' };
+const model = { followUps: new Map(), followKey: new Map(), project: '', sig: '', goals: [], requireGoal: false, noGoalOpen: null, filter: 'all', openId: 0, tasks: new Map(), loading: false, failed: '', asOf: '', creating: false, taskId: 0, taskSearch: '', goalSearch: '', screen: 'goal' };
 const PHONE = matchMedia('(max-width: 760px)'); // the team page's phone layout (team_page.css): a goal, its task list and a task are three screens
 let root = null;
 let layout = 'cards'; // 'cards': the board's Goals face (cards and the goal beside them); 'page': the team page's Goals tab (a table, and a goal's own page, #7453)
@@ -398,12 +398,34 @@ function drawGoalMain(main, g) {
 
 const focusHeading = (sel) => requestAnimationFrame(() => root && root.querySelector(sel)?.focus({ preventScroll: true }));
 
+/** The column's counts: the open and done tasks, and the follow-ups still open when there are any (#7816). */
+function sideCounts(g) {
+    const r = g.rollup, openN = r.active + r.blocked + r.queued, fu = model.followUps.get(g.id) || 0;
+    return `${openN} open, ${r.done} done${fu ? `, ${W.followUpsOpenText(fu)}` : ''}`;
+}
+
+/** The server counts a goal's open follow-ups where one goal is read (never in the list): read it again when the goal's tasks change, and say it in the column's head. */
+function readFollowUps(g) {
+    const key = JSON.stringify([g.id, g.rollup, g.updatedAt]);
+    if (model.followKey.get(g.id) === key) return;
+    model.followKey.set(g.id, key);
+    const project = model.project;
+    readJson(`/goals/${g.id}`).then(one => {
+        if (project !== model.project) return;
+        const n = Number(one && one.follow_ups_open) || 0;
+        if (n === (model.followUps.get(g.id) || 0)) return;
+        model.followUps.set(g.id, n);
+        const counts = model.openId === g.id && root && root.querySelector('.goal-side-counts'); if (counts) counts.textContent = sideCounts(goalById(g.id) || g);
+    }).catch(() => { model.followKey.delete(g.id); }); // a failed read is tried again at the next drawing; the count is not made up
+}
+
 /** The task column: header with the counts, search, Open then Done, each row a button that opens the task in the main pane. */
 function drawGoalSide(side, g) {
     side.replaceChildren();
     const r = g.rollup, openN = r.active + r.blocked + r.queued;
     const back = backButton(`Goal: ${g.title}`, () => { model.screen = 'goal'; drawPage(); focusHeading('.goal-tasks-open'); }); back.classList.add('goal-side-back'); // a phone's way back from the list to the goal
-    const head = el('div', 'goal-side-head'); head.append(el('strong', null, 'Tasks'), el('span', 'goal-side-counts', `${openN} open, ${r.done} done`));
+    const head = el('div', 'goal-side-head'); head.append(el('strong', null, 'Tasks'), el('span', 'goal-side-counts', sideCounts(g)));
+    readFollowUps(g);
     const search = el('input', 'goal-side-search'); search.type = 'search'; search.placeholder = 'Search tasks'; search.autocomplete = 'off'; search.maxLength = 100;
     search.setAttribute('aria-label', `Search the tasks of ${g.title}`); search.value = model.taskSearch;
     const list = el('div', 'goal-side-list');
@@ -473,6 +495,7 @@ async function showTaskInMain(main, g) {
         project: model.project, backLabel: PHONE.matches ? 'Tasks' : `Goal: ${g.title}`, goalTitleOf: (gid) => (goalById(gid) || {}).title,
         openGoal: (gid) => { if (gid === g.id) closeGoalTask(); else hooks.openGoal?.(gid); },
         onBack: () => closeGoalTask(),
+        openTask: (t) => openGoalTask(g, t), // a follow-up listed on the task's page
         onChanged: () => { loadTasks(g.id); loadGoals(); },
     });
 }

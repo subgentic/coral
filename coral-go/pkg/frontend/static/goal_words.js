@@ -73,6 +73,8 @@ export const noGoalsText = 'No goals yet. A goal says what the team is for and w
 export const showMoreText = (left, page = 50) => `Show ${Math.min(page, Math.max(0, left))} more`;
 /** Said once after it: "Showing 100 of 120 tasks". */
 export const tasksShownText = (shown, total) => `Showing ${shown} of ${total} tasks`;
+/** The goal page's count of the tasks made as follow-ups of another task that are still open (#7816, the server's follow_ups_open). */
+export const followUpsOpenText = (n) => (n === 1 ? '1 follow-up open' : `${n} follow-ups open`);
 /** Under the list when the route sent fewer tasks than the goal's rollup counts (its cap): honest about it, and where the rest are. */
 export const tasksCappedText = (shown, total) => `Showing ${shown} of ${total} tasks. The rest are on the Tasks panel.`;
 

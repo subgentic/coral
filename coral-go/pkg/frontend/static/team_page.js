@@ -270,6 +270,7 @@ export async function openTaskPage(task, from) {
     m.renderTaskPage(host, full, {
         project: S.team, backLabel,
         openGoal: (id) => { closeItem(false); openGoalPage(id); },
+        openTask: (t) => openTaskPage(t, from), // a follow-up listed on the task's page
         onBack: () => closeItem(true),
     });
     note(keyRoute('team', S.team, 'tasks', task.id));

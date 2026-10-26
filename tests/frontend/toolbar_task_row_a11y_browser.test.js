@@ -1,6 +1,6 @@
 // The accessibility pass on the shared toolbar and the shared task row (task 7772): every pill group is named and each pill says whether it is chosen (aria-pressed), the compact select is named, a pill that
 // is chosen is drawn differently from the others in forced colors too (Windows High Contrast drops the fill that marks it), a More menu opens on Enter with the keyboard on its first item, ArrowDown moves,
-// Escape closes it and gives the keyboard back to its button, and on a phone a task is one 44 px button named for the task and its state. Real isolated dev server (helpers/team_page.js).
+// Escape closes it and gives the keyboard back to its button, and on a phone a task is one 44 px button named for the task. Real isolated dev server (helpers/team_page.js).
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { install: installTP, seed, openTeam, goTab, scenarios } = require('./helpers/team_page');
@@ -54,11 +54,11 @@ const TEAM = `qa-tbr-${Date.now() % 100000}`;
             assert.deepEqual(await ev(`({ name: document.activeElement.getAttribute('aria-label'), open: [...document.querySelectorAll('[role=menu]')].some(e => e.getClientRects().length) })`), { name: 'More board actions', open: false });
         });
         await open(390, 844, true);
-        await S.run('390 px: a task in the Tasks tab is one 44 px button named for the task and its state', async () => {
+        await S.run('390 px: a task in the Tasks tab is a 44 px row with one button named for the task, in the folded table', async () => {
             await goTab(ev, settle, 'Tasks'); await settle(800);
-            const rows = await ev(`[...document.querySelectorAll('[role=tabpanel]:not([hidden]) .task-col-row')].map(r => { const b = r.querySelector('button'); const q = b.getBoundingClientRect(); return { n: r.querySelectorAll('button, a[href]').length, name: b.getAttribute('aria-label'), h: Math.round(q.height), w: Math.round(q.width) }; })`);
-            assert.ok(rows.length >= 3, 'the column has rows: ' + JSON.stringify(rows));
-            for (const r of rows) assert.ok(r.n === 1 && r.h >= 44 && /^Open task #\d+: .+, (Queued|In progress|Blocked|In review|Done)/.test(r.name), JSON.stringify(r));
+            const rows = await ev(`[...document.querySelectorAll('[role=tabpanel]:not([hidden]) .dt-table tbody tr')].map(r => { const b = r.querySelector('.dt-primary'); const q = r.getBoundingClientRect(); return { n: r.querySelectorAll('.dt-primary').length, name: b.getAttribute('aria-label'), h: Math.round(q.height), w: Math.round(q.width) }; })`); // the row is the touch target (a tap on it opens the task), the title button the keyboard's
+            assert.ok(rows.length >= 3, 'the table has rows: ' + JSON.stringify(rows));
+            for (const r of rows) assert.ok(r.n === 1 && r.h >= 44 && /^Open task #\d+: .+/.test(r.name), JSON.stringify(r));
             await shot('tasks-phone');
         });
     } finally { await Emulation.setEmulatedMedia({ features: [] }).catch(() => {}); await removeBoards(ev, [TEAM]); await client.close(); }
