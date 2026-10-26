@@ -119,7 +119,7 @@ const CASES = [
                 for (const [id, kind, v] of ${JSON.stringify(edits)}) {
                     const e = document.getElementById(id); if (!e) { missing.push(id); continue; }
                     if (kind === 'check') e.checked = !e.checked;
-                    else if (kind === 'forced') { e.checked = true; e.disabled = true; }
+                    else if (kind === 'forced') { e.checked = true; e.disabled = true; e.dataset.locked = '1'; } // what renderDebugInputLogStatus does for a forced log
                     else if (kind === 'loaded') { e.dataset.loaded = '1'; e.value = v; }
                     else if (kind === 'addopt') { if (![...e.options].some(o => o.value === v)) e.add(new Option(v, v)); e.value = v; }
                     else if (kind === 'pick') { if (![...e.options].some(o => o.value === v)) missing.push(id + '=' + v); e.value = v; }

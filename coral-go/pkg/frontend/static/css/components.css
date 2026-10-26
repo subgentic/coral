@@ -2152,12 +2152,6 @@
 #settings-modal input:disabled, #settings-modal select:disabled { opacity: .6; cursor: not-allowed; }
 .settings-hint[data-state="warn"], .settings-hint [data-state="warn"] { color: var(--warning); }
 .settings-hint[data-state="error"] { color: var(--danger); }
-.settings-database-encryption-warning {
-    display: block;
-    margin-top: 6px;
-    max-width: 560px;
-}
-
 .cli-verify-result {
     font-size: var(--fs-base);
     flex-shrink: 0;
@@ -3734,6 +3728,7 @@ body[data-nav-tab]:not([data-nav-tab="agents"], [data-nav-tab="jobs"], [data-nav
 .sec-row details { margin: 10px 0; }
 .sec-row summary { cursor: pointer; font-weight: 600; font-size: 0.8125rem; margin-bottom: 10px; }
 .sec-sessions { border-top: 1px solid var(--border); margin-top: 14px; padding-top: 12px; }
+.sec-sessions:empty { display: none; } /* nothing to manage and nothing to say: no rule either (#7040) */
 .sec-sub-head { font-weight: 600; font-size: 0.8125rem; margin-bottom: 6px; }
 .sec-count { color: var(--text-secondary); font-weight: 400; }
 .sec-list { list-style: none; margin: 0 0 10px; padding: 0; font-size: 0.8125rem; }
@@ -4184,7 +4179,7 @@ body:has(#launch-modal[style*="flex"] :is(#launch-tmux-slot, #team-tmux-slot)[da
 .cli-recheck-status:not(:empty) { margin-top: 10px; }
 
 /* Network and Hub layout nits (#5985): a status line that is empty takes no room; "Run as a hub" is label left, switch right like every other row; Disconnect aligns with the row's left edge. */
-#settings-remote-access-status:empty, #settings-hub-mode-status:empty { display: none; }
+#settings-remote-access-status:empty, #settings-hub-mode-status:empty, #settings-debug-input-log-status:empty { display: none; }
 .settings-row-hub { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .4rem 1.5rem; align-items: center; padding: .7rem 0; border-top: 1px solid var(--border); }
 .settings-row-hub > dt { grid-column: 1; grid-row: 1; }
 .settings-row-hub > dd { display: contents; }

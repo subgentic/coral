@@ -96,6 +96,7 @@ export function renderDebugInputLogStatus(status) {
     if (!box || !el) return;
     const log = status?.debug_input_log || {};
     box.disabled = log.forced === true;
+    box.dataset.locked = log.forced === true ? '1' : ''; // the field's disabledWhen reads it: a redraw of the rows keeps the switch off
     if (log.forced === true) box.checked = true;
     const del = document.getElementById('settings-debug-input-log-delete');
     const file = log.path || 'input-debug.log';

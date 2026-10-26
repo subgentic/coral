@@ -144,10 +144,10 @@ const BASE = require('./test_base').BASE;
         console.log('7. A build without database encryption shows no encryption row');
         await ev(`window.__encCompiled = false; (async () => { await window.showSettingsModal('security'); return true; })()`);
         await waitFor(`getComputedStyle(document.getElementById('settings-modal')).display !== 'none'`, 'Settings');
-        await waitFor(`document.getElementById('settings-database-encryption').closest('.settings-row').hidden === true`, 'the encryption row to be hidden', 8000);
-        assert.equal(await ev(`document.getElementById('settings-database-encryption').closest('.settings-row').getClientRects().length`), 0);
+        await waitFor(`document.getElementById('settings-database-encryption').closest('.settings-row, .sv-row').hidden === true`, 'the encryption row to be hidden', 8000);
+        assert.equal(await ev(`document.getElementById('settings-database-encryption').closest('.settings-row, .sv-row').getClientRects().length`), 0);
         await ev(`window.hideSettingsModal(); window.__encCompiled = true; (async () => { await window.showSettingsModal('security'); return true; })()`);
-        await waitFor(`document.getElementById('settings-database-encryption').closest('.settings-row').hidden === false`, 'a build with it shows the row', 8000);
+        await waitFor(`document.getElementById('settings-database-encryption').closest('.settings-row, .sv-row').hidden === false`, 'a build with it shows the row', 8000);
         await ev(`window.hideSettingsModal(); true`);
         console.log('   ✓');
     } finally { await guard.restore?.(); await client.close(); }

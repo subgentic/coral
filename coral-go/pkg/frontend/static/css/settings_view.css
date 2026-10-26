@@ -54,6 +54,9 @@
 .sv-input[aria-invalid="true"] { border-color: var(--sv-error-color); }
 .sv-error { grid-column: 1 / -1; margin: 4px 0 0; font-size: var(--sv-help-size); font-weight: var(--sv-label-weight); color: var(--sv-error-color); }
 .sv-error[hidden] { display: none; }
+#settings-modal .sv .telemetry-install-id code { font: var(--dlg-control); }
+.sv .sv-control > .telemetry-install-id { width: auto; max-width: none; justify-content: flex-start; } /* the value and its Copy start at the control column's left edge, as the API key's do */
+.sv .telemetry-install-id code { flex: 0 1 auto; } /* a value in the dialog is the dialog's control size, not the page's */
 .sv-live-wide { grid-column: 1 / -1; min-width: 0; } /* a live part under the whole row (field.live { wide: true }) */
 .sv-row[data-disabled] .sv-label { color: var(--sv-value-color); }
 .sv-choices { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
