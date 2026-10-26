@@ -252,25 +252,6 @@ func (h *BoardHandler) resolveTaskWaits(project string, taskID int64, taskTitle,
 	}
 }
 
-func (h *BoardHandler) ResolveCommitWaits(ctx context.Context, project, commitHash string) {
-	resolved, err := h.bs.ResolveMatchingCommitWaits(ctx, project, commitHash)
-	if err != nil || len(resolved) == 0 {
-		return
-	}
-	for _, w := range resolved {
-		sessionName := w.SessionName
-		if sub, err := h.bs.GetProjectSubscription(ctx, project, w.SubscriberID); err == nil && sub != nil && sub.SessionName != "" {
-			sessionName = sub.SessionName
-		}
-		if h.terminal != nil && sessionName != "" {
-			nudge := fmt.Sprintf("[Wait resolved] Commit %s landed on '%s'.", commitHash, project)
-			if err := h.sendAutomated(ctx, project, sessionName, nudge); err != nil {
-				slog.Warn("failed to nudge waiting agent", "subscriber", w.SubscriberID, "session", sessionName, "error", err)
-			}
-		}
-	}
-}
-
 // endOwnWaits ends the registered waits of an agent that is plainly not parked: it posted, claimed a task or completed one (#7765). A wait parks an agent until the thing it waits for happens;
 // an agent woken by anything else (a task nudge, the Operator) and working again would otherwise keep "waiting for a message from the Orchestrator" in the status and the health check until it ran
 // coral-board wait --cancel. An error is only logged: the action itself has happened.
