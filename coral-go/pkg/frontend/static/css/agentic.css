@@ -2028,7 +2028,7 @@ body.panel-dragging .agentic-state {
     flex-direction: column;
     gap: var(--space-lg);
 }
-.note-card { border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-secondary); }
+.note-card { flex: none; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-secondary); }
 .note-card-time { padding: var(--space-md) var(--space-lg) 0; font-size: var(--fs-base); font-weight: 500; color: var(--text-secondary); }
 .note-md-rendered { padding: var(--space-md) var(--space-lg) var(--space-lg); cursor: pointer; border-radius: var(--radius-lg); overflow-wrap: anywhere; }
 .note-md-rendered:hover { background: var(--bg-hover); }
@@ -2041,17 +2041,27 @@ body.panel-dragging .agentic-state {
 .note-md-editor {
     flex: 1;
     width: 100%;
-    padding: 12px 14px;
+    box-sizing: border-box;
+    min-height: 13rem; /* about eight lines; the script makes it as tall as its text, up to most of the list (#7760) */
+    padding: var(--space-md) var(--space-lg) var(--space-lg);
     background: var(--bg-primary);
     border: none;
-    border-top: 2px solid var(--accent);
+    border-top: 1px solid var(--border);
+    border-radius: 0;
+    box-shadow: none;
     color: var(--text-primary);
-    font-family: var(--font-mono);
-    font-size: 0.75rem;
+    font-family: var(--font-sans); /* the note's own reading font and size: editing looks like the note */
+    font-size: 0.875rem;
     line-height: 1.6;
     resize: none;
     outline: none;
 }
+.note-card-editing { overflow: hidden; }
+.note-card-editing .note-card-time { padding-bottom: var(--space-md); } /* the header has room under it: the box does not touch its words */
+.note-md-editor:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; box-shadow: none; } /* the whole box shows it has the keyboard, one ring */
+.note-edit-actions { display: flex; justify-content: flex-end; gap: 8px; padding: var(--space-md) var(--space-lg); border-top: 1px solid var(--border); }
+.note-edit-actions .btn-small { margin: 0; }
+@media (pointer: coarse) { .note-edit-actions .btn-small { min-height: var(--control-touch-height, 44px); } }
 
 /* ── Custom Views ─────────────────────────────────────────── */
 

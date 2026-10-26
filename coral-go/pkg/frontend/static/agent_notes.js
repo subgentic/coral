@@ -80,6 +80,26 @@ function renderNotes() {
     list.replaceChildren(...items);
 }
 
+/** The edit box is as tall as its text (at least about eight lines, at most most of the list's height, then it scrolls), so a long note is not read through a three-line slot (#7760). */
+function growEditor(editor) {
+    const list = document.getElementById('note-md-rendered');
+    editor.style.height = 'auto';
+    const cap = Math.max(160, Math.round(((list && list.clientHeight) || 480) * 0.8));
+    editor.style.height = Math.min(editor.scrollHeight + 2, cap) + 'px';
+}
+
+/** Save and Cancel under the box, inside the card. They keep the focus where it is on a press (the box saves when it loses the focus), and Tab from the box reaches them (blur ignores the card's own controls). */
+function editActions() {
+    const bar = el('div', 'note-edit-actions');
+    const save = el('button', 'btn btn-small btn-primary', 'Save'), cancel = el('button', 'btn btn-small', 'Cancel');
+    save.type = 'button'; cancel.type = 'button';
+    for (const b of [save, cancel]) b.addEventListener('mousedown', (e) => e.preventDefault());
+    save.addEventListener('click', () => finishEdit());
+    cancel.addEventListener('click', () => cancelEdit());
+    bar.append(cancel, save);
+    return bar;
+}
+
 function startEdit(id) {
     if (_editing) return;
     const list = document.getElementById('note-md-rendered');
@@ -87,17 +107,33 @@ function startEdit(id) {
     if (!list || !editor) return;
     _editing = { id };
     let content = '';
-    if (id === 'new') {
-        list.prepend(editor);
+    const bar = editActions();
+    if (id === 'new') { // a note not written yet is a card too, under its own header
+        const card = el('div', 'note-card note-card-editing');
+        card.append(el('div', 'note-card-time', 'New note'), editor, bar);
+        list.prepend(card);
     } else {
         const card = list.querySelector(`.note-card[data-note-id="${CSS.escape(String(id))}"]`);
         content = (_notes.find(n => String(n.id) === String(id)) || {}).content || '';
         const body = card && card.querySelector('.note-card-body');
-        if (body) { body.style.display = 'none'; body.after(editor); } else list.append(editor);
+        if (body) { body.style.display = 'none'; body.after(editor); editor.after(bar); card.classList.add('note-card-editing'); } else { list.append(editor); editor.after(bar); }
     }
     editor.style.display = '';
     editor.value = content;
+    growEditor(editor);
     editor.focus();
+    bar.scrollIntoView({ block: 'nearest' }); // Save and Cancel are on the screen with the box, not below the list's edge
+}
+
+/** The box is put away, not removed: it is the one shared element that the next edit moves into its card. */
+function hideEditor(editor) { if (editor) editor.style.display = 'none'; }
+
+/** Cancel: leave the box without saving what was typed. */
+function cancelEdit() {
+    if (!_editing) return;
+    _editing = null;
+    hideEditor(document.getElementById('note-md-editor'));
+    renderNotes();
 }
 
 async function finishEdit() {
@@ -107,7 +143,7 @@ async function finishEdit() {
     const content = editor ? editor.value : '';
     const was = id === 'new' ? '' : ((_notes.find(n => String(n.id) === String(id)) || {}).content || '');
     _editing = null;
-    if (editor) editor.style.display = 'none';
+    hideEditor(editor);
     if (content !== was) await saveContent(id, content);
     renderNotes();
 }
@@ -148,7 +184,9 @@ export function initNotesMd() {
     const list = document.getElementById('note-md-rendered');
     const editor = document.getElementById('note-md-editor');
     if (!list || !editor) return;
-    editor.addEventListener('blur', () => finishEdit());
+    editor.addEventListener('blur', (e) => { if (e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest('.note-edit-actions')) return; finishEdit(); }); // Tab to Save or Cancel keeps the box open
+    editor.addEventListener('input', () => growEditor(editor));
+    window.addEventListener('resize', () => { if (_editing) growEditor(editor); });
     editor.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
             e.preventDefault();
