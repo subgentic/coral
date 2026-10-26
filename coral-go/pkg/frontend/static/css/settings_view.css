@@ -33,7 +33,8 @@
 .sv-control { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; justify-content: flex-end; }
 .sv-form .sv-control { justify-content: flex-start; }
 .sv-control > .sv-input, .sv-control > .sv-custom, .sv-control > .sv-choices { flex: 1; min-width: 0; }
-.sv-control > select.sv-input { min-width: min(100%, 9rem); } /* a select beside a button wraps the button under it before it narrows past a readable word */
+.sv-control > select.sv-input { width: auto; flex: 1 1 9rem; } /* a select beside a button stays beside it while they fit, and wraps the button under it before it narrows past a readable word */
+.sv-row-toggle:not(:has(.sv-help)) { padding-block: 2px; } /* a switch row with no hint is as compact as its 44 px target allows */
 .sv-input { box-sizing: border-box; width: 100%; min-height: var(--sv-control-height); font: inherit; font-size: var(--fs-md); background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--control-border); border-radius: var(--radius-lg); } /* the page's input look: the toolbar's search field's, in both themes */
 .sv-textarea { min-height: 6rem; resize: vertical; }
 .sv input.sv-input, .sv .sv-textarea { padding: 6px 10px; }
@@ -51,11 +52,11 @@
 
 /* the on/off box is a switch; it stays a native checkbox (the keyboard, the screen reader and the touch target are unchanged) */
 .sv-switch-hit { display: inline-flex; align-items: center; justify-content: flex-end; }
-.sv-switch { appearance: none; -webkit-appearance: none; position: relative; width: 40px; height: 22px; margin: 0; flex: none; border-radius: 1rem; border: 1px solid var(--control-border); background: var(--bg-hover); cursor: pointer; }
-.sv-switch::before { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--text-secondary); transition: transform .12s; }
-.sv input.sv-switch.sv-switch { padding: 0; box-sizing: border-box; width: 40px; height: 22px; min-height: 0; margin: 0; flex: none; } /* inside a dialog, the dialog's own input padding must not squeeze the switch */
+.sv-switch { appearance: none; -webkit-appearance: none; position: relative; width: 2.5rem; height: 1.4rem; margin: 0; flex: none; border-radius: 1rem; border: 1px solid var(--control-border); background: var(--bg-hover); cursor: pointer; }
+.sv-switch::before { content: ""; position: absolute; top: 2px; left: 2px; width: calc(1.4rem - 8px); height: calc(1.4rem - 8px); border-radius: 50%; background: var(--text-secondary); transition: transform .12s; }
+.sv input.sv-switch.sv-switch { padding: 0; box-sizing: border-box; width: 2.5rem; height: 1.4rem; min-height: 0; margin: 0; flex: none; } /* in rem: the switch grows with the text size */ /* inside a dialog, the dialog's own input padding must not squeeze the switch */
 .sv-switch:checked { background: var(--accent-dim); border-color: var(--accent-dim); }
-.sv-switch:checked::before { background: var(--text-on-accent); transform: translateX(18px); }
+.sv-switch:checked::before { background: var(--text-on-accent); transform: translateX(1.1rem); }
 .sv-switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .sv-switch:disabled { opacity: .5; cursor: not-allowed; }
 @media (prefers-reduced-motion: reduce) { .sv-switch::before { transition: none; } }
@@ -68,7 +69,7 @@
 .sv-bar .btn:disabled { opacity: .5; cursor: not-allowed; } /* nothing changed: both are off, the status says why */
 
 /* a touch screen: every control is a 44 px target */
-@media (pointer: coarse) {
+@media (pointer: coarse), (max-width: 767px) {
     .sv-input, .sv-action, .sv-confirm .btn, .sv-bar .btn { min-height: var(--sv-control-height-touch); }
     .sv-switch-hit { min-width: var(--sv-control-height-touch); min-height: var(--sv-control-height-touch); }
 }
