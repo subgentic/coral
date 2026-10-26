@@ -32,7 +32,7 @@ const install = ev => ev(SOURCE);
 
 // The accessible names the design gives its controls (IA v4 and the mockup): the tests say them once.
 const N = {
-    dialogNew: /^New agent$/i, dialogRestart: /^Restart Session$/i,
+    dialogNew: /^New agent$/i, dialogRestart: /^Restart .+$/i, // "Restart <the agent's name>" (#7886)
     folder: /^Folder/i, recents: /^Recent folders$/i, machine: /^Machine$/i,
     persona: /persona/i, name: /^Name/i, prompt: /^Behavior prompt$/i,
     provider: /^Provider$/i, model: /^Model$/i, thinking: /^Thinking/i, mode: /mode$/i, flags: /^Flags/i,

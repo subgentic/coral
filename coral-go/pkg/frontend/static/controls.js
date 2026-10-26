@@ -600,10 +600,11 @@ export function restartStage(arg) {
     if (!RESTART_STAGES.includes(to)) return;
     wiz.dataset.stage = to;
     const sub = `Step ${RESTART_STAGES.indexOf(to) + 1} of ${RESTART_STAGES.length}: ${RESTART_STAGE_NAMES[to]}`;
-    const subEl = document.getElementById('restart-stage-sub'); // the one header line New Agent has: the step, then who: "Step 1 of 2: Persona. Restarting <b>name</b>" (#7689)
+    const subEl = document.getElementById('restart-stage-sub'); // New Agent's header: the title names what it does, the line under it the step and its name: "Restart <name>", "Step 1 of 2: Persona" (#7886)
     const who = wiz.dataset.who || '';
-    subEl.textContent = '';
-    if (who) { subEl.append(`${sub}. Restarting `); const b = document.createElement('b'); b.textContent = who; subEl.append(b); } else subEl.textContent = sub;
+    subEl.textContent = sub;
+    const title = document.getElementById('restart-title');
+    if (title) title.textContent = who ? `Restart ${who}` : 'Restart agent'; // the agent's name, written as text (it is the agent's own)
     document.getElementById('restart-back').hidden = to === 'persona';
     document.getElementById('restart-next').hidden = to === 'agent';
     document.getElementById('restart-go').hidden = to !== 'agent' && !launchFlags.launchFromAnyStep; // Restart is shown after Next, as New Agent's Launch is (#7779, the operator: "click next before showing the relaunch option")
