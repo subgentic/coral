@@ -23,6 +23,7 @@
     --table-fold-line-h: 24px;
     --table-fold-meta-h: 20px;
     --table-fold-row-h: 60px;
+    --table-fit-name-min: 5rem;
     --table-primary-color: var(--text-primary);
     --table-secondary-size: 0.8125rem;
     --table-secondary-weight: 400;
@@ -275,3 +276,10 @@
 .dt-box.dt-fold-column.dt-folded .dt-title-content { overflow: visible; }
 .dt-box.dt-fold-column.dt-folded .dt-id { min-width: 0; }
 .dt-box.dt-fold-column.dt-folded .dt-chip { box-sizing: border-box; height: var(--table-fold-meta-h); padding-block: 0; font-size: var(--table-head-size); font-weight: var(--table-head-weight); }
+
+/* The hover/current background is stronger than the panel. Quiet text still
+ * needs 4.5:1 on that background in either theme. */
+.dt-row:hover, .dt-row[aria-current="true"] { --table-tertiary-color: color-mix(in srgb, var(--text-muted) 85%, var(--text-primary)); --table-secondary-color: color-mix(in srgb, var(--text-secondary) 85%, var(--text-primary)); }
+
+/* Measuring fit must reserve a readable name, not only fit the metadata. */
+.dt-box.dt-fit:not(.dt-folded) td.dt-grow { min-width: var(--table-fit-name-min); }

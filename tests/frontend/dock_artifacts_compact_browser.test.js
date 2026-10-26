@@ -34,6 +34,8 @@ const STUB = `(() => {
             if (q.has('sort')) { body.total = items.length; body.all = window.__data.length; }
             return json(body);
         }
+        if (window.__tasks && url.pathname === '/api/board/' + ${JSON.stringify(TEAM)} + '/tasks') return json({tasks:window.__tasks,total_open:window.__tasks.length,total_completed:0,has_more:false});
+        if (window.__tasks && url.pathname.endsWith('/tasks') && url.pathname.startsWith('/api/sessions/live/')) return json([]);
         if (url.pathname === '/api/session-artifacts') { window.__req.push({ kind: 'standalone', query: Object.fromEntries(q.entries()) }); return json({ session_id: q.get('session_id'), artifacts: window.__data.slice(0, 3), has_more: false, truncated: false }); }
         if (url.pathname === '/api/system/artifact-store/kept') return json({ kept: [] });
         return R(u, o);
@@ -89,12 +91,14 @@ const STUB = `(() => {
             // A compact fixture fits in the default dock; the old fixed 40rem breakpoint folds it anyway.
             await ev(`window.__data = window.__data.map((r,i) => ({...r, name: 'File '+i, task_id: null, created_at: new Date().toISOString()})); import((window.__coralStatic || '/static/') + 'team_artifacts_page.js').then(m => m.loadArtifacts({keep:true})); true`);
             await settled(); await settle(400);
-            check(`${view.w}: compact columns fit without folding at the default dock width`, await ev(`!document.querySelector('${panel} .dt-box').classList.contains('dt-folded')`));
+            if (!view.phone) check(`${view.w}: compact columns fit without folding at the default dock width`, await ev(`!document.querySelector('${panel} .dt-box').classList.contains('dt-folded')`));
+            check(`${view.w}: artifact table fits its dock`, await ev(`(() => {const b=document.querySelector('${panel} .dt-box');return b.scrollWidth <= b.clientWidth + 1;})()`));
             await ev(`document.querySelector('${panel} tbody tr .dt-primary').click(); true`); await settle(500);
             check(`${view.w}: one click opens preview without covering the artifact list`, await ev(`document.getElementById('preview-pane').getBoundingClientRect().height > 0 && document.getElementById('agentic-detail-pane').hidden`));
             await ev(`document.querySelectorAll('${panel} tbody tr .dt-primary')[1].click(); true`); await settle(400);
             check(`${view.w}: another artifact opens without closing a sheet`, await ev(`document.getElementById('agentic-detail-pane').hidden && document.querySelectorAll('${panel} tbody tr').length === 7`));
-            await ev(`(async () => { const S = window.__coralStatic || '/static/'; (await import(S+'preview_pane.js')).closeAllTabs(); const {state} = await import(S+'state.js'); state.currentAgentTasks = Array.from({length:5},(_,i)=>({id:900+i,title:'A long task title that should remain on one line '+i,status:'in_progress',agent_name:'Developer',priority:'high'})); state.currentBoardTasks=[]; state.currentSubagents=[]; window.switchAgenticTab('tasks','top'); (await import(S+'task_list.js')).renderBoardTaskList(); return true; })()`);
+            await ev(`(async () => { const S = window.__coralStatic || '/static/'; (await import(S+'preview_pane.js')).closeAllTabs(); const {state} = await import(S+'state.js'); state.currentSession.board_is_orchestrator = true; window.__tasks = Array.from({length:5},(_,i)=>({id:900+i,title:'A long task title that should remain on one line '+i,status:'in_progress',assigned_to:'Developer',priority:'high'})); state.currentAgentTasks=[]; state.currentSubagents=[]; const tasks = await import(S+'task_list.js'); await tasks.loadBoardTasks(${JSON.stringify(TEAM)}); window.switchAgenticTab('tasks','top'); return true; })()`);
+            await waitFor(`document.querySelectorAll('#board-task-list .dt-row').length === 5`, 'five actual dock Tasks rows');
             await settle(400); await shot(`dock-tasks-compact-${view.w}`);
             const sizes = await ev(`(() => {const rs=[...document.querySelectorAll('#board-task-list .dt-row')]; return rs.map(r=>{ const b=r.querySelector('.dt-primary'),id=r.querySelector('.board-task-id'); return {height:r.getBoundingClientRect().height, titleY:(()=>{const t=document.createRange();t.selectNodeContents(b);return t.getBoundingClientRect().top;})(),idY:id.getBoundingClientRect().top,size:parseFloat(getComputedStyle(b).fontSize)}; });})()`);
             check(`${view.w}: five folded rows fit in 320px with normal title sizes (${JSON.stringify(sizes)})`, sizes.length===5 && sizes.every(r=>r.height<=68 && r.size<=14 && Math.abs(r.titleY-r.idY)<12) && sizes.reduce((n,r)=>n+r.height,0)<=320);
