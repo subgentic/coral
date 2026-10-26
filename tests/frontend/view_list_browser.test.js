@@ -33,6 +33,10 @@ const SECTIONS = `[{ title: 'Views', items: [{ key: 'all', label: 'All chats', c
                 if (mobile) assert.ok(p.selH >= 44, `the select is 44 px: ${p.selH}`); else assert.ok(p.minH >= 32, `an item is at least 32 px: ${p.minH}`);
                 assert.equal(p.side, 0, 'nothing scrolls sideways');
             });
+            await check(`${label}: the select's border is the controls' border colour (3:1 on the page, WCAG 1.4.11), as every other select's (#7946)`, async () => {
+                const c = await ev(`(() => { const probe = document.createElement('i'); probe.style.borderTop = '1px solid var(--control-border)'; document.body.append(probe); const want = getComputedStyle(probe).borderTopColor; probe.remove(); return [getComputedStyle(window.__root.querySelector('.view-list-select')).borderTopColor, want]; })()`);
+                assert.equal(c[0], c[1], JSON.stringify(c));
+            });
             await check(`${label}: the current view, the counts, "soon" in words, the sections and the colour dot`, async () => {
                 const p = await probe();
                 assert.deepEqual(p.current, ['all'], JSON.stringify(p));
