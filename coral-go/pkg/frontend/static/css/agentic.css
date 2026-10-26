@@ -809,21 +809,6 @@ body.panel-dragging .agentic-state {
     container-type: inline-size;
 }
 
-.board-task-status-icon {
-    font-size: var(--icon-inline-size);
-    flex-shrink: 0;
-    width: 16px;
-    text-align: center;
-}
-
-.board-task-status-icon.completed { color: var(--success); }
-.board-task-status-icon.pending { color: var(--text-muted); }
-.board-task-status-icon.skipped { color: var(--text-muted); opacity: 0.6; }
-.board-task-status-icon.cancelled { color: var(--warning); }
-.board-task-status-icon.failed { color: var(--error); }
-.board-task-status-icon.blocked { color: var(--warning); }
-.board-task-status-icon.draft { color: var(--text-muted); opacity: 0.7; }
-
 .board-task-priority {
     font-size: var(--fs-sm);
     font-weight: 600;

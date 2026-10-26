@@ -38,11 +38,6 @@ const _fmt = (key, opts, d) => (isNaN(d) ? 'Invalid Date' : _dtf(key, opts).form
 /** A Date as the local hour and minute (hh:mm). */
 export function formatHourMinute(d) { return _fmt('hm', { hour: '2-digit', minute: '2-digit' }, d); }
 
-/** A Date as "Oct 16 10:31": month, day, hour and minute. */
-export function formatMonthDayHourMinute(d) {
-    return _fmt('md', { month: 'short', day: 'numeric' }, d) + ' ' + formatHourMinute(d);
-}
-
 /** A Date as the locale's month, day, hour and minute (the task detail's dates). */
 export function formatMonthDayTime(d) { return _fmt('mdt', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }, d); }
 

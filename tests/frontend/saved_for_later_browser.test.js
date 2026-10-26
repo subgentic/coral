@@ -143,6 +143,7 @@ const hex = i => i.toString(16).padStart(20, '0');
         assert.equal(await ev(`document.querySelector('#saved-table .dt-sortbar').hidden`), true, 'the existing Saved sort control is the only sort bar');
         const dlg = await ev(`(() => { const rows = [...document.querySelectorAll('${ROWS}')]; return { first: rows[0].querySelector('.dt-primary').textContent, saved: rows[0].cells[1].textContent.trim(), state: rows[0].cells[2].textContent.trim(), pressed: [...document.querySelectorAll('#saved-table .group-chip')].map(c => c.getAttribute('aria-pressed')), counts: [...document.querySelectorAll('#saved-table .group-chip-count')].map(c => c.textContent), inside: !!document.activeElement.closest('#agentic-panel-saved') }; })()`);
         assert.match(dlg.first, /^sv-a, /, 'the row is named by its source and its text'); assert.equal(dlg.state, 'Open'); assert.match(dlg.saved, /ago|now/); assert.deepEqual(dlg.pressed, ['true', 'false'], 'Open is the chip on'); assert.deepEqual(dlg.counts, ['2', '0']); assert.ok(dlg.inside, 'the focus is inside the tab');
+        assert.equal(await ev(`Math.round(document.querySelector('#saved-table button.dt-quiet').getBoundingClientRect().height)`), 28, 'fine-pointer secondary actions use the compact shared height');
         await shot('saved-tab-desktop');
 
         console.log('4. Done moves an item to the Done chip; it can be opened again');
@@ -198,6 +199,8 @@ const hex = i => i.toString(16).padStart(20, '0');
         await waitFor(`document.querySelectorAll('${ROWS}').length === 3`, 'three items', 6000);
         await waitFor(`!!${rowWith('no longer has')} && ${rowWith('no longer has')}.cells[2].textContent.trim() === 'Gone'`, 'the gone message to be found when the list opens', 8000);
         assert.equal(await ev(`${rowWith('no longer has')}.querySelectorAll('.dt-quiet').length`), 0, 'a gone row has no Done button');
+        const heights = await ev(`[...document.querySelectorAll('${ROWS}')].map(r => Math.round(r.getBoundingClientRect().height))`);
+        assert.ok(Math.max(...heights) - Math.min(...heights) <= 1, 'Open and Gone folded rows have equal height: ' + heights);
         // #5802: the list's own answer marks the gone ones, so opening the tab asks nothing per bookmark (QA's #5796: it was one request per row, up to 200)
         const seen = await ev(`(async () => { const prev = window.fetch; const urls = []; window.fetch = (u, o) => { urls.push(String(u)); return prev(u, o); }; try { const m = await import((window.__coralStatic || '/static/') + 'saved.js'); await m.openSaved(); await new Promise(r => setTimeout(r, 800)); } finally { window.fetch = prev; } return urls; })()`); // sleep-ok: a negative check: for 800 ms after the list opens nothing else is asked
         assert.equal(seen.filter(u => /\/api\/saved(\?|$)/.test(u)).length, 1, 'the list is read once: ' + JSON.stringify(seen));

@@ -94,7 +94,8 @@ const open = [
             assert.ok(g.scroll <= g.width + 1, `at ${w}px no sideways scroll: ${JSON.stringify(g)}`);
             for (const key of ['priority', 'assignee', 'type', 'cost', 'created_at']) {
                 const cell = g.cells.find(c => c.key === key);
-                assert.ok(cell.shown, `${key} remains visible at ${w}px`);
+                if (g.folded && ['assignee', 'cost'].includes(key)) assert.equal(cell.shown, false, `empty ${key} is omitted at ${w}px`);
+                else assert.ok(cell.shown, `${key} remains visible at ${w}px`);
                 if (!g.folded) assert.ok(Math.abs(cell.left - g.heads.find(h => h.key === key).left) < 1, `${key} aligns with its header at ${w}px`);
             }
         }

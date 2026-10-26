@@ -10,11 +10,12 @@ import { browserLocal } from './safe_storage.js';
 import { showToast, escapeHtml } from './utils.js';
 import { buildTaskBar } from './task_bar.js';
 import { loadPanelOpen, savePanelOpen } from './list_bar.js';
-import { _priorityOrder, _formatCost, _formatTaskTime, _priorityLabel, _agentTaskStatus } from './task_format.js';
+import { _priorityOrder, _formatCost, _priorityLabel, _agentTaskStatus } from './task_format.js';
 import { morphHtml } from './dom_morph.js';
 import { _verifyMark } from './task_verify_marks.js';
 import { goalTitle, refreshGoalTitles } from './task_goals.js';
 import * as DT from './data_table.js';
+import { whenText } from './when_text.js';
 
 const dockTaskTableState = DT.tableState();
 
@@ -563,7 +564,7 @@ function _taskTable(tasks) {
         t._source === 'board' && t.goal_id ? `Goal: ${goalTitle(_goalBoard, t.goal_id)}` : ''].filter(Boolean).join(' · ');
     dockTaskTableState.sort = _taskSortExplicit ? { key: _taskSortField, dir: _taskSortAsc ? 'asc' : 'desc' } : null;
     const table = DT.dataTable({ label: 'Agent tasks', rows: tasks, rowKey: key, rowName: t => t.title || t.description || '',
-        state: dockTaskTableState, onSort: field => _toggleTaskSort(field), bare: true, foldAt: 50, defaultSortLabel: _queryActive() && _taskFilters.sort !== 'open' ? taskSortLabel[_taskFilters.sort] : 'Open first, newest first',
+        state: dockTaskTableState, onSort: field => _toggleTaskSort(field), bare: true, defaultSortLabel: _queryActive() && _taskFilters.sort !== 'open' ? taskSortLabel[_taskFilters.sort] : 'Open first, newest first',
         columns: [
             { key: 'status', label: 'Status', line: 2, cell: t => {
                 const st = _taskStatus(t), cls = st.className === 'completed' ? 'goal-state-task-done' : st.className === 'in-progress' ? 'goal-state-task-active' : st.className === 'blocked' ? 'goal-state-task-blocked' : '';
@@ -576,7 +577,7 @@ function _taskTable(tasks) {
                 const cell = DT.tag(t._source === 'subagent' ? 'sub' : t._source); cell.classList.add('board-task-source');
                 if (t._source === 'subagent') cell.title = `Subagent launched by ${t.assigned_to || '—'}`; return cell;
             } },
-            { key: 'assignee', label: 'Agent', sort: true, firstDir: 'desc', line: 2, cell: t => span('board-task-assignee', t.assigned_to || '—') },
+            { key: 'assignee', label: 'Agent', sort: true, firstDir: 'desc', line: 2, when: t => !!t.assigned_to, cell: t => span('board-task-assignee', t.assigned_to || '—') },
             { key: 'task', label: 'Task', primary: true, width: 'grow', line: 1, subtitle: details, cell: t => {
                 const cell = span('board-task-desc');
                 const name = t.title || t.description || '';
@@ -587,8 +588,8 @@ function _taskTable(tasks) {
                 if (t._source === 'board') { const mark = document.createElement('template'); mark.innerHTML = _verifyMark(t); cell.append(mark.content); }
                 return cell;
             } },
-            { key: 'cost', label: 'Cost', sort: true, firstDir: 'desc', numeric: true, line: 2, tone: 'tertiary', cell: t => { const cost = _taskRowCost(t, t._source === 'agent', t._source === 'subagent'); return span(cost.costClass, cost.costText || '—'); } },
-            { key: 'created_at', label: 'Created', sort: true, firstDir: 'desc', align: 'end', line: 1, tone: 'tertiary', cell: t => span('board-task-time', _formatTaskTime(t.created_at)) },
+            { key: 'cost', label: 'Cost', sort: true, firstDir: 'desc', numeric: true, line: 2, tone: 'tertiary', when: t => !!_taskRowCost(t, t._source === 'agent', t._source === 'subagent').costText, cell: t => { const cost = _taskRowCost(t, t._source === 'agent', t._source === 'subagent'); return span(cost.costClass, cost.costText || '—'); } },
+            { key: 'created_at', label: 'Created', sort: true, firstDir: 'desc', align: 'end', line: 1, tone: 'tertiary', cell: t => { const cell = DT.timeCell(t.created_at); cell.classList.add('board-task-time'); return cell; } },
         ],
     });
     // Keep the existing action dispatcher and identifiers: opening a board task,
@@ -699,7 +700,7 @@ export function renderBoardTaskList() {
     // Older done tasks come a page at a time (#3269).
     const more = querying ? (scope && _hideCompleted && !isQuery(_taskFilters) && !_filteredList.cursor ? '' : _filteredMoreHtml()) : _taskLoadMoreHtml(boardDoneTotal, boardDoneLoaded);
     const signature = JSON.stringify([tasks, _liveCosts, _taskFilters.sort, _taskSortField, _taskSortAsc, _taskSortExplicit, more,
-        tasks.map(t => [t._source === 'board' ? _claimedFor(t) : '', t.goal_id ? goalTitle(_goalBoard, t.goal_id) : ''])]);
+        tasks.map(t => [whenText(t.created_at), t._source === 'board' ? _claimedFor(t) : '', t.goal_id ? goalTitle(_goalBoard, t.goal_id) : ''])]);
     if (container.dataset.drawn === signature && container.querySelector('.dt-table')) return;
     const active = container.contains(document.activeElement) ? document.activeElement : null;
     const held = active && { row: active.closest('tr')?.dataset.key, sort: active.dataset.key, sortbar: active.closest('.dt-sortbar') ? active.tagName : '' };
