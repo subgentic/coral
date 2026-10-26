@@ -22,7 +22,7 @@ const BASE = require('./test_base').BASE;
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
         await ev(`(async () => { const st = ${S}; window.ST = (await import(st + 'state.js')).state; window.SD = await import(st + 'settings_dialog.js');
             window.__puts = []; window.__mode = 'ok'; window.__toasts = []; const real = window.fetch; const json = (b, s = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } }));
-            window.fetch = (u, o = {}) => { const p = new URL(String(u), location.href).pathname, m = (o.method || 'GET').toUpperCase(); if (p === '/api/settings' && m === 'PUT') { window.__puts.push(o.body); return window.__mode === 'ok' ? json({ ok: true }) : json({ error: 'default_working_dir must be a folder' }, 400); } return real(u, o); };
+            window.fetch = (u, o = {}) => { const p = new URL(String(u), location.href).pathname, m = (o.method || 'GET').toUpperCase(); if (p === '/api/system/terminal-backend' && m === 'GET') return json({ saved: '', running: 'pty', forced: false, choice: false, restart_required: false, can_restart: true, running_agents: 0, left_over: 0 }); if (p === '/api/settings' && m === 'PUT') { window.__puts.push(o.body); return window.__mode === 'ok' ? json({ ok: true }) : json({ error: 'default_working_dir must be a folder' }, 400); } return real(u, o); };
             new MutationObserver(() => { for (const t of document.querySelectorAll('.toast, [role=status] .toast, #toast-container > *')) { const x = t.textContent.trim(); if (x && !window.__toasts.includes(x)) window.__toasts.push(x); } }).observe(document.body, { childList: true, subtree: true, characterData: true });
             window.ST.settings = { default_working_dir: '/work/saved', default_agent_type: 'claude' }; return true; })()`);
 
@@ -51,6 +51,16 @@ const BASE = require('./test_base').BASE;
             await ev(`window.__mode = 'ok'; true`); await type('settings-working-dir', '/work/fixed'); await save();
             await waitFor(`getComputedStyle(document.getElementById('settings-modal')).display === 'none'`, 'closed after the retry', 8000);
             assert.equal(await ev(`window.ST.settings.default_working_dir`), '/work/fixed');
+        });
+        await run('a Save that leaves the dialog open (the wake choice is refused) takes the form as its new start: no unsaved note once only the refused value is put back', async () => {
+            await ev(`window.__puts.length = 0; window.__mode = 'ok'; window.ST.settings = {}; true`); await open('terminal'); // sparse settings: the form at open differs from them by the defaults a first Save also writes (#7041)
+            await waitFor(`!document.getElementById('tb-autowake').hidden`, 'the wake row, shown on a pty Coral', 8000);
+            await type('settings-working-dir', '/work/stays-open'); await type('tb-autowake-cap', '99'); // a cap over 50: the settings save, the wake choice is refused and the dialog stays open
+            await save(); await waitFor(`window.__toasts.some(t => /Wake up to/.test(t))`, 'the refusal of the wake choice', 8000);
+            assert.equal(await shown(), 'flex', 'the dialog stays open'); assert.equal((await puts())[0].default_working_dir, '/work/stays-open', 'and the working directory was saved');
+            assert.equal(await ev(`!document.getElementById('settings-unsaved').hidden`), true, 'the refused cap is still an unsaved change');
+            await type('tb-autowake-cap', '8');
+            await waitFor(`document.getElementById('settings-unsaved').hidden`, 'the note gone: the saved working directory is the form\'s new start', 5000);
         });
     } finally { await client.close(); }
     const failed = results.filter(([, e]) => e);
