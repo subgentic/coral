@@ -30,14 +30,16 @@ const BASE = require('./test_base').BASE;
       const tel = document.getElementById('settings-telemetry-enabled');
       const rem = document.getElementById('settings-remote-access-enabled');
       const status = document.getElementById('settings-remote-access-status');
-      const help = document.getElementById('settings-telemetry-help');
+      const described = el => (el?.getAttribute('aria-describedby') || '').split(' ').filter(Boolean).filter(id => document.getElementById(id)); // the ids that name an element (a note that is not drawn names none)
+      const telDesc = described(tel), remDesc = described(rem);
       return {
         telemetryFound: !!tel,
         remoteFound: !!rem,
         statusFound: !!status,
-        helpFound: !!help,
-        telemetryAria: tel?.getAttribute('aria-describedby'),
-        remoteAria: rem?.getAttribute('aria-describedby'),
+        helpFound: telDesc.length > 0 && /Anonymous product events/.test(document.getElementById(telDesc[0]).textContent), // the usage analytics sentence is the control's own description (settings_view: the sentence, #8219)
+        telemetryDescribed: telDesc.length,
+        remoteSentence: remDesc.length ? document.getElementById(remDesc[0]).textContent.trim() : '',
+        remoteAria: remDesc.slice(1).join(' '),
         statusRole: status?.getAttribute('role'),
       };
     })()`);
@@ -46,8 +48,9 @@ const BASE = require('./test_base').BASE;
     assert.equal(elementsExist.remoteFound, true, 'remote access checkbox must exist');
     assert.equal(elementsExist.statusFound, true, 'remote access status element must exist');
     assert.equal(elementsExist.helpFound, true, 'telemetry help element must exist');
-    assert.equal(elementsExist.telemetryAria, 'settings-telemetry-enabled-desc settings-telemetry-help', 'telemetry aria-describedby: its description, then the help');
-    assert.equal(elementsExist.remoteAria, 'settings-remote-access-status net-remote-note settings-remote-access-enabled-desc', 'remote access aria-describedby: the state first, then what a pending change does (#6619), then its description');
+    assert.equal(elementsExist.telemetryDescribed, 1, 'telemetry is described by one element: its sentence');
+    assert.match(elementsExist.remoteSentence, /Allow connections from other devices/, 'remote access is described by its sentence first (settings_view, #8219)');
+    assert.equal(elementsExist.remoteAria, 'settings-remote-access-status net-remote-note', 'then the state, then what a pending change does (#6619)');
     assert.equal(elementsExist.statusRole, 'status', 'status role="status"');
 
     // 2. Open Settings modal and verify state loading against real server API
