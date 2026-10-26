@@ -32,6 +32,7 @@ const Toolbar = await importOnce('./team_toolbar.js'); // the selection bar take
 const GC = await importOnce('./goal_columns.js');
 const GF = await importOnce('./goal_filters.js'); // the Goals folder's search, pills and Filters (#8596)
 const IT = await importOnce('./inbox_toolbar.js'); // the folders' toolbar on the shared list bar
+const CF = await importOnce('./chat_filters.js'); // the chat folders' Filters (#8603)
 const CH = await importOnce('./mailbox_chats.js'); // the chat folders (#7776): All chats, Board history, By CLI, Tags
 const { providerName } = await importOnce('./model_labels.js'); // a CLI by its name (Claude, Codex, Antigravity), as the Chats list says it
 const { waitingText } = await importOnce('./waiting_text.js'); // a lazy module imports only what loads at startup (import_hygiene): this one loads with it
@@ -154,6 +155,31 @@ async function refreshGoals() {
         goals = Array.isArray(d.goals) ? d.goals : [];
     } catch { goals = []; }
     renderInboxNav(true);
+}
+
+// ── Chats ────────────────────────────────────────────────────────────────
+const chatFilters = new Map(), chatBars = new Map(); // folder key -> its filters, its toolbar
+const chatFiltersOf = key => { if (!chatFilters.has(key)) chatFilters.set(key, { ...CF.loadFilters(key), q: queries[key] || '' }); return chatFilters.get(key); };
+/** A chat folder's toolbar (#8603): the search and the Filters icon beside it (CLI, Agent, Tag, Dates: the fields the folder does not already decide), the chips below; one bar per folder, kept. */
+function inboxChatsToolbar(key) {
+    if (!chatBars.has(key)) {
+        const has = new Set(CF.fieldsFor(key)), fields = [];
+        if (has.has('cli')) fields.push({ type: 'select', key: 'cli', id: 'inbox-chats-cli', label: 'CLI', values: CF.CLIS.map(c => c[0]), labels: Object.fromEntries(CF.CLIS), any: 'Any CLI' });
+        if (has.has('agent')) fields.push({ type: 'text', key: 'agent', id: 'inbox-chats-agent', className: 'list-bar-by', label: 'Agent', max: 80, placeholder: 'Agent name' });
+        if (has.has('tagId')) fields.push({ type: 'select', key: 'tagId', id: 'inbox-chats-tag', label: 'Tag', values: [], labels: {}, any: 'Any tag' });
+        if (has.has('dates')) fields.push({ type: 'date', key: 'from', id: 'inbox-chats-from', label: 'From' }, { type: 'date', key: 'to', id: 'inbox-chats-to', label: 'To' });
+        chatBars.set(key, IT.folderToolbar({ idp: 'inbox-chats', noun: 'chat', searchLabel: 'Search chats', fields, model: { EMPTY: CF.EMPTY, clean: CF.clean, chips: CF.chips, isFiltered: CF.isFiltered, without: CF.without } }, next => {
+            chatFilters.set(key, next); CF.saveFilters(key, next);
+            queries[key] = next.q;
+            const input = $('inbox-search'); if (input && group === key) input.value = next.q; // the sidebar's box shows the same words
+            renderInboxNav(true);
+        }));
+    }
+    const tags = CH.chatTags();
+    CF.setTagNames(new Map(tags.map(t => [String(t.id), t.name])));
+    const filters = chatFiltersOf(key);
+    const node = chatBars.get(key).draw({ filters, options: { tagId: { values: tags.map(t => String(t.id)), labels: Object.fromEntries(tags.map(t => [String(t.id), t.name])) } } });
+    return { node, signature: JSON.stringify([key, filters, tags.map(t => [t.id, t.name])]) };
 }
 
 // ── Saved ────────────────────────────────────────────────────────────────
@@ -293,7 +319,7 @@ async function openChat(c) {
 }
 
 registerGroupSource('hub-inbox', {
-    toolbar: key => key === 'tasks' ? inboxTaskToolbar() : key === 'goals' ? inboxGoalsToolbar() : key === 'saved' ? inboxSavedToolbar() : ({ search: { id: 'inbox-search', label: 'Search the Inbox' } }), // the page's toolbar line, the same shape for Needs you, Tasks and Saved (#7723)
+    toolbar: key => key === 'tasks' ? inboxTaskToolbar() : key === 'goals' ? inboxGoalsToolbar() : key === 'saved' ? inboxSavedToolbar() : CH.CHAT_KEY.test(key) ? inboxChatsToolbar(key) : ({ search: { id: 'inbox-search', label: 'Search the Inbox' } }), // the page's toolbar line, the same shape for Needs you, Tasks and Saved (#7723)
     keys: () => GROUPS.map(g => g.key),
     redraw: () => renderInboxNav(true),
     table: key => {
@@ -330,7 +356,7 @@ registerGroupSource('hub-inbox', {
                 } };
         }
         if (CH.CHAT_KEY.test(key)) {
-            return CH.chatsSpec(key, { query: queries[key] || '', redraw: () => refreshGroupTable('hub-inbox'), open: openChat,
+            return CH.chatsSpec(key, { query: chatFiltersOf(key).q, params: CF.toParams(key, chatFiltersOf(key)), redraw: () => refreshGroupTable('hub-inbox'), open: openChat,
                 after: () => { CH.loadChatCounts(() => renderInboxNav(true)); refreshGroupTable('hub-inbox'); } });
         }
         if (key === 'goals') {
@@ -386,6 +412,7 @@ export function filterInbox(value) {
     if (group === 'saved') { queries.saved = text; saved.setSavedQuery(text); return; }
     queries[group] = CH.CHAT_KEY.test(group) || group === 'tasks' ? text : text.toLowerCase();
     if (group === 'tasks') { inboxTasksState.selected.clear(); taskFilters = { ...taskFilters, q: text }; } // a chat search goes to the server as typed
+    if (CH.CHAT_KEY.test(group)) chatFilters.set(group, { ...chatFiltersOf(group), q: text }); // the sidebar's box and the page's share the one search (#8603)
     if (group === 'goals') { goalFilters = { ...goalFilters, q: text }; GF.saveFilters(goalFilters); } // the sidebar's box and the page's share the one search (#8596)
     renderInboxNav(true);
 }

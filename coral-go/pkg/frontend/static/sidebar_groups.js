@@ -171,7 +171,8 @@ export function openGroupTable(kind, key, { focus = false } = {}) {
     open = { kind, key };
     if (!drawTable()) { open = null; return false; }
     showView('group-table-view');
-    if (focus) document.getElementById('group-table-title')?.focus({ preventScroll: true }); // a group opened by the person: the keyboard starts at its heading
+    // a group opened by the person: the keyboard starts at the page's search box (the first control of the toolbar, #7404), else the first row, else the heading (a ring round the word was the arrival's look)
+    if (focus) (document.querySelector('#group-table-view .gt-search, #group-table-view .list-bar-search') || document.querySelector('#group-table-view .dt-primary') || document.getElementById('group-table-title'))?.focus({ preventScroll: true });
     document.querySelectorAll('.sidebar-pane .session-list > li.active').forEach(li => { li.classList.remove('active'); li.querySelector('[aria-current]')?.removeAttribute('aria-current'); });
     return true;
 }
