@@ -65,3 +65,4 @@ assert.equal(W.allDoneLine(3), 'All 3 tasks are done.'); assert.equal(W.allDoneL
 assert.equal(W.isOpenGoal({ state: 'blocked' }), true); assert.equal(W.isClosedGoal({ state: 'dropped' }), true); assert.equal(W.isOpenGoal({ state: 'done' }), false);
 assert.equal(W.allDoneSaid(3, 'Ship it'), 'All 3 tasks of Ship it are done'); assert.equal(W.allDoneSaid(1, 'A'), 'All 1 task of A is done'); assert.equal(W.closeReasonHint, '300 characters at most.');
 console.log('goal_words: ok');
+assert.equal(W.noGoalRowText(1), '1 task has no goal'); assert.equal(W.noGoalRowText(4), '4 tasks have no goal');

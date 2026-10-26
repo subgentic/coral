@@ -49,6 +49,10 @@ const TABS = [['Goals', { pills: true, filters: false, action: 'New goal' }], ['
                     if (want.pills) assert.ok(mobile ? t.select && !t.pills : t.pills && !t.select, `${tab}: ${mobile ? 'a phone has the compact select' : 'the pills are on the line'} (${JSON.stringify({ pills: t.pills, select: t.select })})`);
                     else assert.ok(!t.pills && !t.select, `${tab}: no pills`);
                     assert.ok(t.last, `${tab}: the action is the last control at the right`);
+                    if (tab === 'Goals') { // the tasks that serve no goal are the table's last row, not a line under the toolbar
+                        const last = await ev(`(() => { const p = document.querySelector('[role=tabpanel]:not([hidden])'); const rows = [...p.querySelectorAll('tbody tr')]; return { note: !!p.querySelector('p.goals-no-goal'), last: rows.length ? rows[rows.length - 1].textContent.replace(/\\s+/g, ' ').trim() : '' }; })()`);
+                        assert.equal(last.note, false, 'no no-goal line under the toolbar'); assert.match(last.last, /^1 task has no goal/, `the last row of the table says it: ${last.last}`);
+                    }
                     if (tab !== 'Artifacts') assert.equal(t.counts, false, `${tab}: no count line under the toolbar`); // (Artifacts' one status line also carries its error and its empty sentence: asked about)
                     assert.ok(t.side <= 0, `${tab}: nothing scrolls sideways (${t.side})`);
                     if (mobile) { assert.ok(t.lines <= 2, `${tab}: two lines at most (${t.lines})`); assert.ok(t.minTarget >= 43.5, `${tab}: every control is a 44 px target (${t.minTarget}): ${JSON.stringify(t.hs)}`); }

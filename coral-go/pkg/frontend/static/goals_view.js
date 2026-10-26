@@ -314,7 +314,6 @@ function drawTableRaw(col) {
     }));
     if (model.requireGoal) col.append(Object.assign(el('p', 'goals-note goals-require'), { textContent: W.requireGoalNote }));
     if (state.hubConnected || window.__goalsHub) col.append(el('p', 'goals-note', W.otherBoardsNote));
-    if (model.noGoalOpen > 0) col.append(el('p', 'goals-note goals-no-goal', W.noGoalTasksText(model.noGoalOpen)));
     if (model.failed) {
         const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert');
         f.append(el('span', null, `${model.failed}${model.goals.length ? ` (${W.asOfText(model.asOf)})` : ''}`), btn('btn btn-small', 'Try again', loadGoals));
@@ -335,7 +334,10 @@ function drawTableRaw(col) {
             key: g.id, current: g.id === model.openId,
             open: () => openGoal(g.id, true),
             cells: [goalRowBtn(g), tableStateChip(W.stateWord(g), `goal-state-${g.state || 'unknown'}`), tasksCell(g.rollup), whenText(g.updatedAt)],
-        })),
+        })).concat(model.noGoalOpen > 0 && model.filter === 'all' ? [{ // the tasks that serve no goal are a last row of the table, not a line under the toolbar (#7717): it opens the team's Tasks
+            key: 'no-goal', open: () => window.openTeamPage?.(model.project, { tab: 'tasks' }),
+            cells: [(() => { const b = rowButton(W.noGoalRowText(model.noGoalOpen)); b.classList.add('goals-no-goal'); return b; })(), '', '', ''],
+        }] : []),
     }));
 }
 

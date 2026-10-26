@@ -129,6 +129,8 @@ export function filterCounts(goals) {
 
 /** The line under the Goals page's heading when open tasks serve no goal (#7253). */
 export const noGoalTasksText = (n) => `${n} ${n === 1 ? 'task serves' : 'tasks serve'} no goal`;
+/** The same fact as the Goals table's last row (#7717): it is a row of the table, which opens the team's Tasks. */
+export const noGoalRowText = (n) => `${n} ${n === 1 ? 'task has' : 'tasks have'} no goal`;
 
 // Closing a goal, reopening it, and the prompt when every task is done (#7272, UI/UX's #7270).
 const openOf = (r) => { const x = r || {}; return ['active', 'blocked', 'queued'].reduce((n, k) => n + Math.max(0, Number(x[k]) || 0), 0); };

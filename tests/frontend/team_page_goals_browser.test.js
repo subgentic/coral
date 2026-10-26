@@ -36,7 +36,7 @@ const GOAL = 'Explore goals with two teams';
                 assert.ok(await onGoals, 'the team page is open');
                 const hd = await headers(); assert.ok(hd, 'Goals has a table');
                 assert.deepEqual(hd.map(x => x.replace(/\s+/g, ' ').trim()).slice(0, 4), ['Goal', 'State', 'Tasks', 'Updated'], 'the columns');
-                const rows = await rowsOf(); assert.equal(rows.length, 2, `a row per goal (got ${rows.length})`);
+                const rows = (await rowsOf()).filter(r => !/ no goal\b/.test(r)); assert.equal(rows.length, 2, `a row per goal (got ${rows.length}); the tasks with no goal are the last row (#7717)`);
                 assert.ok(rows.some(r => r.includes(GOAL)) && rows.some(r => r.includes('Plan the release notes')), 'the two goals are the rows');
                 await click('button', /^New goal$/i, 'button');
                 await ev(`(() => { const e = document.activeElement; if (e && e.tagName === 'TEXTAREA' || e && e.tagName === 'INPUT') {} return true; })()`);
