@@ -2,8 +2,8 @@ name: go-race
 # The race detector in CI (#5006). Security's -race run on epoch found no races (#4979), and nothing keeps it that way: -race is
 # slow, and the package tests take about 20 minutes with it on routes alone. Two parts:
 #  - per push to ci/** (a release batch): the small, high-risk packages that handle credentials, the network and processes, each
-#    in its own job and under about 6 minutes on epoch: internal/auth, internal/cloud, pkg/tunnel, internal/ptymanager and
-#    internal/startup;
+#    in its own job and under about 6 minutes on epoch: internal/auth, internal/cloud, pkg/tunnel, internal/ptymanager,
+#    internal/startup and internal/hooks (the agent hooks' tool input, #8478);
 #  - nightly (and by dispatch): every package with -race, internal/server/routes alone with a long timeout, and everything else
 #    in one job. The scheduled run is on the default branch.
 #
@@ -38,7 +38,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        pkg: [internal/auth, internal/cloud, pkg/tunnel, internal/ptymanager, internal/startup]
+        pkg: [internal/auth, internal/cloud, pkg/tunnel, internal/ptymanager, internal/startup, internal/hooks]
     env:
       CORAL_TELEMETRY_DISABLED: "1"
     defaults:
