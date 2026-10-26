@@ -91,3 +91,45 @@ func TestListAllMessagesForASubscriberIsWhatReadDelivers(t *testing.T) {
 	resp.Body.Close()
 	require.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
+
+// The board's search takes the same parameter (#8484): ?for_subscriber= searches only that member's list, so the matches are the search's and the dock's list's together.
+func TestSearchMessagesForASubscriberIsTheSearchAndTheList(t *testing.T) {
+	e := newMSEnv(t)
+	ctx := context.Background()
+	e.post("Worker", "Backend", "my own review note")
+	e.post("Poster", "Developer", "review untagged 0")
+	for i := 0; i < 6; i++ {
+		e.post("Poster", "Developer", fmt.Sprintf("review untagged %d", i+1))
+		e.post("Poster", "Developer", fmt.Sprintf("@Worker review mine %d", i))
+	}
+	list, err := e.bs.ReadSetIDs(ctx, "proj", "Worker")
+	require.NoError(t, err)
+	inList := map[int64]bool{}
+	for _, id := range list {
+		inList[id] = true
+	}
+	ids := func(r msReply) []int64 {
+		var out []int64
+		for _, m := range r.Messages {
+			out = append(out, int64(m["id"].(float64)))
+		}
+		return out
+	}
+	code, whole := e.get("q=review&limit=200", false)
+	require.Equal(t, http.StatusOK, code)
+	require.Equal(t, 14, whole.Total, "the whole board has fourteen reviews")
+	var want []int64
+	for _, id := range ids(whole) {
+		if inList[id] {
+			want = append(want, id)
+		}
+	}
+	code, filtered := e.get("q=review&limit=200&for_subscriber=Worker", false)
+	require.Equal(t, http.StatusOK, code)
+	require.Equal(t, want, ids(filtered), "the filtered search is the search and the member's list")
+	require.Equal(t, 7, filtered.Total, "six tagged and its own note")
+	for _, bad := range []string{"for_subscriber=", "for_subscriber=A&for_subscriber=B"} {
+		code, _ := e.get("q=review&"+bad, false)
+		require.Equal(t, http.StatusBadRequest, code, bad)
+	}
+}

@@ -111,6 +111,7 @@ func TestBoardMessageSearchIsViewTier(t *testing.T) {
 	}{
 		{"GET", "", TierView},
 		{"GET", "q=alpha&from=Backend+Dev&mentions=QA&since=2026-10-18T00:00:00Z&until=2026-10-19T00:00:00Z&sort=oldest&limit=50&cursor=abc", TierView},
+		{"GET", "q=x&for_subscriber=Backend+Dev", TierView}, // the dock's list of one member (#8484)
 		{"HEAD", "q=x", TierView},
 		{"GET", "search=x", TierNever},
 		{"GET", "offset=5", TierNever},

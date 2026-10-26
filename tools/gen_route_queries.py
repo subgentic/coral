@@ -36,7 +36,7 @@ EXTRA = {
     'GET /api/board/{}/artifacts': {'q', 'kind', 'origin', 'by', 'board', 'kept', 'task', 'since', 'until', 'sort', 'cursor'},
     # The board message search (#4745): SearchMessages reads these from a url.Values it parsed itself (a mistyped query string is refused,
     # not dropped), which the scan above does not follow.
-    'GET /api/board/{}/messages/search': {'q', 'from', 'mentions', 'since', 'until', 'sort', 'limit', 'cursor'},
+    'GET /api/board/{}/messages/search': {'q', 'from', 'mentions', 'since', 'until', 'sort', 'limit', 'cursor', 'for_subscriber'},
     # The agent events search (#4745): queryEvents reads these from a url.Values it parsed itself, which the scan above does not follow.
     'GET /api/sessions/live/{}/events': {'type', 'q', 'since', 'until', 'sort', 'cursor'},
     # The same search on a session's history events (#4779): GetSessionEvents hands queryAgentEvents the url.Values it parsed.
