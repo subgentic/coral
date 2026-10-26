@@ -8,8 +8,8 @@ const { setupHubWorld, BASE } = require('./helpers/hub_world');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor } = await connect();
-    const shot = async name => { if (!process.env.CORAL_SCREENSHOT_DIR) return; fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true });
-        fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
+    const shot = async name => { const dir = process.env.CORAL_SCREENSHOT_DIR || (process.env.RUNNER_TEMP && require('node:path').join(process.env.RUNNER_TEMP, 'out', 'shots')); if (!dir) return; fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(`${dir}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     try {
         for (const [w, h, mobile] of [[1280, 800, false], [390, 844, true]]) {
             console.log(`${w}px: the Hub's /board/@m1/same-team`);
