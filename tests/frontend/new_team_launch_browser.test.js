@@ -56,6 +56,17 @@ const AGENT_KEYS = ['name', 'prompt', 'icon', 'capabilities', 'agent_type', 'mod
             assert.ok(q.working_mode, 'working_mode is in the request'); assert.equal(typeof q.working_mode.mode, 'string'); assert.equal(q.working_mode.dependency_guidance, true); assert.equal(q.working_mode.custom_instructions, 'Keep the diff small.', 'the additional instructions are custom_instructions');
             assert.equal(q.health_monitor, true, 'health_monitor is true');
         });
+        await S.run('step 3 health number out of range (#8455): Launch team sends nothing, opens the Health check tab, names the number and focuses it', async () => {
+            await install_stub(200); await fresh(); await t.to(2, { template: /^Blank/ }); await t.click('button', N.addOrch); await settle(250); await t.click('button', N.next); await t.step(3);
+            await tab('Health check'); assert.ok(await check(/^Send health check/i, true), 'the Send health check switch');
+            await t.type('input', /^Check every/i, '1');
+            await tab('Start');
+            await t.click('button', N.launch); await settle(400);
+            assert.equal((await sent()).launch.length, 0, 'nothing was launched');
+            const r = await ev(`(() => { const d = window.__nt.dlg(${N.team}); const open = [...d.querySelectorAll('[role=tab]')].find(e => e.getAttribute('aria-selected') === 'true'); const a = document.activeElement; return { tab: open && window.__na.name(open), focus: a && a.name, error: [...d.querySelectorAll('.sv-error')].filter(window.__na.vis).map(e => e.textContent.trim()) }; })()`);
+            assert.equal(r.tab, 'Health check, has a problem', 'the tab with the problem is open and says so'); assert.equal(r.focus, 'interval_min', 'the number is focused'); assert.ok(r.error.length === 1 && /5|1440|whole/i.test(r.error[0]), `one error names the range (${JSON.stringify(r.error)})`);
+            await t.type('input', /^Check every/i, '15'); await t.click('button', N.launch); await waitFor(`window.__qa.launch.length === 1`, 'the launch once the number is right', 6000);
+        });
         await S.run('step 3 Workflow: Requests for work are tasks is on for a new team and turning it off leaves it out of the request (#7792)', async () => {
             await install_stub(200); await fresh(); await t.to(2, { template: /^Blank/ }); await t.click('button', N.addOrch); await settle(250); await t.click('button', N.next); await t.step(3);
             await tab('Workflow'); assert.ok(await check(/^Requests for work are tasks/i, false), 'the Requests for work are tasks switch, turned off');

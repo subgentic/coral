@@ -3876,13 +3876,13 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .settings-info-text > * + * { margin-top: .4rem; }
 .settings-pane > .settings-theme-btn, .settings-pane > .settings-prompts-btn { margin-top: 1rem; }
 /* The on/off boxes are switches; they stay native checkboxes (the keyboard, the screen reader and the touch target are unchanged). */
-:is(#settings-modal .settings-row .check-hit, #launch-step-team .settings-pane :is(.check-hit, .health-rule-head)) input[type="checkbox"],
-:is(#settings-modal .settings-row .check-hit, #launch-step-team .settings-pane :is(.check-hit, .health-rule-head)) input[type="checkbox"]::before,
-:is(#settings-modal .settings-row .check-hit, #launch-step-team .settings-pane :is(.check-hit, .health-rule-head)) input[type="checkbox"]:checked,
-:is(#settings-modal .settings-row .check-hit, #launch-step-team .settings-pane :is(.check-hit, .health-rule-head)) input[type="checkbox"]:checked::before,
-:is(#settings-modal .settings-row .check-hit, #launch-step-team .settings-pane :is(.check-hit, .health-rule-head)) input[type="checkbox"]:focus-visible,
-:is(#settings-modal .settings-row .check-hit, #launch-step-team .settings-pane :is(.check-hit, .health-rule-head)) input[type="checkbox"]:disabled,
-@media (prefers-reduced-motion: reduce) { :is(#settings-modal .settings-row .check-hit, #launch-step-team .settings-pane :is(.check-hit, .health-rule-head)) input[type="checkbox"]::before { transition: none; } }
+:is(#settings-modal .settings-row .check-hit, #launch-step-team .settings-pane .check-hit) input[type="checkbox"],
+:is(#settings-modal .settings-row .check-hit, #launch-step-team .settings-pane .check-hit) input[type="checkbox"]::before,
+:is(#settings-modal .settings-row .check-hit, #launch-step-team .settings-pane .check-hit) input[type="checkbox"]:checked,
+:is(#settings-modal .settings-row .check-hit, #launch-step-team .settings-pane .check-hit) input[type="checkbox"]:checked::before,
+:is(#settings-modal .settings-row .check-hit, #launch-step-team .settings-pane .check-hit) input[type="checkbox"]:focus-visible,
+:is(#settings-modal .settings-row .check-hit, #launch-step-team .settings-pane .check-hit) input[type="checkbox"]:disabled,
+@media (prefers-reduced-motion: reduce) { :is(#settings-modal .settings-row .check-hit, #launch-step-team .settings-pane .check-hit) input[type="checkbox"]::before { transition: none; } }
 /* A touch screen: the switches are 44 px wide targets (they were 40 px: the phone census's red on the health switches): their width and knob travel are these two variables. */
 @media (pointer: coarse) { :root { --switch-w: 2.75rem; --switch-travel: 1.35rem; } }
 @container settingspane (max-width: 40rem) {
@@ -4035,8 +4035,6 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 /* Folded section: one summary style. A user sets only the --dz-* variables that differ. */
 .disclosure > summary { cursor: pointer; width: var(--dz-width, fit-content); padding: var(--dz-pad, .25rem .5rem .25rem 0); color: var(--dz-color, inherit); font-size: var(--dz-size, var(--fs-md)); font-weight: 600; }
 .disclosure[open] > summary { margin-bottom: var(--dz-gap, .4rem); }
-.health-advanced { --dz-gap: 10px; }
-.health-advanced > fieldset + fieldset { margin-top: 16px; }
 .launch-type-glyph { font-size: 2rem; } /* the agent card draws the same robot as the start page */
 
 /* Settings' footer: the note that something is not saved yet, on the left (UI audit #5589, finding 27); and the CLI paths behind one line. */
@@ -4314,7 +4312,7 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .team-wizard .team-page-start { flex: 1; min-height: 0; display: flex; padding: 0; }
 .team-wizard .team-page-start.team-page { display: flex; }
 .team-wizard[data-stage="team"] .team-page-start, .team-wizard[data-stage="members"] .team-page-start { display: none; }
-.team-page-start .launch-shell { flex: 1; min-height: 0; }
+.team-page-start .launch-shell, #team-start-host { flex: 1; min-width: 0; min-height: 0; display: flex; } /* step 3 is one settings_view (#8455): it fills the page the way the tab shell did */
 .team-page-team .dir-input-row input { flex: 1; }
 .team-field-hint:empty { display: none; }
 #team-panel-team #btn-browse-team { width: auto; justify-self: start; align-self: flex-start; } /* Browse is its own size under the folder, not the field's width */
@@ -4371,7 +4369,6 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
     .team-template-row .btn, .team-template-pick select, .team-allworkers select { min-height: var(--control-touch-height, 44px); }
 }
 #launch-step-team .settings-pane label:has(> input[type="checkbox"]) { display: flex; flex-direction: row; align-items: flex-start; gap: 10px; margin: 4px 0; }
-#launch-step-team .settings-pane .health-form .health-line { align-items: flex-start; }
 #launch-step-team .settings-pane .settings-hint { margin: 2px 0 12px; }
 
 /* New team and its Edit member dialog are 720 high (UI/UX's team design); the width and the phone sheet are the shared shell's. */
@@ -4380,16 +4377,12 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
     #launch-modal .modal-content.launch-wizard-content.launch-team-content { height: 100dvh; }
 }
 
-.team-launch-health { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
-.team-launch-health [hidden] { display: none !important; } /* the rows that only matter while the health check is on */
-#launch-step-team .settings-pane .health-line { border: 0; padding: 0; background: none; box-shadow: none; } /* the Workflow tab's row pattern: no card */
 #launch-step-team .settings-pane fieldset.team-settings-section { border: 0; padding: 0; margin: 0; min-width: 0; } /* the health panel's layout in the launch dialog (the Team settings form's class is not used here) */
 
 /* New team on a phone and at large text: nothing wider than the screen (the census), and the health panel's (i) on its label's first line. */
 .team-allworkers select { min-width: 0; max-width: 100%; width: min(12em, 100%); }
 .team-menu { min-width: min(12rem, calc(100vw - 32px)); max-width: calc(100vw - 32px); }
 .team-menu-item { white-space: normal; }
-#launch-step-team .settings-pane .health-line > label.health-rule-head:has(> input[type="checkbox"]) { margin: 0; }
 .team-agent-role-name, .team-agent-summary { min-width: 0; }
 
 /* The composer's @ mention list (#7549): above the box, rows of 44 px on a touch screen */
