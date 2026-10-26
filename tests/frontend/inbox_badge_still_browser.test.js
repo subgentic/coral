@@ -1,0 +1,48 @@
+// The Inbox tab's count badge hangs on the tab and moves nothing (#8497, the operator: it shifted the top tabs when it appeared or went). With none waiting, then 3, then 120 ("99+"), every top tab keeps its left,
+// right and width, the badge is out of the layout (absolute, at the word's top-right corner, 16 px high), the tab keeps its accessible name, and nothing scrolls sideways; at desktop and at the 768 px
+// tab row. At 390 the row is a dropdown (no badge in it) and the page is as steady. A stand-in for the agents waiting (the live list); CORAL_SCREENSHOT_DIR saves the shots.
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const { connect } = require('./agent_view_harness');
+const BASE = require('./test_base').BASE;
+
+(async () => {
+    const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const S = `(window.__coralStatic || '/static/')`;
+    const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
+    const waiting = n => ev(`(async () => { const { state } = await import(${S} + 'state.js'), m = await import(${S} + 'inbox_tab.js');
+        state.liveSessions = Array.from({ length: ${n} }, (_, i) => ({ name: 'w' + i, session_id: '0000000' + i + '-0000-4000-8000-0000000000aa', agent_type: 'claude', server: 'local', status: 'idle', display_name: 'Waiting ' + i, working_directory: '/repo/a', waiting_for_input: true, waiting_kind: 'permission', waiting_since: new Date(Date.now() - 300000).toISOString(), sleeping: false }));
+        m.updateInboxTab(); return true; })()`);
+    const tabs = () => ev(`[...document.querySelectorAll('.top-nav-tabs > .top-nav-tab:not(.nav-overflowed)')].filter(t => t.getClientRects().length).map(t => { const r = t.getBoundingClientRect(); return { id: t.id, left: Math.round(r.left * 10) / 10, right: Math.round(r.right * 10) / 10, width: Math.round(r.width * 10) / 10, top: Math.round(r.top * 10) / 10 }; })`);
+    try {
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        for (const [w, h, mobile] of [[1280, 800, false], [768, 800, false], [390, 844, true]]) {
+            const at = `at ${w}px: `;
+            await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
+            await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await waiting(0);
+            const none = await tabs();
+            if (mobile) {
+                assert.equal(none.length, 0, at + 'no tab row on a phone');
+            } else assert.ok(none.length >= 4, at + 'the tabs are there: ' + none.length);
+            for (const n of [3, 120]) {
+                await waiting(n);
+                await waitFor(`!document.getElementById('nav-tab-hub-inbox-badge').hidden`, at + 'the badge shows', 5000);
+                assert.equal(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`), n > 99 ? '99+' : String(n));
+                assert.deepEqual(await tabs(), none, at + `every tab keeps its place with ${n} waiting`);
+                if (!mobile) {
+                    const b = await ev(`(() => { const t = document.getElementById('nav-tab-hub-inbox'), e = document.getElementById('nav-tab-hub-inbox-badge'), tr = t.getBoundingClientRect(), r = e.getBoundingClientRect(); return { pos: getComputedStyle(e).position, h: Math.round(r.height), dTop: Math.round(r.top - tr.top), dLeft: Math.round(r.left - tr.right), label: t.getAttribute('aria-label'), wide: document.documentElement.scrollWidth <= innerWidth }; })()`);
+                    assert.equal(b.pos, 'absolute', at + 'the badge is out of the layout'); assert.equal(b.h, 16, at + 'a 16 px pill');
+                    assert.ok(b.dTop >= 0 && b.dTop <= 4, at + 'at the tab\'s top: ' + JSON.stringify(b)); assert.ok(b.dLeft >= -6 && b.dLeft <= 0, at + 'hanging on the word\'s top-right corner, covering at most its last few pixels: ' + JSON.stringify(b));
+                    assert.equal(b.label, `Inbox, ${n} waiting for input`, at + 'the tab keeps its accessible name'); assert.ok(b.wide, at + 'no sideways scroll');
+                }
+                if (n === 3) await shot(`inbox-badge-${w}`);
+            }
+            await waiting(0);
+            assert.deepEqual(await tabs(), none, at + 'and the tabs are where they were when the badge goes');
+            console.log(`   ✓ ${at}`);
+        }
+        console.log('PASS inbox badge: it hangs on the tab; no tab moves when it shows, changes or goes');
+    } finally { await client.close(); }
+})().catch(e => { console.error(e); process.exitCode = 1; });

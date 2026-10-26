@@ -61,21 +61,25 @@
     font-weight: 600;
 }
 
-/* The Inbox tab's badge: how many agents wait for input (#4718). */
+/* The Inbox tab's badge: how many agents wait for input (#4718). It hangs on the tab's top-right corner and takes no room (#8497): the tab is as wide as its word, so the badge appearing or going moves no tab. */
+.top-nav-tab { position: relative; }
 .nav-tab-badge {
-    display: inline-block;
-    margin-left: 6px;
-    padding: 0 6px;
+    position: absolute;
+    top: 2px;
+    left: calc(100% - 4px); /* just past the word's top-right corner: it covers the last letter by 4 px at most, and a pill of three or four characters stays in the tabs' 24 px gap */
+    box-sizing: border-box;
+    padding: 0 4px;
     min-width: 16px;
+    height: 16px;
     border-radius: var(--radius-lg);
     /* 11px text: the unread red alone is 3.9:1 with white in the dark theme, so it is darkened here (5.5:1 dark, higher in light). */
     background: color-mix(in srgb, var(--rail-badge-unread) 82%, #000);
+    box-shadow: 0 0 0 1px var(--topbar-bg); /* a ring in the bar's colour, so it reads on the active tab's underline */
     color: var(--rail-badge-text);
-    font-size: var(--fs-sm);
-    font-weight: 700;
+    font-size: 0.6875rem;
+    font-weight: 600;
     line-height: 16px;
     text-align: center;
-    vertical-align: 1px;
 }
 .nav-tab-badge[hidden] { display: none; }
 .nav-more-item .nav-more-badge { margin-left: auto; }
