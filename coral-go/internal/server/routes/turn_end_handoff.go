@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	at "github.com/subgentic/coral/internal/agenttypes"
-	"github.com/subgentic/coral/internal/ptymanager"
 	setreg "github.com/subgentic/coral/internal/settings"
 )
 
@@ -14,10 +13,6 @@ import (
 // It is on by default, for Claude agents on a board (team agents Coral launches);
 // an agent with no board, which a person drives, never gets it.
 const TurnEndHandoffSetting = "turn_end_handoff"
-
-// lastDelivered is when a send with a key was last typed into a session, zero if never
-// (ptymanager); a variable so tests can set it.
-var lastDelivered = ptymanager.LastDelivered
 
 // TurnEndHandoff is called by a Claude agent's Stop hook when its turn ends (#3481,
 // #3475 3A). If the agent has unread board messages, the answer tells the hook to keep
@@ -61,19 +56,10 @@ func (h *SessionsHandler) TurnEndHandoff(w http.ResponseWriter, r *http.Request)
 		writeJSON(w, http.StatusOK, none)
 		return
 	}
-	nudgeKey := "board-unread:" + board
-	// A nudge for these messages typed DURING this turn is queued in Claude's input and
-	// arrives when the turn ends, so a hand-off would deliver them twice (#3510: with the
-	// screen rule, the default, a nudge isn't held during a turn). The nudge that started
-	// the turn was typed before its prompt_submit, so it doesn't count. The turn starts at its
-	// FIRST prompt_submit: Claude records another one for the queued nudge itself.
-	if typed := lastDelivered(owner.SessionName, nudgeKey); !typed.IsZero() {
-		if start, ok, err := h.ts.TurnStartTime(ctx, owner.SessionID); err == nil && ok && typed.After(start) {
-			slog.Info("turn-end hand-off: skipped, a nudge was typed during the turn", "session", owner.SessionName, "board", board, "unread", unread)
-			writeJSON(w, http.StatusOK, none)
-			return
-		}
-	}
+	// A nudge typed during a turn is not an acknowledgement: Claude may end
+	// without acting on it (#8557). Unread messages still need a hand-off now,
+	// rather than waiting for the notifier's reminder window. An actual board
+	// read clears unread above; StopHookActive still bounds this to one per chain.
 	plural := "s"
 	if unread == 1 {
 		plural = ""
