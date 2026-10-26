@@ -39,6 +39,9 @@ func TestTmuxKillSendsTheHangupAndTheTerminate(t *testing.T) {
 	dir := t.TempDir()
 	const name = "claude-00006196-0001-4000-8000-000000000000"
 	spawnTmuxSession(t, term, name, dir)
+	// A long grace: the markers prove the SIGNALS ended the children (the SIGKILL after the grace writes none), and a stall of the machine of a few seconds cannot let that SIGKILL come first (#8025: under CI load the
+	// 3 s grace ran out before a child's handler had run, and the test read the late SIGKILL as a hangup never sent).
+	setWaits(t, func(w *waitTimings) { w.treeGrace = 30 * time.Second })
 	f := func(s string) string { return filepath.Join(dir, s) }
 	cmd := `perl -e 'use POSIX; ` +
 		`if (!fork) { POSIX::setsid(); $SIG{TERM} = "IGNORE"; $SIG{HUP} = sub { open M, ">` + f("hup.mark") + `"; print M "x"; close M; exit 0 }; open F, ">` + f("hup.pid") + `"; print F $$; close F; sleep 600; exit 0 } ` +
@@ -53,7 +56,7 @@ func TestTmuxKillSendsTheHangupAndTheTerminate(t *testing.T) {
 	}
 	for _, m := range []string{"hup.mark", "term.mark"} {
 		ok := false
-		for end := time.Now().Add(tmuxTreeGrace - 500*time.Millisecond); time.Now().Before(end); time.Sleep(25 * time.Millisecond) {
+		for end := time.Now().Add(waits().treeGrace - 10*time.Second); time.Now().Before(end); time.Sleep(25 * time.Millisecond) {
 			if _, err := os.Stat(f(m)); err == nil {
 				ok = true
 				break
@@ -65,4 +68,31 @@ func TestTmuxKillSendsTheHangupAndTheTerminate(t *testing.T) {
 	}
 	waitGone(t, hup, 2*time.Second)
 	waitGone(t, termPID, 2*time.Second)
+}
+
+// The other side of the grace (#8025): a child whose hangup handler needs longer than the grace is ended by the SIGKILL that follows it and leaves no marker. This is what a machine that stalls for a few seconds
+// does to the test above on its production 3 s, which is why that test runs with a long grace: the missing marker there did not mean the hangup was not sent.
+func TestTmuxKillEndsAChildThatIsSlowerThanTheGraceWithTheKill(t *testing.T) {
+	needPerl(t)
+	term := newTmuxTestTerminal(t)
+	dir := t.TempDir()
+	const name = "claude-00008025-0001-4000-8000-000000000000"
+	spawnTmuxSession(t, term, name, dir)
+	setWaits(t, func(w *waitTimings) { w.treeGrace = 400 * time.Millisecond })
+	f := func(s string) string { return filepath.Join(dir, s) }
+	cmd := `perl -e 'use POSIX; ` +
+		`if (!fork) { POSIX::setsid(); $SIG{TERM} = "IGNORE"; $SIG{HUP} = sub { select(undef, undef, undef, 2); open M, ">` + f("slow.mark") + `"; print M "x"; close M; exit 0 }; open F, ">` + f("slow.pid") + `"; print F $$; close F; sleep 600; exit 0 } ` +
+		`wait'`
+	if err := term.SendInput(context.Background(), terminalinput.Internal, name, cmd, "", ""); err != nil {
+		t.Fatal(err)
+	}
+	slow := pidFrom(t, f("slow.pid"))
+	if err := term.KillSession(context.Background(), name, "", ""); err != nil {
+		t.Fatal(err)
+	}
+	waitGone(t, slow, 5*time.Second)    // the SIGKILL after the 400 ms grace ended it, long before its 2 s handler could finish
+	time.Sleep(2500 * time.Millisecond) // sleep-ok: the marker, if the handler were to finish, would appear in 2 s; there is no event for a file that must not appear
+	if _, err := os.Stat(f("slow.mark")); err == nil {
+		t.Fatal("the slow handler finished: the SIGKILL after the grace did not end it")
+	}
 }

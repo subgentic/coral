@@ -31,6 +31,9 @@ type waitTimings struct {
 	// launchWait, launchFallback and launchEvery: how long a RequireInputBox send waits in all (an open prompt or a blank screen), how long for an agent whose input
 	// box Coral does not recognise, and how often it looks again.
 	launchWait, launchFallback, launchEvery time.Duration
+	// treeGrace is how long what a killed tmux agent started is given to end on the hangup and SIGTERM before it is killed (tmux_tree_unix.go). A test that proves the signals themselves ended it, not the SIGKILL
+	// after the grace, lengthens it so that a stall of the machine cannot let the kill come first (#8025).
+	treeGrace time.Duration
 }
 
 var waitsP atomic.Pointer[waitTimings]
@@ -49,6 +52,7 @@ func init() {
 		launchWait:            15 * time.Minute,
 		launchFallback:        2 * time.Minute,
 		launchEvery:           time.Second,
+		treeGrace:             3 * time.Second,
 	})
 }
 

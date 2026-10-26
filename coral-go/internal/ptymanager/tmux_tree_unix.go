@@ -23,9 +23,6 @@ import (
 // running, reparented to PID 1 (#6141: checked with a real tmux and real children). The same as the built-in terminal had before #6125, and fixed the same way: the tree of the pane's shell is found before the
 // kill (pid and start time, the same exclusions), sent the polite stop with the kill, and what is still there after a short grace is killed.
 
-// tmuxTreeGrace is how long what the agent started is given to end on the hangup and SIGTERM before it is killed.
-const tmuxTreeGrace = 3 * time.Second
-
 // beginTreeKill finds the tree of the pane whose pid is paneOut (the answer of tmux's #{pane_pid}) and finds its members; the returned function, called after tmux's own kill, sends them the stop, waits for them to end
 // within the grace and kills what is left. A pane whose pid cannot be read is a pane with nothing to do: the function does nothing.
 //
@@ -69,7 +66,7 @@ func beginTreeKill(paneOut, sessionID string) (finish func()) {
 			defer func() { pendingTreeKills.remove(job); close(job.done) }()
 			signalTree(known, syscall.SIGHUP) // what closing the terminal does, then the polite stop
 			signalTree(known, syscall.SIGTERM)
-			deadline := time.Now().Add(tmuxTreeGrace)
+			deadline := time.Now().Add(waits().treeGrace) // 3 s: what the agent started is given that long to end on the hangup and SIGTERM before it is killed
 			for anyAlive(known) && time.Now().Before(deadline) {
 				time.Sleep(25 * time.Millisecond)
 			}

@@ -99,6 +99,7 @@ func TestQuittingFinishesAPendingTmuxTreeKill(t *testing.T) {
 	dir := t.TempDir()
 	const gone = "claude-00006141-0020-4000-8000-000000000000"
 	spawnTmuxSession(t, term, gone, dir)
+	setWaits(t, func(w *waitTimings) { w.treeGrace = 30 * time.Second }) // the grace running out cannot end them before the quit does, however the machine stalls (#8025); read when the kill starts, so before it
 	x, y := startHelpers(t, term, gone, dir, true)
 	if err := term.KillSession(context.Background(), gone, "", ""); err != nil {
 		t.Fatal(err)
@@ -112,7 +113,7 @@ func TestQuittingFinishesAPendingTmuxTreeKill(t *testing.T) {
 	b.Close() // quitting
 	waitGone(t, x, 2*time.Second)
 	waitGone(t, y, 2*time.Second)
-	if took := time.Since(start); took > tmuxTreeGrace-time.Second {
+	if took := time.Since(start); took > waits().treeGrace-time.Second {
 		t.Fatalf("they were ended after %v, which is the grace running out, not the quit finishing the kill", took)
 	}
 }
