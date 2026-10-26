@@ -3,6 +3,7 @@ package coordination
 import (
 	"fmt"
 	"math"
+	"sort"
 	"strings"
 	"time"
 
@@ -249,6 +250,7 @@ func detectRepetitiveHandoffs(messages []Message) []RepetitiveHandoffLoop {
 				for a := range counts {
 					agents = append(agents, a)
 				}
+				sort.Strings(agents) // the agents and the summary naming them are the same on every call
 				loops = append(loops, RepetitiveHandoffLoop{
 					Agents:       agents,
 					MessageCount: windowSize,
@@ -296,6 +298,7 @@ func jaccardSimilarity(a, b []string) (float64, []string) {
 			shared = append(shared, w)
 		}
 	}
+	sort.Strings(shared) // a map's order differs from call to call
 	union := len(setA) + len(setB) - intersection
 	if union == 0 {
 		return 0, nil

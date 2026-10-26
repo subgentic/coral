@@ -262,16 +262,21 @@ func computeActiveLoad(cohortTasks []Task, allTasks []Task, status *BoardStatus,
 	}
 
 	// Also include any active subscribers from tasks who are not in status.Agents
-	for sub, activeID := range activeTaskBySubscriber {
+	extra := make([]string, 0, len(activeTaskBySubscriber))
+	for sub := range activeTaskBySubscriber {
 		if !seenSubscribers[sub] {
-			metrics.SubscriberLoad = append(metrics.SubscriberLoad, SubscriberLoad{
-				SubscriberID: sub,
-				Role:         sub,
-				Availability: "busy",
-				ActiveTaskID: activeID,
-				QueuedCount:  assignedMap[sub],
-			})
+			extra = append(extra, sub)
 		}
+	}
+	sort.Strings(extra) // by id: a map's order differs from call to call, and so would the report
+	for _, sub := range extra {
+		metrics.SubscriberLoad = append(metrics.SubscriberLoad, SubscriberLoad{
+			SubscriberID: sub,
+			Role:         sub,
+			Availability: "busy",
+			ActiveTaskID: activeTaskBySubscriber[sub],
+			QueuedCount:  assignedMap[sub],
+		})
 	}
 
 	return metrics
