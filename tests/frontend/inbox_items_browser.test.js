@@ -55,9 +55,10 @@ const BASE = require('./test_base').BASE;
                     await load('/'); await folder(key);
                     if (isTask) await ev(`import((window.__coralStatic||'/static/')+'inbox_sidebar.js').then(m=>m.filterInbox('Read this task'))`);
                     await open(text); await checkInbox(url); // failing-first: currently jumps to /team
-                    assert.ok(await ev(`document.querySelector('#inbox-page .goals-back')?.getClientRects().length>0`),'Back is visible at this width');
                     const content=isTask?'#inbox-page .team-task-page':'#inbox-page #mb-board';
                     await waitFor(`document.querySelector(${JSON.stringify(content)})?.textContent.includes(${JSON.stringify(isTask?title:'Read this board in the Inbox')})`, 'shared item content');
+                    // Check the mounted page, not the shell shown while its task read is pending.
+                    assert.ok(await ev(`document.querySelector('#inbox-page .goals-back')?.getClientRects().length>0`),'Back is visible at this width');
                     if (!isTask) assert.ok(await ev(`(() => { const title=document.querySelector('#inbox-page .inbox-board-head h2').getBoundingClientRect(), search=document.querySelector('#inbox-page #mb-tools').getBoundingClientRect(); return search.top-title.bottom>=12; })()`),'Board title has at least 12 px before search');
                     if (width===390) assert.equal(await ev(`document.querySelector('#inbox-page select[aria-label="Inbox views"]').value`),key);
                     for (const theme of ['light','dark']) {
