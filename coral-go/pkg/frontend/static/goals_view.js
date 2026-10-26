@@ -223,7 +223,7 @@ function detailTasks(g, rows) {
 }
 
 /** Focus goes to the detail as a whole when a goal opens (its name is read: the goal's title), not to a heading that cannot be typed in: no ring is drawn round words (#7404). */
-function focusDetail() { root?.querySelector('.goals-detail-col')?.focus(); }
+function focusDetail() { root?.querySelector(layout === 'page' ? '#goals-detail-title' : '.goals-detail-col')?.focus({ preventScroll: true }); }
 
 function drawDetailRaw() {
     const col = root.querySelector('.goals-detail-col'); if (!col) return;

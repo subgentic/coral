@@ -309,7 +309,7 @@ const STUB = `(() => {
         check('only the id that answered 200 is a link, to the fixed /api/artifacts/<hex> path (both markdown links of it; b, c, d, e and the others are written as links too, so only the 200 can make one)', lk.hrefs.length === 2 && lk.hrefs.every(h => h === '/api/artifacts/' + 'a'.repeat(64)), JSON.stringify(lk.hrefs));
         check('403, 404, a network failure, an uppercase id, a short id, an id with a tail or a query and a bare id are not links: the 200 id has the only hrefs', lk.hrefs.length === 2 && !lk.hrefs.some(h => /\/\.\.|\?/.test(h)) && lk.text.includes('forbidden') && lk.text.includes('offline'), lk.text);
         check('one meta request per distinct lowercase 64-hex id (a, b, c, d, e, f: the tail and query ids are asked for their own hex, the bare one too), none for the uppercase or short ones', JSON.stringify([...lk.metas].sort()) === JSON.stringify(['a', 'b', 'c', 'd', 'e', 'f']), JSON.stringify(lk.metas));
-        check('"Open the task" is the board path of the task, encoded', lk.open === '/board/team%20a', lk.open);
+        check('"Open the task" is the canonical task path, encoded', lk.open === '/team/team%20a/tasks/7', lk.open);
         const many = await ev(`(async () => { const c = await import(${S} + 'inbox_coral.js'); window.__reqs.length = 0;
             const ids = Array.from({ length: 30 }, (_, i) => 'a' + String(i).padStart(2, '0').repeat(1) + 'f'.repeat(61));
             const t = ids.concat(ids).map(x => 'coral://artifacts/' + x).join(' ');

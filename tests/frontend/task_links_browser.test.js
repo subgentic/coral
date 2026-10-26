@@ -13,6 +13,10 @@ const BASE = require('./test_base').BASE;
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
         await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        // The ordinary CDP shard permits unauthenticated reads/posts with a claimed sender.
+        // A reply intentionally has no claimed sender: sign in as the fixture's Operator.
+        if (process.env.CORAL_TEST_DATA_DIR) assert.equal(await ev(`fetch('/auth/password', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:'coral-cdp-suites-test-password',keep:false})}).then(r=>r.status)`), 200, 'fixture Operator signs in for the real reply route');
+
         await api(`/api/board/${B}/subscribe`, { subscriber_id: 'Operator', job_title: 'Operator' });
         const g = await api(`/api/board/${B}/goals`, { title: 'Links goal', subscriber_id: 'Operator', outcome: 'One destination', done_when: 'All links agree' });
         const t = await api(`/api/board/${B}/tasks`, { title, body: 'Task body', created_by: 'Operator', assigned_to: 'Operator', goal_id: g.id });
@@ -43,7 +47,7 @@ const BASE = require('./test_base').BASE;
         await ev(`import(${S}+'task_navigation.js').then(m=>m.openTask(${JSON.stringify(B)},${id})).then(()=>true)`);
         await waitFor(`document.querySelector('#team-panel-item .ibx-reply-input')?.value === 'Keep this reply draft'`, 'draft survives navigation');
         await ev(`document.querySelector('#team-panel-item .ibx-send').click(); true`);
-        await waitFor(`/Reply (sent|saved)/.test(document.querySelector('#team-panel-item .ibx-reply-status')?.textContent || '')`, 'reply submitted on canonical page');
+        await waitFor(`/Reply (sent|saved)/.test(document.querySelector('#team-panel-item .ibx-reply-status')?.textContent || '')`, 'reply submitted on canonical page', 10000, `({status:document.querySelector('#team-panel-item .ibx-reply-status')?.textContent,disabled:document.querySelector('#team-panel-item .ibx-send')?.disabled})`);
         await waitFor(`document.querySelector('#team-panel-item .ibx-thread')?.textContent.includes('Keep this reply draft')`, 'sent reply joins conversation');
         console.log('PASS reply draft, submit and conversation');
         await team('messages');
