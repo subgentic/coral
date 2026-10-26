@@ -9,7 +9,7 @@ import { showToast } from './utils.js';
 import { state } from './state.js';
 import { importOnce } from './import_once.js';
 const DT = await importOnce('./data_table.js');
-const { itemKey, isUnverified, readableName, sizeText, typeText, createdText, taskText, linkOfItem, renderText } = await importOnce('./artifact_item.js');
+const { itemKey, isUnverified, readableName, sizeText, typeText, createdText, taskText, linkOfItem, renderText, orderByGroup, groupHead } = await importOnce('./artifact_item.js');
 import { renderArtifact } from './artifact_preview.js';
 const { openDetailPane } = await importOnce('./detail_pane.js');
 
@@ -21,20 +21,6 @@ async function read(team, goalId, extra) {
     const resp = await boardFetch(team, `/artifacts?goal=${pathId(goalId)}&${extra}`);
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     return resp.json();
-}
-
-/** The newest task first, a task's files together (the server's order is by time), so a group head is not drawn twice. */
-function byTask(items) {
-    const newest = new Map();
-    for (const it of items) newest.set(it.task_id, Math.max(newest.get(it.task_id) || 0, Date.parse(it.created_at) || 0));
-    return items.map((it, i) => ({ it, i })).sort((a, b) => (newest.get(b.it.task_id) - newest.get(a.it.task_id)) || (Number(b.it.task_id) - Number(a.it.task_id)) || (a.i - b.i)).map(x => x.it);
-}
-
-/** "#2 Title, 3 files"; with more files still to load a count of the loaded ones would be wrong, so the head is the task alone. */
-function groupLabel(item, files, complete) {
-    if (!complete) return taskText(item);
-    const n = files.filter(f => f.task_id === item.task_id).length;
-    return `${taskText(item)}, ${n} ${n === 1 ? 'file' : 'files'}`;
 }
 
 function openPreview(item, link) {
@@ -77,10 +63,10 @@ export function mountGoalArtifacts(host, { team, goalId }) {
         summary.textContent = names();
         body.replaceChildren();
         if (!state.loadedOnce) { body.append(el('p', 'goals-note', 'Loading…')); return; }
-        const rows = byTask(state.items);
+        const rows = orderByGroup(state.items, 'task'); // a task's files together; the newest task first, as the server sorts
         const table = DT.dataTable({
             label: `Artifacts of this goal, ${rows.length}`, bare: true, compact: true, foldAt: 'fit', rows, rowKey: itemKey, rowName: readableName, state: state.tableState,
-            groupBy: (it) => ({ key: String(it.task_id || 0), label: groupLabel(it, rows, !state.cursor) }),
+            groupBy: (it) => groupHead(it, 'task', rows, !state.cursor),
             // an agent's dock opens the preview panel, a team page the detail pane (the document under its facts): one click either way; Details is the sheet's own link beside the dock's preview
             open: (item, tr) => { const link = linkOfItem(item, { server: undefined, project: team }); if (link && dock()) openPreview(item, link).catch(() => {}); else openSheet(item, link, tr.querySelector('.dt-primary'), team); },
             columns: [

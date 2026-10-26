@@ -22,6 +22,18 @@ const { pathToFileURL } = require('node:url');
     assert.equal(p.since, new Date(2026, 9, 5).toISOString()); assert.equal(p.until, new Date(2026, 9, 10).toISOString());
     assert.equal(m.toParams({ ...m.EMPTY, to: '2026-12-31' }).until, new Date(2027, 0, 1).toISOString(), 'the last day of the year ends at the next year\'s midnight');
 
+    // Group by, Task and Goal (#8593): a task or goal is a positive whole number, the server's task and goal parameters; the grouping is how the list is read, never a filter
+    assert.deepEqual(m.clean({ task: '12', goal: 7, group: 'goal' }), { ...m.EMPTY, task: '12', goal: '7', group: 'goal' });
+    assert.deepEqual(m.clean({ task: '0', goal: '-3', group: 'week' }), m.EMPTY); assert.deepEqual(m.clean({ task: '1e3', goal: 'abc' }), m.EMPTY); assert.equal(m.clean({ task: '007' }).task, '7');
+    assert.deepEqual(m.toParams({ ...m.EMPTY, task: '12', goal: '7', group: 'task' }), { task: '12', goal: '7', sort: 'newest' }, 'the grouping is not sent');
+    assert.equal(m.isFiltered({ ...m.EMPTY, group: 'task' }), false, 'a grouping alone does not narrow'); assert.equal(m.isFiltered({ ...m.EMPTY, goal: '7' }), true);
+    assert.deepEqual(m.chips({ ...m.EMPTY, group: 'task' }), [], 'no chip for a grouping');
+    assert.deepEqual(m.chips({ ...m.EMPTY, task: '12', goal: '7' }).map(c => c.label), ['Task: #12', 'Goal: #7'], 'the number until the page has seen the names');
+    const seen = m.noteChoices([{ task_id: 12, task_title: 'Write it', goal_id: 7, goal_title: 'Ship the installer' }, { task_id: 3, task_title: '' }, { task_id: 0 }]);
+    assert.deepEqual(seen, { tasks: [['3', '#3'], ['12', '#12 Write it']], goals: [['7', 'Ship the installer']] });
+    assert.deepEqual(m.chips({ ...m.EMPTY, task: '12', goal: '7' }).map(c => c.label), ['Task: #12 Write it', 'Goal: Ship the installer']);
+    assert.equal(m.without({ ...m.EMPTY, goal: '7' }, 'goal').goal, ''); m.forgetChoices();
+
     // chips and removing them
     assert.deepEqual(m.chips(m.EMPTY), []);
     const f = { ...m.EMPTY, q: 'x', kind: 'pdf', origin: 'unlisted', by: 'Dev', kept: true, from: '2026-10-01', to: '2026-10-02' };
