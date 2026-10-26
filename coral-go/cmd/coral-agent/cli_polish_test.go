@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -132,9 +133,10 @@ func TestTaskListRefusesUnknownOptionsAndHasJSON(t *testing.T) {
 }
 
 func TestTaskCurrentJSONAgent(t *testing.T) {
-	have := true
+	var have atomic.Bool
+	have.Store(true)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !have {
+		if !have.Load() {
 			w.WriteHeader(http.StatusNotFound)
 			w.Write([]byte(`{"error":"No active task"}`))
 			return
@@ -150,7 +152,7 @@ func TestTaskCurrentJSONAgent(t *testing.T) {
 	assert.EqualValues(t, 4, got["id"])
 	_, stdout, _ = runAgent(t, srv.URL, "task", "current")
 	assert.Contains(t, stdout, "Task #4")
-	have = false
+	have.Store(false)
 	code, stdout, _ = runAgent(t, srv.URL, "task", "current", "--json")
 	assert.Equal(t, 0, code)
 	assert.Equal(t, "null", strings.TrimSpace(stdout))
