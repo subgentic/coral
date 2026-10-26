@@ -8,6 +8,7 @@ import './hub_blocked_controls.js'; // dims controls the Hub tier does not allow
 // Load order only (#4996): the imports below with no names are loaded for what the module registers at load, in the order this module imported them before the split (the startup-sequence golden records it).
 import './session_rows.js';
 import './settings_rows_boot.js'; // the Settings dialog's rows that are fields are drawn when its markup is built
+import './team_form.js'; // step 1 of the New team dialog is drawn when the Launch dialog's markup is built
 import './branch_expand.js'; // the capped branch name in the agent header opens in place (#5142)
 import './nav_tabs.js'; // the tab row, its More menu and the phone's view dropdown (#3816)
 import { initPrerequisiteChecks } from './prerequisites.js';
@@ -174,7 +175,6 @@ registerActions({
     'm-show-team-agent-modal': el => { window.showTeamAgentModal(); },
     'm-show-team-wizard-modal': el => { window.showTeamWizardModal(); },
     'm-submit-open-folder': el => { window.submitOpenFolder(); },
-    'm-team-worktree': el => { const r = document.getElementById('team-worktree-branch-row'); if (r) r.style.display = el.checked ? '' : 'none'; },
     'm-test-team-wizard': el => { window.testTeamWizard(); },
     'm-toggle-browser': el => { const ids = String(el.dataset.browser || '').split(' '); if (ids.length === 4 && ids.every(i => /^[a-z0-9-]+$/.test(i))) window.toggleBrowser(...ids); },
     'm-toggle-group-by-team': el => { window.toggleGroupByTeam(); },

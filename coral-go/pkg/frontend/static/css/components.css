@@ -814,40 +814,6 @@
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 15%, transparent);
 }
 
-.settings-toggle {
-    display: flex;
-    align-items: flex-start;
-    justify-content: flex-start;
-    gap: 8px;
-    width: 100%;
-    text-align: left;
-}
-
-.settings-toggle input[type="checkbox"] {
-    width: auto;
-    margin: 2px 0 0;
-    flex-shrink: 0;
-}
-
-.settings-toggle span {
-    flex: 1;
-}
-
-.settings-toggle strong {
-    display: block;
-    color: var(--text-primary);
-    font-size: 0.8125rem;
-    font-weight: 600;
-}
-
-.settings-toggle .toggle-desc {
-    display: block;
-    margin-top: 2px;
-    font-size: var(--fs-base);
-    line-height: 1.35;
-    color: var(--text-secondary);
-}
-
 .modal-actions {
     display: flex;
     flex-wrap: wrap; /* #4344: at 200% text the buttons wrap instead of running off the left edge */
@@ -2449,40 +2415,6 @@
 
 .team-advanced-body {
     padding: 0 12px 12px;
-}
-
-.team-settings-toggle {
-    margin-top: 8px;
-    padding: 12px 0 0;
-    border-top: 1px solid var(--border);
-}
-
-/* Inside a dialog the generic ".modal-content label" (block) outranks .settings-toggle: the box sits beside its words again (#4962: the launch dialog's health option; the worktree option had the same). */
-.modal-content label.team-settings-toggle,
-.sd-modal-content .settings-pane label.team-settings-toggle {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    min-height: var(--control-touch-height, 0);
-}
-.modal-content label.team-settings-toggle input[type="checkbox"],
-.sd-modal-content .settings-pane label.team-settings-toggle input[type="checkbox"] {
-    width: auto;
-    margin: 3px 0 0;
-    flex-shrink: 0;
-}
-
-.team-settings-toggle strong {
-    display: block;
-    font-size: 0.875rem;
-    color: var(--text-primary);
-}
-
-.team-settings-note {
-    margin-top: 4px;
-    font-size: 0.75rem;
-    line-height: 1.4;
-    color: var(--text-secondary);
 }
 
 .mobile-launch-section {
@@ -4383,12 +4315,9 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .team-wizard .team-page-start.team-page { display: flex; }
 .team-wizard[data-stage="team"] .team-page-start, .team-wizard[data-stage="members"] .team-page-start { display: none; }
 .team-page-start .launch-shell { flex: 1; min-height: 0; }
-.team-page-team .launch-field-folder, .team-page-team .team-address-slot { margin: 0 0 16px; }
-.team-page-team .launch-field-folder input[type="text"], .team-address-slot input { width: 100%; box-sizing: border-box; }
 .team-page-team .dir-input-row input { flex: 1; }
-.team-address-slot[hidden] { display: none; }
-.team-worktree-slot { min-height: 7.5rem; } /* the worktree choice and its branch live in a slot as tall as both: ticking it moves nothing */
-.team-field-hint { min-height: 1.1em; }
+.team-field-hint:empty { display: none; }
+#team-panel-team #btn-browse-team { width: auto; justify-self: start; align-self: flex-start; } /* Browse is its own size under the folder, not the field's width */
 .launch-wizard > .modal-actions #launch-team-cancel { margin-right: auto; }
 .launch-wizard > .modal-actions .btn[aria-disabled="true"] { opacity: .55; cursor: not-allowed; }
 #launch-modal[data-team-stage="members"] .launch-server-row, #launch-modal[data-team-stage="start"] .launch-server-row { display: none !important; } /* the machine is a step 1 choice */

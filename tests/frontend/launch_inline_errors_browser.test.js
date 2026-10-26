@@ -64,8 +64,9 @@ const BASE = require('./test_base').BASE;
         await ev(`window.showLaunchModal(); window._selectLaunchType('team'); true`);
         await waitFor(`getComputedStyle(document.getElementById('launch-step-team')).display !== 'none'`, 'the team step');
         await ev(`document.getElementById('team-board-name').value = ''; window.launchTeam(); true`);
-        f = await inline('team-board-name');
-        assert.match(f.text, /Type a name for the team/, JSON.stringify(f)); assert.ok(f.described && f.invalid === 'true');
+        // the name is a field of the step's form (#8335): its error line is the form's, tied to the field and said once
+        f = await ev(`(() => { const f = document.getElementById('team-board-name'); const e = f.closest('.sv-row').querySelector('.sv-error'); return { text: e.textContent, described: (f.getAttribute('aria-describedby') || '').split(' ').includes(e.id), invalid: f.getAttribute('aria-invalid'), visible: e.getClientRects().length > 0 }; })()`);
+        assert.match(f.text, /Team name is required/, JSON.stringify(f)); assert.ok(f.described && f.visible && f.invalid === 'true', JSON.stringify(f));
         assert.equal(await ev(`!!document.getElementById('team-board-name').closest('.settings-pane')`), false, 'the name is above the sections, in view on every tab');
         assert.equal(await ev(`!!document.getElementById('launch-team-health') || /health monitor/i.test(document.getElementById('launch-step-team').textContent)`), false, 'no health check option in the launch dialog');
         await ev(`document.getElementById('team-board-name').value = 'inline-err'; window._validateTeamName(); document.getElementById('launch-team-dir').value = ''; window.launchTeam(); true`);

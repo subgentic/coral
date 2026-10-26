@@ -5,6 +5,7 @@ import { showToast, escapeHtml, escapeAttr, boardNameProblem, OPERATOR_ID } from
 import { loadLiveSessions } from './api.js';
 import { loadBoardProjects } from './message_board.js';
 import { recordRecentDir, getRecentDirs } from './browser.js';
+import { teamForm, showTeamWorktree } from './team_form.js';
 import { serverFetch, boardFetch, identityKey, LOCAL_SERVER } from './server_base.js';
 const { launch } = await importOnce('./launch_state.js');
 const { _acfServer, _effectiveServer, _settingsFor } = await importOnce('./launch_models.js');
@@ -178,11 +179,7 @@ function teamStepMove(dir) {
     const step = currentTeamStep();
     const i = TEAM_STEPS.indexOf(step);
     if (dir > 0 && step === 'team') {
-        const name = document.getElementById('team-board-name');
-        const dirInput = document.getElementById('launch-team-dir');
-        if (!name.value.trim()) { markFieldInvalid(name, 'Team name is required'); return; }
-        if (!_validateTeamName()) { markFieldInvalid(name, boardNameProblem(name.value.trim()) || 'Team name must be unique'); return; }
-        if (!dirInput.value.trim()) { markFieldInvalid(dirInput, 'Choose a folder for the team'); return; }
+        if (!teamForm().validate({ focus: true }).ok) { _syncTeamGate(); return; } // the first field that is wrong takes the focus and says what is missing
     }
     if (dir > 0 && step === 'members' && !hasOrchestrator()) { document.getElementById('team-add-orchestrator')?.focus(); _syncTeamGate(); return; }
     const to = TEAM_STEPS[Math.min(TEAM_STEPS.length - 1, Math.max(0, i + dir))];
@@ -294,17 +291,16 @@ async function _checkTeamGitDir() {
     const server = _effectiveServer(launch.server);
     const dirInput = document.getElementById("launch-team-dir");
     const dir = dirInput ? dirInput.value.trim() : '';
-    const worktreeOpt = document.getElementById('team-worktree-option');
-    if (!dir || !worktreeOpt) return;
+    if (!dir || !teamForm()) return;
     try {
         const resp = await serverFetch(server, `/api/filesystem/is-git?path=${encodeURIComponent(dir)}`);
         const data = await resp.json();
         if (server !== _effectiveServer(launch.server)) return;
-        worktreeOpt.style.display = data.is_git ? '' : 'none';
+        showTeamWorktree(!!data.is_git);
         // Base Branch starts as the repo's own current branch (the answer's `branch`), not a guess ("main" in a repo that has master, #6707), until the person types one.
         const base = document.getElementById('launch-team-base-branch');
         if (base && data.is_git && typeof data.branch === 'string' && data.branch && base.dataset.edited !== '1') base.value = data.branch;
-    } catch { worktreeOpt.style.display = 'none'; }
+    } catch { showTeamWorktree(false); }
 }
 
 /** The target server's board names and labels, to say before launching that one exists (#3536). */
@@ -355,6 +351,7 @@ async function _initTeamForm() {
     const addr = document.getElementById("team-board-server");
     if (addr) { addr.value = ""; addr.disabled = true; } // the machine's own entry reveals it (launch_dialog.js _syncTeamAddress)
     launch.existingTeamBoardNames = new Set();
+    teamForm()?.clearErrors();
     _validateTeamName();
     const tapEl = document.getElementById("team-permission-mode");
     if (tapEl) {
@@ -603,29 +600,16 @@ function _setAllWorkers(type) {
 function _validateTeamName() {
     const input = document.getElementById("team-board-name");
     const hint = document.getElementById("team-board-name-hint");
-    if (!input || !hint) return true;
+    const form = teamForm();
+    if (!input || !hint || !form) return true;
     const value = input.value.trim();
-    input.removeAttribute("aria-invalid");
-    if (!value) {
-        hint.textContent = "";
-        hint.classList.remove("error");
-        return false;
-    }
-    const problem = boardNameProblem(value); // a bad name is flagged (aria-invalid) below, which marks its section in the list while the person is elsewhere
-    if (problem) {
-        hint.textContent = problem;
-        hint.classList.add("error");
-        input.setAttribute("aria-invalid", "true");
-        return false;
-    }
-    // A name in use is allowed (#3536): launching asks whether to join that board or start another.
-    if (launch.existingTeamBoardNames.has(value.toLowerCase())) {
-        hint.textContent = "A board with this name exists. Launching asks whether to join it or start another.";
-        hint.classList.remove("error");
-        return true;
-    }
     hint.textContent = "";
-    hint.classList.remove("error");
+    if (!value) { form.error('name', ''); return false; }
+    const problem = boardNameProblem(value); // a bad name is flagged on its field (aria-invalid), which marks its section in the list while the person is elsewhere
+    form.error('name', problem);
+    if (problem) return false;
+    // A name in use is allowed (#3536): launching asks whether to join that board or start another.
+    if (launch.existingTeamBoardNames.has(value.toLowerCase())) hint.textContent = "A board with this name exists. Launching asks whether to join it or start another.";
     return true;
 }
 window._validateTeamName = _validateTeamName;
@@ -634,7 +618,7 @@ async function launchTeam() {
     const boardName = document.getElementById("team-board-name").value.trim();
     if (!boardName) {
         showToast("Team name is required", true);
-        showTeamStep('team'); markFieldInvalid(document.getElementById("team-board-name"), "Team name is required");
+        showTeamStep('team'); teamForm().validate({ focus: true });
         return;
     }
     if (!_validateTeamName()) {

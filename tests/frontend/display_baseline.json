@@ -1,7 +1,7 @@
 {
   "agent_config_form.js": 4,
   "agent_notes.js": 4,
-  "app.js": 5,
+  "app.js": 4,
   "app_wiring.js": 3,
   "artifact_download.js": 1,
   "board_chat.js": 11,
@@ -47,7 +47,7 @@
   "task_list.js": 4,
   "tasks.js": 1,
   "team_actions.js": 1,
-  "team_dialogs.js": 3,
+  "team_dialogs.js": 1,
   "team_templates_ui.js": 2,
   "team_wizard.js": 11,
   "template_browser.js": 1,

@@ -134,7 +134,7 @@ const GOLDEN = path.join(__dirname, 'fixtures', 'dialog_requests_golden.json');
         await ev(`document.getElementById('team-agents-list').innerHTML = ''; true`);
         await fill('team-board-name', 'alpha-team');
         await fill('launch-team-dir', '/work/repo');
-        await waitFor(`getComputedStyle(document.getElementById('team-worktree-option')).display !== 'none'`, 'the worktree option');
+        await waitFor(`!document.getElementById('launch-team-worktree').closest('.sv-row').hidden`, 'the worktree option');
         await ev(`{ const c = document.getElementById('launch-team-worktree'); c.checked = true; c.dispatchEvent(new Event('change', { bubbles: true })); } true`);
         await fill('launch-team-base-branch', 'develop');
         await fill('team-board-server', 'http://remote:8420');

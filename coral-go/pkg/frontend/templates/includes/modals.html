@@ -230,18 +230,10 @@
                 <p class="sr-only" id="team-step-live" role="status">Step 1 of 3</p>
                 <div class="settings-modal-body team-steps-body">
                     <section class="launch-page team-page team-page-team" id="team-panel-team" data-page="team" aria-label="Name and where it launches">
-                        <div class="launch-field-folder">
-                            <div class="launch-field-head"><label for="team-board-name">Team name</label> <span class="launch-required">Required</span></div>
-                            <input type="text" id="team-board-name" placeholder="e.g. auth-feature, sprint-42" maxlength="64" data-on-input="m-validate-team-name" aria-required="true" aria-describedby="team-board-name-help team-board-name-hint">
-                            <p id="team-board-name-help" class="settings-hint">Letters, digits, - and _. It names the team's board.</p>
+                        <div id="team-form-host" data-coral-root="{{ .CoralRoot }}"></div>
+                        <div id="team-form-parts" hidden>
                             <div id="team-board-name-hint" class="team-field-hint"></div>
-                        </div>
-                        <div class="launch-field-folder">
-                            <div class="launch-field-head"><label for="launch-team-dir">Folder</label> <span class="launch-required">Required</span></div>
-                            <div class="dir-input-row">
-                                <input type="text" id="launch-team-dir" placeholder="Choose a folder" data-coral-root="{{ .CoralRoot }}" required aria-required="true">
-                                <button class="btn" id="btn-browse-team" data-on-click="m-toggle-browser" data-browser="launch-team-dir dir-browser-team browser-list-team browser-current-path-team">Browse</button>
-                            </div>
+                            <button class="btn" id="btn-browse-team" data-on-click="m-toggle-browser" data-browser="launch-team-dir dir-browser-team browser-list-team browser-current-path-team">Browse</button>
                             <div id="launch-team-dir-recents" class="launch-dir-recents" role="group" aria-label="Recent folders"></div>
                             <div id="dir-browser-team" class="dir-browser" style="display:none">
                                 <div class="dir-browser-header">
@@ -252,25 +244,6 @@
                                 <ul class="dir-browser-list" id="browser-list-team">
                                     <li class="empty-state">Loading...</li>
                                 </ul>
-                            </div>
-                        </div>
-                        <div class="team-address-slot" id="team-address-slot" hidden>
-                            <label for="team-board-server">Another computer's address</label>
-                            <input type="text" id="team-board-server" placeholder="e.g. http://remote-machine:8420" disabled>
-                        </div>
-                        <div class="team-worktree-slot" id="team-worktree-slot">
-                            <div id="team-worktree-option" style="display:none">
-                                <label class="settings-toggle team-settings-toggle">
-                                    <input type="checkbox" id="launch-team-worktree" data-on-change="m-team-worktree">
-                                    <span>
-                                        <strong>Launch in a git worktree</strong>
-                                        <div class="team-settings-note">The team works on its own branch in an isolated copy of the repository.</div>
-                                    </span>
-                                </label>
-                                <div id="team-worktree-branch-row" style="display:none">
-                                    <label for="launch-team-base-branch">Base branch</label>
-                                    <input type="text" id="launch-team-base-branch" placeholder="the repo's current branch" value="">
-                                </div>
                             </div>
                         </div>
                     </section>

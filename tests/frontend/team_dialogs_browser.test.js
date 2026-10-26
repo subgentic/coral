@@ -31,7 +31,7 @@ const BASE = require('./test_base').BASE;
             await window.showLaunchModal(); window.hideLaunchModal();
             return true; })()`);
         const teamRows = () => ev(`[...document.querySelectorAll('#team-agents-list .team-agent-row')].map(r => r.querySelector('.team-agent-role-name').textContent)`);
-        const hint = () => ev(`(() => { const h = document.getElementById('team-board-name-hint'); return [h.textContent, h.classList.contains('error')]; })()`);
+        const hint = () => ev(`(() => { const h = document.getElementById('team-board-name-hint'); return [h.textContent, document.getElementById('team-board-name').getAttribute('aria-invalid') === 'true']; })()`); // the notice under the name, and whether the name is flagged (its error line is the form's)
         const toasts = () => ev(`[...document.querySelectorAll('.toast')].map(t => t.textContent.trim())`);
         const openTeam = async () => {
             await ev(`window.showLaunchModal(); window._selectLaunchType('team'); true`);
@@ -45,7 +45,7 @@ const BASE = require('./test_base').BASE;
         await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'team_steps.js'); m.showTeamStep('members'); return true; })()`);
         assert.equal(await ev(`getComputedStyle(document.querySelector('#launch-step-team .team-agents-empty')).display !== 'none'`), true, 'the line that says what to do');
         await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'team_steps.js'); m.showTeamStep('team'); return true; })()`);
-        assert.equal(await ev(`document.getElementById('launch-team-dir').value === '' && document.getElementById('launch-team-dir').required && document.getElementById('launch-team-dir').getBoundingClientRect().height > 0`), true, 'the folder is on the first screen, empty and required');
+        assert.equal(await ev(`document.getElementById('launch-team-dir').value === '' && document.getElementById('launch-team-dir').getAttribute('aria-required') === 'true' && document.getElementById('launch-team-dir').getBoundingClientRect().height > 0`), true, 'the folder is on the first screen, empty and required');
         assert.equal(await ev(`!!document.getElementById('team-goal') && !!document.getElementById('team-goal').closest('#team-panel-start')`), true, 'the optional first task is on step 3, the Start tab');
         await ev(`window._addTeamAgent('Orchestrator', 'First.'); true`);
         // #4950: the team form is a sectioned dialog that opens on Members; the name is above the sections (#5589 finding 6), so every section has it and Launch Team without it stays where it is.
@@ -53,7 +53,7 @@ const BASE = require('./test_base').BASE;
         await ev(`document.getElementById('team-board-name').value = ''; document.querySelector('#launch-step-team [data-on-click="m-launch-team"]').click(); true`);
         await waitFor(`document.activeElement && document.activeElement.id === 'team-board-name'`, 'Launch Team without a name puts the focus on the name');
         assert.equal(await ev(`document.getElementById('launch-step-team').dataset.stage`), 'team', 'and stays on step 1');
-        assert.deepEqual(await hint(), ['', false]);
+        assert.deepEqual(await hint(), ['', true], 'Launch Team without a name flags it');
         await ev(`{ const i = document.getElementById('team-board-name'); i.value = 'taken'; i.dispatchEvent(new Event('input', { bubbles: true })); } true`);
         await waitFor(`window._validateTeamName() && /exists/.test(document.getElementById('team-board-name-hint').textContent)`, 'the existing-board hint');
         await ev(`{ const i = document.getElementById('team-board-name'); i.value = 'bad name!'; window._validateTeamName(); } true`);

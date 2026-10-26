@@ -13,6 +13,7 @@ const { _effectiveServer, _loadServerSettings, _serverSettings, _settingsFor } =
 const { defaultPermissionMode, syncDefaultPermissionMode, _normalizePermFlagsForAgent, _updatePermModeDescription } = await importOnce('./permission_flags.js');
 const { _checkAgentCLI } = await importOnce('./cli_check.js');
 import { checkTmuxForLaunch } from './prerequisites.js';
+import { showTeamAddress } from './team_form.js';
 const { _syncACFModelField, getAgentConfig, renderAgentConfigForm, cliWarningOf } = await importOnce('./agent_config_form.js');
 const { _checkPermissionFlag } = await importOnce('./cli_dialogs.js');
 const { _checkTeamGitDir, _initTeamForm, _loadExistingTeamBoards } = await importOnce('./team_dialogs.js');
@@ -176,8 +177,8 @@ const TEAM_ADDRESS = '__address__';
 /** Show the address field when the Machine is "Another computer's address..." (the field is in step 1, in its own slot); nothing typed there survives another choice. */
 function _syncTeamAddress(on) {
     launch.teamAddress = !!on;
-    const slot = document.getElementById('team-address-slot'), input = document.getElementById('team-board-server');
-    if (slot) slot.hidden = !on;
+    const input = document.getElementById('team-board-server');
+    showTeamAddress(on);
     if (input) { input.disabled = !on; if (!on) input.value = ''; }
     if (on) input?.focus();
 }

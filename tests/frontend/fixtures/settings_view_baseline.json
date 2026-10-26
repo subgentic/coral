@@ -1,18 +1,18 @@
 {
   "settings-row": {
-    "css": 41,
-    "js": 9,
-    "html": 28
+    "css": 37,
+    "js": 5,
+    "html": 6
   },
   "settings-cli-row": {
     "css": 2,
     "js": 0,
-    "html": 9
+    "html": 4
   },
   "tb-row": {
     "css": 1,
     "js": 2,
-    "html": 2
+    "html": 1
   },
   "settings-row-switch": {
     "css": 1,
@@ -20,14 +20,14 @@
     "html": 1
   },
   "settings-unit-field": {
-    "css": 2,
+    "css": 0,
     "js": 0,
-    "html": 3
+    "html": 0
   },
   "settings-inline": {
-    "css": 5,
+    "css": 0,
     "js": 0,
-    "html": 2
+    "html": 0
   },
   "settings-api-key-row": {
     "css": 3,
@@ -40,9 +40,9 @@
     "html": 0
   },
   "net-group-head": {
-    "css": 7,
+    "css": 6,
     "js": 2,
-    "html": 5
+    "html": 3
   },
   "ts-row": {
     "css": 0,
@@ -85,27 +85,24 @@
     "html": 2
   },
   "job-field": {
-    "css": 2,
+    "css": 0,
     "js": 0,
-    "html": 12
+    "html": 0
   },
   "job-limit-fields": {
-    "css": 4,
+    "css": 0,
     "js": 0,
-    "html": 1
+    "html": 0
   },
   "launch-field-*": {
-    "css": 5,
+    "css": 3,
     "js": 6,
-    "html": 13
+    "html": 9
   },
   "__families": [
     "health-form",
     "health-line",
     "health-row",
-    "job-field",
-    "job-limit-fields",
-    "job-row",
     "launch-field-head",
     "launch-persona-row",
     "launch-prompt-field",
@@ -119,12 +116,8 @@
     "settings-cloud-owner-row",
     "settings-cloud-switch-row",
     "settings-cloud-usercode-row",
-    "settings-controls-row",
     "settings-hint-line",
-    "settings-inline",
     "settings-row",
-    "settings-subhead",
-    "settings-unit-field",
     "tb-head",
     "tb-line",
     "tb-row",
