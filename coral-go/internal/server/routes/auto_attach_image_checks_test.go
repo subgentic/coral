@@ -1,7 +1,9 @@
 package routes
 
 import (
+	"bytes"
 	"encoding/binary"
+	"hash/crc32"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -82,4 +84,62 @@ func TestCheckPixelsRefusesWhatIsTooBigOrUnreadable(t *testing.T) {
 	assert.EqualError(t, checkPixels(huge, "image/webp"), "too_many_pixels")
 	assert.NoError(t, checkPixels(webpHeader("VP8X", vp8x), "image/webp"), "a 1 x 1 canvas")
 	assert.EqualError(t, checkPixels([]byte("RIFF\x00\x00\x00\x00WEBPJUNKJUNKJUNKJUNKJUNKJUNKJUNK"), "image/webp"), "bad_image")
+}
+
+// pngHeader is a PNG that is only its signature and a w x h header: enough for image.DecodeConfig, which reads no pixels, so a 10000 x 10000 canvas costs 33 bytes.
+func pngHeader(w, h int) []byte {
+	ihdr := make([]byte, 13)
+	binary.BigEndian.PutUint32(ihdr[0:4], uint32(w))
+	binary.BigEndian.PutUint32(ihdr[4:8], uint32(h))
+	ihdr[8], ihdr[9] = 8, 0 // 8-bit grayscale
+	var b bytes.Buffer
+	b.WriteString("\x89PNG\r\n\x1a\n")
+	binary.Write(&b, binary.BigEndian, uint32(len(ihdr)))
+	chunk := append([]byte("IHDR"), ihdr...)
+	b.Write(chunk)
+	binary.Write(&b, binary.BigEndian, crc32.ChecksumIEEE(chunk))
+	return b.Bytes()
+}
+
+// #8357 (Security's review of #8314): the decompression-bomb guard. Each limit is pinned on both sides: the last size accepted and the first refused.
+func TestCheckPixelsPinsEachLimitOnBothSides(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		w, h int
+		want string // "" is accepted
+	}{
+		{"width at the side limit", attachMaxSide, 1, ""},
+		{"width over the side limit", attachMaxSide + 1, 1, "too_many_pixels"},
+		{"height at the side limit", 1, attachMaxSide, ""},
+		{"height over the side limit", 1, attachMaxSide + 1, "too_many_pixels"},
+		{"within both sides, over the area", 10000, 10000, "too_many_pixels"},
+		{"exactly attachMaxPixels", 8000, attachMaxPixels / 8000, ""},
+		{"one row over attachMaxPixels", 8000, attachMaxPixels/8000 + 1, "too_many_pixels"},
+		{"a tall image at attachMaxPixels", attachMaxPixels / 4000, 4000, ""},
+		{"a tall image one column over", attachMaxPixels/4000 + 1, 4000, "too_many_pixels"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := checkPixels(pngHeader(tc.w, tc.h), "image/png")
+			if tc.want == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tc.want)
+			}
+		})
+	}
+	assert.Equal(t, 40_000_000, attachMaxPixels/8000*8000, "the 'exactly' rows really sit on the limit")
+}
+
+// A lossy WebP states its size without the +1 of the other two kinds, so a canvas of 0 reaches the guard: it is refused, whichever side is 0.
+func TestCheckPixelsRefusesAnEmptyLossyWebp(t *testing.T) {
+	vp8 := func(w, h uint16) []byte {
+		payload := make([]byte, 10)
+		payload[3], payload[4], payload[5] = 0x9d, 0x01, 0x2a
+		binary.LittleEndian.PutUint16(payload[6:8], w)
+		binary.LittleEndian.PutUint16(payload[8:10], h)
+		return webpHeader("VP8 ", payload)
+	}
+	assert.NoError(t, checkPixels(vp8(1, 1), "image/webp"), "a 1 x 1 lossy canvas")
+	assert.EqualError(t, checkPixels(vp8(0, 5), "image/webp"), "too_many_pixels", "no width")
+	assert.EqualError(t, checkPixels(vp8(5, 0), "image/webp"), "too_many_pixels", "no height")
 }
