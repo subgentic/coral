@@ -56,3 +56,15 @@ export function build({ id = '', label, placeholder, value = '', onSearch = null
     if (action) { action.classList.add('team-tb-action'); row.append(action); }
     return row;
 }
+
+/** The selection bar's place on the line (#7743): `node` goes in a span right after the search field and the row is marked `team-toolbar-selecting`, which hides the pills, the select, the chip, the Filters and More icons and the
+ *  action (css) while something is selected, so the bar replaces the line instead of adding one. `mountSelection(row, null)` takes it away and the line is as it was. `adopt` leaves the span alone across redraws. The search field stays. */
+export function mountSelection(row, node) {
+    if (!row) return;
+    for (const old of row.querySelectorAll(':scope > .team-tb-selection')) old.remove();
+    row.classList.toggle('team-toolbar-selecting', !!node);
+    if (!node) return;
+    const slot = el('span', 'team-tb-selection'); slot.append(node);
+    const wrap = row.querySelector(':scope > .list-bar-search-wrap');
+    if (wrap) wrap.after(slot); else row.prepend(slot);
+}

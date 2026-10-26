@@ -70,6 +70,19 @@ const TABS = [['Goals', { pills: true, filters: false, action: 'New goal' }], ['
                 await ev(`document.querySelector('[role=tabpanel]:not([hidden]) .team-tb-chip').click(); true`);
                 await waitFor(`!document.querySelector('[role=tabpanel]:not([hidden]) .team-tb-chip') && document.querySelectorAll('[role=tabpanel]:not([hidden]) tbody tr').length === 5`, 'the chip removed: every open task again', 6000);
             });
+            await S.run(`${label}: the toolbar has a place for a selection bar: it replaces the pills, icons and action, the field stays, and taking it away restores the line`, async () => {
+                await goTab(ev, settle, 'Tasks'); await settle(500);
+                const state = () => ev(`(() => { const p = document.querySelector('[role=tabpanel]:not([hidden])'), row = p.querySelector('.list-bar-search-row'); const vis = s => { const e = row.querySelector(s); return !!e && getComputedStyle(e).display !== 'none' && e.getClientRects().length > 0; };
+                    return { selecting: row.classList.contains('team-toolbar-selecting'), bar: vis('.team-tb-selection'), field: vis('.list-bar-search'), pills: vis('.team-tb-pills') || vis('.team-tb-select'), action: vis('.team-tb-action'), filters: vis('.list-bar-toggle'), lines: new Set([...row.children].filter(e => getComputedStyle(e).display !== 'none').map(e => Math.round((e.getBoundingClientRect().top + e.getBoundingClientRect().bottom) / 20))).size }; })()`);
+                const before = await state();
+                await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'team_toolbar.js'); const n = document.createElement('span'); n.textContent = '2 selected'; m.mountSelection(document.querySelector('[role=tabpanel]:not([hidden]) .list-bar-search-row'), n); return true; })()`);
+                const during = await state();
+                assert.deepEqual([during.selecting, during.bar, during.field, during.pills, during.action, during.filters], [true, true, true, false, false, false], 'selecting: the bar and the field only: ' + JSON.stringify(during));
+                if (!mobile) assert.equal(during.lines, 1, 'one line while selecting');
+                await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'team_toolbar.js'); m.mountSelection(document.querySelector('[role=tabpanel]:not([hidden]) .list-bar-search-row'), null); return true; })()`);
+                const after = await state();
+                assert.deepEqual(after, before, 'the line is as it was: ' + JSON.stringify({ before, after }));
+            });
         }
         console.log('PASS team toolbar');
     } finally { await removeBoards(ev, [TEAM]); await client.close(); }
