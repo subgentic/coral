@@ -204,53 +204,59 @@ function _defaultTeamAgentModalConfig() {
     };
 }
 
-// The Edit member dialog (#7407): the one place a member's role, prompt, provider, model, thinking, mode and permissions are changed. Its changes are held until Save member; Cancel throws them away.
+// Add member / Edit member (#7861, the operator's "same flow as New Agent"): the agent step of the Launch dialog in a second mode, over the team form. The member's values are loaded (a new one
+// starts at the team's provider and default Mode), its role and prompt are the persona step, Save member (not Launch) writes it into the team form and launches nothing; its changes are held until
+// Save member, and Cancel, the arrow and Escape return to the team form without them. The dialog code is New Agent's (launch_dialog.js _selectLaunchType, _applyMember).
 function showTeamAgentModal(row = null, { role = '' } = {}) {
-    launch.teamAgentModalRow = row;
-    const title = document.getElementById('team-agent-modal-title');
-    const subtitle = document.getElementById('team-agent-modal-subtitle');
-    const modal = document.getElementById('team-agent-modal');
-    if (!title || !subtitle || !modal) return;
-
-    title.textContent = row ? 'Edit member' : 'Add member';
-    subtitle.textContent = ''; // no sub-title (#6012): the title and the form say it
-    const save = document.getElementById('team-agent-modal-save'); if (save) save.textContent = 'Save member';
-
     const acfValue = row?.dataset.acfId ? getAgentConfig(row.dataset.acfId) : { ..._defaultTeamAgentModalConfig(), name: role };
     // A member with no Mode of its own launches with the saved default Mode: the dialog shows that Mode (saving it unchanged keeps the member following it, see saveTeamAgentFromModal).
     if (row && !/--permission-mode|--mode|--sandbox|--full-auto|--dangerously/.test(acfValue.flags || '')) acfValue.flags = [acfValue.flags, _teamModeFlags(acfValue.agentType)].filter(Boolean).join(' ');
-    renderAgentConfigForm('team-agent-modal-acf', { showPreset: true, showName: true, nameLabel: 'Role', showAutoPermissions: true, sections: true, value: acfValue });
-    modal.style.display = 'flex';
+    launch.member = { row, returnTo: currentTeamStep(), value: acfValue };
+    window._selectLaunchType('agent');
 }
 window.showTeamAgentModal = showTeamAgentModal;
 
-function hideTeamAgentModal() {
-    const modal = document.getElementById('team-agent-modal');
-    if (modal) modal.style.display = 'none';
-    launch.teamAgentModalRow = null;
+/** Back to the team form from a member: its step, the Launch dialog's team panels (the member's changes, if any, are saved by the caller first). */
+function _leaveMember() {
+    const back = launch.member?.returnTo || 'members';
+    launch.member = null;
+    launch.mode = 'team';
+    document.getElementById('launch-modal')?.removeAttribute('data-member');
+    _showLaunchStep('team');
+    showTeamStep(back);
 }
-window.hideTeamAgentModal = hideTeamAgentModal;
+
+function cancelTeamMember() {
+    const row = launch.member?.row;
+    _leaveMember();
+    (row?.querySelector('.team-agent-open') || document.querySelector('#launch-step-team .team-add-agent-btn'))?.focus();
+}
+window.cancelTeamMember = cancelTeamMember;
 
 function saveTeamAgentFromModal() {
-    const config = getAgentConfig('team-agent-modal-acf');
+    const m = launch.member;
+    if (!m) return;
+    const config = getAgentConfig('launch-agent-acf');
+    config.name = (document.getElementById('launch-agent-name-input')?.value || '').trim() || config.name; // the role is the persona step's name field
     if (!config.name) {
         showToast('A member needs a role', true);
-        markFieldInvalid(document.querySelector('#team-agent-modal-acf .acf-name'), 'A member needs a role');
+        window._launchStage?.('persona');
+        markFieldInvalid(document.getElementById('launch-agent-name-input'), 'A member needs a role');
         return;
     }
 
     // The Mode left at the default is not the member's own: it keeps following the saved default, which the launch needs (an own Mode beats it, #6440).
-    const modalMode = document.querySelector('#team-agent-modal-acf .acf-permission-mode')?.value;
+    const modalMode = document.querySelector('#launch-agent-acf .acf-permission-mode')?.value;
     if (modalMode && modalMode === (document.getElementById('team-permission-mode')?.value || 'default')) config.flags = _normalizePermFlagsForAgent(config.flags, config.agentType, 'default');
     const followsType = config.agentType === document.getElementById('team-agent-type')?.value; // a provider left at the default keeps following it
-    const opener = launch.teamAgentModalRow;
+    const opener = m.row;
     if (opener?.dataset.acfId) {
         opener.dataset.followsTeamType = followsType ? '1' : '';
         setAgentConfig(opener.dataset.acfId, config);
     } else {
         _addTeamAgent(config.name, config.prompt, config.capabilities, followsType ? '' : config.agentType, config.model, config.flags, { reveal: true });
     }
-    hideTeamAgentModal();
+    _leaveMember();
     _syncTeamMembers(); // a rename can make or lose the Orchestrator
     (opener || document.querySelector('#team-agents-list .team-agent-row:last-child'))?.querySelector('.team-agent-open')?.focus();
 }

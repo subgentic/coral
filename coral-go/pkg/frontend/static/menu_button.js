@@ -67,5 +67,5 @@ document.addEventListener('click', e => {
 document.addEventListener('keydown', e => {
     if (current || e.key !== 'ArrowDown') return;
     const t = e.target.closest && e.target.closest('[aria-haspopup="menu"][aria-controls]');
-    if (t && t.closest('#launch-step-team, #team-agent-modal')) { e.preventDefault(); openMenu(t); }
+    if (t && t.closest('#launch-step-team')) { e.preventDefault(); openMenu(t); }
 });

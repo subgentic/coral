@@ -140,15 +140,16 @@ const BASE = require('./test_base').BASE;
         await open(1440, false);
         console.log('The team agent dialog');
         await ev(`window.showLaunchModal(); window._selectLaunchType('team'); window.showTeamAgentModal(); true`);
-        await waitFor(`${vis('#team-agent-modal .settings-tabs')} && !!document.querySelector('#team-agent-modal-acf .acf-name')`, 'the agent dialog');
-        const TA = '#team-agent-modal';
-        assert.deepEqual(await names(TA), [['Persona', 'badge'], ['Agent', 'smart_toy'], ['Permissions', 'lock'], ['Advanced', 'tune']]);
-        await go(TA, 'agent');
+        await waitFor(`${vis('#launch-step-agent .settings-tabs')} && !!document.getElementById('launch-agent-name-input')`, 'the agent dialog');
+        const TA = '#launch-step-agent'; // the member is the agent step of the Launch dialog in a second mode (#7861): the role and prompt are its persona step, the tabs are Agent, Permissions, Advanced
+        assert.deepEqual(await names(TA), [['Agent', 'smart_toy'], ['Permissions', 'lock'], ['Advanced', 'tune']]);
+        assert.equal(await ev(`document.getElementById('launch-step-agent').dataset.stage`), 'persona', 'a new member opens on its role');
+        await ev(`window._launchStage('agent'); true`);
         // The agent form fills in after it opens (the models arrive and it is drawn again), which can replace the name field the problem was marked on: Save is pressed again until the empty name has the focus.
-        await waitFor(`(() => { if (document.activeElement.classList.contains('acf-name')) return true; document.querySelector('#team-agent-modal [data-on-click="m-save-team-agent-from-modal"]').click(); return false; })()`, 'the empty name focused');
-        v = await view(TA); assert.equal(v.open, 'persona', 'Save without a name opens Persona'); assert.equal(await dot(TA, 'Persona'), true);
+        await waitFor(`(() => { if (document.activeElement.id === 'launch-agent-name-input') return true; document.getElementById('launch-agent-save').click(); return false; })()`, 'the empty name focused');
+        assert.equal(await ev(`document.getElementById('launch-step-agent').dataset.stage`), 'persona', 'Save without a name opens the role');
         await shot('team-agent-role-desktop');
-        await ev(`window.hideTeamAgentModal(); window.hideLaunchModal(); true`);
+        await ev(`window.cancelTeamMember(); window.hideLaunchModal(); true`);
         console.log('PASS dialog sections: Restart, the team member dialog');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

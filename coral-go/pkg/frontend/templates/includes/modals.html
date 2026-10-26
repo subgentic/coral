@@ -175,6 +175,7 @@
                     <button class="btn" id="launch-agent-back" data-on-click="m-agent-step" data-arg="back">Back</button>
                     <button class="btn btn-primary" id="launch-agent-next" data-on-click="m-agent-step" data-arg="next">Next</button>
                     <button class="btn btn-primary" id="launch-agent-go" data-on-click="m-launch-session">Launch</button>
+                    <button class="btn btn-primary" id="launch-agent-save" data-on-click="m-save-team-member" hidden>Save member</button>
                     <span id="launch-folder-reason" class="sr-only" role="status" aria-live="polite">Choose a folder first</span>
                     <p id="launch-stage-live" class="sr-only" role="status"></p>
                 </div>
@@ -379,28 +380,6 @@
             <div class="modal-actions">
                 <button class="btn" type="button" data-on-click="m-hide-open-folder-modal">Cancel</button>
                 <button class="btn btn-primary" type="button" id="open-folder-submit" data-on-click="m-submit-open-folder">Open folder</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="team-agent-modal" class="modal" role="dialog" aria-labelledby="team-agent-modal-title" aria-modal="true" style="display:none">
-        <div class="modal-content sd-modal-content launch-wizard restart-wizard-content">
-            <div class="modal-header">
-                <h3 id="team-agent-modal-title">Add Team Agent</h3>
-                <p id="team-agent-modal-subtitle" class="sd-sub" hidden></p>
-            </div>
-            <div class="modal-body settings-modal-body">
-                <div class="settings-shell">
-                    <nav class="settings-nav" aria-label="Agent sections">
-                        <div class="settings-group-pick"><select class="settings-select" aria-label="Agent section"></select></div>
-                        <div class="settings-tabs" role="tablist" aria-orientation="vertical" aria-label="Agent sections"></div>
-                    </nav>
-                    <div id="team-agent-modal-acf" class="settings-panes"></div>
-                </div>
-            </div>
-            <div class="modal-actions modal-footer">
-                <button class="btn" id="team-agent-cancel" data-on-click="m-hide-team-agent-modal">Cancel</button>
-                <button class="btn btn-primary" id="team-agent-modal-save" data-on-click="m-save-team-agent-from-modal">Save member</button>
             </div>
         </div>
     </div>

@@ -8,7 +8,7 @@ installDom({ mode: 'local' });
 const { launch } = await importUi('launch_state');
 const { LOCAL_SERVER } = await importUi('server_base');
 assert.deepEqual({ ...launch, existingTeamBoardNames: [...launch.existingTeamBoardNames] }, {
-    mode: null, existingTeamBoardNames: [], teamAgentModalRow: null, teamAddress: false,
+    mode: null, existingTeamBoardNames: [], member: null, teamAddress: false,
     server: LOCAL_SERVER, serverLocked: false, addTo: null,
     teamAgentCounter: 0, skipDefaultTeamAgents: false,
 }, 'the chooser, every launch target local, nothing pending');

@@ -117,16 +117,16 @@ const GOLDEN = path.join(__dirname, 'fixtures', 'dialog_requests_golden.json');
         };
         const addAgent = async cfg => {
             await ev(`window.showTeamAgentModal(); true`);
-            await waitFor(`getComputedStyle(document.getElementById('team-agent-modal')).display !== 'none' && !!document.querySelector('#team-agent-modal-acf .acf-name')`, 'the team agent dialog');
-            await set('team-agent-modal-acf', '.acf-name', cfg.name);
-            if (cfg.type) await set('team-agent-modal-acf', '.acf-agent-type', cfg.type);
-            if (cfg.model) await set('team-agent-modal-acf', '.acf-model', cfg.model);
-            await set('team-agent-modal-acf', '.acf-prompt', cfg.prompt);
-            if (cfg.mode) await set('team-agent-modal-acf', '.acf-permission-mode', cfg.mode);
-            if (cfg.flags) await set('team-agent-modal-acf', '.acf-flags', cfg.flags);
-            for (const [t, c] of cfg.chips || []) await chip('team-agent-modal-acf', t, c);
-            await click('#team-agent-modal [data-on-click="m-save-team-agent-from-modal"]');
-            await waitFor(`getComputedStyle(document.getElementById('team-agent-modal')).display === 'none'`, 'the team agent dialog to close');
+            await waitFor(`(document.getElementById('launch-modal').hasAttribute('data-member') && getComputedStyle(document.getElementById('launch-step-agent')).display !== 'none') && !!document.getElementById('launch-agent-name-input')`, 'the team agent dialog');
+            await fill('launch-agent-name-input', cfg.name); // the role is the persona step's name field
+            if (cfg.type) await set('launch-agent-acf', '.acf-agent-type', cfg.type);
+            if (cfg.model) await set('launch-agent-acf', '.acf-model', cfg.model);
+            await set('launch-agent-acf', '.acf-prompt', cfg.prompt);
+            if (cfg.mode) await set('launch-agent-acf', '.acf-permission-mode', cfg.mode);
+            if (cfg.flags) await set('launch-agent-acf', '.acf-flags', cfg.flags);
+            for (const [t, c] of cfg.chips || []) await chip('launch-agent-acf', t, c);
+            await click('#launch-step-agent #launch-agent-save');
+            await waitFor(`!document.getElementById('launch-modal').hasAttribute('data-member')`, 'the team agent dialog to close');
         };
         console.log('Agent Team: two agents added through the dialog, one edited, a remote server and a worktree');
         n = await last();
@@ -144,11 +144,11 @@ const GOLDEN = path.join(__dirname, 'fixtures', 'dialog_requests_golden.json');
         await addAgent({ name: 'Dev', prompt: 'Write the code.\nCarefully.', type: 'codex', model: 'gpt-x', chips: [['deny', 'git_write']] });
         // edit the second: the dialog opens with its values and saves them back
         await ev(`window.showTeamAgentModal([...document.querySelectorAll('#team-agents-list .team-agent-row')].find(r => r.querySelector('.team-agent-role-name').textContent === 'Dev')); true`);
-        await waitFor(`getComputedStyle(document.getElementById('team-agent-modal')).display !== 'none' && document.querySelector('#team-agent-modal-acf .acf-name').value === 'Dev'`, 'the edit dialog with its values');
-        out.team_edit_prefilled = await acfOf('team-agent-modal-acf');
-        await set('team-agent-modal-acf', '.acf-prompt', 'Write the code, edited.');
-        await click('#team-agent-modal [data-on-click="m-save-team-agent-from-modal"]');
-        await waitFor(`getComputedStyle(document.getElementById('team-agent-modal')).display === 'none'`, 'the edit dialog to close');
+        await waitFor(`(document.getElementById('launch-modal').hasAttribute('data-member') && getComputedStyle(document.getElementById('launch-step-agent')).display !== 'none') && document.getElementById('launch-agent-name-input').value === 'Dev'`, 'the edit dialog with its values');
+        out.team_edit_prefilled = await acfOf('launch-agent-acf');
+        await set('launch-agent-acf', '.acf-prompt', 'Write the code, edited.');
+        await click('#launch-step-agent #launch-agent-save');
+        await waitFor(`!document.getElementById('launch-modal').hasAttribute('data-member')`, 'the edit dialog to close');
         await click('#launch-step-team [data-on-click="m-launch-team"]');
         out.team_full = (await take(n, 'the team request')).body;
 

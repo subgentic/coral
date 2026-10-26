@@ -28,7 +28,7 @@ function _launchStage(arg) {
     const to = arg === 'details' ? 'persona' : arg === 'next' ? stages[Math.min(at + 1, stages.length - 1)] : arg === 'back' ? stages[Math.max(at - 1, 0)] : arg;
     if (!stages.includes(to)) return;
     const input = document.getElementById('launch-dir');
-    if (to !== 'folder' && (!input || !input.value.trim())) { // a folder is the one thing a launch needs: said where it is, on the folder's own step
+    if (to !== 'folder' && !launch.member && (!input || !input.value.trim())) { // a folder is the one thing a launch needs (a team member is not launched: it has none, #7861): said where it is, on the folder's own step
         setLaunchStage('folder');
         if (input) { markFieldInvalid(input, "Choose a folder"); input.focus(); }
         return;
@@ -45,6 +45,7 @@ function _launchStage(arg) {
 window._launchStage = _launchStage;
 
 function _selectLaunchType(type) {
+    if (type === "back" && launch.member) { window.cancelTeamMember?.(); return; } // the arrow on a member goes back to the team form (#7861)
     if (type === "back" && document.getElementById('launch-step-agent')?.dataset.stage === 'details' && document.getElementById('launch-step-agent').style.display !== 'none') { _launchStage('folder'); return; } // the arrow goes back one step first
     if (type === "back") {
         launch.mode = null;
@@ -55,7 +56,7 @@ function _selectLaunchType(type) {
     if (type === "agent") setLaunchMore(false); // New Agent always opens on step 1, the folder (#7391)
     _showLaunchStep(type);
     if (type === "agent") {
-        if (!launch.addTo) { // New Agent: its own title and no team (Add agent sets both below, #7778)
+        if (!launch.addTo && !launch.member) { // New Agent: its own title and no team (Add agent and a member set both below, #7778, #7861)
             document.getElementById('launch-modal')?.removeAttribute('data-add-to');
             const t = document.getElementById('launch-agent-title-text'); if (t) t.textContent = 'New agent';
         }
@@ -71,14 +72,14 @@ function _selectLaunchType(type) {
             sections: true, // step 3 is a sectioned dialog (#4950): Agent, Permissions, Advanced
             wizard: true, // the persona page for step 2 and three panes for step 3 (#7391)
             adopt: { persona: 'launch-persona-top', agent: 'launch-agent-provider', advanced: 'launch-advanced-extra' },
-            value: { agentType: _settingsFor(_effectiveServer(launch.server)).default_agent_type || 'claude' },
+            value: launch.member ? launch.member.value : { agentType: _settingsFor(_effectiveServer(launch.server)).default_agent_type || 'claude' }, // a member's own values (#7861)
         });
         // The agent is chosen in this step, not only under More options (#6199): a radio group that follows the form's own select, the installed agents first.
         importOnce('./launch_agent_pick.js').then(m => m.buildAgentPick({ group: document.getElementById('launch-agent-pick'), form: document.getElementById('launch-agent-acf'), server: _effectiveServer(launch.server), implicitDefault: !_settingsFor(_effectiveServer(launch.server)).default_agent_type })).catch(() => {});
         _wireDirNote(); _syncDirNote(); _syncLaunchBlock(); _renderDirRecents();
         wireRecap(); syncRecap(); _syncLaunchBlock();
         _checkTmuxHere(); // tmux missing: said once, Launch off (#6046)
-        if (launch.addTo) _applyAddTo(); else document.getElementById('launch-dir')?.focus(); // the one thing most launches need: the folder
+        if (launch.member) _applyMember(); else if (launch.addTo) _applyAddTo(); else document.getElementById('launch-dir')?.focus(); // the one thing most launches need: the folder
     } else if (type === "team") {
         launch.teamAddress = false;
         _renderServerPicker(); // the Machine list, with its address entry for a team (#7407)
@@ -99,6 +100,7 @@ window._selectLaunchType = _selectLaunchType;
 export function showLaunchModal(server, lock = false) {
     launch.mode = null;
     launch.addTo = null; // a New Agent dialog is not an Add agent one (#7778)
+    launch.member = null; // nor a member's (#7861)
     _serverSettings.clear();
     launch.serverLocked = !!lock && isHub();
     launch.server = _effectiveServer(coerceSelection(server, isHub(), state.servers));
@@ -224,7 +226,7 @@ async function _onLaunchServerChange(value, { force = false } = {}) {
     if (launch.mode === 'agent' || launch.mode === 'team') _checkTmuxHere();
     if (launch.mode === 'agent') { _loadAgentBoardProjects(); _renderDirRecents(); }
     if (launch.mode === 'team') { _loadExistingTeamBoards(); _checkTeamGitDir(); }
-    document.querySelectorAll('#launch-modal [data-acf-uid], #team-agent-modal [data-acf-uid]').forEach(c => {
+    document.querySelectorAll('#launch-modal [data-acf-uid]').forEach(c => {
         if (c.querySelector('.acf-agent-type')) {
             _syncACFModelField(c);
             _checkAgentCLI(c.querySelector('.acf-agent-type').value || 'claude', cliWarningOf(c));
@@ -264,7 +266,7 @@ function _syncLaunchBlock() {
     const why = _cliBlock();
     go.disabled = !!why;
     // The reason a button is off is its description (#7391): the missing CLI's line, or "Choose a folder first". The folder one leaves the button focusable (aria-disabled), and pressing it says it where the folder is.
-    const noDir = !(document.getElementById('launch-dir')?.value || '').trim();
+    const noDir = !launch.member && !(document.getElementById('launch-dir')?.value || '').trim();
     const reason = why ? (why.id ||= 'launch-cli-warning') : noDir ? 'launch-folder-reason' : '';
     for (const b of [go, next]) {
         if (!b) continue;
@@ -342,6 +344,23 @@ export function showAddAgentFlow({ board = '', workDir = '', server } = {}) {
         launch.addTo = { board, workDir, skipFolder: !!workDir };
         _selectLaunchType('agent');
     });
+}
+
+/**
+ * Add member / Edit member (#7861): the agent step of this dialog in a second mode, over the team form (team_dialogs.js showTeamAgentModal sets launch.member and asks for it). The member's values are loaded, the
+ * persona step is the role and prompt (Back from the settings), and Save member (not Launch) writes the member into the team form; Cancel, the arrow and Escape return to the team form unchanged.
+ */
+function _applyMember() {
+    const m = launch.member;
+    if (!m) return;
+    document.getElementById('launch-modal')?.setAttribute('data-member', m.row ? 'edit' : 'add');
+    const title = document.getElementById('launch-agent-title-text');
+    if (title) title.textContent = m.row ? 'Edit member' : 'Add member';
+    const name = document.getElementById('launch-agent-name-input');
+    if (name) name.value = m.value.name || '';
+    const help = document.getElementById('launch-name-help'); if (help) help.textContent = 'The role this member has on the team.';
+    _syncLaunchBlock();
+    _launchStage(m.row ? 'agent' : 'persona'); // an existing member opens on its settings, a new one on its role
 }
 
 /** The parts of Add agent that the dialog shows: the title, the folder, and where it starts. */
@@ -482,7 +501,7 @@ async function _loadAgentBoardProjects() {
     // Add agent (#7778): the team is the one it was opened from: it is the select's value, and the field is not shown (nor is anything that would change it).
     const preset = launch.addTo && launch.addTo.board ? bareBoardName(launch.addTo.board) : '';
     const label = select.closest('label');
-    if (label) label.hidden = !!(launch.addTo && launch.addTo.board);
+    if (label) label.hidden = !!(launch.addTo && launch.addTo.board) || !!launch.member;
     const serverRowEl = document.getElementById('launch-board-server-row'); if (serverRowEl) serverRowEl.hidden = false; // New Agent shows it as before (its own style decides)
     if (preset) {
         const opt = document.createElement('option');
