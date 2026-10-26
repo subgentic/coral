@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/subgentic/coral/internal/ptymanager"
+	"github.com/subgentic/coral/internal/sessionstate"
 	"github.com/subgentic/coral/internal/store"
 )
 
@@ -83,6 +84,10 @@ func TestCodexPermission7896KeepsAmbiguousRequests(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join(fixture, "approved-background.jsonl"))
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "rollout-"+sid+".jsonl"), raw, 0600))
+	var nativeCall struct {
+		Timestamp time.Time `json:"timestamp"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(strings.Split(strings.TrimSpace(string(raw)), "\n")[1]), &nativeCall))
 	raw, err = os.ReadFile(filepath.Join(fixture, "hooks.json"))
 	require.NoError(t, err)
 	var events []store.AgentEvent
@@ -97,6 +102,7 @@ func TestCodexPermission7896KeepsAmbiguousRequests(t *testing.T) {
 		{"multiple requests", []StateEvent{request, request}},
 		{"question beside permission", []StateEvent{request, {Type: "permission_request", Kind: "question", At: request.At}}},
 		{"notification asks for input", []StateEvent{request, {Type: "notification", Summary: "Claude needs your permission to use Bash", At: request.At}}},
+		{"request predates the native call by ten seconds", []StateEvent{{Type: request.Type, Kind: request.Kind, ToolName: request.ToolName, At: nativeCall.Timestamp.Add(-10 * time.Second), CallIDs: request.CallIDs}}},
 		{"result belongs to an earlier request", []StateEvent{{Type: request.Type, Kind: request.Kind, ToolName: request.ToolName, At: request.At.Add(time.Minute), CallIDs: request.CallIDs}}},
 	}
 	for _, tc := range cases {
@@ -106,4 +112,23 @@ func TestCodexPermission7896KeepsAmbiguousRequests(t *testing.T) {
 			require.True(t, DeriveSessionState(in).NeedsInput)
 		})
 	}
+	for _, tc := range []struct {
+		name  string
+		event StateEvent
+		own   bool
+	}{
+		{"Coral held-input wait only", StateEvent{Type: "notification", Summary: sessionstate.HeldInputSummary, At: request.At}, false},
+		{"agent question only", StateEvent{Type: "permission_request", Kind: "question", ToolName: "AskUserQuestion", CallIDs: []string{"inner-call-7896"}, At: request.At}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			in := SessionStateInput{Events: []StateEvent{tc.event}}
+			before := DeriveSessionState(in)
+			require.True(t, before.NeedsInput)
+			require.Equal(t, tc.own, before.OwnRequest)
+			h.applyCodexCompletedPermission(&in, sid, "/isolated/work")
+			require.Equal(t, []StateEvent{tc.event}, in.Events, "a completed call cannot manufacture a resolution for a different kind of wait")
+			require.Equal(t, before, DeriveSessionState(in))
+		})
+	}
+
 }

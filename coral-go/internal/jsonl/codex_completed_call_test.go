@@ -81,3 +81,17 @@ func TestCodexCompletedCall7896LongTurnAndReplacement(t *testing.T) {
 	require.NoError(t, os.WriteFile(path, []byte("{}\n"), 0600))
 	require.True(t, r.ReadCodexCompletedCall(sid, "", request).IsZero())
 }
+
+// A reused native call id loses the one-to-one correlation, even if its output
+// later looks completed. Merely rejecting its interval would miss turn invalidation.
+func TestCodexCompletedCall7973DuplicateIDInvalidatesTurn(t *testing.T) {
+	raw, err := os.ReadFile("testdata/codex_permission_7896/approved-background.jsonl")
+	require.NoError(t, err)
+	lines := strings.Split(strings.TrimSpace(string(raw)), "\n")
+	var state codexTurnCache
+	for _, line := range []string{lines[0], lines[1], lines[1], lines[2]} {
+		updateCodexTurnState(&state, []byte(line))
+	}
+	require.True(t, state.calls.invalid, "duplicate native call id must invalidate the turn's correlation")
+	require.Empty(t, state.calls.completed)
+}
