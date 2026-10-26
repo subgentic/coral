@@ -80,6 +80,7 @@ func Note(k Kind) { last.Store(int32(k)) }
 func NoteStatus(status int) { Note(StatusKind(status)) }
 
 // Noted is the kind Exit1 would exit with now (the last noted).
+// Noted has no production caller: it is exported for tests in cmd/coral-agent, cmd/coral-board, ptymanager, server/routes.
 func Noted() Kind { return Kind(last.Load()) }
 
 // StatusKind is the kind of an HTTP status.
