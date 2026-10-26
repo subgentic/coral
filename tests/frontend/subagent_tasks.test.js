@@ -122,9 +122,9 @@ async function run() {
   check('subagent rows are clickable', done.clickable && running.clickable && bare.clickable);
 
   // Status + spend
-  check('completed: check icon, final cost', done.icon === 'Finished' && !done.spinner, `${done.icon}`);
-  check('running: spinner, live ~cost', running.icon === 'Open', `${running.icon}`);
-  check('stopped: skipped icon, no cost', bare.icon === 'Cancelled', `${bare.icon}`);
+  check('completed: check icon, final cost', done.icon === 'Done' && !done.spinner, `${done.icon}`);
+  check('running: spinner, live ~cost', running.icon === 'In progress', `${running.icon}`);
+  check('stopped: skipped icon, no cost', bare.icon === 'Done', `${bare.icon}`);
   check('count badge counts subagents', (await ev(`document.getElementById('task-bar-count').textContent`)) === '2/5', await ev(`document.getElementById('task-bar-count').textContent`));
 
   // Escaping
@@ -216,8 +216,8 @@ async function run() {
   // ── Live update via the poll, with the modal open ──
   await ev(`window.__subagents[${JSON.stringify(A)}][1] = { ...window.__subagents[${JSON.stringify(A)}][1], finished: true, status: 'completed', cost_usd: 1.25, last_activity_at: '2026-09-17T02:25:30Z' }; window.__details.b7running00000000.result = 'The design is done.'; window.__detailFetches.length = 0; true`);
   let flipped = null;
-  for (let i = 0; i < 100; i++) { await sleep(50); flipped = bySub(await rows(), 'b7running00000000'); if (flipped && flipped.icon === 'Finished') break; }
-  check('poll refreshes the row without user action', flipped && !flipped.spinner && flipped.icon === 'Finished', flipped && `${flipped.icon}`);
+  for (let i = 0; i < 100; i++) { await sleep(50); flipped = bySub(await rows(), 'b7running00000000'); if (flipped && flipped.icon === 'Done') break; }
+  check('poll refreshes the row without user action', flipped && !flipped.spinner && flipped.icon === 'Done', flipped && `${flipped.icon}`);
   await until(`/The design is done\\./.test(document.getElementById('task-detail-content').textContent)`, 'the finished result in the open modal');
   m = await modal();
   check('open modal follows: completed, final cost, duration', m.open && m.status === 'Completed' && m.cost === '$1.25' && !m.costLive && m.fields['Duration'] === '5m 30s', JSON.stringify([m.status, m.cost, m.fields['Duration']]));
