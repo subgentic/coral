@@ -185,41 +185,10 @@ func answeredBeforeStart(sf *serverFlags) bool {
 	return false
 }
 
-func main() {
-	if code, ok := subcommand(os.Args[1:]); ok {
-		os.Exit(code)
-	}
-	// Runs last on a normal return: the terminal gets "[SHUTDOWN] done".
-	defer logexit.Flush()
-
-	// Global panic recovery — log the full stack trace before exiting
-	defer func() {
-		if r := recover(); r != nil {
-			log.Printf("[FATAL] panic in main: %v\n%s", r, debug.Stack())
-			logexit.Exit(1)
-		}
-	}()
-
-	// Parse --home early so config.Load() can use it
-	sf := defineServerFlags()
-	parseServerFlags(sf)
-	if answeredBeforeStart(sf) {
-		return
-	}
-
-	// Only now, with the flags valid and the server really starting: --help, a bad flag
-	// and the self-test print nothing of a server's (#3506).
-	// The PATH is logged here once, with the home folder as "~" (logsafe); no other line carries it.
-	log.Printf("[STARTUP] coral server starting%s pid=%d go=%s os=%s arch=%s exe=%q %s",
-		config.FlavorNote(), os.Getpid(), runtime.Version(), runtime.GOOS, runtime.GOARCH, logsafe.Path(mustExecutable()), logsafe.PathSummary())
-
-	// The instance lock before anything touches the data folder (#6388): config.Load makes the folder and tightens its modes, the log and the Terms marker are written in it, so a second coral
-	// started against a folder another one holds must lose here, with a line on stderr and a non-zero exit, and leave the folder (modes, files, coral.log) exactly as it was.
-	instance, lockErr := startup.LockInstance(config.ResolveCoralDir(*sf.homeDir))
-	if lockErr != nil {
-		fmt.Fprintf(os.Stderr, "coral: %v\n", lockErr)
-		os.Exit(1)
-	}
+// loadServerConfig loads the configuration (the data folder is made here, after the instance lock main took) and applies what the command line says over
+// it: hub mode, the Coral Hub URL, bootstrap files, the connect-to-Hub mode and its maximum. It builds the secret detector, which must exist before
+// anything is logged or served, and starts crash logging. It exits for a refused value, as main always did.
+func loadServerConfig(sf *serverFlags) (*config.Config, string) {
 	cfg := config.Load(*sf.homeDir)
 	// --hub or CORAL_HUB=1 (read by config.Load) force hub mode on; otherwise the saved
 	// Settings > Run as a hub decides, at startup (#3460).
@@ -259,7 +228,12 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
+	return cfg, cloudMode
+}
 
+// configureServer is the rest of the startup that needs no running server: the PATH warning, tracking pointed at this data folder, the listen address
+// and port from the flags, the relaunch-fixture build, and the Terms check (which exits when they are not accepted).
+func configureServer(cfg *config.Config, sf *serverFlags) {
 	// Warn if typing "coral" would run a different program. An abandoned PyPI
 	// package ships the same six binary names, uses the same ~/.coral directory
 	// and the same port, and pip --user installs ahead of us on a default PATH.
@@ -300,68 +274,11 @@ func main() {
 		fmt.Fprintln(os.Stderr, "Terms of Service must be accepted to use Coral.")
 		os.Exit(0)
 	}
+}
 
-	// Ignore SIGHUP — macOS sends it during sleep/wake transitions and when
-	// the controlling terminal closes. Without this, the default Go behavior
-	// kills the process.
-	signal.Ignore(syscall.SIGHUP)
-
-	// Graceful shutdown on SIGINT/SIGTERM. While the Connect to Coral Hub step
-	// waits at the terminal, Ctrl-C ends only that step (interruptRouter).
-	ctx, stop := context.WithCancel(context.Background())
-	defer stop()
-	interrupts := newInterruptRouter(stop)
-
-	// Without someone at a terminal (a service, a CI runner, the tray, a shell that started
-	// Coral in the background) a prompt would block startup before the server listens. Skip
-	// the remote access question then: remote access stays off, nothing is saved, the log
-	// says how to turn it on, and the next interactive start still asks (#3271, #4052).
-	var remotePrompt func() bool
-	if canAskAtTerminal(os.Stdin, os.Stdout) {
-		tlsOn := strings.TrimSpace(*sf.tlsCert) != "" && strings.TrimSpace(*sf.tlsKey) != ""
-		remotePrompt = func() bool { return promptRemoteAccess(os.Stdin, os.Stdout, tlsOn) }
-	}
-	// Only a --strict-local-auth given on the command line overrides the default (#3936).
-	var strictFlag *bool
-	flag.Visit(func(f *flag.Flag) {
-		if f.Name == "strict-local-auth" {
-			strictFlag = sf.strictLocalAuth
-		}
-	})
-	rs, err := startup.Start(ctx, cfg, startup.Options{
-		Instance:           instance,
-		BackendType:        *sf.backendFlag,
-		PasswordPrompt:     promptDatabasePassword,
-		UnlockSurface:      "tty",
-		RemoteAccess:       *sf.remoteAccess,
-		RemoteAccessPrompt: remotePrompt,
-		DebugInput:         *sf.debugInput,
-		AgentPriority:      *sf.agentPriority,
-		TLSCert:            *sf.tlsCert,
-		TLSKey:             *sf.tlsKey,
-		StrictLocalAuth:    strictFlag,
-	})
-	if err != nil {
-		logexit.Fatalf("Failed to start: %v", err)
-	}
-	defer rs.Close()
-	recordRun(cfg.CoralDir(), os.Args)
-
-	// Anonymous install/upgrade tracking (non-blocking)
-	tracking.TrackInstallAsync()
-
-	// Check for updates on startup (non-blocking; release tiers only)
-	if config.Version != "" && config.TierChecksForUpdates {
-		go func() {
-			defer safego.Recover("coral/main:245")
-			time.Sleep(5 * time.Second)
-			latest := routes.FetchLatestVersion()
-			if updatecheck.Newer(latest, config.Version) {
-				log.Printf("[UPDATE] New version available: v%s (you have v%s) — %s", latest, config.Version, updatecheck.ReleasesURL)
-			}
-		}()
-	}
-
+// announceDashboard prints the dashboard address in the terminal and opens the browser with a sign-in link (or prints the link when there is no
+// display), unless --no-browser. The link goes to the terminal only, never to coral.log (#3387).
+func announceDashboard(cfg *config.Config, rs *startup.RunningServer, sf *serverFlags) {
 	// Print dashboard URL to stdout so it's visible in the terminal
 	fmt.Printf("\n  Coral dashboard: http://localhost:%d\n", cfg.Port)
 	if cfg.TLS {
@@ -393,6 +310,115 @@ func main() {
 			executil.OpenBrowser(fmt.Sprintf("http://localhost:%d", cfg.Port))
 		}()
 	}
+}
+
+// startupOptions builds what startup.Start needs from the command line: the instance lock, the backend, the prompts (the remote-access question
+// only when someone is at a terminal) and the flags that were really given.
+func startupOptions(sf *serverFlags, instance *startup.Instance) startup.Options {
+	// Without someone at a terminal (a service, a CI runner, the tray, a shell that started
+	// Coral in the background) a prompt would block startup before the server listens. Skip
+	// the remote access question then: remote access stays off, nothing is saved, the log
+	// says how to turn it on, and the next interactive start still asks (#3271, #4052).
+	var remotePrompt func() bool
+	if canAskAtTerminal(os.Stdin, os.Stdout) {
+		tlsOn := strings.TrimSpace(*sf.tlsCert) != "" && strings.TrimSpace(*sf.tlsKey) != ""
+		remotePrompt = func() bool { return promptRemoteAccess(os.Stdin, os.Stdout, tlsOn) }
+	}
+	// Only a --strict-local-auth given on the command line overrides the default (#3936).
+	var strictFlag *bool
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == "strict-local-auth" {
+			strictFlag = sf.strictLocalAuth
+		}
+	})
+	return startup.Options{
+		Instance:           instance,
+		BackendType:        *sf.backendFlag,
+		PasswordPrompt:     promptDatabasePassword,
+		UnlockSurface:      "tty",
+		RemoteAccess:       *sf.remoteAccess,
+		RemoteAccessPrompt: remotePrompt,
+		DebugInput:         *sf.debugInput,
+		AgentPriority:      *sf.agentPriority,
+		TLSCert:            *sf.tlsCert,
+		TLSKey:             *sf.tlsKey,
+		StrictLocalAuth:    strictFlag,
+	}
+}
+
+func main() {
+	if code, ok := subcommand(os.Args[1:]); ok {
+		os.Exit(code)
+	}
+	// Runs last on a normal return: the terminal gets "[SHUTDOWN] done".
+	defer logexit.Flush()
+
+	// Global panic recovery — log the full stack trace before exiting
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("[FATAL] panic in main: %v\n%s", r, debug.Stack())
+			logexit.Exit(1)
+		}
+	}()
+
+	// Parse --home early so config.Load() can use it
+	sf := defineServerFlags()
+	parseServerFlags(sf)
+	if answeredBeforeStart(sf) {
+		return
+	}
+
+	// Only now, with the flags valid and the server really starting: --help, a bad flag
+	// and the self-test print nothing of a server's (#3506).
+	// The PATH is logged here once, with the home folder as "~" (logsafe); no other line carries it.
+	log.Printf("[STARTUP] coral server starting%s pid=%d go=%s os=%s arch=%s exe=%q %s",
+		config.FlavorNote(), os.Getpid(), runtime.Version(), runtime.GOOS, runtime.GOARCH, logsafe.Path(mustExecutable()), logsafe.PathSummary())
+
+	// The instance lock before anything touches the data folder (#6388): config.Load makes the folder and tightens its modes, the log and the Terms marker are written in it, so a second coral
+	// started against a folder another one holds must lose here, with a line on stderr and a non-zero exit, and leave the folder (modes, files, coral.log) exactly as it was.
+	instance, lockErr := startup.LockInstance(config.ResolveCoralDir(*sf.homeDir))
+	if lockErr != nil {
+		fmt.Fprintf(os.Stderr, "coral: %v\n", lockErr)
+		os.Exit(1)
+	}
+	cfg, cloudMode := loadServerConfig(sf)
+
+	configureServer(cfg, sf)
+
+	// Ignore SIGHUP — macOS sends it during sleep/wake transitions and when
+	// the controlling terminal closes. Without this, the default Go behavior
+	// kills the process.
+	signal.Ignore(syscall.SIGHUP)
+
+	// Graceful shutdown on SIGINT/SIGTERM. While the Connect to Coral Hub step
+	// waits at the terminal, Ctrl-C ends only that step (interruptRouter).
+	ctx, stop := context.WithCancel(context.Background())
+	defer stop()
+	interrupts := newInterruptRouter(stop)
+
+	rs, err := startup.Start(ctx, cfg, startupOptions(sf, instance))
+	if err != nil {
+		logexit.Fatalf("Failed to start: %v", err)
+	}
+	defer rs.Close()
+	recordRun(cfg.CoralDir(), os.Args)
+
+	// Anonymous install/upgrade tracking (non-blocking)
+	tracking.TrackInstallAsync()
+
+	// Check for updates on startup (non-blocking; release tiers only)
+	if config.Version != "" && config.TierChecksForUpdates {
+		go func() {
+			defer safego.Recover("coral/main:245")
+			time.Sleep(5 * time.Second)
+			latest := routes.FetchLatestVersion()
+			if updatecheck.Newer(latest, config.Version) {
+				log.Printf("[UPDATE] New version available: v%s (you have v%s) — %s", latest, config.Version, updatecheck.ReleasesURL)
+			}
+		}()
+	}
+
+	announceDashboard(cfg, rs, sf)
 
 	// Connect to Coral Hub, when asked for and not connected yet (#3285).
 	runCloudStartupStep(ctx, cfg, cloudMode, interrupts, os.Stdin, os.Stdout)
