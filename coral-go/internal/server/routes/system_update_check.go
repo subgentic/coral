@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"io"
 	"log/slog"
 	"math/rand/v2"
@@ -32,9 +31,6 @@ const (
 	checkBackoffMax = 24 * time.Hour
 	autoBodyMax     = 1 << 10
 )
-
-// ErrCheckBusy: a check is already running.
-var ErrCheckBusy = errors.New("a check is already running")
 
 // checkTimes is the background job's timing and clock (a test replaces them).
 type checkTimes struct {
