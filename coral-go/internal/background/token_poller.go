@@ -43,6 +43,7 @@ type TokenPoller struct {
 	codexCursors  map[string]*usageCursor[codexParser]
 	claudeCursors map[string]*usageCursor[claudeParser]
 	piCursors     map[string]*usageCursor[piParser]
+	agyCursors    map[string]*usageCursor[agyParser]
 }
 
 // NewTokenPoller creates a new TokenPoller.
@@ -60,6 +61,7 @@ func NewTokenPoller(ss *store.SessionStore, us *store.TokenUsageStore, interval 
 		codexCursors:   make(map[string]*usageCursor[codexParser]),
 		claudeCursors:  make(map[string]*usageCursor[claudeParser]),
 		piCursors:      make(map[string]*usageCursor[piParser]),
+		agyCursors:     make(map[string]*usageCursor[agyParser]),
 	}
 }
 
@@ -93,6 +95,8 @@ func (p *TokenPoller) pollOnce(ctx context.Context) {
 			p.pollClaudeSession(ctx, &ls)
 		case at.Pi:
 			p.pollPiSession(ctx, &ls)
+		case at.Agy, at.Antigravity:
+			p.pollAgySession(ctx, &ls)
 		}
 	}
 }

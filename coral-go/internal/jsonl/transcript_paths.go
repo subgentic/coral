@@ -152,6 +152,12 @@ func newestFile(paths []string) string {
 	return best
 }
 
+// ResolveAgyTranscript is the transcript file of a Coral agy session ("" when it has none): found by the conversation agy's own hook named for it, else by the Coral marker in
+// the transcript, never by the newest file (#7764).
+func ResolveAgyTranscript(sessionID, workingDirectory string) string {
+	return resolveAgyTranscriptStrict(sessionID, workingDirectory)
+}
+
 func resolveAgyTranscript(sessionID string, workingDirectory ...string) string {
 	return resolveAgyTranscriptMode(sessionID, false, workingDirectory...)
 }
@@ -165,12 +171,16 @@ func resolveAgyTranscriptMode(sessionID string, strictLive bool, workingDirector
 		return ""
 	}
 	home, _ := os.UserHomeDir()
-	basePath := os.Getenv("ANTIGRAVITY_DATA_DIR")
-	if basePath == "" {
-		basePath = filepath.Join(home, ".gemini", "antigravity-cli", "brain")
-	} else if filepath.Base(basePath) != "brain" {
-		if info, err := os.Stat(filepath.Join(basePath, "brain")); err == nil && info.IsDir() {
-			basePath = filepath.Join(basePath, "brain")
+	basePath := transcriptlink.AgyBrainDir()
+
+	// The conversation agy's own hook named for this session (#7764): the explicit signal, first. A transcript that carries another session's Coral
+	// marker is not believed (a link written by a nested agy); one with no marker is.
+	if conv := transcriptlink.AgyConversation(sessionID); conv != "" {
+		candidate := transcriptlink.AgyTranscript(conv)
+		if info, err := os.Stat(candidate); err == nil && info.Mode().IsRegular() {
+			if marker := agyTranscriptCoralSessionID(candidate); marker == "" || marker == sessionID {
+				return candidate
+			}
 		}
 	}
 
@@ -583,6 +593,18 @@ func codexTranscriptCoralSessionIDCached(path string, seen os.FileInfo) string {
 }
 
 func agyTranscriptCoralSessionID(path string) string {
+	if id := agyFileCoralSessionID(path); id != "" {
+		return id
+	}
+	// agy 1.4.7 cuts any field over about 4,096 characters in transcript.jsonl, and Coral's marker sits late in the first prompt (past 5,900 of 8,300 characters in a
+	// real session), so the compact file's first row no longer carries it; transcript_full.jsonl, beside it, does (#7764).
+	if filepath.Base(path) == "transcript.jsonl" {
+		return agyFileCoralSessionID(filepath.Join(filepath.Dir(path), "transcript_full.jsonl"))
+	}
+	return ""
+}
+
+func agyFileCoralSessionID(path string) string {
 	f, err := os.Open(path)
 	if err != nil {
 		return ""

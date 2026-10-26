@@ -53,7 +53,8 @@ func main() {
 		d["_coral_session_clear"] = true
 	}
 	agyEvent, hooksRev := opts.agyEvent, opts.hooksRev
-	agyModel := agyModelOf(d, agyEvent) // read before fromAgy rewrites the payload
+	agyModel := agyModelOf(d, agyEvent)               // read before fromAgy rewrites the payload
+	agyConversation := agyConversationOf(d, agyEvent) // read before fromAgy rewrites the payload
 	if agyEvent != "" {
 		// Antigravity CLI (agy) hooks (#3481): its payload names neither the event nor
 		// the tool the way Claude's does; it is translated, and an event Coral doesn't
@@ -84,6 +85,12 @@ func main() {
 			if err := transcriptlink.BindCodex(sessionID, threadID); err != nil {
 				hooks.DebugLog(fmt.Sprintf("CODEX_LINK_FAILED: %v", err))
 			}
+		}
+	}
+	if agyConversation != "" && transcriptlink.IsSessionID(sessionID) {
+		// agy keys its transcript by its own conversation id: the link is what chat, history search and token usage find it by (#7764).
+		if err := transcriptlink.BindAgy(sessionID, agyConversation); err != nil {
+			hooks.DebugLog(fmt.Sprintf("AGY_LINK_FAILED: %v", err))
 		}
 	}
 	agentName := hooks.ResolveAgentName(d)
@@ -416,6 +423,15 @@ func parseAgenticEvent(d map[string]any, hookType, sessionID string) map[string]
 // its parent's id, and binding that would show the parent's transcript in the child's chat.
 func codexThreadID(d map[string]any) string {
 	return hooks.StrVal(d, "session_id")
+}
+
+// agyConversationOf is the agy conversation an agy hook payload names (conversationId, in every payload of agy 1.3.5 and later), "" for any other agent's payload. It is what
+// ties a Coral session to agy's transcript, which agy keys by its own conversation id (#7764).
+func agyConversationOf(d map[string]any, agyEvent string) string {
+	if agyEvent == "" {
+		return ""
+	}
+	return hooks.StrVal(d, "conversationId")
 }
 
 // agyModelOf is the model an agy hook payload names (modelName), for the two events that open
