@@ -29,7 +29,9 @@ const SESSIONS = [
             return Fetch.fulfillRequest({ requestId: e.requestId, responseCode: 200, responseHeaders: (e.responseHeaders || []).filter(h => !/^content-length$/i.test(h.name)), body: Buffer.from(html).toString('base64') });
         });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
+        await waitFor(`window.__coralReady?.parts.settings && window.__coralReady?.parts.history`, 'Hub history/settings ready (the harness disconnects the feed)', 10000, `window.__coralReady?.parts`);
+        console.log('Hub history and settings ready');
         await ev(`(() => { const R = window.fetch.bind(window); window.__hits = ['aaaaaaaa-0001', 'aaaaaaaa-0002'];
             window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin);
                 if (url.pathname === '/api/sessions/history') return Promise.resolve(new Response(JSON.stringify({ sessions: ${JSON.stringify(SESSIONS)}, total: 3, page: 1, page_size: 50 }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
