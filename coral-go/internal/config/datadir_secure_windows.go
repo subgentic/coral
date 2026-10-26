@@ -4,6 +4,7 @@ package config
 
 import (
 	"fmt"
+	"github.com/subgentic/coral/internal/winuser"
 	"io/fs"
 	"path/filepath"
 	"strings"
@@ -142,7 +143,7 @@ func ownedByCurrentUser(h windows.Handle) (bool, error) {
 	if owner == nil {
 		return false, nil
 	}
-	me, err := currentUserSID()
+	me, err := winuser.CurrentSID()
 	if err != nil {
 		return false, err
 	}
@@ -217,7 +218,7 @@ func reprotect(path string, isDir bool) reprotectResult {
 
 // ownerOnlyACL is the access list of this user and SYSTEM only; a folder's is inherited by what is made in it.
 func ownerOnlyACL(inherit bool) (*windows.ACL, error) {
-	user, err := currentUserSID()
+	user, err := winuser.CurrentSID()
 	if err != nil {
 		return nil, err
 	}

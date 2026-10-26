@@ -4,6 +4,7 @@ package hooks
 
 import (
 	"errors"
+	"github.com/subgentic/coral/internal/winuser"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -14,7 +15,7 @@ import (
 // #279: each refusal says what was refused, why, and what to do next, in whole sentences, and never the old
 // "Is another account's program on Coral's port?" for a program of this user's own.
 func TestEachRefusalSaysWhyAndWhatToDo(t *testing.T) {
-	me, err := currentUserSID()
+	me, err := winuser.CurrentSID()
 	require.NoError(t, err)
 	other, err := windows.StringToSid("S-1-5-21-1-2-3-1001")
 	require.NoError(t, err)

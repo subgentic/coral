@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/subgentic/coral/internal/winuser"
 	"net"
 	"os"
 	"path/filepath"
@@ -32,7 +33,7 @@ var (
 	pidOwner     = processOwner
 	coralFolders = allowedCoralFolders
 	tcpRows      = tcpListeners
-	selfSID      = currentUserSID
+	selfSID      = winuser.CurrentSID
 	fileOwner    = fileOwnerSID
 )
 
@@ -187,14 +188,6 @@ func fileOwnerSID(path string) (*windows.SID, error) {
 		return nil, err
 	}
 	return owner.Copy()
-}
-
-func currentUserSID() (*windows.SID, error) {
-	u, err := windows.GetCurrentProcessToken().GetTokenUser()
-	if err != nil {
-		return nil, err
-	}
-	return u.User.Sid.Copy()
 }
 
 // processOwner is pid's user SID and image path.

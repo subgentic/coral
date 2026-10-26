@@ -3,6 +3,7 @@
 package config
 
 import (
+	"github.com/subgentic/coral/internal/winuser"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,7 +19,7 @@ import (
 // made in it inherits that (no protection, nothing explicit but those).
 func usersCanRead(t *testing.T, dir string) {
 	t.Helper()
-	me, err := currentUserSID()
+	me, err := winuser.CurrentSID()
 	require.NoError(t, err)
 	out, err := exec.Command("icacls", dir, "/inheritance:r", "/grant:r", "*"+me.String()+":(OI)(CI)F", "/grant:r", "*S-1-5-18:(OI)(CI)F",
 		"/grant:r", "*S-1-5-32-545:(OI)(CI)RX").CombinedOutput()

@@ -4,6 +4,7 @@ package main
 
 import (
 	"errors"
+	"github.com/subgentic/coral/internal/winuser"
 	"log"
 	"os"
 	"strconv"
@@ -21,15 +22,6 @@ import (
 
 // errNotOurs: the event at the name is owned by another account.
 var errNotOurs = errors.New("the hand-over event is owned by another account")
-
-// currentUserSID is this process's user (never the token's default owner, which is Administrators for an elevated process).
-func currentUserSID() (*windows.SID, error) {
-	u, err := windows.GetCurrentProcessToken().GetTokenUser()
-	if err != nil {
-		return nil, err
-	}
-	return u.User.Sid.Copy()
-}
 
 // showEventName is the event a tray (pid) of this user listens on.
 func showEventName(user *windows.SID, pid int) string {
@@ -110,7 +102,7 @@ func listenShowEvent(h windows.Handle, show func()) {
 // askTrayToShowWindow is a second start of the app asking the running tray (pid) to show its window: it sets that tray's event. An error
 // (no tray listening, an event of another account's) means no hand-over, and the start goes on as before.
 func askTrayToShowWindow(pid int) error {
-	user, err := currentUserSID()
+	user, err := winuser.CurrentSID()
 	if err != nil {
 		return err
 	}
@@ -119,7 +111,7 @@ func askTrayToShowWindow(pid int) error {
 
 // onShowWindowSignal calls show whenever another start of the app asks this tray to show its window.
 func onShowWindowSignal(show func()) {
-	user, err := currentUserSID()
+	user, err := winuser.CurrentSID()
 	if err != nil {
 		log.Printf("[TRAY] no hand-over event (this user: %v): a second start of the app starts as before", err)
 		return
