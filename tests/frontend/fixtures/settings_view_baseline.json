@@ -1,0 +1,138 @@
+{
+  "settings-row": {
+    "css": 41,
+    "js": 9,
+    "html": 30
+  },
+  "settings-cli-row": {
+    "css": 2,
+    "js": 0,
+    "html": 9
+  },
+  "tb-row": {
+    "css": 1,
+    "js": 2,
+    "html": 2
+  },
+  "settings-row-switch": {
+    "css": 1,
+    "js": 0,
+    "html": 1
+  },
+  "settings-unit-field": {
+    "css": 2,
+    "js": 0,
+    "html": 3
+  },
+  "settings-inline": {
+    "css": 5,
+    "js": 0,
+    "html": 2
+  },
+  "settings-api-key-row": {
+    "css": 3,
+    "js": 0,
+    "html": 1
+  },
+  "pw-input-row": {
+    "css": 1,
+    "js": 1,
+    "html": 0
+  },
+  "net-group-head": {
+    "css": 7,
+    "js": 2,
+    "html": 5
+  },
+  "ts-row": {
+    "css": 17,
+    "js": 3,
+    "html": 0
+  },
+  "working-mode-form": {
+    "css": 14,
+    "js": 5,
+    "html": 0
+  },
+  "health-row": {
+    "css": 3,
+    "js": 4,
+    "html": 0
+  },
+  "health-line": {
+    "css": 8,
+    "js": 3,
+    "html": 0
+  },
+  "health-form": {
+    "css": 21,
+    "js": 1,
+    "html": 0
+  },
+  "workflow-mode-line": {
+    "css": 3,
+    "js": 1,
+    "html": 0
+  },
+  "preset-name-field": {
+    "css": 0,
+    "js": 2,
+    "html": 0
+  },
+  "launch-prompt-field": {
+    "css": 3,
+    "js": 3,
+    "html": 2
+  },
+  "job-field": {
+    "css": 2,
+    "js": 0,
+    "html": 12
+  },
+  "job-limit-fields": {
+    "css": 4,
+    "js": 0,
+    "html": 1
+  },
+  "launch-field-*": {
+    "css": 5,
+    "js": 6,
+    "html": 13
+  },
+  "__families": [
+    "health-form",
+    "health-line",
+    "health-row",
+    "job-field",
+    "job-limit-fields",
+    "job-row",
+    "launch-field-head",
+    "launch-persona-row",
+    "launch-prompt-field",
+    "launch-server-row",
+    "net-group-head",
+    "net-level-row",
+    "preset-name-field",
+    "settings-api-key-row",
+    "settings-cli-row",
+    "settings-cloud-connect-row",
+    "settings-cloud-head",
+    "settings-cloud-owner-row",
+    "settings-cloud-switch-row",
+    "settings-cloud-usercode-row",
+    "settings-controls-row",
+    "settings-hint-line",
+    "settings-inline",
+    "settings-row",
+    "settings-subhead",
+    "settings-unit-field",
+    "tb-head",
+    "tb-line",
+    "tb-row",
+    "ts-inline",
+    "ts-name-row",
+    "ts-row",
+    "workflow-mode-line",
+    "working-mode-form"
+  ]
+}

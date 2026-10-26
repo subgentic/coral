@@ -1,0 +1,89 @@
+/* settings_view (#7744): the one block that draws a settings surface (settings_view.js): the rows, the help, the errors, the save bar and, in a narrow host, the fold of the nav into a select.
+ * Every visual choice is a --sv-* token (variables.css); no surface styles a settings row of its own, so a styling change is one token or one rule here. The nav list itself (.settings-tab) is the
+ * shared sectioned shell's (components.css), the same as the dialogs that use section_dialog.js. */
+
+.sv { container: sv / inline-size; display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
+.sv-lead { margin: 0 0 .8rem; font-size: var(--sv-help-size); color: var(--sv-value-color); }
+.sv-shell { flex: 1; min-height: 0; }
+.sv .settings-panes > .settings-pane { max-width: 860px; }
+.sv .settings-pane-sub:empty { display: none; }
+.sv-body { flex: 1; min-height: 0; overflow: auto; }
+
+/* a row: the label and its help at the left, the control at the right (settings mode); label above, control full width (form mode) */
+.sv-row { display: grid; gap: 4px var(--sv-row-gap); align-items: start; padding: var(--sv-row-pad-y) 0; border-top: 1px solid var(--sv-row-divider); }
+.sv-row[hidden] { display: none; }
+.sv-pane > .sv-row:first-of-type, .sv-body > .sv-row:first-of-type { border-top: 0; }
+.sv-settings .sv-row { grid-template-columns: minmax(0, 1fr) var(--sv-control-width); }
+.sv-settings .sv-row-wide, .sv-form .sv-row { grid-template-columns: minmax(0, 1fr); }
+.sv-settings .sv-row-toggle { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+.sv-text { min-width: 0; }
+.sv-label { display: inline; font-size: var(--sv-label-size); font-weight: var(--sv-label-weight); color: var(--sv-label-color); }
+.sv-required { margin-left: .5rem; font-size: var(--sv-help-size); font-weight: var(--sv-label-weight); color: var(--sv-required-color); }
+.sv-help { margin: 2px 0 0; font-size: var(--sv-help-size); font-weight: var(--sv-help-weight); line-height: 1.4; color: var(--sv-help-color); }
+.sv-learn { display: inline; padding: 0; border: 0; background: none; font: inherit; color: var(--link-text, var(--accent)); text-decoration: underline; cursor: pointer; }
+.sv-more { margin-top: 6px; font-size: var(--sv-help-size); line-height: 1.5; color: var(--sv-help-color); }
+.sv-more[hidden] { display: none; }
+.sv-more > p { margin: 0 0 6px; }
+.sv-control { display: flex; align-items: center; gap: 8px; min-width: 0; justify-content: flex-end; }
+.sv-form .sv-control { justify-content: flex-start; }
+.sv-control > .sv-input, .sv-control > .sv-custom, .sv-control > .sv-choices { flex: 1; min-width: 0; }
+.sv-input { box-sizing: border-box; width: 100%; min-height: var(--sv-control-height); font: inherit; font-size: var(--fs-md); }
+.sv-textarea { min-height: 6rem; resize: vertical; }
+.sv-unit { flex: none; font-size: var(--sv-help-size); color: var(--sv-help-color); }
+.sv-input[aria-invalid="true"] { border-color: var(--sv-error-color); }
+.sv-error { grid-column: 1 / -1; margin: 4px 0 0; font-size: var(--sv-help-size); font-weight: var(--sv-label-weight); color: var(--sv-error-color); }
+.sv-error[hidden] { display: none; }
+.sv-row[data-disabled] .sv-label { color: var(--sv-value-color); }
+.sv-choices { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.sv-choice { display: grid; grid-template-columns: auto 1fr; gap: 0 8px; align-items: center; font-size: var(--sv-label-size); color: var(--sv-label-color); }
+.sv-choice-help { grid-column: 2; font-size: var(--sv-help-size); color: var(--sv-help-color); }
+.sv-action { flex: none; }
+.sv-confirm { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: var(--sv-help-size); color: var(--sv-help-color); }
+.sv-confirm-text { color: var(--sv-label-color); }
+
+/* the on/off box is a switch; it stays a native checkbox (the keyboard, the screen reader and the touch target are unchanged) */
+.sv-switch-hit { display: inline-flex; align-items: center; justify-content: flex-end; }
+.sv-switch { appearance: none; -webkit-appearance: none; position: relative; width: 2.5rem; height: 1.4rem; margin: 0; flex: none; border-radius: 1rem; border: 1px solid var(--control-border); background: var(--bg-hover); cursor: pointer; }
+.sv-switch::before { content: ""; position: absolute; top: 2px; left: 2px; width: calc(1.4rem - 8px); height: calc(1.4rem - 8px); border-radius: 50%; background: var(--text-secondary); transition: transform .12s; }
+.sv-switch:checked { background: var(--accent-dim); border-color: var(--accent-dim); }
+.sv-switch:checked::before { background: var(--text-on-accent); transform: translateX(1.1rem); }
+.sv-switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sv-switch:disabled { opacity: .5; cursor: not-allowed; }
+@media (prefers-reduced-motion: reduce) { .sv-switch::before { transition: none; } }
+
+/* the bar: the status at the left, Cancel and Save at the right */
+.sv-bar { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: var(--sv-bar-pad); border-top: 1px solid var(--border); background: var(--bg-primary); }
+.sv-status { font-size: var(--sv-status-size); font-weight: 500; color: var(--text-secondary); min-width: 0; overflow-wrap: anywhere; }
+.sv-status.is-error { color: var(--sv-error-color); }
+.sv-bar-buttons { display: flex; align-items: center; gap: 8px; flex: none; }
+
+/* a touch screen: every control is a 44 px target */
+@media (pointer: coarse) {
+    .sv-input, .sv-action, .sv-confirm .btn, .sv-bar .btn { min-height: var(--sv-control-height-touch); }
+    .sv-learn { min-height: var(--sv-control-height-touch); }
+    .sv-switch-hit { min-width: var(--sv-control-height-touch); min-height: var(--sv-control-height-touch); }
+}
+
+/* narrow, in rem as the main Settings' fold is: the nav becomes a select at the top and the rows stack. The ONE fold breakpoint of the component (a container query: a variable cannot hold it). */
+@container sv (max-width: 50rem) {
+    .sv .settings-nav { width: auto; flex: none; border-right: 0; border-bottom: 1px solid var(--border); padding: .6rem 1rem; overflow: visible; }
+    .sv-shell { flex-direction: column; }
+    .sv .settings-tabs { display: none; }
+    .sv .settings-nav .settings-group-pick { display: block; }
+    .sv .settings-group-pick select { width: 100%; min-height: var(--sv-control-height-touch); font-size: 0.875rem; }
+    .sv .settings-panes { padding: .8rem 1rem 1.2rem; }
+    .sv-settings .sv-row { grid-template-columns: minmax(0, 1fr); }
+    .sv-settings .sv-row-toggle { grid-template-columns: minmax(0, 1fr) auto; }
+    .sv-settings .sv-row:not(.sv-row-toggle) .sv-control { justify-content: flex-start; }
+    .sv-bar { padding: 8px 16px; flex-wrap: wrap; }
+}
+
+/* Windows High Contrast: a switch shows its state with system colours (backgrounds are dropped) */
+@media (forced-colors: active) {
+    .sv-switch { background: Canvas; border: 2px solid ButtonText; }
+    .sv-switch::before { background: ButtonText; }
+    .sv-switch:checked { background: Highlight; border-color: Highlight; }
+    .sv-switch:checked::before { background: HighlightText; }
+    .sv-switch:disabled { opacity: 1; border-color: GrayText; }
+    .sv-switch:disabled::before { background: GrayText; }
+}

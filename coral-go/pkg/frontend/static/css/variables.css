@@ -146,6 +146,24 @@
     --control-height: 36px;
     --control-compact-height: 32px;
     --control-touch-height: 44px;
+    /* settings_view (#7744): every visual choice of the settings rows, the help, the errors and the save bar; read only by settings_view.css, so a styling change is one token here or one rule there */
+    --sv-label-size: var(--fs-md);                   /* 13px */
+    --sv-label-weight: 500;
+    --sv-label-color: var(--text-primary);
+    --sv-help-size: var(--fs-base);                  /* 12px */
+    --sv-help-weight: 400;
+    --sv-help-color: var(--text-muted);              /* tertiary */
+    --sv-value-color: var(--text-secondary);         /* a read-only value */
+    --sv-row-gap: var(--space-2xl);                  /* between the text column and the control column */
+    --sv-row-pad-y: 10px;
+    --sv-row-divider: var(--border-subtle, var(--border));
+    --sv-control-width: minmax(12rem, 22rem);        /* the control's column in settings mode */
+    --sv-control-height: var(--control-compact-height);   /* 32px on a desktop */
+    --sv-control-height-touch: var(--control-touch-height); /* 44px on a phone */
+    --sv-error-color: var(--error-text);
+    --sv-required-color: var(--text-secondary);
+    --sv-bar-pad: 6px 24px;
+    --sv-status-size: var(--fs-base);
     --icon-size: 1.125rem;   /* 18px */
     --icon-inline-size: 1rem; /* 16px */
     --chat-prose-font: var(--font-sans);
