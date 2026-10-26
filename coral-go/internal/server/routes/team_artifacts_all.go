@@ -69,6 +69,7 @@ func (h *BoardHandler) ListAllTeamArtifacts(w http.ResponseWriter, r *http.Reque
 			return
 		}
 	}
+	vals.Set(crossTeamScopeParam, "all")
 	if _, ok := vals["sort"]; !ok { // the list is always a query: its cursor is tied to the filters and the sort
 		vals.Set("sort", "newest")
 	}
