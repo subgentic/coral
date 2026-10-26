@@ -14,7 +14,7 @@ const m = defineFilters({
     kept: { type: 'flag', chip: 'Kept' },
     dates: { type: 'range', from: 'from', to: 'to', chip: (a, b) => `${a || '…'}–${b || '…'}` },
     goal: { type: 'custom', empty: '', clean: v => (/^\d+$/.test(v) ? v : ''), filtered: v => !!v, chip: v => `Goal ${v}` },
-    sort: { type: 'sort', values: ['new', 'old'], default: 'new' },
+    sort: { type: 'order', values: ['new', 'old'], default: 'new' },
 });
 assert.deepEqual(m.EMPTY, { q: '', kind: '', kept: false, from: '', to: '', goal: '', sort: 'new' });
 assert.deepEqual(m.clean(null), m.EMPTY); assert.deepEqual(m.clean('x'), m.EMPTY);
