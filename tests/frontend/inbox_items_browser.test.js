@@ -63,6 +63,10 @@ const BASE = require('./test_base').BASE;
                     await waitFor(`document.querySelector(${JSON.stringify(content)})?.textContent.includes(${JSON.stringify(isTask?title:'Read this board in the Inbox')})`, 'shared item content');
                     // Check the mounted page, not the shell shown while its task read is pending.
                     assert.ok(await ev(`document.querySelector('#inbox-page .goals-back')?.getClientRects().length>0`),'Back is visible at this width');
+                    if (isTask) { // on arrival the keyboard is on the Back link, never the heading: no ring round plain words (#7404, UI/UX on #8662)
+                        await waitFor(`document.activeElement===document.querySelector('#inbox-page .goals-back')`, 'the Back link has the focus on arrival', 6000);
+                        assert.equal(await ev(`document.activeElement===document.querySelector('#inbox-page #team-task-title')`), false, 'the heading does not take the focus');
+                    }
                     if (!isTask) {
                         assert.equal(await ev(`getComputedStyle(document.querySelector('#inbox-page .inbox-board-head h2')).fontFeatureSettings`), '"calt" 0', 'the board heading preserves digit+x');
                         assert.equal(await ev(`document.querySelector('#inbox-page .inbox-board-head h2').textContent`), board);

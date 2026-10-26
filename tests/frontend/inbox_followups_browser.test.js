@@ -69,11 +69,11 @@ const AGENTS = (waiting) => waiting ? [
             });
             const click = async (what, sel) => { const ok = await ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return false; e.click(); return true; })()`); assert.ok(ok, `${what}: no ${sel}`); };
             const escape = () => ev(`(document.activeElement || document.body).dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); true`);
-            if (!mobile) await step('a task page starts at its title and Back puts the focus on the task row', async () => {
+            if (!mobile) await step('a task page starts at its Back link (never a ring round the title, #7404) and Back puts the focus on the task row', async () => {
                 await ev(`window.switchNavTab('hub-inbox'); true`); await click('Tasks', `${pane} .view-list-item[data-key="tasks"]`); await settle(300);
                 await click('the task', '#group-table-view .dt-primary[data-task-id="12"]');
                 await waitFor(`!!document.querySelector('#inbox-page .ibx-reply-input')`, 'the task page', 8000); await settle(300);
-                assert.equal((await active()).id, 'team-task-title', 'the title has the focus');
+                assert.equal((await active()).cls.includes('goals-back'), true, 'the Back link has the focus'); assert.notEqual((await active()).id, 'team-task-title', 'not the title');
                 await click('Back', '#inbox-page .goals-back'); await settle(400);
                 const a = await active(); assert.equal(a.data.taskId, '12', 'Back: the row the task was opened from (' + JSON.stringify(a) + ')');
             });
@@ -93,10 +93,10 @@ const AGENTS = (waiting) => waiting ? [
                 const a = await active(); assert.equal(a.data.id, id, 'with the focus on that message (' + JSON.stringify(a) + ')');
                 assert.equal(await ev(`document.body.getAttribute('data-nav-tab')`), 'hub-inbox', 'still in the Inbox');
             });
-            if (mobile) await step('the phone: a task opens at its title and Back puts the focus on its row in the table', async () => {
+            if (mobile) await step('the phone: a task opens at its Back link (not a ring round the title) and Back puts the focus on its row in the table', async () => {
                 await ev(`document.querySelector('${pane} .view-list-item[data-key="tasks"]').click(); true`); await settle(400);
                 await ev(`document.querySelector('#group-table-view .dt-primary').click(); true`); await settle(600);
-                assert.equal((await active()).id, 'team-task-title', 'the title has the focus');
+                assert.equal((await active()).cls.includes('goals-back'), true, 'the Back link has the focus'); assert.notEqual((await active()).id, 'team-task-title', 'not the title');
                 await ev(`document.querySelector('#inbox-page .goals-back').click(); true`); await settle(500);
                 const a = await active(); assert.ok(a.cls.includes('dt-primary') && a.data.taskId, 'the task row in the table has the focus (' + JSON.stringify(a) + ')');
             });
