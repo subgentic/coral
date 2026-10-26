@@ -11,9 +11,10 @@ const SCAN = `(() => {
     const modal = document.getElementById('settings-modal');
     const pane = [...modal.querySelectorAll('.settings-pane')].find(p => !p.hidden);
     if (!pane) return { missing: true };
+    const closedDetails = e => { for (let p = e.parentElement; p && p !== document.body; p = p.parentElement) if (p.tagName === 'DETAILS' && !p.open && !e.closest('summary')) return true; return false; }; // a closed disclosure's content is not drawn: its boxes are not on the screen
     const vis = e => { const r = e.getBoundingClientRect(); const cs = getComputedStyle(e); return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none'; };
     const name = e => (e.getAttribute('aria-label') || e.textContent || e.id || e.className || e.tagName).toString().replace(/\\s+/g, ' ').trim().slice(0, 40);
-    const controls = [...pane.querySelectorAll('button, a[href], select, input:not([type=hidden]), textarea, [role=switch], [role=button]')].filter(e => vis(e) && !e.closest('[hidden]'));
+    const controls = [...pane.querySelectorAll('button, a[href], select, input:not([type=hidden]), textarea, [role=switch], [role=button]')].filter(e => vis(e) && !e.closest('[hidden]') && !closedDetails(e));
     const content = modal.querySelector('.modal-content').getBoundingClientRect();
     const scroller = e => { for (let p = e.parentElement; p && p !== document.body; p = p.parentElement) { const o = getComputedStyle(p); if (/(auto|scroll)/.test(o.overflowY) || /(auto|scroll)/.test(o.overflowX)) return p; } return null; };
     const out = { sideways: [], beyond: [], clipped: [], overlap: [], n: controls.length };
@@ -73,6 +74,12 @@ const SCAN = `(() => {
                 for (const k of ['sideways', 'beyond', 'clipped', 'overlap']) if (r[k].length) findings.push(`${label} ${g} ${k}: ${r[k].slice(0, 5).join('; ')}`);
                 if (process.env.WALK_LOG) fs.appendFileSync(process.env.WALK_LOG, `${label} ${g}: ${r.n} controls ${JSON.stringify(r)}\n`);
                 await shot(`settings-200-${label}-${g}`);
+                // the same pane with every disclosure open: what a person sees after opening Change password or the CLI paths
+                await ev(`[...document.querySelectorAll('#settings-modal .settings-pane:not([hidden]) details')].forEach(d => { d.open = true; }); true`);
+                const ro = await ev(SCAN);
+                for (const k of ['sideways', 'beyond', 'clipped', 'overlap']) if (ro[k].length) findings.push(`${label} ${g} (disclosures open) ${k}: ${ro[k].slice(0, 5).join('; ')}`);
+                await shot(`settings-200-${label}-${g}-open`);
+                await ev(`[...document.querySelectorAll('#settings-modal .settings-pane:not([hidden]) details')].forEach(d => { d.open = false; }); true`);
             }
         }
         assert.deepEqual(findings, [], 'Settings at 200% text:\n' + findings.join('\n'));
