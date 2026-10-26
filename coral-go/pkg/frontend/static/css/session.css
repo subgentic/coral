@@ -2165,7 +2165,7 @@
 .session-name-row:has(.session-attention-pill) { flex-wrap: nowrap; height: auto; } /* one line while the name and the tag fit; the narrow container below wraps the tag under the name (#8540) */
 .session-name-row:has(.session-attention-pill) .session-label { flex: 1 1 10rem; min-width: 0; display: block; white-space: nowrap; text-overflow: ellipsis; }
 .session-name-row:has(.session-attention-pill) .session-name-spacer { display: none; }
-.session-name-row .session-attention-pill { flex: 0 0 9rem; width: 9rem; max-width: calc(100% - var(--row-dot-block, 16px)); box-sizing: border-box; text-align: center; white-space: normal; }
+.session-name-row .session-attention-pill { flex: 0 0 8rem; width: 8rem; max-width: calc(100% - var(--row-dot-block, 16px)); box-sizing: border-box; text-align: center; white-space: normal; }
 @container (max-width: 14rem) {
     .session-name-row:has(.session-attention-pill) { flex-wrap: wrap; }
     .session-name-row:has(.session-attention-pill) .session-label { flex-basis: calc(100% - 40px); }
