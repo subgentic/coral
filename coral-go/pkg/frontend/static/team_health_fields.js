@@ -75,7 +75,7 @@ export function healthFields(ctx) {
             help: 'A message Coral could not type into an agent (its terminal is on a dialog) and has held back for a while is reported to the Operator.' },
         { ...minutes('held_notice_after_min', 'After', 'minutes held', 'held_notice_on'), visibleWhen: () => ctx.hasHeld() },
         { key: 'mention_renudge_on', type: 'toggle', label: 'Remind the orchestrator of an unanswered mention', help: 'A message that @mentions the orchestrator and has had no reply gets a reminder.' },
-        minutes('mention_renudge_after_min', 'After', 'minutes', 'mention_renudge_on'),
+        minutes('mention_renudge_after_min', 'Remind after', 'minutes', 'mention_renudge_on'),
         { key: 'health_offbooks', type: 'heading', label: 'Work done off the books', help: 'Named to the orchestrator in the next health check, once each.' },
         { key: 'busy_no_task_on', type: 'toggle', label: 'Tell the orchestrator about an agent working with no task', help: 'An agent that has been working for a while with no task in progress is named in the next health check, once.' },
         minutes('busy_no_task_after_min', 'Working with no task for', 'minutes', 'busy_no_task_on'), // a short unit: a longer one runs past the edge of a phone at 200% text
@@ -85,7 +85,7 @@ export function healthFields(ctx) {
         { key: 'goal_size_limit', type: 'number', label: 'More than', unit: 'tasks in a goal', min: G_LO, max: G_HI, integer: true, compact: true, disabledWhen: v => !v.goal_size_on },
         { key: 'health_questions', type: 'heading', label: 'Questions', help: 'Works whether or not the health check is on.' },
         { key: 'ask_reminder_on', type: 'toggle', label: 'Remind about unanswered questions', help: 'When an agent asks a question and the member it asks has not answered, remind that member once.' },
-        minutes('ask_reminder_after_min', 'After', 'minutes', 'ask_reminder_on'),
+        minutes('ask_reminder_after_min', 'Remind the member after', 'minutes', 'ask_reminder_on'),
         { key: 'health_defaults', type: 'custom', label: 'Defaults', help: 'Put every health setting back to the defaults. Save to apply them.', action: { label: 'Reset to defaults', run: view => ctx.onReset(view) } },
     ];
 }
