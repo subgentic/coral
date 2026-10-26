@@ -75,14 +75,14 @@ func TestOnlyDeliveredSendsAreRecorded(t *testing.T) {
 	ctx := context.Background()
 	a := &fakeAgent{screen: permissionMenu}
 	name := "claude-delivered-gate"
-	d, err := DeliverAutomated(ctx, a.input(name, "", taskNotice, false))
+	d, err := DeliverAutomated(ctx, a.input(name, taskNotice, false))
 	require.NoError(t, err)
 	require.Equal(t, Skipped, d)
 	assert.False(t, HasDeliveredTexts(name), "skipped behind a menu: not typed, not recorded")
 
 	a.show(idleInputBox)
 	next := "You have 1 unread message on the message board. Run 'coral-board read' to see it."
-	d, err = DeliverAutomated(ctx, a.input(name, "", next, false))
+	d, err = DeliverAutomated(ctx, a.input(name, next, false))
 	require.NoError(t, err)
 	require.Equal(t, Sent, d)
 	assert.Equal(t, []bool{true}, turns(name, next), "recorded at once when typed")

@@ -39,7 +39,9 @@ type ClaudeArtifactNudger struct {
 
 // NewClaudeArtifactNudger is the nudger for the sessions in ss, typing through term.
 func NewClaudeArtifactNudger(ss *store.SessionStore, term ptymanager.SessionTerminal) *ClaudeArtifactNudger {
-	return &ClaudeArtifactNudger{ss: ss, term: term, now: time.Now, deliver: deliverAutomated}
+	return &ClaudeArtifactNudger{ss: ss, term: term, now: time.Now, deliver: func(ctx context.Context, term ptymanager.SessionTerminal, name, agentType, sessionID string, _ string, text, what string) error {
+		return deliverAutomated(ctx, term, name, agentType, sessionID, text, what)
+	}}
 }
 
 func (n *ClaudeArtifactNudger) enabled(ctx context.Context) bool {

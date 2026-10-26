@@ -95,7 +95,7 @@ func (h *BoardHandler) sendAutomated(ctx context.Context, project, sessionName, 
 		}
 		return err
 	}
-	return deliverAutomated(ctx, h.terminal, sessionName, agentType, sessionID, "", board.OneLine(text), "board message")
+	return deliverAutomated(ctx, h.terminal, sessionName, agentType, sessionID, board.OneLine(text), "board message")
 }
 
 // errNoticeTarget is why a board notice was not typed into a session.
@@ -131,13 +131,12 @@ func (h *BoardHandler) noticeTarget(ctx context.Context, project, sessionName st
 // deliverAutomated is how every automated sender in this package types into an
 // agent (#3431): not into an exited agent's shell or a terminal agent
 // (automatedInputBlocked), and only when the agent isn't waiting on a prompt
-// (ptymanager.DeliverAutomated holds it until the prompt is gone). key groups
-// sends that supersede each other ("" for the text itself).
-func deliverAutomated(ctx context.Context, term ptymanager.SessionTerminal, name, agentType, sessionID, key, text, what string) error {
-	return deliverAutomatedWhile(ctx, term, name, agentType, sessionID, key, text, what, nil)
+// (ptymanager.DeliverAutomated holds it until the prompt is gone).
+func deliverAutomated(ctx context.Context, term ptymanager.SessionTerminal, name, agentType, sessionID, text, what string) error {
+	return deliverAutomatedWhile(ctx, term, name, agentType, sessionID, text, what, nil)
 }
 
-func deliverAutomatedWhile(ctx context.Context, term ptymanager.SessionTerminal, name, agentType, sessionID, key, text, what string, wanted func(context.Context) error) error {
+func deliverAutomatedWhile(ctx context.Context, term ptymanager.SessionTerminal, name, agentType, sessionID, text, what string, wanted func(context.Context) error) error {
 	check := func(ctx context.Context) error {
 		if wanted != nil {
 			if err := wanted(ctx); err != nil {
@@ -154,7 +153,7 @@ func deliverAutomatedWhile(ctx context.Context, term ptymanager.SessionTerminal,
 	}
 	_, err := ptymanager.DeliverAutomated(ctx, ptymanager.AutomatedInput{
 		Term: term, Name: name, AgentType: agentType, SessionID: sessionID,
-		Key: key, Text: text, What: what,
+		Text: text, What: what,
 		// As a bracketed paste where the agent takes one: a menu ignores it (#3457).
 		Paste: true,
 		Ready: check,

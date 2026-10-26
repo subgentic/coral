@@ -151,7 +151,7 @@ func TestABusyTeamSendIsSkippedThenTheNextIsTyped(t *testing.T) {
 	s.mu.Unlock()
 
 	a := &fakeAgent{screen: idleInputBox}
-	d, err := DeliverAutomated(context.Background(), a.input("claude-gate-busy", "", "hello", false))
+	d, err := DeliverAutomated(context.Background(), a.input("claude-gate-busy", "hello", false))
 	require.NoError(t, err)
 	assert.Equal(t, Skipped, d, "not now")
 	assert.Empty(t, a.sent(), "nothing typed while the team is busy")
@@ -161,7 +161,7 @@ func TestABusyTeamSendIsSkippedThenTheNextIsTyped(t *testing.T) {
 	s.mu.Lock()
 	delete(s.next, "busy-team")
 	s.mu.Unlock()
-	d, err = DeliverAutomated(context.Background(), a.input("claude-gate-busy", "", "hello again", false))
+	d, err = DeliverAutomated(context.Background(), a.input("claude-gate-busy", "hello again", false))
 	require.NoError(t, err)
 	assert.Equal(t, Sent, d)
 	assert.Equal(t, []string{"hello again"}, a.sent(), "typed once, when the slot came")

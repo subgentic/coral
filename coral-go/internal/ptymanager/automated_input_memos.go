@@ -1,4 +1,4 @@
-// What is remembered per session: ended sessions, delivered keys, and the last send skipped (#7727).
+// What is remembered per session: ended sessions and the last send skipped (#7727).
 
 package ptymanager
 
@@ -49,51 +49,17 @@ func forgetSessionMemos(name string) {
 }
 
 // ForgetSession is called when a session's agent is killed, restarted, resumed or launched again: what Coral remembers of the old process
-// (the text it typed last, the keys it delivered, the send it skipped) is not true of a new one.
+// (the text it typed last and the send it skipped) is not true of a new one.
 func ForgetSession(name string) {
 	name = sessionOfTarget(name)
 	forgotten.notify(name)
 	gate.mu.Lock()
-	delete(gate.delivered, name)
 	delete(gate.lastTyped, name)
 	gate.mu.Unlock()
 	skipped.Lock()
 	delete(skipped.m, name)
 	skipped.Unlock()
 	forgetSessionMemos(name)
-}
-
-// deliveredKeysPerSession bounds LastDelivered's record for one session.
-const deliveredKeysPerSession = 64
-
-// noteDelivered records that a send with key was just typed into name (LastDelivered).
-func (g *inputGate) noteDelivered(name, key string) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	m := g.delivered[name]
-	if m == nil {
-		m = map[string]time.Time{}
-		g.delivered[name] = m
-	}
-	if _, ok := m[key]; !ok && len(m) >= deliveredKeysPerSession {
-		oldest, at := "", time.Time{}
-		for k, t := range m {
-			if oldest == "" || t.Before(at) {
-				oldest, at = k, t
-			}
-		}
-		delete(m, oldest)
-	}
-	m[key] = g.now()
-}
-
-// LastDelivered returns when a send with key was last typed into the session name, or the zero time if never. The turn-end hand-off
-// uses it to stand down when a nudge was typed during the turn, so it is already queued in the agent's input (#3510).
-func LastDelivered(name, key string) time.Time {
-	name = sessionOfTarget(name)
-	gate.mu.Lock()
-	defer gate.mu.Unlock()
-	return gate.delivered[name][key]
 }
 
 // SkippedSend is the last automated send Coral did not type into a session, and why (SkipPrompt, SkipDraft, ...): what the person sees

@@ -85,7 +85,7 @@ func (h *BoardHandler) dispatchWaitTimeoutsWithClock(ctx context.Context, clock 
 		}
 		w.TargetID = clitext.CleanName(w.TargetID)
 		text := fmt.Sprintf("[Wait timed out] Registered wait #%d on '%s' for %s expired. Review your task and choose the next step.", w.ID, w.Project, w.TargetLabel())
-		err = deliverAutomatedWhile(passCtx, h.terminal, w.SessionName, agentType, sessionID, fmt.Sprintf("board-wait-timeout:%d", w.ID), board.OneLine(text), "board wait timeout", func(ctx context.Context) error {
+		err = deliverAutomatedWhile(passCtx, h.terminal, w.SessionName, agentType, sessionID, board.OneLine(text), "board wait timeout", func(ctx context.Context) error {
 			if stale() {
 				return ptymanager.ErrNotWanted
 			}

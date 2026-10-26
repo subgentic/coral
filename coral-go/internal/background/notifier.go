@@ -502,11 +502,13 @@ func (n *BoardNotifier) nudgeAgent(ctx context.Context, pass *notifyPass, a Agen
 	n.notifiedMu.Unlock()
 }
 
-// nudgeDeliverFn is the type of deliverAutomatedIfWanted, which delivers a nudge.
+// nudgeDeliverFn delivers a nudge; its key labels deliveries for notifier recording tests.
 type nudgeDeliverFn = func(ctx context.Context, rt AgentRuntime, logger *slog.Logger, name, agentType, sessionID, key, text, what string, requireInputBox, mention bool, wanted func(context.Context) bool) (skipped bool, err error)
 
 // deliverNudgeFn delivers a nudge (tests replace it, to see each nudge and to fail some).
-var deliverNudgeFn nudgeDeliverFn = deliverAutomatedIfWanted
+var deliverNudgeFn nudgeDeliverFn = func(ctx context.Context, rt AgentRuntime, logger *slog.Logger, name, agentType, sessionID string, _ string, text, what string, requireInputBox, mention bool, wanted func(context.Context) bool) (bool, error) {
+	return deliverAutomatedIfWanted(ctx, rt, logger, name, agentType, sessionID, text, what, requireInputBox, mention, wanted)
+}
 
 // nudgeDeliverer is how this notifier delivers a nudge: its own deliverNudge when set, else deliverNudgeFn.
 func (n *BoardNotifier) nudgeDeliverer() nudgeDeliverFn {

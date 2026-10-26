@@ -77,8 +77,8 @@ func NewHealthNudges(bs *board.Store, ts *store.TaskStore, rt AgentRuntime, disc
 		Interval: 5 * time.Minute, TeamBudget: 20, heldDialogs: ptymanager.SkippedAtPrompt, heldDrafts: ptymanager.SkippedAtDraft,
 	}
 	h.signal = hookSignal(ts)
-	h.deliver = func(ctx context.Context, a AgentInfo, key, text string) error {
-		_, err := deliverAutomated(ctx, h.runtime, h.logger, naming.SessionName(a.AgentType, a.SessionID), a.AgentType, a.SessionID, key, board.OneLine(text), "health nudge", false, false)
+	h.deliver = func(ctx context.Context, a AgentInfo, _ string, text string) error {
+		_, err := deliverAutomated(ctx, h.runtime, h.logger, naming.SessionName(a.AgentType, a.SessionID), a.AgentType, a.SessionID, board.OneLine(text), "health nudge", false, false)
 		return err
 	}
 	return h
