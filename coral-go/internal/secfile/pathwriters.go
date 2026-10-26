@@ -3,7 +3,6 @@
 package secfile
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"os/user"
@@ -218,8 +217,6 @@ func (w *walker) aclWriters(path string) error {
 	}
 	return nil
 }
-
-var errNoACL = errors.New("no access list")
 
 func (w *walker) add(text, path string, group bool) {
 	if prev, ok := w.who[text]; ok && !prev.Group {

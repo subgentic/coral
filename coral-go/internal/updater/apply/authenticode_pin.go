@@ -1,7 +1,6 @@
 package apply
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 )
@@ -29,9 +28,6 @@ var authenticodePinnedChain = []pinnedCert{
 const authenticodeSubject = "Subgentic LLC"
 
 type pinnedCert struct{ Name, SHA256 string }
-
-// errUnsigned is a package with no Authenticode signature: it goes by the sums and the bundle alone.
-var errUnsigned = errors.New("the package has no Authenticode signature")
 
 // checkSignerPin applies the pin to a signature WinVerifyTrust already accepted: the leaf's organization and common name, and the SHA-256 of
 // every certificate of its chain, leaf first.
