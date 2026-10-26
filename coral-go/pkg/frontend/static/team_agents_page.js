@@ -20,7 +20,7 @@ const WORD = { available: 'Free', busy: 'Busy', task_idle: 'Task assigned, idle'
 // The chips: the statuses people look for first; any other status that has agents gets its own chip after them.
 const FIRST = ['available', 'busy', 'queued', 'sleeping', 'offline'];
 const CHIP_WORD = { available: 'Free', unknown: 'Unknown' };
-const CLASS = { available: 'goal-state-done', busy: 'goal-state-active', queued: 'goal-state-blocked', needs_input: 'goal-state-blocked', unavailable: 'team-state-bad' }; // the colours of the goals' own states; Sleeping and the rest stay quiet
+const CLASS = { available: 'goal-state-done', busy: 'goal-state-active', needs_input: 'goal-state-blocked', unavailable: 'team-state-bad' }; // the colours of the goals' own states; Sleeping and the rest stay quiet
 const PROVIDER = { claude: 'Claude', codex: 'Codex', agy: 'Antigravity', antigravity: 'Antigravity', gemini: 'Antigravity', pi: 'Pi', terminal: 'Terminal' };
 
 const model = { team: '', data: null, filter: 'all', search: '', failed: '', loading: false };
@@ -98,7 +98,7 @@ function remindButton(agent) {
 }
 
 // The Orchestrator first, then the agents that need a person (the header's "N need attention" opens this tab): a waiting agent, then a queued one, then an offline one; the rest in the sidebar's order.
-const NEEDS = ['waiting', 'needs_input', 'queued']; // an ended agent needs no one: it sorts with the rest (#8271)
+const NEEDS = ['waiting', 'needs_input']; // an ended agent needs no one: it sorts with the rest (#8271)
 const rank = (a) => { const i = NEEDS.indexOf(a.availability); return i < 0 ? NEEDS.length : i; };
 const isOrchestrator = (a) => /orchestrator/i.test(`${a.role || ''} ${a.name || ''}`);
 function sidebarIndex(a) {

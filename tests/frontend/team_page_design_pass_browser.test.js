@@ -2,7 +2,7 @@
 // search row and a chip strip that never clips a word; Remind sits in its cell under its header, on the name's line; no tab has a badge at zero. By role and accessible name where there is one (helpers/team_page.js). Isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
-const { install: installTP, seed, openTeam, goTab, scenarios } = require('./helpers/team_page');
+const { install: installTP, seed, agentsUp, openTeam, goTab, scenarios } = require('./helpers/team_page');
 const BASE = require('./test_base').BASE;
 const { removeBoards } = require('./helpers/board_cleanup');
 
@@ -21,7 +21,7 @@ const TEAM = `qa-design-${Date.now() % 100000}`;
             console.log(label);
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installTP(ev);
-            await seed(ev, TEAM);
+            await seed(ev, TEAM); await agentsUp(ev);
             if (mobile) await ev(`window.syncMobileAgentList && window.syncMobileAgentList(); true`);
             await openTeam(ev, waitFor, TEAM).catch(() => {});
 

@@ -2,7 +2,7 @@
 // sideways; at 100% on the same phone the Status column is still there. Real isolated dev server (helpers/team_page.js).
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
-const { install: installTP, seed, openTeam, goTab, scenarios } = require('./helpers/team_page');
+const { install: installTP, seed, agentsUp, openTeam, goTab, scenarios } = require('./helpers/team_page');
 const BASE = require('./test_base').BASE;
 const { removeBoards } = require('./helpers/board_cleanup');
 
@@ -22,6 +22,7 @@ const TEAM = `qa-agents200-${Date.now() % 100000}`;
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installTP(ev);
         await seed(ev, TEAM); await ev(`window.syncMobileAgentList && window.syncMobileAgentList(); true`);
+        await agentsUp(ev); // the seeded members have no terminal, so they are Ended and have no Remind (#8271): this suite is about Remind's place on a folded row
         await openTeam(ev, waitFor, TEAM).catch(() => {});
         await goTab(ev, settle, 'Agents'); await waitFor(`document.querySelectorAll('[role=tabpanel]:not([hidden]) .dt-box tbody tr').length >= 2`, 'the agents', 10000);
         await S.run('390 px, 100% text: shared folded rows keep Status and Remind visible', async () => {
