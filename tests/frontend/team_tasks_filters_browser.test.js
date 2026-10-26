@@ -100,6 +100,19 @@ const G1 = 'Explore goals with two teams', G2 = 'Plan the release notes';
                 await ev(`[...document.querySelectorAll('#tk-menu .list-bar-clear-all')].forEach(b => b.click()); true`); await settle(500);
                 assert.deepEqual(await chips(), []);
             });
+            await S.run(`${label}: the goal page's "N tasks" opens the Tasks tab with that goal chosen (#7878)`, async () => {
+                await ev(`localStorage.removeItem('coral-task-filters:${TEAM}'); true`);
+                await goTab(ev, settle, 'Goals');
+                await waitFor(`!!document.querySelector('${panel} .dt-primary')`, 'the goals table', 10000);
+                await ev(`[...document.querySelectorAll('${panel} .dt-primary')].find(b => b.textContent.includes(${JSON.stringify(G1)})).click(); true`);
+                await waitFor(`!!document.querySelector('.goals-tasks-link')`, 'the goal page with its task count', 10000);
+                assert.equal(await ev(`document.querySelector('.goals-tasks-link').textContent`), '3 tasks');
+                assert.equal(await ev(`document.querySelector('.goals-progress').textContent`), '0 of 3 tasks done', 'the sentence reads as it did');
+                await ev(`document.querySelector('.goals-tasks-link').click(); true`);
+                await waitFor(`document.querySelectorAll('${panel} .dt-primary').length === 3 && !!document.querySelector('${panel} .team-tb-chip')`, 'the Tasks tab with the goal chosen', 10000);
+                assert.deepEqual(await chips(), [`Goal: ${G1} ×`]);
+                assert.match(await ev(`location.pathname + location.search`), new RegExp(`^/team/${TEAM}/tasks\\?goal=\\d+$`));
+            });
         }
         console.log('PASS team tasks filters');
     } finally { await removeBoards(ev, [TEAM]); await client.close(); }

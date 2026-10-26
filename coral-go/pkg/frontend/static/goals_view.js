@@ -246,7 +246,14 @@ function drawDetailRaw() {
         if (g.doneWhen) { const d = el('div'); d.append(el('h4', 'goals-sub', 'Done when'), el('p', 'goals-text', g.doneWhen)); two.append(d); }
         col.append(two);
     }
-    col.append(rollupBar(g.rollup), el('p', 'goal-card-sentence', W.rollupSentence(g.rollup)));
+    // "9 tasks: 5 done, ..." (#7878): the count is a link to the team Tasks tab with this goal chosen (its address /team/<name>/tasks?goal=<id>, #7782)
+    const sentence = el('p', 'goal-card-sentence'), said = /^(\d+ tasks?)(: .*)$/.exec(W.rollupSentence(g.rollup));
+    if (said) {
+        const link = btn('goals-tasks-link', said[1], () => window.openTeamPage?.(model.project, { tab: 'tasks', query: `goal=${g.id}` }));
+        link.setAttribute('aria-label', `${said[1]}: show them in the Tasks tab`);
+        sentence.append(link, document.createTextNode(said[2]));
+    } else sentence.textContent = W.rollupSentence(g.rollup);
+    col.append(rollupBar(g.rollup), sentence);
     const openLeft = g.rollup.active + g.rollup.blocked + g.rollup.queued;
     if ((g.state === 'done' || g.state === 'dropped') && openLeft) col.append(el('p', 'goals-note goals-closed-open', W.closedWithOpenText(openLeft)));
     if (W.readyToClose(g) && !isNotYet(g)) { col.append(allDoneStrip(g)); announceAllDone(g); }
@@ -398,7 +405,14 @@ function drawGoalMain(main, g) {
     if ((g.state === 'done' || g.state === 'dropped') && openLeft) main.append(el('p', 'goals-note goals-closed-open', W.closedWithOpenText(openLeft)));
     if (W.readyToClose(g) && !isNotYet(g)) { main.append(allDoneStrip(g)); announceAllDone(g); }
     const total = totalOf(g.rollup);
-    main.append(el('p', 'goals-tasks-head goals-progress', total ? `${doneOf(g.rollup)} of ${total} tasks done` : 'No tasks yet'));
+    // "2 of 3 tasks done" (#7878): "3 tasks" is a link to the team Tasks tab with this goal chosen
+    const progress = el('p', 'goals-tasks-head goals-progress');
+    if (total) {
+        const noun = `${total} ${total === 1 ? 'task' : 'tasks'}`, link = btn('goals-tasks-link', noun, () => window.openTeamPage?.(model.project, { tab: 'tasks', query: `goal=${g.id}` }));
+        link.setAttribute('aria-label', `${noun}: show them in the Tasks tab`);
+        progress.append(document.createTextNode(`${doneOf(g.rollup)} of `), link, document.createTextNode(' done'));
+    } else progress.textContent = 'No tasks yet';
+    main.append(progress);
     if (total) main.append(rollupBar(g.rollup));
     main.append(el('p', 'goals-note goals-updating', rowsAgree(g) ? '' : 'Updating…')); // the column says it too, and is aria-busy
     const tasks = model.tasks.get(g.id);
