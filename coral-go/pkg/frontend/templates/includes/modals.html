@@ -598,38 +598,9 @@
                 </dd>
                 </div>
                         </dl>
-                        <dl class="info-grid settings-grid" id="settings-cli-paths-dl">
-                <div class="settings-row settings-row-wide">
-                <dt>CLI paths</dt>
-                <dd class="settings-cli-paths">
-                    <details class="settings-cli-details"><summary>Set paths (empty uses PATH)</summary>
-                    <label class="settings-cli-row">
-                        <span class="settings-cli-label">Claude</span>
-                        <input type="text" id="settings-cli-path-claude" aria-label="Claude CLI path" class="settings-input settings-mono-input" placeholder="claude">
-                        <span id="cli-result-claude" class="cli-verify-result"></span>
-                    </label>
-                    <label class="settings-cli-row">
-                        <span class="settings-cli-label">Codex</span>
-                        <input type="text" id="settings-cli-path-codex" aria-label="Codex CLI path" class="settings-input settings-mono-input" placeholder="codex">
-                        <span id="cli-result-codex" class="cli-verify-result"></span>
-                    </label>
-                    <label class="settings-cli-row">
-                        <span class="settings-cli-label">Antigravity</span>
-                        <input type="text" id="settings-cli-path-agy" aria-label="Antigravity CLI path" class="settings-input settings-mono-input" placeholder="agy">
-                        <span id="cli-result-agy" class="cli-verify-result"></span>
-                    </label>
-                    <label class="settings-cli-row">
-                        <span class="settings-cli-label">Pi</span>
-                        <input type="text" id="settings-cli-path-pi" aria-label="Pi CLI path" class="settings-input settings-mono-input" placeholder="pi">
-                        <span id="cli-result-pi" class="cli-verify-result"></span>
-                    </label>
-                    <div class="settings-cli-actions">
+                        <!-- the CLI paths' live parts (#8460): each field's verify result and the Verify All button, filled by cli_dialogs.js; settings_fields.js moves them under their fields -->
+                        <span id="cli-result-claude" class="cli-verify-result"></span><span id="cli-result-codex" class="cli-verify-result"></span><span id="cli-result-agy" class="cli-verify-result"></span><span id="cli-result-pi" class="cli-verify-result"></span>
                         <button class="btn btn-small" data-on-click="m-verify-all-c-l-is" id="verify-all-btn">Verify All</button>
-                    </div>
-                    </details>
-                </dd>
-                </div>
-                        </dl>
                         <div id="settings-prompts-live">
                         <button class="btn settings-prompts-btn" data-on-click="m-hide-settings-modal-then-show-default-prompts-modal">
                             <span class="material-icons icon-inline" aria-hidden="true">edit</span>

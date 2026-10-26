@@ -209,7 +209,7 @@ export function _fillApiKey() {
 
 /** The CLI paths are the way out of "command not found": when Coral cannot find the default agent's CLI the disclosure is already open, with the fields on screen (#7041). Silent on any failure. */
 function openCliPathsWhenMissing(type) {
-    const details = document.querySelector('#settings-modal .settings-cli-details');
+    const details = document.querySelector('#settings-modal #settings-cli-paths');
     if (!details || details.open) return;
     fetch(`/api/system/cli-check?type=${encodeURIComponent(type)}`).then(r => r.ok ? r.json() : null).then(d => { if (d && d.found === false) details.open = true; }).catch(() => {});
 }

@@ -17,12 +17,12 @@ const BASE = require('./test_base').BASE;
                 await ev(`window.__coralReady.then(() => true)`);
                 await ev(`(() => { const real = window.fetch; window.fetch = (u, o) => /\\/api\\/system\\/cli-check/.test(String(u)) ? Promise.resolve(new Response(JSON.stringify({ found: ${found}, status: ${found ? "'available'" : "'missing'"}, agent_type: new URL(String(u), location.href).searchParams.get('type') }), { status: 200, headers: { 'Content-Type': 'application/json' } })) : real(u, o); return true; })()`);
                 await ev(`window.showSettingsModal('agents'); true`);
-                await waitFor(`!!document.querySelector('#settings-pane-agents .settings-cli-details > summary') && document.querySelector('#settings-pane-agents .settings-cli-details > summary').getClientRects().length > 0`, 'the CLI paths line', 8000);
+                await waitFor(`!!document.querySelector('#settings-pane-agents #settings-cli-paths > summary') && document.querySelector('#settings-pane-agents #settings-cli-paths > summary').getClientRects().length > 0`, 'the CLI paths line', 8000);
                 await sleep(500); // sleep-ok: the check answers and the disclosure opens after the dialog fills
                 const tag = `${w} px, CLI ${found ? 'found' : 'missing'}`;
-                const marker = await ev(`(() => { const s = document.querySelector('#settings-pane-agents .settings-cli-details > summary'); const c = getComputedStyle(s, '::before').content; return { content: c, display: getComputedStyle(s).display, listItem: getComputedStyle(s).display === 'list-item' }; })()`);
+                const marker = await ev(`(() => { const s = document.querySelector('#settings-pane-agents #settings-cli-paths > summary'); const c = getComputedStyle(s, '::before').content; return { content: c, display: getComputedStyle(s).display, listItem: getComputedStyle(s).display === 'list-item' }; })()`);
                 assert.ok(marker.content && marker.content !== 'none' && marker.content !== 'normal' || marker.listItem, `${tag}: the CLI paths line draws a disclosure marker: ` + JSON.stringify(marker));
-                const open = await ev(`document.querySelector('#settings-pane-agents .settings-cli-details').open`);
+                const open = await ev(`document.querySelector('#settings-pane-agents #settings-cli-paths').open`);
                 assert.equal(open, !found, `${tag}: the disclosure is ${found ? 'closed' : 'open'} (open=${open})`);
                 if (!found) assert.ok(await ev(`document.getElementById('settings-cli-path-claude').getClientRects().length > 0`), `${tag}: the Claude path field is on screen`);
             }
