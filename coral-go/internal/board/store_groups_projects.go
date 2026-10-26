@@ -76,6 +76,7 @@ func (s *Store) DeleteMessage(ctx context.Context, project string, messageID int
 		return false, err
 	}
 	s.unreadCounts.invalidate()
+	s.readSets.invalidate() // a deleted message would stay in a member's cached read set
 	n, _ := result.RowsAffected()
 	return n > 0, nil
 }

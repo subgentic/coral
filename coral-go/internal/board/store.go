@@ -31,6 +31,7 @@ type Store struct {
 	completionChecksEnabled bool
 	unreadCounts            unreadCountCache
 	numbered                numberedCache // each board's numbered agent names (#4598)
+	readSets                readSetCache  // each member's read set between the dock's polls (#8525)
 	noMentionIndex          bool          // tests: read as before the mention index (#4465)
 	mentionMu               sync.Mutex
 	mentionIndexAnswers     atomic.Int64 // queries the mention index answered (tests check it is used)

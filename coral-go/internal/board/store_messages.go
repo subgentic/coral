@@ -272,31 +272,61 @@ func (s *Store) ReadSetIDs(ctx context.Context, project, subscriberID string) ([
 	if rule == nil {
 		return nil, nil
 	}
-	var read []int64
+	// What an earlier call found is kept (readSetCache): the generations are read before the scan, so a change that lands meanwhile makes the entry stale at once, and the board's newest
+	// message id is read before it, so a message that lands meanwhile is picked up by the next call.
+	numberedGen, deleteGen := s.numbered.gen.Load(), s.readSets.gen.Load()
+	boardMax, err := s.boardMaxMessageID(ctx, project)
+	if err != nil {
+		return nil, err
+	}
+	entry, cached := s.readSets.get(project, subscriberID, rule, numberedGen)
+	if cached && entry.boardMax == boardMax {
+		return mergeReadSet(entry.read, entry.own), nil // nothing new on the board
+	}
+	if !cached {
+		entry = readSetEntry{project: project, subscriberID: subscriberID, jobTitle: rule.jobTitle, tagged: rule.tagged, none: rule.none, numberedGen: numberedGen, gen: deleteGen}
+	}
+	read := entry.read
 	if !rule.none {
 		// The tagged rule reads each batch's candidates in full to apply the rule, so the batch is small (its text is what is held at once); the others' are ids.
 		batch := 100
 		if !rule.tagged {
 			batch = 5000
 		}
-		from := int64(0)
+		from := entry.upTo
 		for i := 0; i < 2000; i++ { // a bound on a board of many thousands of selected messages (200,000 tagged ones)
+			s.readSets.scans.Add(1)
 			got, scanned, more, err := s.selectReadIDs(ctx, project, rule, from, batch)
 			if err != nil {
 				return nil, err
 			}
-			read = append(read, got...)
+			if len(got) > 0 {
+				read = append(read[:len(read):len(read)], got...) // a copy: the entry's slice is shared with the calls that read it
+			}
+			if scanned > entry.upTo {
+				entry.upTo = scanned
+			}
 			if !more || scanned <= from {
 				break
 			}
 			from = scanned
 		}
 	}
-	var own []int64
-	if err := s.reader().SelectContext(ctx, &own, "SELECT id FROM board_messages WHERE project = ? AND subscriber_id = ? ORDER BY id ASC", project, subscriberID); err != nil {
+	var newOwn []int64
+	if err := s.reader().SelectContext(ctx, &newOwn, "SELECT id FROM board_messages WHERE project = ? AND subscriber_id = ? AND id > ? AND id <= ? ORDER BY id ASC", project, subscriberID, entry.boardMax, boardMax); err != nil {
 		return nil, err
 	}
-	// both lists are in id order: merge them, a message in both once
+	own := entry.own
+	if len(newOwn) > 0 {
+		own = append(own[:len(own):len(own)], newOwn...)
+	}
+	entry.read, entry.own, entry.boardMax = read, own, boardMax
+	s.readSets.put(entry)
+	return mergeReadSet(read, own), nil
+}
+
+// mergeReadSet merges the two lists, both in id order: a message in both once.
+func mergeReadSet(read, own []int64) []int64 {
 	out := make([]int64, 0, len(read)+len(own))
 	i, j := 0, 0
 	for i < len(read) || j < len(own) {
@@ -313,7 +343,7 @@ func (s *Store) ReadSetIDs(ctx context.Context, project, subscriberID string) ([
 			j++
 		}
 	}
-	return out, nil
+	return out
 }
 
 // ListMessagesFor lists the dock's view of a board for subscriberID (ReadSetIDs), no cursor and no side effects, paged like the dashboard's list; only the page's messages are read in full.
