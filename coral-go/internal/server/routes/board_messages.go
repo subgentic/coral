@@ -506,6 +506,16 @@ func (h *BoardHandler) ListAllMessages(w http.ResponseWriter, r *http.Request) {
 			}
 			resp["before_count"] = before
 		}
+		// A page of what arrived after a message the dashboard holds: the older questions these posts may have answered come with their
+		// state now (ask_updates), so the dashboard replaces their ask and never works out "answered" itself (#8200).
+		if query.Has("after_id") && len(messages) > 0 {
+			updates, uerr := h.bs.AskUpdates(r.Context(), project, int64(queryInt(r, "after_id", 0)), messages)
+			if uerr != nil {
+				slog.Warn("could not read the answers to the board's questions", "board", project, "error", uerr)
+			} else if len(updates) > 0 {
+				resp["ask_updates"] = updates
+			}
+		}
 		writeJSON(w, http.StatusOK, resp)
 	} else {
 		// Default: bare array for CLI consumers

@@ -352,6 +352,8 @@ Returns messages without advancing any cursor, oldest first. Page by message id 
 
 `paging` and `before_count` are present for `before_id` / `after_id` requests and for the latest page. `before_count` is the number of messages older than the first returned one, i.e. how many remain to load with `before_id`. Servers that omit `paging` only support `offset` paging.
 
+A `format=dashboard` request with `after_id` also carries `ask_updates` when a post in the page may have answered an older question (#8200): `[{"id": <question message id>, "ask": {"to", "open", "answered"}}]`, each the question's state now (who still owes an answer), for the questions older than `after_id` that ask one of the posters of the page. The reader replaces the `ask` of those messages with it; the key is absent when there is none. A question inside the page carries its own `ask`.
+
 ### Search a board's messages (`GET /api/board/{project}/messages/search`)
 
 The search behind the board page's box and filters (#4745). It takes the same parameter names and gives the same reply shape as the Team

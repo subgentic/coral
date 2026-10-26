@@ -236,6 +236,62 @@ func (s *Store) askInfo(ctx context.Context, project string, a askRow, subs map[
 	return info, nil
 }
 
+// AskUpdate is a question the reader already holds, with its state now: a new post may have answered it (#8200).
+type AskUpdate struct {
+	ID  int64    `json:"id"`
+	Ask *AskInfo `json:"ask"`
+}
+
+// askUpdateScan is how many of the board's newest questions older than the page are checked for an answer in it.
+const askUpdateScan = 200
+
+// AskUpdates are the questions older than afterID (the newest message the reader already holds) that a post in msgs could have answered: those
+// that ask one of the posters of msgs, with their state as of now (the same rule as a question's own ask field: who still owes an answer). The
+// reader replaces the ask of those messages with it, so it never works out "answered" itself. A question that asks none of the posters is not
+// listed; one listed may be unchanged. Questions that are in msgs carry their state already.
+func (s *Store) AskUpdates(ctx context.Context, project string, afterID int64, msgs []Message) ([]AskUpdate, error) {
+	if len(msgs) == 0 || afterID <= 0 {
+		return nil, nil
+	}
+	posters := map[string]bool{}
+	for _, m := range msgs {
+		posters[strings.ToLower(m.SubscriberID)] = true
+	}
+	var asks []askRow
+	if err := s.reader().SelectContext(ctx, &asks, `SELECT message_id, asker, asked, created_at FROM board_asks WHERE project = ? AND message_id <= ? ORDER BY message_id DESC LIMIT ?`, project, afterID, askUpdateScan); err != nil {
+		return nil, err
+	}
+	var subs map[string]Subscriber
+	var out []AskUpdate
+	for i := len(asks) - 1; i >= 0; i-- { // oldest first
+		a := asks[i]
+		var to []string
+		_ = json.Unmarshal([]byte(a.Asked), &to)
+		hit := false
+		for _, m := range to {
+			if posters[strings.ToLower(m)] {
+				hit = true
+				break
+			}
+		}
+		if !hit {
+			continue
+		}
+		if subs == nil {
+			var err error
+			if subs, err = s.subscriberIndex(ctx, project); err != nil {
+				return nil, err
+			}
+		}
+		info, err := s.askInfo(ctx, project, a, subs)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, AskUpdate{ID: a.MessageID, Ask: info})
+	}
+	return out, nil
+}
+
 // OpenAsk is one member who has not answered a question.
 type OpenAsk struct {
 	MessageID int64
