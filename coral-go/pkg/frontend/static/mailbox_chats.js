@@ -39,7 +39,7 @@ export function folderCount(key, c = counts) {
     const f = FOLDERS.find(x => x.key === key);
     if (f) return f.minus && n(f.count) !== undefined && n(f.minus) !== undefined ? Math.max(0, n(f.count) - n(f.minus)) : n(f.count);
     const cli = /^chats-cli-(.+)$/.exec(key), tag = /^chats-tag-(\d+)$/.exec(key);
-    if (cli) { const t = cli[1], by = c && c.by_agent_type; return by ? (t === 'agy' ? (by.agy || 0) + (by.antigravity || 0) + (by.gemini || 0) : by[t]) : undefined; }
+    if (cli) { const t = cli[1], by = c && c.by_agent_type; return by ? by[t] : undefined; } // the server already gives agy, antigravity and gemini the one count of their shared history: shown as it is, not added three times (#8011)
     if (tag) { const t = ((c && c.tags) || []).find(x => String(x.id) === tag[1]); return t ? t.count : undefined; }
     return undefined;
 }
