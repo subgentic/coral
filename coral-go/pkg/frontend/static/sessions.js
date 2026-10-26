@@ -104,6 +104,8 @@ function _enterAgent(name, agentType, sessionId, srv) {
         capabilities: agentData?.capabilities || null,
         board_project: agentData?.board_project || null,
         board_job_title: agentData?.board_job_title || null,
+        board_subscriber_id: agentData?.board_subscriber_id || null,
+        board_is_orchestrator: agentData?.board_is_orchestrator ?? null,
         // The terminal socket's target: the tmux session, which is not the agent's list name for
         // every agent (a terminal agent is listed under its folder's name). Reconnects use it (#3469).
         tmux_session: agentData?.tmux_session || null,

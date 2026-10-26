@@ -3,7 +3,7 @@ import { state } from './state.js';
 import { pollEvery, afterPause, isBusyStatus, busyRetryingText, machineOf } from './overload.js';
 import { platform } from './platform/detect.js';
 import { loadSubagents, _claimedFor, _subagentTooltip, subagentToTaskRow } from './subagents.js';
-import { _currentBoardKey } from './task_board_context.js';
+import { _currentBoardKey, agentTaskScope } from './task_board_context.js';
 import { pathId, boardFetch, serverFetch, serverForSession, fetchValidated, dropBody, isCloud, serverUrl, splitKey } from './server_base.js';
 import { EMPTY as TASK_EMPTY, isQuery, loadFilters as loadTaskFilters, phases as taskPhases, toParams as taskParams, saveFilters as saveTaskFilters } from './task_filters.js';
 import { browserLocal } from './safe_storage.js';
@@ -85,7 +85,7 @@ async function _pollBoardTasksOnce() {
 }
 
 async function _fetchLiveCosts(boardProject) {
-    const tasks = state.currentBoardTasks || [];
+    const tasks = agentTaskScope() ? _filteredList.rows : state.currentBoardTasks || [];
     const inProgress = tasks.filter(t => t.status === 'in_progress' && t.session_id);
     if (inProgress.length === 0) {
         _liveCosts = {};
@@ -188,12 +188,21 @@ async function _loadBoardTasksDefault(boardName) {
     }
     let data = null, refused = null;
     try {
-        data = await _boardTasksFetch(boardName, `/tasks?limit=${BOARD_TASK_PAGE}`);
+        const scope = agentTaskScope();
+        if (scope) {
+            if (!scope.assignee) data = { tasks: [], total_open: 0, total_completed: 0 };
+            else {
+                const f = { ...TASK_EMPTY, assignee: scope.assignee };
+                const phases = taskPhases(f);
+                const [open, done] = await Promise.all(phases.map(statuses => _taskQueryFetch(boardName, taskParams(f, boardName, { statuses, limit: 1 }))));
+                data = { tasks: [], total_open: open.total ?? 0, total_completed: done.total ?? 0 };
+            }
+        } else data = await _boardTasksFetch(boardName, `/tasks?limit=${BOARD_TASK_PAGE}`);
     } catch (e) {
         data = null;
         if (e && e.resp && isBusyStatus(e.resp.status)) refused = e.resp;
     }
-    if (seq !== _boardTasksLoadSeq) return;
+    if (seq !== _boardTasksLoadSeq || _taskScopeKey !== (agentTaskScope()?.key || '')) return;
     const sameBoard = _boardList.board === boardName;
     if (!data) {
         // A failed refresh keeps the board's last good list; another board's is dropped.
@@ -227,6 +236,7 @@ async function _loadBoardTasksDefault(boardName) {
         // Once older pages are loaded, "Load more" continues after the last of them.
         nextCursor: older.length ? _boardList.nextCursor : (data.next_cursor || ''),
         // A server from before pagination sends every task and no totals.
+        scopeKey: agentTaskScope()?.key || '',
         totalOpen: data.total_open ?? null,
         totalCompleted: data.total_completed ?? null,
     };
@@ -249,13 +259,19 @@ let _taskBar = null;
 
 let _filteredSeq = 0;
 
-const _queryActive = () => isQuery(_taskFilters) && !!_boardList.board;
+const _queryActive = () => (isQuery(_taskFilters) || !!agentTaskScope()) && !!_boardList.board;
+const viewFilters = () => { const scope = agentTaskScope(); return scope ? { ..._taskFilters, assignee: scope.assignee } : _taskFilters; };
+let _taskScopeKey = '';
 
 /** A board change: its own saved filters, a fresh bar (the old one lets go of the page's click listener). */
 function _syncTaskFiltersBoard(boardName) {
-    if (boardName === _taskFiltersBoard) return;
+    const scopeKey = agentTaskScope()?.key || '';
+    if (boardName === _taskFiltersBoard && scopeKey === _taskScopeKey) return;
+    if (scopeKey !== _taskScopeKey) { _boardList = _emptyBoardList(boardName); state.currentBoardTasks = []; }
+    _taskScopeKey = scopeKey;
     _taskFiltersBoard = boardName;
-    _taskFilters = loadTaskFilters(boardName, browserLocal);
+    _taskFilters = loadTaskFilters(scopeKey ? `${boardName}:${scopeKey}` : boardName, browserLocal);
+    if (scopeKey) _taskFilters.assignee = '';
     _filteredList = _emptyFiltered(boardName);
     _filteredSeq++;
     if (_taskBar) { _taskBar.dispose(); _taskBar = null; }
@@ -275,7 +291,10 @@ async function _taskQueryFetch(boardKey, pairs) {
 
 /** Fetch the filtered list's first page (or the next one: `append`), from the phase and cursor it is at. A poll (`refresh`) keeps a list the person paged further. */
 async function _loadFilteredTasks(boardName, { append = false, refresh = false } = {}) {
-    const f = _taskFilters;
+    const savedFilters = _taskFilters;
+    const scopeKey = agentTaskScope()?.key || '';
+    const f = viewFilters();
+    if (scopeKey && !f.assignee) { _filteredList = { ..._emptyFiltered(boardName), total: 0 }; renderBoardTaskList(); return; }
     const ph = taskPhases(f);
     const L = _filteredList.board === boardName ? _filteredList : (_filteredList = _emptyFiltered(boardName));
     if (refresh && L.rows.length > BOARD_TASK_PAGE) return; // paged further than the first page: a poll leaves it
@@ -290,26 +309,27 @@ async function _loadFilteredTasks(boardName, { append = false, refresh = false }
             const pairs = taskParams(f, boardName, { statuses: ph ? ph[phase] : null });
             if (phase === L.phase && L.cursor) pairs.push(['cursor', L.cursor]);
             const data = await _taskQueryFetch(boardName, pairs);
-            if (seq !== _filteredSeq || _taskFilters !== f) return;
+            if (seq !== _filteredSeq || _taskFilters !== savedFilters || scopeKey !== (agentTaskScope()?.key || '')) return;
             const seen = new Set(L.rows.map(t => t.id));
             rows = [...L.rows, ...(data.tasks || []).filter(t => !seen.has(t.id))];
             cursor = data.next_cursor || ''; total = L.total; truncated = L.truncated || !!data.truncated; void statuses;
         } else if (ph) {
             const [open, done] = await Promise.all([
                 _taskQueryFetch(boardName, taskParams(f, boardName, { statuses: ph[0] })),
-                _taskQueryFetch(boardName, taskParams(f, boardName, { statuses: ph[1], limit: 1 })),
+                _taskQueryFetch(boardName, taskParams(f, boardName, { statuses: ph[1], limit: agentTaskScope() && !isQuery(savedFilters) ? BOARD_TASK_PAGE : 1 })),
             ]);
-            if (seq !== _filteredSeq || _taskFilters !== f) return;
+            if (seq !== _filteredSeq || _taskFilters !== savedFilters || scopeKey !== (agentTaskScope()?.key || '')) return;
             rows = open.tasks || []; cursor = open.next_cursor || ''; phase = 0;
+            if (scopeKey && !isQuery(savedFilters) && !cursor) { rows = [...rows, ...(done.tasks || [])]; cursor = done.next_cursor || ''; phase = 1; }
             doneTotal = done.total ?? 0; total = (open.total ?? rows.length) + doneTotal; truncated = !!(open.truncated || done.truncated);
         } else {
             const data = await _taskQueryFetch(boardName, taskParams(f, boardName));
-            if (seq !== _filteredSeq || _taskFilters !== f) return;
+            if (seq !== _filteredSeq || _taskFilters !== savedFilters || scopeKey !== (agentTaskScope()?.key || '')) return;
             rows = data.tasks || []; cursor = data.next_cursor || ''; total = data.total ?? rows.length; truncated = !!data.truncated; phase = 0;
         }
         Object.assign(L, { rows, cursor, total, doneTotal, truncated, phase });
     } catch (e) {
-        if (seq !== _filteredSeq || _taskFilters !== f) return;
+        if (seq !== _filteredSeq || _taskFilters !== savedFilters || scopeKey !== (agentTaskScope()?.key || '')) return;
         L.error = e && e.resp && e.resp.status === 400 ? 'This search can not be run. Change it and try again.' : 'Could not search the tasks. Try again.';
         if (append) showToast(L.error, true);
     } finally {
@@ -321,13 +341,14 @@ async function _loadFilteredTasks(boardName, { append = false, refresh = false }
 function _filteredHasMore() {
     const L = _filteredList;
     if (L.cursor) return true;
-    return !!taskPhases(_taskFilters) && L.phase === 0 && L.doneTotal > 0;
+    return !!taskPhases(viewFilters()) && L.phase === 0 && L.doneTotal > 0;
 }
 
 /** The bar's choice: kept for the board, and the list is asked again (or the default list is back). */
 function _setTaskFilters(next) {
+    if (agentTaskScope()) next = { ...next, assignee: '' };
     _taskFilters = next;
-    saveTaskFilters(_taskFiltersBoard, next, browserLocal);
+    saveTaskFilters(_taskScopeKey ? `${_taskFiltersBoard}:${_taskScopeKey}` : _taskFiltersBoard, next, browserLocal);
     _filteredList = _emptyFiltered(_taskFiltersBoard);
     _filteredSeq++;
     if (_queryActive()) _loadFilteredTasks(_taskFiltersBoard); else renderBoardTaskList();
@@ -346,6 +367,9 @@ function _syncTaskBar(show, counts) {
     if (_taskBar.node.parentElement !== host) host.append(_taskBar.node);
     _taskBar.names([...new Set((state.currentBoardTasks || []).map(t => t.assigned_to).filter(n => typeof n === 'string' && n))].sort().slice(0, 50));
     _taskBar.set(_taskFilters, counts);
+    // The worker scope is fixed: a board-wide assignee control would promise a view this dock never shows.
+    const assignee = host.querySelector('#tk-assignee');
+    if (assignee) assignee.closest('label').hidden = !!agentTaskScope();
 }
 
 /** "Load more": the next page of done tasks (or of the filtered list). */
@@ -633,13 +657,16 @@ function _taskLoadMoreHtml(boardDoneTotal, boardDoneLoaded) {
 function _updateTaskCount(boardTasks, otherTasks, completedCount) {
     const countEl = document.getElementById('task-bar-count');
     if (countEl) {
-        const boardTotal = _boardList.totalOpen !== null && _boardList.totalCompleted !== null
+        const scope = agentTaskScope();
+        const boardTotal = scope && _boardList.scopeKey !== scope.key ? 0 : _boardList.totalOpen !== null && _boardList.totalCompleted !== null
             ? _boardList.totalOpen + _boardList.totalCompleted : boardTasks.length;
         const total = boardTotal + otherTasks.length;
-        const countText = total > 0 ? `${completedCount}/${total}` : '';
+        const count = scope ? Math.max(0, total - completedCount) : completedCount;
+        const word = scope ? 'open' : 'done';
+        const countText = total > 0 ? `${count}/${total}` : '';
         if (countEl.textContent !== countText) countEl.textContent = countText; // same text: no new text node, no layout
         const tab = document.getElementById('agentic-tab-tasks'); // the badge in words (#7182): "1/4" says nothing to a screen reader or a first look
-        if (tab) { const name = total > 0 ? `Tasks, ${completedCount} of ${total} done` : 'Tasks'; if (tab.getAttribute('aria-label') !== name) tab.setAttribute('aria-label', name); const tip = total > 0 ? `${completedCount} of ${total} done` : ''; if (countEl.title !== tip) countEl.title = tip; }
+        if (tab) { const name = total > 0 ? `Tasks, ${count} of ${total} ${word}` : 'Tasks'; if (tab.getAttribute('aria-label') !== name) tab.setAttribute('aria-label', name); const tip = total > 0 ? `${count} of ${total} ${word}` : ''; if (countEl.title !== tip) countEl.title = tip; }
     }
 }
 
@@ -649,7 +676,9 @@ export function renderBoardTaskList() {
 
     // Merge board tasks and agent tasks into a unified list
     const querying = _queryActive();
-    const boardTasks = (querying ? _filteredList.rows : state.currentBoardTasks || []).map(t => ({ ...t, _source: 'board' }));
+    const scope = agentTaskScope();
+    const scopedBaseReady = !scope || _boardList.scopeKey === scope.key;
+    const boardTasks = (querying ? _filteredList.rows : state.currentBoardTasks || []).filter(t => !scope || (scope.assignee && t.assigned_to === scope.assignee)).map(t => ({ ...t, _source: 'board' }));
     const agentDisplayName = state.currentSession ? (state.currentSession.display_name || state.currentSession.name) : '';
     const agentTasks = (state.currentAgentTasks || []).map(t => ({
         ...t,
@@ -663,26 +692,30 @@ export function renderBoardTaskList() {
 
     const subagentTasks = (state.currentSubagents || []).map(sa => subagentToTaskRow(sa, agentDisplayName));
 
-    const allTasks = querying ? boardTasks : [...boardTasks, ...agentTasks, ...subagentTasks]; // a search is about the board's tasks
+    const includeAgentTasks = !querying || (scope && !isQuery(_taskFilters));
+    const allTasks = includeAgentTasks ? [...boardTasks, ...agentTasks, ...(scope ? [] : subagentTasks)] : boardTasks; // a search is about the board's tasks
     const isDone = t => t.status === 'completed' || t.status === 'skipped';
-    const otherTasks = querying ? [] : [...agentTasks, ...subagentTasks];
+    const otherTasks = includeAgentTasks ? [...agentTasks, ...(scope ? [] : subagentTasks)] : [];
     // The board's done tasks are counted by the server: only a page of them is loaded (#3269).
     const boardDoneLoaded = boardTasks.filter(isDone).length;
-    const boardDoneTotal = _boardList.totalCompleted ?? boardDoneLoaded;
+    const boardDoneTotal = scopedBaseReady ? (_boardList.totalCompleted ?? boardDoneLoaded) : 0;
     const completedCount = boardDoneTotal + otherTasks.filter(isDone).length;
-    const tasks = _filterAndSortTasks(allTasks, querying);
+    const tasks = _filterAndSortTasks(allTasks, querying && (!scope || isQuery(_taskFilters)));
     const section = document.getElementById('board-tasks-section');
     const hasBoard = !!_boardList.board; // the bar belongs to the board whose tasks are listed
     // The bar's counts: what matches of what the board has (the server's totals); with nothing narrowing it, the board's own total.
-    const boardAll = _boardList.totalOpen !== null && _boardList.totalCompleted !== null ? _boardList.totalOpen + _boardList.totalCompleted : boardTasks.length;
+    const boardAll = !scopedBaseReady ? 0 : _boardList.totalOpen !== null && _boardList.totalCompleted !== null ? _boardList.totalOpen + _boardList.totalCompleted : boardTasks.length;
     const barCounts = querying ? { matched: _filteredList.total ?? boardTasks.length, all: Math.max(boardAll, _filteredList.total ?? 0), truncated: _filteredList.truncated } : { matched: boardAll, all: boardAll };
+
+    _updateTaskCount(boardTasks, otherTasks, completedCount);
 
     if (querying && allTasks.length === 0 && section) {
         // Nothing matches (or the search is still on its way): the bar stays, so the search can be changed.
         section.style.display = '';
         _renderTaskListChrome(section, 0, true);
         _syncTaskBar(true, barCounts);
-        morphHtml(container, `<div class="board-task-empty" role="status">${escapeHtml(_filteredList.error || (_filteredList.busy ? 'Searching tasks…' : 'No tasks match this search.'))}</div>`);
+        const ownDefault = scope && !isQuery(_taskFilters);
+        morphHtml(container, `<div class="board-task-empty" role="status">${escapeHtml(_filteredList.error || (_filteredList.busy ? (ownDefault ? 'Loading tasks…' : 'Searching tasks…') : (ownDefault ? 'No tasks assigned to this agent.' : 'No tasks match this search.')))}</div>`);
         return;
     }
     if (allTasks.length === 0) {
@@ -693,7 +726,7 @@ export function renderBoardTaskList() {
     if (section) section.style.display = '';
 
     // Render hide-done toggle in the section header
-    _renderTaskListChrome(section, completedCount, querying);
+    _renderTaskListChrome(section, completedCount, querying && (!scope || isQuery(_taskFilters)));
     _syncTaskBar(hasBoard, barCounts);
 
     const header = _taskListHeaderHtml();
@@ -701,10 +734,8 @@ export function renderBoardTaskList() {
     const rows = _taskRowsHtml(tasks);
 
     // Older done tasks come a page at a time (#3269).
-    const more = querying ? _filteredMoreHtml() : _taskLoadMoreHtml(boardDoneTotal, boardDoneLoaded);
+    const more = querying ? (scope && _hideCompleted && !isQuery(_taskFilters) && !_filteredList.cursor ? '' : _filteredMoreHtml()) : _taskLoadMoreHtml(boardDoneTotal, boardDoneLoaded);
     // Unchanged rows keep their nodes: the list was rebuilt on every poll, a layout each time (#3881).
     morphHtml(container, header + rows + more);
 
-    // Update task count badge: done / all; the board's numbers are the server's totals.
-    _updateTaskCount(boardTasks, otherTasks, completedCount);
 }

@@ -22,3 +22,17 @@ export function _getBoardProject() {
     if (!state.currentSession) return null;
     return _currentBoardKey();
 }
+
+/** A worker's dock is scoped by the board's authoritative role and stable member ID.
+ * The team page and orchestrator keep the board-wide list; a missing member identity shows no board tasks yet. */
+export function agentTaskScope() {
+ const s = state.currentSession;
+ if (state.selectedTeam || !s || s.type !== 'live' || !s.board_project || s.board_is_orchestrator === true) return null;
+ return { key: identityKey(sessionServer(s), s.session_id || s.name), assignee: s.board_subscriber_id || '' };
+}
+
+/** + Task in an agent's dock starts assigned to that agent, including the orchestrator. */
+export function agentTaskAssignee() {
+ const s = state.currentSession;
+ return !state.selectedTeam && s?.type === 'live' && s.board_project ? s.board_subscriber_id || '' : '';
+}

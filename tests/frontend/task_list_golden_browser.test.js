@@ -52,7 +52,7 @@ const SUBAGENTS = [{ id: 'a1', description: 'Search the repo', subagent_type: 'E
                 section: sec ? sec.style.display : null, label: sec && sec.querySelector('.board-tasks-header > span:first-child') ? sec.querySelector('.board-tasks-header > span:first-child').textContent : null,
                 ids: rows.map(r => (r.querySelector('.board-task-id') || {}).textContent.trim()).join(','), text: q('board-task-list').textContent.replace(/\\s+/g, ' ').trim() }; })()`;
         const record = async name => { out[name] = await ev(SNAP); };
-        const show = async (name, { tasks = [], page = {}, agent = [], subs = [], session = { name: 'solo', type: 'live', board_project: 'team-a', session_id: 'sid' }, team = null } = {}) => {
+        const show = async (name, { tasks = [], page = {}, agent = [], subs = [], session = { name: 'solo', type: 'live', board_project: 'team-a', board_is_orchestrator: true, session_id: 'sid' }, team = null } = {}) => {
             await ev(`T.state.currentSession = ${JSON.stringify(session)}; T.state.selectedTeam = ${JSON.stringify(team)}; T.state.currentAgentTasks = ${JSON.stringify(agent)}; T.state.currentSubagents = ${JSON.stringify(subs)};
                 window.__page = Object.assign({ tasks: ${JSON.stringify(tasks)}, next_cursor: '', total_open: null, total_completed: null }, ${JSON.stringify(page)}); T.tasks.loadBoardTasks(${tasks.length || team ? "'team-a'" : 'null'}).then(() => 1)`);
             await ev(`new Promise(r => setTimeout(r, 120))`); // sleep-ok: the load answers over a few frames and the list morphs in; there is no completion event

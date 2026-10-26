@@ -27,7 +27,7 @@ const open = [
         await ev(`(async () => {
             const st = window.__coralStatic || '/static/';
             const T = window.T = { state: (await import(st + 'state.js')).state, tasks: await import(st + 'tasks.js') };
-            T.state.currentSession = { name: 'solo', type: 'live', board_project: 'team-a', session_id: 'sid' }; T.state.currentAgentTasks = []; T.state.currentSubagents = [];
+            T.state.currentSession = { name: 'solo', type: 'live', board_project: 'team-a', board_is_orchestrator: true, session_id: 'sid' }; T.state.currentAgentTasks = []; T.state.currentSubagents = [];
             const all = ${JSON.stringify([...done, ...open])};
             const real = window.fetch;
             window.fetch = (u, o = {}) => { const p = new URL(String(u), location.href);

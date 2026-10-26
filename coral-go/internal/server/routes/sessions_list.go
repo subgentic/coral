@@ -228,7 +228,7 @@ func (h *SessionsHandler) liveSessionRows(r *http.Request, trace *phaseTrace, fu
 	}
 	trace.end("state_transcript_enrichment", "rows", len(sessions), "large_list", largeList)
 
-	sessions = append(sessions, h.sleepingRows(allLive, liveSIDs)...)
+	sessions = append(sessions, h.sleepingRows(allLive, liveSIDs, d.boardSubs)...)
 	h.addBoardLabels(r.Context(), sessions)
 	h.addSessionGoals(r.Context(), sessions)
 	h.addTeamHealth(r, sessions)
@@ -498,6 +498,7 @@ func (h *SessionsHandler) agentRow(trace *phaseTrace, agent AgentInfo, lv liveIn
 		"board_unread":          boardUnread,
 		"skipped_send":          skippedSendField(tmuxName, boardUnread), // the last automated send Coral did not type and why ({why, what, at, since}), null at none (#7727)
 		"board_is_orchestrator": boardSubscriberFlag(boardSub),
+		"board_subscriber_id":   boardSubscriberID(boardSub),
 		"log_path":              agent.LogPath,
 		"sleeping":              lv.sleeping[sid],
 		"archived":              lv.archived[sid],
@@ -546,7 +547,7 @@ func (h *SessionsHandler) agentRow(trace *phaseTrace, agent AgentInfo, lv liveIn
 }
 
 // sleepingRows are placeholder rows for sleeping sessions without an active terminal (not already in liveSIDs).
-func (h *SessionsHandler) sleepingRows(allLive []store.LiveSession, liveSIDs map[string]bool) []map[string]any {
+func (h *SessionsHandler) sleepingRows(allLive []store.LiveSession, liveSIDs map[string]bool, boardSubs map[string]*board.Subscriber) []map[string]any {
 	var sessions []map[string]any
 	for _, ls := range allLive {
 		if ls.IsSleeping != 1 || liveSIDs[ls.SessionID] {
@@ -558,6 +559,10 @@ func (h *SessionsHandler) sleepingRows(allLive []store.LiveSession, liveSIDs map
 		}
 		if ls.DisplayName != nil {
 			dn = *ls.DisplayName
+		}
+		boardSub := boardSubs[naming.SessionName(ls.AgentType, ls.SessionID)]
+		if boardSub != nil {
+			bp = boardSub.Project
 		}
 		entry := map[string]any{
 			"name":                  ls.AgentName,
@@ -589,7 +594,8 @@ func (h *SessionsHandler) sleepingRows(allLive []store.LiveSession, liveSIDs map
 			"board_project":         bp,
 			"board_job_title":       dn,
 			"board_unread":          0,
-			"board_is_orchestrator": nil,
+			"board_is_orchestrator": boardSubscriberFlag(boardSub),
+			"board_subscriber_id":   boardSubscriberID(boardSub),
 			"log_path":              "",
 			"sleeping":              true,
 			"archived":              ls.IsArchived == 1,

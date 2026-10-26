@@ -3,7 +3,7 @@ import { state } from './state.js';
 import { closeOnBackdropAndEscape, releaseEscape } from './dialog_close.js';
 import { boardFetch, serverFetch, sessionServer } from './server_base.js';
 import { ensureBuilt } from './lazy_dom.js';
-import { _getBoardProject, _isSoloAgent } from './task_board_context.js';
+import { _getBoardProject, _isSoloAgent, agentTaskAssignee } from './task_board_context.js';
 import { _renderDepPicker, _getSelectedDeps } from './task_dep_picker.js';
 import { showToast } from './utils.js';
 import { addPendingMessage } from './live_chat.js';
@@ -69,6 +69,8 @@ export async function showCreateTaskModal(preset = {}) {
             }
         } catch { /* ignore */ }
     }
+
+    assigneeSelect.value = preset.assigned_to ?? agentTaskAssignee();
 
     // The Goal select lists the board's open goals; it stays hidden when the board has none (and does not require one), so a board without goals sees no new control (#7253).
     const goalRow = document.getElementById('create-task-goal-row');

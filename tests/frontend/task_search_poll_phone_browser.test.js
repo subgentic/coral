@@ -35,7 +35,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 if (!r.ok) throw new Error(path + ': ' + await r.text()); return r.json(); };
             for (let i = 0; i < ${N}; i++) await post('/tasks', { title: 'delta ' + i, created_by: 'Operator' });
             return true; })()`);
-        await ev(`(async () => { ${MODS} tasks.stopBoardTaskPoll(); state.currentSession = { type: 'live', name: 'tk-bot', session_id: 'tk-bot-id', board_project: ${JSON.stringify(BOARD)} }; state.selectedTeam = null; return true; })()`);
+        await ev(`(async () => { ${MODS} tasks.stopBoardTaskPoll(); state.currentSession = { type: 'live', name: 'tk-bot', session_id: 'tk-bot-id', board_project: ${JSON.stringify(BOARD)}, board_is_orchestrator: true }; state.selectedTeam = null; return true; })()`);
         await ev(`(async () => { const base = (window.__coralStatic || '/static/'); const { showView } = await import(base + 'utils.js'); showView('live-session-view');
             const side = document.getElementById('agentic-state'); side.classList.remove('collapsed'); side.style.width = '680px'; return true; })()`);
         await waitFor(`document.getElementById('agentic-tab-tasks').getClientRects().length > 0`, 'the dock is open', { timeout: 8000 });

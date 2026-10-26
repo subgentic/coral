@@ -135,6 +135,14 @@ func boardSubscriberFlag(sub *board.Subscriber) any {
 	return sub.CanPeek != 0
 }
 
+// boardSubscriberID is the stable assignee identity, independent of a renamed display/job title.
+func boardSubscriberID(sub *board.Subscriber) any {
+	if sub == nil {
+		return nil
+	}
+	return sub.SubscriberID
+}
+
 func boardProject(subs map[string]*board.Subscriber, fallback map[string][2]string, tmuxName, sessionID string) any {
 	if sub, ok := subs[tmuxName]; ok {
 		return sub.Project

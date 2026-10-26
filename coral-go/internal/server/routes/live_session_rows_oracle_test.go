@@ -518,6 +518,7 @@ func (h *SessionsHandler) liveSessionRowsBefore4713(r *http.Request, trace *phas
 			"board_unread":          boardUnread,
 			"skipped_send":          skippedSendField(tmuxName, boardUnread),
 			"board_is_orchestrator": boardSubscriberFlag(boardSub),
+			"board_subscriber_id":   boardSubscriberID(boardSub),
 			"log_path":              agent.LogPath,
 			"sleeping":              liveSleeping[sid],
 			"archived":              liveArchived[sid],
@@ -582,6 +583,10 @@ func (h *SessionsHandler) liveSessionRowsBefore4713(r *http.Request, trace *phas
 		if ls.DisplayName != nil {
 			dn = *ls.DisplayName
 		}
+		boardSub := boardSubs[naming.SessionName(ls.AgentType, ls.SessionID)]
+		if boardSub != nil {
+			bp = boardSub.Project
+		}
 		sessions = append(sessions, map[string]any{
 			"name":                  ls.AgentName,
 			"agent_type":            ls.AgentType,
@@ -611,7 +616,8 @@ func (h *SessionsHandler) liveSessionRowsBefore4713(r *http.Request, trace *phas
 			"board_project":         bp,
 			"board_job_title":       dn,
 			"board_unread":          0,
-			"board_is_orchestrator": nil,
+			"board_is_orchestrator": boardSubscriberFlag(boardSub),
+			"board_subscriber_id":   boardSubscriberID(boardSub),
 			"log_path":              "",
 			"sleeping":              true,
 			"archived":              ls.IsArchived == 1,

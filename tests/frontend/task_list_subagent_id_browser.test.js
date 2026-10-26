@@ -16,7 +16,7 @@ const HOSTILE = ['<img src=x onerror=alert(1)>', '<b onclick=x>hostile</b>'];
         await ev(`(async () => {
             const st = window.__coralStatic || '/static/';
             const T = window.T = { state: (await import(st + 'state.js')).state, tasks: await import(st + 'tasks.js') };
-            T.state.currentSession = { name: 'solo', type: 'live', board_project: 'team-a', session_id: 'sid' }; T.state.currentAgentTasks = [];
+            T.state.currentSession = { name: 'solo', type: 'live', board_project: 'team-a', board_is_orchestrator: true, session_id: 'sid' }; T.state.currentAgentTasks = [];
             T.state.currentSubagents = ${JSON.stringify(HOSTILE)}.map((id, i) => ({ id, subagent_id: id, session_id: 'sid', status: 'in_progress', description: 'Sub ' + i, started_at: '2026-10-1' + i + 'T10:00:00Z' }));
             const real = window.fetch;
             window.fetch = (u, o = {}) => { const p = new URL(String(u), location.href);
