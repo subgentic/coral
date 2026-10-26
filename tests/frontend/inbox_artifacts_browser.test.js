@@ -72,6 +72,7 @@ const WORLD = `(() => {
             // the Team filter
             await ev(`(document.querySelector('#group-table-view .list-bar-filter-btn, #group-table-view [aria-controls$="-menu"]') || {}).click?.(); true`);
             await waitFor(`!!document.getElementById('ia-team')`, `${label}: the Team field`, 5000);
+            await shot(`inbox-artifacts-${label}-filters`); // the Filters panel open: the fields, Kept only beside its box
             await ev(`(() => { const s = document.getElementById('ia-team'); s.value = 'beta'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2`, `${label}: the rows narrowed to the team`, 8000);
             check(`${label}: the Team filter asks the route for that team`, (await ev(`window.__ta.some(q => /(^|[?&])team=beta(&|$)/.test(q))`)));

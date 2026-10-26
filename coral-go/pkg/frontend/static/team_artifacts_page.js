@@ -291,7 +291,7 @@ export function createArtifactsList({ inbox = false } = {}) {
                     ...(by === 'goal' || model.scope || !shown.some(i => i.goal_id) ? [] : [{ key: 'goal', label: 'Goal', line: 2, tone: 'tertiary', cell: item => (item.goal_id && item.goal_title ? String(item.goal_title) : '') }]),
                     { key: 'created', label: 'Created', line: 1, tone: 'tertiary', align: 'end', cell: item => DT.timeCell(item.created_at) },
                     // An agent's list opens an artifact in the preview panel; its sheet (the facts, Keep, Delete, Copy link, who can read it) is one quiet link away (#8539)
-                    { key: 'details', label: 'Details', line: 2, tone: 'tertiary', align: 'end', when: () => !!model.scope, cell: item => detailsLink(item) },
+                    ...(model.scope ? [{ key: 'details', label: 'Details', line: 2, tone: 'tertiary', align: 'end', cell: item => detailsLink(item) }] : []), // only an agent's list has the column: a `when` kept its head and its links on the team's and the Inbox's list at a wide width
                 ],
                 footer: { auto: !model.truncated && !model.error, text: `Showing ${model.items.length} of ${model.counts?.matched ?? model.items.length}${model.truncated ? '+' : ''}`,
                     more: model.hasMore ? { label: 'Load more', busy: !!model.controller, run: () => { if (!model.loadingMore) loadArtifacts({ append: true }); } } : null },
