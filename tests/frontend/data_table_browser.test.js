@@ -219,6 +219,13 @@ const BASE = require('./test_base').BASE;
         assert.equal(dd.hookedDetails, 2); assert.equal(dd.head, true, 'and the header\'s');
         assert.deepEqual(dd.details.map(x => [x.id, x.after]), [['d-b', 'row-b'], ['d-a', 'row-a']], 'each detail still follows its own row');
         console.log('   ✓');
+        console.log('Tags never break mid-word (#8220)');
+        const tg = await ev(`(async () => { const DT = await import(${MOD} + 'data_table.js'); const box = document.createElement('div'); box.id = 'tag-box'; box.style.cssText = 'width:96px;font-size:13px'; document.body.append(box);
+            const mk = t => { const w = document.createElement('div'); const e = DT.tag(t); w.append(e); box.append(w); return e; };
+            const one = mk('west'), hyph = mk('build-west'), two = mk('private network');
+            const r = { one: one.getBoundingClientRect().height, hyph: hyph.getBoundingClientRect().height, two: two.getBoundingClientRect().height, ws: getComputedStyle(hyph).whiteSpace }; box.remove(); return r; })()`);
+        assert.equal(tg.ws, 'nowrap', 'a tag does not wrap');
+        assert.ok(Math.abs(tg.hyph - tg.one) <= 1 && Math.abs(tg.two - tg.one) <= 1, 'a hyphenated name and two words are one line, as one short word is, in a narrow cell: ' + JSON.stringify(tg));
         console.log('PASS data_table: desktop, sort, sticky head, the fold, empty and footer, selection');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
