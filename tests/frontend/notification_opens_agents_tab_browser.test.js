@@ -5,7 +5,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 
-const TABS = ['hub-inbox', 'history', 'servers', 'workflows', 'jobs'];
+const TABS = ['hub-inbox', 'servers', 'workflows', 'jobs']; // Chats are the Inbox's folders on a local Coral (#7776)
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();

@@ -26,7 +26,8 @@ const BASE = require('./test_base').BASE;
             await evaluate(`window.__coral._goHome()`);
             assert.deepEqual(await visible(), ['mobile-agent-list']);
             await evaluate(`window.switchNavTab('history')`);
-            assert.deepEqual(await visible(), ['chats-empty-view'], 'Chats with nothing open shows its own empty state, not the Agents home (#3152)');
+            await evaluate(`new Promise(resolve => { const wait = () => document.getElementById('group-table-view').getClientRects().length > 0 ? resolve() : setTimeout(wait, 50); wait(); })`); // the Inbox opens its chat folder's table once its module has loaded
+            assert.deepEqual(await visible(), ['group-table-view'], 'Chats with nothing open is the Inbox on its chat folder (#7776), not the Agents home (#3152)');
             await evaluate(`window.switchNavTab('agents')`);
             assert.deepEqual(await visible(), ['mobile-agent-list']);
             await evaluate(`window.switchNavTab('jobs')`);
