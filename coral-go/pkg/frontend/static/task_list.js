@@ -9,7 +9,8 @@ import { EMPTY as TASK_EMPTY, SORT_LABEL as taskSortLabel, isQuery, loadFilters 
 import { browserLocal } from './safe_storage.js';
 import { showToast, escapeHtml } from './utils.js';
 import { loadPanelOpen, savePanelOpen } from './list_bar.js';
-import { _priorityOrder, _agentTaskStatus } from './task_format.js';
+import { _agentTaskStatus } from './task_format.js';
+import { reviewRequested, taskStatus, defaultSort, nextSort, filterAndSortTasks } from './task_list_data.js';
 import { morphHtml } from './dom_morph.js';
 import { _verifyMark } from './task_verify_marks.js';
 import { goalTitle, refreshGoalTitles } from './task_goals.js';
@@ -427,40 +428,12 @@ async function loadMoreBoardTasks() {
     renderBoardTaskList();
 }
 
-/** A list item says review_requested; a full task has workflow.completion_review. */
-export function _reviewRequested(t) {
-    return !!(t && (t.review_requested || t.workflow?.completion_review));
-}
-
-// Current sort and filter state for task list
-let _taskSortField = 'created_at';
-
-let _taskSortClicks = 0; // clicks on the chosen column in a row
-
-// clicks on the chosen column in a row
-let _taskSortExplicit = false; // a column was chosen: until then open work comes before done work (#4716)
-
-// a column was chosen: until then open work comes before done work (#4716)
-let _taskSortAsc = false; // default newest first
-
-// default newest first
+let _sort = defaultSort(); // the chosen column and its direction (task_list_data.js)
 let _hideCompleted = browserLocal.get('coral-hide-completed') === 'true';
 let _hideDoneEl = null; // the Filters panel's Hide done (a label with its checkbox), once the bar is built (#7924)
 
 export function _toggleTaskSort(field) {
-    // A column's clicks: the first chooses it, the second turns it round, the third gives the default order back (open work first, #4737).
-    if (_taskSortExplicit && _taskSortField === field) {
-        if (++_taskSortClicks >= 3) {
-            _taskSortExplicit = false; _taskSortField = 'created_at'; _taskSortAsc = false; _taskSortClicks = 0;
-        } else {
-            _taskSortAsc = !_taskSortAsc;
-        }
-    } else {
-        _taskSortExplicit = true;
-        _taskSortField = field;
-        _taskSortAsc = field === 'priority'; // priority defaults asc (critical first)
-        _taskSortClicks = 1;
-    }
+    _sort = nextSort(_sort, field);
     renderBoardTaskList();
 }
 
@@ -468,38 +441,6 @@ export function _toggleHideCompleted() {
     _hideCompleted = !_hideCompleted;
     browserLocal.set('coral-hide-completed', _hideCompleted);
     renderBoardTaskList();
-}
-
-/** The tasks to show: done ones dropped when hidden, in the chosen sort order. */
-function _filterAndSortTasks(allTasks, querying = false) {
-    const isDone = t => t.status === 'completed' || t.status === 'skipped';
-    if (querying && !_taskSortExplicit) return allTasks; // the server's order (a search is not cut by Hide done)
-    const tasks = allTasks.filter(t => {
-        if (!querying && _hideCompleted && (t.status === 'completed' || t.status === 'skipped')) return false;
-        return true;
-    }).sort((a, b) => {
-        let cmp = 0;
-        if (_taskSortField === 'created_at') {
-            cmp = (a.created_at || '').localeCompare(b.created_at || '');
-        } else if (_taskSortField === 'priority') {
-            cmp = (_priorityOrder[a.priority] ?? 2) - (_priorityOrder[b.priority] ?? 2);
-        } else if (_taskSortField === 'assignee') {
-            cmp = (a.assigned_to || '').localeCompare(b.assigned_to || '');
-        } else if (_taskSortField === 'cost') {
-            const aCost = a.cost_usd ?? -1;
-            const bCost = b.cost_usd ?? -1;
-            cmp = aCost - bCost;
-        } else if (_taskSortField === 'type') {
-            cmp = (a._source || '').localeCompare(b._source || '');
-        } else if (_taskSortField === 'id') {
-            cmp = (a.id || 0) - (b.id || 0);
-        }
-        return _taskSortAsc ? cmp : -cmp;
-    });
-    // The default order puts open and active work first, then the finished tasks, newest first inside each part (a stable split): with a thousand
-    // recent finished tasks the first rows were all Finished (#4716). A column the person chose sorts the whole list as it always did.
-    if (!_taskSortExplicit && !querying) return [...tasks.filter(t => !isDone(t)), ...tasks.filter(isDone)];
-    return tasks;
 }
 
 /** Nothing to show: hide the section, or say so for a live agent or a team (and a busy board). */
@@ -537,31 +478,6 @@ function _renderTaskListChrome(section, completedCount, querying = false) {
     _syncHideDone(completedCount, !(completedCount > 0 && !querying));
 }
 
-/** A row's status icon and label. */
-function _taskStatus(t) {
-    const statusWrap = (className, detail, label) => ({ className, detail, label });
-    const activelyClaimed = t.status === 'in_progress' && Boolean(t.claimed_at);
-    const workingDetail = activelyClaimed ? 'Claimed · Working' : 'Open · Working';
-    const statusIcon = (t.outcome || t.workflow?.outcome) === 'failed'
-        ? statusWrap('completed', 'Finished', 'Finished')
-        : t.status === 'completed'
-        ? statusWrap('completed', 'Finished', 'Finished')
-        : t.status === 'review_pending'
-        ? statusWrap('blocked', 'Open · Review pending', 'Review')
-        : _reviewRequested(t) && t.status === 'in_progress'
-        ? statusWrap('blocked', 'Open · Review requested', 'Open · Review requested')
-        : t.status === 'in_progress'
-        ? statusWrap('in-progress', workingDetail, activelyClaimed ? 'Claimed' : 'Open')
-        : t.status === 'skipped'
-        ? statusWrap('cancelled', 'Cancelled', 'Cancelled')
-        : t.status === 'blocked'
-        ? statusWrap('blocked', 'Blocked: waiting for prerequisites', 'Blocked')
-        : t.status === 'draft'
-        ? statusWrap('pending', 'Open · Draft', 'Open · Draft')
-        : statusWrap('pending', 'Open', 'Open');
-    return statusIcon;
-}
-
 /** The dock keeps its own task fields; the shared component owns the table layout. */
 function _taskTable(tasks, footer) {
     const span = (cls, value) => DT.el('span', cls, value);
@@ -572,17 +488,17 @@ function _taskTable(tasks, footer) {
     // The dock is the Tasks view scoped to an agent (#8060): the shared columns (State, Task, and Assigned to when the list spans agents), with the dock's own words on them: the state's detail as its tooltip, the verify mark, the subagent
     // tooltip and the second line. A column's sort field is the server's name for it.
     const FIELD = { task: 'id', who: 'assignee' }, COLUMN = { id: 'task', assignee: 'who' };
-    dockTaskTableState.sort = _taskSortExplicit ? { key: COLUMN[_taskSortField] || _taskSortField, dir: _taskSortAsc ? 'asc' : 'desc' } : null;
+    dockTaskTableState.sort = _sort.explicit ? { key: COLUMN[_sort.field] || _sort.field, dir: _sort.asc ? 'asc' : 'desc' } : null;
     const tweak = columns => {
         const [stateCol, taskCol, whoCol] = columns;
         stateCol.sort = false;
         stateCol.width = 'content'; // the dock knows a review is asked for from the task's workflow, which the shared word reads from review_requested
-        stateCol.cell = t => { const word = taskStatusWord(t.status, _reviewRequested(t)), chip = DT.chip(word, statusClass(word)), st = _taskStatus(t); chip.classList.add('board-task-status-wrap'); chip.title = st.detail; chip.setAttribute('aria-label', st.detail); return chip; };
+        stateCol.cell = t => { const word = taskStatusWord(t.status, reviewRequested(t)), chip = DT.chip(word, statusClass(word)), st = taskStatus(t); chip.classList.add('board-task-status-wrap'); chip.title = st.detail; chip.setAttribute('aria-label', st.detail); return chip; };
         taskCol.firstDir = 'desc'; taskCol.subtitle = details;
         taskCol.cell = t => {
             const cell = DT.el('span'), description = span('board-task-desc');
             const name = t.title || t.description || '';
-            const b = DT.primaryButton(name, `${t._source === 'subagent' ? 'Open subagent' : `Open task #${t.id}`}: ${name}, ${_taskStatus(t).detail}`);
+            const b = DT.primaryButton(name, `${t._source === 'subagent' ? 'Open subagent' : `Open task #${t.id}`}: ${name}, ${taskStatus(t).detail}`);
             b.classList.add('board-task-open', 'board-task-name');
             cell.title = t._source === 'subagent' ? _subagentTooltip(t) : t.body || t.body_preview || '';
             description.title = cell.title;
@@ -664,7 +580,7 @@ export function renderBoardTaskList() {
     const boardDoneLoaded = boardTasks.filter(isDone).length;
     const boardDoneTotal = scopedBaseReady ? (_boardList.totalCompleted ?? boardDoneLoaded) : 0;
     const completedCount = boardDoneTotal + otherTasks.filter(isDone).length;
-    const tasks = _filterAndSortTasks(allTasks, querying && (!scope || isQuery(_taskFilters)));
+    const tasks = filterAndSortTasks(allTasks, _sort, { querying: querying && (!scope || isQuery(_taskFilters)), hideCompleted: _hideCompleted });
     const section = document.getElementById('board-tasks-section');
     const hasBoard = !!_boardList.board; // the bar belongs to the board whose tasks are listed
     // The bar's counts: what matches of what the board has (the server's totals); with nothing narrowing it, the board's own total.
@@ -695,7 +611,7 @@ export function renderBoardTaskList() {
 
     // Older done tasks come a page at a time (#3269).
     const more = _taskFooter(querying, scope, tasks.length, querying ? (_filteredList.total ?? boardTasks.length) + otherTasks.length : boardAll + otherTasks.length);
-    const signature = JSON.stringify([tasks, _liveCosts, _taskFilters.sort, _taskSortField, _taskSortAsc, _taskSortExplicit, more,
+    const signature = JSON.stringify([tasks, _liveCosts, _taskFilters.sort, _sort.field, _sort.asc, _sort.explicit, more,
         tasks.map(t => [whenText(t.created_at), t._source === 'board' ? _claimedFor(t) : '', t.goal_id ? goalTitle(_goalBoard, t.goal_id) : ''])]);
     if (container.dataset.drawn === signature && container.querySelector('.dt-table')) return;
     const active = container.contains(document.activeElement) ? document.activeElement : null;
