@@ -8,9 +8,11 @@ const BASE = require('./test_base').BASE;
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const stub = () => ev(`(() => { const R = window.fetch; window.__asked = []; window.__flags = [];
-        const day = 86400000, now = Date.now();
+        // Pin each bucket inside its calendar day: subtracting i minutes from now can erase Yesterday at 00:11–00:12, and 24-hour days drift across DST (#8578).
+        const now = new Date();
+        const stamp = i => { const d = new Date(now); d.setDate(d.getDate() - Math.floor(i / 12)); d.setHours(12, 59 - i % 12, 0, 0); return d.toISOString(); };
         const sessions = Array.from({ length: 120 }, (_, i) => ({ session_id: 'chat-' + String(i).padStart(3, '0'), type: i === 3 ? 'group' : 'agent', title: i === 3 ? 'release-crew' : 'Chat title ' + i, summary: i === 3 ? 'release-crew - 1 messages, 0 participants' : 'The snippet of chat ' + i, agent_name: ['Backend Dev', 'QA Engineer', 'Frontend Dev'][i % 3], display_name: ['Backend Dev', 'QA Engineer', 'Frontend Dev'][i % 3],
-            last_timestamp: new Date(now - Math.floor(i / 12) * day - i * 60000).toISOString(), duration_sec: 600 + i * 30, source_type: i % 4 === 0 ? 'codex' : 'claude', starred: false, archived: i === 3, active: i === 1, tags: [] }));
+            last_timestamp: stamp(i), duration_sec: 600 + i * 30, source_type: i % 4 === 0 ? 'codex' : 'claude', starred: false, archived: i === 3, active: i === 1, tags: [] }));
         const json = (b, status = 200) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { 'content-type': 'application/json' } }));
         window.fetch = (u, o = {}) => { const url = new URL(String(u && u.url || u), location.origin);
             if (url.pathname === '/api/sessions/history/counts') return json({ all: 119, group: 1, notes: 9, active: 1, starred: 0, archived: 3, by_agent_type: { claude: 90, codex: 30, agy: 27, antigravity: 27, gemini: 27 }, tags: [{ id: 7, name: 'release', color: '#e5534b', count: 4 }] });
