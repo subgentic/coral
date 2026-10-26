@@ -20,8 +20,7 @@ const RUN = { id: 31, workflow_id: 7, workflow_name: 'Nightly', status: 'running
 // A run whose agent step is running: its Kill says what happens to the agent's terminal log (#4399).
 const RUN_AGENT = { id: 32, workflow_id: 7, workflow_name: 'Nightly', status: 'running', trigger_type: 'manual', started_at: '2026-10-15T10:00:00Z',
     steps: [{ index: 0, name: 'agent step', type: 'agent', status: 'running', session_id: SID, session_name: 'claude-' + SID }] };
-const JOB = { id: 5, name: 'Hourly "job"', cron_expr: '0 * * * *', enabled: true, workflow_id: 7, workflow_name: 'Nightly', consecutive_failures: 0,
-    workflow_runs: [{ id: 31, status: 'completed', current_step: 0, started_at: '2026-10-15T10:00:00Z', finished_at: '2026-10-15T10:01:00Z' }] };
+const JOB = { id: 5, name: 'Hourly "job"', cron_expr: '0 * * * *', enabled: true, workflow_id: 7, consecutive_failures: 0 };
 // An agent job: its runs table links each run's session.
 const LONG_PROMPT = 'p'.repeat(700); // a short prompt is shown on the job's page; only a long one is folded (#7443)
 const AGENT_JOB = { id: 6, name: 'Agent job', cron_expr: '0 * * * *', enabled: true, agent_type: 'claude', prompt: LONG_PROMPT, repo_path: '/tmp', consecutive_failures: 0 };

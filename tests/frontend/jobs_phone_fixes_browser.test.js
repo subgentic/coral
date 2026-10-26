@@ -21,9 +21,10 @@ const S = `(window.__coralStatic || '/static/')`;
                 const ago = h => new Date(Date.now() - h * 3600000).toISOString(); const nxt = h => new Date(Date.now() + h * 3600000).toISOString();
                 const base = { description: '', timezone: 'UTC', agent_type: 'claude', repo_path: '/work/repo', base_branch: 'main', prompt: 'Tidy.', enabled: 1, max_duration_s: 3600, cleanup_worktree: 0, flags: '', consecutive_failures: 0 };
                 const fail = id => ({ id, status: 'failed', exit_reason: 'step_failed', error_msg: 'step 1 (Test) failed: exit code 3', workflow_run_id: id, started_at: ago(id), finished_at: ago(id - 0.1) });
-                window.__jobs = [ { ...base, id: 1, name: 'nightly-build', job_type: 'workflow', workflow_id: 1, cron_expr: '0 2 * * *', next_fire_at: nxt(9), last_run: fail(2), consecutive_failures: 2, workflow_runs: [fail(2), fail(3)] },
+                window.__jobs = [ { ...base, id: 1, name: 'nightly-build', job_type: 'workflow', workflow_id: 1, cron_expr: '0 2 * * *', next_fire_at: nxt(9), last_run: fail(2), consecutive_failures: 2 },
                     { ...base, id: 2, name: 'weekly-tidy', job_type: 'prompt', cron_expr: '30 9 * * 1', next_fire_at: nxt(80), last_run: null } ];
                 window.fetch = (u, o) => { const url = String(u), m = (o && o.method) || 'GET';
+                    if (url === '/api/workflows/1/runs' && m === 'GET') return json({ runs: [fail(2), fail(3)] });
                     if (m === 'GET' && /\\/api\\/scheduled\\/jobs$/.test(url)) return json({ jobs: window.__jobs });
                     if (/\\/api\\/scheduled\\/jobs\\/\\d+\\/runs/.test(url)) return json({ runs: [] });
                     if (m === 'GET' && /\\/api\\/workflows$/.test(url)) return json({ workflows: [{ id: 1, name: 'nightly-build', description: '', enabled: 1, steps: [{ name: 'Test' }], last_run: null }] });
@@ -38,6 +39,7 @@ const S = `(window.__coralStatic || '/static/')`;
             const words = await ev(`({ banner: document.querySelector('#scheduler-detail .sched-fail-banner strong').textContent, tip: document.querySelector('#scheduled-jobs-list .sched-fail-badge').title })`);
             assert.equal(words.banner, 'The last 2 runs failed', `${tag}: the banner: ` + words.banner);
             assert.equal(words.tip, 'The last 2 runs failed', `${tag}: the badge's tip: ` + words.tip);
+            assert.equal(await ev(`document.querySelector('.sched-runs-section h3').textContent`), 'Workflow runs', `${tag}: history comes from the workflow runs route`);
             // a run's When is a link to the run; a click anywhere on its row opens it
             const run = await ev(`(() => { const b = document.querySelector('.sched-runs-table .dt-primary'); const cs = getComputedStyle(b); window.__opened = []; window.selectWorkflowRun = id => window.__opened.push(id); const tr = b.closest('tr'); const took = tr.children[2]; const r = took.getBoundingClientRect(); took.scrollIntoView({ block: 'center' }); const r2 = took.getBoundingClientRect(); const hit = document.elementFromPoint(r2.left + 4, r2.top + r2.height / 2); hit.click(); return { primary: b.classList.contains('dt-primary'), weight: cs.fontWeight, color: cs.color, accent: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim(), opened: window.__opened.length }; })()`);
             assert.ok(run.primary && run.weight === '600', `${tag}: a run uses the shared primary action: ` + JSON.stringify(run));

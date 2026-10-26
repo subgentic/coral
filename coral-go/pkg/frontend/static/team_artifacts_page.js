@@ -40,7 +40,7 @@ const itemKey = (item) => managedHex(item) || `${item.source || ''}|${item.uri |
 const isUnverified = (item) => item.provenance === 'unverified';
 
 function readableName(item) {
-    const name = String(item.name || item.title || '').trim();
+    const name = String(item.name || '').trim();
     if (name && !/^(?:coral:\/\/artifacts\/)?[a-f0-9]{64}(?:\.[a-z0-9]+)?$/i.test(name)) return name;
     if (item.task_title) return `${item.task_title} — artifact`;
     return item.task_id ? `Task #${item.task_id} artifact` : 'Uploaded artifact';
@@ -286,7 +286,7 @@ function draw() {
                         const badge = originBadge(item);
                         if (badge) { const note = DT.tag(badge); note.classList.add('dt-note', 'team-artifact-badge', `team-artifact-badge-${isUnverified(item) ? 'unverified' : item.source === 'shared' ? 'shared' : 'received'}`); if (isUnverified(item)) note.classList.add('dt-warning'); first.append(note); }
                         return first;
-                    }, subtitle: item => typeof item.description === 'string' ? item.description : typeof item.note === 'string' ? item.note : '' },
+                    } },
                 { key: 'type', label: 'Type', line: 2, tone: 'tertiary', cell: item => isUnverified(item) ? '—' : DT.tag(typeText(item)) },
                 { key: 'size', label: 'Size', line: 2, tone: 'tertiary', align: 'end', cell: item => isUnverified(item) ? '—' : sizeText(item.size) || '—' },
                 { key: 'task', label: 'Task', line: 2, tone: 'tertiary', when: item => !model.scope || !!item.task_id, cell: taskText },
