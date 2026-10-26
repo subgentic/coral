@@ -84,7 +84,7 @@ export async function showTeamSettingsPage(team, options = {}) {
                 { key: 'mode', type: 'select', label: 'Working mode', id: 'tsr-mode',
                     help: { text: 'Instructions are saved with each task when it is first claimed.', about: 'working modes', more: 'Tasks already claimed keep their instructions. This setting gives guidance; it does not create worktrees by itself.' },
                     options: async () => { await dataReady.catch(() => {}); return modeOptions(); } },
-                { key: 'dependency_guidance', type: 'toggle', label: 'Include dependent-queue guidance', help: 'Tells agents how to work when a task waits on another.' },
+                { key: 'dependency_guidance', type: 'toggle', label: 'Guidance for dependent tasks', help: 'Tells agents how to work when a task waits on another.' },
                 { key: 'asks_are_tasks', type: 'toggle', label: 'Requests for work are tasks', help: 'When an agent needs another agent to do something, it creates a task. Plain posts are for questions and status.' },
                 { key: 'require_goal', type: 'toggle', label: 'Require a goal', help: requireGoalSentence },
                 { key: 'custom_instructions', type: 'textarea', label: 'Additional instructions', help: 'Team-specific conventions, given to agents with each task.', wide: true, rows: 4, placeholder: 'Team-specific conventions' },

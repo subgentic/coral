@@ -3,6 +3,8 @@
    smaller touch sizes in mobile.css and popout.css. Fine pointers (mouse,
    trackpad) keep the desktop layout: nothing here applies to them. */
 @media (pointer: coarse) {
+    .board-chat-header .board-chat-title { min-width: var(--control-touch-height, 44px); }
+    .view-list-item { min-height: var(--control-touch-height, 44px); }
     .modal-content label.create-task-draft-toggle {
         min-height: var(--control-touch-height, 44px);
     }
