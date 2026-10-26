@@ -44,7 +44,7 @@ const MEASURE = `(() => {
                 await ev(`window.showSettingsModal(${JSON.stringify(g)}); true`);
                 await sleep(400); // sleep-ok: the pane draws and its rows load
                 infos.push(...await ev(`[...document.querySelectorAll('#settings-modal .settings-pane:not([hidden]) .settings-info-btn')].filter(b => b.getClientRects().length).map(b => (b.getAttribute('aria-label') || '').slice(0, 40))`));
-                for (const x of await ev(`[...document.querySelectorAll('#settings-modal .settings-pane:not([hidden]) .settings-learn')].filter(b => b.getClientRects().length).map(b => ({ name: (b.getAttribute('aria-label') || '').slice(0, 40), h: Math.round(b.getBoundingClientRect().height) }))`)) learns.push({ g, ...x });
+                for (const x of await ev(`[...document.querySelectorAll('#settings-modal .settings-pane:not([hidden]) .settings-learn, #settings-modal .settings-pane:not([hidden]) .sv-learn')].filter(b => b.getClientRects().length).map(b => ({ name: (b.getAttribute('aria-label') || '').slice(0, 40), h: Math.round(Math.max(b.getBoundingClientRect().height, parseFloat(getComputedStyle(b, '::after').height) || 0)) }))`)) learns.push({ g, ...x });
                 if (g === 'general' || g === 'agents') await shot(`info-${g}-${w}`);
             }
             // #7405: the (i) buttons are gone from Settings: each row's explanation is a visible hint line, and a long one has a Learn more link (a real target: 44 px high on a phone)

@@ -105,9 +105,19 @@ export const SECURITY_FIELDS = [
     { key: 'debug_input_log', type: 'toggle', id: 'settings-debug-input-log', label: 'Log terminal input (debug)', disabledWhen: () => { const e = document.getElementById('settings-debug-input-log'); return !!e && e.dataset.locked === '1'; }, live: ['settings-debug-input-log-status', { id: 'settings-debug-input-log-delete', describes: false }], help: { text: '', more: 'Record everything Coral sends to agent terminals, for troubleshooting. Applies immediately.' } },
 ];
 
+export const NETWORK_FIELDS = [
+    { key: 'remote_access', type: 'toggle', id: 'settings-remote-access-enabled', labelId: 'net-access-title', label: 'Remote access', live: ['settings-remote-access-status', 'net-remote-note'],
+        help: { text: 'Allow connections from other devices.', more: 'Plain HTTP (unencrypted) unless Coral was started with --tls-cert and --tls-key.' } },
+    live('net-group-setup'),
+    live('about-section'),
+    live('net-group-hub'),
+    { key: 'hub_mode', type: 'toggle', id: 'settings-hub-mode-enabled', labelId: 'settings-hub-mode-label', label: 'Manage other computers from this one', live: ['settings-hub-mode-status', 'settings-hub-mode-restart'],
+        help: { text: 'Adds a Servers tab, with full control of those computers.', more: "It uses this Coral's own address, port and sign-in: the API key from other computers, and Remote access above for who can reach it. Nothing new listens. Turning it off keeps the servers you added." } },
+];
+
 /** Draws the groups that are fields into the Settings modal's panes (once, when the modal is built). mount is mountSettingsView. */
 export function drawSettingsGroups(modal, mount) {
-    for (const [hostId, fields] of [['settings-general-rows', GENERAL_FIELDS], ['settings-notifications-rows', NOTIFICATIONS_FIELDS], ['settings-files-rows', FILES_FIELDS], ['settings-terminal-rows', TERMINAL_FIELDS], ['settings-agents-rows', AGENTS_FIELDS], ['settings-cleanup-rows', CLEANUP_FIELDS], ['settings-security-rows', SECURITY_FIELDS]]) {
+    for (const [hostId, fields] of [['settings-general-rows', GENERAL_FIELDS], ['settings-notifications-rows', NOTIFICATIONS_FIELDS], ['settings-files-rows', FILES_FIELDS], ['settings-terminal-rows', TERMINAL_FIELDS], ['settings-agents-rows', AGENTS_FIELDS], ['settings-cleanup-rows', CLEANUP_FIELDS], ['settings-security-rows', SECURITY_FIELDS], ['settings-network-rows', NETWORK_FIELDS]]) {
         const host = modal.querySelector(`#${hostId}`);
         if (host && !host.firstChild) mount(host, { mode: 'settings', saveBar: false, fields: typeof fields === 'function' ? fields(host) : fields });
     }

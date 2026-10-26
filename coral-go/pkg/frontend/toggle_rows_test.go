@@ -40,8 +40,8 @@ func TestShellSettingsSwitchesAreNamedAndDescribed(t *testing.T) {
 			t.Errorf("id %q is used %d times", m[1], strings.Count(html, `id="`+m[1]+`"`))
 		}
 	}
-	if n < 6 {
-		t.Errorf("found %d Settings switches, expected at least 6 (the groups that moved to settings_fields.js draw theirs in the browser): the census regexp no longer matches the markup", n)
+	if n < 4 {
+		t.Errorf("found %d Settings switches, expected at least 4 (the groups that moved to settings_fields.js draw theirs in the browser): the census regexp no longer matches the markup", n)
 	}
 }
 

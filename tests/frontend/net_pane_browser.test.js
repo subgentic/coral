@@ -15,7 +15,7 @@ const BASE = require('./test_base').BASE;
     const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); true`); fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const text = sel => ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); return e ? e.textContent.replace(/\\s+/g, ' ').trim() : null; })()`);
     const vis = sel => `(() => { const e = document.querySelector(${JSON.stringify(sel)}); return !!e && e.checkVisibility(); })()`;
-    const headings = () => ev(`[...document.querySelectorAll('#settings-pane-network h5.net-group-title')].filter(h => h.checkVisibility()).map(h => h.textContent.replace(/\\s+/g, ' ').trim())`);
+    const headings = () => ev(`[...document.querySelectorAll('#settings-pane-network :is(h5.net-group-title, .sv-row-toggle .sv-label)')].filter(h => h.checkVisibility()).map(h => h.textContent.replace(/\\s+/g, ' ').trim())`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) {
@@ -44,15 +44,15 @@ const BASE = require('./test_base').BASE;
 
             // 1. the groups: headings, and the order (one order at every width)
             assert.deepEqual(await headings(), ['Remote access', 'Status', 'Coral Hub', 'Manage other computers from this one'], at + 'the headings list, with nothing that could use a setup code yet');
-            const order = await ev(`(() => { const t = id => document.getElementById(id).getBoundingClientRect().top; return { hubFirst: t('net-group-hub') < t('net-group-access'), accessFirst: t('net-group-access') < t('net-group-hub'), manageLast: t('net-group-manage') > t('net-group-hub') && t('net-group-manage') > t('net-group-access') }; })()`);
+            const order = await ev(`(() => { const t = id => (document.getElementById(id).closest('.sv-row') || document.getElementById(id)).getBoundingClientRect().top; const A = 'settings-remote-access-enabled', M = 'settings-hub-mode-enabled'; return { hubFirst: t('net-group-hub') < t(A), accessFirst: t(A) < t('net-group-hub'), manageLast: t(M) > t('net-group-hub') && t(M) > t(A) }; })()`);
             assert.equal(order.accessFirst, true, at + 'Remote access comes first at every width (#7040)');
             assert.equal(order.manageLast, true, at + 'Manage other computers last');
             assert.equal(await ev(`document.getElementById('settings-remote-access-enabled').getAttribute('aria-labelledby')`), 'net-access-title', at + 'the switch is named by its heading');
             assert.equal(await ev(vis('#net-group-setup')), false, at + 'no Setup code group while Remote access is off and no link is being made');
 
             // 1b. the rows (#7626): both switches are at the far end of their rows, Remote access says in one line what it does, the level question has its select at the right, the Hub command is a full-width box
-            const rows = await ev(`(() => { const r = id => document.getElementById(id).getBoundingClientRect(); const box = b => ({ left: b.left, right: b.right, top: b.top, bottom: b.bottom }); const hint = document.querySelector('#net-group-access + .settings-hint-wrap .settings-hint-short, #net-group-access .settings-hint-short') || document.createElement('i');
-                return { remoteRight: r('settings-remote-access-enabled').right, manageRight: r('settings-hub-mode-enabled').right, groupRight: r('net-group-access').right, manageGroupRight: r('net-group-manage').right,
+            const rows = await ev(`(() => { const r = id => document.getElementById(id).getBoundingClientRect(); const box = b => ({ left: b.left, right: b.right, top: b.top, bottom: b.bottom }); const hint = document.getElementById('settings-remote-access-enabled').closest('.sv-row').querySelector('.sv-help-text') || document.createElement('i');
+                return { remoteRight: r('settings-remote-access-enabled').right, manageRight: r('settings-hub-mode-enabled').right, groupRight: document.getElementById('settings-remote-access-enabled').closest('.sv-row').getBoundingClientRect().right, manageGroupRight: document.getElementById('settings-hub-mode-enabled').closest('.sv-row').getBoundingClientRect().right,
                     hint: hint.textContent.trim(), hintShown: hint.checkVisibility(), statusTitle: document.getElementById('net-status-title').textContent, aboutWords: document.getElementById('about-section').innerText, level: { select: box(r('settings-cloud-max-mode')), label: box(document.querySelector('.net-level-text label').getBoundingClientRect()) } }; })()`);
             assert.ok(rows.groupRight - rows.remoteRight < 24, at + `the Remote access switch is at the far end of its row (${rows.groupRight - rows.remoteRight} px from the edge)`);
             assert.ok(rows.manageGroupRight - rows.manageRight < 24, at + `the Manage switch is at the far end of its row too (${rows.manageGroupRight - rows.manageRight} px from the edge)`);
@@ -64,12 +64,12 @@ const BASE = require('./test_base').BASE;
             if (!mobile) assert.ok(rows.level.select.left > rows.level.label.right - 4, at + 'the level select sits at the right of its question ' + JSON.stringify(rows.level));
             else assert.ok(rows.level.select.top >= rows.level.label.bottom - 2, at + 'on a phone the select is under its question');
             // 1c. Learn more comes after the short line in the Coral Hub and Manage groups (#7626, UI/UX)
-            const learn = await ev(`(() => { const t = (g, sel) => document.querySelector('#' + g + ' ' + sel).getBoundingClientRect().top; return { hub: t('net-group-hub', '.settings-learn') > t('net-group-hub', '#settings-cloud-status'), manage: t('net-group-manage', '.settings-learn') > t('net-group-manage', '#settings-hub-mode-line') }; })()`);
+            const learn = await ev(`(() => { const t = (g, sel) => document.querySelector('#' + g + ' ' + sel).getBoundingClientRect().top; const m = document.getElementById('settings-hub-mode-enabled').closest('.sv-row'); return { hub: t('net-group-hub', '.settings-learn') > t('net-group-hub', '#settings-cloud-status'), manage: m.querySelector('.sv-learn').getBoundingClientRect().top >= m.querySelector('.sv-help-text').getBoundingClientRect().top }; })()`);
             assert.deepEqual(learn, { hub: true, manage: true }, at + 'Learn more is under the short line');
             // 2. Manage other computers: its wording
-            assert.equal(await text('#settings-hub-mode-line'), 'Adds a Servers tab, with full control of those computers.', at + 'a hub has full control of what it manages, said where the switch is');
+            assert.equal(await ev(`document.getElementById('settings-hub-mode-enabled').closest('.sv-row').querySelector('.sv-help-text').textContent.trim()`), 'Adds a Servers tab, with full control of those computers.', at + 'a hub has full control of what it manages, said where the switch is');
             assert.equal(await ev(`document.getElementById('settings-hub-mode-enabled').getAttribute('aria-labelledby')`), 'settings-hub-mode-label');
-            assert.match(await ev(`document.getElementById('settings-hub-mode-enabled').getAttribute('aria-describedby')`), /settings-hub-mode-line/);
+            assert.match(await ev(`document.getElementById('settings-hub-mode-enabled').getAttribute('aria-describedby')`), /settings-hub-mode-status/);
 
             // 3. Remote access turning on: a note, it waits for Save
             assert.equal(await text('#net-remote-note'), '', at + 'no note while nothing is changed');
