@@ -6,12 +6,14 @@ import { needsInputAttention } from './display_activity_hint.js';
  * the three counts, and the announcement of an agent that has just started waiting. */
 
 import { state } from './state.js';
+import { reviewItems, refreshReviews, onReviewsChanged } from './inbox_reviews.js';
 import { isCloud, sessionServer } from './server_base.js';
 import { importOnce } from './import_once.js';
 import { resolveSessionIdentity, sessionStateInfo } from './session_state.js';
 import './safe_markdown.js'; // the shared Inbox renderer's wrapper: the lazy Inbox modules import it, and a lazy module imports only what loads at startup (import_hygiene)
 
 const INBOX_URL = '/inbox';
+onReviewsChanged(() => updateInboxTab());
 
 /** How many agents are waiting for input right now, from the feed's list. */
 export function waitingCount() {
@@ -25,13 +27,14 @@ export function updateInboxTab() {
     if (tab.hidden) tab.hidden = false; // the Inbox is on every Coral
     const badge = document.getElementById('nav-tab-hub-inbox-badge');
     if (!badge) return;
-    const n = waitingCount();
+    refreshReviews();
+    const n = waitingCount() + reviewItems().length;
     const text = n > 99 ? '99+' : n > 0 ? String(n) : '';
     // Only what changed is written: nav_tabs.js redraws the row on any change to it, and this runs for every message of the feed (setting hidden to
     // the value it has is still a change to a MutationObserver).
     if (badge.textContent !== text) badge.textContent = text;
     if (badge.hidden !== (n === 0)) badge.hidden = n === 0;
-    const label = n > 0 ? `Inbox, ${n} waiting for input` : null;
+    const label = n > 0 ? reviewItems().length ? `Inbox, ${n} need your attention` : `Inbox, ${n} waiting for input` : null;
     if (tab.getAttribute('aria-label') !== label) { if (label) tab.setAttribute('aria-label', label); else tab.removeAttribute('aria-label'); }
     setInboxCount('needs', n);
     _hooks.needs?.(); // the Needs you rows, once the sidebar is loaded and while the Inbox is on screen

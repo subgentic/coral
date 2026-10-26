@@ -38,4 +38,8 @@ NF.saveFilters({ ...NF.EMPTY, team: 'team-b', kind: 'other', q: 'not kept' });
 assert.deepEqual(NF.loadFilters(), { ...NF.EMPTY, team: 'team-b', kind: 'other' }, 'kept for the folder, without the search words');
 NF.saveFilters(NF.EMPTY);
 assert.deepEqual(NF.loadFilters(), NF.EMPTY, 'nothing chosen keeps nothing');
+const review = { name: 'Writer', team: 'team-a', waiting_kind: 'review', waiting_since: min(20) };
+assert.equal(NF.kindOf(review), 'review');
+assert.equal(NF.matches(review, { kind: 'review', team: 'team-a', longer: '15' }, ctx, NOW), true);
+assert.equal(NF.matches(review, { kind: 'other' }, ctx, NOW), false, 'review rows do not enter the input-request pill');
 console.log('needs_filters: ok');

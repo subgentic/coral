@@ -8,9 +8,10 @@ import { needsInputAttention } from './display_activity_hint.js';
  * The one search box searches the group on screen: it narrows the rows of Needs you and Tasks, and is the Saved search (the server matches, so it covers every saved message). Saved's Filters and Sort
  * are in Display options. The hub's own framed /inbox is not this: it keeps the frame, full width (inbox_tab.js). */
 import { state } from './state.js';
+import { reviewItems, reviewErrors, refreshReviews, reviewGroups, markReviewed } from './inbox_reviews.js';
 import { go, note, backIs, currentRoute } from './nav.js';
 import { build, keyRoute, parse as parseRoute, inboxFolderPath } from './routes.js';
-import { sessionServer, keyLabel, identityKey } from './server_base.js';
+import { sessionServer, keyLabel, identityKey, splitKey } from './server_base.js';
 import { showView } from './utils.js';
 import { registerActions, textOf } from './actions.js';
 import { tableMarkup, registerGroupSource, refreshGroupTable, openGroupTable, foldWayBack } from './sidebar_groups.js';
@@ -74,10 +75,18 @@ let page = null; // { kind: 'task', project, id } | { kind: 'saved', id }: the i
 // ── Needs you ────────────────────────────────────────────────────────────
 const waitingSessions = () => (state.liveSessions || []).filter(needsInputAttention);
 const teamOf = s => s.board_project ? keyLabel(identityKey(sessionServer(s), s.board_project)) : '';
-const needsText = s => [resolveSessionIdentity(s), sessionStateInfo(s).label, askOf(s), teamOf(s)].join(' ').toLowerCase();
+const needsName = s => s.review ? s.review.produced_by || 'Unknown agent' : resolveSessionIdentity(s);
+const reviewRows = () => reviewItems().map(a => ({ review: a, session_id: a.reviewKey, display_name: a.name, board_project: splitKey(a.team).name, server: splitKey(a.team).server, waiting_kind: 'review', waiting_summary: 'For review', waiting_since: a.created_at }));
+const allNeeds = () => [...waitingSessions(), ...reviewRows()];
+const needsText = s => [s.review?.name || '', needsName(s),resolveSessionIdentity(s), sessionStateInfo(s).label, askOf(s), teamOf(s)].join(' ').toLowerCase();
 let needsFilters = NF.loadFilters(), needsBar = null;
-const needsCtx = { text: needsText, teamOf, nameOf: s => resolveSessionIdentity(s) };
-const needsRows = () => NF.ordered(waitingSessions().filter(s => NF.matches(s, needsFilters, needsCtx)), needsFilters);
+const needsCtx = { text: needsText, teamOf, nameOf: needsName };
+const filteredNeeds = () => NF.ordered(allNeeds().filter(s => NF.matches(s, needsFilters, needsCtx)), needsFilters);
+const needsOverflow = () => reviewGroups(filteredNeeds().filter(s => s.review).map(s => s.review)).filter(g => g.more.length);
+const needsRows = () => {
+    const all = filteredNeeds(), visible = new Set(reviewGroups(all.filter(s => s.review).map(s => s.review)).flatMap(g => g.rows.map(a => a.reviewKey)));
+    return all.filter(s => !s.review || visible.has(s.review.reviewKey));
+};
 /** The Needs you folder's toolbar (#8604): the search, the kind pills (All, Permission, Question, Needs input), the Filters icon (Team, Agent, Waiting longer than, Sort), the chips of what is on. */
 function inboxNeedsToolbar() {
     if (!needsBar) {
@@ -96,15 +105,15 @@ function inboxNeedsToolbar() {
             renderInboxNav(true);
         });
     }
-    const all = waitingSessions();
-    const teams = [...new Set(all.map(teamOf).filter(Boolean))].sort(), names = [...new Set(all.map(s => resolveSessionIdentity(s)))].sort();
+    const all = allNeeds();
+    const teams = [...new Set(all.map(teamOf).filter(Boolean))].sort(), names = [...new Set(all.map(needsName))].sort();
     const rows = all.filter(s => NF.matches(s, { ...needsFilters, kind: '' }, needsCtx));
-    const counts = NF.KINDS.map(k => rows.filter(s => NF.kindOf(s) === k).length);
+    const counts = NF.KINDS.filter(k => k !== 'review' || reviewItems().length || needsFilters.kind === 'review').map(k => rows.filter(s => NF.kindOf(s) === k).length);
     const node = needsBar.draw({
         filters: needsFilters,
         options: { team: { values: teams, labels: {} }, agent: { values: names, labels: {} } },
         pills: { label: 'Show agents waiting on', current: needsFilters.kind || 'all',
-            items: [{ key: 'all', label: 'All', count: rows.length }, ...NF.KINDS.map((k, i) => ({ key: k, label: NF.KIND_LABEL[k], count: counts[i] }))],
+            items: [{ key: 'all', label: 'All', count: rows.length }, ...NF.KINDS.filter(k => k !== 'review' || reviewItems().length || needsFilters.kind === 'review').map((k, i) => ({ key: k, label: NF.KIND_LABEL[k], count: counts[i] }))],
             onPick: key => { needsFilters = { ...needsFilters, kind: key === 'all' ? '' : key }; NF.saveFilters(needsFilters); renderInboxNav(true); } },
     });
     return { node, signature: JSON.stringify([needsFilters, teams, names, counts, rows.length]) };
@@ -115,6 +124,29 @@ const RANK = { high: 0, medium: 1, low: 2 };
 const stateOf = t => TV.taskWord(t);
 const inboxTasksState = DT.tableState();
 const needsState = DT.tableState();
+
+async function openReview(row) {
+    const { openArtifactViewer } = await importOnce('./artifact_viewer.js');
+    openArtifactViewer(row.hex, { server: splitKey(row.team).server, filename: row.name, mediaType: row.media_type, board: splitKey(row.team).name });
+}
+function reviewActions(row) {
+    const box = DT.el('div', 'inbox-review-actions');
+    const errorText = DT.el('span', 'inbox-review-error'); errorText.setAttribute('role', 'alert');
+    const open = DT.el('button', 'btn btn-small dt-quiet', 'Open'); open.type = 'button';
+    open.setAttribute('aria-label', `Open ${row.name}`); open.addEventListener('click', () => openReview(row));
+    const done = DT.el('button', 'btn btn-small dt-quiet', 'Mark reviewed'); done.type = 'button';
+    done.setAttribute('aria-label', `Mark reviewed: ${row.name}`);
+    done.addEventListener('click', async () => {
+        done.disabled = true; errorText.textContent = '';
+        try {
+            await markReviewed(row); sayLive(`Reviewed ${row.name}.`);
+            const target = $('group-table-view')?.querySelector('.inbox-review-actions button') || $('group-table-view')?.querySelector('input[type=search]');
+            target?.focus({ preventScroll: true });
+        } catch (error) { done.disabled = false; errorText.textContent = error.message; }
+    });
+    box.append(open, done, errorText); return box;
+}
+
 const dockSavedState = DT.tableState();
 const savedState = DT.tableState(); // one word set for a task's state (Queued, In progress, Blocked, In review, Done), here as everywhere
 const goalsState = DT.tableState();
@@ -252,7 +284,7 @@ function inboxSavedToolbar() {
 const savedCounts = () => saved.savedView().totals;
 
 // ── The sidebar list ─────────────────────────────────────────────────────
-const countOf = key => key === 'needs' ? waitingSessions().length : key === 'tasks' ? taskRows().length : key === 'goals' ? goals.length : key === 'artifacts' ? IA.artifactCount() ?? undefined : key === 'saved' ? savedCounts().open : undefined;
+const countOf = key => key === 'needs' ? allNeeds().length : key === 'tasks' ? taskRows().length : key === 'goals' ? goals.length : key === 'artifacts' ? IA.artifactCount() ?? undefined : key === 'saved' ? savedCounts().open : undefined;
 /** The folders of the Inbox (#7785, the mailbox mock): one view list, a name and a count each. Needs you, Tasks and Saved open their table in the centre; */
 const folderSections = () => [{ title: 'Needs attention', items: [
     { key: 'needs', label: 'Needs you', count: countOf('needs'), alert: true }, { key: 'tasks', label: 'Tasks', count: countOf('tasks') },
@@ -290,7 +322,7 @@ function renderInboxNav(force = false) {
         needs.map(s => [sessionServer(s), s.session_id, s.display_name, s.waiting_kind, s.waiting_since, teamOf(s), askOf(s)]), tk.map(t => [t.project, t.id, t.title, t.priority, t.status, t.board, t.updated_at, t.artifact_count]), sv.map(f => [f.id, f.which, f.saved, f.state])]);
     if (!force && key === _navKey) return;
     _navKey = key;
-    if (needsRows().some(s => s.waiting_since) && !_poll) _poll = pollEvery(() => renderInboxNav(true), 30000); // "waiting 4 min" in the Needs you table moves on while the tab is open
+    if (needsRows().some(s => s.waiting_since) && !_poll) _poll = pollEvery(() => { refreshReviews(); renderInboxNav(true); }, 30000); // "waiting 4 min" in the Needs you table moves on while the tab is open
     if (_folders && list.contains(_folders)) VL.update(_folders, { sections, current: here });
     else { _folders = VL.build({ id: 'inbox-folders', label: 'Inbox views', sections, current: here, onPick: pickFolder }); list.replaceChildren(_folders); }
     const pageList = page && $('inbox-page')?.querySelector('[data-view-list="inbox-goal-folders"], [data-view-list="inbox-item-folders"]'); // an opened item's own folder list (a phone's select) follows the counts too: it was drawn once, with the counts of that moment (#8681)
@@ -396,19 +428,27 @@ registerGroupSource('hub-inbox', {
             const rows = needsRows(), dirOf = s => String(s.working_directory || '').replace(/[\\/]+$/, '').split(/[\\/]/).pop();
             const goalOf = s => s.goal && s.goal.id && s.goal.title;
             const goal = rows.some(goalOf);
-            return { title: 'Needs you', noun: ['agent', 'agents'], rows, empty: { line: NF.isFiltered(needsFilters) ? 'No agent that needs you matches the search and filters.' : 'Nothing needs your input.' },
-                signature: JSON.stringify(rows.map(s => [sessionServer(s), s.session_id, s.display_name, s.waiting_kind, s.waiting_since, waitingText(s.waiting_since), teamOf(s), askOf(s), goalOf(s) ? s.goal.id : 0, dirOf(s)])), // the words move on with the clock: they are part of what was drawn
-                node: () => DT.dataTable({ label: `Needs you, ${rows.length}`, rows, rowKey: s => `${sessionServer(s)}:${s.session_id}`, state: needsState, rowName: s => resolveSessionIdentity(s),
-                    open: s => { window.switchNavTab?.('agents'); window.selectLiveSession?.(s.name, s.agent_type, s.session_id, sessionServer(s)); },
+            return { title: 'Needs you', rows, note: reviewErrors().join(' '), empty: { line: NF.isFiltered(needsFilters) ? 'Nothing that needs you matches the search and filters.' : 'Nothing needs your input.' },
+                signature: JSON.stringify([needsOverflow().map(g => [g.name, g.more.map(a => a.reviewKey)]), reviewErrors(), rows.map(s => [sessionServer(s), s.session_id, s.display_name, s.waiting_kind, s.waiting_since, waitingText(s.waiting_since), teamOf(s), askOf(s), goalOf(s) ? s.goal.id : 0, dirOf(s)])]), // the words move on with the clock: they are part of what was drawn
+                node: () => { const wrap = DT.el('div', 'inbox-needs-results'); const table = DT.dataTable({ label: `Needs you, ${rows.length}`, rows, rowKey: s => `${sessionServer(s)}:${s.session_id}`, state: needsState, rowName: s => s.review ? `${s.review.name}, for review, ${teamOf(s)}` : resolveSessionIdentity(s),
+                    open: s => { if (s.review) { openReview(s.review); return; } window.switchNavTab?.('agents'); window.selectLiveSession?.(s.name, s.agent_type, s.session_id, sessionServer(s)); },
                     columns: [
-                        { key: 'agent', label: 'Agent', primary: true, width: rows.some(askOf) ? undefined : 'grow', sort: true, sortValue: s => resolveSessionIdentity(s), line: 1, cell: s => { const w = DT.personButton(resolveSessionIdentity(s), `Open ${resolveSessionIdentity(s)}`); Object.assign(w.querySelector('.dt-primary').dataset, { name: s.name, agentType: s.agent_type, sessionId: s.session_id, server: sessionServer(s) }); return w; } },
+                        { key: 'agent', label: rows.some(s => s.review) ? 'Item' : 'Agent', primary: true, width: rows.some(askOf) ? undefined : 'grow', sort: true, sortValue: s => resolveSessionIdentity(s), line: 1, cell: s => { if (s.review) { const b = DT.primaryButton(s.review.name); b.dataset.reviewArtifact = s.review.id; return b; } const w = DT.personButton(resolveSessionIdentity(s), `Open ${resolveSessionIdentity(s)}`); Object.assign(w.querySelector('.dt-primary').dataset, { name: s.name, agentType: s.agent_type, sessionId: s.session_id, server: sessionServer(s) }); return w; } },
                         ...(rows.some(askOf) ? [{ key: 'asks', label: 'Waiting for', width: 'grow', line: 2, cell: s => askOf(s) || '' }] : []), // no row has a question: no empty column
-                        { key: 'cli', label: 'CLI', sort: true, sortValue: s => providerName(s.agent_type) || '', line: 2, cell: s => (s.agent_type ? DT.tag(providerName(s.agent_type)) : '') },
+                        ...(rows.some(s => s.agent_type) ? [{ key: 'cli', label: 'CLI', sort: true, sortValue: s => providerName(s.agent_type) || '', line: 2, cell: s => (s.agent_type ? DT.tag(providerName(s.agent_type)) : '') }] : []),
                         ...(rows.some(dirOf) ? [{ key: 'folder', label: 'Folder', sort: true, sortValue: s => dirOf(s) || '', line: 0, cell: s => dirOf(s) || '' }] : []), // the folder an agent works in tells two of one name apart (#7122)
-                        { key: 'team', label: 'Team', sort: true, sortValue: s => teamOf(s), line: 0, cell: s => teamOf(s) },
+                        { key: 'team', label: 'Team', sort: true, sortValue: s => teamOf(s), line: rows.some(s => s.review) ? 2 : 0, cell: s => teamOf(s) },
                         ...(goal ? [{ key: 'goal', label: 'Goal', line: 0, cell: s => { if (!goalOf(s)) return ''; const l = DT.link(s.goal.title, () => importOnce('./task_goals.js').then(m => m.openGoalOnTeamPage(s.goal.board || s.board_project || '', s.goal.id)).catch(() => {})); l.setAttribute('aria-label', `Goal: ${s.goal.title}`); return l; } }] : []),
+                        ...(rows.some(s => s.review) ? [{ key: 'review', label: 'Actions', line: 2, cell: s => s.review ? reviewActions(s.review) : '' }] : []),
                         { key: 'waiting', label: 'Waiting', tone: 'tertiary', align: 'end', sort: true, sortValue: s => s.waiting_since || '', firstDir: 'desc', line: 1, cell: s => waitingText(s.waiting_since) || '' },
-                    ] }).el };
+                    ] });
+                    wrap.append(table.el);
+                    for (const g of needsOverflow()) {
+                        const p = DT.el('p', 'inbox-review-more', `${g.name}: ${g.more.length} more for review. `);
+                        for (const team of new Set(g.more.map(a => a.team))) p.append(DT.link(`Open ${keyLabel(team)} artifacts`, () => go(keyRoute('team', team, 'artifacts'))));
+                        wrap.append(p);
+                    }
+                    return wrap; } };
         }
         if (key === 'tasks') {
             const rows = taskRows();
@@ -599,6 +639,7 @@ export async function showInbox({ folder = '', quiet = false } = {}) {
     setGroup(group);
     renderInboxNav(true);
     refreshTasks();
+    refreshReviews(true);
     refreshGoals();
     CH.loadChatCounts(() => renderInboxNav(true));
     IA.refreshArtifactCount(() => renderInboxNav(true));

@@ -38,7 +38,7 @@ const BASE = require('./test_base').BASE;
                             const id=u.pathname.split('/').at(-2),body=JSON.parse(opts.body);window.__reviewWrites.push(body);
                             window.__reviewItems.find(a=>a.id===id).tags=body.tags;return json({tags:body.tags});
                         }
-                        if(u.pathname.startsWith('/api/artifacts/')&&/^[0-9a-f]{64}$/.test(u.pathname.split('/')[3])&&u.pathname.split('/').length<=5)return Promise.resolve(new Response('Review preview text',{headers:{'Content-Type':'text/plain'}}));
+                        if(u.pathname.startsWith('/api/artifacts/')&&/^[0-9a-f]{64}$/.test(u.pathname.split('/')[3])&&(u.pathname.split('/').length===4||u.pathname.split('/')[4]==='content'))return Promise.resolve(new Response('Review preview text',{headers:{'Content-Type':'text/plain'}}));
                         return original(url,opts);
                     };return true;
                 })()`);
