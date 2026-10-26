@@ -30,7 +30,7 @@ const STUB = `(() => { const real = window.fetch; window.__keys = [];
             await size(w, h, mobile); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`); await ev(STUB);
-            await ev(`window.__m.add('ak', 'A', 6, { sleeping: false, session_id: 'ak-sid' }); window._coralSetLiveSessions(Object.values(window.__m.agents).map(a => window.__m.entry(a))); localStorage.setItem('coral-live-view-mode', 'chat'); true`);
+            await ev(`window.__m.add('ak', 'A', 6, { sleeping: false, session_id: 'ak-sid' }); window._coralSetLiveSessions(Object.values(window.__m.agents).map(a => window.__m.entry(a))); localStorage.setItem('coral-live-view-mode', 'chat'); localStorage.removeItem('coral-agent-keys'); true`);
             await select('ak');
             await waitFor(`window.__rendered && window.__rendered().length >= 3`, 'the chat', 15000);
             await ev(`document.getElementById('model-chip-bar').hidden = false; true`); // the chips show once the model is known: made to show
@@ -112,6 +112,7 @@ const STUB = `(() => { const real = window.fetch; window.__keys = [];
 
             // a question opens it by itself, once, without moving focus
             await ev(`document.getElementById('command-input').focus(); true`);
+            await ev(`localStorage.removeItem('coral-agent-keys'); true`); // the person has not turned the strip off: a question opens it
             await row({ waiting_for_input: true, waiting_kind: 'choice', waiting_summary: 'Which file?' }); await sleep(300); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
             assert.ok(await ev(q('#agent-key-strip')), at + 'a question opens the strip by itself');
             assert.equal(await status(), 'Keys for the question are shown', at + 'said once');
@@ -121,7 +122,12 @@ const STUB = `(() => { const real = window.fetch; window.__keys = [];
             await row({ waiting_for_input: true, waiting_kind: 'choice', waiting_summary: 'Which file?' }); await sleep(200); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
             assert.equal(await ev(q('#agent-key-strip')), null, at + 'the person closed it for this question: it stays closed');
             await row({ waiting_for_input: true, waiting_kind: 'choice', waiting_summary: 'Which folder?' }); await sleep(200); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
-            assert.ok(await ev(q('#agent-key-strip')), at + 'another question opens it');
+            assert.equal(await ev(`localStorage.getItem('coral-agent-keys')`), 'off', at + 'the chip closing a strip a question opened is the person turning it off');
+            await row({ waiting_for_input: false }); await sleep(150); await row({ waiting_for_input: true, waiting_kind: 'choice', waiting_summary: 'Which path?' }); await sleep(250); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
+            assert.equal(await ev(q('#agent-key-strip')), null, at + 'a second question does not reopen it');
+            await ev(`localStorage.removeItem('coral-agent-keys'); true`); // back to a browser that has not chosen: a question opens it
+            await row({ waiting_for_input: false }); await sleep(150); await row({ waiting_for_input: true, waiting_kind: 'choice', waiting_summary: 'Which folder?' }); await sleep(250); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
+            assert.ok(await ev(q('#agent-key-strip')), at + 'another question opens it while the choice is unset');
             // focus in the strip when the question is answered: it goes to the message box
             await ev(`document.querySelector('#agent-key-strip .tkb-key').focus(); true`);
             await row({ waiting_for_input: false }); await sleep(250); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
@@ -135,7 +141,34 @@ const STUB = `(() => { const real = window.fetch; window.__keys = [];
 
             // closed on every visit: the chat off screen and back
             await ev(`document.getElementById('command-pane').style.display = 'none'; true`); await row({ working: false }); await ev(`document.getElementById('command-pane').style.display = ''; true`); await row({ working: false }); await sleep(200); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
+            assert.ok(await ev(q('#agent-key-strip')), at + 'a new visit shows it when the person last opened it (the choice is kept)');
+            if (w === 390) await shot('agent-keys-on-visit-390');
+            // the person turns it off with the chip: it stays off for a new message, a question, a new visit and a reload (#8728)
+            await ev(`document.getElementById('keys-chip').click(); true`); await sleep(150); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
+            assert.equal(await ev(q('#agent-key-strip')), null, at + 'the chip turned it off');
+            await row({ working: true }); await sleep(150); await row({ working: false }); await sleep(150); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
+            assert.equal(await ev(q('#agent-key-strip')), null, at + 'a new message does not bring it back');
+            if (w === 390) await shot('agent-keys-off-message-390');
+            await row({ waiting_for_input: true, waiting_kind: 'choice', waiting_summary: 'Off?' }); await sleep(200); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
+            assert.equal(await ev(q('#agent-key-strip')), null, at + 'a question does not open it once the person turned it off');
+            await row({ waiting_for_input: false }); await sleep(150); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
+            await ev(`document.getElementById('command-pane').style.display = 'none'; true`); await row({ working: false }); await ev(`document.getElementById('command-pane').style.display = ''; true`); await row({ working: false }); await sleep(200); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
             assert.equal(await ev(q('#agent-key-strip')), null, at + 'a new visit starts closed');
+            await ev(`localStorage.setItem('coral-live-view-mode', 'chat'); true`);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
+            await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`); await ev(STUB);
+            await ev(`window.__m.add('ak', 'A', 6, { sleeping: false, session_id: 'ak-sid' }); window._coralSetLiveSessions(Object.values(window.__m.agents).map(a => window.__m.entry(a))); true`);
+            await select('ak'); await waitFor(`window.__rendered && window.__rendered().length >= 3`, 'the chat after a reload', 15000);
+            await ev(`document.getElementById('model-chip-bar').hidden = false; document.querySelector('[aria-label="Terminal view"]').click(); true`);
+            await waitFor(`!document.getElementById('command-pane').classList.contains('chat-mode')`, 'the terminal view after a reload', 8000);
+            await row({ working: false }); await sleep(300); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
+            assert.equal(await ev(`localStorage.getItem('coral-agent-keys')`), 'off', at + 'the choice is kept in this browser');
+            assert.equal(await ev(q('#agent-key-strip')), null, at + 'after a reload it is still closed');
+            if (w === 390) await shot('agent-keys-off-reload-390');
+            await row({ waiting_for_input: true, waiting_kind: 'choice', waiting_summary: 'After reload?' }); await sleep(200); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
+            assert.equal(await ev(q('#agent-key-strip')), null, at + 'after a reload a question still does not open it');
+            await row({ waiting_for_input: false }); await sleep(150); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
+            await ev(`localStorage.removeItem('coral-agent-keys'); true`);
 
             // a viewer: no chip, no strip, no Stop
             await ev(`document.getElementById('command-pane').classList.add('hub-view-only'); true`);

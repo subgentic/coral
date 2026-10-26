@@ -2,14 +2,15 @@
  * this shows there, and the server refuses a viewer's keys anyway):
  *  - Stop: while the agent works and the message box is empty (no words, no pictures) the round Send button is a red rounded square, "Stop the agent". It sends Escape (the CLI's interrupt; Ctrl-C quits the
  *    Claude CLI on a second press), once: it is aria-disabled (still focusable) until the agent's state changes or 3 s pass. Typing a word turns it back into Send.
- *  - The Keys chip (aria-pressed) opens a row of seven keys above the message box. It is closed on every visit: a new agent, or the chat coming back on screen, starts it closed.
- *  - A question or menu (the needs-input state) opens the strip by itself, once per question, unless the person closed it for that question; when the question is answered it closes again only if it opened itself.
+ *  - The Keys chip (aria-pressed) opens a row of seven keys above the message box. It is closed on every visit until the person opens it; what they chose (open or closed) is kept in this browser and used on every visit.
+ *  - A question or menu (the needs-input state) opens the strip by itself, once per question, unless the person closed it for that question or turned the strip off; when the question is answered it closes again only if it opened itself.
  * Everything the screen reader hears goes through #agent-keys-status, a region that is in the page from the start. The key taps themselves say "Sent: Escape" through the toast (the Notifications regions). */
 import { deriveSessionState } from './session_state.js';
 import { isPhoneLayout } from './phone_layout.js';
 import { registerActions } from './actions.js';
 import { setHidden, setAttr, setText } from './dom_write.js';
 import { sendRawKeys } from './controls.js';
+import { browserLocal } from './safe_storage.js';
 
 const $ = id => document.getElementById(id);
 const STOP_AGAIN_MS = 3000;
@@ -24,6 +25,11 @@ let stopShown = false;
 let stopHeldUntil = 0;
 let stopTimer = 0;
 let last = null;             // the latest row of the open agent
+
+// the person's own choice, kept in this browser: 'on' opens the strip on every visit, 'off' keeps it shut (a question does not open it either); unset is the default below
+const PREF_KEY = 'coral-agent-keys';
+const readPref = () => { const v = browserLocal.get(PREF_KEY); return v === 'on' || v === 'off' ? v : ''; };
+const writePref = v => browserLocal.set(PREF_KEY, v);
 
 const say = text => {
     const r = $('agent-keys-status');
@@ -92,14 +98,14 @@ export function syncAgentKeys(row) {
     if (!visible) { away = true; return; }
     const id = r.session_id || r.name || null;
     if (away || id !== sessionId) { // a new visit: closed, nothing remembered
-        sessionId = id; away = false; open = false; openedBy = null; closedFor = null; paintStrip();
+        sessionId = id; away = false; open = readPref() === 'on'; openedBy = open ? 'byChip' : null; closedFor = null; paintStrip();
     }
     const viewOnly = pane.classList.contains('hub-view-only');
     if (viewOnly) { open = false; openedBy = null; paintStrip(); }
     const key = deriveSessionState(r);
     const q = questionKey(r);
     if (!viewOnly) {
-        if (q && !open && closedFor !== q) openStrip('byQuestion', 'Keys for the question are shown');
+        if (q && !open && closedFor !== q && readPref() !== 'off') openStrip('byQuestion', 'Keys for the question are shown');
         else if (!q && open && openedBy === 'byQuestion') closeStrip();
         if (!q) closedFor = null;
     }
@@ -109,8 +115,8 @@ export function syncAgentKeys(row) {
 
 registerActions({
     'agent-keys-toggle': () => {
-        if (open) closeStrip(undefined, { forQuestion: true });
-        else { open = false; openStrip('byChip'); }
+        if (open) { writePref('off'); closeStrip(undefined, { forQuestion: true }); }
+        else { writePref('on'); open = false; openStrip('byChip'); }
     },
     'cmd-stop': async () => {
         const btn = $('mobile-send-btn');
