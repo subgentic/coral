@@ -3,6 +3,7 @@
 package main
 
 import (
+	"github.com/subgentic/coral/internal/winuser"
 	"os"
 	"testing"
 	"time"
@@ -20,7 +21,7 @@ func testEventName(t *testing.T, user *windows.SID) string {
 
 func mustUser(t *testing.T) *windows.SID {
 	t.Helper()
-	user, err := currentUserSID()
+	user, err := winuser.CurrentSID()
 	require.NoError(t, err)
 	return user
 }

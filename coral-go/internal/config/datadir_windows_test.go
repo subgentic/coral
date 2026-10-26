@@ -3,6 +3,7 @@
 package config
 
 import (
+	"github.com/subgentic/coral/internal/winuser"
 	"os"
 	"path/filepath"
 	"testing"
@@ -36,7 +37,7 @@ func daclSIDs(t *testing.T, path string) (sids []*windows.SID, protected bool) {
 func TestNewDataFolderHasAnOwnerOnlyDACL(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "coral-data")
 	require.NoError(t, EnsureDataDir(dir))
-	user, err := currentUserSID()
+	user, err := winuser.CurrentSID()
 	require.NoError(t, err)
 	system, err := windows.CreateWellKnownSid(windows.WinLocalSystemSid)
 	require.NoError(t, err)

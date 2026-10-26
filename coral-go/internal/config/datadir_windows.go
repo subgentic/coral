@@ -4,6 +4,7 @@ package config
 
 import (
 	"fmt"
+	"github.com/subgentic/coral/internal/winuser"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -12,7 +13,7 @@ import (
 // protectDataDir gives dir a protected DACL: full control for the current user and SYSTEM,
 // inherited by every file and folder below, and nothing inherited from the parent (#3637).
 func protectDataDir(dir string) error {
-	user, err := currentUserSID()
+	user, err := winuser.CurrentSID()
 	if err != nil {
 		return err
 	}
@@ -41,14 +42,6 @@ func protectDataDir(dir string) error {
 		return fmt.Errorf("make the data folder %s private: %w", dir, err)
 	}
 	return nil
-}
-
-func currentUserSID() (*windows.SID, error) {
-	tu, err := windows.GetCurrentProcessToken().GetTokenUser()
-	if err != nil {
-		return nil, err
-	}
-	return tu.User.Sid.Copy()
 }
 
 // broadGroups are the groups that mean "other people on this computer".
@@ -84,7 +77,7 @@ func DataDirBroadReaders(dir string) ([]string, error) {
 // only Everyone, Authenticated Users and Users). Broad groups are named plainly; others by account name,
 // or by SID when it can't be looked up.
 func broadReadersOf(dacl *windows.ACL) ([]string, error) {
-	me, err := currentUserSID()
+	me, err := winuser.CurrentSID()
 	if err != nil {
 		return nil, err
 	}

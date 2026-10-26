@@ -4,6 +4,7 @@ package hooks
 
 import (
 	"errors"
+	"github.com/subgentic/coral/internal/winuser"
 	"net"
 	"net/http"
 	"net/url"
@@ -45,7 +46,7 @@ func resetListenerCheck(t *testing.T, pids func(string, int) ([]uint32, error), 
 // Coral's port itself. The image rule for any other process is TestTheImageMustBeCoralFromItsOwnFolder's. Nothing listening is fine.
 func TestTheRealLookupsFindTheListenerAndEnforceTheImage(t *testing.T) {
 	resetListenerCheck(t, tcpListenerPIDs, processOwner)
-	me, err := currentUserSID()
+	me, err := winuser.CurrentSID()
 	require.NoError(t, err)
 	for _, addr := range []string{"127.0.0.1:0", "[::1]:0"} {
 		ln, err := net.Listen("tcp", addr)
@@ -117,7 +118,7 @@ func TestAnotherAccountsListenerGetsNoToken(t *testing.T) {
 // tool's own folder, covering a dev build, or the Coral install); a renamed binary or another folder gets no token. Each
 // address is cached briefly, and a request with no token is not checked.
 func TestTheImageMustBeCoralFromItsOwnFolder(t *testing.T) {
-	me, err := currentUserSID()
+	me, err := winuser.CurrentSID()
 	require.NoError(t, err)
 	folder := t.TempDir()
 	for _, c := range []struct {
@@ -177,7 +178,7 @@ func TestARealForeignListenerOnThisComputer(t *testing.T) {
 	resetListenerCheck(t, tcpListenerPIDs, processOwner)
 	pids, err := tcpListenerPIDs("127.0.0.1", 8420)
 	require.NoError(t, err)
-	me, _ := currentUserSID()
+	me, _ := winuser.CurrentSID()
 	for _, pid := range pids {
 		if sid, _, err := processOwner(pid); err != nil || !sid.Equals(me) {
 			err := checkListener("127.0.0.1", 8420)
@@ -192,7 +193,7 @@ func TestARealForeignListenerOnThisComputer(t *testing.T) {
 // A test runs its CLI as a child of the test binary, which serves on the port: the listener is then this tool's own
 // executable file, which passes; a different program in another folder still does not.
 func TestAListenerRunningThisToolsOwnExecutablePasses(t *testing.T) {
-	me, err := currentUserSID()
+	me, err := winuser.CurrentSID()
 	require.NoError(t, err)
 	exe, err := os.Executable()
 	require.NoError(t, err)
@@ -215,7 +216,7 @@ func TestAListenerRunningThisToolsOwnExecutablePasses(t *testing.T) {
 // 0.0.0.0 with another account's program on 127.0.0.1 of the same port: the impostor wins, refused. Another account's program
 // on 0.0.0.0 with Coral on 127.0.0.1: Coral wins, allowed. The same for [::] and [::1].
 func TestTheWinnerIsCheckedInBothOrders(t *testing.T) {
-	me, err := currentUserSID()
+	me, err := winuser.CurrentSID()
 	require.NoError(t, err)
 	system, err := windows.CreateWellKnownSid(windows.WinLocalSystemSid)
 	require.NoError(t, err)
@@ -253,7 +254,7 @@ func TestTheWinnerIsCheckedInBothOrders(t *testing.T) {
 // user's Coral: the listener's owner is compared with the owner of Coral's data folder and of the session's token file too, not
 // only with the tool's own account. A service account owning the data folder is never added.
 func TestTheDataFolderOwnerIsAnAllowedListenerOwner(t *testing.T) {
-	me, err := currentUserSID()
+	me, err := winuser.CurrentSID()
 	require.NoError(t, err)
 	sandbox, err := windows.StringToSid("S-1-5-21-1111111111-2222222222-3333333333-1501") // the sandbox's own account
 	require.NoError(t, err)
@@ -296,7 +297,7 @@ func TestTheInstallFoldersComeFromTheSystemNotTheEnvironment(t *testing.T) {
 // A long-running CLI rechecks a changed listener after a short pass; a refusal
 // expires sooner so restarting Coral repairs the next request without a new CLI.
 func TestListenerVerdictExpiresWhenThePortChangesOwner(t *testing.T) {
-	me, err := currentUserSID()
+	me, err := winuser.CurrentSID()
 	require.NoError(t, err)
 	system, err := windows.CreateWellKnownSid(windows.WinLocalSystemSid)
 	require.NoError(t, err)
