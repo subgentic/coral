@@ -11,7 +11,8 @@ export function compactCount(n, kilo = 'K') {
     if (a >= 999.95e6) return sign + (a / 1e9).toFixed(1) + 'B';
     if (a >= 999950) return sign + (a / 1e6).toFixed(1) + 'M';
     if (a >= 1000) return sign + (a / 1e3).toFixed(1) + kilo;
-    return String(v);
+    const r = a >= 100 ? Math.round(v) : Math.round(v * 10) / 10; // a count is whole; a figure that is not (an average, a share of a day) has at most one decimal
+    return Math.abs(r) >= 1000 ? sign + (Math.abs(r) / 1e3).toFixed(1) + kilo : String(r);
 }
 
 /** Tokens: compactCount. */
