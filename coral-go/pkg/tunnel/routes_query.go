@@ -32,7 +32,7 @@ var routeQueries = map[string]string{
 	"GET /api/goals":                              "board,cursor,limit,state",
 	"GET /api/goals/metrics":                      "hours",
 	"GET /api/saved":                              "agent,author,conv,kind,limit,q,sort,state,team",
-	"GET /api/scheduled/jobs/{}/runs":             "limit",
+	"GET /api/scheduled/jobs/{}/runs":             "limit,offset",
 	"GET /api/scheduled/runs/recent":              "limit",
 	"GET /api/session-artifacts":                  "limit,offset,session_id",
 	"GET /api/sessions/history":                   "active,agent_name,archived,date_from,date_to,fts_mode,max_duration_sec,min_duration_sec,page,page_size,q,source_types,starred,tag_ids,tag_logic,type,with_notes",

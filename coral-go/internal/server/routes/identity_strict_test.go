@@ -130,6 +130,12 @@ func TestStrictLocalAuth(t *testing.T) {
 		rec := do("GET", "/api/sessions/live", ``, *hdr)
 		assert.Equal(t, http.StatusUnauthorized, rec.Code, *hdr)
 		assert.Equal(t, want, code(rec), *hdr)
+		// a refused key says so in the header a Coral Hub reads: a hub whose stored key is wrong shows "Key rejected", not "Unreachable" (#8089)
+		if want == "invalid_credential" {
+			assert.Equal(t, "key", rec.Header().Get("X-Coral-Refused"), *hdr)
+		} else {
+			assert.Empty(t, rec.Header().Get("X-Coral-Refused"), *hdr)
+		}
 	}
 	assert.Len(t, reached, 2)
 

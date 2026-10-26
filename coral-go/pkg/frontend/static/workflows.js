@@ -122,14 +122,36 @@ async function fetchWorkflowDetail(id) {
     }
 }
 
-async function fetchWorkflowRuns(workflowId, limit) {
+const RUNS_PAGE = 10; // runs read at a time: the page opens with the newest and the footer reads the older ones (#8089: it showed the newest 10 and said nothing of the rest)
+let runsPage = null; // the runs on screen for the open workflow: { workflowId, rows, total, busy }
+
+async function fetchWorkflowRuns(workflowId, offset = 0) {
     try {
-        const data = await apiFetch(`/api/workflows/${workflowId}/runs?limit=${limit || 20}`);
-        return data.runs || [];
+        const data = await apiFetch(`/api/workflows/${workflowId}/runs?limit=${RUNS_PAGE}&offset=${offset}`);
+        return { runs: data.runs || [], total: data.total };
     } catch (e) {
         console.error('Failed to fetch workflow runs:', e);
-        return [];
+        return null;
     }
+}
+
+/** The next RUNS_PAGE older runs of the workflow on screen, added under the ones shown. */
+async function readOlderRuns(page) {
+    if (runsPage !== page || page.busy) return;
+    page.busy = true; redrawRuns(page);
+    const more = await fetchWorkflowRuns(page.workflowId, page.rows.length);
+    if (!more) showToast('The older runs could not be read', true);
+    else {
+        const have = new Set(page.rows.map(r => r.id));
+        page.rows = page.rows.concat(more.runs.filter(r => !have.has(r.id)));
+        page.total = more.runs.length && Number.isFinite(more.total) ? more.total : page.rows.length; // nothing older came: stop offering more
+    }
+    page.busy = false; redrawRuns(page);
+}
+
+function redrawRuns(page) {
+    const host = document.getElementById('wf-run-table');
+    if (host && runsPage === page) host.replaceChildren(workflowRunsTable(page));
 }
 
 async function fetchRunDetail(runId) {
@@ -321,8 +343,9 @@ export async function selectWorkflow(id) {
     syncPhonePage();
     renderWorkflowList(); // the open row says so
 
-    const runs = await fetchWorkflowRuns(id, 10);
-    renderWorkflowDetail(wf, runs);
+    const first = await fetchWorkflowRuns(id) || { runs: [], total: 0 };
+    runsPage = { workflowId: id, rows: first.runs, total: first.total, busy: false };
+    renderWorkflowDetail(wf, first.runs);
 }
 
 
@@ -345,9 +368,10 @@ function workflowStepsTable(steps) {
     }); table.el.classList.add('wf-steps-table'); return table.el;
 }
 
-function workflowRunsTable(runs) {
+function workflowRunsTable(page) {
     const open = r => withId(r.id, selectWorkflowRun);
-    const table = DT.dataTable({ label: 'Workflow runs', rows: runs, rowKey: r => r.id, bare: true, sortBar: false, open, empty: { line: 'No runs yet.' },
+    const table = DT.dataTable({ label: 'Workflow runs', rows: page.rows, rowKey: r => r.id, bare: true, sortBar: false, open, empty: { line: 'No runs yet.' },
+        footer: page.rows.length < page.total ? { text: `Showing the newest ${page.rows.length} of ${page.total} runs`, more: { label: 'Show older runs', busy: page.busy, run: () => readOlderRuns(page) } } : undefined,
         columns: [
             { key: 'started', label: 'Started', primary: true, width: 'grow', line: 1, cell: r => { const time = DT.timeCell(r.started_at); const b = DT.primaryButton(time.textContent, `Open run #${r.id}`); b.title = time.title; b.addEventListener('click', () => open(r)); return b; } },
             { key: 'result', label: 'Result', line: 2, nowrap: false, cell: runResult, subtitle: r => (r.status === 'failed' || r.status === 'killed') ? r.failure_reason : '' },
@@ -402,7 +426,7 @@ function renderWorkflowDetail(wf, runs) {
         </div>
     `;
     container.querySelector('#wf-step-table').append(workflowStepsTable(steps));
-    container.querySelector('#wf-run-table').append(workflowRunsTable(runs));
+    container.querySelector('#wf-run-table').append(workflowRunsTable(runsPage));
     foldWayBack(container, '.wf-phone-back', '#wf-title');
 }
 

@@ -371,6 +371,18 @@ func (s *WorkflowStore) ListRunsForWorkflow(ctx context.Context, workflowID int6
 	return runs, nil
 }
 
+// CountRunsForWorkflow is how many runs a workflow has had (with that status, when one is given).
+func (s *WorkflowStore) CountRunsForWorkflow(ctx context.Context, workflowID int64, status *string) (int, error) {
+	query, args := "SELECT COUNT(*) FROM workflow_runs WHERE workflow_id = ?", []interface{}{workflowID}
+	if status != nil {
+		query += " AND status = ?"
+		args = append(args, *status)
+	}
+	var n int
+	err := s.db.GetContext(ctx, &n, query, args...)
+	return n, err
+}
+
 // ListRecentRuns returns recent runs across all workflows with workflow name.
 func (s *WorkflowStore) ListRecentRuns(ctx context.Context, limit, offset int, status *string) ([]WorkflowRun, error) {
 	var runs []WorkflowRun

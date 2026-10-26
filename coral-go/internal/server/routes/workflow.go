@@ -506,7 +506,12 @@ func (h *WorkflowHandler) ListWorkflowRuns(w http.ResponseWriter, r *http.Reques
 	for i := range runs {
 		runView(&runs[i])
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"runs": emptyIfNil(runs)})
+	total, err := h.ws.CountRunsForWorkflow(r.Context(), workflowID, status)
+	if err != nil {
+		errInternalServer(w, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"runs": emptyIfNil(runs), "total": total})
 }
 
 // ListRecentRuns returns recent runs across all workflows.
