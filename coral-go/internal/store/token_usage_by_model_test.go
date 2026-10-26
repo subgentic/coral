@@ -132,3 +132,38 @@ func TestUsageSummaries_RequestsAreCallsAndAddUp(t *testing.T) {
 	assert.EqualValues(t, 5, nm, "and By model")
 	assert.EqualValues(t, 3, byModelKey(models)["claude|claude-opus-5-5"].NumRequests, "a model's row counts its calls, not its two sessions")
 }
+
+// The same sums over rows that were rolled up into hourly rows (n_rows above 1): a request count is SUM(n_rows), not the number of stored rows (QA Reviewer 2's gap on #7719: COUNT(*) passed the raw-row test above).
+func TestUsageSummaries_RequestsOfRolledUpHoursAreTheirRowCount(t *testing.T) {
+	db := openTestDB(t)
+	s := NewTokenUsageStore(db)
+	ctx := context.Background()
+	old := time.Now().UTC().Add(-72 * time.Hour).Truncate(time.Hour)
+	rec := func(sid string, at time.Time) {
+		t.Helper()
+		require.NoError(t, s.RecordUsage(ctx, &TokenUsage{SessionID: sid, AgentName: sid, AgentType: "claude", Model: "claude-opus-5-5", RecordedAt: at.Format("2006-01-02T15:04:05.000Z"), InputTokens: 1, OutputTokens: 1, TotalTokens: 2, CostUSD: 0.1}))
+	}
+	for i := 0; i < 7; i++ {
+		rec("old", old.Add(time.Duration(i)*time.Minute)) // seven calls in one hour, three days ago
+	}
+	rec("new", time.Now().UTC().Add(-time.Minute))
+	_, rolled, err := db.RollupTokenUsage(ctx, time.Now().UTC().Add(-24*time.Hour), 1000)
+	require.NoError(t, err)
+	require.EqualValues(t, 7, rolled, "the old hour is rolled up into one stored row of seven calls")
+
+	types, err := s.GetUsageSummary(ctx, "")
+	require.NoError(t, err)
+	models, err := s.GetUsageSummaryByModel(ctx, "")
+	require.NoError(t, err)
+	agents, err := s.GetUsageSummaryByAgent(ctx, "")
+	require.NoError(t, err)
+	require.Len(t, types, 1)
+	require.Len(t, models, 1)
+	var na int64
+	for _, r := range agents {
+		na += int64(r.NumRecords)
+	}
+	assert.EqualValues(t, 8, na, "By agent: 7 rolled-up calls and 1 raw")
+	assert.EqualValues(t, 8, types[0].NumRequests, "By provider counts the calls inside the rolled-up row, not the row")
+	assert.EqualValues(t, 8, models[0].NumRequests, "and By model")
+}
