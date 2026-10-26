@@ -184,7 +184,8 @@ func main() {
 	fmt.Printf("  Stop: coral-tray --stop\n")
 }
 
-func runForeground(host string, port int, noBrowser, debugMode bool, backendType, dataDir string) {
+// setupTrayLog opens tray.log in the data folder (rotated as coral.log is, no symlink followed, with the home folder, user and computer name left out) and makes it the log output; redirect sends the process's stderr to it, and to each new file after a rotation, so a crash in the native code lands there.
+func setupTrayLog(dataDir string, redirect func(*os.File)) {
 	// Setup log file FIRST — when launched from .app there's no terminal,
 	// so log.Fatalf messages would disappear silently without this.
 	logFile := filepath.Join(dataDir, "tray.log")
@@ -197,27 +198,14 @@ func runForeground(host string, port int, noBrowser, debugMode bool, backendType
 		// rotation. CGO crashes (systray, Cocoa) write to stderr, not Go's log package.
 		// Without this, those crash messages vanish when running as a .app bundle or
 		// background process with no terminal attached.
-		lf.OnOpen(redirectStderr)
+		lf.OnOpen(redirect)
 		// lf intentionally NOT closed — log.SetOutput and dup2'd stderr
 		// need the FD open for the process lifetime. OS cleans up on exit.
 	}
+}
 
-	// Global panic recovery — log the full stack trace before exiting
-	defer func() {
-		if r := recover(); r != nil {
-			log.Printf("[FATAL] panic in coral-tray: %v\n%s", r, debug.Stack())
-			os.Exit(1)
-		}
-	}()
-
-	log.Printf("[STARTUP] coral-tray starting pid=%d go=%s os=%s arch=%s",
-		os.Getpid(), runtime.Version(), runtime.GOOS, runtime.GOARCH)
-
-	if debugMode {
-		os.Setenv("CORAL_DEBUG", "1")
-		log.Println("Debug mode enabled")
-	}
-
+// waitForRestartedInstance waits for the instance that started this one to exit, when a restart from Settings named it in the environment (the variable is cleared either way).
+func waitForRestartedInstance() {
 	// Restarted from Settings (#3460): wait for the instance that started this one to
 	// exit and free the port before starting the server.
 	if v := os.Getenv(restartWaitEnv); v != "" {
@@ -227,14 +215,10 @@ func runForeground(host string, port int, noBrowser, debugMode bool, backendType
 			waitForExit(pid, time.Minute)
 		}
 	}
+}
 
-	// This start decides about the window itself: what the last tray left recorded is for the update's relaunch only (#5827).
-	windowmark.Clear(config.Load().CoralDir())
-
-	// Write PID
-	writePID(dataDir)
-	defer removePID(dataDir)
-
+// installCrashSignalHandlers ignores SIGHUP and logs the stack before exiting on SIGABRT (a native crash on macOS).
+func installCrashSignalHandlers() {
 	// Ignore SIGHUP — macOS sends it during sleep/wake transitions and when
 	// the controlling terminal closes. Without this, the default Go behavior
 	// kills the process.
@@ -252,59 +236,10 @@ func runForeground(host string, port int, noBrowser, debugMode bool, backendType
 		log.Printf("[FATAL] stack trace:\n%s", debug.Stack())
 		os.Exit(1)
 	}()
+}
 
-	// Setup signal handling
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-
-	// Coral's server runs as a child process the tray supervises (#4163): restarted after a
-	// crash with backoff, stopped after a crash loop, never restarted after a clean stop.
-	cfg := config.Load()
-	cfg.Port = port
-	coralAppDataDir = cfg.CoralDir()
-	url := fmt.Sprintf("http://localhost:%d", port)
-	// Every open of the dashboard signs in with a fresh single-use link from the server
-	// (#3394), asked for with the command-line token, as coral open does.
-	mintLink := func() (string, error) {
-		lctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		return loginlink.FromCLI(lctx, url, cfg.CoralDir())
-	}
-
-	exe, err := os.Executable()
-	if err != nil {
-		log.Printf("Failed to start: cannot find this program: %v", err)
-		return
-	}
-	// Anonymous install/upgrade tracking (#5184): the tray never reads the Usage analytics setting (the server child applies it, fail closed), so
-	// its own tracking starts OFF and turns on only when the child reports on, once; nothing is sent before that.
-	tracking.SetTelemetryEnabled(false)
-	tracking.SetEntrypoint("coral-tray")
-	tracking.SetCoralDir(dataDir)
-	sup := newSupervisor(exe, append([]string{"--server-child", "--port", strconv.Itoa(port), "--backend", backendType}, hostArgs(host)...), log.Writer())
-	sup.password = nativeDatabasePassword
-	sup.onTelemetry = trayTelemetry(tracking.TrackInstallAsync)
-	status := &trayStatus{}
-	sup.onState = status.set
-	// The local "Install update" started the updater and the server quit (#166): end the dashboard window and the tray, so nothing runs from the install folder.
-	sup.onQuitForUpdate = func() {
-		killCoralApp()
-		systray.Quit()
-	}
-	ready, err := sup.start()
-	if err != nil {
-		log.Printf("Failed to start: %v", err)
-		status.set(stateFailed, err.Error())
-	} else {
-		go func() { defer safego.Recover("coral-tray/main:supervise"); sup.run() }()
-		if sup.awaitFirst(ready) {
-			status.set(stateRunning, "")
-		}
-		// Later starts (a Retry after a wrong password) ask through the run loop (#4163 review).
-		go func() { defer safego.Recover("coral-tray/main:passwords"); sup.servePasswords() }()
-	}
-	stopServer := func() { sup.stop(15 * time.Second) }
-
+// startHeartbeat writes a timestamp and this pid to the heartbeat file in the data folder every 10 seconds, and removes the file when ctx ends.
+func startHeartbeat(ctx context.Context, dataDir string) {
 	// Heartbeat — write timestamp+PID to ~/.coral/heartbeat every 10s.
 	// This is the only way to detect SIGKILL (which can't be caught).
 	// Post-mortem, the last heartbeat timestamp shows when the process died.
@@ -341,6 +276,109 @@ func runForeground(host string, port int, noBrowser, debugMode bool, backendType
 			}
 		}
 	}()
+}
+
+// startWindowAtLaunch opens the Coral window once, when a start that somebody asked for finds the server running (see opensWindowAtStart); a start nobody asked for stays in the background, and a server that is not running gets no window.
+func startWindowAtLaunch(noBrowser, loginItem bool, running func() bool, showWindow func()) {
+	switch {
+	case !opensWindowAtStart(noBrowser, loginItem):
+		log.Printf("[STARTUP] staying in the background (no-browser=%v, login item=%v): the window opens when the app is opened again", noBrowser, loginItem)
+	case running():
+		go func() { defer safego.Recover("coral-tray/main:298"); showWindow() }()
+	default:
+		log.Printf("[STARTUP] the server is not running: no window (the tray menu has the log and Retry)")
+	}
+}
+
+// startServerChild starts Coral's server as the child the tray supervises (#4163): restarted after a crash with backoff, stopped after a crash loop, never restarted after a clean stop. It returns the supervisor, the status the menu shows and the function that stops the server.
+func startServerChild(exe, host string, port int, backendType string) (*supervisor, *trayStatus, func()) {
+	sup := newSupervisor(exe, append([]string{"--server-child", "--port", strconv.Itoa(port), "--backend", backendType}, hostArgs(host)...), log.Writer())
+	sup.password = nativeDatabasePassword
+	sup.onTelemetry = trayTelemetry(tracking.TrackInstallAsync)
+	status := &trayStatus{}
+	sup.onState = status.set
+	// The local "Install update" started the updater and the server quit (#166): end the dashboard window and the tray, so nothing runs from the install folder.
+	sup.onQuitForUpdate = func() {
+		killCoralApp()
+		systray.Quit()
+	}
+	ready, err := sup.start()
+	if err != nil {
+		log.Printf("Failed to start: %v", err)
+		status.set(stateFailed, err.Error())
+	} else {
+		go func() { defer safego.Recover("coral-tray/main:supervise"); sup.run() }()
+		if sup.awaitFirst(ready) {
+			status.set(stateRunning, "")
+		}
+		// Later starts (a Retry after a wrong password) ask through the run loop (#4163 review).
+		go func() { defer safego.Recover("coral-tray/main:passwords"); sup.servePasswords() }()
+	}
+	stopServer := func() { sup.stop(15 * time.Second) }
+	return sup, status, stopServer
+}
+
+func runForeground(host string, port int, noBrowser, debugMode bool, backendType, dataDir string) {
+	setupTrayLog(dataDir, redirectStderr)
+
+	// Global panic recovery — log the full stack trace before exiting
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("[FATAL] panic in coral-tray: %v\n%s", r, debug.Stack())
+			os.Exit(1)
+		}
+	}()
+
+	log.Printf("[STARTUP] coral-tray starting pid=%d go=%s os=%s arch=%s",
+		os.Getpid(), runtime.Version(), runtime.GOOS, runtime.GOARCH)
+
+	if debugMode {
+		os.Setenv("CORAL_DEBUG", "1")
+		log.Println("Debug mode enabled")
+	}
+
+	waitForRestartedInstance()
+
+	// This start decides about the window itself: what the last tray left recorded is for the update's relaunch only (#5827).
+	windowmark.Clear(config.Load().CoralDir())
+
+	// Write PID
+	writePID(dataDir)
+	defer removePID(dataDir)
+
+	installCrashSignalHandlers()
+
+	// Setup signal handling
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	// Coral's server runs as a child process the tray supervises (#4163): restarted after a
+	// crash with backoff, stopped after a crash loop, never restarted after a clean stop.
+	cfg := config.Load()
+	cfg.Port = port
+	coralAppDataDir = cfg.CoralDir()
+	url := fmt.Sprintf("http://localhost:%d", port)
+	// Every open of the dashboard signs in with a fresh single-use link from the server
+	// (#3394), asked for with the command-line token, as coral open does.
+	mintLink := func() (string, error) {
+		lctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		return loginlink.FromCLI(lctx, url, cfg.CoralDir())
+	}
+
+	exe, err := os.Executable()
+	if err != nil {
+		log.Printf("Failed to start: cannot find this program: %v", err)
+		return
+	}
+	// Anonymous install/upgrade tracking (#5184): the tray never reads the Usage analytics setting (the server child applies it, fail closed), so
+	// its own tracking starts OFF and turns on only when the child reports on, once; nothing is sent before that.
+	tracking.SetTelemetryEnabled(false)
+	tracking.SetEntrypoint("coral-tray")
+	tracking.SetCoralDir(dataDir)
+	sup, status, stopServer := startServerChild(exe, host, port, backendType)
+
+	startHeartbeat(ctx, dataDir)
 
 	// The Coral window (the native one, or the dashboard in the browser when it cannot open): shown when the person launched the app, brought forward when they launch it again
 	// (a reopen event on macOS, SIGUSR1 from a second start), and not at all for a start nobody asked for: a login item, the relaunch after an update (--no-browser) (#5827).
@@ -352,15 +390,7 @@ func runForeground(host string, port int, noBrowser, debugMode bool, backendType
 	onShowWindowSignal(func() {
 		go func() { defer safego.Recover("coral-tray/main:showWindowSignal"); showWindow() }()
 	})
-	loginItem := loginItemLaunch()
-	switch {
-	case !opensWindowAtStart(noBrowser, loginItem):
-		log.Printf("[STARTUP] staying in the background (no-browser=%v, login item=%v): the window opens when the app is opened again", noBrowser, loginItem)
-	case status.running():
-		go func() { defer safego.Recover("coral-tray/main:298"); showWindow() }()
-	default:
-		log.Printf("[STARTUP] the server is not running: no window (the tray menu has the log and Retry)")
-	}
+	startWindowAtLaunch(noBrowser, loginItemLaunch(), status.running, showWindow)
 
 	// Check for updates in background
 	go func() {

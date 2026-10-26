@@ -176,8 +176,9 @@ func TestTrayMainDoesNotTrackOnItsOwn(t *testing.T) {
 	assert.NotContains(t, src, "TrackInstallAsync()", "the tray sends its events only through trayTelemetry, after the child says on (#5184)")
 	assert.Contains(t, src, "sup.onTelemetry = trayTelemetry(tracking.TrackInstallAsync)")
 	off := strings.Index(src, "tracking.SetTelemetryEnabled(false)")
-	start := strings.Index(src, "sup.start()")
+	start := strings.Index(src, ":= startServerChild(")
 	assert.True(t, off > 0 && start > off, "tracking is off before the server child starts")
+	assert.Contains(t, src, "sup.onTelemetry = trayTelemetry(", "the hook is set in startServerChild, before sup.start()")
 }
 
 // #5702 review: the hook says the CURRENT setting. Called late with a stale "on" after a switch-off, it must still say off (a fail-open line would turn the tray's tracking back on).
