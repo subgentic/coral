@@ -20,6 +20,7 @@ ok "a release after a move names the new home" "$(echo "$moved" | grep -c 'https
 ok "and still no Homebrew line" "$(echo "$moved" | grep -ci 'brew')" 0
 old=$(RELEASE_HOMES_FILE="$H" bash "$root/tools/devops/download-section.sh" v1.4.133)
 ok "a release before the move keeps the old home" "$(echo "$old" | grep -c 'https://github.com/cdknorow/coral/releases/download/v1.4.133/Coral.dmg')" 1
+# Intentional live release-home contract; the move cases above use a fixed table.
 # the shipped table (#5530): v1.4.141 still names cdknorow, v1.4.142 the new home, and both keep the one tap
 for v in 1.4.141:cdknorow 1.4.142:subgentic 1.4.150:subgentic; do
   t=${v%%:*}; o=${v##*:}; s=$(bash "$root/tools/devops/download-section.sh" "v$t")

@@ -13,6 +13,8 @@ check() { # name want-exit file signing tags
   bash "$script" "$3" "$4" "$5" >/dev/null 2>&1; got=$?
   if [ "$got" != "$2" ]; then echo "FAIL: $1: exit $got, wanted $2"; fail=1; else echo "ok: $1"; fi
 }
+# Intentional live shipping-policy pin; the truth-table cases below use their
+# own fixed switch files, but this check must track the actual release switch.
 check "this branch's real file passes with signing off" 0 "$real" "" "fts5"
 check "switch off, unsigned build" 0 "$work/off.go" "" "fts5"
 check "switch off, Dropbox build" 0 "$work/off.go" "false" "fts5,dropboxers"

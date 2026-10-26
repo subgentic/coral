@@ -7,6 +7,7 @@ here="$(cd "$(dirname "$0")" && pwd)"
 fail=0
 eq() { if [ "$2" = "$3" ]; then echo "ok: $1"; else echo "FAIL: $1: got [$2] want [$3]" >&2; fail=1; fi; }
 
+# Intentional live policy/history pins; synthetic move behavior below uses its own table.
 # the shipped table: v1.4.141 and earlier were built in cdknorow/coral, v1.4.142 is the first release of subgentic/coral (#5530)
 eq "shipped table: current home" "$(release_home_current)" "subgentic/coral"
 eq "shipped table: v1.4.130" "$(release_home_for_tag v1.4.130)" "cdknorow/coral"

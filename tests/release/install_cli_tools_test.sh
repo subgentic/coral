@@ -2,6 +2,7 @@
 # install_cli_tools_test.sh: installers/install-cli.sh links exactly the programs the app ships
 # (tests/release/commands.txt). It runs from inside Coral.app, so it keeps its own list; this keeps
 # the two equal (it missed coral-hook-session-start until #3855's follow-up).
+# Intentional live program-list contract: fixtures would not catch installer drift.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 line=$(grep -E '^TOOLS=\(' "$root/installers/install-cli.sh")

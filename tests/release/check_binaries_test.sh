@@ -7,6 +7,11 @@ chk="$root/tools/devops/check_binaries.py"
 T=$(mktemp -d /tmp/cbt.XXXX); case "$T" in /tmp/cbt.????) ;; *) echo "bad temp dir"; exit 1;; esac
 trap 'rm -rf "$T"' EXIT
 cd "$T"; git init -q .; git config user.name t; git config user.email t@example.invalid
+# Byte/size behavior uses a fixed empty policy; production allowlist edits
+# must not grant exceptions to these synthetic names. Explicit exception cases
+# below supply their own fixture through the same override.
+printf '# empty test allowlist\n' > "$T/.git/test-allowlist"
+export CORAL_BINARY_ALLOWLIST="$T/.git/test-allowlist"
 echo base > a.txt; git add a.txt; git commit -qm base; base=$(git rev-parse HEAD)
 fail=0
 expect() { # name want(0|1) ; runs the check over base..HEAD

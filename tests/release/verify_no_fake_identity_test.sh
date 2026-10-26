@@ -5,6 +5,8 @@ here="$(cd "$(dirname "$0")" && pwd)"
 T="$(mktemp -d /tmp/nofake.XXXXXX)"
 trap 'rm -rf "$T"' EXIT
 mkdir -p "$T/ok" "$T/bad" "$T/none"
+# Intentional integration with the shipped program allowlist: the verifier scans
+# these names, so fixture binaries must use names it actually checks.
 first="$(grep -vE '^[[:space:]]*(#|$)' "$here/commands.txt" | head -1)"
 second="$(grep -vE '^[[:space:]]*(#|$)' "$here/commands.txt" | sed -n 2p)"
 [ -n "$first" ] && [ -n "$second" ] || { echo "FAIL: commands.txt needs two programs for this test" >&2; exit 1; }

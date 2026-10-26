@@ -160,6 +160,8 @@ def check_dryrun(dry):
 
 
 def main():
+    # Intentional live build-contract census: fixtures would hide shipped drift.
+    # Mutations below also prove the checks still see changes in the current files.
     wt = (ROOT / ".github/workflows/windows-tests.yml").read_text()
     rel = (ROOT / ".github/workflows/release.yml").read_text()
     resolve = (ROOT / "tests/release/resolve_release.sh").read_text()

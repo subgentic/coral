@@ -22,6 +22,7 @@ ok "a replaced row swaps the line and a drop row drops it" "$(notes_drop_edited 
 ok "a replaced row of another tag does not apply" "$(notes_drop_edited v1.4.151 <<<"$in2")" "$(printf '%s' "$in2")"
 export RELEASE_NOTES_EDITS_FILE=/nonexistent
 ok "no table: everything is kept" "$(notes_drop_edited v1.4.142 <<<"$in")" "$(printf '%s' "$in")"
+# Intentional live history pin; all parser cases above use fixed table fixtures.
 unset RELEASE_NOTES_EDITS_FILE
 ok "the shipped table drops the v1.4.142 Team settings line" "$(notes_drop_edited v1.4.142 <<<'- **The Team settings tab strip no longer changes after it appears:** x' | wc -l | tr -d ' ')" "0"
 ok "the shipped table does not touch v1.4.143" "$(notes_drop_edited v1.4.143 <<<'- **The Team settings tab strip no longer changes after it appears:** x' | wc -l | tr -d ' ')" "1"
