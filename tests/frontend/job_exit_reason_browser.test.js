@@ -43,12 +43,12 @@ const RESTART = 'Coral restarted before this run launched its agent.';
             let t = await table(1);
             check(`${tag}: the Runs table says "Completed (result not seen)" in a neutral colour with the sentence as text, and a plain pass stays "Passed" in green with none`, t[0].text === 'Completed (result not seen)' && t[0].cell.includes(UNSEEN) && !/goal-state-task-done/.test(t[0].cls) && t[1].text === 'Passed' && t[1].cell === 'Passed' && /goal-state-task-done/.test(t[1].cls), JSON.stringify(t));
             t = await table(2);
-            check(`${tag}: a restart-interrupted run says why in the table (its error as the status words)`, /^Failed: Coral restarted before this run launched its agent/.test(t[0].text), JSON.stringify(t));
+            check(`${tag}: a restart-interrupted run says why in the table (its error as the status words)`, t[0].text === 'Failed' && /Coral restarted before this run launched its agent/.test(t[0].cell), JSON.stringify(t));
             const starts = [[5, 'never-started', 'never started', 'The agent never started: no session appeared in 30 seconds'], [6, 'no-command', "couldn't start the agent", 'The start command failed: claude: not found'], [7, 'exited-at-once', 'agent exited at once', 'The agent exited before it started: exit code 1']];
             for (const [id, name, words, msg] of starts) {
                 const row = by(name); await table(id);
                 const cell = await ev(`(() => { const c = document.querySelector('.sched-runs-section .sched-status'); return { text: c.textContent, line: (c.closest('td').querySelector('.dt-subtitle') || {}).textContent || '' }; })()`);
-                check(`${tag}: a run that failed to start ("${words}") says it on its row (last run failed (${words}), the server's sentence under the name) and in the Runs table (Failed (${words}), the sentence as the line under it)`, row.meta.includes(`last run failed (${words})`) && row.note === msg && cell.text === `Failed (${words})` && cell.line === msg, JSON.stringify([row, cell]));
+                check(`${tag}: a run that failed to start ("${words}") says it on its row (last run failed (${words}), the server's sentence under the name) and in the Runs table (Failed, the sentence as the line under it)`, row.meta.includes(`last run failed (${words})`) && row.note === msg && cell.text === 'Failed' && cell.line === msg, JSON.stringify([row, cell]));
             }
         }
     } finally { await client.close(); }
