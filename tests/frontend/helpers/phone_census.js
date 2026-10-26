@@ -11,7 +11,7 @@ const { connect } = require('../agent_view_harness');
 const { launchStandIn } = require('./stand_in_agent');
 const { guardSettings } = require('./settings_guard');
 const { STUB, HEX } = require('./comments_scale');
-const { GOALS_STUB } = require('./goals_stub');
+const { GOALS_STUB, SHOW_ALL_GOALS } = require('./goals_stub');
 const { scene, tap: tapSel, problems, required, useScaleShot, openBoardComposer, BOARD_COMPOSER_UP, showUpdateReady, UPDATE_NOTICE_UP, UPDATE_DIALOG_UP } = require('./phone_targets');
 const { requiredScenes } = require('./census_required'); // the scenes the suite must visit: one file each, so commits that add scenes do not conflict
 const BASE = require('../test_base').BASE;
@@ -149,7 +149,7 @@ module.exports = part => (async () => {
             await tap('.mobile-history-back');
             await sc('board', async () => { await ev(`window.switchNavTab('board'); true`); }, { min: 2, expect: `document.getElementById('messageboard-view').getClientRects().length > 0` });
             await sc('board: a team board', async () => { await tap('#mb-projects-ul [data-project]'); await waitFor(`/Please check the release notes/.test(document.getElementById('mb-messages').textContent)`, 'board messages', 10000); }, { min: 8, expect: `/Please check the release notes/.test(document.getElementById('mb-messages').textContent)` });
-            await sc('board: goals', async () => { await ev(GOALS_STUB); await ev(`import((window.__coralStatic || '/static/') + 'state.js').then(m => window.openTeamPage(m.state.boardPageProject, { tab: 'goals' })).then(() => true)`); await waitFor(`document.querySelectorAll('#team-panel-goals .dt-table tbody tr').length === 5`, 'the goals', 10000); }, { min: 5, expect: `document.querySelectorAll('#team-panel-goals .dt-table tbody tr').length === 5` });
+            await sc('board: goals', async () => { await ev(GOALS_STUB); await ev(`import((window.__coralStatic || '/static/') + 'state.js').then(m => window.openTeamPage(m.state.boardPageProject, { tab: 'goals' })).then(() => true)`); await waitFor(`!!document.querySelector('#team-panel-goals .goals-chip, #team-panel-goals select')`, 'the goals tab', 10000); await ev(SHOW_ALL_GOALS); await waitFor(`document.querySelectorAll('#team-panel-goals .dt-table tbody tr').length === 5`, 'the goals', 10000); }, { min: 5, expect: `document.querySelectorAll('#team-panel-goals .dt-table tbody tr').length === 5` });
             await sc('board: a goal', async () => { await tap('#team-panel-goals .dt-table tbody tr .dt-primary'); await waitFor(`!!document.querySelector('#team-panel-goals .goals-close')`, 'the goal\'s tasks', 10000); }, { min: 5, expect: `!!document.querySelector('#team-panel-goals .goals-close')` });
             await sc('board: close a goal', async () => { await tap('.goals-close'); await waitFor(`!!document.querySelector('dialog.goals-close-dialog[open]')`, 'the Close dialog', 10000); await ev(`document.querySelector('dialog.goals-close-dialog .goals-actions .btn-primary').focus(); true`); /* the Tab walk starts after the last control, so it comes round to the radios first */ }, { min: 3, expect: `!!document.querySelector('dialog.goals-close-dialog[open]')` });
             await ev(`document.querySelector('dialog.goals-close-dialog') && document.querySelector('dialog.goals-close-dialog').close(); true`);

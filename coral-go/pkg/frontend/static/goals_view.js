@@ -22,7 +22,8 @@ const TV = await importOnce('./tasks_view.js'); // the one Tasks view
 const PAGE = 50; // a goal's tasks are drawn this many at a time
 import * as W from './goal_words.js';
 
-const model = { followUps: new Map(), followKey: new Map(), project: '', sig: '', goals: [], requireGoal: false, noGoalOpen: null, filter: 'all', openId: 0, tasks: new Map(), loading: false, failed: '', asOf: '', creating: false, taskSearch: '', goalSearch: '', screen: 'goal' };
+const DEFAULT_FILTER = 'active'; // the Goals tab opens on the goals in progress, not on every goal ever (#8517, the operator); a pill the person picks is kept while they are on the team
+const model = { followUps: new Map(), followKey: new Map(), project: '', sig: '', goals: [], requireGoal: false, noGoalOpen: null, filter: DEFAULT_FILTER, openId: 0, tasks: new Map(), loading: false, failed: '', asOf: '', creating: false, taskSearch: '', goalSearch: '', screen: 'goal' };
 const PHONE = matchMedia('(max-width: 760px)'); // the team page's phone layout (team_page.css): a goal, its task list and a task are three screens
 let root = null;
 let layout = 'cards'; // 'cards': the board's Goals face (cards and the goal beside them); 'page': the team page's Goals tab (a table, and a goal's own page, #7453)
@@ -207,7 +208,7 @@ function drawTableRaw(col) {
     const sort = goalsTableState.sort;
     const sortValue = g => sort.key === 'goal' ? g.title : sort.key === 'state' ? W.stateWord(g) : sort.key === 'progress' ? (totalOf(g.rollup) ? doneOf(g.rollup) / totalOf(g.rollup) : 0) : g.updatedAt;
     if (sort) shown.sort((a, b) => { const x = sortValue(a), y = sortValue(b); return (sort.dir === 'desc' ? -1 : 1) * (typeof x === 'number' ? x - y : String(x).localeCompare(String(y), undefined, { numeric: true })); });
-    const rows = shown.concat(model.noGoalOpen > 0 && model.filter === 'all' ? [{ id: 'no-goal', title: W.noGoalRowText(model.noGoalOpen), noGoal: true }] : []);
+    const rows = shown.concat(model.noGoalOpen > 0 && (model.filter === 'all' || model.filter === DEFAULT_FILTER) ? [{ id: 'no-goal', title: W.noGoalRowText(model.noGoalOpen), noGoal: true }] : []);
     const table = DT.dataTable({
         label: `Goals, ${shown.length}`, rows, rowKey: g => g.id, state: goalsTableState, rowName: g => g.title,
         selectable: { contextKey: model.project, canSelect: g => !g.noGoal && W.isOpenGoal(g), actions: goalBulkActions(), onChange: keys => Toolbar.mountSelection(toolbar, keys.size ? table.bar : null) },
@@ -531,7 +532,7 @@ function openClose(g, preset) {
 
 /** Show the board's goals in `host` (the page's #mb-goals) and read them. */
 export function showGoals(host, project, opts = {}) {
-    if (project !== model.project) { goalsTableState = DT.tableState(); Object.assign(model, { project, sig: '', goals: [], requireGoal: false, noGoalOpen: null, filter: 'all', openId: 0, tasks: new Map(), failed: '', asOf: '', loading: false, taskSearch: '', screen: 'goal' }); }
+    if (project !== model.project) { goalsTableState = DT.tableState(); Object.assign(model, { project, sig: '', goals: [], requireGoal: false, noGoalOpen: null, filter: DEFAULT_FILTER, openId: 0, tasks: new Map(), failed: '', asOf: '', loading: false, taskSearch: '', screen: 'goal' }); }
     layout = 'page';
     hooks = opts.hooks || {};
     if (host.dataset.built !== 'page') { // the team page's Goals tab (#7453): the status line for a screen reader, and one body that is the table or a goal's page
