@@ -75,6 +75,7 @@ function _selectLaunchType(type) {
             sections: true, // step 3 is a sectioned dialog (#4950): Agent, Permissions, Advanced
             wizard: true, // the persona page for step 2 and three panes for step 3 (#7391)
             adopt: { persona: 'launch-persona-top', agent: 'launch-agent-provider', advanced: 'launch-advanced-extra' },
+            adoptEnd: { agent: 'launch-note-slot' }, // the provider's notes have their room at the END of the Agent pane, under Thinking: nothing above it moves when a note appears (#8528)
             value: launch.member ? launch.member.value : { agentType: _settingsFor(_effectiveServer(launch.server)).default_agent_type || 'claude' }, // a member's own values (#7861)
         });
         // The agent is chosen in this step, not only under More options (#6199): a radio group that follows the form's own select, the installed agents first.

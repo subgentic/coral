@@ -388,6 +388,8 @@ function drawSectionedAcf(container, uid, opts, { f: { showPreset, showName, pro
     // Whatever the dialog asked to sit in a pane (opts.adopt: { paneId: element id }) is parked beside the container while the panes are rebuilt.
     const adopted = Object.entries(opts.adopt || {}).map(([paneId, id]) => [paneId, document.getElementById(id)]).filter(([, el]) => el);
     for (const [, el] of adopted) container.after(el);
+    const adoptedEnd = Object.entries(opts.adoptEnd || {}).map(([paneId, id]) => [paneId, document.getElementById(id)]).filter(([, el]) => el); // parked and placed the same way, but at the END of the pane
+    for (const [, el] of adoptedEnd) container.after(el);
     if (opts.wizard) {
         // New Agent's three steps (#7391): step 2 is the persona page (the prompt here, the persona and name adopted above it), step 3 is these three panes: the provider group adopted into Agent, the Mode as cards, the tool chips in a closed disclosure.
         const toolsHTML = `<details class="acf-tools-details"><summary>Tool permissions <span class="acf-perms-summary settings-hint"></span></summary>${permEditorHTML(true)}</details>`;
@@ -420,6 +422,7 @@ function drawSectionedAcf(container, uid, opts, { f: { showPreset, showName, pro
         container.dataset.acfPersonaPane = '1';
     }
     for (const [paneId, el] of adopted) container.querySelector(`[data-section="${CSS.escape(paneId)}"], [data-adopt="${CSS.escape(paneId)}"]`)?.prepend(el);
+    for (const [paneId, el] of adoptedEnd) container.querySelector(`[data-section="${CSS.escape(paneId)}"], [data-adopt="${CSS.escape(paneId)}"]`)?.append(el);
 }
 
 function initAcfPermissions(container, uid, { caps, v }) {
