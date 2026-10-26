@@ -214,18 +214,7 @@ func (l *Linux) Unsupported(install string) string {
 }
 
 // Writable: the user can create files next to the install and in it.
-func (l *Linux) Writable(install string) bool {
-	for _, d := range []string{filepath.Dir(install), install} {
-		f, err := os.CreateTemp(d, ".coral-update-probe-*")
-		if err != nil {
-			return false
-		}
-		name := f.Name()
-		f.Close()
-		os.Remove(name)
-	}
-	return true
-}
+func (l *Linux) Writable(install string) bool { return writable(install) }
 
 func linuxNewName(install string) string {
 	return filepath.Join(filepath.Dir(install), "."+filepath.Base(install)+".new")
