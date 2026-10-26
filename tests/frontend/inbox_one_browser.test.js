@@ -90,12 +90,12 @@ const AGENTS = (waiting) => waiting ? [
                 await ev(`(() => { const s = document.querySelector('#group-table-view .view-list-select'); s.value = 'tasks'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
                 await waitFor(`!!document.querySelector('#group-table-view .dt-primary')`, at + 'the select opens Tasks', 8000);
                 await ev(`document.querySelector('#group-table-view .dt-primary').click(); true`);
-                await waitFor(`document.getElementById('team-panel-item').getClientRects().length > 0 && !!document.querySelector('#team-panel-item .ibx-reply-input')`, at + 'the task as a screen of its own', 10000);
-                assert.equal(await ev(`document.querySelector('#team-panel-item .goals-back').textContent.trim()`), '\u2190 Tasks', at + 'with the way back, to the folder it came from');
+                await waitFor(`document.getElementById('inbox-page').getClientRects().length > 0 && !!document.querySelector('#inbox-page .ibx-reply-input')`, at + 'the task as a screen of its own', 10000);
+                assert.equal(await ev(`document.querySelector('#inbox-page .goals-back').textContent.trim()`), '\u2190 Tasks', at + 'with the way back, to the folder it came from');
                 assert.equal(await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1`), true, at + 'no sideways scroll on a task');
                 await shot(`inbox-one-task-${w}`);
-                await ev(`document.querySelector('#team-panel-item .goals-back').click(); true`);
-                await waitFor(`document.getElementById('team-panel-tasks').getClientRects().length > 0 && document.getElementById('team-panel-item').hidden`, at + 'back is the Tasks table', 4000);
+                await ev(`document.querySelector('#inbox-page .goals-back').click(); true`);
+                await waitFor(`document.getElementById('group-table-view').getClientRects().length > 0 && document.getElementById('inbox-page').hidden`, at + 'back is the Tasks table', 4000);
                 continue;
             }
 
@@ -130,16 +130,16 @@ const AGENTS = (waiting) => waiting ? [
                 wide ? ['Review the release plan|High|Queued|team-a', 'Write the release notes|Medium|In progress|team-a', 'Check the installer|Low|Blocked|team-b'] : ['Review the release plan|High|Queued|', 'Write the release notes||In progress|', 'Check the installer||Blocked|'], at + 'rows by priority, in words');
             assert.deepEqual(await ev(`(${ON_SCALE})(document.getElementById('group-table-view'), ${SCALE})`), [], at + 'every text of the tasks table is on the scale');
             await ev(`document.querySelector('#group-table-view .dt-primary').click(); true`);
-            await waitFor(`!!document.querySelector('#team-panel-item .ibx-reply-input') && document.getElementById('team-panel-item').checkVisibility()`, at + "the team's task page", 10000);
-            assert.equal(await ev(`location.pathname`), '/team/team-a/tasks/11', at + 'one task URL');
-            assert.equal(await ev(`document.querySelector('#team-panel-item .goals-back').textContent.trim()`), '← Tasks', at + 'back names the team Tasks tab');
+            await waitFor(`!!document.querySelector('#inbox-page .ibx-reply-input') && document.getElementById('inbox-page').checkVisibility()`, at + "the Inbox task page", 10000);
+            assert.equal(await ev(`location.pathname`), '/inbox/tasks/team-a/11', at + 'one task URL');
+            assert.equal(await ev(`document.querySelector('#inbox-page .goals-back').textContent.trim()`), '← Tasks', at + 'back names the Tasks folder');
             assert.equal(await ev(`document.querySelector('#team-task-title').textContent`), '#11 Review the release plan', at + 'one title');
-            assert.match(await ev(`document.querySelector('#team-panel-item .team-task-body').textContent`), /Please check the plan/, at + 'the task description');
-            assert.equal(await ev(`[...document.querySelectorAll('#team-panel-item .ibx-task-title')].filter(e => e.getClientRects().length).length`), 0, at + 'no second title');
-            assert.equal(await ev(`document.querySelectorAll('#team-panel-item .ibx-reply-input').length`), 1, at + 'one reply box');
+            assert.match(await ev(`document.querySelector('#inbox-page .team-task-body').textContent`), /Please check the plan/, at + 'the task description');
+            assert.equal(await ev(`[...document.querySelectorAll('#inbox-page .ibx-task-title')].filter(e => e.getClientRects().length).length`), 0, at + 'no second title');
+            assert.equal(await ev(`document.querySelectorAll('#inbox-page .ibx-reply-input').length`), 1, at + 'one reply box');
             await shot(`inbox-one-task-${w}`);
-            await ev(`document.querySelector('#team-panel-item .goals-back').click(); true`);
-            await waitFor(`document.getElementById('team-panel-tasks').checkVisibility() && location.pathname === '/team/team-a/tasks'`, at + 'back is the team Tasks table', 8000);
+            await ev(`document.querySelector('#inbox-page .goals-back').click(); true`);
+            await waitFor(`document.getElementById('group-table-view').checkVisibility() && location.pathname === '/inbox/tasks'`, at + 'back is the Inbox Tasks table', 8000);
             await ev(`window.switchNavTab('hub-inbox'); true`);
 
             // Saved
@@ -220,8 +220,8 @@ const AGENTS = (waiting) => waiting ? [
                 const au = await auditRegion(ev, ['.sidebar', '#group-table-view']);
                 assert.deepEqual(au.fails.map(f => `${f.sel} ${f.what} ${f.ratio}`), [], how + 'the sidebar and the table: contrast');
                 await ev(`document.querySelector('#group-table-view .dt-primary').click(); true`);
-                await waitFor(`!!document.querySelector('#team-panel-item .ibx-reply-input')`, how + 'a task', 8000);
-                const au2 = await auditRegion(ev, ['#team-panel-item']);
+                await waitFor(`!!document.querySelector('#inbox-page .ibx-reply-input')`, how + 'a task', 8000);
+                const au2 = await auditRegion(ev, ['#inbox-page']);
                 assert.deepEqual(au2.fails.map(f => `${f.sel} ${f.what} ${f.ratio}`), [], how + "a task's page: contrast");
                 assert.equal(await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1`), true, how + 'no sideways scroll');
             }

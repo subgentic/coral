@@ -40,7 +40,7 @@
 .team-page-scroll { flex: 1; min-width: 0; min-height: 0; overflow: auto; display: flex; flex-direction: column; position: relative; }
 .team-panel { flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; }
 .team-panel[hidden] { display: none; }
-#team-panel-messages > .mb-board { flex: 1; min-height: 0; }
+#team-panel-messages > .mb-board, .inbox-board-body > .mb-board { flex: 1; min-height: 0; }
 
 /* the tables of the tabs and the pages that hold them (the goals engine's classes, now a table and a page) */
 .goals-page.goals-table-page { max-width: none; margin-inline: 0; } /* the team page's tabs fill the page area at every width: the board's 1100 px and 1440 px caps (goals.css .goals-page) are not theirs (#7729) */
@@ -273,4 +273,20 @@
     .inbox-goal-page > .view-list { display: block; padding: 12px 16px 0; }
     .inbox-goal-page > .view-list .view-list-nav { display: none; }
     .goal-team-link { display: inline-flex; align-items: center; min-height: 44px; }
+}
+
+/* Inbox task and Board mounts keep the shared page spacing and their own phone folder picker. */
+.inbox-local:has(> .inbox-item-page:not([hidden])) { height: 100%; min-height: 0; }
+.inbox-page.inbox-item-page { padding: 0; min-height: 0; height: 100%; }
+.inbox-item-page > .inbox-item-body { flex: 1 1 auto; min-height: 0; min-width: 0; display: flex; flex-direction: column; }
+.inbox-item-body > .team-task-page { flex: 1; overflow-y: auto; }
+.inbox-item-page > .view-list { display: none; }
+.inbox-board-head { padding: 16px 24px 0; }
+.inbox-board-body { padding: 0 24px; }
+.inbox-board-body .mb-tools { padding: 0; }
+@media (max-width: 760px) {
+    .inbox-item-page > .view-list { display: block; padding: 12px 16px 0; }
+    .inbox-item-page > .view-list .view-list-nav { display: none; }
+    .inbox-board-head { padding: 12px 16px 0; }
+    .inbox-board-body { padding: 0 16px; }
 }

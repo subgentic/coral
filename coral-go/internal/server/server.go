@@ -511,6 +511,7 @@ var DashboardPagePaths = []string{
 	"/agents", "/agents/*",
 	"/chats", "/chats/*",
 	"/inbox/goals", "/inbox/goals/*",
+	"/inbox/tasks", "/inbox/tasks/*", "/inbox/boards", "/inbox/boards/*",
 	"/team/*",
 	"/board/*",
 	"/workflows", "/workflows/*",
