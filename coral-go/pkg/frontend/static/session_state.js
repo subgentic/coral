@@ -1,3 +1,4 @@
+import { hasWorkingDisplayHint, trackDisplayHint } from './display_activity_hint.js';
 /* Moved out of render.js as it was (#3795): no behaviour change. */
 import { isPhoneLayout } from './phone_layout.js';
 import { modelDisplayName } from './model_names.js';
@@ -145,8 +146,16 @@ function waitingOnLabel(w) {
     }
 }
 
-export function sessionStateInfo(s, opts) {
+// UI classification only. deriveSessionState remains the authoritative resolver
+// used by send/queue/approval helpers and must never consume screen evidence.
+export function presentationSessionState(s, opts) {
     const key = deriveSessionState(s, opts);
+    trackDisplayHint(s);
+    return key === 'needs_input' && hasWorkingDisplayHint(s) ? 'working' : key;
+}
+
+export function sessionStateInfo(s, opts) {
+    const key = presentationSessionState(s, opts);
     const info = { key, ...SESSION_STATES[key] };
     // Asleep because its terminal session is gone, not because anyone asked (#3344): the
     // same state, said plainly. The row's "Terminal gone" chip restarts it.
@@ -211,6 +220,7 @@ export function buildSessionTooltip(s) {
         `<tr><td class="tt-label">Branch</td><td class="tt-value">${escapeHtml(branch)}</td></tr>`,
         `<tr><td class="tt-label">Agent</td><td class="tt-value">${escapeHtml(agent)}</td></tr>`,
     ];
+    if (hasWorkingDisplayHint(s)) rows.push('<tr><td class="tt-label">Permission</td><td class="tt-value">Codex’s terminal shows activity. Permission is not confirmed resolved; queued messages remain held.</td></tr>');
     // The model the agent is using now, from the CLI's own signals; no row while it is unknown (#4589).
     const modelName = modelDisplayName(s.model, s.model_display);
     if (modelName) rows.push(`<tr><td class="tt-label">Model</td><td class="tt-value" title="${escapeAttr(typeof s.model === 'string' ? s.model.trim() : '')}">${escapeHtml(modelName)}</td></tr>`);

@@ -1,5 +1,5 @@
 /* Moved out of render.js as it was (#3795): no behaviour change. */
-import { SESSION_STATES, _WORKTREE_ICON, _gitStateSummary, deriveSessionState, getDotClass, getMobileStatusChip, resolveSessionIdentity, sessionGoalText, sessionStateInfo, sessionUnreadCount } from './session_state.js';
+import { _WORKTREE_ICON, _gitStateSummary, getDotClass, getMobileStatusChip, resolveSessionIdentity, sessionGoalText, sessionStateInfo, sessionUnreadCount } from './session_state.js';
 import { _saveSessionOrder } from './list_order.js';
 import { escapeHtml, escapeAttr, agentNameColor } from './utils.js';
 import { autoAcceptChip, autoAcceptMenuItem } from './auto_accept.js';
@@ -518,7 +518,7 @@ function _isSleepingExpanded(groupName) {
 /** Row-level attention (amber/red tint + attention pill): the three states
  *  that need the operator at the terminal. */
  function sessionNeedsAttention(s) {
-    return !!(s && SESSION_STATES[deriveSessionState(s)].attention);
+    return !!(s && sessionStateInfo(s).attention);
 }
 
 /** Elements matching `sel` among `roots` and their descendants. */

@@ -1,3 +1,5 @@
+import { needsInputAttention } from './display_activity_hint.js';
+import { refreshNeedsInputCard } from './needs_input_card.js';
 /* WebSocket connection for real-time coral updates */
 
 import { syncSigninLine } from './signin_line.js';
@@ -133,7 +135,9 @@ function _feedKey(s) {
  * object so the previous snapshot is never aliased.
  */
 function mergeSession(prev, next) {
-    return { ...(prev || {}), ...next };
+    return { ...(prev || {}), ...next,
+        display_activity_hint: next.display_activity_hint ?? null,
+        display_activity_hint_at: next.display_activity_hint_at ?? null };
 }
 
 let _waitingSeeded = false; // first coral_update only records who is already waiting
@@ -236,7 +240,7 @@ function _holdCodexApprovalAlert(s, id) {
     _codexHolds.set(id, setTimeout(() => {
         _codexHolds.delete(id);
         const now = (state.liveSessions || []).find(x => _feedKey(x) === id);
-        if (now && now.waiting_for_input && (now.waiting_since || null) === since) _raiseNeedsInputAlert(now, id);
+        if (now && needsInputAttention(now) && (now.waiting_since || null) === since) _raiseNeedsInputAlert(now, id);
     }, CODEX_REVIEW_HOLD_MS));
 }
 
@@ -250,12 +254,13 @@ function _toastNewlyWaiting(data) {
         // Rising edge only. The first snapshot after load seeds the map
         // silently (no storm for agents that were already waiting), and the
         // agent the operator is typing into never toasts itself.
-        if (notifyEnabled && _waitingSeeded && s.waiting_for_input && !wasWaiting
+        if (notifyEnabled && _waitingSeeded && needsInputAttention(s) && !wasWaiting
             && popoutAllowsToastFor(s.session_id) && !_operatorIsTypingIn(s)) {
             if (_isCodexApprovalRequest(s)) _holdCodexApprovalAlert(s, id);
             else _raiseNeedsInputAlert(s, id);
         }
-        state.prevWaitingState[id] = !!s.waiting_for_input;
+        state.prevWaitingState[id] = needsInputAttention(s);
+        if (!needsInputAttention(s)) { clearTimeout(_codexHolds.get(id)); _codexHolds.delete(id); }
 
         // Detect goal (summary) changes — disabled for now, needs design polish
         // const prevSummary = state.prevSummaryState && state.prevSummaryState[id];
@@ -380,6 +385,7 @@ function _syncViewedSession(data) {
             updateSessionFolder(s.working_directory || "");
             updateModelChip(s, sessionServer(s));
             updateWaitingIndicator(s);
+            refreshNeedsInputCard();
             updateChangedFileCount(s.changed_file_count || 0);
             // Update terminal header status dot
             const termDot = document.getElementById('terminal-status-dot');
@@ -426,3 +432,11 @@ export function handleCoralMessage(data) {
         }
     }
 }
+
+// A stalled socket must not leave an old activity hint hiding attention.
+document.addEventListener('coral:display-hint-expired', () => {
+    const data = { sessions: state.liveSessions || [] };
+    _toastNewlyWaiting(data);
+    _publishSessions(data);
+    _syncViewedSession(data);
+});
