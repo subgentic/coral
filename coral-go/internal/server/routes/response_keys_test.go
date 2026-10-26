@@ -262,13 +262,25 @@ func TestTokenUsageViewsSendTheKeysTheFrontendReads(t *testing.T) {
 	r.Get("/api/token-usage/by-branch", h.UsageSummaryByBranch)
 	base := seedHours(t, ts)
 	since := url.QueryEscape(base.Add(-time.Hour).Format(time.RFC3339))
+	// A session with a live record (its launch time is read by By agent's Launched and Duration columns) and a git snapshot on a branch with a pull request (By branch).
+	ctx := context.Background()
+	require.NoError(t, store.NewSessionStore(db).RegisterLiveSession(ctx, &store.LiveSession{SessionID: "s1", AgentType: "claude", AgentName: "alpha", WorkingDir: t.TempDir()}))
+	sid, when, remote := "s1", base.Format(time.RFC3339), "https://example.invalid/acme/repo"
+	require.NoError(t, store.NewGitStore(db).UpsertGitSnapshot(ctx, &store.GitSnapshot{AgentName: "alpha", AgentType: "claude", WorkingDirectory: t.TempDir(), Branch: "feature", CommitHash: strings.Repeat("a", 40),
+		CommitSubject: "c", CommitTimestamp: &when, SessionID: &sid, RemoteURL: &remote, PRNumber: 12}))
 
 	sum := getKeysJSON(t, r, "/api/token-usage/summary?since="+since)
 	requireKeys(t, "summary", sum, "totals", "by_agent_type", "by_model", "by_thinking", "by_agent",
 		"totals.input_tokens", "totals.output_tokens", "totals.cache_read_tokens", "totals.cache_write_tokens", "totals.num_requests", "totals.cost_usd")
-	requireKeys(t, "by_model row", firstRow(t, "summary", sum, "by_model"), "model", "agent_type", "num_requests", "total_tokens", "cost_usd")
-	requireKeys(t, "by_agent row", firstRow(t, "summary", sum, "by_agent"),
-		"session_id", "agent_name", "folder", "working_dir", "requests", "total_tokens", "cost_usd", "first_seen", "last_seen")
+	// The Analytics tables read these from every row (cost_dashboard.js, _renderProviderTable, _renderModelTable, _renderThinkingTable, _renderAgentTable, _renderTeamTable, _renderBranchTable): a renamed token key
+	// blanks a column and nothing else fails (#8323 found input_tokens on by_agent renamed with this census green), so each row type pins every key its table draws.
+	tokens := []string{"input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens", "cost_usd"}
+	rowKeys := func(own ...string) []string { return append(append([]string{}, own...), tokens...) }
+	requireKeys(t, "by_agent_type row", firstRow(t, "summary", sum, "by_agent_type"), rowKeys("agent_type", "num_requests")...)
+	requireKeys(t, "by_model row", firstRow(t, "summary", sum, "by_model"), rowKeys("model", "agent_type", "num_requests", "total_tokens")...)
+	requireKeys(t, "by_thinking row", firstRow(t, "summary", sum, "by_thinking"), rowKeys("agent_type", "model", "num_calls", "thinking", "thinking_tokens")...)
+	requireKeys(t, "by_agent row", rowWhere(t, sum, "by_agent", "session_id", "s1"), // s1: the session with a live record
+		rowKeys("session_id", "agent_name", "board_name", "folder", "working_dir", "requests", "total_tokens", "first_seen", "last_seen", "launched_at")...) // stopped_at is left out of a session still running: By agent reads it only for an ended one
 
 	plain := getKeysJSON(t, r, "/api/token-usage/timeseries?interval=1h&since="+since)
 	requireKeys(t, "timeseries bucket", firstRow(t, "timeseries", plain, "buckets"), "bucket", "cumulative_cost",
@@ -282,7 +294,9 @@ func TestTokenUsageViewsSendTheKeysTheFrontendReads(t *testing.T) {
 	}
 
 	requireKeys(t, "by-team row", firstRow(t, "by-team", getKeysJSON(t, r, "/api/token-usage/by-team?since="+since), "teams"),
-		"board_name", "num_agents", "total_tokens", "cost_usd")
+		rowKeys("board_name", "num_agents", "total_tokens")...)
+	requireKeys(t, "by-branch row", firstRow(t, "by-branch", getKeysJSON(t, r, "/api/token-usage/by-branch?since="+since), "branches"),
+		rowKeys("board_name", "branch", "repo_name", "pr_number", "remote_url", "num_agents")...)
 	requireKeys(t, "turns row", firstRow(t, "turns", getKeysJSON(t, r, "/api/token-usage/session/s1/turns"), "turns"), "cumulative_cost")
 }
 
