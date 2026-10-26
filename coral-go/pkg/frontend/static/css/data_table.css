@@ -31,6 +31,7 @@
 }
 
 .dt-box { border: 1px solid var(--table-outer); border-radius: var(--table-radius); background: var(--table-bg); overflow-x: clip; container: dt / inline-size; } /* clip, not auto: a scroll box here would keep the sticky header from sticking to the page */
+.dt-box.dt-bare { border: 0; border-radius: 0; background: none; } /* a table that is a column of its page (a goal's tasks): no card around it */
 .dt-table { width: 100%; border-collapse: separate; border-spacing: 0; }
 .dt-table th { position: sticky; top: 0; z-index: 1; background: var(--table-head-bg); border-bottom: 1px solid var(--table-outer); padding: 8px var(--table-pad-x); text-align: left; font-size: var(--table-head-size); font-weight: var(--table-head-weight); letter-spacing: var(--table-head-track); text-transform: uppercase; color: var(--table-head-color); white-space: nowrap; }
 .dt-table th.dt-end, .dt-table td.dt-end { text-align: right; }
@@ -71,6 +72,7 @@
 .dt-bar-confirm { font-size: var(--table-secondary-size); color: var(--table-primary-color); }
 .dt-danger { color: var(--table-danger); border-color: var(--table-danger); background: none; }
 .dt-sortbar, .dt-select-toggle[hidden] { display: none; }
+.dt-box.dt-folded .dt-sortbar[hidden] { display: none; }
 .dt-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 8px var(--table-pad-x); border-top: 1px solid var(--table-outer); font-size: var(--table-tertiary-size); color: var(--table-tertiary-color); }
 .dt-empty { padding: 24px var(--table-pad-x); text-align: center; color: var(--table-secondary-color); }
 .dt-empty-line { margin: 0 0 8px; font-size: var(--table-secondary-size); }

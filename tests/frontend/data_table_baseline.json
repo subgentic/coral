@@ -6,11 +6,11 @@
     "components.css": 5,
     "cost_dashboard.css": 23,
     "docs.css": 4,
-    "layout.css": 37,
+    "layout.css": 38,
     "output.css": 4,
     "scheduler.css": 2,
     "session.css": 2,
-    "team_page.css": 54,
+    "team_page.css": 50,
     "workflows.css": 5
   },
   "js": {

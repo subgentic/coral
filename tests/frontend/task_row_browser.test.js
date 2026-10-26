@@ -82,10 +82,11 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('tasks')).then(() => true)`);
-            await waitFor(`document.querySelectorAll('#group-table-view .task-table tbody tr, #group-table-view .task-col-row').length >= 1`, 'the inbox tasks', 15000);
-            const ib = await ev(`(() => { const tb = document.querySelector('#group-table-view .task-table'); const rows = [...document.querySelectorAll('#group-table-view .task-table tbody tr, #group-table-view .task-col-row')]; return { table: !!tb, heads: tb ? [...tb.querySelectorAll('thead th')].map(h => h.textContent) : [], n: rows.length, words: rows.map(r => r.querySelector('.goal-chip').textContent), idFirst: rows.every(r => r.querySelector('.task-title-cell > .task-id + .team-row-btn') || r.querySelector('.task-col-line1 > .task-id')), h: rows.map(r => Math.round(r.getBoundingClientRect().height)) }; })()`);
+            await waitFor(`document.querySelectorAll('#group-table-view .dt-table tbody tr').length >= 1`, 'the inbox tasks', 15000);
+            if (mobile) await waitFor(`!!document.querySelector('#group-table-view .dt-box.dt-folded')`, 'the Inbox table folds on a phone', 5000);
+            const ib = await ev(`(() => { const rows = [...document.querySelectorAll('#group-table-view .dt-table tbody tr')]; const box = document.querySelector('#group-table-view .dt-box'); return { folded: box.classList.contains('dt-folded'), heads: [...document.querySelectorAll('#group-table-view th')].map(h => h.textContent.replace(/[↑↓↕]/g, '').trim()), n: rows.length, words: rows.map(r => r.querySelector('.goal-chip').textContent), idFirst: rows.every(r => r.querySelector('.dt-title-cell > .dt-id + .dt-primary')), h: rows.map(r => Math.round(r.getBoundingClientRect().height)) }; })()`);
             assert.equal(ib.n, 1, 'one task is assigned to the operator ' + JSON.stringify(ib)); assert.deepEqual(ib.words, ['Queued'], 'the same word as the Tasks tab (not "Open") ' + JSON.stringify(ib)); assert.ok(ib.idFirst, 'the id comes before the title ' + JSON.stringify(ib));
-            if (mobile) assert.ok(!ib.table && ib.h.every(h => h >= 44), 'a phone: the two-line column, 44 px ' + JSON.stringify(ib)); else assert.deepEqual(ib.heads, ['State', 'Task', 'Priority', 'Team', 'Updated'], 'a desktop: the table ' + JSON.stringify(ib));
+            if (mobile) assert.ok(ib.folded && ib.h.every(h => h >= 44), 'a phone: the folded two-line row, 44 px ' + JSON.stringify(ib)); else assert.deepEqual(ib.heads, ['State', 'Task', 'Priority', 'Team', 'Updated'], 'a desktop: the table ' + JSON.stringify(ib));
             await shot(`task-row-inbox-${label}`);
             console.log('   ✓');
         }
@@ -97,9 +98,10 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'goals', item: ${goal} }); true`);
             await waitFor(`!!document.querySelector('.goal-split')`, 'the goal page', 15000);
             if (mobile) await ev(`document.querySelector('.goal-tasks-open').click(); true`);
-            await waitFor(`document.querySelectorAll('.goal-side .task-col-row').length >= 5`, 'the goal column', 10000);
-            const gc = await ev(`(() => { const rows = [...document.querySelectorAll('.goal-side .task-col-row')]; return { words: [...new Set(rows.map(r => r.querySelector('.goal-chip').textContent))].sort(), idFirst: rows.every(r => r.querySelector('.task-col-line1 > .task-id')), high: rows.filter(r => r.querySelector('.task-col-priority')).length, h: rows.map(r => Math.round(r.getBoundingClientRect().height)) }; })()`);
-            assert.deepEqual(gc.words, ['In progress', 'Queued'], 'the same word set ' + JSON.stringify(gc)); assert.ok(gc.idFirst, 'the id before the title'); assert.equal(gc.high, 2, 'High only'); assert.ok(gc.h.every(h => h >= 44), '44 px rows ' + JSON.stringify(gc.h));
+            await waitFor(`document.querySelectorAll('.goal-side .dt-table tbody tr').length >= 5`, 'the goal column', 10000);
+            await waitFor(`!!document.querySelector('.goal-side .dt-box.dt-folded')`, 'the goal column folds to two lines', 5000);
+            const gc = await ev(`(() => { const rows = [...document.querySelectorAll('.goal-side .dt-table tbody tr')]; return { words: [...new Set(rows.map(r => r.querySelector('.goal-chip').textContent))].sort(), idFirst: rows.every(r => r.querySelector('.dt-title-cell > .dt-id + .dt-primary')), high: rows.filter(r => getComputedStyle(r.querySelector('td[data-key="priority"]')).display !== 'none').length, h: rows.map(r => Math.round(r.getBoundingClientRect().height)), folded: document.querySelector('.goal-side .dt-box').classList.contains('dt-folded') }; })()`);
+            assert.deepEqual(gc.words, ['In progress', 'Queued'], 'the same word set ' + JSON.stringify(gc)); assert.ok(gc.idFirst, 'the id before the title'); assert.equal(gc.high, 2, 'High only'); assert.ok(gc.folded && gc.h.every(h => h >= 44), 'the column is the folded table: 44 px rows ' + JSON.stringify(gc));
             await shot(`task-row-goal-column-${mobile ? 'phone' : 'desktop'}`);
         }
         console.log('   ✓');

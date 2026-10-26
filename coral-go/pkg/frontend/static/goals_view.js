@@ -15,7 +15,8 @@ import { foldWayBack } from './way_back.js';
 const { teamTable, rowButton, stateChip: tableStateChip } = await importOnce('./team_table.js'); // lazy: its failure is retried
 const Toolbar = await importOnce('./team_toolbar.js'); // the one toolbar of the team tabs (#7717)
 const { attachDockResize, DOCK_MIN_WIDTH, dockMaxWidth } = await importOnce('./dock_resize.js');
-const TR = await importOnce('./task_row.js'); // the one task row (#7737): the goal's column draws its rows with it
+const DT = await importOnce('./data_table.js'); // the one table (#7743): the goal's column is its folded form
+const TC = await importOnce('./task_columns.js');
 
 const PAGE = 50; // a goal's tasks are drawn this many at a time
 import * as W from './goal_words.js';
@@ -422,9 +423,7 @@ function drawGoalSide(side, g) {
         for (const [name, rows] of groups) {
             if (!rows.length) continue;
             const head = el('h3', 'goal-side-group', `${name} ${rows.length}`);
-            const ul = el('ul', 'task-col-list'); ul.setAttribute('aria-label', `${name} tasks of ${g.title}`);
-            for (const t of rows) ul.append(sideRow(g, t));
-            list.append(head, ul);
+            list.append(head, sideTable(g, name, rows).el);
         }
         const total = taskTotal(g, tasks), left = Math.max(tasks.rows.length - tasks.shown, 0) || (tasks.cursor ? Math.max(total - tasks.shown, 1) : 0);
         if (left) list.append(btn('btn goals-more', W.showMoreText(left, PAGE), () => showMoreTasks(g.id)));
@@ -434,12 +433,20 @@ function drawGoalSide(side, g) {
     search.addEventListener('input', () => { model.taskSearch = search.value; fill(); });
 }
 
-/** A row of the column: the one task row (task_row.js) built from the goal's row and its raw record. */
-function sideRow(g, t) {
+/** A goal's row as the board's task record the columns read. */
+function taskOf(t) {
     const raw = t.raw || {};
-    const task = { ...raw, id: t.id, title: t.title, status: raw.status || t.state, worked_by: t.workedBy || raw.worked_by, assigned_to: raw.assigned_to ?? t.assignee };
-    return TR.taskColumnRow(task, { current: model.taskId === t.id ? TR.taskKey(task) : '', openTask: () => openGoalTask(g, t) });
+    return { ...raw, id: t.id, title: t.title, status: raw.status || t.state, worked_by: t.workedBy || raw.worked_by, assigned_to: raw.assigned_to ?? t.assignee };
 }
+
+/** A group of the column (Open, Done): the one table, folded to its two-line row in the column's narrow box. */
+function sideTable(g, name, rows) {
+    const byId = new Map(rows.map(t => [t.id, t]));
+    return DT.dataTable({ label: `${name} tasks of ${g.title}`, columns: TC.taskColumns({ goalTitleOf: (gid) => (goalById(gid) || {}).title || `Goal ${gid}` }, ['state', 'task', 'who', 'priority']), rows: rows.map(taskOf), rowKey: TC.taskKey,
+        open: (task) => openGoalTask(g, byId.get(task.id)), current: model.taskId ? `t${model.taskId}` : null, sortBar: false, bare: true, rowName: (task) => `#${task.id} ${task.title}`, state: sideState(g.id, name) });
+}
+const sideStates = new Map();
+const sideState = (gid, name) => { const k = `${gid}:${name}`; if (!sideStates.has(k)) sideStates.set(k, DT.tableState()); return sideStates.get(k); };
 
 function openGoalTask(g, t) {
     model.taskId = t.id; model.screen = 'task';
@@ -451,7 +458,7 @@ function closeGoalTask() {
     const id = model.taskId;
     model.taskId = 0; model.screen = PHONE.matches ? 'column' : 'goal';
     drawPage();
-    (root.querySelector(`.task-col-btn[data-task-id="${id}"]`) || root.querySelector('#goals-detail-title'))?.focus({ preventScroll: true });
+    (root.querySelector(`.dt-primary[data-task-id="${id}"]`) || root.querySelector('#goals-detail-title'))?.focus({ preventScroll: true });
 }
 
 /** The picked task, as the task page (#7644), in the main pane; the column beside it stays. */

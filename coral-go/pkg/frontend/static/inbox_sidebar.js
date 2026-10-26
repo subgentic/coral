@@ -23,7 +23,8 @@ import { onInboxHooks, setInboxCount, askOf } from './inbox_tab.js';
 const { coralInboxAdapter, savedExpandFor } = await importOnce('./inbox_coral.js');
 const { mountInbox } = await importOnce('./inbox_panel.js');
 const saved = await importOnce('./saved.js');
-const TR = await importOnce('./task_row.js'); // the one task row (#7737): the Tasks group's page draws with it
+const DT = await importOnce('./data_table.js'); // the one table (#7743): the Tasks group's page is its Tasks columns
+const TC = await importOnce('./task_columns.js');
 const { waitingText } = await importOnce('./waiting_text.js'); // a lazy module imports only what loads at startup (import_hygiene): this one loads with it
 
 const $ = id => document.getElementById(id);
@@ -47,7 +48,8 @@ const needsRows = () => waitingSessions().filter(s => !queries.needs || needsTex
 // ── Tasks ────────────────────────────────────────────────────────────────
 const PRIORITY_WORDS = { high: 'High', medium: 'Medium', low: 'Low' };
 const RANK = { high: 0, medium: 1, low: 2 };
-const stateOf = t => TR.taskWord(t); // one word set for a task's state (Queued, In progress, Blocked, In review, Done), here as everywhere
+const stateOf = t => TC.taskWord(t);
+const inboxTasksState = DT.tableState(); // one word set for a task's state (Queued, In progress, Blocked, In review, Done), here as everywhere
 const taskText = t => [t.title, t.board, t.priority, stateOf(t), t.created_by].join(' ').toLowerCase();
 const taskRows = () => tasks.filter(t => !queries.tasks || taskText(t).includes(queries.tasks)).sort((a, b) => (RANK[a.priority] ?? 3) - (RANK[b.priority] ?? 3));
 async function refreshTasks() {
@@ -169,11 +171,11 @@ registerGroupSource('hub-inbox', {
                     cells: [teamOf(s), ...opt.filter(o => o[1]).map(o => o[2](s)), waitingText(s.waiting_since) || '', ...(goal ? [goalOf(s) ? { link: true, action: 'inbox-goal-open', data: { board: s.goal.board || s.board_project || '', 'goal-id': s.goal.id }, label: s.goal.title, aria: `Goal: ${s.goal.title}` } : ''] : [])] })) };
         }
         if (key === 'tasks') {
-            const rows = taskRows(), openKey = page && page.kind === 'task' ? `${page.project}#${page.id}` : '', phone = isPhoneLayout();
+            const rows = taskRows(), openKey = page && page.kind === 'task' ? `${page.project}#${page.id}` : '';
             return { title: 'Tasks', rows, empty: { line: queries.tasks ? 'No task matches the search.' : 'No assigned tasks.' },
-                signature: JSON.stringify([phone, openKey, rows.map(t => [t.project, t.id, t.title, t.priority, t.status, t.board, t.updated_at])]),
-                node: () => TR.taskList(rows, { label: `Tasks, ${rows.length}`, columns: ['state', 'task', 'priority', 'team', 'when'], phone, // only my tasks: no who; the Team column because the group spans teams
-                    ctx: { who: false, openTask: t => openTaskPage(t.project, t.id), keyOf: t => `${t.project}#${t.id}`, current: openKey, teamOf: t => t.board || '' } }) };
+                signature: JSON.stringify([openKey, rows.map(t => [t.project, t.id, t.title, t.priority, t.status, t.board, t.updated_at])]),
+                node: () => DT.dataTable({ label: `Tasks, ${rows.length}`, columns: TC.taskColumns({ teamOf: t => t.board || '' }, ['state', 'task', 'priority', 'team', 'updated']), rows, rowKey: t => `${t.project}#${t.id}`, // only my tasks: no who; the Team column because the group spans teams
+                    open: t => openTaskPage(t.project, t.id), current: openKey, rowName: t => `#${t.id} ${t.title}`, state: inboxTasksState }).el };
         }
         if (key === 'saved') return savedTableSpec();
         return null;
@@ -305,7 +307,7 @@ function focusCameFrom(was, inList) {
     if (!was) return;
     const root = inList ? document.querySelector('.sidebar-pane[data-pane="hub-inbox"]') : $('group-table-view');
     const id = CSS.escape(String(was.id));
-    const sel = inList ? (was.kind === 'task' ? `.row-btn[data-row-key="${CSS.escape('t:' + was.project + '#' + was.id)}"]` : `.row-btn[data-id="${id}"]`) : (was.kind === 'task' ? `.team-row-btn[data-task-id="${id}"], .task-col-btn[data-task-id="${id}"]` : `.group-table-link[data-id="${id}"]`);
+    const sel = inList ? (was.kind === 'task' ? `.row-btn[data-row-key="${CSS.escape('t:' + was.project + '#' + was.id)}"]` : `.row-btn[data-id="${id}"]`) : (was.kind === 'task' ? `.dt-primary[data-task-id="${id}"]` : `.group-table-link[data-id="${id}"]`);
     const row = root && root.querySelector(sel);
     if (row) row.focus({ preventScroll: true }); else if (!inList) $('group-table-title')?.focus({ preventScroll: true });
 }

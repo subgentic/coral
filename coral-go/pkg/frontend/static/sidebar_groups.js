@@ -148,7 +148,7 @@ function tableHtml(t, kind, key, n = 0, lead = '', several = false, bar = false)
     const top = (t.headless ? lead : `<div class="group-table-head">${lead}<h2 id="${escapeAttr(tid)}" tabindex="-1">${escapeHtml(t.title)}</h2><span class="session-group-count">${t.rows.length}</span>${bar ? '' : extraHtml(t.extra)}</div>`) + (bar && !n ? '' : chipsHtml(t)); // the page's toolbar line has the first table's chips and the create actions
     // A group with nothing in it says so in one line (its chips, if it has them, stay: they are how the list is widened)
     if (!t.rows.length && t.empty) return top + `<div class="empty-pane"><p class="empty-line">${escapeHtml(t.empty.line)}</p>${t.empty.hint ? `<p class="empty-hint">${escapeHtml(t.empty.hint)}</p>` : ''}</div>`;
-    if (t.node) return top + '<div class="group-table-node"></div>'; // a table that draws its own rows (the Inbox's Tasks: the one task row, task_row.js): its node goes in here, built by drawTable
+    if (t.node) return top + '<div class="group-table-node"></div>'; // a table that draws its own rows (the Inbox's Tasks: a data_table of task_columns.js): its node goes in here, built by drawTable
     return top + `<div class="group-table-scroll"><table class="group-table${st ? ' group-table-stack' : ''}${several ? ' group-table-aligned' : ''}"${st ? ' role="table"' : ''} ${t.headless ? 'aria-label="' + escapeAttr(t.title) + '"' : 'aria-labelledby="${escapeAttr(tid)}"'}><thead${st ? ' role="rowgroup"' : ''}><tr${st ? ' role="row"' : ''}>${head}</tr></thead><tbody${st ? ' role="rowgroup"' : ''}>${rows}</tbody></table></div>`
         + (t.note ? `<p class="empty-hint group-table-note">${escapeHtml(t.note)}</p>` : '');
 }

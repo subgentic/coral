@@ -14,11 +14,11 @@ const BASE = require('./test_base').BASE;
         await ev(INBOX_WORLD);
         await ev(`localStorage.removeItem('coral.inbox.tab'); window.switchNavTab('hub-inbox'); true`);
         await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m => m.selectInboxTab('tasks')).then(() => true)`);
-        await waitFor(`document.querySelectorAll('#group-table-view .task-col-row').length === 3 && document.getElementById('group-table-view').getClientRects().length > 0`, 'the three tasks', 10000);
-        const m = await ev(`(() => { const v = document.getElementById('group-table-view'), sc = v.querySelector('.task-col-list'), back = v.querySelector('.group-table-back'), h = v.querySelector('#group-table-title');
+        await waitFor(`document.querySelectorAll('#group-table-view .dt-table tbody tr').length === 3 && document.getElementById('group-table-view').getClientRects().length > 0`, 'the three tasks', 10000);
+        const m = await ev(`(() => { const v = document.getElementById('group-table-view'), sc = v.querySelector('.dt-box'), back = v.querySelector('.group-table-back'), h = v.querySelector('#group-table-title');
             const rect = e => e ? e.getBoundingClientRect() : null; const b = rect(back), t = rect(h);
             return { scroll: sc ? [sc.scrollWidth, sc.clientWidth] : null, page: [document.documentElement.scrollWidth, document.documentElement.clientWidth], backTop: b && Math.round(b.top), titleTop: t && Math.round(t.top), backH: b && Math.round(b.height), titleH: t && Math.round(t.height),
-                rows: [...v.querySelectorAll('.task-col-row')].map(r => r.innerText.replace(/\\s+/g, ' ').trim()) }; })()`);
+                rows: [...v.querySelectorAll('.dt-table tbody tr')].map(r => r.innerText.replace(/\\s+/g, ' ').trim()) }; })()`);
         assert.ok(m.scroll && m.scroll[0] <= m.scroll[1] + 1, `the Tasks table does not scroll sideways (scrollWidth ${m.scroll && m.scroll[0]} > ${m.scroll && m.scroll[1]}) ${JSON.stringify(m)}`);
         assert.ok(m.page[0] <= m.page[1] + 1, 'and neither does the page ' + JSON.stringify(m));
         assert.ok(Math.abs(m.backTop + m.backH / 2 - (m.titleTop + m.titleH / 2)) <= 8, `"\u2190 Inbox" and the title are one row (centres ${m.backTop + m.backH / 2} and ${m.titleTop + m.titleH / 2}) ${JSON.stringify(m)}`);

@@ -1,7 +1,7 @@
 /* The one table (#7743): every list or table surface passes what to show, the component owns how it looks and behaves. The operator's rule: a styling change is one token or one rule, so every size and colour here
  * is a --table-* token (css/data_table.css) and no surface styles a row, a cell or a header.
  *
- *   dataTable({ label, columns, rows, rowKey, open, current, state, onSort, fold, foldAt, empty, footer, selectable, rowName }) -> { el, bar, selectButton, selection(), clear(), state }
+ *   dataTable({ label, columns, rows, rowKey, open, current, state, onSort, fold, foldAt, sortBar, bare, empty, footer, selectable, rowName }) -> { el, bar, selectButton, selection(), clear(), state }
  *   Column = { key, label, field | cell(row, ctx), primary, tone: 'primary'|'secondary'|'tertiary', width: 'grow'|'content'|'<n>rem', nowrap, align: 'start'|'end', numeric,
  *              sort: true|'number'|'date'|fn(a, b), sortValue(row), line: 0|1|2, when(row), subtitle(row) }
  *   cell types: chip(word, cls), avatar(name), tag(text), timeCell(stamp), link(text, run), primaryButton(text, label)
@@ -66,7 +66,7 @@ export function dataTable(cfg) {
     const columns = cfg.columns, sel = cfg.selectable || null, ctx = cfg.ctx || {};
     const foldKind = cfg.fold || 'column', foldAt = cfg.foldAt || 40;
     if (sel && sel.contextKey !== undefined && st.ctx !== String(sel.contextKey)) { st.selected.clear(); st.anchor = null; st.ctx = String(sel.contextKey); }
-    const box = el('div', `dt-box ${foldKind === 'labeled' ? 'dt-fold-labeled' : foldKind === 'always' ? 'dt-fold-column' : foldKind === 'none' ? 'dt-fold-none' : 'dt-fold-column'}`);
+    const box = el('div', `dt-box${cfg.bare ? ' dt-bare' : ''} ${foldKind === 'labeled' ? 'dt-fold-labeled' : foldKind === 'always' ? 'dt-fold-column' : foldKind === 'none' ? 'dt-fold-none' : 'dt-fold-column'}`);
     const bar = el('div', 'dt-bar'); bar.hidden = true;
     const selectButton = button('btn btn-small dt-select-toggle', 'Select', () => { st.select = !st.select; syncSelectMode(); });
     selectButton.setAttribute('aria-pressed', 'false'); selectButton.hidden = !sel;
@@ -75,6 +75,7 @@ export function dataTable(cfg) {
     const nameOf = (r) => (cfg.rowName ? cfg.rowName(r) : keyOf(r));
 
     const sortBar = el('div', 'dt-sortbar');
+    if (cfg.sortBar === false) sortBar.hidden = true; // a narrow column of a few rows (a goal's tasks) needs no Sort by
     const table = el('table', 'dt-table'); table.setAttribute('aria-label', cfg.label); table.setAttribute('role', 'table');
     const thead = el('thead'); thead.setAttribute('role', 'rowgroup'); const tbody = el('tbody'); tbody.setAttribute('role', 'rowgroup');
     table.append(thead, tbody);

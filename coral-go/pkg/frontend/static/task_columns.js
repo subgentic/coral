@@ -1,4 +1,4 @@
-/* A task as a data_table row (#7743, generalising #7737's task_row.js): the columns the Tasks tab, the Inbox's Tasks group and a goal's column pick from. One state word set, one chip, who as an avatar and a name, the priority
+/* A task as a data_table row (#7743, the one task row of #7737, generalised): the columns the Tasks tab, the Inbox's Tasks group and a goal's column pick from. One state word set, one chip, who as an avatar and a name, the priority
  * as a word, the update as a relative time. A task is the board's own record (status, review_requested, assigned_to, worked_by, completed_by, goal_id, priority, created_at, updated_at, board).
  *   taskColumns({ openGoal(goalId), goalTitleOf(goalId), noGoal, teamOf(task) }, ['state', 'task', 'who', 'goal', 'priority', 'updated']) -> Column[] */
 import { taskStatusWord, statusClass } from './goal_words.js';

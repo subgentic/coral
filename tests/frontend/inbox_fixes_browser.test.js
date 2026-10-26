@@ -34,12 +34,12 @@ const { removeBoards } = require('./helpers/board_cleanup');
         // Tasks: priority first, a High chip, the count of high ones on the tab
         await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('tasks')); true`);
         await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 3`, 'three tasks', 10000);
-        const tasks = await ev(`({ titles: [...document.querySelectorAll('#group-table-view .team-row-btn')].map(t => t.textContent), prio: [...document.querySelectorAll('#group-table-view .task-table tbody tr')].map(tr => tr.querySelector('.task-priority').textContent.trim()), count: document.querySelector('#group-table-view .session-group-count').textContent })`);
+        const tasks = await ev(`({ titles: [...document.querySelectorAll('#group-table-view .dt-primary')].map(t => t.textContent), prio: [...document.querySelectorAll('#group-table-view .dt-table tbody tr')].map(tr => tr.querySelector('td[data-key="priority"]').textContent.trim()), count: document.querySelector('#group-table-view .session-group-count').textContent })`);
         assert.deepEqual(tasks.titles, ['Decide: ship 166 with the Windows trace pending?', 'Approve the design', 'Pick the name for the Goals tab'], 'the tasks are ordered by priority: ' + JSON.stringify(tasks));
         assert.deepEqual(tasks.prio, ['High', 'Medium', 'Low'], 'the priority column says each one: ' + JSON.stringify(tasks));
         assert.equal(tasks.count, '3', 'the table says 3 tasks: ' + JSON.stringify(tasks));
         // a task opens: the reply box says the task stays open, and Open the task is a button
-        await ev(`document.querySelector('#group-table-view .team-row-btn').click(); true`);
+        await ev(`document.querySelector('#group-table-view .dt-primary').click(); true`);
         await waitFor(`!!document.querySelector('#inbox-page .ibx-reply-label')`, 'the reply box', 8000);
         const reply = await ev(`(() => { const o = document.querySelector('#inbox-page .ibx-open'); return { label: document.querySelector('#inbox-page .ibx-reply-label').textContent, oldNote: !!document.querySelector('#inbox-page .ibx-note'), openTag: o && o.tagName, openBtn: o && o.classList.contains('btn'), openH: o && Math.round(o.getBoundingClientRect().height) }; })()`);
         assert.ok(/task stays open/.test(reply.label) && !reply.oldNote, 'the reply box says the task stays open (once): ' + JSON.stringify(reply));
