@@ -32,6 +32,8 @@ const G1 = 'Explore goals with two teams', G2 = 'Plan the release notes';
             await goTab(ev, settle, 'Tasks');
             await waitFor(`document.querySelectorAll('${panel} .dt-primary').length === 5`, 'the five tasks', 10000);
             await ev(`localStorage.removeItem('coral-task-filters:${TEAM}'); true`);
+            // the panel has no Sort (the table's heads sort), so the icon and the panel are named "Filters", not "Filters and sort" (#8251)
+            assert.deepEqual(await ev(`[document.getElementById('tk-toggle').getAttribute('aria-label'), document.getElementById('tk-menu').getAttribute('aria-label')]`), ['Filters', 'Filters'], 'the Tasks tab names its Filters icon and panel for what the panel holds');
             await ev(`document.getElementById('tk-toggle').click(); true`); await settle(400);
 
             await S.run(`${label}: the panel has Priority, Goal, Agent and Updated since, and no Status`, async () => {

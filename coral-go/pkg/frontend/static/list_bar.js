@@ -108,9 +108,11 @@ export function buildListBar(spec, onChange, hooks = {}) {
     let announce = false;
     let liveTimer = 0; // the announcement waits for the count to settle: a server-backed panel draws the old count first and the answer's a moment later
     let tog = null, badge = null, chev = null;
+    // the icon and the panel are named for what the panel holds (#8251): "Filters and sort" where it has a Sort, "Filters" where it has not
+    const panelName = spec.sorts ? 'Filters and sort' : 'Filters';
     if (collapsible) {
         tog = make('button', 'sidebar-collapse-btn list-bar-toggle'); tog.type = 'button'; tog.id = `${p}-toggle`;
-        tog.setAttribute('aria-expanded', 'false'); tog.setAttribute('aria-controls', `${p}-menu`); tog.title = 'Filters and sort'; tog.setAttribute('aria-label', 'Filters and sort');
+        tog.setAttribute('aria-expanded', 'false'); tog.setAttribute('aria-controls', `${p}-menu`); tog.title = panelName; tog.setAttribute('aria-label', panelName);
         const icon = make('span', 'material-icons', 'notes'); icon.setAttribute('aria-hidden', 'true');
         badge = make('span', 'display-badge'); badge.hidden = true;
         tog.append(icon, badge);
@@ -149,7 +151,7 @@ export function buildListBar(spec, onChange, hooks = {}) {
     const extras = make('div', 'list-bar-extras'); extras.hidden = true;
     menu.append(...fields.map(x => x.wrap), ...((inline || collapsible) && sort ? [sort.wrap] : []), ...(inline ? [count] : []), extras, clearAll, ...(done ? [done] : []));
     if (inline) { menu.hidden = false; menu.classList.add('list-bar-menu-inline'); clearAll.textContent = 'Clear filters'; }
-    if (collapsible) { menu.classList.add('list-bar-menu-inline', 'list-bar-panel'); clearAll.textContent = 'Clear filters'; menu.setAttribute('aria-label', 'Filters and sort'); }
+    if (collapsible) { menu.classList.add('list-bar-menu-inline', 'list-bar-panel'); clearAll.textContent = 'Clear filters'; menu.setAttribute('aria-label', panelName); }
     // A panel with tool-group boxes (the activity bars) lays them out two to a line: a class on the menu, not a :has() rule, which made every DOM change in the page, the agent list's included, check for it (#7671).
     if (collapsible && fields.some(x => x.wrap.classList.contains('list-bar-group'))) menu.classList.add('list-bar-menu-groups');
     // spec.compactPanel (#7782): the fields sit two to a line (one on a phone) instead of one tall row each, so the panel does not push the list down by a row per field
@@ -169,7 +171,7 @@ export function buildListBar(spec, onChange, hooks = {}) {
         if (!tog) return;
         const on = baseOn + extraOn;
         badge.hidden = on === 0; tog.classList.toggle('active', on > 0);
-        const name = on ? `Filters and sort, ${on} on` : 'Filters and sort';
+        const name = on ? `${panelName}, ${on} on` : panelName;
         tog.setAttribute('aria-label', name); tog.title = name;
     }
     const apply = next => { f = clean(trimmed(next)); announce = true; onChange({ ...f }); };

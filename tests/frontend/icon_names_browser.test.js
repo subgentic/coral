@@ -27,15 +27,33 @@ const AUDIT = `(() => { const root = window.__scanRoot ? document.querySelector(
         if (r.missing) { problems.push(`${name}: scene not found`); return; }
         if (r.nLoud) problems.push(`${name}: ${r.nLoud} icon(s) read as text: ${r.loud.join('; ')}`);
         if (r.nUnnamed) problems.push(`${name}: ${r.nUnnamed} control(s) with no name: ${r.unnamed.join('; ')}`);
+        // the browser's own accessibility tree (#8251): no accessible name carries an icon's ligature word ("expand_more", "arrow_back"), whatever markup it came from
+        const { nodes } = await client.Accessibility.getFullAXTree();
+        const words = nodes.filter(n => !n.ignored && n.name && /\b[a-z]+(_[a-z0-9]+)+\b/.test(n.name.value || '')).map(n => `${n.role && n.role.value}: ${n.name.value}`);
+        // a one-word ligature ("close", "home") reads like a word: look inside each named control for an icon span whose text is in its name
+        for (const n of nodes) {
+            if (n.ignored || !n.name || !n.backendDOMNodeId || !['button', 'link', 'tab', 'menuitem', 'checkbox', 'switch'].includes(n.role && n.role.value)) continue;
+            const { object } = await client.DOM.resolveNode({ backendNodeId: n.backendDOMNodeId }).catch(() => ({}));
+            if (!object) continue;
+            const { result } = await client.Runtime.callFunctionOn({ objectId: object.objectId, returnByValue: true, functionDeclaration: `function () { return [...this.querySelectorAll('.material-icons')].filter(i => !i.closest('[aria-hidden="true"]')).map(i => i.textContent.trim()).filter(Boolean); }` });
+            const loud = (result.value || []).filter(t => new RegExp(`(^|\\s)${t}(\\s|$)`).test(n.name.value));
+            if (loud.length) words.push(`${n.role.value}: ${n.name.value} (icon ${loud.join()})`);
+        }
+        if (words.length) problems.push(`${name}: ${words.length} accessible name(s) with an icon's ligature in them: ${words.slice(0, 4).join('; ')}`);
     };
     try {
         await Page.enable();
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await ev(`window.__coralReady.then(() => true)`); await client.Accessibility.enable(); await client.DOM.enable();
         await ev(`window.__m.add('icon-bot', 'A', 6, { sleeping: false }); true`); await settle(ev, 900); // sleep-ok: views and dialogs fill from several answers; there is no completion event
         await scan('welcome (no agent open)');
+        await ev(`document.documentElement.style.fontSize = '200%'; true`); await settle(ev, 500); await scan('welcome at 200% text, where the top bar names its controls from their text');
+        await Emulation.setDeviceMetricsOverride({ width: 900, height: 900, deviceScaleFactor: 1, mobile: false }); await settle(ev, 600);
+        if (!await ev(`!!document.querySelector('.nav-more-btn') && document.querySelector('.nav-more-btn').getClientRects().length > 0`)) problems.push('the top bar has no More button at 900 px and 200% text: the scene that names it from its contents did not open');
+        await scan('the top bar with its More button (named from its text and a chevron icon)');
+        await ev(`document.documentElement.style.fontSize = ''; true`); await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false }); await settle(ev, 400);
         for (const tab of ['history', 'workflows', 'jobs', 'tokens', 'docs', 'board']) { await ev(`window.switchNavTab('${tab}'); true`); await settle(ev, 900); await scan('tab ' + tab); } // sleep-ok: views and dialogs fill from several answers; there is no completion event
         await ev(`window.switchNavTab('agents'); window.selectLiveSession('icon-bot', 'claude', 'icon-bot-id', 'local'); true`); await settle(ev, 1500); // sleep-ok: views and dialogs fill from several answers; there is no completion event
         await scan('agent chat and its header');
