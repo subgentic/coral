@@ -1,5 +1,5 @@
 // The team page's Artifacts and Knowledge tabs (#7453, stage 2; UI/UX's doc 7aa984fe items 5 and 6): Artifacts has a search box named "Search artifacts", the count as words ("<n> artifacts"), the table Name, Type, Size,
-// Task, Created, a Load more while the server has more, and a row opens the documents-only pane; Knowledge has the table Entry, Updated, From, the button "Distill knowledge", and a row opens the pane with the entry's text.
+// Task, Created, automatic paging while the server has more, and a row opens the documents-only pane; Knowledge has the table Entry, Updated, From, the button "Distill knowledge", and a row opens the pane with the entry's text.
 // The artifact list and the knowledge bundle are stubbed (the bundle in the shape of GET /api/teams/detail/<team>/knowledge: exists, team_name, created_at, index, agents[{name, content}]). Written failing-first by QA
 // (#7499): by role and accessible name (helpers/team_page.js). Isolated dev server.
 const assert = require('node:assert/strict');
@@ -41,12 +41,13 @@ const TEAM = `qa-docs-${Date.now() % 100000}`;
                     assert.equal(await ev(`window.__tp.table().querySelector('thead th input[type="checkbox"]')?.getAttribute('aria-label')`), 'Select all rows on this page', 'the first column selects artifacts for bulk actions');
                     assert.deepEqual(hd.slice(1, 6), ['Name', 'Type', 'Size', 'Task', 'Created'], 'the data columns after selection');
                 }
-                assert.equal((await ev(`window.__tp.rows()`)).length, 5, 'five rows (the first page)');
+                assert.ok((await ev(`window.__tp.rows()`)).length >= 5, 'the first page is present (the visible footer may already append the second)');
             });
-            await S.run(`${label}: Load more adds the next page below the first and keeps the focus in the table`, async () => {
-                assert.ok(await ev(`(() => { const b = window.__tp.find('button', /^Load more$/i); if (!b) return false; b.click(); return true; })()`), 'a button named Load more');
-                await waitFor(`window.__tp.rows().length === 10`, 'ten rows after Load more', 6000);
-                assert.equal(await ev(`!!window.__tp.find('button', /^Load more$/i)`), false, 'Load more is gone when the server has no more');
+            await S.run(`${label}: automatic paging appends the next page without duplicate or reordered rows`, async () => {
+                await waitFor(`window.__tp.rows().length === 10`, 'ten rows after automatic paging', 6000);
+                const names = await ev(`[...window.__tp.table().querySelectorAll('tbody .dt-primary')].map(b => b.textContent)`);
+                assert.deepEqual(names, [0, 1, 2, 3, 4, 100, 101, 102, 103, 104].map(n => 'Report ' + n), 'both pages retain their order with no duplicate rows');
+                assert.equal(await ev(`!!window.__tp.find('button', /^Load more$/i)`), false, 'no paging button after the last page');
             });
             await S.run(`${label}: a row's name button opens the pane; Escape closes it and the focus returns to the row`, async () => {
                 assert.ok(await ev(`(() => { const b = [...window.__tp.table().querySelectorAll('button')].find(x => /^Report 1$/.test(window.__na.name(x))); if (!b) return false; b.focus(); b.click(); return true; })()`), 'no row button named Report 1'); await settle(400);
