@@ -120,8 +120,8 @@ const SHOTS = process.env.CORAL_SCREENSHOT_DIR;
         console.log('5. The words are in the page for a screen reader, and the keyboard order is unchanged');
         const ax = await ev(`(() => { const r = ${rowOf('Their logs.txt')}; const b = r.querySelector('.team-artifact-badge'); return { hidden: !!b.closest('[aria-hidden=true]'), after: !!(r.querySelector('.dt-primary').compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) }; })()`);
         assert.equal(ax.hidden, false); assert.equal(ax.after, true);
-        const stops = await ev(`[...document.querySelectorAll('${ROWS}')].map(r => r.querySelectorAll('button, a[href], summary').length)`);
-        assert.ok(stops.every(n => n === 2), 'every row has two stops, its name and its Details link: ' + JSON.stringify(stops));
+        const stops = await ev(`[...document.querySelectorAll('${ROWS}')].map(r => r.querySelectorAll('button, a[href], summary').length - r.querySelectorAll('[data-task-link]').length)`);
+        assert.ok(stops.every(n => n === 2), 'every row has two stops, its name and its Details link, and a third when the file has a task (its Task link, #8617): ' + JSON.stringify(stops));
         await ev(`document.querySelector('#agentic-detail-pane .detail-close').click(); true`);
 
         console.log('6. A 390 px phone at 200% text: the table fits and the words stay in their row');
