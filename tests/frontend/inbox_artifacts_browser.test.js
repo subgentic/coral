@@ -63,6 +63,7 @@ const WORLD = `(() => {
                 await ev(`document.querySelector('[data-view-list="inbox-folders"] .view-list-item[data-key="artifacts"]').click(); true`);
             } else await ev(`import((window.__coralStatic || '/static/') + 'inbox_sidebar.js').then(m => m.openInboxGroup('artifacts')).then(() => true)`);
             await waitFor(`document.getElementById('group-table-view').dataset.group === 'hub-inbox:artifacts' && document.querySelectorAll('#group-table-view tbody tr').length === 5`, `${label}: five rows`, 10000);
+            if (!mobile) check(`${label}: a folder opened by the person puts the keyboard on the page's search box, not on the heading`, (await ev(`document.activeElement && document.activeElement.classList.contains('list-bar-search')`)) && !(await ev(`document.getElementById('group-table-title').matches(':focus, [tabindex]')`)));
             check(`${label}: the page is titled Artifacts with the count`, (await ev(`(document.getElementById('group-table-title') || {}).textContent + '|' + (document.querySelector('.inbox-artifacts-count') || {}).textContent`)) === 'Artifacts|5');
             check(`${label}: the rows of both teams are one list, newest first`, (await rows()).join() === 'beta-notes.txt,alpha-report.md,beta-data.json,alpha-chart.png,alpha-plan.md', (await rows()).join());
             check(`${label}: a Team column names each row's team`, (await ev(`[...document.querySelectorAll('#group-table-view thead th')].some(t => /Team/.test(t.textContent)) && /beta/.test(document.querySelector('#group-table-view tbody tr').textContent)`)));
@@ -82,6 +83,7 @@ const WORLD = `(() => {
             await ev(`document.querySelectorAll('#group-table-view tbody .dt-primary')[1].click(); true`);
             await waitFor(`(() => { const p = document.querySelector('.inbox-detail-pane'); return !!p && !p.hidden && /alpha-report/.test(p.textContent); })()`, `${label}: the pane with the document`, 8000);
             let p = await pane();
+            check(`${label}: the pane takes the keyboard on its close button, and its title has no focus to draw a ring round`, (await ev(`document.activeElement && document.activeElement.classList.contains('detail-close')`)) && !(await ev(`document.querySelector('.inbox-detail-pane .detail-title').matches(':focus')`)));
             check(`${label}: the row opened its document in the pane`, p && /alpha-report\.md/.test(p.title), JSON.stringify(p && p.title));
             check(`${label}: the list stays (five rows) with the pane open`, (await rows()).length === 5);
             if (mobile) check('390: the pane is a sheet with a way back named Artifacts', p.fixed === 'fixed' && /Artifacts/.test(p.back), JSON.stringify(p));
