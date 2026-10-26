@@ -211,6 +211,18 @@ export function renderAgentConfigForm(containerId, opts = {}) {
     container.dataset.acfUid = uid;
     delete container._acfCliWarning;
 
+    const f = acfStartValues(container, opts);
+    drawAcfForm(container, uid, opts, f);
+    initAcfPermissions(container, uid, f);
+    initAcfPresets(containerId, uid, opts, f);
+    initAcfModel(container, f);
+    placeAcfCliLine(container, opts);
+    wireAcfAgentType(container);
+    finishAcfControls(container, opts);
+}
+
+/** What the form starts from: the launch's value (opts.value) over the Settings defaults, and the permissions summary line. */
+function acfStartValues(container, opts) {
     const showPreset = opts.showPreset !== false;
     const showName = opts.showName !== false;
     const showAutoPermissions = opts.showAutoPermissions !== false;
@@ -236,12 +248,18 @@ export function renderAgentConfigForm(containerId, opts = {}) {
         if (caps.deny?.length) parts.push(`${caps.deny.length} deny`);
         permsSummary = parts.length ? parts.join(', ') : 'default';
     }
+    return { showPreset, showName, showAutoPermissions, v, agentTypeVal, modelVal, nameVal, promptVal, flagsVal, autoPermsVal, caps, permsSummary };
+}
 
+function acfPresetHtml(uid, opts, { showPreset }) {
     let presetHTML = '';
     if (showPreset) {
         presetHTML = `${opts.sections ? `<div class="launch-field-head"><label for="${escapeAttr(uid)}-preset">Start from a persona</label> <span class="launch-optional">optional</span></div>` : ''}<div id="${escapeAttr(uid)}-presets" class="agent-preset-selector" style="margin-bottom:8px"></div>`;
     }
+    return presetHTML;
+}
 
+function acfNameHtml(opts, { showName, nameVal }) {
     let nameHTML = '';
     if (showName) {
         nameHTML = `
@@ -249,7 +267,10 @@ export function renderAgentConfigForm(containerId, opts = {}) {
                 <input type="text" class="acf-name" placeholder="e.g. QA Engineer, Frontend Dev" value="${escapeAttr(nameVal)}">
             </label>`;
     }
+    return nameHTML;
+}
 
+function acfAutoPermissionsHtml(container, opts, { showAutoPermissions, agentTypeVal, autoPermsVal, flagsVal, v }) {
     let autoPermissionsHTML = '';
     if (showAutoPermissions) {
         const defaultMode = defaultPermissionMode(_settingsFor(_acfServer(container)), agentTypeVal || 'claude');
@@ -271,8 +292,11 @@ export function renderAgentConfigForm(containerId, opts = {}) {
                 <span class="settings-hint acf-mode-override" role="status" hidden></span>
             </label>`;
     }
+    return autoPermissionsHTML;
+}
 
-    const topHTML = `
+function acfTopHtml(uid, { agentTypeVal, modelVal }) {
+    return `
         <div class="acf-top-row">
             <label>Agent Type:
                 <select class="acf-agent-type">
@@ -291,7 +315,10 @@ export function renderAgentConfigForm(containerId, opts = {}) {
             ${thinkingPickerHtml()}
         </div>
         <div class="acf-cli-warning" style="display:none;margin:8px 0" role="status"></div>`;
-    const permEditorHTML = (open) => `
+}
+
+function acfPermEditorHtml(uid, open) {
+    return `
             <p class="settings-hint acf-perms-enforced" aria-live="polite" hidden></p>
             <div id="${escapeAttr(uid)}-perms" class="permissions-editor"${open ? '' : ' style="display:none"'}>
                 <div class="perms-group">
@@ -307,46 +334,19 @@ export function renderAgentConfigForm(containerId, opts = {}) {
                     <input type="text" class="perms-shell-input" aria-label="Shell patterns, comma-separated" placeholder="e.g. git *, npm *, npx *">
                 </div>
             </div>`;
+}
+
+/** The form's markup, one of the three sectioned layouts or the plain one. */
+function drawAcfForm(container, uid, opts, f) {
+    const { promptVal, permsSummary, flagsVal } = f;
+    const presetHTML = acfPresetHtml(uid, opts, f);
+    const nameHTML = acfNameHtml(opts, f);
+    const autoPermissionsHTML = acfAutoPermissionsHtml(container, opts, f);
+    const topHTML = acfTopHtml(uid, f);
+    const permEditorHTML = open => acfPermEditorHtml(uid, open);
     const flagsInput = `<input type="text" class="acf-flags" placeholder="e.g. --verbose" value="${escapeAttr(_stripPermFlags(flagsVal))}">`;
-    if (opts.sections) {
-        // The sectioned dialogs (#4950, section_dialog.js): one pane per group of fields, every field the same element with the same class as in the one-form layout.
-        const pane = (id, title, icon, desc, body) => `<section class="settings-pane" data-section="${escapeAttr(id)}" data-title="${escapeAttr(title)}" data-icon="${escapeAttr(icon)}" data-desc="${escapeAttr(desc)}" hidden>${body}</section>`;
-        // Whatever the dialog asked to sit in a pane (opts.adopt: { paneId: element id }) is parked beside the container while the panes are rebuilt.
-        const adopted = Object.entries(opts.adopt || {}).map(([paneId, id]) => [paneId, document.getElementById(id)]).filter(([, el]) => el);
-        for (const [, el] of adopted) container.after(el);
-        if (opts.wizard) {
-            // New Agent's three steps (#7391): step 2 is the persona page (the prompt here, the persona and name adopted above it), step 3 is these three panes: the provider group adopted into Agent, the Mode as cards, the tool chips in a closed disclosure.
-            const toolsHTML = `<details class="acf-tools-details"><summary>Tool permissions <span class="acf-perms-summary settings-hint"></span></summary>${permEditorHTML(true)}</details>`;
-            container.innerHTML = [
-                `<div class="acf-persona-page" data-adopt="persona"><div class="launch-prompt-field"><span class="launch-field-head" id="${escapeAttr(uid)}-prompt-label">Behavior prompt</span><textarea class="acf-prompt" aria-labelledby="${escapeAttr(uid)}-prompt-label" rows="8" placeholder="Describe the agent's role and behavior...">${escapeHtml(promptVal)}</textarea></div></div>`,
-                pane('agent', 'Agent', 'smart_toy', '', topHTML),
-                pane('permissions', 'Permissions', 'lock', '', `${autoPermissionsHTML}${toolsHTML}`),
-                pane('advanced', 'Advanced', 'tune', '', `<label>Flags <span style="color:var(--text-muted);font-weight:normal">(optional)</span>:${flagsInput}</label>`),
-            ].join('');
-        } else if (opts.restart) {
-            // Restart (#7391): New Agent's steps without the first, the agent being fixed. Step 1 is the persona page (the name, read-only, and the prompt); step 2 is the tabs Model (with Thinking), Permissions, Advanced. The Provider is said in a line; its select stays, hidden, for the form's reads.
-            const toolsHTML = `<details class="acf-tools-details"><summary>Tool permissions <span class="acf-perms-summary settings-hint"></span></summary>${permEditorHTML(true)}</details>`;
-            const agentHTML = topHTML.replace('<label>Agent Type:', '<label class="acf-provider-label" hidden><span class="acf-provider-head">Provider</span>');
-            container.innerHTML = [
-                `<div class="acf-persona-page"><p class="launch-field-head"><span>Name</span></p><p class="acf-restart-name"></p><div class="launch-prompt-field"><span class="launch-field-head" id="${escapeAttr(uid)}-prompt-label">Behavior prompt</span><textarea class="acf-prompt" aria-labelledby="${escapeAttr(uid)}-prompt-label" rows="8" placeholder="Describe the agent's role and behavior...">${escapeHtml(promptVal)}</textarea></div></div>`,
-                pane('agent', 'Model', 'smart_toy', '', `<p class="settings-hint acf-provider-fixed"></p>${agentHTML}`),
-                pane('permissions', 'Permissions', 'lock', '', `${autoPermissionsHTML}${toolsHTML}`),
-                pane('advanced', 'Advanced', 'tune', '', `<label>Flags <span style="color:var(--text-muted);font-weight:normal">(optional)</span>:${flagsInput}</label>`),
-            ].join('');
-        } else {
-            // The team member and Add-agent-to-board dialogs (#7391): the same panes as New Agent's step 3, and one Persona pane (the persona, the name, the prompt) where New Agent has a page.
-            const toolsHTML = `<details class="acf-tools-details"><summary>Tool permissions <span class="acf-perms-summary settings-hint"></span></summary>${permEditorHTML(true)}</details>`;
-            const promptHTML = `<div class="launch-prompt-field"><span class="launch-field-head" id="${escapeAttr(uid)}-prompt-label">Behavior prompt</span><textarea class="acf-prompt" aria-labelledby="${escapeAttr(uid)}-prompt-label" rows="10" placeholder="Describe the agent's role and behavior...">${escapeHtml(promptVal)}</textarea></div>`;
-            container.innerHTML = [
-                pane('persona', 'Persona', 'badge', '', `${(showPreset || showName) ? `${presetHTML}${nameHTML}` : ''}${promptHTML}`),
-                pane('agent', 'Agent', 'smart_toy', '', topHTML.replace('<label>Agent Type:', '<label class="acf-provider-label"><span class="acf-provider-head">Provider</span>')),
-                pane('permissions', 'Permissions', 'lock', '', `${autoPermissionsHTML}${toolsHTML}`),
-                pane('advanced', 'Advanced', 'tune', '', `<label>Flags <span style="color:var(--text-muted);font-weight:normal">(optional)</span>:${flagsInput}</label>`),
-            ].join('');
-            container.dataset.acfPersonaPane = '1';
-        }
-        for (const [paneId, el] of adopted) container.querySelector(`[data-section="${CSS.escape(paneId)}"], [data-adopt="${CSS.escape(paneId)}"]`)?.prepend(el);
-    } else container.innerHTML = `
+    if (opts.sections) drawSectionedAcf(container, uid, opts, { f, presetHTML, nameHTML, autoPermissionsHTML, topHTML, permEditorHTML, flagsInput });
+    else container.innerHTML = `
         ${presetHTML}
         ${nameHTML}
         ${topHTML}
@@ -370,8 +370,49 @@ export function renderAgentConfigForm(containerId, opts = {}) {
             </div>
         </details>
     `;
+}
 
-    // Initialize permissions chips
+function drawSectionedAcf(container, uid, opts, { f: { showPreset, showName, promptVal }, presetHTML, nameHTML, autoPermissionsHTML, topHTML, permEditorHTML, flagsInput }) {
+    // The sectioned dialogs (#4950, section_dialog.js): one pane per group of fields, every field the same element with the same class as in the one-form layout.
+    const pane = (id, title, icon, desc, body) => `<section class="settings-pane" data-section="${escapeAttr(id)}" data-title="${escapeAttr(title)}" data-icon="${escapeAttr(icon)}" data-desc="${escapeAttr(desc)}" hidden>${body}</section>`;
+    // Whatever the dialog asked to sit in a pane (opts.adopt: { paneId: element id }) is parked beside the container while the panes are rebuilt.
+    const adopted = Object.entries(opts.adopt || {}).map(([paneId, id]) => [paneId, document.getElementById(id)]).filter(([, el]) => el);
+    for (const [, el] of adopted) container.after(el);
+    if (opts.wizard) {
+        // New Agent's three steps (#7391): step 2 is the persona page (the prompt here, the persona and name adopted above it), step 3 is these three panes: the provider group adopted into Agent, the Mode as cards, the tool chips in a closed disclosure.
+        const toolsHTML = `<details class="acf-tools-details"><summary>Tool permissions <span class="acf-perms-summary settings-hint"></span></summary>${permEditorHTML(true)}</details>`;
+        container.innerHTML = [
+            `<div class="acf-persona-page" data-adopt="persona"><div class="launch-prompt-field"><span class="launch-field-head" id="${escapeAttr(uid)}-prompt-label">Behavior prompt</span><textarea class="acf-prompt" aria-labelledby="${escapeAttr(uid)}-prompt-label" rows="8" placeholder="Describe the agent's role and behavior...">${escapeHtml(promptVal)}</textarea></div></div>`,
+            pane('agent', 'Agent', 'smart_toy', '', topHTML),
+            pane('permissions', 'Permissions', 'lock', '', `${autoPermissionsHTML}${toolsHTML}`),
+            pane('advanced', 'Advanced', 'tune', '', `<label>Flags <span style="color:var(--text-muted);font-weight:normal">(optional)</span>:${flagsInput}</label>`),
+        ].join('');
+    } else if (opts.restart) {
+        // Restart (#7391): New Agent's steps without the first, the agent being fixed. Step 1 is the persona page (the name, read-only, and the prompt); step 2 is the tabs Model (with Thinking), Permissions, Advanced. The Provider is said in a line; its select stays, hidden, for the form's reads.
+        const toolsHTML = `<details class="acf-tools-details"><summary>Tool permissions <span class="acf-perms-summary settings-hint"></span></summary>${permEditorHTML(true)}</details>`;
+        const agentHTML = topHTML.replace('<label>Agent Type:', '<label class="acf-provider-label" hidden><span class="acf-provider-head">Provider</span>');
+        container.innerHTML = [
+            `<div class="acf-persona-page"><p class="launch-field-head"><span>Name</span></p><p class="acf-restart-name"></p><div class="launch-prompt-field"><span class="launch-field-head" id="${escapeAttr(uid)}-prompt-label">Behavior prompt</span><textarea class="acf-prompt" aria-labelledby="${escapeAttr(uid)}-prompt-label" rows="8" placeholder="Describe the agent's role and behavior...">${escapeHtml(promptVal)}</textarea></div></div>`,
+            pane('agent', 'Model', 'smart_toy', '', `<p class="settings-hint acf-provider-fixed"></p>${agentHTML}`),
+            pane('permissions', 'Permissions', 'lock', '', `${autoPermissionsHTML}${toolsHTML}`),
+            pane('advanced', 'Advanced', 'tune', '', `<label>Flags <span style="color:var(--text-muted);font-weight:normal">(optional)</span>:${flagsInput}</label>`),
+        ].join('');
+    } else {
+        // The team member and Add-agent-to-board dialogs (#7391): the same panes as New Agent's step 3, and one Persona pane (the persona, the name, the prompt) where New Agent has a page.
+        const toolsHTML = `<details class="acf-tools-details"><summary>Tool permissions <span class="acf-perms-summary settings-hint"></span></summary>${permEditorHTML(true)}</details>`;
+        const promptHTML = `<div class="launch-prompt-field"><span class="launch-field-head" id="${escapeAttr(uid)}-prompt-label">Behavior prompt</span><textarea class="acf-prompt" aria-labelledby="${escapeAttr(uid)}-prompt-label" rows="10" placeholder="Describe the agent's role and behavior...">${escapeHtml(promptVal)}</textarea></div>`;
+        container.innerHTML = [
+            pane('persona', 'Persona', 'badge', '', `${(showPreset || showName) ? `${presetHTML}${nameHTML}` : ''}${promptHTML}`),
+            pane('agent', 'Agent', 'smart_toy', '', topHTML.replace('<label>Agent Type:', '<label class="acf-provider-label"><span class="acf-provider-head">Provider</span>')),
+            pane('permissions', 'Permissions', 'lock', '', `${autoPermissionsHTML}${toolsHTML}`),
+            pane('advanced', 'Advanced', 'tune', '', `<label>Flags <span style="color:var(--text-muted);font-weight:normal">(optional)</span>:${flagsInput}</label>`),
+        ].join('');
+        container.dataset.acfPersonaPane = '1';
+    }
+    for (const [paneId, el] of adopted) container.querySelector(`[data-section="${CSS.escape(paneId)}"], [data-adopt="${CSS.escape(paneId)}"]`)?.prepend(el);
+}
+
+function initAcfPermissions(container, uid, { caps, v }) {
     _setPermissions(`${uid}-perms`, caps);
     setThinking(container, v.thinking); // a form opened for a running agent shows the level it started with (#4969)
     setThinkingActual(container, v.thinking, v.thinkingActual); // and, under it, what the agent last ran at when that differs (#5105)
@@ -379,12 +420,16 @@ export function renderAgentConfigForm(containerId, opts = {}) {
     trackPermissionPick(container.querySelector('.acf-permission-mode')); // a mode picked here is the person's, whatever the agent type does next (#5836)
     container.querySelector('.acf-permission-mode')?.addEventListener('change', () => _syncEnforcement(container));
     container.querySelector('.perms-shell-input')?.addEventListener('input', () => _syncEnforcement(container));
+}
 
+function initAcfPresets(containerId, uid, opts, { showPreset }) {
     // Render presets if enabled — pass containerId so the preset handler knows which ACF to update
     if (showPreset) {
         _renderPresetButtons(`${uid}-presets`, 'acf', { target: containerId, selectId: opts.sections ? `${uid}-preset` : undefined });
     }
+}
 
+function initAcfModel(container, { modelVal, agentTypeVal }) {
     // Loaded values are classified against the provider's known defaults and
     // model catalog. Known values may be replaced on provider switch; custom
     // values remain user-owned. Hold pre-fill until classification completes.
@@ -404,7 +449,9 @@ export function renderAgentConfigForm(containerId, opts = {}) {
             }
         });
     }
+}
 
+function placeAcfCliLine(container, opts) {
     // A dialog that keeps the form's sections behind "More options" can ask for the missing-CLI line to sit outside them (opts.cliSlot, an element id): the first run's
     // most common stop is a CLI that is not installed, and it was found only after pressing Launch (#5835).
     const cliSlot = opts.cliSlot && document.getElementById(opts.cliSlot);
@@ -413,6 +460,9 @@ export function renderAgentConfigForm(containerId, opts = {}) {
     // Populate datalist + apply visibility + pre-fill for the initial agent type.
     _syncACFModelField(container);
     _checkAgentCLI(container.querySelector('.acf-agent-type')?.value || 'claude', cliWarningOf(container));
+}
+
+function wireAcfAgentType(container) {
     container.querySelector('.acf-agent-type')?.addEventListener('change', () => {
         const agentType = container.querySelector('.acf-agent-type')?.value || 'claude';
         _checkAgentCLI(agentType, cliWarningOf(container));
@@ -426,6 +476,9 @@ export function renderAgentConfigForm(containerId, opts = {}) {
         _syncACFModelField(container);
         _syncEnforcement(container);
     });
+}
+
+function finishAcfControls(container, opts) {
     if (opts.restart) { // Restart's controls (#7391): the provider fixed and said in a line, the name read-only
         const type = container.querySelector('.acf-agent-type');
         type.disabled = true;
@@ -443,6 +496,7 @@ export function renderAgentConfigForm(containerId, opts = {}) {
     }
     if (opts.sections) { const shell = container.closest('.settings-shell'); if (shell) initSectionDialog(shell); } // the panes are in: build the section list
 }
+
 
 // _syncACFModelField reconciles the Model input with the currently selected
 // agent type:
