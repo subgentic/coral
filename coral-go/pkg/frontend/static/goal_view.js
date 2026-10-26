@@ -165,6 +165,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         bar.append(btn('btn goals-add-task', 'Add task', () => { (window.showCreateTaskModal || (() => {}))({ project: model.project, goal_id: g.id, onCreated: loadGoals }); }));
         if (W.isOpenGoal(g)) { const cb = btn('btn btn-primary goals-close', 'Close goal', () => openClose(g)); cb.setAttribute('aria-label', `Close goal: ${g.title}`); bar.append(cb); } // named for its goal: the Close dialog's own button is just Close goal
         else if (W.isClosedGoal(g)) bar.append(btn('btn goals-reopen', 'Reopen', () => reopenGoal(g)));
+        main.append(artifactsHost(g)); // below the progress and the task button, above the pinned bar
         main.append(bar);
         return h;
     }
@@ -340,7 +341,17 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
     }
 
 
-    const update = g => { current = g; drawPage(); };
+    // The goal's Artifacts (#8616): one mount for the goal on show, its node moved into each drawing of the page, so what is open and loaded stays while the page is drawn again
+    const artifacts = { id: 0, host: null, api: null };
+    function artifactsHost(g) {
+        if (artifacts.id !== g.id) {
+            artifacts.api?.destroy(); artifacts.api = null;
+            const host = artifacts.host = el('div', 'goal-artifacts-host'); artifacts.id = g.id;
+            importOnce('./goal_artifacts.js').then(m => { if (!disposed && artifacts.host === host) artifacts.api = m.mountGoalArtifacts(host, { team: model.project, goalId: g.id }); }).catch(() => {}); // no section when it cannot load
+        }
+        return artifacts.host;
+    }
+    const update = g => { const again = current && current.id === g.id && JSON.stringify(current.rollup) !== JSON.stringify(g.rollup); current = g; drawPage(); if (again) artifacts.api?.refresh(); }; // the tasks moved: their files may have
     let reading = false, again = false, signature = '', first = true;
     async function reload() {
         if (disposed) return;
@@ -374,6 +385,6 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         window.addEventListener('focus', visibleRefresh);
     }
     return { update, refreshTasks: () => loadTasks(id), dispose: () => {
-        disposed = true; stop?.(); if (timer) clearInterval(timer); window.removeEventListener('focus', visibleRefresh);
+        disposed = true; artifacts.api?.destroy(); stop?.(); if (timer) clearInterval(timer); window.removeEventListener('focus', visibleRefresh);
     }, focus: focusDetail };
 }
