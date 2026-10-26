@@ -31,7 +31,7 @@ export const serverHas = { check: true, autoPref: true }; // the server has both
 const str = (v) => (typeof v === 'string' ? v : '');
 const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
-export const INSTALL_KINDS = ['app', 'msi', 'portable', 'tarball', 'homebrew', 'unwritable'];
+const INSTALL_KINDS = ['app', 'msi', 'portable', 'tarball', 'homebrew', 'unwritable'];
 const NOT_READY = ['not_checked', 'up_to_date', 'not_promoted', 'backoff', 'check_failed', 'unsupported_install', 'switch_off', 'applying'];
 const ROLLBACK_REASONS = ['did_not_start', 'not_healthy', 'swap_failed', 'verify_failed', 'other'];
 const VERSION_RE = /^\d{1,4}\.\d{1,4}\.\d{1,4}$/;
@@ -82,7 +82,7 @@ export function normalizeStatus(raw) {
     };
 }
 
-export function normalizeRelaunch(r) {
+function normalizeRelaunch(r) {
     return {
         available: r.available === true,
         reason: str(r.reason),
@@ -128,7 +128,7 @@ const REASON_TEXT = {
 /** Set while the person is away signing in again (the hub's 401 reauth_required): on return the dashboard reads the status afresh and shows the dialog again. */
 export const RESUME_KEY = 'coral-update-resume';
 /** A reason this build does not know still gets a sentence (#7338): that Coral did not say why, and that nothing was changed. */
-export const UNKNOWN_REASON_TEXT = 'Coral did not say why. Nothing was changed.';
+const UNKNOWN_REASON_TEXT = 'Coral did not say why. Nothing was changed.';
 export const reasonText = (reason) => (Object.hasOwn(REASON_TEXT, reason) ? REASON_TEXT[reason] : UNKNOWN_REASON_TEXT);
 /** Windows installs from this computer's own dashboard (#7338): the status says local_approval_needed and, only to a request from here, local_install. A relaunch is never offered there. */
 export const installsLocally = (s) => !!s && s.localInstall === true && s.relaunch.reason === 'local_approval_needed';

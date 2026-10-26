@@ -21,7 +21,7 @@ async function requestJson(method, url, body) {
 const base = (hex, server) => serverUrl(`/api/artifacts/${hex}/comments`, server);
 
 /** What the panel draws from one comment: the server's fields under the names the UI uses. `can` is what this viewer may do to it (the server decides again on every write; the UI only hides what would be refused). */
-export function normalizeComment(c) {
+function normalizeComment(c) {
     const can = c.can || {}, who = c.author || {};
     return {
         id: c.id, parentId: c.parent_id == null ? null : c.parent_id, anchor: c.anchor || { whole: true }, body: String(c.body == null ? '' : c.body),

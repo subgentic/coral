@@ -71,7 +71,7 @@ async function fetchJobRuns(jobId) {
 
 let jobsQuery = ''; // the search box's text, lower case
 const matchesQuery = job => !jobsQuery || String(job.name || '').toLowerCase().includes(jobsQuery);
-export function filterJobs(value) { jobsQuery = String(value || '').trim().toLowerCase(); renderJobsSidebar(); }
+function filterJobs(value) { jobsQuery = String(value || '').trim().toLowerCase(); renderJobsSidebar(); }
 
 const JOB_GROUPS = [{ key: 'active', label: 'Active', has: job => job.enabled }, { key: 'paused', label: 'Paused', has: job => !job.enabled }];
 const jobGroups = () => JOB_GROUPS.map(g => ({ ...g, jobs: scheduledJobs.filter(matchesQuery).filter(g.has) })).filter(g => g.jobs.length);
@@ -328,7 +328,7 @@ const formatDuration = ms => fmtDuration(ms);
 
 // ── CRUD operations ──────────────────────────────────────────────────────
 
-export async function toggleScheduledJob(jobId) {
+async function toggleScheduledJob(jobId) {
     try {
         await fetch(`/api/scheduled/jobs/${jobId}/toggle`, { method: 'POST' });
         await fetchJobs();
@@ -338,7 +338,7 @@ export async function toggleScheduledJob(jobId) {
     }
 }
 
-export function deleteScheduledJob(jobId) {
+function deleteScheduledJob(jobId) {
     window.showConfirmModal('Delete Job', 'Delete this scheduled job and all its run history?', async () => {
         try {
             await fetch(`/api/scheduled/jobs/${jobId}`, { method: 'DELETE' });
@@ -424,7 +424,7 @@ function say(id, text) {
 }
 
 /** Show or clear the limit's sentence; mark the field. True when the limit is fine. */
-export function checkLimit() {
+function checkLimit() {
     const r = limitFromFields();
     say('job-modal-limit-msg', r.error || '');
     markInvalid(document.getElementById('job-modal-timeout'), !!r.error);
@@ -554,7 +554,7 @@ export function hideJobModal() {
 }
 
 /** "Runs every day at 02:00 (UTC). Next: tomorrow 02:00, your time." The schedule as the Jobs page says it. */
-export function previewWords(expr, tz, nextIso) {
+function previewWords(expr, tz, nextIso) {
     const words = cronWords(expr);
     const runs = words.startsWith('Schedule:') ? `Runs on the schedule ${expr}` : 'Runs ' + words.charAt(0).toLowerCase() + words.slice(1);
     const next = nextIso ? ` Next: ${atWords(nextIso)}, your time.` : '';

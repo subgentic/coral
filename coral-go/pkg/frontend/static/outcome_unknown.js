@@ -3,7 +3,7 @@
 export const OUTCOME_UNKNOWN_LINE = 'That may have reached the computer. Check before trying again.';
 
 /** Whether a url is a launch (POST /api/sessions/launch or /launch-team, direct or through a hub's remote path). */
-export const isLaunchUrl = (url) => /\/launch(-team)?$/.test(String(url == null ? '' : url).split('?')[0].replace(/\/+$/, ''));
+const isLaunchUrl = (url) => /\/launch(-team)?$/.test(String(url == null ? '' : url).split('?')[0].replace(/\/+$/, ''));
 
 /** A 502 whose body says outcome_unknown, for anything but a launch: in `code`, or (the hub's launch-style answer, until its batch 63 adds `code` everywhere) as the whole `error`. */
 export function isOutcomeUnknown(status, body, url = '') {

@@ -196,7 +196,7 @@ async function onInput(e) {
 
 /** Shared directory browsing logic — returns { entries, dir, filter, results } or null.
  *  Used by both @ mention and file browser search. */
-export async function getDirBrowseResults(query) {
+async function getDirBrowseResults(query) {
     const lastSlash = query.lastIndexOf('/');
     const dir = lastSlash >= 0 ? query.slice(0, lastSlash) : '';
     const filter = (lastSlash >= 0 ? query.slice(lastSlash + 1) : query).toLowerCase();

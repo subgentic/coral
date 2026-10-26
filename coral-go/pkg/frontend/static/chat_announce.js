@@ -12,7 +12,7 @@ const words = (t, max = 120) => {
 };
 
 /** Say `message` once to a screen reader (the same words twice are still a change). */
-export function sayReply(message) {
+function sayReply(message) {
     const el = document.getElementById('chat-reply-status');
     if (!el) return;
     flip = !flip;

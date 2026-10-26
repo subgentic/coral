@@ -31,7 +31,7 @@ export function isGroupFolded(kind, key) { return folded(kind).includes(key); }
 
 function setFolded(kind, keys) { browserLocal.set(KEY(kind), JSON.stringify(keys)); }
 
-export function toggleGroupFold(kind, key) {
+function toggleGroupFold(kind, key) {
     const keys = folded(kind), at = keys.indexOf(key);
     if (at >= 0) keys.splice(at, 1); else keys.push(key);
     setFolded(kind, keys);

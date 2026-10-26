@@ -854,7 +854,7 @@ function _modeLabelInfo() {
 }
 
 /** Sync the Mode quick-action label/tooltip with the terminal buffer. */
-export function refreshModeLabel() {
+function refreshModeLabel() {
     const btn = document.getElementById("btn-mode-toggle");
     if (!btn) return;
     const info = _modeLabelInfo();
@@ -1008,7 +1008,7 @@ function hasImageFiles(e) {
 
 /** The Add image button (#6088): opens the file picker (a phone offers Photo Library, Take Photo and Browse). Launch tier through Coral Hub, as the upload route is: a refused account is told why. This runs
  *  straight from the tap, with nothing awaited before the click, or a phone would not open the picker. */
-export function openImagePicker() {
+function openImagePicker() {
     const session = state.currentSession;
     if (!session || session.type !== "live") return;
     if (sleepingBlocked()) return;
@@ -1030,7 +1030,7 @@ export function openImagePicker() {
 }
 
 /** Pictures chosen in the picker go up one after another, not at once (a phone on a slow connection, and the hub's limit on parallel requests); each is made smaller first when it is a big photo. */
-export async function uploadPickedImages(files, session = state.currentSession) {
+async function uploadPickedImages(files, session = state.currentSession) {
     for (const file of files) {
         const prepared = await prepareImage(file);
         if (prepared.error) { showToast(prepared.error, true); continue; }

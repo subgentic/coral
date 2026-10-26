@@ -12,7 +12,7 @@ import { importOnce } from './import_once.js';
 const { refusalOf, answeredLocally } = await importOnce('./owner_refusal.js'); // lazy modules load the others they need through importOnce, so a failed load is retried
 
 // Coral Hub's page where a team on another Coral is linked ("Coral Hub > Team links"). A constant: the hub refuses a query on it, so nothing is preselected.
-export const HUB_LINKS_URL = 'https://app.coralhub.dev/team-links';
+const HUB_LINKS_URL = 'https://app.coralhub.dev/team-links';
 let _hubForTests = null; // a test says it is Coral Hub without booting the Hub page
 export function _setHubForTests(v) { _hubForTests = v; }
 export const XT_KEYS = ['cross_team_messaging', 'cross_team_artifacts'];

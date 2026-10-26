@@ -80,7 +80,7 @@ export function formatShortTime(isoStr) {
     return `${dd}/${mm}/${yy}`;
 }
 
-export function formatStaleness(seconds) {
+function formatStaleness(seconds) {
     if (seconds === null || seconds === undefined) return "Unknown";
     if (seconds < 5) return "Just now";
     if (seconds < 60) return `${Math.floor(seconds)}s ago`;

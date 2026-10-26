@@ -12,7 +12,7 @@ let busy = false;
 const say = text => { const s = $('wt-status'); if (s && s.textContent !== text) s.textContent = text; };
 
 /** What keeps a worktree from being removed, as badge words (text, never colour alone). */
-export function worktreeBadges(w) {
+function worktreeBadges(w) {
     const out = [];
     if (w.in_use) out.push({ text: 'In use', why: 'A running agent is working in it.' });
     if (w.dirty) out.push({ text: 'Unsaved changes', why: 'It has files that are not committed.' });

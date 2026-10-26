@@ -22,7 +22,7 @@ export const askedWords = (k) => k.replies > 0 ? `Already asked, ${k.replies} re
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
 /** Whether an agent of the board's status list can be asked now, and why not: asleep and not running cannot (the server refuses them as well). */
-export function askableState(a) {
+function askableState(a) {
     const av = String(a.availability || '');
     if (av === 'sleeping') return { can: false, why: 'Asleep: wake it first' };
     if (av === 'offline' || av === 'unavailable') return { can: false, why: 'Not running' };

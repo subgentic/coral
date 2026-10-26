@@ -49,7 +49,7 @@ export function onUserInput(term, fn) {
 
 /** Redraws the canvas at its device size when xterm's own record of it is far from the columns x device cell it drew with (an observer that reported CSS pixels at DPR 2 or 3). Within a column's width
  *  is xterm's own fractional-DPR rounding and is left alone, so this cannot fight it. Returns whether it redrew. */
-export function syncCanvasScale(term) {
+function syncCanvasScale(term) {
     const rs = core(term) && core(term)._renderService;
     const r = rs && rs._renderer && rs._renderer.value;
     const d = rs && rs.dimensions && rs.dimensions.device;

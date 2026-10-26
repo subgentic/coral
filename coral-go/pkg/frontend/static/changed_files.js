@@ -64,7 +64,7 @@ export function toggleStarFile(filepath) {
     }
 }
 
-export function renderStarredFiles() {
+function renderStarredFiles() {
     const container = document.getElementById('starred-files-list');
     if (!container) return;
     const starred = _getStarredFiles();
@@ -99,7 +99,7 @@ export function renderStarredFiles() {
 let _searchResults = [];      // current dropdown results
 let _searchSelectedIdx = 0;   // selected index in dropdown
 
-export async function searchRepoFiles(query) {
+async function searchRepoFiles(query) {
     if (!query || !state.currentSession || state.currentSession.type !== 'live') {
         _hideSearchDropdown();
         return;
@@ -387,7 +387,7 @@ const _diffModeLabels = { branch_point: 'vs merge-base', previous_commit: 'vs HE
 // narrow route the hub allows (PUT /api/settings/git-diff-mode, Interact tier), not through the hub's per-user settings.
 let _cloudDiffMode = '';
 
-export async function setGitDiffMode(mode) {
+async function setGitDiffMode(mode) {
     if (!_diffModes.includes(mode)) return;
     if (isCloud()) {
         try {

@@ -105,7 +105,7 @@ function pickFolder(key) {
     openGroupTable('hub-inbox', key, { focus: true });
 }
 /** The folders in the sidebar. Only drawn when a count or the current folder changed (this runs for every message of the feed). */
-export function renderInboxNav(force = false) {
+function renderInboxNav(force = false) {
     const list = $('inbox-nav-list');
     if (!list) return;
     const here = page ? (page.kind === 'task' ? 'tasks' : 'saved') : group, sections = folderSections();

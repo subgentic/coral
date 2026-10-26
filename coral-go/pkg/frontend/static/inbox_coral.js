@@ -20,7 +20,7 @@ async function json(resp) {
 }
 
 const ARTIFACT_LINK_RE = /coral:\/\/artifacts\/([0-9a-f]{64})(?![0-9a-f])/g;
-export const ARTIFACT_LOOKUPS_MAX = 20;
+const ARTIFACT_LOOKUPS_MAX = 20;
 
 /** The link policy for ONE render of `text`: each distinct lowercase 64-hex artifact id in it (at most ARTIFACT_LOOKUPS_MAX, one request each) is asked for at GET /api/artifacts/<hex>/meta, and
  *  only an answer of exactly 200 makes it a link. 403, 404, any other status and a network failure leave it as text; no path is built from text without that 200. Nothing is kept between renders. */
@@ -72,7 +72,7 @@ let _inbox = null;
 onAccountForgotten(clearInboxDrafts);
 
 /** The mounted panel (made the first time it is asked for, in the Inbox tab's Tasks panel), or null where the page has no such host. */
-export function coralInbox() {
+function coralInbox() {
     if (_inbox) return _inbox;
     const host = document.getElementById('inbox-tasks-host');
     if (!host) return null;

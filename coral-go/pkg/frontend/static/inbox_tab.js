@@ -77,7 +77,7 @@ function announceNewlyWaiting(tab) {
 const askOf = s => String(s.waiting_summary || '').replace(/\s+/g, ' ').trim();
 const needsWords = s => { const why = sessionStateInfo(s).label, ask = askOf(s); return ask && ask !== why ? `${why}. ${ask}` : why; };
 
-export { askOf, needsWords };
+export { askOf };
 
 /** Which group of the dashboard's own Inbox a caller wants on screen (the Saved button of the top bar brings the Saved group's table up): the Inbox's sidebar opens it. */
 /** The group the Inbox opens on, named before the tab is switched to, so no frame shows the last group first (the bookmark opens the Inbox on Saved, #7431). */

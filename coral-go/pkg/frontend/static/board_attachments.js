@@ -16,7 +16,7 @@ function inboundEnvelope(m) {
 }
 
 /** The message's files as {hex, name, type, size}: only entries with a real 64-hex id, at most 50. The server's own words (name, media type) are text and are escaped where shown. */
-export function messageAttachments(m) {
+function messageAttachments(m) {
     const ext = inboundEnvelope(m);
     const list = ext && Array.isArray(ext.attachments) ? ext.attachments : [];
     const out = [];

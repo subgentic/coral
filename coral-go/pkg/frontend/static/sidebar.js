@@ -309,7 +309,7 @@ export function toggleAgenticPanel(forceState) {
 /* The sidebar's panes (#7443): one pane per tab (header, list, pinned action), shown for the tab on screen. The header's parts and the 56 px rail are the same on every tab;
  * what differs is what the search is for, whether the tab has Display options and groups, and its one pinned action. Hide turns the column into the rail; the choice is the
  * tab's own, kept in this browser. */
-export const SIDEBAR_PANES = {
+const SIDEBAR_PANES = {
     agents: { search: 'Search agents', action: { name: 'launch-show', label: 'New agent' } },
     history: { search: 'Search chats', action: null },
     jobs: { search: 'Search jobs', action: { name: 'job-new', label: 'New job' } },

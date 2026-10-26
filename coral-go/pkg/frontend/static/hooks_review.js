@@ -6,11 +6,11 @@ import { state } from './state.js';
 import { promptOptionsBySession } from './needs_input_card.js';
 import { setHooksPlaceholder } from './composer_placeholder.js';
 
-export const HOOKS_PLACEHOLDER = "Answer Codex's question about Coral's hooks first";
+const HOOKS_PLACEHOLDER = "Answer Codex's question about Coral's hooks first";
 const HOOKS_PLACEHOLDER_PHONE = "Answer Codex's hooks question first"; // the full text is cut off mid-word in a phone's box
 
 /** Whether the prompt read from the terminal is Codex's hooks-review question (the stable words, not the version or the count of hooks; the server matches the same). */
-export function isHooksReview(screen) {
+function isHooksReview(screen) {
     if (!screen) return false;
     const text = [screen.question, ...(screen.options || []).map(o => o && o.label)].filter(Boolean).join(' ').toLowerCase().replace(/\s+/g, ' ');
     return text.includes('hook') && (text.includes('new or changed') || text.includes('trust all and continue') || text.includes('review hooks') || text.includes('hooks need review'));
