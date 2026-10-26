@@ -39,7 +39,7 @@ export function loadHistoryFiltered() {
 
 let listStarted = null;
 /** The first read of the chat list, once: the tag filter, then the page the filters ask for. The hub's Chats tab starts it with the page; a local Coral, which has no Chats list of its own (its chats are the Inbox's folders), reads it only when
- *  something needs an entry of it: an opened chat, the Resume dialog, a chat search's rows (#8195). */
+ *  something needs an entry of it: an opened chat that comes without its entry (a link, a saved message) or the Resume dialog (#8195). The Inbox's chat folders do not: they read /api/sessions/history with their own type and pass the entry of the chat they open (inbox_sidebar.js). */
 export function startHistoryList() {
     if (!listStarted) listStarted = populateHfTagSelect().then(() => { syncFilterDomToState(); return loadHistoryFiltered(); }).catch(() => {});
     return listStarted;
