@@ -34,6 +34,17 @@ const BASE = require('./test_base').BASE;
         const k = Object.fromEntries(f.items);
         assert.deepEqual([k['chats'], k['chats-group'], k['chats-notes'], k['chats-starred'], k['chats-active'], k['chats-archived'], k['chats-cli-claude'], k['chats-cli-codex'], k['chats-tag-7']], ['119', '1', '9', '0', '1', '3', '90', '30', '4'], 'counts from the one grouped read (All chats is the agents\' chats: all less the groups) ' + JSON.stringify(f.items));
         assert.ok(f.dot, 'a tag has its colour dot');
+        // the column for a screen reader and the keyboard (#8022): each view's name and count read apart and once, one Tab stop for the column, the arrows move between the views
+        const names = await ev(`[...document.querySelectorAll('.view-list-item')].map(b => [b.getAttribute('aria-label'), b.textContent.replace(/\\s+/g, ' ').trim()])`);
+        assert.ok(names.some(([a]) => a === 'All chats, 119') && names.some(([a]) => a === 'Group chats, 1') && names.some(([a]) => a === 'Pi'), 'name and count apart: ' + JSON.stringify(names.slice(0, 8)));
+        assert.equal(await ev(`[...document.querySelectorAll('.view-list-item')].filter(b => b.tabIndex === 0).map(b => b.dataset.key).join()`), 'chats', 'one Tab stop: the current view');
+        await ev(`document.querySelector('.view-list-item[data-key="chats"]').focus(); true`);
+        const key = async k => { await client.Input.dispatchKeyEvent({ type: 'keyDown', key: k, code: k }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: k, code: k }); };
+        await key('ArrowDown'); await key('ArrowDown');
+        assert.equal(await ev(`document.activeElement.dataset.key`), 'chats-notes', 'Down moves two views on without choosing one');
+        assert.equal(await ev(`document.querySelector('.view-list-current').dataset.key`), 'chats', 'the current view did not change');
+        await key('End'); assert.equal(await ev(`document.activeElement.dataset.key`), 'chats-tag-7'); await key('Home'); assert.equal(await ev(`document.activeElement.dataset.key`), 'needs');
+        await ev(`document.querySelector('.view-list-item[data-key="chats"]').focus(); true`);
         const t = await ev(`(() => { const rows = [...document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)')]; const r = rows[0]; return { n: rows.length, groups: [...document.querySelectorAll('#group-table-view .dt-group th')].map(x => x.textContent), agent: r.querySelector('.dt-primary').textContent, title: r.querySelector('.dt-chat-title').textContent, snippet: r.querySelector('.dt-chat-snippet').textContent, h: Math.round(r.getBoundingClientRect().height), person: !!r.querySelector('.dt-avatar'), group: !!rows[3].querySelector('.dt-tag') && rows[3].querySelector('.dt-tag').textContent }; })()`);
         assert.equal(t.n, 50, 'the first page is 50 chats'); assert.equal(t.agent, 'Backend Dev'); assert.equal(t.title, 'Chat title 0'); assert.match(t.snippet, /The snippet of chat 0/); assert.ok(t.person && t.h <= 40, 'a one-line row ' + JSON.stringify(t) + await ev(`JSON.stringify([...document.querySelector('#group-table-view .dt-table tbody tr:not(.dt-group)').children].map(c => [c.className, Math.round(c.getBoundingClientRect().height)]))`)); assert.equal(t.group, false, 'All chats is the agents\' chats: no group chat in it');
         assert.ok(t.groups.length >= 3 && t.groups[0] === 'Today' && t.groups[1] === 'Yesterday', 'day dividers ' + JSON.stringify(t.groups));
@@ -45,6 +56,7 @@ const BASE = require('./test_base').BASE;
         await ev(`document.querySelector('#group-table-view .dt-foot').scrollIntoView({ block: 'center' }); true`);
         await waitFor(`document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)').length >= 100`, 'the second page', 10000);
         assert.equal((await ev(`window.__asked`)).filter(a => a.type === 'agent' && !a.starred).map(a => a.page).join(), '1,2', 'one read per page');
+        await waitFor(`(document.getElementById('notice-live') || document.body).textContent.includes('50 more chats loaded')`, 'the screen reader hears that more chats came in', 4000);
         console.log('   ✓');
 
         console.log('3. Star and Archive call the flags route');

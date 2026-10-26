@@ -1,6 +1,6 @@
 'use strict';
 // The keyboard-only census (#6188): on a screen, walk it with real Tab key presses (CDP Input.dispatchKeyEvent, not .focus()) and report what a person who cannot use a mouse would hit:
-//   unreachable  a visible, enabled control that no Tab press reaches (a member of a composite widget, a tablist, menu, listbox, radiogroup or toolbar, counts as reached when one of its members is: arrows move inside)
+//   unreachable  a visible, enabled control that no Tab press reaches (a member of a composite widget, a tablist, menu, listbox, radiogroup, toolbar or the mailbox's view list, counts as reached when one of its members is: arrows move inside)
 //   noFocus      a control Tab reaches that shows nothing when focused (no outline, shadow, border, fill, colour or underline difference from when it is not)
 //   offscreen    a control Tab reaches that is not on the screen even after the browser scrolled to it
 //   positive     a tabindex above 0 (it jumps the reading order)
@@ -19,7 +19,7 @@ async function press(Input, key, { shift = false, ctrl = false } = {}) {
 }
 
 const SELECTOR = 'button, a[href], input:not([type=hidden]), select, textarea, summary, [role=button], [role=tab], [role=menuitem], [role=option], [role=switch], [role=checkbox], [role=radio], [tabindex]';
-const COMPOSITE = '[role=tablist], [role=menu], [role=menubar], [role=listbox], [role=radiogroup], [role=toolbar], [role=grid], [role=tree], [role=group][aria-label]';
+const COMPOSITE = '[role=tablist], [role=menu], [role=menubar], [role=listbox], [role=radiogroup], [role=toolbar], [role=grid], [role=tree], [role=group][aria-label], .view-list-nav'; // .view-list-nav: the mailbox's views are one roving group, one Tab stop and Up, Down, Home and End inside it (#8022; view_list.js, mailbox_chats_browser pins it)
 
 const HELPERS = `(() => {
     const vis = e => { if (!e.getClientRects().length) return false; if (e.checkVisibility && !e.checkVisibility({ checkVisibilityCSS: true, contentVisibilityAuto: true })) return false; for (let p = e; p; p = p.parentElement) { const cs = getComputedStyle(p); if (cs.visibility === 'hidden' || cs.display === 'none' || p.hidden || p.inert) return false; } return true; };

@@ -69,6 +69,7 @@ const series = (rows, key) => Array.from({ length: 24 }, (_, h) => ({ cost_usd: 
         assert.equal(await ev(`document.querySelectorAll('#cost-series-overview .viz-fill[opacity="1"]').length`), 8, 'every fill is at full strength until one is brought forward');
         assert.equal(await ev(`document.getElementById('cost-change-cache-write').textContent`), '', 'a tile with nothing now and nothing before says nothing, not +100%');
         await ev(`document.getElementById('cost-series-overview').scrollIntoView({ block: 'start' }); true`); await shot('series-overview-fills'); await setTheme(ev, 'light'); await shot('series-overview-fills-light'); await setTheme(ev, 'dark'); await ev(`window.scrollTo(0, 0); true`);
+        assert.equal(await ev(`document.querySelectorAll('#cost-series-overview .viz-legend-btn')[0].getAttribute('aria-label')`), "Highlight coral-go-team's line, $13.50", 'the legend button says what it does, with the name and the figure apart (#8022)');
         await ev(`document.querySelectorAll('#cost-series-overview .viz-legend-btn')[2].click(); true`);
         assert.equal(await ev(`document.querySelectorAll('#cost-series-overview .viz-fill[opacity="0.25"]').length`), 7, 'a legend item brings its fill forward and dims the rest');
         await shot('series-overview'); await setTheme(ev, 'light'); await shot('series-overview-light'); await setTheme(ev, 'dark');
@@ -81,6 +82,7 @@ const series = (rows, key) => Array.from({ length: 24 }, (_, h) => ({ cost_usd: 
         const titles = () => ev(`[...document.querySelectorAll('#cost-series-team .viz-title')].map(h => h.textContent)`);
         const pressed = () => ev(`[...document.querySelectorAll('#cost-series-team .viz-seg')[0].querySelectorAll('button[aria-pressed="true"]')].map(b => b.textContent)`);
         assert.match(await ev(`document.querySelector('#cost-series-team .viz-check').textContent`), /^✓ Totals agree/);
+        assert.equal(await ev(`document.querySelector('#cost-series-team .viz-check b span').getAttribute('aria-hidden')`), 'true', 'the check mark is drawn, not read (#8022): the words say it');
         await metric('Input');
         assert.deepEqual(await pressed(), ['Cost', 'Input']); assert.deepEqual(await titles(), ['Cost, running total', 'Input, running total'], 'several metrics, several rows: a chart for each');
         assert.match(await ev(`document.querySelector('#cost-series-team .viz-check').textContent`), /^✓ Totals agree The table's rows add up to what each chart ends on \(Cost and Input\)/);

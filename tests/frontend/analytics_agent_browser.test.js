@@ -55,6 +55,7 @@ const CALLS = Array.from({ length: 24 }, (_, h) => ({ bucket: hourIso(23 - h), c
         await waitFor(`document.querySelectorAll('#cost-agent-detail .viz-svg').length >= 3 && document.querySelectorAll('#cost-agent-detail .dt-table tbody tr').length === 2`, 'the drill-down', 12000);
         let d = await detail();
         assert.deepEqual([d.view, d.title, d.current], ['agent-detail', 'Frontend Dev', 'By agent'], JSON.stringify(d));
+        assert.equal(await ev(`(() => { const b = document.querySelector('.viz-back'); return [b.querySelector('span').getAttribute('aria-hidden'), b.textContent]; })()`).then(x => x.join('|')), 'true|\u2190 By agent', 'the back link: its arrow is drawn, not read (#8022)');
         assert.ok(d.svgs.every(s => s[0] === 'true'), 'every chart is hidden from a screen reader: ' + JSON.stringify(d.svgs));
         assert.equal(d.svgs.filter(s => s[1]).length, 2, 'two charts lead; the rest are under More charts: ' + JSON.stringify(d.svgs));
         assert.deepEqual(d.rows, ['$6.00', '$1.20'], 'the biggest turns, the dearest first');
@@ -94,6 +95,8 @@ const CALLS = Array.from({ length: 24 }, (_, h) => ({ bucket: hourIso(23 - h), c
 
         console.log('5. A phone: it fits and the pick is a 44 px select');
         await open(390, 844, true);
+        const chartsLink = await ev(`(() => { const r = document.querySelector('#cost-by-agent tbody tr .dt-link[aria-label="Charts for Frontend Dev"]').getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })()`);
+        assert.ok(chartsLink[0] >= 44 && chartsLink[1] >= 44, 'the Charts link is a 44 px target both ways on a phone (#8022): ' + chartsLink);
         await ev(`document.querySelector('#cost-by-agent tbody tr .dt-link[aria-label="Charts for Frontend Dev"]').click(); true`);
         await waitFor(`document.querySelectorAll('#cost-agent-detail .viz-svg').length >= 3`, 'the drill-down on a phone', 12000);
         const p = await ev(`({ page: document.documentElement.scrollWidth > innerWidth + 1, sel: Math.round(document.getElementById('cost-agent-window').getBoundingClientRect().height), back: Math.round(document.querySelector('#cost-agent-detail .viz-back').getBoundingClientRect().height) })`);

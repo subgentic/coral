@@ -207,6 +207,9 @@ function watchMore(g) {
 }
 const joinWords = list => (list.length < 2 ? list.join('') : `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}`);
 
+/** The bold start of the "Totals" line: its mark is drawn, not read ("check mark Totals agree"); the words say it. */
+function markedLine(mark, words) { const b = el('b'), m = el('span', null, mark); m.setAttribute('aria-hidden', 'true'); b.append(m, document.createTextNode(` ${words}`)); return b; }
+
 /** Draws the panel: the pickers (the metrics, any of them together; running total or each interval), the chart or charts, and the line under them ("Totals agree"). With one metric: a line per shown row.
  *  With several metrics and one row: a line per metric (one chart per unit: tokens together, dollars and requests apart). With several metrics and several rows: one chart per metric, a line per row, one under another.
  *  tableTotal(field, keys) is the sum of the table's rows (those with these keys, or all when keys is null) for a table figure, or null when the table has none; redraw draws the table beside it again. */
@@ -257,8 +260,8 @@ export function drawPanel(host, view, { tableTotal, redraw, phone }) {
     if (rows.length) {
         const bad = rows.filter(x => !agrees(x.rowsTotal, x.chartTotal)), line = el('p', `viz-check${bad.length ? ' viz-check-bad' : ''}`);
         line.setAttribute('role', 'status');
-        if (!bad.length) line.append(el('b', null, '\u2713 Totals agree'), document.createTextNode(rows.length === 1 ? ` The table's rows add up to ${rows[0].m.fmt(rows[0].rowsTotal)}, where the chart ends.` : ` The table's rows add up to what each chart ends on (${joinWords(rows.map(x => x.m.label))}).`));
-        else line.append(el('b', null, '\u2717 Totals differ'), document.createTextNode(` ${joinWords(bad.map(x => `${x.m.label}: the table's rows ${x.m.fmt(x.rowsTotal)}, the chart ${x.m.fmt(x.chartTotal)}`))}.`));
+        if (!bad.length) line.append(markedLine('\u2713', 'Totals agree'), document.createTextNode(rows.length === 1 ? ` The table's rows add up to ${rows[0].m.fmt(rows[0].rowsTotal)}, where the chart ends.` : ` The table's rows add up to what each chart ends on (${joinWords(rows.map(x => x.m.label))}).`));
+        else line.append(markedLine('\u2717', 'Totals differ'), document.createTextNode(` ${joinWords(bad.map(x => `${x.m.label}: the table's rows ${x.m.fmt(x.rowsTotal)}, the chart ${x.m.fmt(x.chartTotal)}`))}.`));
         host.append(line);
     }
 }
@@ -333,7 +336,7 @@ export function drawOverviewPanel(host, { phone }) {
     const chart = el('div', 'viz-chart'); card.append(chart);
     const ul = el('ul', 'viz-legend');
     lines.forEach((l, k) => {
-        const li = el('li'), b = el('button', 'viz-legend-btn'); b.type = 'button'; b.setAttribute('aria-pressed', String(st.hi === l.key));
+        const li = el('li'), b = el('button', 'viz-legend-btn'); b.type = 'button'; b.setAttribute('aria-pressed', String(st.hi === l.key)); b.setAttribute('aria-label', `Highlight ${l.label}'s line, ${METRICS[0].fmt(l.total)}`); // the name and the figure read apart (they were "coral-go-team$13.50")
         const sw = el('i', 'cost-swatch'); sw.style.background = colorOf(l); sw.setAttribute('aria-hidden', 'true');
         b.append(sw, el('span', 'viz-legend-name', l.label), el('span', 'viz-legend-value', METRICS[0].fmt(l.total)));
         b.addEventListener('click', () => { st.hi = st.hi === l.key ? '' : l.key; drawOverviewPanel(host, { phone }); });

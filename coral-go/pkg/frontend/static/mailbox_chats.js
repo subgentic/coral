@@ -78,6 +78,7 @@ async function readMore(key, folder, q, redraw) {
         const rows = Array.isArray(d.sessions) ? d.sessions : [];
         L.rows = L.rows.concat(rows); L.page += 1; L.total = Number.isFinite(d.total) ? d.total : L.rows.length; L.error = '';
         L.done = !rows.length || L.rows.length >= L.total;
+        if (L.page > 1 && rows.length) importOnce('./notifications.js').then(m => m.announceNotice(`${rows.length} more chats loaded`)).catch(() => {}); // heard once: the rows came in below the footer the person was on (#8022)
     } catch (e) { L.error = e.message || 'Chats could not be read'; L.done = true; }
     L.busy = false; redraw();
 }

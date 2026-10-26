@@ -146,7 +146,7 @@
 .dt-box.dt-folded .dt-row:hover td, .dt-box.dt-folded .dt-row.dt-selected td, .dt-box.dt-folded .dt-row[aria-current="true"] td { background: none; }
 .dt-box.dt-folded .dt-row:hover, .dt-box.dt-folded .dt-row[aria-current="true"] { background: var(--table-hover); }
 .dt-box.dt-folded .dt-row.dt-selected { background: var(--table-selected); }
-.dt-box.dt-folded .dt-link { display: inline-flex; align-items: center; min-height: var(--table-touch); } /* a name that opens something is a 44 px target on a phone */
+.dt-box.dt-folded .dt-link { display: inline-flex; align-items: center; min-height: var(--table-touch); min-width: var(--table-touch); } /* a name that opens something is a 44 px target on a phone */
 .dt-box.dt-folded .dt-check { display: none; }
 .dt-box.dt-folded .dt-primary, .dt-box.dt-folded .dt-link, .dt-box.dt-folded .dt-quiet { min-height: var(--table-touch); display: inline-flex; align-items: center; } /* a 44 px target when the table is the phone's two-line row */
 .dt-box.dt-folded.dt-selecting .dt-check { display: block; flex: none; width: var(--table-touch); }
