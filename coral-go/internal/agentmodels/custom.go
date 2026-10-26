@@ -2,6 +2,7 @@ package agentmodels
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -108,7 +109,7 @@ func ValidateCustomSet(in []Custom) ([]Custom, error) {
 		have := map[string]bool{}
 		for _, e := range c.Efforts {
 			e = strings.TrimSpace(e)
-			if !contains(levels, e) {
+			if !slices.Contains(levels, e) {
 				if len(levels) == 0 {
 					return nil, fail("efforts", "this provider's CLI takes no thinking levels")
 				}
@@ -124,15 +125,6 @@ func ValidateCustomSet(in []Custom) ([]Custom, error) {
 		out = append(out, c)
 	}
 	return out, nil
-}
-
-func contains(list []string, s string) bool {
-	for _, x := range list {
-		if x == s {
-			return true
-		}
-	}
-	return false
 }
 
 // CleanCustom is what a stored list is read as: a row that no longer passes validation (a hand-edited database) is dropped, so it can never reach a picker or a command line.
