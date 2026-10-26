@@ -128,7 +128,7 @@ const LONG = 'worktree-agent-a1b2c3d4e5f60718/feature/calm-the-dashboard-remove-
             await tapSel('#mobile-session-list .board-card-header [data-on-click="team-working-mode"]');
             await waitFor(`!!document.querySelector('#team-settings-workspace #team-settings-health form')`, 'the settings page', 15000); await settle(500);
             await audit(`${tag} Team settings, Workflow`, '#team-settings-workspace');
-            for (const sec of ['health', 'messaging', 'prompts']) { await ev(`document.querySelector('#ts-h-${sec}').scrollIntoView({ block: 'start' }); true`); await settle(500); await audit(`${tag} Team settings, ${sec}`, '#team-settings-workspace'); }
+            for (const [sec, name] of [['health', 'Health check'], ['messaging', 'Messaging'], ['prompts', 'Prompts']]) { await ev(`(() => { const page = document.querySelector('#team-settings-workspace'); const tab = [...page.querySelectorAll('[role=tab]')].find(t => t.offsetParent && t.textContent.trim() === ${JSON.stringify(name)}); if (tab) { tab.click(); return true; } const sel = [...page.querySelectorAll('select')].find(x => x.offsetParent && x.getAttribute('aria-label') === 'Team settings group'); const o = sel && [...sel.options].find(x => x.textContent === ${JSON.stringify(name)}); if (o) { sel.value = o.value; sel.dispatchEvent(new Event('change', { bubbles: true })); } return !!o; })()`); await settle(500); await audit(`${tag} Team settings, ${sec}`, '#team-settings-workspace'); }
             // 4. the preview, in the sheet and full screen
             await setup(w, h, theme); await scene(); await settle(500); await openPreview();
             await audit(`${tag} the preview in the sheet`, '#preview-pane');
