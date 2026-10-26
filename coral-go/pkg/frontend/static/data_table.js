@@ -53,11 +53,11 @@ export function link(text, run) { return button('dt-link', text, run); }
 /** Task completion: visible counts remain meaningful without colour or a filled bar. */
 export function progressCell(done, total) {
     const cell = el('span', 'dt-progress');
-    if (!total) { cell.textContent = 'No tasks'; return cell; }
+    if (!total) { cell.textContent = 'No tasks yet'; return cell; }
     const label = `${done} of ${total} done`;
     const meter = el('progress', 'dt-progress-meter');
     meter.max = total; meter.value = done; meter.setAttribute('aria-label', label);
-    cell.append(meter, el('span', 'dt-progress-text', label));
+    cell.append(el('span', 'dt-progress-text', label), meter);
     return cell;
 }
 

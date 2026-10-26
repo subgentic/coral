@@ -15,6 +15,7 @@ import { foldWayBack } from './way_back.js';
 const Toolbar = await importOnce('./team_toolbar.js'); // the one toolbar of the team tabs (#7717)
 const { attachDockResize, DOCK_MIN_WIDTH, dockMaxWidth } = await importOnce('./dock_resize.js');
 const DT = await importOnce('./data_table.js'); // the one table (#7743): the goal's column is its folded form
+const GC = await importOnce('./goal_columns.js');
 const TC = await importOnce('./task_columns.js');
 
 const PAGE = 50; // a goal's tasks are drawn this many at a time
@@ -293,7 +294,6 @@ const drawDetail = () => (layout === 'page' ? drawPage() : keepFocus(root && roo
 
 // ── the team page's Goals tab (#7453): a table of the goals; a goal's own page with its tasks as a table ────────────────
 
-const goalRowBtn = (g) => { const b = DT.primaryButton(g.title || `Goal ${g.id}`); b.dataset.goalId = String(g.id); return b; };
 const doneOf = (rollup) => rollup.done, totalOf = (rollup) => W.allTasksOf(rollup);
 let goalsTableState = DT.tableState();
 
@@ -330,20 +330,14 @@ function drawTableRaw(col) {
         return;
     }
     const sort = goalsTableState.sort;
-    const sortValue = g => sort.key === 'goal' ? g.title : sort.key === 'state' ? W.stateWord(g) : sort.key === 'tasks' ? (totalOf(g.rollup) ? doneOf(g.rollup) / totalOf(g.rollup) : 0) : g.updatedAt;
+    const sortValue = g => sort.key === 'goal' ? g.title : sort.key === 'state' ? W.stateWord(g) : sort.key === 'progress' ? (totalOf(g.rollup) ? doneOf(g.rollup) / totalOf(g.rollup) : 0) : g.updatedAt;
     if (sort) shown.sort((a, b) => { const x = sortValue(a), y = sortValue(b); return (sort.dir === 'desc' ? -1 : 1) * (typeof x === 'number' ? x - y : String(x).localeCompare(String(y), undefined, { numeric: true })); });
     const rows = shown.concat(model.noGoalOpen > 0 && model.filter === 'all' ? [{ id: 'no-goal', title: W.noGoalRowText(model.noGoalOpen), noGoal: true }] : []);
     col.append(DT.dataTable({
         label: `Goals, ${shown.length}`, rows, rowKey: g => g.id, state: goalsTableState,
         onSort: () => drawList(), // keep the no-goal navigation row last in either direction
         open: g => g.noGoal ? window.openTeamPage?.(model.project, { tab: 'tasks', noGoal: true }) : openGoal(g.id, true),
-        columns: [
-            { key: 'goal', label: 'Goal', primary: true, width: 'grow', sort: true, line: 1,
-                cell: g => { const b = goalRowBtn(g); if (g.noGoal) b.classList.add('goals-no-goal'); return b; }, subtitle: g => g.outcome },
-            { key: 'state', label: 'State', sort: true, line: 2, cell: g => g.noGoal ? '' : DT.chip(W.stateWord(g), `goal-state-${g.state || 'unknown'}`) },
-            { key: 'tasks', label: 'Tasks', sort: true, line: 2, tone: 'tertiary', cell: g => g.noGoal ? '' : DT.progressCell(doneOf(g.rollup), totalOf(g.rollup)) },
-            { key: 'updated', label: 'Updated', sort: true, line: 0, tone: 'tertiary', align: 'end', cell: g => g.noGoal ? '' : DT.timeCell(g.updatedAt) },
-        ],
+        columns: GC.goalColumns({ progressLabel: 'Tasks' }, ['goal', 'state', 'progress', 'updated']),
     }).el);
 }
 

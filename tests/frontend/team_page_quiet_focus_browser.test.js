@@ -21,12 +21,12 @@ const TEAM = `qa-quiet-${Date.now() % 100000}`;
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installTP(ev);
         await seed(ev, TEAM); await openTeam(ev, waitFor, TEAM); await settle(500);
         await S.run('a real click on a goal row: the heading is focused with no ring', async () => {
-            await mouse(await center('.goals-body .team-row-btn'));
+            await mouse(await center('.goals-body .dt-primary'));
             const s = await state(); assert.equal(s.focused, true, 'the goal page heading has the focus'); assert.equal(s.quiet, true, 'the view is marked quiet'); assert.match(s.outline, /^none|0px$/, `no outline (got ${s.outline})`);
         });
         await S.run('Enter on the focused row: the heading shows its ring', async () => {
             await ev(`window.__tp.find('button, a', /^(\\u2190\\s*)?Goals$/).click(); true`); await settle(400);
-            await ev(`document.querySelector('.goals-body .team-row-btn').focus(); true`);
+            await ev(`document.querySelector('.goals-body .dt-primary').focus(); true`);
             await key('Enter', 'Enter', 13);
             const s = await state(); assert.equal(s.focused, true, 'the heading has the focus'); assert.equal(s.quiet, false, 'the view is not marked quiet'); assert.ok(!/^none/.test(s.outline), `an outline (got ${s.outline})`);
         });

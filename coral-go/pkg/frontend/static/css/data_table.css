@@ -108,7 +108,7 @@
 .dt-box.dt-fold-labeled.dt-folded td:not(.dt-tone-primary)::before { content: attr(data-label); color: var(--table-tertiary-color); font-size: var(--table-tertiary-size); font-weight: var(--table-tertiary-weight); flex: none; }
 @media (forced-colors: active) { .dt-row.dt-selected { outline: 2px solid Highlight; } .dt-table th { border-bottom-color: CanvasText; } }
 
-.dt-progress { display: inline-flex; align-items: center; gap: var(--table-progress-gap); font-variant-numeric: tabular-nums; }
+.dt-progress { display: inline-flex; flex-direction: column; align-items: flex-start; gap: var(--table-progress-gap); font-variant-numeric: tabular-nums; }
 .dt-progress-meter { appearance: none; width: var(--table-progress-w); height: var(--table-progress-h); border: 0; border-radius: var(--table-radius); overflow: hidden; background: var(--table-progress-track); }
 .dt-progress-meter::-webkit-progress-bar { background: var(--table-progress-track); }
 .dt-progress-meter::-webkit-progress-value { background: var(--table-progress-fill); }
