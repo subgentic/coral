@@ -4,7 +4,7 @@
  *   dataTable({ label, columns, rows, rowKey, open, current, state, onSort, layout, fold, foldAt, sortBar, bare, empty, footer, selectable, rowName }) -> { el, bar, selectButton, selection(), clear(), state }
  *   selectable = { contextKey, onChange(keys), actions: [{ label, run(rows, keys, value), danger, confirm, choose: { label, options() -> [{ value, label }] } }] }: a danger action confirms in the bar, a choose action asks for its value there.
  *   Column = { key, label, field | cell(row, ctx), primary, tone: 'primary'|'secondary'|'tertiary', width: 'grow'|'content'|'<n>rem', nowrap, align: 'start'|'end', numeric,
- *              sort: true|'number'|'date'|fn(a, b), sortValue(row), line: 0|1|2, when(row), subtitle(row) }
+ *              sort: true|'number'|'date'|fn(a, b), sortValue(row), line: 0|1|2, when(row), subtitle(row), hideLabel }
  *   cell types: chip(word, cls), avatar(name), personButton(name, label), tag(text), timeCell(stamp), link(text, run), primaryButton(text, label)
  *   state: tableState(), kept by the caller across redraws: the sort, and the selection (a set of row keys, kept while the rows are filtered or paged, cleared when selectable.contextKey changes).
  * Folded (the table's own box narrower than foldAt rem, 40 by default; also at 200% text): fold 'column' is the two-line row (line 1 and line 2 cells), fold 'labeled' is the name, then "label value" lines
@@ -127,7 +127,7 @@ export function dataTable(cfg) {
                 const b = button('dt-sort', null, () => sortBy(c)); b.dataset.key = c.key;
                 b.append(el('span', null, c.label), el('span', 'dt-arrow', on ? (st.sort.dir === 'desc' ? '↓' : '↑') : '↕')); b.lastChild.setAttribute('aria-hidden', 'true');
                 th.append(b);
-            } else th.append(el('span', 'dt-head-text', c.label));
+            } else th.append(el('span', c.hideLabel ? 'sr-only' : 'dt-head-text', c.label)); // hideLabel: a column that is only an action has no head text on screen, its name is for a reader
             tr.append(th);
         }
         thead.append(tr);
@@ -265,6 +265,8 @@ export function dataTable(cfg) {
         box.append(foot);
     }
 
+    // before the box has a width (it is built apart from the page) a window that is a phone, or narrower than the fold, starts folded: a first paint of the wide table would scroll the page sideways (#7868); the observer below then settles it
+    if (cfg.fold !== 'none') { const root0 = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16; if (cfg.fold === 'always' || window.innerWidth <= 760 || window.innerWidth < foldAt * root0) box.classList.add('dt-folded'); }
     // folded: the table's own box narrower than foldAt rem (the root font size is read, so a larger text size folds sooner); set before the first paint
     if (cfg.fold !== 'none' && typeof ResizeObserver === 'function') {
         const root = () => parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
