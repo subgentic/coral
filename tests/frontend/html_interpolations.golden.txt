@@ -360,7 +360,7 @@
 2	sessions.js	cat.emojis.map(e => `<button class="emoji-picker-btn" data-emoji="${escapeAttr(e)}">${e}</button>`).join("")
 3	sessions.js	e
 1	sessions.js	filtered.map(e => `<button class="emoji-picker-btn" data-emoji="${escapeAttr(e)}">${e}</button>`).join("")
-1	settings_dialog.js	label
+1	settings_fill.js	label
 1	settings_nav.js	p.dataset.icon
 1	sidebar_groups.js	CELL_ACTION_ATTR[c.action]
 1	sidebar_groups.js	CHEVRON
