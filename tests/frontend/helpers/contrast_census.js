@@ -106,6 +106,7 @@ module.exports = part => (async () => {
             await sc('board: tasks', async () => { // the board's tasks are the Tasks tab of an agent on that board (the board's page has no side panel, #7457)
                 await ev(`(async () => { const { state } = await import((window.__coralStatic || '/static/') + 'state.js'); const b = state.boardPageProject; window.__m.add('census-agent', 'C', 1, { sleeping: false, board_project: b }); return b; })()`);
                 await waitFor(`(window.__qaState.liveSessions || []).some(s => s.name === 'census-agent')`, 'the agent', 8000);
+                await ev(`window.exitTeamPage && window.exitTeamPage({ force: true }); true`); // the board is the team page's now (#8129): the agent's own page starts from Agents
                 await ev(`window.selectLiveSession('census-agent', 'claude', 'census-agent-id', 'local'); window.toggleAgenticPanel && window.toggleAgenticPanel(true); window.switchAgenticTab('tasks', 'top'); true`); await waitFor(`document.querySelectorAll('#board-task-list button[aria-label^="Open task"]').length >= 3`, 'the board tasks', 15000); }, { expect: `document.querySelectorAll('#board-task-list button[aria-label^="Open task"]').length >= 3` });
             await sc('board: tasks, filters open', async () => { await ev(`true`); await tap('#board-task-bar .list-bar-toggle'); }, { expect: `document.querySelector('#board-task-bar .list-bar-toggle').getAttribute('aria-expanded') === 'true'` });
             await ev(`document.querySelector('#board-task-bar .list-bar-toggle')?.click(); true`);
