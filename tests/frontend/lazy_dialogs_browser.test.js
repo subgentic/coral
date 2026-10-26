@@ -1,6 +1,6 @@
 // #4500: the Settings, Launch, Job, Create task, Info, Default prompts and Custom view dialogs and the top-bar settings menu
 // are in the page as templates and built on first open. At load none of them is in the document (their templates hold some
-// 600 elements); each opens as before at desktop width and on a 390 px touch phone: focus moves in, Escape closes it, focus
+// 570 elements: they were 600 before the Settings groups became settings_view fields, drawn by script and not held as markup); each opens as before at desktop width and on a 390 px touch phone: focus moves in, Escape closes it, focus
 // goes back to what opened it, and on the phone every control in it is at least 44x44. Settings saves (Apply sends PUT
 // /api/settings and closes it); the menu opens with its items (Servers and Stop all auto-accept hidden here) and closes on an
 // outside click. The parts' own saves are covered by their suites (scheduler_stale_save, default_prompts_stale_save,
@@ -70,7 +70,7 @@ const undersized = sel => `(() => {
                 elements: document.querySelectorAll('*').length }))()`);
             assert.deepEqual(atLoad.inDoc, [], 'none of them is built at load');
             assert.deepEqual(atLoad.templates, LAZY.map(() => 1), 'each has its template');
-            assert.ok(atLoad.lazyElements >= 600, `their templates hold ${atLoad.lazyElements} elements`);
+            assert.ok(atLoad.lazyElements >= 500, `their templates hold ${atLoad.lazyElements} elements`); // the point: the dialogs' markup is a lot, and it is not in the document at load (the bound was 600 until the Settings rows moved into settings_view, #8491)
             console.log(`   ${atLoad.elements} elements in the page, ${atLoad.lazyElements} more in templates`);
             if (!viewId) { // a saved view, for the Custom view editor
                 viewId = await ev(`fetch('/api/views', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'QA lazy view', html: '<p>qa</p>' }) }).then(r => r.json()).then(d => d.id)`);
