@@ -21,9 +21,19 @@ export const NOTIFICATIONS_FIELDS = [
         help: { text: '', more: 'This browser only: alert while this tab is in the background. Shows the agent and server names (your OS may keep them in its notification history), never agent output. May duplicate a local alert.' } },
 ];
 
+export const FILES_FIELDS = [
+    { key: 'file_search_mode', type: 'select', id: 'settings-file-search-mode', label: 'File search mode', help: 'How @ mentions and file browser search for files', options: [{ value: 'directory', label: 'Directory Browsing' }, { value: 'fuzzy', label: 'Fuzzy Matching' }] },
+    { key: 'file_search_limit', type: 'select', id: 'settings-file-search-limit', label: 'File search limit', help: 'Max number of files returned in search results', default: '500',
+        options: [{ value: '50', label: '50' }, { value: '100', label: '100' }, { value: '200', label: '200' }, { value: '500', label: '500' }, { value: '1000', label: '1,000' }] },
+    { key: 'git_diff_mode', type: 'select', id: 'settings-git-diff-mode', label: 'Git diff mode', help: 'What to compare changed files against',
+        options: [{ value: 'branch_point', label: 'Branch Point (merge-base)' }, { value: 'previous_commit', label: 'Previous Commit (HEAD~1)' }, { value: 'main_head', label: 'Main Branch (vs main)' }] },
+    { key: 'git_poll_interval', type: 'select', id: 'settings-git-poll-interval', label: 'Git scan interval', help: { text: '', more: 'How often Coral rescans git for changed files. Scanning a large repository is slow \u2014 stretch this out, or turn it off and use the refresh button.' },
+        options: [{ value: '30', label: 'Every 30 seconds' }, { value: '60', label: 'Every minute' }, { value: '120', label: 'Every 2 minutes' }, { value: '300', label: 'Every 5 minutes' }, { value: '600', label: 'Every 10 minutes' }, { value: '1800', label: 'Every 30 minutes' }, { value: '0', label: 'Off \u2014 refresh manually' }] },
+];
+
 /** Draws the groups that are fields into the Settings modal's panes (once, when the modal is built). mount is mountSettingsView. */
 export function drawSettingsGroups(modal, mount) {
-    for (const [hostId, fields] of [['settings-general-rows', GENERAL_FIELDS], ['settings-notifications-rows', NOTIFICATIONS_FIELDS]]) {
+    for (const [hostId, fields] of [['settings-general-rows', GENERAL_FIELDS], ['settings-notifications-rows', NOTIFICATIONS_FIELDS], ['settings-files-rows', FILES_FIELDS]]) {
         const host = modal.querySelector(`#${hostId}`);
         if (host && !host.firstChild) mount(host, { mode: 'settings', saveBar: false, fields });
     }
