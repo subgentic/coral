@@ -53,6 +53,9 @@ export function chatSections(c = counts) {
     return out;
 }
 
+/** The chat tags there are (from the last counts read): id, name, count, colour. */
+export const chatTags = () => (counts && counts.tags) || [];
+
 export async function loadChatCounts(redraw) {
     try {
         const r = await historyFetch('/api/sessions/history/counts');
@@ -63,14 +66,14 @@ export async function loadChatCounts(redraw) {
 }
 
 // ── a folder's rows: read a page at a time, from the first, again when the folder or the search changes ──
-const lists = new Map(); // folder key + search -> { rows, page, total, done, busy, error }
-const listOf = (key, q) => { const k = `${key}|${q}`; if (!lists.has(k)) lists.set(k, { rows: [], page: 0, total: null, done: false, busy: false, error: '' }); return lists.get(k); };
-async function readMore(key, folder, q, redraw) {
-    const L = listOf(key, q);
+const lists = new Map(); // folder key + search + filters -> { rows, page, total, done, busy, error }
+const listOf = (key, q, extra = '') => { const k = `${key}|${q}|${extra}`; if (!lists.has(k)) lists.set(k, { rows: [], page: 0, total: null, done: false, busy: false, error: '' }); return lists.get(k); };
+async function readMore(key, folder, q, extra, redraw) {
+    const L = listOf(key, q, JSON.stringify(extra));
     if (L.busy || L.done) return;
     L.busy = true; // no redraw here: the spec is being built inside a draw, and a nested draw would close the table it is drawing (the empty line already says Loading)
     try {
-        const p = new URLSearchParams({ ...folder.params, page: String(L.page + 1), page_size: String(PAGE) });
+        const p = new URLSearchParams({ ...extra, ...folder.params, page: String(L.page + 1), page_size: String(PAGE) }); // the folder's own rule wins over a filter
         if (q) p.set('q', q);
         const r = await historyFetch(`/api/sessions/history?${p}`);
         if (!r || !r.ok) throw new Error('chats could not be read');
@@ -123,16 +126,17 @@ export async function setChatFlag(sessionId, flag, value) {
 }
 async function setFlag(s, flag, value, after) { if (await setChatFlag(s.session_id, flag, value)) after(); }
 
-/** The table spec of a chat folder. ctx: { query, open(session), redraw(), after() } (open: the chat in the viewer; redraw: draw the table again; after: counts and rows read again). */
+/** The table spec of a chat folder. ctx: { query, params, open(session), redraw(), after() } (params: the Filters' extra parameters of the history read, chat_filters.js; open: the chat in the viewer; redraw: draw the table again; after: counts and rows read again). */
 export function chatsSpec(key, ctx) {
     const folder = chatFolder(key);
     if (!folder) return null;
     const q = (ctx.query || '').trim();
-    const L = listOf(key, q);
-    if (!L.page && !L.busy && !L.done) readMore(key, folder, q, ctx.redraw);
+    const extra = ctx.params || {}, filtered = !!q || Object.keys(extra).length > 0;
+    const L = listOf(key, q, JSON.stringify(extra));
+    if (!L.page && !L.busy && !L.done) readMore(key, folder, q, extra, ctx.redraw);
     const rows = L.rows;
-    return { title: folder.title, rows, count: folderCount(key) ?? null, empty: { line: L.busy || !L.page ? 'Loading chats…' : (q ? 'No chat matches the search.' : 'No chats here.') },
-        signature: JSON.stringify([key, q, folderCount(key), L.busy, L.done, L.error, rows.map(s => [s.session_id, s.title, s.summary, stampOf(s), s.starred, s.archived, s.active, s.duration_sec])]),
+    return { title: folder.title, rows, count: folderCount(key) ?? null, empty: { line: L.busy || !L.page ? 'Loading chats…' : (filtered ? 'No chat matches the search and filters.' : 'No chats here.') },
+        signature: JSON.stringify([key, q, extra, folderCount(key), L.busy, L.done, L.error, rows.map(s => [s.session_id, s.title, s.summary, stampOf(s), s.starred, s.archived, s.active, s.duration_sec])]),
         node: () => DT.dataTable({ label: `${folder.title}, ${folderCount(key) ?? rows.length}`, rows, rowKey: s => s.session_id, state: DT.tableState(), rowName: s => name(s) || historyLabel(s),
             groupBy: s => ({ key: dayOf(stampOf(s)), label: dayOf(stampOf(s)) }),
             open: s => ctx.open(s),
