@@ -1,9 +1,10 @@
 /* Review artifacts use the same owner-protected team list and tags routes as Artifacts.
- * Keep this data source independent of the lazy Inbox so its badge updates on other tabs. */
+ * After the Inbox first opens, keep its badge updated on other tabs without eager startup reads. */
 import { fetchProjects } from './board_fetch.js';
 import { boardFetch, isCloud, keyLabel, splitKey } from './server_base.js';
 
 let items = [], errors = [], pending = null, lastRead = 0, revision = 0, changed = () => {};
+let activated = false;
 export const reviewItems = () => items;
 export const reviewErrors = () => errors;
 export function onReviewsChanged(fn) { changed = fn; }
@@ -23,6 +24,9 @@ export function reviewGroups(rows) {
 /** Refresh in bounded pages, coalescing feed updates. Failed teams retain their last known rows. */
 export function refreshReviews(force = false) {
     if (isCloud()) return null;
+    // showInbox requests a forced read; badge/feed updates alone must not start the project scan.
+    if (force) activated = true;
+    if (!activated) return null;
     if (pending) return force ? pending.then(() => refreshReviews(true)) : pending;
     if (!force && Date.now() - lastRead < 30000) return null;
     const started = revision;
