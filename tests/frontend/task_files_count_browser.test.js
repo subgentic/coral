@@ -1,6 +1,6 @@
 // A task row says how many artifacts its results reference (#8575, goal #61): a quiet "3 files" button on the row's meta line (the page icon and the count, 12/400, named "3 artifacts, open"),
 // nothing for a task with none; pressed, it opens the task and brings its Artifacts section to the top, focused. The count is the server's artifact_count on the list item, read from real completions (no stubs), and it equals the
-// rows the task page's section draws for the same task, one file shared with another task included. Real board on the isolated dev server (removed again); the team Tasks tab at 1280, folded at 390 px: the button is a 44 px target there without a taller row.
+// rows the task page's section draws for the same task, a file two tasks reference (the team's list holds it once, under the newest task: #8591) included. Real board on the isolated dev server (removed again); the team Tasks tab at 1280, folded at 390 px: the button is a 44 px target there without a taller row.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
@@ -20,7 +20,7 @@ const SHARED = 'coral://artifacts/' + 'c'.repeat(64);
         for (const [sid, jt] of [['orch', 'Orchestrator'], ['be', 'Backend Dev']]) assert.ok((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: sid, job_title: jt, session_name: sid + '-s' })).status < 300);
         const ids = [];
         for (const title of ['Write the report', 'A task with nothing attached', 'Draw the diagram']) { const m = await api('POST', `/api/board/${B}/tasks`, { title, body: 'x', assigned_to: 'be', created_by: 'orch', priority: 'high' }); assert.ok(m.status < 300, JSON.stringify(m)); ids.push(m.body.id); }
-        // the report holds three files, one of them also the diagram's (the team's list shows that one under the newest task only)
+        // the report references three files, one of them also the diagram's: the team's list (and so the count) has it under the newest task, the diagram
         const done = async (id, artifacts) => { assert.ok((await api('POST', `/api/board/${B}/tasks/claim`, { subscriber_id: 'be', task_id: id })).status < 300); const r = await api('POST', `/api/board/${B}/tasks/${id}/complete`, { subscriber_id: 'be', message: 'done', outcome: 'success', artifacts }); assert.ok(r.status < 300, JSON.stringify(r)); };
         await done(ids[0], [{ name: 'report.md', content: '# report' }, { name: 'notes.txt', content: 'notes' }, { name: 'shared.md', uri: SHARED }]);
         await done(ids[2], [{ name: 'shared.md', uri: SHARED }]);
@@ -39,7 +39,7 @@ const SHARED = 'coral://artifacts/' + 'c'.repeat(64);
             console.log(`${at}the count on the rows that have artifacts`);
             const rows = await ev(`[...document.querySelectorAll('#team-panel-tasks tbody tr')].map(r => { const b = r.querySelector('button.dt-files'); return { title: r.querySelector('.dt-primary').textContent, files: b ? { text: b.textContent.replace('description', '').trim(), name: b.getAttribute('aria-label'), icon: b.querySelector('.material-icons').getAttribute('aria-hidden') } : null }; })`);
             const by = Object.fromEntries(rows.map(r => [r.title, r.files]));
-            assert.deepEqual(by['Write the report'], { text: '3 files', name: '3 artifacts, open', icon: 'true' }, at + JSON.stringify(rows));
+            assert.deepEqual(by['Write the report'], { text: '2 files', name: '2 artifacts, open', icon: 'true' }, at + JSON.stringify(rows));
             assert.deepEqual(by['Draw the diagram'], { text: '1 file', name: '1 artifact, open', icon: 'true' });
             assert.equal(by['A task with nothing attached'], null, at + 'no count for a task with none');
             const g = await ev(`(() => { const b = document.querySelector('#team-panel-tasks button.dt-files'), cs = getComputedStyle(b), r = b.getBoundingClientRect(), tr = b.closest('tr').getBoundingClientRect(), pe = getComputedStyle(b, '::after'); return { size: cs.fontSize, weight: cs.fontWeight, h: Math.round(tr.height), hit: [parseFloat(pe.width), parseFloat(pe.height)], inRow: r.right <= tr.right + 1 && r.left >= tr.left - 1, wide: document.documentElement.scrollWidth <= innerWidth }; })()`);
@@ -54,7 +54,7 @@ const SHARED = 'coral://artifacts/' + 'c'.repeat(64);
             await waitFor(`!!document.querySelector('#team-panel-item #team-task-title') && !!document.getElementById('team-task-artifacts-head-${ids[0]}')`, 'the task page and its Artifacts', 15000);
             await waitFor(`document.activeElement && document.activeElement.matches('#team-task-artifacts-head-${ids[0]} ~ .team-task-artifact-list .team-task-artifact-name')`, 'the focus on the first file of the section, not a ring round the heading', 8000);
             assert.equal(await ev(`document.activeElement === document.querySelector('.team-task-artifact-list button, .team-task-artifact-list a')`), true, at + 'the first file link');
-            assert.equal(await ev(`document.querySelectorAll('.team-task-artifact-list .team-task-artifact').length`), 3, at + 'the count and the section agree: the section lists as many files as the row counted');
+            assert.equal(await ev(`document.querySelectorAll('.team-task-artifact-list .team-task-artifact').length`), 2, at + 'the count and the section agree: the section lists as many files as the row counted (the shared one is under the newest task)');
             assert.equal(await ev(`document.getElementById('team-task-artifacts-head-${ids[0]}').hasAttribute('tabindex')`), false, at + 'the heading is not a focus stop');
             assert.match(await ev(`document.getElementById('team-task-title').textContent`), /Write the report$/);
             await shot(`task-files-open-${w}`);
