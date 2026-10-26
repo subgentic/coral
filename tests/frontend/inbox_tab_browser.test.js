@@ -69,12 +69,12 @@ const { settle } = require('./helpers/wait');
             w.handleCoralMessage({ type: 'coral_update', sessions: Array.from({ length: ${n.total} }, (_, i) => ({ name: 'a' + i, session_id: 'a' + i + '-id', agent_type: 'claude', status: 'Idle', waiting_for_input: i < ${n.waiting} })), servers: [] }); return true; })()`);
         const badge = () => ev(`(() => { const b = document.getElementById('nav-tab-hub-inbox-badge'), t = document.getElementById('nav-tab-hub-inbox'); return { text: b.textContent, hidden: b.hidden, label: t.getAttribute('aria-label') }; })()`);
 
-        console.log('2. Where the hub serves the dashboard: after Servers, before Docs');
+        console.log('2. Where the hub serves the dashboard: after Agents, before Docs');
         cloud = true;
         await open(1280, 756);
         check('the tab is shown', await visible('nav-tab-hub-inbox'));
         const order = await ev(`[...document.querySelectorAll('.top-nav-tabs > .top-nav-tab')].filter(el => !el.hidden && getComputedStyle(el).display !== 'none').map(el => el.dataset.arg)`);
-        check('right after Servers and before Docs', order.indexOf('hub-inbox') === order.indexOf('servers') + 1 && order.indexOf('hub-inbox') < order.indexOf('docs'), JSON.stringify(order));
+        check('right after Agents and before Docs', order.indexOf('hub-inbox') === order.indexOf('agents') + 1 && order.indexOf('hub-inbox') < order.indexOf('docs'), JSON.stringify(order));
         check('its name is Inbox, with no number yet', (await ev(`document.getElementById('nav-tab-hub-inbox').firstChild.textContent`)) === 'Inbox' && (await badge()).hidden === true);
 
         console.log('3. The badge is the number of agents waiting for input');
@@ -142,7 +142,7 @@ const { settle } = require('./helpers/wait');
         await ev(`document.getElementById('nav-select').click(); true`);
         check('the list has Inbox after Servers', await waitFor(`!!document.querySelector('#nav-more-menu [data-arg="hub-inbox"]')`, 'the Inbox entry', { soft: true, timeout: 5000 }));
         const items = await ev(`[...document.querySelectorAll('#nav-more-menu .nav-more-item')].map(e => e.children[1].textContent.trim())`);
-        check('named Inbox, in order', items.indexOf('Inbox') === items.indexOf('Servers') + 1 && items.indexOf('Inbox') > -1, JSON.stringify(items));
+        check('named Inbox, in order', items.indexOf('Inbox') === items.indexOf('Agents') + 1 && items.indexOf('Inbox') > -1, JSON.stringify(items));
         const entry = await ev(`(() => { const e = document.querySelector('#nav-more-menu [data-arg="hub-inbox"]'); const b = e.querySelector('.nav-tab-badge'); return { count: b ? b.textContent : null, label: e.getAttribute('aria-label'), others: [...document.querySelectorAll('#nav-more-menu .nav-more-item')].filter(x => x !== e && x.querySelector('.nav-tab-badge')).length }; })()`);
         check('the Inbox entry shows the waiting number and says it', entry.count === '3' && /3 waiting for input/.test(entry.label || '') && entry.others === 0, JSON.stringify(entry));
         await ev(`document.querySelector('#nav-more-menu [data-arg="hub-inbox"]').click(); true`);
