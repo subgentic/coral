@@ -369,86 +369,14 @@ func winStageRisk(st winStage, outside func(string) bool) string {
 	}
 	name = winScAlias(name, args)
 
-	// PowerShell uses its own parameters for names a POSIX shell also has.
-	ambiguous := name == "rm" || name == "mv" || name == "cp"
-	paths := winPaths(args)
-	if ambiguous && !psStyle(args) && !st.sink {
-		// The POSIX rules judge it, but on Windows these are PowerShell's aliases too: a path that is outside the folder or cannot be read still asks (#5690).
-		anyOutside := false
-		for _, p := range paths {
-			anyOutside = anyOutside || pathOutside(p, outside)
-		}
-		if !anyOutside {
-			return ""
-		}
+	if why, done := winPathVerbRisk(st, name, args, outside); done {
+		return why
 	}
+
 	recurse, force := false, false
 	for _, a := range args {
 		recurse = recurse || isRecurse(a)
 		force = force || isForce(a)
-	}
-
-	if name == "xargs" { // xargs hands the pipeline's output to another command: the paths it names are not visible here
-		for _, a := range args {
-			if v := cmdName(a); winDelete[v] || winWrite[v] || winSystem[v] {
-				return "it hands what a pipeline names to " + v + ", not a path inside the working directory"
-			}
-		}
-	}
-
-	if name == "new-item" || name == "ni" {
-		for i, a := range args {
-			v := strings.ToLower(a)
-			if isParam(a, "itemtype", 2) {
-				if k := strings.IndexAny(a, ":="); k > 0 {
-					v = strings.ToLower(a[k+1:])
-				} else if i+1 < len(args) {
-					v = strings.ToLower(args[i+1])
-				}
-				if strings.Contains(v, "junction") || strings.Contains(v, "link") {
-					return "it makes a link (junction or symbolic link): what it points at is not judged (#5690)"
-				}
-			}
-			if isParam(a, "target", 3) {
-				return "it makes a link: what it points at is not judged (#5690)"
-			}
-		}
-	}
-
-	switch {
-	case winDelete[name]:
-		if len(paths) == 0 {
-			return "it deletes what a pipeline or its defaults name, not a path inside the working directory"
-		}
-		for _, p := range paths {
-			if pathOutside(p, outside) {
-				return "it deletes outside the working directory (" + p + ")"
-			}
-		}
-		return ""
-	case winWrite[name]:
-		if name == "robocopy" && (hasArgFold(args, "/mov") || hasArgFold(args, "/move")) && len(paths) > 0 && pathOutside(paths[0], outside) {
-			return "it moves files out of a folder outside the working directory (" + paths[0] + ")" // /mov and /move delete the source
-		}
-		if name == "robocopy" && (hasArgFold(args, "/mir") || hasArgFold(args, "/purge")) {
-			if len(paths) < 2 || pathOutside(paths[1], outside) {
-				return "it mirrors over a folder outside the working directory"
-			}
-		}
-		if len(paths) == 0 && !st.sink {
-			return "it writes without naming a path inside the working directory"
-		}
-		copyOnly := name == "copy-item" || name == "cp" || name == "copy" || name == "cpi" || name == "xcopy" || name == "robocopy"
-		check := paths
-		if copyOnly && len(paths) > 1 {
-			check = paths[len(paths)-1:] // reading from outside is not the risk: the destination is
-		}
-		for _, p := range check {
-			if pathOutside(p, outside) {
-				return "it writes outside the working directory (" + p + ")"
-			}
-		}
-		return ""
 	}
 
 	// Any other PowerShell cmdlet: by its verb. Reading and printing verbs pass; the rest (Stop-Service, Set-Foo,
@@ -468,6 +396,86 @@ func winStageRisk(st winStage, outside func(string) bool) string {
 		}
 	}
 	return ""
+}
+
+// winPathVerbRisk judges the deleting and writing commands by the paths they name: rm, mv and cp read as POSIX unless a path is outside or the parameters are PowerShell's, xargs handing a pipeline to one, New-Item making a link, and every winDelete and winWrite verb. done says the stage was decided here.
+func winPathVerbRisk(st winStage, name string, args []string, outside func(string) bool) (string, bool) {
+	// PowerShell uses its own parameters for names a POSIX shell also has.
+	ambiguous := name == "rm" || name == "mv" || name == "cp"
+	paths := winPaths(args)
+	if ambiguous && !psStyle(args) && !st.sink {
+		// The POSIX rules judge it, but on Windows these are PowerShell's aliases too: a path that is outside the folder or cannot be read still asks (#5690).
+		anyOutside := false
+		for _, p := range paths {
+			anyOutside = anyOutside || pathOutside(p, outside)
+		}
+		if !anyOutside {
+			return "", true
+		}
+	}
+	if name == "xargs" { // xargs hands the pipeline's output to another command: the paths it names are not visible here
+		for _, a := range args {
+			if v := cmdName(a); winDelete[v] || winWrite[v] || winSystem[v] {
+				return "it hands what a pipeline names to " + v + ", not a path inside the working directory", true
+			}
+		}
+	}
+
+	if name == "new-item" || name == "ni" {
+		for i, a := range args {
+			v := strings.ToLower(a)
+			if isParam(a, "itemtype", 2) {
+				if k := strings.IndexAny(a, ":="); k > 0 {
+					v = strings.ToLower(a[k+1:])
+				} else if i+1 < len(args) {
+					v = strings.ToLower(args[i+1])
+				}
+				if strings.Contains(v, "junction") || strings.Contains(v, "link") {
+					return "it makes a link (junction or symbolic link): what it points at is not judged (#5690)", true
+				}
+			}
+			if isParam(a, "target", 3) {
+				return "it makes a link: what it points at is not judged (#5690)", true
+			}
+		}
+	}
+
+	switch {
+	case winDelete[name]:
+		if len(paths) == 0 {
+			return "it deletes what a pipeline or its defaults name, not a path inside the working directory", true
+		}
+		for _, p := range paths {
+			if pathOutside(p, outside) {
+				return "it deletes outside the working directory (" + p + ")", true
+			}
+		}
+		return "", true
+	case winWrite[name]:
+		if name == "robocopy" && (hasArgFold(args, "/mov") || hasArgFold(args, "/move")) && len(paths) > 0 && pathOutside(paths[0], outside) {
+			return "it moves files out of a folder outside the working directory (" + paths[0] + ")", true // /mov and /move delete the source
+		}
+		if name == "robocopy" && (hasArgFold(args, "/mir") || hasArgFold(args, "/purge")) {
+			if len(paths) < 2 || pathOutside(paths[1], outside) {
+				return "it mirrors over a folder outside the working directory", true
+			}
+		}
+		if len(paths) == 0 && !st.sink {
+			return "it writes without naming a path inside the working directory", true
+		}
+		copyOnly := name == "copy-item" || name == "cp" || name == "copy" || name == "cpi" || name == "xcopy" || name == "robocopy"
+		check := paths
+		if copyOnly && len(paths) > 1 {
+			check = paths[len(paths)-1:] // reading from outside is not the risk: the destination is
+		}
+		for _, p := range check {
+			if pathOutside(p, outside) {
+				return "it writes outside the working directory (" + p + ")", true
+			}
+		}
+		return "", true
+	}
+	return "", false
 }
 
 // winSystemRisk judges the commands that run anything or change the system (winAsk, winSystem): sc, net, cipher, assoc, schtasks, netsh and the rest, each in its changing forms only. done says the name was one of them.
