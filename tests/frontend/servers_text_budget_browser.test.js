@@ -122,7 +122,7 @@ const contrast = (a, b) => {
 
     const words = () => ev(`(() => { let n = 0; const shown = e => { for (let p = e; p; p = p.parentElement) { const s = getComputedStyle(p); if (s.display === 'none' || s.visibility === 'hidden' || p.hidden) return false; } return true; };
         const w = document.createTreeWalker(document.getElementById('servers-view'), NodeFilter.SHOW_TEXT);
-        for (let t = w.nextNode(); t; t = w.nextNode()) { const e = t.parentElement; if (!e || e.closest('script, style, .material-icons, select, option') || !shown(e)) continue; n += t.nodeValue.trim().split(/\\s+/).filter(Boolean).length; }
+        for (let t = w.nextNode(); t; t = w.nextNode()) { const e = t.parentElement; if (!e || e.closest('script, style, .material-icons, select, option, [aria-hidden="true"]') || !shown(e)) continue; n += t.nodeValue.trim().split(/\\s+/).filter(Boolean).length; }
         return n; })()`);
     try {
         await Promise.all([Page.enable(), Network.enable()]);

@@ -128,7 +128,7 @@ const contrast = (a, b) => {
         const table = () => ev(`(() => { const t = document.querySelector('#servers-view table.cs-table'); if (!t) return null;
             const rows = [...t.querySelectorAll('tbody > tr.cs-row')];
             return { role: t.getAttribute('role'), label: t.getAttribute('aria-label'),
-                actionsHead: (t.querySelector('thead th.cs-col-actions') || {}).textContent || null, heads: [...t.querySelectorAll('thead th')].filter(th => th.querySelector('button')).map(th => ({ text: th.textContent.replace(/[▲▼]/g, '').trim(), sort: th.getAttribute('aria-sort'), scope: th.getAttribute('scope'), button: !!th.querySelector('button') })),
+                actionsHead: (t.querySelector('thead th.cs-col-actions') || {}).textContent || null, heads: [...t.querySelectorAll('thead th')].filter(th => th.querySelector('button')).map(th => ({ text: th.textContent.replace(/[▲▼↑↓↕]/g, '').trim(), sort: th.getAttribute('aria-sort'), scope: th.getAttribute('scope'), button: !!th.querySelector('button') })),
                 names: rows.map(r => r.querySelector('.cs-name').textContent),
                 rows: rows.map(r => ({ id: r.id, status: r.querySelector('.cs-col-status').textContent, version: r.querySelector('.cs-col-version').textContent, agents: r.querySelector('.cs-col-agents').textContent,
                     select: r.querySelector('.cs-col-access select').value, selectLabel: r.querySelector('.cs-col-access .sr-only').textContent.trim(),
@@ -158,7 +158,7 @@ const contrast = (a, b) => {
         assert.equal(m1.select, 'view'); assert.equal(m1.selectLabel, 'Hub access for Box One');
         assert.ok(t.rows.every(r => r.expanded === 'false' && r.detailHidden), 'every row starts closed');
         const order = await ev(`[...document.getElementById('cs-add-machine').parentElement.children].map(e => e.id || e.className.split(' ')[0])`);
-        assert.ok(order.indexOf('cs-add-machine') >= 0 && order.indexOf('cs-add-machine') < order.findIndex(x => /cs-table/.test(x)), 'Add a machine comes before the table: ' + order);
+        assert.ok(order.indexOf('cs-add-machine') >= 0 && order.indexOf('cs-add-machine') < order.findIndex(x => /dt-box/.test(x)), 'Add a machine comes before the table: ' + order);
         console.log('   ok');
 
         const lay = await ev(`[...document.querySelectorAll('#servers-view tr.cs-row')].map(r => { const t = r.querySelector('.cs-toggle').getBoundingClientRect(), d = r.querySelector('.machine-health-dot').getBoundingClientRect(), v = r.querySelector('.cs-col-version span').getBoundingClientRect(), b = r.querySelector('.server-update-badge'); return { sameLine: Math.abs((d.top + d.height / 2) - (t.top + t.height / 2)) < 8, badgeInline: !b || Math.abs((b.getBoundingClientRect().top + b.getBoundingClientRect().height / 2) - (v.top + v.height / 2)) < 8 }; })`);
@@ -299,7 +299,7 @@ const contrast = (a, b) => {
                 await setTheme(ev, theme);
                 const au = await auditRegion(ev, ['#cs-add-machine', '#servers-view .cs-table']);
                 assert.ok(au.checked > 0 && !au.fails.filter(f => !/Revoke/.test(f.text || '')).length, `${tag} ${theme}: 4.5:1 ${JSON.stringify(au.fails).slice(0, 400)}`);
-                const tg = await ev(`(() => { const hs = [...document.querySelectorAll('#servers-view .cs-sort, #servers-view .cs-toggle')].map(b => Math.round(b.getBoundingClientRect().height)); return Math.min(...hs); })()`);
+                const tg = await ev(`(() => { const hs = [...document.querySelectorAll('#servers-view .cs-sort, #servers-view .cs-toggle, #servers-view .dt-sortbar-select')].filter(b => b.getClientRects().length).map(b => Math.round(b.getBoundingClientRect().height)); return Math.min(...hs); })()`);
                 assert.ok(tg >= (mobile ? 44 : 24), `${tag} ${theme}: the sort headers and row toggles are big enough targets (${tg} px: 24 with a mouse, 44 on a touch phone)`);
                 const over = await ev(`document.documentElement.scrollWidth - innerWidth`);
                 assert.ok(over <= 0, `${tag}: no sideways scroll (${over})`);
