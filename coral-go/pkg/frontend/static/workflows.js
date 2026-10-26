@@ -9,7 +9,7 @@ import { note, currentRoute } from './nav.js';
 import { KILL_LOG_NOTE } from './render.js';
 import { formatDuration } from './format.js';
 import { runFailureHtml, runFailure } from './run_failure.js';
-import { whenWords, resultWords, limitWords, stepWords, runDot } from './job_words.js'; // the Jobs pages' words: one set for both
+import { whenWords, resultWords, limitWords, runDot } from './job_words.js'; // the Jobs pages' words: one set for both
 import { registerGroupSource, groupHeaderHtml, isGroupFolded, syncPaneGroupToggle, refreshGroupTable, openFirstGroupTable, backLinkHtml, foldWayBack } from './sidebar_groups.js';
 import { onViewShown } from './view_switch.js';
 import { isPhoneLayout } from './phone_layout.js';
@@ -18,6 +18,8 @@ import { whenText } from './when_text.js';
 
 const DT = await importOnce('./data_table.js');
 const WE = await importOnce('./workflow_editor.js'); // the create and edit form (#8360): a part of this panel that loads with it
+const WR = await importOnce('./workflow_run_html.js'); // the run page's markup (#8360): pure builders that load with this panel
+const { formatTime, runDurationHtml, runProgressHtml, runStepHtml, runMetaHtml } = WR;
 const WA = await importOnce('./workflow_agent.js'); // Build with Agent and Edit with Agent (#8360): a part of this panel that loads with it
 const workflowTableStates = new Map();
 
@@ -364,110 +366,18 @@ function renderRunDetail(run) {
     shownRun = run;
 
     const steps = run.steps || [];
-    const completedCount = steps.filter(s => s.status === 'completed').length;
-    const totalSteps = steps.length;
-    const progressPct = totalSteps > 0 ? Math.round((completedCount / totalSteps) * 100) : 0;
     const isActive = run.status === 'running' || run.status === 'pending';
 
-    // Overall run duration
-    let durationHtml = '';
-    if (run.started_at) {
-        const endTime = run.finished_at ? new Date(run.finished_at) : new Date();
-        const durSec = Math.round((endTime - new Date(run.started_at)) / 1000);
-        durationHtml = `<span><span class="material-icons" aria-hidden="true">hourglass_empty</span> ${formatDuration(durSec, { unit: 's', dropZeroSeconds: true })}</span>`;
-    }
+    const durationHtml = runDurationHtml(run);
 
-    // Progress bar
-    const progressBarHtml = totalSteps > 0 ? `
-        <div class="wf-progress">
-            <div class="wf-progress-bar">
-                <div class="wf-progress-fill ${esc(run.status)}" style="width:${progressPct}%"></div>
-            </div>
-            <span class="wf-progress-text">${completedCount}/${totalSteps} steps</span>
-        </div>` : '';
+    const progressBarHtml = runProgressHtml(run, steps);
 
     // The failing step's last stderr line, quoted after the run's error in the header.
     const signInFailure = runFailureHtml(run); // escaped where it is made (run_failure.js)
     const failedStep = steps.find(s => (s.status === 'failed' || s.status === 'killed') && s.error_tail && s.error_tail.trim());
     const errorExcerpt = failedStep ? failedStep.error_tail.trim().split('\n').pop().trim().slice(0, 200) : '';
 
-    // Step timeline
-    const stepsHtml = steps.map((s, i) => {
-        const icon = statusIconChar(s.status);
-        const iconClass = s.status || 'pending';
-        const isLast = i === steps.length - 1;
-
-        let timingHtml = '';
-        if (s.started_at && s.finished_at) {
-            const dur = Math.round((new Date(s.finished_at) - new Date(s.started_at)) / 1000);
-            timingHtml = `<span class="wf-run-step-timing">${formatDuration(dur, { unit: 's', dropZeroSeconds: true })}</span>`;
-        } else if (s.started_at) {
-            const elapsed = Math.round((new Date() - new Date(s.started_at)) / 1000);
-            timingHtml = `<span class="wf-run-step-timing wf-timing-active">${formatDuration(elapsed, { unit: 's', dropZeroSeconds: true })}...</span>`;
-        }
-
-        const isFailed = s.status === 'failed' || s.status === 'killed';
-
-        // Exit code badge for shell steps
-        let exitCodeHtml = '';
-        if (s.type === 'shell' && s.exit_code != null) {
-            const ecClass = s.exit_code === 0 ? 'wf-exit-ok' : 'wf-exit-err';
-            exitCodeHtml = `<span class="wf-exit-code ${ecClass}">exit ${s.exit_code}</span>`;
-        }
-
-        // Output section — auto-expanded for failed steps
-        let outputHtml = '';
-        if (s.output_tail) {
-            const outputId = `wf-step-output-${run.id}-${i}`;
-            const autoExpand = isFailed ? ' wf-expanded' : '';
-            const first = String(s.output_tail).split('\n').map(l => l.trim()).find(Boolean) || ''; // a closed step says what its output began with (#7156)
-            const peek = first ? `<span class="wf-run-step-peek">${esc(first.length > 120 ? first.slice(0, 119) + '…' : first)}</span>` : '';
-            outputHtml = `
-                <button type="button" class="wf-run-step-output-toggle" aria-expanded="${escAttr(isFailed)}" aria-controls="${escAttr(outputId)}" aria-label="${escAttr('Output of ' + (s.name || 'step ' + (i + 1)))}" data-on-click="wf-output-toggle">
-                    <span class="material-icons" style="font-size:0.875rem" aria-hidden="true">terminal</span> Output${peek}
-                    <span class="material-icons wf-toggle-arrow" style="font-size:0.875rem" aria-hidden="true">expand_more</span>
-                </button>
-                <div id="${escAttr(outputId)}" class="wf-run-step-output${autoExpand}">${esc(s.output_tail)}</div>`;
-        }
-        // Why a step failed: the end of its stderr, always shown (stderr.txt is still in the file list).
-        if (isFailed && s.error_tail && s.error_tail.trim()) {
-            outputHtml += `
-                <div class="wf-run-step-error-label"><span class="material-icons" style="font-size:0.875rem" aria-hidden="true">error_outline</span> Error output</div>
-                <div class="wf-run-step-output wf-expanded wf-run-step-error">${esc(s.error_tail.replace(/\s+$/, ''))}</div>`;
-        }
-
-        // File list for steps with artifacts
-        let filesHtml = '';
-        const files = s.files || [];
-        if (files.length > 0) {
-            const fileItems = files.map(f => `<span class="wf-step-file">${esc(f)}</span>`).join('');
-            filesHtml = `<details class="wf-step-files-more"><summary aria-label="${escAttr('Files of ' + (s.name || 'step ' + (i + 1)))}">Files</summary><div class="wf-step-files">${fileItems}</div></details>`; // exit_code, stderr.txt, stdout.txt: the way to the files, not the face of the step (#7156)
-        }
-
-        // Session link for agent steps
-        let agentHtml = '';
-        if (s.type === 'agent' && s.session_id) {
-            agentHtml = `<button type="button" class="wf-step-agent-link" data-on-click="wf-step-agent" data-session="${escAttr(s.session_name || s.session_id)}" aria-label="${escAttr('View agent of ' + (s.name || 'step ' + (i + 1)))}">
-                <span class="material-icons" style="font-size:0.8125rem" aria-hidden="true">open_in_new</span> View agent
-            </button>`;
-        }
-
-        return `<div class="wf-run-step ${isLast ? '' : 'wf-run-step-connected'}">
-            <div class="wf-timeline-node ${iconClass}"></div>
-            <div class="wf-run-step-content${isFailed ? ' wf-step-failed' : ''}">
-                <div class="wf-run-step-header">
-                    <span class="wf-run-step-status ${iconClass}" role="img" aria-label="${escAttr(STEP_WORDS[s.status] || 'Waiting')}">${icon}</span>
-                    <span class="wf-run-step-name"><span class="sr-only">Step ${i + 1}: </span>${esc(s.name || 'Step ' + (i + 1))}</span>
-                    <span class="wf-step-type">${esc(s.type || '')}</span>
-                    ${exitCodeHtml}
-                    ${agentHtml}
-                    ${timingHtml}
-                </div>
-                ${outputHtml}
-                ${filesHtml}
-            </div>
-        </div>`;
-    }).join('');
+    const stepsHtml = steps.map((s, i) => runStepHtml(run, s, i, steps.length)).join('');
 
     const killBtn = isActive
         ? `<button class="btn btn-sm" style="color:var(--error-text)" data-on-click="wf-kill-run" data-run-id="${Number(run.id)}">
@@ -493,14 +403,7 @@ function renderRunDetail(run) {
         <button type="button" class="group-back wf-phone-back" data-on-click="wf-phone-back">&larr; Workflows</button>
         <h2 class="wf-item-title wf-run-title">Run #${run.id}</h2>
         ${startedNote && startedNote.runId === Number(run.id) ? `<p class="item-meta wf-started-line">${esc(startedNote.text)}</p>` : ''}
-        <div class="wf-run-meta">
-            <span><span class="wf-status-badge ${esc(run.status)}">${esc(run.status)}</span></span>
-            <span><span class="material-icons" aria-hidden="true">bolt</span> ${esc(run.trigger_type || 'api')}</span>
-            ${run.started_at ? `<span><span class="material-icons" aria-hidden="true">schedule</span> ${formatTime(run.started_at)}</span>` : ''}
-            ${durationHtml}
-            ${run.finished_at ? `<span><span class="material-icons" aria-hidden="true">check_circle</span> ${formatTime(run.finished_at)}</span>` : ''}
-            ${signInFailure ? `<span class="wf-run-error" style="color:var(--error-text)"><span class="material-icons" aria-hidden="true">error</span> ${signInFailure}</span>` : run.error_msg ? `<span class="wf-run-error" style="color:var(--error-text)"><span class="material-icons" aria-hidden="true">error</span> <span class="wf-run-error-text">${esc(stepWords(String(run.error_msg).trim()))}${errorExcerpt ? `<span class="wf-run-error-excerpt">: ${esc(errorExcerpt)}</span>` : ''}</span></span>` : ''}
-        </div>
+        ${runMetaHtml(run, signInFailure, errorExcerpt)}
         ${progressBarHtml}
         <div class="wf-run-steps wf-timeline">${stepsHtml}</div>
         ${killBtn || retriggerBtn ? `<div class="item-bar wf-run-actions">${killBtn}${retriggerBtn}</div>` : ''}
@@ -596,37 +499,6 @@ export function workflowsBackToList() {
     syncPhonePage();
     fetchWorkflows({ openFirst: true });
 }
-
-// ── Helpers ────────────────────────────────────────────────────────────
-
-function formatTime(ts) {
-    if (!ts) return '';
-    try {
-        const d = new Date(ts);
-        return d.toLocaleString(undefined, {
-            month: 'short', day: 'numeric',
-            hour: '2-digit', minute: '2-digit',
-        });
-    } catch (_) {
-        return ts.slice(0, 16);
-    }
-}
-
-// A step's state in words, for a reader: the mark beside it is a glyph (#6639).
-const STEP_WORDS = { completed: 'Passed', running: 'Running', failed: 'Failed', killed: 'Stopped', skipped: 'Skipped' };
-
-function statusIconChar(status) {
-    switch (status) {
-        case 'completed': return '&#10003;';
-        case 'running': return '&#9654;';
-        case 'failed': return '&#10007;';
-        case 'killed': return '!';
-        case 'skipped': return '&#8212;';
-        default: return '&#8226;';
-    }
-}
-
-
 
 // The Workflows view's generated markup (#3645): data-on-* names, never code. The view's own
 // buttons (back, build, create and the create dialog) register in app.js, which loads this module.
