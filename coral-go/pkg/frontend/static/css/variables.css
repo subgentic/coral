@@ -238,7 +238,7 @@
     --bg-secondary: #ecedf0;
     --bg-tertiary:  #e2e4e8;
     --bg-hover:     #d8dbe0;
-    --viz-1: #2a78d6; --viz-2: #eb6834; --viz-3: #1baf7a; --viz-4: #eda100; --viz-5: #e87ba4; --viz-6: #008300; --viz-7: #6250d6; --viz-other: #8b8d93;
+    --viz-1: #2a78d6; --viz-2: #e56634; --viz-3: #249f70; --viz-4: #b8822b; --viz-5: #cc7092; --viz-6: #008300; --viz-7: #6250d6; --viz-other: #7d7f86; /* light: every line is 3:1 or more against the page (#7932) */
     --bg-elevated:  #e8eaed;
 
     /* Borders */
