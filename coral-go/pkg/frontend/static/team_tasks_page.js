@@ -8,7 +8,7 @@ import { whenText } from './when_text.js';
 import { importOnce } from './import_once.js';
 const { rowFocusTarget, stateChip, el } = await importOnce('./team_table.js'); // lazy: its failure is retried
 const DT = await importOnce('./data_table.js'); // the one table (#7743)
-const TC = await importOnce('./task_columns.js'); // a task as its columns
+const TV = await importOnce('./tasks_view.js'); // the one Tasks view: a task list is drawn by tasksTable
 const TB = await importOnce('./task_bulk.js'); // what the selection bar does to the selected tasks
 const Toolbar = await importOnce('./team_toolbar.js'); // the one toolbar of the team tabs (#7717)
 import { goalTitle, refreshGoalTitles, readGoalChoices, noGoalLabel } from './task_goals.js';
@@ -230,7 +230,7 @@ function draw() {
             const e = el('div', 'goals-empty'); e.append(el('p', null, 'No tasks match this filter.'), btn('btn', 'Show all', () => { model.filter = 'all'; draw(); })); body.append(e);
         } else {
             const row = bar.node.querySelector('.list-bar-search-row');
-            const t = DT.dataTable({ label: `Tasks, ${shown.length}`, columns: TC.taskColumns(rowCtx()), rows: shown, rowKey: TC.taskKey, open: (task) => hooks.openTask?.(task), rowName: (task) => `#${task.id} ${task.title}`, state: model.dt,
+            const t = TV.tasksTable('team', shown, { ctx: rowCtx(), label: `Tasks, ${shown.length}`, open: (task) => hooks.openTask?.(task), state: model.dt,
                 selectable: { contextKey: model.project, actions: TB.taskBulkActions(model.project, () => { model.dt.selected.clear(); loadTasks(); }), onChange: (keys) => Toolbar.mountSelection(row, keys.size ? t.bar : null) } }); // the selection bar takes the toolbar's line while tasks are selected
             Toolbar.mountSelection(row, model.dt.selected.size ? t.bar : null);
             row.querySelectorAll('.dt-select-toggle').forEach(b => b.remove());
@@ -249,7 +249,7 @@ function draw() {
 }
 
 const rowCtx = () => ({ openTask: (t) => hooks.openTask?.(t), openGoal: (id) => hooks.openGoal?.(id), goalTitleOf: (id) => goalTitle(model.project, id) || `Goal ${id}`, noGoal: noGoalLabel });
-const { doerOf, whoText, priorityWord } = TC; // the task's own page says the same words
+const { doerOf, whoText, priorityWord } = TV; // the task's own page says the same words
 const isDoneTask = (t) => t.status === 'completed';
 
 /** Show the board's tasks in `host`. hooks: openTask(task), openGoal(id), onCount(openCount). */
@@ -328,7 +328,7 @@ function followUpsSection(task, ctx) {
     const sec = el('div', 'team-task-followups');
     sec.append(el('h3', 'goals-sub', `Follow-ups (${list.length}${open ? `, ${open} open` : ''})`));
     const rows = list.map(f => ({ id: f.id, title: f.title, status: f.status, assigned_to: f.assigned_to }));
-    const table = DT.dataTable({ label: `Follow-ups of task ${task.id}`, columns: TC.taskColumns({}, ['state', 'task', 'who']), rows, rowKey: TC.taskKey, open: (f) => ctx.openTask?.(f), rowName: (f) => `#${f.id} ${f.title}`, sortBar: false, bare: true });
+    const table = TV.tasksTable('follow-ups', rows, { label: `Follow-ups of task ${task.id}`, open: (f) => ctx.openTask?.(f), sortBar: false, bare: true });
     sec.append(table.el);
     return sec;
 }

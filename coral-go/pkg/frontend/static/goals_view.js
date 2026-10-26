@@ -16,7 +16,7 @@ const Toolbar = await importOnce('./team_toolbar.js'); // the one toolbar of the
 const { attachDockResize, DOCK_MIN_WIDTH, dockMaxWidth } = await importOnce('./dock_resize.js');
 const DT = await importOnce('./data_table.js'); // the one table (#7743): the goal's column is its folded form
 const GC = await importOnce('./goal_columns.js');
-const TC = await importOnce('./task_columns.js');
+const TV = await importOnce('./tasks_view.js'); // the one Tasks view
 
 const PAGE = 50; // a goal's tasks are drawn this many at a time
 import * as W from './goal_words.js';
@@ -203,20 +203,21 @@ function drawListRaw() {
 /** The board detail uses the shared task title and table sizing, including its narrow layout. */
 function detailTasks(g, rows) {
     const byId = new Map(rows.map(t => [t.id, t]));
-    const columns = TC.taskColumns({}, ['task', 'state']);
-    const taskCell = columns[0].cell;
-    columns[0].cell = t => { const cell = taskCell(t); cell.querySelector('.dt-primary').classList.add('goal-open-task'); return cell; };
-    columns.splice(1, 0, { key: 'who', label: 'Assigned to', line: 2, cell: t => {
-        const task = byId.get(t.id), text = [task.assignee, task.statusLine].filter(Boolean).join(' · ');
-        return text ? DT.el('span', 'dt-secondary', text) : '';
-    } });
-    columns.push({ key: 'agent', label: 'Agent', line: 2, cell: t => {
-        const task = byId.get(t.id), session = W.taskStateWord(task.state) !== 'Done' && agentFor(task);
-        if (!session) return '';
-        const action = btn('btn btn-small dt-action goal-open-agent', 'Open the agent', () => openAgent(session));
-        action.setAttribute('aria-label', `Open the agent for task #${t.id}`); return action;
-    } });
-    return DT.dataTable({ label: `Tasks of ${g.title}`, columns, rows: rows.map(taskOf), rowKey: TC.taskKey, sortBar: false,
+    const tweak = columns => {
+        const taskCell = columns[0].cell;
+        columns[0].cell = t => { const cell = taskCell(t); cell.querySelector('.dt-primary').classList.add('goal-open-task'); return cell; };
+        columns.splice(1, 0, { key: 'who', label: 'Assigned to', line: 2, cell: t => {
+            const task = byId.get(t.id), text = [task.assignee, task.statusLine].filter(Boolean).join(' · ');
+            return text ? DT.el('span', 'dt-secondary', text) : '';
+        } });
+        columns.push({ key: 'agent', label: 'Agent', line: 2, cell: t => {
+            const task = byId.get(t.id), session = W.taskStateWord(task.state) !== 'Done' && agentFor(task);
+            if (!session) return '';
+            const action = btn('btn btn-small dt-action goal-open-agent', 'Open the agent', () => openAgent(session));
+            action.setAttribute('aria-label', `Open the agent for task #${t.id}`); return action;
+        } });
+    };
+    return TV.tasksTable('goal-page', rows.map(taskOf), { label: `Tasks of ${g.title}`, tweak, sortBar: false, rowName: undefined,
         open: t => { const task = byId.get(t.id), raw = task.raw || task; if (hooks.openTask) hooks.openTask(raw, goalById(raw.goal_id)); else window.openTeamPage?.(model.project, { tab: 'tasks', item: t.id }); } }).el;
 }
 
@@ -496,8 +497,8 @@ function taskOf(t) {
 /** A group of the column (Open, Done): the one table, folded to its two-line row in the column's narrow box. */
 function sideTable(g, name, rows) {
     const byId = new Map(rows.map(t => [t.id, t]));
-    return DT.dataTable({ label: `${name} tasks of ${g.title}`, columns: TC.taskColumns({ goalTitleOf: (gid) => (goalById(gid) || {}).title || `Goal ${gid}` }, ['state', 'task', 'who', 'priority']), rows: rows.map(taskOf), rowKey: TC.taskKey,
-        open: (task) => openGoalTask(g, byId.get(task.id)), current: model.taskId ? `t${model.taskId}` : null, sortBar: false, bare: true, rowName: (task) => `#${task.id} ${task.title}`, state: sideState(g.id, name) });
+    return TV.tasksTable('goal', rows.map(taskOf), { label: `${name} tasks of ${g.title}`, ctx: { goalTitleOf: (gid) => (goalById(gid) || {}).title || `Goal ${gid}` },
+        open: (task) => openGoalTask(g, byId.get(task.id)), current: model.taskId ? `t${model.taskId}` : null, sortBar: false, bare: true, state: sideState(g.id, name) });
 }
 const sideStates = new Map();
 const sideState = (gid, name) => { const k = `${gid}:${name}`; if (!sideStates.has(k)) sideStates.set(k, DT.tableState()); return sideStates.get(k); };
