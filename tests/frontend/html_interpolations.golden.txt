@@ -292,8 +292,6 @@
 1	server_status.js	serverLaunchActionsHtml(e)
 1	server_status.js	updateBadgeHtml(e)
 1	servers.js	adding ? '' : warningHtml((_servers.find(x => x.id === _editing) || {}).warning)
-1	servers.js	agentsText(agents)
-1	servers.js	agentsText(n)
 1	servers.js	attention
 1	servers.js	back
 1	servers.js	bar
@@ -303,18 +301,13 @@
 1	servers.js	factHtml('Last contact', escHtml(contact))
 1	servers.js	factHtml('URL', escHtml(s.url || ''))
 1	servers.js	formHtml()
-1	servers.js	localMeta.map(escHtml).join(' &middot; ')
 1	servers.js	m.cls
 1	servers.js	online
-1	servers.js	remotes.map(rowHtml).join('')
-1	servers.js	rowHtml(local)
-1	servers.js	statusPill('online')
-1	servers.js	statusPill(live.status || s.status)
 1	servers.js	statusPill(status)
 1	servers.js	switchRow({ label: 'Allow private network address', name: 'allow_private', checked: cur.allow_private, labelCl
 1	servers.js	title
 1	servers.js	value
-2	servers.js	warningHtml(s.warning)
+1	servers.js	warningHtml(s.warning)
 1	session_rows.js	(goalLine || unreadChip) ? `<div class="session-line2">${goalLine}${unreadChip}</div>` : ''
 1	session_rows.js	_WORKTREE_ICON
 2	session_rows.js	_archiveItem

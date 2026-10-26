@@ -1,7 +1,7 @@
 {
   "css": {
     "cloud.css": 10,
-    "components.css": 4,
+    "components.css": 1,
     "layout.css": 11,
     "scheduler.css": 4,
     "workflows.css": 5
@@ -9,7 +9,6 @@
   "js": {
     "cloud_servers.js": 13,
     "scheduler.js": 18,
-    "servers.js": 13,
     "sidebar_groups.js": 7,
     "workflows.js": 20
   }

@@ -20,6 +20,8 @@ import {
 import { onBuilt } from './lazy_dom.js';
 import { syncServersBar, serverVisible, serversFiltered, resetServersBar } from './server_search.js'; // this module is in the startup graph (app.js imports it), so its search box is imported directly
 
+let DT = null;            // the shared table (data_table.js): loaded when the tab opens, this module is in the startup graph
+let _dt = null;           // its sort, kept across redraws
 let _servers = [];
 let _editing = null;      // id being edited, '' for "add", null when the form is closed
 let _confirmDelete = null;
@@ -58,6 +60,7 @@ export async function renderServersInto(el) {
         el.addEventListener('submit', onSubmit);
     }
     _host = el;
+    DT ||= await importOnce('./data_table.js'); _dt ||= DT.tableState();
     _editing = null; _draft = null; _confirmDelete = null; _formError = ''; _loadError = ''; _open = null;
     render();
     await load();
@@ -83,6 +86,7 @@ async function readBody(resp) {
 }
 
 async function load() {
+    DT ||= await importOnce('./data_table.js'); _dt ||= DT.tableState();
     try {
         const resp = await fetch('/api/servers');
         if (!resp.ok) {
@@ -118,21 +122,49 @@ function liveOf(s) {
 
 function agentsText(n) { return `${n} agent${n === 1 ? '' : 's'}`; }
 
-/** One row of the table: the server's name (it opens the server's page), its status and its agents (#7638). */
-function rowHtml(s) {
-    if (s.local || s.id === 'local') {
-        // This hub: its version and agent count, like the remote rows (#3152). It has no page of its own: nothing here is edited or removed.
-        const n = serverAgentCount({ id: 'local' });
-        const localMeta = ['This hub', state.localVersion ? `Coral ${state.localVersion}` : ''].filter(Boolean);
-        return `<tr class="servers-row servers-row-local" id="server-row-local" tabindex="-1">
-            <td><span class="servers-row-title">${escHtml(s.label || 'Local')} <span class="servers-id">local</span></span><div class="servers-row-meta">${localMeta.map(escHtml).join(' &middot; ')}</div></td>
-            <td>${statusPill('online')}</td><td>${agentsText(n)}</td></tr>`;
+/** The status as the table's chip (a dot and the word; the hint is its tooltip): the tone is a data_table token class. */
+const STATUS_TONE = { online: 'goal-state-done', unreachable: 'goal-state-blocked', unauthorized: 'goal-state-failed' }; // the chip hues (goals.css)
+function statusChip(status) {
+    const m = statusMeta(status);
+    const c = DT.chip(m.label, STATUS_TONE[m.cls] || '');
+    if (m.hint) c.title = m.hint;
+    return c;
+}
+
+const isLocal = s => !!(s.local || s.id === 'local');
+/** A server's name cell: this hub is plain text (it has no page), a remote server is the row's one button (it opens the server's page), then its id, the private-network tag and a warning, as the old row had them. */
+function serverCell(s) {
+    const box = DT.el('div'), wrap = DT.el('span', 'dt-title-cell'); // the name and its tags on one line, the warning under them, whole and wrapping
+    box.append(wrap);
+    if (isLocal(s)) {
+        wrap.append(DT.el('span', null, s.label || 'Local'), DT.tag('local'));
+        return box;
     }
-    const live = liveOf(s);
-    const agents = serverAgentCount(live);
-    return `<tr class="servers-row" id="server-row-${escHtml(s.id)}" tabindex="-1" data-id="${escHtml(s.id)}">
-        <td><button type="button" class="group-table-link" data-action="open" data-id="${escHtml(s.id)}">${escHtml(s.label || s.id)}</button> <span class="servers-id">${escHtml(s.id)}</span>${s.allow_private ? ' <span class="servers-tag" title="Private network addresses are allowed for this server">private network</span>' : ''}${warningHtml(s.warning)}</td>
-        <td>${statusPill(live.status || s.status)}</td><td>${agentsText(agents)}</td></tr>`;
+    const b = DT.primaryButton(s.label || s.id, `Open ${s.label || s.id}`);
+    b.dataset.action = 'open'; b.dataset.id = s.id; // the tab's click handler opens the server's page
+    wrap.append(b, DT.tag(s.id));
+    if (s.allow_private) { const t = DT.tag('private network'); t.title = 'Private network addresses are allowed for this server'; wrap.append(t); }
+    const warn = warningHtml(s.warning);
+    if (warn) { const w = document.createElement('div'); w.innerHTML = warn; box.append(w.firstElementChild); }
+    return box;
+}
+
+/** This hub and the registered servers as one data_table (Server, Status, Agents): the sort is kept across redraws and every row has the id the tab's focus handling looks for. */
+function serversTable(local, remotes) {
+    const rows = [local, ...remotes];
+    const live = s => (isLocal(s) ? { id: 'local', status: 'online' } : liveOf(s));
+    const t = DT.dataTable({
+        label: 'Registered servers', state: _dt, rows, rowKey: s => (isLocal(s) ? 'local' : s.id), rowName: s => s.label || s.id,
+        columns: [
+            { key: 'server', label: 'Server', primary: true, width: 'grow', nowrap: false, line: 1, sort: true, sortValue: s => (s.label || s.id || '').toLowerCase(), cell: serverCell,
+                subtitle: s => (isLocal(s) ? ['This hub', state.localVersion ? `Coral ${state.localVersion}` : ''].filter(Boolean).join(' \u00b7 ') : '') },
+            { key: 'status', label: 'Status', line: 2, sort: true, sortValue: s => statusMeta(live(s).status || s.status).label, cell: s => statusChip(live(s).status || s.status) },
+            { key: 'agents', label: 'Agents', line: 2, tone: 'tertiary', align: 'end', sort: 'number', sortValue: s => serverAgentCount(live(s)), cell: s => agentsText(serverAgentCount(live(s))) },
+        ],
+        open: s => { if (!isLocal(s)) { _open = s.id; _confirmDelete = null; _focusNext = 'back'; render(); } },
+    });
+    for (const tr of t.el.querySelectorAll('tr.dt-row')) { tr.id = `server-row-${tr.dataset.key}`; tr.tabIndex = -1; } // the id the page of a server and the redraw's focus keep use
+    return t.el;
 }
 
 /** A fact of the server's page: a label (13/500) and its value (13/400). */
@@ -220,7 +252,7 @@ function render() {
     const remotes = allRemotes.filter(serverVisible);
     const local = _servers.find(s => s.local || s.id === 'local') || { local: true, id: 'local', label: 'Local' };
     // The periodic refresh must not pull focus out of a row the user is on.
-    const activeRow = document.activeElement && m.contains(document.activeElement) ? document.activeElement.closest('.servers-row, .servers-page') : null;
+    const activeRow = document.activeElement && m.contains(document.activeElement) ? document.activeElement.closest('.dt-row, .servers-page') : null;
     const keep = activeRow && _editing === null ? { row: activeRow.id, action: document.activeElement.dataset.action } : null;
     const page = _open ? _servers.find(x => x.id === _open && !(x.local || x.id === 'local')) : null;
     if (_open && !page && _servers.length) _open = null; // the server is gone (removed here or elsewhere): back to the table
@@ -229,9 +261,7 @@ function render() {
     const online = allRemotes.filter(s => s.status === 'online').length;
     const topBar = `<div class="servers-top"><span class="servers-summary">${allRemotes.length} servers, ${online} online${online < allRemotes.length ? `, ${allRemotes.length - online} not` : ''}</span><button type="button" class="btn btn-primary" data-action="add">Add server</button></div>`;
     const restoreFocus = rememberFocus(m); // a control the redraw replaced (Add server, Test, Edit) gets focus back (#4882)
-    const table = `<div class="group-table-scroll"><table class="group-table group-table-stack servers-table" aria-label="Registered servers">
-                <thead><tr><th scope="col">Server</th><th scope="col">Status</th><th scope="col">Agents</th></tr></thead>
-                <tbody>${rowHtml(local)}${remotes.map(rowHtml).join('')}</tbody></table></div>`;
+    const table = '<div id="servers-table-slot"></div>'; // the data_table goes in once the markup is set
     const back = '<button type="button" class="group-back" id="servers-back" data-action="back">&larr; Servers</button>';
     const body = _open && page
         ? (_editing === _open ? `<section class="servers-page" id="server-row-${escHtml(_open)}" tabindex="-1" data-id="${escHtml(_open)}">${back}${formHtml()}</section>` : pageHtml(page))
@@ -242,6 +272,8 @@ function render() {
     m.innerHTML = `${_open && page ? '' : '<p class="servers-intro">Servers whose agents and teams appear in this hub. The hub stores each server\'s API key (encrypted); a key grants full control of that server.</p>'}
             ${_loadError ? `<div class="servers-form-error" role="alert">${escHtml(_loadError)}</div>` : ''}
             ${body}`;
+    const slot = m.querySelector('#servers-table-slot');
+    if (slot) slot.replaceWith(serversTable(local, remotes));
     const title = document.getElementById('servers-tab-title');
     if (title) title.hidden = !!(_open && page); // a server's page has its back link, "← Servers", for the title
     const view = document.getElementById('servers-view'); if (view) view.classList.toggle('servers-view-page', !!(_open && page)); // a class, not a :has() rule: the view fills its height when a page is open
@@ -253,7 +285,7 @@ function render() {
     }
     if (_focusNext) {
         const where = _focusNext; _focusNext = null;
-        const el = where === 'back' ? document.getElementById('servers-back') : (m.querySelector(`.servers-row[data-id="${CSS.escape(where)}"] [data-action="open"]`) || m.querySelector('.servers-table'));
+        const el = where === 'back' ? document.getElementById('servers-back') : (m.querySelector(`.dt-row[data-key="${CSS.escape(where)}"] [data-action="open"]`) || m.querySelector('.dt-table'));
         if (el) el.focus();
     }
     if (_editing !== null) {

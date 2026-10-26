@@ -144,7 +144,7 @@ body.cloud-mode .settings-cloud-note { margin: 0 0 12px; }
 .servers-tab-title { font-size: var(--fs-xl, 18px); margin: 0 0 var(--space-md, 8px); }
 .servers-tab-title:focus { outline: none; }
 .servers-tab-title:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.cs-row:focus-visible, .cs-row:focus-visible > td, .servers-row:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.cs-row:focus-visible, .cs-row:focus-visible > td { outline: 2px solid var(--accent); outline-offset: 2px; }
 .server-row-target { background: var(--bg-hover, rgba(88,166,255,.08)); transition: background .4s; }
 .cs-enroll-title { font-size: var(--fs-md, 14px); margin: 0; }
 
