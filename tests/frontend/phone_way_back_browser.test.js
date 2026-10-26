@@ -6,6 +6,7 @@ const { connect } = require('./agent_view_harness');
 const { DATA_WORLD } = require('./helpers/census_world');
 const { INBOX_WORLD } = require('./helpers/inbox_world');
 const { install: installTP, seed, openTeam, goTab } = require('./helpers/team_page');
+const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
 
 const BACKS = '.group-table-back, .inbox-phone-back, .wf-phone-back, .sched-back, .docs-phone-back, .cost-phone-back, .group-back, .goals-back, .mobile-history-back';
@@ -50,5 +51,5 @@ const BACKS = '.group-table-back, .inbox-phone-back, .wf-phone-back, .sched-back
         const colours = new Set(results.filter(r => !r.err).map(r => r.color));
         assert.ok(bad.length === 0 && colours.size === 1, `every phone way back is one text link named for where it goes, beside the title: ${bad.length} of ${results.length} differ (colours: ${[...colours].join(' | ')}):\n` + results.map(r => JSON.stringify(r)).join('\n'));
         console.log('PASS every phone way back is the same');
-    } finally { await client.close(); }
+    } finally { await removeBoards(ev, [TEAM]); await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
