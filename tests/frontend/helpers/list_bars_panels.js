@@ -53,7 +53,7 @@ PANELS.push({
         await ctx.settle(`!!document.querySelector('#inbox-saved-bar .list-bar-chip')`, 'a chip');
         await ctx.ev(`(() => { const b = document.querySelector('.sidebar-pane[data-pane="hub-inbox"] [data-display-button]'); if (b && b.getClientRects().length) b.click(); return true; })()`); // a phone's table hides the list and its Display options
         await openMenu(ctx, '#inbox-saved-bar');
-        return { roots: ['#group-table-view', '.sidebar-pane[data-pane="hub-inbox"]'], focus: phone ? ['.group-chip'] : ['#inbox-search', '.group-chip', '#inbox-saved-bar .list-bar-filter-btn'] }; // a phone's table hides the list, its search and Display options
+        return { roots: ['#group-table-view', '.sidebar-pane[data-pane="hub-inbox"]'], focus: phone ? ['.inbox-folder-toolbar .list-bar-toggle'] : ['#inbox-search', '.inbox-folder-toolbar .team-tb-pills .goals-chip', '#inbox-saved-bar .list-bar-filter-btn'] }; // a phone's table hides the list, its search and Display options; the Open | Done choice is the page toolbar's pills since #8602 (the group chips are gone)
     },
 });
 
