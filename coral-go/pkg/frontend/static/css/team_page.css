@@ -133,7 +133,8 @@
 #team-panel-messages { padding: 16px 24px 0; } /* the same top as the other tabs (a tab's body starts 16 px under the strip, 12 on a phone), and the search row's left edge where theirs is (the messages themselves stay on the tables' edge) */
 .team-panel .list-bar-bar { padding: 0 0 8px; } /* a tab's search starts on the page edge where its chips and table do, not 12 px in (UI/UX 170 consistency, item 3) */
 #team-panel-messages .mb-tools { padding: 0; }
-#team-panel-messages .list-bar-filter-btn { background: var(--bg-tertiary); font-weight: 500; min-height: 32px; padding: 0 12px; } /* Filters, Jump to first and Jump to latest are the page's buttons: 13/500 on the tertiary fill, as Add agent and More (UI/UX #7588 item 4) */
+#team-panel-messages .list-bar-filter-btn { background: var(--bg-tertiary); font-weight: 500; padding: 0 12px; }
+@media (pointer: fine) { #team-panel-messages .list-bar-filter-btn { min-height: 32px; } } /* a fine pointer only: a touch screen's 44 px (touch.css) is not undone by this id's rule (#8157: the search's previous and next were 32 px on a phone) */ /* Filters, Jump to first and Jump to latest are the page's buttons: 13/500 on the tertiary fill, as Add agent and More (UI/UX #7588 item 4) */
 #team-panel-messages .list-bar-filter-btn:hover { background: var(--bg-hover); }
 
 @media (max-width: 760px) {

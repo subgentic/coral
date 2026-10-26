@@ -1,4 +1,4 @@
-// The Message Board on a phone (#7183, UI/UX's #7180 findings 4 and 6): the search and its buttons are one "Search" row that opens on a tap (a wider window shows the bar as before); each message's actions are one
+// The team page's Board tab, as the chat, on a phone (#7183, UI/UX's #7180 findings 4 and 6; on the team page since the board page went, #8157): the search and its buttons are one "Search" row that opens on a tap (a wider window shows the bar as before); each message's actions are one
 // "..." that opens a sheet with Save for later and, set apart from it, Delete (Delete is never beside Save); the two jumps are items of the search bar's More menu: "Jump to first message" and "Jump to latest message". 390 px with touch, and 1280 px.
 // Real isolated server, a board made through the API (and removed again). Drives Chrome over CDP through agent_view_harness.js.
 const assert = require('node:assert/strict');
@@ -6,7 +6,6 @@ const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const { clearSaved } = require('./helpers/saved_cleanup');
 const BASE = require('./test_base').BASE;
-const S = `(window.__coralStatic || '/static/')`;
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -17,9 +16,9 @@ const S = `(window.__coralStatic || '/static/')`;
         await Emulation.setDeviceMetricsOverride({ width: w, height: mobile ? 844 : 800, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
         await ev(`window.__coralReady.then(() => true)`);
-        await ev(`localStorage.setItem('coral.board.face', 'messages'); (async () => { for (const c of ['first message', 'second message']) await fetch('/api/board/${board}/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'qa', as: 'QA', content: c }) }); return true; })()`);
-        await ev(`(async () => { const m = await import(${S} + 'message_board.js'); const { showView } = await import(${S} + 'utils.js'); showView('messageboard-view'); m.selectBoardProject(${JSON.stringify(board)}); return true; })()`);
-        await waitFor(`document.querySelectorAll('#mb-messages .mb-message').length >= 2 && !!document.querySelector('#mb-tools .list-bar-bar')`, 'the board and its tools', 10000);
+        await ev(`localStorage.setItem('coral.board.view', 'chat'); (async () => { await fetch('/api/board/${board}/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'qa', job_title: 'QA', session_name: 'qa-s' }) }); for (const c of ['first message', 'second message']) await fetch('/api/board/${board}/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'qa', as: 'QA', content: c }) }); return true; })()`); // the chat view: this suite is about the chat rows' own "..." (the table's actions are board_table_browser's)
+        await Page.navigate({ url: `${BASE}/team/${board}/messages` }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await waitFor(`document.querySelectorAll('#mb-messages .mb-message').length >= 2 && !!document.querySelector('#mb-tools .list-bar-bar')`, 'the board and its tools', 15000);
     };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
