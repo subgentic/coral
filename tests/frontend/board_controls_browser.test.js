@@ -1,7 +1,8 @@
 // The board's own controls, pinned as they were before message_board.js was split (#8399): Pause Board / Resume Board (the button's words and the server's paused flag), Sleep (Wake Team, the
-// composer disabled with its words; the sleeping banner is not asserted: messages drawn over the board's list remove it, which is how it behaved before the split), and a message's delete (asks first, names the sender and the start of the text; deleting removes the row).
+// composer disabled with its words, and the Sleep banner above the list: it stays when messages are drawn, #8453), and a message's delete (asks first, names the sender and the start of the text; deleting removes the row).
 // A real board on the isolated dev server (removed again); the sleep state is answered by a stand-in (no agents here to sleep).
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { removeBoards } = require('./helpers/board_cleanup');
@@ -12,6 +13,7 @@ const { openBoardPage } = require('./helpers/team_board');
     const api = (method, path, body) => ev(`fetch(${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, headers: { 'Content-Type': 'application/json' }, cache: 'no-store', body: ${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'} }).then(async r => ({ status: r.status, body: await r.json().catch(() => ({})) }))`);
     const B = 'bc-' + Date.now().toString(36);
     const S = `(window.__coralStatic || '/static/')`;
+    const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
@@ -43,6 +45,18 @@ const { openBoardPage } = require('./helpers/team_board');
         await sleep(true);
         const asleep = await ev(`({ btn: document.getElementById('mb-sleep-btn')?.textContent ?? null, input: document.getElementById('mb-post-input').disabled, placeholder: document.getElementById('mb-post-input').placeholder, send: document.querySelector('#mb-board .btn-primary').disabled, opacity: document.querySelector('#mb-board .btn-primary').style.opacity })`);
         assert.deepEqual(asleep, { btn: asleep.btn, input: true, placeholder: 'Team is sleeping...', send: true, opacity: '0.4' });
+        const banner = () => ev(`(() => { const e = document.getElementById('mb-sleep-banner'); return e ? { shown: e.checkVisibility(), outsideList: !document.getElementById('mb-messages').contains(e), text: e.textContent.trim() } : null; })()`);
+        assert.deepEqual(await banner(), { shown: true, outsideList: true, text: '\u{1F319} This team is sleeping. Messages are paused.' }, 'a sleeping board shows its banner, above the list');
+        assert.equal((await api('POST', `/api/board/${B}/messages`, { subscriber_id: 'orch', content: 'a message drawn while it sleeps' })).status, 200);
+        await sleep(true); // the board is drawn again, still sleeping, with the new message
+        await waitFor(`document.querySelectorAll('#mb-messages .mb-message').length === 3`, 'the new message is drawn', 15000);
+        assert.equal((await banner()).shown, true, 'and the banner is still there after the messages were drawn over the list');
+        await shot('sleep-banner-1280');
+        await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+        await waitFor(`document.documentElement.clientWidth <= 400`, 'the phone width', 5000);
+        assert.deepEqual(await ev(`(() => { const b = document.getElementById('mb-sleep-banner').getBoundingClientRect(); return { shown: b.height > 0, inside: b.left >= 0 && b.right <= innerWidth, wide: document.documentElement.scrollWidth <= innerWidth }; })()`), { shown: true, inside: true, wide: true }, 'at 390 px the banner is whole, and nothing scrolls sideways');
+        await shot('sleep-banner-390');
+        await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await sleep(false);
         const awake = await ev(`({ input: document.getElementById('mb-post-input').disabled, placeholder: document.getElementById('mb-post-input').placeholder, send: document.querySelector('#mb-board .btn-primary').disabled, opacity: document.querySelector('#mb-board .btn-primary').style.opacity })`);
         assert.deepEqual(awake, { input: false, placeholder: 'Message the team...', send: false, opacity: '' });
@@ -54,10 +68,10 @@ const { openBoardPage } = require('./helpers/team_board');
         const asked = await ev(`({ title: window.__confirm.title, text: window.__confirm.text })`);
         assert.equal(asked.title, 'Delete Message');
         assert.equal(asked.text, 'Delete the message from Orchestrator ("First thing to say, with some length so it is cut in the con…")? This cannot be undone.');
-        assert.equal(await ev(`document.querySelectorAll('#mb-messages .mb-message').length`), 2, 'asking deletes nothing');
+        assert.equal(await ev(`document.querySelectorAll('#mb-messages .mb-message').length`), 3, 'asking deletes nothing');
         await ev(`window.__confirm.ok(); true`);
-        await waitFor(`document.querySelectorAll('#mb-messages .mb-message').length === 1`, 'the row is gone', 8000);
-        assert.equal((await api('GET', `/api/board/${B}/messages/all`)).body.length ?? (await api('GET', `/api/board/${B}/messages/all`)).body.messages?.length, 1, 'the server has one message left');
+        await waitFor(`document.querySelectorAll('#mb-messages .mb-message').length === 2`, 'the row is gone', 8000);
+        assert.equal((await api('GET', `/api/board/${B}/messages/all`)).body.length ?? (await api('GET', `/api/board/${B}/messages/all`)).body.messages?.length, 2, 'the server has two messages left');
         console.log('   ✓');
 
         console.log('PASS board controls: pause, sleep, delete and their words');

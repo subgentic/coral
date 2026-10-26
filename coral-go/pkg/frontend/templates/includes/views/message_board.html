@@ -25,14 +25,15 @@
         <div id="mb-board" class="mb-board" style="display:none">
             <!-- The board's search, First and Latest (#4771; board_search.js builds the bar here) -->
             <div id="mb-tools" class="mb-tools"></div>
+            <!-- Not in the list below: a message drawn over it would remove it (#8453) -->
+            <div id="mb-sleep-banner" class="mb-sleep-banner" role="status" style="display:none">
+                <span>🌙 This team is sleeping. Messages are paused.</span>
+            </div>
             <!-- Messages -->
             <div class="mb-messages-wrap">
                 <div id="mb-earlier-status" class="sr-only" role="status" aria-live="polite"></div><!-- #7762: "50 earlier messages loaded" (message_board.js) -->
                 <div id="mb-earlier-loading" class="mb-earlier-loading" hidden aria-hidden="true">Loading earlier messages&hellip;</div>
                 <div id="mb-messages" class="mb-messages-scroll" tabindex="-1" role="list" aria-label="Messages"><!-- every direct child is a list item: a message, a run of task-queue lines, the "Loading earlier messages" or "Start of the board" line, or a notice, so a screen reader can move item by item -->
-                    <div id="mb-sleep-banner" class="mb-sleep-banner" role="listitem" style="display:none">
-                        <span>🌙 This team is sleeping. Messages are paused.</span>
-                    </div>
                     <div class="empty-state" id="mb-messages-empty" role="listitem">No messages on the board yet</div>
                 </div>
                 <!-- Reading higher up while posts arrive (#4502): a count and a way to the latest, announced politely -->
