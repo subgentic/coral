@@ -43,7 +43,7 @@ const BASE = require('./test_base').BASE;
             check(`${label}: opening the folder puts the focus on the page's search box`, await ev(`(() => { const a = document.activeElement; return !!a && a.matches('input[type=search]') && !!a.closest('.inbox-folder-toolbar'); })()`));
             const g = await geometry();
             check(`${label}: the Needs you page has a search box named "Search needs you" and the Filters icon in the same row, to its right`, g && g.qName === 'Search needs you' && g.sameRow && g.right && /Filters/.test(g.toggleName), JSON.stringify(g));
-            if (mobile) check(`${label}: the pills are one select, the search keeps at least 10rem, nothing is wider than the screen`, g && g.select && !g.pills && g.searchW >= 160 && g.over <= 0, JSON.stringify(g));
+            if (mobile) check(`${label}: the pills are not in the row (one select in the Filters sheet since #8700), the search keeps at least 10rem, nothing is wider than the screen`, g && !g.select && !g.pills && g.searchW >= 160 && g.over <= 0, JSON.stringify(g));
             else check(`${label}: the pills All, Permission, Question and Needs input are in the row, with their counts`, g && g.pills && (await ev(`[...document.querySelectorAll('.team-tb-pills .goals-chip')].map(b => b.textContent.trim()).join('|')`)) === 'All 4|Permission 1|Question 1|Needs input 2');
             check(`${label}: the agent waiting longest is first`, (await names())[0] === 'QA Engineer', JSON.stringify(await names()));
 
@@ -55,7 +55,7 @@ const BASE = require('./test_base').BASE;
 
             await ev(`document.querySelector('.inbox-folder-toolbar .list-bar-toggle').click(); true`); await settle(200);
             const labels = await ev(`[...document.querySelectorAll('.inbox-folder-toolbar .list-bar-field-label')].filter(e => e.getClientRects().length).map(e => e.textContent.trim()).join('|')`);
-            check(`${label}: the Filters panel has Team, Agent, Waiting longer than and Sort`, labels === 'Team|Agent|Waiting longer than|Sort', labels);
+            check(`${label}: the Filters panel has Team, Agent, Waiting longer than and Sort`, labels.replace(/^Show\|/, '') === 'Team|Agent|Waiting longer than|Sort', labels);
             await setField('inbox-needs-team', 'team-b'); await waitNames(2, 'team-b');
             check(`${label}: a Team filter shows only that team's agents, as a chip, and the icon says one is on`, (await chipText()) === 'Team: team-b' && /1 on/.test(await ev(`document.querySelector('.inbox-folder-toolbar .list-bar-toggle').getAttribute('aria-label')`)), await chipText());
             await setField('inbox-needs-longer', '60'); await waitNames(1, 'waiting more than an hour');
