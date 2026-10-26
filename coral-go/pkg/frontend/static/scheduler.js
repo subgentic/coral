@@ -196,24 +196,26 @@ export async function selectScheduledJob(jobId) {
         if (!el.closest('#scheduled-jobs-list')) setRowCurrent(el, false);
     });
 
-    const [runs] = await Promise.all([fetchJobRuns(jobId), job.workflow_id ? loadWorkflowsById() : null]);
-    renderJobDetail(job, runs);
+    const [runs, , workflowRuns] = await Promise.all([fetchJobRuns(jobId), job.workflow_id ? loadWorkflowsById() : null,
+        job.workflow_id ? fetch(`/api/workflows/${Number(job.workflow_id)}/runs`).then(r => { if (!r.ok) throw new Error('Unable to load workflow runs'); return r.json(); }).then(data => data.runs || []).catch(() => null) : null]);
+    if (selectedJobId !== jobId) return;
+    renderJobDetail(job, runs, workflowRuns);
     if (isPhoneLayout()) { document.getElementById('scheduler-view')?.setAttribute('data-phone-item', ''); document.getElementById('scheduler-detail')?.scrollIntoView({ block: 'start' }); } // a phone shows the job's page as its own screen (#7443); the list is the screen before it (#6139)
 }
 
-function renderJobDetail(job, runs) {
+function renderJobDetail(job, runs, workflowRuns) {
     const container = document.getElementById('scheduler-detail');
     if (!container) return;
 
     const isWorkflow = !!job.workflow_id;
     const wf = isWorkflow && workflowsById ? workflowsById.get(Number(job.workflow_id)) : null;
-    const wfName = wf ? wf.name : (job.workflow_name || `workflow ${job.workflow_id}`);
+    const wfName = wf ? wf.name : `workflow ${job.workflow_id}`;
     const doesHtml = isWorkflow
         ? `Workflow <a href="#" data-on-click="job-workflow" data-workflow-id="${Number(job.workflow_id)}" class="sched-link">${escapeHtml(wfName)}</a>${wf && Array.isArray(wf.steps) ? ` (${wf.steps.length} step${wf.steps.length === 1 ? '' : 's'})` : ''}`
         : `${escapeHtml(AGENT_NAMES[job.agent_type] || job.agent_type || 'Agent')} agent${job.repo_path ? ` in <span class="sched-path">${escapeHtml(job.repo_path)}</span>` : ''}`;
 
-    const history = isWorkflow && job.workflow_runs?.length ? job.workflow_runs : runs;
-    const workflowHistory = !!(isWorkflow && job.workflow_runs?.length);
+    const workflowHistory = !!(isWorkflow && workflowRuns?.length);
+    const history = workflowHistory ? workflowRuns : runs;
 
     // The failure comes first (#6521): a job that fires on schedule and fails every time otherwise looks fine until the run history is opened.
     const fails = job.consecutive_failures || 0;
@@ -273,7 +275,7 @@ function renderJobDetail(job, runs) {
             <dl class="sched-facts">${settingsRows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>
         </details>
         <div class="sched-runs-section">
-            <h3>Runs</h3>
+            <h3>${workflowHistory ? 'Workflow runs' : 'Runs'}</h3>
             <div id="sched-run-history"></div>
         </div>
         <div class="item-bar sched-actions">

@@ -11,7 +11,7 @@ const run = (id, over = {}) => ({ id, workflow_id: 7, workflow_name: 'Nightly', 
 const RUNS = { 91: run(91), 92: run(92, { error_msg: 'Codex is not signed in', agent_type: 'codex' }), 93: run(93, { error_code: 'some_future_code', error_msg: 'something else broke', agent_type: undefined }),
     95: run(95, { error_msg: 'Antigravity is not signed in', agent_type: 'agy' }), 96: run(96, { error_msg: 'x', agent_type: 'gemini' }), 97: run(97, { error_msg: 'x', agent_type: 'pi' }), 98: run(98, { error_msg: 'x', agent_type: undefined }), 99: run(99, { error_code: 'signin_check_timeout', error_msg: 'Claude did not answer the sign-in check' }), 100: run(100, { error_code: 'signin_check_timeout', error_msg: 'x', agent_type: 'codex' }), 101: run(101, { error_code: 'signin_check_timeout', error_msg: 'x', agent_type: undefined }), 94: run(94, { error_code: undefined, agent_type: undefined, error_msg: 'step build failed' }) };
 const JOB = { id: 5, name: 'Nightly review', enabled: true, cron_expr: '0 3 * * *', timezone: 'UTC', repo_path: '/tmp/r', max_duration_s: 600, job_type: 'workflow', workflow_id: 7, consecutive_failures: 0,
-    last_run: { id: 91, status: 'failed', error_msg: 'Claude is not signed in', error_code: 'not_signed_in', agent_type: 'claude' }, workflow_runs: [RUNS[91], RUNS[94]] };
+    last_run: { id: 91, status: 'failed', error_msg: 'Claude is not signed in', error_code: 'not_signed_in', agent_type: 'claude' } };
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
