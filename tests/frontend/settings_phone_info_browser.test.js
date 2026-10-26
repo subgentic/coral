@@ -21,9 +21,9 @@ const { connect } = require('./agent_view_harness');
         const rows = () => ev(`(() => { const out = []; const pane = '#settings-modal .settings-pane:not([hidden])';
             for (const row of document.querySelectorAll(pane + ' .settings-row')) { // the rows of a group that is not a settings_view yet
             if (!row.getClientRects().length) continue;
-            const dt = row.querySelector('dt, :scope > .net-group-head'), label = dt && dt.querySelector('label, .net-group-title'); if (!label) continue;
+            const dt = row.querySelector('dt'), label = dt && dt.querySelector('label'); if (!label) continue;
             const hint = row.querySelector('.settings-hint-line'), learn = row.querySelector('.settings-learn'), l = label.getBoundingClientRect();
-            const tog = row.querySelector(':scope > dd > .check-hit input, :scope > .net-group-head > .check-hit input, :scope > .net-group-head > .settings-hub-mode-toggle input'), tb = tog && tog.getBoundingClientRect();
+            const tog = row.querySelector(':scope > dd > .check-hit input'), tb = tog && tog.getBoundingClientRect();
             out.push({ label: label.textContent.trim().slice(0, 30), info: !!row.querySelector('.settings-info-btn'), hint: !!hint && hint.getClientRects().length > 0, under: !hint || !hint.getClientRects().length || hint.getBoundingClientRect().top >= l.bottom - 2, learnH: learn ? Math.round(Math.max(learn.getBoundingClientRect().height, parseFloat(getComputedStyle(learn, '::after').height) || 0)) : null, tog: tb ? tb.top < l.bottom && tb.bottom > l.top : null }); // the Hub's Learn more beside its sentence has its 44 px target in ::after too (#8276)
             }
             for (const row of document.querySelectorAll(pane + ' .sv-row')) { // the rows of a settings_view: its Learn more has its 44 px target in ::after

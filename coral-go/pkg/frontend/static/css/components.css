@@ -3789,16 +3789,10 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .settings-row > dd:has(> .check-hit) .settings-hint { align-self: stretch; text-align: right; }
 /* Settings > Network and Hub (#6579 part 2): the groups are sections with an h3 title, so the headings list reads Remote access, Setup code, Coral Hub, Manage other computers; a section is a row like the others
    (a title where a term was, a body where a definition was). On a phone Coral Hub, the reason most people open the pane, comes first. */
-.settings-row > .net-group-head { display: flex; flex-wrap: wrap; align-items: center; gap: .1rem .4rem; align-self: start; padding-top: .35rem; min-width: 0; }
-.net-group-title { margin: 0; font-size: .875rem; font-weight: 600; color: var(--text-primary); }
-.settings-row > .net-body { min-width: 0; margin: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; color: var(--text-primary); word-break: normal; overflow-wrap: anywhere; font-size: .8125rem; }
-.net-group-head .check-hit > input[type="checkbox"] { width: auto; margin: 0; flex: none; }
-.net-group-head > .check-hit { display: inline-flex; align-items: center; margin: 0 0 0 auto; } /* (the dialog's generic label leaves 12 px under itself: the switch is centred on the title and the (i)) */
+.net-group > .net-body { min-width: 0; margin: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; color: var(--text-primary); word-break: normal; overflow-wrap: anywhere; font-size: .8125rem; }
 .net-group[hidden] { display: none; }
 #settings-cloud .settings-cloud-connect-row .btn { margin-left: 0; }
-.settings-row > .net-group-head { flex-wrap: nowrap; }
-.net-group-head > .settings-info-btn, .tb-head > .settings-info-btn { align-self: center; margin-top: 0; } /* the head is one centred row (title, (i), switch): the (i) centres with the title (a wrapped title: centred on it as a block), not at the top of the row with a margin worked out for a body label's line height (the icon census, #6879) */
-.settings-row > .net-group-head .net-group-title { min-width: 0; }
+.tb-head > .settings-info-btn { align-self: center; margin-top: 0; } /* the head is one centred row (title, (i)): the (i) centres with the title (a wrapped title: centred on it as a block), not at the top of the row with a margin worked out for a body label's line height (the icon census, #6879) */
 /* (the phone used to put Coral Hub first with order: -1: the pane reads in the same order at every width now, #7040) */
 .settings-info-btn { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; padding: 0; flex: none; border: 1px solid var(--control-border); border-radius: 50%; background: none; color: var(--text-secondary); cursor: pointer; }
 .settings-info-btn .material-icons { font-size: 1rem; }

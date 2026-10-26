@@ -127,9 +127,10 @@ export const SECURITY_FIELDS = [
 export const NETWORK_FIELDS = [
     { key: 'remote_access', type: 'toggle', id: 'settings-remote-access-enabled', labelId: 'net-access-title', label: 'Remote access', live: ['settings-remote-access-status', 'net-remote-note'],
         help: { text: 'Allow connections from other devices.', more: 'Plain HTTP (unencrypted) unless Coral was started with --tls-cert and --tls-key.' } },
-    live('net-group-setup'),
-    live('about-section'),
-    live('net-group-hub'),
+    // the groups of this pane (#8491): a title drawn by settings_view (the sections are labelled by it) and the group's body, a part of the page its own module fills and shows or hides (the row and its title leave with it, settings_view.css)
+    { key: 'net_setup_title', type: 'heading', id: 'net-setup-title', label: 'Setup code' }, live('net-group-setup'),
+    { key: 'net_status_title', type: 'heading', id: 'net-status-title', label: 'Status' }, live('about-section'),
+    { key: 'net_hub_title', type: 'heading', id: 'net-hub-title', label: 'Coral Hub' }, live('net-group-hub'),
     { key: 'hub_mode', type: 'toggle', id: 'settings-hub-mode-enabled', labelId: 'settings-hub-mode-label', label: 'Manage other computers from this one', live: ['settings-hub-mode-status', 'settings-hub-mode-restart'],
         help: { text: 'Adds a Servers tab, with full control of those computers.', more: "It uses this Coral's own address, port and sign-in: the API key from other computers, and Remote access above for who can reach it. Nothing new listens. Turning it off keeps the servers you added." } },
 ];

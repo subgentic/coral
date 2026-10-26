@@ -50,7 +50,7 @@ for (const f of cssFiles) {
 assert.deepEqual(leaks, [], 'no other stylesheet styles a .sv selector (a surface changes a token or the rule in settings_view.css): ' + leaks.join(' | '));
 
 // (b) the legacy row classes
-const LEGACY = ['settings-row', 'settings-cli-row', 'tb-row', 'settings-row-switch', 'settings-unit-field', 'settings-inline', 'settings-api-key-row', 'net-group-head',
+const LEGACY = ['settings-row', 'settings-cli-row', 'tb-row', 'settings-row-switch', 'settings-unit-field', 'settings-inline', 'settings-api-key-row',
     'ts-row', 'working-mode-form', 'health-row', 'health-line', 'health-form', 'workflow-mode-line', 'preset-name-field', 'launch-prompt-field', 'job-field', 'job-limit-fields'];
 // Shared controls that are NOT legacy rows and stay their own component (#8460, Goal #54 item e): pw-input-row is the password field with its Show button beside it, one control (password_ui.js)
 // used by the sign-in page and the set-password dialog (auth_page.go) and by Settings' Security group (the Change password fields). It is a control inside a row, not a row, so it is not counted

@@ -704,8 +704,7 @@
                         <div id="settings-network-live" hidden>
                             <div id="settings-remote-access-status" class="settings-hint" role="status">Loading effective access status&hellip;</div>
                             <div id="net-remote-note" class="settings-hint" role="status"></div>
-                <section class="settings-row settings-row-wide net-group" id="net-group-setup" aria-labelledby="net-setup-title" hidden>
-                <div class="net-group-head"><h5 id="net-setup-title" class="net-group-title">Setup code</h5></div>
+                <section class="net-group" id="net-group-setup" aria-labelledby="net-setup-title" hidden>
                 <div class="net-body">
                     <button type="button" class="btn btn-small" id="settings-setup-code-reveal" aria-expanded="false" aria-controls="settings-setup-code-box">Show setup code</button>
                     <div id="settings-setup-code-box" class="settings-cloud-usercode-row" hidden>
@@ -717,7 +716,6 @@
                 </section>
                 <section class="net-group" id="about-section" aria-labelledby="net-status-title">
                 <!-- Status: the version (Coral has no paid licence, #3221) and this machine's health from the feed (#3446); a hub-served page has no machine of its own, so it hides the group (UI audit #5589, finding 19) -->
-                <div class="net-group-head"><h5 id="net-status-title" class="net-group-title">Status</h5></div>
                 <div class="net-body">
                     <div id="app-version-label" class="settings-version-label"></div>
                     <div class="settings-machine-health" data-local-only>
@@ -726,8 +724,7 @@
                     <button type="button" class="btn btn-small settings-editions-btn" data-editions="open">Connect to Coral Hub…</button>
                 </div>
                 </section>
-                <section class="settings-row settings-row-wide net-group" id="net-group-hub" data-learn-after="#settings-cloud-status" aria-labelledby="net-hub-title">
-                <div class="net-group-head"><h5 id="net-hub-title" class="net-group-title">Coral Hub</h5></div>
+                <section class="net-group" id="net-group-hub" data-learn-after="#settings-cloud-status" aria-labelledby="net-hub-title">
                 <div class="net-body" id="settings-cloud">
                     <div class="settings-cloud-head">
                         <div id="settings-cloud-status" data-cloud="status" class="settings-hint" role="status" aria-live="polite">Loading…</div>
