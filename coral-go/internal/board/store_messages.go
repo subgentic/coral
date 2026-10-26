@@ -23,10 +23,6 @@ const OriginHubUser = "hub_user"
 // tunnel (#3404): sent as the Operator, with HubUser naming who.
 const OriginHubOperator = "hub_operator"
 
-// OriginHubUserUnknown marks a Coral Hub chat post with no Hub user header: a hub still on
-// an older pkg/hubproxy (#3377). It's sent as HubUnknownSender.
-const OriginHubUserUnknown = "hub_user_unknown"
-
 // OriginHubNotice marks a fixed-template notice from Coral Hub about a team link (#3489):
 // sent as HubUnknownSender ("Coral Hub"), never an agent or the Operator.
 const OriginHubNotice = "hub_notice"
