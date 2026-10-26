@@ -46,6 +46,12 @@ jobs:
             tools/gen_route_queries.py
             # Starts and runs the outbound connector (remote agents) that holds the tunnel to the hub open.
             coral-go/internal/background/remote_agents.go
+            # The files remote_agents.go was split into (#8259, move-only): the remote rows and the live-list parsing, the upstream feed, the snapshot the hub reads,
+            # and the polling and its state. A change in any of them is a change to what the connector sends and accepts.
+            coral-go/internal/background/remote_rows.go
+            coral-go/internal/background/remote_feed.go
+            coral-go/internal/background/remote_snapshot.go
+            coral-go/internal/background/remote_poll.go
             # The /ws/coral feed: the hub dials this with ?feed=hub and relies on its message shapes.
             coral-go/internal/server/routes/websocket.go
             # The session list the hub's feed reconciles against; its fields must stay in step with the feed's.
