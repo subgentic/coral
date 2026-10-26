@@ -87,19 +87,19 @@ const { removeBoards } = require('./helpers/board_cleanup');
         check('the x brings the default list back (Hide done too)', s.hide && s.statuses.length >= 56 && s.chips.length === 0, JSON.stringify([s.count, s.statuses.length, s.hide]));
 
         // ── The open tasks first, then the done ones, as pages of one list ──
+        await ev(`window.__searchBeforePaging = document.getElementById('tk-search'); true`);
         await type('gamma');
-        await settle(`document.querySelector('#board-task-bar .list-bar-count').textContent === '63 of 66'`, 'the count of gamma');
+        // Three open matches leave the footer in view, so it automatically loads the
+        // first done page. Clicking twice raced that load and clicked a removed button.
+        await settle(`document.querySelectorAll('#board-task-list .board-task-item:not(.board-task-header)').length === 53`, 'automatic first done page');
         s = await snap();
-        check('"gamma" (3 open, 60 done): the open ones come first and the done ones are still to load', s.titles.length === 3 && s.statuses.every(x => x !== 'Finished') && /Showing 3 of 63/.test(s.more || ''), JSON.stringify([s.count, s.titles.length, s.more]));
-        await ev(`document.querySelector('#board-task-list .dt-more').click(); true`);
-        await settle(`document.querySelectorAll('#board-task-list .board-task-item:not(.board-task-header)').length === 53`, 'the first page of the done ones');
-        s = await snap();
-        check('Load more then brings the first 50 done tasks after the open ones, and offers the last 10', s.statuses.slice(0, 3).every(x => x !== 'Finished') && s.statuses.slice(3).every(x => x === 'Finished') && /Showing 53 of 63/.test(s.more || ''), JSON.stringify([s.statuses.length, s.more]));
-        await ev(`document.querySelector('#board-task-list .dt-more').click(); true`);
+        check('gamma automatically loads the first 50 done after its three open tasks', s.count === '63 of 66' && s.statuses.slice(0, 3).every(x => x !== 'Finished') && s.statuses.slice(3).every(x => x === 'Finished') && /Showing 53 of 63/.test(s.more || ''), JSON.stringify([s.count, s.statuses.length, s.more]));
+        check('automatic paging keeps the same search input, its text and keyboard focus', await ev(`document.getElementById('tk-search') === window.__searchBeforePaging && document.activeElement === window.__searchBeforePaging && window.__searchBeforePaging.value === 'gamma'`));
+        await ev(`document.querySelector('#board-task-list .dt-foot').scrollIntoView({ block: 'end' }); true`);
         await settle(`document.querySelectorAll('#board-task-list .board-task-item:not(.board-task-header)').length === 63`, 'every match');
         s = await snap();
         check('and the last page: all 63, each once, no button', new Set(s.ids).size === 63 && s.more === null, JSON.stringify([s.ids.length, new Set(s.ids).size, s.more]));
-        await ev(`document.querySelector('#board-task-bar .list-bar-clear-q').click(); true`);
+        await ev(`document.getElementById('tk-search').scrollIntoView({ block: 'start' }); document.querySelector('#board-task-bar .list-bar-clear-q').click(); true`);
         await settle(`document.querySelector('#board-task-bar .list-bar-count').textContent === '66 tasks'`, 'the default list back again');
 
         // ── Filters ──
