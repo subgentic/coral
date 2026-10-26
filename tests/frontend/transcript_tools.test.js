@@ -378,8 +378,8 @@ async function run() {
   check('a solo agent\'s Tasks tab shows + Task and an empty state', tasksTab.shown && tasksTab.addBtn && /No tasks/.test(tasksTab.empty), JSON.stringify(tasksTab));
   await ev(`document.querySelector('#board-tasks-section .btn-create-task').click(); true`);
   await until(`!!document.getElementById('create-task-heading') && document.getElementById('create-task-heading').textContent.trim() !== '' && document.getElementById('create-task-modal').style.display !== 'none'`, 'the Create Task dialog');
-  const dlg = await ev(`(() => { const vis = (id) => { const e = document.getElementById(id); return !!e && !e.hidden && getComputedStyle(e).display !== 'none'; };
-    return { heading: document.getElementById('create-task-heading').textContent, boardFields: vis('create-task-board-fields'), sendRow: vis('create-task-send-row'), sendChecked: document.getElementById('create-task-send').checked }; })()`);
+  const dlg = await ev(`(() => { const vis = (id) => { const e = document.getElementById(id); const r = e && (e.closest('.sv-row') || e); return !!r && !r.hidden && r.checkVisibility({ checkVisibilityCSS: true }); };
+    return { heading: document.getElementById('create-task-heading').textContent, boardFields: vis('create-task-assignee'), sendRow: vis('create-task-send'), sendChecked: document.getElementById('create-task-send').checked }; })()`);
   check('the Create Task dialog for a solo agent hides board fields and offers sending it to the agent', dlg.heading === 'New task for Lead Dev' && !dlg.boardFields && dlg.sendRow && dlg.sendChecked, JSON.stringify(dlg));
   await ev(`window.__posts = []; document.getElementById('create-task-title').value = 'Add a battle log'; document.getElementById('create-task-body').value = 'Log each round.'; document.getElementById('create-task-submit').click(); true`);
   await until(`(window.__posts || []).some(p => /\\/tasks$/.test(p[1])) && document.getElementById('create-task-modal').style.display === 'none'`, 'the task POST and the dialog to close');
