@@ -114,11 +114,7 @@
                 <div id="agentic-panel-agent-ui" class="agentic-panel"></div>
                 <div id="agentic-panel-saved" class="agentic-panel" data-local-only>
                   <!-- The Saved list of the page's scope (an agent's): the Inbox's Saved table, filtered to it (inbox_sidebar.js drawDockSaved, #7631) -->
-                  <div id="saved-ui" class="saved-pane">
-                    <div class="saved-head">
-                        <h2 class="saved-scope" id="saved-scope">All</h2>
-                        <button type="button" class="saved-close" id="saved-close" data-on-click="saved-close" title="Close (Esc)" aria-label="Close Saved for later"><span class="material-icons" aria-hidden="true">close</span></button>
-                    </div>
+                  <div id="saved-ui" class="saved-pane" role="region" aria-label="Saved for later">
                     <div id="saved-bar" class="saved-bar"></div>
                     <div id="saved-panel" class="saved-panel">
                         <div id="saved-table" class="saved-table"></div>

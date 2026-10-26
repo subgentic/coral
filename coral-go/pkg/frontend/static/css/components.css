@@ -3888,19 +3888,8 @@ body[data-nav-tab]:not([data-nav-tab="agents"], [data-nav-tab="jobs"], [data-nav
 body[data-saved-scope="all"] #agentic-state #agentic-tab-saved { display: none !important; } /* an id more than the page kinds' own tab rules above */
 body[data-saved-scope="all"] #agentic-state[data-page="other"], body[data-saved-scope="all"] #agentic-state[data-page="chats"] { display: none !important; }
 body[data-saved-scope="all"][data-dock-page="other"] #panel-toggle-btn, body[data-saved-scope="all"][data-dock-page="chats"] #panel-toggle-btn { display: none !important; }
-/* Which scope the list shows (#4792): "Saved: QA Engineer", "Saved: coral-go-team" or "All". */
-.saved-head { display: flex; align-items: center; gap: 8px; padding-right: 8px; flex: none; } /* the scope's name, and the way to shut the sidebar the Saved button opened */
-.saved-head .saved-scope { flex: 1 1 auto; min-width: 0; }
 .saved-table { padding: 8px 12px 12px; } /* the Inbox's Saved table, filtered to the page's scope (inbox_sidebar.js drawDockSaved) */
-.saved-scope { margin: 0; padding: 10px 12px 2px; font-size: 0.8125rem; font-weight: 600; color: var(--text-primary); flex: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* A visible way to shut the sidebar the Saved button opened (#4742): the dock's own edge chevron is easy to miss. A phone's overlay has its own close. */
-.saved-close { margin-left: auto; background: none; border: none; color: var(--text-secondary); cursor: pointer; border-radius: var(--radius-sm); width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; flex: none; }
-.saved-close:hover { color: var(--text-primary); background: var(--bg-tertiary); }
-.saved-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.saved-close .material-icons { font-size: 1.125rem; }
-@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .saved-close { display: none; } }
-@media (pointer: coarse) { .saved-close { width: 44px; height: 44px; } } /* a touch tablet wider than a phone: a 44px target */
 
 .saved-panel { overflow-y: auto; min-height: 0; flex: 1; }
 .saved-panel:focus { outline: none; }
