@@ -62,6 +62,7 @@ export function selectView(key, { focus = false } = {}) {
     setText(document.getElementById('cost-view-title'), v.label);
     syncRangeLine();
     drawViews();
+    document.dispatchEvent(new CustomEvent('cost-view-change', { detail: v.key })); // a view with a chart over time reads it (cost_dashboard.js)
     const status = document.getElementById('cost-status');
     if (status && focus) setText(status, `Showing ${v.label}`);
     if (focus && isPhoneLayout()) document.getElementById('cost-view-title')?.focus({ preventScroll: true });
