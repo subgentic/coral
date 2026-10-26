@@ -3,6 +3,8 @@ package routes
 import (
 	"context"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -16,6 +18,14 @@ import (
 // #7420: the feed waited for its next 5 s tick to show a Codex row's request open or closed, so a request that Codex's reviewer settled in 3 s was still on the row when the dashboard's 4 s hold ended.
 // A hook event that opens or closes a request now kicks the feed (a coral_diff within a moment), and only those: a tool_use is one per tool call, so it kicks only when it closes a request.
 func TestAnAgentEventThatOpensOrClosesARequestKicksTheFeed(t *testing.T) {
+	// This tests person-facing requests. Automatic Codex review is explicitly
+	// not a request to the person (#8471), and must not kick that rising edge.
+	home := t.TempDir()
+	t.Setenv("CODEX_HOME", home)
+	dir := filepath.Join(home, "sessions", "2026", "10", "26")
+	require.NoError(t, os.MkdirAll(dir, 0700))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "rollout-aaaaaaaa-7420-0000-0000-000000000001.jsonl"), []byte(`{"type":"turn_context","payload":{"approval_policy":"on-request","approvals_reviewer":"user"}}`+"\n"), 0600))
+
 	server, h, _, ss := setupSessionsTestServer(t)
 	ctx := context.Background()
 	sid := "aaaaaaaa-7420-0000-0000-000000000001"
