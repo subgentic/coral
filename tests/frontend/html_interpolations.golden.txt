@@ -532,6 +532,7 @@
 1	view_sandbox.js	VIEW_CSP
 1	view_sandbox.js	html
 1	view_sandbox.js	prelude(ctx)
+1	workflow_editor.js	escAttr(name)
 1	workflows.js	agentHtml
 1	workflows.js	autoExpand
 1	workflows.js	backHtml
@@ -544,7 +545,6 @@
 1	workflows.js	escAttr('View agent of ' + (s.name || 'step ' + (i + 1)))
 1	workflows.js	escAttr(STEP_WORDS[s.status] || 'Waiting')
 1	workflows.js	escAttr(isFailed)
-1	workflows.js	escAttr(name)
 1	workflows.js	escAttr(open ? ' active' : '')
 2	workflows.js	escAttr(outputId)
 1	workflows.js	escAttr(rd.dot)
