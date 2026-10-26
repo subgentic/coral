@@ -20,6 +20,37 @@ func FormatJSON(r Report) (string, error) {
 func FormatMarkdown(r Report) string {
 	var b strings.Builder
 
+	writeReportHeader(&b, r)
+	writeScorecard(&b, r)
+
+	// Observable Facts
+	b.WriteString("## 2. Observable Facts\n\n")
+	writeTaskDistribution(&b, r)
+	writeDurations(&b, r)
+	writeActiveLoad(&b, r)
+	writeBlockedTasks(&b, r)
+	writeReviewHeldSlots(&b, r)
+
+	// Heuristic Signals
+	b.WriteString("## 3. Heuristic Signals & Inefficiency Candidates\n\n")
+	b.WriteString("> [!NOTE]\n")
+	b.WriteString("> The signals below are automated candidates based on operational patterns. They highlight areas for planner attention rather than definitive defects.\n\n")
+	writeReadyUnclaimed(&b, r)
+	writeNotificationChurn(&b, r)
+	writeActiveWithoutProgress(&b, r)
+	writeDuplicateScope(&b, r)
+	writeManualRecovery(&b, r)
+	writeHandoffLoops(&b, r)
+
+	writeUnavailableMetrics(&b, r)
+	writeKeyFindings(&b, r)
+	writeRecommendations(&b, r)
+
+	return b.String()
+}
+
+// writeReportHeader writes the title and the metadata list.
+func writeReportHeader(b *strings.Builder, r Report) {
 	b.WriteString(fmt.Sprintf("# Coordination Efficiency Report: `%s`\n\n", r.Metadata.Board))
 	b.WriteString(fmt.Sprintf("- **Generated At**: %s\n", r.Metadata.GeneratedAt.UTC().Format(time.RFC3339)))
 	if r.Metadata.WindowStart != nil {
@@ -31,7 +62,10 @@ func FormatMarkdown(r Report) string {
 	b.WriteString(fmt.Sprintf("- **Tasks In Window**: %d\n", r.Metadata.TotalTasksInWindow))
 	b.WriteString(fmt.Sprintf("- **Messages In Window**: %d\n", r.Metadata.TotalMessagesInWindow))
 	b.WriteString(fmt.Sprintf("- **Subscribers Tracked**: %d\n\n", r.Metadata.SubscribersTracked))
+}
 
+// writeScorecard writes section 1, the quality scorecard.
+func writeScorecard(b *strings.Builder, r Report) {
 	// Coordination Scorecard
 	b.WriteString("## 1. Coordination Quality Scorecard\n\n")
 	statusNote := ""
@@ -61,9 +95,10 @@ func FormatMarkdown(r Report) string {
 	b.WriteString(fmt.Sprintf("| Notification Hygiene | **%.1f** | 15 | Signal-to-noise ratio, absence of churn/spurious nudges |\n", r.CoordinationScore.NotificationCleanScore))
 	b.WriteString(fmt.Sprintf("| Recovery Economy | **%.1f** | 15 | First-pass completion vs cancellation/rework burden |\n\n", r.CoordinationScore.RecoveryEconomyScore))
 	b.WriteString(fmt.Sprintf("*Methodology*: %s\n\n", r.CoordinationScore.ScoringMethodology))
+}
 
-	// Observable Facts
-	b.WriteString("## 2. Observable Facts\n\n")
+// writeTaskDistribution writes section 2A, the task counts.
+func writeTaskDistribution(b *strings.Builder, r Report) {
 	b.WriteString("### A. Task Distribution\n\n")
 	b.WriteString("| Total Created | Completed | In Progress | Pending (Planned) | Blocked (Prereqs) | Cancelled | Skipped |\n")
 	b.WriteString("| :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n")
@@ -76,16 +111,22 @@ func FormatMarkdown(r Report) string {
 		r.ObservableFacts.TaskCounts.Cancelled,
 		r.ObservableFacts.TaskCounts.Skipped,
 	))
+}
 
+// writeDurations writes section 2B, the latencies and durations.
+func writeDurations(b *strings.Builder, r Report) {
 	b.WriteString("### B. Latencies & Durations\n\n")
 	b.WriteString("| Metric | Count | Min | Median | Mean | P90 | Max |\n")
 	b.WriteString("| :--- | :---: | :---: | :---: | :---: | :---: | :---: |\n")
-	formatDurationRow(&b, "Ready-to-Claim Latency (Unblocked → Claim)", r.ObservableFacts.Durations.ReadyToClaimLatency)
-	formatDurationRow(&b, "Total Pre-Claim Wait (Created → Claim, includes blocking)", r.ObservableFacts.Durations.TotalPreClaimWait)
-	formatDurationRow(&b, "Execution Duration (Claim → Complete)", r.ObservableFacts.Durations.ExecutionDuration)
-	formatDurationRow(&b, "Total Lead Time (Create → Complete)", r.ObservableFacts.Durations.TotalLeadTime)
+	formatDurationRow(b, "Ready-to-Claim Latency (Unblocked → Claim)", r.ObservableFacts.Durations.ReadyToClaimLatency)
+	formatDurationRow(b, "Total Pre-Claim Wait (Created → Claim, includes blocking)", r.ObservableFacts.Durations.TotalPreClaimWait)
+	formatDurationRow(b, "Execution Duration (Claim → Complete)", r.ObservableFacts.Durations.ExecutionDuration)
+	formatDurationRow(b, "Total Lead Time (Create → Complete)", r.ObservableFacts.Durations.TotalLeadTime)
 	b.WriteString(fmt.Sprintf("\n*Missing or unparseable timestamps preserved in denominator*: %d\n\n", r.ObservableFacts.Durations.MissingTimestamps))
+}
 
+// writeActiveLoad writes section 2C, the active load, the carryover backlog and the subscribers' load.
+func writeActiveLoad(b *strings.Builder, r Report) {
 	b.WriteString("### C. Active Load vs. Planned Backlog\n\n")
 	b.WriteString(fmt.Sprintf("- **Cohort Active In-Progress Slots**: %d (consuming agent capacity in this window)\n", r.ObservableFacts.ActiveVsPlannedLoad.ActiveInProgressTasks))
 	b.WriteString(fmt.Sprintf("- **Cohort Planned Assigned Backlog**: %d (queued work created in this window)\n", r.ObservableFacts.ActiveVsPlannedLoad.PlannedAssignedTasks))
@@ -116,7 +157,10 @@ func FormatMarkdown(r Report) string {
 		}
 		b.WriteString("\n")
 	}
+}
 
+// writeBlockedTasks writes section 2D, the blocked tasks (only when there are some).
+func writeBlockedTasks(b *strings.Builder, r Report) {
 	if len(r.ObservableFacts.DependencyGraph.BlockedTasks) > 0 {
 		b.WriteString("### D. Blocked Tasks & Dependencies\n\n")
 		b.WriteString("| Task ID | Title | Assignee | Unmet Prerequisites |\n")
@@ -134,7 +178,10 @@ func FormatMarkdown(r Report) string {
 		}
 		b.WriteString("\n")
 	}
+}
 
+// writeReviewHeldSlots writes section 2E, the review-held slots (only when there are some).
+func writeReviewHeldSlots(b *strings.Builder, r Report) {
 	if len(r.ObservableFacts.ReviewHeldSlots) > 0 {
 		b.WriteString("### E. Review-Held Slots\n\n")
 		b.WriteString("| Task ID | Title | Assignee | Reviewer Role | Held For |\n")
@@ -144,12 +191,10 @@ func FormatMarkdown(r Report) string {
 		}
 		b.WriteString("\n")
 	}
+}
 
-	// Heuristic Signals
-	b.WriteString("## 3. Heuristic Signals & Inefficiency Candidates\n\n")
-	b.WriteString("> [!NOTE]\n")
-	b.WriteString("> The signals below are automated candidates based on operational patterns. They highlight areas for planner attention rather than definitive defects.\n\n")
-
+// writeReadyUnclaimed writes section 3A, the ready-but-unclaimed tasks.
+func writeReadyUnclaimed(b *strings.Builder, r Report) {
 	// Ready Unclaimed
 	b.WriteString("### A. Ready-but-Unclaimed Analysis\n\n")
 	b.WriteString(fmt.Sprintf("- **Legitimate Planned Serialization (Owner Busy)**: %d tasks\n", r.HeuristicSignals.ReadyUnclaimed.OwnerBusyCount))
@@ -163,7 +208,10 @@ func FormatMarkdown(r Report) string {
 		b.WriteString(fmt.Sprintf("  - Task #%d: `%s` (Assignee `%s` idle; waiting %.0fs)\n", t.TaskID, t.Title, t.Assignee, t.AgeSeconds))
 	}
 	b.WriteString(fmt.Sprintf("\n- **Unassigned Ready Work**: %d tasks\n\n", r.HeuristicSignals.ReadyUnclaimed.UnassignedCount))
+}
 
+// writeNotificationChurn writes section 3B, the notification churn.
+func writeNotificationChurn(b *strings.Builder, r Report) {
 	// Notification Churn
 	b.WriteString("### B. Notification Churn & Reminder Churn\n\n")
 	if len(r.HeuristicSignals.NotificationChurn) == 0 {
@@ -189,7 +237,10 @@ func FormatMarkdown(r Report) string {
 		}
 		b.WriteString("\n")
 	}
+}
 
+// writeActiveWithoutProgress writes section 3C, the active-without-progress candidates.
+func writeActiveWithoutProgress(b *strings.Builder, r Report) {
 	// Active without progress
 	b.WriteString("### C. Active-without-Progress Candidates\n\n")
 	if len(r.HeuristicSignals.ActiveWithoutProgress) == 0 {
@@ -203,7 +254,10 @@ func FormatMarkdown(r Report) string {
 		}
 		b.WriteString("\n")
 	}
+}
 
+// writeDuplicateScope writes section 3D, the duplicate or overlapping scope candidates (only when there are some).
+func writeDuplicateScope(b *strings.Builder, r Report) {
 	// Duplicate scope
 	if len(r.HeuristicSignals.DuplicateScopeCandidates) > 0 {
 		b.WriteString("### D. Duplicate or Overlapping Scope Candidates\n\n")
@@ -215,7 +269,10 @@ func FormatMarkdown(r Report) string {
 		}
 		b.WriteString("\n")
 	}
+}
 
+// writeManualRecovery writes section 3E, the manual recovery and rework events (only when there are some).
+func writeManualRecovery(b *strings.Builder, r Report) {
 	// Manual Recovery
 	if len(r.HeuristicSignals.ManualRecoveryEvents) > 0 {
 		b.WriteString("### E. Manual Recovery & Rework Events\n\n")
@@ -226,7 +283,10 @@ func FormatMarkdown(r Report) string {
 		}
 		b.WriteString("\n")
 	}
+}
 
+// writeHandoffLoops writes section 3F, the repetitive handoff loops (only when there are some).
+func writeHandoffLoops(b *strings.Builder, r Report) {
 	// Repetitive handoffs
 	if len(r.HeuristicSignals.RepetitiveHandoffLoops) > 0 {
 		b.WriteString("### F. Repetitive Handoff Loops\n\n")
@@ -238,7 +298,10 @@ func FormatMarkdown(r Report) string {
 		}
 		b.WriteString("\n")
 	}
+}
 
+// writeUnavailableMetrics writes section 4, the metrics that cannot be derived.
+func writeUnavailableMetrics(b *strings.Builder, r Report) {
 	// Unavailable Metrics
 	b.WriteString("## 4. Disclosed Unavailable Metrics\n\n")
 	b.WriteString("The following dimensions cannot be derived from messageboard data alone and are excluded to avoid synthetic/causal speculation:\n")
@@ -246,22 +309,26 @@ func FormatMarkdown(r Report) string {
 		b.WriteString(fmt.Sprintf("- %s\n", un))
 	}
 	b.WriteString("\n")
+}
 
+// writeKeyFindings writes section 5, the key findings.
+func writeKeyFindings(b *strings.Builder, r Report) {
 	// Key Findings
 	b.WriteString("## 5. Key Findings\n\n")
 	for _, f := range r.KeyFindings {
 		b.WriteString(fmt.Sprintf("- %s\n", f))
 	}
 	b.WriteString("\n")
+}
 
+// writeRecommendations writes section 6, the recommendations.
+func writeRecommendations(b *strings.Builder, r Report) {
 	// Recommendations
 	b.WriteString("## 6. Actionable Recommendations\n\n")
 	for _, rec := range r.Recommendations {
 		b.WriteString(fmt.Sprintf("- %s\n", rec))
 	}
 	b.WriteString("\n")
-
-	return b.String()
 }
 
 // taskRef is a task's number as the report writes it, a dash for an event that belongs to no task (a reassignment is a message).
