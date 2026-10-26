@@ -49,6 +49,7 @@
 .sv-error { grid-column: 1 / -1; margin: 4px 0 0; font-size: var(--sv-help-size); font-weight: var(--sv-label-weight); color: var(--sv-error-color); }
 .sv-error[hidden] { display: none; }
 .sv .sv-notice > .net-group { border-top: 0; padding-top: 0; margin-top: 0; } /* a live group of Network and Hub sits in the row's own divider */
+.sv-row-heading:has(+ .sv-row-notice > .sv-notice > .net-group) { padding-bottom: 0; } /* the group's title sits close over its body */
 .sv-row-heading + .sv-row-notice:has(> .sv-notice > .net-group) { border-top: 0; padding-top: 0; } /* the group's body sits under its title, not under a second rule */
 .sv-row-heading:has(+ .sv-row-notice > .sv-notice > [hidden]:only-child) { display: none; } /* a group's title leaves with its hidden body (Network and Hub, #8491) */
 #settings-modal .sv .telemetry-install-id code { font: var(--dlg-control); }
@@ -63,6 +64,10 @@
 .sv-choice { display: grid; grid-template-columns: auto 1fr; gap: 0 8px; align-items: center; font-size: var(--sv-label-size); color: var(--sv-label-color); }
 .sv .sv-choice { display: grid; margin: 0; font-weight: 400; } /* a dialog's label and input rules (display: block, a 100% field) do not apply to a choice */
 .sv .sv-choice > input { width: 16px; height: 16px; min-height: 0; margin: 0; padding: 0; }
+.sv .sv-choice > input[type="checkbox"] { appearance: none; -webkit-appearance: none; position: relative; border: 1px solid var(--control-border); border-radius: var(--radius-sm); background: var(--bg-primary); } /* the shared check: a box that fills with the accent and shows a tick */
+.sv .sv-choice > input[type="checkbox"]:checked { background: var(--accent-dim); border-color: var(--accent-dim); }
+.sv .sv-choice > input[type="checkbox"]:checked::after { content: ""; position: absolute; left: 4px; top: 1px; width: 4px; height: 8px; border: solid var(--text-on-accent); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.sv .sv-choice > input[type="checkbox"]:disabled { opacity: .5; cursor: not-allowed; }
 .sv-choice-help { grid-column: 2; font-size: var(--sv-help-size); color: var(--sv-help-color); }
 .sv-action { flex: none; }
 .sv-confirm { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: var(--sv-help-size); color: var(--sv-help-color); }
