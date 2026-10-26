@@ -536,6 +536,61 @@ func taskTimeBlock(winTasks, usualTasks []board.TaskTime) spendTaskTime {
 	return tt
 }
 
+// addSeries adds the points of the charts, oldest first: an hour's point is its own hour; a day's is the sum of its 24 hours. The 24 h range has 24 hourly points and, as the week's bars, the six days before
+// today and today (whole UTC days, today's still running); the 7 d range has its seven days. A measure nobody has a source for (cache write, commits, tool calls) is nil in every point.
+func addSeries(resp *spendResponse, fr spendFrame, tok *spendTokenSeries, tools *spendToolRows, commitsByHour, tasksByHour map[string]int, toolMeasured int) {
+	cwReported := tok.winCW > 0 || tok.usualCW > 0
+	commitsAvailable := resp.Commits.Available
+	pointOf := func(hours []time.Time) spendSeriesPoint {
+		var p spendSeriesPoint
+		var cw int64
+		commits, toolCalls := 0, 0
+		for _, t := range hours {
+			key := t.Format("2006-01-02T15")
+			p.Tokens += tok.hourTokens[key]
+			p.CacheRead += tok.hourCache[key]
+			cw += tok.hourCW[key]
+			p.TasksDone += tasksByHour[key]
+			commits += commitsByHour[key]
+			toolCalls += tools.byHour[key]
+		}
+		if cwReported {
+			p.CacheWrite = &cw
+		}
+		if commitsAvailable {
+			p.Commits = &commits
+		}
+		if toolMeasured > 0 {
+			p.ToolCalls = &toolCalls
+		}
+		return p
+	}
+	dayPoints := func(first, until time.Time) {
+		for d := first; d.Before(until); d = d.Add(24 * time.Hour) {
+			var hs []time.Time
+			for h := 0; h < 24; h++ {
+				hs = append(hs, d.Add(time.Duration(h)*time.Hour))
+			}
+			p := pointOf(hs)
+			p.Day = d.Format("2006-01-02")
+			resp.PerDay = append(resp.PerDay, p)
+			resp.TaskTime.PerDay = append(resp.TaskTime.PerDay, spendTaskPoint{Day: p.Day, Done: p.TasksDone})
+		}
+	}
+	if fr.hourly {
+		for t := fr.start; t.Before(fr.end); t = t.Add(time.Hour) {
+			p := pointOf([]time.Time{t})
+			p.Hour = t.Format(time.RFC3339)
+			resp.PerHour = append(resp.PerHour, p)
+			resp.TaskTime.PerHour = append(resp.TaskTime.PerHour, spendTaskPoint{Hour: p.Hour, Done: p.TasksDone})
+		}
+		today := time.Date(fr.now.Year(), fr.now.Month(), fr.now.Day(), 0, 0, 0, 0, time.UTC)
+		dayPoints(today.Add(-6*24*time.Hour), today.Add(24*time.Hour))
+	} else {
+		dayPoints(fr.start, fr.end)
+	}
+}
+
 // Spend answers GET /api/board/{project}/spend?range=24h|7d.
 func (h *SpendHandler) Spend(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
@@ -553,31 +608,24 @@ func (h *SpendHandler) Spend(w http.ResponseWriter, r *http.Request) {
 
 	now := h.clock()
 	fr := newSpendFrame(rng, now)
-	start, end, hours, hourly := fr.start, fr.end, fr.hours, fr.hourly
 	ctx := r.Context()
-	f := spendStamp
 
 	roster, fail := h.readRoster(ctx, project, fr)
 	if fail != "" {
 		errInternalServer(w, fail)
 		return
 	}
-	order := roster.order
 	tok, fail := h.readTokenSeries(ctx, project, fr)
 	if fail != "" {
 		errInternalServer(w, fail)
 		return
 	}
-	win, usual := tok.win, tok.usual
-	winCW, usualCW := tok.winCW, tok.usualCW
-	hourTokens, hourCache, hourCW := tok.hourTokens, tok.hourCache, tok.hourCW
 
 	tools, fail := h.readToolCalls(ctx, roster, fr)
 	if fail != "" {
 		errInternalServer(w, fail)
 		return
 	}
-	toolWin, toolUsual, toolByBucket := tools.window, tools.usual, tools.byHour
 
 	cm := h.readCommits(ctx, project, roster, fr)
 	commitInfo := cm.info
@@ -588,71 +636,20 @@ func (h *SpendHandler) Spend(w http.ResponseWriter, r *http.Request) {
 		errInternalServer(w, fail)
 		return
 	}
-	winTasks, usualTasks, tasksByAgent, tasksByBucket := tasks.win, tasks.usual, tasks.byAgent, tasks.byHour
 
-	// the agents
-	resp := spendResponse{Board: project, Range: rng, RangeHours: hours, GeneratedAt: f(now), WindowStart: f(start), WindowEnd: f(end),
-		Tokens: map[string]spendTokens{"window": win, "usual": usual}, Commits: commitInfo, OfAgents: len(order)}
+	// the reply: the frame and the board's tokens and commits, the agents, the tool calls, the task times, the charts
+	resp := spendResponse{Board: project, Range: rng, RangeHours: fr.hours, GeneratedAt: spendStamp(now), WindowStart: spendStamp(fr.start), WindowEnd: spendStamp(fr.end),
+		Tokens: map[string]spendTokens{"window": tok.win, "usual": tok.usual}, Commits: commitInfo, OfAgents: len(roster.order)}
 	var toolMeasured int
-	resp.Agents, resp.MeasuredAgents, toolMeasured = agentRows(roster, tools, commitsBy, tasksByAgent, commitInfo.Unattributed)
-	tc := spendToolCalls{MeasuredAgents: toolMeasured, OfAgents: len(order)}
+	resp.Agents, resp.MeasuredAgents, toolMeasured = agentRows(roster, tools, commitsBy, tasks.byAgent, commitInfo.Unattributed)
+	tc := spendToolCalls{MeasuredAgents: toolMeasured, OfAgents: len(roster.order)}
 	if toolMeasured > 0 {
-		tc.Window, tc.Usual = &toolWin, &toolUsual
+		tc.Window, tc.Usual = &tools.window, &tools.usual
 	}
 	resp.ToolCalls = tc
-	resp.TaskTime = taskTimeBlock(winTasks, usualTasks)
+	resp.TaskTime = taskTimeBlock(tasks.win, tasks.usual)
 
-	// the series, oldest first: an hour's point is its own hour; a day's is the sum of its 24 hours
-	cwReported := winCW > 0 || usualCW > 0
-	pointOf := func(hours []time.Time) spendSeriesPoint {
-		var p spendSeriesPoint
-		var cw int64
-		commits, tools := 0, 0
-		for _, t := range hours {
-			key := t.Format("2006-01-02T15")
-			p.Tokens += hourTokens[key]
-			p.CacheRead += hourCache[key]
-			cw += hourCW[key]
-			p.TasksDone += tasksByBucket[key]
-			commits += hourCommits[key]
-			tools += toolByBucket[key]
-		}
-		if cwReported {
-			p.CacheWrite = &cw
-		}
-		if commitInfo.Available {
-			p.Commits = &commits
-		}
-		if toolMeasured > 0 {
-			p.ToolCalls = &tools
-		}
-		return p
-	}
-	dayPoints := func(first, until time.Time) {
-		for d := first; d.Before(until); d = d.Add(24 * time.Hour) {
-			var hs []time.Time
-			for h := 0; h < 24; h++ {
-				hs = append(hs, d.Add(time.Duration(h)*time.Hour))
-			}
-			p := pointOf(hs)
-			p.Day = d.Format("2006-01-02")
-			resp.PerDay = append(resp.PerDay, p)
-			resp.TaskTime.PerDay = append(resp.TaskTime.PerDay, spendTaskPoint{Day: p.Day, Done: p.TasksDone})
-		}
-	}
-	if hourly {
-		for t := start; t.Before(end); t = t.Add(time.Hour) {
-			p := pointOf([]time.Time{t})
-			p.Hour = t.Format(time.RFC3339)
-			resp.PerHour = append(resp.PerHour, p)
-			resp.TaskTime.PerHour = append(resp.TaskTime.PerHour, spendTaskPoint{Hour: p.Hour, Done: p.TasksDone})
-		}
-		// the 24 h view's chart is a bar a day for the week: the six days before today and today, whole UTC days (today's still running)
-		today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
-		dayPoints(today.Add(-6*24*time.Hour), today.Add(24*time.Hour))
-	} else {
-		dayPoints(start, end)
-	}
+	addSeries(&resp, fr, tok, tools, hourCommits, tasks.byHour, toolMeasured)
 	writeJSON(w, http.StatusOK, resp)
 }
 
