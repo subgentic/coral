@@ -111,6 +111,7 @@
 .dt-flag-on { color: var(--warning); }
 .dt-flag:hover { color: var(--table-primary-color); }
 .dt-flag-on:hover { color: var(--warning); }
+@media (max-width: 767px), (pointer: coarse) { .dt-chat-flags .dt-flag { width: var(--table-touch); height: var(--table-touch); } } /* the opened chat's Star and Archive on a phone: a 44 px target */
 .dt-flag:focus-visible { outline-offset: -2px; } /* the cell clips what is drawn outside it: the ring sits inside the button */
 .dt-box.dt-folded .dt-chat-flags { display: none; } /* a phone has no hover: the opened chat carries them */
 .dt-td .btn-small { margin: 0; } /* a button in a cell sits in the row's own height, not the page button's 8px 20px margin */

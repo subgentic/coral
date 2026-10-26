@@ -121,7 +121,7 @@ const BASE = require('./test_base').BASE;
         await waitFor(`!document.getElementById('nav-more-menu').hidden`, 'the list', 3000);
         assert.equal(await ev(`document.getElementById('nav-select').getAttribute('aria-expanded')`), 'true');
         const items = await ev(`[...document.querySelectorAll('#nav-more-menu .nav-more-item')].map(n => [n.dataset.arg, Math.round(n.getBoundingClientRect().height), n.classList.contains('active'), n.getAttribute('aria-current')])`);
-        assert.deepEqual(items.map(i => i[0]), ['agents', 'hub-inbox', 'history', 'workflows', 'jobs', 'tokens', 'docs'], 'every view is listed');
+        assert.deepEqual(items.map(i => i[0]), ['agents', 'hub-inbox', 'workflows', 'jobs', 'tokens', 'docs'], 'every view is listed (Chats are the Inbox\'s folders on a local Coral, #7776)');
         assert.ok(items.every(i => i[1] >= 44), 'every item is at least 44 px tall');
         assert.deepEqual(items.filter(i => i[2]).map(i => i[0]), ['agents'], 'the current view is marked');
         const box = await ev(`(() => { const m = document.getElementById('nav-more-menu').getBoundingClientRect(), b = document.getElementById('nav-select').getBoundingClientRect(); return { top: m.top, bottom: m.bottom, left: m.left, right: m.right, btnBottom: b.bottom, h: innerHeight }; })()`);

@@ -45,6 +45,7 @@ const STUB = `(() => {
         return out; }`;
     const openTab = async tab => {
         await ev(`window.switchNavTab(${JSON.stringify(tab)}); true`);
+        if (tab === 'history') await require('./helpers/hub_chats').showHubChats(ev); // the hub's Chats list: a local Coral's Chats are the Inbox's folders (#7776)
         await waitFor(`!document.querySelector('${pane(tab)}').hidden`, `the ${tab} pane`, 8000);
     };
     try {
@@ -151,13 +152,14 @@ const STUB = `(() => {
             // a chat from the table: its page has its own way back, a 17/700 title and who, when and how long under it
             await ev(`document.querySelector('#group-table-view .group-table-link').click(); true`);
             await waitFor(`document.getElementById('history-session-view').checkVisibility() && document.getElementById('history-back').checkVisibility()`, at + 'the chat opens with the way back', 8000);
-            assert.equal(await ev(`document.getElementById('history-back').textContent`), '\u2190 Today', at + 'back names the group');
+            assert.equal(await ev(`document.getElementById('history-back').textContent`), '\u2190 All chats', at + 'back names the Inbox folder it came from (a local Coral: #7776; the hub\'s way back names the day group)');
             assert.deepEqual(await ev(`(() => { const t = getComputedStyle(document.getElementById('history-session-title')); return [t.fontSize, t.fontWeight]; })()`), ['17px', '700'], at + "an item's title is 17/700");
             assert.match(await ev(`document.getElementById('history-session-meta').textContent`), /^Ada \u00b7 (today|just now|\d+ min ago)/, at + 'who and when under the title (the fixture is today at 12:00: within the hour after it the page says "N min ago", as it does for anything under an hour)');
             assert.deepEqual(await ev(`[...document.querySelectorAll('#history-session-view > .item-bar > .btn')].filter(b => b.getClientRects().length).map(b => b.textContent.trim() + (b.classList.contains('btn-primary') ? '*' : ''))`), ['Details', '+ Tag', 'Resume*'], at + "the chat's actions are its bar, the primary last");
             assert.equal(await ev(`document.querySelector('#history-session-view .history-title-row .btn:not(.mobile-history-back)') === null`), true, at + 'and none is beside the title');
             assert.equal(await ev(`(() => { const r = document.querySelector('#history-session-view > .item-bar').getBoundingClientRect(); return r.bottom <= innerHeight + 1; })()`), true, at + 'the bar is on screen');
             await shot(`sidebar-one-chat-${w}`);
+            // The way back to the table, the sidebar row's page and the group's chevron are the hub's Chats list (history_list.js, #7776): a local Coral's way back is the Inbox folder (mailbox_chats, inbox_one).
             await ev(`document.getElementById('history-back').click(); true`);
             await waitFor(`document.getElementById('group-table-view').checkVisibility()`, at + 'back is the table', 8000);
             // the same page from a sidebar row has the same way back; the chevron folds without opening a table
