@@ -81,7 +81,11 @@ export function showBoardChatTab(boardName) {
                 <button class="btn-nav board-select-btn board-icon-btn" data-on-click="board-chat-select" aria-label="Export messages" aria-pressed="false" title="Export: select messages to export as Markdown"><span class="material-icons" aria-hidden="true">download</span></button>
             </div>
             <div class="board-paused-banner" id="board-chat-paused-banner" style="display:none">Board reads are paused — agents cannot see new messages</div>
-            <div class="board-chat-messages" id="board-panel-msgs"></div>
+            <div class="board-chat-msgs-wrap">
+                <div id="board-chat-earlier-status" class="sr-only" role="status" aria-live="polite"></div><!-- #7762: "50 earlier messages loaded" -->
+                <div id="board-chat-loading" class="mb-earlier-loading" hidden aria-hidden="true">Loading earlier messages&hellip;</div>
+                <div class="board-chat-messages" id="board-panel-msgs"></div>
+            </div>
             <div class="board-chat-input-pane" id="board-chat-input-pane">
                 <div class="command-pane-body">
                     <div class="command-editor board-chat-editor-wrap">
@@ -220,12 +224,40 @@ function _trimBoardChatWindow(msgsEl) {
     _boardChatOffset += drop;
 }
 
+// Earlier messages load by themselves when the reader scrolls near the top (#7762, as the team page's Messages tab does): no button and no count. "Loading earlier messages..." floats over the
+// top of the list while a page is out (it takes no room, so nothing shifts), a screen reader hears how many were added, and "Start of the board" is the list's first line once the first message is loaded.
+let _boardChatEarlierBusy = false;
+
+function _sayBoardChatEarlier(text) {
+    const el = document.getElementById('board-chat-earlier-status');
+    if (el && el.textContent !== text) el.textContent = text;
+}
+
+function _setBoardChatLoading(on) {
+    const el = document.getElementById('board-chat-loading');
+    if (el && el.hidden === on) el.hidden = !on;
+    if (on) _sayBoardChatEarlier('Loading earlier messages\u2026');
+}
+
+/** A list the loaded messages do not fill has nothing to scroll: the page before loads without a scroll event. */
+function _fillBoardChatTop(msgsEl) {
+    if (msgsEl && msgsEl.clientHeight > 0 && _boardChatOffset > 0 && !_boardChatEarlierBusy && msgsEl.scrollHeight <= msgsEl.clientHeight + 80) _loadEarlierBoardChat();
+}
+
+function _wireBoardChatScroll(msgsEl) {
+    if (msgsEl._bcScrollWired) return;
+    msgsEl._bcScrollWired = true;
+    msgsEl.addEventListener('scroll', () => { if (msgsEl.scrollTop < 80 && _boardChatOffset > 0) _loadEarlierBoardChat(); }, { passive: true });
+}
+
 async function _loadEarlierBoardChat() {
-    if (!_activeBoardChat || _boardChatOffset <= 0 || !_boardChatMessages.length) return;
+    if (!_activeBoardChat || _boardChatOffset <= 0 || !_boardChatMessages.length || _boardChatEarlierBusy) return;
     const msgsEl = document.getElementById('board-panel-msgs');
     if (!msgsEl) return;
     const boardName = _activeBoardChat;
     const gen = _boardChatGen;
+    _boardChatEarlierBusy = true;
+    _setBoardChatLoading(true);
     try {
         const resp = await boardFetch(boardName, `/messages/all?limit=${_BOARD_CHAT_PAGE}&before_id=${encodeURIComponent(_boardChatMessages[0].id)}&format=dashboard`);
         if (!resp.ok) return;
@@ -237,6 +269,7 @@ async function _loadEarlierBoardChat() {
         // Save scroll height to preserve position after prepending
         const prevScrollHeight = msgsEl.scrollHeight;
 
+        const had = _boardChatMessages.length;
         const byId = new Map([...messages, ..._boardChatMessages].map(m => [m.id, m]));
         _boardChatMessages = [...byId.values()].sort((a, b) => a.id - b.id);
         _boardChatOffset = Number(data.before_count) || 0;
@@ -245,9 +278,17 @@ async function _loadEarlierBoardChat() {
 
         // Restore scroll position so user stays where they were
         msgsEl.scrollTop = msgsEl.scrollHeight - prevScrollHeight;
-    } catch { /* ignore */ }
+        const added = _boardChatMessages.length - had;
+        _sayBoardChatEarlier(added > 0 ? `${added} earlier message${added === 1 ? '' : 's'} loaded${_boardChatOffset <= 0 ? '. This is the start of the board' : ''}.` : '');
+    } catch { /* ignore */ } finally {
+        _boardChatEarlierBusy = false;
+        _setBoardChatLoading(false);
+        _fillBoardChatTop(msgsEl);
+    }
 }
 (window.__coral ||= {})._loadEarlierBoardChat = _loadEarlierBoardChat;
+/** Tests: how many messages the panel holds and how many of the board are not loaded yet. */
+(window.__coral ||= {}).boardChatCounts = () => ({ shown: _boardChatMessages.length, notLoaded: _boardChatOffset });
 
 /** An empty board says what to do next (#5989): tell the lead what to build, the agent named Orchestrator, else the board's first member; the compose box is focused by the caller. */
 function _emptyBoardLine() {
@@ -266,16 +307,9 @@ function _renderBoardPanelMessages(msgsEl, scrollToBottom) {
     }
     const wasAtBottom = scrollToBottom || msgsEl.scrollTop >= msgsEl.scrollHeight - msgsEl.clientHeight - 20;
 
-    // "Load Earlier" button
-    let loadEarlierHtml = '';
-    if (_boardChatOffset > 0) {
-        const remaining = _boardChatOffset;
-        loadEarlierHtml = `<div style="text-align:center;padding:6px 0 8px">
-            <button class="btn btn-small" data-on-click="board-chat-earlier" style="font-size:0.6875rem;color:var(--text-muted)">
-                ▲ Load ${Math.min(remaining, _BOARD_CHAT_PAGE)} earlier (${remaining} remaining)
-            </button>
-        </div>`;
-    }
+    // No "Load earlier" button or count (#7762): earlier messages load on scroll-up. Once the board's first message is loaded, a quiet line says so.
+    const loadEarlierHtml = _boardChatOffset <= 0 ? '<div class="mb-earlier-line">Start of the board</div>' : '';
+    _wireBoardChatScroll(msgsEl);
 
     // Runs of task-queue lines are one collapsed row (#3343), except in select mode.
     const items = groupTaskQueueRuns(messages, !_boardChatSelectMode);
@@ -309,6 +343,7 @@ function _renderBoardPanelMessages(msgsEl, scrollToBottom) {
     resolveBoardArtifacts(msgsEl, _activeBoardChat ? splitKey(_activeBoardChat).server : undefined);
     if (wasAtBottom) msgsEl.scrollTop = msgsEl.scrollHeight;
     msgsEl.dataset.rendered = '1';
+    _fillBoardChatTop(msgsEl);
     // Update select bar if in select mode
     if (_boardChatSelectMode) _updateBoardChatSelectBar();
 }

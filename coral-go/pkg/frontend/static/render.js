@@ -432,7 +432,6 @@ registerActions({
     'board-chat-key': (el, event) => { if (_boardMentionKey(event)) return; if (event.key === 'Enter' && !event.isComposing && (!event.shiftKey || event.ctrlKey || event.metaKey)) { event.preventDefault(); const b = textOf(el.dataset.board); if (b) window.__coral._sendBoardChat(b); } },
     'board-chat-mention': (el, event) => { const b = textOf(el.dataset.board); if (b) _boardMentionInput(event, b); },
     'board-mention-pick': (el, event) => { event.preventDefault(); const n = textOf(el.dataset.name); if (n) _insertBoardMention(n); },
-    'board-chat-earlier': () => window.__coral._loadEarlierBoardChat(),
     'board-chat-msg-select': el => { const id = idOf(el.dataset.msgId); if (id) _toggleBoardChatMsgSelect(id, el.checked); },
     'board-chat-select-all': () => _boardChatSelectAll(),
     'board-chat-select-none': () => _boardChatSelectNone(),

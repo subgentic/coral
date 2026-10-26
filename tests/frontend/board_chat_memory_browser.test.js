@@ -99,8 +99,8 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         const total = await ev(`window.__board4318.total`);
         check('(B) the panel received every message up to the newest', total === 1200 && (await ev(`[...document.querySelectorAll('#board-panel-msgs .mb-message-body')].at(-1)?.textContent.startsWith('Message 1200:')`)), String(total));
         check('(B) it keeps a window of the newest messages, not all 1,200', n >= 300 && n <= 350, `${n} shown`);
-        const earlier = await ev(`document.querySelector('#board-panel-msgs [data-on-click="board-chat-earlier"]')?.textContent.trim() || ''`);
-        check('(B) "Load earlier" counts the rest', earlier.includes(`(${1200 - n} remaining)`), earlier);
+        const counts = await ev(`window.__coral.boardChatCounts()`);
+        check('(B) the rest are not loaded, and the panel has no "Load earlier" button or count (#7762)', counts.notLoaded === 1200 - n && (await ev(`document.querySelectorAll('#board-panel-msgs [data-on-click="board-chat-earlier"], #board-panel-msgs .mb-load-earlier').length`)) === 0 && !(await ev(`document.getElementById('board-panel-msgs').textContent`)).match(/Load \d+ earlier|remaining\)/), JSON.stringify(counts));
         check('(B) its DOM stays bounded while 1,140 more messages arrive', b1.nodes - b0.nodes < 8000, `${b0.nodes} -> ${b1.nodes} nodes`);
         check('(B) and so does its heap', b1.heap - b0.heap < 10, `${b0.heap.toFixed(1)} -> ${b1.heap.toFixed(1)} MB`);
 
@@ -108,7 +108,7 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         // (A hidden panel has no scroll position and counts as at the bottom: shown here, on top of the page.)
         const scrolls = await ev(`(() => { const p = document.getElementById('agentic-panel-board'); document.body.appendChild(p);
             p.style.cssText = 'display:block;position:fixed;left:0;top:0;width:420px;height:320px;z-index:99999;background:#fff';
-            const el = document.getElementById('board-panel-msgs'); el.style.height = '200px'; el.style.overflow = 'auto'; el.scrollTop = 0;
+            const el = document.getElementById('board-panel-msgs'); el.parentElement.style.height = '200px'; el.style.overflow = 'auto'; // the list's wrapper is what the panel's column gives its height to (#7762) el.scrollTop = 150; // reading higher up, but not at the very top: the top loads earlier messages (#7762)
             return el.scrollHeight > el.clientHeight; })()`);
         check('(B) the shown panel scrolls', scrolls);
         // Fed by the panel's own poll (every 3 s): showing the tab again would scroll it to the bottom.
@@ -120,10 +120,23 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         const top = await ev(`document.getElementById('board-panel-msgs').scrollTop`);
         check('(B) scrolled up, new messages are added and none is dropped', after === before + 60 && top < 50, `${before} -> ${after}, scrollTop ${top}`);
 
-        // "Load earlier" brings older ones back.
-        await ev(`document.querySelector('#board-panel-msgs [data-on-click="board-chat-earlier"]').click()`);
+        // Scrolling to the top brings older ones back by itself (#7762): no button; "Loading earlier messages..." floats over the list while it loads, the row at the top stays put, a screen reader is told.
+        await ev(`new Promise(r => { document.getElementById('board-panel-msgs').scrollTop = 300; setTimeout(() => r(true), 150); })`); // away from the top first: a scroll event needs a change
+        const row0 = await ev(`(() => { const el = document.getElementById('board-panel-msgs'); el.scrollTop = 0; const r = el.querySelector('.mb-message'); return { id: r.querySelector('.mb-message-body').textContent.slice(0, 14), y: r.getBoundingClientRect().top }; })()`); // at the top: the scroll event, and the load, come after this read
         await waitFor(`${shown} === ${after + 50}`, 'an earlier page', { timeout: 5000, soft: true });
-        check('(B) "Load earlier" brings back a page of the older messages', (await ev(shown)) === after + 50, String(await ev(shown)));
+        check('(B) scrolling to the top brings back a page of the older messages', (await ev(shown)) === after + 50, String(await ev(shown)));
+        const row1 = await ev(`(() => { const r = [...document.querySelectorAll('#board-panel-msgs .mb-message')].find(x => x.querySelector('.mb-message-body').textContent.startsWith(${JSON.stringify(row0.id)})); return r ? r.getBoundingClientRect().top : null; })()`);
+        check('(B) the row that was at the top stays where it was', row1 !== null && Math.abs(row1 - row0.y) < 40, `${row0.y} -> ${row1}`);
+        check('(B) a screen reader hears it, and the loading line is gone', (await ev(`document.getElementById('board-chat-earlier-status').textContent`)) === '50 earlier messages loaded.' && (await ev(`document.getElementById('board-chat-loading').hidden`)) === true);
+        // the floating "Loading earlier messages..." (the board's and the panel's one class) reads at 4.5:1 or more in both themes (computed style: a hidden element has one)
+        const contrast = await ev(`(() => {
+            const lum = c => { const [r, g, b] = c.match(/[\\d.]+/g).slice(0, 3).map(Number).map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+            const out = {}; const html = document.documentElement; const was = html.getAttribute('data-theme');
+            for (const t of ['dark', 'light']) { html.setAttribute('data-theme', t); const cs = getComputedStyle(document.getElementById('board-chat-loading')); const a = lum(cs.color), b = lum(cs.backgroundColor); out[t] = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05); }
+            if (was === null) html.removeAttribute('data-theme'); else html.setAttribute('data-theme', was);
+            return out; })()`);
+        check('(B) the loading line has 4.5:1 contrast in both themes', contrast.dark >= 4.5 && contrast.light >= 4.5, JSON.stringify(contrast));
+        check('(B) the panel has no count line either', (await ev(`document.querySelectorAll('#board-panel-msgs .mb-message-count').length`)) === 0);
     } catch (e) {
         check('no exception', false, e.message);
     } finally {

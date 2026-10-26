@@ -31,7 +31,6 @@
 1	board_chat.js	hubUserBadge(m)
 1	board_chat.js	messageAttachmentAttrs(m)
 1	board_chat.js	messageAttachmentsHtml(m)
-1	board_chat.js	remaining
 1	board_chat.js	renderBoardMessageBody(m)
 1	board_chat.js	selectedClass
 1	board_chat.js	spacing

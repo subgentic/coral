@@ -469,20 +469,6 @@
       }
     },
     {
-      "id": "board/action/board-chat-earlier",
-      "tab": "board",
-      "kind": "action",
-      "what": "click -> board-chat-earlier",
-      "action": "board-chat-earlier",
-      "source": "static/board_chat.js:274",
-      "status": "moved",
-      "newHome": "team page: Messages tab (the board's own column, message_board.js): Earlier messages (mb-earlier)",
-      "proof": {
-        "file": "static/message_board.js",
-        "needle": "'mb-earlier'"
-      }
-    },
-    {
       "id": "board/action/board-chat-msg-select",
       "tab": "board",
       "kind": "action",

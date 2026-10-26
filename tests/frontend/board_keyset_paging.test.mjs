@@ -141,7 +141,8 @@ assert.equal(query(chatPages[0]).get('offset'), '0', 'the chat panel loads its l
 window.__coral._loadEarlierBoardChat();
 for (let i = 0; i < 3; i++) await settle();
 assert.equal(query(requests.at(-1)).get('before_id'), String(board.at(-50).id), 'chat panel loads earlier by id');
-assert.match(document.getElementById('board-panel-msgs').textContent, new RegExp(`${board.length - 100} remaining`));
+assert.equal(window.__coral.boardChatCounts().notLoaded, board.length - 100, 'the rest are not loaded');
+assert.doesNotMatch(document.getElementById('board-panel-msgs').textContent, /remaining|Load \d+ earlier/, 'the panel has no button or count (#7762)');
 
 // The panel's poll asks only for what follows its newest message (#3722).
 const panelIds = () => [...document.querySelectorAll('#board-panel-msgs .mb-message')].length;
