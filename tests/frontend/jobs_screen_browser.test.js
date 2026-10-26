@@ -45,6 +45,12 @@ const S = `(window.__coralStatic || '/static/')`;
             await ev(`window.switchNavTab('jobs'); true`);
             await waitFor(`document.querySelectorAll('#scheduled-jobs-list .sched-row').length === 3`, `${at}: the three jobs listed at once`, 8000);
 
+            if (!mobile) {
+                await waitFor(`document.querySelectorAll('#group-table-view .dt-chip').length >= 3`, at + 'status chips in group tables', 4000);
+                assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view .dt-chip')].map(e => e.textContent)`), ['last run failed', 'last run passed', 'Paused'], at + 'failed, passed and paused use the shared chips');
+                assert.equal(await ev(`document.querySelectorAll('#group-table-view .dt-chip .goal-dot[aria-hidden="true"]').length`), 3, at + 'words convey state; dots are decorative');
+                await shot('jobs-state-chips');
+            }
             console.log(`${at}: one list, every job, in words`);
             assert.equal(await ev(`document.querySelectorAll('.sidebar-subtab').length`), 0, `${at}: no Active / Scheduled tabs`);
             assert.equal(await ev(`/No active jobs/.test(document.querySelector('[data-section="jobs"]').textContent)`), false, `${at}: nothing says "No active jobs" over jobs that exist`);

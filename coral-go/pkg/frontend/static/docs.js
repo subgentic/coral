@@ -49,7 +49,7 @@ registerGroupSource('docs', {
                 label: `${g.label} topics, ${g.docs.length}`, rows: g.docs,
                 rowKey: d => d.name, rowName: titleOf, state: docTableStates.get(key),
                 open: d => selectDoc(d.name, { focusHeading: true }),
-                columns: [{ key: 'doc-name', label: 'Topic', primary: true, width: 'grow', line: 1, sort: true, sortValue: titleOf, cell: d => DT.primaryButton(titleOf(d)) }],
+                columns: [{ key: 'doc-name', label: 'Topic', primary: true, width: 'grow', line: 1, sort: true, sortValue: titleOf, cell: d => DT.primaryButton(titleOf(d)), subtitle: d => String(d.summary || '').trim() }],
             }).el,
             extra: { action: 'docs-copy-agent-line', label: 'Copy docs line for agents', icon: 'content_copy', title: 'Copies one line you can paste to an agent so it can read these docs' },
         };

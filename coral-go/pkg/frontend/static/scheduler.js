@@ -97,9 +97,14 @@ registerGroupSource('jobs', {
                 columns: [
                     { key: 'job', label: 'Job', field: 'name', primary: true, width: 'grow', line: 1, sort: true, cell: job => DT.primaryButton(job.name) },
                     { key: 'schedule', label: 'Schedule', width: '12rem', line: 2, sort: true, sortValue: scheduleOf, cell: scheduleOf },
-                    { key: 'last-run', label: 'Last run', width: '9rem', line: 2, tone: 'tertiary', sort: 'date', sortValue: job => job.last_run?.started_at, cell: job => lastWords(job.last_run) },
+                    { key: 'last-run', label: 'Last run', width: '9rem', line: 2, tone: 'tertiary', sort: 'date', sortValue: job => job.last_run?.started_at, cell: job => {
+                        const run = job.last_run;
+                        if (!run) return lastWords(run);
+                        const cls = run.status === 'failed' ? 'goal-state-task-blocked' : run.status === 'running' ? 'goal-state-task-active' : run.status === 'completed' && run.exit_reason !== 'ended_while_coral_was_down' ? 'goal-state-task-done' : '';
+                        return DT.chip(lastWords(run), cls);
+                    } },
                     { key: 'next', label: 'Next', width: '7rem', line: 1, tone: 'tertiary', sort: 'date', sortValue: job => job.enabled ? job.next_fire_at : '', cell: job => {
-                        const cell = DT.el('span', 'dt-time', nextOf(job));
+                        const cell = job.enabled ? DT.el('span', 'dt-time', nextOf(job)) : DT.chip('Paused');
                         if (job.enabled && job.next_fire_at) cell.title = `Next run ${atWords(job.next_fire_at)} your time`;
                         return cell;
                     } },

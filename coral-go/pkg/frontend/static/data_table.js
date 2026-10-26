@@ -26,7 +26,8 @@ export function primaryButton(text, label) {
 /** A state as a dot and a word (the dot is decoration: the word says it). */
 export function chip(word, cls) {
     const c = el('span', `dt-chip goal-chip ${cls || ''}`.trim());
-    c.append(el('span', 'goal-dot'), document.createTextNode(word));
+    const dot = el('span', 'goal-dot'); dot.setAttribute('aria-hidden', 'true');
+    c.append(dot, document.createTextNode(word));
     return c;
 }
 export function tag(text) { return el('span', 'dt-tag', text); }

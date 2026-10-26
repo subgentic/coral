@@ -89,6 +89,9 @@ const BASE = require('./test_base').BASE;
             assert.deepEqual(await ev(`(() => { const t = getComputedStyle(document.querySelector('#group-table-title')), c = getComputedStyle(document.querySelector('#group-table-view .group-table-head .session-group-count')); return [t.fontSize, t.fontWeight, c.fontSize, c.fontWeight]; })()`), ['20px', '700', '11px', '600'], at + "the title is 20/700 and its count 11/600");
             assert.deepEqual(await ev(`(${ON_SCALE})(document.getElementById('group-table-view'), ${SCALE})`), [], at + 'every text of the topics table is on the scale');
             assert.deepEqual(await ev(`(() => { const b = document.querySelector('#group-table-view .group-table-head .group-table-extra'); return b ? [b.textContent.trim(), b.classList.contains('btn')] : null; })()`), ['content_copy Copy docs line for agents', true], at + 'Copy docs line for agents is a normal button in the table\'s head too');
+            const subtitles = await ev(`(() => { const xs = [...document.querySelectorAll('#group-table-view .dt-subtitle')]; return xs.map(e => ({text: e.textContent, size: getComputedStyle(e).fontSize, weight: getComputedStyle(e).fontWeight})); })()`);
+            assert.ok(subtitles.length > 0, at + 'real API topics include summary subtitles');
+            assert.ok(subtitles.every(s => s.text.trim() && !s.text.includes(String.fromCharCode(10)) && s.size === '12px' && s.weight === '400'), at + 'subtitles are one line at 12/400');
             await shot(`docs-one-table-${w}`);
 
             // a topic: the page, its way back, the document at its reading scale, and the copy button in the header
