@@ -26,6 +26,7 @@ const rel = f => path.relative(st, f);
 // name -> reason. Add a name only with the reason it is used in a way this scan cannot see.
 export const ALLOW = new Map([
     ['mountSettingsView', 'settings_view.js (#7744) has no product caller until its first surface is converted (step 1: the team page\'s Settings tab); settings_view_browser imports the module by URL. Remove this entry in that commit.'],
+    ['mountSelection', 'the toolbar\'s place for the selection bar of data_table (#7743, Frontend Dev builds it on this contract); team_toolbar_browser drives it by URL until that table is built'],
     ['__coralReady', 'the suites wait on it (ready.js): a promise-like with the page\'s startup parts, in 117 suites and the harness preload'],
     ['__coralTest', 'the namespace test_hooks.js installs when the page\'s boot data asks for it (dev build, CORAL_TEST_HOOKS=1)'],
     ['_resetForTests', 'artifact_readers.js remembers once per page whether this person may see who can read an artifact; the suite forgets it between its cases'],

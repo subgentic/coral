@@ -913,6 +913,8 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .gt-toolbar { display: flex; flex-wrap: nowrap; align-items: center; gap: 8px; margin: 0 0 var(--space-lg); container-type: inline-size; }
 .gt-toolbar .list-bar-search-wrap { flex: 0 1 28em; min-width: 8em; } /* one width in every group of a tab (the Inbox's Saved has chips beside it, Needs you and Tasks do not): the box does not jump when the group changes (QA's finding 2) */
 .gt-toolbar .gt-menu { margin-left: auto; }
+.gt-toolbar.team-toolbar-selecting > :is(.group-table-chips, .gt-menu, .team-tb-action) { display: none !important; } /* the selection bar replaces the line's controls (#7743) */
+.gt-toolbar .team-tb-selection { flex: 1 1 auto; display: flex; align-items: center; gap: 8px; min-width: 0; }
 .gt-toolbar .gt-menu + .team-tb-action { margin-left: 0; }
 .gt-toolbar .list-bar-search { min-height: 32px; width: 100%; box-sizing: border-box; }
 .gt-toolbar .group-table-chips { flex: 0 0 auto; margin: 0; }
