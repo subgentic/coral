@@ -334,3 +334,10 @@
     .inbox-folder-toolbar .list-bar-toggle { order: 2; }
 }
 
+/* The Inbox's Artifacts folder (Goal #62): the list and, to its right, the document pane (a sheet over the page on a phone, like the team page's) */
+.inbox-artifacts-row { display: flex; align-items: flex-start; gap: var(--space-xl); min-width: 0; }
+.inbox-artifacts-main { flex: 1 1 0; min-width: 0; }
+.inbox-artifacts-list .goals-table-page { padding: 0; } /* the group page has its own padding */
+@media (min-width: 761px) {
+    .inbox-artifacts-row > .inbox-detail-pane { position: sticky; top: 0; align-self: flex-start; max-height: calc(100vh - 7rem); border: 1px solid var(--border); border-radius: var(--radius-lg); }
+}
