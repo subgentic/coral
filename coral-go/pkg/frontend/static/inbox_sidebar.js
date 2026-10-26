@@ -21,6 +21,8 @@ import { setHidden } from './dom_write.js';
 import { onViewShown } from './view_switch.js';
 import { importOnce } from './import_once.js';
 import { onInboxHooks, setInboxCount, askOf } from './inbox_tab.js';
+import { note, currentRoute } from './nav.js';
+import { parse as parseRoute, inboxFolderPath } from './routes.js';
 const { coralInboxAdapter, savedExpandFor } = await importOnce('./inbox_coral.js');
 const saved = await importOnce('./saved.js');
 const DT = await importOnce('./data_table.js'); // the one table (#7743): the Tasks group's page is its Tasks columns
@@ -245,7 +247,17 @@ let _navKey = null, _folders = null, _poll = 0;
 function pickFolder(key) {
     if (page) closePage(false);
     setGroup(key);
+    noteFolder(key);
     openGroupTable('hub-inbox', key, { focus: true });
+}
+/** The address follows the folder (#8652): /inbox/<folder>, so a link, Back and a reload keep it. Goals, Tasks and Board history are other page families' paths (#8571, #8633) where this build has them. A folder that has no path (the route
+ *  parser does not know it) leaves the address as it is; the old /chats address is replaced by the folder's, not stacked under it (Back would otherwise come back to it and rewrite it). */
+function noteFolder(key) {
+    if (document.body.getAttribute('data-nav-tab') !== 'hub-inbox') return;
+    const path = inboxFolderPath(key), route = path ? parseRoute(path) : null;
+    if (!route) return;
+    const cur = currentRoute();
+    note(route, { replace: !!cur && cur.view === 'chats' });
 }
 /** The folders in the sidebar. Only drawn when a count or the current folder changed (this runs for every message of the feed). */
 function renderInboxNav(force = false) {
@@ -560,6 +572,7 @@ export async function showInbox({ folder = '', quiet = false } = {}) {
     if (page) { if (isPhoneLayout()) $('inbox-view')?.setAttribute('data-phone-item', ''); return; } // a saved message is open: the tab returns to it
     $('inbox-view')?.removeAttribute('data-phone-item');
     if (document.body.getAttribute('data-nav-tab') !== 'hub-inbox') return; // the module arrived after the person had moved on (a notification's click, a chosen agent): its table must not cover that
+    noteFolder(group);
     openGroupTable('hub-inbox', group); // a phone too: the table has the folders' select on top
 }
 
@@ -573,6 +586,7 @@ export async function openInboxGroup(name) {
     page = null;
     $('inbox-page') && ($('inbox-page').hidden = true);
     setGroup(name);
+    noteFolder(name);
     openGroupTable('hub-inbox', name);
 }
 

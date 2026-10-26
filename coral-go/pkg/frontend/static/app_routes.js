@@ -79,6 +79,11 @@ function registerRouteHandlers() {
         await applyTeamRoute(routeKey(r), r.sub || 'goals', r.item || 0, r.query || ''); // the team page (#7453); /team/<name> is its Goals tab
     });
 
+    route('inbox-folder', async r => { // /inbox/<folder> (#8652): the Inbox on that folder; the address stays (the folder notes the same route)
+        await liveListReady;
+        switchNavTab('hub-inbox', { fromHistory: true, folder: r.folder });
+    });
+
     route('board', async r => { // the old board page is gone (#8061): /board/<team> opens the team page's Messages tab, in its place in the history
         await liveListReady;
         switchNavTab('agents', { fromHistory: true });

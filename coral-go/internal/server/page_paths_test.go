@@ -20,6 +20,7 @@ var pageSamples = map[string]string{
 	"/chats/*":     "/chats/42",
 	"/team/*":      "/team/@m2/coral-go-team/settings",
 	"/board/*":     "/board/%40odd",
+	"/inbox/*":     "/inbox/chats-starred",
 	"/workflows":   "/workflows",
 	"/workflows/*": "/workflows/7/runs/3",
 	"/jobs":        "/jobs",
@@ -68,7 +69,7 @@ func TestDashboardPagePathsServeTheShell(t *testing.T) {
 		post, _ := pageGet(t, c, "POST", ts.URL+sample)
 		assert.Equal(t, rootPost.StatusCode, post.StatusCode, "%s: POST answers as on /", sample)
 	}
-	for _, miss := range []string{"/api/nope-3532", "/ws/nope", "/auth/nope", "/static/missing-3532.js", "/random-3532", "/agentsx", "/chat/x", "/history"} {
+	for _, miss := range []string{"/api/nope-3532", "/ws/nope", "/auth/nope", "/static/missing-3532.js", "/random-3532", "/inbox", "/agentsx", "/chat/x", "/history"} {
 		resp, _ := pageGet(t, c, "GET", ts.URL+miss)
 		assert.False(t, resp.StatusCode == 200 && strings.HasPrefix(resp.Header.Get("Content-Type"), "text/html"), "%s must not get the shell (%d %s)", miss, resp.StatusCode, resp.Header.Get("Content-Type"))
 	}

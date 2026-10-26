@@ -3,7 +3,7 @@
 // coral-hub Security's condition): a crafted path never becomes a route, so no /api path is
 // built from it.
 import assert from 'node:assert/strict';
-import { parse, build, fromLegacyHash, valid, normalize, chatsQuery } from '../../coral-go/pkg/frontend/static/routes.js';
+import { parse, build, fromLegacyHash, valid, normalize, chatsQuery, inboxFolderPath } from '../../coral-go/pkg/frontend/static/routes.js';
 
 const S = '6f9a3c1e-0000-4000-8000-000000000001';
 const rt = (path, route) => {
@@ -28,11 +28,26 @@ rt('/team/m2/settings', { view: 'team', server: null, id: 'm2', sub: 'settings' 
 rt('/team/%40m2/settings', { view: 'team', server: null, id: '@m2', sub: 'settings' });
 rt('/team/a%2Fb', { view: 'team', server: null, id: 'a/b', sub: null });
 // The team page's tabs and its item pages (#7453)
-for (const tab of ['goals', 'messages', 'tasks', 'agents', 'artifacts', 'knowledge', 'settings']) rt(`/team/qa/${tab}`, { view: 'team', server: null, id: 'qa', sub: tab });
+for (const tab of ['goals', 'tasks', 'agents', 'artifacts', 'knowledge', 'settings']) rt(`/team/qa/${tab}`, { view: 'team', server: null, id: 'qa', sub: tab });
+// The Board tab's path word is board; the page still names it messages, and the old /messages address reads as the same tab (#8652)
+rt('/team/qa/board', { view: 'team', server: null, id: 'qa', sub: 'messages' });
+assert.deepEqual(parse('/team/qa/messages'), { view: 'team', server: null, id: 'qa', sub: 'messages' }, 'the old address is the Board tab');
+assert.equal(build(parse('/team/qa/messages')), '/team/qa/board', 'and is written as /board');
 rt('/team/@m2/qa/goals/12', { view: 'team', server: 'm2', id: 'qa', sub: 'goals', item: 12 });
 rt('/team/qa/tasks/7', { view: 'team', server: null, id: 'qa', sub: 'tasks', item: 7 });
-rt('/team/qa/messages/104094', { view: 'team', server: null, id: 'qa', sub: 'messages', item: 104094 }); // a message of the Board tab (#7921)
-for (const bad of ['/team/qa/goals/0', '/team/qa/goals/x', '/team/qa/goals/12/y', '/team/qa/settings/3', '/team/qa/agents/3', '/team/qa/files']) assert.equal(parse(bad), null, bad);
+rt('/team/qa/board/104094', { view: 'team', server: null, id: 'qa', sub: 'messages', item: 104094 }); // a message of the Board tab (#7921)
+assert.deepEqual(parse('/team/qa/messages/104094'), { view: 'team', server: null, id: 'qa', sub: 'messages', item: 104094 }, 'a message link of the old address still opens it');
+for (const bad of ['/team/qa/goals/0', '/team/qa/goals/x', '/team/qa/goals/12/y', '/team/qa/settings/3', '/team/qa/agents/3', '/team/qa/files', '/team/qa/board/0', '/team/qa/board/x']) assert.equal(parse(bad), null, bad);
+// The Inbox folders' pages (#8652): needs, saved and the chat folders; goals, tasks and boards belong to other page families, a bare /inbox to Coral Hub
+rt('/inbox/needs', { view: 'inbox-folder', folder: 'needs' });
+rt('/inbox/saved', { view: 'inbox-folder', folder: 'saved' });
+rt('/inbox/chats/all', { view: 'inbox-folder', folder: 'chats' });
+for (const f of ['active', 'starred', 'notes', 'archived', 'cli-claude', 'cli-agy', 'tag-7']) rt(`/inbox/chats/${f}`, { view: 'inbox-folder', folder: `chats-${f}` });
+assert.deepEqual(parse('/inbox/chats'), { view: 'inbox-folder', folder: 'chats' }, 'a bare /inbox/chats is All chats');
+assert.equal(build(parse('/inbox/chats')), '/inbox/chats/all', 'and is written in full');
+for (const bad of ['/inbox', '/inbox/', '/inbox/other', '/inbox/needs/x', '/inbox/saved/1', '/inbox/chats/nonsense', '/inbox/chats/tag-0', '/inbox/chats/cli-', '/inbox/chats/cli-Claude', '/inbox/chats/all/x', '/inbox/chats-group']) assert.equal(parse(bad), null, bad);
+assert.equal(inboxFolderPath('needs'), '/inbox/needs'); assert.equal(inboxFolderPath('chats-cli-codex'), '/inbox/chats/cli-codex'); assert.equal(inboxFolderPath('chats-group'), '/inbox/boards'); assert.equal(inboxFolderPath('nope'), '', 'a folder with no path');
+assert.equal(valid({ view: 'inbox-folder', folder: 'saved' }), true); assert.equal(valid({ view: 'inbox-folder', folder: 'goals' }), false, 'goals is not this family');
 rt('/board/@m2/qa', { view: 'board', server: 'm2', id: 'qa' });
 rt('/workflows', { view: 'workflows' });
 rt('/workflows/7', { view: 'workflows', id: 7 });
