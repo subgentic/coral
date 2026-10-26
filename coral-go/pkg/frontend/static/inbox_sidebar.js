@@ -79,6 +79,7 @@ function inboxTaskToolbar() {
             if (input && group === 'tasks') input.value = next.q;
             renderInboxNav(true);
         });
+        taskBar.node.classList.add('inbox-tasks-toolbar');
         taskBar.node.querySelector('.list-bar-search-row').classList.add('gt-toolbar');
     }
     taskBar.set({ ...taskFilters, q: queries.tasks });
