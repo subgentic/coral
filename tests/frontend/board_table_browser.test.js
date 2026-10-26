@@ -122,7 +122,7 @@ const BASE = require('./test_base').BASE;
         console.log('7. Copy link is the message\'s own address, and opening it lands on the message');
         const link = await ev(`(() => { let got = ''; Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async t => { got = t; } } }); document.querySelectorAll('#mb-messages > .mb-message')[0].querySelectorAll('.mb-row-actions button').forEach(b => { if (b.textContent === 'Copy link') b.click(); }); return new Promise(r => setTimeout(() => r(got), 200)); })()`);
         const first = await ev(`document.querySelectorAll('#mb-messages > .mb-message')[0].dataset.messageId`);
-        assert.ok(link.endsWith(`/team/${B}/messages/${first}`), 'the link: ' + link);
+        assert.ok(link.endsWith(`/team/${B}/board/${first}`), 'the link: ' + link);
         await open(1280, 800, false, 'dark', 'table', `/team/${B}/messages/${qid}`);
         await waitFor(`document.querySelector('#mb-messages > .mb-message[data-message-id="${qid}"].mb-open')`, 'the linked message opens', 10000);
 

@@ -77,7 +77,7 @@ export function switchNavTab(tab, opts = {}) {
         // The hub's /inbox page in a frame where the hub serves the dashboard, the dashboard's own Inbox (Needs you, Saved for later) on every other Coral (#4811); the tab writes no address of its own.
         const chatOpen = chatsInInbox && state.currentSession && state.currentSession.type === 'history';
         showView(chatOpen ? 'history-session-view' : 'inbox-view');
-        importOnce('./inbox_tab.js').then(m => m.showInboxTabContent(chatsInInbox ? { folder: opts.folder || (state.inboxFolder && state.inboxFolder.key) || 'chats', quiet: chatOpen } : {}));
+        importOnce('./inbox_tab.js').then(m => m.showInboxTabContent(chatsInInbox ? { folder: opts.folder || (state.inboxFolder && state.inboxFolder.key) || 'chats', quiet: chatOpen } : { folder: opts.folder || '' }));
     } else if (tab === 'artifacts') {
         // The hub's /artifacts page in a frame (artifacts_tab.js), the Inbox's way; the tab writes no address of its own.
         showView('artifacts-view');

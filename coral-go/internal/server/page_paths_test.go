@@ -20,6 +20,7 @@ var pageSamples = map[string]string{
 	"/inbox/boards/*": "/inbox/boards/release-team",
 	"/inbox/goals":    "/inbox/goals",
 	"/inbox/goals/*":  "/inbox/goals/release-team/17",
+	"/inbox/*":        "/inbox/chats/starred",
 	"/agents":         "/agents",
 	"/agents/*":       "/agents/@m2/6f9a3c1e-0000-4000-8000-000000000001/files",
 	"/chats":          "/chats?q=battle&page=2",
@@ -74,7 +75,7 @@ func TestDashboardPagePathsServeTheShell(t *testing.T) {
 		post, _ := pageGet(t, c, "POST", ts.URL+sample)
 		assert.Equal(t, rootPost.StatusCode, post.StatusCode, "%s: POST answers as on /", sample)
 	}
-	for _, miss := range []string{"/api/nope-3532", "/ws/nope", "/auth/nope", "/static/missing-3532.js", "/random-3532", "/agentsx", "/chat/x", "/history"} {
+	for _, miss := range []string{"/api/nope-3532", "/ws/nope", "/auth/nope", "/static/missing-3532.js", "/random-3532", "/inbox", "/agentsx", "/chat/x", "/history"} {
 		resp, _ := pageGet(t, c, "GET", ts.URL+miss)
 		assert.False(t, resp.StatusCode == 200 && strings.HasPrefix(resp.Header.Get("Content-Type"), "text/html"), "%s must not get the shell (%d %s)", miss, resp.StatusCode, resp.Header.Get("Content-Type"))
 	}

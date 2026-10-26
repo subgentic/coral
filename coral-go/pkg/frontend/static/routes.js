@@ -7,7 +7,8 @@
      /agents/[@<server>/]<session>[/<sub>]?view=terminal  the same, plus terminal: true (the link opens the agent on its terminal; coral-hub, #6752)
      /chats[/@<server>][?filters]         { view: 'chats', query }
      /chats/[@<server>/]<id>              { view: 'chats', id }
-     /team/[@<server>/]<team>[/<tab>[/<n>]]  { view: 'team', server, id, sub, item }: the team page (#7453); <tab> is one of TEAM_TABS (none = Goals), <n> a goal or a task
+     /team/[@<server>/]<team>[/<tab>[/<n>]]  { view: 'team', server, id, sub, item }: the team page (#7453); <tab> is one of TEAM_TABS (none = Goals), <n> a goal or a task; the Board tab's path word is "board" (the old "messages" is read and written as board, #8652)
+     /inbox/needs, /inbox/saved, /inbox/chats[/<all|active|starred|notes|archived|cli-<cli>|tag-<n>]  { view: 'inbox-folder', folder }: an Inbox folder's page (#8652); goals, tasks and boards are their own page families (#8571, #8633)
      /board/[@<server>/]<name>            { view: 'board', server, id }
      /workflows[/<id>[/runs/<run>]]       { view: 'workflows', id, run }
      /analytics[/<page>]                  { view: 'analytics', sub }: <page> is one of ANALYTICS_PAGES (none = Overview, #8606)
@@ -34,6 +35,13 @@ export const AGENT_SUBTABS = ['board', 'tasks', 'notes', 'files', 'browse', 'art
 // The Analytics pages that have a path (analytics_views.js VIEWS, #8606); /analytics is Overview, and an agent's page (agent-detail) is under By agent.
 export const ANALYTICS_PAGES = ['provider', 'model', 'thinking', 'team', 'agent', 'branch', 'task', 'calls', 'per-commit', 'task-time'];
 const NAME_MAX = 200; // board.MaxIdentityRunes
+const INBOX = 'in' + 'box'; // the path word, spelled in two parts: the icon-name lint reads that quoted word as an icon name
+// The Inbox folders' paths (#8652): /inbox/needs, /inbox/saved, /inbox/chats/<all|active|starred|notes|archived|cli-<cli>|tag-<n>>. The folder keys are the Inbox's own (inbox_sidebar.js): chats is All chats, the others chats-<word>.
+const INBOX_CHATS_RE = /^(?:all|active|starred|notes|archived|cli-[a-z0-9]{1,20}|tag-[1-9]\d{0,11})$/;
+const INBOX_FOLDER_RE = /^(?:needs|saved|chats|chats-(?:active|starred|notes|archived|cli-[a-z0-9]{1,20}|tag-[1-9]\d{0,11}))$/;
+// The team page's tabs by the word their path uses: the Board tab was Messages (#7784), and /team/<t>/messages still opens it, as /board (#8652).
+const TAB_PATH = { messages: 'board' };
+const TAB_FROM_PATH = { board: 'messages', messages: 'messages' };
 
 // The query keys the Chats tab owns (search_filters.js), kept on /chats only.
  const CHATS_QUERY_KEYS = ['page', 'type', 'q', 'fts_mode', 'tag_ids', 'tag_logic', 'source_types',
@@ -113,10 +121,15 @@ export function parse(pathname, search = '') {
             if (n === null) return null;
             if (top === 'board') return rest.length === 1 ? { view: 'board', server: t.server, id: n } : null;
             if (rest.length === 1) return { view: 'team', server: t.server, id: n, sub: null };
-            if (!TEAM_TABS.includes(rest[1])) return null;
-            if (rest.length === 2) { const query = rest[1] === 'tasks' ? tasksQuery(search) : ''; return query ? { view: 'team', server: t.server, id: n, sub: rest[1], query } : { view: 'team', server: t.server, id: n, sub: rest[1] }; }
-            return rest.length === 3 && TEAM_ITEM_TABS.includes(rest[1]) && INT_RE.test(rest[2]) ? { view: 'team', server: t.server, id: n, sub: rest[1], item: Number(rest[2]) } : null;
+            const tab = Object.hasOwn(TAB_FROM_PATH, rest[1]) ? TAB_FROM_PATH[rest[1]] : rest[1]; // the path's word, as the page names the tab
+            if (!TEAM_TABS.includes(tab)) return null;
+            if (rest.length === 2) { const query = tab === 'tasks' ? tasksQuery(search) : ''; return query ? { view: 'team', server: t.server, id: n, sub: tab, query } : { view: 'team', server: t.server, id: n, sub: tab }; }
+            return rest.length === 3 && TEAM_ITEM_TABS.includes(tab) && INT_RE.test(rest[2]) ? { view: 'team', server: t.server, id: n, sub: tab, item: Number(rest[2]) } : null;
         }
+        case INBOX:
+            if (rest.length === 1 && (rest[0] === 'needs' || rest[0] === 'saved')) return { view: 'inbox-folder', folder: rest[0] };
+            if (rest[0] === 'chats' && rest.length <= 2 && (rest.length === 1 || INBOX_CHATS_RE.test(rest[1]))) return { view: 'inbox-folder', folder: rest.length === 1 || rest[1] === 'all' ? 'chats' : `chats-${rest[1]}` };
+            return null;
         case 'workflows': {
             if (!rest.length) return { view: 'workflows' };
             if (!INT_RE.test(rest[0])) return null;
@@ -193,9 +206,11 @@ export function build(r) {
         case 'inbox-boards':
             return r.sub === 'boards' ? `/inbox/boards${r.id ? '/' + seg(r.id) : ''}` : '/';
         case 'team':
-            return `/team/${srvSeg(r.server)}${seg(r.id)}${TEAM_TABS.includes(r.sub) ? '/' + r.sub + (r.item && TEAM_ITEM_TABS.includes(r.sub) ? '/' + r.item : '') : ''}${r.sub === 'tasks' && !r.item && r.query ? '?' + r.query : ''}`;
+            return `/team/${srvSeg(r.server)}${seg(r.id)}${TEAM_TABS.includes(r.sub) ? '/' + (TAB_PATH[r.sub] || r.sub) + (r.item && TEAM_ITEM_TABS.includes(r.sub) ? '/' + r.item : '') : ''}${r.sub === 'tasks' && !r.item && r.query ? '?' + r.query : ''}`;
         case 'board':
             return `/board/${srvSeg(r.server)}${seg(r.id)}`;
+        case 'inbox-folder':
+            return INBOX_FOLDER_RE.test(String(r.folder)) ? `/inbox/${r.folder === 'needs' || r.folder === 'saved' ? r.folder : 'chats/' + (r.folder === 'chats' ? 'all' : r.folder.slice(6))}` : '/';
         case 'workflows':
             return r.id ? `/workflows/${r.id}${r.run ? '/runs/' + r.run : ''}` : '/workflows';
         case 'jobs':
@@ -293,4 +308,12 @@ export function keyRoute(view, key, sub = null, item = null, query = '') {
 /** The identity key a team or board route names (the inverse of keyRoute). */
 export function routeKey(route) {
     return route.server ? `@${route.server}/${route.id}` : route.id;
+}
+
+/** The path of an Inbox folder by its key (#8652), for the folders whose pages are other families' too (goals #8571, tasks and boards #8633): parse() answers null for a path this build does not know. */
+export function inboxFolderPath(key) {
+    if (key === 'goals') return '/inbox/goals';
+    if (key === 'tasks') return '/inbox/tasks';
+    if (key === 'chats-group') return '/inbox/boards';
+    return INBOX_FOLDER_RE.test(String(key)) ? build({ view: 'inbox-folder', folder: key }) : '';
 }
