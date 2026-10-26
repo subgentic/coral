@@ -16,11 +16,11 @@ const BASE = require('./test_base').BASE;
     };
     const KEYS = { Enter: [13, '\r'], Escape: [27] };
     const key = async k => { const [vk, text] = KEYS[k]; for (const type of ['keyDown', 'keyUp']) await Input.dispatchKeyEvent({ type, key: k, code: k, windowsVirtualKeyCode: vk, ...(type === 'keyDown' && text ? { text } : {}) }); };
-    // Saved's Open and Done are the page toolbar's pills (#8602): the strip the sampler follows.
+    // Saved's Open and Done are the page toolbar's pills (#8602), in its one header row (#8700; a phone has the choice in the Filters sheet): the row is the strip the sampler follows.
     // The frames from now: the state on every animation frame, kept when it changes (the sampler of UI/UX's note).
     const SAMPLE = `(() => { window.__frames = []; const vis = e => e && !e.hidden && e.getClientRects().length;
         const snap = () => { const nav = document.querySelector('.top-nav-tab.active'); const t = document.getElementById('group-table-view'); const shown = !!vis(t) && /^hub-inbox:/.test(t.dataset.group); const group = shown ? t.dataset.group.split(':')[1] : '';
-            const chips = [...t.querySelectorAll('.group-table-chips, .inbox-folder-toolbar .team-tb-pills, .inbox-folder-toolbar .team-tb-select')].find(vis); const search = document.getElementById('inbox-search');
+            const chips = [...t.querySelectorAll('.group-table-chips, .inbox-folder-toolbar .list-bar-search-row')].find(vis); const search = document.getElementById('inbox-search');
             const k = { nav: nav && nav.textContent.trim().replace(/\\s*\\d+$/, ''), inbox: shown || !!vis(document.getElementById('inbox-view')), group, savedPanel: shown && group === 'saved',
                 stripTop: chips && vis(chips) ? Math.round(chips.getBoundingClientRect().top) : null, searchTop: search && vis(search) ? Math.round(search.getBoundingClientRect().top) : null, scrollTop: (() => { let n = 0; for (let e = t; e; e = e.parentElement) n += Math.round(e.scrollTop); return n; })(), // the table and every scroller round it
                 loading: shown && /Loading saved items/.test(t.textContent) };
