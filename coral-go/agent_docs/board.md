@@ -356,7 +356,7 @@ A `format=dashboard` request with `after_id` also carries `ask_updates` when a p
 
 ### Search a board's messages (`GET /api/board/{project}/messages/search`)
 
-The search behind the board page's box and filters (#4745). It takes the same parameter names and gives the same reply shape as the Team
+The search behind the team page's Board tab box and filters (#4745). It takes the same parameter names and gives the same reply shape as the Team
 Artifacts query (`q`, `since`, `until`, `sort`, `cursor`; `total` and `next_cursor`), so one client bar serves every panel.
 
 | Parameter | Values |

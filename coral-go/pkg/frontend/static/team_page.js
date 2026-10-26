@@ -61,7 +61,7 @@ function teamDir() {
     return s ? s.working_directory : '';
 }
 
-// More: the board's own actions (Select, Export, Pause, Delete), moved here from the board page's header while this page is on screen (they keep their ids and their handlers).
+// More: the board's own actions (Select, Export, Pause, Delete), moved here from the board view's hidden holder (message_board.html) while this page is on screen (they keep their ids and their handlers).
 let moreOpen = false;
 function buildMore() {
     const host = $('team-page-actions');
@@ -81,7 +81,7 @@ const BOARD_ACTIONS = ['mb-select-btn', 'mb-export-btn', 'mb-pause-btn', 'mb-del
 function adoptBoardActions() {
     const menu = $('team-page-more-menu'); if (!menu) return;
     for (const id of BOARD_ACTIONS) { const b = $(id); if (b && b.parentElement !== menu) { b.dataset.home = b.parentElement ? b.parentElement.id : ''; menu.append(b); } }
-    for (const id of BOARD_ACTIONS) { const b = $(id); if (b) b.style.display = ''; } // display-ok: the board page's markup hides these with an inline display:none, which message_board.js clears the same way
+    for (const id of BOARD_ACTIONS) { const b = $(id); if (b) b.style.display = ''; } // display-ok: the holder's markup hides these with an inline display:none, which message_board.js clears the same way
     const sel = $('mb-select-btn'); if (sel) sel.hidden = S.tab !== 'messages'; // selecting messages is the Messages tab's
 }
 function releaseBoardActions() {

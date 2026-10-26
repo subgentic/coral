@@ -28,7 +28,7 @@ export function buildMoreMenu(id, items, noun = '') {
     const name = noun ? `More ${noun} actions` : 'More actions'; // the tab's own noun (UI/UX, #7717): "More message actions", "More artifact actions"; the page's header keeps its plain "More"
     const wrap = make('span', 'list-bar-more');
     const btn = make('button', 'sidebar-collapse-btn list-bar-more-btn'); btn.type = 'button'; btn.id = `${id}-more`;
-    // named "More actions", not "More": a page's header has a More button too, and the board page shows both at 390 px (#7713)
+    // named "More actions", not "More": a page's header has a More button too, and the team page's Board tab shows both at 390 px (#7713)
     btn.title = name; btn.setAttribute('aria-label', name); btn.setAttribute('aria-haspopup', 'menu'); btn.setAttribute('aria-expanded', 'false'); btn.setAttribute('aria-controls', `${id}-more-menu`);
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     for (const [k, v] of [['width', '18'], ['height', '18'], ['viewBox', '0 0 24 24'], ['fill', 'currentColor'], ['aria-hidden', 'true']]) svg.setAttribute(k, v);

@@ -121,7 +121,7 @@ export function showBoardInPage(project, host, messageId = null) {
     startBoardPoll();
 }
 
-/** On the team page the composer is "Message the team" and its button "Send" (UI/UX's design); on the board page they keep the names they have: they are put back when the column goes home. */
+/** On the team page the composer is "Message the team" and its button "Send" (UI/UX's design); they are put back when the column goes home (the hidden holder in the board view). */
 function nameComposerForPage(on) {
     const box = document.getElementById('mb-post-input'), send = document.querySelector('#mb-board .mb-post-send-btn');
     for (const [e, name] of [[box, 'Message the team'], [send, 'Send']]) {
