@@ -47,7 +47,7 @@ const STUB = `(() => {
     const results = [];
     const check = (label, cond, detail) => { results.push(!!cond); console.log(`[${cond ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' — ' + detail : ''}`); };
     const settle = (ms, quietMs = 320) => require('./helpers/wait').settle(ev, ms, quietMs); // the page's geometry still for quietMs, or ms at most (helpers/wait.js); not a fixed sleep
-    const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; await settle(350); fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(path.join(d, name.replace(/[^a-z0-9-]+/gi, '-') + '.png'), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }; // sleep-ok: tab fades
+    const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR || path.join(process.env.RUNNER_TEMP || require('node:os').tmpdir(), 'out', 'shots'); await settle(350); fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(path.join(d, name.replace(/[^a-z0-9-]+/gi, '-') + '.png'), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }; // sleep-ok: tab fades
     const press = async (key, code, vk) => { const t = key === 'Enter' ? '\r' : undefined; await Input.dispatchKeyEvent({ type: t ? 'keyDown' : 'rawKeyDown', key, code, windowsVirtualKeyCode: vk, text: t }); await Input.dispatchKeyEvent({ type: 'keyUp', key, code, windowsVirtualKeyCode: vk }); await settle(60); };
     const type = async text => { for (const ch of text) { await Input.dispatchKeyEvent({ type: 'keyDown', key: ch, text: ch }); await Input.dispatchKeyEvent({ type: 'keyUp', key: ch }); } };
     const INTERACTIVE = new Set(['button', 'textbox', 'checkbox', 'link', 'combobox', 'searchbox']);
@@ -128,11 +128,14 @@ const STUB = `(() => {
             const folded = cols.phone;
             check(`${tag}: ${folded ? 'a narrow panel folds the shared rows with their description' : 'a wide panel shows every column'} (${JSON.stringify(cols)})`, folded ? cols.facts && cols.th.length === 0 : cols.th.length === 5 && cols.facts);
             if (!view.phone) {
-                for (const width of [620, 900]) {
+                for (const width of [420, 620, 680, 980]) {
                     await ev(`document.getElementById('agentic-state').style.width = '${width}px'; true`);
                     await waitFor(`(() => { const box = document.querySelector('${panel} .dt-box'); return box && Math.abs(document.getElementById('agentic-state').getBoundingClientRect().width - ${width}) < 1 && box.classList.contains('dt-folded') === (box.clientWidth < 40 * parseFloat(getComputedStyle(document.documentElement).fontSize)); })()`, 'the artifact table follows the shared 40rem threshold');
                     const layout = await ev(`(() => { const box = document.querySelector('${panel} .dt-box'), missing = box.querySelector('tbody tr [data-key=task]'); return { folded: box.classList.contains('dt-folded'), width: box.clientWidth, missingVisible: missing.getBoundingClientRect().width > 0, facts: [...box.querySelectorAll('tbody tr:first-child [data-key=type], tbody tr:first-child [data-key=size]')].every(c => c.classList.contains('dt-tone-tertiary')) }; })()`);
-                    check(`${tag}: shared threshold at ${width}px, with quiet facts and no empty folded task (${JSON.stringify(layout)})`, layout.folded === (width === 620) && layout.facts && (!layout.folded || !layout.missingVisible));
+                    check(`${tag}: shared threshold at ${width}px, with quiet facts and no empty folded task (${JSON.stringify(layout)})`, layout.folded === (width < 640) && layout.facts && (!layout.folded || !layout.missingVisible));
+                    const edges = await ev(`(() => { const panel = document.querySelector('${panel}').getBoundingClientRect(), table = document.querySelector('${panel} .dt-table').getBoundingClientRect(); return { left: table.left - panel.left, right: panel.right - table.right }; })()`);
+                    check(`${tag}: ${width}px table fills the dock (${JSON.stringify(edges)})`, Math.abs(edges.left) < 1 && Math.abs(edges.right) < 1);
+                    if (width !== 620) await shot(`dock-artifacts-${width}-${view.theme}`);
                 }
                 await ev(`document.getElementById('agentic-state').style.width = '680px'; true`);
             }
