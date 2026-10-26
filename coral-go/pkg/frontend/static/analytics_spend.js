@@ -79,7 +79,7 @@ function shape(body, { sub, headline, cards, chart, how, table }) {
 
 function card(value, label, sub) {
     const c = el('div', 'cost-card spend-card');
-    c.append(el('div', 'cost-card-value', value), el('div', 'cost-card-label', label));
+    c.append(el('div', 'cost-card-value' + (value === 'Not measured' ? ' cost-card-value-word' : ''), value), el('div', 'cost-card-label', label));
     if (sub) c.append(el('div', 'spend-card-sub', sub));
     return c;
 }
