@@ -678,12 +678,9 @@ async function launchTeam() {
     }
 
     const settings = readTeamLaunchSettings(); // step 3's tabs (#7407)
-    if (settings.problem) {
+    if (settings.problem) { // the form has opened its tab and focused the field
         showTeamStep('start');
-        document.querySelector('#launch-step-team .settings-tab[data-section="health"], #launch-step-team .settings-tab[id$="-tab-health"]')?.click();
         showToast(settings.problem.text, true);
-        settings.problem.el.closest('details') && (settings.problem.el.closest('details').open = true);
-        settings.problem.el.focus();
         return;
     }
     const goal = document.getElementById("team-goal")?.value.trim() || "";

@@ -39,7 +39,7 @@ export function showTeamStep(step, { focus = false } = {}) {
     if (live) live.textContent = `Step ${i + 1} of ${TEAM_STEPS.length}: ${STEP_NAMES[step]}`;
     document.dispatchEvent(new CustomEvent('team-step-shown', { detail: { step } }));
     if (focus) {
-        const first = { team: '#team-board-name', members: '#team-template-select', start: '#team-pane-workflow, #team-goal' }[step];
+        const first = { team: '#team-board-name', members: '#team-template-select', start: '#team-goal' }[step];
         (step === 'start' ? document.querySelector('#launch-step-team .settings-tab[aria-selected="true"]') || document.getElementById('team-goal') : document.querySelector(first))?.focus();
     }
 }

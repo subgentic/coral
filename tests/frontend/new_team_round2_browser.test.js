@@ -17,17 +17,18 @@ const BASE = require('./test_base').BASE;
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installNT(ev);
         await stubModels(ev); await openNewTeam(ev, waitFor);
         await t.to(3);
-        await S.run('Health check: no (i) icons, no card, a line for each switch, the dependent rows hidden until Send health check is on', async () => {
+        await S.run('Health check (a settings_view, #8455): no (i) icons, a line for each switch, the dependent rows off until Send health check is on', async () => {
             await tab('Health check');
-            const r = await ev(`(() => { const d = window.__nt.dlg(${N.team}); const p = [...d.querySelectorAll('.settings-pane')].find(x => x.dataset.section === 'health'); const vis = window.__na.vis;
-                const sw = n => [...p.querySelectorAll('input[type=checkbox]')].find(i => i.name === n);
-                const line = p.querySelector('.health-line'); const cs = line ? getComputedStyle(line) : null;
-                return { fieldset: getComputedStyle(p.querySelector('fieldset')).borderTopWidth, info: [...p.querySelectorAll('.settings-info-btn')].filter(vis).length, card: cs ? [cs.borderTopWidth, cs.backgroundColor] : null, onHint: !!p.querySelector('#hc-on-h') && vis(p.querySelector('#hc-on-h')), clearVisible: !!sw('all_clear') && vis(sw('all_clear')), everyVisible: [...p.querySelectorAll('input')].some(i => /interval/.test(i.name) && vis(i)) }; })()`);
-            assert.equal(r.info, 0, 'no (i) icon'); assert.equal(r.card[0], '0px', 'no border on the row'); assert.equal(r.fieldset, '0px', 'and none on the group'); assert.equal(r.onHint, true, 'the first switch has its line on the page');
-            assert.equal(r.clearVisible, false, 'Post when all is well is hidden while Send health check is off'); assert.equal(r.everyVisible, false, 'and so is Every');
+            const probe = () => ev(`(() => { const d = window.__nt.dlg(${N.team}); const p = [...d.querySelectorAll('.settings-pane')].find(x => x.dataset.section === 'health'); const vis = window.__na.vis;
+                const row = k => p.querySelector('[data-key="' + k + '"]'); const help = k => { const h = row(k) && row(k).querySelector('.sv-help'); return h ? [vis(h), h.textContent.trim()] : null; };
+                return { info: [...p.querySelectorAll('.settings-info-btn')].filter(vis).length, onHelp: help('on'), clearHelp: help('all_clear'), everyOff: row('interval_min').hasAttribute('data-disabled'), clearOff: row('all_clear').hasAttribute('data-disabled'), recipient: !!row('recipient') }; })()`);
+            const off = await probe();
+            assert.equal(off.info, 0, 'no (i) icon'); assert.deepEqual(off.onHelp, [true, 'Checks on stuck or idle agents. Uses tokens each time.'], 'the first switch has its line on the page');
+            assert.deepEqual(off.clearHelp, [true, 'So a quiet team is not mistaken for a stopped check.'], 'Post when all is well has its own line');
+            assert.equal(off.everyOff, true, 'Check every is off while Send health check is off'); assert.equal(off.clearOff, true, 'and so is Post when all is well'); assert.equal(off.recipient, false, 'who gets the check is not asked: it goes to the Orchestrator');
             await ev(`(() => { const d = window.__nt.dlg(${N.team}); const i = [...d.querySelectorAll('input[type=checkbox]')].find(x => x.name === 'on'); i.click(); return true; })()`); await settle(250);
-            const on = await ev(`(() => { const d = window.__nt.dlg(${N.team}); const p = [...d.querySelectorAll('.settings-pane')].find(x => x.dataset.section === 'health'); const sw = [...p.querySelectorAll('input[type=checkbox]')].find(i => i.name === 'all_clear'); const hint = p.querySelector('#hc-clear-w'); return { clear: window.__na.vis(sw), hint: hint ? [window.__na.vis(hint), hint.textContent.trim()] : null }; })()`);
-            assert.equal(on.clear, true, 'Post when all is well shows once Send is on'); assert.deepEqual(on.hint, [true, 'A short line so a quiet team is not mistaken for a stopped check.'], 'with its own visible line');
+            const on = await probe();
+            assert.equal(on.everyOff, false, 'Check every is on once Send is on'); assert.equal(on.clearOff, false, 'and Post when all is well');
         });
         await S.run('Edit member: the persona select is labelled "Start from a persona" (optional) and the Behavior prompt is not mono', async () => {
             await t.click('button', /^Back$/i); await t.step(2); await settle(200);
