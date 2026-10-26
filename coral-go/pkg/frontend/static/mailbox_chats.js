@@ -36,7 +36,8 @@ export function chatFolder(key, c = counts) {
 /** The view list's sections for the chat folders, with the counts the last read gave (a folder with none yet shows no number). */
 export function chatSections(c = counts) {
     const n = (v) => (c && Number.isFinite(c[v]) ? c[v] : undefined);
-    const by = (t) => (c && c.by_agent_type ? (t === 'agy' ? (c.by_agent_type.agy || 0) + (c.by_agent_type.antigravity || 0) + (c.by_agent_type.gemini || 0) : c.by_agent_type[t]) : undefined);
+    // the server already gives agy, antigravity and gemini the one count of their shared history, so the folder shows it as it is (adding the three showed it three times, #8011)
+    const by = (t) => (c && c.by_agent_type ? c.by_agent_type[t] : undefined);
     const out = [{ title: 'Chats', items: FOLDERS.map(f => ({ key: f.key, label: f.label, count: n(f.count) })) },
         { title: 'By CLI', items: CLIS.map(([t, label]) => ({ key: `chats-cli-${t}`, label, count: by(t) })) }];
     const tags = (c && c.tags) || [];

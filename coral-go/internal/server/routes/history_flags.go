@@ -2,6 +2,7 @@ package routes
 
 import (
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -26,7 +27,12 @@ func (h *HistoryHandler) SetChatFlags(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, "supply starred or archived")
 		return
 	}
-	id := chi.URLParam(r, "sessionID")
+	// chi hands the id over as it was sent: the dashboard encodes it, so "board:team" arrives as "board%3Ateam"
+	id, err := url.PathUnescape(chi.URLParam(r, "sessionID"))
+	if err != nil {
+		errBadRequest(w, "the chat id is not valid")
+		return
+	}
 	exists := false
 	if board, ok := strings.CutPrefix(id, "board:"); ok {
 		if h.bs != nil {
