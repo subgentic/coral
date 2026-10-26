@@ -96,6 +96,7 @@
 .dt-chat-line { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } /* a chat: its title, then its snippet after it, one line (Gmail's) */
 .dt-chat-title { color: var(--table-primary-color); font-size: var(--table-secondary-size); font-weight: var(--table-secondary-weight); }
 .dt-chat-snippet, .dt-chat-live { color: var(--table-secondary-color); font-size: var(--table-secondary-size); font-weight: var(--table-secondary-weight); }
+.dt-chat-line .dt-tag { margin-left: 6px; }
 .dt-chat-flags { display: inline-flex; gap: 2px; justify-content: flex-end; }
 .dt-flag { display: inline-flex; align-items: center; justify-content: center; width: var(--control-compact-height); height: var(--control-compact-height); padding: 0; border: 0; border-radius: var(--radius-md); background: none; color: var(--table-tertiary-color); cursor: pointer; }
 .dt-row .dt-flag { opacity: 0; }
@@ -147,6 +148,7 @@
 .dt-box.dt-fold-column.dt-folded td.dt-line-1 { order: 1; }
 .dt-box.dt-fold-column.dt-folded td.dt-line-1.dt-grow { flex: 1 1 0; min-width: 0; }
 .dt-box.dt-fold-column.dt-folded tr::before { content: ""; order: 2; flex-basis: 100%; height: 0; }
+.dt-box.dt-fold-column.dt-folded td.dt-line-2.dt-grow { flex: 1 1 100%; min-width: 0; } /* a growing second line takes its whole line: a chat's title and snippet are not cut at the width of their own text */
 .dt-box.dt-fold-column.dt-folded td.dt-line-2 { order: 3; font-size: var(--table-tertiary-size); font-weight: var(--table-tertiary-weight); }
 .dt-box.dt-fold-labeled.dt-folded tr { flex-direction: column; align-items: stretch; row-gap: 2px; }
 .dt-box.dt-fold-labeled.dt-folded td { display: flex; gap: 6px; white-space: normal; }
