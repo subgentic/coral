@@ -121,5 +121,3 @@ func (s *TaskStore) getEditedFilesBySession(ctx context.Context, sessionIDs []st
 	}
 	return result, nil
 }
-
-// ── History queries (by session_id only) ────────────────────────────────

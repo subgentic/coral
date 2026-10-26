@@ -30,5 +30,3 @@ func NewTaskStore(db *DB) *TaskStore {
 func (s *TaskStore) reader() *sqlx.DB {
 	return s.db.Reader()
 }
-
-// ── Agent Tasks ────────────────────────────────────────────────────────

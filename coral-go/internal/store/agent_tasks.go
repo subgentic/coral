@@ -341,8 +341,6 @@ func (s *TaskStore) ReorderAgentTasks(ctx context.Context, agentName string, tas
 	})
 }
 
-// ── Agent Notes ────────────────────────────────────────────────────────
-
 // ListTasksBySession returns tasks for a historical session.
 func (s *TaskStore) ListTasksBySession(ctx context.Context, sessionID string) ([]AgentTask, error) {
 	var tasks []AgentTask

@@ -79,8 +79,6 @@ func (s *TaskStore) DeleteAgentNote(ctx context.Context, noteID int64) error {
 	return err
 }
 
-// ── Agent Events ──────────────────────────────────────────────────────
-
 // ListNotesBySession returns notes for a historical session.
 func (s *TaskStore) ListNotesBySession(ctx context.Context, sessionID string) ([]AgentNote, error) {
 	var notes []AgentNote
