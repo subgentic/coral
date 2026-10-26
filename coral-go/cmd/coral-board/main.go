@@ -135,6 +135,15 @@ Commands:
                                Post a short message (@mention agents);
                                --task N answers task N (a person's reply on it);
                                use -- before text that starts with '-'
+  post --assign "Name" [--goal N] [--title T] [--priority P] "<text>"
+                               Work to produce (code, tests, docs, a review) is
+                               a task: this creates it (title from --title or
+                               the first line, the text as its body, assigned to
+                               Name, on --goal N or your own task's goal; with
+                               neither it refuses) and posts the text with its
+                               link. Name is told by the task: no @mention.
+                               A question, decision, heads-up or status stays a
+                               plain post
   post - [--to "a,b"] <<'EOF'  Multi-line posts and anything with backticks:
                                Bash heredoc, literal stdin text; EOF closes on
                                its own line. UTF-8 only. 'coral-board help post'

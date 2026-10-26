@@ -115,7 +115,9 @@ Subcommands:
 const taskUsageText = `Usage: coral-board task <subcommand> [args]
 
 Subcommands:
-  add "title" [--body "details"] [--priority P] [--assignee "Agent Name"] [--remind-at TIME] [--goal ID]
+  add "title" [--body "details"] [--priority P] [--assignee "Agent Name"] [--remind-at TIME] [--goal ID] [--follow-up ID]
+                                   --follow-up ID: the work that came out of task ID: it takes that task's goal, reviewers and assignee unless you give your own,
+                                   and ID lists it (task show ID, task detail ID, the goal page's "N follow-ups open")
   list [--json] [--goal ID]        Every task, or one goal's; --json prints the tasks as a JSON array
   goal <task-id> <goal-id|none>    Put a task on a goal of this board, move it, or take it off (coral-board goal ... manages the goals)
   claim [id]                       Claim a specific task or the next available one
@@ -180,6 +182,7 @@ func cmdTaskAdd(st *boardState, args []string) {
 	parent := fs.Int64("parent", 0, "Parent task ID")
 	retryOf := fs.Int64("retry-of", 0, "Finished task ID this new task retries")
 	goal := fs.Int64("goal", 0, "The goal of this board the task serves")
+	followUp := fs.Int64("follow-up", 0, "Make this a follow-up of that task: it takes the task's goal, reviewers and assignee unless you give your own")
 	goalFrom := fs.Int64("goal-from", 0, "Accept this goal request another team sent: the task is made already linked to its goal (write your own title and body; the request text is not copied)")
 	clihelp.ParseFlags(fs, reordered, func() string { return commandUsage(os.Args[1], os.Args[2:]) })
 	goalGiven := false
@@ -191,6 +194,19 @@ func cmdTaskAdd(st *boardState, args []string) {
 		clierr.Exit1()
 	}
 	subscriberID := resolveSubscriberID()
+	if *followUp > 0 {
+		fu := resolveFollowUp(st, *followUp, *parent, *retryOf, *goalFrom)
+		*parent = *followUp
+		if !goalGiven && fu.goal > 0 {
+			*goal = fu.goal
+		}
+		if *reviewers == "" {
+			*reviewers = fu.reviewers
+		}
+		if *assignee == "" {
+			*assignee = fu.assignee
+		}
+	}
 
 	reqBody := map[string]any{
 		"title":         title,
@@ -270,6 +286,9 @@ func cmdTaskAdd(st *boardState, args []string) {
 	json.Unmarshal(data, &task)
 	id := task["id"]
 	fmt.Printf("Created Task #%.0f: %s\n", id, title)
+	if *followUp > 0 {
+		fmt.Printf("  A follow-up of task #%d (it is listed there).\n", *followUp)
+	}
 	if _, linked := task["goal_id"]; !goalGiven && !(linked && task["goal_id"] != nil) {
 		if line := goalHintLine(st.Project, id); line != "" {
 			fmt.Println(line)
@@ -995,4 +1014,56 @@ func cmdTaskAddFromRequest(st *boardState, request int64, title, body, priority,
 	}
 	_ = json.Unmarshal(data, &out)
 	fmt.Printf("Created Task #%.0f: %s (for goal request #%d; the asking team is told it was accepted)\n", out.Task["id"], title, request)
+}
+
+// followUpInherits is what a follow-up takes from the task it follows when the caller gave none of its own.
+type followUpInherits struct {
+	goal      int64
+	reviewers string // comma separated
+	assignee  string
+}
+
+// resolveFollowUp reads the task a follow-up is made from (#7791): its goal, its reviewers (as named when it was made) and who did its work, else who has it. It refuses a task that is not on this
+// board and options that name another kind of link.
+func resolveFollowUp(st *boardState, id, parent, retryOf, goalFrom int64) followUpInherits {
+	if parent != 0 || retryOf != 0 || goalFrom != 0 {
+		fmt.Fprintln(os.Stderr, "--follow-up can't be combined with --parent, --retry-of or --goal-from: it is the task's own link to the task it follows")
+		clierr.Exit1()
+	}
+	data, status, err := apiCallRaw("GET", fmt.Sprintf("/%s/tasks/%d", url.PathEscape(st.Project), id), nil)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		clierr.Exit1()
+	}
+	if status == http.StatusNotFound {
+		fmt.Fprintf(os.Stderr, "--follow-up: task #%d is not on this board\n", id)
+		clierr.Exit1()
+	}
+	if status != http.StatusOK {
+		fmt.Fprintf(os.Stderr, "--follow-up: unable to read task #%d: %s\n", id, clierr.Describe(nil, status, data))
+		clierr.Exit1()
+	}
+	var parentTask struct {
+		GoalID     *int64  `json:"goal_id"`
+		AssignedTo *string `json:"assigned_to"`
+		WorkedBy   string  `json:"worked_by"`
+		Workflow   struct {
+			Reviewers []string `json:"reviewers"`
+		} `json:"workflow"`
+	}
+	if err := json.Unmarshal(data, &parentTask); err != nil {
+		fmt.Fprintln(os.Stderr, "--follow-up: unable to read task:", err)
+		clierr.Exit1()
+	}
+	var out followUpInherits
+	if parentTask.GoalID != nil && *parentTask.GoalID > 0 {
+		out.goal = *parentTask.GoalID
+	}
+	out.reviewers = strings.Join(parentTask.Workflow.Reviewers, ",")
+	if parentTask.WorkedBy != "" {
+		out.assignee = parentTask.WorkedBy
+	} else if parentTask.AssignedTo != nil {
+		out.assignee = *parentTask.AssignedTo
+	}
+	return out
 }

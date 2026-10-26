@@ -73,6 +73,8 @@ type Task struct {
 	// Verification: whether a completed task's "done" is backed by an independent check (#4563); set when the workflow is
 	// attached, for a completed task with outcome success only.
 	Verification *Verification `db:"-" json:"verification,omitempty"`
+	// FollowUps: the tasks made from this one (task add --follow-up, follow_ups.go); filled where one task is read (GetTask), never in a list.
+	FollowUps []FollowUp `db:"-" json:"follow_ups,omitempty"`
 }
 
 type TaskDep struct {

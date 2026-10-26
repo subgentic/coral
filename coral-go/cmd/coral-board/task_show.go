@@ -25,17 +25,28 @@ type taskShowArtifact struct {
 
 // taskShow is task show's view of a task: what a person needs to read a task's result (#285).
 type taskShow struct {
-	ID          int64              `json:"id"`
-	Title       string             `json:"title"`
-	Status      string             `json:"status"`
-	Priority    string             `json:"priority,omitempty"`
-	AssignedTo  string             `json:"assigned_to,omitempty"`
-	CreatedBy   string             `json:"created_by,omitempty"`
-	CompletedBy string             `json:"completed_by,omitempty"`
-	Body        string             `json:"body,omitempty"`
-	Outcome     string             `json:"outcome,omitempty"`
-	Message     string             `json:"message,omitempty"`
-	Artifacts   []taskShowArtifact `json:"artifacts"`
+	ID          int64  `json:"id"`
+	Title       string `json:"title"`
+	Status      string `json:"status"`
+	Priority    string `json:"priority,omitempty"`
+	AssignedTo  string `json:"assigned_to,omitempty"`
+	CreatedBy   string `json:"created_by,omitempty"`
+	CompletedBy string `json:"completed_by,omitempty"`
+	Body        string `json:"body,omitempty"`
+	Outcome     string `json:"outcome,omitempty"`
+	Message     string `json:"message,omitempty"`
+	// FollowUpOf is the task this one was made from (task add --follow-up), and FollowUps the tasks made from it (#7791).
+	FollowUpOf int64              `json:"follow_up_of,omitempty"`
+	FollowUps  []taskShowFollowUp `json:"follow_ups,omitempty"`
+	Artifacts  []taskShowArtifact `json:"artifacts"`
+}
+
+// taskShowFollowUp is one follow-up of a task as task show lists it.
+type taskShowFollowUp struct {
+	ID         int64  `json:"id"`
+	Title      string `json:"title"`
+	Status     string `json:"status"`
+	AssignedTo string `json:"assigned_to,omitempty"`
 }
 
 // cmdTaskShow is `coral-board task show <id> [--json]`: a task's title, status, assignee, body, outcome, result message and its
@@ -83,9 +94,16 @@ func parseTaskShow(data []byte) (taskShow, error) {
 		CompletedBy       *string `json:"completed_by"`
 		Body              *string `json:"body"`
 		CompletionMessage *string `json:"completion_message"`
-		Workflow          struct {
-			Outcome   string `json:"outcome"`
-			Artifacts []struct {
+		FollowUps         []struct {
+			ID         int64   `json:"id"`
+			Title      string  `json:"title"`
+			Status     string  `json:"status"`
+			AssignedTo *string `json:"assigned_to"`
+		} `json:"follow_ups"`
+		Workflow struct {
+			ParentTaskID int64  `json:"parent_task_id"`
+			Outcome      string `json:"outcome"`
+			Artifacts    []struct {
 				Name      string `json:"name"`
 				URI       string `json:"uri"`
 				Content   string `json:"content"`
@@ -107,6 +125,10 @@ func parseTaskShow(data []byte) (taskShow, error) {
 	t := taskShow{ID: raw.ID, Title: clitext.CleanName(raw.Title), Status: clitext.CleanName(raw.Status), Priority: clitext.CleanName(raw.Priority),
 		AssignedTo: clitext.CleanName(val(raw.AssignedTo)), CreatedBy: clitext.CleanName(raw.CreatedBy), CompletedBy: clitext.CleanName(val(raw.CompletedBy)),
 		Body: val(raw.Body), Outcome: clitext.CleanName(raw.Workflow.Outcome), Message: val(raw.CompletionMessage), Artifacts: []taskShowArtifact{}}
+	t.FollowUpOf = raw.Workflow.ParentTaskID
+	for _, f := range raw.FollowUps {
+		t.FollowUps = append(t.FollowUps, taskShowFollowUp{ID: f.ID, Title: clitext.CleanName(f.Title), Status: clitext.CleanName(f.Status), AssignedTo: clitext.CleanName(val(f.AssignedTo))})
+	}
 	for _, a := range raw.Workflow.Artifacts {
 		t.Artifacts = append(t.Artifacts, taskShowArtifact{Name: clitext.CleanName(a.Name), URI: clitext.CleanName(a.URI), MediaType: clitext.CleanName(a.MediaType),
 			Digest: clitext.CleanName(a.Digest), InlineBytes: len(a.Content), Landed: a.Landed})
@@ -134,8 +156,27 @@ func printTaskShow(w io.Writer, t taskShow) {
 	if len(who) > 0 {
 		fmt.Fprintln(w, strings.Join(who, "  "))
 	}
+	if t.FollowUpOf > 0 {
+		fmt.Fprintf(w, "Follow-up of task #%d\n", t.FollowUpOf)
+	}
 	if t.Body != "" {
 		fmt.Fprintln(w, "\n"+t.Body)
+	}
+	if len(t.FollowUps) > 0 {
+		open := 0
+		for _, f := range t.FollowUps {
+			if f.Status != "completed" && f.Status != "skipped" && f.Status != "cancelled" {
+				open++
+			}
+		}
+		fmt.Fprintf(w, "\nFollow-ups (%d, %d open):\n", len(t.FollowUps), open)
+		for _, f := range t.FollowUps {
+			who := ""
+			if f.AssignedTo != "" {
+				who = "  (" + f.AssignedTo + ")"
+			}
+			fmt.Fprintf(w, "  #%d  [%s]  %s%s\n", f.ID, f.Status, f.Title, who)
+		}
 	}
 	if t.Message != "" {
 		fmt.Fprintln(w, "\nResult: "+t.Message)

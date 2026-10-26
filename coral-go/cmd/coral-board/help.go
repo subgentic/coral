@@ -131,9 +131,19 @@ any board message ends the wait.`
 
 // postFlags and sendFlags are the options of post and of send. They are read in any case (--TO is --to) and anywhere before or among the words of the message.
 var (
-	postFlags = []string{"--to", "--file", "--task"}
+	postFlags = []string{"--to", "--file", "--task", "--assign", "--goal", "--title", "--priority"}
 	sendFlags = []string{"--board", "--to", "--address", "--reply-to", "--message-id", "--attach", "--file"}
 )
+
+// isPostValueOption: post's options, each of which takes a value.
+func isPostValueOption(opt string) bool {
+	for _, k := range postFlags {
+		if opt == k {
+			return true
+		}
+	}
+	return false
+}
 
 // foldOpt is arg lower-cased when that is one of known (so --TO is --to), else arg as it is.
 func foldOpt(arg string, known []string) string {
@@ -172,7 +182,7 @@ func checkFreeText(args []string) error {
 			if rest[i] == "--" {
 				break
 			}
-			if opt := foldOpt(rest[i], postFlags); opt == "--to" || opt == "--file" || opt == "--task" {
+			if opt := foldOpt(rest[i], postFlags); isPostValueOption(opt) {
 				i++
 				continue
 			}

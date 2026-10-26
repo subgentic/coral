@@ -102,6 +102,8 @@ type Goal struct {
 	ClosedAt     *string    `db:"closed_at" json:"closed_at,omitempty"`
 	ClosedReason string     `db:"closed_reason" json:"closed_reason,omitempty"`
 	Rollup       GoalRollup `db:"-" json:"rollup"`
+	// FollowUpsOpen: the open tasks of the goal that were made as follow-ups of another task (task add --follow-up); filled where one goal is read (GetGoal), never in a list.
+	FollowUpsOpen int `db:"-" json:"follow_ups_open,omitempty"`
 }
 
 // Closed reports whether the goal is done or dropped.
@@ -334,6 +336,9 @@ func (s *Store) GetGoal(ctx context.Context, board string, id int64) (*Goal, err
 		return nil, err
 	}
 	g.Rollup = rollups[id]
+	if g.FollowUpsOpen, err = s.goalFollowUpsOpen(ctx, board, id); err != nil {
+		return nil, err
+	}
 	return &g, nil
 }
 

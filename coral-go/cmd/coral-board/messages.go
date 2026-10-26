@@ -110,7 +110,7 @@ func cmdPost() {
 	}
 
 	// Parse --to flag and collect remaining args as the message
-	var toNames, filePath, taskArg string
+	var toNames, filePath, taskArg, assignArg, goalArg, titleArg, priorityArg string
 	var msgParts []string
 	literal := false
 	for i := 2; i < len(os.Args); i++ {
@@ -129,7 +129,19 @@ func cmdPost() {
 		} else if opt == "--task" && i+1 < len(os.Args) {
 			taskArg = os.Args[i+1]
 			i++
-		} else if opt == "--to" || opt == "--file" || opt == "--task" {
+		} else if (opt == "--assign" || opt == "--goal" || opt == "--title" || opt == "--priority") && i+1 < len(os.Args) {
+			switch opt {
+			case "--assign":
+				assignArg = os.Args[i+1]
+			case "--goal":
+				goalArg = os.Args[i+1]
+			case "--title":
+				titleArg = os.Args[i+1]
+			case "--priority":
+				priorityArg = os.Args[i+1]
+			}
+			i++
+		} else if isPostValueOption(opt) {
 			fmt.Fprintf(os.Stderr, "Error: %s needs a value\n", os.Args[i])
 			os.Exit(2)
 		} else {
@@ -158,6 +170,20 @@ func cmdPost() {
 		}
 	}
 
+	if assignArg == "" && (goalArg != "" || titleArg != "" || priorityArg != "") {
+		fmt.Fprintln(os.Stderr, "Error: --goal, --title and --priority are for --assign: post --assign \"Name\" [--goal N] [--title T] [--priority P] \"text\"")
+		os.Exit(2)
+	}
+	var assigned *postAssignment
+	if assignArg != "" {
+		if taskArg != "" {
+			fmt.Fprintln(os.Stderr, "Error: --assign makes a task of the post; it can't also be an answer on one (--task)")
+			os.Exit(2)
+		}
+		assigned = prepareAssignment(st, message, assignArg, toNames, goalArg, titleArg, priorityArg) // refuses, creating nothing
+		message = assigned.message
+	}
+
 	// Prepend @mentions if --to was provided
 	if toNames != "" {
 		var mentions []string
@@ -175,7 +201,11 @@ func cmdPost() {
 	subscriberID := resolveSubscriberID()
 
 	body := map[string]any{"subscriber_id": subscriberID, "content": message}
-	if taskArg != "" { // --task N: an answer on task N, listed with the person's replies on its page (#7703)
+	if assigned != nil { // --assign: the task is made now, and the post carries its link (#7791)
+		n := assigned.create(st, subscriberID)
+		body["task_id"] = n
+		body["content"] = strings.TrimSpace(message) + fmt.Sprintf("\n\n-> Task #%d, assigned to %s.", n, assignArg)
+	} else if taskArg != "" { // --task N: an answer on task N, listed with the person's replies on its page (#7703)
 		n, convErr := strconv.ParseInt(taskArg, 10, 64)
 		if convErr != nil || n <= 0 {
 			fmt.Fprintf(os.Stderr, "Error: --task needs a task number (got %q)\n", taskArg)

@@ -15,7 +15,14 @@ import (
 
 // GetTask returns one task on a board.
 func (s *Store) GetTask(ctx context.Context, project string, taskID int64) (*Task, error) {
-	return s.getTaskByID(ctx, project, taskID)
+	t, err := s.getTaskByID(ctx, project, taskID)
+	if err != nil {
+		return nil, err
+	}
+	if t.FollowUps, err = s.FollowUps(ctx, project, taskID); err != nil {
+		return nil, err
+	}
+	return t, nil
 }
 
 // getTaskByID fetches a task by ID and board_id.
