@@ -10,7 +10,7 @@
  *   decorate(row, tr, detailTr) and decorateHead(th, column): called each time the rows (or the header) are drawn, for the hooks a surface keeps on them.
  *   cell types: chip(word, cls), avatar(name), avatars(people, label), personButton(name, label), tag(text), timeCell(stamp), link(text, run), primaryButton(text, label)
  *   state: tableState(), kept by the caller across redraws: the sort, and the selection (a set of row keys, kept while the rows are filtered or paged, cleared when selectable.contextKey changes).
- * Folded (the table's own box narrower than foldAt rem, 40 by default; also at 200% text): fold 'column' is the two-line row (line 1 and line 2 cells), fold 'labeled' is the name, then "label value" lines
+ * Folded (the table's own box narrower than foldAt rem, 40 by default; 'fit' measures the unfolded columns; also at 200% text): fold 'column' is the two-line row (line 1 and line 2 cells), fold 'labeled' is the name, then "label value" lines
  * (the Analytics tables); scroll: a table of many columns scrolls sideways inside its box, shaded where more is to come, rather than being cut off; the header row is hidden and a "Sort by" select takes its place. Everything is built with the DOM and textContent: titles and names are written by agents. */
 import { whenText } from './when_text.js';
 import { browserLocal } from './safe_storage.js';
@@ -407,7 +407,19 @@ export function dataTable(cfg) {
     // folded: the table's own box narrower than foldAt rem (the root font size is read, so a larger text size folds sooner); set before the first paint
     if (cfg.fold !== 'none' && typeof ResizeObserver === 'function') {
         const root = () => parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-        new ResizeObserver(() => { const w = box.clientWidth; if (!w) return; const on = cfg.fold === 'always' || w < foldAt * root(); box.classList.toggle('dt-folded', on); }).observe(box);
+        const syncFold = () => {
+            const w = box.clientWidth; if (!w) return;
+            let on = cfg.fold === 'always' || w < foldAt * root();
+            if (foldAt === 'fit' && cfg.fold !== 'always') {
+                // Measure the actual table in its available width, before paint. Names may
+                // ellipsize; headers and metadata must fit without clipping or sideways scroll.
+                box.classList.remove('dt-folded');
+                on = table.getBoundingClientRect().width > w + 1;
+            }
+            box.classList.toggle('dt-folded', on);
+        };
+        new ResizeObserver(syncFold).observe(box);
+        document.fonts?.ready.then(syncFold);
     }
     return { el: box, bar, selectButton, selection: () => new Set(st.selected), clear, state: st };
 }

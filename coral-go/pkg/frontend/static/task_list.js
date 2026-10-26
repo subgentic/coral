@@ -496,14 +496,14 @@ function _taskTable(tasks, footer) {
         stateCol.cell = t => { const word = taskStatusWord(t.status, reviewRequested(t)), chip = DT.chip(word, statusClass(word)), st = taskStatus(t); chip.classList.add('board-task-status-wrap'); chip.title = st.detail; chip.setAttribute('aria-label', st.detail); return chip; };
         taskCol.firstDir = 'desc'; taskCol.subtitle = details;
         taskCol.cell = t => {
-            const cell = DT.el('span'), description = span('board-task-desc');
+            const cell = DT.el('span', 'dt-title-cell'), description = span('board-task-desc dt-title-content');
             const name = t.title || t.description || '';
             const b = DT.primaryButton(name, `${t._source === 'subagent' ? 'Open subagent' : `Open task #${t.id}`}: ${name}, ${taskStatus(t).detail}`);
             b.classList.add('board-task-open', 'board-task-name');
             cell.title = t._source === 'subagent' ? _subagentTooltip(t) : t.body || t.body_preview || '';
             description.title = cell.title;
             description.append(b);
-            cell.append(span('board-task-id', t.id != null ? `#${t.id}` : '—'), ' ', description);
+            cell.append(span('board-task-id dt-id', t.id != null ? `#${t.id}` : '—'), description);
             if (t._source === 'board') { const mark = document.createElement('template'); mark.innerHTML = _verifyMark(t); cell.append(mark.content); }
             return cell;
         };

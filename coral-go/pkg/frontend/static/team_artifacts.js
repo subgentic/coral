@@ -14,7 +14,7 @@ function currentTeam() {
     return state.currentSession?.type === 'live' ? sessionTeamKey(state.currentSession) || null : null;
 }
 
-/** The agent's artifacts are the team page's Artifacts table, scoped to this agent and drawn in the dock's panel (its document opens as a sheet over the panel). */
+/** The agent's artifacts are the team page's Artifacts table, scoped to this agent and drawn in the dock's panel (its document opens in the preview panel, leaving this list available). */
 async function showAgentArtifacts() {
     const host = document.getElementById('agentic-panel-artifacts-view'), session = state.currentSession;
     if (!host || !sessionID || !session) return;
