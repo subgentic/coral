@@ -11,13 +11,13 @@ import (
 // #7791, goal #21: task add --follow-up <id> makes a child task that takes the parent's goal, reviewers and assignee unless the caller gave their own, and links itself to the parent.
 func TestTaskAddFollowUpInheritsFromTheParent(t *testing.T) {
 	srv := newAssignServer(t)
-	srv.tasks[40] = map[string]any{"id": 40, "goal_id": 21, "assigned_to": "Orchestrator", "worked_by": "Backend Dev", "status": "completed",
-		"workflow": map[string]any{"reviewers": []any{"Security Reviewer", "QA Engineer"}}}
+	srv.setTask(40, map[string]any{"id": 40, "goal_id": 21, "assigned_to": "Orchestrator", "worked_by": "Backend Dev", "status": "completed",
+		"workflow": map[string]any{"reviewers": []any{"Security Reviewer", "QA Engineer"}}})
 	dir := subscribedDataDir(t, srv.URL)
 	res := runBoard(t, srv.URL, dir, "task", "add", "Fix the review notes", "--follow-up", "40")
 	require.Equal(t, 0, res.code, res.stderr)
-	require.Len(t, srv.created, 1)
-	got := srv.created[0]
+	require.Len(t, srv.createdTasks(), 1)
+	got := srv.createdTasks()[0]
 	assert.EqualValues(t, 21, got["goal_id"], "the parent's goal")
 	assert.Equal(t, "Backend Dev", got["assigned_to"], "who did the parent's work, not the orchestrator it sat with in review")
 	wf, _ := got["workflow"].(map[string]any)
@@ -29,7 +29,7 @@ func TestTaskAddFollowUpInheritsFromTheParent(t *testing.T) {
 	// the caller's own choices win
 	res = runBoard(t, srv.URL, dir, "task", "add", "Second", "--follow-up", "40", "--assignee", "Lead Developer", "--goal", "3", "--reviewers", "QA Engineer")
 	require.Equal(t, 0, res.code, res.stderr)
-	got = srv.created[1]
+	got = srv.createdTasks()[1]
 	assert.Equal(t, "Lead Developer", got["assigned_to"])
 	assert.EqualValues(t, 3, got["goal_id"])
 	wf, _ = got["workflow"].(map[string]any)
@@ -39,18 +39,18 @@ func TestTaskAddFollowUpInheritsFromTheParent(t *testing.T) {
 
 func TestTaskAddFollowUpOfATaskWithNoGoalOrWorkerTakesWhatThereIs(t *testing.T) {
 	srv := newAssignServer(t)
-	srv.tasks[41] = map[string]any{"id": 41, "assigned_to": "Dev A", "status": "in_progress", "workflow": map[string]any{}}
+	srv.setTask(41, map[string]any{"id": 41, "assigned_to": "Dev A", "status": "in_progress", "workflow": map[string]any{}})
 	dir := subscribedDataDir(t, srv.URL)
 	res := runBoard(t, srv.URL, dir, "task", "add", "More", "--follow-up", "41")
 	require.Equal(t, 0, res.code, res.stderr)
-	got := srv.created[0]
+	got := srv.createdTasks()[0]
 	assert.Equal(t, "Dev A", got["assigned_to"], "no worker yet: who has it")
 	assert.NotContains(t, got, "goal_id", "a parent on no goal gives none")
 }
 
 func TestTaskAddFollowUpRefusesWhatItCannotFollow(t *testing.T) {
 	srv := newAssignServer(t)
-	srv.tasks[40] = map[string]any{"id": 40, "status": "completed", "workflow": map[string]any{}}
+	srv.setTask(40, map[string]any{"id": 40, "status": "completed", "workflow": map[string]any{}})
 	dir := subscribedDataDir(t, srv.URL)
 	res := runBoard(t, srv.URL, dir, "task", "add", "x", "--follow-up", "99")
 	assert.NotZero(t, res.code)

@@ -72,6 +72,31 @@ func goalOf(body map[string]any) string {
 	return "null"
 }
 
+// setCurrent, setTask, createdTasks and sentMessages read and write what the handler reads and appends, under its lock: the handler runs on the server's goroutines.
+func (s *assignServer) setCurrent(m map[string]any) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.current = m
+}
+
+func (s *assignServer) setTask(id int64, m map[string]any) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.tasks[id] = m
+}
+
+func (s *assignServer) createdTasks() []map[string]any {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]map[string]any(nil), s.created...)
+}
+
+func (s *assignServer) sentMessages() []map[string]any {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]map[string]any(nil), s.messages...)
+}
+
 func (s *assignServer) counts() (tasks, messages int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -84,16 +109,16 @@ func TestPostAssignCreatesTheTaskAndPostsItsLink(t *testing.T) {
 	dir := subscribedDataDir(t, srv.URL)
 	res := runBoard(t, srv.URL, dir, "post", "--assign", "Backend Dev", "--goal", "7", "--priority", "high", "Fix the flaky test\nIt fails one run in ten under load.")
 	require.Equal(t, 0, res.code, res.stderr)
-	require.Len(t, srv.created, 1)
-	task := srv.created[0]
+	require.Len(t, srv.createdTasks(), 1)
+	task := srv.createdTasks()[0]
 	assert.Equal(t, "Fix the flaky test", task["title"], "the first line is the title")
 	assert.Equal(t, "Fix the flaky test\nIt fails one run in ten under load.", task["body"], "the post is the body")
 	assert.Equal(t, "Backend Dev", task["assigned_to"])
 	assert.EqualValues(t, 7, task["goal_id"])
 	assert.Equal(t, "high", task["priority"])
 	assert.Equal(t, "Tester", task["subscriber_id"], "the poster is the creator")
-	require.Len(t, srv.messages, 1)
-	msg := srv.messages[0]
+	require.Len(t, srv.sentMessages(), 1)
+	msg := srv.sentMessages()[0]
 	assert.EqualValues(t, 900, msg["task_id"], "the post is on the task")
 	content, _ := msg["content"].(string)
 	assert.Contains(t, content, "Fix the flaky test\nIt fails one run in ten under load.")
@@ -105,19 +130,19 @@ func TestPostAssignCreatesTheTaskAndPostsItsLink(t *testing.T) {
 
 func TestPostAssignTakesTheGoalOfThePostersOwnTask(t *testing.T) {
 	srv := newAssignServer(t)
-	srv.current = map[string]any{"id": 5, "goal_id": 21}
+	srv.setCurrent(map[string]any{"id": 5, "goal_id": 21})
 	dir := subscribedDataDir(t, srv.URL)
 	res := runBoard(t, srv.URL, dir, "post", "--assign", "QA Engineer", "--title", "Review the patch", "Please review coral://artifacts/abc.")
 	require.Equal(t, 0, res.code, res.stderr)
-	require.Len(t, srv.created, 1)
-	assert.EqualValues(t, 21, srv.created[0]["goal_id"], "the goal of the poster's in-progress task")
-	assert.Equal(t, "Review the patch", srv.created[0]["title"], "--title wins over the first line")
-	assert.Equal(t, "medium", srv.created[0]["priority"])
+	require.Len(t, srv.createdTasks(), 1)
+	assert.EqualValues(t, 21, srv.createdTasks()[0]["goal_id"], "the goal of the poster's in-progress task")
+	assert.Equal(t, "Review the patch", srv.createdTasks()[0]["title"], "--title wins over the first line")
+	assert.Equal(t, "medium", srv.createdTasks()[0]["priority"])
 
 	// an explicit --goal wins over the task's
 	res = runBoard(t, srv.URL, dir, "post", "--assign", "QA Engineer", "--goal", "3", "Second job")
 	require.Equal(t, 0, res.code, res.stderr)
-	assert.EqualValues(t, 3, srv.created[1]["goal_id"])
+	assert.EqualValues(t, 3, srv.createdTasks()[1]["goal_id"])
 }
 
 func TestPostAssignWithNoGoalRefusesAndCreatesNothing(t *testing.T) {
@@ -130,7 +155,7 @@ func TestPostAssignWithNoGoalRefusesAndCreatesNothing(t *testing.T) {
 	tasks, msgs := srv.counts()
 	assert.Zero(t, tasks+msgs, "no guess: nothing was made")
 
-	srv.current = map[string]any{"id": 5} // a task on no goal is no goal either
+	srv.setCurrent(map[string]any{"id": 5}) // a task on no goal is no goal either
 	res = runBoard(t, srv.URL, dir, "post", "--assign", "Backend Dev", "Fix the flake")
 	assert.Equal(t, 1, res.code)
 	tasks, msgs = srv.counts()
@@ -171,7 +196,7 @@ func TestPostAssignLongFirstLineMakesAShortTitle(t *testing.T) {
 	long := strings.Repeat("word ", 40)
 	res := runBoard(t, srv.URL, dir, "post", "--assign", "Backend Dev", "--goal", "1", long)
 	require.Equal(t, 0, res.code, res.stderr)
-	title, _ := srv.created[0]["title"].(string)
+	title, _ := srv.createdTasks()[0]["title"].(string)
 	assert.LessOrEqual(t, len([]rune(title)), maxAssignTitle)
 	assert.True(t, strings.HasSuffix(title, "…"))
 }

@@ -58,6 +58,19 @@ func newGoalServer(t *testing.T) *goalServer {
 	return gs
 }
 
+// setReply and setStatus change what the handler answers under the lock it reads them with: the handler runs on the server's goroutines.
+func (gs *goalServer) setReply(key, body string) {
+	gs.mu.Lock()
+	defer gs.mu.Unlock()
+	gs.reply[key] = body
+}
+
+func (gs *goalServer) setStatus(status int) {
+	gs.mu.Lock()
+	defer gs.mu.Unlock()
+	gs.status = status
+}
+
 func (gs *goalServer) requests() []string {
 	gs.mu.Lock()
 	defer gs.mu.Unlock()
@@ -80,7 +93,7 @@ func bodyOf(t *testing.T, req string) map[string]any {
 
 func TestGoalAddSendsTheFieldsAndPrintsTheId(t *testing.T) {
 	gs := newGoalServer(t)
-	gs.reply["POST /api/board/team/goals"] = `{"id":7,"title":"Ship teams","state":"proposed"}`
+	gs.setReply("POST /api/board/team/goals", `{"id":7,"title":"Ship teams","state":"proposed"}`)
 	res := goalRun(t, gs, "goal", "add", "Ship teams", "--outcome", "Orgs own machines", "--done-when", "an admin approves one", "--state", "proposed", "--driver", "Orchestrator")
 	require.Equal(t, 0, res.code, res.stderr)
 	assert.Equal(t, "Created Goal #7: Ship teams\n", res.stdout)
@@ -91,7 +104,7 @@ func TestGoalAddSendsTheFieldsAndPrintsTheId(t *testing.T) {
 	assert.Equal(t, map[string]any{"title": "Ship teams", "outcome": "Orgs own machines", "done_when": "an admin approves one", "state": "proposed", "driver": "Orchestrator", "subscriber_id": "Tester"}, b)
 
 	// The title is printed as the server stored it, cleaned, not as typed (#7239).
-	gs.reply["POST /api/board/team/goals"] = `{"id":8,"title":"Tred X","state":"active"}`
+	gs.setReply("POST /api/board/team/goals", `{"id":8,"title":"Tred X","state":"active"}`)
 	res = goalRun(t, gs, "goal", "add", "Tred\x1b[31m\u202eX")
 	require.Equal(t, 0, res.code, res.stderr)
 	assert.Equal(t, "Created Goal #8: Tred X\n", res.stdout)
@@ -111,7 +124,7 @@ func TestGoalAddSendsTheFieldsAndPrintsTheId(t *testing.T) {
 
 func TestGoalListAndShowRead(t *testing.T) {
 	gs := newGoalServer(t)
-	gs.reply["GET /api/board/team/goals"] = `{"goals":[{"id":3,"title":"Ship teams","state":"active","driver":"Orchestrator","rollup":{"done":2,"active":1,"blocked":0,"queued":2,"total":5}},{"id":4,"title":"No tasks","state":"blocked","rollup":{"total":0}}]}`
+	gs.setReply("GET /api/board/team/goals", `{"goals":[{"id":3,"title":"Ship teams","state":"active","driver":"Orchestrator","rollup":{"done":2,"active":1,"blocked":0,"queued":2,"total":5}},{"id":4,"title":"No tasks","state":"blocked","rollup":{"total":0}}]}`)
 	res := goalRun(t, gs, "goal", "list")
 	require.Equal(t, 0, res.code, res.stderr)
 	assert.Contains(t, res.stdout, "#3   active    Orchestrator    2/5       Ship teams")
@@ -126,17 +139,17 @@ func TestGoalListAndShowRead(t *testing.T) {
 	assert.Contains(t, gs.requests()[1], "state=proposed,active,blocked,done,dropped")
 
 	// The goals come in pages: the list follows next_cursor to the end (#7239).
-	gs.reply["GET /api/board/team/goals"] = `{"goals":[{"id":3,"title":"First page","state":"active"}],"next_cursor":"c1"}`
-	gs.reply["GET /api/board/team/goals?cursor=c1"] = `{"goals":[{"id":9,"title":"Second page","state":"active"}],"next_cursor":""}`
+	gs.setReply("GET /api/board/team/goals", `{"goals":[{"id":3,"title":"First page","state":"active"}],"next_cursor":"c1"}`)
+	gs.setReply("GET /api/board/team/goals?cursor=c1", `{"goals":[{"id":9,"title":"Second page","state":"active"}],"next_cursor":""}`)
 	res = goalRun(t, gs, "goal", "list")
 	require.Equal(t, 0, res.code, res.stderr)
 	assert.Contains(t, res.stdout, "First page")
 	assert.Contains(t, res.stdout, "Second page")
 	delete(gs.reply, "GET /api/board/team/goals?cursor=c1")
-	gs.reply["GET /api/board/team/goals"] = `{"goals":[{"id":3,"title":"Ship teams","state":"active","driver":"Orchestrator","rollup":{"done":2,"active":1,"blocked":0,"queued":2,"total":5}},{"id":4,"title":"No tasks","state":"blocked","rollup":{"total":0}}]}`
+	gs.setReply("GET /api/board/team/goals", `{"goals":[{"id":3,"title":"Ship teams","state":"active","driver":"Orchestrator","rollup":{"done":2,"active":1,"blocked":0,"queued":2,"total":5}},{"id":4,"title":"No tasks","state":"blocked","rollup":{"total":0}}]}`)
 
-	gs.reply["GET /api/board/team/goals/3"] = `{"id":3,"title":"Ship teams","state":"blocked","driver":"Orchestrator","blocked_on":"the operator","rollup":{"done":1,"active":0,"blocked":1,"queued":0,"total":2}}`
-	gs.reply["GET /api/board/team/tasks"] = `{"tasks":[{"id":11,"title":"Build it","status":"completed","assigned_to":"Backend Dev"},{"id":12,"title":"Test it","status":"blocked"}],"next_cursor":""}`
+	gs.setReply("GET /api/board/team/goals/3", `{"id":3,"title":"Ship teams","state":"blocked","driver":"Orchestrator","blocked_on":"the operator","rollup":{"done":1,"active":0,"blocked":1,"queued":0,"total":2}}`)
+	gs.setReply("GET /api/board/team/tasks", `{"tasks":[{"id":11,"title":"Build it","status":"completed","assigned_to":"Backend Dev"},{"id":12,"title":"Test it","status":"blocked"}],"next_cursor":""}`)
 	res = goalRun(t, gs, "goal", "show", "3")
 	require.Equal(t, 0, res.code, res.stderr)
 	for _, want := range []string{"Goal #3: Ship teams", "State:", "blocked", "Blocked on:", "the operator", "1 done, 0 active, 1 blocked, 0 queued (2)", "#11   completed    Backend Dev", "#12   blocked      —"} {
@@ -172,14 +185,14 @@ func TestGoalUpdateSendsOnlyWhatWasGivenAndClears(t *testing.T) {
 
 func TestGoalCloseReportsOpenTasksAndNeedsAReason(t *testing.T) {
 	gs := newGoalServer(t)
-	gs.reply["POST /api/board/team/goals/3/close"] = `{"goal":{"id":3,"state":"dropped"},"open_tasks":2}`
+	gs.setReply("POST /api/board/team/goals/3/close", `{"goal":{"id":3,"state":"dropped"},"open_tasks":2}`)
 	res := goalRun(t, gs, "goal", "close", "3", "--reason", "not doing it", "--state", "dropped")
 	require.Equal(t, 0, res.code, res.stderr)
 	assert.Contains(t, res.stdout, "Closed Goal #3 (dropped)")
 	assert.Contains(t, res.stdout, "2 tasks of this goal are still open")
 	assert.Equal(t, map[string]any{"reason": "not doing it", "state": "dropped", "subscriber_id": "Tester"}, bodyOf(t, gs.requests()[0]))
 
-	gs.reply["POST /api/board/team/goals/4/close"] = `{"goal":{"id":4,"state":"done"},"open_tasks":1}`
+	gs.setReply("POST /api/board/team/goals/4/close", `{"goal":{"id":4,"state":"done"},"open_tasks":1}`)
 	res = goalRun(t, gs, "goal", "close", "4", "--reason", "shipped")
 	require.Equal(t, 0, res.code, res.stderr)
 	assert.Contains(t, res.stdout, "1 task of this goal is still open")
@@ -212,7 +225,7 @@ func TestTaskGoalLinksMovesAndClears(t *testing.T) {
 
 func TestTaskAddAndListTakeTheGoal(t *testing.T) {
 	gs := newGoalServer(t)
-	gs.reply["POST /api/board/team/tasks"] = `{"id":21}`
+	gs.setReply("POST /api/board/team/tasks", `{"id":21}`)
 	res := goalRun(t, gs, "task", "add", "Do it", "--goal", "3")
 	require.Equal(t, 0, res.code, res.stderr)
 	// task add with no goal also reads the board's open goals for its hint (#7296); the requests that matter here are the others
@@ -231,7 +244,7 @@ func TestTaskAddAndListTakeTheGoal(t *testing.T) {
 	require.Equal(t, 0, res.code, res.stderr)
 	assert.NotContains(t, bodyOf(t, requests()[1]), "goal_id", "no goal given: none sent")
 
-	gs.reply["GET /api/board/team/tasks"] = `{"tasks":[{"id":11,"title":"Build it","status":"pending","priority":"high"}],"next_cursor":""}`
+	gs.setReply("GET /api/board/team/tasks", `{"tasks":[{"id":11,"title":"Build it","status":"pending","priority":"high"}],"next_cursor":""}`)
 	res = goalRun(t, gs, "task", "list", "--goal", "3")
 	require.Equal(t, 0, res.code, res.stderr)
 	assert.Contains(t, res.stdout, "Build it")
@@ -247,7 +260,7 @@ func TestTaskAddAndListTakeTheGoal(t *testing.T) {
 
 func TestGoalErrorsAreTheServersSentence(t *testing.T) {
 	gs := newGoalServer(t)
-	gs.status = 404
+	gs.setStatus(404)
 	res := goalRun(t, gs, "goal", "show", "9")
 	assert.Equal(t, 6, res.code, res.stderr)
 	assert.Contains(t, res.stderr, "that goal is not on this board")
@@ -286,9 +299,9 @@ func TestGoalHelp(t *testing.T) {
 // #7184: a goal's tasks come a page at a time, by next_cursor, and goal show lists every one of them (there is no cut to report).
 func TestGoalShowFollowsTheTaskCursor(t *testing.T) {
 	gs := newGoalServer(t)
-	gs.reply["GET /api/board/team/goals/3"] = `{"id":3,"title":"Big","state":"active","rollup":{"done":0,"active":0,"blocked":0,"queued":3,"total":3}}`
-	gs.reply["GET /api/board/team/tasks"] = `{"tasks":[{"id":11,"title":"A","status":"pending"},{"id":12,"title":"B","status":"pending"}],"next_cursor":"c1"}`
-	gs.reply["GET /api/board/team/tasks?cursor=c1"] = `{"tasks":[{"id":13,"title":"C","status":"pending"}],"next_cursor":""}`
+	gs.setReply("GET /api/board/team/goals/3", `{"id":3,"title":"Big","state":"active","rollup":{"done":0,"active":0,"blocked":0,"queued":3,"total":3}}`)
+	gs.setReply("GET /api/board/team/tasks", `{"tasks":[{"id":11,"title":"A","status":"pending"},{"id":12,"title":"B","status":"pending"}],"next_cursor":"c1"}`)
+	gs.setReply("GET /api/board/team/tasks?cursor=c1", `{"tasks":[{"id":13,"title":"C","status":"pending"}],"next_cursor":""}`)
 	res := goalRun(t, gs, "goal", "show", "3")
 	require.Equal(t, 0, res.code, res.stderr)
 	for _, title := range []string{" A", " B", " C"} {

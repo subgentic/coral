@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,14 +14,16 @@ import (
 // Each way a request can fail has its own exit code, and the message says what to do (#228). Run as subprocesses, so the exit code is the real one.
 func TestExitCodesByFailure(t *testing.T) {
 	release := make(chan struct{})
-	status := 200
+	var status atomic.Int32 // the handler reads it on the server's goroutine
+	status.Store(200)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if status == 0 {
+		st := int(status.Load())
+		if st == 0 {
 			<-release // never answers
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(status)
+		w.WriteHeader(st)
 		w.Write([]byte(`{"error":"nope"}`))
 	}))
 	defer srv.Close()
@@ -38,13 +41,13 @@ func TestExitCodesByFailure(t *testing.T) {
 
 	// 5 and 6: the server answers 401/403 and 404
 	for st, want := range map[int]int{401: 5, 403: 5, 404: 6, 500: 1} {
-		status = st
+		status.Store(int32(st))
 		res = runBoard(t, srv.URL, dir, "read")
 		assert.Equal(t, want, res.code, "HTTP %d: %q", st, res.stderr)
 	}
 
 	// 4: the server accepts and never answers, and CORAL_TIMEOUT (1s is the shortest) ends the wait
-	status = 0
+	status.Store(0)
 	res = runBoardEnv(t, srv.URL, dir, []string{"CORAL_TIMEOUT=1s"}, "read")
 	assert.Equal(t, 4, res.code, "timeout: %q", res.stderr)
 	assert.Contains(t, res.stderr, "did not answer within 1s")
@@ -65,10 +68,11 @@ func TestHelpHasTheExitCodeTable(t *testing.T) {
 // The review verbs end with the code of what failed (QA's live check of #101): a 404 is 6, a missing --to or --note is a usage error (2), and the message
 // carries the server's words, not "<nil>".
 func TestReviewVerbsExitCodes(t *testing.T) {
-	status := 404
+	var status atomic.Int32 // the handler reads it on the server's goroutine
+	status.Store(404)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(status)
+		w.WriteHeader(int(status.Load()))
 		w.Write([]byte(`{"error":"Task not found"}`))
 	}))
 	defer srv.Close()
@@ -79,7 +83,7 @@ func TestReviewVerbsExitCodes(t *testing.T) {
 		assert.Contains(t, res.stderr, "Coral says: Task not found (HTTP 404)", verb)
 		assert.NotContains(t, res.stderr, "<nil>", verb)
 	}
-	status = 403
+	status.Store(403)
 	res := runBoard(t, srv.URL, dir, "task", "review", "999", "--to", "QA Engineer")
 	assert.Equal(t, 5, res.code, res.stderr)
 	res = runBoard(t, srv.URL, dir, "task", "review", "999")

@@ -14,8 +14,8 @@ const twoGoals = `{"goals":[{"id":3,"title":"Ship the goals page","state":"activ
 
 func TestTaskAddWithNoGoalNamesTheBoardsOpenGoals(t *testing.T) {
 	gs := newGoalServer(t)
-	gs.reply["POST /api/board/team/tasks"] = `{"id":9,"title":"Fix it"}`
-	gs.reply["GET /api/board/team/goals"] = twoGoals
+	gs.setReply("POST /api/board/team/tasks", `{"id":9,"title":"Fix it"}`)
+	gs.setReply("GET /api/board/team/goals", twoGoals)
 	res := goalRun(t, gs, "task", "add", "Fix it")
 	require.Equal(t, 0, res.code, res.stderr)
 	assert.Contains(t, res.stdout, "Created Task #9: Fix it")
@@ -33,7 +33,7 @@ func TestTaskAddWithNoGoalNamesTheBoardsOpenGoals(t *testing.T) {
 	// With --goal given there is nothing to say; with no open goal there is nothing to name; a goals read that fails says nothing and does not fail the add.
 	res = goalRun(t, gs, "task", "add", "Fix it", "--goal", "3")
 	assert.NotContains(t, res.stdout, "open goals")
-	gs.reply["GET /api/board/team/goals"] = `{"goals":[],"next_cursor":""}`
+	gs.setReply("GET /api/board/team/goals", `{"goals":[],"next_cursor":""}`)
 	res = goalRun(t, gs, "task", "add", "Fix it")
 	assert.Equal(t, "Created Task #9: Fix it\n", res.stdout)
 	delete(gs.reply, "GET /api/board/team/goals")
@@ -43,8 +43,8 @@ func TestTaskAddWithNoGoalNamesTheBoardsOpenGoals(t *testing.T) {
 
 func TestJoinListsTheOpenGoalsWithWhatMakesThemDone(t *testing.T) {
 	gs := newGoalServer(t)
-	gs.reply["POST /api/board/team/subscribe"] = `{"project":"team","subscriber_id":"Tester"}`
-	gs.reply["GET /api/board/team/goals"] = twoGoals
+	gs.setReply("POST /api/board/team/subscribe", `{"project":"team","subscriber_id":"Tester"}`)
+	gs.setReply("GET /api/board/team/goals", twoGoals)
 	res := goalRun(t, gs, "join", "team", "--as", "Developer")
 	require.Equal(t, 0, res.code, res.stderr)
 	assert.Contains(t, res.stdout, "Joined 'team' as 'Developer'")
@@ -54,7 +54,7 @@ func TestJoinListsTheOpenGoalsWithWhatMakesThemDone(t *testing.T) {
 	assert.Contains(t, res.stdout, "blocked", "a blocked goal says so")
 	assert.Contains(t, res.stdout, "--goal <id>", "and how a task joins one")
 
-	gs.reply["GET /api/board/team/goals"] = `{"goals":[],"next_cursor":""}`
+	gs.setReply("GET /api/board/team/goals", `{"goals":[],"next_cursor":""}`)
 	res = goalRun(t, gs, "join", "team", "--as", "Developer")
 	assert.Equal(t, "Joined 'team' as 'Developer' (subscriber: Tester)\n", res.stdout, "a board with no goals says nothing more")
 }
@@ -63,20 +63,20 @@ func TestJoinListsTheOpenGoalsWithWhatMakesThemDone(t *testing.T) {
 // change (the goals list's seq moved since this agent's last read); nothing when the board has none; --json is untouched.
 func TestReadPrintsTheGoalsBlockWhenTheBoardsGoalsChanged(t *testing.T) {
 	gs := newGoalServer(t)
-	gs.reply["GET /api/board/team/messages"] = `[]`
+	gs.setReply("GET /api/board/team/messages", `[]`)
 	dir := subscribedDataDir(t, gs.URL)
 	read := func(args ...string) boardRun {
 		return runBoard(t, gs.URL, dir, append([]string{"read"}, args...)...)
 	}
 
 	// No goals on the board: nothing more than before.
-	gs.reply["GET /api/board/team/goals"] = `{"goals":[],"next_cursor":"","seq":0}`
+	gs.setReply("GET /api/board/team/goals", `{"goals":[],"next_cursor":"","seq":0}`)
 	res := read()
 	require.Equal(t, 0, res.code, res.stderr)
 	assert.Equal(t, "No new messages.\n", res.stdout)
 
 	// A goal appears: the next read says so, with what makes it done; the read after that is quiet.
-	gs.reply["GET /api/board/team/goals"] = twoGoals[:len(twoGoals)-len(`,"next_cursor":""}`)] + `,"next_cursor":"","seq":4}`
+	gs.setReply("GET /api/board/team/goals", twoGoals[:len(twoGoals)-len(`,"next_cursor":""}`)]+`,"next_cursor":"","seq":4}`)
 	res = read()
 	require.Equal(t, 0, res.code, res.stderr)
 	assert.Contains(t, res.stdout, "No new messages.")
@@ -87,7 +87,7 @@ func TestReadPrintsTheGoalsBlockWhenTheBoardsGoalsChanged(t *testing.T) {
 	assert.Equal(t, "No new messages.\n", res.stdout, "the same seq: said once")
 
 	// The goals change (the seq moves): said again. --json prints no block.
-	gs.reply["GET /api/board/team/goals"] = twoGoals[:len(twoGoals)-len(`,"next_cursor":""}`)] + `,"next_cursor":"","seq":5}`
+	gs.setReply("GET /api/board/team/goals", twoGoals[:len(twoGoals)-len(`,"next_cursor":""}`)]+`,"next_cursor":"","seq":5}`)
 	res = read("--json")
 	assert.NotContains(t, res.stdout, "open goals")
 	res = read()
@@ -98,16 +98,16 @@ func TestReadPrintsTheGoalsBlockWhenTheBoardsGoalsChanged(t *testing.T) {
 
 	// A goals read that fails says nothing and does not fail the read.
 	delete(gs.reply, "GET /api/board/team/goals")
-	gs.status = 0
+	gs.setStatus(0)
 	res = read()
 	assert.Equal(t, 0, res.code)
 }
 
 func TestJoinSavesTheGoalsSeqSoTheFirstReadIsQuiet(t *testing.T) {
 	gs := newGoalServer(t)
-	gs.reply["POST /api/board/team/subscribe"] = `{"project":"team","subscriber_id":"Tester"}`
-	gs.reply["GET /api/board/team/messages"] = `[]`
-	gs.reply["GET /api/board/team/goals"] = twoGoals[:len(twoGoals)-len(`,"next_cursor":""}`)] + `,"next_cursor":"","seq":4}`
+	gs.setReply("POST /api/board/team/subscribe", `{"project":"team","subscriber_id":"Tester"}`)
+	gs.setReply("GET /api/board/team/messages", `[]`)
+	gs.setReply("GET /api/board/team/goals", twoGoals[:len(twoGoals)-len(`,"next_cursor":""}`)]+`,"next_cursor":"","seq":4}`)
 	dir := t.TempDir()
 	res := runBoard(t, gs.URL, dir, "join", "team", "--as", "Developer")
 	require.Equal(t, 0, res.code, res.stderr)

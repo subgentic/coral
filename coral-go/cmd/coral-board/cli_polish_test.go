@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -212,9 +213,10 @@ func TestGetBoardTimesOut(t *testing.T) {
 
 // task current --json prints the task as JSON, or null when there is none; without --json it is the text it always was (#241 R1).
 func TestTaskCurrentJSON(t *testing.T) {
-	have := true
+	var have atomic.Bool // the handler reads it on the server's goroutine
+	have.Store(true)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !have {
+		if !have.Load() {
 			w.WriteHeader(http.StatusNotFound)
 			w.Write([]byte(`{"error":"no active task"}`))
 			return
@@ -236,7 +238,7 @@ func TestTaskCurrentJSON(t *testing.T) {
 	res = runBoard(t, srv.URL, dir, "task", "current")
 	assert.Contains(t, res.stdout, "Task #7")
 
-	have = false
+	have.Store(false)
 	res = runBoard(t, srv.URL, dir, "task", "current", "--json")
 	assert.Equal(t, 0, res.code)
 	assert.Equal(t, "null", strings.TrimSpace(res.stdout))
