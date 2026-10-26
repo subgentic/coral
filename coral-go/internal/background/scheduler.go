@@ -195,13 +195,6 @@ func (s *JobScheduler) SetNextFireTimeFn(fn func(cronExpr, tz string, after time
 	s.nextFireTimeFn = fn
 }
 
-// RunningCount returns the number of active watchdog goroutines.
-func (s *JobScheduler) RunningCount() int {
-	s.runningMu.Lock()
-	defer s.runningMu.Unlock()
-	return len(s.running)
-}
-
 // Run starts the scheduler loop.
 func (s *JobScheduler) Run(ctx context.Context) error {
 	s.parentCtx = ctx // store for launchAndWatch goroutines

@@ -173,12 +173,3 @@ func (s *Store) GetAllSubscriptions(ctx context.Context) (map[string]*Subscriber
 	}
 	return result, nil
 }
-
-// UpdateSessionName updates the mutable tmux/pty session name for a subscriber.
-// Used when an agent restarts and gets a new session but keeps its identity.
-func (s *Store) UpdateSessionName(ctx context.Context, project, subscriberID, sessionName string) error {
-	_, err := s.db.ExecContext(ctx,
-		"UPDATE board_subscribers SET session_name = ? WHERE project = ? AND subscriber_id = ?",
-		sessionName, project, subscriberID)
-	return err
-}
