@@ -18,6 +18,7 @@
     --bg-secondary: #18181c;
     --bg-tertiary:  #212126;
     --bg-hover:     #2a2a30;
+    --viz-1: #3987e5; --viz-2: #d95926; --viz-3: #199e70; --viz-4: #c98500; --viz-5: #d55181; --viz-6: #008300; --viz-7: #9085e9; --viz-other: #6e7076; /* the line colours of the charts over time (#7857): seven and Other, validated as a set against each theme's chart surface */
     --bg-elevated:  #1e1e24;
 
     /* Borders */
@@ -237,6 +238,7 @@
     --bg-secondary: #ecedf0;
     --bg-tertiary:  #e2e4e8;
     --bg-hover:     #d8dbe0;
+    --viz-1: #2a78d6; --viz-2: #eb6834; --viz-3: #1baf7a; --viz-4: #eda100; --viz-5: #e87ba4; --viz-6: #008300; --viz-7: #6250d6; --viz-other: #8b8d93;
     --bg-elevated:  #e8eaed;
 
     /* Borders */
