@@ -4,6 +4,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -12,14 +13,16 @@ import (
 // coral-agent exits with a code for each way a request fails (#228).
 func TestAgentExitCodesByFailure(t *testing.T) {
 	release := make(chan struct{})
-	status := 404
+	var status atomic.Int64
+	status.Store(404)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if status == 0 {
+		requestStatus := int(status.Load())
+		if requestStatus == 0 {
 			<-release
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(status)
+		w.WriteHeader(requestStatus)
 		w.Write([]byte(`{"error":"no"}`))
 	}))
 	defer srv.Close()
@@ -33,12 +36,12 @@ func TestAgentExitCodesByFailure(t *testing.T) {
 	assert.Contains(t, stderr, "Is Coral running?")
 
 	for st, want := range map[int]int{401: 5, 403: 5, 404: 6, 500: 1} {
-		status = st
+		status.Store(int64(st))
 		code, _, stderr = runAgent(t, srv.URL, "task", "list")
 		assert.Equal(t, want, code, "HTTP %d: %q", st, stderr)
 	}
 
-	status = 0
+	status.Store(0)
 	code, _, stderr = runAgentEnv(t, srv.URL, []string{"CORAL_TIMEOUT=1s"}, "task", "list")
 	assert.Equal(t, 4, code, stderr)
 	assert.Contains(t, stderr, "did not answer within 1s")

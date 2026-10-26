@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -204,9 +205,12 @@ func TestArtifactUploadTaskOptionsOnTheCommandLine(t *testing.T) {
 	if err := os.WriteFile(file, []byte("hello"), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	var mu sync.Mutex
 	var headers []string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
 		headers = append(headers, r.Header.Get("X-Artifact-Task"))
+		mu.Unlock()
 		_, _ = w.Write([]byte(`{"uri":"coral://artifacts/abc123"}`))
 	}))
 	defer srv.Close()
@@ -216,8 +220,11 @@ func TestArtifactUploadTaskOptionsOnTheCommandLine(t *testing.T) {
 			t.Errorf("%v: exit %d, want the usage error 2", bad, code)
 		}
 	}
-	if len(headers) != 0 {
-		t.Fatalf("a usage error sends nothing: %v", headers)
+	mu.Lock()
+	initialHeaders := append([]string(nil), headers...)
+	mu.Unlock()
+	if len(initialHeaders) != 0 {
+		t.Fatalf("a usage error sends nothing: %v", initialHeaders)
 	}
 	if code, _, e := runAgentWithToken(t, srv.URL, "artifact", "upload", file, "--no-task"); code != 0 {
 		t.Fatalf("--no-task: exit %d %s", code, e)
@@ -225,7 +232,10 @@ func TestArtifactUploadTaskOptionsOnTheCommandLine(t *testing.T) {
 	if code, _, e := runAgentWithToken(t, srv.URL, "artifact", "upload", file, "--task", "7644"); code != 0 {
 		t.Fatalf("--task: exit %d %s", code, e)
 	}
-	if strings.Join(headers, ",") != "none,7644" {
-		t.Errorf("headers %q", headers)
+	mu.Lock()
+	gotHeaders := append([]string(nil), headers...)
+	mu.Unlock()
+	if strings.Join(gotHeaders, ",") != "none,7644" {
+		t.Errorf("headers %q", gotHeaders)
 	}
 }
