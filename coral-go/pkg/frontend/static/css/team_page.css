@@ -250,3 +250,12 @@
     .goal-side-search { min-height: 44px; }
 }
 .goals-note.team-agents-count { margin: 8px 0 4px; } /* the count line: 8 px under the search row, a little above the table (#8271) */
+
+/* Inbox shares the task toolbar outside .team-panel. One state control: the
+ * pills when its own width permits, the select alone below 40rem. */
+.inbox-tasks-toolbar { container: inboxtasks / inline-size; }
+.inbox-tasks-toolbar .team-tb-select { display: none; }
+@container inboxtasks (max-width: 40rem) {
+    .inbox-tasks-toolbar .team-tb-pills { display: none; }
+    .inbox-tasks-toolbar .team-tb-select { display: block; }
+}
