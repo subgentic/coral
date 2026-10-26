@@ -1,5 +1,9 @@
 // The Workflow page (#6515 finding 3, #6551): its name once, the last failure in words, steps numbered from 1 with their command, runs as When / Result / Took / Started by. 1280 and 390 px, stubbed API with #6530's fields.
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const { setTheme } = require('./helpers/contrast');
+const SHOT_DIR = process.env.CORAL_SCREENSHOT_DIR || process.env.SHOTS || path.join(process.env.RUNNER_TEMP || require('node:os').tmpdir(), 'out', 'shots');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 
@@ -56,7 +60,13 @@ const BASE = require('./test_base').BASE;
                 assert.ok(ratio >= 4.5, at + `the failure line's contrast in the ${theme} theme is ${ratio.toFixed(2)}, under 4.5`);
             }
             await ev(`document.documentElement.removeAttribute('data-theme'); true`);
-            if (process.env.SHOTS) { const s = await Page.captureScreenshot({ format: 'png' }); require('fs').writeFileSync(`${process.env.SHOTS}/workflow-page-${w}.png`, Buffer.from(s.data, 'base64')); }
+            fs.mkdirSync(SHOT_DIR, { recursive: true });
+            await ev(`document.querySelector('#wf-detail .wf-steps-table').scrollIntoView({ block: 'center' }); true`);
+            for (const theme of ['dark', 'light']) {
+                await setTheme(ev, theme);
+                const shot = await Page.captureScreenshot({ format: 'png' });
+                fs.writeFileSync(path.join(SHOT_DIR, `workflow-page-${w}-${theme}.png`), Buffer.from(shot.data, 'base64'));
+            }
         }
         console.log('PASS workflow page: name once, steps from 1 with commands, runs in words');
     } finally { await client.close(); }
