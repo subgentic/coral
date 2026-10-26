@@ -31,7 +31,7 @@ var pageSamples = map[string]string{
 	"/jobs":           "/jobs",
 	"/jobs/*":         "/jobs/x",
 	"/analytics":      "/analytics",
-	"/analytics/*":    "/analytics/x",
+	"/analytics/*":    "/analytics/provider",
 	"/docs":           "/docs",
 	"/docs/*":         "/docs/board",
 	"/servers":        "/servers",

@@ -39,6 +39,12 @@ rt('/workflows/7', { view: 'workflows', id: 7 });
 rt('/workflows/7/runs/3', { view: 'workflows', id: 7, run: 3 });
 rt('/jobs', { view: 'jobs' });
 rt('/analytics', { view: 'analytics' });
+// Each Analytics page has its own path (#8606); Overview is /analytics
+for (const v of ['provider', 'model', 'thinking', 'team', 'agent', 'branch', 'task', 'calls', 'per-commit', 'task-time']) rt(`/analytics/${v}`, { view: 'analytics', sub: v });
+assert.deepEqual(parse('/analytics/overview'), { view: 'analytics' }, '/analytics/overview is Overview');
+assert.equal(build({ view: 'analytics', sub: 'overview' }), '/analytics', 'Overview has the bare path');
+assert.equal(build({ view: 'analytics', sub: 'agent-detail' }), '/analytics/agent', 'an agent page is under By agent');
+for (const bad of ['/analytics/agent-detail', '/analytics/x/y', '/analytics/provider/model', '/analytics/..%2Fapi']) assert.equal(parse(bad), null, bad);
 rt('/docs/board', { view: 'docs', id: 'board' });
 rt('/docs/README', { view: 'docs', id: 'README' });
 rt('/servers/m2', { view: 'servers', id: 'm2' });

@@ -4,6 +4,8 @@
 import { escapeHtml, escapeAttr } from './utils.js';
 import { isPhoneLayout } from './phone_layout.js';
 import { setText } from './dom_write.js';
+import { state } from './state.js';
+import { note } from './nav.js';
 
 export const VIEWS = [
     { key: 'overview', label: 'Overview' },
@@ -52,9 +54,11 @@ export function syncRangeLine() {
 }
 
 /** Shows a view: the page's data-view, its title and the list's marks; on a phone it is the screen after the list. */
-export function selectView(key, { focus = false } = {}) {
+export function selectView(key, { focus = false, fromHistory = false } = {}) {
     const v = VIEWS.find(x => x.key === key) || VIEWS[0];
     current = v.key;
+    state.analyticsView = v.key;
+    if (!fromHistory) note({ view: 'analytics', sub: v.key }); // the page is in the address (#8606): a click and Back stay in step
     const el = page();
     if (el) {
         el.dataset.view = v.key;
@@ -73,6 +77,7 @@ export function selectView(key, { focus = false } = {}) {
 /** On a phone: back from a view to the list. */
 export function phoneBack() {
     page()?.removeAttribute('data-phone-item');
+    note({ view: 'analytics' }); // the list
     drawViews();
     (document.querySelector('#cost-nav-list .row-btn[aria-current="true"]') || document.querySelector('#cost-nav-list .row-btn'))?.focus({ preventScroll: true }); // the view just left, else the first
 }
@@ -80,7 +85,9 @@ export function phoneBack() {
 /** The tab was opened: the list is drawn, the view that was open stays (a phone starts at the list). */
 export function showViews() {
     const el = page();
+    const ask = state.analyticsAsk; // a route asked for a page (/analytics/<page>): read once
+    state.analyticsAsk = null;
     if (el && isPhoneLayout()) el.removeAttribute('data-phone-item');
-    selectView(current);
-    if (el && isPhoneLayout()) el.removeAttribute('data-phone-item');
+    selectView(ask ? ask.view : current, { fromHistory: true });
+    if (el && isPhoneLayout() && !(ask && ask.open)) el.removeAttribute('data-phone-item');
 }

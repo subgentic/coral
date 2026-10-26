@@ -42,7 +42,7 @@ export function switchNavTab(tab, opts = {}) {
     if (!opts.fromHistory && TAB_ROUTE[routeTab]) {
         const cur = currentRoute();
         const route = tabRoute(routeTab, TAB_ROUTE[routeTab]);
-        if (!cur || cur.view !== route.view || cur.id !== route.id || cur.server !== route.server) note(route);
+        if (!cur || cur.view !== route.view || cur.id !== route.id || cur.server !== route.server || cur.sub !== route.sub && route.view === 'analytics') note(route);
     }
 
     // Toggle sidebar visibility — full-width views hide the sidebar
@@ -113,6 +113,7 @@ function tabRoute(tab, view) {
     const cur = state.currentSession;
     if (tab === 'agents' && state.selectedTeam) return keyRoute('team', state.selectedTeam);
     if (tab === 'agents' && cur && cur.type === 'live' && !isPhoneLayout()) return liveRoute(sessionServer(cur), cur.session_id);
+    if (tab === 'tokens' && !isPhoneLayout() && state.analyticsView !== 'overview') return { view, sub: state.analyticsView }; // the page that was open (a phone starts at the list)
     if (tab === 'history') return historyRoute(cur?.type === 'history' ? cur.name : null, currentChatsQuery());
     return { view };
 }

@@ -106,7 +106,10 @@ function registerRouteHandlers() {
     });
 
     route('jobs', () => switchNavTab('jobs', { fromHistory: true }));
-    route('analytics', () => switchNavTab('tokens', { fromHistory: true }));
+    route('analytics', r => {
+        state.analyticsAsk = { view: r.sub || 'overview', open: !!r.sub }; // the Analytics page the path names (#8606); showViews reads it once the tab has loaded
+        switchNavTab('tokens', { fromHistory: true });
+    });
 
     route('docs', async r => {
         switchNavTab('docs', { fromHistory: true });

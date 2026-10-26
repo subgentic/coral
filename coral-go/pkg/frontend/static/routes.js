@@ -10,7 +10,8 @@
      /team/[@<server>/]<team>[/<tab>[/<n>]]  { view: 'team', server, id, sub, item }: the team page (#7453); <tab> is one of TEAM_TABS (none = Goals), <n> a goal or a task
      /board/[@<server>/]<name>            { view: 'board', server, id }
      /workflows[/<id>[/runs/<run>]]       { view: 'workflows', id, run }
-     /jobs, /analytics, /docs[/<name>], /servers[/<id>]
+     /analytics[/<page>]                  { view: 'analytics', sub }: <page> is one of ANALYTICS_PAGES (none = Overview, #8606)
+     /jobs, /docs[/<name>], /servers[/<id>]
 
    A remote object's server is the RAW segment "@<server>". A name that starts with "@" is written
    as %40, so the marker is tested before decoding. Every segment is decoded once and must match
@@ -30,6 +31,8 @@ export const TEAM_TABS = ['goals', 'messages', 'tasks', 'agents', 'artifacts', '
 const TEAM_ITEM_TABS = ['goals', 'tasks', 'messages']; // the tabs with an item: /team/<name>/goals/<id>, /team/<name>/tasks/<id> (pages), /team/<name>/messages/<id> (the Board tab scrolled to that message, #7921)
 // An agent's own tabs (live_session.html #agentic-tab-<id>); the team-scoped ones belong to /team.
 export const AGENT_SUBTABS = ['board', 'tasks', 'notes', 'files', 'browse', 'artifacts', 'activity', 'agent-ui'];
+// The Analytics pages that have a path (analytics_views.js VIEWS, #8606); /analytics is Overview, and an agent's page (agent-detail) is under By agent.
+export const ANALYTICS_PAGES = ['provider', 'model', 'thinking', 'team', 'agent', 'branch', 'task', 'calls', 'per-commit', 'task-time'];
 const NAME_MAX = 200; // board.MaxIdentityRunes
 
 // The query keys the Chats tab owns (search_filters.js), kept on /chats only.
@@ -121,8 +124,14 @@ export function parse(pathname, search = '') {
             if (rest.length === 3 && rest[1] === 'runs' && INT_RE.test(rest[2])) return { view: 'workflows', id: Number(rest[0]), run: Number(rest[2]) };
             return null;
         }
-        case 'jobs': case 'analytics':
+        case 'jobs':
             return rest.length ? null : { view: top };
+        case 'analytics': {
+            if (!rest.length) return { view: 'analytics' };
+            if (rest.length !== 1) return null;
+            if (rest[0] === 'overview') return { view: 'analytics' };
+            return ANALYTICS_PAGES.includes(rest[0]) ? { view: 'analytics', sub: rest[0] } : null;
+        }
         case 'docs': {
             if (!rest.length) return { view: 'docs' };
             return rest.length === 1 && DOC_RE.test(rest[0]) ? { view: 'docs', id: rest[0] } : null;
@@ -189,8 +198,12 @@ export function build(r) {
             return `/board/${srvSeg(r.server)}${seg(r.id)}`;
         case 'workflows':
             return r.id ? `/workflows/${r.id}${r.run ? '/runs/' + r.run : ''}` : '/workflows';
-        case 'jobs': case 'analytics':
-            return '/' + r.view;
+        case 'jobs':
+            return '/jobs';
+        case 'analytics': {
+            const page = r.sub === 'agent-detail' ? 'agent' : r.sub;
+            return ANALYTICS_PAGES.includes(page) ? '/analytics/' + page : '/analytics';
+        }
         case 'docs':
             return r.id ? `/docs/${seg(r.id)}` : '/docs';
         case 'servers':

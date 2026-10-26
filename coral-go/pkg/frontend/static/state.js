@@ -38,6 +38,8 @@ export const state = {
     autoScroll: true,
     isSelecting: false,         // true when user has text selected; pauses DOM updates
     liveSessions: [],           // cached live session list
+    analyticsView: 'overview',  // the Analytics page shown (analytics_views.js), for the tab's URL
+    analyticsAsk: null,         // { view, open }: the page a route asks for, read once when the tab opens (app_routes.js)
     inboxFolder: null,          // { key, label }: the Inbox chat folder the open chat came from (its way back), or null
     historySessionsList: [],    // cached history session list (from last paginated fetch)
     currentCommands: {},        // commands for current session's agent type
