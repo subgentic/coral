@@ -722,18 +722,6 @@ body.panel-dragging .agentic-state {
     overflow-y: auto;
 }
 
-.board-tasks-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-md);
-    padding: 6px 12px;
-    font-size: var(--fs-base);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: var(--text-secondary);
-}
 
 .modal-error {
     color: var(--error);
@@ -785,22 +773,7 @@ body.panel-dragging .agentic-state {
     justify-content: flex-end;
 }
 
-.btn-create-task {
-    padding: 2px 8px;
-    font-size: var(--fs-md);
-    font-weight: 500;
-    margin-left: auto;
-    cursor: pointer;
-    background: transparent;
-    border: 1px solid var(--control-border);
-    border-radius: var(--radius-sm);
-    color: var(--text-muted);
-}
 
-.btn-create-task:hover {
-    background: var(--bg-hover);
-    color: var(--text);
-}
 
 .board-task-list {
     display: flex;
@@ -953,12 +926,13 @@ body.panel-dragging .agentic-state {
 .board-task-hide-toggle {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 6px;
+    min-height: 24px;
     font-size: var(--fs-md);
     font-weight: 400;
     text-transform: none;
     letter-spacing: 0;
-    color: var(--text-muted);
+    color: var(--text-secondary);
     cursor: pointer;
     white-space: nowrap;
     user-select: none;
@@ -2252,3 +2226,9 @@ body.panel-dragging .agentic-state {
     .task-detail-meta { flex-direction: column; align-items: flex-start; }
 }
 .list-bar-more-menu { min-width: 240px; white-space: nowrap; } /* "Copy publishing instructions" on one line */
+
+/* The owner's own controls in a list bar's panel (the dock's Hide done, #7924) */
+.list-bar-extras { display: flex; flex-direction: column; gap: 6px; }
+.list-bar-extras[hidden] { display: none; }
+.list-bar-menu-grid > .list-bar-extras { grid-column: 1 / -1; }
+.board-task-solo { display: flex; justify-content: flex-end; padding: 6px 12px; } /* + Task alone, when there are no tasks to search (#7924) */

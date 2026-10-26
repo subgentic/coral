@@ -145,7 +145,9 @@ export function buildListBar(spec, onChange, hooks = {}) {
     // spec.doneButton (#7883): a phone's panel has a Done button that shuts it (the filters apply as they are chosen, so there is nothing to confirm); a desktop's panel stays beside the list and has no use for it
     const done = collapsible && spec.doneButton ? make('button', 'list-bar-done btn', 'Done') : null;
     if (done) done.type = 'button';
-    menu.append(...fields.map(x => x.wrap), ...((inline || collapsible) && sort ? [sort.wrap] : []), ...(inline ? [count] : []), clearAll, ...(done ? [done] : []));
+    // extras (#7924): controls the panel's owner keeps (the dock's Hide done: a preference of its own, not a filter of the query) go in the panel after the fields and the sort, and count toward the icon's badge (setExtraOn)
+    const extras = make('div', 'list-bar-extras'); extras.hidden = true;
+    menu.append(...fields.map(x => x.wrap), ...((inline || collapsible) && sort ? [sort.wrap] : []), ...(inline ? [count] : []), extras, clearAll, ...(done ? [done] : []));
     if (inline) { menu.hidden = false; menu.classList.add('list-bar-menu-inline'); clearAll.textContent = 'Clear filters'; }
     if (collapsible) { menu.classList.add('list-bar-menu-inline', 'list-bar-panel'); clearAll.textContent = 'Clear filters'; menu.setAttribute('aria-label', 'Filters and sort'); }
     // A panel with tool-group boxes (the activity bars) lays them out two to a line: a class on the menu, not a :has() rule, which made every DOM change in the page, the agent list's included, check for it (#7671).
@@ -162,6 +164,14 @@ export function buildListBar(spec, onChange, hooks = {}) {
     // Whatever a panel's model does with a text, the bar sends it trimmed: a tab or a space pasted at either end is a request the server refuses (#4806), and no panel can forget it.
     const textKeys = ['q', ...spec.fields.filter(x => x.type === 'text').map(x => x.key)];
     const trimmed = o => { const t = { ...o }; for (const k of textKeys) if (typeof t[k] === 'string') t[k] = t[k].trim(); return t; };
+    let baseOn = 0, extraOn = 0;
+    function paintBadge() {
+        if (!tog) return;
+        const on = baseOn + extraOn;
+        badge.hidden = on === 0; tog.classList.toggle('active', on > 0);
+        const name = on ? `Filters and sort, ${on} on` : 'Filters and sort';
+        tog.setAttribute('aria-label', name); tog.title = name;
+    }
     const apply = next => { f = clean(trimmed(next)); announce = true; onChange({ ...f }); };
     const later = next => { clearTimeout(timer); timer = setTimeout(() => apply(next), DEBOUNCE_MS); };
     // the panel of a collapsible bar: opened and shut by the icon (the state is the panel's owner's to keep: hooks.onPanel)
@@ -230,10 +240,8 @@ export function buildListBar(spec, onChange, hooks = {}) {
             filterBtn.textContent = isFiltered(f) ? `Filters (${list.filter(c => c.key !== 'q').length})` : 'Filters';
             if (tog) {
                 // what is on behind the icon: the filters (the search is its own box) and a sort that is not the default; the icon says so, so a shut panel never hides a filter
-                const on = list.filter(c => c.key !== 'q').length + (f.sort !== EMPTY.sort ? 1 : 0);
-                badge.hidden = on === 0; tog.classList.toggle('active', on > 0);
-                const name = on ? `Filters and sort, ${on} on` : 'Filters and sort';
-                tog.setAttribute('aria-label', name); tog.title = name;
+                baseOn = list.filter(c => c.key !== 'q').length + (f.sort !== EMPTY.sort ? 1 : 0);
+                paintBadge();
             }
             const all = `${counts && counts.all}${counts && counts.truncated ? '+' : ''}`; // '+': older ones were not scanned
             const say = text => {
@@ -272,6 +280,9 @@ export function buildListBar(spec, onChange, hooks = {}) {
         isOpen: () => !menu.hidden,
         /** The expand-all icon: what pressing it will do next ('expand' or 'collapse'). */
         setExpandNext(next) { if (!chev) return; chev.dataset.next = next; const word = spec.expandAll[next]; chev.title = word; chev.setAttribute('aria-label', word); },
+        /** The owner's own controls in the panel (nodes), and how many of them are on: the icon's badge counts them with the filters. */
+        setExtras(nodes) { extras.replaceChildren(...nodes); extras.hidden = !nodes.length; },
+        setExtraOn(n) { if (n !== extraOn) { extraOn = n; paintBadge(); } },
         /** A bar with headerSlots: the title (a node) before the search box, and the action icons (nodes) after the filter icons. */
         setHeader(title, tools = []) { if (!lead) return; lead.replaceChildren(...(title ? [title] : [])); tail.replaceChildren(...tools); },
         /** A bar that is replaced (a panel rebuilt for another board) lets go of the page's click listener and any search still waiting. */
