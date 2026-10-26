@@ -51,7 +51,7 @@ const AGENTS = (waiting) => waiting ? [
             await ev(`localStorage.clear(); window.__coralReady.startup('liveList', 'liveListLoaded', 'settings'); document.documentElement.style.fontSize = '${font}px'; true`);
             await setAgents(false);
             await ev(`window.switchNavTab('hub-inbox'); true`);
-            await waitFor(`!document.querySelector('${pane}').hidden && document.querySelectorAll('${pane} .view-list-item').length === 4`, `${label}: the Inbox pane`, 10000);
+            await waitFor(`!document.querySelector('${pane}').hidden && document.querySelectorAll('${pane} .view-list-item:is([data-key="needs"], [data-key="tasks"], [data-key="goals"], [data-key="saved"])').length === 4`, `${label}: the Inbox pane`, 10000);
             await waitFor(`document.querySelector('${pane} .view-list-item[data-key="tasks"] .view-list-count').textContent === '3'`, `${label}: the counts`, 10000);
             const step = async (name, fn) => { try { await fn(); console.log(`[PASS] ${label}: ${name}`); } catch (e) { console.log(`[FAIL] ${label}: ${name}: ${e.message}`); process.exitCode = 1; } };
 

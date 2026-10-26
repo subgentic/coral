@@ -47,6 +47,7 @@ const AGENTS = (waiting) => waiting ? [
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; await new Promise(r => setTimeout(r, 400)); /* sleep-ok: a screenshot waits out transitions */ fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(path.join(d, name + '.png'), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const pane = '.sidebar-pane[data-pane="hub-inbox"]';
+    const attn = `${pane} .view-list-item:is([data-key="needs"], [data-key="tasks"], [data-key="goals"], [data-key="saved"])`; // the Needs attention folders; the chat folders under them have their own suite (mailbox_chats)
     const ON_SCALE = `(root, sizes) => { const want = getComputedStyle(document.body).fontFamily, out = [];
         for (const e of root.querySelectorAll('*')) { if (!e.getClientRects().length || e.matches('.material-icons, .sr-only, pre, code, svg, svg *') || e.closest('pre, code')) continue;
             if (![...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) continue;
@@ -65,11 +66,11 @@ const AGENTS = (waiting) => waiting ? [
             await ev(`localStorage.clear(); window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
             await setAgents(true);
             await ev(`window.switchNavTab('hub-inbox'); true`);
-            await waitFor(`!document.querySelector('${pane}').hidden && document.querySelectorAll('${pane} .view-list-item').length === 4`, at + 'the Inbox pane', 10000);
+            await waitFor(`!document.querySelector('${pane}').hidden && document.querySelectorAll('${attn}').length === 4`, at + 'the Inbox pane', 10000);
             await waitFor(`document.querySelector('${pane} .view-list-item[data-key="tasks"] .view-list-count').textContent === '3' && document.querySelector('${pane} .view-list-item[data-key="saved"] .view-list-count').textContent === '2'`, at + 'the counts', 10000);
 
-            assert.deepEqual(await ev(`[...document.querySelectorAll('${pane} .view-list-item .view-list-name')].map(e => e.textContent)`), ['Needs you', 'Tasks', 'Goals', 'Saved'], at + 'the folders (#7785)');
-            assert.deepEqual(await ev(`[...document.querySelectorAll('${pane} .view-list-item .view-list-count')].map(e => e.textContent)`), ['2', '3', '0', '2'], at + 'with their counts (Goals has its own now: none open in this world)');
+            assert.deepEqual(await ev(`[...document.querySelectorAll('${attn} .view-list-name')].map(e => e.textContent)`), ['Needs you', 'Tasks', 'Goals', 'Saved'], at + 'the folders (#7785)');
+            assert.deepEqual(await ev(`[...document.querySelectorAll('${attn} .view-list-count')].map(e => e.textContent)`), ['2', '3', '0', '2'], at + 'with their counts (Goals has its own now: none open in this world)');
             assert.equal(await ev(`document.querySelectorAll('${pane} li.sb-row, ${pane} .sgroup-header').length`), 0, at + 'the pane lists folders only: the rows are the table\'s');
             if (!mobile) assert.equal(await ev(`Math.round(document.querySelector('${pane} .view-list-item').getBoundingClientRect().height) >= 36`), true, at + 'a folder is at least 36 px high');
             if (!mobile) assert.deepEqual(await ev(`(() => { const t = document.querySelector('${pane} .view-list-title'), n = document.querySelector('${pane} .view-list-item .view-list-name'); const left = e => { const r = document.createRange(); r.selectNodeContents(e); return Math.round(r.getBoundingClientRect().left); }; return [left(t), left(n)]; })()`).then(([t, n]) => Math.abs(t - n) <= 1), true, at + 'the section title starts where the folders\' text does (#7851)');

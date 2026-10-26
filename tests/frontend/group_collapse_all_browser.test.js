@@ -31,7 +31,7 @@ const { connect } = require('./agent_view_harness');
             await build();
             // The Inbox has been shown, so its folders are in the page too (#7606, #7785): Collapse all folds the Agents list's own groups and stores nothing of the Inbox's
             await ev(`window.switchNavTab('hub-inbox'); true`);
-            await waitFor(`document.querySelectorAll('[data-pane="hub-inbox"] .view-list-item').length === 4`, dev + ': the Inbox\'s folders are drawn', 10000);
+            await waitFor(`document.querySelectorAll('[data-pane="hub-inbox"] .view-list-item:is([data-key="needs"], [data-key="tasks"], [data-key="goals"], [data-key="saved"])').length === 4`, dev + ': the Inbox\'s folders are drawn', 10000);
             await ev(`window.switchNavTab('agents'); true`);
             await waitFor(`document.querySelectorAll(${JSON.stringify(root)} + ' .session-group-header[data-group-name]').length === 10`, dev + ': back on the Agents list', 5000);
             let s = await state();
