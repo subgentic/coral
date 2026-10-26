@@ -556,7 +556,7 @@ function _taskTable(tasks, footer) {
     const table = DT.dataTable({ label: 'Agent tasks', rows: tasks, rowKey: key, rowName: t => t.title || t.description || '',
         footer, state: dockTaskTableState, onSort: field => _toggleTaskSort(field), bare: true, sortBar: false, defaultSortLabel: _queryActive() && _taskFilters.sort !== 'open' ? taskSortLabel[_taskFilters.sort] : 'Open first, newest first',
         columns: [
-            { key: 'status', label: 'Status', line: 2, cell: t => {
+            { key: 'status', label: 'Status', width: 'content', line: 2, cell: t => {
                 const st = _taskStatus(t), cls = st.className === 'completed' ? 'goal-state-task-done' : st.className === 'in-progress' ? 'goal-state-task-active' : st.className === 'blocked' ? 'goal-state-task-blocked' : '';
                 const chip = DT.chip(st.label, cls);
                 chip.classList.add('board-task-status-wrap'); chip.title = st.detail; chip.setAttribute('aria-label', st.detail); return chip;
@@ -573,7 +573,7 @@ function _taskTable(tasks, footer) {
                 return cell;
             } },
             // The dock shows Status, Task and Agent only (#7962, the operator): priority, type, cost and the time are on the main Tasks tab and in the opened task
-            { key: 'assignee', label: 'Agent', sort: true, firstDir: 'desc', line: 2, when: t => !!t.assigned_to, cell: t => span('board-task-assignee', t.assigned_to || '—') },
+            { key: 'assignee', label: 'Agent', width: 'content', sort: true, firstDir: 'desc', line: 2, when: t => !!t.assigned_to, cell: t => span('board-task-assignee', t.assigned_to || '—') },
         ],
     });
     // Keep the existing action dispatcher and identifiers: opening a board task,

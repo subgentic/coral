@@ -21,7 +21,8 @@ const { removeBoards } = require('./helpers/board_cleanup');
             return { folded: list.querySelector('.dt-box').classList.contains('dt-folded'), list: Math.round(lr.width), heads: [...list.querySelectorAll('thead th')].filter(h => h.getClientRects().length).map(h => h.dataset.key),
                 cells: [...row.querySelectorAll('td.dt-td')].filter(c => c.getClientRects().length > 0 && c.getBoundingClientRect().width > 0).map(c => c.dataset.key),
                 gone: ['.board-task-cost', '.board-task-priority-value', '.board-task-source', '.board-task-time'].filter(sel => !!list.querySelector(sel)), scrolls: list.scrollWidth - list.clientWidth,
-                name: !!row.querySelector('.board-task-name'), status: !!row.querySelector('.board-task-status-wrap') }; })()`);
+                name: !!row.querySelector('.board-task-name'), status: !!row.querySelector('.board-task-status-wrap'),
+                widths: Object.fromEntries([...list.querySelectorAll('thead th')].filter(h => h.getClientRects().length).map(h => [h.dataset.key, Math.round(h.getBoundingClientRect().width)])), chip: Math.round(list.querySelector('.board-task-status-wrap').getBoundingClientRect().width) }; })()`);
         const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
         await ev(`document.querySelector('#board-task-bar .list-bar-toggle') && document.querySelector('#board-task-bar .list-bar-menu:not([hidden])') && document.querySelector('#board-task-bar .list-bar-toggle').click(); true`); // the filter menu out of the way
         await shot('tasks-dock-680-columns');
@@ -31,6 +32,8 @@ const { removeBoards } = require('./helpers/board_cleanup');
         assert.deepEqual(m.heads, ['status', 'id', 'assignee'], '680 px: the heads are Status, Task and Agent: ' + JSON.stringify(m));
         assert.deepEqual(m.gone, [], 'no priority, type, cost or time cell is drawn in the dock: ' + JSON.stringify(m));
         assert.ok(m.name && m.status, 'the row has its task and its status'); assert.ok(m.scrolls <= 1, 'and it does not scroll sideways');
+        assert.ok(m.widths.status <= m.chip + 48, 'Status fits its chip, it does not take a third of the line: ' + JSON.stringify(m.widths) + ' chip ' + m.chip);
+        assert.ok(m.widths.id > m.list * 0.6, 'Task takes the rest of the line: ' + JSON.stringify(m.widths));
         await ev(`document.getElementById('agentic-state').style.width = '420px'; true`);
         await waitFor(`document.getElementById('board-task-list').getBoundingClientRect().width < 460`, 'the narrow dock');
         await shot('tasks-dock-420-columns');

@@ -73,6 +73,9 @@
 .dt-table td { height: var(--table-row-h); padding: 0 var(--table-pad-x); border-bottom: 1px solid var(--table-border); vertical-align: middle; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 16rem; }
 .dt-table tbody tr:last-child td { border-bottom: 0; }
 .dt-table td.dt-grow { width: 45%; max-width: 0; }
+/* a column that fits its content (width: 'content') takes what its cells need and no more; the grow column then takes the rest of the line (#7962) */
+.dt-table th.dt-content, .dt-table td.dt-content { width: 1%; white-space: nowrap; }
+.dt-box.dt-has-content .dt-table td.dt-grow { width: 100%; }
 .dt-table td.dt-wrap { white-space: normal; }
 .dt-primary { display: inline; max-width: 100%; background: none; border: 0; padding: 0; text-align: left; font: inherit; font-size: var(--table-primary-size); font-weight: var(--table-primary-weight); color: var(--table-primary-color); cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dt-primary:hover { color: var(--accent); text-decoration: underline; }
