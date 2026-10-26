@@ -68,6 +68,9 @@ const BASE = require('./test_base').BASE;
         await Emulation.setEmulatedMedia({ features: [] });
         await ev(`(() => { const s = document.querySelector('#dt-host .dt-sortbar-select'); s.value = 'n'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
         assert.deepEqual(await names(), ['alpha', 'Delta', 'Bravo', 'Charlie'], 'the Sort by select sorts');
+        // a name too long for the phone's row ends in an ellipsis: the 44 px button is not a flex box (text-overflow does nothing on one, and the name was cut off mid-letter, #8149)
+        const clip = await ev(`(() => { const td = document.querySelector('#dt-host tbody tr .dt-primary').parentElement; const b = td.querySelector('.dt-primary').cloneNode(true); b.textContent = 'a-name-too-long-for-a-phone-row-'.repeat(8); td.append(b); const s = getComputedStyle(b); const out = { display: s.display, to: s.textOverflow, over: b.scrollWidth > b.clientWidth, h: Math.round(b.getBoundingClientRect().height) }; b.remove(); return out; })()`);
+        assert.ok(!/flex/.test(clip.display) && clip.to === 'ellipsis' && clip.over && clip.h >= 44, 'a long name is cut with an ellipsis and stays a 44 px target: ' + JSON.stringify(clip));
         await ev(`document.querySelector('#dt-host .dt-sortbar-dir').click(); true`);
         assert.deepEqual(await names(), ['Charlie', 'Bravo', 'Delta', 'alpha'], 'and its direction button reverses it');
         console.log('   ✓');

@@ -123,17 +123,19 @@ function drawStatus(data) {
 }
 
 function drawCounts() {
-    queueMicrotask(drawTabEdges); // the counts widen the tabs
+    let widened = false;
     for (const t of TEAM_TABS) {
         const c = document.querySelector(`#team-tab-${t} .team-tab-count`); if (!c) continue;
         const n = S.counts[t];
         const text = n ? String(n) : ''; // no badge at zero or unknown: one rule for every tab
-        if (c.textContent !== text) c.textContent = text;
+        if (c.textContent !== text) { c.textContent = text; widened = true; }
         c.hidden = !text;
         const label = $(`team-tab-${t}`).querySelector('.team-tab-label');
         // a space between the word and its count, so the tab is read "Goals 2"
         label.textContent = text ? `${LABEL[t]} ` : LABEL[t];
     }
+    // the counts widen the tabs: when one changed, the selected tab is brought wholly into view again (its own count arrives after it was scrolled to, #8149), then the edges are drawn
+    queueMicrotask(() => { if (widened) $(`team-tab-${S.tab}`)?.scrollIntoView({ inline: 'nearest', block: 'nearest' }); drawTabEdges(); });
 }
 
 /** The counts on the tabs and the header's status: three light reads, repeated while the page is on screen. */
