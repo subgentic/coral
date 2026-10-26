@@ -10,17 +10,17 @@
       "listRoute": 1
     }
   },
+  "board_window.js": {
+    "board": {
+      "row": 1
+    }
+  },
   "inbox_coral.js": {
     "tasks": {
       "listRoute": 1
     },
     "board": {
       "listRoute": 1
-    }
-  },
-  "message_board.js": {
-    "board": {
-      "row": 1
     }
   },
   "saved.js": {

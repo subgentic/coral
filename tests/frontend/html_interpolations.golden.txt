@@ -60,6 +60,24 @@
 1	board_table.js	tagHtml
 1	board_table.js	taskLink
 1	board_table.js	timeHtml
+1	board_window.js	BOARD_SAVE_BUTTON(bs.currentProject || '', keyLabel(bs.currentProject || ''), String(m.created_at || ''), Stri
+1	board_window.js	alignClass
+1	board_window.js	askBadge(m)
+1	board_window.js	boardMessageColorStyle(color)
+1	board_window.js	checkbox
+1	board_window.js	externalMessageBadge(m)
+1	board_window.js	hubUserBadge(m)
+1	board_window.js	messageAttachmentAttrs(m)
+1	board_window.js	messageAttachmentsHtml(m)
+1	board_window.js	messageTimeHtml(m.created_at)
+1	board_window.js	parts.actions
+1	board_window.js	parts.attrs
+1	board_window.js	parts.classes
+1	board_window.js	parts.tagsOpen
+1	board_window.js	parts.toggle
+1	board_window.js	renderBoardMessageBody(m)
+1	board_window.js	selectedClass
+1	board_window.js	spacing
 1	browser.js	machineBlock()
 1	changed_files.js	adds
 1	changed_files.js	agentOnlyCls
@@ -208,26 +226,8 @@
 1	live_jobs.js	onClick
 1	live_jobs.js	triggerBadge
 1	markdown.js	HL_MARK
-1	message_board.js	BOARD_SAVE_BUTTON(currentProject || '', keyLabel(currentProject || ''), String(m.created_at || ''), String(m.j
-1	message_board.js	alignClass
-1	message_board.js	askBadge(m)
-1	message_board.js	boardMessageColorStyle(color)
-1	message_board.js	checkbox
-1	message_board.js	externalMessageBadge(m)
-1	message_board.js	hubUserBadge(m)
-1	message_board.js	messageAttachmentAttrs(m)
-1	message_board.js	messageAttachmentsHtml(m)
-1	message_board.js	messageTimeHtml(m.created_at)
 2	message_board.js	p.message_count
 1	message_board.js	p.subscriber_count
-1	message_board.js	parts.actions
-1	message_board.js	parts.attrs
-1	message_board.js	parts.classes
-1	message_board.js	parts.tagsOpen
-1	message_board.js	parts.toggle
-1	message_board.js	renderBoardMessageBody(m)
-1	message_board.js	selectedClass
-1	message_board.js	spacing
 1	mobile.js	switchRow({ label: 'Group by server', labelClass: 'list-display-option', labelAttrs: ' data-display-row="group
 1	mobile.js	switchRow({ label: 'Show branches', labelClass: 'list-display-option', labelAttrs: ' data-display-row="branche
 1	mobile.js	switchRow({ label: 'Show model', labelClass: 'list-display-option', labelAttrs: ' data-display-row="model"', a

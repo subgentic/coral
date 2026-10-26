@@ -11,7 +11,7 @@ const READERS = new Map([
     ['cloud.js', "the hub's fetch wrapper puts the line in the body of any write's outcome_unknown answer"],
     ['server_status.js', 'responseErrorText: the sentence for a failed send'],
     ['board_chat.js', "the team board's message box says the line and puts the words back"],
-    ['message_board.js', "the message board's post says the line"],
+    ['board_composer.js', "the message board's post says the line"],
     ['image_attach.js', "an upload says the line with no Retry"],
 ]);
 const walk = d => fs.readdirSync(d, { withFileTypes: true }).flatMap(e => e.isDirectory() ? (['vendor', 'css', 'fonts'].includes(e.name) ? [] : walk(path.join(d, e.name))) : e.name.endsWith('.js') ? [path.join(d, e.name)] : []);
@@ -21,7 +21,7 @@ const extra = mention.filter(f => !READERS.has(f)), missing = [...READERS.keys()
 assert.deepEqual(extra, [], `a script reads outcome_unknown and is not on the list (add it with the reason, and prove it never retries): ${extra.join(', ')}`);
 assert.deepEqual(missing, [], `listed but no longer mentions outcome_unknown: ${missing.join(', ')}`);
 // the readers never retry what they read: no timer or retry word in the lines that handle it
-for (const f of ['board_chat.js', 'message_board.js', 'cloud.js', 'server_status.js']) {
+for (const f of ['board_chat.js', 'board_composer.js', 'cloud.js', 'server_status.js']) {
     const lines = fs.readFileSync(path.join(st, f), 'utf8').split('\n');
     lines.forEach((l, i) => { if (/outcome_unknown|outcomeUnknownLine|isOutcomeUnknown/.test(l)) assert.doesNotMatch(lines.slice(Math.max(0, i - 1), i + 2).join('\n'), /setTimeout|setInterval|afterPause|\bretry\b|requestSubmit/i, `${f}:${i + 1} sits next to a retry`); });
 }

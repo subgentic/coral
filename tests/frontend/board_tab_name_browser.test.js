@@ -30,7 +30,7 @@ const TEAM = `qa-board-name-${Date.now() % 100000}`;
                 assert.deepEqual([d.word, d.name, d.exp], ['Board', 'Board', 'Export the board'], JSON.stringify(d)); assert.ok(!/Chat/.test(d.title), d.title);
                 // an empty board's line (no board here is empty: the seeded team has a message), read from the sources that write it
                 const root = require('node:path').join(__dirname, '..', '..', 'coral-go', 'pkg', 'frontend'), read = p => require('node:fs').readFileSync(require('node:path').join(root, p), 'utf8');
-                for (const p of ['static/message_board.js', 'static/board_chat.js', 'templates/includes/views/message_board.html']) { const t = read(p); assert.ok(t.includes('No messages on the board yet') && !/No messages yet/.test(t), p + ' says the board'); }
+                for (const p of ['static/board_window.js', 'static/board_chat.js', 'templates/includes/views/message_board.html']) { const t = read(p); assert.ok(t.includes('No messages on the board yet') && !/No messages yet/.test(t), p + ' says the board'); }
             });
         }
     } finally { await removeBoards(ev, [TEAM]); await client.close(); }
