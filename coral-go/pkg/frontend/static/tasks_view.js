@@ -1,6 +1,8 @@
-/* A task as a data_table row (#7743, the one task row of #7737, generalised): the columns the Tasks tab, the Inbox's Tasks group and a goal's column pick from. One state word set, one chip, who as an avatar and a name, the priority
- * as a word, the update as a relative time. A task is the board's own record (status, review_requested, assigned_to, worked_by, completed_by, goal_id, priority, created_at, updated_at, board).
- *   taskColumns({ openGoal(goalId), goalTitleOf(goalId), noGoal, teamOf(task) }, ['state', 'task', 'who', 'goal', 'priority', 'updated']) -> Column[] */
+/* The one Tasks view (#8060, the operator: "shoot for simplicity"): a list of tasks is drawn by tasksTable(scope, rows, options) and nowhere else. A scope says which columns the list has: the team's Tasks tab all of them, a task's
+ * follow-ups, the Inbox's own scope ("mine": Team in, Assigned to out, they are all the person's), a goal's side column and a goal's page. One state word set, one chip, who as an avatar and a name, the priority as a word, the update
+ * as a relative time. A task is the board's own record (status, review_requested, assigned_to, worked_by, completed_by, goal_id, priority, created_at, updated_at, board).
+ *   tasksTable('team', rows, { ctx: { openGoal(goalId), goalTitleOf(goalId), noGoal, teamOf(task) }, open, state, ...dataTable options }) -> { el, bar, selectButton, ... } (a data_table)
+ *   taskColumns(ctx, ['state', 'task', 'who', 'goal', 'priority', 'updated']) -> Column[] (the columns alone, for a surface that adds its own) */
 import { taskStatusWord, statusClass } from './goal_words.js';
 import { importOnce } from './import_once.js';
 const DT = await importOnce('./data_table.js'); // lazy: its failure is retried
@@ -28,4 +30,23 @@ export function taskColumns(ctx, keys = ['state', 'task', 'who', 'goal', 'priori
         updated: { key: 'updated', label: 'Updated', tone: 'tertiary', align: 'end', sort: 'date', sortValue: (t) => t.updated_at || t.created_at || '', line: 1, firstDir: 'desc', cell: (t) => DT.timeCell(t.updated_at || t.created_at) },
     };
     return keys.map(k => all[k]);
+}
+
+/** The columns of each scope, in order; a narrow box (the goal's column, a task's follow-ups) folds them to the two-line row, so the order is also the order of the lines. */
+export const SCOPES = {
+    team: ['state', 'task', 'who', 'goal', 'priority', 'updated'],
+    mine: ['state', 'task', 'priority', 'team', 'updated'],
+    goal: ['state', 'task', 'who', 'priority'],
+    'goal-page': ['task', 'state'],
+    'follow-ups': ['state', 'task', 'who'],
+};
+
+/** A task list as the shared table: the scope's columns, the task's own key and name, and everything else (open, state, selectable, bare, sortBar, ...) as the data_table takes it. `tweak(columns)` lets a surface add a column of
+ *  its own (a goal's page adds the Open the agent action) and may return the new array. */
+export function tasksTable(scope, rows, { ctx = {}, tweak, ...table } = {}) {
+    const keys = SCOPES[scope];
+    if (!keys) throw new Error(`tasksTable: no scope "${scope}"`);
+    let columns = taskColumns(ctx, keys);
+    if (tweak) columns = tweak(columns) || columns;
+    return DT.dataTable({ label: `Tasks, ${rows.length}`, rowKey: taskKey, rowName: (t) => `#${t.id} ${t.title}`, ...table, columns, rows });
 }

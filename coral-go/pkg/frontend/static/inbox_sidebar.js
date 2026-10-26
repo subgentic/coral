@@ -24,7 +24,7 @@ const { coralInboxAdapter, savedExpandFor } = await importOnce('./inbox_coral.js
 const { mountInbox } = await importOnce('./inbox_panel.js');
 const saved = await importOnce('./saved.js');
 const DT = await importOnce('./data_table.js'); // the one table (#7743): the Tasks group's page is its Tasks columns
-const TC = await importOnce('./task_columns.js');
+const TV = await importOnce('./tasks_view.js'); // the one Tasks view
 const VL = await importOnce('./view_list.js'); // the mailbox's view list (#7785)
 const TB = await importOnce('./task_bulk.js'); // what the selection bar does to the selected tasks
 const Toolbar = await importOnce('./team_toolbar.js'); // the selection bar takes the page's toolbar line (mountSelection)
@@ -57,7 +57,7 @@ const needsRows = () => waitingSessions().filter(s => !queries.needs || needsTex
 // ── Tasks ────────────────────────────────────────────────────────────────
 const PRIORITY_WORDS = { high: 'High', medium: 'Medium', low: 'Low' };
 const RANK = { high: 0, medium: 1, low: 2 };
-const stateOf = t => TC.taskWord(t);
+const stateOf = t => TV.taskWord(t);
 const inboxTasksState = DT.tableState();
 const needsState = DT.tableState();
 const dockSavedState = DT.tableState();
@@ -239,8 +239,8 @@ registerGroupSource('hub-inbox', {
                 signature: JSON.stringify([openKey, rows.map(t => [t.project, t.id, t.title, t.priority, t.status, t.board, t.updated_at])]),
                 node: () => {
                     const row = document.querySelector('#group-table-view .gt-toolbar');
-                    const t = DT.dataTable({ label: `Tasks, ${rows.length}`, columns: TC.taskColumns({ teamOf: t => t.board || '' }, ['state', 'task', 'priority', 'team', 'updated']), rows, rowKey: t => `${t.project}#${t.id}`, // only my tasks: no who; the Team column because the group spans teams
-                        open: t => openTaskPage(t.project, t.id), current: openKey, rowName: t => `#${t.id} ${t.title}`, state: inboxTasksState,
+                    const t = TV.tasksTable('mine', rows, { ctx: { teamOf: t => t.board || '' }, rowKey: t => `${t.project}#${t.id}`, // only my tasks: no who; the Team column because the group spans teams
+                        open: t => openTaskPage(t.project, t.id), current: openKey, state: inboxTasksState,
                         selectable: { contextKey: 'inbox-tasks', actions: TB.inboxTaskActions(() => { inboxTasksState.selected.clear(); refreshTasks(); }), onChange: keys => row && Toolbar.mountSelection(row, keys.size ? t.bar : null) } }); // the bar takes the toolbar's line while tasks are selected
                     if (row) { Toolbar.mountSelection(row, inboxTasksState.selected.size ? t.bar : null); row.querySelectorAll('.dt-select-toggle').forEach(b => b.remove()); if (isPhoneLayout()) row.append(t.selectButton); }
                     return t.el;

@@ -176,7 +176,7 @@ func TestHistoryListAndCountsSendTheKeysTheFrontendReads(t *testing.T) {
 	requireKeys(t, "GET /api/sessions/history/counts", counts, "all", "group", "notes", "active", "starred", "archived", "by_agent_type", "tags")
 }
 
-// Tasks (task_list.js, task_columns.js, team_tasks_page.js, goals_adapter.js, inbox_coral.js): the board's task list GET /api/board/{p}/tasks (the default list) and GET /api/board/tasks (the query).
+// Tasks (task_list.js, tasks_view.js, team_tasks_page.js, goals_adapter.js, inbox_coral.js): the board's task list GET /api/board/{p}/tasks (the default list) and GET /api/board/tasks (the query).
 func TestTaskListsSendTheKeysTheFrontendReads(t *testing.T) {
 	_, h := setupBoardTestServer(t)
 	r := chi.NewRouter()
@@ -199,7 +199,7 @@ func TestTaskListsSendTheKeysTheFrontendReads(t *testing.T) {
 		return out
 	}
 
-	// the default list: the wrapper and each row (task_columns.js taskColumns, task_list.js, team_tasks_page.js)
+	// the default list: the wrapper and each row (tasks_view.js taskColumns, task_list.js, team_tasks_page.js)
 	list := get("/api/board/keys-team/tasks?limit=50")
 	requireKeys(t, "GET /api/board/{p}/tasks", list, "tasks", "next_cursor", "total_open", "total_completed")
 	rows, _ := list["tasks"].([]any)

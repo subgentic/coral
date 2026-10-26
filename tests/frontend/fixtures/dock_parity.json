@@ -2713,7 +2713,7 @@
       "status": "moved",
       "newHome": "every task name opens its page (and the dependency links under the facts, taskExtraHtml, open the task)",
       "proof": {
-        "file": "static/task_columns.js",
+        "file": "static/tasks_view.js",
         "needle": "Open task #"
       }
     },
@@ -2904,7 +2904,7 @@
       "status": "moved",
       "newHome": "team page: Tasks tab, a row of the Tasks table opens the task page",
       "proof": {
-        "file": "static/task_columns.js",
+        "file": "static/tasks_view.js",
         "needle": "Open task #"
       }
     },
@@ -2918,7 +2918,7 @@
       "status": "moved",
       "newHome": "team page: Tasks tab, a row of the Tasks table opens the task page",
       "proof": {
-        "file": "static/task_columns.js",
+        "file": "static/tasks_view.js",
         "needle": "Open task #"
       }
     },
@@ -4995,7 +4995,7 @@
       "status": "moved",
       "newHome": "team page: Tasks tab, a row of the Tasks table opens the task page",
       "proof": {
-        "file": "static/task_columns.js",
+        "file": "static/tasks_view.js",
         "needle": "Open task #"
       }
     },
@@ -5008,7 +5008,7 @@
       "status": "moved",
       "newHome": "team page: Tasks tab, a row of the Tasks table opens the task page",
       "proof": {
-        "file": "static/task_columns.js",
+        "file": "static/tasks_view.js",
         "needle": "Open task #"
       }
     },
@@ -5021,7 +5021,7 @@
       "status": "moved",
       "newHome": "team page: Tasks tab, a row of the Tasks table opens the task page",
       "proof": {
-        "file": "static/task_columns.js",
+        "file": "static/tasks_view.js",
         "needle": "Open task #"
       }
     },
@@ -5633,7 +5633,7 @@
       "status": "moved",
       "newHome": "team page: Tasks tab, a row of the Tasks table opens the task page",
       "proof": {
-        "file": "static/task_columns.js",
+        "file": "static/tasks_view.js",
         "needle": "Open task #"
       }
     },
@@ -5646,7 +5646,7 @@
       "status": "moved",
       "newHome": "team page: Tasks tab, a row of the Tasks table opens the task page",
       "proof": {
-        "file": "static/task_columns.js",
+        "file": "static/tasks_view.js",
         "needle": "Open task #"
       }
     },
@@ -5659,7 +5659,7 @@
       "status": "moved",
       "newHome": "team page: Tasks tab, a row of the Tasks table opens the task page",
       "proof": {
-        "file": "static/task_columns.js",
+        "file": "static/tasks_view.js",
         "needle": "Open task #"
       }
     },
