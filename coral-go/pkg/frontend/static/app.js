@@ -9,6 +9,7 @@ import './hub_blocked_controls.js'; // dims controls the Hub tier does not allow
 import './session_rows.js';
 import './settings_rows_boot.js'; // the Settings dialog's rows that are fields are drawn when its markup is built
 import './team_form.js'; // step 1 of the New team dialog is drawn when the Launch dialog's markup is built
+import './agent_form.js'; // step 1 of the New agent dialog is drawn when the Launch dialog's markup is built
 import './branch_expand.js'; // the capped branch name in the agent header opens in place (#5142)
 import './nav_tabs.js'; // the tab row, its More menu and the phone's view dropdown (#3816)
 import { initPrerequisiteChecks } from './prerequisites.js';

@@ -97,7 +97,7 @@
   "launch-field-*": {
     "css": 3,
     "js": 6,
-    "html": 9
+    "html": 7
   },
   "__families": [
     "health-form",

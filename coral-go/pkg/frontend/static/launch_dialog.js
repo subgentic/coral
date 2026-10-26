@@ -14,6 +14,7 @@ const { defaultPermissionMode, syncDefaultPermissionMode, _normalizePermFlagsFor
 const { _checkAgentCLI } = await importOnce('./cli_check.js');
 import { checkTmuxForLaunch } from './prerequisites.js';
 import { showTeamAddress } from './team_form.js';
+import { agentForm as folderForm } from './agent_form.js';
 const { _syncACFModelField, getAgentConfig, renderAgentConfigForm, cliWarningOf } = await importOnce('./agent_config_form.js');
 const { _checkPermissionFlag } = await importOnce('./cli_dialogs.js');
 const { _checkTeamGitDir, _initTeamForm, _loadExistingTeamBoards } = await importOnce('./team_dialogs.js');
@@ -31,7 +32,7 @@ function _launchStage(arg) {
     const input = document.getElementById('launch-dir');
     if (to !== 'folder' && !launch.member && (!input || !input.value.trim())) { // a folder is the one thing a launch needs (a team member is not launched: it has none, #7861): said where it is, on the folder's own step
         setLaunchStage('folder');
-        if (input) { markFieldInvalid(input, "Choose a folder"); input.focus(); }
+        _folderPressed = true; folderForm()?.validate({ focus: true }); _syncLaunchBlock(); // the folder is flagged under it, and one red line above the buttons says it
         return;
     }
     const list = document.getElementById('dir-browser'); if (list) list.style.display = 'none'; // display-ok: the folder list is shown and hidden by style.display where it is opened (browser.js)
@@ -79,6 +80,7 @@ function _selectLaunchType(type) {
         });
         // The agent is chosen in this step, not only under More options (#6199): a radio group that follows the form's own select, the installed agents first.
         importOnce('./launch_agent_pick.js').then(m => m.buildAgentPick({ group: document.getElementById('launch-agent-pick'), form: document.getElementById('launch-agent-acf'), server: _effectiveServer(launch.server), implicitDefault: !_settingsFor(_effectiveServer(launch.server)).default_agent_type })).catch(() => {});
+        _folderPressed = false; folderForm()?.clearErrors();
         _wireDirNote(); _syncDirNote(); _syncLaunchBlock(); _renderDirRecents();
         wireRecap(); syncRecap(); _syncLaunchBlock();
         _checkTmuxHere(); // tmux missing: said once, Launch off (#6046)
@@ -262,20 +264,21 @@ function _syncLaunchAccess() {
 document.addEventListener('coral:server-access-loaded', () => { if (document.getElementById('launch-modal')?.style.display === 'flex') _syncLaunchAccess(); });
 
 // A missing CLI is said once, under the folder, and Launch stays off until it is there (#5990); the message is the button's reason.
+let _folderPressed = false; // Next was pressed with no folder: only then is it said above the buttons (nothing before the first press)
 const _cliBlock = () => document.querySelector('#launch-step-agent [data-blocks-launch]');
 function _syncLaunchBlock() {
     const go = document.getElementById('launch-agent-go'), next = document.getElementById('launch-agent-next');
     if (!go) return;
     const why = _cliBlock();
     go.disabled = !!why;
-    // The reason a button is off is its description (#7391): the missing CLI's line, or "Choose a folder first". The folder one leaves the button focusable (aria-disabled), and pressing it says it where the folder is.
+    // The reason Launch is off is its description (#7391): the missing CLI's line. A missing folder never turns a button off: pressing Next says it where the folder is (one red line above the buttons, the error under the field).
     const noDir = !launch.member && !(document.getElementById('launch-dir')?.value || '').trim();
-    const reason = why ? (why.id ||= 'launch-cli-warning') : noDir ? 'launch-folder-reason' : '';
+    const status = document.getElementById('launch-folder-status');
+    if (status) status.textContent = _folderPressed && noDir ? 'Choose a folder' : '';
     for (const b of [go, next]) {
         if (!b) continue;
-        const off = b === go ? !!why || noDir : noDir;
-        if (off && !b.disabled) b.setAttribute('aria-disabled', 'true'); else b.removeAttribute('aria-disabled');
-        if (off && reason) b.setAttribute('aria-describedby', reason); else b.removeAttribute('aria-describedby');
+        b.removeAttribute('aria-disabled');
+        if (b === go && why) { b.setAttribute('aria-describedby', why.id ||= 'launch-cli-warning'); } else b.removeAttribute('aria-describedby');
     }
 }
 document.addEventListener('cli-blocks-launch', e => { if (e.target.closest && e.target.closest('#launch-step-agent')) _syncLaunchBlock(); });
@@ -320,8 +323,9 @@ function _syncDirNote() {
     const on = !!(v && (v === '~' || (!input.dataset.dirServer && root && v === root)));
     // A note read when the person is at the Folder field, not a live region (#6656): it describes the field while it applies, so it is read with it and not announced from nowhere.
     if (note.hidden === on) note.hidden = !on;
-    if (on) { if (input.getAttribute('aria-describedby') !== 'launch-dir-note') input.setAttribute('aria-describedby', 'launch-dir-note'); }
-    else if (input.hasAttribute('aria-describedby')) input.removeAttribute('aria-describedby');
+    const ids = (input.getAttribute('aria-describedby') || '').split(/\s+/).filter(x => x && x !== 'launch-dir-note'); // the form's own error line stays in the description
+    if (on) ids.push('launch-dir-note');
+    if (ids.length) input.setAttribute('aria-describedby', ids.join(' ')); else input.removeAttribute('aria-describedby');
 }
 function _wireDirNote() {
     const input = document.getElementById('launch-dir');
@@ -405,7 +409,7 @@ export async function launchSession() {
     if (!dir) {
         const agentForm = launch.mode !== "terminal";
         if (agentForm) setLaunchMore(false); // the folder is step 1: back to it, so the flagged field can take the focus
-        markFieldInvalid(document.getElementById(agentForm ? "launch-dir" : "launch-terminal-dir"), agentForm ? "Choose a folder" : "Working directory is required");
+        if (agentForm) { _folderPressed = true; folderForm().validate({ focus: true }); _syncLaunchBlock(); } else markFieldInvalid(document.getElementById("launch-terminal-dir"), "Working directory is required");
         return;
     }
 

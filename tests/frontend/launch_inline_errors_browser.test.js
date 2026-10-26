@@ -43,12 +43,14 @@ const BASE = require('./test_base').BASE;
         await ev(`window.showLaunchModal(); window._selectLaunchType('agent'); true`);
         await waitFor(`getComputedStyle(document.getElementById('launch-step-agent')).display !== 'none'`, 'the agent step');
         await ev(`document.getElementById('launch-dir').value = ''; window.launchSession(); true`);
-        let f = await inline('launch-dir');
+        // the folder is a field of the step's form (#8368): its error line is the form's, tied to the field
+        const formLine = () => ev(`(() => { const f = document.getElementById('launch-dir'); const e = f.closest('.sv-row').querySelector('.sv-error'); return { text: e.hidden ? null : e.textContent, described: (f.getAttribute('aria-describedby') || '').split(' ').includes(e.id), invalid: f.getAttribute('aria-invalid'), visible: e.getClientRects().length > 0 }; })()`);
+        let f = await formLine();
         assert.match(f.text, /Choose a folder.*Browse/, JSON.stringify(f)); assert.ok(f.described && f.visible && f.invalid === 'true', JSON.stringify(f));
         assert.ok(!(await ev(`[...document.querySelectorAll('.toast')].some(t => /Choose a folder/.test(t.textContent))`)), 'said once: no toast repeats the line under the field (#6029)');
-        assert.deepEqual(await ev(`(() => { const f = document.getElementById('launch-dir'), e = document.getElementById('launch-dir-error'); const l = document.querySelector('label[for="launch-dir"]'), row = f.closest('.dir-input-row'); return { inLabel: l.contains(e), nameHasError: l.textContent.includes(e.textContent), after: row.nextElementSibling === e }; })()`), { inLabel: false, nameHasError: false, after: true }, 'the line is after the label, so it is not part of the field name');
+        assert.deepEqual(await ev(`(() => { const f = document.getElementById('launch-dir'), e = f.closest('.sv-row').querySelector('.sv-error'); const l = document.querySelector('label[for="launch-dir"]'); return { inLabel: l.contains(e), nameHasError: l.textContent.includes(e.textContent) }; })()`), { inLabel: false, nameHasError: false }, 'the line is after the label, so it is not part of the field name');
         await ev(`document.getElementById('launch-dir').value = '/x'; document.getElementById('launch-dir').dispatchEvent(new Event('input', { bubbles: true })); true`);
-        f = await inline('launch-dir'); assert.equal(f.text, null, 'cleared by the edit'); assert.equal(f.invalid, null);
+        f = await formLine(); assert.equal(f.text, null, 'cleared by the edit'); assert.equal(f.invalid, null);
         assert.equal(await ev(`document.getElementById('launch-dir').getAttribute('aria-describedby')`), null, 'and the description with it');
 
         console.log('2. A folder the server does not find: its message and the way out');

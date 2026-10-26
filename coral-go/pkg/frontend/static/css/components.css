@@ -4185,7 +4185,6 @@ body:has(#nav-tab-hub-inbox.active) #saved-btn .saved-count { display: none; }
 .launch-field-head label, .launch-field-head span:first-child { margin: 0; flex: none; } /* the label stays on one line; "optional" wraps under it at 200% text (UI/UX, #7407) */
 .sd-modal-content.restart-wizard-content :is(.settings-pane, .acf-persona-page) textarea.acf-prompt { font-family: inherit; font-size: var(--fs-md, .875rem); }
 .sd-modal-content.restart-wizard-content .acf-persona-page textarea.acf-prompt { min-height: 16rem; resize: vertical; } /* the prompt is the person's writing: the product font, not mono */
-.launch-required { color: var(--warning-text, var(--warning)); font-size: .75rem; font-weight: 600; } /* sentence case like every other badge (UI/UX's consistency pass 2, #7689) */
 .launch-optional { color: var(--text-secondary); font-size: .75rem; font-weight: 400; }
 .launch-recent-label { align-self: center; color: var(--text-secondary); font-size: .8125rem; }
 .launch-persona-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 6px; }
@@ -4317,13 +4316,14 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .team-page-start .launch-shell { flex: 1; min-height: 0; }
 .team-page-team .dir-input-row input { flex: 1; }
 .team-field-hint:empty { display: none; }
-#team-panel-team #btn-browse-team { width: auto; justify-self: start; align-self: flex-start; } /* Browse is its own size under the folder, not the field's width */
+#team-panel-team #btn-browse-team, #launch-step-agent #btn-browse { width: auto; justify-self: start; align-self: flex-start; } /* Browse is its own size under the folder, not the field's width */
 .launch-wizard > .modal-actions #launch-team-cancel { margin-right: auto; }
 .launch-wizard > .modal-actions .btn[aria-disabled="true"] { opacity: .55; cursor: not-allowed; }
 #launch-modal[data-team-stage="members"] .launch-server-row, #launch-modal[data-team-stage="start"] .launch-server-row { display: none !important; } /* the machine is a step 1 choice */
 .launch-recap.launch-recap-warn { color: var(--warning-text, var(--warning)); }
 .launch-recap.launch-recap-error { color: var(--sv-error-color); }
 #team-recap:empty { display: none; }
+#launch-folder-status:empty { display: none; }
 .team-template-row { display: flex; align-items: flex-end; gap: 8px; margin: 0 0 14px; }
 .team-template-pick { flex: 1; min-width: 0; }
 .team-template-pick select { width: 100%; }

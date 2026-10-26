@@ -60,12 +60,12 @@ const BASE = require('./test_base').BASE;
             await click('button', /^payments-app$/);
             assert.equal(await ev(`window.__na.find('input', ${N.folder}).value`), '/work/payments-app', 'pressing a chip puts the whole path in the field');
         });
-        await S.run('with no folder Next says why: aria-disabled or disabled, "Choose a folder first" as its description, and it does not advance', async () => {
+        await S.run('with no folder Next is on; pressing it says "Choose a folder" under the field and on one red line, and it does not advance; nothing is said before the first press', async () => {
             await reopen(); await ev(`(() => { const i = window.__na.find('input', ${N.folder}); i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
-            const n = await ev(`(() => { const b = window.__na.find('button', ${N.next}); const d = (b.getAttribute('aria-describedby') || '').split(/\\s+/).map(i => (document.getElementById(i) || {}).textContent || '').join(' '); return { off: b.disabled || b.getAttribute('aria-disabled') === 'true', why: d.trim() }; })()`);
-            assert.ok(n.off, 'Next is off with no folder'); assert.match(n.why, /Choose a folder first/, 'its description names the reason');
-            assert.match(await ev(`(() => { const d = window.__na.dialog(); const l = [...d.querySelectorAll('[aria-live=polite],[role=status]')].map(e => window.__na.text(e)).join(' '); return l; })()`), /Choose a folder first/, 'a polite status says it too');
-            await click('button', N.next);
+            const state = () => ev(`(() => { const b = window.__na.find('button', ${N.next}); const f = document.getElementById('launch-dir'); const e = f.closest('.sv-row').querySelector('.sv-error'); return { off: b.disabled || b.getAttribute('aria-disabled') === 'true', status: window.__na.text(document.getElementById('launch-folder-status')), error: e.hidden ? '' : e.textContent, focus: document.activeElement === f }; })()`);
+            let n = await state(); assert.ok(!n.off, 'Next is on'); assert.equal(n.status, '', 'nothing before the first press'); assert.equal(n.error, '');
+            await click('button', N.next); n = await state();
+            assert.ok(!n.off && n.focus, 'Next stays on and the folder takes the focus'); assert.equal(n.status, 'Choose a folder', 'one line above the buttons'); assert.match(n.error, /Choose a folder/, 'and the error under the field');
             assert.match(await stepLine(ev), /^Step 1 of 3/, 'pressing Next with no folder stays on step 1');
         });
         await S.run('a machine selector is there with several machines and only then (any select about the machine or server on step 1)', async () => {
