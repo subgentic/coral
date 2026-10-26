@@ -109,7 +109,6 @@
 .team-row-cell { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; }
 .team-link { background: none; border: 0; padding: 0; color: var(--link-text, var(--accent)); font: inherit; text-align: left; cursor: pointer; }
 .team-link:hover { text-decoration: underline; }
-.team-muted { color: var(--text-secondary); }
 
 /* a goal's page and a task's page: facts side by side, tasks as a table, the actions pinned at the bottom */
 .goals-facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 16px; margin: 0; font-size: 0.875rem; max-width: 70ch; }
