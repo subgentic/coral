@@ -1,3 +1,4 @@
+import { readInboxArtifacts } from './inbox_servers.js';
 /* The Inbox's Artifacts folder (Goal #62): every file the agents of every team made, in one list, as the team page's Artifacts tab draws it (team_artifacts_page.js, its search, Filters and
  * table) with a Team filter and column, and the document in a pane on the page's right: a click on a row opens it there and the list stays. The server merges the teams (GET /api/team-artifacts);
  * this file is the folder: its count for the sidebar, its page, and the search the sidebar's box feeds. Lazy: inbox_sidebar.js imports it. */
@@ -19,9 +20,7 @@ export const artifactCount = () => count;
 export async function refreshArtifactCount(done) {
     if (done) onCount = done;
     try {
-        const r = await fetch('/api/team-artifacts?limit=1');
-        if (!r.ok) return;
-        const d = await r.json();
+        const d = await readInboxArtifacts(new URLSearchParams({limit:'1'}));
         if (Number.isSafeInteger(d.all) && d.all !== count) { count = d.all; onCount(); }
     } catch { /* the count stays as it was */ }
 }

@@ -1,3 +1,5 @@
+import { inboxSources, serverColumns, multipleServers } from './inbox_servers.js';
+import { serverFetch, isCloud } from './server_base.js';
 /* The mailbox's chat folders (#7776, UI/UX's mock #7773): All chats, Board history, With notes, Starred, Active now and Archived; by CLI (Claude, Codex, Antigravity, Pi); and the chat tags. One chat is one line of
  * the one table (data_table.js): the agent, the chat's title with a snippet after it, when it last spoke and how long it ran; the days are its dividers, the list grows as it is read (the footer scrolls into view),
  * and the folders' counts come from one grouped read (GET /api/sessions/history/counts). A chat is starred or archived with its own two quiet buttons (PATCH /api/sessions/history/{id}/flags: only the person).
@@ -58,8 +60,10 @@ export const chatTags = () => (counts && counts.tags) || [];
 
 export async function loadChatCounts(redraw) {
     try {
-        const r = await historyFetch('/api/sessions/history/counts');
-        if (r && r.ok) counts = await r.json();
+        const replies = await Promise.all(inboxSources().map(async server => { const r = await serverFetch(server, '/api/sessions/history/counts'); if (!r.ok) throw new Error('Chat counts unavailable'); return r.json(); }));
+        counts = { ...replies[0], by_agent_type: {} };
+        for (const key of ['all','group','notes','starred','active','archived']) counts[key] = replies.reduce((sum, d) => sum + (Number(d[key]) || 0), 0);
+        for (const d of replies) for (const [key, value] of Object.entries(d.by_agent_type || {})) counts.by_agent_type[key] = (counts.by_agent_type[key] || 0) + value;
     } catch { /* the folders keep their last counts */ }
     redraw?.();
     return counts;
@@ -67,19 +71,24 @@ export async function loadChatCounts(redraw) {
 
 // ── a folder's rows: read a page at a time, from the first, again when the folder or the search changes ──
 const lists = new Map(); // folder key + search + filters -> { rows, page, total, done, busy, error }
-const listOf = (key, q, extra = '') => { const k = `${key}|${q}|${extra}`; if (!lists.has(k)) lists.set(k, { rows: [], page: 0, total: null, done: false, busy: false, error: '' }); return lists.get(k); };
+const listOf = (key, q, extra = '') => { const k = `${inboxSources().join(",")}|${key}|${q}|${extra}`; if (!lists.has(k)) lists.set(k, { rows: [], page: 0, total: null, done: false, busy: false, error: '' }); return lists.get(k); };
 async function readMore(key, folder, q, extra, redraw) {
     const L = listOf(key, q, JSON.stringify(extra));
     if (L.busy || L.done) return;
     L.busy = true; // no redraw here: the spec is being built inside a draw, and a nested draw would close the table it is drawing (the empty line already says Loading)
     try {
-        const p = new URLSearchParams({ ...extra, ...folder.params, page: String(L.page + 1), page_size: String(PAGE) }); // the folder's own rule wins over a filter
+        const { server: selected, ...query } = extra;
+        const p = new URLSearchParams({ ...query, ...folder.params, page: String(L.page + 1), page_size: String(PAGE) }); // the folder's own rule wins over a filter
         if (q) p.set('q', q);
-        const r = await historyFetch(`/api/sessions/history?${p}`);
-        if (!r || !r.ok) throw new Error('chats could not be read');
-        const d = await r.json();
-        const rows = Array.isArray(d.sessions) ? d.sessions : [];
-        L.rows = L.rows.concat(rows); L.page += 1; L.total = Number.isFinite(d.total) ? d.total : L.rows.length; L.error = '';
+        const sources = inboxSources().filter(server => (!selected || server === selected) && (!p.has('tag_ids') || server === 'local'));
+        const replies = await Promise.all(sources.map(async server => {
+            const r = await serverFetch(server, `/api/sessions/history?${p}`);
+            if (!r.ok) throw new Error('Chats could not be read');
+            const d = await r.json(); return { ...d, sessions: (d.sessions || []).map(row => ({ ...row, server })) };
+        }));
+        const rows = replies.flatMap(d => d.sessions);
+        const d = { total: replies.reduce((sum, d) => sum + (Number(d.total) || d.sessions.length), 0) };
+        L.rows = L.rows.concat(rows).sort((a,b) => stampOf(b).localeCompare(stampOf(a))); L.page += 1; L.total = Number.isFinite(d.total) ? d.total : L.rows.length; L.error = '';
         L.done = !rows.length || L.rows.length >= L.total;
         if (L.page > 1 && rows.length) importOnce('./notifications.js').then(m => m.announceNotice(`${rows.length} more chats loaded`)).catch(() => {}); // heard once: the rows came in below the footer the person was on (#8022)
     } catch (e) { L.error = e.message || 'Chats could not be read'; L.done = true; }
@@ -116,37 +125,41 @@ const snippetOf = (s) => {
 };
 
 /** Star or archive a chat (the flags route): true when it was saved; a failure says so in a toast. */
-export async function setChatFlag(sessionId, flag, value) {
+export async function setChatFlag(sessionId, flag, value, server = null) {
     try {
-        const r = await historyFetch(`/api/sessions/history/${encodeURIComponent(sessionId)}/flags`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ [flag]: value }) });
+        if (isCloud() || (server && server !== 'local')) throw new Error('Remote history is read-only');
+        const read = server ? (url, options) => serverFetch(server, url, options) : historyFetch;
+        const r = await read(`/api/sessions/history/${encodeURIComponent(sessionId)}/flags`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ [flag]: value }) });
         if (!r || !r.ok) throw new Error('not saved');
     } catch { (await importOnce('./utils.js')).showToast?.('The chat could not be changed', true); return false; }
     resetChatLists();
     return true;
 }
-async function setFlag(s, flag, value, after) { if (await setChatFlag(s.session_id, flag, value)) after(); }
+async function setFlag(s, flag, value, after) { if (await setChatFlag(s.session_id, flag, value, s.server)) after(); }
 
 /** The table spec of a chat folder. ctx: { query, params, open(session), redraw(), after() } (params: the Filters' extra parameters of the history read, chat_filters.js; open: the chat in the viewer; redraw: draw the table again; after: counts and rows read again). */
 export function chatsSpec(key, ctx) {
     const folder = chatFolder(key);
     if (!folder) return null;
     const q = (ctx.query || '').trim();
-    const extra = ctx.params || {}, filtered = !!q || Object.keys(extra).length > 0;
+    const extra = { ...(ctx.params || {}), ...(multipleServers() && ctx.server ? { server: ctx.server } : {}) }, filtered = !!q || Object.keys(extra).length > 0;
     const L = listOf(key, q, JSON.stringify(extra));
     if (!L.page && !L.busy && !L.done) readMore(key, folder, q, extra, ctx.redraw);
     const rows = L.rows;
     return { title: folder.title, noun: ['chat', 'chats'], rows, count: folderCount(key) ?? null, empty: { line: L.busy || !L.page ? 'Loading chats…' : (filtered ? 'No chat matches the search and filters.' : 'No chats here.') },
-        signature: JSON.stringify([key, q, extra, folderCount(key), L.busy, L.done, L.error, rows.map(s => [s.session_id, s.title, s.summary, stampOf(s), s.starred, s.archived, s.active, s.duration_sec])]),
-        node: () => DT.dataTable({ label: `${folder.title}, ${folderCount(key) ?? rows.length}`, rows, rowKey: s => s.session_id, state: DT.tableState(), rowName: s => name(s) || historyLabel(s),
+        signature: JSON.stringify([key, q, extra, folderCount(key), L.busy, L.done, L.error, rows.map(s => [s.server, s.session_id, s.title, s.summary, stampOf(s), s.starred, s.archived, s.active, s.duration_sec])]),
+        node: () => DT.dataTable({ label: `${folder.title}, ${folderCount(key) ?? rows.length}`, rows, rowKey: s => `${s.server}:${s.session_id}`, state: DT.tableState(), rowName: s => name(s) || historyLabel(s),
             groupBy: s => ({ key: dayOf(stampOf(s)), label: dayOf(stampOf(s)) }),
             open: s => ctx.open(s),
             footer: (L.done && !L.error) ? undefined : { text: L.error || (L.done ? '' : (L.total != null ? `Showing ${rows.length} of ${L.total}` : '')), auto: !L.done && !L.error, more: L.done ? null : { label: 'Load more', busy: L.busy, run: () => readMore(key, folder, q, extra, ctx.redraw) } },
             columns: [
+                ...serverColumns(),
                 { key: 'agent', label: key === 'chats-group' ? 'Name' : 'Agent', primary: true, line: 1, cell: s => { const n = name(s); const w = isGroup(s) ? DT.primaryButton(n || 'Board') : DT.personButton(n || 'Agent', `Open the chat of ${n || 'the agent'}`); const b = w.matches('button') ? w : w.querySelector('.dt-primary'); b.dataset.sessionId = s.session_id; if (isGroup(s)) { const wrap = DT.el('span', 'dt-person'); wrap.append(b, DT.tag('Board')); return wrap; } return w; } },
                 { key: 'chat', label: 'Chat', width: 'grow', line: 2, cell: s => { /* a board's name is the agent column's: its line says only what happened in it */ const c = DT.el('span', 'dt-chat-line'); const sn = snippetOf(s); if (isGroup(s)) { if (sn) c.append(DT.el('span', 'dt-chat-snippet', sn)); } else { c.append(DT.el('span', 'dt-chat-title', historyLabel(s))); if (sn) c.append(DT.el('span', 'dt-chat-snippet', ` \u2013 ${sn}`)); } if (s.active) { const live = DT.el('span', 'dt-chat-live', ' · active now'); c.append(live); } /* an archived board stays in Board history, marked */ if (s.archived && key !== 'chats-archived') c.append(DT.tag('Archived')); return c; } },
                 { key: 'when', label: 'When', tone: 'tertiary', align: 'end', line: 1, cell: s => DT.timeCell(stampOf(s)) },
                 { key: 'ran', label: 'Ran', tone: 'tertiary', align: 'end', line: 0, cell: s => ran(s.duration_sec) },
                 { key: 'flags', label: 'Star and archive', hideLabel: true, line: 0, cell: s => {
+                    if (isCloud() || (s.server && s.server !== 'local')) return '';
                     const w = DT.el('span', 'dt-chat-flags');
                     // icon buttons that show on the row's hover or focus (the star stays drawn when set); a phone has them in the opened chat
                     const flag = (key, on, icon, label, pressed) => { const b = DT.el('button', `dt-flag${key === 'starred' && on ? ' dt-flag-on' : ''}`); b.type = 'button'; b.title = label; b.setAttribute('aria-label', `${label}: ${name(s) || historyLabel(s)}`); if (pressed) b.setAttribute('aria-pressed', String(!!on)); const i = DT.el('span', 'material-icons', icon); i.setAttribute('aria-hidden', 'true'); b.append(i); b.addEventListener('click', (e) => { e.stopPropagation(); setFlag(s, key, !on, ctx.after); }); return b; };

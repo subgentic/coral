@@ -2,6 +2,7 @@
 const assert=require('node:assert/strict');
 const {connect}=require('./agent_view_harness');
 const BASE=require('./test_base').BASE;
+const fs=require('node:fs'),path=require('node:path');
 const folders=['goals','tasks','chats-group','needs','saved','chats','artifacts'];
 (async()=>{
  const {client,Page,Emulation,ev,waitFor,PRELOAD,install}=await connect();const failures=[];
@@ -50,6 +51,9 @@ const folders=['goals','tasks','chats-group','needs','saved','chats','artifacts'
     assert.ok(await ev(`document.documentElement.scrollWidth<=innerWidth+1`),'no horizontal overflow');
     const sortable=await ev(`(() => {const s=[...document.querySelectorAll('#group-table-view .dt-sortbar select')].find(s=>[...s.options].some(o=>o.value==='server'));if(s&&s.getClientRects().length){s.value='server';s.dispatchEvent(new Event('change',{bubbles:true}));return true;}const h=document.querySelector('#group-table-view th[data-key="server"]');const b=h?.querySelector('button');if(b){b.click();return true;}return false;})()`);
     assert.ok(sortable,'Server sort control in '+folder);
+    await waitFor(`(()=>{const values=${cells}.map(e=>e.textContent);return values.length>1&&values.every((v,i)=>!i||values[i-1].localeCompare(v)<=0);})()`,'Server ascending order in '+folder);
+    const shotDir=process.env.CORAL_SCREENSHOT_DIR||(process.env.RUNNER_TEMP&&path.join(process.env.RUNNER_TEMP,'out'));
+    if(shotDir){fs.mkdirSync(shotDir,{recursive:true});for(const theme of ['light','dark']){await ev(`document.documentElement.setAttribute('data-theme','${theme}');true`);fs.writeFileSync(path.join(shotDir,`inbox-server-${folder}-${width}-${theme}.png`),Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}}
     await ev(`document.querySelector('#group-table-view .list-bar-toggle').click();true`);
     const select=`[...document.querySelectorAll('.list-bar-field')].find(e=>e.querySelector('.list-bar-field-label')?.textContent.trim()==='Server')?.querySelector('select')`;
     await waitFor(`!!(${select})&&(${select}).getClientRects().length>0`,'Server filter in '+folder);

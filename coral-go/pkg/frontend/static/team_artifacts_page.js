@@ -1,3 +1,4 @@
+import { serverColumns, serverOf, readInboxArtifacts } from './inbox_servers.js';
 /* The team page's Artifacts tab (#7453): the team's artifacts as a table (Name, Type, Size, Task, Created) under the search, Filters and Sort bar the old tab had, and the document in the detail pane. The name opens the pane: the preview, every detail the old
  * row's (i) showed, and the actions pinned under it (Open, Download, Copy link, Keep, Delete). The server does the matching: a search covers every artifact, not the loaded page (team_artifact_filters.js is the query). Everything drawn is built with the DOM and
  * textContent: names, task titles and the words about where a file came from are written by agents and other computers. Lazy: team_page.js imports it. */
@@ -17,7 +18,7 @@ const { loadFilters, saveFilters, toParams, isFiltered, noteChoices, forgetChoic
 const { loadPanelOpen, savePanelOpen, buildMoreMenu } = await importOnce('./list_bar.js');
 const { isOwnerLabelRefusal, OWNER_LABEL_TEXT } = await importOnce('./owner_label.js');
 const { readersAllowed, readersBlock } = await importOnce('./artifact_readers.js');
-const { HEX_RE, managedHex, itemKey, isUnverified, readableName, sizeText, typeText, createdText, taskText, linkOfItem, renderText, orderByGroup, groupHead } = await importOnce('./artifact_item.js');
+const { HEX_RE, managedHex, itemKey: artifactKey, isUnverified, readableName, sizeText, typeText, createdText, taskText, linkOfItem, renderText, orderByGroup, groupHead } = await importOnce('./artifact_item.js');
 
 const Tags = await importOnce('./artifact_tags.js');
 const { REVIEW, STARTER } = await importOnce('./artifact_tag_rules.js');
@@ -29,10 +30,11 @@ Local paths like /tmp/<file> are not reachable by the user, so always upload. Fu
 /** One artifacts list with its own state: the team page's Artifacts tab and an agent's (createArtifactsList()), or the Inbox's Artifacts folder across every team (createArtifactsList({ inbox: true })). */
 export function createArtifactsList({ inbox = false } = {}) {
     let artifactState = DT.tableState();
+    const itemKey = item => inbox && serverOf(item) !== LOCAL_SERVER ? `${serverOf(item)}:${artifactKey(item)}` : artifactKey(item);
     // the filters: the team page's (and an agent's), or the Inbox's, which add the team
     const F = inbox ? { EMPTY: INBOX.EMPTY, load: k => INBOX.load(k, browserLocal), save: (k, v) => INBOX.save(k, v, browserLocal), isFiltered: INBOX.isFiltered }
         : { EMPTY, load: k => loadFilters(k, browserLocal), save: (k, v) => saveFilters(k, v, browserLocal), isFiltered };
-    const linkOf = (item) => linkOfItem(item, { server: server(), project: inbox ? item.board_id : model.project }); // where the bytes are, for the list this page shows
+    const linkOf = (item) => linkOfItem(item, { server: inbox ? serverOf(item) : server(), project: inbox ? item.board_id : model.project }); // where the bytes are, for the list this page shows
 
     const PAGE = 100;
     const model = { project: '', scope: null, key: '', loaded: false, items: [], hasMore: false, cursor: '', counts: null, truncated: false, loading: false, error: '', loadingMore: false, filters: { ...F.EMPTY }, kept: new Set(), tagCounts: {}, gen: 0, controller: null, teams: [] };
@@ -59,7 +61,7 @@ export function createArtifactsList({ inbox = false } = {}) {
     // ── what is kept and what is deleted ─────────────────────────────────────
 
     // Keep and Delete act on this computer's store: only for a team of this computer (a linked computer's artifact is its own, and the same route here would reach our copy of the same bytes, or none), and not through the Hub or in the pop-out (Security, #7520).
-    const local = () => !isCloud() && !document.body.classList.contains('popout-mode') && server() === LOCAL_SERVER;
+    const local = () => !isCloud() && !document.body.classList.contains('popout-mode') && server() === LOCAL_SERVER && (!inbox || model.items.every(item => serverOf(item) === LOCAL_SERVER));
     async function loadKept() {
         if (!local()) return new Set();
         try { const r = await fetch('/api/system/artifact-store/kept'); return new Set(r.ok ? (await r.json()).kept || [] : []); } catch { return new Set(); }
@@ -70,7 +72,7 @@ export function createArtifactsList({ inbox = false } = {}) {
         if (HEX_RE.test(String(hex)) && origin === server()) forget(hex);
     });
     function forget(hex) {
-        model.items = model.items.filter(it => managedHex(it) !== hex);
+        model.items = model.items.filter(it => managedHex(it) !== hex || (inbox && serverOf(it) !== LOCAL_SERVER));
         if (detailKey() === hex) closeDetailPane();
         draw();
     }
@@ -119,7 +121,8 @@ export function createArtifactsList({ inbox = false } = {}) {
             if (!(scope && scope.standalone)) for (const [k, v] of Object.entries(toParams(model.filters))) params.set(k, v); // the search, the filters and the sort are the server's to apply
             if (!append) params.set('offset', '0'); else if (model.cursor) params.set('cursor', model.cursor); else params.set('offset', String(model.items.length));
             if (scope) params.set('session_id', scope.session); // one agent's list: the same query, scoped to the agent (its totals are the agent's)
-            const r = await (inbox ? fetch(`/api/team-artifacts?${params}`, { signal: ctrl.signal }) : scope && scope.standalone ? fetch(serverUrl(`/api/session-artifacts?${params}`, scope.server), { signal: ctrl.signal }) : boardFetch(project, `/artifacts?${params}`, { signal: ctrl.signal }));
+            const inboxData = inbox ? await readInboxArtifacts(params, model.filters, ctrl.signal) : null;
+            const r = await (inbox ? Promise.resolve({ ok: true, json: async () => inboxData }) : scope && scope.standalone ? fetch(serverUrl(`/api/session-artifacts?${params}`, scope.server), { signal: ctrl.signal }) : boardFetch(project, `/artifacts?${params}`, { signal: ctrl.signal }));
             if (!r.ok) { if (await isOwnerLabelRefusal(r)) throw new Error(OWNER_LABEL_TEXT); throw new Error(`Unable to load ${inbox ? '' : scope ? 'agent ' : 'team '}artifacts (${r.status}).`); }
             const data = await r.json();
             if (gen !== model.gen || key !== model.key) return;
@@ -235,7 +238,7 @@ export function createArtifactsList({ inbox = false } = {}) {
                         const r = await fetch(`/api/artifacts/${hex}`, { method: 'DELETE' });
                         if (!r.ok && r.status !== 404) throw new Error('Delete failed');
                         ok.push(itemKey(item)); deletions?.postMessage({ hex, server: origin });
-                        if (key === model.key) { model.items = model.items.filter(it => managedHex(it) !== hex); if (detailKey() === hex) closeDetailPane(); }
+                        if (key === model.key) { model.items = model.items.filter(it => managedHex(it) !== hex || (inbox && serverOf(it) !== LOCAL_SERVER)); if (detailKey() === hex) closeDetailPane(); }
                     } catch { failed++; } }
                     model.bulkBusy = false; finish(key, ok, failed, 'Deleted');
                     if (key === model.key) loadArtifacts({ keep: true });
@@ -270,10 +273,11 @@ export function createArtifactsList({ inbox = false } = {}) {
             const by = !model.scope && !inbox ? model.filters.group : ''; // the team's list read by task or goal: a head per group, its files together (an agent's list is not grouped)
             const shown = by ? orderByGroup(model.items, by) : model.items;
             const table = DT.dataTable({
-                label: `Artifacts, ${model.items.length}`, bare: !!model.scope, compact: !!model.scope, foldAt: model.scope ? 'fit' : 40, rows: shown, groupBy: by ? (it) => groupHead(it, by, shown, !model.hasMore) : undefined, rowKey: itemKey, current: detailKey(), sortBar: false, state: artifactState, rowName: item => Tags.nameWithTags(readableName(item), item.tags),
+                label: `Artifacts, ${model.items.length}`, bare: !!model.scope, compact: !!model.scope, foldAt: model.scope ? 'fit' : 40, rows: shown, groupBy: by ? (it) => groupHead(it, by, shown, !model.hasMore) : undefined, rowKey: itemKey, current: detailKey(), sortBar: inbox, state: artifactState, rowName: item => Tags.nameWithTags(readableName(item), item.tags),
                 selectable: model.scope ? null : { contextKey: model.key, canSelect: item => !!linkOf(item)?.preview, actions: artifactBulkActions(), onChange: keys => Toolbar.mountSelection(toolbarRow, keys.size ? table.bar : null) },
                 open: (item, tr) => openArtifact(item, tr.querySelector('.dt-primary')),
                 columns: [
+                    ...(inbox ? serverColumns() : []),
                     { key: 'name', label: 'Name', primary: true, width: 'grow', line: 1,
                         cell: item => {
                             const first = el('span', 'dt-title-stack');

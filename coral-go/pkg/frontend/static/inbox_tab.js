@@ -1,3 +1,4 @@
+import './inbox_servers.js'; // source helpers shared by lazy Inbox filters and lists
 import { needsInputAttention } from './display_activity_hint.js';
 /* Inbox tab (#4718, #4811, #7472): on every Coral. Where the hub serves the dashboard it is the Coral Hub's /inbox page (what needs the Operator, what was saved) inside the dashboard, in a
  * frame whose address is the constant below: never built from a URL, a hash or a message, and nothing is posted to or read from the frame. On every other Coral the dashboard builds its own

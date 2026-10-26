@@ -1,3 +1,4 @@
+import { serverFilter } from './inbox_servers.js';
 /* The Team Artifacts panel's search, filters and sort (#4573): what they are, how they are kept per board and how they become the list route's query. Pure (no DOM, no imports)
  * so it can be tested on its own; team_artifact_bar.js draws the controls and team_artifacts.js asks the server. The server does the matching: a search covers every artifact,
  * not just the loaded page. */
@@ -53,7 +54,7 @@ export const saveFilters = kept.save;
 
 /** The Inbox's list across teams (Goal #62): the same filters plus the team (a team's id), kept under its own key. The task, goal and group choices are numbers of one team, so the Inbox's bar does not offer them. */
 export const INBOX = (() => {
-    const m = defineFilters({ q: FIELDS.q, team: { type: 'text', max: 200, chip: v => `Team: ${v}` }, ...Object.fromEntries(Object.entries(FIELDS).filter(([k]) => k !== 'q')) });
+    const m = defineFilters({ server: serverFilter, q: FIELDS.q, team: { type: 'text', max: 200, chip: v => `Team: ${v}` }, ...Object.fromEntries(Object.entries(FIELDS).filter(([k]) => k !== 'q')) });
     const p = m.persist(key => `coral-team-artifacts-filters:${key}`);
     return { EMPTY: m.EMPTY, clean: m.clean, isFiltered: m.isFiltered, chips: m.chips, without: m.without, load: p.load, save: p.save };
 })();

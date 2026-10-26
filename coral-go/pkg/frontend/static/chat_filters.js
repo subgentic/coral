@@ -1,3 +1,4 @@
+import { serverFilter } from './inbox_servers.js';
 /* The Inbox chat folders' search and Filters (#8603, UI/UX #8589 section 9): what they are, how they are kept in the browser per folder, and how they become the history route's parameters (GET
  * /api/sessions/history: source_types, agent_name, tag_ids, date_from, date_to and q; the folder's own rule, Archived or Starred or a CLI, stays and wins). Pure (no DOM; it imports the model and the browser
  * store) so it is tested on its own; inbox_toolbar.js draws the controls on the shared list bar. Only fields the chats' data already carries: a history row has no team, and the route has no order of its own
@@ -13,6 +14,7 @@ let tagNames = new Map();
 export function setTagNames(map) { tagNames = map instanceof Map ? map : new Map(); }
 
 const model = defineFilters({
+    server: serverFilter,
     q: { type: 'text', max: 200, chip: v => `Search: ${v}` },
     cli: { type: 'choice', values: CLIS.map(c => c[0]), chip: v => `CLI: ${CLI_LABEL[v]}` },
     agent: { type: 'text', max: 80, chip: v => `Agent: ${v}` },

@@ -56,7 +56,7 @@ function registerRouteHandlers() {
 
     route('chats', async (r, opts) => {
         await liveListReady;
-        if (r.server && !setHistorySource(r.server)) return notFound('That computer was not found', { view: 'chats' });
+        if ((r.server || !isCloud()) && !setHistorySource(r.server || 'local')) return notFound('That computer was not found', { view: 'chats' });
         if (r.id) {
             switchNavTab('history', { fromHistory: true });
             const cur = state.currentSession;

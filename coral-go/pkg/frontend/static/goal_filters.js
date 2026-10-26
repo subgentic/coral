@@ -1,3 +1,4 @@
+import { serverFilter } from './inbox_servers.js';
 /* The Inbox Goals folder's search, pills and Filters (#8596, UI/UX #8589 section 9): what they are, how they are kept in the browser and how a goal is matched against them. Pure (no DOM; it imports the
  * model and the browser store) so it is tested on its own; inbox_toolbar.js draws the controls on the shared list bar and inbox_sidebar.js asks the rows. The goals are the ones GET /api/goals sends (open goals of every team), so
  * every field here is one the rows already carry: no new server field. */
@@ -15,6 +16,7 @@ export function setTeamNames(map) { teamNames = map instanceof Map ? map : new M
 const teamChip = v => `Team: ${teamNames.get(v) || v}`;
 
 const model = defineFilters({
+    server: serverFilter,
     q: { type: 'text', max: 200, chip: v => `Search: ${v}` },
     state: { type: 'choice', values: STATES }, // the pills of the toolbar: a shortcut of this field, so it has no chip of its own
     team: { type: 'custom', empty: '', clean: v => text(v, 200), filtered: v => !!v, chip: teamChip, clear: f => ({ ...f, team: '' }) },

@@ -1,3 +1,4 @@
+import { serverFilter } from './inbox_servers.js';
 /* The Tasks panel's search, filters and sort (#4744): what they are, how they are kept per board and how they become the task query's parameters. Pure (no DOM, no imports) so it can be tested on
  * its own; tasks_view.js draws the controls (on the shared list bar) and tasks.js asks the server (GET /api/board/tasks, #4540 and #4745). The server does the matching: a search covers every task of
  * the board, not just the loaded page. */
@@ -26,6 +27,7 @@ export function setGoalNames(map) { goalNames = map instanceof Map ? map : new M
 const goalChipLabel = goal => (goal === NO_GOAL ? 'No goal' : `Goal: ${goalNames.get(Number(goal)) || `Goal ${goal}`}`);
 
 const model = defineFilters({
+    server: serverFilter,
     q: { type: 'text', max: 200, chip: v => `Search: ${v}` },
     status: { type: 'choice', values: STATUSES, chip: v => `Status: ${STATUS_LABEL[v]}` },
     priority: { type: 'choice', values: PRIORITIES, chip: v => `Priority: ${PRIORITY_LABEL[v]}` },
