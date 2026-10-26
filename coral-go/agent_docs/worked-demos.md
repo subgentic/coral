@@ -102,7 +102,7 @@ which path you mean.
 Either way, each agent does get its own terminal session (a tmux session on the tmux backend).
 
 Jobs are the path *designed* to behave the way the README described teams as behaving —
-`internal/background/scheduler.go:551` keys the worktree on `runID` and `create_worktree`
+`runWorktreeDir` in `internal/background` keys the worktree on `runID`, and `create_worktree`
 defaults to `true`.
 
 > **Correction — do not rely on this yet.** An earlier version of this page recommended
