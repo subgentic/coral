@@ -36,6 +36,8 @@ const BASE = require('./test_base').BASE;
                 create: !!h.querySelector('[data-on-click="task-create-show"]'), assignee: !!h.querySelector('[id$="assignee"]'),
                 overflow: document.documentElement.scrollWidth > innerWidth + 1 }; })()`);
             assert.deepEqual(facts, { shared: true, searches: 1, create: false, assignee: false, overflow: false });
+            const stateControl = await ev(`(() => { const h = document.getElementById('group-table-view'), visible = e => !!e && e.getClientRects().length > 0; return { pills: visible(h.querySelector('.team-tb-pills')), select: visible(h.querySelector('.team-tb-select')) }; })()`);
+            assert.deepEqual(stateControl, { pills: width === 1280, select: width === 390 }, `${width}: exactly one state control is visible`);
             await shot(`inbox-tasks-toolbar-${width}`);
             await ev(`document.querySelector('#group-table-view .list-bar-toggle').click(); true`);
             await waitFor(`document.getElementById('inbox-tk-priority').getBoundingClientRect().height > 0`, 'Filters open');
