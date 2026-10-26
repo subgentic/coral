@@ -11,6 +11,7 @@ import { importOnce } from './import_once.js';
 import { isPhoneLayout } from './phone_layout.js';
 const { dataTable, tableState, link: dtLink, chip, tag, avatar } = await importOnce('./data_table.js'); // the shared table (#7743)
 const { showViews, syncRangeLine } = await importOnce('./analytics_views.js'); // the sidebar's list of views and the page's title (#7473)
+const agentDetail = await importOnce('./analytics_agent.js'); // one agent over the range, opened from By agent (#7930)
 const series = await importOnce('./analytics_series.js'); // the lines over time above By provider, By model, By team and By agent (#7857)
 const { showSpend } = await importOnce('./analytics_spend.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried
 
@@ -642,6 +643,7 @@ function _renderAgentTable(rows) {
         _numCol('duration', 'Duration', span, () => '', { cell: r => _formatDuration(start(r), end(r)) }),
         _numCol('requests', 'Requests', r => r.requests || 0, String),
         _tokCol('input_tokens', 'Input'), _tokCol('output_tokens', 'Output'), ..._cacheCols(),
+        { key: 'details', label: 'Details', tone: 'secondary', cell: r => { const b = dtLink('Charts', () => agentDetail.openAgent(r, document.getElementById('cost-time-range')?.value || 'day')); b.setAttribute('aria-label', `Charts for ${r.display_name || r.agent_name || 'agent'}`); return b; } }, // one agent over the range (#7930)
     ], filtered, NO_DATA, { ..._seriesOpts('agent'), rowKey: r => r.session_id || `${r.agent_name}:${start(r)}` });
     _attachAgentChartHovers(container, new Set(filtered.map(r => r.session_id).filter(Boolean)));
 }
