@@ -733,9 +733,10 @@ function registerRouteHandlers() {
         await applyTeamRoute(routeKey(r), r.sub || 'goals', r.item || 0, r.query || ''); // the team page (#7453); /team/<name> is its Goals tab
     });
 
-    route('board', r => {
-        switchNavTab('board', { fromHistory: true });
-        selectBoardProject(routeKey(r));
+    route('board', async r => { // the old board page is gone (#8061): /board/<team> opens the team page's Messages tab, in its place in the history
+        await liveListReady;
+        switchNavTab('agents', { fromHistory: true });
+        await openTeamPage(routeKey(r), { tab: 'messages', replace: true });
     });
 
     route('workflows', async r => {
