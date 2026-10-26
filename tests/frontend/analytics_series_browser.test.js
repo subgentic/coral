@@ -62,12 +62,12 @@ const series = (rows, key) => Array.from({ length: 24 }, (_, h) => ({ cost_usd: 
         await setTheme(ev, 'dark');
         console.log('1b. The Overview: the change against the period before, cost by team stacked');
         await view('overview');
-        await waitFor(`document.querySelectorAll('#cost-series-overview .viz-fill').length === 8 && /vs the prior 24 hours/.test(document.getElementById('cost-change-cost').textContent)`, 'the stacked chart and the change lines', 12000);
-        const ov = await ev(`({ cost: document.getElementById('cost-change-cost').textContent, input: document.getElementById('cost-change-input').textContent, legend: document.querySelectorAll('#cost-series-overview .viz-legend-btn').length, hidden: document.querySelector('#cost-series-overview .viz-svg').getAttribute('aria-hidden'), title: document.querySelector('#cost-series-overview .viz-title').textContent })`);
-        assert.equal(ov.cost, '+100% vs the prior 24 hours', JSON.stringify(ov)); assert.equal(ov.input, '+100% vs the prior 24 hours'); assert.equal(ov.legend, 8); assert.equal(ov.hidden, 'true'); assert.match(ov.title, /^Cost each hour, stacked by team/);
+        await waitFor(`document.querySelectorAll('#cost-series-overview .viz-fill').length === 8 && /^\\+100%$/.test(document.getElementById('cost-change-cost').textContent)`, 'the stacked chart and the change lines', 12000);
+        const ov = await ev(`({ cost: document.getElementById('cost-change-cost').textContent, sub: document.getElementById('cost-range-line').textContent.replace(/\\s+/g, ' ').trim(), input: document.getElementById('cost-change-input').textContent, legend: document.querySelectorAll('#cost-series-overview .viz-legend-btn').length, hidden: document.querySelector('#cost-series-overview .viz-svg').getAttribute('aria-hidden'), title: document.querySelector('#cost-series-overview .viz-title').textContent })`);
+        assert.equal(ov.cost, '+100%', JSON.stringify(ov)); assert.equal(ov.input, '+100%'); assert.match(ov.sub, /^Last 24 hours \u00b7 Change against the prior 24 hours/, 'the comparison is said once, in the subtitle: ' + ov.sub); assert.equal(ov.legend, 8); assert.equal(ov.hidden, 'true'); assert.match(ov.title, /^Cost each hour, stacked by team/);
         await ev(`document.querySelectorAll('#cost-series-overview .viz-legend-btn')[2].click(); true`);
         assert.equal(await ev(`document.querySelectorAll('#cost-series-overview .viz-fill[opacity="0.25"]').length`), 7, 'a legend item brings its fill forward and dims the rest');
-        await shot('series-overview');
+        await shot('series-overview'); await setTheme(ev, 'light'); await shot('series-overview-light'); await setTheme(ev, 'dark');
         await view('team'); await waitFor(`document.querySelectorAll('#cost-series-team .viz-svg path.viz-line').length === 8`, 'the team chart again', 8000);
         console.log('   ✓');
 
@@ -171,6 +171,7 @@ const series = (rows, key) => Array.from({ length: 24 }, (_, h) => ({ cost_usd: 
             return { page: document.documentElement.scrollWidth > innerWidth + 1, svgW: Math.round(s.getBoundingClientRect().width), boxW: Math.round(box.clientWidth), ends: s.querySelectorAll('.viz-end').length, sw: Math.round(Math.min(sw.width, sw.height)), swTag: document.querySelector('#cost-by-team .cost-swatch').tagName, metricRows: new Set([...document.querySelectorAll('#cost-series-team .viz-seg')[0].querySelectorAll('button')].map(b => Math.round(b.getBoundingClientRect().top))).size, seg: Math.round(document.querySelector('#cost-series-team .viz-seg button').getBoundingClientRect().height), folded: document.querySelector('#cost-by-team .dt-box').classList.contains('dt-folded') }; })()`);
         assert.equal(p.metricRows, 1, 'the Metric segments are one row at 390: ' + JSON.stringify(p)); assert.equal(p.page, false, JSON.stringify(p)); assert.ok(p.svgW <= p.boxW + 1, JSON.stringify(p)); assert.equal(p.ends, 0, 'no end labels on a phone'); assert.ok(p.sw >= 18 && p.swTag === 'SPAN', 'on a touch screen the swatch is only a colour (the 44 px row does the same): ' + JSON.stringify(p)); assert.ok(p.seg >= 44, 'the pickers are 44 px: ' + JSON.stringify(p)); assert.equal(p.folded, true);
         console.log('   ✓'); await shot('series-team-phone');
+        await view('overview'); await waitFor(`document.querySelectorAll('#cost-series-overview .viz-fill').length === 8`, 'the Overview on a phone', 12000); await ev(`window.scrollTo(0, 0); true`); await shot('series-overview-phone'); await setTheme(ev, 'light'); await shot('series-overview-phone-light'); await setTheme(ev, 'dark');
         console.log('PASS analytics over time: lines, legend table, picker, highlight, tooltip, totals, phone');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

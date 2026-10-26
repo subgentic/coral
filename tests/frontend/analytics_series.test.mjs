@@ -46,13 +46,13 @@ assert.ok(agrees(0.1 + 0.2, 0.3), 'a float sum is the same figure');
 assert.ok(!agrees(1, 1.01));
 assert.ok(agrees(15491800000, 15491800000.4));
 assert.deepEqual(METRICS.map(m => m.table), ['cost_usd', 'input_tokens', 'output_tokens', 'cache_read_tokens', 'cache_write_tokens', 'requests']);
-// the change against the period before: signed words, never a colour, and no claim without something to compare
-assert.equal(changeText(112, 100, 'the prior 24 hours'), '+12% vs the prior 24 hours');
-assert.equal(changeText(97, 100, 'the prior 7 days'), '\u22123% vs the prior 7 days');
-assert.equal(changeText(100, 100, 'the hour before'), 'no change vs the hour before');
-assert.equal(changeText(5, 0, 'the prior 24 hours'), 'no usage in the prior 24 hours');
-assert.equal(changeText(0, 0, 'x'), '');
-assert.equal(changeText(0, 10, 'the prior 24 hours'), '\u2212100% vs the prior 24 hours');
+// the change against the period before: a signed percent, never a colour, and nothing when the period before has nothing to compare with
+assert.equal(changeText(112, 100), '+12%');
+assert.equal(changeText(97, 100), '\u22123%');
+assert.equal(changeText(100, 100), '0%');
+assert.equal(changeText(5, 0), '', 'no usage before: no claim');
+assert.equal(changeText(0, 0), '');
+assert.equal(changeText(0, 10), '\u2212100%');
 assert.equal(priorWord('week'), 'the prior 7 days'); assert.equal(priorWord('nothing'), 'the prior 24 hours');
 assert.deepEqual(bucketTotals([{ cost_usd: 1, input_tokens: 5, num_requests: 2 }, { cost_usd: 2.5, output_tokens: 7 }]), { cost_usd: 3.5, input_tokens: 5, output_tokens: 7, cache_read_tokens: 0, cache_write_tokens: 0, num_requests: 2 });
 // the agent drill-down: the cache hit is read / (input + read), none without input; a clicked bar is its bucket to the next one (the end exclusive, as the server reads it)

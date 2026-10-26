@@ -561,16 +561,19 @@ async function _refreshOverview() {
             read(`/api/token-usage/timeseries?since=${iso(sinceMs - hours * 3600000)}&until=${iso(sinceMs)}&interval=1d`),
         ]);
         const word = series.priorWord(document.getElementById('cost-time-range')?.value || 'day'), cur = series.bucketTotals(now), before = series.bucketTotals(prior);
-        for (const [field, id] of Object.entries(_CHANGE_CARDS)) { const e = document.getElementById(`cost-change-${id}`); if (e) e.textContent = series.changeText(cur[field], before[field], word); }
+        let compared = false;
+        for (const [field, id] of Object.entries(_CHANGE_CARDS)) { const e = document.getElementById(`cost-change-${id}`), t = series.changeText(cur[field], before[field]); if (e) e.textContent = t; if (t) compared = true; }
+        _setText('cost-compare-text', compared ? ` \u00b7 Change against ${word}` : ''); // said once here, not on each tile
         series.setData('overview', { buckets: byTeam, interval, sinceMs, untilMs });
     } catch {
         for (const id of Object.values(_CHANGE_CARDS)) { const e = document.getElementById(`cost-change-${id}`); if (e) e.textContent = ''; }
+        _setText('cost-compare-text', '');
         series.setData('overview', null, 'The chart is unavailable. The figures above are complete.');
     }
     series.drawOverviewPanel(host, { phone: isPhoneLayout() });
 }
 
-document.addEventListener('cost-view-change', e => { if (SERIES_VIEWS[e.detail]) _refreshSeries(e.detail); else if (e.detail === 'overview') _refreshOverview(); });
+document.addEventListener('cost-view-change', e => { if (SERIES_VIEWS[e.detail]) _refreshSeries(e.detail); else if (e.detail === 'overview') _refreshOverview(); else _setText('cost-compare-text', ''); });
 let _resizeTimer = null;
 window.addEventListener('resize', () => { clearTimeout(_resizeTimer); _resizeTimer = setTimeout(() => { const v = _currentView(); if (SERIES_VIEWS[v] && document.getElementById(`cost-series-${v}`)?.firstChild) _drawSeries(v); }, 150); });
 
@@ -917,13 +920,14 @@ function _cssVar(name) {
 
 function _renderSparklines(buckets) {
     if (buckets.length < 2) return;
-
-    _renderMiniSparkline('cost-spark-input', buckets.map(b => b.input_tokens), _cssVar('--accent'));
-    _renderMiniSparkline('cost-spark-output', buckets.map(b => b.output_tokens), _cssVar('--success'));
-    _renderMiniSparkline('cost-spark-cache-read', buckets.map(b => b.cache_read_tokens), _cssVar('--sh-builtin'));
-    _renderMiniSparkline('cost-spark-cache-write', buckets.map(b => b.cache_write_tokens), _cssVar('--color-tool-bash'));
-    _renderMiniSparkline('cost-spark-requests', buckets.map(b => b.num_requests), _cssVar('--text-secondary'));
-    _renderMiniSparkline('cost-spark-cost', buckets.map(b => b.cumulative_cost), _cssVar('--accent'));
+    // each tile's line is its metric's colour in the charts (the same tokens: input blue, output orange, cache read aqua, cache write yellow)
+    const c = field => _cssVar(`--viz-${(series.METRIC_SLOT[field] ?? 0) + 1}`);
+    _renderMiniSparkline('cost-spark-input', buckets.map(b => b.input_tokens), c('input_tokens'));
+    _renderMiniSparkline('cost-spark-output', buckets.map(b => b.output_tokens), c('output_tokens'));
+    _renderMiniSparkline('cost-spark-cache-read', buckets.map(b => b.cache_read_tokens), c('cache_read_tokens'));
+    _renderMiniSparkline('cost-spark-cache-write', buckets.map(b => b.cache_write_tokens), c('cache_write_tokens'));
+    _renderMiniSparkline('cost-spark-requests', buckets.map(b => b.num_requests), c('num_requests'));
+    _renderMiniSparkline('cost-spark-cost', buckets.map(b => b.cumulative_cost), c('cost_usd'));
 }
 
 // ── Burn Rate ────────────────────────────────────────────────

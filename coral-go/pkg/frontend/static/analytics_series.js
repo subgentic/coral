@@ -245,14 +245,12 @@ export function drawPanel(host, view, { tableTotal, redraw, phone }) {
 const PRIOR_WORD = { hour: 'the hour before', day: 'the prior 24 hours', week: 'the prior 7 days', month: 'the prior 30 days' };
 export const priorWord = period => PRIOR_WORD[period] || PRIOR_WORD.day;
 
-/** What a figure did against the same stretch before it, in words with its sign (never a colour): "+12% vs the prior 24 hours", "no usage in the prior 24 hours" when there was none to compare, '' when neither period has any. */
-export function changeText(current, prior, word) {
+/** What a figure did against the same stretch before it: "+12%" or "\u22123%", never a colour; '' when the stretch before had nothing to compare with (the comparison is said once, in the page's subtitle). */
+export function changeText(current, prior) {
     const c = Number(current) || 0, p = Number(prior) || 0;
-    if (!c && !p) return '';
-    if (!p) return `no usage in ${word}`;
+    if (!p) return '';
     const pct = Math.round(((c - p) / p) * 100);
-    if (pct === 0) return `no change vs ${word}`;
-    return `${pct > 0 ? '+' : '−'}${Math.abs(pct)}% vs ${word}`;
+    return pct === 0 ? '0%' : `${pct > 0 ? '+' : '\u2212'}${Math.abs(pct)}%`;
 }
 
 /** The totals of a time series' buckets (what a period before is compared by). */
