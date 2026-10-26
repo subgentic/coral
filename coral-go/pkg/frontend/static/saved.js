@@ -287,7 +287,7 @@ async function openSavedView({ toggle = false } = {}) {
         const onSaved = inboxSavedShowing();
         if (toggle && onSaved) { closeSaved(); return; }
         if (!onSaved) await selectInboxTab('saved'); // the Inbox is open on another group: the button brings its Saved table up
-        $('group-table-view')?.querySelector('.group-table-link, .group-chip')?.focus();
+        $('group-table-view')?.querySelector('.dt-primary, .group-chip')?.focus();
         return;
     }
     dropJumpBar();
@@ -296,7 +296,7 @@ async function openSavedView({ toggle = false } = {}) {
     await rememberInboxGroup('saved'); // before the tab shows: the Inbox opens on Saved, not on the group it was last left on
     window.switchNavTab?.('hub-inbox');
     try { const read = showSavedView(); await selectInboxTab('saved'); await read; } finally { wantAllScope(false); } // the Inbox at its Saved group: the table is up at once and says it is loading (a phone waited for the read first and showed the list meanwhile)
-    $('group-table-view')?.querySelector('.group-table-link, .group-chip')?.focus();
+    $('group-table-view')?.querySelector('.dt-primary, .group-chip')?.focus();
 }
 
 let _before = null; // {open, tab}: the dock as it was when the Saved button opened it

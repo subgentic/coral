@@ -124,7 +124,7 @@ const STUB = `(() => {
 
             // the chevron only folds; the name opens the table
             await openTab('history');
-            await waitFor(`!!document.querySelector('#group-table-view table.group-table') && document.getElementById('group-table-view').checkVisibility()`, at + 'the tab opens on its first group as a table', 8000);
+            await waitFor(`!!document.querySelector('#group-table-view table.dt-table') && document.getElementById('group-table-view').checkVisibility()`, at + 'the tab opens on its first group as a table', 8000);
             assert.equal(await ev(`document.querySelector('#group-table-title').textContent`), 'Today', at + 'the first group is Today');
             assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view th')].map(h => [h.textContent, h.getAttribute('scope')])`), [['Chat', 'col'], ['Agent', 'col'], ['When', 'col'], ['Ran', 'col']], at + 'a real table with column headers');
             assert.equal(await ev(`document.querySelectorAll('#group-table-view tbody tr').length`), 2, at + 'two chats today');
@@ -150,7 +150,7 @@ const STUB = `(() => {
             await waitFor(`document.querySelector('#group-table-title').textContent === 'Today'`, at + 'back on Today', 8000);
 
             // a chat from the table: its page has its own way back, a 17/700 title and who, when and how long under it
-            await ev(`document.querySelector('#group-table-view .group-table-link').click(); true`);
+            await ev(`document.querySelector('#group-table-view .dt-primary').click(); true`);
             await waitFor(`document.getElementById('history-session-view').checkVisibility() && document.getElementById('history-back').checkVisibility()`, at + 'the chat opens with the way back', 8000);
             assert.equal(await ev(`document.getElementById('history-back').textContent`), '\u2190 All chats', at + 'back names the Inbox folder it came from (a local Coral: #7776; the hub\'s way back names the day group)');
             assert.deepEqual(await ev(`(() => { const t = getComputedStyle(document.getElementById('history-session-title')); return [t.fontSize, t.fontWeight]; })()`), ['17px', '700'], at + "an item's title is 17/700");

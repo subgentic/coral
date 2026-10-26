@@ -1,6 +1,9 @@
 // The Chats page follows the sidebar's search (#7722, the #7720 audit's finding 5): with a search typed the sidebar lists the chats that have hits, and the page's table lists the same chats, its count
 // the same number; with the search cleared the table is the whole list again, and a search that finds nothing says so in the page. 1280 px, isolated dev server; the history list and the search answer are stubbed.
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const { setTheme } = require('./helpers/contrast');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 
@@ -22,7 +25,7 @@ const SESSIONS = [
                 return R(u, o); }; return true; })()`);
         await ev(`window.switchNavTab('history'); Promise.all([import((window.__coralStatic||'/static/')+'sidebar.js'), import((window.__coralStatic||'/static/')+'view_switch.js')]).then(([sb, vs]) => { sb.showSidebarPane('history'); vs.showView('chats-empty-view'); document.body.setAttribute('data-nav-tab', 'history'); return true; })`);
         await ev(`import((window.__coralStatic||'/static/')+'history_list.js').then(m => { m.renderHistorySessions(${JSON.stringify(SESSIONS)}, 3, 1, 50); return true; })`);
-        const table = () => ev(`(() => { const v = document.getElementById('group-table-view'); if (!v || v.offsetParent === null) return null; return { title: (v.querySelector('#group-table-title') || {}).textContent, count: (v.querySelector('.group-table-head .session-group-count') || {}).textContent, rows: [...v.querySelectorAll('tbody tr')].map(r => r.querySelector('.group-table-link').textContent.trim()), text: v.innerText.replace(/\\s+/g, ' ').trim().slice(0, 200) }; })()`);
+        const table = () => ev(`(() => { const v = document.getElementById('group-table-view'); if (!v || v.offsetParent === null) return null; return { title: (v.querySelector('#group-table-title') || {}).textContent, count: (v.querySelector('.group-table-head .session-group-count') || {}).textContent, rows: [...v.querySelectorAll('tbody tr')].map(r => r.querySelector('.dt-primary').textContent.trim()), text: v.innerText.replace(/\\s+/g, ' ').trim().slice(0, 200) }; })()`);
         await waitFor(`!!document.querySelector('#group-table-view tbody tr')`, 'the Chats page table', 10000);
         let t = await table();
         assert.deepEqual([t.count, t.rows.length], ['3', 3], 'no search: the page lists all 3 chats ' + JSON.stringify(t));
@@ -54,6 +57,16 @@ const SESSIONS = [
         await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 3`, 'the whole list again', 5000).catch(() => {});
         t = await table();
         assert.deepEqual([t.count, t.rows.length], ['3', 3], 'cleared: the page lists all 3 chats again ' + JSON.stringify(t));
-        console.log('PASS the Chats page follows the search');
+        for (const width of [1280, 390]) for (const theme of ['dark', 'light']) {
+            await Emulation.setDeviceMetricsOverride({ width, height: 900, deviceScaleFactor: 1, mobile: width === 390 });
+            await setTheme(ev, theme);
+            await waitFor(`!!document.querySelector('#group-table-view .dt-box${width === 390 ? '.dt-folded' : ':not(.dt-folded)'}')`, 'the shared Chats table layout');
+            const layout = await ev(`(() => { const host = document.getElementById('group-table-view'); return { count: host.querySelectorAll('tbody tr').length, overflow: document.documentElement.scrollWidth > innerWidth + 1, buttons: [...host.querySelectorAll('.dt-primary')].map(b => ({ text: b.textContent, height: b.getBoundingClientRect().height })) }; })()`);
+            assert.equal(layout.count, 3); assert.equal(layout.overflow, false, JSON.stringify(layout));
+            if (width === 390) assert.ok(layout.buttons.every(b => b.height >= 44), JSON.stringify(layout));
+            const dir = process.env.CORAL_SCREENSHOT_DIR || (process.env.RUNNER_TEMP ? path.join(process.env.RUNNER_TEMP, 'out', 'shots-8255') : '');
+            if (dir) { fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(path.join(dir, `chats-table-${width}-${theme}.png`), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
+        }
+        console.log('PASS the Chats page follows the search; shared table fits desktop and phone in both themes');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

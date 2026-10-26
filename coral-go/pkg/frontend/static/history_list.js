@@ -1,4 +1,5 @@
 /* The Chats list and a history transcript (moved out of render.js, #4996; no behaviour change). */
+import { importOnce } from './import_once.js';
 import { historyServer } from './history_source.js';
 import { identityKey } from './server_base.js';
 import { state } from './state.js';
@@ -14,6 +15,9 @@ import { browserLocal } from './safe_storage.js';
 import { setAttr } from './dom_write.js';
 import { registerGroupSource, groupHeaderHtml, isGroupFolded, syncPaneGroupToggle, refreshGroupTable } from './sidebar_groups.js';
 
+
+const DT = await importOnce('./data_table.js');
+const chatTableStates = new Map();
 
 /** The usual branches say nothing: only another one is worth a word in a row. */
 const unusualBranch = b => !!b && !/^(main|master|trunk|develop)$/.test(b);
@@ -172,8 +176,17 @@ registerGroupSource('history', {
     table: key => {
         const g = drawn.find(x => x.key === key);
         if (!g) return null;
-        const rows = matched(g).map(chatTableRow);
-        return { title: g.label, columns: ['Chat', 'Agent', 'When', 'Ran'], rows, empty: searchMatches ? { line: 'No matching chats.' } : undefined };
+        const rows = matched(g).map(s => ({ ...chatTableRow(s), id: s.session_id }));
+        if (!chatTableStates.has(key)) chatTableStates.set(key, DT.tableState());
+        return { title: g.label, rows, signature: JSON.stringify(rows), empty: searchMatches ? { line: 'No matching chats.' } : undefined,
+            node: () => DT.dataTable({ label: `${g.label} chats, ${rows.length}`, rows, rowKey: r => r.id, rowName: r => r.title, state: chatTableStates.get(key), sortBar: false,
+                open: r => r.action === 'board-open' ? window.selectBoardProject?.(r.data.board) : window.selectHistorySession?.(r.id),
+                columns: [
+                    { key: 'chat', label: 'Chat', primary: true, width: 'grow', line: 1, cell: r => { const b = DT.primaryButton(r.title); b.dataset.sessionId = r.id; return b; } },
+                    { key: 'agent', label: 'Agent', line: 2, cell: r => r.cells[0] },
+                    { key: 'when', label: 'When', tone: 'tertiary', line: 1, cell: r => r.cells[1] },
+                    { key: 'ran', label: 'Ran', tone: 'tertiary', align: 'end', line: 2, cell: r => r.cells[2] },
+                ] }).el };
     },
     isEmpty: () => document.getElementById('chats-empty-view')?.style.display === 'flex' && document.body.getAttribute('data-nav-tab') === 'history',
     showList: () => window.switchNavTab?.('history'),
