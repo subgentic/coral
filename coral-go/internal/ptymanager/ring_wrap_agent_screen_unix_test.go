@@ -22,24 +22,12 @@ func TestAgentScreenKeepsTheInputBoxAfterTheReplayRingWrapped(t *testing.T) {
 	const sid = "6481aaaa-0000-4000-8000-000000000001"
 	name := naming.SessionName("codex", sid)
 	require.NoError(t, backend.Spawn(name, "codex", t.TempDir(), sid, codexLikeStandIn, 120, 40))
-	ch, err := backend.Attach(name, "ws-agent-screen")
-	require.NoError(t, err)
-	var seen strings.Builder
-	deadline := time.After(2 * time.Minute) // only the ceiling of a stand-in that never ends: the wait itself is for REPAINTS-DONE (#7163)
-	for !strings.Contains(seen.String(), "REPAINTS-DONE") {
-		select {
-		case data, ok := <-ch:
-			require.True(t, ok, "the terminal closed")
-			seen.Write(data)
-			if seen.Len() > 4096 {
-				s := seen.String()
-				seen.Reset()
-				seen.WriteString(s[len(s)-2048:])
-			}
-		case <-deadline:
-			t.Fatal("the stand-in did not finish")
-		}
-	}
+	// The wait is for the stand-in's last line, read from the ring itself: a subscriber is cut off for falling behind (lag.go) when this goroutine is not scheduled for a moment under load, and the test
+	// saw "the terminal closed" (#7746, as ring_wrap_screen_unix_test.go).
+	require.Eventually(t, func() bool {
+		replay, err := backend.Replay(name)
+		return err == nil && strings.Contains(string(replay), "REPAINTS-DONE")
+	}, 2*time.Minute, 20*time.Millisecond, "the stand-in did not finish") // only the ceiling of a stand-in that never ends (#7163)
 	replay, err := backend.Replay(name)
 	require.NoError(t, err)
 	require.NotContains(t, string(replay), "Ask Codex to do anything")
