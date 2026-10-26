@@ -1341,7 +1341,7 @@
     font-weight: 600;
 }
 
-/* ── Board Chat (right panel) ─────────────────────────────── */
+/* ── Board (right panel) ─────────────────────────────── */
 
 #agentic-panel-board.active {
     display: flex;

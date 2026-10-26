@@ -92,7 +92,7 @@ const BASE = require('./test_base').BASE;
         await ev(`(async () => {
             const render = await import(${S}+'render.js');
             render.renderLiveSessions([{ session_id: 'gamma-1', name: 'gamma-1', agent_type: 'claude', board_project: 'gamma', display_name: 'Gamma agent', working_directory: '/tmp/gamma' }]);
-            (await import(${S}+'render.js')).showBoardChatTab('gamma'); // the board chat of an agent on the team (its Board Chat tab)
+            (await import(${S}+'render.js')).showBoardChatTab('gamma'); // the board chat of an agent on the team (its Board tab)
             return true;
         })()`);
         await waitFor(`document.querySelectorAll('#board-panel-msgs .mb-message').length === 4`, 'the team chat');

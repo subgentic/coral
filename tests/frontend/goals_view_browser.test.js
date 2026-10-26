@@ -36,6 +36,7 @@ const innerHeightOf = h => h;
             await open(w, h, mobile, zoom);
             assert.equal(await shown('#mb-face-switch'), true, `${at}: the switch is there with a board open`);
             assert.deepEqual(await ev(`['mb-face-messages', 'mb-face-goals'].map(id => document.getElementById(id).getAttribute('aria-pressed'))`), ['true', 'false']);
+            assert.deepEqual(await ev(`['mb-face-messages', 'mb-face-goals'].map(id => document.getElementById(id).textContent.trim())`), ['Board', 'Goals'], `${at}: the two faces are Board and Goals (the team page's tab is called Board too)`);
             await toGoals();
             assert.equal(await shown('#mb-board'), false, `${at}: Messages are out of the way`);
             assert.deepEqual(await ev(`['mb-face-messages', 'mb-face-goals'].map(id => document.getElementById(id).getAttribute('aria-pressed'))`), ['false', 'true']);

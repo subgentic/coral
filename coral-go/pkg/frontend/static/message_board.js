@@ -205,7 +205,7 @@ export function leaveBoardPage() {
     _boardHome = null;
 }
 
-// Messages | Goals (#7113): the board's two faces. The Goals face is this computer's own (the Hub has its own goals page), so the switch is not drawn through the Hub; the choice is kept for this browser.
+// Board | Goals (#7113): the board's two faces. The Goals face is this computer's own (the Hub has its own goals page), so the switch is not drawn through the Hub; the choice is kept for this browser.
 const FACE_KEY = 'coral.board.face';
 let _tracked = ''; // the board whose goals the switch counts
 function applyBoardFace(project) {

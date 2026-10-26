@@ -12,7 +12,7 @@ import { announceNotice } from './notifications.js';
 import { outcomeUnknownLine } from './outcome_unknown.js';
 import { paintPauseButton as _paintPauseButton } from './board_pause_button.js';
 
-// ── Board Chat (right-panel tab) ──────────────────────────────────────
+// ── Board (right-panel tab) ──────────────────────────────────────
 let _boardChatTimer = null;
 let _activeBoardChat = null;
 let _boardChatGen = 0;   // bumped whenever the board chat panel is rebuilt, to drop stale loads
