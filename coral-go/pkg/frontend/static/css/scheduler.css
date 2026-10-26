@@ -196,44 +196,6 @@ div.job-field#sched-label { margin-bottom: 6px; }
     word-break: break-word;
 }
 
-.sched-runs-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.8125rem;
-    margin-top: 8px;
-}
-
-.sched-runs-table th,
-.sched-runs-table td {
-    padding: 6px 10px;
-    text-align: left;
-    border-bottom: 1px solid var(--border);
-}
-
-.sched-runs-table th {
-    font-size: var(--fs-base);
-    font-weight: 500;
-    color: var(--text-secondary);
-}
-
-.sched-status {
-    display: inline-block;
-    padding: 1px 6px;
-    border-radius: var(--radius-sm);
-    font-size: var(--fs-base);
-    font-weight: 600;
-}
-
-.status-ok      { color: var(--success); }
-.status-err     { color: var(--error); }
-.status-running { color: var(--accent); }
-
-.run-session-link {
-    color: var(--accent);
-    font-size: var(--fs-md);
-    margin-left: 6px;
-}
-
 .sched-runs-section,
 .sched-prompt-section {
     margin-top: 16px;
@@ -284,7 +246,6 @@ div.job-field#sched-label { margin-bottom: 6px; }
 /* A run that failed because the agent's CLI is not signed in (#5471): the words, what to do, and a tag after the status in a table */
 .run-failure-text { font-weight: 600; }
 .run-failure-hint { color: var(--text-secondary); }
-.run-failure-tag { color: var(--error); font-size: 0.8125rem; }
 
 .sched-prompt-section > summary { display: flex; align-items: center; gap: 4px; list-style: none; }
 .sched-prompt-section > summary::-webkit-details-marker { display: none; }
@@ -334,11 +295,8 @@ div.job-field#sched-label { margin-bottom: 6px; }
 /* A phone's top bar says "Jobs" in its tab picker, as it does for Workflows, Chats and Inbox, so the heading is for assistive technology there too (#7722). */
 .sched-view-header h2 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .sched-view-header { margin-bottom: 0; } }
-.sched-status.status-none { color: var(--text-secondary); }
-.sched-status-note { display: block; font-size: var(--fs-sm); color: var(--text-secondary); font-weight: 400; }
 
 /* The Jobs fixes of #7121: a run's When is the link into the run; the checkbox of an agent job sits beside its label (a phone rule had made the label a block); a phone's job has a back row to the list. */
-.sched-runs-table .row-open-btn { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
 #job-modal .flag-shortcut-btn { margin: 0; }
 #job-modal label.job-cleanup-option { display: flex; flex-direction: row; align-items: center; gap: 8px; }
 .sched-back { display: none; }

@@ -937,7 +937,6 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .welcome > .empty-pane { margin: 0; align-self: stretch; }
 .empty-pane .empty-line { margin: 0; font-size: var(--fs-lg); font-weight: 400; line-height: 1.5; color: var(--text-primary); }
 .empty-pane .empty-hint { margin: 0; font-size: var(--fs-base); font-weight: 400; line-height: 1.4; color: var(--text-secondary); }
-.runs-empty-line { margin: 0; font-size: var(--fs-lg); font-weight: 400; line-height: 1.5; color: var(--text-primary); }
 /* The line under an item page's title: who, when, how long */
 .item-meta { margin: 2px 0 0; font-size: var(--fs-base); font-weight: 400; line-height: 1.4; color: var(--text-secondary); }
 .group-table-scroll { max-width: 100%; overflow-x: auto; }
