@@ -2,7 +2,7 @@
 //  - each open starts from nothing: a failed or slow load leaves the limit fields empty and off (never the last open's numbers), says so, and Save writes neither limit
 //  - the artifact store's line has the received files' three states: below 80%, from 80% with what to do, at the limit that new uploads are refused (warning colour); "1 file"
 //  - the Prune confirmation uses the page's words (saved diffs, unlinked artifacts, stored diff copies), singular for one; Prune and Shrink by keyboard leave the focus on their own button
-//  - the age breakdown is one line per kind; Shrink and Prune sit on one row with their fields
+//  - the age breakdown is one line per kind; Shrink and Prune sit on one row under their fields
 // Run against an isolated dev server. CORAL_SCREENSHOT_DIR=<dir> saves screenshots.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -102,14 +102,13 @@ const GIB = 1024 ** 3;
         assert.match(ages[0], /^Files: \d+ artifacts, \d+ saved diffs$/, 'the file counts moved here from the limit lines'); assert.match(ages[1], /^Artifacts by age: <1d /); assert.match(ages[2], /^Task diffs by age: <1d /);
         assert.equal(await ev(`document.querySelector('.settings-storage-breakdown').open`), false, 'the breakdown is closed until asked');
 
-        console.log('4. Shrink and Prune sit on one row with their fields');
+        console.log('4. Shrink and Prune sit on one row under their fields');
         await ev(`document.getElementById('settings-storage-prune').scrollIntoView({ block: 'center' }); true`); await sleep(300); // sleep-ok: the scroll settles
-        const row = await ev(`(() => { const t = id => Math.round(document.getElementById(id).getBoundingClientRect().top); const h = id => Math.round(document.getElementById(id).getBoundingClientRect().height); const lab = document.querySelector('.settings-controls-row .settings-inline').getBoundingClientRect(); const inp = document.getElementById('settings-prune-days').getBoundingClientRect();
-            return { shrink: t('settings-storage-shrink'), prune: t('settings-storage-prune'), kind: t('settings-prune-kind'), labelH: Math.round(lab.height), inputInLabel: inp.right <= lab.right + 1 }; })()`);
-        assert.ok(Math.abs(row.shrink - row.prune) <= 2, 'Shrink and Prune side by side: ' + JSON.stringify(row)); assert.ok(row.labelH < 90 && row.inputInLabel, '"Older than" is a labelled field: the label over its input and "days" (#7405 round 2), not a sentence: ' + JSON.stringify(row));
+        const row = await ev(`(() => { const t = id => Math.round(document.getElementById(id).getBoundingClientRect().top); const lab = document.querySelector('label[for="settings-prune-days"]').getBoundingClientRect(); const inp = document.getElementById('settings-prune-days').getBoundingClientRect();
+            return { shrink: t('settings-storage-shrink'), prune: t('settings-storage-prune'), kindBottom: Math.round(document.getElementById('settings-prune-kind').getBoundingClientRect().bottom), labelAbove: lab.bottom <= inp.top + 4 || lab.right <= inp.left + 4 }; })()`);
+        assert.ok(Math.abs(row.shrink - row.prune) <= 2, 'Shrink and Prune side by side: ' + JSON.stringify(row)); assert.ok(row.shrink >= row.kindBottom - 2 && row.labelAbove, '"Older than" is a labelled field and the buttons are on one row under their fields: ' + JSON.stringify(row));
         const feel = await ev(`(() => { const b = id => document.getElementById(id); const bot = id => Math.round(b(id).getBoundingClientRect().bottom); return { pruneDanger: b('settings-storage-prune').classList.contains('btn-danger'), shrinkDanger: b('settings-storage-shrink').classList.contains('btn-danger'), small: b('settings-storage-prune').classList.contains('btn-small') || b('settings-storage-shrink').classList.contains('btn-small'), pruneBottom: bot('settings-storage-prune'), shrinkBottom: bot('settings-storage-shrink'), fieldBottom: bot('settings-prune-kind'), pairs: document.querySelectorAll('#settings-pane-cleanup select[id$="-kind"]').length }; })()`);
         assert.deepEqual([feel.pruneDanger, feel.shrinkDanger, feel.small, feel.pairs], [true, false, false, 1], 'Prune is the danger button, Shrink is not, both the normal size, and there is one What to prune: ' + JSON.stringify(feel));
-        assert.ok(Math.abs(feel.pruneBottom - feel.fieldBottom) <= 3 && Math.abs(feel.shrinkBottom - feel.fieldBottom) <= 3, 'the buttons are in line with their fields: ' + JSON.stringify(feel));
         await shot('storage-ux-controls');
 
         console.log('5. Prune and Shrink by keyboard: the page\'s words, and the focus comes back to the button that asked');

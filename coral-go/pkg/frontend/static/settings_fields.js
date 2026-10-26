@@ -75,9 +75,28 @@ const AGENTS_FIELDS = host => [
     live('settings-prompts-live'),
 ];
 
+export const CLEANUP_FIELDS = [
+    { key: 'artifact_store_max', type: 'number', id: 'settings-artifact-store-max', label: 'Artifact store limit', unit: 'GiB', min: 0, step: 1, compact: true, live: ['settings-artifact-store-size', { id: 'settings-storage-breakdown', wide: true }],
+        help: { text: 'The most space stored artifacts may take.', more: "Above it, agents' new uploads are refused until you delete some (Team Artifacts > Delete). 0 means no limit. Saved task and session diffs aren't counted." } },
+    { key: 'received_max', type: 'number', id: 'settings-received-max', label: 'Received files limit', unit: 'GiB', min: 0, step: 1, compact: true, live: ['settings-received-size', 'settings-received-unlisted'],
+        help: { text: 'The most space received files may take.', more: "Files sent to this computer by other teams and Corals. Above it, new received files are refused; nothing is deleted, and your agents' own uploads are not affected. The default is 2; 0 means no limit." } },
+    { key: 'free_space', type: 'heading', label: 'Free space' },
+    { key: 'prune_days', type: 'number', id: 'settings-prune-days', label: 'Older than', unit: 'days', min: 1, max: 3650, step: 1, default: 14, compact: true,
+        help: { text: '', more: 'Prune deletes saved diffs of finished tasks and stopped sessions, and artifacts nothing links, older than the days you choose. Shrink rewrites saved diffs of finished tasks without secrets, dot-files, binaries and big files (the code changes stay). Kept artifacts and anything still linked are never touched. Each shows what it would do first.' } },
+    { key: 'prune_kind', type: 'select', id: 'settings-prune-kind', label: 'What to prune', default: 'diffs', options: [{ value: 'diffs', label: 'Saved diffs' }, { value: 'objects', label: 'Unlinked artifacts' }, { value: 'all', label: 'Both' }] },
+    live('settings-storage-actions'),
+    { key: 'retention_enabled', type: 'toggle', id: 'settings-retention-enabled', label: 'Prune every hour', live: ['settings-retention-status', 'settings-retention-review'],
+        help: { text: '', more: 'Does the same as Prune by itself, once an hour. After you turn it on, nothing is removed until you review what it would do, or 24 hours later; each run frees at most 2 GiB.' } },
+    { key: 'terminal_logs', type: 'heading', id: 'settings-terminal-logs-title', label: 'Terminal logs', help: { text: 'Kept after an agent is killed.', more: "Each agent's terminal output stays in the logs folder of Coral's data folder. Deleting removes the logs of agents that have ended; the log of a live, sleeping or archived agent is never touched." } },
+    live('settings-terminal-logs-status'),
+    live('settings-terminal-logs-delete'),
+    { key: 'worktrees', type: 'heading', id: 'wt-title', label: 'Kept worktrees', help: { text: 'Kept because they still hold your work.', more: 'Git worktrees Coral made for teams and jobs and kept when they stopped. Remove one when you no longer need it: Coral never forces a removal, so unsaved changes or unmerged commits keep it.' } },
+    { key: 'worktrees_list', type: 'notice', render: slot => { slot.id = 'settings-worktrees-row'; const el = document.getElementById('settings-worktrees-live'); if (el) slot.append(el); } },
+];
+
 /** Draws the groups that are fields into the Settings modal's panes (once, when the modal is built). mount is mountSettingsView. */
 export function drawSettingsGroups(modal, mount) {
-    for (const [hostId, fields] of [['settings-general-rows', GENERAL_FIELDS], ['settings-notifications-rows', NOTIFICATIONS_FIELDS], ['settings-files-rows', FILES_FIELDS], ['settings-terminal-rows', TERMINAL_FIELDS], ['settings-agents-rows', AGENTS_FIELDS]]) {
+    for (const [hostId, fields] of [['settings-general-rows', GENERAL_FIELDS], ['settings-notifications-rows', NOTIFICATIONS_FIELDS], ['settings-files-rows', FILES_FIELDS], ['settings-terminal-rows', TERMINAL_FIELDS], ['settings-agents-rows', AGENTS_FIELDS], ['settings-cleanup-rows', CLEANUP_FIELDS]]) {
         const host = modal.querySelector(`#${hostId}`);
         if (host && !host.firstChild) mount(host, { mode: 'settings', saveBar: false, fields: typeof fields === 'function' ? fields(host) : fields });
     }

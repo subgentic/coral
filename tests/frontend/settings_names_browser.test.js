@@ -18,8 +18,8 @@ const BASE = require('./test_base').BASE;
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         console.log('1. Storage and cleanup: the one pair of fields and the hourly switch are named');
         await open('storage');
-        const names = await ev(`['settings-prune-kind', 'settings-prune-days'].map(id => document.getElementById(id).getAttribute('aria-label'))`);
-        assert.deepEqual(names, ['What to prune', 'Older than, in days']);
+        const names = await ev(`['settings-prune-kind', 'settings-prune-days'].map(id => { const e = document.getElementById(id); const by = (e.getAttribute('aria-labelledby') || '').split(' ').filter(Boolean).map(i => document.getElementById(i).textContent.trim()); return by.length ? by.join(' ') : e.labels[0].textContent.trim(); })`); // the visible label (and the unit, for the number)
+        assert.deepEqual(names, ['What to prune', 'Older than days']);
         console.log('2. Agents: Default thinking says which CLI');
         await open('agents');
         assert.equal(await ev(`document.getElementById('settings-default-thinking-claude').getAttribute('aria-label')`), 'Claude default thinking');

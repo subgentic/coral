@@ -2162,11 +2162,6 @@ button.subscriber-history-link {
 /* A field that is off (the storage limits while they load, or when the load failed) reads as off, not as an empty box to fill in (#4469, UX). */
 #settings-modal input:disabled, #settings-modal select:disabled { opacity: .6; cursor: not-allowed; }
 .settings-hint[data-state="warn"], .settings-hint [data-state="warn"] { color: var(--warning); }
-/* The controls of one setting on one wrapping row (field, kind, then the buttons side by side) instead of a stack that grows tall (#4469). */
-.settings-controls-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm) var(--space-md); }
-.settings-controls-row > * { margin: 0; }
-.settings-controls-row .settings-inline { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs); max-width: 100%; } /* the words wrap at the field when the row is narrow (popover_bounds: no sideways scroll at 200% text) */
-.settings-controls-row .settings-inline input { display: inline-block; margin: 0; width: 3.5em; min-width: 44px; flex: none; } /* never narrower than a touch target (text200_wide) */
 .settings-hint[data-state="error"] { color: var(--danger); }
 .settings-database-encryption-warning {
     display: block;
@@ -4019,8 +4014,6 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .settings-nav { width: 13.5rem; flex: none; border-right: 1px solid var(--border); padding: .6rem; overflow-y: auto; background: var(--bg-tertiary); }
 .settings-nav .settings-group-pick { display: none; }
 .info-grid.settings-grid .settings-row > dt, .settings-row > dt label { font-size: .875rem; font-weight: 600; }
-.settings-row .settings-controls-row select, .settings-row .settings-controls-row input { width: auto; }
-.settings-row .settings-controls-row .settings-inline input { width: 4.5em; }
 .settings-tabs { display: flex; flex-direction: column; gap: 2px; }
 .settings-tab { display: flex; align-items: center; gap: .6rem; width: 100%; text-align: left; background: none; border: 0; border-radius: var(--radius-md); color: var(--text-secondary); font: inherit; font-size: .875rem; padding: .5rem .7rem; min-height: 2.25rem; cursor: pointer; }
 .settings-tab:hover { background: var(--bg-hover); color: var(--text-primary); }
@@ -4257,10 +4250,6 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .settings-cli-details > summary::before { content: '▸'; font-size: 0.75rem; flex: none; } /* a flex summary draws no marker of its own, and the line read as a caption (#7041) */
 .settings-cli-details[open] > summary::before { transform: rotate(90deg); }
 
-/* A number field with its unit beside it, inside the field's own box (UI audit #5589, finding 20): the unit is no longer in the label. */
-.settings-unit-field { display: inline-flex; align-items: center; gap: 6px; }
-.settings-unit-field input[type="number"] { width: 6rem; }
-.settings-field-unit { color: var(--text-secondary); font-size: var(--fs-base); }
 
 /* The missing-CLI line of the New Agent dialog sits under the folder, outside More options (#5835): nothing shows while it has nothing to say. */
 .launch-cli-slot:empty { display: none; }
@@ -4627,10 +4616,6 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .mention-note { font-size: 0.75rem; color: var(--text-secondary); }
 @media (max-width: 767px), (pointer: coarse) { .mention-option { min-height: var(--control-touch-height, 44px); align-items: center; } }
 
-/* Storage and cleanup (#7627): one pair of fields for Prune now and the hourly run; the hourly run is a switch row under them. */
-.settings-retention-switch { width: 100%; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--border); }
-.settings-retention-switch > label:first-child { font: var(--dlg-label); color: var(--text-primary); margin: 0; }
-#settings-modal .settings-controls-row > label.settings-inline { margin-bottom: 0; padding-bottom: 0; } /* the dialog's generic label leaves 12 px under itself: the buttons beside Older than and What to prune sit level with their fields (#7627) */
 
 /* The Servers tab of a self-hosted hub (#7638): a table (Server, Status, Agents), and a server's page with its facts and Test, Edit and Remove in a bar pinned at its foot */
 .servers-page { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; }

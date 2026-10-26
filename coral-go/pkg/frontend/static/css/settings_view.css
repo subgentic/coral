@@ -54,6 +54,7 @@
 .sv-input[aria-invalid="true"] { border-color: var(--sv-error-color); }
 .sv-error { grid-column: 1 / -1; margin: 4px 0 0; font-size: var(--sv-help-size); font-weight: var(--sv-label-weight); color: var(--sv-error-color); }
 .sv-error[hidden] { display: none; }
+.sv-live-wide { grid-column: 1 / -1; min-width: 0; } /* a live part under the whole row (field.live { wide: true }) */
 .sv-row[data-disabled] .sv-label { color: var(--sv-value-color); }
 .sv-choices { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
 .sv-choice { display: grid; grid-template-columns: auto 1fr; gap: 0 8px; align-items: center; font-size: var(--sv-label-size); color: var(--sv-label-color); }
@@ -131,4 +132,5 @@
     .sv-shell { flex: none; }
     .sv .settings-panes { overflow: visible; flex: none; }
     .sv-bar { position: static; }
+    .sv .wt-item { padding: 8px; gap: 2px 8px; } /* a kept-worktree row (a live part of Storage and cleanup) on a narrow pane: the card's own padding gives the words the room */
 }

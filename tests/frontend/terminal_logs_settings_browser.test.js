@@ -34,7 +34,7 @@ const MIB = 1024 ** 2;
             await ev(`window.showSettingsModal('cleanup'); true`);
             await waitFor(`!!document.getElementById('settings-terminal-logs-status') && !/Loading/.test(document.getElementById('settings-terminal-logs-status').textContent)`, 'the terminal logs line', 8000);
         };
-        const state = () => ev(`(() => { const b = document.getElementById('settings-terminal-logs-delete'); return { text: (document.getElementById('settings-terminal-logs-status')?.textContent ?? ''), role: document.getElementById('settings-terminal-logs-status').getAttribute('role'), hidden: b.hidden, button: b.textContent, label: (document.querySelector('label[for=settings-terminal-logs-delete]') || {}).textContent }; })()`);
+        const state = () => ev(`(() => { const b = document.getElementById('settings-terminal-logs-delete'); return { text: (document.getElementById('settings-terminal-logs-status')?.textContent ?? ''), role: document.getElementById('settings-terminal-logs-status').getAttribute('role'), hidden: b.hidden, button: b.textContent, label: (document.getElementById('settings-terminal-logs-title') || {}).textContent }; })()`);
         const showRow = () => ev(`(() => { const i = document.getElementById('settings-terminal-logs-status'); let p = i.parentElement; while (p && !(p.scrollHeight > p.clientHeight + 1 && /(auto|scroll)/.test(getComputedStyle(p).overflowY))) p = p.parentElement; if (p) p.scrollTop += i.getBoundingClientRect().top - p.getBoundingClientRect().top - 120; return true; })()`);
 
         console.log('1. The line and the button name the numbers');
