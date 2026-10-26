@@ -46,6 +46,7 @@ export async function fetchMessages(project, limit = PAGE_SIZE, page = {}) {
     return {
         messages: Array.isArray(data.messages) ? data.messages : [], total: Number(data.total) || 0,
         beforeCount: Number(data.before_count) || 0,
+        askUpdates: Array.isArray(data.ask_updates) ? data.ask_updates : [], // the older questions a page after_id answers, with their state now (#8200)
     };
 }
 

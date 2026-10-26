@@ -181,19 +181,16 @@ export function retagMentions(container, self = 'operator') {
     }
 }
 
-/** A reply answers the Question it names, for the member who wrote it (the server does the same: ask.open loses that member, answered when none is left). The loaded messages are updated in place and the ones that changed
- * are returned, so a row already on screen can say so without a reload. */
-export function applyAnswers(all, fresh) {
+/** The server's word on the older Questions a new page answered (ask_updates: [{ id, ask }], #8200): each loaded message of those ids takes the new ask; the ones that changed are returned, so a row already on screen
+ * can say so without a reload. The dashboard never works out "answered" itself. */
+export function applyAskUpdates(all, updates) {
     const changed = [];
-    for (const r of fresh) {
-        if (!r || !r.reply_to) continue;
-        const p = all.find(x => x.id === r.reply_to);
-        if (!p || !p.ask || !Array.isArray(p.ask.open) || !p.ask.open.length) continue;
-        const who = [r.job_title, r.subscriber_id].filter(Boolean).map(x => String(x).toLowerCase());
-        const open = p.ask.open.filter(n => !who.includes(String(n).toLowerCase()));
-        if (open.length === p.ask.open.length) continue;
-        p.ask = { ...p.ask, open, answered: open.length === 0 };
-        if (!changed.includes(p)) changed.push(p);
+    for (const u of updates || []) {
+        if (!u || !u.ask || typeof u.ask !== 'object') continue;
+        const p = all.find(x => x.id === u.id);
+        if (!p || JSON.stringify(p.ask) === JSON.stringify(u.ask)) continue;
+        p.ask = u.ask;
+        changed.push(p);
     }
     return changed;
 }

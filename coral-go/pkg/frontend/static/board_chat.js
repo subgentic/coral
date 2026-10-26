@@ -12,7 +12,7 @@ import { initGrowingTextarea } from './growing_textarea.js';
 import { announceNotice } from './notifications.js';
 import { outcomeUnknownLine } from './outcome_unknown.js';
 import { paintPauseButton as _paintPauseButton } from './board_pause_button.js';
-import { applyAnswers, onRowActions, boardView, saveBoardView, rowParts, applyView, mountTableTools, forgetOpenRows, refreshReplies, retagMentions, watchFold, dayLineBefore } from './board_table.js'; // the Board as a table (#7922): the team page's module at dock width
+import { applyAskUpdates, onRowActions, boardView, saveBoardView, rowParts, applyView, mountTableTools, forgetOpenRows, refreshReplies, retagMentions, watchFold, dayLineBefore } from './board_table.js'; // the Board as a table (#7922): the team page's module at dock width
 import { messageTimeHtml } from './message_time.js';
 import { keyRoute, build } from './routes.js';
 
@@ -186,7 +186,7 @@ async function _loadBoardPanelChat(boardName, { full = false } = {}) {
                 if (!fresh.length) return;
                 const byId = new Map([..._boardChatMessages, ...fresh].map(m => [m.id, m]));
                 _boardChatMessages = [...byId.values()].sort((a, b) => a.id - b.id);
-                applyAnswers(_boardChatMessages, fresh); // a Question these answer says so in the render below
+                applyAskUpdates(_boardChatMessages, data.ask_updates); // a Question these answer says so in the render below (the server's word, #8200)
                 _boardChatTotal = expected;
                 const el = document.getElementById('board-panel-msgs');
                 _trimBoardChatWindow(el);
