@@ -106,7 +106,7 @@ GET /api/sessions/live/{name}/search-files | unbound
 GET /api/sessions/live/{name}/subagents | unbound
 GET /api/sessions/live/{name}/subagents/{subagentID} | unbound
 GET /api/sessions/live/{name}/tasks | unbound
-GET /api/sessions/live/{name}/waiting | unbound | operator-only
+GET /api/sessions/live/{name}/waiting | token-session | operator-only
 GET /api/sessions/resolve | unbound
 GET /api/sessions/{sessionID}/changes | unbound
 GET /api/sessions/{sessionID}/changes.diff | unbound
@@ -214,7 +214,7 @@ POST /api/sessions/live/{name}/tasks | token-bound
 POST /api/sessions/live/{name}/tasks/reorder | token-bound
 POST /api/sessions/live/{name}/token-usage | token-bound
 POST /api/sessions/live/{name}/turn-end | token-session
-POST /api/sessions/live/{name}/waiting/send | unbound | operator-only
+POST /api/sessions/live/{name}/waiting/send | token-session | operator-only
 POST /api/sessions/live/{sessionID}/archive | unbound | operator-only
 POST /api/sessions/live/{sessionID}/refresh-hooks | unbound | operator-only
 POST /api/sessions/live/{sessionID}/sleep | unbound | operator-only

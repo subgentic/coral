@@ -52,6 +52,32 @@ func waitingUnread(out map[string]any) int {
 	return n
 }
 
+// agentMayReachWaiting is the handler's half of the Orchestrator's use of the waiting routes (#8558; the identity layer's half is orchestratorOwnBoardRoutes): a request from an agent's token (which the
+// identity layer let through only for an active registered orchestrator) is for a target on the caller's own board, and nothing else; a request with no agent's token (the Operator's dashboard and
+// command line) is not asked. It answers the refusal itself. target is the exact session name.
+func (h *SessionsHandler) agentMayReachWaiting(w http.ResponseWriter, r *http.Request, target string) bool {
+	owner, agent := VerifiedSession(r.Context())
+	if !agent {
+		return true
+	}
+	deny := func() bool {
+		errForbidden(w, "An agent can't use this for an agent of another team: an Orchestrator may use it for the agents of its own team")
+		return false
+	}
+	if h.bs == nil {
+		return deny()
+	}
+	caller, err := h.bs.GetSubscriptionBySessionName(r.Context(), owner.SessionName)
+	if err != nil || caller == nil || h.bs.RequireTaskReviewer(r.Context(), caller.Project, caller.SubscriberID) != nil {
+		return deny() // not an active registered orchestrator (a path the identity layer already closes; checked again here)
+	}
+	mine, err := h.bs.GetSubscriptionBySessionName(r.Context(), target)
+	if err != nil || mine == nil || mine.Project != caller.Project {
+		return deny()
+	}
+	return true
+}
+
 // ListWaiting lists what waits for one live agent: its unread board messages (sender, time, text) and the last automated send that was not typed, with why.
 // GET /api/sessions/live/{name}/waiting?agent_type=..&session_id=..
 //
@@ -65,6 +91,9 @@ func (h *SessionsHandler) ListWaiting(w http.ResponseWriter, r *http.Request) {
 	}
 	// The dashboard names the folder; board subscriptions and terminal state use the exact session name.
 	name = naming.SessionName(ls.AgentType, ls.SessionID)
+	if !h.agentMayReachWaiting(w, r, name) {
+		return
+	}
 	out := map[string]any{"board": nil, "unread": 0, "messages": []waitingMessage{}, "skipped": nil}
 	if h.bs != nil {
 		if sub, err := h.bs.GetSubscriptionBySessionName(r.Context(), name); err == nil && sub != nil {
@@ -108,6 +137,9 @@ func (h *SessionsHandler) SendWaitingNow(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	name = naming.SessionName(ls.AgentType, ls.SessionID)
+	if !h.agentMayReachWaiting(w, r, name) {
+		return
+	}
 	if h.bs == nil {
 		errBadRequest(w, "no board")
 		return

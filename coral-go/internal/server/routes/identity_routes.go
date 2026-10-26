@@ -489,6 +489,22 @@ func ValidateAgentSessionRoutes(routes chi.Routes) error {
 	return nil
 }
 
+// orchestratorOwnBoardRoutes are operator-only routes that a team's Orchestrator may also use, for the agents of its own board only (#8558, Goal #58): what waits for an agent, and typing its nudge
+// now. The identity layer lets an agent through when its token's session is an active registered orchestrator of the board it is on; the handler then checks that the target is on that board.
+// Everyone else keeps the 403, and the routes have no tunnel row: Coral Hub never reaches them.
+var orchestratorOwnBoardRoutes = map[string]bool{
+	"GET /api/sessions/live/{name}/waiting":       true,
+	"POST /api/sessions/live/{name}/waiting/send": true,
+}
+
+// orchestratorOwnBoardWords is what an agent's refusal on such a route adds: a team's Orchestrator may use it for its own members.
+func orchestratorOwnBoardWords(route string) string {
+	if orchestratorOwnBoardRoutes[route] {
+		return "; an Orchestrator may use it for the agents of its own team"
+	}
+	return ""
+}
+
 // dashboardOnlyRoutes are the operator-only routes the Operator can use only from the dashboard (the command line is refused too): their refusal of an agent says "the dashboard" and
 // no more, so an agent is not pointed at a way that does not work (#6495, QA's #6483).
 var dashboardOnlyRoutes = map[string]bool{

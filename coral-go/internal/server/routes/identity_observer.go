@@ -203,9 +203,13 @@ func (o *IdentityObserver) Middleware(next http.Handler) http.Handler {
 				// In every mode (#3929): an agent's token is who the caller is, as for another
 				// board (#3869). A request with no token is left to strict mode.
 				if only {
-					o.refuse(w, http.StatusForbidden, "forbidden_for_agent",
-						"An agent can't "+operatorOnlyRoutes[r.Method+" "+route]+": that is for the Operator"+operatorOnlyWhere(r.Method+" "+route))
-					return
+					if orchestratorOwnBoardRoutes[r.Method+" "+route] && o.callerIsOrchestrator(r.Context(), owner) {
+						// A team's Orchestrator, for the members of its own board (#8558): the handler checks that the target is on that board.
+					} else {
+						o.refuse(w, http.StatusForbidden, "forbidden_for_agent",
+							"An agent can't "+operatorOnlyRoutes[r.Method+" "+route]+": that is for the Operator"+operatorOnlyWhere(r.Method+" "+route)+orchestratorOwnBoardWords(r.Method+" "+route))
+						return
+					}
 				}
 			}
 			// One session's data is that session's, and its board's (#5013): an agent reads itself and the sessions on its own board.
@@ -633,4 +637,16 @@ func (o *IdentityObserver) AgentOperatorAction(r *http.Request, action string) b
 // an active Orchestrator of the board it sends from, in its own session), and a goal request to another team (#7361: the same, the handler holds the caller to the board it names as its own).
 func acrossBoards(method, tail string) bool {
 	return method == http.MethodPost && (tail == "subscribe" || tail == "external-messages" || tail == "goal-requests")
+}
+
+// callerIsOrchestrator reports whether the session's token belongs to an active registered orchestrator of the board it is subscribed to.
+func (o *IdentityObserver) callerIsOrchestrator(ctx context.Context, owner *store.SessionTokenOwner) bool {
+	if o.bs == nil || owner == nil {
+		return false
+	}
+	sub, err := o.bs.GetSubscriptionBySessionName(ctx, owner.SessionName)
+	if err != nil || sub == nil {
+		return false
+	}
+	return o.bs.RequireTaskReviewer(ctx, sub.Project, sub.SubscriberID) == nil
 }
