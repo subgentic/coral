@@ -26,6 +26,15 @@
 
 .team-tabs { flex: none; display: flex; gap: 4px; padding: 6px 24px 0; border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; scroll-padding-inline: 2rem; } /* one row that never changes height: when the tabs are wider than the window the strip scrolls sideways, the selected tab is scrolled into view, and a fade at the edge says there is more */
 .team-tabs::-webkit-scrollbar { display: none; }
+/* the tab row: the tab list and, on a phone, the More button beside it (Artifacts, Knowledge and Settings behind it, #8648) */
+.team-tabs-row { flex: none; position: relative; display: flex; align-items: flex-end; }
+.team-tabs-row::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: var(--border); pointer-events: none; } /* the strip's line runs under More too */
+.team-tabs-row > .team-tabs { flex: 1 1 auto; min-width: 0; border-bottom: 0; padding-bottom: 1px; } /* the strip keeps its height: its 1px line is the row's */
+.team-tabs-row > .team-tab-more { display: none; } /* a desktop shows every tab */
+.team-tab-more.is-current { color: var(--text-primary); border-bottom-color: var(--accent); } /* not bolder: the strip keeps its width */
+.team-tab-more::after { content: ''; display: inline-block; margin-left: 6px; width: 6px; height: 6px; border: solid currentColor; border-width: 0 1.5px 1.5px 0; transform: translateY(-2px) rotate(45deg); }
+.team-more-menu.team-tabs-more-menu > button { display: flex !important; align-items: center; justify-content: space-between; gap: 12px; }
+.team-more-menu.team-tabs-more-menu > button[aria-current="true"] { font-weight: 600; }
 .team-tabs[data-more="end"] { mask-image: linear-gradient(to right, currentColor calc(100% - 2rem), transparent); }
 .team-tabs[data-more="start"] { mask-image: linear-gradient(to left, currentColor calc(100% - 2rem), transparent); }
 .team-tabs[data-more="both"] { mask-image: linear-gradient(to right, transparent, currentColor 2rem, currentColor calc(100% - 2rem), transparent); }
@@ -147,6 +156,13 @@
     #team-page-add-agent { display: none; }
     .team-page-health { min-height: 44px; grid-column: 1; }
     .team-tab { min-height: 44px; }
+    .team-tab[data-tab="artifacts"], .team-tab[data-tab="knowledge"], .team-tab[data-tab="settings"] { display: none; } /* behind More: the row never scrolls sideways */
+    .team-tabs-row > .team-tab-more { display: inline-flex; align-items: center; flex: none; margin: 6px 8px 0 0; padding: 0 8px; }
+    .team-tabs-row .team-tab { padding: 0 8px; }
+    .team-tabs-row > .team-tabs { gap: 0; padding-left: 8px; }
+    .team-tabs-row .team-tab-count { margin-left: 4px; padding: 0 5px; }
+    .team-tabs-row > .team-tabs { padding-right: 0; }
+    .team-tabs-more-menu { right: 8px; }
     .team-page-actions .btn, .goals-pinbar .btn, .team-more-menu > button { min-height: 44px; }
     .team-more-menu > button.team-more-add { display: block !important; }
     .goals-table-page { padding: var(--team-page-padding, 12px 16px 0); }

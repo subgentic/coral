@@ -22,9 +22,10 @@ const BASE = require('./test_base').BASE;
         // names: the team page's visible buttons (the Board tab with its header, tabs, pills, switch and search): none shares a name with another
         const dup = await ev(`(() => { const vis = e => e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden'; const name = e => (e.getAttribute('aria-label') || e.textContent).replace(/\\s+/g, ' ').trim();
             const names = [...document.querySelectorAll('#team-page-view button')].filter(vis).map(name).filter(Boolean);
-            return { dup: [...new Set(names.filter((n, i) => names.indexOf(n) !== i))], n: names.length }; })()`);
+            return { dup: [...new Set(names.filter((n, i) => names.indexOf(n) !== i))], n: names.length, header: names.filter(n => n === 'More').length, tabs: names.filter(n => n === 'More tabs').length }; })()`);
         assert.ok(dup.n >= 8, 'the team page has its buttons: ' + JSON.stringify(dup));
         assert.deepEqual(dup.dup, [], 'no two visible buttons on the team page share a name');
+        assert.deepEqual([dup.header, dup.tabs], [1, 1], "the header's button is named More and the tab row's is named More tabs (#8648): " + JSON.stringify(dup));
 
         // the More menu in the light theme: the team page's More holds the board's Select, Export, Pause and Delete
         await installAudit(ev); await setTheme(ev, 'light');

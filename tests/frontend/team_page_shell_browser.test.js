@@ -17,7 +17,7 @@ const TEAM = `qa-team-${Date.now() % 100000}`;
     const S = scenarios();
     const same = (a, b, what) => { assert.ok(a && b, `${what}: the header and the tab strip are there`); for (const part of ['h1', 'tabs']) { assert.ok(a[part] && b[part], `${what}: the ${part} is there`); for (const k of ['x', 'y', 'w', 'h']) assert.ok(Math.abs(a[part][k] - b[part][k]) <= 0.5, `${what}: the ${part} ${k} moved from ${a[part][k]} to ${b[part][k]}`); } };
     const key = async k => { await ev(`(() => { const e = document.activeElement; e.dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(k)}, bubbles: true, cancelable: true })); return true; })()`); await settle(200); };
-    const activeTab = () => ev(`(() => { const t = window.__tp.tabs().find(x => x.getAttribute('aria-selected') === 'true'); return t ? window.__tp.tabLabel(t) : ''; })()`);
+    const activeTab = () => ev(`(() => { const t = window.__tp.allTabs().find(x => x.getAttribute('aria-selected') === 'true'); return t ? window.__tp.tabLabel(t) : ''; })()`);
     const focusedTab = () => ev(`(() => { const e = document.activeElement; return e && e.getAttribute('role') === 'tab' ? window.__tp.tabLabel(e) : ''; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -41,9 +41,9 @@ const TEAM = `qa-team-${Date.now() % 100000}`;
                 assert.ok(r.statuses.length <= 1, `one status in the header, not ${r.statuses.length}: ${JSON.stringify(r.statuses)}`);
             });
             await S.run(`${label}: the tablist named Team has the seven tabs in order, each name carrying its count where it has one`, async () => {
-                const names = await ev(`window.__tp.tabs().map(t => window.__tp.tabLabel(t))`);
+                const names = await ev(`window.__tp.allTabs().map(t => window.__tp.tabLabel(t))`); // a phone has Artifacts, Knowledge and Settings behind its More menu (team_tabs_more_browser): they are still the tablist's tabs
                 assert.deepEqual(names, TABS, 'the tabs, in order');
-                const full = await ev(`window.__tp.tabs().map(t => window.__na.name(t))`);
+                const full = await ev(`window.__tp.allTabs().map(t => window.__na.name(t))`);
                 assert.ok(/Goals\s*2/.test(full[0]), `Goals carries its count 2 (got ${JSON.stringify(full[0])})`);
                 assert.ok(/Tasks\s*5/.test(full[2]), `Tasks carries its count 5 (got ${JSON.stringify(full[2])})`);
                 assert.ok(/Agents\s*2/.test(full[3]), `Agents carries its count 2 (got ${JSON.stringify(full[3])})`);
@@ -53,9 +53,10 @@ const TEAM = `qa-team-${Date.now() % 100000}`;
                 const tabindexes = await ev(`window.__tp.tabs().map(t => t.tabIndex)`);
                 assert.deepEqual(tabindexes.filter(i => i === 0).length, 1, `exactly one tab is a tab stop (got ${JSON.stringify(tabindexes)})`);
                 await key('ArrowRight'); assert.equal(await focusedTab(), 'Board', 'Right moves to Board');
-                await key('End'); assert.equal(await focusedTab(), 'Settings', 'End moves to Settings');
+                const last = mobile ? 'Agents' : 'Settings'; // a phone's row ends at Agents: the rest are behind More
+                await key('End'); assert.equal(await focusedTab(), last, `End moves to ${last}`);
                 await key('ArrowRight'); assert.equal(await focusedTab(), 'Goals', 'Right wraps to Goals');
-                await key('ArrowLeft'); assert.equal(await focusedTab(), 'Settings', 'Left wraps to Settings');
+                await key('ArrowLeft'); assert.equal(await focusedTab(), last, `Left wraps to ${last}`);
                 await key('Home'); assert.equal(await focusedTab(), 'Goals', 'Home moves to Goals');
             });
             await S.run(`${label}: the header and the tab strip are at the same pixels on every tab`, async () => {
