@@ -72,7 +72,9 @@ type ChatFolderCounts struct {
 	Tags        []ChatFolderTag `json:"tags"`
 }
 
-// CountChatFolders aggregates all folders in one query of the history database.
+// CountChatFolders aggregates all folders in one query of the history database. Each count is its list's total: All, Notes,
+// Active now and Archived are agent chats (Archived counts the archived ones, the others the visible ones); Group chats is
+// every board, an archived board included; Starred is the visible chats of both kinds.
 // The board ids come from the board database's existing project listing; json_each
 // folds them into the same aggregate without an IN limit or a request per folder.
 func (s *SessionStore) CountChatFolders(ctx context.Context, boards []string) (*ChatFolderCounts, error) {
@@ -89,12 +91,12 @@ func (s *SessionStore) CountChatFolders(ctx context.Context, boards []string) (*
  EXISTS(SELECT 1 FROM live_sessions ls WHERE ls.board_name=b.value AND ls.status='active' AND ls.is_sleeping=0 AND ls.is_archived=0 AND ls.pid>0),0
  FROM json_each(?) b LEFT JOIN chat_flags cf ON cf.session_id='board:'||b.value
  ), visible AS (SELECT * FROM chats WHERE archived=0)
- SELECT 'folder' AS kind,'all' AS name,'' AS color,0 AS id,COUNT(*) AS n FROM visible
- UNION ALL SELECT 'folder','group','',0,COUNT(*) FROM visible WHERE is_group=1
- UNION ALL SELECT 'folder','notes','',0,COUNT(*) FROM visible WHERE notes=1
- UNION ALL SELECT 'folder','active','',0,COUNT(*) FROM visible WHERE active=1
+ SELECT 'folder' AS kind,'all' AS name,'' AS color,0 AS id,COUNT(*) AS n FROM visible WHERE is_group=0
+ UNION ALL SELECT 'folder','group','',0,COUNT(*) FROM chats WHERE is_group=1
+ UNION ALL SELECT 'folder','notes','',0,COUNT(*) FROM visible WHERE notes=1 AND is_group=0
+ UNION ALL SELECT 'folder','active','',0,COUNT(*) FROM visible WHERE active=1 AND is_group=0
  UNION ALL SELECT 'folder','starred','',0,COUNT(*) FROM visible WHERE starred=1
- UNION ALL SELECT 'folder','archived','',0,COUNT(*) FROM chats WHERE archived=1
+ UNION ALL SELECT 'folder','archived','',0,COUNT(*) FROM chats WHERE archived=1 AND is_group=0
  UNION ALL SELECT 'cli',cli,'',0,COUNT(*) FROM visible WHERE is_group=0 GROUP BY cli
  UNION ALL SELECT 'tag',t.name,t.color,t.id,COUNT(v.id) FROM tags t LEFT JOIN session_tags st ON st.tag_id=t.id LEFT JOIN visible v ON v.id=st.session_id AND v.is_group=0 GROUP BY t.id,t.name,t.color`
 	var rows []struct {

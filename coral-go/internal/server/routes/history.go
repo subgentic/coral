@@ -91,7 +91,7 @@ func (h *HistoryHandler) ListSessions(w http.ResponseWriter, r *http.Request) {
 	if (chatType == "all" || chatType == "group") && h.bs != nil {
 		boardSessions = h.boardHistoryRows(r, q.Get("q"), q.Get("date_from"), q.Get("date_to"))
 		var err error
-		boardSessions, err = h.filterBoardChatRows(r, boardSessions, params)
+		boardSessions, err = h.filterBoardChatRows(r, boardSessions, params, chatType)
 		if err != nil {
 			errInternalServer(w, "could not read chat flags")
 			return
