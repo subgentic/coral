@@ -167,12 +167,14 @@ export function mountSettingsView(host, spec) {
         // the help: one line under the label; a long text behind Learn more; "Applies immediately" for a switch that saves at once
         const helpBits = [];
         const help = typeof field.help === 'string' ? { text: field.help } : field.help || null;
-        let helpEl = null;
+        let helpEl = null, descId = null; // descId: the sentence alone describes the control (the Learn more beside it would read the label out again, "Learn more about <label>")
         if (help && help.text) helpBits.push(help.text);
         if (field.apply === 'now') helpBits.push('Applies immediately.');
         if (helpBits.length || (help && help.more)) {
             helpEl = node(helpBits.length ? 'p' : 'span', helpBits.length ? 'sv-help' : 'sv-help sv-help-inline'); helpEl.id = `${id}-h`; // no sentence: the Learn more follows the label on its line
-            helpEl.append(node('span', `sv-help-text${field.helpTextClass ? ' ' + field.helpTextClass : ''}`, helpBits.join(' '))); // helpTextClass: a class the caller's own code finds the sentence by
+            const sentence = node('span', `sv-help-text${field.helpTextClass ? ' ' + field.helpTextClass : ''}`, helpBits.join(' ')); // helpTextClass: a class the caller's own code finds the sentence by
+            if (helpBits.length) { sentence.id = `${id}-ht`; descId = sentence.id; }
+            helpEl.append(sentence);
             if (help && help.more) {
                 const { btn, more } = learnMore(help, field, id);
                 helpEl.append(' ', btn); text.append(helpEl, more);
@@ -187,7 +189,7 @@ export function mountSettingsView(host, spec) {
             if (typeof item === 'object' && item.wide) { e.classList.add('sv-live-wide'); wideLive.push(e); } else text.append(e);
             liveIds.push(lid);
         }
-        const describedBy = [helpEl && helpEl.id, ...liveIds].filter(Boolean);
+        const describedBy = [descId, ...liveIds].filter(Boolean);
         if (describedBy.length && target && target.setAttribute) target.setAttribute('aria-describedby', describedBy.join(' '));
         const control = node('div', 'sv-control');
         control.append(ctl.node);
@@ -220,7 +222,7 @@ export function mountSettingsView(host, spec) {
         const errorEl = node('p', 'sv-error'); errorEl.id = `${id}-e`; errorEl.hidden = true; errorEl.setAttribute('role', 'alert');
         row.append(text, control, errorEl, ...wideLive);
         if (field.setup && target) field.setup(target); // the caller's own touch on the control, once the row is whole (a data-on-* action it names with setAttribute, which the action census reads)
-        const rec = { field, group, row, ctl, errorEl, helpEl, actionEl, id, label };
+        const rec = { field, group, row, ctl, errorEl, helpEl, descId, actionEl, id, label };
         const onEdit = () => touched(field.key);
         for (const ev of ['input', 'change']) (ctl.node).addEventListener(ev, onEdit);
         if (ctl.onChange) ctl.onChange(onEdit);
@@ -360,9 +362,9 @@ export function mountSettingsView(host, spec) {
     }
     function describe(r, on) {
         const t = r.ctl.input || r.ctl.node; if (!t || !t.setAttribute) return;
-        const own = new Set([r.helpEl && r.helpEl.id, r.errorEl.id].filter(Boolean));
+        const own = new Set([r.descId, r.errorEl.id].filter(Boolean));
         const extra = (t.getAttribute('aria-describedby') || '').split(/\s+/).filter(x => x && !own.has(x)); // what the caller added (a line of its own) stays
-        const ids = [r.helpEl && r.helpEl.id, ...extra, on && r.errorEl.id].filter(Boolean);
+        const ids = [r.descId, ...extra, on && r.errorEl.id].filter(Boolean);
         if (ids.length) t.setAttribute('aria-describedby', ids.join(' ')); else t.removeAttribute('aria-describedby');
     }
     function checkField(key) {
