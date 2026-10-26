@@ -15,7 +15,7 @@ const PAGE = 50;
 export const CHAT_KEY = /^chats(-|$)/;
 const CLIS = [['claude', 'Claude'], ['codex', 'Codex'], ['agy', 'Antigravity'], ['pi', 'Pi']];
 const FOLDERS = [
-    { key: 'chats', label: 'All chats', params: { type: 'all' }, count: 'all' },
+    { key: 'chats', label: 'All chats', params: { type: 'agent' }, count: 'all', minus: 'group' }, // the agents' chats: the boards' have their own folder
     { key: 'chats-group', label: 'Group chats', params: { type: 'group' }, count: 'group' },
     { key: 'chats-notes', label: 'With notes', params: { type: 'agent', with_notes: '1' }, count: 'notes' },
     { key: 'chats-starred', label: 'Starred', params: { starred: '1' }, count: 'starred' },
@@ -37,7 +37,7 @@ export function chatFolder(key, c = counts) {
 export function chatSections(c = counts) {
     const n = (v) => (c && Number.isFinite(c[v]) ? c[v] : undefined);
     const by = (t) => (c && c.by_agent_type ? (t === 'agy' ? (c.by_agent_type.agy || 0) + (c.by_agent_type.antigravity || 0) + (c.by_agent_type.gemini || 0) : c.by_agent_type[t]) : undefined);
-    const out = [{ title: 'Chats', items: FOLDERS.map(f => ({ key: f.key, label: f.label, count: n(f.count) })) },
+    const out = [{ title: 'Chats', items: FOLDERS.map(f => ({ key: f.key, label: f.label, count: f.minus && n(f.count) !== undefined && n(f.minus) !== undefined ? Math.max(0, n(f.count) - n(f.minus)) : n(f.count) })) },
         { title: 'By CLI', items: CLIS.map(([t, label]) => ({ key: `chats-cli-${t}`, label, count: by(t) })) }];
     const tags = (c && c.tags) || [];
     if (tags.length) out.push({ title: 'Tags', items: tags.map(t => ({ key: `chats-tag-${t.id}`, label: t.name, count: t.count, dot: /^#[0-9a-f]{3,8}$/i.test(t.color || '') ? t.color : undefined })) });
@@ -91,7 +91,16 @@ function dayOf(iso, now = new Date()) {
 const stampOf = (s) => s.last_timestamp || s.updated_at || '';
 const ran = (sec) => { if (sec == null || !(sec >= 0)) return ''; const m = Math.round(sec / 60); return m < 1 ? 'under a min' : m < 60 ? `${m} min` : `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ''}`; };
 const name = (s) => (isGroup(s) ? (s.title || String(s.session_id).replace(/^board:/, '')) : (s.display_name || s.agent_name || ''));
-const snippetOf = (s) => { const t = historyLabel(s); const x = String(s.summary || '').replace(/\s+/g, ' ').trim(); return x && x !== t ? x : ''; };
+/** The line after a chat's title. A group chat's summary starts with its own name ("orch-notify - 1 messages, 0 participants"): the name is not said twice, and one is "1 message". */
+const snippetOf = (s) => {
+    const t = historyLabel(s);
+    let x = String(s.summary || '').replace(/\s+/g, ' ').trim();
+    if (isGroup(s)) {
+        for (const n of [t, String(s.session_id || '').replace(/^board:/, '')]) if (n && x.startsWith(n)) { x = x.slice(n.length).replace(/^\s*[-\u2013\u2014:]\s*/, ''); break; }
+        x = x.replace(/\b1 messages\b/, '1 message').replace(/\b1 participants\b/, '1 participant');
+    }
+    return x && x !== t ? x : '';
+};
 
 /** Star or archive a chat (the flags route): true when it was saved; a failure says so in a toast. */
 export async function setChatFlag(sessionId, flag, value) {
@@ -120,7 +129,7 @@ export function chatsSpec(key, ctx) {
             footer: (L.done && !L.error) ? undefined : { text: L.error || (L.done ? '' : (L.total != null ? `Showing ${rows.length} of ${L.total}` : '')), auto: !L.done && !L.error, more: L.done ? null : { label: 'Load more', busy: L.busy, run: () => readMore(key, folder, q, ctx.redraw) } },
             columns: [
                 { key: 'agent', label: 'Agent', primary: true, line: 1, cell: s => { const n = name(s); const w = isGroup(s) ? DT.primaryButton(n || 'Group chat') : DT.personButton(n || 'Agent', `Open the chat of ${n || 'the agent'}`); const b = w.matches('button') ? w : w.querySelector('.dt-primary'); b.dataset.sessionId = s.session_id; if (isGroup(s)) { const wrap = DT.el('span', 'dt-person'); wrap.append(b, DT.tag('Group')); return wrap; } return w; } },
-                { key: 'chat', label: 'Chat', width: 'grow', line: 2, cell: s => { const c = DT.el('span', 'dt-chat-line'); c.append(DT.el('span', 'dt-chat-title', historyLabel(s))); const sn = snippetOf(s); if (sn) c.append(DT.el('span', 'dt-chat-snippet', ` – ${sn}`)); if (s.active) { const live = DT.el('span', 'dt-chat-live', ' · active now'); c.append(live); } return c; } },
+                { key: 'chat', label: 'Chat', width: 'grow', line: 2, cell: s => { /* a board's name is the agent column's: its line says only what happened in it */ const c = DT.el('span', 'dt-chat-line'); const sn = snippetOf(s); if (isGroup(s)) { if (sn) c.append(DT.el('span', 'dt-chat-snippet', sn)); } else { c.append(DT.el('span', 'dt-chat-title', historyLabel(s))); if (sn) c.append(DT.el('span', 'dt-chat-snippet', ` \u2013 ${sn}`)); } if (s.active) { const live = DT.el('span', 'dt-chat-live', ' · active now'); c.append(live); } return c; } },
                 { key: 'when', label: 'When', tone: 'tertiary', align: 'end', line: 1, cell: s => DT.timeCell(stampOf(s)) },
                 { key: 'ran', label: 'Ran', tone: 'tertiary', align: 'end', line: 0, cell: s => ran(s.duration_sec) },
                 { key: 'flags', label: 'Star and archive', hideLabel: true, line: 0, cell: s => {
