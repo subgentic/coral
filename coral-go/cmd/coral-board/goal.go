@@ -36,9 +36,6 @@ A goal is ONE outcome a person can check, with a done-when to verify it, a drive
 
 A task joins a goal when it is added (task add --goal <id>) or later (task goal <task> <goal|none>); task list --goal <id> lists a goal's tasks.`
 
-// goalTextFlags are the goal options whose values are free text.
-var goalTextFlags = []string{"title", "outcome", "done-when", "blocked-on"}
-
 func cmdGoal() {
 	if len(os.Args) < 3 {
 		fmt.Fprintln(os.Stderr, goalUsageText)
