@@ -20,6 +20,7 @@ func lower(pid int) error {
 // lowerChanged is lower, reporting whether pid's niceness was changed (false when it already
 // ran at Nice or nicer).
 func lowerChanged(pid int) (bool, error) {
+	preferOOMKill(pid) // what the kernel kills first when memory runs out is an agent, not the server (#8734)
 	cur, err := syscall.Getpriority(syscall.PRIO_PROCESS, pid)
 	if err == nil && niceness(cur) >= Nice {
 		return false, nil

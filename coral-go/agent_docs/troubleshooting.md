@@ -572,6 +572,14 @@ to 4 ms.
 
 Check an agent with `ps -o ni= -p <pid>` (10 for Low, the same as Coral's for Normal).
 
+On Linux, Low also makes agents the first the kernel's out-of-memory killer picks: an agent and what
+it starts get `oom_score_adj` +500, Coral keeps its own. Under a memory limit (a container, a
+systemd unit, a small workspace) the killer takes the process with the highest score, and with both at
+0 that was Coral, the larger of the two, which ended every agent's terminal with it; now an agent CLI
+is killed first and Coral stays up. If an agent ends with `Killed` and Coral is still running, it ran
+out of memory: give the workspace more, or run fewer agents. Check one with
+`cat /proc/<pid>/oom_score_adj` (500 for Low).
+
 ### Profiling a slow server
 
 Only a **dev build** has a profiler (`go build -tags dev`, or `make dev`). A shipped

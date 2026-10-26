@@ -3,7 +3,9 @@
 // and Coral Hub quickly. Agents' processes (a tmux pane and everything it
 // starts, a PTY session's child, a workflow step) are reniced right after they
 // start; their children inherit it. The server itself, and the tmux server it
-// talks to, keep normal priority.
+// talks to, keep normal priority. On Linux the same agents also get a higher
+// oom_score_adj, so the kernel's out-of-memory killer takes an agent before the
+// server (#8734).
 //
 // The level is the agent_priority setting ("low", the default, or "normal"),
 // applied live to agents started afterwards. CORAL_AGENT_PRIORITY or
