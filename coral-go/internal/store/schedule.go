@@ -339,16 +339,16 @@ func (s *ScheduleStore) ListActiveRuns(ctx context.Context) ([]ScheduledRun, err
 	return runs, err
 }
 
-// GetRunningCount returns the count of pending/running runs.
-func (s *ScheduleStore) GetRunningCount(ctx context.Context) (int, error) {
+// getRunningCount returns the count of pending/running runs.
+func (s *ScheduleStore) getRunningCount(ctx context.Context) (int, error) {
 	var count int
 	err := s.db.GetContext(ctx, &count,
 		"SELECT COUNT(*) FROM scheduled_runs WHERE status IN ('pending', 'running')")
 	return count, err
 }
 
-// GetAllJobSessionIDs returns session_ids for all runs (for filtering from live sessions).
-func (s *ScheduleStore) GetAllJobSessionIDs(ctx context.Context) (map[string]bool, error) {
+// getAllJobSessionIDs returns session_ids for all runs (for filtering from live sessions).
+func (s *ScheduleStore) getAllJobSessionIDs(ctx context.Context) (map[string]bool, error) {
 	var ids []string
 	err := s.db.SelectContext(ctx, &ids,
 		"SELECT session_id FROM scheduled_runs WHERE session_id IS NOT NULL")

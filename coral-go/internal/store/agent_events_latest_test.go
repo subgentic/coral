@@ -314,7 +314,7 @@ func TestEditedFilesIndexToleratesMalformedDetailJSON(t *testing.T) {
 	all, err := ts.GetAllEditedFileCounts(ctx)
 	require.NoError(t, err)
 	require.Equal(t, map[string]int{sid: 1}, all)
-	files, err := ts.GetEditedFilesBySession(ctx, []string{sid})
+	files, err := ts.getEditedFilesBySession(ctx, []string{sid})
 	require.NoError(t, err)
 	require.Equal(t, map[string]bool{"/r/a.go": true}, files[sid])
 }

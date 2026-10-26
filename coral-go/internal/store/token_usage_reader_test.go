@@ -26,8 +26,8 @@ func TestTokenUsageReadsDoNotNeedThePrimaryConnection(t *testing.T) {
 	start := time.Now()
 	for name, call := range map[string]func() error{
 		"GetSessionUsage":         func() error { _, e := s.GetSessionUsage(rctx, "s1"); return e },
-		"GetTeamUsage":            func() error { _, e := s.GetTeamUsage(rctx, 1); return e },
-		"GetBoardUsage":           func() error { _, e := s.GetBoardUsage(rctx, "b"); return e },
+		"getTeamUsage":            func() error { _, e := s.getTeamUsage(rctx, 1); return e },
+		"getBoardUsage":           func() error { _, e := s.getBoardUsage(rctx, "b"); return e },
 		"GetUsageSummary":         func() error { _, e := s.GetUsageSummary(rctx, ""); return e },
 		"GetUsageSummaryByModel":  func() error { _, e := s.GetUsageSummaryByModel(rctx, ""); return e },
 		"GetUsageSummaryByAgent":  func() error { _, e := s.GetUsageSummaryByAgent(rctx, ""); return e },

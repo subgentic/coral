@@ -68,6 +68,7 @@ func (s *SessionStore) GetIndexedSession(ctx context.Context, sessionID string) 
 // EnqueueForSummarization adds a session to the summarization queue.
 // If the session already exists with a 'failed' status, it is reset to 'pending'
 // so it will be retried (e.g. after re-indexing with a corrected source_file).
+// EnqueueForSummarization has no production caller: it is exported for the history-guardian test in internal/server/routes.
 func (s *SessionStore) EnqueueForSummarization(ctx context.Context, sessionID string) error {
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO summarizer_queue (session_id, status) VALUES (?, 'pending')

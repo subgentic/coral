@@ -230,8 +230,8 @@ func (s *TeamStore) GetActiveMembers(ctx context.Context, teamID int64) ([]TeamM
 	return members, err
 }
 
-// GetSleepingMembers returns all sleeping members for a team.
-func (s *TeamStore) GetSleepingMembers(ctx context.Context, teamID int64) ([]TeamMember, error) {
+// getSleepingMembers returns all sleeping members for a team.
+func (s *TeamStore) getSleepingMembers(ctx context.Context, teamID int64) ([]TeamMember, error) {
 	var members []TeamMember
 	err := s.db.SelectContext(ctx, &members,
 		`SELECT id, team_id, agent_name, agent_config_json, session_id, status, created_at, stopped_at

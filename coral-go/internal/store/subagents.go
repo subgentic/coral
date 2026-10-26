@@ -139,6 +139,7 @@ func (s *SubagentStore) ListSubagentsBySession(ctx context.Context, sessionID st
 
 // GetSubagentSpend returns summed subagent spend per main agent for the given
 // sessions. Sessions without subagents are absent from the map.
+// GetSubagentSpend has no production caller: it is exported for the subagent-sync test in internal/background.
 func (s *SubagentStore) GetSubagentSpend(ctx context.Context, sessionIDs []string) (map[string]SubagentSpend, error) {
 	result := map[string]SubagentSpend{}
 	if len(sessionIDs) == 0 {

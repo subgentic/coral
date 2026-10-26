@@ -23,14 +23,14 @@ func TestAFloodOfUnknownProofHashesReadsNothingFromTheDatabase(t *testing.T) {
 
 	_, ok := db.SessionProofKey(ctx, hash)
 	require.True(t, ok, "a live session's key is found")
-	before := db.ProofKeyLoads()
+	before := db.proofKeyLoads()
 	for i := 0; i < 5000; i++ {
 		_, ok := db.SessionProofKey(ctx, fmt.Sprintf("%064x", i))
 		require.False(t, ok)
 	}
 	_, ok = db.SessionProofKey(ctx, hash)
 	assert.True(t, ok, "and still found during the flood")
-	assert.Equal(t, before, db.ProofKeyLoads(), "5000 made-up hashes read nothing from the database")
+	assert.Equal(t, before, db.proofKeyLoads(), "5000 made-up hashes read nothing from the database")
 }
 
 func TestTheProofKeySetFollowsMintAndRevokeAndTheTTL(t *testing.T) {

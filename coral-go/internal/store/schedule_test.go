@@ -89,7 +89,7 @@ func TestScheduledRuns(t *testing.T) {
 	assert.Equal(t, "running", active.Status)
 
 	// Running count
-	count, err := s.GetRunningCount(ctx)
+	count, err := s.getRunningCount(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, 1, count)
 
@@ -106,7 +106,7 @@ func TestScheduledRuns(t *testing.T) {
 	assert.Equal(t, "completed", lastRun.Status)
 
 	// All job session IDs
-	ids, err := s.GetAllJobSessionIDs(ctx)
+	ids, err := s.getAllJobSessionIDs(ctx)
 	require.NoError(t, err)
 	assert.True(t, ids["sess-abc"])
 

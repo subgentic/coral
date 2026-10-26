@@ -125,6 +125,7 @@ const agentEventKeep = 500
 
 // SetEventKeep changes how many events this store keeps per session; tests use it to reach the
 // pruning without inserting hundreds of events.
+// SetEventKeep has no production caller: it is exported for the session-state sequence test in internal/server/routes.
 func (s *TaskStore) SetEventKeep(n int) { s.eventKeep.Store(int64(n)) }
 
 // NewTaskStore creates a new TaskStore.
@@ -191,6 +192,7 @@ func (s *TaskStore) ListAgentTasksForSessions(ctx context.Context, sessionIDs []
 }
 
 // CreateAgentTask creates a new task with auto-incrementing sort order.
+// CreateAgentTask has no production caller: it is exported for the team-availability test in internal/server/routes.
 func (s *TaskStore) CreateAgentTask(ctx context.Context, agentName, title string, sessionID *string, displayName *string) (*AgentTask, error) {
 	return s.CreateAgentTaskWithWorkflow(ctx, agentName, title, sessionID, displayName, "", "medium", nil)
 }
@@ -398,8 +400,8 @@ func (s *TaskStore) computeAgentTaskCost(ctx context.Context, taskID int64, comp
 	}
 }
 
-// CompleteAgentTaskByTitle marks a task as completed by title match.
-func (s *TaskStore) CompleteAgentTaskByTitle(ctx context.Context, agentName, title string, sessionID *string) error {
+// completeAgentTaskByTitle marks a task as completed by title match.
+func (s *TaskStore) completeAgentTaskByTitle(ctx context.Context, agentName, title string, sessionID *string) error {
 	task, err := s.FindOpenAgentTask(ctx, agentName, title, sessionID)
 	if err != nil || task == nil {
 		return err
@@ -993,6 +995,7 @@ func (s *TaskStore) GetFileEdits(ctx context.Context, sessionID, workingDir stri
 
 // GetAllEditedFileCounts returns the count of distinct files each session has
 // edited via Write/Edit tool events. Used for the tooltip file count display.
+// GetAllEditedFileCounts has no production caller: it is exported for the session-list performance test in internal/server/routes.
 func (s *TaskStore) GetAllEditedFileCounts(ctx context.Context) (map[string]int, error) {
 	var rows []struct {
 		SessionID string `db:"session_id"`
@@ -1010,10 +1013,10 @@ func (s *TaskStore) GetAllEditedFileCounts(ctx context.Context) (map[string]int,
 	return result, nil
 }
 
-// GetEditedFilesBySession returns the set of absolute file paths each session has
+// getEditedFilesBySession returns the set of absolute file paths each session has
 // touched via Write/Edit tool events. Used by the git poller to build per-agent
 // file counts instead of sharing repo-wide git diff results across all agents.
-func (s *TaskStore) GetEditedFilesBySession(ctx context.Context, sessionIDs []string) (map[string]map[string]bool, error) {
+func (s *TaskStore) getEditedFilesBySession(ctx context.Context, sessionIDs []string) (map[string]map[string]bool, error) {
 	if len(sessionIDs) == 0 {
 		return map[string]map[string]bool{}, nil
 	}

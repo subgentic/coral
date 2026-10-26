@@ -67,7 +67,7 @@ func TestGitSnapshotAllLatest(t *testing.T) {
 		Branch: "dev", CommitHash: "bbb", SessionID: &sid2,
 	})
 
-	all, err := s.GetAllLatestGitState(ctx)
+	all, err := s.getAllLatestGitState(ctx)
 	require.NoError(t, err)
 	assert.Contains(t, all, "sess-1")
 	assert.Contains(t, all, "sess-2")
@@ -119,7 +119,7 @@ func TestChangedFiles(t *testing.T) {
 	assert.Len(t, result, 2)
 
 	// File counts (across all modes)
-	counts, err := s.GetAllChangedFileCounts(ctx)
+	counts, err := s.getAllChangedFileCounts(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, 3, counts["sess-1"])
 }
@@ -169,7 +169,7 @@ func TestOldGitSnapshotRowsAreCleanedByEveryGetter(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, list, 1)
 	check("list", list[0].Branch, list[0].CommitSubject)
-	list, err = s.GetRecentGitSnapshots(ctx, "", 5)
+	list, err = s.getRecentGitSnapshots(ctx, "", 5)
 	require.NoError(t, err)
 	require.Len(t, list, 1)
 	check("recent", list[0].Branch, list[0].CommitSubject)
@@ -177,7 +177,7 @@ func TestOldGitSnapshotRowsAreCleanedByEveryGetter(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, list, 1)
 	check("for session", list[0].Branch, list[0].CommitSubject)
-	all, err := s.GetAllLatestGitState(ctx)
+	all, err := s.getAllLatestGitState(ctx)
 	require.NoError(t, err)
 	check("all latest", all[sid].Branch, all[sid].CommitSubject)
 	live, err := s.GetLiveGitState(ctx, map[string]string{sid: "old-repo"})

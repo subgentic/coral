@@ -195,7 +195,7 @@ func TestTeamStore_SleepWakeCycle(t *testing.T) {
 	err = s.UpdateTeamStatus(ctx, team.ID, "sleeping")
 	require.NoError(t, err)
 
-	sleeping, err := s.GetSleepingMembers(ctx, team.ID)
+	sleeping, err := s.getSleepingMembers(ctx, team.ID)
 	require.NoError(t, err)
 	assert.Len(t, sleeping, 2)
 
@@ -326,7 +326,7 @@ func TestTeamStore_SleepWake_StoppedMemberStaysStopped(t *testing.T) {
 	err = s.UpdateTeamStatus(ctx, team.ID, "sleeping")
 	require.NoError(t, err)
 
-	sleeping, err := s.GetSleepingMembers(ctx, team.ID)
+	sleeping, err := s.getSleepingMembers(ctx, team.ID)
 	require.NoError(t, err)
 	assert.Len(t, sleeping, 2, "only the 2 active members should be sleeping")
 

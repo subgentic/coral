@@ -381,10 +381,10 @@ func (x sessionListExtras) item(r sessionPageRow) SessionListItem {
 	}
 }
 
-// GetSessionDuration returns the duration of a session in seconds.
+// getSessionDuration returns the duration of a session in seconds.
 // For active sessions, duration is calculated from created_at to now.
 // For stopped sessions, duration is calculated from created_at to stopped_at.
-func (s *SessionStore) GetSessionDuration(ctx context.Context, sessionID string) (float64, error) {
+func (s *SessionStore) getSessionDuration(ctx context.Context, sessionID string) (float64, error) {
 	var result struct {
 		CreatedAt string  `db:"created_at"`
 		StoppedAt *string `db:"stopped_at"`
@@ -420,8 +420,8 @@ func (s *SessionStore) GetSessionDuration(ctx context.Context, sessionID string)
 	return end.Sub(start).Seconds(), nil
 }
 
-// GetRecentStoppedSessions returns recently stopped sessions for timeline display.
-func (s *SessionStore) GetRecentStoppedSessions(ctx context.Context, since string, limit int) ([]LiveSession, error) {
+// getRecentStoppedSessions returns recently stopped sessions for timeline display.
+func (s *SessionStore) getRecentStoppedSessions(ctx context.Context, since string, limit int) ([]LiveSession, error) {
 	var sessions []LiveSession
 	query := `SELECT session_id, agent_type, agent_name, working_dir, display_name,
 		 board_name, icon, created_at, stopped_at

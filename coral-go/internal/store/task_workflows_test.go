@@ -29,7 +29,7 @@ func TestPersonalWorkflowPersistenceAndIsolation(t *testing.T) {
 	_, err = s.CreateAgentTaskWithWorkflow(ctx, "agent", "Steal", &other, nil, "", "medium", &board.CreateTaskOpts{BlockedBy: []board.TaskDep{{TaskID: build.ID}}})
 	require.Error(t, err)
 	require.Error(t, s.FinishAgentTask(ctx, child.ID, AgentTaskDone, "bypass"))
-	require.Error(t, s.CompleteAgentTaskByTitle(ctx, "agent", "Build", &sid)) // hook cannot bypass required output
+	require.Error(t, s.completeAgentTaskByTitle(ctx, "agent", "Build", &sid)) // hook cannot bypass required output
 	_, err = s.ClaimNextAgentTask(ctx, "agent", &sid, build.ID)
 	require.NoError(t, err)
 	_, err = s.ClaimNextAgentTask(ctx, "agent", &sid)

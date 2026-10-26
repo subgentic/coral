@@ -148,8 +148,8 @@ func sanitizeAll(snaps []GitSnapshot, err error) ([]GitSnapshot, error) {
 	return snaps, err
 }
 
-// GetRecentGitSnapshots returns recent snapshots across all agents, optionally filtered by time.
-func (s *GitStore) GetRecentGitSnapshots(ctx context.Context, since string, limit int) ([]GitSnapshot, error) {
+// getRecentGitSnapshots returns recent snapshots across all agents, optionally filtered by time.
+func (s *GitStore) getRecentGitSnapshots(ctx context.Context, since string, limit int) ([]GitSnapshot, error) {
 	var snaps []GitSnapshot
 	var err error
 	if since != "" {
@@ -206,8 +206,8 @@ func (s *GitStore) GetLatestGitStateBySession(ctx context.Context, sessionID str
 	return snap.sanitize(), err
 }
 
-// GetAllLatestGitState returns the latest snapshot per agent/session, keyed by session_id and agent_name.
-func (s *GitStore) GetAllLatestGitState(ctx context.Context) (map[string]*GitSnapshot, error) {
+// getAllLatestGitState returns the latest snapshot per agent/session, keyed by session_id and agent_name.
+func (s *GitStore) getAllLatestGitState(ctx context.Context) (map[string]*GitSnapshot, error) {
 	var snaps []GitSnapshot
 	err := s.db.SelectContext(ctx, &snaps,
 		`SELECT g.id, g.agent_name, g.agent_type, g.working_directory, g.branch,
@@ -386,8 +386,8 @@ func (s *GitStore) GetChangedFiles(ctx context.Context, agentName string, sessio
 	return files, true, err
 }
 
-// GetAllChangedFileCounts returns file counts per agent/session.
-func (s *GitStore) GetAllChangedFileCounts(ctx context.Context) (map[string]int, error) {
+// getAllChangedFileCounts returns file counts per agent/session.
+func (s *GitStore) getAllChangedFileCounts(ctx context.Context) (map[string]int, error) {
 	var rows []struct {
 		Key   string `db:"key"`
 		Count int    `db:"cnt"`

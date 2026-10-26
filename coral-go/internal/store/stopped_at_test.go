@@ -108,7 +108,7 @@ func TestGetSessionDuration_ActiveSession(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	duration, err := ss.GetSessionDuration(ctx, "sess-active")
+	duration, err := ss.getSessionDuration(ctx, "sess-active")
 	require.NoError(t, err)
 	assert.GreaterOrEqual(t, duration, 0.0, "active session duration should be >= 0")
 	assert.Less(t, duration, 5.0, "freshly created session should be < 5s")
@@ -134,7 +134,7 @@ func TestGetSessionDuration_StoppedSession(t *testing.T) {
 	err = ss.UnregisterLiveSession(ctx, "sess-stopped")
 	require.NoError(t, err)
 
-	duration, err := ss.GetSessionDuration(ctx, "sess-stopped")
+	duration, err := ss.getSessionDuration(ctx, "sess-stopped")
 	require.NoError(t, err)
 	assert.Greater(t, duration, 0.0, "stopped session should have positive duration")
 	assert.Less(t, duration, 5.0, "short session should be < 5s")
@@ -145,7 +145,7 @@ func TestGetSessionDuration_NonExistent(t *testing.T) {
 	ss := NewSessionStore(db)
 	ctx := context.Background()
 
-	_, err := ss.GetSessionDuration(ctx, "nonexistent")
+	_, err := ss.getSessionDuration(ctx, "nonexistent")
 	assert.Error(t, err, "nonexistent session should return error")
 }
 
@@ -178,7 +178,7 @@ func TestGetRecentStoppedSessions(t *testing.T) {
 
 	// Get recent stopped sessions
 	since := time.Now().Add(-1 * time.Hour).UTC().Format(time.RFC3339)
-	stopped, err := ss.GetRecentStoppedSessions(ctx, since, 10)
+	stopped, err := ss.getRecentStoppedSessions(ctx, since, 10)
 	require.NoError(t, err)
 	assert.Len(t, stopped, 2, "should return 2 stopped sessions")
 
@@ -193,7 +193,7 @@ func TestGetRecentStoppedSessions_Empty(t *testing.T) {
 	ss := NewSessionStore(db)
 	ctx := context.Background()
 
-	stopped, err := ss.GetRecentStoppedSessions(ctx, "", 10)
+	stopped, err := ss.getRecentStoppedSessions(ctx, "", 10)
 	require.NoError(t, err)
 	assert.Empty(t, stopped)
 }

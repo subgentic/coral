@@ -34,7 +34,7 @@ func TestAgentTasksCRUD(t *testing.T) {
 	require.NoError(t, err)
 
 	// Complete by title
-	err = s.CompleteAgentTaskByTitle(ctx, "agent-1", "Add tests", nil)
+	err = s.completeAgentTaskByTitle(ctx, "agent-1", "Add tests", nil)
 	require.NoError(t, err)
 
 	// Reorder

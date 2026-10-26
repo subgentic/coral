@@ -228,6 +228,7 @@ func (s *SessionStore) GetBoardSessions(ctx context.Context, boardName string) (
 }
 
 // CountLiveSessions returns the total number of live sessions (including sleeping).
+// CountLiveSessions has no production caller: it is exported for the launch-limit test in internal/server/routes.
 func (s *SessionStore) CountLiveSessions(ctx context.Context) (int, error) {
 	var count int
 	err := s.reader().GetContext(ctx, &count,

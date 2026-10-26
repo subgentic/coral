@@ -29,9 +29,9 @@ func usageSnapshot(t *testing.T, s *TokenUsageStore, sessions []string, since st
 		put("session "+id, u, err)
 	}
 	team := int64(1)
-	v1, err := s.GetTeamUsage(ctx, team)
+	v1, err := s.getTeamUsage(ctx, team)
 	put("team", v1, err)
-	v2, err := s.GetBoardUsage(ctx, "board-a")
+	v2, err := s.getBoardUsage(ctx, "board-a")
 	put("board", v2, err)
 	v3, err := s.GetUsageSummary(ctx, since)
 	put("summary", v3, err)

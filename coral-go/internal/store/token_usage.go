@@ -303,6 +303,7 @@ func (s *TokenUsageStore) recordUsageOn(ctx context.Context, ex usageExecer, u *
 }
 
 // GetSessionUsage returns aggregated token usage for a session (sum of all per-turn records).
+// GetSessionUsage has no production caller: it is exported for the retention test in internal/background.
 func (s *TokenUsageStore) GetSessionUsage(ctx context.Context, sessionID string) (*TokenUsage, error) {
 	var u TokenUsage
 	err := s.db.Reader().GetContext(ctx, &u,
@@ -328,8 +329,8 @@ func (s *TokenUsageStore) GetSessionUsage(ctx context.Context, sessionID string)
 	return &u, nil
 }
 
-// GetTeamUsage returns aggregated token usage for a team (sum of all per-turn records).
-func (s *TokenUsageStore) GetTeamUsage(ctx context.Context, teamID int64) (*UsageSummary, error) {
+// getTeamUsage returns aggregated token usage for a team (sum of all per-turn records).
+func (s *TokenUsageStore) getTeamUsage(ctx context.Context, teamID int64) (*UsageSummary, error) {
 	var summary UsageSummary
 	err := s.db.Reader().GetContext(ctx, &summary,
 		`SELECT COALESCE(SUM(input_tokens), 0) as input_tokens,
@@ -346,8 +347,8 @@ func (s *TokenUsageStore) GetTeamUsage(ctx context.Context, teamID int64) (*Usag
 	return &summary, nil
 }
 
-// GetBoardUsage returns aggregated token usage for a board (sum of all per-turn records).
-func (s *TokenUsageStore) GetBoardUsage(ctx context.Context, boardName string) (*UsageSummary, error) {
+// getBoardUsage returns aggregated token usage for a board (sum of all per-turn records).
+func (s *TokenUsageStore) getBoardUsage(ctx context.Context, boardName string) (*UsageSummary, error) {
 	var summary UsageSummary
 	err := s.db.Reader().GetContext(ctx, &summary,
 		`SELECT COALESCE(SUM(input_tokens), 0) as input_tokens,

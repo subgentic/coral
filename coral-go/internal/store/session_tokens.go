@@ -142,6 +142,7 @@ func (db *DB) InvalidateSessionTokens() {
 }
 
 // SessionTokenCacheStats is how many owner lookups were asked for and how many the cache answered.
+// SessionTokenCacheStats has no production caller: it is exported for the token-cache end-to-end test in internal/server.
 func (db *DB) SessionTokenCacheStats() (lookups, hits int64) {
 	return db.tokenOwners.lookups.Load(), db.tokenOwners.hits.Load()
 }
@@ -218,8 +219,8 @@ func (s *proofKeySet) invalidate() {
 	s.keys = nil
 }
 
-// ProofKeyLoads is how many times the live proof keys were read from the database, for tests.
-func (db *DB) ProofKeyLoads() int64 { return db.proofKeys.loads.Load() }
+// proofKeyLoads is how many times the live proof keys were read from the database, for tests.
+func (db *DB) proofKeyLoads() int64 { return db.proofKeys.loads.Load() }
 
 // SessionTokenOwnerOf returns the session a live (unrevoked) token belongs to. The answer is
 // cached (tokenOwnerCache); a miss reads the read pool, not the write connection.

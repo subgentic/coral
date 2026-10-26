@@ -89,7 +89,7 @@ func TestTokenUsageStore_GetTeamUsage(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	summary, err := s.GetTeamUsage(ctx, teamID)
+	summary, err := s.getTeamUsage(ctx, teamID)
 	require.NoError(t, err)
 	// Should sum all per-turn records: s1(150+300) + s2(800) = 1250
 	assert.Equal(t, int64(1250), summary.TotalTokens)
@@ -112,7 +112,7 @@ func TestTokenUsageStore_GetBoardUsage(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	summary, err := s.GetBoardUsage(ctx, "my-board")
+	summary, err := s.getBoardUsage(ctx, "my-board")
 	require.NoError(t, err)
 	assert.Equal(t, int64(800), summary.TotalTokens)
 	assert.InDelta(t, 0.05, summary.CostUSD, 0.001)
@@ -342,7 +342,7 @@ func TestTokenUsageStore_GetTeamUsage_CacheTokens(t *testing.T) {
 		TotalTokens: 240, CostUSD: 0.02,
 	}))
 
-	summary, err := s.GetTeamUsage(ctx, teamID)
+	summary, err := s.getTeamUsage(ctx, teamID)
 	require.NoError(t, err)
 	assert.Equal(t, int64(80), summary.CacheReadTokens)
 	assert.Equal(t, int64(30), summary.CacheWriteTokens)
@@ -353,7 +353,7 @@ func TestTokenUsageStore_GetBoardUsage_NoMatch(t *testing.T) {
 	s := NewTokenUsageStore(db)
 	ctx := context.Background()
 
-	summary, err := s.GetBoardUsage(ctx, "nonexistent")
+	summary, err := s.getBoardUsage(ctx, "nonexistent")
 	require.NoError(t, err)
 	assert.Equal(t, int64(0), summary.TotalTokens)
 	assert.Equal(t, 0, summary.NumSessions)
