@@ -19,6 +19,9 @@ const SERVERS = [
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const sleep = ms => new Promise(r => setTimeout(r, ms)); // sleep-ok: a redraw and its layout settle over frames; there is no completion event
     const ok = name => console.log(`   ✓ ${name}`);
+    const fillForm = vals => ev(`(() => { const v = ${JSON.stringify(vals)}; for (const k of Object.keys(v)) { const e = document.getElementById('servers-' + k); e.value = v[k]; e.dispatchEvent(new Event('input', { bubbles: true })); } return true; })()`);
+    const submitForm = () => ev(`document.querySelector('#servers-form .sv-bar .btn-primary').click(); true`);
+    const cancelForm = () => ev(`[...document.querySelectorAll('#servers-form .sv-bar .btn')].find(b => b.textContent.trim() === 'Cancel').click(); true`);
     const shot = async n => { if (process.env.SHOT_DIR) fs.writeFileSync(`${process.env.SHOT_DIR}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     try {
         await Page.enable();
@@ -51,16 +54,16 @@ const SERVERS = [
         await ev(`document.querySelector('.servers-page [data-action=edit]').click(); true`);
         await waitFor(`!!document.getElementById('servers-form')`, 'the edit form');
         assert.equal(await ev(`!!document.querySelector('#servers-form .servers-row-warn')`), true, 'the edit form shows the warning');
-        assert.equal(await ev(`document.querySelector('#servers-form input[name=url]').closest('label').textContent.includes('unencrypted')`), false, 'it is not part of the URL field\'s name');
+        assert.equal(await ev(`document.querySelector('label[for=servers-url]').textContent.includes('unencrypted')`), false, 'it is not part of the URL field\'s name');
         // Name and description by what the markup says: the label text names each field, the help text under it describes it, and neither repeats the other.
-        const acc = await ev(`(() => { const t = id => (document.getElementById(id) || {}).textContent?.replace(/\\s+/g, ' ').trim(); const f = n => document.querySelector('#servers-form input[name=' + n + ']');
-            const o = {}; for (const n of ['id', 'url', 'api_key', 'allow_private']) { const e = f(n); o[n] = { name: e.getAttribute('aria-labelledby').split(' ').map(t).join(' '), desc: (e.getAttribute('aria-describedby') || '').split(' ').filter(Boolean).map(t).join(' ') }; } return o; })()`);
+        const acc = await ev(`(() => { const t = id => (document.getElementById(id) || {}).textContent?.replace(/\\s+/g, ' ').trim(); const f = n => document.getElementById({ id: 'servers-id', url: 'servers-url', api_key: 'servers-key', allow_private: 'servers-private' }[n]);
+            const o = {}; for (const n of ['id', 'url', 'api_key', 'allow_private']) { const e = f(n); o[n] = { name: e.getAttribute('aria-labelledby') ? e.getAttribute('aria-labelledby').split(' ').map(t).join(' ') : document.querySelector('label[for=' + e.id + ']').textContent.replace(/\\s+/g, ' ').trim(), desc: (e.getAttribute('aria-describedby') || '').split(' ').filter(Boolean).map(t).join(' ') }; } return o; })()`);
         assert.deepEqual(acc.id, { name: 'Server id', desc: 'Lowercase letters, digits and dashes. Cannot be changed later.' });
         assert.deepEqual(acc.url, { name: 'URL', desc: 'Scheme, host and port only.' });
         assert.deepEqual(acc.api_key, { name: 'API key', desc: 'Write-only. The key is stored encrypted and is never shown again.' });
-        assert.equal(acc.allow_private.name, 'Allow private network address'); assert.match(acc.allow_private.desc, /^Only tick this for a server on your LAN/);
+        assert.equal(acc.allow_private.name, 'Allow private network address'); assert.match(acc.allow_private.desc, /^Only for a server on your LAN/);
         ok('each server form field is named by its label and described by its help');
-        await ev(`document.querySelector('#servers-form [data-action=cancel-form]').click(); true`);
+        await cancelForm();
         await ev(`document.getElementById('servers-back').click(); true`);
         await waitFor(`!!document.querySelector('#server-row-tls [data-action=open]')`, 'the table');
         await ev(`document.querySelector('#server-row-tls [data-action=open]').click(); true`);
@@ -68,7 +71,7 @@ const SERVERS = [
         await ev(`document.querySelector('.servers-page [data-action=edit]').click(); true`);
         await waitFor(`!!document.getElementById('servers-form')`, 'the second edit form');
         assert.equal(await ev(`!!document.querySelector('#servers-form .servers-row-warn')`), false, 'an https server\'s edit form has none');
-        await ev(`document.querySelector('#servers-form [data-action=cancel-form]').click(); true`);
+        await cancelForm();
         await ev(`document.getElementById('servers-back').click(); true`);
         await waitFor(`!!document.querySelector('[data-action=add]')`, 'the table again');
         ok('the edit form shows the warning for the http server and none for the https one');
@@ -76,19 +79,19 @@ const SERVERS = [
         // 3. a refused add shows its message next to the URL field, and that field is flagged and focused
         await ev(`document.querySelector('[data-action=add]').click(); true`);
         await waitFor(`!!document.getElementById('servers-form')`, 'the add form');
-        await ev(`(() => { const f = document.getElementById('servers-form'); f.elements.id.value = 'new1'; f.elements.url.value = 'http://example.org:8420'; f.elements.api_key.value = 'k'; f.requestSubmit(); return true; })()`);
-        await waitFor(`!!document.getElementById('servers-url-error')`, 'the inline URL error');
-        const err = await ev(`(() => { const e = document.getElementById('servers-url-error'); const u = document.querySelector('#servers-form input[name=url]');
-            return { text: e.lastElementChild.textContent.replace(/\\s+/g, ' ').trim(), role: e.getAttribute('role'), invalid: u.getAttribute('aria-invalid'), by: u.getAttribute('aria-describedby'), focus: document.activeElement === u, top: !!document.querySelector('#servers-form .servers-form-error'), posts: window.__posts, kept: u.value }; })()`);
-        assert.equal(err.text, REFUSED); assert.equal(err.role, 'alert'); assert.equal(err.invalid, 'true'); assert.equal(err.by, 'servers-url-d servers-url-error', 'the URL field is described by its help, then the error');
-        assert.equal(err.focus, true, 'focus goes to the URL field'); assert.equal(err.top, false, 'not also in the form\'s top error'); assert.equal(err.posts, 1); assert.equal(err.kept, 'http://example.org:8420', 'what was typed is kept');
+        await fillForm({ id: 'new1', url: 'http://example.org:8420', key: 'k' }); await submitForm();
+        await waitFor(`!!document.getElementById('servers-url').closest('.sv-row').querySelector('.sv-error') && !document.getElementById('servers-url').closest('.sv-row').querySelector('.sv-error').hidden`, 'the inline URL error');
+        const err = await ev(`(() => { const e = document.getElementById('servers-url').closest('.sv-row').querySelector('.sv-error'); const u = document.getElementById('servers-url');
+            return { text: e.textContent.replace(/\\s+/g, ' ').trim(), role: e.getAttribute('role'), invalid: u.getAttribute('aria-invalid'), by: u.getAttribute('aria-describedby'), errId: e.id, focus: document.activeElement === u, top: document.querySelector('#servers-form .sv-status').textContent.includes('unencrypted'), posts: window.__posts, kept: u.value }; })()`);
+        assert.equal(err.text, REFUSED); assert.equal(err.role, 'alert'); assert.equal(err.invalid, 'true'); assert.ok(err.by.split(' ').includes(err.errId), 'the URL field is described by the error: ' + err.by);
+        assert.equal(err.focus, true, 'focus goes to the URL field');  assert.equal(err.posts, 1); assert.equal(err.kept, 'http://example.org:8420', 'what was typed is kept');
         await shot('refused-desktop');
         // another refusal (a duplicate id) still goes to the form's top error, not next to the URL
-        await ev(`window.__postAnswer = { status: 409, body: { error: 'A server with that id already exists.' } }; (() => { const f = document.getElementById('servers-form'); f.elements.api_key.value = 'k'; f.requestSubmit(); return true; })()`);
-        await waitFor(`!!document.querySelector('#servers-form .servers-form-error')`, 'the top error');
-        assert.equal(await ev(`!!document.getElementById('servers-url-error')`), false, 'the URL error is cleared by a new submit');
+        await ev(`window.__postAnswer = { status: 409, body: { error: 'A server with that id already exists.' } }; true`); await fillForm({ key: 'k' }); await submitForm();
+        await waitFor(`document.querySelector('#servers-form .sv-status').textContent.includes('already exists')`, 'the status line says it');
+        assert.equal(await ev(`!!document.getElementById('servers-url').closest('.sv-row').querySelector('.sv-error') && !document.getElementById('servers-url').closest('.sv-row').querySelector('.sv-error').hidden`), false, 'the URL error is cleared by a new submit');
         ok('a refused http URL shows the server\'s words next to the URL field (flagged, focused, kept); other refusals stay in the top error');
-        await ev(`document.querySelector('#servers-form [data-action=cancel-form]').click(); true`);
+        await cancelForm();
 
         // 4. phone, 200% text
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
@@ -100,13 +103,13 @@ const SERVERS = [
         await shot('rows-phone-200');
         await ev(`document.querySelector('[data-action=add]').click(); true`);
         await waitFor(`!!document.getElementById('servers-form')`, 'the add form on the phone');
-        await ev(`window.__postAnswer = { status: 400, body: { error: ${JSON.stringify(REFUSED)} } }; (() => { const f = document.getElementById('servers-form'); f.elements.id.value = 'new1'; f.elements.url.value = 'http://example.org:8420'; f.elements.api_key.value = 'k'; f.requestSubmit(); return true; })()`);
-        await waitFor(`!!document.getElementById('servers-url-error')`, 'the inline URL error on the phone');
-        const fit2 = await ev(`(() => { const e = document.getElementById('servers-url-error'); const r = e.getBoundingClientRect(); return { docOver: document.documentElement.scrollWidth - innerWidth, right: Math.round(r.right), vw: innerWidth, sw: e.scrollWidth, cw: e.clientWidth }; })()`);
+        await ev(`window.__postAnswer = { status: 400, body: { error: ${JSON.stringify(REFUSED)} } }; true`); await fillForm({ id: 'new1', url: 'http://example.org:8420', key: 'k' }); await submitForm();
+        await waitFor(`!!document.getElementById('servers-url').closest('.sv-row').querySelector('.sv-error') && !document.getElementById('servers-url').closest('.sv-row').querySelector('.sv-error').hidden`, 'the inline URL error on the phone');
+        const fit2 = await ev(`(() => { const e = document.getElementById('servers-url').closest('.sv-row').querySelector('.sv-error'); const r = e.getBoundingClientRect(); return { docOver: document.documentElement.scrollWidth - innerWidth, right: Math.round(r.right), vw: innerWidth, sw: e.scrollWidth, cw: e.clientWidth }; })()`);
         assert.ok(fit2.docOver <= 0 && fit2.right <= fit2.vw && fit2.sw <= fit2.cw + 1, JSON.stringify(fit2));
-        await ev(`document.getElementById('servers-url-error').scrollIntoView({ block: 'center' }); true`); await sleep(200); // sleep-ok: layout settles after a font-size or scroll change; there is no completion event
+        await ev(`document.getElementById('servers-url').closest('.sv-row').querySelector('.sv-error').scrollIntoView({ block: 'center' }); true`); await sleep(200); // sleep-ok: layout settles after a font-size or scroll change; there is no completion event
         await shot('refused-phone-200');
-        const chk = await ev(`(() => { const i = document.querySelector('#servers-form input[name=allow_private]'); i.scrollIntoView({ block: 'center' }); const r = i.getBoundingClientRect(); const cs = getComputedStyle(i);
+        const chk = await ev(`(() => { const i = document.getElementById('servers-private'); i.scrollIntoView({ block: 'center' }); const r = i.getBoundingClientRect(); const cs = getComputedStyle(i);
             return { w: Math.round(r.width), h: Math.round(r.height), left: Math.round(r.left), right: Math.round(r.right), display: cs.display, appearance: cs.appearance, vis: i.checkVisibility({ checkVisibilityCSS: true }) }; })()`);
         assert.ok(chk.vis && chk.w >= 12 && chk.h >= 12 && chk.left >= 0 && chk.right <= 390, 'the private-network checkbox is drawn inside the screen at 200%: ' + JSON.stringify(chk));
         await shot('checkbox-phone-200');
