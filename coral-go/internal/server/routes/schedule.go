@@ -364,12 +364,18 @@ func (h *ScheduleHandler) ToggleJob(w http.ResponseWriter, r *http.Request) {
 func (h *ScheduleHandler) GetJobRuns(w http.ResponseWriter, r *http.Request) {
 	jobID, _ := strconv.ParseInt(chi.URLParam(r, "jobID"), 10, 64)
 	limit := clampLimit(queryInt(r, "limit", 20), 20, 200)
-	runs, err := h.sched.GetRunsForJob(r.Context(), jobID, limit)
+	offset := clampOffset(queryInt(r, "offset", 0))
+	runs, err := h.sched.GetRunsForJobPage(r.Context(), jobID, limit, offset)
 	if err != nil {
 		errInternalServer(w, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"runs": emptyIfNil(runs)})
+	total, err := h.sched.CountRunsForJob(r.Context(), jobID)
+	if err != nil {
+		errInternalServer(w, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"runs": emptyIfNil(runs), "total": total})
 }
 
 // GetRecentRuns returns recent runs across all jobs.

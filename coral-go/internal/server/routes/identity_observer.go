@@ -299,6 +299,7 @@ func (o *IdentityObserver) Middleware(next http.Handler) http.Handler {
 					o.refuse(w, http.StatusUnauthorized, "cli_signature_required",
 						"The command-line signature is not valid for this Coral: another data folder's token, a used or expired signature, or a coral command from another version (since v1.4.70 the signature covers the query too). Use the coral command that came with this Coral.")
 				case callerAPIKey, callerHub:
+					w.Header().Set(auth.RefusedHeader, "key") // a hub that holds this key shows "Key rejected" for it, not "Unreachable" (#8089)
 					o.refuse(w, http.StatusUnauthorized, "invalid_credential",
 						"The credential sent is not valid for this Coral (a wrong API key, or a Coral Hub stamp that isn't this connector's): it is refused, never ignored")
 				default:

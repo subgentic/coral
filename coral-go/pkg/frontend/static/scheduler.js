@@ -48,14 +48,17 @@ async function fetchJobs() {
     }
 }
 
+const RUNS_PAGE = 20; // runs read at a time: the page opens with the newest and the footer reads the older ones (#8089: it showed the newest 20 and said nothing of the rest)
+let runsPage = null; // the runs on screen for the open job: { jobId, workflowId, workflowHistory, rows, total, busy }
+
 async function fetchJobRuns(jobId) {
     try {
-        const resp = await fetch(`/api/scheduled/jobs/${jobId}/runs?limit=20`);
+        const resp = await fetch(`/api/scheduled/jobs/${jobId}/runs?limit=${RUNS_PAGE}`);
         const data = await resp.json();
-        return data.runs || [];
+        return { runs: data.runs || [], total: data.total };
     } catch (e) {
         console.error('Failed to fetch runs:', e);
-        return [];
+        return { runs: [], total: 0 };
     }
 }
 
@@ -190,14 +193,14 @@ export async function selectScheduledJob(jobId) {
         if (!el.closest('#scheduled-jobs-list')) setRowCurrent(el, false);
     });
 
-    const [runs, , workflowRuns] = await Promise.all([fetchJobRuns(jobId), job.workflow_id ? loadWorkflowsById() : null,
-        job.workflow_id ? fetch(`/api/workflows/${Number(job.workflow_id)}/runs`).then(r => { if (!r.ok) throw new Error('Unable to load workflow runs'); return r.json(); }).then(data => data.runs || []).catch(() => null) : null]);
+    const [jobRuns, , workflowPage] = await Promise.all([fetchJobRuns(jobId), job.workflow_id ? loadWorkflowsById() : null,
+        job.workflow_id ? fetch(`/api/workflows/${Number(job.workflow_id)}/runs`).then(r => { if (!r.ok) throw new Error('Unable to load workflow runs'); return r.json(); }).then(data => ({ runs: data.runs || [], total: data.total })).catch(() => null) : null]);
     if (selectedJobId !== jobId) return;
-    renderJobDetail(job, runs, workflowRuns);
+    renderJobDetail(job, jobRuns.runs, workflowPage && workflowPage.runs, jobRuns.total, workflowPage && workflowPage.total);
     if (isPhoneLayout()) { document.getElementById('scheduler-view')?.setAttribute('data-phone-item', ''); document.getElementById('scheduler-detail')?.scrollIntoView({ block: 'start' }); } // a phone shows the job's page as its own screen (#7443); the list is the screen before it (#6139)
 }
 
-function renderJobDetail(job, runs, workflowRuns) {
+function renderJobDetail(job, runs, workflowRuns, runsTotal, workflowRunsTotal) {
     const container = document.getElementById('scheduler-detail');
     if (!container) return;
 
@@ -210,6 +213,7 @@ function renderJobDetail(job, runs, workflowRuns) {
 
     const workflowHistory = !!(isWorkflow && workflowRuns?.length);
     const history = workflowHistory ? workflowRuns : runs;
+    runsPage = { jobId: job.id, workflowId: workflowHistory ? Number(job.workflow_id) : 0, workflowHistory, rows: history, total: workflowHistory ? workflowRunsTotal : runsTotal, busy: false };
 
     // The failure comes first (#6521): a job that fires on schedule and fails every time otherwise looks fine until the run history is opened.
     const fails = job.consecutive_failures || 0;
@@ -283,7 +287,7 @@ function renderJobDetail(job, runs, workflowRuns) {
             <button class="btn btn-small btn-primary" data-on-click="job-toggle" data-job-id="${Number(job.id)}">${job.enabled ? 'Pause' : 'Enable'}</button>
         </div>
     `;
-    container.querySelector('#sched-run-history').append(renderRunsTable(history, workflowHistory));
+    container.querySelector('#sched-run-history').append(renderRunsTable(runsPage));
     foldWayBack(container, '.sched-back', '.sched-header');
 }
 
@@ -299,9 +303,11 @@ function resultCell(r) {
 const tookOf = (r) => (r.started_at && r.finished_at ? formatDuration(new Date(r.finished_at) - new Date(r.started_at)) : r.started_at ? 'running...' : '-');
 
 // Both job kinds share the table; workflow runs open their run and agent runs link to their conversation.
-function renderRunsTable(runs, workflowHistory) {
+function renderRunsTable(page) {
+    const { rows: runs, workflowHistory } = page;
     const open = r => withId(r.id, id => window.selectWorkflowRun(id));
     const table = DT.dataTable({ label: 'Job runs', rows: runs, rowKey: r => r.id, bare: true, sortBar: false,
+        footer: runs.length < page.total ? { text: `Showing the newest ${runs.length} of ${page.total} runs`, more: { label: 'Show older runs', busy: page.busy, run: () => readOlderRuns(page) } } : undefined,
         open: workflowHistory ? open : undefined, empty: { line: 'No runs yet.' },
         columns: [
             { key: 'started', label: 'Started', primary: true, width: 'grow', line: 1, cell: r => {
@@ -318,6 +324,28 @@ function renderRunsTable(runs, workflowHistory) {
         ],
     });
     table.el.classList.add('sched-runs-table'); return table.el;
+}
+
+/** The next RUNS_PAGE older runs of the job on screen, added under the ones shown. */
+async function readOlderRuns(page) {
+    if (runsPage !== page || page.busy) return;
+    page.busy = true; redrawRuns(page);
+    try {
+        const url = page.workflowId ? `/api/workflows/${page.workflowId}/runs` : `/api/scheduled/jobs/${page.jobId}/runs`;
+        const resp = await fetch(`${url}?limit=${RUNS_PAGE}&offset=${page.rows.length}`);
+        if (!resp.ok) throw new Error('not read');
+        const data = await resp.json();
+        const have = new Set(page.rows.map(r => r.id));
+        page.rows = page.rows.concat((data.runs || []).filter(r => !have.has(r.id)));
+        if (Number.isFinite(data.total)) page.total = data.total;
+        if (!(data.runs || []).length) page.total = page.rows.length; // nothing older came: stop offering more
+    } catch { showToast('The older runs could not be read', true); }
+    page.busy = false; redrawRuns(page);
+}
+
+function redrawRuns(page) {
+    const host = document.getElementById('sched-run-history');
+    if (host && runsPage === page) host.replaceChildren(renderRunsTable(page));
 }
 
 const formatDuration = ms => fmtDuration(ms);

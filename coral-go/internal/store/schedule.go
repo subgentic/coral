@@ -220,11 +220,23 @@ func (s *ScheduleStore) FinishScheduledRunIfActive(ctx context.Context, runID in
 
 // GetRunsForJob returns recent runs for a specific job.
 func (s *ScheduleStore) GetRunsForJob(ctx context.Context, jobID int64, limit int) ([]ScheduledRun, error) {
+	return s.GetRunsForJobPage(ctx, jobID, limit, 0)
+}
+
+// GetRunsForJobPage is a page of a job's runs, newest first: limit runs after the first offset.
+func (s *ScheduleStore) GetRunsForJobPage(ctx context.Context, jobID int64, limit, offset int) ([]ScheduledRun, error) {
 	var runs []ScheduledRun
 	err := s.db.SelectContext(ctx, &runs,
-		"SELECT * FROM scheduled_runs WHERE job_id = ? ORDER BY scheduled_at DESC, id DESC LIMIT ?",
-		jobID, limit)
+		"SELECT * FROM scheduled_runs WHERE job_id = ? ORDER BY scheduled_at DESC, id DESC LIMIT ? OFFSET ?",
+		jobID, limit, offset)
 	return runs, err
+}
+
+// CountRunsForJob is how many runs a job has had.
+func (s *ScheduleStore) CountRunsForJob(ctx context.Context, jobID int64) (int, error) {
+	var n int
+	err := s.db.GetContext(ctx, &n, "SELECT COUNT(*) FROM scheduled_runs WHERE job_id = ?", jobID)
+	return n, err
 }
 
 // GetLastRunForJob returns the most recent run for a job.
