@@ -4,7 +4,6 @@ import { escapeHtml, escapeAttr, showToast } from './utils.js';
 import { registerActions } from './actions.js';
 import { registerDialog, closeDialog } from './modal_chrome.js';
 import { importOnce } from './import_once.js';
-const { categoriesOf, templatesOf, categoryName, filterCategories, filterTemplates, templateName, displayName, previewParts } = await importOnce('./template_browser_data.js');
 
 let _categoriesCache = {};
 
@@ -47,6 +46,8 @@ async function fetchTemplate(type, category, name) {
  * @param {function} onSelect — called with the full template object when user clicks Use/Add
  */
 export async function showTemplateBrowser(type, onSelect) {
+    // Loaded here, not at the top of the file: a top-level await would hold this module (and whatever imports it) until the data module has answered.
+    const { categoriesOf, templatesOf, categoryName, filterCategories, filterTemplates, templateName, displayName, previewParts } = await importOnce('./template_browser_data.js');
     const existing = document.getElementById('template-browser-modal');
     if (existing) existing.remove();
 
