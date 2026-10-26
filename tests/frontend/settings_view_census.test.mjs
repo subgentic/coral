@@ -50,8 +50,12 @@ for (const f of cssFiles) {
 assert.deepEqual(leaks, [], 'no other stylesheet styles a .sv selector (a surface changes a token or the rule in settings_view.css): ' + leaks.join(' | '));
 
 // (b) the legacy row classes
-const LEGACY = ['settings-row', 'settings-cli-row', 'tb-row', 'settings-row-switch', 'settings-unit-field', 'settings-inline', 'settings-api-key-row', 'pw-input-row', 'net-group-head',
+const LEGACY = ['settings-row', 'settings-cli-row', 'tb-row', 'settings-row-switch', 'settings-unit-field', 'settings-inline', 'settings-api-key-row', 'net-group-head',
     'ts-row', 'working-mode-form', 'health-row', 'health-line', 'health-form', 'workflow-mode-line', 'preset-name-field', 'launch-prompt-field', 'job-field', 'job-limit-fields'];
+// Shared controls that are NOT legacy rows and stay their own component (#8460, Goal #54 item e): pw-input-row is the password field with its Show button beside it, one control (password_ui.js)
+// used by the sign-in page and the set-password dialog (auth_page.go) and by Settings' Security group (the Change password fields). It is a control inside a row, not a row, so it is not counted
+// down to zero; it is named here so the families check below does not read it as a new settings-style row.
+const SHARED_CONTROLS = ['pw-input-row'];
 const FAMILY = /^(settings|ts|launch|job|health|working-mode|workflow-mode|preset|pw|tb|net)-[a-z-]*(row|field|line|form|inline|head|fields)$/;
 const count = (list, cls) => list.reduce((n, f) => n + (read(f).match(new RegExp(`(?<![\\w-])${cls.replace(/[-]/g, '\\-')}(?![\\w-])`, 'g')) || []).length, 0);
 const cssSel = cls => cssFiles.reduce((n, f) => n + selectorsOf(read(f)).filter(s => new RegExp(`\\.${cls}(?![\\w-])`).test(s)).length, 0);
@@ -70,7 +74,7 @@ for (const [c, now] of Object.entries(nowCounts)) {
 }
 assert.deepEqual(up, [], 'a legacy settings row class grew: draw the row with settings_view (mountSettingsView), do not add a row class: ' + up.join('; '));
 // a NEW class of the same families anywhere in the scripts and templates (the ones that exist today are listed in the baseline's __families)
-const known = new Set([...LEGACY, ...Object.keys(baseline).filter(k => k !== '__families'), ...(baseline.__families || [])]);
+const known = new Set([...LEGACY, ...SHARED_CONTROLS, ...Object.keys(baseline).filter(k => k !== '__families'), ...(baseline.__families || [])]);
 const fresh = new Set();
 for (const f of [...jsFiles, ...tplFiles]) for (const m of read(f).matchAll(/class(?:Name)?\s*=\s*["'`]([^"'`]*)["'`]/g)) for (const c of m[1].split(/\s+/)) if (FAMILY.test(c) && !/\$\{/.test(c)) fresh.add(c);
 if (process.argv.includes('--update')) { baseline.__families = [...fresh].sort(); fs.writeFileSync(baselinePath, JSON.stringify(baseline, null, 2) + '\n'); }
