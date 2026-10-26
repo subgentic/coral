@@ -353,7 +353,7 @@ func cmdTaskListGoal(st *boardState, asJSON bool, goal int64) {
 	}
 }
 
-// fetchTasks is fetchAllTasks for one goal's tasks when goal is not 0: a goal's task read pages with next_cursor like the board's (#7184), so every task comes.
+// fetchTasks reads every task of the board, or of one goal when goal is not 0, a page at a time (#3269, #7184), in the order the full list always had: priority, then id. A server from before pagination ignores the parameters and answers with every task and no next_cursor, which ends the loop.
 func fetchTasks(st *boardState, goal int64) []map[string]any {
 	var tasks []map[string]any
 	cursor := ""
