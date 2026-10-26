@@ -274,7 +274,7 @@ function drawGoalMain(main, g) {
     // The pinned bar: Add task and Close goal (Reopen for a closed one), always at the bottom of the page.
     const bar = el('div', 'goals-pinbar');
     bar.append(btn('btn goals-add-task', 'Add task', () => { (window.showCreateTaskModal || (() => {}))({ goal_id: g.id }); }));
-    if (W.isOpenGoal(g)) { const cb = btn('btn btn-primary goals-close', 'Close goal', () => openClose(g)); bar.append(cb); }
+    if (W.isOpenGoal(g)) { const cb = btn('btn btn-primary goals-close', 'Close goal', () => openClose(g)); cb.setAttribute('aria-label', `Close goal: ${g.title}`); bar.append(cb); } // named for its goal: the Close dialog's own button is just Close goal
     else if (W.isClosedGoal(g)) bar.append(btn('btn goals-reopen', 'Reopen', () => reopenGoal(g)));
     main.append(bar);
     return h;

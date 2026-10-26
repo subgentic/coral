@@ -223,6 +223,7 @@
 .goal-side { border-left: 1px solid var(--border); background: var(--bg-secondary); overflow-y: auto; min-height: 0; }
 .goal-side-grip { position: absolute; top: 0; bottom: 0; right: var(--goal-side-w); width: 8px; margin-right: -4px; z-index: 2; cursor: col-resize; touch-action: none; outline: none; } /* an 8 px target on the column's edge, its line drawn in the middle */
 .goal-side-grip::before, .detail-grip::before { content: ''; position: absolute; top: 0; bottom: 0; left: 3px; width: 2px; background: transparent; transition: background 0.15s; } /* the agent dock's handle: the edge turns accent on hover, while dragged and on keyboard focus */
+.goal-side-grip:focus-visible, .detail-grip:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; } /* the keyboard's ring on the handle itself, not only its edge's colour */
 .goal-side-grip:hover::before, .goal-side-grip.dragging::before, .goal-side-grip:focus-visible::before, .detail-grip:hover::before, .detail-grip.dragging::before, .detail-grip:focus-visible::before { background: var(--accent); }
 .goals-page.goals-open.goals-table-page { max-width: none; padding: 0; gap: 0; min-height: 0; overflow: hidden; } /* an open goal fills the page area to the window's right edge: the padding belongs to the main pane */
 .goals-page.goals-open .goals-body { gap: 0; }
