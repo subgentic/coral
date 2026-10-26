@@ -44,6 +44,7 @@ GET /api/scheduled/jobs/{id}/runs redact
 GET /api/scheduled/runs/recent redact
 GET /api/session-artifacts redact
 GET /api/sessions/history redact
+GET /api/sessions/history/counts redact
 GET /api/sessions/history/search redact
 GET /api/sessions/history/{id} redact
 GET /api/sessions/history/{id}/agent-notes redact
