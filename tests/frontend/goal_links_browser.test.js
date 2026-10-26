@@ -42,7 +42,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         const inboxGoal = `/inbox/goals/${B}/${G}`;
         await waitFor(`location.pathname === ${JSON.stringify(inboxGoal)} && document.querySelector('#inbox-page #goals-detail-title')?.textContent === ${JSON.stringify(TITLE)}`, 'Goals folder: the goal opens in the Inbox', 15000);
         assert.equal(await ev(`getComputedStyle(document.getElementById('inbox-page')).display !== 'none'`), true, 'the Inbox goal is on screen');
-        await waitFor(`document.activeElement === document.querySelector('#inbox-page #goals-detail-title') && !!document.activeElement`, 'Inbox goal: the keyboard starts at its heading', 6000);
+        assert.equal(await ev(`document.activeElement === document.querySelector('#inbox-page #goals-detail-title')`), false, 'Inbox goal: the heading does not take the focus (no ring round plain words, #7404; #8571)');
         assert.equal(await ev(`document.querySelector('#inbox-page .goal-team-link')?.getAttribute('href')`), WANT, 'the explicit team link addresses the same goal');
         await ev(`document.querySelector('#inbox-page .goal-team-link').click(); true`);
         await landed('Goals folder: Open on team page');
