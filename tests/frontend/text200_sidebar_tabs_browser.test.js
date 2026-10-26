@@ -7,6 +7,7 @@ const { SCAN } = require('./helpers/phone_scan');
 const { setTheme } = require('./helpers/contrast');
 const BASE = require('./test_base').BASE;
 const S = `(window.__coralStatic || '/static/')`;
+const OPEN_TASKS = `document.querySelector('.sidebar-pane[data-pane="hub-inbox"] .view-list-item[data-key="tasks"]').click()`;
 
 const VIEWS = [['1280 px, 200% text', 1280, 800, false, 32], ['390 px', 390, 844, true, 16], ['390 px, 200% text', 390, 844, true, 32]];
 const JOBS = [
@@ -20,7 +21,10 @@ const STUB = `(() => { const inner = window.fetch; const json = b => Promise.res
     window.fetch = (url, opts = {}) => { const path = String(url && url.url || url).replace(/^https?:\\/\\/[^/]+/, '').split('?')[0], m = (opts.method || 'GET').toUpperCase();
         if (m === 'GET' && path === '/api/scheduled/jobs') return json({ jobs: ${JSON.stringify(JOBS)} });
         if (m === 'GET' && path === '/api/board/tasks') return json({ tasks: ${JSON.stringify(INBOX_TASKS)} });
-        if (m === 'GET' && /^\\/api\\/board\\/[^/]+\\/tasks\\/\\d+$/.test(path)) return json({ body: 'Please check the plan and say what is missing.', created_by: 'Orchestrator', status: 'pending' });
+        if (m === 'GET' && /^\\/api\\/board\\/[^/]+\\/tasks\\/\\d+$/.test(path)) {
+            const task = ${JSON.stringify(INBOX_TASKS)}.find(t => t.id === Number(path.split('/').pop()) && t.board_id === path.split('/')[3]);
+            if (task) return json({ ...task, body: 'Please check the plan and say what is missing.' });
+        }
         if (m === 'GET' && path === '/api/saved') return json({ items: ${JSON.stringify(INBOX_SAVED)}, open: 2, done: 0 });
         if (m === 'GET' && path === '/api/workflows') return json({ workflows: ${JSON.stringify(WORKFLOWS)} });
         if (m === 'GET' && path === '/api/scheduled/jobs/1') return json(${JSON.stringify(JOBS[0])});
@@ -53,12 +57,23 @@ const BROKEN = `(() => { const c = document.createElement('canvas').getContext('
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
             await setTheme(ev, theme);
             await ev(`document.documentElement.style.fontSize = '${font}px'; true`);
-            for (const [name, tab, prep, open] of [['Chats', 'history', HISTORY, null], ['Jobs', 'jobs', null, null], ['Jobs, one job open', 'jobs', null, `document.querySelector('#scheduled-jobs-list .sched-row .row-btn').click()`], ['Workflows', 'workflows', null, null], ['Workflows, one workflow open', 'workflows', null, `document.querySelector('.wf-nav-row .row-btn').click()`], ['Inbox', 'hub-inbox', null, null], ['Inbox, one task open', 'hub-inbox', null, `(async () => { document.querySelector('.sidebar-pane[data-pane="hub-inbox"] .view-list-item[data-key="tasks"]').click(); for (let i = 0; i < 60 && !document.querySelector('#group-table-view .dt-primary'); i++) await new Promise(r => setTimeout(r, 50)); document.querySelector('#group-table-view .dt-primary').click(); })()`], ['Inbox, the Saved table', 'hub-inbox', null, `document.querySelector('.sidebar-pane[data-pane="hub-inbox"] .view-list-item[data-key="saved"]').click()`], ['Docs', 'docs', null, null], ['Docs, one topic open', 'docs', null, `document.querySelector('#docs-nav-list .row-btn').click()`]]) {
+            for (const [name, tab, prep, open] of [['Chats', 'history', HISTORY, null], ['Jobs', 'jobs', null, null], ['Jobs, one job open', 'jobs', null, `document.querySelector('#scheduled-jobs-list .sched-row .row-btn').click()`], ['Workflows', 'workflows', null, null], ['Workflows, one workflow open', 'workflows', null, `document.querySelector('.wf-nav-row .row-btn').click()`], ['Inbox', 'hub-inbox', null, null], ['Inbox, Tasks list', 'hub-inbox', null, OPEN_TASKS], ['Inbox, one task open', 'hub-inbox', null, OPEN_TASKS], ['Inbox, the Saved table', 'hub-inbox', null, `document.querySelector('.sidebar-pane[data-pane="hub-inbox"] .view-list-item[data-key="saved"]').click()`], ['Docs', 'docs', null, null], ['Docs, one topic open', 'docs', null, `document.querySelector('#docs-nav-list .row-btn').click()`]]) {
                 const where = `${name}, ${label}, ${theme}`;
                 try {
                     await ev(`window.switchNavTab('${tab}'); true`); await settle(900);
                     if (prep) { await ev(prep); await settle(500); }
                     if (open) { await ev(`${open}; true`); await settle(900); }
+                    if (name === 'Inbox, Tasks list' || name === 'Inbox, one task open') {
+                        await waitFor(`(() => { const table = document.getElementById('group-table-view'); return table?.getClientRects().length && table.dataset.group === 'hub-inbox:tasks' && table.querySelectorAll('tbody .dt-primary').length === ${INBOX_TASKS.length}; })()`, 'the populated Tasks-folder list', 6000);
+                        const titles = await ev(`[...document.querySelectorAll('#group-table-view tbody .dt-primary')].map(e => e.textContent)`);
+                        for (const task of INBOX_TASKS) assert.ok(titles.some(title => title.includes(task.title)), `${where}: the Tasks list must show ${task.title}`);
+                        if (name === 'Inbox, one task open') {
+                            const task = INBOX_TASKS[0];
+                            await ev(`[...document.querySelectorAll('#group-table-view tbody .dt-primary')].find(e => e.textContent.includes(${JSON.stringify(task.title)})).click(); true`);
+                            await waitFor(`!!document.getElementById('team-task-title')?.getClientRects().length`, 'the task detail heading', 6000);
+                            assert.equal(await ev(`document.getElementById('team-task-title').textContent.trim()`), `#${task.id} ${task.title}`, `${where}: the heading must have the seeded task ID and title`);
+                        }
+                    }
                     const r = await ev(SCAN); const broken = await ev(BROKEN);
                     if (r.missing) { problems.push(`${where}: scene not found`); continue; }
                     if (r.docOver > 0 || r.nWide) problems.push(`${where}: wider than the screen (docOver ${r.docOver}) ${r.wide.slice(0, 3).join('; ')}`);
@@ -82,6 +97,6 @@ const BROKEN = `(() => { const c = document.createElement('canvas').getContext('
         }
         for (const p of problems) console.log('[FAIL]', p);
         assert.deepEqual(problems, [], `${problems.length} problem(s)`);
-        console.log('[PASS] Chats, Jobs, Workflows and Docs hold at 200% text and on a phone, in both themes');
+        console.log('[PASS] Chats, Jobs, Workflows, Inbox Tasks/Saved and Docs hold at 200% text and on a phone, in both themes');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
