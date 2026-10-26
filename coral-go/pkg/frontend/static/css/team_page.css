@@ -349,3 +349,6 @@
 @media (min-width: 761px) {
     .inbox-artifacts-row > .inbox-detail-pane { position: sticky; top: 0; align-self: flex-start; max-height: calc(100vh - 7rem); border: 1px solid var(--border); border-radius: var(--radius-lg); }
 }
+
+/* The same literal board name as its list row, including digit+x (#8682). */
+.goals-detail-title, .team-page-title { font-feature-settings: "calt" 0; }

@@ -323,3 +323,6 @@
     .artifact-tag-add, .artifact-tag-offer { padding: 0 12px; }
     .artifact-tag-offers { gap: 8px; }
 }
+
+/* Names and identifiers keep their literal glyphs (digit+x is not multiplication). */
+.dt-primary, .dt-id, .dt-table [data-key="team"] { font-feature-settings: "calt" 0; }
