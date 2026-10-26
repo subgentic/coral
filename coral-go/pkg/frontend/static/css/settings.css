@@ -35,6 +35,7 @@
 #settings-modal .info-grid.settings-grid .settings-row > dt, #settings-modal .info-grid.settings-grid .settings-row > dt.toggle-dt { flex-direction: column; flex-wrap: nowrap; align-items: flex-start; gap: 0; }
 #settings-modal .settings-hint-wrap { grid-column: 1 / -1; display: flex; flex-direction: column; align-items: flex-start; }
 @media (max-width: 767px), (pointer: coarse) { #settings-modal .settings-learn { min-height: var(--control-touch-height, 44px); display: inline-flex; align-items: center; } }
+@media (max-width: 767px), (pointer: coarse) { #settings-modal .settings-cloud-head > .settings-learn { min-height: 0; display: inline; position: relative; } #settings-modal .settings-cloud-head > .settings-learn::after { content: ''; position: absolute; left: -8px; right: -8px; top: 50%; height: var(--control-touch-height, 44px); transform: translateY(-50%); } } /* beside the sentence the 44 px target is invisible, so a Learn more that wraps under it makes no gap (as .sv-learn) */
 /* a phone: the dialog is the screen on every section (the tab list is the Section selector) */
 @media (max-width: 767px) { #settings-modal .modal-content.settings-modal-content { width: 100vw; max-width: none; height: 100dvh; max-height: none; min-height: 0; border-radius: 0; margin: 0; } }
 /* Terminal backend: two cards, a name and one line each (as Mode in New agent) */

@@ -152,7 +152,7 @@ export function healthCard(h, { title = 'Machine health', online = false, waitin
 async function renderLocalCard() {
     const slot = document.getElementById('machine-health-local');
     if (!slot) return;
-    const { chip } = await importOnce('./data_table.js'); // the shared chip (the Servers table's), loaded when the card first draws
+    const chip = await importOnce('./data_table.js').then(m => m.chip, () => null); // the shared chip (the Servers table's), loaded when the card first draws; the card draws with the plain status if it cannot load
     slot.replaceChildren(healthCard(localMachineHealth(), { title: 'This computer', chip }));
 }
 onBuilt('settings-modal', renderLocalCard); // the card's slot is in Settings, built on first open (#4500)
