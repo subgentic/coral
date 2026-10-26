@@ -54,7 +54,7 @@ const AGENT_PARTS = {
         assert.equal(await ev(`/Sign in here to manage browsers/.test(document.getElementById('settings-pane-security').textContent)`), false);
         assert.equal(await ev(`(() => { const h = document.getElementById('settings-telemetry-install-hint'); return !h || h.hidden || getComputedStyle(h).display === 'none' || !document.getElementById('settings-telemetry-install-id').textContent.includes('Loading') ; })()`), true, 'no deletion hint without an install ID');
         await open('notifications');
-        assert.equal(await ev(`document.querySelector('#settings-pane-notifications label[for=settings-notify-needs-input], #settings-pane-notifications dt').textContent.trim().split('\\n')[0]`), 'Show notifications in Coral');
+        assert.equal(await ev(`document.querySelector('#settings-pane-notifications .sv-label, #settings-pane-notifications dt').textContent.trim().split('\\n')[0]`), 'Show notifications in Coral');
         console.log('PASS Settings layout');
     } finally { await client.close(); }
 })().catch(err => { console.error(err); process.exit(1); });

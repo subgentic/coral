@@ -31,9 +31,20 @@ export const FILES_FIELDS = [
         options: [{ value: '30', label: 'Every 30 seconds' }, { value: '60', label: 'Every minute' }, { value: '120', label: 'Every 2 minutes' }, { value: '300', label: 'Every 5 minutes' }, { value: '600', label: 'Every 10 minutes' }, { value: '1800', label: 'Every 30 minutes' }, { value: '0', label: 'Off \u2014 refresh manually' }] },
 ];
 
+// A live part of a group (filled by its own module, shown or hidden by it): moved from where the template holds it into its place among the rows.
+const live = id => ({ key: `live_${id}`, type: 'notice', render: slot => { const el = document.getElementById(id); if (el) slot.append(el); } });
+const px = n => ({ value: String(n), label: `${n}px` });
+export const TERMINAL_FIELDS = [
+    { key: 'terminal_font_size', type: 'select', id: 'settings-terminal-font-size', labelId: 'settings-terminal-font-size-label', label: 'Terminal font size', default: '13', options: [10, 11, 12, 13, 14, 16, 18].map(px) },
+    { key: 'terminal_scrollback', type: 'select', id: 'settings-terminal-scrollback', labelId: 'settings-terminal-scrollback-label', label: 'Terminal scrollback', default: '20000',
+        options: [{ value: '1000', label: '1,000 lines' }, { value: '5000', label: '5,000 lines' }, { value: '10000', label: '10,000 lines' }, { value: '20000', label: '20,000 lines' }, { value: '50000', label: '50,000 lines' }, { value: '100000', label: 'Unlimited (100k)' }] },
+    { key: 'fit_pane_width', type: 'toggle', id: 'settings-fit-pane-width', label: 'Fit pane width', help: { text: '', more: 'With the tmux backend, the terminal takes the size of this browser window.' } },
+    live('settings-terminal-backend'), live('tb-autowake'), live('settings-tools-folder-dl'), live('settings-engine-more'),
+];
+
 /** Draws the groups that are fields into the Settings modal's panes (once, when the modal is built). mount is mountSettingsView. */
 export function drawSettingsGroups(modal, mount) {
-    for (const [hostId, fields] of [['settings-general-rows', GENERAL_FIELDS], ['settings-notifications-rows', NOTIFICATIONS_FIELDS], ['settings-files-rows', FILES_FIELDS]]) {
+    for (const [hostId, fields] of [['settings-general-rows', GENERAL_FIELDS], ['settings-notifications-rows', NOTIFICATIONS_FIELDS], ['settings-files-rows', FILES_FIELDS], ['settings-terminal-rows', TERMINAL_FIELDS]]) {
         const host = modal.querySelector(`#${hostId}`);
         if (host && !host.firstChild) mount(host, { mode: 'settings', saveBar: false, fields });
     }
