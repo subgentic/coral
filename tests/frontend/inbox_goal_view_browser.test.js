@@ -15,7 +15,15 @@ const BASE = require('./test_base').BASE;
         fs.mkdirSync(dir, { recursive: true });
         fs.writeFileSync(path.join(dir, name + '.png'), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));
     };
-    const load = async url => { await Page.navigate({url: BASE + url}); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList','liveListLoaded','settings')`); };
+    const load = async url => { await Page.navigate({url: BASE + url}); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList','liveListLoaded','settings')`);
+        // Review captures show the final theme, never an intermediate color in its transition.
+        await ev(`(() => { const style = document.createElement('style'); style.textContent = '*, *::before, *::after { transition: none !important; animation: none !important; }'; document.head.append(style); return true; })()`);
+    };
+    const clickGoal = async mount => {
+        const point = await ev(`(() => { const row = [...document.querySelectorAll('${mount} .dt-primary')].find(e=>e.textContent==='Keep this goal in the Inbox'); const r = row.getBoundingClientRect(); return {x:r.left+r.width/2,y:r.top+r.height/2}; })()`);
+        await client.Input.dispatchMouseEvent({type:'mousePressed',...point,button:'left',clickCount:1});
+        await client.Input.dispatchMouseEvent({type:'mouseReleased',...point,button:'left',clickCount:1});
+    };
     const detail = mount => waitFor(`!!document.querySelector('${mount} #goals-detail-title') && document.querySelector('${mount} .goal-side-group')?.textContent === 'Open 1'`, 'goal and task loaded', 15000);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD});
@@ -35,9 +43,10 @@ const BASE = require('./test_base').BASE;
             await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('goals')).then(()=>true)`);
             await waitFor(`[...document.querySelectorAll('#group-table-view .dt-primary')].some(e=>e.textContent==='Keep this goal in the Inbox')`, 'Inbox goal row',15000);
             await ev(`import((window.__coralStatic||'/static/')+'inbox_sidebar.js').then(m=>m.filterInbox('Keep this goal'))`);
-            await ev(`[...document.querySelectorAll('#group-table-view .dt-primary')].find(e=>e.textContent==='Keep this goal in the Inbox').click(); true`);
+            await clickGoal('#group-table-view');
             await detail('#inbox-page'); // fails before #8571: the row leaves Inbox for the team page
             assert.equal(await ev(`document.body.getAttribute('data-nav-tab')`),'hub-inbox');
+            assert.equal(await ev(`getComputedStyle(document.querySelector('#inbox-page #goals-detail-title')).outlineStyle`),'none','pointer arrival has no ring around the title');
             assert.equal(await ev('location.pathname'),url);
             assert.equal(await ev(`document.querySelector('#inbox-page .goals-facts').textContent`),'OutcomeOne shared goal viewDone whenBack returns to the filtered list');
             assert.equal(await ev(`document.querySelectorAll('#inbox-page .goal-team-link').length`),1);
@@ -48,6 +57,9 @@ const BASE = require('./test_base').BASE;
                 assert.ok(await ev('document.documentElement.scrollWidth <= innerWidth + 1'),'no horizontal overflow');
                 await shot(`inbox-goal-${width}-${theme}`);
             }
+            await client.Input.dispatchKeyEvent({type:'keyDown',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
+            await client.Input.dispatchKeyEvent({type:'keyUp',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
+            assert.equal(await ev(`document.getElementById('inbox-view').hasAttribute('data-quiet-focus')`),false,'keyboard use restores visible focus');
             await ev(`document.querySelector('#inbox-page .goal-main .goals-back').click(); true`);
             await waitFor(`!!document.querySelector('#group-table-view .dt-primary') && location.pathname==='/inbox/goals'`, 'Back to Goals folder');
             assert.ok(await ev(`[...document.querySelectorAll('#group-table-view .dt-primary')].every(e=>/Keep this goal/.test(e.textContent))`),'search retained');
@@ -64,7 +76,10 @@ const BASE = require('./test_base').BASE;
             }
             await ev(`document.querySelector('#inbox-page .goal-side .dt-primary').click(); true`);
             await waitFor(`location.pathname===${JSON.stringify(`/team/${board}/tasks/${taskId}`)}`, 'task uses team task page');
-            await load(`/team/${board}/goals/${id}`); await detail('#team-panel-goals');
+            await load(`/team/${board}/goals`);
+            await waitFor(`[...document.querySelectorAll('#team-panel-goals .dt-primary')].some(e=>e.textContent==='Keep this goal in the Inbox')`, 'team goal row');
+            await clickGoal('#team-panel-goals'); await detail('#team-panel-goals');
+            await ev(`document.documentElement.setAttribute('data-theme','dark'); true`);
             assert.equal(await ev(`document.querySelectorAll('#team-panel-goals .goal-team-link').length`),0);
             assert.equal(await ev(`document.querySelector('#team-panel-goals .goals-facts').textContent`),'OutcomeOne shared goal viewDone whenBack returns to the filtered list');
             await shot(`team-goal-${width}-dark`);
