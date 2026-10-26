@@ -6,7 +6,8 @@ import { browserLocal } from './safe_storage.js';
 import { pollEvery } from './overload.js';
 import { whenText } from './when_text.js';
 import { importOnce } from './import_once.js';
-const { teamTable, rowButton, rowFocusTarget, stateChip, el } = await importOnce('./team_table.js'); // lazy: its failure is retried
+const { rowFocusTarget, stateChip, el } = await importOnce('./team_table.js'); // lazy: its failure is retried
+const TR = await importOnce('./task_row.js'); // the one task row, shared with the Inbox group and the goal column (#7737)
 const Toolbar = await importOnce('./team_toolbar.js'); // the one toolbar of the team tabs (#7717)
 import { goalTitle, refreshGoalTitles, noGoalLabel } from './task_goals.js';
 import { taskStatusWord, statusClass } from './goal_words.js';
@@ -198,7 +199,7 @@ function draw() {
         if (!shown.length) {
             const e = el('div', 'goals-empty'); e.append(el('p', null, 'No tasks match this filter.'), btn('btn', 'Show all', () => { model.filter = 'all'; draw(); })); body.append(e);
         } else {
-            body.append(teamTable({ label: `Tasks, ${shown.length}`, columns: ['Task', 'State', 'Assigned to', 'Goal', 'Priority'], rows: shown.map(rowOf) }));
+            body.append(TR.taskList(shown, { label: `Tasks, ${shown.length}`, columns: ['state', 'task', 'who', 'goal', 'priority', 'when'], phone: PHONE.matches, ctx: rowCtx() }));
         }
         if (query ? queryHasMore() : (model.cursor && (model.filter === 'all' || model.filter === 'done'))) body.append(btn('btn goals-more', model.loadingMore ? 'Loading…' : (query ? 'Load more' : 'Load more done tasks'), loadMore));
         if (model.moreFailed) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, model.moreFailed)); body.append(f); }
@@ -211,25 +212,9 @@ function draw() {
     }
 }
 
-/** Who did the work (the server's worked_by: the author of a reviewed task, not the orchestrator it was handed to), and for a done task that it is who did it. */
+const rowCtx = () => ({ openTask: (t) => hooks.openTask?.(t), openGoal: (id) => hooks.openGoal?.(id), goalTitleOf: (id) => goalTitle(model.project, id) || `Goal ${id}`, noGoal: noGoalLabel });
+const { doerOf, whoText, priorityWord } = TR; // the task's own page says the same words
 const isDoneTask = (t) => t.status === 'completed';
-const doerOf = (t) => t.worked_by || (isDoneTask(t) ? t.completed_by : '') || t.assigned_to; // an older server has no worked_by: who completed a done task, else its assignee
-const whoText = (t) => { const w = doerOf(t); return isDoneTask(t) ? (w ? `Done by ${w}` : 'Done') : (w || 'Nobody yet'); };
-const priorityWord = (p) => { const s = String(p || '').trim(); return s ? s[0].toUpperCase() + s.slice(1).toLowerCase() : ''; };
-
-function rowOf(t) {
-    const b = rowButton(t.title, `Open task #${t.id}: ${t.title}`); b.dataset.taskId = String(t.id);
-    const first = el('span', 'team-row-cell'); first.append(b, el('span', 'team-row-sub', `#${t.id}`));
-    const word = taskStatusWord(t.status, t.review_requested);
-    const goalName = t.goal_id ? (goalTitle(model.project, t.goal_id) || `Goal ${t.goal_id}`) : '';
-    first.append(el('span', 'team-row-phone', [whoText(t), goalName].filter(Boolean).join(' · '))); // a phone's table folds who and which goal under the title
-    let goal = el('span', 'team-muted', noGoalLabel);
-    if (t.goal_id) {
-        const title = goalTitle(model.project, t.goal_id) || `Goal ${t.goal_id}`;
-        goal = btn('team-link', title, () => hooks.openGoal?.(t.goal_id)); goal.dataset.goalLink = String(t.goal_id);
-    }
-    return { key: `t${t.id}`, open: () => hooks.openTask?.(t), cells: [first, stateChip(word, statusClass(word)), whoText(t), goal, priorityWord(t.priority)] };
-}
 
 /** Show the board's tasks in `host`. hooks: openTask(task), openGoal(id), onCount(openCount). */
 // The tab keeps itself current (the old tab polled every 10 s): when the window comes back to the front, and on a slow read while it is on screen; a list the person paged further is left as it is.
