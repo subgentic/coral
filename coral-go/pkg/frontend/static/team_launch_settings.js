@@ -16,7 +16,7 @@ function workflowHTML() {
     return `<label class="team-wf-field" for="team-wm-mode"><span class="launch-field-head">Working mode</span></label>
         <select id="team-wm-mode" name="mode" aria-describedby="team-wm-hint"><option value="none">None</option><option value="shared_checkout">Shared checkout</option><option value="worktrees">Worktrees</option></select>
         <p class="settings-hint" id="team-wm-hint">${escapeHtml(WORKFLOW_HINT)}</p>
-        ${switchRow({ label: 'Include dependent-queue guidance', name: 'dependency_guidance', attrs: ' id="team-wm-dep"', labelClass: 'check-hit' })}
+        ${switchRow({ label: 'Guidance for dependent tasks', name: 'dependency_guidance', attrs: ' id="team-wm-dep"', labelClass: 'check-hit' })}
         ${switchRow({ label: 'Requests for work are tasks', name: 'asks_are_tasks', checked: true, attrs: ' id="team-wm-asks"', labelClass: 'check-hit', describedBy: ['team-wm-asks-hint'] })}
         <p class="settings-hint" id="team-wm-asks-hint">${escapeHtml(ASKS_ARE_TASKS_HINT)}</p>
         ${switchRow({ label: 'Require a goal', name: 'require_goal', attrs: ' id="team-wm-goal"', labelClass: 'check-hit', describedBy: ['team-wm-goal-hint'] })}

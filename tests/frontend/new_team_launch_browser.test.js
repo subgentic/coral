@@ -49,7 +49,7 @@ const AGENT_KEYS = ['name', 'prompt', 'icon', 'capabilities', 'agent_type', 'mod
         await S.run('step 3 working mode and health: the request carries working_mode {mode, dependency_guidance, custom_instructions} and health_monitor true', async () => {
             await install_stub(200); await fresh(); await t.to(2, { template: /^Blank/ }); await t.click('button', N.addOrch); await settle(250); await t.click('button', N.next); await t.step(3);
             await tab('Start'); await t.type('textarea', /^Additional instructions/i, 'Keep the diff small.', N.team); await t.type('textarea', /^First task/i, 'Look at the build.', N.team);
-            await tab('Workflow'); assert.ok(await t.pick(/^Working mode$/i, /Worktrees/i), 'a Working mode choice Worktrees'); assert.ok(await check(/dependent|queue guidance/i, true), 'the dependent-queue guidance switch');
+            await tab('Workflow'); assert.ok(await t.pick(/^Working mode$/i, /Worktrees/i), 'a Working mode choice Worktrees'); assert.ok(await check(/^Guidance for dependent tasks$/i, true), 'the Guidance for dependent tasks switch');
             await tab('Health check'); assert.ok(await check(/^Send health check/i, true), 'the Send health check switch');
             await t.click('button', N.launch); await waitFor(`window.__qa.launch.length === 1`, 'the launch request', 6000);
             const q = (await sent()).launch[0];
