@@ -358,42 +358,10 @@ func winStageRisk(st winStage, outside func(string) bool) string {
 	if why, done := winDownloadRisk(st, name, args, outside); done {
 		return why
 	}
+	if why, done := winExtractRisk(st, name, args, outside); done {
+		return why
+	}
 	switch name {
-	case "tar", "bsdtar":
-		for i, a := range args {
-			v := ""
-			switch {
-			case (a == "-C" || a == "--directory") && i+1 < len(args):
-				v = args[i+1]
-			case strings.HasPrefix(a, "--directory="):
-				v = a[len("--directory="):]
-			case len(a) > 2 && strings.HasPrefix(a, "-C"):
-				v = a[2:]
-			}
-			if v != "" && pathOutside(v, outside) {
-				return "it extracts outside the working directory (" + v + ")"
-			}
-		}
-		return ""
-	case "7z", "7za", "7zr":
-		for _, a := range args {
-			if len(a) > 2 && strings.HasPrefix(a, "-o") && pathOutside(a[2:], outside) {
-				return "it extracts outside the working directory (" + a[2:] + ")"
-			}
-		}
-		return ""
-	case "unzip":
-		for i, a := range args {
-			if a == "-d" && i+1 < len(args) && pathOutside(args[i+1], outside) {
-				return "it extracts outside the working directory (" + args[i+1] + ")"
-			}
-		}
-		return ""
-	case "expand", "makecab":
-		if p := winPaths(args); len(p) > 1 && pathOutside(p[len(p)-1], outside) {
-			return "it writes outside the working directory (" + p[len(p)-1] + ")"
-		}
-		return ""
 	case "git":
 		// A setting that makes git run a program (core.hooksPath, an alias with !, git -c ...): the same rule as the POSIX words (auto_accept_gitcfg.go).
 		if why := gitCodeExecRisk(args); why != "" {
@@ -565,6 +533,48 @@ func winStageRisk(st winStage, outside func(string) bool) string {
 		}
 	}
 	return ""
+}
+
+// winExtractRisk judges the archive tools (tar, 7z, unzip, expand, makecab): where they extract or write.
+func winExtractRisk(st winStage, name string, args []string, outside func(string) bool) (string, bool) {
+	switch name {
+	case "tar", "bsdtar":
+		for i, a := range args {
+			v := ""
+			switch {
+			case (a == "-C" || a == "--directory") && i+1 < len(args):
+				v = args[i+1]
+			case strings.HasPrefix(a, "--directory="):
+				v = a[len("--directory="):]
+			case len(a) > 2 && strings.HasPrefix(a, "-C"):
+				v = a[2:]
+			}
+			if v != "" && pathOutside(v, outside) {
+				return "it extracts outside the working directory (" + v + ")", true
+			}
+		}
+		return "", true
+	case "7z", "7za", "7zr":
+		for _, a := range args {
+			if len(a) > 2 && strings.HasPrefix(a, "-o") && pathOutside(a[2:], outside) {
+				return "it extracts outside the working directory (" + a[2:] + ")", true
+			}
+		}
+		return "", true
+	case "unzip":
+		for i, a := range args {
+			if a == "-d" && i+1 < len(args) && pathOutside(args[i+1], outside) {
+				return "it extracts outside the working directory (" + args[i+1] + ")", true
+			}
+		}
+		return "", true
+	case "expand", "makecab":
+		if p := winPaths(args); len(p) > 1 && pathOutside(p[len(p)-1], outside) {
+			return "it writes outside the working directory (" + p[len(p)-1] + ")", true
+		}
+		return "", true
+	}
+	return "", false
 }
 
 // winDownloadRisk judges the download tools (Invoke-WebRequest, Invoke-RestMethod, curl, wget): where the download is written, and the options that read more from a file.
