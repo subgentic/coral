@@ -6,8 +6,11 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
@@ -616,11 +619,12 @@ func TestUsageSummary_ByThinkingHasANotReportedRemainder(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
 	got := map[string]store.ThinkingUsageSummary{}
-	var tokens int64
+	var tokens, calls int64
 	var cost float64
 	for _, r := range body.ByThinking {
 		got[r.AgentType+"|"+r.Thinking] = r
 		tokens += r.TotalTokens
+		calls += r.NumCalls
 		cost += r.CostUSD
 	}
 	require.Len(t, got, 4, "%+v", body.ByThinking)
@@ -632,6 +636,8 @@ func TestUsageSummary_ByThinkingHasANotReportedRemainder(t *testing.T) {
 	assert.EqualValues(t, 300, got["agy|"].InputTokens, "a type with no level at all is all Not reported")
 	assert.Equal(t, body.Totals["total_tokens"], float64(tokens), "the breakdown adds up to the totals")
 	assert.InDelta(t, body.Totals["cost_usd"], cost, 1e-9)
+	assert.Equal(t, body.Totals["num_requests"], float64(calls), "the calls add up too: the Not reported rows carry the calls no level was recorded for (#7719)")
+	assert.EqualValues(t, 4, calls)
 }
 
 func TestWithNotReportedNeverGoesNegative(t *testing.T) {
@@ -747,4 +753,49 @@ func TestWithNotReportedTakesModelLessRowsOutOfTheRemainders(t *testing.T) {
 		}
 	}
 	assert.True(t, kept)
+}
+
+// #7719 (UI/UX's note on #7712): the Cumulative spend line ends at the Total cost tile's figure, for every range: both are read from the same rows (the jsonl-over-proxy dedup, the hourly rollups), the line as a
+// running sum of the buckets, the tile as the sum of the types.
+func TestTimeseriesCumulativeEndsAtTheSummaryTotal(t *testing.T) {
+	ts, h, router := setupTokenUsageTest(t)
+	router.Get("/api/token-usage/timeseries", h.UsageTimeSeries)
+	ctx := t.Context()
+	now := time.Now().UTC()
+	at := func(h int) string { return now.Add(-time.Duration(h) * time.Hour).Format("2006-01-02T15:04:05.000Z") }
+	for i, h := range []int{1, 2, 2, 5, 9, 30, 47} {
+		require.NoError(t, ts.RecordUsage(ctx, &store.TokenUsage{SessionID: fmt.Sprintf("s%d", i%3), AgentName: "a", AgentType: "claude", Source: "jsonl", RecordedAt: at(h), InputTokens: 10, OutputTokens: 5, TotalTokens: 15, CostUSD: 0.37 * float64(i+1)}))
+	}
+	// a proxy row of a session that also has transcript rows is not counted (twice) by either
+	require.NoError(t, ts.RecordUsage(ctx, &store.TokenUsage{SessionID: "s0", AgentName: "a", AgentType: "claude", Source: "proxy", RecordedAt: at(3), InputTokens: 10, OutputTokens: 5, TotalTokens: 15, CostUSD: 9}))
+	for _, c := range []struct{ since, interval string }{{"", "1h"}, {now.Add(-24 * time.Hour).Format(time.RFC3339Nano), "1h"}, {now.Add(-24 * time.Hour).Format(time.RFC3339Nano), "5m"}, {now.Add(-6 * time.Hour).Format(time.RFC3339Nano), "1d"}} {
+		get := func(path string, into any) {
+			q := "?interval=" + c.interval
+			if c.since != "" {
+				q = "?since=" + url.QueryEscape(c.since) + "&interval=" + c.interval
+			}
+			if path == "/api/token-usage/summary" {
+				q = strings.Replace(q, "&interval="+c.interval, "", 1)
+				q = strings.Replace(q, "?interval="+c.interval, "", 1)
+			}
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, httptest.NewRequest(http.MethodGet, path+q, nil))
+			require.Equal(t, http.StatusOK, w.Code, path)
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), into))
+		}
+		var sum struct {
+			Totals struct {
+				CostUSD float64 `json:"cost_usd"`
+			} `json:"totals"`
+		}
+		var series struct {
+			Buckets []struct {
+				CumulativeCost float64 `json:"cumulative_cost"`
+			} `json:"buckets"`
+		}
+		get("/api/token-usage/summary", &sum)
+		get("/api/token-usage/timeseries", &series)
+		require.NotEmpty(t, series.Buckets, "%+v", c)
+		assert.InDelta(t, sum.Totals.CostUSD, series.Buckets[len(series.Buckets)-1].CumulativeCost, 1e-9, "the line ends at the tile's total: since %q, interval %s", c.since, c.interval)
+	}
 }

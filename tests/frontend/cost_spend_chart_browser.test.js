@@ -35,6 +35,8 @@ const { DATA_WORLD } = require('./helpers/census_world');
             assert.ok(Math.abs(p.plotRight - p.dotX) <= 1, `${tag}: the line ends where the plot does ${JSON.stringify(p)}`);
         };
         fits(await probe(), 'desktop');
+        const ends = await ev(`({ tile: document.getElementById('cost-total-cost').textContent.trim(), top: document.querySelector('#cost-spend-chart text.spend-label').textContent.trim() })`);
+        assert.equal(ends.top, ends.tile, 'the axis top and the line\'s end are the Total cost tile\'s figure (#7719) ' + JSON.stringify(ends));
         await shot('cumulative-spend-desktop');
         // a live refresh draws it again: still one of everything
         for (let i = 0; i < 2; i++) { await ev(`document.querySelector('[data-on-click="cost-refresh"]').click(); true`); await ev(`new Promise(r => setTimeout(r, 400))`); } // sleep-ok: the refresh reads and redraws
@@ -47,6 +49,18 @@ const { DATA_WORLD } = require('./helpers/census_world');
             fits(await probe(), `${w} px`);
             if (w === 390) await shot('cumulative-spend-phone');
         }
+        // drawn while its view is hidden (a phone opens on the list: the card has no width, the chart takes its 600 px fallback), then shown: it is drawn again at the card's width, not left at 600 (#7719 item 2)
+        await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+        const loaded = Page.loadEventFired(); await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await loaded; await install();
+        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        await ev(`window.switchNavTab('tokens'); true`);
+        await waitFor(`!!document.querySelector('#cost-spend-chart svg polygon')`, 'the spend chart, drawn while hidden');
+        const hidden = await ev(`({ shown: document.getElementById('cost-spend-chart').getClientRects().length > 0, vb: Math.round(document.querySelector('#cost-spend-chart svg').viewBox.baseVal.width) })`);
+        assert.equal(hidden.shown, false, 'the phone opens Analytics on its list: the chart is hidden ' + JSON.stringify(hidden));
+        assert.equal(hidden.vb, 600, 'drawn hidden, it has the 600 px fallback ' + JSON.stringify(hidden));
+        await ev(`import((window.__coralStatic || '/static/') + 'analytics_views.js').then(m => { m.selectView('overview'); return true; })`);
+        await waitFor(`(() => { const s = document.querySelector('#cost-spend-chart svg'), b = document.getElementById('cost-spend-chart'); const c = getComputedStyle(b); return b.getClientRects().length > 0 && Math.abs(Math.round(s.viewBox.baseVal.width) - Math.round(b.clientWidth - parseFloat(c.paddingLeft) - parseFloat(c.paddingRight))) <= 1; })()`, 'the chart drawn again at the card\'s width once shown');
+        fits(await probe(), 'phone, drawn hidden then shown');
         console.log('PASS Cumulative spend: one series on one scale, nothing past the last point, redrawn not added to, fits the card at every width');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

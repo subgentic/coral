@@ -94,3 +94,41 @@ func TestGetUsageSummaryByModel_EmptyIsAnEmptyList(t *testing.T) {
 	assert.NotNil(t, rows, "the route answers [] and not null")
 	assert.Empty(t, rows)
 }
+
+// #7719: Requests is the calls recorded, the number By agent sums, in every grouping: the totals of the types, of the models and of the sessions all add up to the same figure (a sessions count under the name
+// "Requests" gave a tile of 7 beside a By agent column that summed to 1052).
+func TestUsageSummaries_RequestsAreCallsAndAddUp(t *testing.T) {
+	db := openTestDB(t)
+	s := NewTokenUsageStore(db)
+	ctx := context.Background()
+	rec := func(sid, typ, model, at string) {
+		t.Helper()
+		require.NoError(t, s.RecordUsage(ctx, &TokenUsage{SessionID: sid, AgentName: sid, AgentType: typ, Model: model, RecordedAt: at, InputTokens: 1, OutputTokens: 1, TotalTokens: 2, CostUSD: 0.1}))
+	}
+	rec("s1", "claude", "claude-opus-5-5", "2026-10-01T10:00:00Z")
+	rec("s1", "claude", "claude-sonnet-5-5", "2026-10-01T10:05:00Z")
+	rec("s1", "claude", "claude-opus-5-5", "2026-10-01T10:10:00Z")
+	rec("s2", "claude", "claude-opus-5-5", "2026-10-01T11:00:00Z")
+	rec("s3", "codex", "gpt-5-codex", "2026-10-01T12:00:00Z")
+
+	types, err := s.GetUsageSummary(ctx, "")
+	require.NoError(t, err)
+	models, err := s.GetUsageSummaryByModel(ctx, "")
+	require.NoError(t, err)
+	agents, err := s.GetUsageSummaryByAgent(ctx, "")
+	require.NoError(t, err)
+	var nt, nm, na int64
+	for _, r := range types {
+		nt += r.NumRequests
+	}
+	for _, r := range models {
+		nm += r.NumRequests
+	}
+	for _, r := range agents {
+		na += int64(r.NumRecords)
+	}
+	assert.EqualValues(t, 5, na, "By agent: one request per recorded call")
+	assert.EqualValues(t, 5, nt, "By provider adds up to the same")
+	assert.EqualValues(t, 5, nm, "and By model")
+	assert.EqualValues(t, 3, byModelKey(models)["claude|claude-opus-5-5"].NumRequests, "a model's row counts its calls, not its two sessions")
+}

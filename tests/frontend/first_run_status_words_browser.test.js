@@ -65,7 +65,7 @@ const { connect } = require('./agent_view_harness');
             const real = { operation: 'Bash', call_type: 'tool', agent_name: 'Dev', calls: 3 };
             return { none: m.shownCallMetrics(own).length, empty: m.shownCallMetrics([]).length, mixed: m.shownCallMetrics(own.concat([real])).length, agentApi: m.shownCallMetrics([{ operation: '/api/board/{project}/tasks', call_type: 'api', agent_name: 'Dev', calls: 2 }]).length };
         })()`);
-        check('only Coral\'s own routes: no rows; with a tool call (or a route an agent called): the table as it is', rows.none === 0 && rows.empty === 0 && rows.mixed === 3 && rows.agentApi === 1, JSON.stringify(rows));
+        check('only Coral\'s own routes: no rows; with a tool call (or a route an agent called): those rows only, never the agent-less routes beside them (#7719)', rows.none === 0 && rows.empty === 0 && rows.mixed === 1 && rows.agentApi === 1, JSON.stringify(rows));
     } finally { await client.close(); }
     if (results.some(r => !r)) { console.error(`${results.filter(r => !r).length} of ${results.length} failed`); process.exit(1); }
     console.log(`\nAll ${results.length} first-run status-words checks passed`);

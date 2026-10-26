@@ -25,6 +25,10 @@ const COST_NAME_COLUMNS = { provider: 1, model: 2, thinking: 2, agent: 1, task: 
 // By Thinking Level has three columns that name its rows, each with its 44 px buttons: all three do not fit before Cost at 390 px (#5120). On a phone the model and the level come first (a
 // model's name says its provider; the Provider column follows Share), so the figure is on screen.
 const COST_PHONE_NAMES = { thinking: ['model', 'level'] };
+// By Agent has eleven columns: at 1280 px it scrolled sideways with its sort column, Cost, cut off at the edge, so Cost follows the name there too (#7719).
+const ALWAYS_COST_SECOND = new Set(['agent']);
+// The calls table has no Cost: on a phone its figures follow the operation, in the order the rest of the page reads them (Calls first, then Errors, Avg ms), and the type, agent and team come after.
+const PHONE_FIRST = { calls: ['operation', 'calls', 'errors', 'avg_ms'] };
 const _phone = typeof matchMedia === 'function' ? matchMedia(PHONE_QUERY) : null;
 
 function placeCostColumns(root) {
@@ -38,10 +42,13 @@ function placeCostColumns(root) {
         const cost = at('cost_usd'), share = at('cost_pct');
         let order = ths.map((_, i) => i);
         const lead = (COST_PHONE_NAMES[ths[0] && ths[0].dataset.table] || []).map(at);
-        if (narrow && cost >= 0 && lead.length && lead.every(i => i >= 0)) {
+        const first = (PHONE_FIRST[ths[0] && ths[0].dataset.table] || []).map(at);
+        if (narrow && first.length && first.every(i => i >= 0)) {
+            order = [...first, ...order.filter(i => !first.includes(i))];
+        } else if (narrow && cost >= 0 && lead.length && lead.every(i => i >= 0)) {
             const moved = [...lead, cost, ...(share >= 0 ? [share] : [])];
             order = [...moved, ...order.filter(i => !moved.includes(i))];
-        } else if (narrow && cost >= names) {
+        } else if ((narrow || ALWAYS_COST_SECOND.has(ths[0] && ths[0].dataset.table)) && cost >= names) {
             const moved = share >= names ? [cost, share] : [cost];
             order = [...order.slice(0, names), ...moved, ...order.slice(names).filter(i => !moved.includes(i))];
         }
@@ -417,29 +424,32 @@ export async function showCostDashboard() {
     showViews();
     _watchScrollCues();
     await _refreshCostDashboard();
-    await _refreshCallMetrics();
     stopCostDashboard(); // clear any existing timer
     _costRefreshTimer = pollEvery(_refreshCostDashboard, 15000);
 }
 
-/** Coral's own routes (the dashboard's calls to its server: an api or proxy row no agent made) are noise until an agent has really used a tool: then the table is the person's work, so it says nothing, not a list of /api paths (#6382, first-run report #6370 item 11). */
+/** Coral's own routes (the dashboard's calls to its server: an api or proxy row no agent made) are noise: the table is the person's work, so they are left out, and with nothing else it says nothing, not a list of /api paths (#6382, first-run report #6370 item 11; also beside real calls, #7719). */
 export function shownCallMetrics(rows) {
     const own = r => (r.call_type === 'api' || r.call_type === 'proxy') && !r.agent_name;
-    return rows.some(r => !own(r)) ? rows : [];
+    return rows.filter(r => !own(r)); // never listed, even beside real calls: they grew with every refresh of this page (#7719)
 }
 
-async function _refreshCallMetrics() {
+async function _refreshCallMetrics(period, hours) {
     const el = document.getElementById('call-metrics-summary');
     if (!el) return;
+    const label = (document.querySelector(`#cost-time-range option[value="${period}"]`)?.textContent || 'Last 24 hours').toLowerCase();
     try {
-        const response = await fetch('/api/call-metrics/summary?hours=24', { cache: 'no-store' });
+        const response = await fetch(`/api/call-metrics/summary?hours=${hours}`, { cache: 'no-store' });
         if (!response.ok) throw new Error('metrics unavailable');
         const data = await response.json();
         const rows = shownCallMetrics(data.rows || []);
         // Metrics past the raw-row cap are not stored (#5359): say so, so a gap after a burst is not read as quiet (#5368).
         const dropped = data.cap_dropped > 0 ? `<p class="cost-empty">${Number(data.cap_dropped)} calls were not recorded since Coral started: the call metrics table was full.</p>` : '';
-        if (!rows.length) { emptyState(el, 'No tool calls in the last 24 hours yet. They appear once an agent has used a tool.', 'cost-empty'); if (dropped) el.insertAdjacentHTML('beforeend', dropped); return; }
-        el.innerHTML = dropped + `<table class="cost-table"><thead><tr><th>Operation</th><th>Type</th><th>Agent</th><th>Team</th><th>Calls</th><th>Errors</th><th>Avg ms</th></tr></thead><tbody>${rows.map(r => `<tr><td>${escapeHtml(r.operation)}</td><td>${escapeHtml(r.call_type)}</td><td>${escapeHtml(r.agent_name || '—')}</td><td>${escapeHtml(r.board_name || '—')}</td><td>${r.calls}</td><td>${r.errors}</td><td>${Math.round(r.avg_duration_ms || 0)}</td></tr>`).join('')}</tbody></table>`;
+        // The server keeps calls for a limited time (#3261) and answers with the window it used: a longer range says so.
+        const kept = data.hours > 0 && data.hours < hours ? `<p class="cost-empty">Calls are kept for ${Math.round(data.hours / 24)} days, so this shows the last ${Math.round(data.hours / 24)} days.</p>` : '';
+        if (!rows.length) { emptyState(el, `No tool calls in the ${label} yet. They appear once an agent has used a tool.`, 'cost-empty'); if (kept + dropped) el.insertAdjacentHTML('beforeend', kept + dropped); return; }
+        el.innerHTML = kept + dropped + `<table class="cost-table"><thead><tr><th data-table="calls" data-field="operation">Operation</th><th data-field="call_type">Type</th><th data-field="agent">Agent</th><th data-field="team">Team</th><th data-field="calls">Calls</th><th data-field="errors">Errors</th><th data-field="avg_ms">Avg ms</th></tr></thead><tbody>${rows.map(r => `<tr><td>${escapeHtml(r.operation)}</td><td>${escapeHtml(r.call_type)}</td><td>${escapeHtml(r.agent_name || '—')}</td><td>${escapeHtml(r.board_name || '—')}</td><td>${r.calls}</td><td>${r.errors}</td><td>${Math.round(r.avg_duration_ms || 0)}</td></tr>`).join('')}</tbody></table>`;
+        placeCostColumns(el);
     } catch { emptyState(el, 'Call metrics unavailable', 'cost-empty'); }
 }
 
@@ -489,6 +499,7 @@ export async function _refreshCostDashboard() {
 
     // Flash live indicator
     _flashLiveIndicator();
+    _refreshCallMetrics(period, hoursAgo); // the calls view follows the range too, with the page's own refresh (#7719)
     showSpend(document.getElementById('cost-spend'), period, document.getElementById('cost-task-time')); // tokens per commit and task time, one team (#7526, #7530): its own read, its own errors
 
     try {
@@ -507,13 +518,13 @@ export async function _refreshCostDashboard() {
             _setText('cost-output-tokens', formatTokens(t.output_tokens || 0));
             _setText('cost-cache-read', formatTokens(t.cache_read_tokens || 0));
             _setText('cost-cache-write', formatTokens(t.cache_write_tokens || 0));
-            _setText('cost-total-requests', String(t.num_sessions || 0));
+            _setText('cost-total-requests', String(t.num_requests || 0)); // the calls recorded: the figure By agent's Requests column adds up to
             _setText('cost-total-cost', _formatCost(t.cost_usd || 0));
 
             // By provider (#5120): the agent types' totals, from by_agent_type: the one source for them (by_model and by_thinking split them).
             _renderProviderTable((data.by_agent_type || []).map(a => ({
                 agent_type: a.agent_type || 'unknown',
-                requests: a.num_sessions || 0,
+                requests: a.num_requests || 0,
                 input_tokens: a.input_tokens || 0,
                 output_tokens: a.output_tokens || 0,
                 cache_read_tokens: a.cache_read_tokens || 0,
@@ -527,7 +538,7 @@ export async function _refreshCostDashboard() {
                 model: modelDisplayName(a.model, a.model_display) || 'unknown',
                 model_id: typeof a.model === 'string' ? a.model : '',
                 agent_type: a.agent_type || 'unknown',
-                requests: a.num_sessions || 0,
+                requests: a.num_requests || 0,
                 input_tokens: a.input_tokens || 0,
                 output_tokens: a.output_tokens || 0,
                 cache_read_tokens: a.cache_read_tokens || 0,
@@ -1092,7 +1103,7 @@ function _watchSpendChart(container) {
 }
 function _spendInnerWidth(container) {
     const cs = getComputedStyle(container);
-    return Math.round(container.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0));
+    return Math.max(0, Math.round(container.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0))); // 0 while the view is hidden (the padding alone is not a width)
 }
 
 function _renderSpendChart(buckets) {
@@ -1106,8 +1117,8 @@ function _renderSpendChart(buckets) {
         return;
     }
 
-    const W = _spendInnerWidth(container) || 600;
-    _spendDrawnW = W;
+    _spendDrawnW = _spendInnerWidth(container);
+    const W = _spendDrawnW || 600; // hidden: a fallback, drawn again when the card has a width
     const H = 180;
     const PAD = { top: 24, right: 16, bottom: 32, left: 56 };
     const plotW = W - PAD.left - PAD.right;
