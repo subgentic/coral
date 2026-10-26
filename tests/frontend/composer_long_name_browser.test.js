@@ -2,6 +2,7 @@
 // text no longer carries "you can type now" (Send's own title says a message is held). 390 px and 1280 px, a starting agent with a 60-character name and one with a short name.
 // Drives Chrome over CDP through agent_view_harness.js against the isolated dev server, as first_run_status_words_browser does.
 const { connect } = require('./agent_view_harness');
+const { framesJs } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, sleep, PRELOAD, install } = await connect();
@@ -39,7 +40,7 @@ const { connect } = require('./agent_view_harness');
             const hint = await ev(`(() => { const h = document.getElementById('composer-starting-hint'); const r = h && h.getBoundingClientRect(); const i = document.getElementById('command-input').getBoundingClientRect(); return h ? { shown: !h.hidden && !!h.getClientRects().length, text: h.textContent, above: r.bottom <= i.top + 1, inWidth: r.right <= innerWidth + 1 } : null; })()`);
             check(`${tag}: while the agent starts a quiet line above the box says the message is held`, hint && hint.shown && /held until it is ready/.test(hint.text) && hint.above && hint.inWidth, JSON.stringify(hint));
             const rewrites = await ev(`(async () => { const st = await import(${S} + 'agent_starting.js'); const h = document.getElementById('composer-starting-hint'); let n = 0; const mo = new MutationObserver(m => { n += m.length; }); mo.observe(h, { childList: true, characterData: true, subtree: true });
-                for (let i = 0; i < 3; i++) { st.syncSendStarting(true); await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); } await new Promise(r => setTimeout(r, 50)); mo.disconnect(); return n; })()`);
+                for (let i = 0; i < 3; i++) { st.syncSendStarting(true); await ${framesJs(2)}; } await new Promise(r => setTimeout(r, 50)); mo.disconnect(); return n; })()`);
             check(`${tag}: a toolbar rebuild (syncSendStarting again) does not rewrite the hint's text`, rewrites === 0, String(rewrites));
             if (process.env.SHOT_DIR) require('node:fs').writeFileSync(`${process.env.SHOT_DIR}/composer-${w}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); // a picture for a review, when asked for
             if (mobile) check(`${tag}: the phone's placeholder does not wrap`, long.ws === 'nowrap', JSON.stringify(long));
