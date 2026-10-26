@@ -80,6 +80,12 @@ const BASE = require('./test_base').BASE;
         assert.equal(await ev(`document.querySelector('#dt-host .dt-empty-line').textContent`), 'Nothing here');
         await ev(`document.querySelector('#dt-host .dt-empty .btn').click(); document.querySelector('#dt-host2 .dt-more').click(); true`);
         assert.deepEqual(await ev(`window.__log`), ['made', 'more']); assert.equal(await ev(`document.querySelector('#dt-host2 .dt-foot-text').textContent`), 'Showing 1 of 5');
+        // footer.auto (#7937): no footer when there is nothing more to load; with more to load, the same footer as before
+        await ev(`(async () => { const DT = await import(${MOD} + 'data_table.js'); const mk = (id, footer) => { const h = document.createElement('div'); h.id = id; document.body.append(h); h.append(DT.dataTable({ label: id, columns: [{ key: 'a', label: 'A', field: 'a' }], rows: [{ a: 1 }, { a: 2 }], rowKey: r => r.a, footer }).el); };
+            mk('dt-auto-all', { auto: true, text: 'Showing 2 of 2' }); mk('dt-auto-more', { auto: true, text: 'Showing 2 of 5', more: { label: 'Load more', run: () => {} } }); mk('dt-plain-all', { text: 'Showing 2 of 2' }); return true; })()`);
+        assert.equal(await ev(`document.querySelectorAll('#dt-auto-all .dt-foot').length`), 0, 'auto: all rows shown, no footer');
+        assert.equal(await ev(`document.querySelector('#dt-auto-more .dt-foot-text').textContent + '|' + document.querySelector('#dt-auto-more .dt-more').textContent`), 'Showing 2 of 5|Load more', 'auto: more to load, the footer stays');
+        assert.equal(await ev(`document.querySelector('#dt-plain-all .dt-foot-text').textContent`), 'Showing 2 of 2', 'without auto the footer is as it was');
         console.log('   ✓');
 
         console.log('5. Selection');
