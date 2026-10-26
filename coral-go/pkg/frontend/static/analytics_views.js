@@ -17,6 +17,7 @@ export const VIEWS = [
     { key: 'calls', label: 'Tool and API calls' },
     { key: 'per-commit', label: 'Tokens per commit' },
     { key: 'task-time', label: 'Task time' },
+    { key: 'agent-detail', label: 'Agent', hidden: true }, // one agent over the range: opened from By agent's Details, not listed (analytics_agent.js, #7930)
 ];
 
 let current = 'overview';
@@ -26,7 +27,8 @@ const page = () => document.getElementById('cost-dashboard-view');
 
 function shown() {
     const q = query.trim().toLowerCase();
-    return q ? VIEWS.filter(v => v.label.toLowerCase().includes(q)) : VIEWS;
+    const listed = VIEWS.filter(v => !v.hidden);
+    return q ? listed.filter(v => v.label.toLowerCase().includes(q)) : listed;
 }
 
 /** The sidebar's list: one button per view, the open one marked. */
@@ -34,8 +36,8 @@ export function drawViews() {
     const list = document.getElementById('cost-nav-list');
     if (!list) return;
     const held = list.contains(document.activeElement) ? document.activeElement.dataset.view : null; // the list is drawn again: the keyboard stays on its row
-    const rows = shown();
-    list.innerHTML = rows.map(v => `<li class="session-list-item${escapeAttr(v.key === current ? ' active' : '')}"><button type="button" class="row-btn"${v.key === current ? ' aria-current="true"' : ''} data-on-click="analytics-view" data-view="${escapeAttr(v.key)}">${escapeHtml(v.label)}</button></li>`).join('')
+    const rows = shown(), on = current === 'agent-detail' ? 'agent' : current; // an agent's page is under By agent
+    list.innerHTML = rows.map(v => `<li class="session-list-item${escapeAttr(v.key === on ? ' active' : '')}"><button type="button" class="row-btn"${v.key === on ? ' aria-current="true"' : ''} data-on-click="analytics-view" data-view="${escapeAttr(v.key)}">${escapeHtml(v.label)}</button></li>`).join('')
         || '<li class="empty-state">No view matches the search.</li>';
     if (held) list.querySelector(`.row-btn[data-view="${CSS.escape(held)}"]`)?.focus({ preventScroll: true });
 }
