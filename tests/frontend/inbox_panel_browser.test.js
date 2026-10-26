@@ -210,7 +210,8 @@ const STUB = `(() => {
             await waitFor(`/view only/.test(document.querySelectorAll('#inbox-tasks-host .ibx-reply-status')[2].textContent)`, 'the refusal', 4000);
             check(`${dev}: a refusal shows the server's own reason and keeps the draft`, (await status(2)) === 'Your Coral Hub access is view only.' && (await ev(`document.querySelectorAll('#inbox-tasks-host .ibx-reply-input')[2].value`)) === 'Approved.');
             // sign-out's memory purge drops the drafts
-            await ev(`import(${S} + 'local_store.js').then(m => m.forgetAccountMemory()); true`);
+            // the purge runs when the module is loaded: wait for it (the page's local_store.js is a stub of the bundle that is fetched the first time it is imported by URL; an unawaited import let the checks below read the box before the purge ran, #8753)
+            await ev(`import(${S} + 'local_store.js').then(m => { m.forgetAccountMemory(); return true; })`);
             await head(2); await head(2);
             check(`${dev}: after sign-out's memory purge the unsent draft is gone`, (await ev(`document.querySelectorAll('#inbox-tasks-host .ibx-reply-input')[2].value`)) === '');
 
