@@ -3761,7 +3761,6 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .settings-modal-body .settings-grid { display: block; }
 .settings-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(12rem, 22rem); gap: .4rem 1.5rem; align-items: start; padding: .7rem 0; border-top: 1px solid var(--border); }
 .settings-row[hidden] { display: none; }
-.settings-row-wide { grid-template-columns: minmax(0, 1fr); }
 .info-grid.settings-grid .settings-row > dt, .info-grid.settings-grid .settings-row > dt.toggle-dt { display: flex; align-self: start; flex-direction: row; flex-wrap: wrap; align-items: center; gap: .1rem .4rem; padding-top: .35rem; min-width: 0; color: var(--text-primary); }
 .settings-row > dt label { cursor: default; color: var(--text-primary); }
 .settings-row > dd { min-width: 0; margin: 0; }
@@ -3930,21 +3929,11 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .cm-levels { display: inline-flex; flex-wrap: wrap; gap: var(--space-xs, 2px) var(--space-sm, 4px); }
 .cm-chip { font-size: 0.6875rem; padding: 1px var(--space-sm, 4px); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-secondary); }
 .cm-form { display: flex; flex-direction: column; gap: var(--space-md, 8px); width: 100%; min-width: 0; }
-.cm-field { display: flex; flex-direction: column; gap: var(--space-xs, 2px); font-size: 0.75rem; color: var(--text-secondary); margin: 0; }
-.cm-field .settings-input { width: 100%; margin: 0; }
-.cm-levels-field { border: 0; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-sm, 4px) var(--space-lg, 12px); font-size: 0.8125rem; }
-.cm-levels-field > legend { font-size: 0.75rem; color: var(--text-secondary); padding: 0; margin-bottom: var(--space-sm, 4px); }
-.cm-levels-field .settings-hint { flex-basis: 100%; }
-.cm-levels-field .cm-level { display: inline-flex; flex-direction: row; flex-wrap: nowrap; align-items: center; gap: var(--space-sm, 4px); min-height: 44px; min-width: 44px; margin: 0; }
-.cm-levels-field .cm-level input { flex: none; width: auto; margin: 0; }
-.cm-levels-field .cm-level span { flex: none; white-space: nowrap; }
 .cm-add { align-self: flex-start; }
 .settings-custom-models .btn { margin: 0; }
-.cm-error { color: var(--error); font-size: 0.8125rem; margin: 0; }
-.cm-actions { display: flex; gap: var(--space-md, 8px); }
 .cm-status:empty { display: none; }
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
-    .cm-row .btn, .cm-actions .btn, .cm-add { min-height: 44px; min-width: 44px; }
+    .cm-row .btn, .cm-add { min-height: 44px; min-width: 44px; }
 }
 .modal-content:has(.settings-shell) #launch-step-agent .settings-modal-body { flex-direction: column; overflow: auto; }
 /* Agent Team (UI audit #5589, findings 5 and 6): the team name, which every launch needs, is above the sections; the template tools are one disclosure after the picker, so the members come first. */
