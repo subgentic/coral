@@ -117,6 +117,7 @@ func New(t testing.TB, state State) *Stub {
 // NoSlower fails the test when subject takes a second or more longer than baseline: how a hold shows (a wait on a lock or on a login, a sleep put into the path), told apart from a
 // busy machine without an absolute number of seconds. baseline and subject are timed five times, interleaved so both meet the machine's load of the moment, and the FASTEST run of each
 // is compared: a spike from load is in some runs only and does not count; a delay in the subject is in every run. The slack (a second) is under the two-second hold the tests guard against.
+// NoSlower has no production caller: it is exported for tests in agentmodels, agentsignin, background, server/routes.
 func NoSlower(t testing.TB, what string, baseline, subject func(), slack time.Duration) {
 	t.Helper()
 	const n = 5
@@ -139,6 +140,7 @@ func NoSlower(t testing.TB, what string, baseline, subject func(), slack time.Du
 }
 
 // AnsweredMarker is the file the signed-in stand-in makes just BEFORE it writes its answer to an initialize request (and before it goes on reading stdin): it is there whenever the reply can be read, so a test can time how long after the reply a caller let go of the process.
+// AnsweredMarker has no production caller: it is exported for tests in agentmodels.
 func (s *Stub) AnsweredMarker() string { return filepath.Join(s.dir, "answered") }
 
 // Path is the stub's program: what a test gives as the CLI path.
