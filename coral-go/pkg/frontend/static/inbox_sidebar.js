@@ -24,6 +24,7 @@ import { onInboxHooks, setInboxCount, askOf } from './inbox_tab.js';
 const { coralInboxAdapter, savedExpandFor } = await importOnce('./inbox_coral.js');
 const saved = await importOnce('./saved.js');
 const DT = await importOnce('./data_table.js'); // the one table (#7743): the Tasks group's page is its Tasks columns
+const TF = await importOnce('./task_filters.js');
 const TV = await importOnce('./tasks_view.js'); // the one Tasks view
 const VL = await importOnce('./view_list.js'); // the mailbox's view list (#7785)
 const TB = await importOnce('./task_bulk.js'); // what the selection bar does to the selected tasks
@@ -63,7 +64,40 @@ const dockSavedState = DT.tableState();
 const savedState = DT.tableState(); // one word set for a task's state (Queued, In progress, Blocked, In review, Done), here as everywhere
 const goalsState = DT.tableState();
 const taskText = t => [t.title, t.board, t.priority, stateOf(t), t.created_by].join(' ').toLowerCase();
-const taskRows = () => tasks.filter(t => !queries.tasks || taskText(t).includes(queries.tasks)).sort((a, b) => (RANK[a.priority] ?? 3) - (RANK[b.priority] ?? 3));
+let taskFilters = { ...TF.EMPTY }, taskState = 'all', taskBar = null;
+const taskMatches = t => (!queries.tasks || taskText(t).includes(queries.tasks.toLowerCase()))
+    && (!taskFilters.priority || t.priority === taskFilters.priority)
+    && (!taskFilters.from || Date.parse(t.updated_at || t.created_at) >= new Date(taskFilters.from + 'T00:00:00').getTime());
+const taskRows = () => tasks.filter(t => taskMatches(t) && (taskState === 'all' || stateOf(t) === taskState)).sort((a, b) => (RANK[a.priority] ?? 3) - (RANK[b.priority] ?? 3));
+function inboxTaskToolbar() {
+    if (!taskBar) {
+        taskBar = TV.tasksToolbar('mine', next => {
+            inboxTasksState.selected.clear();
+            taskFilters = next;
+            queries.tasks = next.q;
+            const input = $('inbox-search');
+            if (input && group === 'tasks') input.value = next.q;
+            renderInboxNav(true);
+        });
+        taskBar.node.querySelector('.list-bar-search-row').classList.add('gt-toolbar');
+    }
+    taskBar.set({ ...taskFilters, q: queries.tasks });
+    if (!inboxTasksState.selected.size) Toolbar.mountSelection(taskBar.node.querySelector('.list-bar-search-row'), null);
+    const states = ['Queued', 'In progress', 'In review', 'Blocked'];
+    const rows = tasks.filter(taskMatches);
+    const active = document.activeElement;
+    const held = taskBar.node.contains(active) ? (active.matches('.team-tb-select') ? 'select' : active.dataset.filter) : null;
+    Toolbar.adopt(taskBar.node.querySelector('.list-bar-search-row'), {
+        pills: { label: 'Show tasks that are', current: taskState,
+            items: [{ key: 'all', label: 'All', count: rows.length }, ...states.map(key => ({ key, label: key, count: rows.filter(t => stateOf(t) === key).length }))],
+            onPick: key => { inboxTasksState.selected.clear(); taskState = key; renderInboxNav(true); } },
+    });
+    if (held) {
+        const next = held === 'select' ? taskBar.node.querySelector('.team-tb-select') : [...taskBar.node.querySelectorAll('[data-filter]')].find(el => el.dataset.filter === held);
+        next?.focus({ preventScroll: true });
+    }
+    return { node: taskBar.node, signature: JSON.stringify([taskFilters, queries.tasks, taskState]) };
+}
 async function refreshTasks() {
     try {
         tasks = await coralInboxAdapter.listTasks();
@@ -209,7 +243,7 @@ async function openChat(c) {
 }
 
 registerGroupSource('hub-inbox', {
-    toolbar: () => ({ search: { id: 'inbox-search', label: 'Search the Inbox' } }), // the page's toolbar line, the same shape for Needs you, Tasks and Saved (#7723)
+    toolbar: key => key === 'tasks' ? inboxTaskToolbar() : ({ search: { id: 'inbox-search', label: 'Search the Inbox' } }), // the page's toolbar line, the same shape for Needs you, Tasks and Saved (#7723)
     keys: () => GROUPS.map(g => g.key),
     redraw: () => renderInboxNav(true),
     table: key => {
@@ -234,7 +268,7 @@ registerGroupSource('hub-inbox', {
         }
         if (key === 'tasks') {
             const rows = taskRows();
-            return { title: 'Tasks', rows, empty: { line: queries.tasks ? 'No task matches the search.' : 'No assigned tasks.' },
+            return { title: 'Tasks', rows, empty: { line: queries.tasks || TF.isFiltered(taskFilters) || taskState !== 'all' ? 'No task matches the filters.' : 'No assigned tasks.' },
                 signature: JSON.stringify([rows.map(t => [t.project, t.id, t.title, t.priority, t.status, t.board, t.updated_at])]),
                 node: () => {
                     const row = document.querySelector('#group-table-view .gt-toolbar');
@@ -300,7 +334,8 @@ onViewShown(id => {
 export function filterInbox(value) {
     const text = String(value || '').trim();
     if (group === 'saved') { queries.saved = text; saved.setSavedQuery(text); return; }
-    queries[group] = CH.CHAT_KEY.test(group) ? text : text.toLowerCase(); // a chat search goes to the server as typed
+    queries[group] = CH.CHAT_KEY.test(group) || group === 'tasks' ? text : text.toLowerCase();
+    if (group === 'tasks') { inboxTasksState.selected.clear(); taskFilters = { ...taskFilters, q: text }; } // a chat search goes to the server as typed
     renderInboxNav(true);
 }
 

@@ -139,19 +139,27 @@ function drawTable() {
     // A source with a `lead` (the Inbox: its view list as one select, #7785) puts that on top of the table on a phone instead: the select is the way to the other views, so there is no way back to a list.
     const lead = isPhoneLayout() && src.lead ? src.lead() : null;
     const back = isPhoneLayout() && !lead ? `<button type="button" class="group-back group-table-back" data-on-click="sgroup-list" data-kind="${escapeAttr(open.kind)}">\u2190 ${escapeHtml(TAB_NAME[open.kind] || 'List')}</button>` : '';
-    const bar = src.toolbar ? src.toolbar() : null;
-    const html = (bar ? toolbarHtml(bar, tables[0]) : '') + tables.map((x, i) => tableHtml(x, i, i ? '' : back, !!bar)).join('');
+    const bar = src.toolbar ? src.toolbar(open.key) : null;
+    const html = (bar && !bar.node ? toolbarHtml(bar, tables[0]) : '') + tables.map((x, i) => tableHtml(x, i, i ? '' : back, !!bar)).join('');
     host.dataset.group = open.kind + ':' + open.key; // which table is on screen (saved.js asks for the Inbox's Saved)
     const a = document.activeElement, typing = a && host.contains(a) && a.id === 'gt-search' ? { start: a.selectionStart, end: a.selectionEnd } : null;
-    const drawn = html + tables.map(x => (x.node ? `|${x.signature || ''}` : '')).join('') + (lead ? `|${lead.signature}` : ''); // a table with its own rows says what they are (signature): the same rows are not drawn again
+    // A component toolbar keeps its own listeners, open panel, search, and focus across table redraws.
+    const toolbarFocus = bar?.node?.contains(a) ? a : null;
+    const toolbarCaret = toolbarFocus && typeof toolbarFocus.selectionStart === 'number' ? [toolbarFocus.selectionStart, toolbarFocus.selectionEnd] : null;
+    const drawn = html + (bar?.signature || '') + tables.map(x => (x.node ? `|${x.signature || ''}` : '')).join('') + (lead ? `|${lead.signature}` : ''); // a table with its own rows says what they are (signature): the same rows are not drawn again
     // A row the keyboard is on keeps it across a redraw (the Inbox's "waiting 4 min" moves on every 30 seconds while the table is the only list, #7004): it is found again by its class and data attributes
     const held = host.contains(a) && a.matches('.group-chip, .dt-primary, .dt-quiet') ? { cls: a.className, data: JSON.stringify(a.dataset) } : null;
     if (host.dataset.drawn !== drawn) {
         host.innerHTML = html; host.dataset.drawn = drawn; // a redraw of what is there would drop the focus from a row the keyboard is on
+        if (bar?.node) host.prepend(bar.node);
         if (lead) host.prepend(lead.node());
         const slots = host.querySelectorAll('.group-table-node'); // one per table that draws its own rows (and has some), in order
         let k = 0;
         for (const x of tables) if (x.node && (x.rows.length || !x.empty)) slots[k++]?.replaceWith(x.node());
+    }
+    if (toolbarFocus && toolbarFocus.isConnected && document.activeElement !== toolbarFocus) {
+        toolbarFocus.focus({ preventScroll: true });
+        if (toolbarCaret) toolbarFocus.setSelectionRange(...toolbarCaret);
     }
     if (held && host.dataset.drawn === drawn && !host.contains(document.activeElement)) [...host.querySelectorAll('.group-chip, .dt-primary, .dt-quiet')].find(e => e.className === held.cls && JSON.stringify(e.dataset) === held.data)?.focus({ preventScroll: true });
     if (typing) { const again = document.getElementById('gt-search'); if (again && again !== a) { again.focus({ preventScroll: true }); try { again.setSelectionRange(typing.start, typing.end); } catch { /* a search field has a caret */ } } } // the person is typing in the page's search: the redraw keeps their caret
