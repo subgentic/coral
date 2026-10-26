@@ -40,12 +40,15 @@ const { removeBoards } = require('./helpers/board_cleanup');
         s = await state(); assert.equal(s.selecting, false, 'the selection is cleared and the toolbar is back after the action');
         for (const id of [ids[0], ids[1]]) assert.equal((await api('GET', `/api/board/${B}/tasks/${id}`)).body.priority || (await api('GET', `/api/board/${B}/tasks/${id}`)).body.task.priority, 'high', 'the server has it');
         // Reassign
+        const reassignedId = await ev(`${row(2)}.closest('tr').dataset.key.slice(1)`);
         await ev(`${row(2)}.click(); true`);
         await ev(`[...document.querySelectorAll('#team-panel-tasks .dt-bar-action')].find(b => b.textContent === 'Reassign').click(); true`);
         await waitFor(`!!document.querySelector('#team-panel-tasks .dt-bar-choice') && document.querySelector('#team-panel-tasks .dt-bar-choice').options.length > 1`, 'the members');
         await ev(`(() => { document.querySelector('#team-panel-tasks .dt-bar-choice').value = 'dev'; return true; })()`);
         await ev(`document.querySelector('#team-panel-tasks .dt-bar-apply').click(); true`);
-        await waitFor(`[...document.querySelectorAll('#team-panel-tasks .dt-table tbody tr')].some(r => /dev/.test(r.querySelector('td[data-key="who"]').textContent))`, 'a task is dev\'s', 10000);
+        await waitFor(`[...document.querySelectorAll('#team-panel-tasks .dt-table tbody tr')].some(r => r.querySelector('td[data-key="who"] [role=img]')?.getAttribute('aria-label') === 'dev')`, 'a task is dev\'s', 10000);
+        const reassigned = (await api('GET', `/api/board/${B}/tasks/${reassignedId}`)).body;
+        assert.equal((reassigned.task || reassigned).assigned_to, 'dev', 'the server records the chosen assignee');
         // Cancel tasks confirms in the bar: Keep puts it away, the action runs
         await ev(`${row(0)}.click(); true`);
         await ev(`[...document.querySelectorAll('#team-panel-tasks .dt-bar-action')].find(b => b.textContent === 'Cancel tasks').click(); true`);

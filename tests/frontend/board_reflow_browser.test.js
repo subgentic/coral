@@ -4,8 +4,8 @@
 // than a page of messages, so "Load earlier" is shown: at 200% that nowrap button was wider than the screen, and the feed
 // (with a maximum width, so not stretched) took its width; every row was laid out in that box and clipped. Also long
 // sender names with spaces, ordinary messages, a long unbroken token, a link and a fenced block (which scrolls on its own).
-// A long unbroken sender name is #4502's case (board_followups_browser). On a desktop the feed is as before: the column's
-// width at 1400 px, and at most 840 px, from the column's left edge, at 1920 (#7315). On a failure it prints the right edge of each box from the
+// A long unbroken sender name is #4502's case (board_followups_browser). The default Table view fills its column at desktop widths (#8504);
+// the 840 px cap belongs to Chat view. On a failure it prints the right edge of each box from the
 // last row up to the body.
 'use strict';
 
@@ -98,9 +98,11 @@ const LONG = 'Senior Platform Reliability Developer With A Long Title';
                     w.remove(); return { feed: Math.round(fr.width), col: Math.round(col.width), rowRight: Math.round(rowRight), vw: document.documentElement.clientWidth }; })()`);
                 assert.ok(g.feed <= g.col && g.rowRight <= g.vw, `${v.name}: wide content does not widen the feed (${JSON.stringify(g)})`);
             }
-            if (v.width === 1400) assert.equal(m.feedWidth, Math.min(m.colWidth, 840), `${v.name}: the feed fills its column up to its 840 px maximum (the board's page has no side panel since #7457: the column is the page)`);
+            if (v.width >= 1400) {
+                assert.equal(await ev(`document.getElementById('mb-messages').classList.contains('mb-table')`), true, 'the default view is Table');
+                assert.equal(m.feedWidth, m.colWidth, `${v.name}: the Board table fills its column (#8504)`);
+            }
             if (v.width === 1920) {
-                assert.equal(m.feedWidth, 840, `${v.name}: the feed stays at its 840 px maximum`);
                 assert.ok(m.feedMargins[0] <= 1, `${v.name}: and starts at its column's left edge, as the search field does, not centred (#7315) (${m.feedMargins})`);
             }
             console.log(`${v.name}: ${m.rows} rows fit (feed right ${m.feedRight} of ${m.vw}, ${m.feedWidth} wide)`);
