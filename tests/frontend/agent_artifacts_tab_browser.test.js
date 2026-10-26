@@ -109,19 +109,12 @@ const STUB = `(() => {
             await ev(`import((window.__coralStatic || '/static/') + 'team_artifacts_page.js').then(m => m.loadArtifacts({ keep: true })); true`); await settle(600);
             check(`${tag}: a reload asks again (${before} -> ${await ev('window.__req.length')} requests)`, (await ev('window.__req.length')) > before);
 
-            // ═══ a row opens its document as a sheet over the panel; the chat is still there
-            await ev(`document.querySelector('${panel} tbody tr .dt-primary').focus(); document.querySelector('${panel} tbody tr .dt-primary').click(); true`);
-            await waitFor(`!document.getElementById('agentic-detail-pane').hidden`, 'the sheet opens');
-            const sheet = await ev(`(() => { const a = document.getElementById('agentic-detail-pane'), p = document.querySelector('${panel}'); const ar = a.getBoundingClientRect(), pr = p.getBoundingClientRect(); const foot = [...a.querySelectorAll('.detail-foot .btn')]; const d = foot.find(b => b.textContent === 'Delete'); return { inside: p.contains(a), covers: Math.abs(ar.left - pr.left) <= 1 && Math.abs(ar.width - pr.width) <= 1 && Math.abs(ar.top - pr.top) <= 1, noPageClass: !document.body.classList.contains('team-detail-open'), foot: foot.map(b => b.textContent), danger: !!d && d.classList.contains('btn-danger'), title: (a.querySelector('.detail-title') || {}).textContent, focus: document.activeElement === a.querySelector('.detail-title'), chat: !!document.querySelector('#live-session-view') && document.querySelector('#live-session-view').getClientRects().length > 0 }; })()`);
-            check(`${tag}: the document is a sheet over the panel itself, the actions pinned, Delete a danger button, the title focused (${JSON.stringify(sheet)})`, sheet.inside && sheet.covers && sheet.noPageClass && ['Open', 'Download', 'Copy link', 'Keep', 'Delete'].every(t => sheet.foot.includes(t)) && sheet.danger && sheet.focus && sheet.chat);
-            await assertPinnedBar(ev, '#agentic-detail-pane .detail-foot', `${tag}: the Artifacts sheet`);
-            await shot(`sheet-${view.name}-${view.theme}`);
-            await press('Escape', 'Escape', 27);
-            const back = await ev(`(() => ({ hidden: document.getElementById('agentic-detail-pane').hidden, onRow: document.activeElement === document.querySelector('${panel} tbody tr .dt-primary') }))()`);
-            check(`${tag}: Escape closes the sheet and the focus is back on the row (${JSON.stringify(back)})`, back.hidden && back.onRow);
-            await ev(`document.querySelector('${panel} tbody tr .dt-primary').click(); true`); await waitFor(`!document.getElementById('agentic-detail-pane').hidden`, 'the sheet opens again');
-            await ev(`document.querySelector('#agentic-detail-pane .detail-close').click(); true`);
-            check(`${tag}: Close closes it too, the focus on the row`, await ev(`document.getElementById('agentic-detail-pane').hidden && document.activeElement === document.querySelector('${panel} tbody tr .dt-primary')`));
+            // A dock artifact opens in preview, leaving the list available for the next click.
+            await ev(`document.querySelector('${panel} tbody tr .dt-primary').click(); true`);
+            await waitFor(`document.getElementById('preview-pane').getBoundingClientRect().height > 0`, 'the artifact preview opens');
+            check(`${tag}: preview leaves the list available`, await ev(`document.getElementById('agentic-detail-pane').hidden && document.querySelector('${panel} tbody tr .dt-primary').getClientRects().length > 0`));
+            await shot(`preview-${view.name}-${view.theme}`);
+            await ev(`import((window.__coralStatic || '/static/') + 'preview_pane.js').then(m => m.closeAllTabs()); true`);
 
             // ═══ the table follows the PANEL's width: narrow, Type, Size and Task fold under the name; Created stays
             const cols = await ev(`(() => { const p = document.querySelector('${panel}'); const vis = e => e.getClientRects().length > 0; const w = p.getBoundingClientRect().width; return { w, th: [...p.querySelectorAll('thead th')].filter(vis).map(h => h.textContent), phone: !!p.querySelector('.dt-box.dt-folded'), facts: [...p.querySelectorAll('tbody tr:first-child [data-key=type], tbody tr:first-child [data-key=size]')].every(vis) }; })()`);
@@ -130,9 +123,10 @@ const STUB = `(() => {
             if (!view.phone) {
                 for (const width of [420, 620, 680, 980]) {
                     await ev(`document.getElementById('agentic-state').style.width = '${width}px'; true`);
-                    await waitFor(`(() => { const box = document.querySelector('${panel} .dt-box'); return box && Math.abs(document.getElementById('agentic-state').getBoundingClientRect().width - ${width}) < 1 && box.classList.contains('dt-folded') === (box.clientWidth < 40 * parseFloat(getComputedStyle(document.documentElement).fontSize)); })()`, 'the artifact table follows the shared 40rem threshold');
-                    const layout = await ev(`(() => { const box = document.querySelector('${panel} .dt-box'), missing = box.querySelector('tbody tr [data-key=task]'); return { folded: box.classList.contains('dt-folded'), width: box.clientWidth, missingVisible: missing.getBoundingClientRect().width > 0, facts: [...box.querySelectorAll('tbody tr:first-child [data-key=type], tbody tr:first-child [data-key=size]')].every(c => c.classList.contains('dt-tone-tertiary')) }; })()`);
-                    check(`${tag}: shared threshold at ${width}px, with quiet facts and no empty folded task (${JSON.stringify(layout)})`, layout.folded === (width < 640) && layout.facts && (!layout.folded || !layout.missingVisible));
+                    await waitFor(`(() => { const box = document.querySelector('${panel} .dt-box'); return box && Math.abs(document.getElementById('agentic-state').getBoundingClientRect().width - ${width}) < 1 ; })()`, 'the artifact dock reaches its resized width');
+                    await settle(300);
+                    const layout = await ev(`(() => { const box = document.querySelector('${panel} .dt-box'), missing = box.querySelector('tbody tr [data-key=task]'); const folded = box.classList.contains('dt-folded'); box.classList.remove('dt-folded'); const needsFold = box.querySelector('.dt-table').getBoundingClientRect().width > box.clientWidth + 1; box.classList.toggle('dt-folded', folded); return { folded, needsFold, width: box.clientWidth, missingVisible: missing.getBoundingClientRect().width > 0, facts: [...box.querySelectorAll('tbody tr:first-child [data-key=type], tbody tr:first-child [data-key=size]')].every(c => c.classList.contains('dt-tone-tertiary')) }; })()`);
+                    check(`${tag}: content fits at ${width}px, with quiet facts and no empty folded task (${JSON.stringify(layout)})`, layout.folded === layout.needsFold && layout.facts && (!layout.folded || !layout.missingVisible));
                     const edges = await ev(`(() => { const panel = document.querySelector('${panel}').getBoundingClientRect(), table = document.querySelector('${panel} .dt-table').getBoundingClientRect(); return { left: table.left - panel.left, right: panel.right - table.right }; })()`);
                     check(`${tag}: ${width}px table fills the dock (${JSON.stringify(edges)})`, Math.abs(edges.left) < 1 && Math.abs(edges.right) < 1);
                     if (width !== 620) await shot(`dock-artifacts-${width}-${view.theme}`);

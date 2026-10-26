@@ -275,7 +275,7 @@ function draw() {
     Toolbar.mountSelection(toolbarRow, null);
     if (model.items.length || artifactState.selected.size) {
         const table = DT.dataTable({
-            label: `Artifacts, ${model.items.length}`, bare: !!model.scope, rows: model.items, rowKey: itemKey, current: detailKey(), sortBar: false, state: artifactState, rowName: readableName,
+            label: `Artifacts, ${model.items.length}`, bare: !!model.scope, foldAt: model.scope ? 'fit' : 40, rows: model.items, rowKey: itemKey, current: detailKey(), sortBar: false, state: artifactState, rowName: readableName,
             selectable: model.scope ? null : { contextKey: model.key, canSelect: item => !!linkOf(item)?.preview, actions: artifactBulkActions(), onChange: keys => Toolbar.mountSelection(toolbarRow, keys.size ? table.bar : null) },
             open: (item, tr) => openArtifact(item, tr.querySelector('.dt-primary')),
             columns: [
@@ -323,6 +323,14 @@ const sources = (list) => (Array.isArray(list) ? list.map(v => { const at = Stri
 
 function openArtifact(item, opener) {
     const key = itemKey(item), link = linkOf(item), un = isUnverified(item), name = readableName(item);
+    if (model.scope && link) {
+        importOnce('./preview_pane.js').then(m => m.openArtifactTab(link.hex ? `coral://artifacts/${link.hex}` : item.uri || '', {
+            server: link.server, filename: name, mediaType: item.media_type,
+            contentURL: link.contentURL, externalURL: link.preview ? undefined : link.url,
+        }));
+        root?.querySelectorAll('tr[data-key]').forEach(r => { if (r.dataset.key === key) r.setAttribute('aria-current', 'true'); else r.removeAttribute('aria-current'); });
+        return;
+    }
     const hex = link && link.hex;
     const received = item.source === 'received';
     const facts = [

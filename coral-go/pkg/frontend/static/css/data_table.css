@@ -19,6 +19,10 @@
     --table-code-font: var(--font-mono, monospace);
     --table-primary-size: 0.875rem;
     --table-primary-weight: 600;
+    --table-fold-primary-weight: 500;
+    --table-fold-line-h: 24px;
+    --table-fold-meta-h: 20px;
+    --table-fold-row-h: 60px;
     --table-primary-color: var(--text-primary);
     --table-secondary-size: 0.8125rem;
     --table-secondary-weight: 400;
@@ -188,7 +192,7 @@
 .dt-warning { border-color: var(--table-warning); color: var(--table-primary-color); }
 .dt-row:has(.dt-subtitle) td { height: var(--table-row-description-h); }
 .dt-box.dt-folded .dt-row:has(.dt-subtitle) td { height: auto; }
-.dt-box.dt-folded .dt-primary { display: block; min-height: var(--table-touch); min-width: var(--table-touch); line-height: var(--table-touch); } /* a block, not a flex box: text-overflow does nothing on a flex box, so a long name was cut off mid-letter instead of ending in an ellipsis (#8149); the line height and the minimum width keep it a 44 px target, also for a short name such as "#31" (the run table's row button was 43 px wide, #8171) */
+.dt-box.dt-folded .dt-primary { display: block; min-height: var(--table-touch); min-width: var(--table-touch); line-height: 1.3; } /* a block, not a flex box: text-overflow does nothing on a flex box, so a long name was cut off mid-letter instead of ending in an ellipsis (#8149); the line height and the minimum width keep it a 44 px target, also for a short name such as "#31" (the run table's row button was 43 px wide, #8171) */
 
 .dt-primary:focus-visible { outline: var(--table-focus-w) solid var(--table-focus-color); outline-offset: calc(-1 * var(--table-focus-w)); }
 
@@ -253,3 +257,21 @@
 .dt-name-text { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-inline-size: 32rem; }
 .dt-box.dt-folded .dt-primary:has(.dt-name-text) { display: flex; align-items: center; }
 .dt-box.dt-folded .dt-name-text { line-height: 1.35; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: normal; overflow-wrap: anywhere; max-inline-size: 100%; }
+
+/* A folded column row keeps its two lines compact. The title still has a 44px
+ * hit area, centered over its 24px text line; the row itself opens across both lines. */
+.dt-box.dt-fold-column.dt-folded .dt-row { min-height: var(--table-fold-row-h); align-content: center; }
+.dt-box.dt-fold-column.dt-folded td.dt-line-1 { height: var(--table-fold-line-h); overflow: visible; display: flex; align-items: center; min-width: 0; }
+.dt-box.dt-fold-column.dt-folded td.dt-line-1.dt-end { justify-content: flex-end; }
+.dt-box.dt-fold-column.dt-folded .dt-title-cell { align-items: center; width: 100%; }
+.dt-box.dt-fold-column.dt-folded .dt-title-stack { width: 100%; }
+.dt-box.dt-fold-column.dt-folded .dt-primary { box-sizing: border-box; padding: 0; margin-block: calc((var(--table-fold-line-h) - var(--table-touch)) / 2); line-height: 1.3; font-weight: var(--table-fold-primary-weight); }
+.dt-box.dt-fold-column.dt-folded .dt-title-cell > .dt-primary { min-width: 0; flex: 1; }
+.dt-box.dt-fold-column.dt-folded td.dt-line-2 { min-height: var(--table-fold-meta-h); line-height: var(--table-fold-meta-h); }
+.dt-box.dt-fold-column.dt-folded .dt-name-text { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dt-box.dt-fold-column.dt-folded .dt-subtitle.dt-clamp-2 { -webkit-line-clamp: 1; }
+
+.dt-title-content { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.dt-box.dt-fold-column.dt-folded .dt-title-content { overflow: visible; }
+.dt-box.dt-fold-column.dt-folded .dt-id { min-width: 0; }
+.dt-box.dt-fold-column.dt-folded .dt-chip { box-sizing: border-box; height: var(--table-fold-meta-h); padding-block: 0; font-size: var(--table-head-size); font-weight: var(--table-head-weight); }
