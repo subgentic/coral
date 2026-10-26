@@ -18,7 +18,7 @@ const { loadFilters, saveFilters, toParams, isFiltered, EMPTY } = await importOn
 const { loadPanelOpen, savePanelOpen, buildMoreMenu } = await importOnce('./list_bar.js');
 const { isOwnerLabelRefusal, OWNER_LABEL_TEXT } = await importOnce('./owner_label.js');
 const { inlineArtifactPath } = await importOnce('./artifact_paths.js');
-const { readersAllowed, readersDisclosure } = await importOnce('./artifact_readers.js');
+const { readersAllowed, readersBlock } = await importOnce('./artifact_readers.js');
 
 const PAGE = 100;
 const HEX_RE = /^[a-f0-9]{64}$/;
@@ -349,7 +349,7 @@ function openArtifact(item, opener) {
         sub: [un ? '' : typeText(item), un ? '' : sizeText(item.size), whenText(item.created_at)].filter(Boolean).join(' · '), subTitle: createdText(item), // the exact time behind the one in words
         facts: facts.filter(([, v]) => v != null && v !== ''),
         details: link && link.preview && hex ? (h, { isStale }) => { // the Operator's "Who can read this" (#5577) is behind Details with the facts, for a stored artifact
-            readersAllowed(hex, link.server).then(ok => { if (ok && !isStale()) h.add(readersDisclosure(hex, link.server)); }).catch(() => {});
+            readersAllowed(hex, link.server).then(ok => { if (ok && !isStale()) h.add(readersBlock(hex, link.server, h)); }).catch(() => {});
         } : null,
         body: link && link.preview ? (host, { signal, isStale }) => {
             return renderArtifact(host, hex ? `coral://artifacts/${hex}` : item.uri || '', { server: link.server, filename: name, mediaType: item.media_type, contentURL: link.contentURL }, { signal, isStale, renderContent: renderText, openEntry: () => {}, setMeta: () => {} }); } : null,

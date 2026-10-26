@@ -3,7 +3,8 @@
  * and the artifact viewer's, one rule. Whether it is open is remembered for the viewer (one switch for all of them), and the button only exists while there is something behind it.
  *
  *   const d = makeDetails({ panel })      d.button (put it in the header row)   d.panel (put it under the header)   d.add(node)   d.clear()
- * add() makes the button appear; the panel is shown only while the button says it is open (aria-expanded, aria-controls). */
+ * add() makes the button appear; the panel is shown only while the button says it is open (aria-expanded, aria-controls). onShown(fn) runs fn each time the panel is shown (at once when it already is):
+ * what is behind Details is loaded then, not before. remove(node) takes one thing out, and the button goes when nothing is left. */
 import { browserLocal } from './safe_storage.js';
 
 const KEY = 'coral-details-open';
@@ -20,16 +21,20 @@ export function makeDetails({ panel = null } = {}) {
     chevron.className = 'material-icons details-toggle-chevron'; chevron.setAttribute('aria-hidden', 'true'); chevron.textContent = 'expand_more';
     button.append('Details', chevron);
     let used = false;
+    let shown = [];
     const isOpen = () => browserLocal.get(KEY) === '1';
     const sync = () => {
         const open = isOpen() && used;
         button.hidden = !used; button.setAttribute('aria-expanded', String(open)); p.hidden = !open;
+        if (open) for (const fn of shown) fn();
     };
     button.addEventListener('click', () => { browserLocal.set(KEY, isOpen() ? '0' : '1'); sync(); });
     sync();
     return {
         button, panel: p,
         add(node) { p.append(node); used = true; sync(); },
-        clear() { p.replaceChildren(); used = false; sync(); },
+        remove(node) { node.remove(); used = p.children.length > 0; sync(); },
+        onShown(fn) { shown.push(fn); if (isOpen() && used) fn(); },
+        clear() { p.replaceChildren(); used = false; shown = []; sync(); },
     };
 }

@@ -115,7 +115,7 @@ export function openDetailPane({ key, title, sub = '', facts = [], body = null, 
         document.body.classList.add('team-detail-open');
         rail(true);
     }
-    if (details) { try { details({ add: more.add, clear: more.clear }, { isStale: () => current === null || current.gen !== mine }); } catch { /* the pane is shown without them */ } }
+    if (details) { try { details({ add: more.add, remove: more.remove, onShown: more.onShown, clear: more.clear }, { isStale: () => current === null || current.gen !== mine }); } catch { /* the pane is shown without them */ } }
     if (body) { try { body(doc, { signal: abort.signal, isStale: () => current === null || current.gen !== mine }); } catch (e) { doc.textContent = 'This document could not be shown.'; } }
     if (focus) h.focus({ preventScroll: true }); // keyboard and screen reader: the pane's title (the row's own button keeps the way back)
     live(`${title}, details`);

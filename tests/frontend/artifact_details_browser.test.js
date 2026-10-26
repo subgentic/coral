@@ -52,6 +52,15 @@ const BUNDLE = { exists: true, team_name: TEAM, created_at: '2026-10-25T05:00:00
                 assert.deepEqual([s.expanded, s.controls, s.hidden], ['false', true, true], 'closed to begin with, the button names its panel'); assert.match(s.name, /^Details/);
                 assert.ok(!/Who can read this|MIME|Producer|Worker A/.test(s.facts), 'no facts and no readers on show: ' + s.facts.slice(0, 200));
                 assert.ok(/^Text \u00b7 1\.8 KB \u00b7 \d+ min ago$/.test(s.sub), `the header says the type, the size and when: ${s.sub}`); assert.ok(s.exact, 'with the exact time on hover');
+                if (mobile) { // the Details button is a 44 px target on a phone, with a touch pointer and with a mouse (#7796)
+                    for (const touch of [true, false]) {
+                        await Emulation.setTouchEmulationEnabled({ enabled: touch }); await settle(150);
+                        const sz = await ev(`(() => { const b = document.querySelector('#detail-pane .details-toggle'); const r = b.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })()`);
+                        assert.ok(sz[0] >= 44 && sz[1] >= 44, `${touch ? 'touch' : 'mouse'}: the pane's Details button is 44 px: ${JSON.stringify(sz)}`);
+                        const gg = await geometry('#detail-pane .detail-head', '#detail-pane .detail-doc'); assert.ok(gg && gg.gap <= 16, `${touch ? 'touch' : 'mouse'}: and the content is still straight under the header: ${JSON.stringify(gg)}`);
+                    }
+                    await Emulation.setTouchEmulationEnabled({ enabled: true });
+                }
                 await shot(`artifact-details-closed-${w}`);
             });
             await S.run(`${label}: Details opens and closes by keyboard (Enter, Space), shows the facts and "Who can read this", repeats nothing the header says, and stays open for the next artifact`, async () => {
@@ -63,6 +72,7 @@ const BUNDLE = { exists: true, team_name: TEAM, created_at: '2026-10-25T05:00:00
                 assert.ok(!/(^|\s)(Type|Size|Created)\s/.test(s.text.replace(/MIME/, '')), 'nothing repeats the header (type, size, time): ' + s.text.slice(0, 200));
                 await waitFor(`!!document.querySelector('#detail-pane .detail-details .artifact-readers')`, 'Who can read this inside Details', 8000);
                 assert.equal(await ev(`window.__na.text(document.querySelector('#detail-pane .detail-details')).includes('Who can read this')`), true, 'Who can read this is in the same panel');
+                assert.deepEqual(await ev(`(() => { const r = document.querySelector('#detail-pane .detail-details .artifact-readers'); return { tag: r.tagName, nested: r.querySelectorAll('details, summary').length, body: r.querySelector('.artifact-readers-body').textContent.length > 0 }; })()`), { tag: 'SECTION', nested: 0, body: true }, 'Who can read this is shown directly: its answer is there, no second disclosure inside the first (#7796)');
                 await shot(`artifact-details-open-${w}`);
                 await key(' ', 'Space', 32, ' '); await settle(200);
                 assert.equal(await ev(`document.querySelector('#detail-pane .detail-details').hidden`), true, 'Space closes it');
@@ -94,6 +104,14 @@ const BUNDLE = { exists: true, team_name: TEAM, created_at: '2026-10-25T05:00:00
                 await waitFor(`!!document.querySelector('#artifact-viewer .details-toggle:not([hidden])') && /The design review text\\./.test(document.querySelector('#artifact-viewer .artifact-viewer-body').textContent)`, 'the viewer with its content and Details', 10000);
                 const g = await geometry('#artifact-viewer .artifact-viewer-header', '#artifact-viewer .artifact-viewer-body'); assert.ok(g && g.gap >= 0 && g.gap <= 16, `the content's top is within 16 px of the header's bottom: ${JSON.stringify(g)}`);
                 assert.equal(await ev(`document.querySelector('#artifact-viewer .artifact-viewer-readers').hidden`), true, 'closed to begin with');
+                if (mobile) {
+                    for (const touch of [true, false]) {
+                        await Emulation.setTouchEmulationEnabled({ enabled: touch }); await settle(150);
+                        const sz = await ev(`(() => { const r = document.querySelector('#artifact-viewer .details-toggle').getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })()`);
+                        assert.ok(sz[0] >= 44 && sz[1] >= 44, `${touch ? 'touch' : 'mouse'}: the viewer's Details button is 44 px: ${JSON.stringify(sz)}`);
+                    }
+                    await Emulation.setTouchEmulationEnabled({ enabled: true });
+                }
                 await ev(`${toggle('#artifact-viewer')}.focus(); true`); await key('Enter', 'Enter', 13, '\r'); await settle(200);
                 assert.equal(await ev(`document.querySelector('#artifact-viewer .artifact-viewer-readers').hidden`), false, 'Enter opens it');
                 assert.ok(await ev(`window.__na.text(document.querySelector('#artifact-viewer .artifact-viewer-readers')).includes('Who can read this')`), 'Who can read this is inside');
