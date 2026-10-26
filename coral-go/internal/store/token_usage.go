@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"time"
 )
 
 // TokenUsage represents a token usage snapshot for a session.
@@ -163,7 +164,7 @@ func (s *TokenUsageStore) ListUsage(ctx context.Context, f UsageFilter) ([]Token
 	}
 	if f.Since != "" {
 		query += " AND t.recorded_at >= ?"
-		args = append(args, f.Since)
+		args = append(args, windowBound(f.Since))
 	}
 
 	query += ` GROUP BY t.session_id ORDER BY MAX(t.recorded_at) DESC, t.session_id`
@@ -250,6 +251,21 @@ func (s *TokenUsageStore) GetLatestTurnContextBySessionIDs(ctx context.Context, 
 // tokenUsageNow stamps a usage report that has no timestamp of its own (a var for tests).
 var tokenUsageNow = NowUTC
 
+// windowBound is a window's start or end as the stored stamps compare against it. The stamps are text in several forms ("...:00Z", "...:00.000Z", "...:00.000000+00:00", bare "...:00"), and
+// as text "." sorts before "Z": a since of "2026-10-25T10:00:00Z" was greater than the row stamped "2026-10-25T10:00:00.000Z" that is exactly at it, and that row was dropped (#8634). A whole-second
+// time is therefore made the series' own form, 2006-01-02T15:04:05 in UTC, which sorts before every stamp of that second; one with a fraction (the stamp of that precision compares right) and one
+// that is not a time are left as they are.
+func windowBound(t string) string {
+	parsed, err := time.Parse(time.RFC3339Nano, t)
+	if err != nil {
+		parsed, err = time.Parse("2006-01-02 15:04:05", t) // a space for the T sorts before every stamp of that day
+	}
+	if err != nil || parsed.Nanosecond() != 0 {
+		return t
+	}
+	return parsed.UTC().Format("2006-01-02T15:04:05")
+}
+
 func sinceWhere(since string) string {
 	if since == "" {
 		return ""
@@ -261,5 +277,5 @@ func sinceArgs(since string) []interface{} {
 	if since == "" {
 		return nil
 	}
-	return []interface{}{since}
+	return []interface{}{windowBound(since)}
 }
