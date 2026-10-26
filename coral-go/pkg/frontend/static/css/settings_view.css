@@ -15,6 +15,11 @@
 .sv-row[hidden] { display: none; }
 .sv-heading { margin: 8px 0 0; font-size: var(--sv-label-size); font-weight: 600; color: var(--sv-label-color); }
 .sv-notice { min-width: 0; }
+/* the live parts of a Settings group (the terminal backend card, wake after a restart) sit on the page's row spacing: the row's own padding, not their own margins; the Learn more follows the sentence */
+.sv .sv-notice > #settings-terminal-backend { margin: 0; }
+.sv .sv-notice > #tb-autowake { display: block; margin: 0; padding: 0; border-top: 0; }
+#settings-modal .sv .sv-notice > #tb-autowake > span:not(:first-child) { display: inline; margin: 0; }
+#settings-modal .sv .sv-notice > #tb-autowake > button { display: inline; min-height: 0; }
 .sv-row-notice:has(> .sv-notice > [hidden]:only-child), .sv-row-notice:has(> .sv-notice > dl > [hidden]:only-child) { display: none; } /* a live part its own module has hidden leaves no empty row */
 .sv-pane > .sv-row:first-of-type, .sv-body > .sv-row:first-of-type { border-top: 0; }
 .sv-settings .sv-row { grid-template-columns: minmax(0, 1fr) var(--sv-control-width); }
