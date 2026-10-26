@@ -352,47 +352,10 @@ func winStageRisk(st winStage, outside func(string) bool) string {
 	if why, done := winNestedRisk(st, name, args, outside); done {
 		return why
 	}
+	if why, done := winStartRisk(st, name, args, outside); done {
+		return why
+	}
 	switch name {
-	case "start":
-		// cmd's start and PowerShell's alias of Start-Process: the program it starts is judged, with -ArgumentList always asking.
-		for i, a := range args {
-			if (strings.EqualFold(a, "/d") || isParam(a, "workingdirectory", 2)) && (i+1 >= len(args) || pathOutside(args[i+1], outside)) {
-				return "it starts a program in a folder outside the working directory (#5690)"
-			}
-			if isParam(a, "argumentlist", 2) || strings.EqualFold(a, "-args") {
-				return "it starts a program with arguments Coral can't judge"
-			}
-		}
-		for len(args) > 0 && strings.HasPrefix(args[0], "/") && len(args[0]) <= 8 { // start's own switches: /b /wait /min
-			args = args[1:]
-		}
-		if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
-			return winVerbRisk(strings.Join(args, " "), outside)
-		}
-		return ""
-	case "start-process", "saps":
-		filePath := ""
-		for i, a := range args {
-			if isParam(a, "workingdirectory", 2) && (i+1 >= len(args) || pathOutside(args[i+1], outside)) {
-				return "it starts a process in a folder outside the working directory (#5690)"
-			}
-			if isParam(a, "verb", 1) && i+1 < len(args) && strings.EqualFold(args[i+1], "runas") {
-				return "it starts a process as administrator"
-			}
-			if isParam(a, "argumentlist", 2) || strings.EqualFold(a, "-args") {
-				return "it starts a program with arguments Coral can't judge (S2)"
-			}
-			if isParam(a, "filepath", 2) && i+1 < len(args) {
-				filePath = args[i+1]
-			}
-		}
-		if filePath != "" {
-			return winVerbRisk(filePath, outside) // Start-Process -FilePath format.com: the program is judged
-		}
-		if len(args) > 0 && !strings.HasPrefix(args[0], "-") && winKnownCommand(args[0]) {
-			return winVerbRisk(strings.Join(args, " "), outside) // Start-Process cmd, powershell: the program is judged
-		}
-		return ""
 	case "invoke-webrequest", "iwr", "invoke-restmethod", "irm", "curl", "wget":
 		for _, a := range args {
 			// curl -K file and --config file read more options (an output among them) from a file Coral does not read.
@@ -629,6 +592,53 @@ func winStageRisk(st winStage, outside func(string) bool) string {
 		}
 	}
 	return ""
+}
+
+// winStartRisk judges start and Start-Process: the program they start, the folder it starts in, and its arguments.
+func winStartRisk(st winStage, name string, args []string, outside func(string) bool) (string, bool) {
+	switch name {
+	case "start":
+		// cmd's start and PowerShell's alias of Start-Process: the program it starts is judged, with -ArgumentList always asking.
+		for i, a := range args {
+			if (strings.EqualFold(a, "/d") || isParam(a, "workingdirectory", 2)) && (i+1 >= len(args) || pathOutside(args[i+1], outside)) {
+				return "it starts a program in a folder outside the working directory (#5690)", true
+			}
+			if isParam(a, "argumentlist", 2) || strings.EqualFold(a, "-args") {
+				return "it starts a program with arguments Coral can't judge", true
+			}
+		}
+		for len(args) > 0 && strings.HasPrefix(args[0], "/") && len(args[0]) <= 8 { // start's own switches: /b /wait /min
+			args = args[1:]
+		}
+		if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
+			return winVerbRisk(strings.Join(args, " "), outside), true
+		}
+		return "", true
+	case "start-process", "saps":
+		filePath := ""
+		for i, a := range args {
+			if isParam(a, "workingdirectory", 2) && (i+1 >= len(args) || pathOutside(args[i+1], outside)) {
+				return "it starts a process in a folder outside the working directory (#5690)", true
+			}
+			if isParam(a, "verb", 1) && i+1 < len(args) && strings.EqualFold(args[i+1], "runas") {
+				return "it starts a process as administrator", true
+			}
+			if isParam(a, "argumentlist", 2) || strings.EqualFold(a, "-args") {
+				return "it starts a program with arguments Coral can't judge (S2)", true
+			}
+			if isParam(a, "filepath", 2) && i+1 < len(args) {
+				filePath = args[i+1]
+			}
+		}
+		if filePath != "" {
+			return winVerbRisk(filePath, outside), true // Start-Process -FilePath format.com: the program is judged
+		}
+		if len(args) > 0 && !strings.HasPrefix(args[0], "-") && winKnownCommand(args[0]) {
+			return winVerbRisk(strings.Join(args, " "), outside), true // Start-Process cmd, powershell: the program is judged
+		}
+		return "", true
+	}
+	return "", false
 }
 
 // winNestedRisk judges the commands that run another command: a nested PowerShell, call, for, forfiles, if and else, cmd and the POSIX shells. done says the name was one of them.
