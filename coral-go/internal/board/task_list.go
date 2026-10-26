@@ -75,6 +75,10 @@ type TaskListItem struct {
 	BlockedBy    []TaskDep     `db:"-" json:"blocked_by,omitempty"`
 	// Reviewers: who reviews the task, from its newest review round (the open one, else the last): the Tasks tab's Who column (#8501). Absent for a task that was never in review.
 	Reviewers []string `db:"-" json:"reviewers,omitempty"`
+	// ArtifactCount: how many distinct artifacts the task's own results hold (its completion's and its review's, each stored object or link once): the Tasks tab's file count (#8579). Absent for none.
+	ArtifactCount int `db:"-" json:"artifact_count,omitempty"`
+	// ArtifactRows is the number of artifact rows in the workflow as the query counts them; fillListArtifactCounts turns it into ArtifactCount.
+	ArtifactRows int `db:"artifact_rows" json:"-"`
 	// ReviewersJSON is the reviewers as the query reads them (a JSON array of names); fillListReviewers turns it into Reviewers.
 	ReviewersJSON string `db:"reviewers_json" json:"-"`
 }
@@ -108,7 +112,8 @@ const taskListColumns = `t.id, t.revision, t.board_id, t.title,
 	     WHEN t.status = 'completed' AND COALESCE(t.completed_by, '') != '' THEN t.completed_by
 	     ELSE COALESCE(t.assigned_to, '') END AS worked_by,
 	` + prefixedUpdatedAtSQL + ` AS updated_at,
-	COALESCE((SELECT json_group_array(json_extract(v.value, '$.reviewer')) FROM json_each(w.data, '$.review_rounds[#-1].reviewers') v), '[]') AS reviewers_json
+	COALESCE((SELECT json_group_array(json_extract(v.value, '$.reviewer')) FROM json_each(w.data, '$.review_rounds[#-1].reviewers') v), '[]') AS reviewers_json,
+	COALESCE(json_array_length(w.data, '$.artifacts'), 0) + COALESCE(json_array_length(w.data, '$.completion_review.artifacts'), 0) AS artifact_rows
 	FROM board_tasks t LEFT JOIN task_workflows w ON w.task_id = t.id`
 
 // ListTaskPage returns a page of the board's task list. Each page costs O(limit) rows:
@@ -155,6 +160,7 @@ func (s *Store) ListTaskPage(ctx context.Context, project string, q TaskListQuer
 	}
 	s.loadListVerification(ctx, page.Tasks)
 	fillListReviewers(page.Tasks)
+	s.fillListArtifactCounts(ctx, page.Tasks)
 	if err := s.loadListBlockedBy(ctx, page.Tasks); err != nil {
 		return nil, err
 	}
@@ -268,6 +274,55 @@ func fillListReviewers(items []TaskListItem) {
 			items[i].Reviewers = names
 		}
 	}
+}
+
+// fillListArtifactCounts sets ArtifactCount on the items that hold artifact rows: one batched read of their workflows, then each distinct stored object or link counted once, and a
+// piece of inline content once for its place (the task page's list collapses the same way, #8579).
+func (s *Store) fillListArtifactCounts(ctx context.Context, items []TaskListItem) {
+	var ids []int64
+	for i := range items {
+		if items[i].ArtifactRows > 0 {
+			ids = append(ids, items[i].ID)
+		}
+	}
+	if len(ids) == 0 {
+		return
+	}
+	data, err := s.loadWorkflowData(ctx, ids)
+	if err != nil {
+		return
+	}
+	for i := range items {
+		if items[i].ArtifactRows == 0 {
+			continue
+		}
+		raw, found := data[items[i].ID]
+		w, err := decodeWorkflow(raw, found)
+		if err != nil {
+			continue
+		}
+		items[i].ArtifactCount = countDistinctArtifacts(&w)
+	}
+}
+
+// countDistinctArtifacts is how many artifacts a workflow's results hold, by identity: a managed object or a link once however often it is referenced, inline content once per place.
+func countDistinctArtifacts(w *TaskWorkflow) int {
+	seen := map[string]bool{}
+	add := func(source string, refs []TaskArtifact) {
+		for i, a := range refs {
+			switch {
+			case a.URI != "":
+				seen["u:"+a.URI] = true
+			case a.Content != "":
+				seen[fmt.Sprintf("c:%s:%d", source, i)] = true
+			}
+		}
+	}
+	add("completion", w.Artifacts)
+	if w.CompletionReview != nil {
+		add("review", w.CompletionReview.Artifacts)
+	}
+	return len(seen)
 }
 
 // loadListBlockedBy fills BlockedBy for list items, with the same batched loader as Task.

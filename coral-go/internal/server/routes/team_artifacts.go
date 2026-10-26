@@ -32,13 +32,16 @@ var digestLikeName = regexp.MustCompile(`^(?:sha256:)?[a-fA-F0-9]{32,64}$`)
 
 // teamArtifact is one deduplicated artifact reference in a team's task results.
 type teamArtifact struct {
-	ID             string `json:"id"`
-	Name           string `json:"name"`
-	MediaType      string `json:"media_type,omitempty"`
-	Size           *int64 `json:"size"`
-	CreatedAt      string `json:"created_at"`
-	TaskID         int64  `json:"task_id"`
-	TaskTitle      string `json:"task_title"`
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	MediaType string `json:"media_type,omitempty"`
+	Size      *int64 `json:"size"`
+	CreatedAt string `json:"created_at"`
+	TaskID    int64  `json:"task_id"`
+	TaskTitle string `json:"task_title"`
+	// GoalID and GoalTitle: the goal of this board the task works toward (#8579); absent for a task with none, and for a row of no task.
+	GoalID         *int64 `json:"goal_id,omitempty"`
+	GoalTitle      string `json:"goal_title,omitempty"`
 	Source         string `json:"source"`
 	URI            string `json:"uri,omitempty"`
 	Digest         string `json:"digest,omitempty"`
@@ -218,7 +221,7 @@ func collectTeamArtifacts(project string, tasks []board.TeamArtifactTask, subscr
 			return
 		}
 		for i, a := range refs {
-			item := teamArtifact{Name: a.Name, MediaType: a.MediaType, CreatedAt: created, TaskID: t.TaskID, TaskTitle: t.Title, Source: source, URI: a.URI, Digest: a.Digest, index: i, ReferenceCount: 1, Provenance: a.Provenance}
+			item := teamArtifact{Name: a.Name, MediaType: a.MediaType, CreatedAt: created, TaskID: t.TaskID, TaskTitle: t.Title, GoalID: t.GoalID, GoalTitle: t.GoalTitle, Source: source, URI: a.URI, Digest: a.Digest, index: i, ReferenceCount: 1, Provenance: a.Provenance}
 			if producer != "" {
 				p := producer
 				item.ProducedBy = &p
@@ -615,12 +618,17 @@ func (h *BoardHandler) linkUploadTasks(ctx context.Context, project string, item
 	if err != nil {
 		return
 	}
+	goals, _ := h.bs.TaskGoals(ctx, project, ids) // a read that fails leaves the rows without a goal, as a task with none
 	for i := range items {
 		if items[i].TaskID != 0 || items[i].uploadTask <= 0 {
 			continue
 		}
 		if title, ok := titles[items[i].uploadTask]; ok {
 			items[i].TaskID, items[i].TaskTitle = items[i].uploadTask, title
+			if g, ok := goals[items[i].uploadTask]; ok {
+				gid := g.ID
+				items[i].GoalID, items[i].GoalTitle = &gid, g.Title
+			}
 		}
 	}
 }
