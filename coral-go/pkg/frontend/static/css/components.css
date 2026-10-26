@@ -116,7 +116,9 @@
     font-size: 0.8125rem;
     margin: 8px 16px 12px;
     flex-shrink: 0; /* above the message list, not in it (#8453) */
+    display: flex; align-items: center; justify-content: center; gap: 8px; /* the moon icon and the words, a space apart */
 }
+.mb-sleep-banner .material-icons { font-size: 1.125rem; }
 
 .restart-spinner {
     display: inline-block;

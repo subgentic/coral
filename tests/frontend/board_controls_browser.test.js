@@ -45,8 +45,8 @@ const { openBoardPage } = require('./helpers/team_board');
         await sleep(true);
         const asleep = await ev(`({ btn: document.getElementById('mb-sleep-btn')?.textContent ?? null, input: document.getElementById('mb-post-input').disabled, placeholder: document.getElementById('mb-post-input').placeholder, send: document.querySelector('#mb-board .btn-primary').disabled, opacity: document.querySelector('#mb-board .btn-primary').style.opacity })`);
         assert.deepEqual(asleep, { btn: asleep.btn, input: true, placeholder: 'Team is sleeping...', send: true, opacity: '0.4' });
-        const banner = () => ev(`(() => { const e = document.getElementById('mb-sleep-banner'); return e ? { shown: e.checkVisibility(), outsideList: !document.getElementById('mb-messages').contains(e), text: e.textContent.trim() } : null; })()`);
-        assert.deepEqual(await banner(), { shown: true, outsideList: true, text: '\u{1F319} This team is sleeping. Messages are paused.' }, 'a sleeping board shows its banner, above the list');
+        const banner = () => ev(`(() => { const e = document.getElementById('mb-sleep-banner'); return e ? { shown: e.checkVisibility(), outsideList: !document.getElementById('mb-messages').contains(e), text: e.querySelector('.mb-sleep-text').textContent, icon: e.querySelector('.material-icons').textContent, gap: Math.round(e.querySelector('.mb-sleep-text').getBoundingClientRect().left - e.querySelector('.material-icons').getBoundingClientRect().right) } : null; })()`);
+        assert.deepEqual(await banner(), { shown: true, outsideList: true, text: 'This team is sleeping. Messages are paused.', icon: 'bedtime', gap: 8 }, 'a sleeping board shows its banner, above the list: the moon is the bedtime icon with a gap before the words');
         assert.equal((await api('POST', `/api/board/${B}/messages`, { subscriber_id: 'orch', content: 'a message drawn while it sleeps' })).status, 200);
         await sleep(true); // the board is drawn again, still sleeping, with the new message
         await waitFor(`document.querySelectorAll('#mb-messages .mb-message').length === 3`, 'the new message is drawn', 15000);
