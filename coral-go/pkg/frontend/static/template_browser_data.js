@@ -1,10 +1,13 @@
 /* The pure parts of the template browser (moved out of template_browser.js, #8413): what the aitmpl.com answers hold, which entries a filter keeps, the names a row shows and the words of a template's preview. Node-tested. */
 
+// The first of the candidates that is a list; none of them (an error answer, null) is an empty list, so the browser says "No categories found" instead of throwing.
+const firstList = (...candidates) => candidates.find(Array.isArray) || [];
+
 /** The categories of the answer: the list itself or the one under `categories` or `commands`. */
-export const categoriesOf = raw => raw.categories || raw.commands || raw || [];
+export const categoriesOf = raw => firstList(raw?.categories, raw?.commands, raw);
 
 /** The templates of a category's answer: the list itself or the one under `agents` or `commands`. */
-export const templatesOf = raw => raw.agents || raw.commands || raw || [];
+export const templatesOf = raw => firstList(raw?.agents, raw?.commands, raw);
 
 /** A category is a name or an object with one. */
 export const categoryName = c => c.name || c;
