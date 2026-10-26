@@ -7,7 +7,7 @@ const { install: installTP, seed, openTeam, goTab, rect, scenarios } = require('
 const BASE = require('./test_base').BASE;
 const { removeBoards } = require('./helpers/board_cleanup');
 
-const VIEWS = [['1280x800', 1280, 800, false], ['390x844', 390, 844, true]];
+const VIEWS = [['1280x800', 1280, 800, false], ['2000x900', 2000, 900, false], ['390x844', 390, 844, true]];
 const TEAM = `qa-msgs-${Date.now() % 100000}`;
 const BOX = `window.__tp.find('textarea, input[type=text], [role=textbox]', /^Message the team$/i)`;
 
@@ -34,6 +34,11 @@ const BOX = `window.__tp.find('textarea, input[type=text], [role=textbox]', /^Me
                 assert.ok(await ev(`!!${BOX}`), 'a text box named Message the team');
                 assert.ok(await ev(`!!window.__tp.find('button', /^Send$/i)`), 'a button named Send');
                 const now = await rect(ev); for (const part of ['h1', 'tabs']) for (const k of ['x', 'y', 'w', 'h']) assert.ok(Math.abs(base[part][k] - now[part][k]) <= 0.5, `the ${part} ${k} moved on Messages (${base[part][k]} to ${now[part][k]})`);
+            });
+            if (w >= 1280) await S.run(`${label}: the Board table fills the pane (its right edge meets the pane's), as the other tabs do (#8504)`, async () => {
+                const g = await ev(`(() => { const t = document.querySelector('#mb-messages'), p = document.querySelector('#mb-board'); if (!t || !p) return null; const a = t.getBoundingClientRect(), b = p.getBoundingClientRect(); return { table: Math.round(a.right), pane: Math.round(b.right), left: Math.round(a.left - b.left), cls: t.className }; })()`);
+                assert.ok(g && /mb-table/.test(g.cls), `the Board is drawn as the table (${JSON.stringify(g)})`);
+                assert.ok(g.pane - g.table <= 4, `the table's right edge (${g.table}) meets the pane's (${g.pane}) within the scrollbar`);
             });
             await S.run(`${label}: a message typed and sent appears in the list and the box is emptied`, async () => {
                 await ev(`(() => { const t = ${BOX}; t.focus(); t.value = 'Hello from the Messages tab'; t.dispatchEvent(new Event('input', { bubbles: true })); window.__tp.find('button', /^Send$/i).click(); return true; })()`);
