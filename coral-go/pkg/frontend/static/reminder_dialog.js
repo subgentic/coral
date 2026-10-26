@@ -1,3 +1,4 @@
+import { plural } from './format.js';
 /* The dialog that starts a periodic reminder (#6329): the instruction to send (for an agent) and how often, with the checks said next to the field. It replaces window.prompt, which the native app
  * does not support. It is a native <dialog> opened with showModal(), so it sits above the Team view dialog it is opened from (the top layer), Escape closes it, Tab stays inside and focus goes back to
  * the button that opened it.
@@ -29,7 +30,7 @@ function reminderSeconds(raw) {
 
 /** An interval in words: "every minute", "every 5 minutes", "every 2.5 minutes", "every 30 seconds", "every 2 hours". */
 function everyWords(seconds) {
-    const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+
     if (seconds < 60) return `every ${plural(seconds, 'second')}`;
     if (seconds === 60) return 'every minute';
     if (seconds >= 3600 && seconds % 3600 === 0) return seconds === 3600 ? 'every hour' : `every ${plural(seconds / 3600, 'hour')}`;

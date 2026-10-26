@@ -2,7 +2,7 @@
 import { historyFetch } from './history_source.js';
 import { serverFetch, serverForSession, teamFetch, keyLabel } from './server_base.js';
 import { formatTokens } from './format.js';
-import { _formatCost } from './session_state.js';
+import { formatCost } from './format.js';
 import { formatDurationSec as formatDuration } from './utils.js';
 import { importOnce } from './import_once.js';
 
@@ -18,7 +18,7 @@ export async function updateTokenUsage(sessionId) {
         if (!data.totals.total_tokens || data.totals.total_tokens === 0) { el.style.display = 'none'; return; }
 
         const parts = [formatTokens(data.totals.total_tokens) + ' tokens'];
-        if (data.totals.cost_usd > 0) parts.push(_formatCost(data.totals.cost_usd));
+        if (data.totals.cost_usd > 0) parts.push(formatCost(data.totals.cost_usd));
         el.textContent = parts.join(' · ');
         el.style.display = '';
     } catch {
@@ -43,7 +43,7 @@ export async function updateHistoryTokenUsage(sessionId) {
         const cache = (t.cache_read_tokens || 0) + (t.cache_write_tokens || 0);
         document.getElementById('htu-cache').textContent = cache > 0 ? formatTokens(cache) : '—';
         document.getElementById('htu-requests').textContent = String(t.num_sessions || '—');
-        document.getElementById('htu-cost').textContent = t.cost_usd > 0 ? _formatCost(t.cost_usd) : '—';
+        document.getElementById('htu-cost').textContent = t.cost_usd > 0 ? formatCost(t.cost_usd) : '—';
         container.style.display = '';
     } catch (error) {
         if (error.name === 'AbortError') return;
@@ -58,7 +58,7 @@ export async function getTeamTokenUsage(boardName) {
         const data = await resp.json();
         if (!data.totals.total_tokens || data.totals.total_tokens === 0) return null;
         const parts = [formatTokens(data.totals.total_tokens) + ' tokens'];
-        if (data.totals.cost_usd > 0) parts.push(_formatCost(data.totals.cost_usd));
+        if (data.totals.cost_usd > 0) parts.push(formatCost(data.totals.cost_usd));
         if (data.totals.execution_time_sec > 0) parts.push(formatDuration(data.totals.execution_time_sec));
         return parts.join(' · ');
     } catch {
@@ -117,7 +117,7 @@ export async function showTeamTokenUsage(boardName) {
         <div><span class="info-token-label">Cache Read</span><span class="info-token-value">${formatTokens(totalCacheR)}</span></div>
         <div><span class="info-token-label">Cache Write</span><span class="info-token-value">${formatTokens(totalCacheW)}</span></div>
         <div><span class="info-token-label">Requests</span><span class="info-token-value">${totalReqs}</span></div>
-        <div><span class="info-token-label">Cost</span><span class="info-token-value">${_formatCost(totalCost)}</span></div>
+        <div><span class="info-token-label">Cost</span><span class="info-token-value">${formatCost(totalCost)}</span></div>
         ${executionTimeRow}
     </div>`;
 
@@ -128,7 +128,7 @@ export async function showTeamTokenUsage(boardName) {
     const state = tableState(); state.sort = { key: 'total_cost_usd', dir: 'desc' };
     content.append(dataTable({ label: 'Token usage by member', fold: 'labeled', scroll: true, state, rows: agents, rowKey: r => r.name, columns: [
         { key: 'name', label: 'Agent', tone: 'primary', sort: true, sortValue: r => r.name || '', cell: r => r.name || '' },
-        num('total_cost_usd', 'Cost', { cell: r => _formatCost(r.total_cost_usd || 0), foldFirst: true }),
+        num('total_cost_usd', 'Cost', { cell: r => formatCost(r.total_cost_usd || 0), foldFirst: true }),
         num('total_input_tokens', 'Input'), num('total_output_tokens', 'Output'), num('total_cache_read_tokens', 'Cache read'), num('total_cache_write_tokens', 'Cache write'),
     ] }).el);
 }

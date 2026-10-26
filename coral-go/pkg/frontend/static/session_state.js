@@ -245,7 +245,7 @@ export function buildSessionTooltip(s) {
         const tokCache = (s.token_cache_read || 0);
         let tokenText = `${tokIn} in / ${tokOut} out`;
         if (tokCache > 0) tokenText += ` / ${formatTokens(tokCache)} cache`;
-        if (s.token_cost_usd > 0) tokenText += ` · ${_formatCost(s.token_cost_usd)}`;
+        if (s.token_cost_usd > 0) tokenText += ` · ${formatCost(s.token_cost_usd)}`;
         rows.push(`<tr><td class="tt-label">Tokens</td><td class="tt-value">${tokenText}</td></tr>`);
     }
     if (s.board_project) {
@@ -294,8 +294,4 @@ export function _shortPath(fullPath, segments = 2) {
  export function sessionUnreadCount(s) {
     const n = Number(s && s.board_unread);
     return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
-}
-
-export function _formatCost(c) {
-    return formatCost(c);
 }

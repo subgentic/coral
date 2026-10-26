@@ -1,6 +1,7 @@
+import { formatCost } from './format.js';
 /* The task detail dialog's markup (moved out of tasks.js, #4996; no behaviour change). */
 import { escapeHtml, escapeAttr } from './utils.js';
-import { _priorityLabel, formatTaskDate, _formatCost, _formatTokenCount } from './task_format.js';
+import { _priorityLabel, formatTaskDate, _formatTokenCount } from './task_format.js';
 import { whenWords } from './job_words.js';
 import { serverUrl, artifactPath, contextServer, keyLabel, boardKeyName, splitKey, identityKey } from './server_base.js';
 import { _claimedFor } from './subagents.js';
@@ -209,7 +210,7 @@ function _taskCostHtml(task) {
         const warningClass = task.cost_usd >= 1.0 ? ' board-task-cost-warning' : '';
         html += `<div class="task-detail-section">
             <div class="task-detail-label">Cost</div>
-            <div class="task-detail-cost-summary${warningClass}">${_formatCost(task.cost_usd, true)}</div>
+            <div class="task-detail-cost-summary${warningClass}">${formatCost(task.cost_usd, { nullAsZero: true, zeroAsTwo: true, subCent: 'lt', precise: true })}</div>
             <div class="task-detail-tokens">
                 <div class="task-detail-token-item">
                     <span class="task-detail-token-label">Input</span>
@@ -242,7 +243,7 @@ function _taskLiveCostHtml(liveCost) {
         const warningClass = lc.cost_usd >= 1.0 ? ' board-task-cost-warning' : '';
         html += `<div class="task-detail-section">
             <div class="task-detail-label">Running Cost</div>
-            <div class="task-detail-cost-summary board-task-cost-live${warningClass}">~${_formatCost(lc.cost_usd, true)}</div>
+            <div class="task-detail-cost-summary board-task-cost-live${warningClass}">~${formatCost(lc.cost_usd, { nullAsZero: true, zeroAsTwo: true, subCent: 'lt', precise: true })}</div>
             <div class="task-detail-tokens">
                 <div class="task-detail-token-item">
                     <span class="task-detail-token-label">Input</span>

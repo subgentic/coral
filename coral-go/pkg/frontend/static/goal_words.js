@@ -1,3 +1,4 @@
+import { plural } from './format.js';
 /* The Goals view's words (#7113, UI/UX's #7091 design): a goal's state, the rollup of its tasks, the counts and the empty, filtered-empty and failed lines as a person says them, not as the
  * routes store them. Pure functions (node-tested like job_words.js); the numbers come from the routes' rollup, never from counting rows in the page. No imports.
  * The state words are capitalised and lower-cased on use: the icon scanner reads a quoted lower-case word ("done", "block") as a Material icon name (icon_subset). */
@@ -5,7 +6,6 @@ const STATES = ['Active', 'Blocked', 'Proposed', 'Done', 'Dropped'];
 /** The filter chips, in order: All, then the five states. */
 export const FILTERS = ['All', ...STATES].map(w => w.toLowerCase());
 
-const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 const word = (s) => { const t = String(s || '').trim(); return t ? t[0].toUpperCase() + t.slice(1).toLowerCase() : ''; };
 
 /** The chip's label for a filter: "All", "Active", ... */

@@ -18,7 +18,6 @@ const { showSpend } = await importOnce('./analytics_spend.js'); // a lazy module
 
 // What an empty table says: where the numbers come from and what to try (#6975), not just that there are none.
 const NO_DATA = 'No data in this range yet. It appears once an agent has used tokens; try a longer range.';
-const _formatCost = c => formatCost(c, { zeroAsTwo: true });
 
 function _formatTime(isoStr) {
     if (!isoStr) return '\u2014';
@@ -39,7 +38,6 @@ function _formatDuration(startStr, endStr) {
         return formatDuration(diffMs);
     } catch { return '\u2014'; }
 }
-
 
 function _findSession(sessionId) {
     if (!sessionId || !state.liveSessions) return null;
@@ -340,7 +338,7 @@ export async function _refreshCostDashboard() {
             _setText('cost-cache-read', formatTokens(t.cache_read_tokens || 0));
             _setText('cost-cache-write', formatTokens(t.cache_write_tokens || 0));
             _setText('cost-total-requests', String(t.num_requests || 0)); // the calls recorded: the figure By agent's Requests column adds up to
-            _setText('cost-total-cost', _formatCost(t.cost_usd || 0));
+            _setText('cost-total-cost', formatCost(t.cost_usd || 0, { zeroAsTwo: true }));
 
             // By provider (#5120): the agent types' totals, from by_agent_type: the one source for them (by_model and by_thinking split them).
             _renderProviderTable((data.by_agent_type || []).map(a => ({
@@ -452,7 +450,7 @@ const _tables = {};
 const _numCol = (key, label, get, show, extra) => ({ key, label, numeric: true, sort: 'number', firstDir: 'desc', sortValue: get, cell: r => show(get(r)), ...extra });
 const _tokCol = (key, label, extra) => _numCol(key, label, r => r[key] || 0, formatTokens, extra);
 const _cacheCols = () => [_tokCol('cache_read_tokens', 'Cache read', { narrowHide: true }), _tokCol('cache_write_tokens', 'Cache write', { narrowHide: true })]; // the two that wait when the table's box is narrow
-const _costCol = () => _numCol('cost_usd', 'Cost', r => r.cost_usd || 0, _formatCost, { foldFirst: true }); // the figure the page is opened for: on a phone it follows the name (#5056)
+const _costCol = () => _numCol('cost_usd', 'Cost', r => r.cost_usd || 0, c => formatCost(c, { zeroAsTwo: true }), { foldFirst: true }); // the figure the page is opened for: on a phone it follows the name (#5056)
 const _shareCol = () => _numCol('cost_pct', 'Share', r => r.cost_pct || 0, v => `${Math.round(v * 100)}%`, { foldFirst: true });
 // Team's and branch's Share: the share of the whole table (not of the filtered rows), drawn as a bar with its figure.
 const _shareBarCol = total => _numCol('cost_pct', 'Share', r => r.cost_usd || 0, () => '', { foldFirst: true, cell: r => {
@@ -537,7 +535,6 @@ function _swatched(view, cell) {
     };
 }
 const _seriesOpts = view => ({ open: r => _highlight(view, r), rowName: r => SERIES_VIEWS[view].name(r), rowKey: SERIES_VIEWS[view].rowKey });
-
 
 // ── The Overview over time (#7930): the change against the period before, and cost by team stacked ──
 const _CHANGE_CARDS = { input_tokens: 'input', output_tokens: 'output', cache_read_tokens: 'cache-read', cache_write_tokens: 'cache-write', num_requests: 'requests', cost_usd: 'cost' };
@@ -778,7 +775,7 @@ function _renderSpendChart(buckets) {
     };
 
     // The chart's text alternative: what it shows and where it ends (the tables below carry the detail) (#6432).
-    const chartLabel = `Cumulative spend: ${_formatCost(buckets[buckets.length - 1].cumulative_cost || 0)} over ${n} intervals`;
+    const chartLabel = `Cumulative spend: ${formatCost(buckets[buckets.length - 1].cumulative_cost || 0, { zeroAsTwo: true })} over ${n} intervals`;
     const svg = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" class="spend-chart-svg" role="img" aria-label="${escapeAttr(chartLabel)}">
         <!-- Grid lines -->
         <line class="cost-chart-grid" x1="${PAD.left}" y1="${PAD.top}" x2="${PAD.left + plotW}" y2="${PAD.top}" />
@@ -790,8 +787,8 @@ function _renderSpendChart(buckets) {
         <!-- Dot on last point -->
         <circle class="spend-dot" cx="${points[points.length - 1].split(',')[0]}" cy="${points[points.length - 1].split(',')[1]}" r="3" />
         <!-- Y labels -->
-        <text class="spend-label" x="${PAD.left - 8}" y="${PAD.top + 4}" text-anchor="end">${_formatCost(maxCost)}</text>
-        <text class="spend-label" x="${PAD.left - 8}" y="${PAD.top + plotH / 2 + 4}" text-anchor="end">${_formatCost(midCost)}</text>
+        <text class="spend-label" x="${PAD.left - 8}" y="${PAD.top + 4}" text-anchor="end">${formatCost(maxCost, { zeroAsTwo: true })}</text>
+        <text class="spend-label" x="${PAD.left - 8}" y="${PAD.top + plotH / 2 + 4}" text-anchor="end">${formatCost(midCost, { zeroAsTwo: true })}</text>
         <text class="spend-label" x="${PAD.left - 8}" y="${PAD.top + plotH + 4}" text-anchor="end">$0</text>
         <!-- X labels -->
         <text class="spend-label" x="${PAD.left}" y="${H - 4}" text-anchor="start">${formatBucketLabel(buckets[0].bucket)}</text>
@@ -861,7 +858,7 @@ function _renderBurnRate(buckets, periodHours) {
     const spanHours = Math.max((lastTime - firstTime) / 3600000, 1);
 
     const rate = totalCost / spanHours;
-    el.textContent = _formatCost(rate) + '/hr';
+    el.textContent = formatCost(rate, { zeroAsTwo: true }) + '/hr';
 }
 
 // ── Team Table ───────────────────────────────────────────────

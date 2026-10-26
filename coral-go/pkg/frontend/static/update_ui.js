@@ -1,3 +1,4 @@
+import { plural } from './format.js';
 /* The auto-update UI (#5275, design #5270): the "Update and relaunch" control in the top bar, the failure notice, and the status both read. Hidden and silent while the flag is off (update_flag.js):
  * nothing is fetched. The status comes from update_api.js; this module keeps the last one, asks again every ten minutes and when the tab is shown (the Settings pane reads it with getUpdateStatus).
  * The control never animates: its state is a colour, a word and a number of days (colour is not the only signal: from "warm" on the age is written, on a phone too). */
@@ -16,7 +17,7 @@ let timer = 0;
 export const getUpdateStatus = () => status;
 
 const $ = (id) => document.getElementById(id);
-const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+
 
 /** Whether the control is offered: an update is staged and verified and this install can apply it. */
 export function relaunchOffered(s) {

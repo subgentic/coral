@@ -6,9 +6,6 @@ import { installDom, importUi } from './helpers/jsdom_env.mjs';
 installDom({ mode: 'local' });
 const { formatDuration, formatCost } = await importUi('format');
 const { formatDurationSec } = await importUi('utils');
-const eventRow = await importUi('event_row');
-const taskFormat = await importUi('task_format');
-const sessionState = await importUi('session_state');
 
 // ── the old bodies, verbatim ──
 const oldEvent = ms => {
@@ -84,7 +81,6 @@ const tryCall = (f, ...a) => { try { return f(...a); } catch (e) { return 'THROW
 
 for (const x of durations) {
     same('event', tryCall(formatDuration, x, { shape: 'precise' }), tryCall(oldEvent, x), x);
-    same('event export', tryCall(eventRow.formatDuration, x), tryCall(oldEvent, x), x);
     same('scheduler', tryCall(formatDuration, x), tryCall(oldScheduler, x), x);
     same('workflows', tryCall(formatDuration, x, { unit: 's', dropZeroSeconds: true }), tryCall(oldWorkflows, x), x);
     same('seconds', tryCall(formatDuration, x, { shape: 'rounded' }), tryCall(oldSec, x), x);
@@ -101,10 +97,8 @@ for (const x of costInputs) {
     same('cost dashboard cost', tryCall(formatCost, x, { zeroAsTwo: true }), tryCall(oldCostDashboard, x), x);
     for (const precise of [false, true, undefined]) {
         same('task cost', tryCall(formatCost, x, { nullAsZero: true, zeroAsTwo: true, subCent: 'lt', precise }), tryCall(oldTask, x, precise), x);
-        same('task cost export', tryCall(taskFormat._formatCost, x, precise), tryCall(oldTask, x, precise), x);
     }
     same('session cost', tryCall(formatCost, x), tryCall(oldSession, x), x);
-    same('session cost export', tryCall(sessionState._formatCost, x), tryCall(oldSession, x), x);
 }
-console.log(`format_unify.test.mjs: ok (${durations.length} durations x 8 callers, ${costInputs.length} costs x 5 callers, byte-identical)`);
+console.log(`format_unify.test.mjs: ok (${durations.length} durations across all option sets, ${costInputs.length} costs across all option sets, byte-identical)`);
 process.exit(0); // the pages the modules were loaded into keep timers running

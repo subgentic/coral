@@ -87,3 +87,9 @@ export function formatCost(c, { zeroAsTwo = false, nullAsZero = false, subCent =
     if (subCent === 'lt') return c > 0 && c < 0.01 ? '<$0.01' : '$' + c.toFixed(2);
     return c < 0.01 ? '$' + c.toFixed(4) : '$' + c.toFixed(2);
 }
+
+/** A count and its singular/plural word; localized counts retain the settings view's numeric coercion. */
+export function plural(n, one, many = one + 's', { localized = false } = {}) {
+    const count = localized ? Number(n) : n;
+    return `${localized ? count.toLocaleString() : count} ${count === 1 ? one : many}`;
+}

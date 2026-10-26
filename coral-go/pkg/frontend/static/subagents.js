@@ -1,11 +1,11 @@
 /* Moved out of tasks.js as it was (#3837): no behaviour change. */
 import { escapeHtml, renderMarkdown, DOMPURIFY_CONFIG } from './utils.js';
 import { closeOnBackdropAndEscape } from './dialog_close.js';
-import { _formatCost, _formatTokenCount, formatTaskDate } from './task_format.js';
+import { _formatTokenCount, formatTaskDate } from './task_format.js';
 import { redrawBoardTaskList, closeTaskDetailModal } from './task_hooks.js';
 import { serverFetch, serverForSession, dropBody } from './server_base.js';
 import { state } from './state.js';
-import { formatDuration } from './format.js';
+import { formatCost, formatDuration } from './format.js';
 
 // Which session state.currentSubagents belongs to. Lets a session switch drop
 // the previous agent's subagents at once instead of showing them until the
@@ -179,7 +179,7 @@ function _renderSubagentDetail(sa) {
     const tok = (label, n) => `<div class="task-detail-token-item"><span class="task-detail-token-label">${label}</span><span class="task-detail-token-value">${_formatTokenCount(n || 0)}</span></div>`;
     html += `<div class="task-detail-section">
             <div class="task-detail-label">${running ? 'Cost So Far' : 'Cost'}</div>
-            <div class="task-detail-cost-summary${running ? ' board-task-cost-live' : ''}${warningClass}">${running ? '~' : ''}${_formatCost(sa.cost_usd || 0, true)}</div>
+            <div class="task-detail-cost-summary${running ? ' board-task-cost-live' : ''}${warningClass}">${running ? '~' : ''}${formatCost(sa.cost_usd || 0, { nullAsZero: true, zeroAsTwo: true, subCent: 'lt', precise: true })}</div>
             <div class="task-detail-tokens">
                 ${tok('Input', sa.input_tokens)}${tok('Output', sa.output_tokens)}${tok('Cache Read', sa.cache_read_tokens)}${tok('Cache Write', sa.cache_write_tokens)}
             </div>

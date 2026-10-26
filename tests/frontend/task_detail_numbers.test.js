@@ -9,7 +9,7 @@ const escape = value => String(value ?? '').replaceAll('&', '&amp;').replaceAll(
 const context = vm.createContext({
   escapeHtml: escape, escapeAttr: escape, _priorityRank: {}, formatTaskDate: String, _verifyLine: () => '', whenWords: String,
   _getBoardProject: () => 'p', boardKeyName: String, keyLabel: String, identityKey: String, splitKey: () => ({ server: '' }),
-  _formatCost: String, _formatTokenCount: String, _priorityLabel: String, _claimedFor: () => '', serverUrl: String, artifactPath: String, contextServer: () => '',
+  formatCost: String, _formatTokenCount: String, _priorityLabel: String, _claimedFor: () => '', serverUrl: String, artifactPath: String, contextServer: () => '',
 });
 vm.runInContext(source.slice(start).replaceAll('export function', 'function'), context);
 const evil = '<img src=x onerror=bad()>';

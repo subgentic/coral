@@ -6,7 +6,7 @@ import { escapeHtml, escapeAttr, showToast, showView, setRowCurrent } from './ut
 import { registerActions, withId, uuidOf } from './actions.js';
 import { pollEvery } from './overload.js';
 import { showJobModal, editScheduledJob } from './job_form.js';
-import { formatDuration as fmtDuration } from './format.js';
+import { formatDuration } from './format.js';
 import { runFailure } from './run_failure.js';
 import { cronWords, atWords, awayWords, whenWords, resultWords, reasonWords, lastWords, limitWords, exitNote, resultLine, runDot } from './job_words.js';
 import { updateJobsSectionCount } from './live_jobs.js';
@@ -348,7 +348,6 @@ function redrawRuns(page) {
     if (host && runsPage === page) host.replaceChildren(renderRunsTable(page));
 }
 
-const formatDuration = ms => fmtDuration(ms);
 
 // ── CRUD operations ──────────────────────────────────────────────────────
 

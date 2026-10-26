@@ -1,3 +1,4 @@
+import { plural } from './format.js';
 /* Settings > Updates (#5275, design #5270): one status card (a dot, a line, a sentence, the action), the two switches, when it last looked, the version, and where Coral reaches. The pane is
  * drawn from the status each time it is shown. The switches are saved with Apply like the rest of Settings (applyUpdatePrefs); the card's buttons act at once: "Update and relaunch" opens the
  * confirmation (a dialog over this one), "Check now" asks the updater to look. A Homebrew or unsupported install says so and why, with the command to run. */
@@ -9,7 +10,7 @@ const { HUB_RELAUNCH_ON, HUB_RELAUNCH_OFF, HUB_RELAUNCH_WINDOWS } = await import
 const { failureNotice, getUpdateStatus, refreshUpdateStatus, relaunchOffered } = await importOnce('./update_ui.js');
 
 const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
-const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+
 let hubOn = null; // the hub switch as the server has it (GET /api/cloud/status), null when unknown
 const body = () => document.getElementById('update-pane-body');
 

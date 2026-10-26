@@ -7,7 +7,7 @@ import { selectLiveSession } from './sessions.js';
 import { pollEvery } from './overload.js';
 import { note, currentRoute } from './nav.js';
 import { KILL_LOG_NOTE } from './render.js';
-import { formatDuration as fmtDuration } from './format.js';
+import { formatDuration } from './format.js';
 import { runFailureHtml, runFailure } from './run_failure.js';
 import { whenWords, resultWords, limitWords, stepWords, runDot } from './job_words.js'; // the Jobs pages' words: one set for both
 import { limitSeconds, limitParts } from './time_limit.js';
@@ -348,7 +348,6 @@ export async function selectWorkflow(id) {
     renderWorkflowDetail(wf, first.runs);
 }
 
-
 /** A run's result for the runs table and the last-run line: "Passed", "Failed: step 2 (Test)", with the one-line reason from the server underneath. Step numbers come from 1 (#6530). */
 function runResult(r) {
     const failed = r.status === 'failed' || r.status === 'killed';
@@ -375,7 +374,7 @@ function workflowRunsTable(page) {
         columns: [
             { key: 'started', label: 'Started', primary: true, width: 'grow', line: 1, cell: r => { const time = DT.timeCell(r.started_at); const b = DT.primaryButton(time.textContent, `Open run #${r.id}`); b.title = time.title; b.addEventListener('click', () => open(r)); return b; } },
             { key: 'result', label: 'Result', line: 2, nowrap: false, cell: runResult, subtitle: r => (r.status === 'failed' || r.status === 'killed') ? r.failure_reason : '' },
-            { key: 'duration', label: 'Duration', line: 2, tone: 'tertiary', cell: r => r.duration_seconds != null ? (r.duration_seconds < 1 ? 'under 1s' : formatDuration(Math.round(r.duration_seconds))) : '—' },
+            { key: 'duration', label: 'Duration', line: 2, tone: 'tertiary', cell: r => r.duration_seconds != null ? (r.duration_seconds < 1 ? 'under 1s' : formatDuration(Math.round(r.duration_seconds), { unit: 's', dropZeroSeconds: true })) : '—' },
             { key: 'trigger', label: 'Trigger', line: 2, tone: 'tertiary', when: r => !!r.trigger_type, cell: r => r.trigger_type || '—' },
         ],
     }); table.el.classList.add('wf-runs-table'); return table.el;
@@ -489,7 +488,7 @@ function renderRunDetail(run) {
     if (run.started_at) {
         const endTime = run.finished_at ? new Date(run.finished_at) : new Date();
         const durSec = Math.round((endTime - new Date(run.started_at)) / 1000);
-        durationHtml = `<span><span class="material-icons" aria-hidden="true">hourglass_empty</span> ${formatDuration(durSec)}</span>`;
+        durationHtml = `<span><span class="material-icons" aria-hidden="true">hourglass_empty</span> ${formatDuration(durSec, { unit: 's', dropZeroSeconds: true })}</span>`;
     }
 
     // Progress bar
@@ -515,10 +514,10 @@ function renderRunDetail(run) {
         let timingHtml = '';
         if (s.started_at && s.finished_at) {
             const dur = Math.round((new Date(s.finished_at) - new Date(s.started_at)) / 1000);
-            timingHtml = `<span class="wf-run-step-timing">${formatDuration(dur)}</span>`;
+            timingHtml = `<span class="wf-run-step-timing">${formatDuration(dur, { unit: 's', dropZeroSeconds: true })}</span>`;
         } else if (s.started_at) {
             const elapsed = Math.round((new Date() - new Date(s.started_at)) / 1000);
-            timingHtml = `<span class="wf-run-step-timing wf-timing-active">${formatDuration(elapsed)}...</span>`;
+            timingHtml = `<span class="wf-run-step-timing wf-timing-active">${formatDuration(elapsed, { unit: 's', dropZeroSeconds: true })}...</span>`;
         }
 
         const isFailed = s.status === 'failed' || s.status === 'killed';
@@ -933,7 +932,6 @@ function statusIconChar(status) {
     }
 }
 
-const formatDuration = sec => fmtDuration(sec, { unit: 's', dropZeroSeconds: true });
 
 // An editor error is said (the message is an alert), the field it is about is marked and described by it, and focus goes there; typing in the field clears the mark (#6348).
 function showError(el, msg, field) {

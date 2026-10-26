@@ -1,22 +1,8 @@
 /* The comments routes of an artifact (#5182), the only place the UI talks to /api/artifacts/{id}/comments, so the server's shape is read in one spot. Every call resolves the parsed answer or throws
- * an Error whose message is the server's reason (a 403 says why) and whose .status is the HTTP status (requestJson, api.js). `server` routes the call to a registered remote like the artifact itself. */
+ * an Error whose message is the server's reason (a 403 says why) and whose .status is the HTTP status (requestJson, request_json.js). `server` routes the call to a registered remote like the artifact itself. */
 import { serverUrl, isCloud } from './server_base.js';
 
-// One request: the parsed answer, or an Error with the server's reason ({"error": "..."}) or "HTTP <status>" and .status on it (the same as api.js requestJson once that lands).
-async function requestJson(method, url, body) {
-    const init = { method };
-    if (body !== undefined) { init.headers = { 'Content-Type': 'application/json' }; init.body = JSON.stringify(body); }
-    const resp = await fetch(url, init);
-    const text = await resp.text().catch(() => '');
-    let data = {};
-    try { data = text ? JSON.parse(text) : {}; } catch (e) { if (resp.ok) throw e; }
-    if (!resp.ok) {
-        const error = new Error((data && typeof data.error === 'string' && data.error) || `HTTP ${resp.status}`);
-        error.status = resp.status;
-        throw error;
-    }
-    return data;
-}
+import { requestJson } from './request_json.js';
 
 const base = (hex, server) => serverUrl(`/api/artifacts/${hex}/comments`, server);
 

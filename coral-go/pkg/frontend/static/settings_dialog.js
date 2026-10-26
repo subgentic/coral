@@ -1,3 +1,4 @@
+import { plural } from './format.js';
 /* Moved out of modals.js as it was (#4684): The Settings dialog: its sections, the API key, storage, database encryption, filling and saving it. No behaviour change. */
 import { defaultTerminalFont, terminalFontFor } from './terminal_font.js';
 import { importOnce } from './import_once.js';
@@ -190,7 +191,7 @@ async function loadArtifactStoreSize({ fresh = false } = {}) {
         input.value = d.max_bytes > 0 ? String(Math.round(d.max_bytes / GIB)) : '0';
         input.dataset.loaded = '1'; // only a limit read from Coral is saved back
         input.disabled = false;
-        const plural = (n, one, many) => `${Number(n).toLocaleString()} ${Number(n) === 1 ? one : many}`;
+
         // The same three states as the received files' line: below 80%, from 80% with what to do, and at the limit that new uploads are refused, in the warning colour.
         let art = _gib(d.bytes); // the limit field is beside it: "3.0 GiB of 10.0 GiB"; the file count is in the breakdown
         const atLimit = d.max_bytes > 0 && d.bytes >= d.max_bytes;
@@ -204,7 +205,7 @@ async function loadArtifactStoreSize({ fresh = false } = {}) {
         const artNode = document.createElement('span');
         artNode.textContent = art;
         if (atLimit) artNode.dataset.state = 'warn';
-        const rest = [`Diffs: ${_gib((d.task_diffs?.bytes || 0) + (d.session_diffs?.bytes || 0))} in ${plural((d.task_diffs?.files || 0) + (d.session_diffs?.files || 0), 'file', 'files')}`];
+        const rest = [`Diffs: ${_gib((d.task_diffs?.bytes || 0) + (d.session_diffs?.bytes || 0))} in ${plural((d.task_diffs?.files || 0) + (d.session_diffs?.files || 0), 'file', 'files', { localized: true })}`];
         out.replaceChildren(artNode, ...rest.flatMap(l => [document.createElement('br'), l]));
         showReceivedCap(d.received);
     } catch {

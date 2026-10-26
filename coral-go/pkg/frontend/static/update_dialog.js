@@ -1,3 +1,4 @@
+import { plural } from './format.js';
 /* The confirmation that comes before a relaunch (#5275, design #5270): it names what restarts. It never relaunches on the first click; the safe answer ("Not now") has the focus when agents would restart;
  * the primary button says what it will do. The list is the server's (the pty agents a relaunch restarts, and an ack of exactly that list): a list that changed since it was read is shown again and has to be
  * answered again (409 stale_ack). A dialog on a desktop, a sheet at the bottom on a phone (css). Escape and the focus trap are modal_chrome's; focus goes back to the control that opened it (dialog_focus.js). */
@@ -18,7 +19,7 @@ const AFTER_DEFAULT = 'Coral is quitting to install the update. If it does not s
 const STATE_WORDS = { working: 'working', idle: 'idle', waiting: 'waiting for you' };
 
 const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
-const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+
 /** Which of the restarted agents come back on their own (the server's `resumes`), in words: " 2 start again on their own afterwards; 1 starts a new conversation." Empty when the server does not say. */
 function comeBack(back, fresh, n) {
     const parts = [];

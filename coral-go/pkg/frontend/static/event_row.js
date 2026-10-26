@@ -1,15 +1,10 @@
 /* Shared pieces of an Activity row: how long the activity took and what else is known about it */
 
 import { escapeHtml, escapeAttr } from './utils.js';
-import { formatDuration as fmtDuration } from './format.js';
+import { formatDuration } from './format.js';
 import { browserLocal } from './safe_storage.js';
 import { formatClockTime } from './format.js';
 import { getToolIcon } from './event_icons.js';
-
-/** 850 -> "850ms", 9100 -> "9.1s", 75000 -> "1m 15s", 3720000 -> "1h 2m". */
-export function formatDuration(ms) {
-    return fmtDuration(ms, { shape: 'precise' });
-}
 
 function parseDetail(ev) {
     if (!ev || !ev.detail_json) return null;
@@ -25,7 +20,7 @@ function eventFailed(ev) {
 /** Extra facts for the row tooltip: duration, HTTP status and size, failure reason. */
 function eventDetailText(ev) {
     const parts = [];
-    const dur = formatDuration(ev.duration_ms);
+    const dur = formatDuration(ev.duration_ms, { shape: 'precise' });
     if (dur) parts.push(`took ${dur}`);
     const d = parseDetail(ev) || {};
     const r = d.response || {};
@@ -38,7 +33,7 @@ function eventDetailText(ev) {
 
 /** Right-aligned duration chip; empty when the source reported no timing. */
 function durationChip(ev) {
-    const dur = formatDuration(ev.duration_ms);
+    const dur = formatDuration(ev.duration_ms, { shape: 'precise' });
     if (!dur) return '';
     const slow = Number(ev.duration_ms) >= 10000 ? ' slow' : '';
     return `<span class="event-duration${slow}">${escapeHtml(dur)}</span>`;
@@ -100,7 +95,7 @@ export function renderActivityChart(container, events, groups) {
 
     const bars = shown.map(r => {
         const pct = Math.max(2, (value(r) / max) * 100);
-        const total = formatDuration(r.totalMs);
+        const total = formatDuration(r.totalMs, { shape: 'precise' });
         const tip = `${r.label}: ${r.count} event${r.count === 1 ? '' : 's'}${total ? ', ' + total + ' total' : ''}`;
         return `<div class="activity-chart-row" title="${escapeHtml(tip)}">
             <span class="activity-chart-label">${escapeHtml(r.label)}</span>
