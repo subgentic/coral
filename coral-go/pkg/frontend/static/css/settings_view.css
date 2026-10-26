@@ -77,6 +77,7 @@
 .sv-status { font-size: var(--sv-status-size); font-weight: 500; color: var(--text-secondary); min-width: 0; overflow-wrap: anywhere; }
 .sv-status.is-error { color: var(--sv-error-color); }
 .sv-bar-buttons { display: flex; align-items: center; gap: 8px; flex: none; }
+.sv-form-bar { flex: 1 1 auto; border-top: 0; padding: 0; background: none; } /* a form's bar sits in the dialog's own footer (spec.form.barHost): that footer has the rule and the padding */
 .sv-bar .btn:disabled { opacity: .5; cursor: not-allowed; } /* nothing changed: both are off, the status says why */
 
 /* a touch screen: every control is a 44 px target */

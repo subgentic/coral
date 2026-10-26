@@ -2,6 +2,7 @@ import { rawKeyOk, rawKeySeq } from './raw_keys.js';
 import { importOnce } from './import_once.js';
 import { moveRestarting } from './session_overlay.js';
 import { dashboardPromptRequested } from './dashboard_analytics.js';
+import { mountSettingsView } from './settings_view.js'; // the Add Macro form (a startup module: the Settings rows draw from it too)
 /* Quick actions, command sending, mode toggling, and session controls */
 
 import { state, sessionKey, saveSessionDraft } from './state.js';
@@ -363,13 +364,27 @@ export async function executeMacro(command) {
     }
 }
 
-export async function addMacro() {
-    const label = document.getElementById("macro-label-input").value.trim();
-    const command = document.getElementById("macro-command-input").value.trim();
-    if (!label || !command) { showToast("Label and command are required", true); return; }
-    await changeMacros(list => [...list, { label, command }]);
-    hideMacroModal();
-    renderQuickActions();
+let macroForm = null; // the Add Macro form (settings_view in form mode), drawn the first time the dialog opens
+function macroView() {
+    if (macroForm) return macroForm;
+    document.getElementById("macro-footer").replaceChildren();
+    macroForm = mountSettingsView(document.getElementById("macro-form"), {
+        mode: 'form',
+        fields: [
+            { key: 'label', type: 'text', id: 'macro-label-input', label: 'Label', required: true, placeholder: 'e.g. Commit & Push' },
+            { key: 'command', type: 'text', id: 'macro-command-input', label: 'Command', required: true, placeholder: 'e.g. /commit && git push', help: 'Use && to chain several commands (1 second between each).' },
+        ],
+        form: {
+            submit: 'Add', cancel: 'Cancel', barHost: document.getElementById("macro-footer"),
+            onSubmit: async values => {
+                await changeMacros(list => [...list, { label: values.label.trim(), command: values.command.trim() }]);
+                hideMacroModal();
+                renderQuickActions();
+            },
+            onCancel: () => hideMacroModal(),
+        },
+    });
+    return macroForm;
 }
 
 export async function deleteMacro(index) {
@@ -380,8 +395,8 @@ export async function deleteMacro(index) {
 }
 
 export function showMacroModal() {
-    document.getElementById("macro-label-input").value = "";
-    document.getElementById("macro-command-input").value = "";
+    const view = macroView();
+    view.cancel(); // empty fields, no errors, an empty line
     document.getElementById("macro-modal").style.display = "flex";
     document.getElementById("macro-label-input").focus();
 }

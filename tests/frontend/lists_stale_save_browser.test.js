@@ -42,8 +42,9 @@ const BASE = require('./test_base').BASE;
 
     // Macros: adding keeps what another client added; deleting removes the macro clicked, not what is at its position now.
     assert.equal(await otherClientPut({ macros: JSON.stringify([{ label: 'A', command: 'a' }, { label: 'B', command: 'b' }]) }), 200);
+    await ev(`import(${MOD}+'controls.js').then(m=>{m.showMacroModal();return true;})`); // the form is drawn when the dialog opens
     await ev(`(()=>{document.getElementById('macro-label-input').value='C';document.getElementById('macro-command-input').value='c';return true;})()`);
-    await ev(`import(${MOD}+'controls.js').then(m=>m.addMacro()).then(()=>true)`);
+    await ev(`document.querySelector('#macro-footer .btn-primary').click(); new Promise(r => setTimeout(r, 400)).then(() => true)`); // sleep-ok: the save
     assert.deepEqual((await server('macros')).map(x => x.label), ['A', 'B', 'C'], 'a macro another client added is kept');
     // This page now holds [A, B, C]. Another client puts X first; this page deletes B by the position it sees (1).
     assert.equal(await otherClientPut({ macros: JSON.stringify([{ label: 'X', command: 'x' }, { label: 'A', command: 'a' }, { label: 'B', command: 'b' }, { label: 'C', command: 'c' }]) }), 200);

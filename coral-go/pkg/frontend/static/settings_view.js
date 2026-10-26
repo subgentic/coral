@@ -3,6 +3,8 @@
  * settings_view.css; no surface styles a settings row of its own.
  *
  *   const view = mountSettingsView(host, spec);
+ *   a form (mode: 'form') may add form: { submit: 'Add', cancel: 'Cancel', onSubmit(values, view), onCancel?, barHost? }: its own footer (barHost: the dialog's footer element) with the status line; the primary is always enabled, pressing it
+ *   checks the form (Required fields, validate), focuses the first invalid field and says what is missing; view.submit() does the same from the caller. Enter in a text input submits.
  *
  *   spec = {
  *     mode: 'settings' | 'form',        direction only: settings = label and hint at the left, the control at the right, one save bar; form = label above, hint under it, control full width, no nav, no bar
@@ -52,6 +54,7 @@ function paragraphs(text) {
 export function mountSettingsView(host, spec) {
     const uid = `sv${++seq}`;
     const mode = spec.mode === 'form' ? 'form' : 'settings';
+    const formSpec = mode === 'form' && spec.form ? { submit: 'Save', cancel: 'Cancel', ...spec.form } : null; // a form's own footer: status at the left, Cancel and the primary at the right (the primary is never disabled for what is missing: pressing it names it)
     const words = { ...WORDS, ...(spec.words || {}) };
     const groups = (spec.groups && spec.groups.length ? spec.groups : [{ id: 'all', label: '', fields: spec.fields || [] }]).filter(g => g.render || g.fields);
     const fields = new Map();      // key -> { field, group, row, ctl, errorEl, helpEl, baseline }
@@ -249,6 +252,17 @@ export function mountSettingsView(host, spec) {
         saveBtn.addEventListener('click', () => { view.save(); });
         root.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !saveBtn.disabled) { e.preventDefault(); view.save(); } });
     }
+    if (formSpec) {
+        bar = node('footer', 'sv-bar sv-form-bar');
+        statusEl = node('span', 'sv-status'); statusEl.setAttribute('role', 'status'); statusEl.setAttribute('aria-live', 'polite');
+        const buttons = node('div', 'sv-bar-buttons');
+        cancelBtn = node('button', 'btn sv-cancel', formSpec.cancel); cancelBtn.type = 'button';
+        saveBtn = node('button', 'btn btn-primary sv-save', formSpec.submit); saveBtn.type = 'button';
+        buttons.append(cancelBtn, saveBtn); bar.append(statusEl, buttons); (formSpec.barHost || inner).append(bar);
+        cancelBtn.addEventListener('click', () => view.cancel());
+        saveBtn.addEventListener('click', () => { view.submit(); });
+        root.addEventListener('keydown', e => { const t = e.target; if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey && t && t.tagName === 'INPUT' && t.type !== 'checkbox' && t.type !== 'radio' && t.type !== 'button') { e.preventDefault(); view.submit(); } });
+    }
     host.append(root);
     if (spec.parts) for (const ev of ['input', 'change']) root.addEventListener(ev, () => setTimeout(() => { if (!destroyed) afterChange(); }, 0)); // a part's own controls: the bar follows them after the part's handlers have run
     if (shell) {
@@ -286,9 +300,9 @@ export function mountSettingsView(host, spec) {
     }
     function paintBar() {
         const dirty = dirtyKeys().size > 0 || partsDirty().length > 0;
-        if (saveBtn) { saveBtn.disabled = !dirty || busy || !!globalReadOnly; cancelBtn.disabled = !dirty || busy; }
+        if (saveBtn) { saveBtn.disabled = formSpec ? busy : !dirty || busy || !!globalReadOnly; cancelBtn.disabled = formSpec ? busy : !dirty || busy; }
         if (statusEl) {
-            const text = busy ? words.busy : status !== null ? status : dirty ? words.dirty : lastSaved ? words.saved : words.none;
+            const text = busy ? words.busy : status !== null ? status : formSpec ? '' : dirty ? words.dirty : lastSaved ? words.saved : words.none;
             statusEl.textContent = text; statusEl.classList.toggle('is-error', statusError && !busy);
         }
         root.dataset.dirty = dirty ? '1' : '';
@@ -313,7 +327,7 @@ export function mountSettingsView(host, spec) {
         if (!r) return;
         if (!message) { errors.delete(key); r.errorEl.hidden = true; r.errorEl.textContent = ''; const t = r.ctl.input || r.ctl.node; t?.removeAttribute?.('aria-invalid'); describe(r, false); }
         else {
-            const text = new RegExp(r.field.label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(message) ? message : `${r.field.label}: ${message}`; // the message names the field
+            const text = new RegExp(r.field.label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(message) ? message : /^is required\b/.test(message) ? `${r.field.label} ${message}` : `${r.field.label}: ${message}`; // the message names the field (a verb phrase reads on from the name: "Label is required.")
             errors.set(key, text); r.errorEl.textContent = text; r.errorEl.hidden = false;
             const t = r.ctl.input || r.ctl.node; t?.setAttribute?.('aria-invalid', 'true'); describe(r, true);
         }
@@ -391,11 +405,23 @@ export function mountSettingsView(host, spec) {
             root.dispatchEvent(new CustomEvent('sv-saved', { bubbles: true, detail: { changes } }));
             return result;
         },
+        async submit() { // a form: check it (the first invalid field takes the focus, the line says what is missing), then hand the values to the caller
+            if (busy || !formSpec) return null;
+            const v = view.validate({ focus: true });
+            if (!v.ok) { status = errors.get(v.first) || 'Check the form.'; statusError = true; paintBar(); return null; }
+            busy = true; status = null; statusError = false; paintBar();
+            let result = {};
+            try { result = (await formSpec.onSubmit(valuesNow(), view)) || {}; }
+            catch (e) { busy = false; status = `${words.failed}${(e && (e.userMessage || e.message)) || 'no answer'}`; statusError = true; paintBar(); return null; }
+            busy = false; status = result.note || null; statusError = false; paintBar();
+            root.dispatchEvent(new CustomEvent('sv-submitted', { bubbles: true, detail: { values: valuesNow() } }));
+            return result;
+        },
         cancel() {
             for (const [k, r] of fields) if (r.field.apply !== 'now') r.ctl.set(baseline[k] === undefined ? r.field.default : baseline[k]);
             view.clearErrors(); status = null; statusError = false; lastSaved = false;
             afterChange();
-            barSpec && barSpec.onCancel && barSpec.onCancel();
+            const closer = barSpec || formSpec; closer && closer.onCancel && closer.onCancel();
         },
         showGroup(id) { if (shell) { showSection(shell, id); announce(); } },
         removeFields(keys) { for (const k of keys) { const r = fields.get(k); if (r) { r.row.remove(); fields.delete(k); errors.delete(k); } } afterChange(); }, // fields that do not apply (known only after the load): their rows go, with their values

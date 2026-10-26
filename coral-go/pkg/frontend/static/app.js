@@ -22,7 +22,7 @@ import './local_store.js';
 import { loadLiveSessions } from './api.js';
 import { deserializeFromUrl, urlSearchFor } from './search_filters.js';
 import { connectCoralWs } from './websocket.js';
-import { addMacro, hideMacroModal, restartSession, restartStage, hideRestartModal, confirmRestart, editGoal, refreshGoal, requestGoal } from './controls.js';
+import { restartSession, restartStage, hideRestartModal, confirmRestart, editGoal, refreshGoal, requestGoal } from './controls.js';
 import { selectLiveSession, selectHistorySession, editAndResubmit, renameAgent, setAgentIcon, toggleChatFlag } from './sessions.js';
 import { KILL_LOG_NOTE_MANY, toggleGroupCollapse, killGroup, killBoard, toggleTeamSleep, toggleAgentSleep, toggleAgentArchive, toggleArchivedSection, shareAgentTeam, saveTeamFromSidebar, killSessionDirect, showInfoDirect, attachDirect, restartDirect, showConfirmModal, hideConfirmModal, showPromptModal, hidePromptModal, showAlertModal, hideAlertModal, copyFolderPath, moveGroupUp, moveGroupDown, toggleGroupByTeam, expandSleepingGroup, setBoardAccentColor, moveSessionUp, moveSessionDown, showTeamTokenUsage, distillTeamKnowledge, toggleSessionSummary, applySessionSummaryPref, filterLiveAgents, agentSearchKey, toggleShowServer, toggleShowBranches, toggleShowProvider, toggleShowModel, toggleShowThinking, toggleGroupByServer, groupHeaderKey, teamHeaderKey } from './render.js';
 import './capture.js';
@@ -121,7 +121,6 @@ registerActions({
 // module loads, so their actions register here and call the same globals the inline handlers did.
 // A literal argument comes from data-arg and must be one the markup uses.
 registerActions({
-    'm-add-macro': el => { window.addMacro(); },
     'm-apply-settings': el => { window.applySettings(); },
     'm-browser-navigate-up': el => { window.browserNavigateUp(); },
     'm-browser-use': el => { window.browserUse(); },
@@ -138,7 +137,6 @@ registerActions({
     'm-hide-job-modal': el => { window.hideJobModal(); },
     'm-hide-launch-modal': el => { window.hideLaunchModal(); },
     'm-hide-launch-modal-then-show-job-modal': el => { window.hideLaunchModal(); window.showJobModal(); },
-    'm-hide-macro-modal': el => { window.hideMacroModal(); },
     'm-hide-mobile-connect-modal': el => { window._hideMobileConnectModal(); },
     'm-hide-open-folder-modal': el => { window.hideOpenFolderModal(); },
     'm-hide-prompt-modal': el => { window.hidePromptModal(); },
@@ -346,7 +344,6 @@ Object.assign(window, {
     popoutRetry, 
     
     // controls
-    addMacro, hideMacroModal,
     restartSession,
     editGoal, refreshGoal, requestGoal,
     hideRestartModal, confirmRestart, 

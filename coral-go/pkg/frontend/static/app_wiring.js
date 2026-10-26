@@ -10,7 +10,7 @@ import { initWindows } from './platform/windows.js';
 import { initBrowser } from './platform/browser.js';
 import { isCloud } from './server_base.js';
 import { handleUnauthorized, isSignedOut401 } from './auth_redirect.js';
-import { sendCommand, addMacro, initImageDrop } from './controls.js';
+import { sendCommand, initImageDrop } from './controls.js';
 import { initFileSearch } from './changed_files.js';
 import { initFileMention } from './file_mention.js';
 import { initCommandMention } from './command_mention.js';
@@ -62,7 +62,7 @@ export function installUnauthorizedRedirect() {
     };
 }
 
-/** The command box and the inputs around it: image drop, the file search, the @file and /command mentions, the notes, the macro dialog's Enter and the box's own keys. */
+/** The command box and the inputs around it: image drop, the file search, the @file and /command mentions, the notes and the box's own keys. */
 export function wireComposer() {
     // Image drag-and-drop on command pane
     initImageDrop();
@@ -78,11 +78,6 @@ export function wireComposer() {
 
     // Markdown notes panel: click-to-edit, blur-to-save
     initNotesMd();
-
-    // Enter in macro modal submits
-    document.getElementById("macro-command-input").addEventListener("keydown", (e) => {
-        if (e.key === "Enter") { e.preventDefault(); addMacro(); }
-    });
 
     // Chat mode: the command box grows with its text
     initCommandInputAutosize();

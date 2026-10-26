@@ -69,7 +69,8 @@ const B = 'dock-tasks-' + Date.now().toString(36);
         assert.deepEqual(ring, [], 'no element of the list wears a ring after a mouse click and the page being left');
 
         console.log('9. no colons on the Restart and Add Macro labels');
-        const macro = await ev(`['macro-label-input', 'macro-command-input'].map(id => document.getElementById(id).closest('label').firstChild.textContent.trim())`);
+        await ev(`import((window.__coralStatic || '/static/') + 'controls.js').then(m => { m.showMacroModal(); return true; })`); // the form is drawn when the dialog opens
+        const macro = await ev(`['macro-label-input', 'macro-command-input'].map(id => document.querySelector('label[for="' + id + '"]').textContent.trim())`);
         assert.deepEqual(macro, ['Label', 'Command'], 'the Add Macro labels');
         await ev(`window.selectLiveSession && true; window.restartSession(); true`);
         await waitFor(`!!document.querySelector('#restart-acf .acf-permission-mode')`, 'the Restart form', 10000);
