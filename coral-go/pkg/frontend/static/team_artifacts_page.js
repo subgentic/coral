@@ -274,7 +274,9 @@ function draw() {
                     } },
                 { key: 'type', label: 'Type', line: 2, tone: 'tertiary', cell: item => isUnverified(item) ? '—' : DT.tag(typeText(item)) },
                 { key: 'size', label: 'Size', line: 2, tone: 'tertiary', align: 'end', cell: item => isUnverified(item) ? '—' : sizeText(item.size) || '—' },
-                { key: 'task', label: 'Task', line: 2, tone: 'tertiary', when: item => !model.scope || !!item.task_id, cell: taskText },
+                // the head says the task or goal a group is: its own column would say it on every row (#8617)
+                ...(by === 'task' ? [] : [{ key: 'task', label: 'Task', line: 2, tone: 'tertiary', when: item => !model.scope || !!item.task_id, cell: taskCell }]),
+                ...(by === 'goal' || model.scope || !shown.some(i => i.goal_id) ? [] : [{ key: 'goal', label: 'Goal', line: 2, tone: 'tertiary', cell: item => (item.goal_id && item.goal_title ? String(item.goal_title) : '') }]),
                 { key: 'created', label: 'Created', line: 1, tone: 'tertiary', align: 'end', cell: item => DT.timeCell(item.created_at) },
                 // An agent's list opens an artifact in the preview panel; its sheet (the facts, Keep, Delete, Copy link, who can read it) is one quiet link away (#8539)
                 { key: 'details', label: 'Details', line: 2, tone: 'tertiary', align: 'end', when: () => !!model.scope, cell: item => detailsLink(item) },
@@ -306,6 +308,14 @@ function draw() {
 }
 
 const sources = (list) => (Array.isArray(list) ? list.map(v => { const at = String(v).indexOf('/'); const server = at < 0 ? String(v) : String(v).slice(0, at), board = at < 0 ? '' : String(v).slice(at + 1); return board ? `${server}, board ${board} (claimed by the sender)` : server; }).join('\n') : '');
+
+/** The Task column: a link that opens the task's page (#8617); "No task" for a file no task holds. */
+function taskCell(item) {
+    if (!item.task_id) return taskText(item);
+    const b = DT.link(taskText(item), () => { importOnce('./task_navigation.js').then(m => m.openTask(model.project, item.task_id)).catch(() => {}); });
+    b.dataset.taskLink = String(item.task_id);
+    return b;
+}
 
 /** The sheet's own link on an agent's row (the row itself opens the preview): the item's facts and actions, as the team page's rows open them. */
 function detailsLink(item) {

@@ -52,6 +52,8 @@ const BASE = require('./test_base').BASE;
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         console.log('   ✓');
 
+        const heading = () => ev(`[...document.querySelectorAll('#team-panel-artifacts thead th')].map(th => th.textContent.trim().toLowerCase())`);
+        assert.ok(!(await heading()).includes('task'), 'grouped by task: the head says the task, no Task column: ' + JSON.stringify(await heading()));
         console.log('3. Group by Goal: the goal\'s title, and No goal for the rest');
         await pick('ta-group', 'goal');
         await waitFor(`document.querySelectorAll('#team-panel-artifacts tr.dt-group').length === 2`, 'two goal heads', 8000);
@@ -60,6 +62,7 @@ const BASE = require('./test_base').BASE;
         await shot('artifacts-group-goal');
         console.log('   ✓');
 
+        assert.ok(!(await heading()).includes('goal') && (await heading()).includes('task'), 'grouped by goal: no Goal column, the Task column is back: ' + JSON.stringify(await heading()));
         console.log('4. The Task and Goal filters: the server narrows, a chip says it');
         await pick('ta-group', '');
         await pick('ta-task', String(t1));
@@ -71,6 +74,26 @@ const BASE = require('./test_base').BASE;
         await waitFor(`document.querySelectorAll('#team-panel-artifacts [data-artifact-id]').length === 3`, 'the goal\'s three files', 8000);
         assert.equal(await ev(`[...document.querySelectorAll('#team-panel-artifacts [class*=chip]')].some(c => c.textContent.includes('Goal: Ship it'))`), true, 'the Goal chip');
         await shot('artifacts-goal-filter');
+        console.log('   ✓');
+
+        console.log('4b. Ungrouped: a Goal column, the Task column is a link to the task page');
+        await pick('ta-goal', ''); await pick('ta-group', '');
+        await waitFor(`document.querySelectorAll('#team-panel-artifacts [data-artifact-id]').length === 4`, 'all four, ungrouped', 8000);
+        assert.ok((await heading()).includes('goal') && (await heading()).includes('task'), JSON.stringify(await heading()));
+        await ev(`document.querySelector('#team-panel-artifacts [data-task-link="${t1}"]').click(); true`);
+        await waitFor(`!!document.getElementById('team-task-title') && document.getElementById('team-task-title').textContent.includes('Write the report')`, 'the task page', 15000);
+        await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'artifacts' }); true`);
+        await waitFor(`document.querySelectorAll('#team-panel-artifacts [data-artifact-id]').length === 4`, 'back on the Artifacts', 15000);
+        console.log('   ✓');
+
+        console.log('4c. Kept only sits next to its box in the filter panel at 390');
+        await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+        await ev(`(() => { const k = document.getElementById('ta-kept'); if (!k || k.offsetParent === null) document.querySelector('#team-panel-artifacts .list-bar-filter-btn, #team-panel-artifacts button[aria-label*="Filters" i], #team-panel-artifacts .list-bar-icon')?.click(); return true; })()`); // the panel stays open from before when it was
+        await waitFor(`!!document.getElementById('ta-kept') && document.getElementById('ta-kept').offsetParent !== null`, 'the Kept only box', 5000);
+        const gap = await ev(`(() => { const c = document.getElementById('ta-kept').getBoundingClientRect(), l = document.querySelector('label.list-bar-kept .list-bar-field-label').getBoundingClientRect(); return Math.round(l.left - c.right); })()`);
+        assert.ok(gap >= 0 && gap <= 24, 'the words sit beside the box, gap ' + gap);
+        await shot('artifacts-kept-390');
+        await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         console.log('   ✓');
 
         console.log('5. The grouping is kept for the team');
