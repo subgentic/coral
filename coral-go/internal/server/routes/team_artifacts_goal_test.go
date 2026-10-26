@@ -139,3 +139,27 @@ func TestTaskListRowsCarryTheirArtifactCount(t *testing.T) {
 	}
 	assert.Equal(t, 2, seen)
 }
+
+// #8575: a task's own list (?task=<n>) holds what its row counts, so a file two tasks reference is on both; the team's list shows it once, under the newest.
+func TestATasksArtifactListAgreesWithItsRowCountForASharedFile(t *testing.T) {
+	srv, h, _ := teamArtifactServer(t)
+	ctx := context.Background()
+	shared := "coral://artifacts/" + "ab12cd34ef56ab12cd34ef56ab12cd34ef56ab12cd34ef56ab12cd34ef56ab12"
+	mk := func(title string, arts []board.TaskArtifact) int64 {
+		task, err := h.bs.CreateTask(ctx, "g-team", title, "", "medium", "lead")
+		require.NoError(t, err)
+		_, err = h.bs.CompleteTaskWithArtifacts(ctx, "g-team", task.ID, "lead", nil, "success", arts)
+		require.NoError(t, err)
+		return task.ID
+	}
+	first := mk("first", []board.TaskArtifact{{Name: "shared.md", URI: shared}, {Name: "own.md", Content: "# own"}})
+	second := mk("second", []board.TaskArtifact{{Name: "shared.md", URI: shared}})
+
+	team := getTeamArtifacts(t, srv, "/api/board/g-team/artifacts?limit=50", http.StatusOK)
+	require.Len(t, team.Artifacts, 2, "the team's list shows the shared file once")
+	for _, id := range []int64{first, second} {
+		list := getTeamArtifacts(t, srv, "/api/board/g-team/artifacts?task="+itoa(id), http.StatusOK)
+		want := map[int64]int{first: 2, second: 1}[id]
+		assert.Len(t, list.Artifacts, want, "task %d: its list is what its row counts", id)
+	}
+}
