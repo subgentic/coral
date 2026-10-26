@@ -29,28 +29,9 @@ func main() {
 		}
 	}()
 
-	raw, ok, err := hooks.ReadStdin(os.Stdin)
-	if err != nil {
-		hooks.DebugLog(fmt.Sprintf("AGENTIC_STATE STDIN_ERROR: %v", err))
-		return
-	}
+	d, opts, ok := readHookPayload(os.Stdin, os.Args[1:])
 	if !ok {
-		hooks.DebugLog("AGENTIC_STATE DROPPED: the payload is over the size bound")
 		return
-	}
-
-	hooks.DebugLog(fmt.Sprintf("AGENTIC_STATE RAW(%d)", len(raw))) // the size only: never the payload (#3571)
-
-	var d map[string]any
-	if err := json.Unmarshal(raw, &d); err != nil {
-		hooks.DebugLog("AGENTIC_STATE JSON_ERROR")
-		return
-	}
-
-	// --session-clear flag injects marker for /clear detection
-	opts := parseArgs(os.Args[1:])
-	if opts.sessionClear {
-		d["_coral_session_clear"] = true
 	}
 	agyEvent, hooksRev := opts.agyEvent, opts.hooksRev
 	agyModel := agyModelOf(d, agyEvent)               // read before fromAgy rewrites the payload
@@ -66,69 +47,22 @@ func main() {
 		}
 	}
 
-	hookType, _ := d["hook_event_name"].(string)
-	if hookType == "" {
-		hookType, _ = d["type"].(string)
-	}
-	if hookType == "" {
-		hookType, _ = d["event"].(string)
-	}
-	if hookType == "" {
-		hookType, _ = d["event_name"].(string)
-	}
+	hookType := hookTypeOf(d)
 	hooks.DebugLog(fmt.Sprintf("AGENTIC_STATE INPUT: hook_type=%s argv=%v", hooks.LogID(hookType), os.Args[1:]))
 
 	base := hooks.CoralBase()
 	sessionID := hooks.ResolveSessionID(hooks.StrVal(d, "session_id"))
-	if strings.HasPrefix(os.Getenv("CORAL_SESSION_NAME"), "codex-") {
-		if threadID := codexThreadID(d); threadID != "" && threadID != sessionID {
-			if err := transcriptlink.BindCodex(sessionID, threadID); err != nil {
-				hooks.DebugLog(fmt.Sprintf("CODEX_LINK_FAILED: %v", err))
-			}
-		}
-	}
-	if agyConversation != "" && transcriptlink.IsSessionID(sessionID) {
-		// agy keys its transcript by its own conversation id: the link is what chat, history search and token usage find it by (#7764).
-		if err := transcriptlink.BindAgy(sessionID, agyConversation); err != nil {
-			hooks.DebugLog(fmt.Sprintf("AGY_LINK_FAILED: %v", err))
-		}
-	}
+	bindTranscripts(d, sessionID, agyConversation)
 	agentName := hooks.ResolveAgentName(d)
 	if agentName == "" {
 		hooks.DebugLog(fmt.Sprintf("DROPPED (no agent_name): hook_type=%s", hookType))
 		return
 	}
 
-	if agyModel != "" {
-		// agy names its model in every payload; Coral shows it on the session (#4588).
-		report := map[string]any{"session_id": sessionID, "model": agyModel}
-		if err := hooks.CoralPost(base, hooks.LivePath(agentName, "/context-window"), report); err != nil {
-			hooks.DebugLog(fmt.Sprintf("AGY_MODEL_POST_FAILED: agent=%s err=%v", hooks.LogID(agentName), err))
-		}
-	}
+	postAgyModel(base, agentName, sessionID, agyModel)
 
-	// PreToolUse: record the tool call that is starting so the chat can show
-	// what a permission prompt, question or plan approval is asking. It is not
-	// an activity event; its PostToolUse is.
 	if hookType == "PreToolUse" {
-		pending := parsePendingTool(d, sessionID)
-		if pending == nil {
-			return
-		}
-		if _, err := hooks.CoralAPI(base, "POST", hooks.LivePath(agentName, "/pending-tool"), pending); err != nil {
-			hooks.DebugLog(fmt.Sprintf("PENDING_POST_FAILED: agent=%s tool=%v err=%v", agentName, pending["tool_name"], err))
-		}
-		// agy sends no hook for a question to the user, only this PreToolUse: its ask_question always waits for the user, so the
-		// request is recorded as Claude's PermissionRequest records it (#4819). A tool permission prompt is not known from here: the
-		// server confirms those from the screen (it records the same event).
-		if event := agyWaitEvent(d, agyEvent, sessionID); event != nil {
-			if hooksRev > 0 {
-				event["hooks_rev"] = hooksRev
-			}
-			if _, err := hooks.CoralAPI(base, "POST", hooks.LivePath(agentName, "/events"), event); err != nil {
-				hooks.DebugLog(fmt.Sprintf("POST_FAILED: base=%s agent=%s event_type=%s err=%v", hooks.RedactedURL(base), agentName, event["event_type"], err))
-			}
-		}
+		recordPendingTool(base, agentName, sessionID, d, agyEvent, hooksRev)
 		return
 	}
 
@@ -156,8 +90,110 @@ func main() {
 	if mode := claudePermissionMode(d); mode != "" && agyEvent == "" && strings.HasPrefix(os.Getenv("CORAL_SESSION_NAME"), "claude-") {
 		event["permission_mode"] = mode // the CLI's mode now (it follows Shift+Tab): the dashboard's Mode button reads it
 	}
-	// A tool call that ended (PostToolUse) is recorded without the agent waiting for Coral's answer; the Stop event keeps the full wait (its turn end is what the
-	// dashboard turns on, and the token count follows it).
+	if !postEvent(base, agentName, hookType, event) {
+		return
+	}
+
+	if hookType == "Stop" {
+		forwardTokenUsage(base, agentName, sessionID, d)
+	}
+
+	hooks.DebugLog(fmt.Sprintf("DONE: agent=%s event_type=%s", agentName, event["event_type"]))
+}
+
+// readHookPayload reads the hook's stdin as the JSON object the CLI sent and the hook's own arguments (--session-clear marks the payload as a /clear). It reports false, having logged why, when
+// there is nothing to record: stdin could not be read, the payload is over the size bound, or it is not JSON.
+func readHookPayload(in io.Reader, args []string) (map[string]any, hookArgs, bool) {
+	raw, ok, err := hooks.ReadStdin(in)
+	if err != nil {
+		hooks.DebugLog(fmt.Sprintf("AGENTIC_STATE STDIN_ERROR: %v", err))
+		return nil, hookArgs{}, false
+	}
+	if !ok {
+		hooks.DebugLog("AGENTIC_STATE DROPPED: the payload is over the size bound")
+		return nil, hookArgs{}, false
+	}
+
+	hooks.DebugLog(fmt.Sprintf("AGENTIC_STATE RAW(%d)", len(raw))) // the size only: never the payload (#3571)
+
+	var d map[string]any
+	if err := json.Unmarshal(raw, &d); err != nil {
+		hooks.DebugLog("AGENTIC_STATE JSON_ERROR")
+		return nil, hookArgs{}, false
+	}
+
+	// --session-clear flag injects marker for /clear detection
+	opts := parseArgs(args)
+	if opts.sessionClear {
+		d["_coral_session_clear"] = true
+	}
+	return d, opts, true
+}
+
+// hookTypeOf is the event's name: the CLIs name it hook_event_name, type, event or event_name.
+func hookTypeOf(d map[string]any) string {
+	for _, key := range []string{"hook_event_name", "type", "event", "event_name"} {
+		if name, _ := d[key].(string); name != "" {
+			return name
+		}
+	}
+	return ""
+}
+
+// bindTranscripts links the Coral session to the CLI's own transcript: a Codex thread, or an agy conversation.
+func bindTranscripts(d map[string]any, sessionID, agyConversation string) {
+	if strings.HasPrefix(os.Getenv("CORAL_SESSION_NAME"), "codex-") {
+		if threadID := codexThreadID(d); threadID != "" && threadID != sessionID {
+			if err := transcriptlink.BindCodex(sessionID, threadID); err != nil {
+				hooks.DebugLog(fmt.Sprintf("CODEX_LINK_FAILED: %v", err))
+			}
+		}
+	}
+	if agyConversation != "" && transcriptlink.IsSessionID(sessionID) {
+		// agy keys its transcript by its own conversation id: the link is what chat, history search and token usage find it by (#7764).
+		if err := transcriptlink.BindAgy(sessionID, agyConversation); err != nil {
+			hooks.DebugLog(fmt.Sprintf("AGY_LINK_FAILED: %v", err))
+		}
+	}
+}
+
+// postAgyModel tells Coral the model agy runs: it names its model in every payload, and Coral shows it on the session (#4588).
+func postAgyModel(base, agentName, sessionID, agyModel string) {
+	if agyModel == "" {
+		return
+	}
+	report := map[string]any{"session_id": sessionID, "model": agyModel}
+	if err := hooks.CoralPost(base, hooks.LivePath(agentName, "/context-window"), report); err != nil {
+		hooks.DebugLog(fmt.Sprintf("AGY_MODEL_POST_FAILED: agent=%s err=%v", hooks.LogID(agentName), err))
+	}
+}
+
+// recordPendingTool records the tool call that is starting (PreToolUse), so the chat can show what a permission prompt, question or plan approval is asking. It is not
+// an activity event; its PostToolUse is.
+func recordPendingTool(base, agentName, sessionID string, d map[string]any, agyEvent string, hooksRev int) {
+	pending := parsePendingTool(d, sessionID)
+	if pending == nil {
+		return
+	}
+	if _, err := hooks.CoralAPI(base, "POST", hooks.LivePath(agentName, "/pending-tool"), pending); err != nil {
+		hooks.DebugLog(fmt.Sprintf("PENDING_POST_FAILED: agent=%s tool=%v err=%v", agentName, pending["tool_name"], err))
+	}
+	// agy sends no hook for a question to the user, only this PreToolUse: its ask_question always waits for the user, so the
+	// request is recorded as Claude's PermissionRequest records it (#4819). A tool permission prompt is not known from here: the
+	// server confirms those from the screen (it records the same event).
+	if event := agyWaitEvent(d, agyEvent, sessionID); event != nil {
+		if hooksRev > 0 {
+			event["hooks_rev"] = hooksRev
+		}
+		if _, err := hooks.CoralAPI(base, "POST", hooks.LivePath(agentName, "/events"), event); err != nil {
+			hooks.DebugLog(fmt.Sprintf("POST_FAILED: base=%s agent=%s event_type=%s err=%v", hooks.RedactedURL(base), agentName, event["event_type"], err))
+		}
+	}
+}
+
+// postEvent posts the activity event and reports whether it was sent. A tool call that ended (PostToolUse) is recorded without the agent waiting for Coral's answer; the Stop event
+// keeps the full wait (its turn end is what the dashboard turns on, and the token count follows it).
+func postEvent(base, agentName, hookType string, event map[string]any) bool {
 	post := func() error {
 		_, err := hooks.CoralAPI(base, "POST", hooks.LivePath(agentName, "/events"), event)
 		return err
@@ -167,22 +203,24 @@ func main() {
 	}
 	if err := post(); err != nil {
 		hooks.DebugLog(fmt.Sprintf("POST_FAILED: base=%s agent=%s event_type=%s err=%v", hooks.RedactedURL(base), agentName, event["event_type"], err))
+		return false
+	}
+	return true
+}
+
+// forwardTokenUsage sends the token usage a Stop payload carries (when it carries any).
+func forwardTokenUsage(base, agentName, sessionID string, d map[string]any) {
+	if d["total_input_tokens"] == nil && d["total_output_tokens"] == nil && d["total_cost_usd"] == nil {
 		return
 	}
-
-	// Forward token usage data on Stop events
-	if hookType == "Stop" && (d["total_input_tokens"] != nil || d["total_output_tokens"] != nil || d["total_cost_usd"] != nil) {
-		tokenData := map[string]any{
-			"session_id":    sessionID,
-			"input_tokens":  d["total_input_tokens"],
-			"output_tokens": d["total_output_tokens"],
-			"cost_usd":      d["total_cost_usd"],
-			"num_turns":     d["num_turns"],
-		}
-		_ = hooks.CoralPost(base, hooks.LivePath(agentName, "/token-usage"), tokenData)
+	tokenData := map[string]any{
+		"session_id":    sessionID,
+		"input_tokens":  d["total_input_tokens"],
+		"output_tokens": d["total_output_tokens"],
+		"cost_usd":      d["total_cost_usd"],
+		"num_turns":     d["num_turns"],
 	}
-
-	hooks.DebugLog(fmt.Sprintf("DONE: agent=%s event_type=%s", agentName, event["event_type"]))
+	_ = hooks.CoralPost(base, hooks.LivePath(agentName, "/token-usage"), tokenData)
 }
 
 // claudePermissionMode is the permission mode a Claude hook payload carries (permission_mode), when it is one of the six words the CLI has, and the empty string otherwise. The server checks again.
@@ -313,7 +351,23 @@ func parseAgenticEvent(d map[string]any, hookType, sessionID string) map[string]
 		}
 	}
 
-	// Tool use
+	if tool := toolNameOf(d); tool != "" {
+		return toolUseEvent(d, hookType, sessionID, tool)
+	}
+
+	if hookType == "Stop" || d["stop_hook_active"] != nil {
+		return stopEvent(d, hookType, sessionID)
+	}
+
+	if hookType == "Notification" || d["message"] != nil {
+		return notificationEvent(d, sessionID)
+	}
+
+	return nil
+}
+
+// toolNameOf is the tool a payload names: tool_name, else the name of its tool object, else name.
+func toolNameOf(d map[string]any) string {
 	tool, _ := d["tool_name"].(string)
 	if tool == "" {
 		if toolData, _ := d["tool"].(map[string]any); toolData != nil {
@@ -323,98 +377,100 @@ func parseAgenticEvent(d map[string]any, hookType, sessionID string) map[string]
 	if tool == "" {
 		tool, _ = d["name"].(string)
 	}
-	if tool != "" {
-		inp := hooks.GetToolInput(d)
-		summary := hooks.MakeToolSummary(tool, inp)
-		detail := makeToolDetail(tool, inp)
-		if resp := makeResponseDetail(d["tool_response"]); resp != nil {
-			detail = withDetail(detail, "response", resp)
-		}
-		// Codex's PostToolUse gives a shell command's output as a plain string, with no exit code: its
-		// transcript has it (#4545).
-		shellFailed := false
-		if _, isText := d["tool_response"].(string); isText && hookType == "PostToolUse" && codexShellTools[tool] {
-			if code, status, ok := codexToolResult(hooks.StrVal(d, "transcript_path"), hooks.StrVal(d, "tool_use_id")); ok {
-				detail = withDetail(detail, "exit_code", code)
-				shellFailed = status == "failed" || code != 0
-			}
-		}
-		// agy's PostToolUse says error "" for a command that exited non-zero: its transcript has the code (#4577).
-		if step, isAgy := d["_agy_step"].(int64); isAgy && hookType == "PostToolUse" && tool == "run_command" {
-			if code, ok := agyToolResult(hooks.StrVal(d, "_agy_artifacts"), hooks.StrVal(d, "transcript_path"), step); ok {
-				detail = withDetail(detail, "exit_code", code)
-				shellFailed = shellFailed || code != 0
-			}
-		}
-		if shellFailed {
-			summary = "Failed: " + summary
-			detail = withDetail(detail, "failed", true)
-		}
-		// PostToolUseFailure: the tool errored or was interrupted.
-		if hookType == "PostToolUseFailure" || d["error"] != nil {
-			summary = "Failed: " + summary
-			detail = withDetail(detail, "failed", true)
-			if errMsg, _ := d["error"].(string); errMsg != "" {
-				detail = withDetail(detail, "error", hooks.Truncate(errMsg, 300))
-			}
-			if interrupted, _ := d["is_interrupt"].(bool); interrupted {
-				detail = withDetail(detail, "interrupted", true)
-			}
-		}
-		event := map[string]any{
-			"event_type":  "tool_use",
-			"tool_name":   tool,
-			"summary":     summary,
-			"detail_json": detail,
-			"session_id":  sessionID,
-		}
-		if id, _ := d["tool_use_id"].(string); id != "" {
-			event["tool_use_id"] = id
-		}
-		// Measured by the agent around the tool call itself.
-		if ms, ok := d["duration_ms"].(float64); ok && ms >= 0 {
-			event["duration_ms"] = int64(ms)
-		}
-		return event
-	}
+	return tool
+}
 
-	// Stop
-	if hookType == "Stop" || d["stop_hook_active"] != nil {
-		reason, _ := d["reason"].(string)
-		if reason == "" {
-			reason = "unknown"
-		}
-		event := map[string]any{
-			"event_type": "stop",
-			"summary":    "Agent stopped: " + reason,
-			"session_id": sessionID,
-		}
-		// A claude.ai artifact link in the reply this turn ended with (#6583): only the ids, read from the end of the agent's own transcript.
-		if hookType == "Stop" && strings.HasPrefix(os.Getenv("CORAL_SESSION_NAME"), "claude-") {
-			if ids := claudeartifact.LastAssistantIDs(hooks.StrVal(d, "transcript_path")); len(ids) > 0 {
-				event["detail_json"] = map[string]any{"claude_artifact_ids": ids}
-			}
-		}
-		return event
+// toolUseEvent is the activity event of a tool call: its summary and detail, the exit code of a shell command (from the CLI's own transcript where the payload has none), a failure, and the
+// timing the agent measured.
+func toolUseEvent(d map[string]any, hookType, sessionID, tool string) map[string]any {
+	inp := hooks.GetToolInput(d)
+	summary := hooks.MakeToolSummary(tool, inp)
+	detail := makeToolDetail(tool, inp)
+	if resp := makeResponseDetail(d["tool_response"]); resp != nil {
+		detail = withDetail(detail, "response", resp)
 	}
-
-	// Notification
-	if hookType == "Notification" || d["message"] != nil {
-		message, _ := d["message"].(string)
-		event := map[string]any{
-			"event_type": "notification",
-			"summary":    "Notification: " + hooks.Truncate(message, 100),
-			"session_id": sessionID,
+	// Codex's PostToolUse gives a shell command's output as a plain string, with no exit code: its
+	// transcript has it (#4545).
+	shellFailed := false
+	if _, isText := d["tool_response"].(string); isText && hookType == "PostToolUse" && codexShellTools[tool] {
+		if code, status, ok := codexToolResult(hooks.StrVal(d, "transcript_path"), hooks.StrVal(d, "tool_use_id")); ok {
+			detail = withDetail(detail, "exit_code", code)
+			shellFailed = status == "failed" || code != 0
 		}
-		// Claude Code names the kind (permission_prompt, idle_prompt, elicitation_dialog,
-		// ...): kept so the state needn't rely on the message's wording (#3475).
-		if t, _ := d["notification_type"].(string); t != "" {
-			event["detail_json"] = map[string]any{"notification_type": t}
-		}
-		return event
 	}
+	// agy's PostToolUse says error "" for a command that exited non-zero: its transcript has the code (#4577).
+	if step, isAgy := d["_agy_step"].(int64); isAgy && hookType == "PostToolUse" && tool == "run_command" {
+		if code, ok := agyToolResult(hooks.StrVal(d, "_agy_artifacts"), hooks.StrVal(d, "transcript_path"), step); ok {
+			detail = withDetail(detail, "exit_code", code)
+			shellFailed = shellFailed || code != 0
+		}
+	}
+	if shellFailed {
+		summary = "Failed: " + summary
+		detail = withDetail(detail, "failed", true)
+	}
+	// PostToolUseFailure: the tool errored or was interrupted.
+	if hookType == "PostToolUseFailure" || d["error"] != nil {
+		summary = "Failed: " + summary
+		detail = withDetail(detail, "failed", true)
+		if errMsg, _ := d["error"].(string); errMsg != "" {
+			detail = withDetail(detail, "error", hooks.Truncate(errMsg, 300))
+		}
+		if interrupted, _ := d["is_interrupt"].(bool); interrupted {
+			detail = withDetail(detail, "interrupted", true)
+		}
+	}
+	event := map[string]any{
+		"event_type":  "tool_use",
+		"tool_name":   tool,
+		"summary":     summary,
+		"detail_json": detail,
+		"session_id":  sessionID,
+	}
+	if id, _ := d["tool_use_id"].(string); id != "" {
+		event["tool_use_id"] = id
+	}
+	// Measured by the agent around the tool call itself.
+	if ms, ok := d["duration_ms"].(float64); ok && ms >= 0 {
+		event["duration_ms"] = int64(ms)
+	}
+	return event
+}
 
-	return nil
+// stopEvent is the event of the agent's turn ending.
+func stopEvent(d map[string]any, hookType, sessionID string) map[string]any {
+	reason, _ := d["reason"].(string)
+	if reason == "" {
+		reason = "unknown"
+	}
+	event := map[string]any{
+		"event_type": "stop",
+		"summary":    "Agent stopped: " + reason,
+		"session_id": sessionID,
+	}
+	// A claude.ai artifact link in the reply this turn ended with (#6583): only the ids, read from the end of the agent's own transcript.
+	if hookType == "Stop" && strings.HasPrefix(os.Getenv("CORAL_SESSION_NAME"), "claude-") {
+		if ids := claudeartifact.LastAssistantIDs(hooks.StrVal(d, "transcript_path")); len(ids) > 0 {
+			event["detail_json"] = map[string]any{"claude_artifact_ids": ids}
+		}
+	}
+	return event
+}
+
+// notificationEvent is the event of a CLI notification.
+func notificationEvent(d map[string]any, sessionID string) map[string]any {
+	message, _ := d["message"].(string)
+	event := map[string]any{
+		"event_type": "notification",
+		"summary":    "Notification: " + hooks.Truncate(message, 100),
+		"session_id": sessionID,
+	}
+	// Claude Code names the kind (permission_prompt, idle_prompt, elicitation_dialog,
+	// ...): kept so the state needn't rely on the message's wording (#3475).
+	if t, _ := d["notification_type"].(string); t != "" {
+		event["detail_json"] = map[string]any{"notification_type": t}
+	}
+	return event
 }
 
 // codexThreadID is the Codex thread this hook fires for: the session_id of Codex's own
