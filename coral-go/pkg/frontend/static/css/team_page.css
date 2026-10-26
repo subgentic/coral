@@ -349,6 +349,8 @@
 .goals-detail-title, .team-page-title { font-feature-settings: "calt" 0; }
 
 /* Keep the review actions together; the full team name remains in the metadata tooltip. */
+/* Open below is the artifact's keyboard and touch target; its title does not need a duplicate button line. */
+.inbox-review-name { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .inbox-review-actions { display: grid; grid-template-columns: max-content max-content; gap: 8px; }
 .inbox-review-error { grid-column: 1 / -1; white-space: normal; }
 .inbox-review-error:empty { display: none; }
