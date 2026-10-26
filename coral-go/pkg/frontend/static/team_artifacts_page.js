@@ -136,7 +136,7 @@ function deleteArtifact(hex, name, size) {
 // ── reading the list ─────────────────────────────────────────────────────
 
 export async function loadArtifacts({ append = false, keep = false } = {}) {
-    const { project, key } = model; if (!key) return;
+    const { project, key } = model; if (!key || (append && (model.controller || !model.hasMore))) return;
     const scope = model.scope;
     model.controller?.abort();
     const gen = ++model.gen, ctrl = model.controller = new AbortController();
@@ -165,7 +165,7 @@ export async function loadArtifacts({ append = false, keep = false } = {}) {
         if (gen !== model.gen || e.name === 'AbortError') return;
         model.error = e.message || 'Unable to load artifacts.';
     } finally {
-        if (gen === model.gen) { model.loading = false; model.loadingMore = false; draw(); }
+        if (gen === model.gen) { model.controller = null; model.loading = false; model.loadingMore = false; draw(); }
     }
 }
 
@@ -275,7 +275,7 @@ function draw() {
     Toolbar.mountSelection(toolbarRow, null);
     if (model.items.length || artifactState.selected.size) {
         const table = DT.dataTable({
-            label: `Artifacts, ${model.items.length}`, rows: model.items, rowKey: itemKey, current: detailKey(), sortBar: false, state: artifactState, rowName: readableName,
+            label: `Artifacts, ${model.items.length}`, bare: !!model.scope, rows: model.items, rowKey: itemKey, current: detailKey(), sortBar: false, state: artifactState, rowName: readableName,
             selectable: model.scope ? null : { contextKey: model.key, canSelect: item => !!linkOf(item)?.preview, actions: artifactBulkActions(), onChange: keys => Toolbar.mountSelection(toolbarRow, keys.size ? table.bar : null) },
             open: (item, tr) => openArtifact(item, tr.querySelector('.dt-primary')),
             columns: [
@@ -287,13 +287,13 @@ function draw() {
                         if (badge) { const note = DT.tag(badge); note.classList.add('dt-note', 'team-artifact-badge', `team-artifact-badge-${isUnverified(item) ? 'unverified' : item.source === 'shared' ? 'shared' : 'received'}`); if (isUnverified(item)) note.classList.add('dt-warning'); first.append(note); }
                         return first;
                     }, subtitle: item => typeof item.description === 'string' ? item.description : typeof item.note === 'string' ? item.note : '' },
-                { key: 'type', label: 'Type', line: 2, cell: item => isUnverified(item) ? '—' : DT.tag(typeText(item)) },
+                { key: 'type', label: 'Type', line: 2, tone: 'tertiary', cell: item => isUnverified(item) ? '—' : DT.tag(typeText(item)) },
                 { key: 'size', label: 'Size', line: 2, tone: 'tertiary', align: 'end', cell: item => isUnverified(item) ? '—' : sizeText(item.size) || '—' },
-                { key: 'task', label: 'Task', line: 2, tone: 'tertiary', cell: taskText },
+                { key: 'task', label: 'Task', line: 2, tone: 'tertiary', when: item => !model.scope || !!item.task_id, cell: taskText },
                 { key: 'created', label: 'Created', line: 1, tone: 'tertiary', align: 'end', cell: item => DT.timeCell(item.created_at) },
             ],
-            footer: { auto: !model.truncated, text: `Showing ${model.items.length} of ${model.counts?.matched ?? model.items.length}${model.truncated ? '+' : ''}`,
-                more: model.hasMore ? { label: 'Load more', busy: model.loadingMore, run: () => { if (!model.loadingMore) loadArtifacts({ append: true }); } } : null },
+            footer: { auto: !model.truncated && !model.error, text: `Showing ${model.items.length} of ${model.counts?.matched ?? model.items.length}${model.truncated ? '+' : ''}`,
+                more: model.hasMore ? { label: 'Load more', busy: !!model.controller, run: () => { if (!model.loadingMore) loadArtifacts({ append: true }); } } : null },
         });
         body.append(table.el); Toolbar.mountSelection(toolbarRow, artifactState.selected.size ? table.bar : null);
         if (!model.scope && matchMedia('(max-width: 760px)').matches) toolbarRow?.append(table.selectButton);
