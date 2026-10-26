@@ -19,8 +19,9 @@ const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls)
 function fmtTokens(n) {
     const v = Number(n);
     if (!Number.isFinite(v)) return '';
+    if (v >= 999.5e6) return `${(v / 1e9).toFixed(1)} B`;
     if (v >= 1e7) return `${Math.round(v / 1e6)} M`;
-    if (v >= 1e6) return `${(v / 1e6).toFixed(1)} M`;
+    if (v >= 999500) return `${(v / 1e6).toFixed(1)} M`; // a figure that rounds up to the next unit moves into it
     if (v >= 1e3) return `${Math.round(v / 1e3)} K`;
     return String(Math.round(v));
 }

@@ -1,12 +1,21 @@
 /* Small formatters shared by several views (#3794). Each was copied into the modules that needed it; these are the copies that
  * were character for character the same. Pure functions: no DOM, no state. */
 
-/** 1234 -> "1.2K", 2500000 -> "2.5M"; below 1000 the number as text. */
-export function formatTokens(n) {
-    if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
-    if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
-    return String(n);
+/** A count as a person reads it: 1234 -> "1.2K", 2500000 -> "2.5M", 15491800000 -> "15.5B", then T; below 1000 the number as text. A figure that rounds up to the next unit moves
+ *  into it (999,950 is "1.0M", not "1000.0K"). kilo is the thousands' letter (the task rows write a lower-case k). */
+export function compactCount(n, kilo = 'K') {
+    const v = Number(n);
+    if (!Number.isFinite(v)) return String(n);
+    const a = Math.abs(v), sign = v < 0 ? '-' : '';
+    if (a >= 999.95e9) return sign + (a / 1e12).toFixed(1) + 'T';
+    if (a >= 999.95e6) return sign + (a / 1e9).toFixed(1) + 'B';
+    if (a >= 999950) return sign + (a / 1e6).toFixed(1) + 'M';
+    if (a >= 1000) return sign + (a / 1e3).toFixed(1) + kilo;
+    return String(v);
 }
+
+/** Tokens: compactCount. */
+export function formatTokens(n) { return compactCount(n); }
 
 /** An ISO timestamp as the local clock time (hh:mm:ss), or '' for none or a bad one. */
 export function formatClockTime(isoStr) {
