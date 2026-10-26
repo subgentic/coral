@@ -20,11 +20,10 @@
  *
  * The controller: values() set(key, v) dirty() isDirty() changes() error(key, message) clearErrors() validate({ focus }) save() cancel() showGroup(id) reload() destroy().
  * Events on the host: 'sv-dirty' { dirty }, 'sv-group' { id }, 'sv-saved' { changes }. */
-import { importOnce } from './import_once.js';
 import { browserLocal } from './safe_storage.js';
 import { storeKey } from './local_store.js';
 
-const { initSectionDialog, showSection, markSectionError } = await importOnce('./section_dialog.js'); // the nav: the shared sectioned shell (lazy, loaded through importOnce, so a failed load is retried)
+import { initSectionDialog, showSection, markSectionError } from './section_dialog.js'; // the nav: the shared sectioned shell (loaded at startup with this module: the Settings dialog's rows are drawn from it the moment its markup is built)
 
 let seq = 0;
 const WORDS = { none: 'No changes to save.', dirty: 'You have unsaved changes.', saved: 'Saved.', failed: 'Could not save: ', busy: 'Saving\u2026' };
