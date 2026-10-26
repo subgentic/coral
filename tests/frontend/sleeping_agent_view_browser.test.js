@@ -147,7 +147,8 @@ const SLEEPING_PLACEHOLDER = '';
         await firstPage();
         await ev(`document.getElementById('sleeping-restart-btn').click()`);
         await waitFor(`getComputedStyle(document.getElementById('restart-modal')).display !== 'none'`, 'restart modal', 2000);
-        assert.match(await ev(`document.getElementById('restart-stage-sub').textContent`), /qa-sleep-r/);
+        assert.match(await ev(`document.getElementById('restart-title').textContent`), /^Restart qa-sleep-r$/, 'the title names the agent (#7886)');
+        assert.match(await ev(`document.getElementById('restart-stage-sub').textContent`), /^Step 1 of 2: Persona/, 'the line under it is the step');
         await ev(`window.hideRestartModal ? window.hideRestartModal() : (document.getElementById('restart-modal').style.display = 'none')`);
         console.log('   ✓ restart modal opens for the sleeping agent');
 
