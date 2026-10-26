@@ -536,6 +536,11 @@ values are clamped: times are 5 to 1440 minutes, and nudges are 1 to 5.
 | `status_nudge` | on, `after_min` 20, `escalate_after_min` 10 | ask for a status after no activity; escalate if still silent |
 | `mention_renudge` | on, `after_min` 10 | remind the orchestrator of an unanswered mention |
 | `held_notice` | on, `after_min` 10 | tell the Operator, on the board, about an agent whose messages have waited at a dialog that long: its name and "waiting at a dialog" only, once per hold |
+| `busy_no_task` | on, `after_min` 10 | a line of the orchestrator's check for an agent that has been in a turn that long with no task in progress (once per turn; the orchestrator itself is left out) |
+| `post_no_task` | on | a line of the check for a commit, SHA or patch an agent posted with no task number in the post and no task in progress when it posted (once per post) |
+| `upload_no_task` | on | a line of the check for an artifact an agent uploaded with no task in progress, unless it said `--no-task` (once per upload) |
+
+The three off-the-books signals use the board's, the hooks' and the upload route's own records, never the screen. Each line names the agent and a fixed phrase (a short SHA or digest, never the agent's words), is said once, and goes out in the orchestrator's next check (five lines at most per check; the rest wait). A switch that is off keeps its signal silent.
 
 The claim nudge names the agent's highest-priority assigned task. Once that escalates, the
 next one waits until the first is resolved. A task whose reminder is snoozed gets no status

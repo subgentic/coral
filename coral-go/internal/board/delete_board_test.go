@@ -13,7 +13,7 @@ import (
 var boardOwnedRows = []struct{ table, col string }{
 	{"board_subscribers", "project"}, {"board_messages", "project"}, {"board_reminders", "project"}, {"board_groups", "project"},
 	{"board_tasks", "board_id"}, {"board_settings", "project"}, {"board_waits", "project"}, {"board_working_modes", "board_id"},
-	{"board_workflow_presets", "board_id"}, {"health_counters", "project"}, {"health_items", "project"}, {"boards", "id"},
+	{"board_workflow_presets", "board_id"}, {"health_counters", "project"}, {"health_items", "project"}, {"health_offbooks", "project"}, {"boards", "id"},
 	{"board_goals", "board_id"}, {"board_goal_meta", "board_id"}, {"board_goal_events", "board_id"}, {"board_settings_log", "board_id"}, // the goals tables were missing from this census until #7355
 	{"board_goal_requests_in", "board_id"}, {"board_goal_requests_out", "board_id"}, // #7361: a goal request goes with either of its two boards
 }
@@ -61,6 +61,7 @@ func fillBoard(t *testing.T, s *Store, project string) (taskIDs []int64) {
 		{`INSERT INTO health_actions (project, rule, target, at) VALUES (?, 'claim', 'Dev', '2026-10-19T00:00:00Z')`, []any{project}},
 		{`INSERT INTO health_counters (project, rule, target, subject, count, last_at) VALUES (?, 'claim', 'Dev', '1', 1, '2026-10-19T00:00:00Z')`, []any{project}},
 		{`INSERT INTO health_items (project, item, state, shown_at) VALUES (?, 'stuck:Dev', 'open', '2026-10-19T00:00:00Z')`, []any{project}},
+		{`INSERT INTO health_offbooks (project, kind, agent, ref, detail, at) VALUES (?, 'post', 'Dev', '1', 'posted a commit', '2026-10-19T00:00:00.000Z')`, []any{project}},
 		{`INSERT INTO hub_operator_actions (at, hub_user, method, path, project, status) VALUES ('2026-10-19T00:00:00Z', 'u', 'PUT', '/x', ?, 200)`, []any{project}},
 		{`INSERT OR IGNORE INTO boards (id, label, created_at) VALUES (?, ?, '2026-10-19T00:00:00Z')`, []any{project, project}},
 		{`INSERT INTO board_goal_requests_in (board_id, request_id, from_board, goal_uid, created_at) VALUES (?, 'in-' || ?, 'a-peer', 'u', '2026-10-19T00:00:00Z')`, []any{project, project}},

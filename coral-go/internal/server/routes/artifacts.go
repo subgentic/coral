@@ -565,6 +565,7 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 		return
 	}
 	_ = fresh
+	h.noteOffBooksUpload(r.Context(), taskID, hexID) // an agent with no task in progress: a line of the orchestrator's check (#7793)
 	// The name and type viewers get: the first upload's, when these bytes were stored before.
 	reply := map[string]any{
 		"uri":        "coral://artifacts/" + hexID,

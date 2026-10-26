@@ -35,7 +35,8 @@ type BoardHealthMonitor struct {
 	limit func(ctx context.Context, a AgentInfo) (resets time.Duration, blocked bool)
 
 	mu        sync.Mutex
-	lastCheck map[string]time.Time // per board
+	lastCheck map[string]time.Time       // per board
+	offShown  map[string][]offBooksShown // per board: the off-the-books occurrences the check composed last, said once it is delivered (board_health_offbooks.go)
 }
 
 func NewBoardHealthMonitor(store *board.Store, interval time.Duration) *BoardHealthMonitor {
@@ -138,6 +139,7 @@ func (m *BoardHealthMonitor) checkProject(ctx context.Context, project string, b
 	m.mu.Lock()
 	m.lastCheck[project] = m.now()
 	m.mu.Unlock()
+	m.markOffBooksShown(ctx, project, text, m.now())
 }
 
 // composeCheck gathers a board's items and writes its check: what Coral's own rules escalated, idle agents with no
@@ -166,6 +168,7 @@ func (m *BoardHealthMonitor) composeCheck(ctx context.Context, project, orch str
 	reviewers, _ := m.store.Reviewers(ctx, project)
 	idle, agents, idleNoWork := m.idleItems(ctx, subs, bySession, orch, busyAgents(tasks), waiting, now)
 	items = append(items, idle...)
+	items = append(items, m.offBooksItems(ctx, project, orch, subs, bySession, tasks, now)...) // work done off the books (#7793)
 	items = append(items, reviewItems(reviews, reviewers, parked, idleNoWork)...)
 	// 4. Queue problems (task numbers only).
 	issues, _, _ := taskQueueIssues(tasks)

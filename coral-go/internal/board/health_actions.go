@@ -55,6 +55,17 @@ CREATE TABLE IF NOT EXISTS health_items (
 	acked_by    TEXT,
 	acked_at    TEXT,
 	PRIMARY KEY (project, item)
+);
+CREATE TABLE IF NOT EXISTS health_offbooks (
+	id       INTEGER PRIMARY KEY AUTOINCREMENT,
+	project  TEXT NOT NULL,
+	kind     TEXT NOT NULL,
+	agent    TEXT NOT NULL,
+	ref      TEXT NOT NULL,
+	detail   TEXT NOT NULL,
+	at       TEXT NOT NULL,
+	shown_at TEXT,
+	UNIQUE (project, kind, ref)
 );`)
 	return err
 }

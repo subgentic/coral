@@ -6,6 +6,9 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/subgentic/coral/internal/board"
 )
 
 // An artifact an agent uploads is linked to the task it is working on (#7739, the operator's: "any artifact created by an agent working on a task links to that task"). The task is the
@@ -63,4 +66,35 @@ func (h *SessionsHandler) artifactTaskLink(ctx context.Context, r *http.Request)
 		return ids[0], ""
 	}
 	return 0, ""
+}
+
+// noteOffBooksUpload: an agent's upload that links to no task and was not sent with --no-task, from an agent with no task in progress, is work done off the books (#7793, goal #21): the
+// orchestrator's health check says it once, when the team's health check and its upload switch are on. A person's upload, a token-less one and the orchestrator's own are not noted.
+func (h *SessionsHandler) noteOffBooksUpload(ctx context.Context, taskID int64, digest string) {
+	if taskID != 0 || h.bs == nil {
+		return
+	}
+	owner, ok := VerifiedSession(ctx)
+	if !ok || owner == nil {
+		return
+	}
+	sub, err := h.bs.GetSubscriptionBySessionName(ctx, owner.SessionName)
+	if err != nil || sub == nil {
+		return
+	}
+	hs := h.bs.GetHealthSettings(ctx, sub.Project)
+	if !hs.On || !hs.UploadNoTask.On {
+		return
+	}
+	if orch, err := h.bs.TeamOrchestrator(ctx, sub.Project); err == nil && board.SameIdentity(sub.SubscriberID, orch) {
+		return
+	}
+	if ids, err := h.bs.InProgressTaskIDsOf(ctx, sub.Project, sub.SubscriberID); err != nil || len(ids) > 0 {
+		return // two in progress links none, but it has work: not off the books
+	}
+	short := digest
+	if len(short) > 8 {
+		short = short[:8]
+	}
+	_ = h.bs.AddOffBooks(ctx, sub.Project, board.OffBooksUpload, sub.SubscriberID, digest, "uploaded an artifact ("+short+") with no task in progress", time.Now())
 }

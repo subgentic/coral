@@ -24,6 +24,12 @@ type HealthSettings struct {
 	// HeldNotice tells the Operator about an agent whose automated messages have waited at a
 	// dialog for AfterMin (#4175 step 3).
 	HeldNotice HealthMentionNudge `json:"held_notice"`
+	// The signals of work done off the books (#7793, goal #21): each is a line of the orchestrator's check, once per occurrence, and each is a switch.
+	// BusyNoTask: an agent in a turn for AfterMin with no task in progress. PostNoTask: a commit, SHA or patch posted with no task number by an agent
+	// with no task in progress. UploadNoTask: an artifact uploaded by an agent with no task in progress.
+	BusyNoTask   HealthMentionNudge `json:"busy_no_task"`
+	PostNoTask   HealthRuleOn       `json:"post_no_task"`
+	UploadNoTask HealthRuleOn       `json:"upload_no_task"`
 }
 
 // HealthRuleOn is a rule that is only on or off.
@@ -61,6 +67,9 @@ func DefaultHealthSettings() HealthSettings {
 		StatusNudge:    HealthStatusNudge{On: true, AfterMin: 20, EscalateAfterMin: 10},
 		MentionRenudge: HealthMentionNudge{On: true, AfterMin: 10},
 		HeldNotice:     HealthMentionNudge{On: true, AfterMin: 10},
+		BusyNoTask:     HealthMentionNudge{On: true, AfterMin: 10},
+		PostNoTask:     HealthRuleOn{On: true},
+		UploadNoTask:   HealthRuleOn{On: true},
 	}
 }
 
@@ -84,6 +93,7 @@ func (h HealthSettings) Clamp() HealthSettings {
 	h.StatusNudge.EscalateAfterMin = clampInt(h.StatusNudge.EscalateAfterMin, 5, 1440)
 	h.MentionRenudge.AfterMin = clampInt(h.MentionRenudge.AfterMin, 5, 1440)
 	h.HeldNotice.AfterMin = clampInt(h.HeldNotice.AfterMin, 5, 1440)
+	h.BusyNoTask.AfterMin = clampInt(h.BusyNoTask.AfterMin, 5, 1440)
 	h.Recipient = strings.TrimSpace(h.Recipient)
 	var revs []string
 	for _, r := range h.DefaultReviewers {
@@ -104,6 +114,11 @@ func (s *Store) GetHealthSettings(ctx context.Context, project string) HealthSet
 		_ = json.Unmarshal([]byte(v), &h)
 	}
 	return h.Clamp()
+}
+
+// SetHealthSettings stores a board's health settings, clamped (the settings route's own save goes through BoardSettingsUpdate; this is for the rest of the server and tests).
+func (s *Store) SetHealthSettings(ctx context.Context, project string, h HealthSettings) error {
+	return s.setHealthSettings(ctx, project, h)
 }
 
 func (s *Store) setHealthSettings(ctx context.Context, project string, h HealthSettings) error {

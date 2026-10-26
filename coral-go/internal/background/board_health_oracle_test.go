@@ -115,6 +115,14 @@ func dumpBoard(t *testing.T, path string) []string {
 		}
 		r.Close()
 	}
+	// The off-the-books scan (#7793) is new work the frozen walk does not do: it marks where it has read the board's posts. That one row, and the (empty here) occurrences table, are not what the oracle compares.
+	kept := out[:0]
+	for _, line := range out {
+		if !strings.Contains(line, "key=health_offbooks_post_cursor") {
+			kept = append(kept, line)
+		}
+	}
+	out = kept
 	sort.Strings(out)
 	return out
 }
@@ -131,6 +139,10 @@ func runCheckOracle(t *testing.T, seed int64) {
 	pathA, pathB := filepath.Join(dir, "a.db"), filepath.Join(dir, "b.db")
 	bs, err := board.NewStoreWithKey(pathA, "")
 	require.NoError(t, err)
+	// The frozen walk has no off-the-books signals (#7793): they are off here so the two sides say the same, and have their own tests (board_health_offbooks_test.go).
+	hs := bs.GetHealthSettings(ctx, "team")
+	hs.BusyNoTask.On, hs.PostNoTask.On, hs.UploadNoTask.On = false, false, false
+	require.NoError(t, bs.SetHealthSettings(ctx, "team", hs))
 	devs := []string{}
 	for i := 0; i < 2+rng.Intn(4); i++ {
 		devs = append(devs, fmt.Sprintf("Dev %d", i))
