@@ -25,6 +25,7 @@ func seriesRouter(t *testing.T) (*store.TokenUsageStore, *chi.Mux, *store.DB) {
 	t.Cleanup(func() { db.Close() })
 	h := NewTokenUsageHandler(db)
 	r := chi.NewRouter()
+	r.Get("/api/token-usage", h.ListUsage)
 	r.Get("/api/token-usage/summary", h.UsageSummary)
 	r.Get("/api/token-usage/timeseries", h.UsageTimeSeries)
 	r.Get("/api/token-usage/turns", h.UsageTurns)
@@ -220,4 +221,22 @@ func TestCallMetricsSummaryOverTime(t *testing.T) {
 	var plain struct{ Rows []map[string]any }
 	require.Equal(t, 200, seriesGet(t, r, "/api/call-metrics/summary?hours=6", false, &plain))
 	assert.Len(t, plain.Rows, 1, "without an interval the answer is the summary it was")
+}
+
+// GET /api/token-usage answers { records, totals }: a record per session, no by_agent. The team's token-usage dialog groups the records itself (#7987: it read a by_agent that is not here).
+func TestListUsageAnswersRecordsAndTotalsForATeam(t *testing.T) {
+	ts, r, _ := seriesRouter(t)
+	seedHours(t, ts)
+	var out map[string]json.RawMessage
+	require.Equal(t, 200, seriesGet(t, r, "/api/token-usage?board_name=team-a", false, &out))
+	assert.Contains(t, out, "records")
+	assert.Contains(t, out, "totals")
+	assert.NotContains(t, out, "by_agent")
+	var recs []struct {
+		AgentName string `json:"agent_name"`
+		NumTurns  int    `json:"num_turns"`
+	}
+	require.NoError(t, json.Unmarshal(out["records"], &recs))
+	require.NotEmpty(t, recs)
+	assert.Equal(t, "alpha", recs[0].AgentName)
 }
