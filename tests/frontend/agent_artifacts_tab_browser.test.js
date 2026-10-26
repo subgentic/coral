@@ -123,9 +123,9 @@ const STUB = `(() => {
             check(`${tag}: Close closes it too, the focus on the row`, await ev(`document.getElementById('agentic-detail-pane').hidden && document.activeElement === document.querySelector('${panel} tbody tr .dt-primary')`));
 
             // ═══ the table follows the PANEL's width: narrow, Type, Size and Task fold under the name; Created stays
-            const cols = await ev(`(() => { const p = document.querySelector('${panel}'); const vis = e => e.getClientRects().length > 0; const w = p.getBoundingClientRect().width; return { w, th: [...p.querySelectorAll('thead th')].filter(vis).map(h => h.textContent), phone: !!p.querySelector('.dt-box.dt-folded'), subtitle: vis(p.querySelector('.dt-subtitle')) }; })()`);
+            const cols = await ev(`(() => { const p = document.querySelector('${panel}'); const vis = e => e.getClientRects().length > 0; const w = p.getBoundingClientRect().width; return { w, th: [...p.querySelectorAll('thead th')].filter(vis).map(h => h.textContent), phone: !!p.querySelector('.dt-box.dt-folded'), facts: [...p.querySelectorAll('tbody tr:first-child [data-key=type], tbody tr:first-child [data-key=size]')].every(vis) }; })()`);
             const folded = cols.phone;
-            check(`${tag}: ${folded ? 'a narrow panel folds the shared rows with their description' : 'a wide panel shows every column'} (${JSON.stringify(cols)})`, folded ? cols.subtitle && cols.th.length === 0 : cols.th.length === 5 && cols.subtitle);
+            check(`${tag}: ${folded ? 'a narrow panel folds the shared rows with their description' : 'a wide panel shows every column'} (${JSON.stringify(cols)})`, folded ? cols.facts && cols.th.length === 0 : cols.th.length === 5 && cols.facts);
             const un = await axUnnamed(`#agentic-panel-artifacts-view`);
             const au = await auditRegion(ev, [`#agentic-panel-artifacts-view`]);
             check(`${tag}: every control has a name (${JSON.stringify(un)}) and the text has 4.5:1 contrast (${JSON.stringify((au.fails || []).slice(0, 2))})`, un.length === 0 && (au.fails || []).length === 0);

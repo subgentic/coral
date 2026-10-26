@@ -42,6 +42,11 @@ const A = 'a'.repeat(64), B = 'b'.repeat(64), C = 'c'.repeat(64);
             await ev(`(() => { const i = document.querySelector('#team-panel-artifacts input[aria-label="Search team artifacts"]'); i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })); return true; })()`); await settle(600);
             assert.equal((await rows()).length, 3, 'cleared: all three');
         });
+        await S.run('wide rows do not repeat type/size as a description; focused titles have an inset ring', async () => {
+            assert.equal(await ev(`document.querySelector('#team-panel-artifacts .dt-subtitle') === null`), true, 'no invented description for artifacts without one');
+            const inset = await ev(`(() => { const b = document.querySelector('#team-panel-artifacts .dt-primary'); b.focus(); return parseFloat(getComputedStyle(b).outlineOffset); })()`);
+            assert.ok(inset <= 0, 'the title focus ring stays inside its button');
+        });
         await S.run('origin badges: "From build-server" and "Link not verified" (no type or size)', async () => {
             const r = await rows();
             assert.ok(r.some(t => /build-log\.txt/.test(t) && /From build-server/.test(t)), 'the received file says where it is from');

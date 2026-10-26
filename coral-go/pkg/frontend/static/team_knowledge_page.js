@@ -178,7 +178,7 @@ function draw() {
             open: (e, tr) => openEntry(e, tr.querySelector('.dt-primary')),
             columns: [
                 { key: 'entry', label: 'Entry', primary: true, width: 'grow', field: 'name', sort: true, line: 1, cell: e => DT.primaryButton(e.name) },
-                { key: 'updated', label: 'Updated', tone: 'tertiary', align: 'end', line: 1, cell: () => DT.timeCell(model.data.created_at) },
+                { key: 'updated', label: 'Updated', sort: 'date', sortValue: () => model.data.created_at, tone: 'tertiary', align: 'end', line: 1, cell: () => DT.timeCell(model.data.created_at) },
                 { key: 'from', label: 'From', field: 'from', sort: true, line: 2 },
             ],
         }).el);

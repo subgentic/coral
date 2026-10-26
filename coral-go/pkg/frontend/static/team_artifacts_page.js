@@ -246,9 +246,9 @@ function draw() {
                         const badge = originBadge(item);
                         if (badge) { const note = DT.tag(badge); note.classList.add('dt-note', 'team-artifact-badge', `team-artifact-badge-${isUnverified(item) ? 'unverified' : item.source === 'shared' ? 'shared' : 'received'}`); if (isUnverified(item)) note.classList.add('dt-warning'); first.append(note); }
                         return first;
-                    }, subtitle: item => item.description || (isUnverified(item) ? '' : [typeText(item), sizeText(item.size)].filter(Boolean).join(' · ')) },
-                { key: 'type', label: 'Type', line: 0, cell: item => isUnverified(item) ? '—' : DT.tag(typeText(item)) },
-                { key: 'size', label: 'Size', line: 0, tone: 'tertiary', align: 'end', cell: item => isUnverified(item) ? '—' : sizeText(item.size) || '—' },
+                    }, subtitle: item => typeof item.description === 'string' ? item.description : typeof item.note === 'string' ? item.note : '' },
+                { key: 'type', label: 'Type', line: 2, cell: item => isUnverified(item) ? '—' : DT.tag(typeText(item)) },
+                { key: 'size', label: 'Size', line: 2, tone: 'tertiary', align: 'end', cell: item => isUnverified(item) ? '—' : sizeText(item.size) || '—' },
                 { key: 'task', label: 'Task', line: 2, tone: 'tertiary', cell: taskText },
                 { key: 'created', label: 'Created', line: 1, tone: 'tertiary', align: 'end', cell: item => DT.timeCell(item.created_at) },
             ],

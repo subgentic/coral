@@ -27,6 +27,8 @@
     --table-check-w: 24px;
     --table-touch: var(--control-touch-height, 44px);
     --table-avatar: 20px;
+    --table-focus-w: 2px;
+    --table-focus-color: var(--accent);
     --table-warning: var(--warning);
     --table-row-description-h: 52px;
     --table-progress-w: 64px;
@@ -125,3 +127,5 @@
 .dt-row:has(.dt-subtitle) td { height: var(--table-row-description-h); }
 .dt-box.dt-folded .dt-row:has(.dt-subtitle) td { height: auto; }
 .dt-box.dt-folded .dt-primary { min-height: var(--table-touch); }
+
+.dt-primary:focus-visible { outline: var(--table-focus-w) solid var(--table-focus-color); outline-offset: calc(-1 * var(--table-focus-w)); }

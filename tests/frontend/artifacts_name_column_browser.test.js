@@ -46,7 +46,7 @@ const HEX = c => c.repeat(64);
                 assert.equal(r.text, NAMES[i], at + 'the whole name is the button');
                 assert.ok(r.created && r.created.length <= 20, at + 'Created is short: ' + r.created);
                 assert.ok(r.createdTitle && /\d{4}|\d{1,2}:\d{2}/.test(r.createdTitle), at + 'the whole time is the tooltip');
-                assert.equal(r.tds, r.folded ? 3 : 5, at + `${r.folded ? 'Name, Task and Created in the folded row' : 'every column'}: ${r.tds}`);
+                assert.equal(r.tds, 5, at + `${r.folded ? 'all facts in the folded row' : 'every column'}: ${r.tds}`);
             }
             if (w === 680) await shot('artifacts-name-680');
             if (w === 480) await shot('artifacts-name-480');
@@ -58,7 +58,7 @@ const HEX = c => c.repeat(64);
         const phone = await measure();
         for (const r of phone) {
             assert.ok(r.nameW >= 150, `phone: Name keeps a readable width: ${JSON.stringify(r)}`);
-            assert.ok(r.tds === 3, `phone: Name and Created, a 44 px target: ${JSON.stringify(r)}`);
+            assert.ok(r.tds === 5, `phone: Name and Created, a 44 px target: ${JSON.stringify(r)}`);
         }
         await shot('artifacts-name-phone');
         console.log('PASS artifacts list: Name keeps its width');
