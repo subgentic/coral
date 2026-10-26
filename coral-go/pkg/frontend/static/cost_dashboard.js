@@ -1,7 +1,6 @@
 import { openTask } from './task_navigation.js';
 /* Token Usage Dashboard — token usage and cost UI */
 
-import { modelDisplayName } from './model_names.js';
 import { showView, escapeHtml, escapeAttr } from './utils.js';
 import { state } from './state.js';
 import { emptyState } from './dom_write.js';
@@ -299,20 +298,9 @@ function _watchCostTables() {
 
 export async function _refreshCostDashboard() {
     _watchCostTables();
+    const { costRange, providerRows, modelRows, thinkingRows, agentRows } = await importOnce('./cost_data.js'); // the range and the rows, pure (#8359); loaded when the page first refreshes, as the page's other lazy parts are
     const period = document.getElementById('cost-time-range')?.value || 'day';
-
-    // Map period to a 'since' timestamp for the unified token-usage API
-    const sinceMap = { 'hour': 1, 'day': 24, 'week': 168, 'month': 720, 'all': 0 };
-    const hoursAgo = sinceMap[period] || 24;
-    const since = hoursAgo > 0 ? new Date(Date.now() - hoursAgo * 3600000).toISOString() : '';
-    const sinceParam = since ? `?since=${encodeURIComponent(since)}` : '';
-
-    // Choose time-series interval based on period
-    const intervalMap = { 'hour': '5m', 'day': '1h', 'week': '1h', 'month': '1d', 'all': '1d' };
-    const interval = intervalMap[period] || '1h';
-    const tsParams = since
-        ? `?since=${encodeURIComponent(since)}&interval=${interval}`
-        : `?interval=${interval}`;
+    const { hoursAgo, since, sinceParam, interval, tsParams } = costRange(period, Date.now());
 
     // Flash live indicator
     _flashLiveIndicator();
@@ -341,66 +329,16 @@ export async function _refreshCostDashboard() {
             _setText('cost-total-cost', formatCost(t.cost_usd || 0, { zeroAsTwo: true }));
 
             // By provider (#5120): the agent types' totals, from by_agent_type: the one source for them (by_model and by_thinking split them).
-            _renderProviderTable((data.by_agent_type || []).map(a => ({
-                agent_type: a.agent_type || 'unknown',
-                requests: a.num_requests || 0,
-                input_tokens: a.input_tokens || 0,
-                output_tokens: a.output_tokens || 0,
-                cache_read_tokens: a.cache_read_tokens || 0,
-                cache_write_tokens: a.cache_write_tokens || 0,
-                cost_usd: a.cost_usd || 0,
-                cost_pct: 0,
-            })));
+            _renderProviderTable(providerRows(data.by_agent_type));
 
             // One row per model id and agent type (#4589); a session that switched models is in each model's row.
-            _renderModelTable((data.by_model || []).map(a => ({
-                model: modelDisplayName(a.model, a.model_display) || 'unknown',
-                model_id: typeof a.model === 'string' ? a.model : '',
-                agent_type: a.agent_type || 'unknown',
-                requests: a.num_requests || 0,
-                input_tokens: a.input_tokens || 0,
-                output_tokens: a.output_tokens || 0,
-                cache_read_tokens: a.cache_read_tokens || 0,
-                cache_write_tokens: a.cache_write_tokens || 0,
-                cost_usd: a.cost_usd || 0,
-            })));
+            _renderModelTable(modelRows(data.by_model));
 
             // By thinking level (#4969, #5120): per provider and model, the levels the transcripts recorded, and the rest of each model's usage as "Not reported".
-            _renderThinkingTable((data.by_thinking || []).map(a => ({
-                agent_type: a.agent_type || 'unknown',
-                model: a.model ? modelDisplayName(a.model, a.model_display) : 'Not reported',
-                model_id: typeof a.model === 'string' ? a.model : '',
-                requests: a.num_calls || 0,
-                level: _thinkingLevelName(a.thinking),
-                level_key: a.thinking || '',
-                input_tokens: a.input_tokens || 0,
-                output_tokens: a.output_tokens || 0,
-                cache_read_tokens: a.cache_read_tokens || 0,
-                cache_write_tokens: a.cache_write_tokens || 0,
-                thinking_tokens: a.thinking ? (a.thinking_tokens || 0) : null,
-                cost_usd: a.cost_usd || 0,
-                cost_pct: 0,
-            })));
+            _renderThinkingTable(thinkingRows(data.by_thinking));
 
             // Render per-agent (session) breakdown
-            _renderAgentTable((data.by_agent || []).map(a => ({
-                session_id: a.session_id,
-                agent_name: a.agent_name,
-                display_name: a.agent_name || 'Agent',
-                board_name: a.board_name || '',
-                folder: a.folder || '',
-                working_dir: a.working_dir || '',
-                requests: a.requests || 0,
-                input_tokens: a.input_tokens || 0,
-                output_tokens: a.output_tokens || 0,
-                cache_read_tokens: a.cache_read_tokens || 0,
-                cache_write_tokens: a.cache_write_tokens || 0,
-                cost_usd: a.cost_usd || 0,
-                first_seen: a.first_seen || '',
-                last_seen: a.last_seen || '',
-                launched_at: a.launched_at || '',
-                stopped_at: a.stopped_at || '',
-            })));
+            _renderAgentTable(agentRows(data.by_agent));
         }
 
         // Render time-series chart and sparklines
@@ -611,8 +549,6 @@ function _renderModelTable(rows) {
     ], filtered, null, _seriesOpts('model'));
 }
 
-const _THINKING_NAMES = { low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Extra high', max: 'Max' };
-function _thinkingLevelName(level) { return level ? (_THINKING_NAMES[level] || level) : 'Not reported'; }
 
 /** Usage by thinking level (#4969). "Not reported" is the usage whose turn recorded no level (a CLI that writes none, or from before it was tracked):
  *  never the level an agent was launched with. "Thinking" is the tokens the CLI reported for thinking, shown apart: it is not added to any total. */
