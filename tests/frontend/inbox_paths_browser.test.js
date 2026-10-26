@@ -59,6 +59,9 @@ const TEAM = `qa-paths-${Date.now() % 100000}`;
             await load('/chats'); await inboxReady(); await folderTitle('All chats'); const n1 = await ev(`history.length`);
             check(`${label}: the old /chats address opens All chats and is replaced by /inbox/chats/all, with no extra Back entry (one entry for the visit)`, (await path()) === '/inbox/chats/all' && n1 === n0 + 1, `${await path()} ${n0} -> ${n1}`);
 
+            await load('/chats?q=routeclick'); await inboxReady(); await folderTitle('All chats');
+            check(`${label}: a /chats link that carries a search keeps its address (the filters are in it)`, (await path()) + (await ev(`location.search`)) === '/chats?q=routeclick', (await path()) + (await ev(`location.search`)));
+
             // the team's Board tab
             await load('/');
             await installTP(ev); await seed(ev, TEAM); await openTeam(ev, waitFor, TEAM);

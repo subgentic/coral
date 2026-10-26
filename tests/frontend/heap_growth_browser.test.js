@@ -111,7 +111,7 @@ async function httpJson(method, path, body) {
                 if (${parts.includes('board')}) { if (${n} <= 5) { await post('/api/board/${BOARD}/subscribe', { subscriber_id: 'Operator', job_title: 'Operator' }); await post('/api/board/${BOARD}/messages', { subscriber_id: 'Operator', content: 'round ${n} ' + 'y'.repeat(120) }); } // (the board's own messages are bounded: it shows a window of the newest)
                 window.switchNavTab('agents', { fromHistory: true }); localStorage.setItem('coral.board.view', 'chat');
                 const teamPage = await import((window.__coralStatic || '/static/') + 'team_page.js'); await teamPage.openTeamPage(${JSON.stringify(BOARD)}, { tab: 'messages' });
-                if (location.pathname !== '/team/' + ${JSON.stringify(BOARD)} + '/messages' || !document.querySelector('#team-panel-messages #mb-board')) throw new Error('heap cycle did not reach the team Board tab');
+                if (location.pathname !== '/team/' + ${JSON.stringify(BOARD)} + '/board' || !document.querySelector('#team-panel-messages #mb-board')) throw new Error('heap cycle did not reach the team Board tab');
                 await ${framesJs(2)}; }
                 if (${parts.includes('history')}) { window.switchNavTab('history'); await ${framesJs(2)}; }
                 window.switchNavTab('agents'); await ${framesJs(1)}; return true; })()`);

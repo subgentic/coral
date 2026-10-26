@@ -92,14 +92,14 @@ const CSP = ["default-src 'self'", "script-src 'self'", "style-src 'self'", "sty
    await ev(`document.querySelector('#mb-projects-ul [data-project="@m1/same-team"]').click();true`);
    await waitFor(`document.getElementById('mb-messages').textContent.includes('Board message from m1')`,'correct remote board');
    assert.ok(await ev(`document.getElementById('team-page-title').textContent.includes('Laptop')`),'team page computer stays named');
-   assert.equal(await ev(`location.pathname`), '/team/@m1/same-team/messages', 'Hub chooser opens the source-scoped team page');
+   assert.equal(await ev(`location.pathname`), '/team/@m1/same-team/board', 'Hub chooser opens the source-scoped team page');
    assert.ok(await ev(`!!document.querySelector('#team-panel-messages #mb-board') && document.getElementById('team-page-view').checkVisibility()`), 'Board content is on the team page');
    await waitFor(`document.querySelector('[data-on-click=mb-post]').getAttribute('aria-disabled')==='true'`,'View tier marks Board send unavailable');
    await shot(theme+'-390-board');
    await menu();await ev(`document.querySelector('#nav-more-menu [data-arg="board"]').click();true`);
    await waitFor(`!!document.querySelector('#mb-projects-ul [data-project="@m2/same-team"]')`,'Desktop board in the Hub chooser');
    await ev(`document.querySelector('#mb-projects-ul [data-project="@m2/same-team"]').click();true`);
-   await waitFor(`document.getElementById('mb-messages').textContent.includes('Board message from m2') && location.pathname==='/team/@m2/same-team/messages'`,'same board id opens on Desktop');
+   await waitFor(`document.getElementById('mb-messages').textContent.includes('Board message from m2') && location.pathname==='/team/@m2/same-team/board'`,'same board id opens on Desktop');
    assert.ok(await ev(`document.getElementById('team-page-title').textContent.includes('Desktop')`),'second board source stays named');
    assert.deepEqual(await ev(`window.__cspViolations`),[],'Hub chooser and both team pages respect CSP');
    assert.ok(await ev(`document.documentElement.scrollWidth<=innerWidth`),'Desktop team page has no sideways scroll');
