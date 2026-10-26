@@ -41,9 +41,9 @@ assert.equal(jsCount("h('table', null, h('tr', null, h('td', null, 'a'), h(\"th\
 assert.equal(jsCount("el('div'); h('span'); h('tbody'); document.createElement('section'); `<thead></thead><tabletop>`"), 0, 'other tags, and a name that begins like a table, are not tables');
 assert.equal(jsCount('const th = 1; const tr = th + 1; // a variable called h or th is not a call'), 0, 'a variable is not a builder');
 
-// the real world: the last legacy table builder is seen (sidebar_groups.js), and cloud_servers.js, which was the h() builder's blind spot, is a dataTable now (#7903 step 2)
+// The former legacy builders now supply or host shared dataTable nodes.
 const groups = fs.readFileSync(path.join(STATIC, 'sidebar_groups.js'), 'utf8');
-assert.ok(jsCount(groups) >= 7, 'sidebar_groups.js builds its table by hand: the census counts it');
+assert.equal(jsCount(groups), 0, 'sidebar_groups.js only hosts shared table nodes');
 const cloud = fs.readFileSync(path.join(STATIC, 'cloud_server_view.js'), 'utf8');
 assert.equal(jsCount(cloud), 0, 'cloud_server_view.js builds no table of its own');
 // the exemptions: a reason, and a file that exists and matches

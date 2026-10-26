@@ -429,22 +429,7 @@ export async function openInboxGroup(name) {
 }
 
 registerActions({
-    'inbox-agent-open': el => {
-        const name = textOf(el.dataset.name), type = textOf(el.dataset.agentType), sid = textOf(el.dataset.sessionId), server = textOf(el.dataset.server);
-        if (!name) return;
-        window.switchNavTab?.('agents');
-        window.selectLiveSession?.(name, type, sid, server);
-    },
-    'inbox-task-open': el => { const p = textOf(el.dataset.project), id = textOf(el.dataset.taskId); if (p && id) openTask(p, id); },
-    'inbox-saved-open': el => { const id = textOf(el.dataset.id); if (!id) return; if (el.dataset.where === 'dock-tab') openDockSavedSheet(id, el); else openSavedPage(id); }, // the dock's rows open the message as a sheet over the dock (the person stays with the agent)
     'inbox-saved-chip': el => { const t = textOf(el.dataset.tab); if (t) { saved.setSavedTab(t); sayLive(t === 'done' ? 'Showing the messages marked done' : 'Showing the open messages'); } },
-    'inbox-saved-done': async el => {
-        const it = saved.findSavedItem(textOf(el.dataset.id));
-        if (!it) return;
-        const done = !it.done_at;
-        if (await saved.savedSetDone(it, done)) sayLive(done ? 'Marked done' : 'Moved back to Open');
-    },
-    'inbox-goal-open': el => { const board = textOf(el.dataset.board), id = Number(el.dataset.goalId); if (board && id) importOnce('./task_goals.js').then(m => m.openGoalOnTeamPage(board, id)).catch(() => {}); },
     'inbox-phone-back': () => closePage(true, true),
     'inbox-back': () => { const was = page, g = was ? 'saved' : group; closePage(false); openGroupTable('hub-inbox', g); focusCameFrom(was); }, // the link back to the group's table (on a phone too, as the shared back link did), with the focus on the row it came from
 });
