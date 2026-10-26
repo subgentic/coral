@@ -580,6 +580,7 @@ function _taskTable(tasks, footer) {
                 const b = DT.primaryButton(name, `${t._source === 'subagent' ? 'Open subagent' : `Open task #${t.id}`}: ${name}, ${_taskStatus(t).detail}`);
                 b.classList.add('board-task-open', 'board-task-name');
                 cell.title = t._source === 'subagent' ? _subagentTooltip(t) : t.body || t.body_preview || '';
+                description.title = cell.title;
                 description.append(b);
                 cell.append(span('board-task-id', t.id != null ? `#${t.id}` : '—'), ' ', description);
                 if (t._source === 'board') { const mark = document.createElement('template'); mark.innerHTML = _verifyMark(t); cell.append(mark.content); }
