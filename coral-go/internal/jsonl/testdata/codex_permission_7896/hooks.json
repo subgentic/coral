@@ -1,0 +1,14 @@
+[
+  {
+    "event_type": "prompt_submit",
+    "created_at": "2026-10-26T06:25:29.930603+00:00",
+    "tool_name": null,
+    "detail_json": "{}"
+  },
+  {
+    "event_type": "permission_request",
+    "created_at": "2026-10-26T06:25:35.324373+00:00",
+    "tool_name": "Bash",
+    "detail_json": "{\"call_ids\": [\"inner-call-7896\"], \"kind\": \"permission\", \"tool_name\": \"Bash\"}"
+  }
+]

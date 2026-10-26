@@ -41,6 +41,7 @@ func (r *SessionReader) ReadCodexTurn(sessionID, workingDir string) (kind string
 func readCodexTurnEventIncremental(path string, state *codexTurnCache) (string, time.Time) {
 	scanTranscriptAppend(path, &state.transcriptReadState, func() {
 		state.event, state.at, state.active, state.activity, state.model, state.effort = "", time.Time{}, false, false, "", ""
+		state.calls = codexCallTracker{}
 	}, func(line []byte) {
 		if m, e := codexLineModelEffort(line); m != "" {
 			state.model, state.effort = m, e
@@ -51,6 +52,7 @@ func readCodexTurnEventIncremental(path string, state *codexTurnCache) (string, 
 }
 
 func updateCodexTurnState(state *codexTurnCache, line []byte) {
+	state.calls.read(line)
 	var entry struct {
 		Timestamp string `json:"timestamp"`
 		Type      string `json:"type"`

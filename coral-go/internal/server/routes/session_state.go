@@ -53,6 +53,7 @@ func (h *SessionsHandler) applyTranscriptState(input *SessionStateInput, events 
 			kind = "turn_activity" // the turn going on, not a new turn: it never answers an open request (#6672)
 		}
 		mergeTranscriptTurnEvent(input, events, kind, atTime)
+		h.applyCodexCompletedPermission(input, sessionID, workingDir)
 	case at.Agy, at.Antigravity, at.Gemini:
 		kind, atTime, summary := h.jsonl.ReadAgyTurnEvent(sessionID, workingDir)
 		mergeTranscriptTurnEvent(input, events, kind, atTime, summary)

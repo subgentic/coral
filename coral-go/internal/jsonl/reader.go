@@ -61,6 +61,7 @@ type claudeTurnCache struct {
 }
 
 type codexTurnCache struct {
+	calls codexCallTracker
 	transcriptReadState
 	event  string
 	at     time.Time
