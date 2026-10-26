@@ -156,3 +156,30 @@ func TestAllTeamArtifactsSortKeyTellsTwoTeamsApart(t *testing.T) {
 	solo.BoardID = ""
 	require.Equal(t, keyOf(solo).ID, keyOf(teamArtifact{ID: "same"}).ID, "a team's own list keeps its cursors' keys")
 }
+
+func TestAllTeamArtifactsCursorsDoNotCrossRoutes(t *testing.T) {
+	srv, h := allTeamArtifactsServer(t)
+	twoTeamsFourResults(t, h)
+	// the team route's cursor is refused by the cross-team list, and the cross-team list's by the team route
+	r := chi.NewRouter()
+	r.Get("/api/board/{project}/artifacts", h.ListTeamArtifacts)
+	team := httptest.NewServer(r)
+	t.Cleanup(team.Close)
+	resp, err := http.Get(team.URL + "/api/board/alpha/artifacts?sort=newest&limit=1")
+	require.NoError(t, err)
+	var teamPage struct {
+		NextCursor string `json:"next_cursor"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&teamPage))
+	resp.Body.Close()
+	require.NotEmpty(t, teamPage.NextCursor)
+	getAllTeamArtifacts(t, srv, "?sort=newest&limit=1&cursor="+url.QueryEscape(teamPage.NextCursor), http.StatusBadRequest)
+	cross := getAllTeamArtifacts(t, srv, "?sort=newest&limit=1", http.StatusOK)
+	require.NotEmpty(t, cross.NextCursor)
+	resp, err = http.Get(team.URL + "/api/board/alpha/artifacts?sort=newest&limit=1&cursor=" + url.QueryEscape(cross.NextCursor))
+	require.NoError(t, err)
+	resp.Body.Close()
+	require.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	// and a caller cannot send the marker itself
+	getAllTeamArtifacts(t, srv, "?_scope=all", http.StatusBadRequest)
+}
