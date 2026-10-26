@@ -332,15 +332,15 @@ function acfPermEditorHtml(uid, open) {
             <p class="settings-hint acf-perms-enforced" aria-live="polite" hidden></p>
             <div id="${escapeAttr(uid)}-perms" class="permissions-editor"${open ? '' : ' style="display:none"'}>
                 <div class="perms-group">
-                    <span class="perms-label" id="${escapeAttr(uid)}-perms-allow-label">Allow:</span>
+                    <span class="perms-label" id="${escapeAttr(uid)}-perms-allow-label">Allow</span>
                     <div id="${escapeAttr(uid)}-perms-allow" class="perms-chips" role="group" aria-labelledby="${escapeAttr(uid)}-perms-allow-label"></div>
                 </div>
                 <div class="perms-group">
-                    <span class="perms-label" id="${escapeAttr(uid)}-perms-deny-label">Deny: <span class="perms-deny-note settings-hint"></span></span>
+                    <span class="perms-label" id="${escapeAttr(uid)}-perms-deny-label">Deny <span class="perms-deny-note settings-hint"></span></span>
                     <div id="${escapeAttr(uid)}-perms-deny" class="perms-chips" role="group" aria-labelledby="${escapeAttr(uid)}-perms-deny-label"></div>
                 </div>
                 <div class="perms-shell-patterns" style="display:none">
-                    <label class="perms-label">Shell patterns <span style="color:var(--text-muted);font-weight:normal">(comma-separated)</span>: <span class="perms-patterns-note settings-hint"></span></label>
+                    <label class="perms-label">Shell patterns <span style="color:var(--text-muted);font-weight:normal">(comma-separated)</span> <span class="perms-patterns-note settings-hint"></span></label>
                     <input type="text" class="perms-shell-input" aria-label="Shell patterns, comma-separated" placeholder="e.g. git *, npm *, npx *">
                 </div>
             </div>`;
@@ -504,7 +504,7 @@ function finishAcfControls(container, opts) {
         if (mode && launchFlags.modeCards) segmentSelect(mode, { label: 'Permission mode', cards: true, className: 'seg-modes' });
         _syncEnforcement(container);
     }
-    if (opts.sections) { mountAgentRows(container); mountPermissionRows(container); } // the Agent and Permissions panes' rows are fields of settings_view
+    if (opts.sections) { mountAgentRows(container); mountPermissionRows(container); mountAdvancedRows(container); } // the Agent, Permissions and Advanced panes' rows are fields of settings_view
     if (opts.sections) { const shell = container.closest('.settings-shell'); if (shell) initSectionDialog(shell); } // the panes are in: build the section list
 }
 
@@ -530,6 +530,18 @@ function mountPermissionRows(container) {
     pane.prepend(host);
     mountSettingsView(host, { mode: 'form', fields });
     modeLabel?.remove();
+}
+
+/** The Advanced pane's Flags as a field of settings_view (#8462): the form's own input moves in, so the reads and the flag normalising find it as before. */
+function mountAdvancedRows(container) {
+    const pane = container.querySelector('.settings-pane[data-section="advanced"]');
+    const flagsLabel = pane?.querySelector('.acf-flags')?.closest('label');
+    if (!flagsLabel) return;
+    const uid = container.dataset.acfUid || 'acf';
+    const host = document.createElement('div'); host.className = 'acf-agent-rows';
+    pane.prepend(host);
+    mountSettingsView(host, { mode: 'form', fields: [{ key: 'flags', type: 'custom', label: 'Flags', optional: true, labelId: `${uid}-flags-l`, render: slot => adoptChildren(flagsLabel, ['.launch-optional'], slot, `${uid}-flags-l`) }] });
+    flagsLabel.remove();
 }
 
 /** The Agent pane's rows as fields of settings_view (#8457): the controls the form built move into them (their listeners and classes come along, so every read of the form is unchanged), and the label, the optional mark and the spacing are the form's. A control the code hides (Model for a terminal, Thinking for a provider with no levels) hides its row. */

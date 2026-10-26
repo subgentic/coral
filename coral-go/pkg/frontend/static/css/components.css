@@ -4228,6 +4228,9 @@ body:has(#nav-tab-hub-inbox.active) #saved-btn .saved-count { display: none; }
 #launch-agent-pick .launch-agent-opt:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
 .launch-note-slot { display: flow-root; min-height: 2.2em; margin: 0; } /* one note, as tall as the longest at this width in em: it wraps to more lines as the box narrows or the text grows (container queries below) */ /* flow-root: a note's or an empty slot's margin stays inside it, so nothing moves when a note comes */
 .launch-note-slot .settings-hint, .launch-note-slot .launch-cli-slot:empty { margin: 0 0 6px; }
+.launch-note-slot[data-idle] { min-height: 0; }
+.launch-agent-provider:has(> .launch-note-slot[data-idle]) { margin-bottom: 0; }
+.launch-note-slot[data-idle] .launch-cli-slot, .launch-note-slot[data-idle] .settings-hint { margin: 0; } /* nothing to say (no CLI line, no tmux line, no Codex note): the slot takes no room (UI/UX on #8457); a note that appears pushes the rows below it down */
 /* Segmented controls and cards drawn over a select (segmented.js). */
 select.seg-source { display: none; } /* (.modal-content select is display: block, one class more specific than the class alone) */
 .seg-group { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--control-border); border-radius: var(--radius-md); overflow: hidden; margin: 2px 0 8px; }
@@ -4274,7 +4277,6 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .launch-persona-row .persona-files[open] .persona-files-row { position: absolute; right: 0; z-index: 3; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 8px; }
 
 .launch-wizard .launch-cli-slot { margin: 0 0 6px; }
-.launch-wizard .launch-cli-slot .acf-cli-warning { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; } /* the install help is one column: the sentence, the link, the command (#8033) */
 
 /* Restart on the same shell (#7391): the provider line has a slot of its own so the tabs do not move when it appears. */
 .restart-wizard-content > .modal-actions #restart-cancel { margin-right: auto; }

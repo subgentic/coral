@@ -29,7 +29,17 @@ export function setAgentNameMode(member) {
         : { label: 'Name', help: 'Choose a persona above and its name goes here, or type your own.', required: false, optional: true });
 }
 
+/** The notes slot under the Provider reserves room for a CLI, tmux or Codex line; with nothing to say it takes none. */
+function watchNoteSlot(modal) {
+    const slot = modal.querySelector('#launch-note-slot');
+    if (!slot) return;
+    const sync = () => { const busy = [...slot.querySelectorAll('.acf-cli-warning, #launch-codex-note, #launch-tmux-slot > *')].some(e => !e.hidden && e.style.display !== 'none' && e.textContent.trim()); slot.toggleAttribute('data-idle', !busy); };
+    new MutationObserver(sync).observe(slot, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['hidden', 'style'] });
+    sync();
+}
+
 function mount(modal) {
+    watchNoteSlot(modal);
     const nameHost = modal.querySelector('#agent-name-host');
     if (nameHost && !_nameView) {
         _nameView = mountSettingsView(nameHost, { mode: 'form', fields: [
