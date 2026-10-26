@@ -49,6 +49,12 @@ const BASE = require('./test_base').BASE;
                 assert.match(await ev(`document.getElementById('group-table-view').textContent`),/1 more/,'overflow remains discoverable');
                 assert.equal(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`),'13','all pending artifacts count');
                 assert.ok(await ev(`document.documentElement.scrollWidth<=innerWidth+1`),'no horizontal overflow');
+                assert.equal(await ev(`document.querySelector('#group-table-view .group-table-head .session-group-count').textContent`),'12 of 13','heading explains the cap');
+                const layout = await ev(`(() => {const r=${row('Review file 01.txt')}, buttons=[...r.querySelectorAll('.inbox-review-actions button')], rects=buttons.map(b=>b.getBoundingClientRect());return {height:r.getBoundingClientRect().height,sameLine:Math.abs(rects[0].top-rects[1].top)<2,standard:buttons.every(b=>!b.classList.contains('dt-quiet')&&!b.disabled)};})()`);
+                assert.ok(layout.sameLine,'both actions stay on one line');
+                assert.ok(layout.height<=(width===390?90:40),'compact review row: '+JSON.stringify(layout));
+                assert.ok(layout.standard,'standard enabled button treatment');
+
                 const dir=process.env.CORAL_SCREENSHOT_DIR||(process.env.RUNNER_TEMP&&path.join(process.env.RUNNER_TEMP,'out'));
                 if(dir){fs.mkdirSync(dir,{recursive:true});for(const theme of ['light','dark']){await ev(`document.documentElement.setAttribute('data-theme','${theme}');true`);fs.writeFileSync(path.join(dir,`inbox-review-${width}-${theme}.png`),Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}}
                 await ev(`[...(${row('Review file 01.txt')}).querySelectorAll('button')].find(b=>b.textContent.trim()==='Open').click();true`);
@@ -64,6 +70,8 @@ const BASE = require('./test_base').BASE;
                 assert.deepEqual((await ev(`window.__reviewWrites.at(-1).tags`)).sort(),['internal','reviewed']);
                 assert.equal(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`),'12');
                 assert.ok(await ev(`!!(${row('Review file 11.txt')})`),'overflow promotes next artifact');
+                assert.equal(await ev(`document.querySelector('#group-table-view .group-table-head .session-group-count').textContent`),'12','heading and badge agree after review');
+                if(dir){for(const theme of ['light','dark']){await ev(`document.documentElement.setAttribute('data-theme','${theme}');true`);fs.writeFileSync(path.join(dir,`inbox-reviewed-${width}-${theme}.png`),Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}}
                 console.log('PASS review artifacts '+width);
             } catch(error){failures.push(width+': '+error.message);console.error(failures.at(-1));}
         }

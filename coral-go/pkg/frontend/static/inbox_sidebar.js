@@ -132,9 +132,9 @@ async function openReview(row) {
 function reviewActions(row) {
     const box = DT.el('div', 'inbox-review-actions');
     const errorText = DT.el('span', 'inbox-review-error'); errorText.setAttribute('role', 'alert');
-    const open = DT.el('button', 'btn btn-small dt-quiet', 'Open'); open.type = 'button';
+    const open = DT.el('button', 'btn btn-small', 'Open'); open.type = 'button';
     open.setAttribute('aria-label', `Open ${row.name}`); open.addEventListener('click', () => openReview(row));
-    const done = DT.el('button', 'btn btn-small dt-quiet', 'Mark reviewed'); done.type = 'button';
+    const done = DT.el('button', 'btn btn-small', 'Mark reviewed'); done.type = 'button';
     done.setAttribute('aria-label', `Mark reviewed: ${row.name}`);
     done.addEventListener('click', async () => {
         done.disabled = true; errorText.textContent = '';
@@ -426,18 +426,23 @@ registerGroupSource('hub-inbox', {
             const rows = needsRows(), dirOf = s => String(s.working_directory || '').replace(/[\\/]+$/, '').split(/[\\/]/).pop();
             const goalOf = s => s.goal && s.goal.id && s.goal.title;
             const goal = rows.some(goalOf);
-            return { title: 'Needs you', rows, note: reviewErrors().join(' '), empty: { line: NF.isFiltered(needsFilters) ? 'Nothing that needs you matches the search and filters.' : 'Nothing needs your input.' },
+            const total = filteredNeeds().length;
+            return { title: 'Needs you', rows, count: total > rows.length ? `${rows.length} of ${total}` : total, note: [...reviewErrors(), ...(total > rows.length ? [`${total - rows.length} more for review below the list.`] : [])].join(' '), empty: { line: NF.isFiltered(needsFilters) ? 'Nothing that needs you matches the search and filters.' : 'Nothing needs your input.' },
                 signature: JSON.stringify([needsOverflow().map(g => [g.name, g.more.map(a => a.reviewKey)]), reviewErrors(), rows.map(s => [sessionServer(s), s.session_id, s.display_name, s.waiting_kind, s.waiting_since, waitingText(s.waiting_since), teamOf(s), askOf(s), goalOf(s) ? s.goal.id : 0, dirOf(s)])]), // the words move on with the clock: they are part of what was drawn
                 node: () => { const wrap = DT.el('div', 'inbox-needs-results'); const table = DT.dataTable({ label: `Needs you, ${rows.length}`, rows, rowKey: s => `${sessionServer(s)}:${s.session_id}`, state: needsState, rowName: s => s.review ? `${s.review.name}, for review, ${teamOf(s)}` : resolveSessionIdentity(s),
                     open: s => { if (s.review) { openReview(s.review); return; } window.switchNavTab?.('agents'); window.selectLiveSession?.(s.name, s.agent_type, s.session_id, sessionServer(s)); },
                     columns: [
-                        { key: 'agent', label: rows.some(s => s.review) ? 'Item' : 'Agent', primary: true, width: rows.some(askOf) ? undefined : 'grow', sort: true, sortValue: s => resolveSessionIdentity(s), line: 1, cell: s => { if (s.review) { const b = DT.primaryButton(s.review.name); b.dataset.reviewArtifact = s.review.id; return b; } const w = DT.personButton(resolveSessionIdentity(s), `Open ${resolveSessionIdentity(s)}`); Object.assign(w.querySelector('.dt-primary').dataset, { name: s.name, agentType: s.agent_type, sessionId: s.session_id, server: sessionServer(s) }); return w; } },
-                        ...(rows.some(askOf) ? [{ key: 'asks', label: 'Waiting for', width: 'grow', line: 2, cell: s => askOf(s) || '' }] : []), // no row has a question: no empty column
+                        { key: 'agent', label: rows.some(s => s.review) ? 'Item' : 'Agent', primary: true, width: rows.some(s => s.review) ? 'grow' : rows.some(askOf) ? undefined : 'grow', sort: true, sortValue: s => resolveSessionIdentity(s), line: 1, cell: s => { if (s.review) { const b = DT.primaryButton(s.review.name); b.dataset.reviewArtifact = s.review.id; return b; } const w = DT.personButton(resolveSessionIdentity(s), `Open ${resolveSessionIdentity(s)}`); Object.assign(w.querySelector('.dt-primary').dataset, { name: s.name, agentType: s.agent_type, sessionId: s.session_id, server: sessionServer(s) }); return w; } },
+                        ...(rows.some(askOf) ? [{ key: 'asks', label: 'Waiting for', width: rows.some(s => s.review) ? 'content' : 'grow', line: 2, cell: s => {
+                            if (!s.review) return askOf(s) || '';
+                            const meta = DT.el('span', 'inbox-review-meta', 'For review'); meta.title = `For review · ${teamOf(s)}`;
+                            meta.append(DT.el('span', 'inbox-review-meta-team', ` · ${teamOf(s)}`)); return meta;
+                        } }] : []), // no row has a question: no empty column
                         ...(rows.some(s => s.agent_type) ? [{ key: 'cli', label: 'CLI', sort: true, sortValue: s => providerName(s.agent_type) || '', line: 2, cell: s => (s.agent_type ? DT.tag(providerName(s.agent_type)) : '') }] : []),
                         ...(rows.some(dirOf) ? [{ key: 'folder', label: 'Folder', sort: true, sortValue: s => dirOf(s) || '', line: 0, cell: s => dirOf(s) || '' }] : []), // the folder an agent works in tells two of one name apart (#7122)
-                        { key: 'team', label: 'Team', sort: true, sortValue: s => teamOf(s), line: rows.some(s => s.review) ? 2 : 0, cell: s => teamOf(s) },
+                        { key: 'team', label: 'Team', sort: true, sortValue: s => teamOf(s), line: 0, cell: s => teamOf(s) },
                         ...(goal ? [{ key: 'goal', label: 'Goal', line: 0, cell: s => { if (!goalOf(s)) return ''; const l = DT.link(s.goal.title, () => importOnce('./task_goals.js').then(m => m.openGoalOnTeamPage(s.goal.board || s.board_project || '', s.goal.id)).catch(() => {})); l.setAttribute('aria-label', `Goal: ${s.goal.title}`); return l; } }] : []),
-                        ...(rows.some(s => s.review) ? [{ key: 'review', label: 'Actions', line: 2, cell: s => s.review ? reviewActions(s.review) : '' }] : []),
+                        ...(rows.some(s => s.review) ? [{ key: 'review', label: 'Actions', width: '14rem', line: 2, cell: s => s.review ? reviewActions(s.review) : '' }] : []),
                         { key: 'waiting', label: 'Waiting', tone: 'tertiary', align: 'end', sort: true, sortValue: s => s.waiting_since || '', firstDir: 'desc', line: 1, cell: s => waitingText(s.waiting_since) || '' },
                     ] });
                     wrap.append(table.el);
