@@ -103,9 +103,11 @@ export function dayDividerHtml(iso, { listItem = true } = {}) {
 /** The parts only an open row has, built when it opens (a collapsed row has none: a long board is a lot of rows): the tags again at the top of the message (the phone's folded row hides them in the head), the replies' place and Reply, Copy link and More. */
 function openParts(id, agent, moreLabel, more, tagHtml) {
     const replyText = `Reply to ${agent}`;
+    const taskTag = /<span class="mb-row-tag mb-row-task">#(\d+)<\/span>/.exec(tagHtml);
+    const taskLink = taskTag ? `<button type="button" class="btn mb-row-btn mb-task-link" data-on-click="mb-task-open" data-task-id="${Number(taskTag[1])}">Open task #${Number(taskTag[1])}</button>` : '';
     return {
         tagsOpen: tagHtml ? `<div class="mb-row-tags-open">${tagHtml}</div>` : '',
-        actions: `<div class="mb-row-replies" hidden></div><div class="mb-row-actions"><button type="button" class="btn mb-row-btn" data-on-click="mb-msg-reply" data-msg-id="${Number(id)}" data-sender="${escapeAttr(agent)}" aria-label="${escapeAttr(replyText)}">Reply</button><button type="button" class="btn mb-row-btn" data-on-click="mb-msg-copy-link" data-msg-id="${Number(id)}">Copy link</button>${more ? `<button type="button" class="btn mb-row-btn mb-row-more" data-on-click="mb-msg-more" aria-haspopup="dialog" aria-label="${escapeAttr(moreLabel)}">More</button>` : ''}</div>`,
+        actions: `<div class="mb-row-replies" hidden></div><div class="mb-row-actions">${taskLink}<button type="button" class="btn mb-row-btn" data-on-click="mb-msg-reply" data-msg-id="${Number(id)}" data-sender="${escapeAttr(agent)}" aria-label="${escapeAttr(replyText)}">Reply</button><button type="button" class="btn mb-row-btn" data-on-click="mb-msg-copy-link" data-msg-id="${Number(id)}">Copy link</button>${more ? `<button type="button" class="btn mb-row-btn mb-row-more" data-on-click="mb-msg-more" aria-haspopup="dialog" aria-label="${escapeAttr(moreLabel)}">More</button>` : ''}</div>`,
     };
 }
 
@@ -307,6 +309,7 @@ const surfaceOf = (el) => surfaces.find(s => el.closest(s.box));
 
 // The head's press and a reply's jump: the same on every surface that draws the table (the team page's Board tab, the agent dock's).
 registerActions({
+    'mb-task-open': el => withId(el.dataset.taskId, id => surfaceOf(el)?.task(id)),
     'mb-row-toggle': el => { const row = el.closest('.mb-message'); if (!row) return; toggleRow(row); if (row.classList.contains('mb-open')) keepBelowDay(row); },
     'mb-msg-reply': el => withId(el.dataset.msgId, id => { const n = textOf(el.dataset.sender), s = surfaceOf(el); if (n && s) s.reply(id, n); }),
     'mb-msg-copy-link': el => withId(el.dataset.msgId, id => surfaceOf(el)?.link(id)),

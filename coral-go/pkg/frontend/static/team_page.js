@@ -1,3 +1,4 @@
+import { openTask } from './task_navigation.js';
 /* The team page (#7453, UI/UX's one team page): the page a team's row opens. Its header (the team's name and ONE status, Add agent and More) and its tab strip (Goals, Messages, Tasks, Agents, Artifacts, Knowledge, Settings) never move; under them
  * is the tab's table or an item's page (a goal's, a task's) with a link back that returns the focus to the row; documents open in the detail pane on the right (detail_pane.js). The address follows: /team/<name>/<tab>[/<n>].
  * This module is the shell: each tab's own panel is built the first time the tab is opened by its own module (goals_view.js, team_tasks_page.js, team_artifacts_page.js); Messages is the board's own column moved in (message_board.js),
@@ -18,7 +19,7 @@ const { el } = await importOnce('./team_table.js');
 const { quietFocus } = await importOnce('./quiet_focus.js');
 
 const LABEL = { goals: 'Goals', messages: 'Board', tasks: 'Tasks', agents: 'Agents', artifacts: 'Artifacts', knowledge: 'Knowledge', settings: 'Settings' };
-const S = { team: '', tab: 'goals', item: null, counts: {}, built: false, countSeq: 0, noGoal: false }; // noGoal: the next Tasks tab opens filtered to the tasks that serve no goal (the Goals table's last row, #7717)
+const S = { team: '', tab: 'goals', item: null, counts: {}, built: false, countSeq: 0, navSeq: 0, noGoal: false }; // noGoal: the next Tasks tab opens filtered to the tasks that serve no goal (the Goals table's last row, #7717)
 const $ = (id) => document.getElementById(id);
 
 const currentTeamPage = () => (S.team && $('team-page-view') && $('team-page-view').style.display !== 'none' ? { team: S.team, tab: S.tab } : null);
@@ -190,8 +191,10 @@ function markTab(tab) {
 /** Choose a tab (the person pressed it, a key moved to it, or an address named it). */
 export async function goTab(tab, { focus = false, user = false, item = 0, replace = false } = {}) {
     if (!TEAM_TABS.includes(tab)) tab = 'goals';
+    S.navSeq++;
     closeDetailPane();
     leaveMessages(tab);
+    closeItem(false);
     S.tab = tab; S.item = null;
     markTab(tab);
     adoptBoardActions();
@@ -201,15 +204,15 @@ export async function goTab(tab, { focus = false, user = false, item = 0, replac
 }
 
 const teamHooks = () => ({
-    openTask: (task, goal) => openTaskPage(task, goal ? { kind: 'goal', goal } : { kind: 'tasks' }),
+    openTask: (task) => openTask(S.team, task.id),
     openGoal: (id) => openGoalPage(id),
     onItem: (id) => { if (S.tab === 'goals' && !S.quiet) note(keyRoute('team', S.team, 'goals', id || null)); },
     onCount: (n) => { },
 });
 
 async function fillTab(tab, item = 0) {
-    const team = S.team, host = panel(tab);
-    const stale = () => tab !== S.tab || team !== S.team; // another tab was chosen while this one's module loaded: it must not draw over the newer one
+    const team = S.team, host = panel(tab), seq = S.navSeq;
+    const stale = () => seq !== S.navSeq || tab !== S.tab || team !== S.team; // another tab was chosen while this one's module loaded: it must not draw over the newer one
     try {
         if (tab === 'goals') {
             const m = await importOnce('./goals_view.js');
@@ -224,7 +227,7 @@ async function fillTab(tab, item = 0) {
             await m.showTasks(host, team, { ...teamHooks(), noGoal, query, onCount: (n) => { S.counts.tasks = n; drawCounts(); },
                 onFilters: (qs) => { if (!S.quiet && S.tab === 'tasks' && !S.item) note(keyRoute('team', S.team, 'tasks', null, qs), { replace: true }); } }); // the address keeps the filters (#7782)
             if (stale()) return;
-            if (item) openTaskById(item, { kind: 'tasks' });
+            if (item) await openTaskById(item);
         } else if (tab === 'artifacts') {
             const m = await importOnce('./team_artifacts_page.js');
             if (stale()) return;
@@ -259,29 +262,25 @@ function leaveMessages(nextTab) {
 
 // ── item pages ───────────────────────────────────────────────────────────
 
-/** A task's page under the Goals or the Tasks tab's header: the same header and tabs, a link back that returns to the row. */
-export async function openTaskPage(task, from) {
+/** A board task always belongs to its team's Tasks tab. Ignore a read if navigation moved on. */
+async function openTaskById(id) {
+    const team = S.team, seq = S.navSeq;
     const m = await importOnce('./team_tasks_page.js');
     const host = $('team-panel-item');
-    const full = (await m.readTask(S.team, task.id)) || task.raw || task;
-    const origin = from && from.kind === 'goal' ? panel('goals') : panel(S.tab);
-    S.item = { kind: 'task', id: task.id, origin, from };
-    const backLabel = from && from.kind === 'goal' ? from.goal.title || 'Goal' : 'Tasks';
+    const full = await m.readTask(team, id);
+    if (!full || seq !== S.navSeq || team !== S.team || S.tab !== 'tasks') return;
+    const origin = panel('tasks');
+    S.item = { kind: 'task', id, origin };
+    const backLabel = 'Tasks';
     origin.hidden = true;
     host.hidden = false;
     m.renderTaskPage(host, full, {
         project: S.team, backLabel,
         openGoal: (id) => { closeItem(false); openGoalPage(id); },
-        openTask: (t) => openTaskPage(t, from), // a follow-up listed on the task's page
+        openTask: (t) => openTask(S.team, t.id), // a follow-up listed on the task's page
         onBack: () => closeItem(true),
     });
-    note(keyRoute('team', S.team, 'tasks', task.id));
-}
-
-async function openTaskById(id, from) {
-    const m = await importOnce('./team_tasks_page.js');
-    const t = await m.readTask(S.team, id);
-    if (t) openTaskPage(t, from);
+    note(keyRoute('team', team, 'tasks', id));
 }
 
 /** An agent's page under the Agents tab's header: the same header and tabs, a link back that returns to the row. */
@@ -296,15 +295,16 @@ async function openAgentPage(agent) {
 
 function closeItem(restoreFocus) {
     if (!S.item) return;
-    const { origin, id, from, kind } = S.item;
+    const { origin, id, kind } = S.item;
     S.item = null;
     $('team-panel-item').hidden = true;
+    $('team-panel-item')._taskConversation?.destroy({ keepDrafts: true });
+    $('team-panel-item')._taskConversation = null;
     $('team-panel-item').replaceChildren();
     origin.hidden = false;
     if (restoreFocus && kind === 'agent') importOnce('./team_agents_page.js').then(m => m.focusAgentRow(id));
     else if (restoreFocus) {
-        if (from && from.kind === 'goal') { note(keyRoute('team', S.team, 'goals', from.goal.id)); origin.querySelector('#goals-detail-title')?.focus(); origin.querySelector(`[data-task-id="${id}"]`)?.focus(); }
-        else { note(keyRoute('team', S.team, 'tasks')); importOnce('./team_tasks_page.js').then(m => m.focusTaskRow(id)); }
+        note(keyRoute('team', S.team, 'tasks')); importOnce('./team_tasks_page.js').then(m => { if (!m.focusTaskRow(id)) $('team-tab-tasks')?.focus(); });
     }
 }
 
@@ -359,6 +359,8 @@ export async function applyTeamRoute(team, tab, item, query = '') {
 
 /** Leave the page: the board's column goes back to its own page and the dock's panels back to the dock. */
 function leaveTeamPage() {
+    S.navSeq++;
+    closeItem(false);
     closeDetailPane();
     releaseBoardActions();
     importOnce('./message_board.js').then(m => m.leaveBoardPage?.()).catch(() => {});
