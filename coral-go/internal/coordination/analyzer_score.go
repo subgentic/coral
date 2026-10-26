@@ -204,6 +204,9 @@ func generateRecommendations(f ObservableFacts, h HeuristicSignals, s Coordinati
 		recs = append(recs, fmt.Sprintf("Dispatch targeted nudges with explicit claim IDs (coral-board task claim <ID>) for the %d unclaimed task(s) assigned to idle subscribers.",
 			h.ReadyUnclaimed.OwnerIdleCount))
 	}
+	if n := len(h.ActiveWithoutProgress); n > 0 {
+		recs = append(recs, fmt.Sprintf("Check in with the assignees of the %d task(s) in progress past the inactivity limit (candidates only: a long build or a long reasoning step looks the same).", n))
+	}
 	if len(h.NotificationChurn) > 0 {
 		recs = append(recs, "Debounce orchestrator reminders against actual task claim state to avoid alerting on already-claimed tasks.")
 	}

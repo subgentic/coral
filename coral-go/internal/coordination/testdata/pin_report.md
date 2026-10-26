@@ -129,6 +129,7 @@ The following dimensions cannot be derived from messageboard data alone and are 
 ## 6. Actionable Recommendations
 
 - Dispatch targeted nudges with explicit claim IDs (coral-board task claim <ID>) for the 1 unclaimed task(s) assigned to idle subscribers.
+- Check in with the assignees of the 2 task(s) in progress past the inactivity limit (candidates only: a long build or a long reasoning step looks the same).
 - Debounce orchestrator reminders against actual task claim state to avoid alerting on already-claimed tasks.
 - Monitor upstream prerequisites for blocked tasks to ensure prompt unblocking upon prerequisite completion.
 
