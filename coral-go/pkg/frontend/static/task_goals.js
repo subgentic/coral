@@ -13,14 +13,14 @@ export const requireGoalSentence = 'Every new task needs a goal, and a task cann
 
 /** Every goal of the board in these states, following the route's cursor; ok is false when a read failed. */
 async function readGoals(project, states) {
-    const out = { goals: [], requireGoal: false, ok: false };
+    const out = { goals: [], requireGoal: false, noGoalOpen: null, ok: false };
     try {
         let cursor = '';
         for (let n = 0; n < 20; n++) {
             const r = await boardFetch(project, `/goals?state=${states}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`);
             if (!r.ok) return out;
             const json = await r.json(), page = toGoalList(json);
-            out.goals = out.goals.concat(page.goals); out.requireGoal = page.requireGoal;
+            out.goals = out.goals.concat(page.goals); out.requireGoal = page.requireGoal; out.noGoalOpen = page.noGoalOpen ?? out.noGoalOpen;
             cursor = json && !Array.isArray(json) && typeof json.next_cursor === 'string' ? json.next_cursor : '';
             if (!cursor) break;
         }
@@ -41,6 +41,16 @@ async function readRequireGoal(project) {
 export async function readOpenGoals(project) {
     const [read, requireGoal] = await Promise.all([readGoals(project, OPEN_STATES), readRequireGoal(project)]);
     return { ...read, requireGoal };
+}
+
+/** The goals the Tasks filter offers (#7782): every goal of the board with its task count (all its tasks: done, active, blocked and queued), the open ones (proposed, active, blocked) and the closed ones (done, dropped)
+ *  apart, and how many open tasks serve none (null while the route does not say). ok is false when the read failed. */
+export async function readGoalChoices(project) {
+    const got = await readGoals(project, ALL_STATES);
+    const tasksOf = g => g.rollup.done + g.rollup.active + g.rollup.blocked + g.rollup.queued;
+    const row = g => ({ id: g.id, title: g.title || `Goal ${g.id}`, tasks: tasksOf(g) });
+    const isOpen = g => OPEN_STATES.split(',').includes(g.state);
+    return { ok: got.ok, open: got.goals.filter(isOpen).map(row), closed: got.goals.filter(g => !isOpen(g)).map(row), noGoalOpen: got.noGoalOpen };
 }
 
 /** One goal by number: null when it cannot be read. */

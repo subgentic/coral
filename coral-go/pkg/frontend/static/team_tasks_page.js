@@ -11,7 +11,7 @@ const DT = await importOnce('./data_table.js'); // the one table (#7743)
 const TC = await importOnce('./task_columns.js'); // a task as its columns
 const TB = await importOnce('./task_bulk.js'); // what the selection bar does to the selected tasks
 const Toolbar = await importOnce('./team_toolbar.js'); // the one toolbar of the team tabs (#7717)
-import { goalTitle, refreshGoalTitles, noGoalLabel } from './task_goals.js';
+import { goalTitle, refreshGoalTitles, readGoalChoices, noGoalLabel } from './task_goals.js';
 import { taskStatusWord, statusClass } from './goal_words.js';
 import { state } from './state.js';
 import { showToast } from './utils.js';
@@ -29,7 +29,7 @@ const emptyQuery = () => ({ rows: [], phase: 0, cursor: '', total: null, doneTot
 // Hide completed (the old tab's toggle, same stored key): the Open chip, chosen until the person picks All; kept in this browser (#7453).
 const HIDE_KEY = 'coral-hide-completed';
 const startFilter = () => (browserLocal.get(HIDE_KEY) === 'false' ? 'all' : 'open');
-const model = { dt: DT.tableState(), noGoal: false, project: '', filters: { ...TF.EMPTY }, q: emptyQuery(), seq: 0, moreLoaded: false, rows: [], cursor: '', totalOpen: null, totalDone: null, filter: startFilter(), loading: false, failed: '', loadingMore: false, moreFailed: '' };
+const model = { dt: DT.tableState(), choices: null, project: '', filters: { ...TF.EMPTY }, q: emptyQuery(), seq: 0, moreLoaded: false, rows: [], cursor: '', totalOpen: null, totalDone: null, filter: startFilter(), loading: false, failed: '', loadingMore: false, moreFailed: '' };
 let root = null, hooks = {};
 const say = (t) => { const s = root && root.querySelector('.team-tasks-status'); if (s) { s.textContent = ''; s.textContent = t; } };
 const bucket = (t) => { const w = taskStatusWord(t.status, t.review_requested); return { 'Queued': 'queued', 'In progress': 'active', 'Blocked': 'blocked', 'In review': 'review', 'Done': 'done' }[w] || 'queued'; };
@@ -152,13 +152,41 @@ let bar = null, barKey = '';
 function setFilters(next) {
     model.filters = next;
     TF.saveFilters(model.project, next, browserLocal);
+    hooks.onFilters?.(TF.toQuery(next)); // the address keeps them (#7782)
     loadTasks();
 }
 function ensureBar() {
     if (bar && barKey === model.project) return;
     barKey = model.project;
-    bar = buildTaskBar(setFilters, { onPanel: open => { try { browserLocal.set(`coral-list-bar-open:team-tasks:${model.project}`, open ? '1' : ''); } catch { /* the panel is shut next time */ } } });
+    bar = buildTaskBar(setFilters, { onPanel: open => { try { browserLocal.set(`coral-list-bar-open:team-tasks:${model.project}`, open ? '1' : ''); } catch { /* the panel is shut next time */ } } }, { team: true });
+    applyChoices();
     bar.setOpen(browserLocal.get(`coral-list-bar-open:team-tasks:${model.project}`) === '1');
+}
+// The Goal and Agent selects of the Filters panel (#7782): the goals of the board with their task counts (No goal first, the open goals, then the closed ones under their own heading) and the board's members. Read
+// when the tab is shown and again when it is older than a minute; until then the selects offer only what the stored filters name.
+const CHOICES_MS = 60000;
+function applyChoices() {
+    if (!bar) return;
+    const c = model.choices, f = model.filters;
+    const values = [TF.NO_GOAL], labels = { [TF.NO_GOAL]: c && c.noGoalOpen != null ? `${noGoalLabel} (${c.noGoalOpen})` : noGoalLabel }, groups = {}, names = new Map();
+    if (c) for (const [list, group] of [[c.open, 'Open goals'], [c.closed, 'Closed goals']]) for (const g of list) { const v = String(g.id); values.push(v); labels[v] = `${g.title} (${g.tasks})`; groups[v] = group; names.set(g.id, g.title); }
+    if (f.goal && !values.includes(f.goal)) { values.push(f.goal); labels[f.goal] = `Goal ${f.goal}`; } // a goal the stored filter names stays selectable until the goals are read
+    TF.setGoalNames(names);
+    bar.setOptions('goal', values, labels, groups);
+    const agents = [...new Set([...(c ? c.members : []), ...rowsNow().map(t => t.assigned_to), f.assignee].filter(n => typeof n === 'string' && n))].sort();
+    bar.setOptions('assignee', agents, {});
+}
+async function loadChoices() {
+    const project = model.project;
+    model.choicesAt = Date.now();
+    try {
+        const { fetchSubscribers } = await importOnce('./board_fetch.js');
+        const [g, subs] = await Promise.all([readGoalChoices(project), fetchSubscribers(project).catch(() => [])]);
+        if (project !== model.project || !g.ok) return;
+        const list = Array.isArray(subs) ? subs : (subs && Array.isArray(subs.subscribers) ? subs.subscribers : []);
+        model.choices = { ...g, members: list.map(s => s && s.subscriber_id).filter(n => typeof n === 'string' && n) };
+        applyChoices(); draw();
+    } catch { model.choicesAt = 0; /* the selects keep what they have; the next time the tab is shown reads again */ }
 }
 const rowsNow = () => (TF.isQuery(model.filters) ? model.q.rows : model.rows);
 
@@ -188,7 +216,7 @@ function draw() {
     Toolbar.adopt(bar.node.querySelector('.list-bar-search-row'), {
         pills: { label: 'Show tasks that are', current: model.filter, items: FILTERS.map(([key, label]) => ({ key, label, count: c[key] })),
             onPick: key => { model.filter = key; if (key === 'open' || key === 'all') browserLocal.set(HIDE_KEY, key === 'open' ? 'true' : 'false'); say(`${FILTERS.find(f => f[0] === key)[1]}: ${c[key]} tasks`); draw(); } },
-        chip: model.noGoal ? { label: 'No goal', aria: 'Remove the No goal filter', onRemove: () => { model.noGoal = false; say('Showing every task again'); draw(); } } : null,
+        chips: TF.chips(model.filters).filter(c => c.key !== 'q').map(c => ({ label: c.label, aria: `Remove the filter: ${c.label}`, onRemove: () => { say(`Removed the filter: ${c.label}`); setFilters(TF.without(model.filters, c.key)); } })),
         action: newTask,
     });
     // No count line: the selected pill's number is the count of the table under it (it said every task read, 69, beside "Open 19"). Only a search that matched more than was read says so.
@@ -197,7 +225,7 @@ function draw() {
     if (model.loading) body.append(el('p', 'goals-note', 'Loading tasks…'));
     else if (!all.length) { if (!failed) { const e = el('div', 'goals-empty'); e.append(el('p', null, query && TF.isFiltered(model.filters) ? 'No tasks match this search.' : 'No tasks yet')); body.append(e); } }
     else {
-        const shown = all.filter(t => (model.filter === 'all' || (model.filter === 'open' ? bucket(t) !== 'done' : bucket(t) === model.filter)) && (!model.noGoal || !t.goal_id));
+        const shown = all.filter(t => (model.filter === 'all' || (model.filter === 'open' ? bucket(t) !== 'done' : bucket(t) === model.filter)));
         if (!shown.length) {
             const e = el('div', 'goals-empty'); e.append(el('p', null, 'No tasks match this filter.'), btn('btn', 'Show all', () => { model.filter = 'all'; draw(); })); body.append(e);
         } else {
@@ -243,9 +271,11 @@ function watch() {
 }
 
 export function showTasks(host, project, h = {}) {
-    if (project !== model.project) { bar = null; Object.assign(model, { dt: DT.tableState(), noGoal: false, project, filters: TF.loadFilters(project, browserLocal), q: emptyQuery(), rows: [], cursor: '', moreLoaded: false, totalOpen: null, totalDone: null, filter: startFilter(), loading: false, failed: '', loadingMore: false, moreFailed: '' }); }
+    if (project !== model.project) { bar = null; Object.assign(model, { dt: DT.tableState(), choices: null, project, filters: TF.loadFilters(project, browserLocal), q: emptyQuery(), rows: [], cursor: '', moreLoaded: false, totalOpen: null, totalDone: null, filter: startFilter(), loading: false, failed: '', loadingMore: false, moreFailed: '' }); }
     hooks = h;
-    if (h.noGoal) { model.noGoal = true; model.filter = 'open'; } // opened from the Goals table's "N tasks have no goal" row: exactly those tasks, with a chip that removes the filter (#7717)
+    if (!model.choices || Date.now() - (model.choicesAt || 0) > CHOICES_MS) loadChoices();
+    if (h.query) model.filters = TF.fromQuery(h.query); // an address with filters in it (a link): they are the view, over what this browser kept
+    if (h.noGoal) { model.filters = TF.clean({ ...TF.EMPTY, goal: TF.NO_GOAL }); model.filter = 'open'; } // opened from the Goals table's "N tasks have no goal" row: exactly those tasks, the Goal filter's No goal, a chip that removes it (#7717, #7782)
     if (!host.dataset.built) {
         host.dataset.built = '1';
         const status = el('div', 'team-tasks-status sr-only'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
@@ -255,6 +285,7 @@ export function showTasks(host, project, h = {}) {
     root = host.firstChild;
     watch();
     draw();
+    hooks.onFilters?.(TF.toQuery(model.filters)); // the address says what is on screen
     return loadTasks();
 }
 

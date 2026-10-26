@@ -220,7 +220,9 @@ async function fillTab(tab, item = 0) {
             const m = await importOnce('./team_tasks_page.js');
             if (stale()) return;
             const noGoal = S.noGoal; S.noGoal = false;
-            await m.showTasks(host, team, { ...teamHooks(), noGoal, onCount: (n) => { S.counts.tasks = n; drawCounts(); } });
+            const query = S.tasksQuery; S.tasksQuery = '';
+            await m.showTasks(host, team, { ...teamHooks(), noGoal, query, onCount: (n) => { S.counts.tasks = n; drawCounts(); },
+                onFilters: (qs) => { if (!S.quiet && S.tab === 'tasks' && !S.item) note(keyRoute('team', S.team, 'tasks', null, qs), { replace: true }); } }); // the address keeps the filters (#7782)
             if (stale()) return;
             if (item) openTaskById(item, { kind: 'tasks' });
         } else if (tab === 'artifacts') {
@@ -323,6 +325,7 @@ export async function openTeamPage(team, opts = {}) {
     }
     const tab = TEAM_TABS.includes(opts.tab) ? opts.tab : 'goals';
     S.noGoal = tab === 'tasks' && !!opts.noGoal;
+    S.tasksQuery = tab === 'tasks' ? opts.query || '' : '';
     const changed = S.team !== team;
     if (changed) { S.team = team; S.counts = {}; S.item = null; S.knowledgeFor = ''; }
     state.selectedTeam = team; // the team on screen (the sidebar marks its row; the panels moved in read it)
@@ -343,14 +346,14 @@ export async function openTeamPage(team, opts = {}) {
 }
 
 /** The route changed under the page (Back, Forward, a link): show what it names without writing another address. */
-export async function applyTeamRoute(team, tab, item) {
+export async function applyTeamRoute(team, tab, item, query = '') {
     S.quiet = true;
     try {
         if (S.team === team && currentTeamPage() && !item && S.item) { closeItem(false); }
         if (S.team === team && currentTeamPage() && S.tab === tab && !S.item) {
             if (tab === 'goals') { const m = await importOnce('./goals_view.js'); if (item) m.openGoalWhenKnown(item); else if (m.openGoalId()) m.closeGoal(); return true; }
         }
-        return await openTeamPage(team, { tab, item, silent: true });
+        return await openTeamPage(team, { tab, item, query, silent: true });
     } finally { S.quiet = false; }
 }
 

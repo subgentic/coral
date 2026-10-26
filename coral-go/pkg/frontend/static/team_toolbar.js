@@ -5,7 +5,7 @@
  * with a search field of the same make (`build`), so no tab draws its own. Text is set with textContent only.
  *
  *   build({ label, placeholder, value, onSearch, pills, action })  -> the row element (a search field, the pills, the action)
- *   adopt(row, { pills, action })                                  -> puts the pills and the action into a list bar's `.list-bar-search-row`
+ *   adopt(row, { pills, chips, action })                           -> puts the pills, the chips of the filters that are on and the action into a list bar's `.list-bar-search-row`
  *   pills: { label, items: [{ key, label, count }], current, onPick(key) }                                       */
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = String(text); return e; };
 
@@ -33,12 +33,14 @@ function chipButton(c) {
 }
 
 /** Put the pills and the action into a list bar's search row: [search][pills or select][Filters][More][action]. Called on every draw: what an earlier draw put there goes first. */
-export function adopt(row, { pills = null, chip = null, action = null } = {}) {
-    for (const old of row.querySelectorAll('.team-tb-pills, .team-tb-select, .team-tb-chip, .team-tb-action')) old.remove();
+export function adopt(row, { pills = null, chips = [], action = null } = {}) {
+    for (const old of row.querySelectorAll('.team-tb-pills, .team-tb-select, .team-tb-chip, .team-tb-chips, .team-tb-action')) old.remove();
     row.classList.add('team-toolbar-row');
     const first = row.querySelector('.list-bar-toggle') || row.querySelector('.list-bar-more');
     if (pills) { const [group, select] = pillElements(pills); for (const e of [group, select]) { if (first) row.insertBefore(e, first); else row.append(e); } group.querySelector('[aria-pressed="true"]')?.scrollIntoView({ inline: 'nearest', block: 'nearest' }); }
-    if (chip) { const c = chipButton(chip); if (first) row.insertBefore(c, first); else row.append(c); }
+    // every filter that is on, one removable chip each (#7782), on a line of their own under the row's controls, so the line itself never grows past the page
+    row.classList.toggle('team-toolbar-chips', chips.length > 0);
+    if (chips.length) { const box = el('div', 'team-tb-chips'); for (const chip of chips) box.append(chipButton(chip)); row.append(box); }
     if (action) { action.classList.add('team-tb-action'); row.append(action); }
     return row;
 }

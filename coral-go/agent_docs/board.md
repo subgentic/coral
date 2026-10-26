@@ -952,6 +952,7 @@ and the connector accepts only the parameters below.
 | `assigned_to`, `board`, `created_by` | Multi: exact names (a board is its `board_id`) |
 | `priority` | Multi: `critical`, `high`, `medium`, `low` |
 | `verification` | Multi: `verified`, `evidence`, `unverified`: the state of a completed task (see Verification below); tasks that have none are never returned by it |
+| `goal_id` | Multi: a goal number of the task's own board, or `none` (a task that serves no goal), e.g. `goal_id=5`, `goal_id=none`, `goal_id=5,none` (#7782) |
 | `parked` | `true`: parked now (a reason, and a park time not yet past or none); `false`: not parked |
 | `created_since`, `updated_since` | RFC 3339 time (an offset is read as that instant); tasks created or updated at or after it |
 | `q` | Search text (#4745): a plain, case-insensitive substring of a task's title, body or completion message, at most 200 characters, no control characters, given once. `%` and `_` are ordinary characters (no pattern); whitespace around it is trimmed, and an empty `q` is no search. It combines with every other filter. Through Coral Hub it is matched on the text a viewer sees (a token in a body is not there to match, and the marker `[redacted token]` that stands in for it is), and a `q` holding a token, key or password is refused with a 400 |

@@ -80,12 +80,15 @@ type TaskQuery struct {
 	Priorities    []string
 	CreatedBy     []string
 	Verifications []string
-	Parked        *bool
-	CreatedSince  string
-	UpdatedSince  string
-	SortUpdated   bool
-	Desc          bool
-	Limit         int
+	// GoalIDs and NoGoal are the goal filter (#7782): the tasks that serve one of these goals of their board, and/or those that serve none (goal_id=5,none).
+	GoalIDs      []int64
+	NoGoal       bool
+	Parked       *bool
+	CreatedSince string
+	UpdatedSince string
+	SortUpdated  bool
+	Desc         bool
+	Limit        int
 	// Text is q, lower-cased: a plain substring (never a pattern) of a task's title, body or completion message (#4745). Empty: no
 	// search. Shown, set by the caller and not by the parser, is what a viewer sees of a text: the match is made on it (nil: the text
 	// as stored), so a search through Coral Hub cannot tell a viewer what the redaction hides.
@@ -107,6 +110,7 @@ type TaskQueryParams struct {
 	Parked, CreatedSince, UpdatedSince, Sort, Order, Limit, Cursor       []string
 	Q                                                                    []string
 	ID                                                                   []string
+	GoalID                                                               []string
 }
 
 // splitMulti reads a multi-value parameter: repeated (status=a&status=b) or comma separated (status=a,b), or both.
@@ -205,6 +209,9 @@ func ParseTaskQuery(p TaskQueryParams) (*TaskQuery, error) {
 	if q.CreatedBy, err = splitMulti("created_by", p.CreatedBy); err != nil {
 		return nil, err
 	}
+	if q.GoalIDs, q.NoGoal, err = parseGoalIDs(p.GoalID); err != nil {
+		return nil, err
+	}
 	if q.Parked, err = parseParked(p.Parked); err != nil {
 		return nil, err
 	}
@@ -264,6 +271,28 @@ func parseQueryIDs(vals []string) ([]int64, error) {
 		}
 	}
 	return ids, nil
+}
+
+// parseGoalIDs reads goal_id: repeated or comma separated, each a whole positive goal number or the word none (a task that serves no goal), each once.
+func parseGoalIDs(vals []string) ([]int64, bool, error) {
+	parts, err := splitMulti("goal_id", vals)
+	if err != nil || parts == nil {
+		return nil, false, err
+	}
+	var ids []int64
+	none := false
+	for _, part := range parts {
+		if part == "none" {
+			none = true
+			continue
+		}
+		n, perr := strconv.ParseInt(part, 10, 64)
+		if perr != nil || n < 1 || strconv.FormatInt(n, 10) != part {
+			return nil, false, taskQueryErr("goal_id must be a whole positive number or none, got %q", truncateEcho(part))
+		}
+		ids = append(ids, n)
+	}
+	return ids, none, nil
 }
 
 // truncateEcho is a caller's text for an error message: cut at 40 characters, so a long value is not sent back whole (quote it with %q).
@@ -537,6 +566,19 @@ func taskQueryWhere(q *TaskQuery, sortExpr string) (join string, where []string,
 	in("assigned_to", q.AssignedTo)
 	in("board_id", q.Boards)
 	in("created_by", q.CreatedBy)
+	if len(q.GoalIDs) > 0 || q.NoGoal {
+		var alts []string
+		if len(q.GoalIDs) > 0 {
+			alts = append(alts, "goal_id IN ("+placeholders(len(q.GoalIDs))+")")
+			for _, id := range q.GoalIDs {
+				args = append(args, id)
+			}
+		}
+		if q.NoGoal {
+			alts = append(alts, "COALESCE(goal_id, 0) = 0")
+		}
+		where = append(where, "("+strings.Join(alts, " OR ")+")")
+	}
 	if len(q.IDs) > 0 {
 		where = append(where, "id IN ("+placeholders(len(q.IDs))+")")
 		for _, id := range q.IDs {

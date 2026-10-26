@@ -103,7 +103,7 @@ export function parse(pathname, search = '') {
             if (top === 'board') return rest.length === 1 ? { view: 'board', server: t.server, id: n } : null;
             if (rest.length === 1) return { view: 'team', server: t.server, id: n, sub: null };
             if (!TEAM_TABS.includes(rest[1])) return null;
-            if (rest.length === 2) return { view: 'team', server: t.server, id: n, sub: rest[1] };
+            if (rest.length === 2) { const query = rest[1] === 'tasks' ? tasksQuery(search) : ''; return query ? { view: 'team', server: t.server, id: n, sub: rest[1], query } : { view: 'team', server: t.server, id: n, sub: rest[1] }; }
             return rest.length === 3 && TEAM_ITEM_TABS.includes(rest[1]) && INT_RE.test(rest[2]) ? { view: 'team', server: t.server, id: n, sub: rest[1], item: Number(rest[2]) } : null;
         }
         case 'workflows': {
@@ -144,6 +144,18 @@ export function chatsQuery(search) {
     return out.toString();
 }
 
+/** The team Tasks tab's filters from a query string (#7782): only its own keys, each checked against what the filter can hold; anything else is dropped (the dashboard reads the rest again with its own checks). */
+export function tasksQuery(search) {
+    const p = new URLSearchParams(search || '');
+    const out = new URLSearchParams();
+    const ok = {
+        goal: v => v === 'none' || /^[1-9]\d{0,11}$/.test(v), agent: v => v.length <= 80 && !/[\u0000-\u001f\u007f]/.test(v), priority: v => ['critical', 'high', 'medium', 'low'].includes(v),
+        q: v => v.length <= 200 && !/[\u0000-\u001f\u007f]/.test(v), from: v => /^\d{4}-\d{2}-\d{2}$/.test(v), sort: v => ['newest', 'oldest', 'updated'].includes(v),
+    };
+    for (const k of Object.keys(ok)) { const v = p.get(k); if (v !== null && v.trim() !== '' && ok[k](v)) out.set(k, v); }
+    return out.toString();
+}
+
 /** One name segment: encoded, with a leading "@" written as %40 so it can't read as a server. */
 function seg(v) {
     const e = encodeURIComponent(String(v));
@@ -160,7 +172,7 @@ export function build(r) {
         case 'chats':
             return r.id ? `/chats/${srvSeg(r.server)}${seg(r.id)}` : `/chats${r.server ? '/' + srvSeg(r.server).replace(/\/$/, '') : ''}${r.query ? '?' + r.query : ''}`;
         case 'team':
-            return `/team/${srvSeg(r.server)}${seg(r.id)}${TEAM_TABS.includes(r.sub) ? '/' + r.sub + (r.item && TEAM_ITEM_TABS.includes(r.sub) ? '/' + r.item : '') : ''}`;
+            return `/team/${srvSeg(r.server)}${seg(r.id)}${TEAM_TABS.includes(r.sub) ? '/' + r.sub + (r.item && TEAM_ITEM_TABS.includes(r.sub) ? '/' + r.item : '') : ''}${r.sub === 'tasks' && !r.item && r.query ? '?' + r.query : ''}`;
         case 'board':
             return `/board/${srvSeg(r.server)}${seg(r.id)}`;
         case 'workflows':
@@ -243,13 +255,13 @@ export function liveRoute(server, sessionId, sub = null) {
 }
 
 /** The route of a team or board from its identity key. */
-export function keyRoute(view, key, sub = null, item = null) {
+export function keyRoute(view, key, sub = null, item = null, query = '') {
     const k = String(key ?? '');
     // As splitKey reads it: "@<server>/name" only when <server> is a server id ("@x!/y" is a name).
     const m = /^@([^/]+)\/(.+)$/.exec(k);
     const remote = m && SERVER_RE.test(m[1]);
     const r = { view, server: remote ? routeServer(m[1]) : null, id: remote ? m[2] : k };
-    if (view === 'team') { r.sub = TEAM_TABS.includes(sub) ? sub : null; if (item && TEAM_ITEM_TABS.includes(r.sub)) r.item = Number(item); }
+    if (view === 'team') { r.sub = TEAM_TABS.includes(sub) ? sub : null; if (item && TEAM_ITEM_TABS.includes(r.sub)) r.item = Number(item); else if (query && r.sub === 'tasks') r.query = tasksQuery(query); }
     return r;
 }
 

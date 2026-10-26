@@ -20,7 +20,21 @@ const SPEC = {
     model: { EMPTY, clean, chips, isFiltered, without },
 };
 
-/** onChange(filters) is called with the new, clean filters when the person changes anything (typing after a short pause). */
-export function buildTaskBar(onChange, hooks = {}) {
-    return buildListBar(SPEC, onChange, hooks);
+// The team page's Tasks tab (#7782): no Status field (the state pills above the list are the status), the goal as a select (the page fills its options: No goal, then the team's goals with their task counts), the agent
+// as a select of the team's members, and the fields two to a line. The board's own Tasks panel (task_list.js) keeps the full set.
+const TEAM_SPEC = {
+    ...SPEC,
+    compactPanel: true,
+    chipsElsewhere: true, // the page puts every filter that is on as a chip on its toolbar line
+    fields: [
+        SPEC.fields[1],
+        { type: 'select', key: 'goal', id: 'tk-goal', label: 'Goal', values: [], labels: {}, any: 'Any goal' },
+        { type: 'select', key: 'assignee', id: 'tk-assignee', label: 'Agent', values: [], labels: {}, any: 'Any agent' },
+        SPEC.fields[3],
+    ],
+};
+
+/** onChange(filters) is called with the new, clean filters when the person changes anything (typing after a short pause). team: the team page's Tasks tab's panel. */
+export function buildTaskBar(onChange, hooks = {}, { team = false } = {}) {
+    return buildListBar(team ? TEAM_SPEC : SPEC, onChange, hooks);
 }

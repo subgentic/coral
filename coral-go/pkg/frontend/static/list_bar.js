@@ -147,6 +147,8 @@ export function buildListBar(spec, onChange, hooks = {}) {
     if (collapsible) { menu.classList.add('list-bar-menu-inline', 'list-bar-panel'); clearAll.textContent = 'Clear filters'; menu.setAttribute('aria-label', 'Filters and sort'); }
     // A panel with tool-group boxes (the activity bars) lays them out two to a line: a class on the menu, not a :has() rule, which made every DOM change in the page, the agent list's included, check for it (#7671).
     if (collapsible && fields.some(x => x.wrap.classList.contains('list-bar-group'))) menu.classList.add('list-bar-menu-groups');
+    // spec.compactPanel (#7782): the fields sit two to a line (one on a phone) instead of one tall row each, so the panel does not push the list down by a row per field
+    if (collapsible && spec.compactPanel) menu.classList.add('list-bar-menu-grid');
 
     const chipList = make('ul', 'list-bar-chips'); chipList.setAttribute('aria-label', 'Active filters'); chipList.hidden = true;
     if (noSearch) node.classList.add('list-bar-nosearch');
@@ -219,7 +221,7 @@ export function buildListBar(spec, onChange, hooks = {}) {
                 li.append(b); return li;
             }));
             if (list.length > 1) { const li = make('li'); const b = make('button', 'list-bar-chip list-bar-chip-all', 'Clear all'); b.type = 'button'; b.addEventListener('click', () => { everything(); focusSearch(); }); li.append(b); chipList.append(li); }
-            chipList.hidden = !list.length;
+            chipList.hidden = !list.length || !!spec.chipsElsewhere; // spec.chipsElsewhere (#7782): the owner shows the chips itself (the team Tasks tab: on the toolbar line)
             if (inline || collapsible) clearAll.hidden = !isFiltered(f);
             filterBtn.textContent = isFiltered(f) ? `Filters (${list.filter(c => c.key !== 'q').length})` : 'Filters';
             if (tog) {
@@ -242,11 +244,19 @@ export function buildListBar(spec, onChange, hooks = {}) {
         /** The names seen in the list, offered in the text field that has a datalist (typed text still works). */
         names(list) { const fld = fields.find(x => x.list); if (fld) fld.list.replaceChildren(...list.map(n => new Option(n))); },
         /** A select field's options, when they change with the list (the boards or machines there are now): the value is kept if it is still one of them. */
-        setOptions(key, values, labels) {
+        setOptions(key, values, labels, groups = null) {
             const fld = fields.find(x => x.spec.key === key); if (!fld || fld.spec.type !== 'select') return;
             const cur = fld.input.value;
             const any = fld.spec.any ? [new Option(fld.spec.any, '')] : [];
-            fld.input.replaceChildren(...any, ...values.map(v => new Option(labels[v] || v, v)));
+            // groups ({ value: group label }, #7782): a value in a group is listed under that label (the Goal field: open goals, then the closed ones), in the order the values come; a value with no group stays at the top
+            const made = [], byLabel = new Map();
+            for (const v of values) {
+                const o = new Option(labels[v] || v, v), g = groups && groups[v];
+                if (!g) { made.push(o); continue; }
+                if (!byLabel.has(g)) { const og = document.createElement('optgroup'); og.label = g; byLabel.set(g, og); made.push(og); }
+                byLabel.get(g).append(o);
+            }
+            fld.input.replaceChildren(...any, ...made);
             fld.input.value = values.includes(cur) ? cur : '';
         },
         /** Show or hide a field of the Filters menu (the Machine field, where there is only one machine). */

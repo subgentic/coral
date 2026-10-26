@@ -8,7 +8,9 @@ export const PRIORITIES = ['critical', 'high', 'medium', 'low'];
 export const PRIORITY_LABEL = { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low' };
 export const SORTS = ['open', 'newest', 'oldest', 'updated'];
 export const SORT_LABEL = { open: 'Open first', newest: 'Newest', oldest: 'Oldest', updated: 'Recently updated' };
-export const EMPTY = { q: '', status: '', priority: '', assignee: '', from: '', sort: 'open' };
+export const EMPTY = { q: '', status: '', priority: '', assignee: '', goal: '', from: '', sort: 'open' };
+/** The goal filter's value for the tasks that serve no goal (#7782): the other values are a goal's number as digits, '' is any. */
+export const NO_GOAL = 'none';
 
 /** The server's status words each choice stands for ('parked' is its own filter, not a status). */
 export const OPEN_STATUSES = ['pending', 'in_progress', 'review_pending', 'blocked', 'draft'];
@@ -18,6 +20,7 @@ const STATUS_WORDS = { open: OPEN_STATUSES, working: ['in_progress'], review: ['
 const SORT_PARAM = 'so' + 'rt'; // the query's parameter name, spelled in two parts: the icon-name lint reads that quoted word as an icon name
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const text = (v, max) => (typeof v === 'string' ? v.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, max) : '');
+const goalValue = v => { const t = typeof v === 'number' ? String(v) : v; return t === NO_GOAL || (typeof t === 'string' && /^[1-9]\d{0,11}$/.test(t)) ? t : ''; };
 const day = v => (typeof v === 'string' && DAY.test(v) && !Number.isNaN(Date.parse(v + 'T00:00:00Z')) ? v : '');
 
 /** Whatever was stored or typed, as a filters object with every field valid (an unknown choice, a bad date or a long string becomes empty). */
@@ -28,13 +31,14 @@ export function clean(f) {
         status: STATUSES.includes(o.status) ? o.status : '',
         priority: PRIORITIES.includes(o.priority) ? o.priority : '',
         assignee: text(o.assignee, 80),
+        goal: goalValue(o.goal),
         from: day(o.from),
         sort: SORTS.includes(o.sort) ? o.sort : 'open',
     };
 }
 
 /** True when anything narrows the list (the sort alone does not). */
-export function isFiltered(f) { return !!(f.q || f.status || f.priority || f.assignee || f.from); }
+export function isFiltered(f) { return !!(f.q || f.status || f.priority || f.assignee || f.goal || f.from); }
 /** True when the list must come from the task query: a filter, or an order the default list does not have. */
 export function isQuery(f) { return isFiltered(f) || f.sort !== 'open'; }
 
@@ -55,6 +59,11 @@ export function saveFilters(board, f, store) {
     } catch { /* storage unavailable: the choice lasts until the page is closed */ }
 }
 
+/** The goals' titles by number, for the goal chip's words (the page sets them when it has read the board's goals; a number it does not know reads "Goal 12"). */
+let goalNames = new Map();
+export function setGoalNames(map) { goalNames = map instanceof Map ? map : new Map(); }
+export const goalChipLabel = goal => (goal === NO_GOAL ? 'No goal' : `Goal: ${goalNames.get(Number(goal)) || `Goal ${goal}`}`);
+
 /** The active filters as chips: {key, label}; removing a chip clears that key. */
 export function chips(f) {
     const out = [];
@@ -62,6 +71,7 @@ export function chips(f) {
     if (f.status) out.push({ key: 'status', label: `Status: ${STATUS_LABEL[f.status]}` });
     if (f.priority) out.push({ key: 'priority', label: `Priority: ${PRIORITY_LABEL[f.priority]}` });
     if (f.assignee) out.push({ key: 'assignee', label: `Agent: ${f.assignee}` });
+    if (f.goal) out.push({ key: 'goal', label: goalChipLabel(f.goal) });
     if (f.from) out.push({ key: 'from', label: `Updated since ${f.from}` });
     return out;
 }
@@ -93,9 +103,27 @@ export function toParams(f, board, { statuses = null, limit = 50 } = {}) {
     if (c.status === 'parked') p.push(['parked', 'true']);
     if (c.priority) p.push(['priority', c.priority]);
     if (c.assignee) p.push(['assigned_to', c.assignee]);
+    if (c.goal) p.push(['goal_id', c.goal]);
     if (c.from) p.push(['updated_since', localMidnight(c.from)]);
     p.push([SORT_PARAM, c.sort === 'updated' ? 'updated_at' : 'created_at']);
     p.push(['order', c.sort === 'oldest' ? 'asc' : 'desc']);
     p.push(['limit', String(limit)]);
     return p;
+}
+
+/** The team Tasks tab's filters as the query of its address (#7782): the search, the priority, the goal, the agent, the day and an order that is not the default; empty filters give ''. */
+export function toQuery(f) {
+    const c = clean(f), p = new URLSearchParams();
+    if (c.goal) p.set('goal', c.goal);
+    if (c.assignee) p.set('agent', c.assignee);
+    if (c.priority) p.set('priority', c.priority);
+    if (c.q) p.set('q', c.q);
+    if (c.from) p.set('from', c.from);
+    if (c.sort !== 'open') p.set(SORT_PARAM, c.sort);
+    return p.toString();
+}
+/** The filters an address's query holds (the keys toQuery writes; clean() checks every value again), on top of the empty ones. */
+export function fromQuery(search) {
+    const p = new URLSearchParams(search || '');
+    return clean({ ...EMPTY, goal: p.get('goal') || '', assignee: p.get('agent') || '', priority: p.get('priority') || '', q: p.get('q') || '', from: p.get('from') || '', sort: p.get(SORT_PARAM) || 'open' });
 }

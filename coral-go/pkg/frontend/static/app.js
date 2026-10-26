@@ -725,7 +725,7 @@ function registerRouteHandlers() {
     onRoute('team', async r => {
         await liveListReady;
         switchNavTab('agents', { fromHistory: true });
-        await applyTeamRoute(routeKey(r), r.sub || 'goals', r.item || 0); // the team page (#7453); /team/<name> is its Goals tab
+        await applyTeamRoute(routeKey(r), r.sub || 'goals', r.item || 0, r.query || ''); // the team page (#7453); /team/<name> is its Goals tab
     });
 
     route('board', r => {
