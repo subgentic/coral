@@ -50,9 +50,10 @@ const BASE = require('./test_base').BASE;
                 assert.equal(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`),'13','all pending artifacts count');
                 assert.ok(await ev(`document.documentElement.scrollWidth<=innerWidth+1`),'no horizontal overflow');
                 assert.equal(await ev(`document.querySelector('#group-table-view .inbox-folder-head .session-group-count').textContent`),'12 of 13','heading explains the cap');
-                const layout = await ev(`(() => {const r=${row('Review file 01.txt')}, buttons=[...r.querySelectorAll('.inbox-review-actions button')], rects=buttons.map(b=>b.getBoundingClientRect());return {height:r.getBoundingClientRect().height,sameLine:Math.abs(rects[0].top-rects[1].top)<2,standard:buttons.every(b=>!b.classList.contains('dt-quiet')&&!b.disabled)};})()`);
+                const layout = await ev(`(() => {const r=${row('Review file 01.txt')}, buttons=[...r.querySelectorAll('.inbox-review-actions button')], rects=buttons.map(b=>b.getBoundingClientRect());const team=r.querySelector('.inbox-review-team');return {team:team.textContent,teamHeight:team.getBoundingClientRect().height,teamFits:team.scrollWidth<=team.clientWidth+1,height:r.getBoundingClientRect().height,sameLine:Math.abs(rects[0].top-rects[1].top)<2,standard:buttons.every(b=>!b.classList.contains('dt-quiet')&&!b.disabled)};})()`);
                 assert.ok(layout.sameLine,'both actions stay on one line');
-                assert.ok(layout.height<=(width===390?90:40),'compact review row: '+JSON.stringify(layout));
+                if(width===390){assert.equal(layout.team,team,'phone keeps the full team name');assert.ok(layout.teamHeight>0&&layout.teamFits,'team metadata is visible and wraps within the row');}
+                assert.ok(layout.height<=(width===390?90+layout.teamHeight:40),'compact review row: '+JSON.stringify(layout));
                 assert.ok(layout.standard,'standard enabled button treatment');
                 if(width===390)assert.ok(await ev(`[...(${row('Review file 01.txt')}).querySelectorAll('.inbox-review-actions button')].every(b=>b.getBoundingClientRect().height>=44)`),'review actions keep 44px touch targets');
 

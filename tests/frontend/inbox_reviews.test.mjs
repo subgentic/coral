@@ -8,9 +8,10 @@ assert.equal(groups.length,2,'same session on another server is a separate produ
 assert.equal(groups[0].rows.length,10); assert.equal(groups[0].more.length,2,'same agent across teams shares its cap');
 assert.equal(groups[1].rows.length,1);
 let artifacts = Array.from({length:201},(_,i)=>row(i+1)), writes = [], fail = false, failRead = false;
-let release, entered, slow = false;
+let release, entered, slow = false, reads = 0;
 const started = new Promise(resolve => { entered = resolve; });
 globalThis.fetch = async (url, options = {}) => {
+    reads++;
     const u = new URL(url, 'http://localhost');
     if(u.pathname==='/api/board/projects')return Response.json([{project:'a'}]);
     if(u.pathname.endsWith('/tags')) {
@@ -25,7 +26,10 @@ globalThis.fetch = async (url, options = {}) => {
     if(slow){slow=false; await new Promise(resolve=>{release=resolve; entered();});}
     return Response.json(snapshot);
 };
+await M.refreshReviews();
+assert.equal(reads,0,'badge updates before opening Inbox must not read projects or artifacts');
 await M.refreshReviews(true);
+assert.ok(reads>0,'opening Inbox starts review reads');
 assert.equal(M.reviewItems().length,201,'reads beyond the first page');
 const first=M.reviewItems()[0];
 fail=true;
