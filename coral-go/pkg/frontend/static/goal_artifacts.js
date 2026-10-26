@@ -13,7 +13,8 @@ const { itemKey, isUnverified, readableName, sizeText, typeText, createdText, ta
 import { renderArtifact } from './artifact_preview.js';
 const { openDetailPane } = await importOnce('./detail_pane.js');
 
-const PAGE = 20;
+// the first 20 and Load more; on a phone the first 5, so the button is on screen without scrolling (UI/UX, #8616)
+const pageSize = () => (matchMedia('(max-width: 760px)').matches ? 5 : 20);
 const dock = () => state.currentSession?.type === 'live'; // openArtifactTab opens the preview panel for a live agent's dock and does nothing without a team or an agent
 const el = DT.el;
 
@@ -57,10 +58,10 @@ export function mountGoalArtifacts(host, { team, goalId }) {
     box.append(summary, body);
     host.append(box);
     box.hidden = true;
-    const names = () => `Artifacts (${state.total})`;
+    const setSummary = () => { const n = el('span', 'goal-artifacts-count', ` (${state.total})`); summary.replaceChildren('Artifacts', n); }; // the count in the quiet tone, the word in the heading's
 
     function draw() {
-        summary.textContent = names();
+        setSummary();
         body.replaceChildren();
         if (!state.loadedOnce) { body.append(el('p', 'goals-note', 'Loading…')); return; }
         const rows = orderByGroup(state.items, 'task'); // a task's files together; the newest task first, as the server sorts
@@ -92,14 +93,14 @@ export function mountGoalArtifacts(host, { team, goalId }) {
             state.total = Number.isFinite(Number(data.total)) ? Number(data.total) : (data.artifacts || []).length;
         } catch { state.total = 0; }
         box.hidden = state.total === 0;
-        summary.textContent = names();
+        setSummary();
     }
 
     async function load(more) {
         if (state.busy) return;
         state.busy = true;
         try {
-            const data = await read(team, goalId, `limit=${PAGE}${more && state.cursor ? `&cursor=${encodeURIComponent(state.cursor)}` : ''}`);
+            const data = await read(team, goalId, `limit=${pageSize()}${more && state.cursor ? `&cursor=${encodeURIComponent(state.cursor)}` : ''}`);
             const have = new Set(more ? state.items.map(itemKey) : []);
             state.items = (more ? state.items : []).concat((Array.isArray(data.artifacts) ? data.artifacts : []).filter(a => a && !have.has(itemKey(a))));
             state.cursor = typeof data.next_cursor === 'string' ? data.next_cursor : '';
