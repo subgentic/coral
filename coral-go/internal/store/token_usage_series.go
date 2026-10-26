@@ -64,7 +64,7 @@ func (s *TokenUsageStore) GetUsageTurns(ctx context.Context, q UsageTurnsQuery) 
 		where, args = append(where, `recorded_at >= ?`), append(args, wholeSecondUsageCutoff(q.Since))
 	}
 	if q.Until != "" {
-		where, args = append(where, `recorded_at < ?`), append(args, q.Until)
+		where, args = append(where, `recorded_at < ?`), append(args, wholeSecondUsageCutoff(q.Until))
 	}
 	order := `recorded_at DESC, id DESC`
 	if q.Order == "cost" {
@@ -165,7 +165,7 @@ func (s *TokenUsageStore) GetUsageTimeSeriesGrouped(ctx context.Context, q TimeS
 	if q.Interval == "5m" {
 		rel, args = `(SELECT `+usageCols+`, n_rows, recorded_at FROM token_usage_all`+sinceWhere(q.Since)+`)`, sinceArgs(q.Since)
 	} else {
-		rel, args = usageRelation(ctx, s.db.Reader(), q.Since)
+		rel, args = usageRelationWindow(ctx, s.db.Reader(), q.Since, q.Until)
 	}
 	query := `SELECT ` + bucketExpr + ` AS bucket, ` + groupSQL + ` AS grp,
 	          COALESCE(SUM(cost_usd), 0) AS cost_usd,
@@ -181,7 +181,7 @@ func (s *TokenUsageStore) GetUsageTimeSeriesGrouped(ctx context.Context, q TimeS
 	}
 	if q.Until != "" {
 		query += ` AND u.recorded_at < ?`
-		args = append(args, q.Until)
+		args = append(args, wholeSecondUsageCutoff(q.Until))
 	}
 	query += ` GROUP BY bucket, grp ORDER BY bucket ASC, grp ASC`
 

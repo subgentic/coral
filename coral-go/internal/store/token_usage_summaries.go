@@ -128,7 +128,7 @@ func (s *TokenUsageStore) GetUsageSummaryByAgentBoard(ctx context.Context, since
 // stamp of that second) are left out; until "" is no end (#8235).
 func (s *TokenUsageStore) GetUsageSummaryByAgentBoardUntil(ctx context.Context, since, until, board string) ([]AgentUsageSummary, error) {
 	var summaries []AgentUsageSummary
-	rel, args := usageRelation(ctx, s.db.Reader(), since)
+	rel, args := usageRelationWindow(ctx, s.db.Reader(), since, until)
 	// Prefer the session's current display name so renames show; unnamed
 	// agents come back empty and the UI labels them "Agent". The folder is
 	// reported separately so those rows can still be told apart.
@@ -154,7 +154,7 @@ func (s *TokenUsageStore) GetUsageSummaryByAgentBoardUntil(ctx context.Context, 
 	   WHERE ` + usageDedup("t.")
 	if until != "" {
 		query += ` AND t.recorded_at < ?`
-		args = append(args, until)
+		args = append(args, wholeSecondUsageCutoff(until))
 	}
 	if board != "" {
 		query += ` AND COALESCE(NULLIF(t.board_name, ''), ls.board_name) = ?`

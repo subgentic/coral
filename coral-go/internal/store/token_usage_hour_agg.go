@@ -159,6 +159,13 @@ const usageCols = `session_id, agent_name, agent_type, team_id, board_name, inpu
 //
 // A since that is not a canonical UTC time, and a database with nothing aggregated yet, get the raw and hourly rows only, as before.
 func usageRelation(ctx context.Context, db sqlGetter, since string) (frag string, args []any) {
+	return usageRelationWindow(ctx, db, since, "")
+}
+
+// usageRelationWindow uses the cache only for complete hours inside the window.
+// The caller applies the exclusive until predicate to the resulting rows; the
+// partial upper hour must retain its raw timestamps for that predicate to work.
+func usageRelationWindow(ctx context.Context, db sqlGetter, since, until string) (frag string, args []any) {
 	raw := `SELECT ` + usageCols + `, 1 AS n_rows, recorded_at, recorded_at AS min_at, recorded_at AS max_at FROM token_usage`
 	hourly := `SELECT ` + usageCols + `, n_rows, recorded_at, recorded_at AS min_at, recorded_at AS max_at FROM token_usage_hourly`
 	plain := func() (string, []any) {
@@ -173,6 +180,20 @@ func usageRelation(ctx context.Context, db sqlGetter, since string) (frag string
 	}
 	if err := db.GetContext(ctx, &last, `SELECT MAX(hour) FROM token_usage_hour_agg`); err != nil || !last.Valid {
 		return plain()
+	}
+	if until != "" {
+		end, err := time.Parse(time.RFC3339Nano, until)
+		if err != nil {
+			// Spend's agent summary passes a UTC second without a suffix.
+			end, err = time.Parse("2006-01-02T15:04:05", until)
+		}
+		if err != nil {
+			return plain()
+		}
+		lastComplete := end.UTC().Truncate(time.Hour).Add(-time.Hour).Format("2006-01-02T15")
+		if lastComplete < last.String {
+			last.String = lastComplete
+		}
 	}
 	from := "" // the first aggregated hour a query may use
 	if since != "" {

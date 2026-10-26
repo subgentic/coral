@@ -69,3 +69,24 @@ func TestUsageSummaryByAgentBoardUntilStopsAtTheEndSecond(t *testing.T) {
 		assert.EqualValues(t, 127, read(t, ""))
 	})
 }
+
+func TestUsageAgentSummaryPartialHour8624(t *testing.T) {
+	db := openTestDB(t)
+	s := NewTokenUsageStore(db)
+	for _, row := range []struct {
+		at   string
+		cost float64
+	}{{"2026-10-26T09:10:00.000Z", 8}, {"2026-10-26T10:10:00.000Z", 1}, {"2026-10-26T10:30:00.000000+00:00", 4}, {"2026-10-26T10:40:00.000Z", 2}} {
+		require.NoError(t, s.RecordUsage(t.Context(), &TokenUsage{SessionID: "window", AgentName: "window", AgentType: "claude", RecordedAt: row.at, Source: "jsonl", CostUSD: row.cost}))
+	}
+	n, err := db.RefreshTokenUsageHourAgg(t.Context(), time.Date(2026, 10, 26, 12, 0, 0, 0, time.UTC), 100)
+	require.NoError(t, err)
+	require.Equal(t, 2, n)
+	for _, cut := range []string{"2026-10-26T10:30:00", "2026-10-26T10:30:00Z"} {
+		rows, err := s.GetUsageSummaryByAgentBoardUntil(t.Context(), "2026-10-26T08:00:00Z", cut, "")
+		require.NoError(t, err)
+		require.Len(t, rows, 1)
+		assert.Equal(t, 9.0, rows[0].CostUSD, "%s must use raw rows for the partial last hour", cut)
+		assert.Equal(t, 2, rows[0].NumRecords)
+	}
+}
