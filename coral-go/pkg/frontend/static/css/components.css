@@ -1868,9 +1868,9 @@
 }
 
 .flag-shortcut-btn.active {
-    background: var(--accent);
+    background: var(--accent-dim); /* the one selected style of a segment or a chip in a form (#8054) */
     color: var(--text-on-accent);
-    border-color: var(--accent);
+    border-color: var(--accent-dim);
 }
 
 .dir-browser {
@@ -2684,7 +2684,7 @@
 }
 
 .template-cat-btn.active {
-    background: var(--accent);
+    background: var(--accent-dim); /* the one selected style of a segment or a chip in a form (#8054) */
     color: var(--text-on-accent);
 }
 
@@ -2846,9 +2846,9 @@
 }
 
 .perm-chip.active {
-    background: var(--accent);
+    background: var(--accent-dim); /* the one selected style of a segment or a chip in a form (#8054) */
     color: var(--text-on-accent);
-    border-color: var(--accent);
+    border-color: var(--accent-dim);
 }
 
 .perms-shell-patterns {

@@ -132,9 +132,8 @@
 }
 
 .job-type-btn.active {
-    background: var(--bg-secondary);
-    color: var(--text-primary);
-    box-shadow: 0 1px 3px rgba(var(--black-rgb), 0.2);
+    background: var(--accent-dim); /* the one selected style of a segment or a chip in a form (#8054): the accent fill, the same at every width and theme */
+    color: var(--text-on-accent);
 }
 
 .sched-header {
