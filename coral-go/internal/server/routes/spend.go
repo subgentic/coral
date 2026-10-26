@@ -506,6 +506,36 @@ func agentRows(ro *spendRoster, tools *spendToolRows, commitsBy map[string]int, 
 	return rows, tokenMeasured, toolMeasured
 }
 
+// taskTimeBlock is the page's task times: the window's against the usual period's, and who completed how many in the window (the first spelling of a name names it; a task with no completer is in the
+// totals and not listed), most first, then by name. The per-hour and per-day points are added with the series.
+func taskTimeBlock(winTasks, usualTasks []board.TaskTime) spendTaskTime {
+	tt := spendTaskTime{Window: board.SummarizeTaskTimes(winTasks), Usual: board.SummarizeTaskTimes(usualTasks), ReviewLabel: spendReviewLabel, Agents: []spendTaskAgent{}}
+	byCompleter := map[string][]board.TaskTime{}
+	displayOfKey := map[string]string{}
+	for _, t := range winTasks {
+		k := spendNameKey(t.CompletedBy)
+		byCompleter[k] = append(byCompleter[k], t)
+		if _, ok := displayOfKey[k]; !ok {
+			displayOfKey[k] = strings.TrimSpace(t.CompletedBy)
+		}
+	}
+	for k, tts := range byCompleter {
+		if k == "" {
+			continue
+		}
+		st := board.SummarizeTaskTimes(tts)
+		tt.Agents = append(tt.Agents, spendTaskAgent{Name: displayOfKey[k], Done: st.Done, Median: st.WorkMedian, SentBack: st.WentBack2Plus})
+	}
+	sort.Slice(tt.Agents, func(i, j int) bool {
+		a, b := tt.Agents[i], tt.Agents[j]
+		if a.Done != b.Done {
+			return a.Done > b.Done
+		}
+		return a.Name < b.Name
+	})
+	return tt
+}
+
 // Spend answers GET /api/board/{project}/spend?range=24h|7d.
 func (h *SpendHandler) Spend(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
@@ -551,7 +581,6 @@ func (h *SpendHandler) Spend(w http.ResponseWriter, r *http.Request) {
 
 	cm := h.readCommits(ctx, project, roster, fr)
 	commitInfo := cm.info
-	nameKey := spendNameKey
 	commitsBy, hourCommits := attributeCommits(&commitInfo, cm, roster)
 
 	tasks, fail := h.readTaskTimes(ctx, project, fr)
@@ -571,30 +600,7 @@ func (h *SpendHandler) Spend(w http.ResponseWriter, r *http.Request) {
 		tc.Window, tc.Usual = &toolWin, &toolUsual
 	}
 	resp.ToolCalls = tc
-	resp.TaskTime = spendTaskTime{Window: board.SummarizeTaskTimes(winTasks), Usual: board.SummarizeTaskTimes(usualTasks), ReviewLabel: spendReviewLabel, Agents: []spendTaskAgent{}}
-	byCompleter := map[string][]board.TaskTime{}
-	displayOfKey := map[string]string{}
-	for _, tt := range winTasks {
-		k := nameKey(tt.CompletedBy)
-		byCompleter[k] = append(byCompleter[k], tt)
-		if _, ok := displayOfKey[k]; !ok {
-			displayOfKey[k] = strings.TrimSpace(tt.CompletedBy)
-		}
-	}
-	for k, tts := range byCompleter {
-		if k == "" {
-			continue
-		}
-		st := board.SummarizeTaskTimes(tts)
-		resp.TaskTime.Agents = append(resp.TaskTime.Agents, spendTaskAgent{Name: displayOfKey[k], Done: st.Done, Median: st.WorkMedian, SentBack: st.WentBack2Plus})
-	}
-	sort.Slice(resp.TaskTime.Agents, func(i, j int) bool {
-		a, b := resp.TaskTime.Agents[i], resp.TaskTime.Agents[j]
-		if a.Done != b.Done {
-			return a.Done > b.Done
-		}
-		return a.Name < b.Name
-	})
+	resp.TaskTime = taskTimeBlock(winTasks, usualTasks)
 
 	// the series, oldest first: an hour's point is its own hour; a day's is the sum of its 24 hours
 	cwReported := winCW > 0 || usualCW > 0
