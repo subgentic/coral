@@ -591,15 +591,6 @@
                         <div id="settings-agents-rows" data-coral-root="{{ .CoralRoot }}"></div>
                         <!-- the live parts of this group (filled by settings_dialog.js, shown or hidden by it) sit here until the rows are drawn, then settings_fields.js moves each into place -->
                         <div id="settings-agents-live" hidden>
-                        <dl class="info-grid settings-grid" id="settings-custom-models-dl">
-                <div class="settings-row settings-row-wide" id="settings-custom-models-row" hidden>
-                <dt>Custom models</dt>
-                <dd>
-                    <div id="settings-custom-models" class="settings-custom-models"></div>
-                    <span class="settings-hint" data-info>Model ids are passed to the CLI as they are written here. They appear in every model picker, including the one that switches a running agent's model.</span>
-                </dd>
-                </div>
-                        </dl>
                         <!-- the CLI paths' live parts (#8460): each field's verify result and the Verify All button, filled by cli_dialogs.js; settings_fields.js moves them under their fields -->
                         <span id="cli-result-claude" class="cli-verify-result"></span><span id="cli-result-codex" class="cli-verify-result"></span><span id="cli-result-agy" class="cli-verify-result"></span><span id="cli-result-pi" class="cli-verify-result"></span>
                         <button class="btn btn-small" data-on-click="m-verify-all-c-l-is" id="verify-all-btn">Verify All</button>

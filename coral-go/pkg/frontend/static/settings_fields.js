@@ -87,7 +87,8 @@ const AGENTS_FIELDS = host => [
     { key: 'default_models', type: 'heading', id: 'settings-agents-models', label: 'Default models', help: 'Used when launching an agent without a model specified. Pick from the dropdown or type any model id.' },
     modelRow('claude', 'Claude'), modelRow('codex', 'Codex'), modelRow('agy', 'Antigravity'), modelRow('pi', 'Pi'),
     { key: 'default_models_notice', type: 'notice', render: slot => { slot.innerHTML = '<span id="settings-default-models-notice" class="settings-hint" role="status"></span>'; } },
-    live('settings-custom-models-dl'),
+    { key: 'custom_models', type: 'custom', id: 'settings-custom-models', wide: true, label: 'Custom models', help: { text: 'Model ids are passed to the CLI as they are written here.', more: "They appear in every model picker, including the one that switches a running agent's model." }, // the list and its form: custom_models.js draws them and shows the row once the server has the route
+        render: slot => slot.classList.add('settings-custom-models') },
     { key: 'agents_behaviour', type: 'heading', id: 'settings-agents-behaviour', label: 'Behaviour' },
     { key: 'auto_resume', type: 'toggle', id: 'settings-auto-resume', label: 'Resume after API errors', help: hintOnly("When an agent's CLI stops on a rate limit, an overload or another API error, Coral wakes it again after about 2, then 5, then 15 minutes, and stops trying after the third. Waking the agent yourself starts the count again.") },
     { key: 'auto_goals', type: 'toggle', id: 'settings-auto-goals', label: "Name each agent's goal", help: hintOnly("Coral asks Claude Code's smallest model (Haiku) for a short goal line for each agent, from your requests only: once when the agent first answers, then for a new request at most every 30 minutes. Each one is a short call made with your Claude Code account (about 1,300 input tokens). When off, the goal shows your first prompt.") },
@@ -164,6 +165,6 @@ export function drawSettingsGroups(modal, mount) {
     for (const [hostId, fields] of [['settings-general-rows', GENERAL_FIELDS], ['settings-notifications-rows', NOTIFICATIONS_FIELDS], ['settings-files-rows', FILES_FIELDS], ['settings-terminal-rows', TERMINAL_FIELDS], ['settings-agents-rows', AGENTS_FIELDS], ['settings-cleanup-rows', CLEANUP_FIELDS], ['settings-security-rows', SECURITY_FIELDS], ['settings-network-rows', NETWORK_FIELDS]]) {
         const host = modal.querySelector(`#${hostId}`);
         if (host && !host.firstChild) mount(host, { mode: 'settings', saveBar: false, fields: typeof fields === 'function' ? fields(host) : fields });
-        if (hostId === 'settings-terminal-rows') for (const id of TERMINAL_BACKEND_IDS) host.querySelector(`#${id}`)?.closest('.sv-row')?.setAttribute('hidden', ''); // until terminal_backend.js has read the status
+        for (const id of hostId === 'settings-terminal-rows' ? TERMINAL_BACKEND_IDS : hostId === 'settings-agents-rows' ? ['settings-custom-models'] : []) host.querySelector(`#${id}`)?.closest('.sv-row')?.setAttribute('hidden', ''); // until the module that fills them has read its status
     }
 }

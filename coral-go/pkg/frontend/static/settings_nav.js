@@ -49,7 +49,7 @@ export function openSettingsGroup(id) {
 /** Called after a hub dashboard has hidden the rows it does not allow: a group with no row left leaves the rail. */
 export function refreshSettingsGroups() {
     for (const p of panes()) {
-        const empty = !p.querySelector('.settings-row:not([hidden]), .sv-row:not([hidden]), .tb-row:not([hidden])');
+        const empty = !p.querySelector('.settings-row:not([hidden]), .sv-row:not([hidden])');
         if (empty) p.dataset.empty = '1'; else delete p.dataset.empty;
         const tab = tabFor(p.dataset.group);
         if (tab) tab.hidden = empty;

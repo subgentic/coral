@@ -32,9 +32,10 @@ const LIMITS = { max_per_family: 50, max_total: 200, efforts: { claude: ['low', 
         await ev(STUB(route));
         await ev(`window.showSettingsModal('agents'); true`);
         if (route) await waitFor(`document.querySelectorAll('#settings-custom-models .cm-row').length === 3 && !!document.querySelector('#settings-custom-models [data-cm-add]')`, 'the list and its one Add button', 8000);
-        else await waitFor(`!!document.getElementById('settings-custom-models-row')`, 'the row', 5000);
+        else await waitFor(`!!document.getElementById('settings-custom-models')`, 'the row', 5000);
     };
     const addFor = async p => { await ev(`document.querySelector('#settings-custom-models [data-cm-add]').click(); true`); await ev(`(() => { const s = document.getElementById('cm-provider'); s.value = ${JSON.stringify(p)}; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); };
+    const ERR = `(() => { const e = document.getElementById('cm-id').closest('.sv-row').querySelector('.sv-error'); return { shown: !!e && !e.hidden, text: e ? e.textContent : '', invalid: document.getElementById('cm-id').getAttribute('aria-invalid') }; })()`; // the form's error line under the Model id box
     const click = sel => ev(`document.querySelector(${JSON.stringify(sel)}).click(); true`);
     const type = async text => { for (const ch of text) await Input.dispatchKeyEvent({ type: 'char', text: ch }); };
     const focusId = () => ev(`(() => { const a = document.activeElement; return a ? (a.id || a.getAttribute('data-cm-add') || a.getAttribute('data-cm-edit') || a.textContent.trim()) : ''; })()`);
@@ -50,30 +51,30 @@ const LIMITS = { max_per_family: 50, max_total: 200, efforts: { claude: ['low', 
         // Codex takes no levels yet: the form says so and offers none
         await addFor('codex');
         check('the add form takes the keyboard on its provider box', (await focusId()) === 'cm-provider');
-        check('Codex has no level boxes, and the form says why', (await ev(`document.querySelectorAll('#settings-custom-models .cm-form input[type=checkbox]').length`)) === 0 && /does not pass thinking levels to Codex yet/.test(await ev(`document.querySelector('#settings-custom-models .cm-form').textContent`)));
+        check('Codex has no level boxes, and the form says why', (await ev(`[...document.querySelectorAll('#settings-custom-models .cm-form input[type=checkbox]')].filter(c => c.getClientRects().length).length`)) === 0 && /does not pass thinking levels to Codex yet/.test(await ev(`document.querySelector('#settings-custom-models .cm-form').textContent`)));
         const bad = [['', /Enter the model id/], ['-flag', /starting with a letter or number/], ['has space', /starting with a letter or number/], ['semi;colon', /starting with a letter or number/], ['x'.repeat(129), /up to 128 characters/]];
         for (const [v, re] of bad) {
-            await ev(`(() => { const i = document.getElementById('cm-id'); i.value = ${JSON.stringify(v)}; document.querySelector('#settings-custom-models .cm-form').requestSubmit(); return true; })()`);
-            const m = await ev(`(() => { const e = document.getElementById('cm-err'); return { shown: !e.hidden, text: e.textContent, invalid: document.getElementById('cm-id').getAttribute('aria-invalid'), role: e.getAttribute('role') }; })()`);
-            check(`"${v.slice(0, 12)}" is refused with a reason, as an alert, and the box says it is invalid`, m.shown && re.test(m.text) && m.invalid === 'true' && m.role === 'alert', m.text);
+            await ev(`(() => { const i = document.getElementById('cm-id'); i.value = ${JSON.stringify(v)}; document.querySelector('#settings-custom-models .cm-form .sv-save').click(); return true; })()`);
+            const m = await ev(ERR);
+            check(`"${v.slice(0, 12)}" is refused with a reason under the box, and the box says it is invalid`, m.shown && re.test(m.text) && m.invalid === 'true', m.text);
         }
-        await ev(`(() => { document.getElementById('cm-id').value = 'gpt-6-astra'; document.getElementById('cm-name').value = 'Astra'; document.querySelector('#settings-custom-models .cm-form').requestSubmit(); return true; })()`);
+        await ev(`(() => { document.getElementById('cm-id').value = 'gpt-6-astra'; document.getElementById('cm-name').value = 'Astra'; document.querySelector('#settings-custom-models .cm-form .sv-save').click(); return true; })()`);
         t = await ev(`document.querySelector('#settings-custom-models .cm-row[data-provider="codex"]').innerText.replace(/\\s+/g, ' ')`);
         check(`a valid id is added as a Codex row (${t})`, /Codex gpt-6-astra Astra/.test(t));
         check('the keyboard lands on the new row\'s Edit button', (await focusId()) === 'codex:0');
         check('the page says the change is not saved yet', /Unsaved changes\. Apply to save\./.test(await ev(`document.querySelector('#settings-custom-models .cm-status').textContent`)));
         // a duplicate in the same provider is refused; the same id in another provider is fine
         await addFor('codex');
-        await ev(`(() => { document.getElementById('cm-id').value = 'gpt-6-astra'; document.querySelector('#settings-custom-models .cm-form').requestSubmit(); return true; })()`);
-        check('a duplicate in the same provider is refused', /already in the list for Codex/.test(await ev(`document.getElementById('cm-err').textContent`)));
+        await ev(`(() => { document.getElementById('cm-id').value = 'gpt-6-astra'; document.querySelector('#settings-custom-models .cm-form .sv-save').click(); return true; })()`);
+        check('a duplicate in the same provider is refused', /already in the list for Codex/.test((await ev(ERR)).text));
         await ev(`document.getElementById('cm-id').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`);
         check('Escape closes the form and not Settings', (await ev(`!document.querySelector('#settings-custom-models .cm-form') && getComputedStyle(document.getElementById('settings-modal')).display !== 'none'`)) && (await focusId()) === '1');
         // Claude: levels are boxes from the server's limits; edit the seeded model
         await addFor('claude');
-        check('Claude offers the five levels as boxes', (await ev(`[...document.querySelectorAll('#settings-custom-models .cm-form input[type=checkbox]')].map(c => c.value).join()`)) === 'low,medium,high,xhigh,max');
-        await ev(`(() => { document.getElementById('cm-id').value = 'claude-opus-5-5'; document.querySelectorAll('#settings-custom-models .cm-form input[type=checkbox]').forEach(c => { if (c.value === 'medium' || c.value === 'max') c.checked = true; }); document.querySelector('#settings-custom-models .cm-form').requestSubmit(); return true; })()`);
+        check('Claude offers the five levels as boxes', (await ev(`[...document.querySelectorAll('#settings-custom-models .cm-form input[type=checkbox]')].filter(c => c.getClientRects().length).map(c => c.value).join()`)) === 'low,medium,high,xhigh,max');
+        await ev(`(() => { document.getElementById('cm-id').value = 'claude-opus-5-5'; document.querySelectorAll('#settings-custom-models .cm-form input[type=checkbox]').forEach(c => { if (c.value === 'medium' || c.value === 'max') c.checked = true; }); document.querySelector('#settings-custom-models .cm-form .sv-save').click(); return true; })()`);
         await click('[data-cm-edit="claude:0"]');
-        await ev(`(() => { document.getElementById('cm-name').value = 'Global Opus'; document.querySelector('#settings-custom-models .cm-form').requestSubmit(); return true; })()`);
+        await ev(`(() => { document.getElementById('cm-name').value = 'Global Opus'; document.querySelector('#settings-custom-models .cm-form .sv-save').click(); return true; })()`);
         await click('#settings-custom-models .cm-row[data-provider="pi"] button[aria-label^="Remove"]');
         check('removing a row puts the keyboard on the Add button', (await focusId()) === '1');
         const pay = await ev(`import(${S} + 'custom_models.js').then(m => m.customModelsPayload())`);
@@ -108,7 +109,7 @@ const LIMITS = { max_per_family: 50, max_total: 200, efforts: { claude: ['low', 
 
         console.log('3. no route on this server: the section is hidden');
         await open({ w: 1280, h: 900, phone: false }, 'light', false);
-        await waitFor(`document.getElementById('settings-custom-models-row').hidden`, 'the row to hide', 5000);
+        await waitFor(`document.getElementById('settings-custom-models').closest('.sv-row').hidden`, 'the row to hide', 5000);
         check('the row is hidden when GET /api/custom-models is a 404', true);
 
         console.log('4. both themes, desktop and phone');

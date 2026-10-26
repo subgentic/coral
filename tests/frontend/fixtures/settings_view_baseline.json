@@ -1,8 +1,8 @@
 {
   "settings-row": {
-    "css": 33,
+    "css": 32,
     "js": 5,
-    "html": 3
+    "html": 2
   },
   "settings-cli-row": {
     "css": 0,
@@ -11,7 +11,7 @@
   },
   "tb-row": {
     "css": 0,
-    "js": 1,
+    "js": 0,
     "html": 0
   },
   "settings-row-switch": {
