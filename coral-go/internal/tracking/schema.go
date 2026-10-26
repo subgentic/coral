@@ -148,8 +148,8 @@ var eventSpecs = map[string]map[string]propSpec{
 	EventUpdateOfferOpened: {"to_version": versionProp, "source": enum(UpdateSourceDashboard, UpdateSourceTray), "channel": enum(UpdateChannelApproved, UpdateChannelAgentic), "method": enum(UpdateMethodDownloadLink)},
 }
 
-// KnownEvent reports whether name is on the allowlist.
-func KnownEvent(name string) bool {
+// knownEvent reports whether name is on the allowlist.
+func knownEvent(name string) bool {
 	_, ok := eventSpecs[name]
 	return ok
 }

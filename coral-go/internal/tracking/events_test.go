@@ -41,7 +41,7 @@ func TestEventAllowlistMatchesTheDisclosure(t *testing.T) {
 	documented := map[string]bool{}
 	for _, e := range AllEvents {
 		documented[e.Name] = true
-		if !KnownEvent(e.Name) {
+		if !knownEvent(e.Name) {
 			t.Errorf("event %q is disclosed but not on the typed allowlist", e.Name)
 		}
 	}
