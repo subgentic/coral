@@ -1,0 +1,58 @@
+{
+  "board_chat.js": {
+    "board": {
+      "row": 1,
+      "listRoute": 3
+    }
+  },
+  "board_search.js": {
+    "board": {
+      "listRoute": 1
+    }
+  },
+  "goals_view.js": {
+    "tasks": {
+      "columns": 2
+    }
+  },
+  "inbox_coral.js": {
+    "tasks": {
+      "listRoute": 1
+    },
+    "board": {
+      "listRoute": 1
+    }
+  },
+  "inbox_sidebar.js": {
+    "tasks": {
+      "columns": 1
+    }
+  },
+  "message_board.js": {
+    "board": {
+      "row": 1
+    }
+  },
+  "saved.js": {
+    "board": {
+      "listRoute": 1
+    }
+  },
+  "task_list.js": {
+    "tasks": {
+      "rowClass": 5,
+      "listRoute": 4
+    }
+  },
+  "team_page.js": {
+    "tasks": {
+      "listRoute": 1
+    }
+  },
+  "team_tasks_page.js": {
+    "tasks": {
+      "columns": 2,
+      "listRoute": 1
+    }
+  }
+}
