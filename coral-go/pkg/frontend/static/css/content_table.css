@@ -1,0 +1,29 @@
+/* The one style of a table an author wrote in Markdown (#7905): a subagent's details, a chat bubble, the generic .md, a Docs page and the file preview. It is content, not a list the dashboard draws, so it is
+ * not the data_table component and the data_table census does not count it (it counts every other stylesheet). One block; every size and colour is a --content-table-* token: a surface that reads differently
+ * sets the token on its container, never a rule of its own for a table, a row, a cell or a header. */
+:root {
+    --content-table-display: block; /* block lets a wide table scroll in itself instead of stretching its container */
+    --content-table-scroll: auto;
+    --content-table-width: auto;
+    --content-table-min-width: 0;
+    --content-table-max: 100%;
+    --content-table-margin: 8px 0;
+    --content-table-font: inherit;
+    --content-table-size: 0.75rem;
+    --content-table-pad: 4px 8px;
+    --content-table-valign: top;
+    --content-table-head-bg: var(--bg-tertiary);
+    --content-table-head-color: var(--text-primary);
+    --content-table-head-size: inherit;
+    --content-table-head-weight: 600;
+}
+.chat-bubble .message-text { --content-table-display: table; --content-table-scroll: visible; --content-table-max: none; --content-table-valign: middle; --content-table-head-bg: var(--bg-secondary); --content-table-head-color: inherit; }
+.chat-prose.chat-messages .chat-bubble .message-text { --content-table-font: var(--font-sans); --content-table-size: 0.875rem; --content-table-margin: 0 0 16px; }
+.md { --content-table-margin: 0 0 8px; --content-table-size: inherit; --content-table-valign: middle; --content-table-head-bg: transparent; --content-table-head-color: inherit; --content-table-head-weight: bold; }
+.docs-content { --content-table-display: table; --content-table-scroll: visible; --content-table-max: none; --content-table-width: 100%; --content-table-size: 0.8125rem; --content-table-pad: 6px 10px; --content-table-valign: middle; --content-table-head-color: inherit; --content-table-head-size: var(--fs-base); --content-table-head-weight: 500; }
+.docs-table-wrap { --content-table-margin: 0; --content-table-width: max-content; --content-table-min-width: 100%; }
+.preview-pane-markdown { --content-table-max: none; --content-table-margin: 0 0 1em; --content-table-size: inherit; --content-table-pad: 6px 12px; --content-table-valign: middle; --content-table-head-color: inherit; --content-table-head-weight: bold; }
+
+:is(.subagent-detail-md, .chat-bubble .message-text, .md, .docs-content, .preview-pane-markdown) table { border-collapse: collapse; display: var(--content-table-display); width: var(--content-table-width); min-width: var(--content-table-min-width); max-width: var(--content-table-max); margin: var(--content-table-margin); font-family: var(--content-table-font); font-size: var(--content-table-size); overflow-x: var(--content-table-scroll); }
+:is(.subagent-detail-md, .chat-bubble .message-text, .md, .docs-content, .preview-pane-markdown) :is(th, td) { border: 1px solid var(--border); padding: var(--content-table-pad); text-align: left; vertical-align: var(--content-table-valign); }
+:is(.subagent-detail-md, .chat-bubble .message-text, .md, .docs-content, .preview-pane-markdown) th { background: var(--content-table-head-bg); color: var(--content-table-head-color); font-size: var(--content-table-head-size); font-weight: var(--content-table-head-weight); }

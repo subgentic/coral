@@ -105,25 +105,8 @@
     padding: 0;
 }
 
-.docs-content table {
-    border-collapse: collapse;
-    width: 100%;
-    margin: 8px 0;
-    font-size: 0.8125rem;
-}
 
-.docs-content th,
-.docs-content td {
-    border: 1px solid var(--border);
-    padding: 6px 10px;
-    text-align: left;
-}
 
-.docs-content th {
-    background: var(--bg-tertiary);
-    font-size: var(--fs-base); /* a table's header is 12/500 */
-    font-weight: 500;
-}
 .docs-content strong, .docs-content b { font-size: 0.875rem; font-weight: 600; } /* bold labels 14/600 */
 
 .docs-content ul,
@@ -168,7 +151,6 @@
 /* Tables (#7162): each sits in a focusable scroll region, so a keyboard and a phone reach every column; the line above says it scrolls, drawn only while it does. */
 .docs-table-wrap { overflow-x: auto; max-width: 100%; margin: 8px 0; }
 .docs-table-wrap:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.docs-table-wrap > table { margin: 0; width: max-content; min-width: 100%; }
 .docs-table-hint { margin: 8px 0 0; color: var(--text-secondary); font-size: 0.75rem; }
 .docs-table-hint[hidden] { display: none; }
 

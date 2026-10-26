@@ -829,8 +829,7 @@ body.panel-dragging .xterm-container {
 .preview-pane-markdown ul,
 .preview-pane-markdown ol,
 .preview-pane-markdown blockquote,
-.preview-pane-markdown pre,
-.preview-pane-markdown table { margin: 0 0 1em; }
+.preview-pane-markdown pre { margin: 0 0 1em; }
 .preview-pane-markdown ul,
 .preview-pane-markdown ol { padding-left: 2em; }
 .preview-pane-markdown li { margin: 0.25em 0; }
@@ -855,10 +854,6 @@ body.panel-dragging .xterm-container {
     background: var(--bg-tertiary);
 }
 .preview-pane-markdown pre code { padding: 0; background: none; }
-.preview-pane-markdown table { border-collapse: collapse; display: block; overflow-x: auto; }
-.preview-pane-markdown th,
-.preview-pane-markdown td { padding: 6px 12px; border: 1px solid var(--border); }
-.preview-pane-markdown th { background: var(--bg-tertiary); }
 .preview-pane-markdown hr { border: 0; border-top: 1px solid var(--border); margin: 1.5em 0; }
 .preview-pane-markdown img { max-width: 100%; }
 

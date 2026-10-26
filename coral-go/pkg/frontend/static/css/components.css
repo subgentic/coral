@@ -3967,13 +3967,11 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .ibx-open-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
 .ibx .md, .ibx-saved-body .md { overflow-wrap: anywhere; line-height: 1.5; font-size: var(--fs-md, 0.875rem); color: var(--text-primary); }
 .md > :first-child { margin-top: 0; }
-.md p, .md ul, .md ol, .md blockquote, .md pre, .md table { margin: 0 0 8px; }
+.md p, .md ul, .md ol, .md blockquote, .md pre { margin: 0 0 8px; }
 .md ul, .md ol { padding-left: 22px; }
 .md blockquote { padding-left: 10px; border-left: 3px solid var(--border); color: var(--text-secondary); }
 .md pre { padding: 8px 10px; overflow-x: auto; background: var(--bg-tertiary); border-radius: var(--radius-md); }
 .md code { font-family: var(--font-mono, monospace); font-size: 0.9em; }
-.md table { border-collapse: collapse; display: block; overflow-x: auto; max-width: 100%; }
-.md th, .md td { border: 1px solid var(--border); padding: 4px 8px; text-align: left; }
 .md .md-h { font-weight: 700; margin: 10px 0 4px; }
 .md hr { border: 0; border-top: 1px solid var(--border); margin: 10px 0; }
 .md a { color: var(--link-text); overflow-wrap: anywhere; }

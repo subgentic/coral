@@ -137,22 +137,8 @@
     color: var(--text-secondary);
 }
 
-.chat-bubble .message-text table {
-    border-collapse: collapse;
-    margin: 8px 0;
-    font-size: 0.75rem;
-}
 
-.chat-bubble .message-text th,
-.chat-bubble .message-text td {
-    border: 1px solid var(--border);
-    padding: 4px 8px;
-}
 
-.chat-bubble .message-text th {
-    background: var(--bg-secondary);
-    font-weight: 600;
-}
 
 /* ── Markdown Body (rich rendering) ────────────────────────── */
 
@@ -827,11 +813,6 @@
     padding: 0;
 }
 
-.chat-prose.chat-messages .chat-bubble .message-text table {
-    font-family: var(--font-sans);
-    font-size: 0.875rem;
-    margin: 0 0 16px;
-}
 
 /* User turns stay as a compact, neutral bubble on the right */
 .chat-prose.chat-messages .chat-bubble.human {

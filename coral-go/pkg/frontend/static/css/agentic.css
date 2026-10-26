@@ -936,26 +936,6 @@ body.panel-dragging .agentic-state {
     color: var(--text-muted);
 }
 
-.subagent-detail-md table {
-    border-collapse: collapse;
-    margin: 8px 0;
-    font-size: 0.75rem;
-    display: block;      /* lets a wide table scroll instead of stretching the modal */
-    overflow-x: auto;
-    max-width: 100%;
-}
-.subagent-detail-md th,
-.subagent-detail-md td {
-    border: 1px solid var(--border, rgba(var(--white-rgb), 0.12));
-    padding: 4px 8px;
-    text-align: left;
-    vertical-align: top;
-}
-.subagent-detail-md th {
-    background: var(--bg-tertiary, rgba(var(--white-rgb), 0.06));
-    color: var(--text-primary);
-    font-weight: 600;
-}
 
 .subagent-detail-md a { color: var(--subagent-accent); }
 .subagent-detail-md hr {

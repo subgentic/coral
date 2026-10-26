@@ -1,21 +1,15 @@
 {
   "css": {
-    "agentic.css": 3,
-    "chat.css": 4,
-    "cloud.css": 9,
-    "components.css": 5,
-    "docs.css": 4,
-    "layout.css": 33,
-    "output.css": 4,
-    "scheduler.css": 2,
-    "session.css": 2,
-    "team_page.css": 16,
+    "cloud.css": 10,
+    "components.css": 4,
+    "layout.css": 11,
+    "scheduler.css": 4,
     "workflows.css": 5
   },
   "js": {
+    "cloud_servers.js": 13,
     "scheduler.js": 18,
     "servers.js": 13,
-    "session_state.js": 43,
     "sidebar_groups.js": 7,
     "workflows.js": 20
   }
