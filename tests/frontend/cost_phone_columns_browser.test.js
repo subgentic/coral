@@ -54,7 +54,7 @@ const WIDE = {
             const inside = e => { const r = e.getBoundingClientRect(); return r.left >= card.left - 1 && r.right <= card.right + 1; };
             const cells = [...box.querySelectorAll('tbody tr:first-child td')].filter(td => td.getClientRects().length).sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top || a.getBoundingClientRect().left - b.getBoundingClientRect().left);
             const labels = cells.map(td => td.dataset.label), ci = cells.findIndex(td => td.dataset.key === 'cost_usd');
-            out[id] = { folded: dt.classList.contains('dt-folded'), labels, ci, inside: cells.every(inside), heads: [...box.querySelectorAll('thead th')].map(th => th.dataset.key ? th.querySelector('.dt-sort, .dt-head-text').firstChild.textContent.trim() : ''),
+            out[id] = { folded: dt.classList.contains('dt-folded'), labels, ci, inside: cells.every(inside), heads: [...box.querySelectorAll('thead th:not(.dt-check)')].map(th => th.dataset.key ? th.querySelector('.dt-sort, .dt-head-text').firstChild.textContent.trim() : ''),
                 costs: [...box.querySelectorAll('tbody tr')].map(tr => tr.querySelector('td[data-key="cost_usd"]').textContent.trim()) };
         } return out; })()`);
 
