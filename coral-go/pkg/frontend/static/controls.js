@@ -20,6 +20,7 @@ import { prepareImage, artifactErrorText, PICKER_ACCEPT, parseUploadReply, uploa
 import { attachmentsLead, sentToastText } from './shared_images.js';
 import { loadModals } from './lazy_panels.js';
 import { responseErrorText, responseError } from './server_status.js';
+import { launchFlags } from './launch_flags.js';
 import { reportSendError, showComposerError, clearComposerError, awaitSocketAccept, nextInputId, refuseSocketSends } from './terminal_gone.js';
 import { rememberSend, noteHeld } from './held_sends.js'; // a message held behind the agent's question shows as queued under the box (#6611)
 import { pollEvery } from './overload.js';
@@ -590,7 +591,7 @@ async function showRestartModal() {
 const RESTART_STAGES = ['persona', 'agent'];
 const RESTART_STAGE_NAMES = { persona: 'Persona', agent: 'Settings' };
 
-/** Restart's two steps, New Agent's without its first (the agent is fixed): the persona page, then the settings tabs (Model, Permissions, Advanced). Restart is in the footer of both: a restart that changes nothing needs no walk through the steps. `arg` is a stage name, "next" or "back". */
+/** Restart's two steps, New Agent's without its first (the agent is fixed): the persona page, then the settings tabs (Model, Permissions, Advanced). Restart is in the footer of the second only, as Launch is on New Agent's last step (#7779); launchFlags.launchFromAnyStep puts it in both. `arg` is a stage name, "next" or "back". */
 export function restartStage(arg) {
     const wiz = document.getElementById('restart-wizard');
     if (!wiz) return;
@@ -605,6 +606,7 @@ export function restartStage(arg) {
     if (who) { subEl.append(`${sub}. Restarting `); const b = document.createElement('b'); b.textContent = who; subEl.append(b); } else subEl.textContent = sub;
     document.getElementById('restart-back').hidden = to === 'persona';
     document.getElementById('restart-next').hidden = to === 'agent';
+    document.getElementById('restart-go').hidden = to !== 'agent' && !launchFlags.launchFromAnyStep; // Restart is shown after Next, as New Agent's Launch is (#7779, the operator: "click next before showing the relaunch option")
     const live = document.getElementById('restart-stage-live'); if (live) live.textContent = sub;
     const modal = document.getElementById('restart-modal');
     if (to === 'agent') importOnce('./quiet_focus.js').then(m => m.quietFocus(modal), () => {}); // the selected tab takes the focus: no ring until a key is pressed (#7391)

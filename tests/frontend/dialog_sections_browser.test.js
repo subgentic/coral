@@ -52,7 +52,7 @@ const BASE = require('./test_base').BASE;
         await ev(`T.state.currentSession = ${JSON.stringify(session)}; window.restartSession(); true`);
         await waitFor(`${vis('#restart-acf .acf-prompt')} && !!document.querySelector('#restart-acf .acf-agent-type')`, 'the restart dialog');
         let st = await stage();
-        assert.deepEqual(st, { stage: 'persona', sub: 'Step 1 of 2: Persona. Restarting QA Engineer', back: false, next: true, go: true }, 'it opens on the persona, with Restart in the footer already');
+        assert.deepEqual(st, { stage: 'persona', sub: 'Step 1 of 2: Persona. Restarting QA Engineer', back: false, next: true, go: false }, 'it opens on the persona: Next, and no Restart until the person has clicked it (#7779)');
         assert.equal(await ev(vis('#restart-modal .settings-tabs')), false, 'the list of sections is for step 2');
         assert.equal(await ev(`document.getElementById('restart-stage-sub').textContent`), 'Step 1 of 2: Persona. Restarting QA Engineer', 'one header line, as New Agent has: the step, then who');
         assert.equal(await ev(`document.querySelector('#restart-acf .acf-restart-name').textContent`), 'QA Engineer');
