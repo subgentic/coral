@@ -6,6 +6,7 @@ import (
 	"go/parser"
 	"go/token"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
@@ -37,9 +38,19 @@ import (
 func parseRouterSource(t *testing.T) (*ast.File, *token.FileSet) {
 	t.Helper()
 	fset := token.NewFileSet()
-	f, err := parser.ParseFile(fset, "../router.go", nil, 0)
+	paths, err := filepath.Glob("../router*.go")
 	require.NoError(t, err)
-	return f, fset
+	require.NotEmpty(t, paths)
+	merged := &ast.File{}
+	for _, path := range paths {
+		if strings.HasSuffix(path, "_test.go") {
+			continue
+		}
+		f, err := parser.ParseFile(fset, path, nil, 0)
+		require.NoError(t, err)
+		merged.Decls = append(merged.Decls, f.Decls...)
+	}
+	return merged, fset
 }
 
 type fnKey struct{ recv, name string }
