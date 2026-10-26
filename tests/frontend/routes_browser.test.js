@@ -97,7 +97,7 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         check('Back to the filtered list restores its filter', (await ev(`document.getElementById('history-search').value`)) === 'routesqa', await url());
 
         console.log('4. Old hash links become their paths (replaced, not pushed)');
-        for (const [hash, path, tabId] of [['#tokens', '/analytics', 'nav-tab-tokens'], ['#history', '/chats', 'nav-tab-hub-inbox'],
+        for (const [hash, path, tabId] of [['#tokens', '/analytics', 'nav-tab-tokens'], ['#history', '/inbox/chats/all', 'nav-tab-hub-inbox'],
             ['#workflows', '/workflows', 'nav-tab-workflows'], ['#agents', '/agents', 'nav-tab-agents']]) {
             await open('/' + hash);
             await until(`(document.querySelector('.top-nav-tab.active') || {}).id === ${JSON.stringify(tabId)}`, tabId);
@@ -156,7 +156,7 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         const toast = re => `[...document.querySelectorAll('.toast')].some(t => ${re}.test(t.textContent))`;
         for (const [path, list, re] of [
             ['/agents/00000000-0000-4000-8000-000000000000', '/agents', '/not running here/'],
-            ['/chats/no-such-chat-3532', '/chats', '/chat was not found/'],
+            ['/chats/no-such-chat-3532', '/inbox/chats/all', '/chat was not found/'],
             ['/workflows/987654321', '/workflows', '/workflow was not found/'],
             ['/workflows/987654321/runs/987654321', '/workflows', '/workflow run was not found/'],
             ['/docs/no-such-doc', '/docs', '/document was not found/'],
@@ -205,7 +205,7 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         boards.push(board);
         await open(`/board/${board}`);
         await until(`${TITLE} === ${JSON.stringify(board)}`, 'the board');
-        check('/board/<name> opens the board on its team page, at /team/<name>/messages', (await ev(shown('team-page-view'))) && (await url()) === `/team/${board}/messages`, await url());
+        check('/board/<name> opens the board on its team page, at /team/<name>/board', (await ev(shown('team-page-view'))) && (await url()) === `/team/${board}/board`, await url());
         // A #team-view=x link in a post is never a route (Security, #3532). Since #3542 it isn't a
         // link at all: board Markdown shows it as text with its target, and clicking that leaves
         // the board's page, hash and view as they are. (nav_unit covers the router ignoring a hash.)
@@ -218,7 +218,7 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         await ev(`(${frag}).click(); true`);
         await new Promise(r => setTimeout(r, 300)); // sleep-ok: a negative check, nothing may react
         const after = await ev(`({ path: location.pathname, hash: location.hash, board: ${shown('team-page-view')}, team: !!(document.getElementById('team-center-view') && !document.getElementById('team-center-view').hidden) })`);
-        check('a #team-view= link in a post drives nothing', after.path === `/team/${board}/messages` && !after.hash && after.board && !after.team, JSON.stringify(after));
+        check('a #team-view= link in a post drives nothing', after.path === `/team/${board}/board` && !after.hash && after.board && !after.team, JSON.stringify(after));
 
         // A dashboard page link in a post (#3542 keeps it, rebuilt from the parsed route): a plain
         // click goes through the router, with no page load, and Back returns to the board.
@@ -233,8 +233,8 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         const rc = await ev(`({ url: location.pathname + location.search, same: window.__samePage === true, box: (document.getElementById('history-search') || {}).value })`);
         check('a page link in a post opens it through the router (no page load, its own query only)', linkHref === '/chats?q=routeclick' && rc.url === '/chats?q=routeclick' && rc.same && rc.box === 'routeclick', JSON.stringify({ linkHref, ...rc }));
         await ev('history.back(); true');
-        await atUrl(`/team/${board}/messages`);
-        check('and Back returns to the board', (await url()) === `/team/${board}/messages` && (await ev('window.__samePage === true')), await url());
+        await atUrl(`/team/${board}/board`);
+        check('and Back returns to the board', (await url()) === `/team/${board}/board` && (await ev('window.__samePage === true')), await url());
 
         // "../../api" is a legal name: encoded, it stays one segment under /api/board/.
         const climb = '../../api';
