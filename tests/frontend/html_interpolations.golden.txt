@@ -253,16 +253,16 @@
 1	notifications.js	linkHtml
 2	pending_messages.js	label
 1	pending_messages.js	renderMarkdown(lead.rest, undefined, 'chat')
+1	preview_content.js	content
+1	preview_content.js	lang
+1	preview_content.js	safe
 1	preview_pane.js	_fileIcon(tab)
 1	preview_pane.js	active
 1	preview_pane.js	buttons
-1	preview_pane.js	content
 1	preview_pane.js	icon
-1	preview_pane.js	lang
 1	preview_pane.js	link
 1	preview_pane.js	preview
 1	preview_pane.js	renderMarkdownStrict(content)
-1	preview_pane.js	safe
 1	preview_pane.js	unshare
 1	prompt_modals.js	bg
 1	registered_server_view.js	adding ? '' : warningHtml((_servers.find(x => x.id === _editing) || {}).warning)

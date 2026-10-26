@@ -15,7 +15,7 @@ const MODES = new Set(['board', 'chat', 'file']);
 const MARKED_PARSE = {
     'markdown.js': 'the renderers themselves (moved out of utils.js, #5065)',
     'notes.js': 'links', // session notes, which can be an agent-derived auto summary
-    'preview_pane.js': 'links', // a workspace file, which can be agent-written
+    'preview_content.js': 'links', // a workspace file, which can be agent-written
 };
 const DOMPURIFY_SANITIZE = {
     'markdown.js': 'sanitizeHtml itself (moved out of utils.js, #5065)',
