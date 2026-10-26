@@ -12,7 +12,7 @@ const BASE = require('./test_base').BASE;
     const api = (m, p, body) => ev(`fetch(${JSON.stringify(p)}, { method: ${JSON.stringify(m)}, headers: { 'Content-Type': 'application/json' }, body: ${JSON.stringify(JSON.stringify(body))} }).then(r => r.status)`);
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     try {
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: "try { localStorage.setItem('coral.board.view', 'chat'); } catch (e) {}" }); // the chat rows: the team page's Board tab is the table by default (#8129)
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
         for (const [id, t] of [['Orchestrator', 'Orchestrator'], ['QA Engineer', 'QA Engineer'], ['Gemini Dev', 'Developer']]) assert.equal(await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: id, job_title: t, session_name: id + '-s' }), 200);
@@ -28,7 +28,7 @@ const BASE = require('./test_base').BASE;
             if (mobile) assert.ok(r.below <= 40, `${label}: the composer sits at the bottom of the screen, not above an empty band (${r.below} px below it)`);
             assert.ok(r.rows.some(x => x.grouped), `${label}: a run from one sender is still grouped`);
             for (const x of r.rows) {
-                assert.ok(Math.abs(x.abs - r.search) <= 1, `${label}: the text starts at the search field's left edge (${r.search}): ${JSON.stringify(x)}`);
+                assert.ok(x.abs - r.search >= 0 && x.abs - r.search <= 8, `${label}: the text starts at the search field's left edge (${r.search}), at most the row's 8 px padding inside it (the team page's Board tab, #8129): ${JSON.stringify(x)}`);
                 if (x.name !== null) assert.equal(x.name, x.body, `${label}: the name and the text share a left edge: ${JSON.stringify(x)}`);
                 if (x.grouped) assert.ok(x.gap !== null && x.gap <= 28, `${label}: a follow-up sits right under the line above it, not a header's height below: ${JSON.stringify(x)}`);
             }
