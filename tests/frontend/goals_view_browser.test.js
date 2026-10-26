@@ -3,6 +3,7 @@
 // with a back row, the empty, filtered and failed states, and New goal with a refused title. 1280 and 390 px, 100% and 200% text. A real isolated server for the rest of the page.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { nextFrame } = require('./helpers/wait');
 const BASE = require('./test_base').BASE;
 const S = `(window.__coralStatic || '/static/')`;
 
@@ -70,7 +71,7 @@ const innerHeightOf = h => h;
             assert.equal(await ev(`document.querySelector('.goal-item.active .goal-card').getAttribute('aria-current')`), 'true');
             assert.deepEqual(await texts('.goals-sub'), ['Outcome', 'Done when', 'Tasks']);
             assert.deepEqual(await texts('.dt-id'), ['#101', '#102', '#103']);
-            await ev(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve(true))))`); // table folding follows its ResizeObserver
+            await nextFrame(ev); // table folding follows its ResizeObserver
             const titles = await ev(`[...document.querySelectorAll('.goals-detail-col .dt-primary')].map(b => { const r = document.createRange(); r.selectNodeContents(b); return { whiteSpace: getComputedStyle(b).whiteSpace, textHeight: r.getBoundingClientRect().height, fontSize: parseFloat(getComputedStyle(b).fontSize), cellWidth: b.closest('td').getBoundingClientRect().width }; })`);
             assert.ok(titles.every(t => t.whiteSpace === 'nowrap' && t.textHeight <= t.fontSize * 1.5 && t.cellWidth > 160), `${at}: task titles occupy one readable line: ${JSON.stringify(titles)}`);
             assert.equal(await ev(`document.querySelector('.goals-detail-col .dt-table').getAttribute('aria-label')`), 'Tasks of ' + (await texts('.goals-detail-title'))[0], `${at}: the task list has a name (#7250)`);
