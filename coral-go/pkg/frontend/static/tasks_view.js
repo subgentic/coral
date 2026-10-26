@@ -58,7 +58,7 @@ export function tasksTable(scope, rows, { ctx = {}, tweak, ...table } = {}) {
     if (!keys) throw new Error(`tasksTable: no scope "${scope}"`);
     let columns = taskColumns(ctx, keys);
     if (tweak) columns = tweak(columns) || columns;
-    return DT.dataTable({ label: `Tasks, ${rows.length}`, rowKey: taskKey, rowName: (t) => `#${t.id} ${t.title}`, ...table, columns, rows });
+    return DT.dataTable({ compact: true, label: `Tasks, ${rows.length}`, rowKey: taskKey, rowName: (t) => `#${t.id} ${t.title}`, ...table, columns, rows });
 }
 
 // ── the one toolbar (#8119): Search, Filters, + Task, on every scope that has a list bar ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
