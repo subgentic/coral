@@ -16,6 +16,9 @@ const TOTAL = 2100, DAYS = 6, NEEDLE = 'zebra-needle';
 const SENDERS = [['orchestrator', 'Orchestrator'], ['qa-1', 'QA Engineer'], ['be-1', 'Backend Dev'], ['fe-1', 'Frontend Dev'], ['fe-teams', 'Frontend Dev Teams UI'], ['sec-win', 'Security Reviewer Windows'],
     ['ds', 'Data Science & Dashboarding'], ['devops', 'DevOps Engineer'], ['uiux', 'UI/UX'], ['lead', 'Lead Developer'], ['codex', 'Codex Test'], ['qa-2', 'QA Reviewer 2'], ['ua', 'UI Accessibility'], ['operator', 'Operator']];
 const now = Date.now(), STEP = (DAYS * 86400000) / TOTAL;
+// The seeded timeline ends at most six hours after the local midnight: the newest 250 messages span 17.7 hours, so with it ending later (any run after 17:42) they all fell on today and the day-line check had one line to find (#8568).
+const sinceMidnight = now - new Date(new Date(now).getFullYear(), new Date(now).getMonth(), new Date(now).getDate()).getTime();
+const END = now - Math.max(0, sinceMidnight - 6 * 3600000);
 const NEEDLE_AT = new Set([121, 703, 1507]); // by order of posting
 const spec = (i) => {
     const [sid, title] = SENDERS[i % SENDERS.length];
@@ -81,7 +84,7 @@ const spec = (i) => {
         for (let i = 29; i <= TOTAL; i += 29) { const st = await ev(`fetch('/api/board/${B}/messages/${postedIds[i - 1]}', { method: 'DELETE' }).then(r => r.status)`); assert.ok(st < 300, 'deleting message ' + i + ': ' + st); deleted.add(i); }
         const dataDir = process.env.CORAL_TEST_DATA_DIR;
         assert.ok(dataDir, 'the runner gives the isolated data directory (CORAL_TEST_DATA_DIR)');
-        const stamp = i => new Date(now - (TOTAL - i) * STEP).toISOString();
+        const stamp = i => new Date(END - (TOTAL - i) * STEP).toISOString();
         const sql = ['PRAGMA busy_timeout=20000;', 'BEGIN;', ...postedIds.map((id, k) => `UPDATE board_messages SET created_at='${stamp(k + 1)}' WHERE id=${id};`), 'COMMIT;'].join('\n');
         execFileSync('sqlite3', [require('node:path').join(dataDir, 'messageboard.db')], { input: sql });
         const kept = postedIds.filter((id, k) => !deleted.has(k + 1));
