@@ -844,10 +844,7 @@
                     </section>
                     <section class="settings-pane" id="settings-pane-notifications" data-group="notifications" data-icon="notifications" data-title="Notifications" role="tabpanel" aria-labelledby="settings-tab-notifications" tabindex="-1" hidden>
                         <h4 class="settings-pane-title">Notifications</h4>
-                        <dl class="info-grid settings-grid">
-                {{ template "includes/toggle_row" (toggle "settings-notify-needs-input" "Show notifications in Coral" "Show a toast when an agent needs input.") }}
-                {{ template "includes/toggle_row" (toggle "settings-desktop-notify" "Desktop alerts" "This browser only: alert while this tab is in the background. Shows the agent and server names (your OS may keep them in its notification history), never agent output. May duplicate a local alert.") }}
-                        </dl>
+                        <div id="settings-notifications-rows"></div>
                     </section>
                     <section class="settings-pane" id="settings-pane-files" data-group="files" data-icon="account_tree" data-title="Files and Git" role="tabpanel" aria-labelledby="settings-tab-files" tabindex="-1" hidden>
                         <h4 class="settings-pane-title">Files and Git</h4>
