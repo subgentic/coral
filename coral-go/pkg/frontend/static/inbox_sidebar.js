@@ -29,6 +29,7 @@ const VL = await importOnce('./view_list.js'); // the mailbox's view list (#7785
 const TB = await importOnce('./task_bulk.js'); // what the selection bar does to the selected tasks
 const Toolbar = await importOnce('./team_toolbar.js'); // the selection bar takes the page's toolbar line (mountSelection)
 const GC = await importOnce('./goal_columns.js');
+const CH = await importOnce('./mailbox_chats.js'); // the chat folders (#7776): All chats, Group chats, By CLI, Tags
 const { providerName } = await importOnce('./model_labels.js'); // a CLI by its name (Claude, Codex, Antigravity), as the Chats list says it
 const { waitingText } = await importOnce('./waiting_text.js'); // a lazy module imports only what loads at startup (import_hygiene): this one loads with it
 
@@ -41,8 +42,10 @@ const GROUPS = [
 ];
 const GROUP_KEY = 'coral.inbox.tab'; // the group last on screen, kept in this browser
 let tasks = [];
-let group = (() => { const v = browserLocal.get(GROUP_KEY); return GROUPS.some(g => g.key === v) ? v : 'needs'; })();
-const queries = { needs: '', tasks: '', goals: '', saved: '' }; // each group's own search text (lower case; Saved's goes to the server as typed)
+/** A folder's name and its search words: the groups above, or a chat folder (its title comes from the chat folders' own list). */
+const groupMeta = key => GROUPS.find(g => g.key === key) || (CH.CHAT_KEY.test(key) && CH.chatFolder(key) ? { key, label: CH.chatFolder(key).title, search: 'Search chats', short: 'Search' } : null);
+let group = (() => { const v = browserLocal.get(GROUP_KEY); return groupMeta(v) ? v : 'needs'; })();
+const queries = { needs: '', tasks: '', goals: '', saved: '' }; // a chat folder keeps its search as typed under its own key // each group's own search text (lower case; Saved's goes to the server as typed)
 let page = null; // { kind: 'task', project, id } | { kind: 'saved', id }: the item on screen, or null
 
 // ── Needs you ────────────────────────────────────────────────────────────
@@ -92,7 +95,7 @@ const countOf = key => key === 'needs' ? needsRows().length : key === 'tasks' ? 
 const folderSections = () => [{ title: 'Needs attention', items: [
     { key: 'needs', label: 'Needs you', count: countOf('needs'), alert: true }, { key: 'tasks', label: 'Tasks', count: countOf('tasks') },
     { key: 'goals', label: 'Goals', count: countOf('goals') },
-    { key: 'saved', label: 'Saved', count: countOf('saved') }] }];
+    { key: 'saved', label: 'Saved', count: countOf('saved') }] }, ...CH.chatSections()];
 let _navKey = null, _folders = null, _poll = 0;
 /** A folder was picked: a page that is open gives way, and the folder's table opens with the keyboard at its heading. */
 function pickFolder(key) {
@@ -201,6 +204,13 @@ export function drawDockSaved(host) {
     (same || host.querySelector('.group-chip, .group-table-link'))?.focus({ preventScroll: true }); // a row that went (Done, Reopen) leaves the focus on the table's first control, not on the page
 }
 
+/** A chat of a folder opens in the chat viewer as it does from the Chats list (the way back to the folder comes with the Chats tab's removal, step 3). */
+async function openChat(c) {
+    const isGroup = c.type === 'group' || String(c.session_id || '').startsWith('board:');
+    if (isGroup) { const { historyServer } = await importOnce('./history_source.js'); window.selectBoardProject?.(identityKey(historyServer(), c.title || String(c.session_id).replace(/^board:/, ''))); return; }
+    window.selectHistorySession?.(c.session_id);
+}
+
 registerGroupSource('hub-inbox', {
     toolbar: () => ({ search: { id: 'inbox-search', label: 'Search the Inbox' } }), // the page's toolbar line, the same shape for Needs you, Tasks and Saved (#7723)
     keys: () => GROUPS.map(g => g.key),
@@ -238,6 +248,10 @@ registerGroupSource('hub-inbox', {
                     return t.el;
                 } };
         }
+        if (CH.CHAT_KEY.test(key)) {
+            return CH.chatsSpec(key, { query: queries[key] || '', redraw: () => refreshGroupTable('hub-inbox'), open: openChat,
+                after: () => { CH.loadChatCounts(() => renderInboxNav(true)); refreshGroupTable('hub-inbox'); } });
+        }
         if (key === 'goals') {
             const rows = goalRows();
             return { title: 'Goals', rows, empty: { line: queries.goals ? 'No goal matches the search.' : 'No open goals.' },
@@ -257,13 +271,13 @@ registerGroupSource('hub-inbox', {
 
 /** Which group is on screen: the search box is named for it and holds its text, and Display options (Saved's Filters and Sort) is there for Saved only. */
 function setGroup(key) {
-    if (!GROUPS.some(g => g.key === key)) key = 'needs';
+    if (!groupMeta(key)) key = 'needs';
     const was = group;
     group = key;
     browserLocal.set(GROUP_KEY, key);
-    const input = $('inbox-search'), g = GROUPS.find(x => x.key === key);
+    const input = $('inbox-search'), g = groupMeta(key);
     if (input) {
-        const text = key === 'saved' ? (saved.savedView().query || queries.saved) : queries[key];
+        const text = key === 'saved' ? (saved.savedView().query || queries.saved) : (queries[key] || '');
         if (input.placeholder !== (g.short || g.search)) input.placeholder = g.short || g.search;
         if (input.getAttribute('aria-label') !== g.search) input.setAttribute('aria-label', g.search); // the name stays whole whatever the placeholder says (a placeholder as short as the box's default no longer skips it)
         if (input.value !== text) input.value = text;
@@ -289,7 +303,7 @@ onViewShown(id => {
 export function filterInbox(value) {
     const text = String(value || '').trim();
     if (group === 'saved') { queries.saved = text; saved.setSavedQuery(text); return; }
-    queries[group] = text.toLowerCase();
+    queries[group] = CH.CHAT_KEY.test(group) ? text : text.toLowerCase(); // a chat search goes to the server as typed
     renderInboxNav(true);
 }
 
@@ -411,6 +425,7 @@ export async function showInbox() {
     renderInboxNav(true);
     refreshTasks();
     refreshGoals();
+    CH.loadChatCounts(() => renderInboxNav(true));
     saved.loadSaved(); // everything's list (the Inbox is the all scope), read for the table and the count
     if (page) { if (isPhoneLayout()) $('inbox-view')?.setAttribute('data-phone-item', ''); return; } // a task or a message is open: the tab returns to it
     $('inbox-view')?.removeAttribute('data-phone-item');
@@ -419,11 +434,11 @@ export async function showInbox() {
 }
 
 /** The group the Inbox opens on the next time it is shown, with nothing drawn (the Saved button names it before it switches to the tab, so the last group is not on screen first). */
-export function rememberGroup(name) { if (GROUPS.some(g => g.key === name)) { group = name; browserLocal.set(GROUP_KEY, name); } }
+export function rememberGroup(name) { if (groupMeta(name)) { group = name; browserLocal.set(GROUP_KEY, name); } }
 
 /** A group wanted on screen from elsewhere (the Saved button of the top bar): its table opens. */
 export async function openInboxGroup(name) {
-    if (!GROUPS.some(g => g.key === name)) name = 'needs';
+    if (!groupMeta(name)) name = 'needs';
     $('inbox-local') && ($('inbox-local').hidden = false);
     page = null;
     $('inbox-page') && ($('inbox-page').hidden = true);
