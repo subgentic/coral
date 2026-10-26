@@ -36,7 +36,7 @@ func TestPeerUIDRealLoopback(t *testing.T) {
 
 		clientAP := netip.MustParseAddrPort(sc.RemoteAddr().String())
 		serverAP := netip.MustParseAddrPort(sc.LocalAddr().String())
-		uid, err := PeerUID(clientAP, serverAP)
+		uid, err := peerUID(clientAP, serverAP)
 		require.NoError(t, err, network)
 		assert.Equal(t, os.Geteuid(), uid, network)
 	}

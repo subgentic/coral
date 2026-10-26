@@ -70,10 +70,10 @@ const (
 	stateListen   = 0x0A
 )
 
-// PeerUID returns the uid owning the client socket of the loopback connection
+// peerUID returns the uid owning the client socket of the loopback connection
 // client -> server, from the kernel's socket tables. It re-reads once if the row
 // is missing.
-func PeerUID(client, server netip.AddrPort) (int, error) {
+func peerUID(client, server netip.AddrPort) (int, error) {
 	for attempt := 0; attempt < 2; attempt++ {
 		uid, err := lookup(client, server)
 		if !errors.Is(err, ErrNotFound) {

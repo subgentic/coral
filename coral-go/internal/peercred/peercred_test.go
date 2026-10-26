@@ -102,7 +102,7 @@ func TestPeerUIDIsTheClientSocketsOwner(t *testing.T) {
 		row{server, client, established, coralUID}, // Coral's side
 		row{client, server, established, otherUID}, // the caller's side
 	)
-	uid, err := PeerUID(client, server)
+	uid, err := peerUID(client, server)
 	require.NoError(t, err)
 	assert.Equal(t, otherUID, uid)
 }
@@ -112,7 +112,7 @@ func TestPeerUIDIPv6AndMapped(t *testing.T) {
 		dir := useTables(t)
 		writeTable(t, dir, "tcp", row{netip.MustParseAddrPort("127.0.0.1:1"), netip.MustParseAddrPort("127.0.0.1:2"), established, 7})
 		writeTable(t, dir, "tcp6", row{server6, client6, established, coralUID}, row{client6, server6, established, otherUID})
-		uid, err := PeerUID(client6, server6)
+		uid, err := peerUID(client6, server6)
 		require.NoError(t, err)
 		assert.Equal(t, otherUID, uid)
 	})
@@ -120,7 +120,7 @@ func TestPeerUIDIPv6AndMapped(t *testing.T) {
 		dir := useTables(t)
 		writeTable(t, dir, "tcp", row{client, server, established, otherUID}) // the client's own IPv4 socket
 		writeTable(t, dir, "tcp6", row{mappedSv, mappedCl, established, coralUID})
-		uid, err := PeerUID(mappedCl, mappedSv)
+		uid, err := peerUID(mappedCl, mappedSv)
 		require.NoError(t, err)
 		assert.Equal(t, otherUID, uid)
 	})
@@ -128,7 +128,7 @@ func TestPeerUIDIPv6AndMapped(t *testing.T) {
 		dir := useTables(t)
 		writeTable(t, dir, "tcp", row{server, client, established, coralUID})
 		writeTable(t, dir, "tcp6", row{mappedCl, mappedSv, established, otherUID})
-		uid, err := PeerUID(client, server)
+		uid, err := peerUID(client, server)
 		require.NoError(t, err)
 		assert.Equal(t, otherUID, uid)
 	})
@@ -139,32 +139,32 @@ func TestPeerUIDFailsClosed(t *testing.T) {
 	t.Run("no row", func(t *testing.T) {
 		dir := useTables(t)
 		writeTable(t, dir, "tcp", row{server, client, established, coralUID})
-		_, err := PeerUID(client, server)
+		_, err := peerUID(client, server)
 		assert.True(t, errors.Is(err, ErrNotFound), "%v", err)
 	})
 	t.Run("only a TIME_WAIT or closed row (they show uid 0)", func(t *testing.T) {
 		dir := useTables(t)
 		writeTable(t, dir, "tcp", row{client, server, stateTimeWait, 0}, row{client, server, stateClose, 0})
-		_, err := PeerUID(client, server)
+		_, err := peerUID(client, server)
 		assert.True(t, errors.Is(err, ErrNotFound), "%v", err)
 	})
 	t.Run("no tables at all", func(t *testing.T) {
 		useTables(t)
-		_, err := PeerUID(client, server)
+		_, err := peerUID(client, server)
 		assert.True(t, errors.Is(err, ErrNotFound), "%v", err)
 	})
 	t.Run("a bad uid", func(t *testing.T) {
 		dir := useTables(t)
 		table := header + fmt.Sprintf("   0: %s %s 01 00000000:00000000 00:00000000 00000000  x1x        0 1 1\n", kernelAddr(client), kernelAddr(server))
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "tcp"), []byte(table), 0o644))
-		_, err := PeerUID(client, server)
+		_, err := peerUID(client, server)
 		assert.Error(t, err)
 		assert.False(t, errors.Is(err, ErrNotFound))
 	})
 	t.Run("another port is another connection", func(t *testing.T) {
 		dir := useTables(t)
 		writeTable(t, dir, "tcp", row{netip.MustParseAddrPort("127.0.0.1:51235"), server, established, coralUID})
-		_, err := PeerUID(client, server)
+		_, err := peerUID(client, server)
 		assert.True(t, errors.Is(err, ErrNotFound), "%v", err)
 	})
 }
