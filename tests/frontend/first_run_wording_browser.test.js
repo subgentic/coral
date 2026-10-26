@@ -48,6 +48,7 @@ const HISTORY = `(() => {
 
         // (c) History
         await ev(`window.switchNavTab('history'); true`);
+        await ev(`import((window.__coralStatic||'/static/')+'history_filters.js').then(m => m.startHistoryList()).then(() => true)`); // the Chats pane is the hub's: a local Coral starts its list when something wants an entry (as the keyboard census does, #8261)
         await waitFor(`document.querySelectorAll('#history-sessions-list [data-on-click="history-open"]').length === 3`, 'the chats', 10000);
         const labels = await ev(`[...document.querySelectorAll('#history-sessions-list .session-label')].map(e => e.textContent)`);
         check('a chat with no title and no first message of its own is the agent\'s name alone (#7756), not its first reply', labels[0] === 'my-first-project', JSON.stringify(labels));
