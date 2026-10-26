@@ -355,11 +355,27 @@ function _setTaskFilters(next) {
 function _syncTaskBar(show, counts) {
     const host = document.getElementById('board-task-bar');
     if (!host) return;
-    if (!show) { if (_taskBar && _taskBar.node.parentElement === host) _taskBar.node.remove(); return; }
+    // With no tasks the bar has nothing to search, but + Task stays reachable: the button alone, at the right (a live agent or a team always gets the section)
+    const solo = host.querySelector('.board-task-solo');
+    if (!show) {
+        if (_taskBar && _taskBar.node.parentElement === host) _taskBar.node.remove();
+        if (!solo) { const d = document.createElement('div'); d.className = 'board-task-solo'; d.innerHTML = '<button type="button" class="btn btn-primary btn-small btn-create-task" data-on-click="task-create-show" title="Create Task" aria-label="Create task">+ Task</button>'; host.append(d); }
+        return;
+    }
+    if (solo) solo.remove();
     if (!_taskBar) {
         const board = _taskFiltersBoard;
-        _taskBar = buildTaskBar(_setTaskFilters, { onPanel: open => savePanelOpen('tasks', board, open) });
+        _taskBar = buildTaskBar(_setTaskFilters, { onPanel: open => savePanelOpen('tasks', board, open) }, { dock: true });
         _taskBar.setOpen(loadPanelOpen('tasks', board)); // the panel is left as it was for this board (#5293)
+        // The one top row (#7924): the search, the Filters icon, then + Task; Hide done is a control of the Filters panel, not a title row
+        const tools = document.createElement('div');
+        tools.innerHTML = '<button type="button" class="btn btn-primary btn-small btn-create-task" data-on-click="task-create-show" title="Create Task" aria-label="Create task">+ Task</button>';
+        _taskBar.setHeader(null, [tools.firstElementChild]);
+        const hide = document.createElement('div');
+        hide.innerHTML = '<label class="board-task-hide-toggle"><input type="checkbox" data-on-change="task-hide-done"> <span class="board-task-hide-text">Hide done</span></label>';
+        _hideDoneEl = hide.firstElementChild;
+        _taskBar.setExtras([_hideDoneEl]);
+        _syncHideDone(_hideDoneLast.count, _hideDoneLast.hidden);
     }
     if (_taskBar.node.parentElement !== host) host.append(_taskBar.node);
     _taskBar.names([...new Set((state.currentBoardTasks || []).map(t => t.assigned_to).filter(n => typeof n === 'string' && n))].sort().slice(0, 50));
@@ -412,6 +428,7 @@ let _taskSortAsc = false; // default newest first
 
 // default newest first
 let _hideCompleted = browserLocal.get('coral-hide-completed') === 'true';
+let _hideDoneEl = null; // the Filters panel's Hide done (a label with its checkbox), once the bar is built (#7924)
 
 export function _toggleTaskSort(field) {
     // A column's clicks: the first chooses it, the second turns it round, the third gives the default order back (open work first, #4737).
@@ -481,29 +498,26 @@ function _renderEmptyTaskList(container, section) {
     }
     // A live agent always gets the section, so "+ Task" is reachable
     if (section) section.style.display = '';
-    const headerLabel = section ? section.querySelector('.board-tasks-header > span:first-child') : null;
-    if (headerLabel && headerLabel.textContent !== 'Tasks') headerLabel.textContent = 'Tasks';
-    const toggle = document.getElementById('board-task-hide-toggle-container');
-    if (toggle && toggle.firstChild) toggle.innerHTML = '';
+    _syncHideDone(0, true);
     morphHtml(container, _boardList.busy
         ? `<div class="board-task-empty board-task-busy" role="status">${escapeHtml(_boardList.busy)}</div>`
         : '<div class="board-task-empty">No tasks yet</div>');
     return;
 }
 
-/** The hide-done toggle and the section label in the header. */
+/** Hide done in the Filters panel: offered when there are done tasks and no search runs (the status filter says what to show then); its count, its checkbox and the icon's badge follow. */
+let _hideDoneLast = { count: 0, hidden: true }; // the last state asked for: a bar built after the list was drawn takes it
+function _syncHideDone(completedCount, hidden) {
+    _hideDoneLast = { count: completedCount, hidden };
+    if (!_hideDoneEl) return;
+    _hideDoneEl.hidden = hidden;
+    const text = `Hide done (${completedCount})`, t = _hideDoneEl.querySelector('.board-task-hide-text'), box = _hideDoneEl.querySelector('input');
+    if (t && t.textContent !== text) t.textContent = text;
+    if (box && box.checked !== _hideCompleted) box.checked = _hideCompleted;
+    if (_taskBar) _taskBar.setExtraOn(!hidden && _hideCompleted ? 1 : 0);
+}
 function _renderTaskListChrome(section, completedCount, querying = false) {
-    // Render hide-done toggle in the section header (not during a search: the status filter says what to show)
-    const toggleContainer = document.getElementById('board-task-hide-toggle-container');
-    if (toggleContainer) {
-        morphHtml(toggleContainer, completedCount > 0 && !querying
-            ? `<label class="board-task-hide-toggle"><input type="checkbox" ${_hideCompleted ? 'checked' : ''} data-on-change="task-hide-done"> Hide done (${completedCount})</label>`
-            : '');
-    }
-
-    // Update section header to "Tasks" instead of "Board Tasks"
-    const headerLabel = section ? section.querySelector('.board-tasks-header > span:first-child') : null;
-    if (headerLabel && headerLabel.textContent !== 'Tasks') headerLabel.textContent = 'Tasks';
+    _syncHideDone(completedCount, !(completedCount > 0 && !querying));
 }
 
 /** A row's status icon and label. */
@@ -567,7 +581,7 @@ function _taskTable(tasks, footer) {
         t._source === 'board' && t.goal_id ? `Goal: ${goalTitle(_goalBoard, t.goal_id)}` : ''].filter(Boolean).join(' · ');
     dockTaskTableState.sort = _taskSortExplicit ? { key: _taskSortField, dir: _taskSortAsc ? 'asc' : 'desc' } : null;
     const table = DT.dataTable({ label: 'Agent tasks', rows: tasks, rowKey: key, rowName: t => t.title || t.description || '',
-        footer, state: dockTaskTableState, onSort: field => _toggleTaskSort(field), bare: true, defaultSortLabel: _queryActive() && _taskFilters.sort !== 'open' ? taskSortLabel[_taskFilters.sort] : 'Open first, newest first',
+        footer, state: dockTaskTableState, onSort: field => _toggleTaskSort(field), bare: true, sortBar: false, defaultSortLabel: _queryActive() && _taskFilters.sort !== 'open' ? taskSortLabel[_taskFilters.sort] : 'Open first, newest first',
         columns: [
             { key: 'status', label: 'Status', line: 2, cell: t => {
                 const st = _taskStatus(t), cls = st.className === 'completed' ? 'goal-state-task-done' : st.className === 'in-progress' ? 'goal-state-task-active' : st.className === 'blocked' ? 'goal-state-task-blocked' : '';

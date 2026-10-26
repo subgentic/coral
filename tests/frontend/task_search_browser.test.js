@@ -34,7 +34,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         const bar = document.getElementById('board-task-bar');
         return { shown: !!bar.firstChild && bar.getClientRects().length > 0, count: (bar.querySelector('.list-bar-count') || {}).textContent || '', chips: [...bar.querySelectorAll('.list-bar-chip-text')].map(e => e.textContent),
             titles: rows.map(r => (r.querySelector('.board-task-desc') || {}).textContent.trim()), statuses: rows.map(r => (r.querySelector('.board-task-status-wrap') || {}).textContent), ids: rows.map(r => Number((r.querySelector('.board-task-id') || {}).textContent.replace('#', ''))),
-            more: (l.querySelector('.dt-foot') || {}).textContent || null, empty: (l.querySelector('.board-task-empty') || {}).textContent || null, hide: !!document.querySelector('#board-task-hide-toggle-container input') }; })()`);
+            more: (l.querySelector('.dt-foot') || {}).textContent || null, empty: (l.querySelector('.board-task-empty') || {}).textContent || null, hide: (() => { const e = document.querySelector('.board-task-hide-toggle'); return !!e && !e.hidden; })() }; })()`);
     const load = () => ev(`(async () => { ${MODS} await tasks.loadBoardTasks(${JSON.stringify(BOARD)}); return true; })()`);
     const type = async (text) => { await ev(`document.getElementById('tk-search').focus(); true`); await Input.insertText({ text }); };
     const pick = (id, value) => ev(`(() => { const s = document.getElementById(${JSON.stringify(id)}); s.value = ${JSON.stringify(value)}; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
@@ -67,6 +67,34 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await load();
         let s = await snap();
         check('the toolbar omits the count line', await ev(`document.querySelector('#board-task-bar .list-bar-count').hidden && document.querySelector('#board-task-bar .list-bar-count').getClientRects().length === 0`));
+        // ── The one top row (#7924): the search, the Filters icon and + Task on one line; Hide done and Sort only inside Filters ──
+        const top = await ev(`(() => { const bar = document.getElementById('board-task-bar'), mid = e => { const r = e.getBoundingClientRect(); return Math.round(r.top + r.height / 2); }, vis = e => !!e && e.getClientRects().length > 0;
+            const search = bar.querySelector('.list-bar-search'), tog = document.getElementById('tk-toggle'), add = bar.querySelector('.btn-create-task'), menu = document.getElementById('tk-menu');
+            return { title: !!document.querySelector('.board-tasks-header'), has: [vis(search), vis(tog), vis(add)], mids: [mid(search), mid(tog), mid(add)], order: [search.getBoundingClientRect().left < tog.getBoundingClientRect().left, tog.getBoundingClientRect().left < add.getBoundingClientRect().left],
+                menuHidden: menu.hidden, hideInPanel: !!menu.querySelector('.board-task-hide-toggle'), hideOutside: [...document.querySelectorAll('.board-task-hide-toggle')].some(e => !menu.contains(e)), sortbar: [...document.querySelectorAll('#board-task-list .dt-sortbar')].some(e => !e.hidden && e.getClientRects().length),
+                sortInPanel: !!menu.querySelector('#tk-sort'), badge: !document.querySelector('#tk-toggle .display-badge').hidden }; })()`);
+        check('no title row, no count: the search, the Filters icon and + Task are on one line, in that order', !top.title && top.has.every(Boolean) && Math.max(...top.mids) - Math.min(...top.mids) <= 6 && top.order.every(Boolean), JSON.stringify(top));
+        check('the Filters are closed to start with, and hold Hide done and the one sort; the list has no Sort by row', top.menuHidden && top.hideInPanel && !top.hideOutside && top.sortInPanel && !top.sortbar, JSON.stringify(top));
+        check('with nothing on, the Filters icon carries no dot', !top.badge, JSON.stringify(top));
+        await ev(`document.querySelector('.board-task-hide-toggle input').click(); true`);
+        await settle(`!document.querySelector('#tk-toggle .display-badge').hidden`, 'the badge');
+        check('Hide done on is a dot on the Filters icon, and the icon says so', await ev(`document.getElementById('tk-toggle').getAttribute('aria-label') === 'Filters and sort, 1 on' && document.getElementById('tk-toggle').classList.contains('active')`), await ev(`document.getElementById('tk-toggle').getAttribute('aria-label')`));
+        await ev(`document.querySelector('.board-task-hide-toggle input').click(); true`);
+        await settle(`document.querySelector('#tk-toggle .display-badge').hidden`, 'the badge gone');
+        if (process.env.CORAL_SCREENSHOT_DIR) { // the review's shots: the dock at 680 and 420, the Filters shut and open, both themes
+            const fs = require('node:fs'), dir = process.env.CORAL_SCREENSHOT_DIR; fs.mkdirSync(dir, { recursive: true });
+            for (const w of [680, 420]) for (const theme of ['dark', 'light']) {
+                await ev(`document.getElementById('agentic-state').style.width = '${w}px'; if ('${theme}' === 'light') document.documentElement.dataset.theme = 'light'; else delete document.documentElement.dataset.theme; true`);
+                await ev(`new Promise(r => setTimeout(r, 700))`); // sleep-ok: the theme's colour transition
+                for (const open of [false, true]) {
+                    await ev(`(() => { const t = document.getElementById('tk-toggle'); if (document.getElementById('tk-menu').hidden === ${open}) t.click(); return true; })()`);
+                    await ev(`new Promise(r => setTimeout(r, 250))`); // sleep-ok: the panel opens
+                    fs.writeFileSync(`${dir}/dock-tasks-${w}-${theme}-${open ? 'filters' : 'closed'}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));
+                }
+                await ev(`if (!document.getElementById('tk-menu').hidden) document.getElementById('tk-toggle').click(); true`);
+            }
+            await ev(`delete document.documentElement.dataset.theme; document.getElementById('agentic-state').style.width = '680px'; true`);
+        }
         check('the bar tracks the board count for search announcements (66 tasks)', s.shown && s.count === '66 tasks' && s.chips.length === 0, JSON.stringify([s.shown, s.count, s.chips]));
         check('the default list is unchanged: open first, then the newest 50 done, Hide done offered', s.statuses.slice(0, 6).every(x => x !== 'Finished') && s.statuses.filter(x => x === 'Finished').length === 50 && s.hide && /Showing 56 of 66/.test(s.more || ''), JSON.stringify([s.statuses.length, s.hide, s.more]));
 
@@ -130,7 +158,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         s = await snap();
         check('Oldest: the first task made is first, 50 of them, Load more for the rest', s.ids.length === 50 && s.ids[0] === Math.min(...s.ids) && /Load more/.test(s.more || ''), JSON.stringify([s.ids.slice(0, 3), s.more]));
         await pick('tk-sort', 'open');
-        await settle(`document.querySelector('#board-task-bar .list-bar-count').textContent === '66 tasks' && !!document.querySelector('#board-task-hide-toggle-container input')`, 'open first again');
+        await settle(`document.querySelector('#board-task-bar .list-bar-count').textContent === '66 tasks' && (() => { const e = document.querySelector('.board-task-hide-toggle'); return !!e && !e.hidden; })()`, 'open first again');
 
         // ── Kept for the board ──
         await pick('tk-status', 'blocked');
