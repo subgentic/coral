@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"time"
 )
 
 // TokenUsage represents a token usage snapshot for a session.
@@ -163,7 +164,7 @@ func (s *TokenUsageStore) ListUsage(ctx context.Context, f UsageFilter) ([]Token
 	}
 	if f.Since != "" {
 		query += " AND t.recorded_at >= ?"
-		args = append(args, f.Since)
+		args = append(args, wholeSecondUsageCutoff(f.Since))
 	}
 
 	query += ` GROUP BY t.session_id ORDER BY MAX(t.recorded_at) DESC, t.session_id`
@@ -261,5 +262,17 @@ func sinceArgs(since string) []interface{} {
 	if since == "" {
 		return nil
 	}
-	return []interface{}{since}
+	return []interface{}{wholeSecondUsageCutoff(since)}
+}
+
+// wholeSecondUsageCutoff keeps a whole UTC second as a timestamp prefix, without Z or
+// an offset: every stored fractional spelling of that instant then compares at the
+// same inclusive lower (or exclusive upper) boundary. Other bounds retain their layout.
+func wholeSecondUsageCutoff(at string) string {
+	t, err := time.Parse(time.RFC3339Nano, at)
+	_, offset := t.Zone()
+	if err == nil && offset == 0 && t.Nanosecond() == 0 {
+		return t.UTC().Format("2006-01-02T15:04:05")
+	}
+	return at
 }

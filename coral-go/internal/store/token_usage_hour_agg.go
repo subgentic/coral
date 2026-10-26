@@ -165,7 +165,7 @@ func usageRelation(ctx context.Context, db sqlGetter, since string) (frag string
 		if since == "" {
 			return `(` + raw + ` UNION ALL ` + hourly + `)`, nil
 		}
-		return `(` + raw + ` WHERE recorded_at >= ? UNION ALL ` + hourly + ` WHERE recorded_at >= ?)`, []any{since, since}
+		return `(` + raw + ` WHERE recorded_at >= ? UNION ALL ` + hourly + ` WHERE recorded_at >= ?)`, []any{wholeSecondUsageCutoff(since), wholeSecondUsageCutoff(since)}
 	}
 	var last sql.NullString
 	if !tokenUsageHourAggOn || (since != "" && !canonicalSince.MatchString(since)) {
@@ -193,7 +193,7 @@ func usageRelation(ctx context.Context, db sqlGetter, since string) (frag string
 	args = append(args, from, last.String)
 	if since != "" { // the raw rows of the hours before the aggregate's, from since on
 		parts = append(parts, raw+` WHERE recorded_at >= ? AND recorded_at < ?`)
-		args = append(args, since, from)
+		args = append(args, wholeSecondUsageCutoff(since), from)
 	}
 	// the raw rows of the dirty and odd hours inside the aggregate's range
 	parts = append(parts, `SELECT `+usageCols+`, 1 AS n_rows, r.recorded_at, r.recorded_at AS min_at, r.recorded_at AS max_at
@@ -204,7 +204,7 @@ func usageRelation(ctx context.Context, db sqlGetter, since string) (frag string
 	args = append(args, last.String+"~")
 	if since != "" {
 		parts = append(parts, hourly+` WHERE recorded_at >= ?`)
-		args = append(args, since)
+		args = append(args, wholeSecondUsageCutoff(since))
 	} else {
 		parts = append(parts, hourly)
 	}

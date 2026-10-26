@@ -61,7 +61,7 @@ func (s *TokenUsageStore) GetUsageTurns(ctx context.Context, q UsageTurnsQuery) 
 		where, args = append(where, `session_id = ?`), append(args, q.Session)
 	}
 	if q.Since != "" {
-		where, args = append(where, `recorded_at >= ?`), append(args, q.Since)
+		where, args = append(where, `recorded_at >= ?`), append(args, wholeSecondUsageCutoff(q.Since))
 	}
 	if q.Until != "" {
 		where, args = append(where, `recorded_at < ?`), append(args, q.Until)
