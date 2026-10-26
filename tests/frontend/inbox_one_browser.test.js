@@ -27,7 +27,8 @@ const STUB = `(() => { const real = window.fetch; const J = (b, s) => Promise.re
     window.__saved = ${JSON.stringify(SAVED)}; window.__tasks = ${JSON.stringify(TASKS)}; window.__savedQs = [];
     window.fetch = (u, o) => { const url = new URL(String(u && u.url || u), location.origin), p = url.pathname, m = (o && o.method) || 'GET';
         if (p === '/api/board/tasks' && m === 'GET') return J({ tasks: window.__tasks });
-        let t = /^\\/api\\/board\\/([^/]+)\\/tasks\\/(\\d+)$/.exec(p); if (t && m === 'GET') return J({ body: 'Please check the plan and say what is missing.', created_by: 'Orchestrator', status: 'pending' });
+        const teamTasks = /^\\/api\\/board\\/([^/]+)\\/tasks$/.exec(p); if (teamTasks && m === 'GET') return J({ tasks: window.__tasks.filter(t => t.board_id === decodeURIComponent(teamTasks[1])), total_open: window.__tasks.filter(t => t.board_id === decodeURIComponent(teamTasks[1])).length });
+        let t = /^\\/api\\/board\\/([^/]+)\\/tasks\\/(\\d+)$/.exec(p); if (t && m === 'GET') return J({ ...window.__tasks.find(x => x.id === Number(t[2])), assigned_to: 'Operator', body: 'Please check the plan and say what is missing.' });
         if (/^\\/api\\/board\\/team-a\\/messages\\/all$/.test(p) && m === 'GET') return J([{ id: 1, subscriber_id: 'Operator', content: '@Orchestrator: Is the plan final?', created_at: new Date(Date.now() - 1800000).toISOString(), task_id: 11 }, { id: 2, subscriber_id: 'Orchestrator', content: 'Yes: **shipping Tuesday**, after the rollback step.', created_at: new Date(Date.now() - 900000).toISOString(), task_id: 11 }]);
         t = /^\\/api\\/saved\\/(\\d+)\\/message$/.exec(p); if (t) return J({ text: 'The whole message, in full: the plan needs a rollback step before Tuesday.', partial: false });
         t = /^\\/api\\/saved\\/(\\d+)$/.exec(p);
@@ -89,12 +90,12 @@ const AGENTS = (waiting) => waiting ? [
                 await ev(`(() => { const s = document.querySelector('#group-table-view .view-list-select'); s.value = 'tasks'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
                 await waitFor(`!!document.querySelector('#group-table-view .dt-primary')`, at + 'the select opens Tasks', 8000);
                 await ev(`document.querySelector('#group-table-view .dt-primary').click(); true`);
-                await waitFor(`document.getElementById('inbox-page').getClientRects().length > 0 && !!document.querySelector('#inbox-page .ibx-reply-input')`, at + 'the task as a screen of its own', 10000);
-                assert.equal(await ev(`document.querySelector('#inbox-page .inbox-phone-back').textContent.trim()`), '\u2190 Tasks', at + 'with the way back, to the folder it came from');
+                await waitFor(`document.getElementById('team-panel-item').getClientRects().length > 0 && !!document.querySelector('#team-panel-item .ibx-reply-input')`, at + 'the task as a screen of its own', 10000);
+                assert.equal(await ev(`document.querySelector('#team-panel-item .goals-back').textContent.trim()`), '\u2190 Tasks', at + 'with the way back, to the folder it came from');
                 assert.equal(await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1`), true, at + 'no sideways scroll on a task');
                 await shot(`inbox-one-task-${w}`);
-                await ev(`document.querySelector('#inbox-page .inbox-phone-back').click(); true`);
-                await waitFor(`document.getElementById('group-table-view').getClientRects().length > 0 && document.getElementById('inbox-page').hidden`, at + 'back is the Tasks table', 4000);
+                await ev(`document.querySelector('#team-panel-item .goals-back').click(); true`);
+                await waitFor(`document.getElementById('team-panel-tasks').getClientRects().length > 0 && document.getElementById('team-panel-item').hidden`, at + 'back is the Tasks table', 4000);
                 continue;
             }
 
@@ -119,7 +120,7 @@ const AGENTS = (waiting) => waiting ? [
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2`, at + 'cleared', 5000);
 
             // Tasks
-            await ev(`document.querySelector('${pane} .view-list-item[data-key="tasks"]').click(); true`);
+            await ev(`window.switchNavTab('hub-inbox'); document.querySelector('${pane} .view-list-item[data-key="tasks"]').click(); true`);
             await waitFor(`document.querySelector('#group-table-title').textContent === 'Tasks'`, at + 'Tasks opens its table', 8000);
             assert.equal(await ev(`document.querySelector('${pane} .sidebar-search-input').getAttribute('aria-label')`), 'Search tasks', at + 'the search is named for Tasks now');
             // the one task row (#7737): a table on a desktop (State, Task, Priority, Team, Updated), the two-line column on a phone; one word set for the state (the Inbox's "Open" is Queued)
@@ -129,17 +130,17 @@ const AGENTS = (waiting) => waiting ? [
                 wide ? ['Review the release plan|High|Queued|team-a', 'Write the release notes|Medium|In progress|team-a', 'Check the installer|Low|Blocked|team-b'] : ['Review the release plan|High|Queued|', 'Write the release notes||In progress|', 'Check the installer||Blocked|'], at + 'rows by priority, in words');
             assert.deepEqual(await ev(`(${ON_SCALE})(document.getElementById('group-table-view'), ${SCALE})`), [], at + 'every text of the tasks table is on the scale');
             await ev(`document.querySelector('#group-table-view .dt-primary').click(); true`);
-            await waitFor(`!!document.querySelector('#inbox-page .ibx-reply-input') && document.getElementById('inbox-page').checkVisibility()`, at + "the task's page", 10000);
-            assert.equal(await ev(`document.querySelector('#inbox-page > .group-back').textContent`), '← Tasks', at + 'back names the group');
-            assert.deepEqual(await ev(`(() => { const t = getComputedStyle(document.querySelector('#inbox-page .wf-item-title')); return [document.querySelector('#inbox-page .wf-item-title').textContent, t.fontSize, t.fontWeight]; })()`), ['Review the release plan', '17px', '700'], at + 'the title is 17/700');
-            assert.match(await ev(`document.querySelector('#inbox-page .item-meta').textContent`), /^From Orchestrator · team-a · High priority · Queued/, at + 'one facts line');
-            assert.match(await ev(`document.querySelector('#inbox-page .ibx-panel').textContent`), /Please check the plan/, at + "the component shows the task's own text");
-            assert.equal(await ev(`getComputedStyle(document.querySelector('#inbox-page .ibx-task-head')).display`), 'none', at + "and not a second heading");
-            assert.equal(await ev(`document.querySelectorAll('#inbox-page .ibx-task').length`), 1, at + 'one task is mounted');
-            assert.equal(await ev(`document.querySelector('${pane} .view-list-item[aria-current="true"]').dataset.key`), 'tasks', at + 'the open task\'s folder is the current one');
+            await waitFor(`!!document.querySelector('#team-panel-item .ibx-reply-input') && document.getElementById('team-panel-item').checkVisibility()`, at + "the team's task page", 10000);
+            assert.equal(await ev(`location.pathname`), '/team/team-a/tasks/11', at + 'one task URL');
+            assert.equal(await ev(`document.querySelector('#team-panel-item .goals-back').textContent.trim()`), '← Tasks', at + 'back names the team Tasks tab');
+            assert.equal(await ev(`document.querySelector('#team-task-title').textContent`), '#11 Review the release plan', at + 'one title');
+            assert.match(await ev(`document.querySelector('#team-panel-item .team-task-body').textContent`), /Please check the plan/, at + 'the task description');
+            assert.equal(await ev(`[...document.querySelectorAll('#team-panel-item .ibx-task-title')].filter(e => e.getClientRects().length).length`), 0, at + 'no second title');
+            assert.equal(await ev(`document.querySelectorAll('#team-panel-item .ibx-reply-input').length`), 1, at + 'one reply box');
             await shot(`inbox-one-task-${w}`);
-            await ev(`document.querySelector('#inbox-page > .group-back').click(); true`);
-            await waitFor(`document.getElementById('group-table-view').checkVisibility() && document.querySelector('#group-table-title').textContent === 'Tasks'`, at + 'back is the table', 8000);
+            await ev(`document.querySelector('#team-panel-item .goals-back').click(); true`);
+            await waitFor(`document.getElementById('team-panel-tasks').checkVisibility() && location.pathname === '/team/team-a/tasks'`, at + 'back is the team Tasks table', 8000);
+            await ev(`window.switchNavTab('hub-inbox'); true`);
 
             // Saved
             await ev(`document.querySelector('${pane} .view-list-item[data-key="saved"]').click(); true`);
@@ -214,13 +215,13 @@ const AGENTS = (waiting) => waiting ? [
             if (w === 1280) for (const theme of ['dark', 'light']) for (const zoom of ['', '32px']) {
                 const how = at + `${theme}${zoom ? ', 200% text' : ''}: `;
                 await setTheme(ev, theme); await ev(`document.documentElement.style.fontSize = ${JSON.stringify(zoom)}; true`);
-                await ev(`document.querySelector('${pane} .view-list-item[data-key="tasks"]').click(); true`);
+                await ev(`window.switchNavTab('hub-inbox'); document.querySelector('${pane} .view-list-item[data-key="tasks"]').click(); true`);
                 await waitFor(`document.querySelector('#group-table-title').textContent === 'Tasks'`, how + 'the tasks table', 8000);
                 const au = await auditRegion(ev, ['.sidebar', '#group-table-view']);
                 assert.deepEqual(au.fails.map(f => `${f.sel} ${f.what} ${f.ratio}`), [], how + 'the sidebar and the table: contrast');
                 await ev(`document.querySelector('#group-table-view .dt-primary').click(); true`);
-                await waitFor(`!!document.querySelector('#inbox-page .ibx-reply-input')`, how + 'a task', 8000);
-                const au2 = await auditRegion(ev, ['#inbox-page']);
+                await waitFor(`!!document.querySelector('#team-panel-item .ibx-reply-input')`, how + 'a task', 8000);
+                const au2 = await auditRegion(ev, ['#team-panel-item']);
                 assert.deepEqual(au2.fails.map(f => `${f.sel} ${f.what} ${f.ratio}`), [], how + "a task's page: contrast");
                 assert.equal(await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1`), true, how + 'no sideways scroll');
             }

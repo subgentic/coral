@@ -47,15 +47,16 @@ const BASE = require('./test_base').BASE;
         const links = [];
         for (const title of ['Pick the icon', 'Sign the installer']) { // the one with a goal last: its page stays open for the look below
             await ev(`[...document.querySelectorAll('#group-table-view .dt-primary')].find(b => b.textContent === ${JSON.stringify(title)}).click(); true`);
-            await waitFor(`!!document.querySelector('#inbox-page .ibx-reply-label')`, `${title} opened`, 8000);
-            links.push(await ev(`({ t: document.querySelector('#inbox-page .ibx-task-title').textContent, g: (document.querySelector('#inbox-page .ibx-goal') || {}).textContent || '' })`));
+            await waitFor(`!!document.querySelector('#team-panel-item .ibx-reply-label')`, `${title} opened`, 8000);
+            links.push(await ev(`({ t: document.querySelector('#team-task-title').textContent.replace(/^#\\d+ /, ''), g: ([...document.querySelectorAll('#team-panel-item .goals-facts dt')].find(x => x.textContent === 'Goal')?.nextElementSibling.querySelector('button') || {}).textContent || '' })`));
             if (title === 'Sign the installer') break;
-            await ev(`document.querySelector('#inbox-page .group-back:not(.inbox-phone-back)').click(); true`);
+            await ev(`window.switchNavTab('hub-inbox'); true`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2`, 'back at the table', 8000);
         }
-        assert.deepEqual(links.sort((a, b) => a.t.localeCompare(b.t)), [{ t: 'Pick the icon', g: '' }, { t: 'Sign the installer', g: 'Goal: Ship the new installer' }]);
-        const quiet = await ev(`(() => { const g = document.querySelector('#inbox-page .ibx-goal'), o = g.parentElement.querySelector('.ibx-open:not(.ibx-goal)'), gs = getComputedStyle(g), gr = g.getBoundingClientRect(), or = o.getBoundingClientRect(); return { border: gs.borderTopWidth, underline: gs.textDecorationLine.includes('underline'), bg: gs.backgroundColor, gap: Math.round(gr.left - or.right), sameRow: Math.abs((gr.top + gr.bottom) / 2 - (or.top + or.bottom) / 2) < 14 }; })()`);
-        assert.ok(quiet.border === '0px' && quiet.underline && quiet.bg === 'rgba(0, 0, 0, 0)' && quiet.gap >= 0 && quiet.gap <= 24 && quiet.sameRow, 'the task\'s Goal is the same quiet underlined link, beside Open the task: ' + JSON.stringify(quiet));
+        assert.deepEqual(links.sort((a, b) => a.t.localeCompare(b.t)), [{ t: 'Pick the icon', g: '' }, { t: 'Sign the installer', g: 'Ship the new installer' }]);
+        assert.equal(await ev(`location.pathname`), `/team/${B}/tasks/${t1.json.id}`, 'Inbox opens the canonical team task page');
+        await ev(`[...document.querySelectorAll('#team-panel-item .goals-facts dt')].find(x => x.textContent === 'Goal').nextElementSibling.querySelector('button').click(); true`);
+        await waitFor(`document.querySelector('#team-panel-goals .goals-detail-title')?.textContent === 'Ship the new installer' && location.pathname.includes('/goals/')`, 'task Goal link opens the goal', 10000);
         await shot('inbox-task-goal');
         console.log('PASS the goal a waiting agent or task serves');
     } finally { await removeBoards(ev, [B]).catch(() => {}); await client.close(); }

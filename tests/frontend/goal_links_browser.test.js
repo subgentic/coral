@@ -54,8 +54,8 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await home();
         await inboxFolder('tasks', '#group-table-view .dt-table tbody tr .dt-primary');
         await ev(`document.querySelector('#group-table-view .dt-table tbody tr .dt-primary').click(); true`);
-        await waitFor(`!!document.querySelector('#inbox-page .ibx-goal')`, 'the task page with its Goal button', 15000);
-        await ev(`document.querySelector('#inbox-page .ibx-goal').click(); true`);
+        await waitFor(`!![...document.querySelectorAll('#team-panel-item .goals-facts dt')].find(x=>x.textContent==='Goal')?.nextElementSibling.querySelector('button')`, 'the task page with its Goal button', 15000);
+        await ev(`[...document.querySelectorAll('#team-panel-item .goals-facts dt')].find(x=>x.textContent==='Goal')?.nextElementSibling.querySelector('button').click(); true`);
         await landed('Inbox task page');
         console.log('   ✓');
 

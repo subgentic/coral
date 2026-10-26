@@ -3,9 +3,9 @@ const INBOX_WORLD = `(() => {
     const real = window.fetch; window.__reqs = []; window.__pwn = undefined;
     const ago = ms => new Date(Date.now() - ms).toISOString();
     const TASKS = [
-        { id: 1, board_id: 'team-a', board_label: 'team-a', title: 'Pick the release date', priority: 'high', status: 'pending', created_by: 'Orchestrator', created_at: ago(7200000), updated_at: ago(7200000), revision: 1 },
-        { id: 2, board_id: 'team-a', board_label: 'team-a', title: 'Check <img src=x onerror="window.__pwn=1"> the logo', priority: 'medium', status: 'in_progress', created_by: 'Designer', created_at: ago(86400000 * 3), updated_at: ago(86400000 * 3) },
-        { id: 3, board_id: 'team-b', board_label: 'team-b', title: 'Approve the budget', priority: 'low', status: 'review_pending', created_by: 'Lead', created_at: ago(60000), updated_at: ago(60000) },
+        { id: 1, board_id: 'team-a', board_label: 'team-a', assigned_to: 'Operator', title: 'Pick the release date', priority: 'high', status: 'pending', created_by: 'Orchestrator', created_at: ago(7200000), updated_at: ago(7200000), revision: 1 },
+        { id: 2, board_id: 'team-a', board_label: 'team-a', assigned_to: 'Operator', title: 'Check <img src=x onerror="window.__pwn=1"> the logo', priority: 'medium', status: 'in_progress', created_by: 'Designer', created_at: ago(86400000 * 3), updated_at: ago(86400000 * 3) },
+        { id: 3, board_id: 'team-b', board_label: 'team-b', assigned_to: 'Operator', title: 'Approve the budget', priority: 'low', status: 'review_pending', created_by: 'Lead', created_at: ago(60000), updated_at: ago(60000) },
     ];
     const BODY = { 1: 'Which day?\\n\\n- **Monday** the 4th\\n- Friday the 8th\\n\\nSee [the plan](https://example.com/plan) and [click](javascript:alert(1)).\\n\\n<script>window.__pwn=1</script>\\n\\n![t](https://evil.example/p.png)',
         2: 'Plain text.', 3: '' };

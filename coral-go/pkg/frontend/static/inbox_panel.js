@@ -82,6 +82,7 @@ const SAVED_WORDS = {
  * options.onCount(n): told how many tasks the list holds after each read (the host shows it on its tab).
  * options.region === false: the root is a plain div, not a region named "Tasks for you" (the host's own panel is named already).
  * options.poll(fn, ms) -> id: the host's poller for the single-item page's conversation (an interval id, cleared with clearInterval); options.threadPollMs: its period (default 10000). Without poll the conversation is read on open and after a reply.
+ * options.conversationOnly: the host already draws task facts/body; draw only its conversation and reply.
  * options.only ({ project, id }, optional, #7472): the host shows ONE task as a page of its own. The list holds that task alone, open, without its own heading button (the host's page has the title and
  *   the link back), and onCount is not called (the host's count is of the whole list). Without it everything is as it always was; a host that never passes it (Coral Hub's pinned version) is unchanged.
  * @param {HTMLElement} host @param {object} adapter @param {{ load?: boolean, region?: boolean, onCount?: (n: number) => void, only?: { project: string, id: (string|number) } }} [options]
@@ -181,9 +182,10 @@ export function mountInbox(host, adapter, options) {
             g.addEventListener('click', () => adapter.openGoal(task));
             metaRow.append(g);
         }
-        if (metaRow.childNodes.length) out.push(metaRow);
+        if (!options?.conversationOnly && metaRow.childNodes.length) out.push(metaRow);
         const text = full.body == null ? '' : String(full.body);
-        out.push(inset(text ? await renderBody(text, adapter) : el('p', 'ibx-empty', 'This task has no text.')));
+        if (!options?.conversationOnly) out.push(inset(text ? await renderBody(text, adapter) : el('p', 'ibx-empty', 'This task has no text.')));
+        else if (reviewNote) out.push(reviewNote);
         const thread = only && typeof adapter.listTaskMessages === 'function' ? threadSection(task, from) : null; // the conversation under the text, above the box (#7703)
         if (thread) out.push(thread.node);
         out.push(replyBox(task, from, reviewNote ? reviewNote.id : '', thread ? thread.refresh : null));
@@ -382,7 +384,7 @@ export function mountInbox(host, adapter, options) {
         return { root: wrap, button: auto ? null : button, region };
     }
 
-    function destroy() { gone = true; for (const t of root.querySelectorAll('textarea')) _boxes.delete(t); root.remove(); clearInboxDrafts(); }
+    function destroy({ keepDrafts = false } = {}) { gone = true; for (const t of root.querySelectorAll('textarea')) _boxes.delete(t); root.remove(); if (!keepDrafts) clearInboxDrafts(); }
 
     if (!options || options.load !== false) refresh();
     return { refresh, savedExpand, destroy };

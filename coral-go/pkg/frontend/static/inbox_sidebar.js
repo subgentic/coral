@@ -1,3 +1,4 @@
+import { openTask } from './task_navigation.js';
 /* The dashboard's own Inbox on the shared sidebar (#7472), loaded the first time the Inbox tab is shown (inbox_tab.js keeps the badge and the counts, which are always there).
  *
  * Three groups, the hub's /inbox order: Needs you (the agents waiting for input, from the live list the dashboard already holds), Tasks (the open tasks assigned to the Operator) and Saved (the
@@ -14,14 +15,12 @@ import { tableMarkup, registerGroupSource, refreshGroupTable, openGroupTable, fo
 import { isPhoneLayout } from './phone_layout.js';
 import { browserLocal } from './safe_storage.js';
 import { resolveSessionIdentity, sessionStateInfo } from './session_state.js';
-import { whenText } from './when_text.js';
 import { pollEvery } from './overload.js';
 import { setHidden } from './dom_write.js';
 import { onViewShown } from './view_switch.js';
 import { importOnce } from './import_once.js';
 import { onInboxHooks, setInboxCount, askOf } from './inbox_tab.js';
 const { coralInboxAdapter, savedExpandFor } = await importOnce('./inbox_coral.js');
-const { mountInbox } = await importOnce('./inbox_panel.js');
 const saved = await importOnce('./saved.js');
 const DT = await importOnce('./data_table.js'); // the one table (#7743): the Tasks group's page is its Tasks columns
 const TV = await importOnce('./tasks_view.js'); // the one Tasks view
@@ -55,7 +54,6 @@ const needsText = s => [resolveSessionIdentity(s), sessionStateInfo(s).label, as
 const needsRows = () => waitingSessions().filter(s => !queries.needs || needsText(s).includes(queries.needs));
 
 // ── Tasks ────────────────────────────────────────────────────────────────
-const PRIORITY_WORDS = { high: 'High', medium: 'Medium', low: 'Low' };
 const RANK = { high: 0, medium: 1, low: 2 };
 const stateOf = t => TV.taskWord(t);
 const inboxTasksState = DT.tableState();
@@ -108,7 +106,7 @@ function pickFolder(key) {
 function renderInboxNav(force = false) {
     const list = $('inbox-nav-list');
     if (!list) return;
-    const here = page ? (page.kind === 'task' ? 'tasks' : 'saved') : group, sections = folderSections();
+    const here = page ? 'saved' : group, sections = folderSections();
     // what the tables show is part of the key too: the folder list is drawn from the counts, but the table on screen is refreshed (refreshGroupTable below) only when a row of it changed
     const needs = needsRows(), tk = taskRows(), sv = saved.savedView().shown.map(saved.savedItemFacts);
     const key = JSON.stringify([here, sections, queries.needs, queries.tasks, page && `${page.kind}:${page.project || ''}#${page.id}`,
@@ -234,13 +232,13 @@ registerGroupSource('hub-inbox', {
                     ] }).el };
         }
         if (key === 'tasks') {
-            const rows = taskRows(), openKey = page && page.kind === 'task' ? `${page.project}#${page.id}` : '';
+            const rows = taskRows();
             return { title: 'Tasks', rows, empty: { line: queries.tasks ? 'No task matches the search.' : 'No assigned tasks.' },
-                signature: JSON.stringify([openKey, rows.map(t => [t.project, t.id, t.title, t.priority, t.status, t.board, t.updated_at])]),
+                signature: JSON.stringify([rows.map(t => [t.project, t.id, t.title, t.priority, t.status, t.board, t.updated_at])]),
                 node: () => {
                     const row = document.querySelector('#group-table-view .gt-toolbar');
                     const t = TV.tasksTable('mine', rows, { ctx: { teamOf: t => t.board || '' }, rowKey: t => `${t.project}#${t.id}`, // only my tasks: no who; the Team column because the group spans teams
-                        open: t => openTaskPage(t.project, t.id), current: openKey, state: inboxTasksState,
+                        open: t => openTask(t.project, t.id), state: inboxTasksState,
                         selectable: { contextKey: 'inbox-tasks', actions: TB.inboxTaskActions(() => { inboxTasksState.selected.clear(); refreshTasks(); }), onChange: keys => row && Toolbar.mountSelection(row, keys.size ? t.bar : null) } }); // the bar takes the toolbar's line while tasks are selected
                     if (row) { Toolbar.mountSelection(row, inboxTasksState.selected.size ? t.bar : null); row.querySelectorAll('.dt-select-toggle').forEach(b => b.remove()); if (isPhoneLayout()) row.append(t.selectButton); }
                     return t.el;
@@ -261,7 +259,7 @@ registerGroupSource('hub-inbox', {
         if (key === 'saved') return savedListSpec();
         return null;
     },
-    lead: () => { const here = page ? (page.kind === 'task' ? 'tasks' : 'saved') : group, sections = folderSections(); return { signature: JSON.stringify([here, sections]), node: () => VL.build({ id: 'inbox-folders-page', label: 'Inbox views', sections, current: here, onPick: pickFolder }) }; }, // a phone: the folders are one select on top of the table
+    lead: () => { const here = page ? 'saved' : group, sections = folderSections(); return { signature: JSON.stringify([here, sections]), node: () => VL.build({ id: 'inbox-folders-page', label: 'Inbox views', sections, current: here, onPick: pickFolder }) }; }, // a phone: the folders are one select on top of the table
     isEmpty: () => false, // the tab opens its group's table itself (showInbox)
     showList: () => { closePage(false); window.switchNavTab?.('hub-inbox'); },
     empty: () => { closePage(false); window.switchNavTab?.('hub-inbox'); },
@@ -305,7 +303,7 @@ export function filterInbox(value) {
     renderInboxNav(true);
 }
 
-// ── Items: a task's page and a saved message's page ──────────────────────
+// ── Saved message page ──────────────────────
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = String(text); return e; };
 function openPageShell(kindLabel, groupKey) {
     const host = $('inbox-page');
@@ -321,22 +319,6 @@ function openPageShell(kindLabel, groupKey) {
     phoneBack.type = 'button'; phoneBack.setAttribute('data-on-click', 'inbox-phone-back');
     host.append(back, phoneBack);
     return host;
-}
-
-function openTaskPage(project, id) {
-    const t = tasks.find(x => String(x.project) === String(project) && String(x.id) === String(id));
-    if (!t) return;
-    page = { kind: 'task', project: t.project, id: t.id };
-    const host = openPageShell('Tasks', 'tasks');
-    host.append(el('h2', 'wf-item-title', t.title || '(no title)'));
-    const high = t.priority === 'high';
-    host.append(el('p', 'item-meta', [t.created_by ? `From ${t.created_by}` : '', t.board, (PRIORITY_WORDS[t.priority] || t.priority) + (high ? ' priority' : ''), stateOf(t), whenText(t.updated_at || t.created_at)].filter(Boolean).join(' · ')));
-    const mount = el('div', 'inbox-task-mount');
-    host.append(mount);
-    mountInbox(mount, coralInboxAdapter, { region: false, only: { project: t.project, id: t.id }, poll: (fn, ms) => pollEvery(fn, ms) }); // the component's own text and reply box, for this one task
-    setGroup('tasks');
-    renderInboxNav(true);
-    focusTitle(host);
 }
 
 let openMore = null;
@@ -389,7 +371,7 @@ function focusCameFrom(was) {
     if (!was) return;
     const root = $('group-table-view');
     const id = CSS.escape(String(was.id));
-    const row = root && root.querySelector(was.kind === 'task' ? `.dt-primary[data-task-id="${id}"]` : `.dt-primary[data-id="${id}"]`);
+    const row = root && root.querySelector(`.dt-primary[data-id="${id}"]`);
     if (row) row.focus({ preventScroll: true }); else $('group-table-title')?.focus({ preventScroll: true });
 }
 
@@ -397,7 +379,7 @@ function sayLive(text) { const live = $('inbox-live'); if (live) { const s = doc
 
 /** Leave a page for its group's table (a phone's table has the folders' select on top). */
 function closePage(openTable = true, focusBack = false) {
-    const was = page, g = page ? (page.kind === 'task' ? 'tasks' : 'saved') : group;
+    const was = page, g = page ? 'saved' : group;
     page = null;
     const host = $('inbox-page');
     if (host) { host.hidden = true; host.replaceChildren(); host.dataset.saved = ''; }
@@ -426,7 +408,7 @@ export async function showInbox({ folder = '', quiet = false } = {}) {
     CH.loadChatCounts(() => renderInboxNav(true));
     saved.loadSaved(); // everything's list (the Inbox is the all scope), read for the table and the count
     if (quiet || (folder && state.currentSession && state.currentSession.type === 'history')) return; // a chat is on screen, or being opened (a saved message, a link to a chat): the Inbox is drawn under it, for the way back
-    if (page) { if (isPhoneLayout()) $('inbox-view')?.setAttribute('data-phone-item', ''); return; } // a task or a message is open: the tab returns to it
+    if (page) { if (isPhoneLayout()) $('inbox-view')?.setAttribute('data-phone-item', ''); return; } // a saved message is open: the tab returns to it
     $('inbox-view')?.removeAttribute('data-phone-item');
     if (document.body.getAttribute('data-nav-tab') !== 'hub-inbox') return; // the module arrived after the person had moved on (a notification's click, a chosen agent): its table must not cover that
     openGroupTable('hub-inbox', group); // a phone too: the table has the folders' select on top
@@ -452,7 +434,7 @@ registerActions({
         window.switchNavTab?.('agents');
         window.selectLiveSession?.(name, type, sid, server);
     },
-    'inbox-task-open': el => { const p = textOf(el.dataset.project), id = textOf(el.dataset.taskId); if (p && id) openTaskPage(p, id); },
+    'inbox-task-open': el => { const p = textOf(el.dataset.project), id = textOf(el.dataset.taskId); if (p && id) openTask(p, id); },
     'inbox-saved-open': el => { const id = textOf(el.dataset.id); if (!id) return; if (el.dataset.where === 'dock-tab') openDockSavedSheet(id, el); else openSavedPage(id); }, // the dock's rows open the message as a sheet over the dock (the person stays with the agent)
     'inbox-saved-chip': el => { const t = textOf(el.dataset.tab); if (t) { saved.setSavedTab(t); sayLive(t === 'done' ? 'Showing the messages marked done' : 'Showing the open messages'); } },
     'inbox-saved-done': async el => {
@@ -463,5 +445,5 @@ registerActions({
     },
     'inbox-goal-open': el => { const board = textOf(el.dataset.board), id = Number(el.dataset.goalId); if (board && id) importOnce('./task_goals.js').then(m => m.openGoalOnTeamPage(board, id)).catch(() => {}); },
     'inbox-phone-back': () => closePage(true, true),
-    'inbox-back': () => { const was = page, g = was ? (was.kind === 'task' ? 'tasks' : 'saved') : group; closePage(false); openGroupTable('hub-inbox', g); focusCameFrom(was); }, // the link back to the group's table (on a phone too, as the shared back link did), with the focus on the row it came from
+    'inbox-back': () => { const was = page, g = was ? 'saved' : group; closePage(false); openGroupTable('hub-inbox', g); focusCameFrom(was); }, // the link back to the group's table (on a phone too, as the shared back link did), with the focus on the row it came from
 });

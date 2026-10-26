@@ -1,3 +1,4 @@
+import { parse, routeKey } from './routes.js';
 /* Toasts and notifications (moved out of utils.js, #5065; no behaviour change). */
 import { importOnce } from './import_once.js';
 import { escapeHtml, escapeAttr } from './html_escape.js';
@@ -251,7 +252,9 @@ export function showAlertNotification(title, message, level = 'info', link = nul
             } else if (target.kind === 'web') {
                 window.open(target.href, '_blank', 'noopener,noreferrer');
             } else {
-                window.location.assign(target.href);
+                const route = parse(target.href);
+                if (route?.view === 'team' && route.sub === 'tasks' && route.item) importOnce('./task_navigation.js').then(m => m.openTask(routeKey(route), route.item));
+                else window.location.assign(target.href);
             }
         });
     }
