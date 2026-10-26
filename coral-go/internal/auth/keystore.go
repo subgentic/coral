@@ -456,6 +456,7 @@ func isSessionCookieName(name string) bool {
 }
 
 // SessionCookieName is the name of this server's session cookie for r (tests, tools).
+// SessionCookieName has no production caller: it is exported for tests in server.
 func (ks *KeyStore) SessionCookieName(r *http.Request) string { return ks.cookieName(r) }
 
 // extractSessionCookie returns the session token r carries for this server: this server's
