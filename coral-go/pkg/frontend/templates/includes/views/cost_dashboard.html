@@ -31,31 +31,37 @@
         <div class="cost-card">
             <div class="cost-card-label">Input tokens</div>
             <div class="cost-card-value" id="cost-input-tokens">0</div>
+            <div class="cost-card-change" id="cost-change-input"></div>
             <div class="cost-card-sparkline" aria-hidden="true" id="cost-spark-input"></div>
         </div>
         <div class="cost-card">
             <div class="cost-card-label">Output tokens</div>
             <div class="cost-card-value" id="cost-output-tokens">0</div>
+            <div class="cost-card-change" id="cost-change-output"></div>
             <div class="cost-card-sparkline" aria-hidden="true" id="cost-spark-output"></div>
         </div>
         <div class="cost-card">
             <div class="cost-card-label">Cache read</div>
             <div class="cost-card-value" id="cost-cache-read">0</div>
+            <div class="cost-card-change" id="cost-change-cache-read"></div>
             <div class="cost-card-sparkline" aria-hidden="true" id="cost-spark-cache-read"></div>
         </div>
         <div class="cost-card">
             <div class="cost-card-label">Cache write</div>
             <div class="cost-card-value" id="cost-cache-write">0</div>
+            <div class="cost-card-change" id="cost-change-cache-write"></div>
             <div class="cost-card-sparkline" aria-hidden="true" id="cost-spark-cache-write"></div>
         </div>
         <div class="cost-card">
             <div class="cost-card-label">Requests</div>
             <div class="cost-card-value" id="cost-total-requests">0</div>
+            <div class="cost-card-change" id="cost-change-requests"></div>
             <div class="cost-card-sparkline" aria-hidden="true" id="cost-spark-requests"></div>
         </div>
         <div class="cost-card cost-card-highlight">
             <div class="cost-card-label">Total cost</div>
             <div class="cost-card-value" id="cost-total-cost">$0.00</div>
+            <div class="cost-card-change" id="cost-change-cost"></div>
             <div class="cost-card-sparkline" aria-hidden="true" id="cost-spark-cost"></div>
         </div>
         <div class="cost-card cost-card-burn">
@@ -87,6 +93,11 @@
         <div id="cost-spend-chart" class="cost-chart-container">
             <div class="cost-empty">Loading chart data...</div>
         </div>
+
+    <div class="cost-section" data-cview="overview">
+        <h3 class="cost-section-title">Cost by team</h3>
+        <div id="cost-series-overview" class="viz-panel"></div>
+    </div>
     </div>
 
     <!-- By Provider (#5120) -->
