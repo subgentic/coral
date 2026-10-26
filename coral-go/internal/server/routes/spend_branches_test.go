@@ -462,3 +462,45 @@ func TestSpendAnUnreadableBoardOfAgentsIsAnErrorInWords(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, code)
 	assert.Equal(t, "could not read the board's agents", out["error"])
 }
+
+// #8241: two cases the first mutation run left alive. One agent with a tool source is enough for the tool-call measures to be answered (not null); and the 7 d view's day is the sum of its 24 hours,
+// hour 23 included.
+func TestSpendOneAgentWithAToolSourceIsEnoughForTheToolCalls(t *testing.T) {
+	w := newSpendWorld(t, spendNow)
+	w.agent(spA, agenttypes.Claude, "Only source", "folder-a", "")
+	w.agent(spB, agenttypes.Gemini, "No source", "folder-b", "")
+	w.toolUse(spA, "Only source", "2026-10-25T09:11:00+00:00")
+	w.toolUse(spA, "Only source", "2026-10-25T09:12:00+00:00")
+	w.toolUse(spA, "Only source", "2026-10-20T09:12:00+00:00") // the usual
+	code, out := w.get("?range=24h")
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	tools := out["tool_calls"].(map[string]any)
+	assert.EqualValues(t, 1, tools["measured_agents"], "exactly one agent has a source")
+	assert.EqualValues(t, 2, tools["of_agents"])
+	assert.EqualValues(t, 2, tools["window"], "answered, not null, with one measured agent")
+	assert.EqualValues(t, 1, tools["usual"])
+	nine := out["per_hour"].([]any)[22].(map[string]any) // 2026-10-25T09:00Z is the 23rd hour of the window starting 2026-10-24T11:00Z
+	assert.Equal(t, "2026-10-25T09:00:00Z", nine["hour"])
+	assert.EqualValues(t, 2, nine["tool_calls"], "the hourly points follow")
+	assert.EqualValues(t, 2, agentNamed(t, out, "Only source")["tool_calls"])
+}
+
+func TestSpendADayOfTheSevenDayViewSumsAllItsHoursTheLastIncluded(t *testing.T) {
+	w := newSpendWorld(t, spendNow)
+	w.agent(spA, agenttypes.Claude, "Late worker", "folder-a", "")
+	w.usage(spA, agenttypes.Claude, "Late worker", "2026-10-24T23:30:00Z", 70, 7, 0, 0) // hour 23 of the 24th
+	w.toolUse(spA, "Late worker", "2026-10-24T23:40:00+00:00")
+	w.usage(spA, agenttypes.Claude, "Late worker", "2026-10-24T00:10:00Z", 3, 0, 0, 0) // hour 0 of the 24th
+	code, out := w.get("?range=7d")
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	var day map[string]any
+	for _, d := range out["per_day"].([]any) {
+		if d.(map[string]any)["day"] == "2026-10-24" {
+			day = d.(map[string]any)
+		}
+	}
+	require.NotNil(t, day, "the 24th is one of the seven days")
+	assert.EqualValues(t, 70+7+3, day["tokens"], "hour 0 and hour 23 are both in the day")
+	assert.EqualValues(t, 1, day["tool_calls"], "a tool call at 23:40 is in its day")
+	assert.EqualValues(t, 70+7+3, out["tokens"].(map[string]any)["window"].(map[string]any)["input"].(float64)+out["tokens"].(map[string]any)["window"].(map[string]any)["output"].(float64), "the window total agrees with the days")
+}
