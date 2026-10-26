@@ -443,6 +443,9 @@ let _navGeneration = 0;
 import { historyRoute, historyServer, setHistorySource } from './history_source.js';
 
 function switchNavTab(tab, opts = {}) {
+    // The Chats tab is the Inbox's chat folders (#7776) on a local Coral: an old link, a shortcut or a Back to the chats opens the Inbox on the folder (All chats unless one is named), and an open chat shows under the Inbox. The hub keeps its Chats tab.
+    const routeTab = tab, chatsInInbox = tab === 'history' && !isCloud();
+    if (chatsInInbox) tab = 'hub-inbox';
     // A panel that loads on first use (lazy_panels.js) shows its view only if
     // nothing else was selected or shown while it loaded. Once loaded it shows at once.
     const generation = ++_navGeneration;
@@ -457,9 +460,9 @@ function switchNavTab(tab, opts = {}) {
     // The URL follows the tab (#3532): a tab the user chose is a history entry. Servers writes its
     // own (it can carry a server); the board tab names no board, so it keeps the URL.
     const TAB_ROUTE = { agents: 'agents', history: 'chats', workflows: 'workflows', jobs: 'jobs', tokens: 'analytics', docs: 'docs' };
-    if (!opts.fromHistory && TAB_ROUTE[tab]) {
+    if (!opts.fromHistory && TAB_ROUTE[routeTab]) {
         const cur = currentRoute();
-        const route = tabRoute(tab, TAB_ROUTE[tab]);
+        const route = tabRoute(routeTab, TAB_ROUTE[routeTab]);
         if (!cur || cur.view !== route.view || cur.id !== route.id || cur.server !== route.server) note(route);
     }
 
@@ -493,8 +496,9 @@ function switchNavTab(tab, opts = {}) {
         importOnce('./servers_tab.js').then(m => m.showServersTabContent(opts.focusId));
     } else if (tab === 'hub-inbox') {
         // The hub's /inbox page in a frame where the hub serves the dashboard, the dashboard's own Inbox (Needs you, Saved for later) on every other Coral (#4811); the tab writes no address of its own.
-        showView('inbox-view');
-        importOnce('./inbox_tab.js').then(m => m.showInboxTabContent());
+        const chatOpen = chatsInInbox && state.currentSession && state.currentSession.type === 'history';
+        showView(chatOpen ? 'history-session-view' : 'inbox-view');
+        importOnce('./inbox_tab.js').then(m => m.showInboxTabContent(chatsInInbox ? { folder: opts.folder || (state.inboxFolder && state.inboxFolder.key) || 'chats', quiet: chatOpen } : {}));
     } else if (tab === 'artifacts') {
         // The hub's /artifacts page in a frame (artifacts_tab.js), the Inbox's way; the tab writes no address of its own.
         showView('artifacts-view');

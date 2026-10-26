@@ -400,7 +400,8 @@ import { historyServer, historyRoute } from './history_source.js';
 import { describeChat } from './history_list.js';
 import { setBackLink } from './sidebar_groups.js';
 
-export async function selectHistorySession(sessionId, locator = null) {
+/** `entry` is the chat's row when the caller has it (an Inbox folder's list): the page's title and meta come from it even when the cached list does not hold the chat. */
+export async function selectHistorySession(sessionId, locator = null, entry = null) {
     const source = historyServer();
     const route = normalize(historyRoute(sessionId));
     if (!route || (isCloud() && !source)) return false;
@@ -416,6 +417,7 @@ export async function selectHistorySession(sessionId, locator = null) {
         saveSessionDraft(oldKey, input.value);
     }
 
+    if (entry && !state.historySessionsList.some(x => x.session_id === sessionId)) state.historySessionsList = [entry, ...state.historySessionsList];
     state.currentSession = { type: "history", name: sessionId, server: source || 'local' };
     refreshAgentUI();
 
@@ -431,7 +433,7 @@ export async function selectHistorySession(sessionId, locator = null) {
     const openedEntry = state.historySessionsList.find(x => x.session_id === sessionId);
     document.getElementById("history-session-title").textContent = historyLabel(openedEntry); // the chat's title; its id is behind Details (#6200)
     const described = describeChat(openedEntry); // the way back to its group's table, and who, when and how long under the title (#7443)
-    setBackLink('history-back', 'history', described.group);
+    setBackLink('history-back', isCloud() ? 'history' : 'hub-inbox', isCloud() ? described.group : (state.inboxFolder || { key: 'chats', label: 'All chats' })); // a local Coral's chat goes back to the Inbox folder it came from
     const metaEl = document.getElementById('history-session-meta');
     if (metaEl) { metaEl.textContent = described.meta; metaEl.hidden = !described.meta; }
     document.getElementById("history-session-id").textContent = sessionId;
