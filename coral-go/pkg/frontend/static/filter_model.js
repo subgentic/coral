@@ -72,7 +72,7 @@ export function defineFilters(fields) {
             if (f.type === 'sort' || !f.chip && f.type !== 'custom') continue;
             if (f.type === 'range') { if (v[f.from] || v[f.to]) out.push({ key, label: f.chip(v[f.from], v[f.to]) }); }
             else if (f.type === 'flag') { if (v[key]) out.push({ key, label: typeof f.chip === 'function' ? f.chip() : f.chip }); }
-            else if (f.type === 'custom') { const label = f.chip && f.chip(v[key], v); if (label) out.push({ key, label }); }
+            else if (f.type === 'custom') { const label = narrows(f, key, v) && f.chip && f.chip(v[key], v); if (label) out.push({ key, label }); }
             else if (v[key]) out.push({ key, label: f.chip(v[key]) });
         }
         return out;
