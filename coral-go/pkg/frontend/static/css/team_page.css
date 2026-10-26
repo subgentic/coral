@@ -295,6 +295,7 @@
 .inbox-folder-toolbar { container: inboxfolder / inline-size; }
 .inbox-folder-toolbar .team-tb-select { display: none; }
 .inbox-folder-toolbar .list-bar-search-row.gt-toolbar { flex-wrap: wrap; }
+.inbox-folder-toolbar .list-bar-menu :is(.list-bar-field, .list-bar-sort) > .list-bar-field-label { flex: 0 0 7.5rem; white-space: nowrap; } /* one label column wide enough for the longest label (Updated since): no label wraps (UI/UX on #8596) */
 .inbox-folder-toolbar .list-bar-search-row.gt-toolbar > .list-bar-search-wrap { flex: 1 1 10rem; min-width: 10rem; }
 @container inboxfolder (max-width: 40rem) {
     .inbox-folder-toolbar .team-tb-pills { display: none; }

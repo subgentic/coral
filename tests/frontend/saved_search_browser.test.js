@@ -1,5 +1,5 @@
 // The Saved for later panel's search, filters and order (#4778), against the real isolated server (q and the order are #4745's, kind and conv were there):
-//   - a bar sits between the Open / Done tabs and the list: search, Filters (Type, From) and Sort (Newest saved, Oldest saved);
+//   - the page's toolbar holds the Open / Done pills; the sidebar's bar keeps search, Filters (Type, From) and Sort (Newest saved, Oldest saved);
 //   - a search or a filter asks the server (title and snippet), so it covers every saved message: "k of N" for the tab, chips, "No saved messages match this search.";
 //   - Type (agent chat, board message) and From (a conversation, by its title) narrow it; Oldest saved reverses it; the Open and Done tabs and their totals are not changed by a search;
 //   - Clear all brings the plain list back. Desktop and phone.
@@ -28,10 +28,11 @@ async function run() {
     const { waitFor } = require('./helpers/wait').bind(ev);
     const settle = (cond, label) => waitFor(cond, label, { timeout: 8000 });
     const api = (method, path, body) => ev(`fetch(${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, headers: { 'Content-Type': 'application/json' }, body: ${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'} }).then(async r => ({ status: r.status, body: await r.json().catch(() => null) }))`);
+    // the Open and Done totals are read from the pills of the page toolbar (#8602)
     const snap = () => ev(`(() => { const bar = document.getElementById('inbox-saved-bar'), t = document.getElementById('group-table-view'), rows = [...t.querySelectorAll('tbody tr')], n = c => c && c.textContent !== '0' ? '(' + c.textContent + ')' : '';
         return { shown: !!bar.firstChild, count: (bar.querySelector('.list-bar-count') || {}).textContent || '', chips: [...bar.querySelectorAll('.list-bar-chip-text')].map(e => e.textContent), titles: rows.map(r => r.textContent.replace(/\\s+/g, ' ').slice(0, 80)),
-            empty: (t.querySelector('.empty-line') || {}).textContent || null, note: (t.querySelector('.group-table-note') || {}).textContent || '', tabs: [...t.querySelectorAll('.group-chip .group-chip-count')].map(c => n(c)), over: document.documentElement.scrollWidth - document.documentElement.clientWidth }; })()`);
-    const chip = i => ev(`document.querySelectorAll('#group-table-view .group-chip')[${i}].click(); true`); // Open (0) and Done (1)
+            empty: (t.querySelector('.empty-line') || {}).textContent || null, note: (t.querySelector('.group-table-note') || {}).textContent || '', tabs: [...document.querySelectorAll('.inbox-folder-toolbar .team-tb-pills .goals-chip')].map(b => { const m = b.textContent.match(/\\d+/); return m && m[0] !== '0' ? '(' + m[0] + ')' : ''; }), over: document.documentElement.scrollWidth - document.documentElement.clientWidth }; })()`);
+    const chip = async i => { await settle(`document.querySelectorAll('.inbox-folder-toolbar .team-tb-pills .goals-chip').length > ${i}`, `pill ${i}`); return ev(`document.querySelectorAll('.inbox-folder-toolbar .team-tb-pills .goals-chip')[${i}].click(); true`); }; // Open (0) and Done (1): the pills of the page toolbar (#8602)
     const setQuery = text => ev(`(() => { const e = document.getElementById('inbox-search'); e.value = ${JSON.stringify(text)}; e.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
     let phone = false; // a phone's table fills the screen and its search box is on the list screen behind it, so the text is set in the box without typing
     const type = async (text) => { if (phone) return setQuery(text); await ev(`document.getElementById('inbox-search').focus(); true`); await Input.insertText({ text }); }; // the sidebar's one search box, the server matches
@@ -68,6 +69,7 @@ async function run() {
             phone = mobile;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
+            await ev(`try { localStorage.removeItem('coral-saved-filters'); } catch {} true`); await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); // the filters are kept in the browser (#8602): each device starts with none
             await waitFor(`typeof window._coralSetLiveSessions === 'function'`, 'the app hooks', { timeout: 10000 });
             await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'saved.js'); await m.openSaved(); return true; })()`); // the Inbox at Saved: the table, its Open and Done chips, the sidebar's search and Display options (Filters and Sort)
             await settle(`document.querySelectorAll('#group-table-view tbody tr').length === 4`, 'the four open messages').catch(async e => { throw new Error(e.message + ' | ' + JSON.stringify(await ev(`({ rows: document.querySelectorAll('#saved-list > li').length, text: document.getElementById('saved-list').textContent.slice(0, 200), status: document.getElementById('saved-status').textContent, bar: !!document.getElementById('saved-bar').firstChild })`)) + ' | ' + exceptions.join(' ; ')); });
@@ -78,11 +80,11 @@ async function run() {
             await settle(`document.querySelector('#inbox-saved-bar .list-bar-count').textContent === '2 of 4'`, 'the search');
             s = await snap();
             check(`${dev}: "retry" matches two of the open ones (titles and snippets), with a chip; the tabs' totals stay`, s.titles.length === 2 && s.chips.join() === 'Search: retry' && s.tabs.join() === '(4),(2)', JSON.stringify([s.titles.length, s.count, s.chips, s.tabs]));
-            await ev(`document.querySelectorAll('#group-table-view .group-chip')[1].click(); true`);
+            await ev(`document.querySelectorAll('.inbox-folder-toolbar .team-tb-pills .goals-chip')[1].click(); true`);
             await settle(`document.querySelector('#inbox-saved-bar .list-bar-count').textContent === '1 of 2'`, 'the Done tab');
             s = await snap();
             check(`${dev}: the Done tab has its own match (1 of 2: the Backend Dev note)`, s.titles.length === 1 && /Backend Dev/.test(s.titles[0]), JSON.stringify(s.titles));
-            await ev(`document.querySelectorAll('#group-table-view .group-chip')[0].click(); true`);
+            await ev(`document.querySelectorAll('.inbox-folder-toolbar .team-tb-pills .goals-chip')[0].click(); true`);
             await type('zzz-nothing');
             await settle(`!!document.querySelector('#group-table-view .empty-line')`, 'the empty line');
             s = await snap();

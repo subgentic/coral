@@ -27,8 +27,8 @@ export const { EMPTY, clean, isFiltered, isQuery, chips, without } = model;
 export const storageKey = () => 'coral-inbox-goals-filters';
 const kept = model.persist(storageKey);
 /** The filters kept in this browser for the folder, or the empty ones. */
-export const loadFilters = () => kept.load('inbox-goals', browserLocal);
-export const saveFilters = f => kept.save('inbox-goals', f, browserLocal);
+export const loadFilters = () => ({ ...kept.load('inbox-goals', browserLocal), q: '' });
+export const saveFilters = f => kept.save('inbox-goals', { ...f, q: '' }, browserLocal); // the search words are not kept: a page opened later starts with an empty box
 
 const stamp = g => Date.parse(g.updated_at || g.updatedAt || '') || 0;
 

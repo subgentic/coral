@@ -143,7 +143,11 @@ function inboxGoalsToolbar() {
                 { type: 'date', key: 'from', id: 'inbox-goals-from', label: 'Updated since' },
             ],
             model: { EMPTY: GF.EMPTY, clean: GF.clean, chips: GF.chips, isFiltered: GF.isFiltered, without: GF.without },
-        }, next => { goalFilters = next; GF.saveFilters(next); renderInboxNav(true); });
+        }, next => {
+            goalFilters = next; GF.saveFilters(next);
+            const input = $('inbox-search'); if (input && group === 'goals') input.value = next.q; // the sidebar's box shows the same words
+            renderInboxNav(true);
+        });
     }
     const teams = [...new Set(goals.map(g => g.board_id))].sort((a, b) => goalTeam({ board_id: a }).localeCompare(goalTeam({ board_id: b })));
     const drivers = [...new Set(goals.map(g => g.driver).filter(Boolean))].sort();
@@ -169,6 +173,20 @@ async function refreshGoals() {
 }
 
 // ── Saved ────────────────────────────────────────────────────────────────
+let savedBar = null;
+/** The Saved page's toolbar (#8602): the search, the Open | Done pills and the Filters icon (Type, Team, From, Saved since, Sort) on the same filters as the sidebar's Display options. */
+function inboxSavedToolbar() {
+    if (!savedBar) {
+        savedBar = IT.folderToolbar(saved.savedPageSpec(), next => {
+            saved.setSavedFilters(next);
+            const input = $('inbox-search'); if (input && group === 'saved') input.value = next.q || ''; // the sidebar's box shows the same words
+        });
+    }
+    const v = saved.savedView(), filters = saved.savedFiltersNow(), options = saved.savedPageOptions();
+    const node = savedBar.draw({ filters, options,
+        pills: { label: 'Show', current: v.tab, items: [{ key: 'open', label: 'Open', count: v.totals.open }, { key: 'done', label: 'Done', count: v.totals.done }], onPick: key => saved.setSavedTab(key) } });
+    return { node, signature: JSON.stringify([filters, v.tab, v.totals, options]) };
+}
 const savedCounts = () => saved.savedView().totals;
 
 // ── The sidebar list ─────────────────────────────────────────────────────
@@ -213,7 +231,7 @@ function savedListSpec(where = '') {
     const multi = rows.some(f => f.serverName);
     const empty = v.loading ? 'Loading saved items' : v.error ? v.error : v.filtered ? 'No saved messages match this search.' : v.scoped || (v.tab === 'done' ? 'Nothing is marked done.' : 'Nothing is saved for later.');
     return { title: 'Saved', headless: dock, chipsLabel: 'Show',
-        chips: [{ action: 'inbox-saved-chip', data: { tab: 'open' }, label: 'Open', count: v.totals.open, pressed: v.tab === 'open' }, { action: 'inbox-saved-chip', data: { tab: 'done' }, label: 'Done', count: v.totals.done, pressed: v.tab === 'done' }],
+        chips: !dock ? [] : [{ action: 'inbox-saved-chip', data: { tab: 'open' }, label: 'Open', count: v.totals.open, pressed: v.tab === 'open' }, { action: 'inbox-saved-chip', data: { tab: 'done' }, label: 'Done', count: v.totals.done, pressed: v.tab === 'done' }],
         empty: { line: empty, hint: v.loading || v.error || v.filtered || v.tab === 'done' ? '' : 'Save a message from a chat or a board with its bookmark.' },
         note: [v.query ? 'The search covers every saved message, not only these.' : '', ...v.down.map(d => `${d.label || d.id} did not answer, so its saved messages are not shown.`)].filter(Boolean).join(' '), rows,
         signature: JSON.stringify([multi, rows.map(f => [f.id, f.which, f.saved, f.state, f.gone, f.done, f.serverName])]),
@@ -292,7 +310,7 @@ async function openChat(c) {
 }
 
 registerGroupSource('hub-inbox', {
-    toolbar: key => key === 'tasks' ? inboxTaskToolbar() : key === 'goals' ? inboxGoalsToolbar() : ({ search: { id: 'inbox-search', label: 'Search the Inbox' } }), // the page's toolbar line, the same shape for Needs you, Tasks and Saved (#7723)
+    toolbar: key => key === 'tasks' ? inboxTaskToolbar() : key === 'goals' ? inboxGoalsToolbar() : key === 'saved' ? inboxSavedToolbar() : ({ search: { id: 'inbox-search', label: 'Search the Inbox' } }), // the page's toolbar line, the same shape for Needs you, Tasks and Saved (#7723)
     keys: () => GROUPS.map(g => g.key),
     redraw: () => renderInboxNav(true),
     table: key => {
@@ -392,6 +410,7 @@ export function filterInbox(value) {
     if (group === 'saved') { queries.saved = text; saved.setSavedQuery(text); return; }
     queries[group] = CH.CHAT_KEY.test(group) || group === 'tasks' ? text : text.toLowerCase();
     if (group === 'tasks') { inboxTasksState.selected.clear(); taskFilters = { ...taskFilters, q: text }; } // a chat search goes to the server as typed
+    if (group === 'goals') { goalFilters = { ...goalFilters, q: text }; GF.saveFilters(goalFilters); } // the sidebar's box and the page's share the one search (#8596)
     renderInboxNav(true);
 }
 
