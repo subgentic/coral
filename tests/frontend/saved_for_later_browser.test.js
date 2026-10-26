@@ -258,7 +258,7 @@ const hex = i => i.toString(16).padStart(20, '0');
         assert.ok(keep && drop, 'the board has its messages');
         await ev(`(async () => { localStorage.setItem('coral.board.view', 'chat'); window.switchNavTab('agents', { fromHistory: true }); const m = await import((window.__coralStatic || '/static/') + 'team_page.js'); await m.openTeamPage(${JSON.stringify(BOARD)}, { tab: 'messages' }); return true; })()`);
         await waitFor(`document.querySelectorAll('#mb-messages .mb-message').length === 3`, 'the team page Board chat rows', 8000);
-        assert.equal(await ev(`location.pathname`), `/team/${BOARD}/messages`, 'saving starts on the team page');
+        assert.equal(await ev(`location.pathname`), `/team/${BOARD}/board`, 'saving starts on the team page');
         const bb = await ev(`(() => { const b = document.querySelector('#mb-messages [data-message-id="${keep.id}"] .mb-save-btn'); return b ? { label: b.getAttribute('aria-label'), pressed: b.getAttribute('aria-pressed'), hidden: b.hidden } : null; })()`);
         assert.deepEqual({ ...bb, label: bb.label.split(':')[0] }, { label: 'Save for later', pressed: 'false', hidden: false });
         for (const id of [keep.id, drop.id]) {
@@ -286,7 +286,7 @@ const hex = i => i.toString(16).padStart(20, '0');
         await waitFor(`!!document.querySelector('#inbox-page .item-bar .btn-primary:not([disabled])')`, 'the board message\'s page with its Open button', 8000);
         await ev(`document.querySelector('#inbox-page .item-bar .btn-primary').click(); true`);
         await waitFor(`!!document.querySelector('#mb-messages [data-message-id="${keep.id}"].chat-search-target')`, 'the jump into the board', 10000, `({ view: getComputedStyle(document.getElementById('team-page-view')).display, rows: document.querySelectorAll('#mb-messages .mb-message').length, targets: document.querySelectorAll('.chat-search-target').length, tip: document.getElementById('saved-status').textContent, gone: [...document.querySelectorAll('.why:not([hidden])')].map(e => e.textContent) })`);
-        assert.equal(await ev(`location.pathname`), `/team/${BOARD}/messages/${keep.id}`, 'a saved message opens its exact team page address');
+        assert.equal(await ev(`location.pathname`), `/team/${BOARD}/board/${keep.id}`, 'a saved message opens its exact team page address');
         assert.equal(await ev(`document.activeElement === document.querySelector('#mb-messages [data-message-id="${keep.id}"]')`), true, 'the focus is on the message');
         await waitFor(`!!document.getElementById('saved-jumpbar') && !!document.querySelector('#mb-messages .saved-jump')`, 'the jump bar and the Saved tag', 6000);
         assert.equal(await ev(`document.querySelector('#saved-jumpbar .btn').textContent`), 'Back to Saved');

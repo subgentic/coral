@@ -257,6 +257,7 @@ function noteFolder(key) {
     const path = inboxFolderPath(key), route = path ? parseRoute(path) : null;
     if (!route) return;
     const cur = currentRoute();
+    if (cur && cur.view === 'chats' && (cur.id || cur.query)) return; // a chat's own address, or the Chats list with its search in the address (/chats?q=...): the filters are in it, so it stays
     note(route, { replace: !!cur && cur.view === 'chats' });
 }
 /** The folders in the sidebar. Only drawn when a count or the current folder changed (this runs for every message of the feed). */
