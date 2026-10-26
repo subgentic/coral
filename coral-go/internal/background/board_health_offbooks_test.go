@@ -246,6 +246,10 @@ func TestCommitMentionReadsAShaOrAPatchAndNothingElse(t *testing.T) {
 		{"deadbee1", "a commit (deadbee)"},
 		{"sha256 3689bac5 then 6f52d7a3d", "a commit (6f52d7a)"},
 		{"commit 0123456789abcdef0123456789abcdef01234", "a commit (0123456)"},
+		{"see commit abc1234 and the commit hash 3f2a9c1", "a commit (abc1234)"},
+		{"merged (3f2a9c1), then 7a1b2c3d4", "a commit (3f2a9c1)"},
+		{"session 7a1b2c3d-4e5f-6789-abcd-ef0123456789 is up, landed 3f2a9c1", "a commit (3f2a9c1)"},
+		{"colour #a1b2c3d4 and Task id abcdef12 and landed 5e6f7a8b", "a commit (5e6f7a8)"},
 	} {
 		text, want := c[0], c[1]
 		got, ok := commitMention(text)
@@ -254,6 +258,8 @@ func TestCommitMentionReadsAShaOrAPatchAndNothingElse(t *testing.T) {
 	}
 	for _, text := range []string{
 		"", "hello", "1234567 is a number", "feedface is a word", "abcdefg is not hex", "a patch with no link", art,
+		"session 7a1b2c3d-4e5f-6789-abcd-ef0123456789 is up", "uuid ef0123456789 alone", "the tail -abcd-ef0123456789 of one", "colour #a1b2c3d4", "color: a1b2c3d4", "Task id abcdef12", "ID: 7a1b2c3d",
+		"ref 7a1b2c3d-4e5f-6789-abcd-ef0123456789 is up", "token=3f2a9c1e", "key \"3f2a9c1e\"", "issue #3f2a9c1", "the session (7a1b2c3d) died",
 		"sha256:3689bac5f1d2 is a digest", "(sha-256 3689bac5)", "the 64 hex digest " + strings.Repeat("ab1", 21) + "a",
 	} {
 		_, ok := commitMention(text)

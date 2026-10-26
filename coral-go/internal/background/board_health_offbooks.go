@@ -36,8 +36,35 @@ var (
 	artifactLinkRe = regexp.MustCompile(`coral://artifacts/[0-9a-f]{64}`)
 )
 
-// commitMention says what a post offers as a commit or a patch: a SHA (7 to 40 hex characters with a digit and a letter among them, not the start of an artifact's sha256) or the
-// word patch with an artifact link. what is a fixed phrase with the short SHA, never the agent's text.
+// idWords are the words that name an identifier or a colour, not a commit: the hex after one of them is not a SHA ("Task id abcdef12", "session 7a1b2c3d", "colour a1b2c3d4").
+var idWords = map[string]bool{"id": true, "ids": true, "uuid": true, "guid": true, "session": true, "token": true, "key": true, "color": true, "colour": true, "rgb": true, "hex": true, "nonce": true}
+
+// wordBefore is the word that ends just before position at, looking back over spaces and the marks that join a label to its value (: = quotes, brackets).
+func wordBefore(s string, at int) string {
+	i := at
+	for i > 0 && strings.ContainsRune(" \t:=\"'([", rune(s[i-1])) {
+		i--
+	}
+	end := i
+	for i > 0 && (s[i-1] >= 'a' && s[i-1] <= 'z') {
+		i--
+	}
+	return s[i:end]
+}
+
+// notACommit says a hex run is part of something else: it touches a hyphen (a UUID's parts, "0f3a-9c1e"), follows a "#" (a colour, an issue), or follows an id word.
+func notACommit(lower string, loc []int) bool {
+	if loc[0] > 0 && (lower[loc[0]-1] == '-' || lower[loc[0]-1] == '#') {
+		return true
+	}
+	if loc[1] < len(lower) && lower[loc[1]] == '-' {
+		return true
+	}
+	return idWords[wordBefore(lower, loc[0])]
+}
+
+// commitMention says what a post offers as a commit or a patch: a SHA (7 to 40 hex characters with a digit and a letter among them, not the start of an artifact's sha256, not a part
+// of a UUID, a colour, or an id) or the word patch with an artifact link. what is a fixed phrase with the short SHA, never the agent's text.
 func commitMention(content string) (what string, ok bool) {
 	lower := strings.ToLower(content)
 	for _, loc := range shaTokenRe.FindAllStringIndex(lower, -1) {
@@ -51,6 +78,9 @@ func commitMention(content string) (what string, ok bool) {
 		}
 		if strings.Contains(lower[from:loc[0]], "sha256") || strings.Contains(lower[from:loc[0]], "sha-256") {
 			continue // the start of an artifact's digest, not a commit
+		}
+		if notACommit(lower, loc) {
+			continue
 		}
 		return "a commit (" + tok[:7] + ")", true
 	}
