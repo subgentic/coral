@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"image"
 	"path/filepath"
 	"strings"
 	"unicode/utf8"
@@ -246,23 +245,16 @@ func imageExt(family string) string {
 // by its header only (nothing is decoded). A format whose size this does not read (TIFF, HEIF) is not
 // measured here: it is refused when it carries metadata, and a viewer's own limits apply.
 func imageSizeOK(data []byte, family string) error {
-	var w, h int
 	switch family {
-	case "image/webp":
-		var ok bool
-		if w, h, ok = webpSize(data); !ok {
-			return errors.New("bad image")
-		}
-	case "image/jpeg", "image/png", "image/gif":
-		cfg, _, err := image.DecodeConfig(bytes.NewReader(data))
-		if err != nil {
-			return errors.New("bad image")
-		}
-		w, h = cfg.Width, cfg.Height
+	case "image/webp", "image/jpeg", "image/png", "image/gif":
 	default:
 		return nil
 	}
-	if w <= 0 || h <= 0 || w > attachMaxSide || h > attachMaxSide || int64(w)*int64(h) > attachMaxPixels {
+	w, h, ok := imageDimensions(data, family)
+	if !ok {
+		return errors.New("bad image")
+	}
+	if !pixelsOK(w, h) {
 		return errors.New("too many pixels")
 	}
 	return nil

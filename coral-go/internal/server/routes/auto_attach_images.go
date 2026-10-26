@@ -18,22 +18,30 @@ func sniffImage(data []byte) string {
 	return ""
 }
 
+// imageDimensions reads an image's size from its header only (nothing is decoded): a WebP's first chunk, any other type through image.DecodeConfig.
+func imageDimensions(data []byte, mediaType string) (w, h int, ok bool) {
+	if mediaType == "image/webp" {
+		return webpSize(data)
+	}
+	cfg, _, err := image.DecodeConfig(bytes.NewReader(data))
+	if err != nil {
+		return 0, 0, false
+	}
+	return cfg.Width, cfg.Height, true
+}
+
+// pixelsOK is whether a w x h image is within the limits: attachMaxSide on a side and attachMaxPixels in all (the decompression-bomb guard of auto-attach and of the received-file gate).
+func pixelsOK(w, h int) bool {
+	return w > 0 && h > 0 && w <= attachMaxSide && h <= attachMaxSide && int64(w)*int64(h) <= attachMaxPixels
+}
+
 // checkPixels refuses an image larger than attachMaxSide on a side or attachMaxPixels in all.
 func checkPixels(data []byte, mediaType string) error {
-	var w, h int
-	if mediaType == "image/webp" {
-		var ok bool
-		if w, h, ok = webpSize(data); !ok {
-			return errAttach("bad_image")
-		}
-	} else {
-		cfg, _, err := image.DecodeConfig(bytes.NewReader(data))
-		if err != nil {
-			return errAttach("bad_image")
-		}
-		w, h = cfg.Width, cfg.Height
+	w, h, ok := imageDimensions(data, mediaType)
+	if !ok {
+		return errAttach("bad_image")
 	}
-	if w <= 0 || h <= 0 || w > attachMaxSide || h > attachMaxSide || int64(w)*int64(h) > attachMaxPixels {
+	if !pixelsOK(w, h) {
 		return errAttach("too_many_pixels")
 	}
 	return nil
