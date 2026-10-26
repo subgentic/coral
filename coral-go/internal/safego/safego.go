@@ -26,6 +26,7 @@ import (
 var panics atomic.Int64
 
 // Panics is how many goroutine panics were recovered since start.
+// Panics has no production caller: it is exported for tests in ptymanager, server/routes.
 func Panics() int64 { return panics.Load() }
 
 // Recover, deferred as the goroutine's first statement, recovers a panic and logs it with its
