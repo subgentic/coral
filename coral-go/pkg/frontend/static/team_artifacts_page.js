@@ -7,7 +7,7 @@ import { pollEvery } from './overload.js';
 import { importOnce } from './import_once.js';
 import { browserLocal } from './safe_storage.js';
 import { renderArtifact } from './artifact_preview.js';
-import { renderMarkdownStrict, highlightCodeIn, escapeHtml, showToast } from './utils.js';
+import { showToast } from './utils.js';
 const DT = await importOnce('./data_table.js');
 const Toolbar = await importOnce('./team_toolbar.js');
 let artifactState = DT.tableState();
@@ -18,7 +18,7 @@ const { loadFilters, saveFilters, toParams, isFiltered, EMPTY } = await importOn
 const { loadPanelOpen, savePanelOpen, buildMoreMenu } = await importOnce('./list_bar.js');
 const { isOwnerLabelRefusal, OWNER_LABEL_TEXT } = await importOnce('./owner_label.js');
 const { readersAllowed, readersBlock } = await importOnce('./artifact_readers.js');
-const { HEX_RE, managedHex, itemKey, isUnverified, readableName, sizeText, typeText, createdText, taskText, linkOfItem } = await importOnce('./artifact_item.js');
+const { HEX_RE, managedHex, itemKey, isUnverified, readableName, sizeText, typeText, createdText, taskText, linkOfItem, renderText } = await importOnce('./artifact_item.js');
 const linkOf = (item) => linkOfItem(item, { server: server(), project: model.project }); // where the bytes are, for the list this page shows
 
 const PAGE = 100;
@@ -275,12 +275,6 @@ function draw() {
     if (held === '#load-more') (body.querySelector('.dt-more') || body.querySelectorAll('[data-artifact-id]')[Math.min(rowsBefore, model.items.length - 1)])?.focus({ preventScroll: true });
     else if (held === '#retry') (body.querySelector('.team-artifacts-retry') || body.querySelector('[data-artifact-id]') || bar.node.querySelector('.list-bar-search'))?.focus({ preventScroll: true }); // Retry is drawn away by the answer: the list's first row, never the page
     else if (held) body.querySelector(`[data-artifact-id="${CSS.escape(held)}"]`)?.focus({ preventScroll: true });
-}
-
-/** The artifact's text: Markdown through the strict renderer (raw HTML shown as text, then the sanitizer), anything else as plain text. */
-function renderText(host, content, path) {
-    if (/\.(?:md|markdown|mdown)$/i.test(path || '')) { host.innerHTML = `<div class="preview-pane-markdown artifact-viewer-markdown">${renderMarkdownStrict(content)}</div>`; highlightCodeIn(host); }
-    else host.innerHTML = `<pre class="preview-pane-code artifact-viewer-text"><code>${escapeHtml(content)}</code></pre>`;
 }
 
 const sources = (list) => (Array.isArray(list) ? list.map(v => { const at = String(v).indexOf('/'); const server = at < 0 ? String(v) : String(v).slice(0, at), board = at < 0 ? '' : String(v).slice(at + 1); return board ? `${server}, board ${board} (claimed by the sender)` : server; }).join('\n') : '');

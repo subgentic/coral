@@ -12,6 +12,7 @@
 1	agent_config_form.js	title
 1	agent_config_form.js	topHTML
 1	agent_config_form.js	uid
+1	artifact_item.js	renderMarkdownStrict(content)
 1	artifact_preview.js	rows
 1	artifact_viewer.js	renderMarkdownStrict(content)
 1	auto_accept.js	`<button type="button" class="overflow-menu-item auto-accept-menu-item" role="menuitemcheckbox" aria-checked="
@@ -457,7 +458,6 @@
 1	task_detail_html.js	workflow.artifacts.map(artifactHtml).join('')
 1	task_verify_marks.js	v.icon
 1	task_verify_marks.js	v.state
-1	team_artifacts_page.js	renderMarkdownStrict(content)
 1	team_availability.js	(data.health_report || []).map(item => `<li>${escapeHtml(item)}</li>`).join('')
 1	team_availability.js	Object.entries(labels).filter(([key]) => data.summary[key] || key === 'available').map(([key,label]) => `<div 
 1	team_availability.js	a.tasks.length ? `<ul>${tasks(a.tasks)}</ul>` : ''
