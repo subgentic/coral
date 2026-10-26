@@ -64,7 +64,7 @@ const HUB_PRELOAD = `(() => {
     })()`);
     const access = mode => ev(`(async () => {
         window.__mode = ${JSON.stringify(mode)};
-        (await import((window.__coralStatic || '/static/') + 'cloud_servers.js')).invalidateServerAccess();
+        (await import((window.__coralStatic || '/static/') + 'server_access.js')).invalidateServerAccess();
         T.render.renderLiveSessions(T.state.liveSessions);
         // Nothing is redrawn, so nothing marks again until the 5 s look: do that look now (the first asks the hub, its answer marks).
         (await import((window.__coralStatic || '/static/') + 'hub_blocked_controls.js')).markBlockedControls();

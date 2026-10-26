@@ -144,14 +144,14 @@ const UNDERSIZED = `(() => {
                 ? Promise.resolve(new Response(JSON.stringify({ servers: [{ id: 's1', label: 'Work Mac', online: true, last_seen: '2026-10-13T00:00:00Z', access_mode: 'view', local_mode: 'launch' }] }), { status: 200, headers: { 'content-type': 'application/json' } }))
                 : real(u, o);
             const { showView } = await import((window.__coralStatic||'/static/')+'utils.js');
-            const cs = await import((window.__coralStatic||'/static/')+'cloud_servers.js');
+            const cs = await import((window.__coralStatic||'/static/')+'servers.js');
             const body = document.getElementById('servers-tab-body');
             showView(body.closest('.view, [id$=-view]')?.id || 'servers-view');
-            await cs.renderCloudServersInto(body);
+            await cs.renderServersInto(body, { source: 'cloud' });
             await ${framesJs(2)};
             const hasSelect = !!body.querySelector('.cs-row select');
             const small = ${UNDERSIZED};
-            cs.hideCloudServers();
+            cs.hideServersModal();
             window.fetch = real;
             return { hasSelect, small };
         })()`);

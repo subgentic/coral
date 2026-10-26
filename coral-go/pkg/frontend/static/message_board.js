@@ -902,7 +902,7 @@ export function hideBoardSubscribers() {
 async function subscribeDashboard(project) {
     try {
         if (isCloud()) {
-            const access = await (await importOnce('./cloud_servers.js')).serverAccess(splitKey(project).server);
+            const access = await (await importOnce('./server_access.js')).serverAccess(splitKey(project).server);
             if (!access?.mayInteract) return;
         }
         await boardFetch(project, `/subscribe`, {

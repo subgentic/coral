@@ -38,10 +38,10 @@ const TIP = 'Coral on this machine is restarting into an update. It reconnects o
         const srv = (id, label, online) => ({ id, label, online, access_mode: 'launch', local_mode: 'launch', created_at: '2026-10-01T00:00:00Z', last_seen: '2026-10-20T08:00:00Z' });
         const open = async (servers, replies) => {
             await ev(`window.__calls.length = 0; window.__servers = ${JSON.stringify(servers)}; window.__reply = ${JSON.stringify(replies)}; true`);
-            await ev(`import(${S} + 'cloud_servers.js').then(m => m.renderCloudServersInto(document.getElementById('rb-host')))`);
+            await ev(`import(${S} + 'servers.js').then(m => m.renderServersInto(document.getElementById('rb-host'), { source: 'cloud' }))`);
         };
         const badges = () => ev(`[...document.querySelectorAll('#rb-host .cs-row')].map(r => ({ id: r.dataset.id, badge: (r.querySelector('.server-relaunch-badge') || {}).textContent || null }))`);
-        const close = () => ev(`import(${S} + 'cloud_servers.js').then(m => { m.hideCloudServers(); return true; })`);
+        const close = () => ev(`import(${S} + 'servers.js').then(m => { m.hideServersModal(); return true; })`);
 
         console.log('1. flag off: nothing is read, nothing shown');
         await ev(`import((window.__coralStatic || '/static/') + 'update_flag.js').then(m => { m.setUpdatesEnabled(false); return true; })`);

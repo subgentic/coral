@@ -1,7 +1,7 @@
 // The Servers list's search box (#4778): the shared list bar with a search and a count, above the list, from six machines up. Both lists, against stubbed answers:
 //   - a self-hosted hub (servers.js: "N servers"): no box with five; with eight a box above the list says "8 servers"; typing narrows the rows by name, id or address and the count says "k of 8 servers";
 //     nothing matching says so (and "Add server" is still there); clearing brings the list back; the periodic refresh keeps the text and the focus; leaving the tab drops the box and its text;
-//   - Coral Hub's own list (cloud_servers.js: "N machines"): the same, through the hub's Servers tab in cloud mode;
+//   - Coral Hub's own list (servers.js: "N machines"): the same, through the hub's Servers tab in cloud mode;
 //   - a phone: the box fits, nothing scrolls sideways.
 // Notes and Knowledge have no search box by design (one markdown document per agent, an overview and one document per agent: the browser's find covers them).
 // Drives Chrome over CDP through agent_view_harness.js; the cloud mode is the dashboard page's own flag, as in servers_tab_browser.test.js.
@@ -148,7 +148,7 @@ const hubRows = n => remotes(n).map(s => ({ id: s.id, label: s.label, online: s.
         v = await view(CS);
         check('Coral Hub: a name narrows the machines, "1 of 9 machines"', v.rows.join() === 'm4' || v.rows.length === 1, JSON.stringify([v.rows, v.count]));
         check('Coral Hub: the count says 1 of 9 machines', v.count === '1 of 9 machines', v.count);
-        await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'cloud_servers.js'); await m.renderCloudServersInto(document.getElementById('servers-tab-body')); })(); true`); // what the 5 s refresh does
+        await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'servers.js'); await m.renderServersInto(document.getElementById('servers-tab-body'), { source: 'cloud' }); })(); true`); // what the 5 s refresh does
         await settle(`document.querySelectorAll('${CS}').length === 1 && document.activeElement && document.activeElement.id === 'sb-search'`, 'the list drawn again with the search kept');
         v = await view(CS);
         check('Coral Hub: a refresh keeps the search, the count and the focus in the box', v.rows.length === 1 && v.count === '1 of 9 machines' && v.focus === 'sb-search', JSON.stringify([v.rows, v.count, v.focus]));

@@ -275,7 +275,7 @@ const CLOUD_PRELOAD = `(() => {
         await setServers([row('m1', 'view', 'launch'), row('m2', 'interact', 'view'), row('m3', 'interact', 'launch'), row('m5', 'interact', 'launch')], { delay: 600 });
         // A fresh cache answers an unknown server at once (null), which would clear the state BEFORE the
         // frame and never race it. Expire it so the selection's lookup is a real, slow request (#3125).
-        await ev(`(async () => { (await import((window.__coralStatic||'/static/')+'cloud_servers.js')).invalidateServerAccess(); return true; })()`);
+        await ev(`(async () => { (await import((window.__coralStatic||'/static/')+'server_access.js')).invalidateServerAccess(); return true; })()`);
         await ev(`window.__m.add('race', 'R', 5, { sleeping: false, server: 'm5' }); true`);
         await ev(`window.selectLiveSession('race', 'claude', 'race-id', 'm5'); true`);
         await waitFor(`window.__wsTerm && window.__wsTerm.url.includes('race-id') && window.__wsTerm.readyState === 1`, 'race socket', 3000);

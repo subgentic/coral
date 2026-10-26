@@ -1,3 +1,4 @@
+const { liveServer: liveOf, buildServersTable } = await importOnce('./server_table.js');
 /* Servers dialog for the Cloud Hub: the servers enrolled to this account.
  * List (name, online/offline, last contact), rename, "allow launching from the
  * web" switch, revoke (confirmed in the dialog, never window.confirm), and the
@@ -18,17 +19,17 @@
 
 import { rememberFocus } from './dom_morph.js';
 import { importOnce } from './import_once.js';
-import { state } from './state.js';
 import { h } from './cloud.js';
 import { formatLastSeen, updateNotice, RELEASES_URL, DOWNLOAD_URL, serverVersion, serverAgentCount, belowMinimumText } from './server_status.js';
-import { accessBlockedMessage, accessChanged } from './hub_access.js';
-import { pollEvery } from './overload.js';
+import { accessChanged } from './hub_access.js';
+const { MODES, MODE_INFO, accessChoice, effectiveMode, launchNote, effectiveNote, invalidateServerAccess, serverAccess } = await importOnce('./server_access.js');
+const rank = m => MODES.indexOf(m);
 import { announceNotice } from './notifications.js';
 import { OWNER_LABEL_STEP } from './owner_label.js';
 import { healthDot, healthCard } from './machine_health.js';
 // This module is loaded lazily, so its search box is loaded the same way (a static import of a module not loaded at startup could not be retried: import_hygiene).
 const { syncRelaunchReads, resetRelaunchReads, relaunchBadge } = await importOnce('./relaunch_badge.js'); // the "Updating" badge of a hub relaunch (#5355, behind the update flag)
-const { syncServersBar, serverVisible, serversFiltered, resetServersBar } = await importOnce('./server_search.js');
+const { syncServersBar, serverVisible, serversFiltered } = await importOnce('./server_search.js');
 const DT = await importOnce('./data_table.js'); // the one table (#7903)
 
 // The Servers tab (#3070) hosts this list; there is no separate dialog.
@@ -38,7 +39,6 @@ let loadError = '';
 let confirming = null;   // id awaiting revoke confirmation
 let renaming = null;     // id being renamed
 let busy = new Set();
-let timer = null;
 let loaded = false;
 let enrollOpen = null; // null follows the account: first machine open, existing machines closed
 let enrollCode = '';
@@ -50,50 +50,26 @@ const RELINK_BUTTON = 'Owner not confirmed';
 const relinkHelp = label => `${label || 'This machine'} can't confirm its owner yet. On that computer, ${OWNER_LABEL_STEP}.`;
 const relinkId = s => `${rowId(s.id)}-relink`;
 
-/** Open the Servers tab, optionally at one server's row. */
-export async function showCloudServers(focusId) {
-    const { openServersTab } = await importOnce('./servers_tab.js');
-    return openServersTab(focusId);
-}
-
-/** Render the server list into `el` (the Servers tab) and keep it fresh. Resolves once loaded. */
-export async function renderCloudServersInto(el) {
-    wireMoreClose();
-    if (host !== el) enrollOpen = null; // a new visit follows the account again; a redraw into the same page keeps what the person opened
-    host = el;
-    confirming = null; renaming = null; loadError = '';
-    loaded = false;
-    resetRelaunchReads(); // the first list of a visit reads each online machine's relaunch status once
-    render();
-    await load();
-    clearInterval(timer);
-    timer = pollEvery(() => { if (!renaming && !busy.size) load(); }, 5000);
-}
-
-/** Leaving the Servers tab: stop refreshing. */
-export function hideCloudServers() {
-    clearInterval(timer); timer = null;
-    host = null;
-    resetServersBar();
-}
-
-async function load() {
-    try {
-        const r = await fetch('/api/servers', { headers: { Accept: 'application/json' } });
-        if (!r.ok) loadError = 'Could not load your servers.';
-        else {
-            const d = await r.json();
-            const before = loaded ? new Map(servers.map(s => [s.id, s.online === true])) : null;
-            servers = Array.isArray(d && d.servers) ? d.servers : [];
-            // A computer that goes offline or comes back is said once (#6226): the list redraws in place every 5 s and nothing in it is a live region.
-            if (before) for (const s of servers) { const was = before.get(s.id); if (was !== undefined && was !== (s.online === true)) announceNotice(`${s.label || 'A computer'} is ${s.online === true ? 'online' : 'offline'}`); }
-            loaded = true;
-            loadError = '';
-            syncRelaunchReads(servers, render);
-        }
-    } catch { loadError = 'Could not reach the hub.'; }
-    render();
-}
+let load;
+export const serverView = {
+    mount(el, refresh) {
+        load = refresh; wireMoreClose();
+        if (host !== el) enrollOpen = null;
+        host = el; confirming = null; renaming = null; loadError = ''; loaded = false;
+        resetRelaunchReads();
+    },
+    leave() { host = null; },
+    canRefresh: () => !renaming && !busy.size,
+    accept(rows) {
+        const before = loaded ? new Map(servers.map(s => [s.id, s.online === true])) : null;
+        servers = rows;
+        if (before) for (const s of servers) { const was = before.get(s.id); if (was !== undefined && was !== (s.online === true)) announceNotice(`${s.label || 'A computer'} is ${s.online === true ? 'online' : 'offline'}`); }
+        loaded = true; loadError = ''; syncRelaunchReads(servers, render);
+    },
+    fail: error => { loadError = error; },
+    expand: id => { expanded.add(id); render(); },
+    render,
+};
 
 async function call(id, method, body) {
     busy.add(id); render();
@@ -111,135 +87,6 @@ async function call(id, method, body) {
     // An agent already open on this server re-decides its read-only state from a
     // fresh lookup: the effective mode, not the hub setting alone (#3138).
     if (changed) accessChanged(id, await serverAccess(id));
-}
-
-export const MODES = ['view', 'interact', 'launch'];
-
-export const MODE_INFO = {
-    view: { label: 'View', text: 'Read terminals, chats, files, tasks and boards. Nothing you do here changes anything on the machine.' },
-    // What each mode allows, as the route table has it (testdata/cloud_routes.golden, what the connector enforces): pinned by
-    // TestDashboardModeTextMatchesTheRouteTable (#4526; this said Interact could kill an agent long after #4274 made it Launch).
-    interact: { label: 'Interact', text: 'Also type into running agents, post on boards, change tasks and notes, and rename or archive agents. Agents can run commands, so this can make the machine run code. It can also change a team\'s working mode.' },
-    launch: { label: 'Launch', text: 'Also start, stop, sleep, wake and restart agents (one agent or a whole team), browse the machine\'s folders, pause boards, delete board messages and boards, and turn on auto-accept.' },
-};
-
-const rank = m => MODES.indexOf(m);
-
-/** The lower of two modes; an unknown or missing local mode does not limit. */
-export function lowerMode(a, b) {
-    if (rank(b) < 0) return rank(a) < 0 ? 'view' : a;
-    if (rank(a) < 0) return b;
-    return rank(a) <= rank(b) ? a : b;
-}
-
-/** What the owner chose for a server's hub access: view, interact or launch (the hub reads a stored launch as "up to what the computer allows"). An unknown or missing value never widens: view. */
-export function accessChoice(s) {
-    const m = s && s.access_mode;
-    if (m === 'follow') return 'launch'; // an older hub's word for the same thing
-    return m === 'launch' || m === 'interact' ? m : 'view';
-}
-
-/** The owner's choice as a cap. */
-export function hubMode(s) { return accessChoice(s); }
-
-/** What actually applies: the lower of the owner's choice and the machine's announced max; a machine that has not announced counts as View. */
-export function effectiveMode(s) {
-    return rank(s.local_mode) < 0 ? 'view' : lowerMode(hubMode(s), s.local_mode);
-}
-
-/** The most this computer allows, as words for a note: "This computer allows up to Interact; change it in Coral on that computer." Fixed words, never machine text; '' when it allows Launch. */
-export function launchNote(s) {
-    const local = rank(s.local_mode) >= 0 ? s.local_mode : null;
-    if (local && rank(local) < rank('launch')) return `This computer allows up to ${MODE_INFO[local].label}; change it in Coral on that computer (Settings > Network and Hub).`;
-    return '';
-}
-
-/** "Effective: Interact, limited by this computer" when what applies is lower than the owner's choice, else ''. */
-export function effectiveNote(s) {
-    const eff = effectiveMode(s);
-    return rank(eff) < rank(accessChoice(s)) ? `Effective: ${MODE_INFO[eff].label}, limited by this computer` : '';
-}
-
-let _modeCache = { at: 0, byId: null, pending: null };
-
-/** Mark the cached Servers list stale, so the next access lookup asks the hub (after
- *  a mode change, so it applies at once rather than within 15 s). The last list stays
- *  readable by cachedServerAccess until the new one arrives: a dialog drawn from it keeps
- *  its answer instead of flickering to "allowed" while the hub is asked again (#5004). */
-export function invalidateServerAccess() { _modeCache = { at: 0, byId: _modeCache.byId, pending: null }; }
-
-async function _serverRow(serverId) {
-    const now = Date.now();
-    if (!_modeCache.byId || now - _modeCache.at > 15000) {
-        _modeCache.pending = _modeCache.pending || fetch('/api/servers', { credentials: 'same-origin', quiet: true })
-            .then(r => (r.ok ? r.json() : null))
-            .then(d => { _modeCache.byId = d && Array.isArray(d.servers) ? Object.fromEntries(d.servers.map(x => [x.id, x])) : (_modeCache.byId || {}); _modeCache.at = Date.now(); })
-            .catch(() => { _modeCache.byId = _modeCache.byId || {}; _modeCache.at = Date.now(); })
-            .finally(() => { _modeCache.pending = null; });
-        await _modeCache.pending;
-    } else if (_modeCache.pending) {
-        await _modeCache.pending;
-    }
-    return (_modeCache.byId && _modeCache.byId[serverId]) || null;
-}
-
-/** Whether this tab's account may send interact-level requests to `serverId` right now (the lower of the hub mode and the
- *  machine's own limit). Cached for 15 s; an unknown server or a failed lookup answers true so a lookup problem never
- *  blocks the UI (the hub still enforces). Used to skip background writes a viewer could only get refused. */
-export async function serverMayInteract(serverId) {
-    const a = await serverAccess(serverId);
-    return !a || a.mayInteract;
-}
-
-/** What the Cloud Hub lets this account do on `serverId`: {hub, local, effective, limitedBy, mayInteract, label},
- *  or null for an unknown server (a lookup problem never blocks the UI; the hub still enforces). Prefers the hub's own
- *  effective_mode / limited_by when the row carries them. */
-export async function serverAccess(serverId) {
-    const s = await _serverRow(serverId);
-    return s ? _access(s, serverId) : null;
-}
-
-/** Whether the Servers list has loaded (even if that load failed or left a server out) and no mode
- *  change has marked it stale since: a failed load counts, it stamps the time and is not retried at once. */
-export function serverListSettled() {
-    return _modeCache.byId !== null && _modeCache.at !== 0;
-}
-
-/** serverAccess from the cached Servers list, without asking the hub: null when the list was not
- *  loaded yet or the server is unknown. For drawing a menu (#3443); serverAccess loads it. */
-export function cachedServerAccess(serverId) {
-    const s = _modeCache.byId && _modeCache.byId[serverId];
-    return s ? _access(s, serverId) : null;
-}
-
-function _access(s, serverId) {
-    const hub = hubMode(s);
-    const local = rank(s.local_mode) >= 0 ? s.local_mode : null;
-    const effective = rank(s.effective_mode) >= 0 ? s.effective_mode : effectiveMode(s);
-    let limitedBy = s.limited_by === 'hub' || s.limited_by === 'machine' ? s.limited_by : null;
-    if (!limitedBy && rank(effective) < rank('launch')) limitedBy = !local || rank(local) < rank(hub) ? 'machine' : 'hub'; // a computer that has not announced is the limit: there is nothing for the owner to raise
-    return { hub, local, effective, limitedBy, mayInteract: rank(effective) >= rank('interact'), mayLaunch: rank(effective) >= rank('launch'), label: s.label || serverId };
-}
-
-
-/** Plain-language text for a hub refusal of a proxied request, or '' when it is not one we explain.
- *  `local_mode` = the machine's own Cloud access setting is lower than the hub allows (mode is its
- *  current maximum); `access_mode` / `launch_disabled` = the hub setting is too low. */
-export function refusalMessage(status, body, serverName = '') {
-    if (status !== 403 || !body || typeof body !== 'object') return '';
-    const known = m => (rank(m) >= 0 ? m : null);
-    if (body.error === 'local_mode') {
-        const m = known(body.mode);
-        return accessBlockedMessage({ local: m, effective: m, limitedBy: 'machine', label: serverName }, known(body.required));
-    }
-    if (body.error === 'access_mode' || body.error === 'launch_disabled') {
-        const hub = known(body.hub_mode), local = known(body.local_mode);
-        const effective = hub && local ? lowerMode(hub, local) : hub || local;
-        const limitedBy = hub && local && rank(local) < rank(hub) ? 'machine' : 'hub';
-        return accessBlockedMessage({ hub, local, effective, limitedBy, label: serverName },
-            known(body.required) || (body.error === 'launch_disabled' ? 'launch' : null));
-    }
-    return '';
 }
 
 /** The row's update badge (a link to the releases page), or null. */
@@ -269,7 +116,6 @@ function cmpVersion(a, b) {
     return 0;
 }
 
-function liveOf(s) { return { ...s, ...((state.servers || []).find(x => x && x.id === s.id) || {}) }; } // version, agent count and the update notice (#3059, #3099)
 function effectiveOf(s) { return rank(s.effective_mode) >= 0 ? s.effective_mode : effectiveMode(s); }
 
 /** The value a column sorts by. */
@@ -282,8 +128,6 @@ function sortValue(s, key) {
     return String(s.label || 'Unnamed server').toLowerCase();
 }
 
-/** Open one machine's details (a deep link to it). */
-export function expandServer(id) { expanded.add(id); render(); }
 
 function toggle(id) {
     if (expanded.has(id)) expanded.delete(id); else expanded.add(id);
@@ -394,7 +238,7 @@ function serversTable(shown) {
         access: s => accessPicker(s, busy.has(s.id), `${rowId(s.id)}-access-help`),
         actions: s => h('div', { className: 'cs-actions' }, rowActions(s, busy.has(s.id))),
     };
-    const t = DT.dataTable({
+    return buildServersTable(DT, {
         label: 'Your computers', state: dtState, rows: shown, rowKey: s => s.id, rowName: s => s.label || 'Unnamed server',
         columns: [
             { key: 'name', label: 'Name', primary: true, width: 'grow', line: 1, sort: true, sortValue: s => sortValue(s, 'name'), cell: cellOf.name },
@@ -408,15 +252,13 @@ function serversTable(shown) {
         // The names the deep links, the focus keep and the suites read: the table keeps its own classes, these are hooks only (no rule in any stylesheet); they are put back whenever a sort draws the rows again.
         decorateHead: (th, c) => { th.classList.add('cs-th', `cs-col-${c.key}`); th.querySelector('.dt-sort')?.classList.add('cs-sort'); },
         decorate: (s, tr, detail) => {
-            tr.id = rowId(s.id); tr.tabIndex = -1; tr.dataset.id = s.id; tr.classList.add('cs-row'); tr.classList.toggle('cs-open', isOpenRow(s));
+            tr.dataset.id = s.id; tr.classList.add('cs-row'); tr.classList.toggle('cs-open', isOpenRow(s));
             for (const td of tr.querySelectorAll('td.dt-td')) td.classList.add(`cs-col-${td.dataset.key}`);
             if (detail) detail.classList.add('cs-detail');
             const escape = e => { if (e.key === 'Escape' && confirming === s.id) { e.preventDefault(); e.stopPropagation(); cancelRevoke(s); } };
             tr.addEventListener('keydown', escape); if (detail) detail.addEventListener('keydown', escape);
         },
-    });
-    t.el.querySelector('table').classList.add('cs-table');
-    return t.el;
+    }, { rowId: s => rowId(s.id), tableClass: 'cs-table' });
 }
 
 

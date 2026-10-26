@@ -59,7 +59,7 @@ export async function syncPaneWidth() {
     // Through the hub, a viewer (View mode, or a machine limited to View) must not write at all, even in the background:
     // looking at a session never sends a request the hub would refuse.
     if (isCloud() && server !== 'local') {
-        const { serverMayInteract } = await importOnce('./cloud_servers.js');
+        const { serverMayInteract } = await importOnce('./server_access.js');
         if (!(await serverMayInteract(server))) { _lastSyncedCols = null; return; }
     }
     try {

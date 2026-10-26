@@ -7,7 +7,7 @@ const { pathToFileURL } = require('url');
     globalThis.location = { protocol: 'https:', host: 'hub.example', origin: 'https://hub.example' };
     globalThis.document = { addEventListener() {}, getElementById() { return null; } };
     const dir = path.resolve(__dirname, '../../coral-go/pkg/frontend/static');
-    const m = await import(pathToFileURL(path.join(dir, 'cloud_servers.js')).href);
+    const m = await import(pathToFileURL(path.join(dir, 'server_access.js')).href);
 
     assert.strictEqual(m.lowerMode('launch', 'interact'), 'interact');
     assert.strictEqual(m.lowerMode('view', 'launch'), 'view');

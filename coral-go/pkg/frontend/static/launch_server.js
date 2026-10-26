@@ -123,13 +123,13 @@ export function bareBoardName(key) {
 }
 
 /** The access-refusal message for a launch response ('' when it is not one).
- *  cloud_servers.js owns the wording (refusalMessage); it is loaded only when a
+ *  server_access.js owns the wording (refusalMessage); it is loaded only when a
  *  403 arrives, so this module stays light. */
 async function accessRefusal(status, body, serverName) {
     if (status !== 403 || !body || typeof body !== 'object') return '';
     if (!['access_mode', 'launch_disabled', 'local_mode'].includes(body.error)) return '';
     try {
-        const { refusalMessage } = await importOnce('./cloud_servers.js');
+        const { refusalMessage } = await importOnce('./server_access.js');
         return refusalMessage(status, body, serverName) || '';
     } catch {
         return '';

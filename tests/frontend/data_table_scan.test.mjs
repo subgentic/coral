@@ -44,8 +44,8 @@ assert.equal(jsCount('const th = 1; const tr = th + 1; // a variable called h or
 // the real world: the last legacy table builder is seen (sidebar_groups.js), and cloud_servers.js, which was the h() builder's blind spot, is a dataTable now (#7903 step 2)
 const groups = fs.readFileSync(path.join(STATIC, 'sidebar_groups.js'), 'utf8');
 assert.ok(jsCount(groups) >= 7, 'sidebar_groups.js builds its table by hand: the census counts it');
-const cloud = fs.readFileSync(path.join(STATIC, 'cloud_servers.js'), 'utf8');
-assert.equal(jsCount(cloud), 0, 'cloud_servers.js builds no table of its own any more');
+const cloud = fs.readFileSync(path.join(STATIC, 'cloud_server_view.js'), 'utf8');
+assert.equal(jsCount(cloud), 0, 'cloud_server_view.js builds no table of its own');
 // the exemptions: a reason, and a file that exists and matches
 for (const [kind, dir] of [['css', path.join(STATIC, 'css')], ['js', STATIC]]) for (const [f, why] of Object.entries(EXEMPT[kind])) {
     assert.ok(why && why.length >= 20, `${kind}/${f}: an exemption needs its reason`);
