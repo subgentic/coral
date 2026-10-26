@@ -611,3 +611,21 @@
     #mobile-analytics-list .sidebar-header { padding: 12px; }
     .cost-page { padding: 12px; }
 }
+
+/* The tables fold when the page is narrow (#7738): a phone, and a desktop at 200% text (40 rem is 640 px at 100%). Each row is its name over its figures as "label value" (the labels come from
+   the cells' data-label; Cost or Calls first), so no table scrolls sideways; the header row is not drawn, the "Sort by" select above the table stands in for its sort buttons. */
+.cost-page { container: costpage / inline-size; }
+.cost-fold-sort { display: none; }
+@container costpage (max-width: 40rem) {
+    .cost-fold-sort { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 8px; color: var(--text-secondary); font-size: 0.8125rem; }
+    .cost-fold-sort select, .cost-fold-sort .cost-fold-dir { min-height: var(--control-touch-height, 44px); }
+    .cost-table-container .cost-table thead { display: none; }
+    .cost-table-container .cost-table, .cost-table-container .cost-table tbody { display: block; width: 100%; }
+    .cost-table-container .cost-table tbody tr { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 14px; padding: 12px; border-bottom: 1px solid var(--border); }
+    .cost-table-container .cost-table tbody tr:last-child { border-bottom: 0; }
+    .cost-table-container .cost-table td { display: block; padding: 0; border: 0; text-align: left; max-width: 100%; font-size: 0.75rem; font-weight: 400; color: var(--text-secondary); font-variant-numeric: tabular-nums; } /* the figures under the name: 12/400, the label tertiary, the value secondary (UI/UX #7738) */
+    .cost-table-container .cost-table td.cost-fold-name { order: -2; font-size: 0.8125rem; font-weight: 600; color: var(--text-primary); }
+    .cost-table-container .cost-table td.cost-fold-name:first-child { flex: 1 1 100%; }
+    .cost-table-container .cost-table td.cost-fold-first { order: -1; }
+    .cost-table-container .cost-table td[data-label]:not(.cost-fold-name)::before { content: attr(data-label) " "; color: var(--text-muted); font-weight: 400; }
+}

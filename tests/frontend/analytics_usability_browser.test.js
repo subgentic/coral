@@ -64,14 +64,10 @@ const BRANCHES = [{ repo_name: 'coral', branch: 'main', board_name: 'coral-go-te
             check(`${tag}: tile labels and table headers are sentence case, 12/500, never uppercase`, look.labels.length === 1 && look.labels[0] === 'none,12px,500' && look.ths.length === 1 && look.ths[0] === 'none' && look.texts.every(t => t === t.charAt(0).toUpperCase() + t.slice(1).toLowerCase()), JSON.stringify(look));
             check(`${tag}: the Burn rate figure is in the normal colour (amber is a warning), and the figures of one line of tiles sit at one height`, look.burn && look.lines.every(n => n === 1), JSON.stringify(look));
             const scroll = await ev(`[...document.querySelectorAll('#cost-dashboard-view .cost-table-container')].filter(b => b.querySelector('table')).map(b => ({ id: b.id, wide: b.scrollWidth > b.clientWidth + 1, more: b.dataset.more || '', hint: (b.previousElementSibling && b.previousElementSibling.classList.contains('cost-scroll-hint') && !b.previousElementSibling.hidden) ? b.previousElementSibling.textContent : '' }))`);
-            if (mobile) {
-                const wide = scroll.filter(s => s.wide);
-                check(`${tag}: tables wider than the screen are marked as having more to the right (the edge fades), and ONE line for the page says so, not one above every table`, wide.length >= 3 && wide.every(s => s.more === 'right') && (await ev(`[...document.querySelectorAll('#cost-dashboard-view .cost-scroll-hint')].filter(h => !h.hidden && h.getClientRects().length > 0).map(h => h.textContent)`)).length === 1 && (await ev(`document.querySelectorAll('#cost-dashboard-view .cost-scroll-hint').length`)) === 1, JSON.stringify(scroll));
-                const id = wide[0].id;
-                await ev(`document.getElementById(${JSON.stringify(id)}).scrollIntoView({ block: 'center' }); true`); await shot('analytics-table-390');
-                await ev(`(() => { const b = document.getElementById(${JSON.stringify(id)}); b.scrollLeft = b.scrollWidth; return true; })()`);
-                await waitFor(`!document.getElementById(${JSON.stringify(id)}).dataset.more`, 'the fade to go at the end of the scroll', 4000);
-                check(`${tag}: at the end of one table's scroll its fade goes; the page's line stays while another table has more`, await ev(`!document.getElementById(${JSON.stringify(id)}).dataset.more && [...document.querySelectorAll('#cost-dashboard-view .cost-table-container')].some(b => b.dataset.more) === !document.getElementById('cost-scroll-hint').hidden`));
+            if (mobile) { // the tables fold on a phone (#7738): none is wider than the screen, so none is marked and the page's line is gone
+                const hint = await ev(`[...document.querySelectorAll('#cost-dashboard-view .cost-scroll-hint')].filter(h => !h.hidden && h.getClientRects().length > 0).map(h => h.textContent)`);
+                check(`${tag}: no table is wider than the screen (they fold), so none is marked as having more to the right and the page's line is not shown`, scroll.length >= 3 && scroll.every(s => !s.wide && s.more === '') && hint.length === 0, JSON.stringify({ scroll, hint }));
+                await ev(`document.getElementById('cost-by-provider').scrollIntoView({ block: 'center' }); true`); await shot('analytics-table-390');
             } else check(`${tag}: a desktop table that fits shows no cue`, scroll.every(s => !s.wide || true) && scroll.filter(s => !s.wide).every(s => s.more === '' && s.hint === ''), JSON.stringify(scroll));
         }
         // an empty range

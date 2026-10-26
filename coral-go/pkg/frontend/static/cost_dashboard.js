@@ -60,6 +60,51 @@ function placeCostColumns(root) {
             for (const i of order) tr.appendChild(byIndex.get(i));
         }
     }
+    foldCostTables(root);
+}
+
+// ── The tables on a phone and at large text (#7738) ──────────────────────
+// A table that does not fit its page folds (css, a container query in rem on the page: 40 rem is a phone, and a desktop at 200% text): each row is its name, then its figures as "label value"
+// under it, Cost or Calls first, so nothing is behind a sideways scroll. The header row is not drawn then, so each cell carries its column's name (data-label, drawn by css and read as part of the
+// cell), the table keeps its roles (a display other than table drops them from the page's structure), and a "Sort by" select with a reverse button above the table makes the sort the header's buttons make.
+const FOLD_FIRST = new Set(['cost_usd', 'calls']);
+function foldCostTables(root) {
+    for (const table of root.querySelectorAll('table.cost-table')) {
+        const head = table.querySelector('thead tr');
+        if (!head) continue;
+        const ths = [...head.children];
+        const names = COST_NAME_COLUMNS[ths[0] && ths[0].dataset.table] ?? 1;
+        const label = th => { const n = [...(th.querySelector('.cost-sort-btn') || th).childNodes].find(x => x.nodeType === 3); return (n ? n.textContent : th.textContent).trim(); };
+        table.setAttribute('role', 'table');
+        for (const group of table.children) group.setAttribute('role', 'rowgroup');
+        for (const tr of table.querySelectorAll('tr')) {
+            tr.setAttribute('role', 'row');
+            const cells = [...tr.children];
+            if (cells.length !== ths.length) { for (const c of cells) c.setAttribute('role', 'cell'); continue; }
+            cells.forEach((c, i) => {
+                if (c.tagName === 'TH') { c.setAttribute('role', 'columnheader'); return; }
+                c.setAttribute('role', 'cell'); c.dataset.label = label(ths[i]); c.classList.toggle('cost-fold-name', i < names);
+                c.classList.toggle('cost-fold-first', FOLD_FIRST.has(ths[i].dataset.field));
+            });
+        }
+        // the sort, for a table whose header is not drawn
+        let bar = root.previousElementSibling && root.previousElementSibling.classList.contains('cost-fold-sort') ? root.previousElementSibling : null;
+        const sortable = ths.filter(th => th.querySelector('.cost-sort-btn'));
+        if (!sortable.length) { if (bar) bar.remove(); continue; }
+        if (!bar) { bar = document.createElement('div'); bar.className = 'cost-fold-sort'; root.before(bar); }
+        const current = sortable.find(th => /ascending|descending/.test(th.getAttribute('aria-sort') || ''));
+        const text = document.createElement('label'); text.textContent = 'Sort by ';
+        const select = document.createElement('select'); select.className = 'cost-time-select';
+        for (const th of sortable) { const o = document.createElement('option'); o.value = th.dataset.field; o.textContent = label(th); o.selected = th === current; select.append(o); }
+        text.append(select);
+        const reverse = document.createElement('button'); reverse.type = 'button'; reverse.className = 'btn btn-sm cost-fold-dir';
+        const desc = current && current.getAttribute('aria-sort') === 'descending';
+        reverse.textContent = desc ? 'Descending' : 'Ascending'; reverse.setAttribute('aria-label', `Order: ${desc ? 'descending' : 'ascending'}, press to reverse`);
+        const press = field => { const th = sortable.find(x => x.dataset.field === field); if (th) th.querySelector('.cost-sort-btn').click(); };
+        select.addEventListener('change', () => press(select.value));
+        reverse.addEventListener('click', () => press(select.value));
+        bar.replaceChildren(text, reverse);
+    }
 }
 if (_phone) _phone.addEventListener('change', () => placeCostColumns(document.getElementById('cost-dashboard-view') || document));
 
