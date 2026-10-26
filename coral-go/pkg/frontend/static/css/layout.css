@@ -981,7 +981,7 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 /* A page that lists several groups (the landing, #7722): their tables share one column grid, and each next head has room above it */
 .group-table-aligned { table-layout: fixed; }
 .group-table-aligned th:first-child { width: 34%; }
-.group-table-scroll + .group-table-head { margin-top: var(--space-2xl); }
+.group-table-head ~ .group-table-head { margin-top: var(--space-2xl); }
 /* A table that stacks its rows on a phone (the Inbox's Saved): the message over its date, state and action, so none is behind the table's sideways scroll; the header row stays for a screen reader. */
 @media (max-width: 760px) {
     .group-table-stack thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

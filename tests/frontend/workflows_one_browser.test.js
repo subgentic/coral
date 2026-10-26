@@ -108,14 +108,14 @@ const STUB = `(() => { const real = window.fetch; const J = b => Promise.resolve
             assert.equal(foot, true, at + 'the pinned action is on screen');
 
             // the tab opens on its first group's table
-            await waitFor(`!!document.querySelector('#group-table-view table.group-table') && document.getElementById('group-table-view').checkVisibility()`, at + 'the first group as a table', 10000);
+            await waitFor(`!!document.querySelector('#group-table-view table.dt-table') && document.getElementById('group-table-view').checkVisibility()`, at + 'the first group as a table', 10000);
             assert.equal(await ev(`document.querySelector('#group-table-title').textContent`), 'Active', at + 'Active first');
             // UI/UX's #7588 item 8: the group head is one fixed row (36 px, 44 on a phone) with a header button or without, so the title is where every other tab has it
             assert.equal(await ev(`(() => { const v = document.getElementById('group-table-view'), t = document.querySelector('#group-table-title').getBoundingClientRect(), h = document.querySelector('#group-table-view .group-table-head').getBoundingClientRect(); const m = innerWidth < 768 || matchMedia('(pointer: coarse)').matches ? 44 : 36;
                 return Math.round(h.height) === m && Math.abs(t.top - ((() => { const tb = v.querySelector('.gt-toolbar'); return tb ? tb.getBoundingClientRect().bottom + parseFloat(getComputedStyle(tb).marginBottom) : v.getBoundingClientRect().top + parseFloat(getComputedStyle(v).paddingTop); })() + (m - t.height) / 2)) < 1.5; })()`), true, at + 'the title row is one fixed height');
-            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view table')[0].querySelectorAll('th')].map(h => [h.textContent, h.getAttribute('scope')])`), [['Workflow', 'col'], ['Steps', 'col'], ['Last run', 'col'], ['Result', 'col'], ['Run', 'col']], at + 'the columns (of the first table: the page lists every group, #7722)');
-            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(r => r.children[0].textContent.trim() + '|' + r.children[1].textContent.trim() + '|' + r.children[3].textContent.trim())`), ['nightly-build|2|Failed: step 2 (Test)', 'lint-and-fix|1|Passed', 'old-deploy|1|\u2014none'], at + 'a row per workflow, every group of the sidebar: name, steps, result (#7722)');
-            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view tbody .group-table-cell-btn')].map(b => b.getAttribute('aria-label'))`), ['Run nightly-build', 'Run lint-and-fix', 'Run old-deploy'], at + 'a Run button per row, named for its workflow');
+            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view table')[0].querySelectorAll('th')].map(h => [h.querySelector('.dt-sort > span, .dt-head-text').textContent, h.getAttribute('scope')])`), [['Workflow', 'col'], ['Steps', 'col'], ['Last run', 'col'], ['Result', 'col'], ['Run', 'col']], at + 'the columns (of the first table: the page lists every group, #7722)');
+            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(r => r.children[0].textContent.trim() + '|' + r.children[1].textContent.trim() + '|' + r.children[3].textContent.trim())`), ['nightly-build|2|Failed: step 2 (Test)', 'lint-and-fix|1|Passed', 'old-deploy|1|No runs'], at + 'a row per workflow, every group of the sidebar: name, steps, result (#7722)');
+            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view tbody .dt-action')].map(b => b.getAttribute('aria-label'))`), ['Run nightly-build', 'Run lint-and-fix', 'Run old-deploy'], at + 'a Run button per row, named for its workflow');
             assert.deepEqual(await ev(`(() => { const t = getComputedStyle(document.querySelector('#group-table-title')), c = getComputedStyle(document.querySelector('#group-table-view .group-table-head .session-group-count')); return [t.fontSize, t.fontWeight, c.fontSize, c.fontWeight]; })()`), ['20px', '700', '11px', '600'], at + 'the title is 20/700, its count 11/600');
             assert.equal(await ev(`!!document.querySelector('#group-table-view .group-table-head .group-table-extra')`), false, at + 'no Build with Agent button in the table head any more (#7723)');
             assert.equal(await ev(`document.querySelector('#group-table-view .gt-toolbar .team-tb-action').textContent`), 'New workflow', at + 'New workflow is the create action on the toolbar line, at the right');
@@ -126,12 +126,22 @@ const STUB = `(() => { const real = window.fetch; const J = b => Promise.resolve
             await ev(`document.querySelector('#group-table-view .gt-toolbar .list-bar-more-btn').click(); true`);
             await waitFor(`document.getElementById('gt-more-menu').hidden`, at + 'the menu closes', 4000);
             assert.deepEqual(await ev(`(${ON_SCALE})(document.getElementById('group-table-view'), ${SCALE})`), [], at + 'every text of the table is on the scale');
-            assert.equal(await ev(`(() => { const sc = document.querySelector('#group-table-view .group-table-scroll'); return document.documentElement.scrollWidth <= document.documentElement.clientWidth && sc.scrollWidth <= sc.clientWidth + 1; })()`), true, at + 'the table fits the page with no sideways scroll');
+            assert.equal(await ev(`(() => { const sc = document.querySelector('#group-table-view .dt-box'); return document.documentElement.scrollWidth <= document.documentElement.clientWidth && sc.scrollWidth <= sc.clientWidth + 1; })()`), true, at + 'the table fits the page with no sideways scroll');
             await shot(`workflows-one-table-${w}`);
+            // Sorting is shared, and each group's sort survives a search redraw.
+            await ev(`document.querySelector('#group-table-view .dt-sort[data-key="workflow"]').click(); true`);
+            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view table')[0].querySelectorAll('.dt-primary')].map(b => b.textContent)`), ['lint-and-fix', 'nightly-build'], at + 'sort by workflow name');
+            await ev(`(() => { const s = document.getElementById('workflows-search'); s.value = 'nightly'; s.dispatchEvent(new Event('input', { bubbles: true })); })(); true`);
+            await waitFor(`document.querySelectorAll('#group-table-view .dt-primary').length === 1`, at + 'search filters the table', 4000);
+            await ev(`(() => { const s = document.getElementById('workflows-search'); s.value = ''; s.dispatchEvent(new Event('input', { bubbles: true })); })(); true`);
+            await waitFor(`document.querySelectorAll('#group-table-view .dt-primary').length === 3`, at + 'clear search restores groups', 4000);
+            assert.equal(await ev(`document.querySelector('#group-table-view .dt-primary').textContent`), 'lint-and-fix', at + 'sort survives filtering');
+            await ev(`document.querySelector('#group-table-view .dt-sort[data-key="workflow"]').click(); true`);
+
 
             // Run in the table: the button says Starting\u2026 and is off until the run exists, then a line says Started <name> and the run's page is open
-            await ev(`document.querySelector('#group-table-view tbody .group-table-cell-btn').click(); true`);
-            assert.deepEqual(await ev(`(() => { const b = document.querySelector('#group-table-view tbody .group-table-cell-btn'); return [b.textContent.trim(), b.disabled]; })()`), ['Starting\u2026', true], at + 'Run reads Starting\u2026 and is disabled while the run is being made');
+            await ev(`document.querySelector('#group-table-view tbody .dt-action').click(); true`);
+            assert.deepEqual(await ev(`(() => { const b = document.querySelector('#group-table-view tbody .dt-action'); return [b.textContent.trim(), b.disabled]; })()`), ['Starting\u2026', true], at + 'Run reads Starting\u2026 and is disabled while the run is being made');
             await waitFor(`!!document.querySelector('#wf-run-detail .wf-run-title')`, at + "the run's page", 8000);
             assert.equal(await ev(`document.getElementById('wf-status').textContent`), 'Started nightly-build', at + 'a status line says what started');
             assert.equal(await ev(`(document.querySelector('#wf-run-detail .wf-started-line') || {}).textContent`), 'Started nightly-build', at + "and the run's page shows it");
@@ -147,7 +157,7 @@ const STUB = `(() => { const real = window.fetch; const J = b => Promise.resolve
             // a workflow's page
             await ev(`document.querySelector('${pane('workflows')} .sgroup-header[data-group-name="workflows:active"]').click(); true`);
             await waitFor(`document.querySelector('#group-table-title').textContent === 'Active'`, at + 'Active again', 8000);
-            await ev(`document.querySelector('#group-table-view .group-table-link').click(); true`);
+            await ev(`document.querySelector('#group-table-view .dt-primary').click(); true`);
             await waitFor(`!!document.querySelector('#wf-detail .item-bar') && !!document.querySelector('#wf-detail .wf-runs-table tbody tr')`, at + "the workflow's page", 8000);
             assert.equal(await ev(`document.getElementById('wf-back-btn').textContent`), '← Active', at + 'back names the group');
             assert.deepEqual(await ev(`(() => { const t = getComputedStyle(document.getElementById('wf-title')); return [t.fontSize, t.fontWeight]; })()`), ['17px', '700'], at + "the name is 17/700");
@@ -203,7 +213,7 @@ const STUB = `(() => { const real = window.fetch; const J = b => Promise.resolve
                     await waitFor(`document.getElementById('group-table-view').checkVisibility()`, how + 'the table', 8000);
                     const au = await auditRegion(ev, ['.sidebar', '#group-table-view']);
                     assert.deepEqual(au.fails.map(f => `${f.sel} ${f.what} ${f.ratio}`), [], how + 'the sidebar and the table: contrast');
-                    await ev(`document.querySelector('#group-table-view .group-table-link').click(); true`);
+                    await ev(`document.querySelector('#group-table-view .dt-primary').click(); true`);
                     await waitFor(`!!document.querySelector('#wf-detail .item-bar')`, how + 'the workflow', 8000);
                     const au2 = await auditRegion(ev, ['#wf-page']);
                     assert.deepEqual(au2.fails.map(f => `${f.sel} ${f.what} ${f.ratio}`), [], how + "the workflow's page: contrast");

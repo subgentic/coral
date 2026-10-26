@@ -25,14 +25,14 @@ const BASE = require('./test_base').BASE;
             await ev(`window.__coralReady.startup('liveList', 'settings')`);
             if (font) await ev(`document.documentElement.style.fontSize = '${font}'; true`);
             await ev(`window.switchNavTab('workflows'); true`);
-            await waitFor(`document.querySelectorAll('#group-table-view .group-table-cell-btn').length === 2`, `${tag}: a Run button on each row of the table`, 8000);
-            const r = await ev(`[...document.querySelectorAll('#group-table-view .group-table-cell-btn')].map(b => { const bb = b.getBoundingClientRect(), row = b.closest('tr'), rb = row.getBoundingClientRect(); return { name: b.getAttribute('aria-label'), text: b.textContent.trim(), inside: !!b.closest('button:not(.group-table-cell-btn)'), h: Math.round(bb.height), within: bb.top >= rb.top - 1 && bb.bottom <= rb.bottom + 1 && bb.right <= innerWidth }; })`);
+            await waitFor(`document.querySelectorAll('#group-table-view .dt-action').length === 2`, `${tag}: a Run button on each row of the table`, 8000);
+            const r = await ev(`[...document.querySelectorAll('#group-table-view .dt-action')].map(b => { const bb = b.getBoundingClientRect(), row = b.closest('tr'), rb = row.getBoundingClientRect(); return { name: b.getAttribute('aria-label'), text: b.textContent.trim(), inside: !!b.closest('button:not(.dt-action)'), h: Math.round(bb.height), within: bb.top >= rb.top - 1 && bb.bottom <= rb.bottom + 1 && bb.right <= innerWidth }; })`);
             assert.deepEqual(r.map(x => x.name), ['Run nightly-build', 'Run release-notes'], `${tag}: each button is named for its workflow`);
             assert.ok(r.every(x => x.text === 'Run' && !x.inside), `${tag}: a real button, not inside another one: ` + JSON.stringify(r));
             assert.ok(r.every(x => x.within), `${tag}: inside its row and the screen: ` + JSON.stringify(r));
             assert.equal(await ev(`document.documentElement.scrollWidth <= innerWidth + 1`), true, `${tag}: nothing scrolls sideways`);
             if (process.env.CORAL_SCREENSHOT_DIR) { const fs = require('node:fs'); fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); await new Promise(r => setTimeout(r, 300)); /* sleep-ok: a screenshot waits out transitions */ fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/workflow-table-run-${w}${font ? '-200' : ''}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
-            await ev(`document.querySelector('#group-table-view .group-table-cell-btn').click(); true`);
+            await ev(`document.querySelector('#group-table-view .dt-action').click(); true`);
             await waitFor(`window.__triggers.length === 1`, `${tag}: one click starts the workflow`, 4000);
             assert.deepEqual(await ev(`window.__triggers`), [1], `${tag}: workflow 1, once`);
             await waitFor(`document.getElementById('wf-run-detail-container').style.display !== 'none'`, `${tag}: it opens the run, as the page's Run does`, 6000);

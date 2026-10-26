@@ -14,6 +14,10 @@ import { limitSeconds, limitParts } from './time_limit.js';
 import { registerGroupSource, groupHeaderHtml, isGroupFolded, syncPaneGroupToggle, refreshGroupTable, openFirstGroupTable, backLinkHtml, foldWayBack } from './sidebar_groups.js';
 import { onViewShown } from './view_switch.js';
 import { isPhoneLayout } from './phone_layout.js';
+import { importOnce } from './import_once.js';
+
+const DT = await importOnce('./data_table.js');
+const workflowTableStates = new Map();
 
 let workflows = [];
 let selectedWorkflowId = null;
@@ -44,9 +48,25 @@ registerGroupSource('workflows', {
     table: key => {
         const g = wfGroups().find(x => x.key === key);
         if (!g) return null;
-        return { title: g.label, columns: ['Workflow', 'Steps', 'Last run', 'Result', 'Run'],
-            rows: g.items.map(w => ({ title: w.name, action: 'wf-select', data: { 'workflow-id': Number(w.id) },
-                cells: [String(stepsOf(w)), w.last_run && w.last_run.started_at ? whenWords(w.last_run.started_at) : '', lastResult(w.last_run), { action: 'wf-trigger', data: { 'workflow-id': Number(w.id) }, label: 'Run', aria: `Run ${w.name}` }] })),
+        if (!workflowTableStates.has(key)) workflowTableStates.set(key, DT.tableState());
+        return { title: g.label, rows: g.items, signature: JSON.stringify(g.items),
+            node: () => DT.dataTable({
+                label: `${g.label} workflows, ${g.items.length}`, rows: g.items,
+                rowKey: w => w.id, rowName: w => w.name, state: workflowTableStates.get(key),
+                open: w => selectWorkflow(Number(w.id)),
+                columns: [
+                    { key: 'workflow', label: 'Workflow', field: 'name', primary: true, width: 'grow', line: 1, sort: true, cell: w => DT.primaryButton(w.name) },
+                    { key: 'steps', label: 'Steps', numeric: true, width: 'content', line: 2, tone: 'tertiary', sort: 'number', sortValue: stepsOf, cell: w => String(stepsOf(w)) },
+                    { key: 'last-run', label: 'Last run', width: 'content', line: 1, tone: 'tertiary', sort: 'date', sortValue: w => w.last_run?.started_at, cell: w => w.last_run?.started_at ? whenWords(w.last_run.started_at) : 'Never' },
+                    { key: 'result', label: 'Result', width: 'content', line: 2, sort: true, sortValue: w => lastResult(w.last_run), cell: w => lastResult(w.last_run) || 'No runs' },
+                    { key: 'run', label: 'Run', width: 'content', line: 2, cell: w => {
+                        const b = DT.el('button', 'btn btn-small dt-action', 'Run'); b.type = 'button';
+                        b.setAttribute('aria-label', `Run ${w.name}`);
+                        b.addEventListener('click', () => triggerWorkflow(Number(w.id), b));
+                        return b;
+                    } },
+                ],
+            }).el,
             extra: { action: 'wf-build-agent', label: 'Build with Agent', icon: 'smart_toy', title: 'Starts an agent that builds the workflow with you' } };
     },
     toolbar: () => ({ search: { id: 'workflows-search', label: 'Search workflows' }, action: { name: 'wf-create', label: 'New workflow' }, menu: { noun: 'workflow', items: [{ name: 'wf-build-agent', label: 'Build with Agent' }] } }), // the create action on the page's toolbar line, Build with Agent its second way (#7723)
