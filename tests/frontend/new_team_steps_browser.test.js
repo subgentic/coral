@@ -55,13 +55,15 @@ const BASE = require('./test_base').BASE;
             await t.click('button', /^payments-app$/);
             assert.equal(await ev(`window.__nt.find(window.__nt.dlg(${N.team}), 'input', ${N.folder}).value`), '/work/payments-app');
         });
-        await S.run('step 1: Next is off with its reason said (aria-disabled or disabled, the description, the polite status): "Name the team and choose a folder first", then "Name the team first" / "Choose a folder first"', async () => {
+        await S.run('step 1: Next is always on; pressing it with something missing says the first thing wrong on one red line (and under the field), nothing before the first press', async () => {
             await reopen();
-            const state = () => ev(`(() => { const d = window.__nt.dlg(${N.team}); const b = window.__nt.find(d, 'button', ${N.next}); const why = (b.getAttribute('aria-describedby') || '').split(/\\s+/).map(i => (document.getElementById(i) || {}).textContent || '').join(' ').trim(); const live = [...d.querySelectorAll('[aria-live=polite],[role=status]')].map(e => window.__na.text(e)).join(' | '); return { off: b.disabled || b.getAttribute('aria-disabled') === 'true', why, live }; })()`);
+            const state = () => ev(`(() => { const d = window.__nt.dlg(${N.team}); const b = window.__nt.find(d, 'button', ${N.next}); const live = window.__na.text(document.getElementById('team-recap')); const first = document.getElementById('team-board-name'); return { off: b.disabled || b.getAttribute('aria-disabled') === 'true', live, errors: [...d.querySelectorAll('.sv-error')].filter(e => !e.hidden).map(e => e.textContent), focus: document.activeElement === first }; })()`);
             await t.type('input', N.teamName, ''); await t.type('input', N.folder, '');
-            let s = await state(); assert.ok(s.off, 'Next is off'); assert.match(s.why, /Name the team and choose a folder first/); assert.match(s.live, /Name the team and choose a folder first/, 'a polite status says it');
-            await t.type('input', N.teamName, 'alpha'); s = await state(); assert.match(s.why, /Choose a folder first/);
-            await t.type('input', N.teamName, ''); await t.type('input', N.folder, '/work/payments-app'); s = await state(); assert.match(s.why, /Name the team first/);
+            let s = await state(); assert.ok(!s.off, 'Next is on'); assert.equal(s.live, '', 'nothing is said before the first press'); assert.deepEqual(s.errors, []);
+            await t.click('button', N.next); s = await state();
+            assert.ok(!s.off && s.focus, 'Next stays on and the name takes the focus'); assert.match(s.live, /Team name is required/, 'one line names the first thing wrong'); assert.deepEqual(s.errors, ['Team name is required', 'Choose a folder for the team']);
+            await t.type('input', N.teamName, 'alpha'); s = await state(); assert.match(s.live, /Choose a folder for the team/);
+            await t.type('input', N.teamName, ''); await t.type('input', N.folder, '/work/payments-app'); s = await state(); assert.match(s.live, /Team name is required/);
             await t.click('button', N.next); assert.match(await stepLine(ev), /^Step 1 of 3/, 'Next does not advance');
         });
         await S.run('step 1: a machine select named "Machine" with several machines, "Another computer\'s address..." as its last entry, and choosing it reveals the address field', async () => {
