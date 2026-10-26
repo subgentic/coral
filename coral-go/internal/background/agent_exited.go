@@ -50,8 +50,9 @@ func skipIfAgentExited(ctx context.Context, rt any, logger *slog.Logger, name, w
 // deliverAutomated is how every automated sender in this package types into an
 // agent (#3431): never into an exited agent's shell or a terminal agent
 // (skipIfAgentExited, which reports it as skipped), and only when the agent isn't
-// waiting on a prompt: ptymanager.DeliverAutomated holds it until the prompt is
-// gone. key groups sends that supersede each other ("" for the text itself);
+// waiting on a prompt: ptymanager.DeliverAutomated skips it while the prompt is
+// open. The caller must retain its source-of-truth work and retry, not mark it
+// delivered. key groups sends that supersede each other ("" for the text itself);
 // requireInputBox holds it until the agent's normal input box is on screen (a
 // launch's first prompt). mention: it is about a board message that tags the agent, which
 // the gate types in mid-turn when it follows the signals (#3578).
@@ -66,7 +67,7 @@ func deliverAutomatedIfWanted(ctx context.Context, rt AgentRuntime, logger *slog
 	if skipIfAgentExited(ctx, rt, logger, name, what) {
 		return true, nil
 	}
-	_, err = ptymanager.DeliverAutomated(ctx, ptymanager.AutomatedInput{
+	delivery, err := ptymanager.DeliverAutomated(ctx, ptymanager.AutomatedInput{
 		Term: rt, Name: name, AgentType: agentType, SessionID: sessionID,
 		Key: key, Text: text, What: what, RequireInputBox: requireInputBox,
 		// As a bracketed paste where the agent takes one: a menu ignores it (#3457).
@@ -97,7 +98,7 @@ func deliverAutomatedIfWanted(ctx context.Context, rt AgentRuntime, logger *slog
 	if errors.Is(err, ptymanager.ErrNotWanted) {
 		return true, nil // over before it could be typed: skipped
 	}
-	return false, err
+	return delivery == ptymanager.Skipped, err
 }
 
 // errSkippedExited: the agent's CLI exited before a held send's turn; nothing typed.
