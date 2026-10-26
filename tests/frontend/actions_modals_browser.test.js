@@ -79,7 +79,7 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         await ev(`window.showJobModal(); true`);
         await until(shown('job-modal'), 'the job dialog');
         const jt = await ev(`(() => { const seen = []; for (const t of ['prompt', 'workflow']) { document.querySelector('#job-modal .job-type-btn[data-type="' + t + '"]').click(); seen.push([t, document.getElementById('job-modal-repo').closest('.sv-row').hidden]); } return seen; })()`);
-        check('the job dialog type switch shows the agent fields for Agent Prompt and the workflow for Workflow', JSON.stringify(jt) === JSON.stringify([['prompt', false], ['workflow', true]]), JSON.stringify(jt));
+        check('the job dialog type switch shows the agent fields for Agent prompt and the workflow for Workflow', JSON.stringify(jt) === JSON.stringify([['prompt', false], ['workflow', true]]), JSON.stringify(jt));
         await ev(`document.querySelector('#job-modal [data-on-click="m-hide-job-modal"]').click(); true`);
         check('the job dialog’s Cancel closes it', !(await ev(shown('job-modal'))));
 

@@ -55,7 +55,7 @@ const S = `(window.__coralStatic || '/static/')`;
             // New job: the agent form
             await ev(`window.showJobModal(); true`);
             await waitFor(`!!document.getElementById('job-modal-repo') && document.getElementById('job-modal-repo').closest('#job-modal')`, 'the job form', 8000);
-            await ev(`(() => { const b = [...document.querySelectorAll('#job-modal button')].find(x => /Agent Prompt/.test(x.textContent)); if (b) b.click(); const d = [...document.querySelectorAll('#job-modal details')].find(x => /More options/.test(x.textContent)); if (d) d.open = true; return true; })()`);
+            await ev(`(() => { const b = [...document.querySelectorAll('#job-modal button')].find(x => /Agent prompt/.test(x.textContent)); if (b) b.click(); const d = [...document.querySelectorAll('#job-modal details')].find(x => /More options/.test(x.textContent)); if (d) d.open = true; return true; })()`);
             await waitFor(`document.getElementById('job-modal-flags').getClientRects().length > 0`, 'More options open', 5000);
             await sleep(400); // sleep-ok: the form lays out after the tab and the disclosure change
             const form = await ev(`(() => { const body = document.querySelector('#job-modal .modal-body') || document.querySelector('#job-modal'); const br = body.getBoundingClientRect(); const chips = [...document.querySelectorAll('#job-modal .flag-shortcut-btn')];

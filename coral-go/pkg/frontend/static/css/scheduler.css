@@ -111,6 +111,7 @@
 }
 
 .job-type-btn {
+    font-family: inherit; /* a button takes the browser's own font otherwise (#8409) */
     flex: 1;
     display: flex;
     align-items: center;
