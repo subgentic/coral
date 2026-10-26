@@ -1,0 +1,76 @@
+// #8571: the same goal detail mounts in Inbox and Team, with local Back and durable URLs.
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const { connect } = require('./agent_view_harness');
+const { removeBoards } = require('./helpers/board_cleanup');
+const BASE = require('./test_base').BASE;
+(async () => {
+    const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const board = 'goal-mount-' + Date.now().toString(36);
+    const api = (method, url, body) => ev(`fetch(${JSON.stringify(url)}, {method:${JSON.stringify(method)},headers:{'Content-Type':'application/json'},body:${JSON.stringify(JSON.stringify(body))}}).then(async r => ({status:r.status,body:await r.json()}))`);
+    const shot = async name => {
+        const dir = process.env.CORAL_SCREENSHOT_DIR || (process.env.RUNNER_TEMP && path.join(process.env.RUNNER_TEMP, 'out'));
+        if (!dir) return;
+        fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(path.join(dir, name + '.png'), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));
+    };
+    const load = async url => { await Page.navigate({url: BASE + url}); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList','liveListLoaded','settings')`); };
+    const detail = mount => waitFor(`!!document.querySelector('${mount} #goals-detail-title') && document.querySelector('${mount} .goal-side-group')?.textContent === 'Open 1'`, 'goal and task loaded', 15000);
+    try {
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD});
+        await load('/');
+        assert.equal((await api('POST', `/api/board/${board}/subscribe`, {subscriber_id:'orch',job_title:'Orchestrator',session_name:board})).status,200);
+        const created = await api('POST', `/api/board/${board}/goals`, {subscriber_id:'Operator',title:'Keep this goal in the Inbox',outcome:'One shared goal view',done_when:'Back returns to the filtered list'});
+        assert.equal(created.status,201); const id = created.body.id;
+        assert.equal((await api('PATCH', `/api/board/${board}/goals/${id}`, {subscriber_id:'Operator',state:'active'})).status,200);
+        const task = await api('POST', `/api/board/${board}/tasks`, {created_by:'orch',title:'Verify both mounts',body:'Test task navigation',priority:'medium',goal_id:id});
+        assert.ok(task.status < 300); const taskId = task.body.id || task.body.task.id;
+        const url = `/inbox/goals/${board}/${id}`;
+        for (const width of [1280,390]) {
+            await Emulation.setDeviceMetricsOverride({width,height:900,deviceScaleFactor:1,mobile:width===390});
+            await Emulation.setTouchEmulationEnabled({enabled:width===390});
+            await load('/');
+            await ev(`window.switchNavTab('hub-inbox'); true`);
+            await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('goals')).then(()=>true)`);
+            await waitFor(`[...document.querySelectorAll('#group-table-view .dt-primary')].some(e=>e.textContent==='Keep this goal in the Inbox')`, 'Inbox goal row',15000);
+            await ev(`import((window.__coralStatic||'/static/')+'inbox_sidebar.js').then(m=>m.filterInbox('Keep this goal'))`);
+            await ev(`[...document.querySelectorAll('#group-table-view .dt-primary')].find(e=>e.textContent==='Keep this goal in the Inbox').click(); true`);
+            await detail('#inbox-page'); // fails before #8571: the row leaves Inbox for the team page
+            assert.equal(await ev(`document.body.getAttribute('data-nav-tab')`),'hub-inbox');
+            assert.equal(await ev('location.pathname'),url);
+            assert.equal(await ev(`document.querySelector('#inbox-page .goals-facts').textContent`),'OutcomeOne shared goal viewDone whenBack returns to the filtered list');
+            assert.equal(await ev(`document.querySelectorAll('#inbox-page .goal-team-link').length`),1);
+            assert.ok(await ev(`document.querySelector('#inbox-page .goal-team-link').getAttribute('aria-label').includes(${JSON.stringify(board)})`));
+            if (width===390) assert.equal(await ev(`document.querySelector('#inbox-page select[aria-label="Inbox views"]').value`),'goals');
+            for (const theme of ['light','dark']) {
+                await ev(`document.documentElement.setAttribute('data-theme',${JSON.stringify(theme)}); true`);
+                assert.ok(await ev('document.documentElement.scrollWidth <= innerWidth + 1'),'no horizontal overflow');
+                await shot(`inbox-goal-${width}-${theme}`);
+            }
+            await ev(`document.querySelector('#inbox-page .goal-main .goals-back').click(); true`);
+            await waitFor(`!!document.querySelector('#group-table-view .dt-primary') && location.pathname==='/inbox/goals'`, 'Back to Goals folder');
+            assert.ok(await ev(`[...document.querySelectorAll('#group-table-view .dt-primary')].every(e=>/Keep this goal/.test(e.textContent))`),'search retained');
+            await ev('history.forward(); true');
+            await detail('#inbox-page');
+            await load(url); await detail('#inbox-page');
+            assert.equal(await ev(`document.body.getAttribute('data-nav-tab')`),'hub-inbox','reload keeps Inbox');
+            if (width===390) {
+                await ev(`document.querySelector('#inbox-page .goal-tasks-open').click(); true`);
+                assert.ok(await ev(`document.querySelector('#inbox-page .goal-side').getClientRects().length>0`));
+                await ev(`document.querySelector('#inbox-page .goal-side-back').click(); true`);
+                assert.ok(await ev(`document.querySelector('#inbox-page .goal-main').getClientRects().length>0`));
+                await ev(`document.querySelector('#inbox-page .goal-tasks-open').click(); true`);
+            }
+            await ev(`document.querySelector('#inbox-page .goal-side .dt-primary').click(); true`);
+            await waitFor(`location.pathname===${JSON.stringify(`/team/${board}/tasks/${taskId}`)}`, 'task uses team task page');
+            await load(`/team/${board}/goals/${id}`); await detail('#team-panel-goals');
+            assert.equal(await ev(`document.querySelectorAll('#team-panel-goals .goal-team-link').length`),0);
+            assert.equal(await ev(`document.querySelector('#team-panel-goals .goals-facts').textContent`),'OutcomeOne shared goal viewDone whenBack returns to the filtered list');
+            await shot(`team-goal-${width}-dark`);
+            await ev(`document.querySelector('#team-panel-goals .goal-main .goals-back').click(); true`);
+            await waitFor(`location.pathname===${JSON.stringify(`/team/${board}/goals`)} && !!document.querySelector('#team-panel-goals .dt-primary')`, 'team Back to Goals');
+        }
+        console.log('PASS shared goal view: Inbox/team, 1280/390, Back/search, history, reload, task navigation');
+    } finally { await removeBoards(ev,[board]).catch(()=>{}); await client.close(); }
+})().catch(e=>{console.error(e);process.exitCode=1;});
