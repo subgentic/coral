@@ -15,7 +15,7 @@ const PAGE = 50;
 export const CHAT_KEY = /^chats(-|$)/;
 const CLIS = [['claude', 'Claude'], ['codex', 'Codex'], ['agy', 'Antigravity'], ['pi', 'Pi']];
 const FOLDERS = [
-    { key: 'chats', label: 'All chats', params: { type: 'agent' }, count: 'all', minus: 'group' }, // the agents' chats: the boards' have their own folder
+    { key: 'chats', label: 'All chats', params: { type: 'agent' }, count: 'all' }, // the agents' chats: the boards' have their own folder
     { key: 'chats-group', label: 'Group chats', params: { type: 'group' }, count: 'group' },
     { key: 'chats-notes', label: 'With notes', params: { type: 'agent', with_notes: '1' }, count: 'notes' },
     { key: 'chats-starred', label: 'Starred', params: { starred: '1' }, count: 'starred' },
@@ -37,7 +37,7 @@ export function chatFolder(key, c = counts) {
 export function folderCount(key, c = counts) {
     const n = (v) => (c && Number.isFinite(c[v]) ? c[v] : undefined);
     const f = FOLDERS.find(x => x.key === key);
-    if (f) return f.minus && n(f.count) !== undefined && n(f.minus) !== undefined ? Math.max(0, n(f.count) - n(f.minus)) : n(f.count);
+    if (f) return n(f.count); // each count is its folder's total, as the counts route sends it (#8065)
     const cli = /^chats-cli-(.+)$/.exec(key), tag = /^chats-tag-(\d+)$/.exec(key);
     if (cli) { const t = cli[1], by = c && c.by_agent_type; return by ? by[t] : undefined; } // the server already gives agy, antigravity and gemini the one count of their shared history: shown as it is, not added three times (#8011)
     if (tag) { const t = ((c && c.tags) || []).find(x => String(x.id) === tag[1]); return t ? t.count : undefined; }
