@@ -16,7 +16,7 @@ const TV = await importOnce('./tasks_view.js');
 const PAGE = 50;
 
 /** Mount one goal; each mount owns its task pages, search and phone screen. */
-export function mountGoal(host, { team, id, back, onTask, goal, refresh, status, teamLink }) {
+export function mountGoal(host, { team, id, back, onTask, goal, refresh, status, teamLink, focusOnOpen = true }) { // focusOnOpen: false where the page opens in place and the heading should not take the focus (the Inbox, #8681)
     const root = host;
     const model = { project: team, openId: id, tasks: new Map(), followUps: new Map(), followKey: new Map(), taskSearch: '', screen: 'goal', creating: false };
     let current = goal;
@@ -366,7 +366,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
             if (!g || g.id !== id) throw new Error('That goal was not found');
             const next = JSON.stringify(g);
             if (next !== signature) { signature = next; update(g); }
-            if (first) { first = false; focusDetail(); }
+            if (first) { first = false; if (focusOnOpen) focusDetail(); }
             await loadTasks(id);
         } catch (e) {
             if (disposed) return;
