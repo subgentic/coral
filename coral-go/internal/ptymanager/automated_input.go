@@ -145,9 +145,3 @@ func (g *inputGate) forgetTyped(name string) {
 	defer g.mu.Unlock()
 	delete(g.lastTyped, name)
 }
-
-// Repainter is implemented by terminals that can make the agent redraw its whole screen (the PTY backend's: its rendered screen
-// is a replay that can lose the agent's terminal state, #247).
-type Repainter interface {
-	RepaintSession(ctx context.Context, name, agentType, sessionID string) error
-}

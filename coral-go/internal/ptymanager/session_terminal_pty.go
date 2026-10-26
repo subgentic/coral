@@ -361,14 +361,3 @@ func (p *PTYSessionTerminal) AttachCommand(_ string) string {
 // Verify interface compliance at compile time.
 var _ SessionTerminal = (*PTYSessionTerminal)(nil)
 var _ SessionTerminal = (*TmuxSessionTerminal)(nil)
-
-// RepaintSession makes the agent draw its whole screen again (Repainter, #247): PTYBackend.Repaint.
-func (p *PTYSessionTerminal) RepaintSession(_ context.Context, name, _, sessionID string) error {
-	key, err := p.keyFor(name, sessionID)
-	if err != nil {
-		return err
-	}
-	return p.backend.Repaint(key)
-}
-
-var _ Repainter = (*PTYSessionTerminal)(nil)
