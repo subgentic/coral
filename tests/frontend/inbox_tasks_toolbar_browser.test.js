@@ -37,15 +37,16 @@ const BASE = require('./test_base').BASE;
                 overflow: document.documentElement.scrollWidth > innerWidth + 1 }; })()`);
             assert.deepEqual(facts, { shared: true, searches: 1, create: false, assignee: false, overflow: false });
             const stateControl = await ev(`(() => { const h = document.getElementById('group-table-view'), visible = e => !!e && e.getClientRects().length > 0; return { pills: visible(h.querySelector('.team-tb-pills')), select: visible(h.querySelector('.team-tb-select')) }; })()`);
-            assert.deepEqual(stateControl, { pills: width === 1280, select: width === 390 }, `${width}: exactly one state control is visible`);
+            assert.deepEqual(stateControl, { pills: width === 1280, select: false }, `${width}: the pills are the row's state control where they fit; on a phone the choice is a select in the Filters sheet, none in the row (#8700)`);
             if (width === 390) {
-                const searchLayout = await ev(`(() => { const h = document.getElementById('group-table-view'), search = h.querySelector('.list-bar-search').getBoundingClientRect(); return { width: search.width, minimum: 10 * parseFloat(getComputedStyle(document.documentElement).fontSize), bottom: search.bottom, controls: ['.team-tb-select', '.list-bar-toggle', '.dt-select-toggle'].map(s => h.querySelector(s).getBoundingClientRect().top) }; })()`);
-                assert.ok(searchLayout.width >= searchLayout.minimum && searchLayout.controls.every(top => top >= searchLayout.bottom), `phone search keeps 10rem with controls below: ${JSON.stringify(searchLayout)}`);
+                const searchLayout = await ev(`(() => { const h = document.getElementById('group-table-view'), search = h.querySelector('.list-bar-search').getBoundingClientRect(), toggle = h.querySelector('.list-bar-toggle').getBoundingClientRect(); return { width: search.width, minimum: 10 * parseFloat(getComputedStyle(document.documentElement).fontSize), sameRow: Math.abs((search.top + search.height / 2) - (toggle.top + toggle.height / 2)) < 6, over: document.documentElement.scrollWidth - innerWidth }; })()`);
+                assert.ok(searchLayout.width >= searchLayout.minimum && searchLayout.sameRow && searchLayout.over <= 0, `phone search keeps 10rem and the Filters icon is on its row: ${JSON.stringify(searchLayout)}`);
             }
             await shot(`inbox-tasks-toolbar-${width}`);
             await ev(`document.querySelector('#group-table-view .list-bar-toggle').click(); true`);
             await waitFor(`document.getElementById('inbox-tk-priority').getBoundingClientRect().height > 0`, 'Filters open');
             await shot(`inbox-tasks-filters-${width}`);
+            if (width === 390) assert.ok(await ev(`(() => { const s = document.querySelector('#group-table-view .inbox-pill-field select'); return !!s && s.getClientRects().length > 0 && s.options.length >= 5; })()`), '390: the state choice is a select in the Filters sheet');
             await ev(`(() => { const p = document.getElementById('inbox-tk-priority'); p.value = 'high'; p.dispatchEvent(new Event('change', { bubbles: true })); })()`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody .dt-primary').length === 1`, 'priority matches one task');
             assert.match(await ev(`document.querySelector('#group-table-view tbody').textContent`), /Review the release plan/);
