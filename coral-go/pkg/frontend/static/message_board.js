@@ -1,56 +1,31 @@
-import { openTask } from './task_navigation.js';
-/* Message Board: project list, messages, subscribers, posting */
-
-import { OPERATOR_ID, isOperatorId, escapeHtml, escapeAttr, showView, getAgentColor, showToast, askBadge, externalMessageBadge, hubUserBadge, renderBoardMessageBody, setBoardMentionNames, highlightMentionsIn, boardMessageColorStyle } from './utils.js';
-import { registerActions, withId, textOf } from './actions.js';
-import { scrollBehavior } from './motion.js';
+import { fetchAllBoardMessages, fetchAllHistory, fetchAllLiveChat, fetchProjects } from './board_fetch.js';
+import { doExportBoard, toggleMessageSelect, selectAllMessages, selectNoneMessages, cancelSelectMode, exportSelectedAsMarkdown, resetSelection, connectBoard, hideExportBoardModal } from './board_export.js';
 import { emptyState } from './dom_write.js';
-import { state } from './state.js';
-import { resolveBoardArtifacts } from './board_artifacts.js';
-import { messageAttachmentAttrs, messageAttachmentsHtml } from './board_attachments.js';
-import { groupTaskQueueRuns, renderTaskQueueRun } from './board_system_lines.js';
-import { platform } from './platform/detect.js';
-import { BOARD_SAVE_BUTTON, aboutRow, nameSaveButton } from './saved_marks.js';
-import { messageTimeHtml } from './message_time.js';
-import { paintPauseButton } from './board_pause_button.js';
-import { pathId, keyLabel, noteBoardLabel, hasBoardLabel, splitKey, boardFetch, teamFetch, isCloud, inTeam } from './server_base.js';
+import { escapeAttr, escapeHtml, showView, OPERATOR_ID, showToast } from './utils.js';
+import { keyLabel, splitKey, hasBoardLabel, boardFetch, noteBoardLabel, inTeam } from './server_base.js';
 import { importOnce } from './import_once.js';
+import { state } from './state.js';
+import { initGrowingTextarea } from './growing_textarea.js';
+import { mountBoardSearch, resetBoardSearch, highlightBoard } from './board_search.js';
+import { applyView, setAllRows, forgetOpenRows, watchFold, boardView, mountTableTools, saveBoardView, onRowActions } from './board_table.js';
+import { openTask } from './task_navigation.js';
+import { launchBlockedReason } from './hub_access.js';
+import { registerActions, textOf, withId } from './actions.js';
+import { bs } from './board_state.js';
+import { attachMentionList, loadBoardSubscribers, subscribeDashboard } from './board_members.js';
+import { confirmDeleteBoardMessage, copyMessageLink, loadPausedState, loadSleepState } from './board_controls.js';
+import { clearNewPill, jumpToLatest } from './board_new_pill.js';
+import { focusMessageById, formatTime, isAtBottom, jumpToFirst, loadBoardMessages, loadEarlierMessages, openMessageActions, renderMessages } from './board_window.js';
+import { _pollNewMessages, startBoardPoll, stopBoardPoll } from './board_poll.js';
+import { replyToMessage } from './board_composer.js';
 import './goals_adapter.js'; // the Goals view (goals_view.js) is lazy and imports only what loads at startup (import_hygiene): its two small helpers load here (#7113)
 import './goal_words.js';
-import { OUTCOME_UNKNOWN_LINE, isOutcomeUnknown } from './outcome_unknown.js';
-import { launchBlockedReason, blockedReason } from './hub_access.js';
-import { pollEvery, afterPause, isBusyStatus, busyRetryingText, machineOf } from './overload.js';
-import { keyRoute, build } from './routes.js';
-import { mountBoardSearch, highlightBoard, setBoardMembers, resetBoardSearch } from './board_search.js';
-import { PAGE_SIZE, fetchAllBoardMessages, fetchAllHistory, fetchAllLiveChat, fetchMessages, fetchProjects, fetchSubscribers, mergeMessages } from './board_fetch.js';
-import { initGrowingTextarea } from './growing_textarea.js';
-import { onRowActions, boardView, saveBoardView, rowParts, toggleRow, setAllRows, refreshReplies, retagMentions, revealRow, applyAskUpdates, refreshAsk, applyView, mountTableTools, forgetOpenRows, sameDay, dayDividerHtml, watchFold } from './board_table.js'; // the board as a table (#7921)
 export { fetchAllBoardMessages, fetchAllHistory, fetchAllLiveChat } from './board_fetch.js';
-import { connectBoard, isSelectMode, isSelected, resetSelection, toggleMessageSelect, doExportBoard, hideExportBoardModal, selectAllMessages, selectNoneMessages, exportSelectedAsMarkdown, cancelSelectMode } from './board_export.js';
 export { showExportBoardModal, doExportBoard, toggleSelectMode, toggleMessageSelect, selectAllMessages, selectNoneMessages, cancelSelectMode, exportSelectedAsMarkdown } from './board_export.js';
-
-let currentProject = null;
-let pollTimer = null;
-let isPaused = false;
-let isSleeping = false;
-let _allMessages = [];
-let _totalMessages = 0;
-let _loadedOffset = 0; // older messages not loaded yet (the offset of the first loaded one)
-let _loadedProject = null; // board whose initial page is loaded; polls wait for it
-let _pollInFlight = false;
-let _countedTotal = 0; // the board's total as the rows loaded account for it (see _pollNewMessages)
-let _staleRows = false; // a message shown may have been deleted: the latest page is loaded again at the bottom
-
-let pendingMessageId = null;
-
-// ── API helpers ──────────────────────────────────────────────────────────
-
-
-
-
-
-
-
+// the moved exports, still importable from here
+export { postBoardMessage } from './board_composer.js';
+export { toggleBoardPause } from './board_controls.js';
+/* Message Board: project list, messages, subscribers, posting */
 
 // ── Sidebar rendering ────────────────────────────────────────────────────
 
@@ -73,7 +48,7 @@ function renderBoardSidebar(projects) {
         return;
     }
     list.innerHTML = projects.map(p => {
-        const active = currentProject === p.project ? 'active' : '';
+        const active = bs.currentProject === p.project ? 'active' : '';
         return `<li class="session-list-item ${escapeAttr(active)}" data-on-click="mb-project" data-project="${escapeAttr(p.project)}"><button type="button" class="row-btn"${active ? ' aria-current="true"' : ''}>
             <span class="session-name">${escapeHtml(keyLabel(p.project))}</span>
             <span class="mb-project-count">${p.message_count} msgs</span>
@@ -96,8 +71,8 @@ export function showBoardInPage(project, host, messageId = null) {
     const board = document.getElementById('mb-board');
     if (!board || !host) return;
     if (board.parentElement !== host) { _boardHome = { parent: board.parentElement, next: board.nextSibling }; host.append(board); }
-    const again = currentProject === project && _loadedProject === project;
-    currentProject = project;
+    const again = bs.currentProject === project && bs._loadedProject === project;
+    bs.currentProject = project;
     state.boardPageProject = project;
     state.currentBoardServer = splitKey(project).server;
     board.style.display = 'flex'; // display-ok: #mb-board is shown and hidden this way everywhere else in this file
@@ -115,7 +90,7 @@ export function showBoardInPage(project, host, messageId = null) {
     loadSleepState(project);
     syncBoardDeleteButton(project);
     applyBoardTable(project);
-    if (!again) { clearNewPill(); pendingMessageId = messageId != null ? String(messageId) : null; loadBoardMessages(project); }
+    if (!again) { clearNewPill(); bs.pendingMessageId = messageId != null ? String(messageId) : null; loadBoardMessages(project); }
     else if (messageId != null) focusMessageById(messageId); // a link to a message of the board already on screen
     loadBoardSubscribers(project);
     startBoardPoll();
@@ -138,7 +113,7 @@ export function leaveBoardPage() {
     applyView(document.getElementById('mb-messages'), 'chat'); // the board's own page is the chat
     document.querySelector('#mb-tools > .mb-table-tools')?.remove();
     stopBoardPoll();
-    currentProject = null;
+    bs.currentProject = null;
     board.style.display = 'none'; // display-ok: as above
     if (_boardHome.parent && _boardHome.parent.isConnected) _boardHome.parent.insertBefore(board, _boardHome.next && _boardHome.next.parentElement === _boardHome.parent ? _boardHome.next : null);
     _boardHome = null;
@@ -147,7 +122,7 @@ export function leaveBoardPage() {
 export function showMessageBoardProjects() {
     document.getElementById('messageboard-title').textContent = 'Message Board';
     resetBoardSearch();
-    currentProject = null;
+    bs.currentProject = null;
     state.boardPageProject = null;
     clearNewPill();
     stopBoardPoll();
@@ -201,296 +176,22 @@ async function loadBoardProjectList() {
 
 // ── Messages ─────────────────────────────────────────────────────────────
 
-async function loadBoardMessages(project) {
-    const msgsEl = document.getElementById('mb-messages');
-    const empty = document.getElementById('mb-messages-empty');
-    if (empty) empty.style.display = 'none';
-    // Show loading indicator below any existing messages
-    let loadingEl = msgsEl?.querySelector('.loading-indicator');
-    if (!loadingEl && msgsEl) {
-        loadingEl = document.createElement('div');
-        loadingEl.className = 'loading-indicator';
-        loadingEl.setAttribute('role', 'listitem');
-        loadingEl.textContent = 'Loading messages';
-        msgsEl.appendChild(loadingEl);
-    }
-    _loadedProject = null;
-    try {
-        const result = await fetchMessages(project, PAGE_SIZE);
-        if (currentProject !== project) return;
-        _loadedProject = project;
-        _totalMessages = _countedTotal = result.total;
-        _staleRows = false;
-        _allMessages = result.messages;
-        _loadedOffset = result.beforeCount;
-        renderMessages(_allMessages);
-    } catch (e) {
-        // Refused as busy (#3430): say it is retrying, and load again once the pause is over
-        // instead of at the next 10 s poll (which only fetches new messages after a first load).
-        if (e && e.resp && isBusyStatus(e.resp.status) && currentProject === project) {
-            if (loadingEl) {
-                loadingEl.classList.add('mb-busy');
-                loadingEl.setAttribute('role', 'status');
-                loadingEl.textContent = busyRetryingText(e.resp, { hub: isCloud() });
-            }
-            let machine = '';
-            try { machine = machineOf(new URL(e.resp.url).pathname); } catch { /* same server */ }
-            clearTimeout(_boardBusyRetry);
-            _boardBusyRetry = afterPause(() => {
-                _boardBusyRetry = null;
-                if (currentProject === project && _loadedProject !== project) loadBoardMessages(project);
-            }, machine);
-            return;
-        }
-        console.error('Failed to load board messages:', e);
-    }
-}
-let _boardBusyRetry = null;
-
-let _earlierInFlight = false;
-
-async function loadEarlierMessages() {
-    const project = currentProject;
-    if (!project || _loadedProject !== project || _loadedOffset <= 0 || !_allMessages.length || _earlierInFlight) return;
-    _earlierInFlight = true;
-    setEarlierLoading(true);
-    const firstId = _allMessages[0].id;
-    let result;
-    try {
-        result = await fetchMessages(project, PAGE_SIZE, { before_id: firstId });
-    } catch (e) {
-        console.error('Failed to load earlier messages:', e);
-        return;
-    } finally {
-        _earlierInFlight = false; // before the render: a search jump that still misses its message loads the next page from it
-        setEarlierLoading(false); // the line goes with the load, success or not
-    }
-    // A trim or a reload while it was out moved the oldest message loaded: this page would leave a gap.
-    if (currentProject !== project || !_allMessages.length || _allMessages[0].id !== firstId) return;
-    const had = _allMessages.length;
-    _allMessages = mergeMessages(result.messages, _allMessages);
-    _loadedOffset = result.beforeCount;
-    renderMessages(_allMessages, { keepAnchor: true, prepended: _allMessages.length - had });
-    const added = _allMessages.length - had;
-    sayEarlier(added > 0 ? `${added} earlier message${added === 1 ? '' : 's'} loaded${_loadedOffset <= 0 ? '. This is the start of the board' : ''}.` : '');
-}
 /** Tests: how many messages are loaded, how many the board has, and how many are not loaded yet. */
-(window.__coral ||= {}).boardCounts = () => ({ shown: _allMessages.length, total: _totalMessages, notLoaded: _loadedOffset });
+(window.__coral ||= {}).boardCounts = () => ({ shown: bs._allMessages.length, total: bs._totalMessages, notLoaded: bs._loadedOffset });
 (window.__coral ||= {}).loadEarlierMessages = loadEarlierMessages;
-
-// The board keeps about this many messages in the DOM while you read at the bottom (#4492): a poll appends what is new, and once
-// a page more than this has built up the oldest go (they count as not loaded, so scrolling up or "Load earlier" brings them back).
-// Nothing is dropped while you read higher up, select messages or wait for a search jump.
-const BOARD_KEEP = 300;
-const ROW = ':scope > .mb-message, :scope > .mb-queue-run';
-
-function isAtBottom(container) {
-    return (container.scrollHeight - container.scrollTop - container.clientHeight) < 50;
-}
-
-// Scrolling near the top loads the page before the oldest message shown, as "Load earlier" does. Not the scroll that moving
-// keyboard focus onto "Load earlier" makes (the browser scrolls it into view): that is the reader reaching the button, who
-// then presses it or not (Frontend's finding on #4492).
-/** Earlier messages with nothing to scroll: a box the loaded messages do not fill (short messages, a tall window) never gets a scroll event, so the page before loads without one. */
-function fillTop() {
-    const c = document.getElementById('mb-messages');
-    if (c && c.clientHeight > 0 && _loadedOffset > 0 && !_earlierInFlight && c.scrollHeight <= c.clientHeight + 80) loadEarlierMessages();
-}
-
-function wireBoardScroll(container) {
-    if (container._mbScrollWired) return;
-    container._mbScrollWired = true;
-    let focusScrollUntil = 0;
-    container.addEventListener('focusin', (e) => {
-        if (e.target.closest?.('.mb-load-earlier')) focusScrollUntil = performance.now() + 300;
-    });
-    container.addEventListener('scroll', () => {
-        if (performance.now() < focusScrollUntil && document.activeElement?.closest?.('.mb-load-earlier')) return;
-        if (container.scrollTop < 80 && _loadedOffset > 0) loadEarlierMessages();
-        if (_unseen && isAtBottom(container)) clearNewPill();
-    }, { passive: true });
-}
-
-function boardHeaderHtml() {
-    // No button and no count (#7762): scrolling near the top loads the page before the oldest message shown. One quiet line above the rows, once the board's first message is the one on screen ("Loading earlier messages\u2026" floats over the box while a page is out: setEarlierLoading).
-    if (_loadedOffset <= 0 && _allMessages.length) return '<div class="mb-earlier-line" role="listitem">Start of the board</div>';
-    return '';
-}
-
-// Names each row's Save and Delete by its message, so a list of them reads as different buttons. The text is the message's own (untrusted), so it goes in as an attribute value, never as markup.
-function nameBoardButtons(root) {
-    const rows = root.matches && root.matches('.mb-message') ? [root] : [...(root.querySelectorAll ? root.querySelectorAll('.mb-message') : [])];
-    for (const row of rows) {
-        const save = row.querySelector('.mb-save-btn');
-        if (save) nameSaveButton(save);
-        const about = aboutRow(save);
-        row.querySelector('.mb-delete-msg-btn')?.setAttribute('aria-label', `Delete the message from ${about}`);
-    }
-}
-
-// One row: a message, or a collapsed run of task-queue lines. prev is the item before it (grouping by sender).
-function renderBoardItem(item, prev) {
-    if (item.kind === 'queue') return renderTaskQueueRun(item, formatTime);
-    const m = item.m;
-    const color = getAgentColor(m.job_title || 'Unknown');
-    const agent = m.job_title || 'Unknown';
-    const prevMsg = prev && prev.kind === 'msg' ? prev.m : null;
-    const prevAgent = prevMsg ? (prevMsg.job_title || 'Unknown') : null;
-    const sameAsPrev = agent === prevAgent;
-    const spacing = sameAsPrev ? 'mb-message-grouped' : 'mb-message-first';
-    const isLeader = /orchestrator/i.test(agent) || isOperatorId(m.subscriber_id);
-    const alignClass = isLeader ? ' board-msg-left' : ' board-msg-right';
-    const selectedClass = isSelectMode() && isSelected(m.id) ? ' mb-message-selected' : '';
-    const snippet = String(m.content || '').replace(/\s+/g, ' ').trim().slice(0, 40);
-    const moreLabel = `Actions for the message from ${agent}, ${formatTime(m.created_at)}${snippet ? `: ${snippet}` : ''}`; // each one names its own message (three at one minute are three names)
-    const deleteLabel = `Delete the message from ${agent}, ${formatTime(m.created_at)}`; // names the message: the × alone is read as "times"
-    const parent = m.reply_to ? _allMessages[indexOfId(_allMessages, m.reply_to)] : null;
-    const parts = rowParts(m, { agent, timeHtml: messageTimeHtml(m.created_at), moreLabel, replyName: m.reply_to ? (parent ? (parent.job_title || 'Unknown') : 'an earlier message') : '', self: OPERATOR_ID.toLowerCase() }); // the table's head, actions and flags (board_table.js)
-    const checkbox = isSelectMode() ? `<input type="checkbox" class="mb-select-checkbox" data-msg-id="${Number(m.id)}" ${isSelected(m.id) ? 'checked' : ''} data-on-click="mb-msg-select">` : '';
-    return `
-        <div class="mb-message ${spacing}${alignClass}${selectedClass}${parts.classes}"${parts.attrs} role="listitem" data-message-id="${escapeAttr(String(m.id))}"${m.reply_to ? ` data-reply-to="${Number(m.reply_to)}"` : ''}${messageAttachmentAttrs(m)} style="${boardMessageColorStyle(color)}">
-            ${parts.toggle}
-            <div class="mb-message-header">
-                ${checkbox}
-                <span class="mb-agent-name">${m.icon ? escapeHtml(m.icon) + ' ' : ''}${escapeHtml(agent)}</span>
-                ${externalMessageBadge(m)}${hubUserBadge(m)}${askBadge(m)}
-                ${messageTimeHtml(m.created_at)}
-                ${BOARD_SAVE_BUTTON(currentProject || '', keyLabel(currentProject || ''), String(m.created_at || ''), String(m.job_title || m.subscriber_id || ''))}
-                <button class="mb-delete-msg-btn" data-on-click="mb-msg-delete" data-msg-id="${Number(m.id)}" title="Delete message" aria-label="${escapeAttr(deleteLabel)}">&times;</button>
-                <button type="button" class="mb-msg-more" data-on-click="mb-msg-more" aria-haspopup="dialog" title="Message actions" aria-label="${escapeAttr(moreLabel)}">&hellip;</button>
-            </div>
-            ${parts.tagsOpen}
-            <div class="mb-message-body" id="mbd-${Number(m.id)}">${renderBoardMessageBody(m)}</div>
-            ${messageAttachmentsHtml(m)}
-            ${parts.actions}
-        </div>`;
-}
-
-/** On a phone a message's actions are behind one "..." (#7183): a sheet with Save for later (or Remove from saved) and, set apart below it, Delete. The buttons are the message's own (hidden on a phone): the sheet presses them. */
-function openMessageActions(opener) {
-    const row = opener.closest('.mb-message'); if (!row) return;
-    const messageId = row.dataset.messageId;
-    const save = row.querySelector('.mb-save-btn'), del = row.querySelector('.mb-delete-msg-btn');
-    const dlg = document.createElement('dialog'); dlg.className = 'mb-actions-sheet'; dlg.setAttribute('aria-labelledby', 'mb-actions-title');
-    const title = document.createElement('h3'); title.id = 'mb-actions-title'; title.textContent = (opener.getAttribute('aria-label') || 'Message actions').replace(/^Actions for the m/, 'M').replace(/:.*$/, '');
-    dlg.append(title);
-    const item = (cls, text, target) => { const b = document.createElement('button'); b.type = 'button'; b.className = cls; b.textContent = text; b.addEventListener('click', () => { dlg.close(); target.click(); }); return b; };
-    if (save) dlg.append(item('btn mb-actions-item', save.getAttribute('aria-pressed') === 'true' ? 'Remove from saved' : 'Save for later', save));
-    const select = opener.closest('.mb-table') && !isSelectMode() ? document.getElementById('mb-select-btn') : null; // the table's More holds Select too
-    if (select) dlg.append(item('btn mb-actions-item', 'Select messages', select));
-    if (del) { const apart = document.createElement('div'); apart.className = 'mb-actions-apart'; apart.append(item('btn mb-actions-item mb-actions-danger', 'Delete message', del)); dlg.append(apart); }
-    const close = document.createElement('button'); close.type = 'button'; close.className = 'btn mb-actions-item'; close.textContent = 'Close'; close.addEventListener('click', () => dlg.close());
-    dlg.append(close); document.body.append(dlg);
-    dlg.addEventListener('close', () => { dlg.remove(); const back = opener.isConnected ? opener : document.querySelector(`.mb-message[data-message-id="${CSS.escape(String(messageId))}"] .mb-row-more, .mb-message[data-message-id="${CSS.escape(String(messageId))}"] .mb-msg-more`); if (back) back.focus(); }); // the list may have been drawn again (a save marks the row): the same message's button gets the focus
-    dlg.showModal();
-    dlg.querySelector('.mb-actions-item')?.focus();
-}
-
-// Where messages[i] is in the list, searching from the end (new rows are at the end).
-function indexOfId(messages, id) {
-    for (let i = messages.length - 1; i >= 0; i--) if (messages[i].id === id) return i;
-    return -1;
-}
-
-// A row's first message id: a message row's own, a task-queue run's first line.
-function rowFirstId(row) {
-    return Number(row.classList.contains('mb-queue-run') ? row.dataset.queueRun : row.dataset.messageId);
-}
-
-// "Load earlier" (and a search jump's older pages) draws only the rows the page adds, in one batch above the rows shown (#4638): every older page used to
-// draw the whole board again, which cost more with each page (a board of 700 took over a second in UX's run). The rows shown stay as they are, with the focus
-// and what the reader opened; the first of them follows the new rows' last for grouping. Returns false (and the caller draws it all) when the rows shown are not
-// the loaded messages after the page, in select mode, or when a task-queue run could join across the page's edge.
-function prependEarlier(container, count) {
-    const first = container.querySelector(ROW);
-    if (!first || isSelectMode() || first.classList.contains('mb-queue-run') || container.querySelector(':scope > .empty-state, :scope > .loading-indicator')) return false;
-    if (!_allMessages[count] || _allMessages[count].id !== rowFirstId(first)) return false;
-    const items = groupTaskQueueRuns(_allMessages.slice(0, count + 1), true); // with the first message shown, to see what it would join
-    const tail = items[items.length - 1];
-    if (tail.kind !== 'msg' || tail.m.id !== _allMessages[count].id) return false;
-    const fresh = items.slice(0, -1);
-    const tmp = document.createElement('template');
-    tmp.innerHTML = fresh.map((item, i) => renderBoardItem(item, i > 0 ? fresh[i - 1] : null)).join('');
-    const added = [...tmp.content.children];
-    const prev = fresh[fresh.length - 1];
-    const grouped = !!prev && prev.kind === 'msg' && (prev.m.job_title || 'Unknown') === (tail.m.job_title || 'Unknown');
-    first.className = first.className.replace(/mb-message-(first|grouped)/, grouped ? 'mb-message-grouped' : 'mb-message-first'); // in place: the same class order as a whole render
-    const lead = first.previousElementSibling && first.previousElementSibling.classList.contains('mb-day') ? first.previousElementSibling : first; // the day line above the first row stays above the new rows
-    lead.before(tmp.content);
-    for (const el of added) { nameBoardButtons(el); resolveBoardArtifacts(el, state.currentBoardServer); }
-    updateBoardHeader(container);
-    return true; // (renderMessages draws the day dividers after it)
-}
-
-// The jump's landing: the message in the middle of the board with the focus on it (Save for Later's jump and the search's, #4510, #4771); the one before it loses its mark.
-/** instant: the jump came after pages were loaded above it (the rows moved under it, a smooth scroll would be cut short by the page's own scroll adjustments, and a row near the top loads one more page): it lands at once. */
-function revealMessage(target, instant = false) {
-    for (const old of document.querySelectorAll('#mb-messages .chat-search-target')) if (old !== target) old.classList.remove('chat-search-target');
-    const run = target.closest('details');
-    if (run) run.open = true; // a task-queue line inside a collapsed row
-    if (target.classList.contains('mb-message')) toggleRow(target, true); // a jump (a search hit, a saved message, a link) lands on the whole message
-    target.classList.add('chat-search-target');
-    if (target.classList.contains('mb-message') && target.parentElement && target.parentElement.classList.contains('mb-table')) revealRow(target, instant ? 'auto' : scrollBehavior());
-    else target.scrollIntoView({ block: 'center', behavior: instant ? 'auto' : scrollBehavior() });
-    target.setAttribute('tabindex', '-1'); // the focus goes to the message
-    target.focus({ preventScroll: true });
-}
-
-/** Go to a message of the board, loading the older pages until it is there (the board's own jump; the search's matches use it). */
-function focusMessageById(id) {
-    const container = document.getElementById('mb-messages');
-    const target = container && container.querySelector(`[data-message-id="${CSS.escape(String(id))}"]`);
-    if (target) { revealMessage(target); highlightBoard(container); return; }
-    pendingMessageId = String(id);
-    loadEarlierMessages();
-}
-
-/** "First": every older page is loaded, and the board is at its first message. */
-async function jumpToFirst() {
-    const container = document.getElementById('mb-messages');
-    if (!container) return;
-    for (let guard = 0; _loadedOffset > 0 && guard < 400; guard++) {
-        const before = _loadedOffset;
-        await loadEarlierMessages();
-        if (_loadedOffset >= before) break;
-    }
-    container.scrollTop = 0;
-    const first = container.querySelector(ROW);
-    if (first) { first.setAttribute('tabindex', '-1'); first.focus({ preventScroll: true }); }
-}
 
 const SEARCH_HOOKS = { me: OPERATOR_ID, redraw: () => highlightBoard(document.getElementById('mb-messages')), jumpTo: id => focusMessageById(id), first: () => jumpToFirst(), latest: () => jumpToLatest(), expandAll: () => setAllRows(document.getElementById('mb-messages'), true), collapseAll: () => setAllRows(document.getElementById('mb-messages'), false) };
 
 // ── The board as a table (#7921) ─────────────────────────────────────────
 let _pill = 'all'; // All, Questions or Mentions me: which rows the table shows
 let _tableTeam = null;
-let _replyTo = null; // { id, name }: the message the composer's text answers (Reply), sent with the post while the text still starts with the name
-
-/** The day dividers: one above the first row of each day, kept in step with the rows after every draw, append, prepend and trim (a divider is no row: nothing else counts it). */
-function syncDays(container) {
-    const at = new Map(_allMessages.map(m => [String(m.id), m.created_at]));
-    const rows = [...container.querySelectorAll(ROW)];
-    let prev = null;
-    for (const row of rows) {
-        const when = at.get(String(rowFirstId(row)));
-        const key = when ? new Date(when).toDateString() : null;
-        const lead = row.previousElementSibling && row.previousElementSibling.classList.contains('mb-day') ? row.previousElementSibling : null;
-        const wants = !!key && (prev === null || !sameDay(prev, when));
-        if (wants && !(lead && lead.dataset.day === key)) {
-            lead?.remove();
-            row.insertAdjacentHTML('beforebegin', dayDividerHtml(when));
-        } else if (!wants && lead) lead.remove();
-        if (key) prev = when;
-    }
-    for (const d of container.querySelectorAll(':scope > .mb-day')) if (!d.nextElementSibling || !d.nextElementSibling.matches('.mb-message, .mb-queue-run')) d.remove();
-}
 
 /** The table's controls and view on the board's box: the pills and the Table | Chat switch under the search, the open rows dropped when the team changes. */
 function applyBoardTable(project) {
     const box = document.getElementById('mb-messages'), host = document.getElementById('mb-tools');
     if (!box || !host) return;
     if (_tableTeam !== project) {
-        _tableTeam = project; _pill = 'all'; _replyTo = null;
+        _tableTeam = project; _pill = 'all'; bs._replyTo = null;
         forgetOpenRows();
         host.querySelector(':scope > .mb-table-tools')?.remove();
     }
@@ -504,378 +205,7 @@ function applyBoardTable(project) {
     });
 }
 
-/** Reply: "@Sender " goes at the start of the composer's text and the focus to it; the post carries reply_to while the text still starts with the name. */
-function replyToMessage(id, name) {
-    const input = document.getElementById('mb-post-input');
-    if (!input) return;
-    const prefix = `@${name} `;
-    if (!input.value.toLowerCase().startsWith(prefix.toLowerCase())) input.value = prefix + input.value;
-    _replyTo = { id: Number(id), name };
-    input.dispatchEvent(new Event('input', { bubbles: true })); // the growing box follows the text
-    input.focus();
-    input.setSelectionRange(input.value.length, input.value.length);
-}
-
-/** Copy link: the message's own address (the team page's Board tab with the message's number). */
-async function copyMessageLink(id) {
-    if (!currentProject) return;
-    const url = `${location.origin}${build(keyRoute('team', currentProject, 'messages', Number(id)))}`;
-    try { await navigator.clipboard.writeText(url); showToast('Link copied'); } catch { showToast('Could not copy the link', true); }
-}
-
-onRowActions('.mb-messages-scroll', { reply: replyToMessage, link: copyMessageLink, task: id => openTask(currentProject, id) });
-
-function renderMessages(messages, { keepAnchor = false, prepended = 0 } = {}) {
-    const container = document.getElementById('mb-messages');
-    wireBoardScroll(container);
-    if (!messages.length) {
-        emptyState(container, 'No messages on the board yet');
-        container.firstElementChild.setAttribute('role', 'listitem'); // the messages box is a list: its one notice is an item
-        return;
-    }
-    // Save scroll position before replacing content
-    const prevScrollTop = container.scrollTop;
-    const prevScrollHeight = container.scrollHeight;
-    const wasAtBottom = isAtBottom(container);
-    // "Load earlier" pressed from the keyboard is drawn again with the list: focus goes to the new one (UX on #4492).
-    const earlierFocused = !!document.activeElement?.closest?.('#mb-messages > .mb-load-earlier');
-
-    // Runs of task-queue lines are one collapsed row (#3343), except in select mode.
-    if (!(prepended > 0 && prependEarlier(container, prepended))) {
-        const items = groupTaskQueueRuns(messages, !isSelectMode());
-        container.innerHTML = boardHeaderHtml() + items.map((item, i) => renderBoardItem(item, i > 0 ? items[i - 1] : null)).join('');
-        nameBoardButtons(container);
-        resolveBoardArtifacts(container, state.currentBoardServer);
-    }
-    syncDays(container);
-    refreshReplies(container);
-    if (earlierFocused) {
-        // The button again, or with every message loaded the count line, so focus doesn't drop to the page.
-        const next = container.querySelector(':scope > .mb-load-earlier button');
-        if (next) next.focus({ preventScroll: true });
-        else {
-            const count = container.querySelector(':scope > .mb-message-count');
-            if (count) { count.tabIndex = -1; count.focus({ preventScroll: true }); }
-            else { container.tabIndex = -1; container.focus({ preventScroll: true }); } // every message is loaded and the count line is gone (#5991)
-        }
-    }
-    if (pendingMessageId) {
-        const target = container.querySelector(`[data-message-id="${CSS.escape(pendingMessageId)}"]`);
-        if (target) {
-            revealMessage(target, true);
-            pendingMessageId = null;
-            highlightBoard(container);
-            return; // the jump decides the scroll position
-        } else if (_loadedOffset > 0) {
-            // Search hits may be older than the initial latest page. Keep
-            // loading real pages until the stable message id is present.
-            loadEarlierMessages();
-        }
-    }
-    highlightBoard(container);
-    if (keepAnchor) {
-        // Older messages went in above: what you were reading stays where it was.
-        container.scrollTop = prevScrollTop + (container.scrollHeight - prevScrollHeight);
-    } else if (wasAtBottom) {
-        container.scrollTop = container.scrollHeight;
-    } else {
-        container.scrollTop = prevScrollTop;
-    }
-    fillTop();
-}
-
-// A poll's new messages (already merged into _allMessages) go in after the rows shown (#4492): message rows already shown are
-// left as they are, and only a task-queue run at the end is drawn again, since the new lines can extend it. Falls back to a whole
-// render when the rows shown don't match the loaded messages.
-function appendNewMessages(count) {
-    const container = document.getElementById('mb-messages');
-    announceArrivals(_allMessages.slice(-count), isAtBottom(container)); // (a board read higher up is told by the pill below instead)
-    const rows = container.querySelectorAll(ROW);
-    const last = rows[rows.length - 1];
-    const lastIdx = last ? indexOfId(_allMessages, rowFirstId(last)) : -1;
-    if (!last || lastIdx < 0 || lastIdx >= _allMessages.length - count || container.querySelector(':scope > .empty-state, :scope > .loading-indicator')) {
-        renderMessages(_allMessages);
-        return;
-    }
-    const wasAtBottom = isAtBottom(container);
-    const collapse = !isSelectMode();
-    let start, prev, replace = null;
-    if (last.classList.contains('mb-queue-run') && collapse) {
-        start = lastIdx; // the run is drawn again with the new lines it gains
-        replace = last;
-        const before = rows.length > 1 ? rows[rows.length - 2] : null;
-        prev = before && before.classList.contains('mb-message') ? { kind: 'msg', m: _allMessages[indexOfId(_allMessages, rowFirstId(before))] } : null;
-        if (prev && !prev.m) prev = null;
-    } else {
-        start = lastIdx + 1; // a message row: kept, and the new rows group with it
-        prev = { kind: 'msg', m: _allMessages[lastIdx] };
-    }
-    const items = groupTaskQueueRuns(_allMessages.slice(start), collapse);
-    const tmp = document.createElement('template');
-    tmp.innerHTML = items.map((item, i) => renderBoardItem(item, i > 0 ? items[i - 1] : prev)).join('');
-    const added = [...tmp.content.children];
-    if (replace) replace.replaceWith(tmp.content); else container.appendChild(tmp.content);
-    for (const el of added) { nameBoardButtons(el); resolveBoardArtifacts(el, state.currentBoardServer); }
-    if (wasAtBottom) trimBoardWindow(container);
-    syncDays(container);
-    refreshReplies(container);
-    updateBoardHeader(container);
-    highlightBoard(container);
-    if (wasAtBottom) container.scrollTop = container.scrollHeight;
-    else noteUnseenMessages(count);
-}
-
-// What arrives while the board is at the bottom is said once, politely, to a screen reader (the pill below does that for a board read higher up): who, and the start
-// of what they wrote; several at once are a count and the latest. Nothing for the task queue's own lines, a system post, or what the Operator posted themselves.
-let _announceFlip = false;
-function announceArrivals(fresh, atBottom) {
-    if (!atBottom) return;
-    const said = fresh.filter(m => m && !m.is_system && m.subscriber_id !== 'Operator' && String(m.content || '').trim());
-    const region = document.getElementById('mb-announce');
-    if (!said.length || !region) return;
-    const last = said[said.length - 1];
-    const who = last.job_title || last.subscriber_id || 'Unknown';
-    const start = String(last.content).replace(/\s+/g, ' ').trim();
-    const text = start.length > 140 ? start.slice(0, 140) + '…' : start;
-    _announceFlip = !_announceFlip;
-    region.textContent = (said.length === 1 ? `New message from ${who}: ${text}` : `${said.length} new messages. The latest is from ${who}: ${text}`) + (_announceFlip ? '' : ' ');
-}
-
-// Reading higher up: the posts a poll brings are not shown to you, so a small pill at the board's bottom edge counts them and jumps to the latest
-// (#4502). A polite live region announces it; it goes when the board is at the bottom again, by the button or by scrolling.
-let _unseen = 0;
-function noteUnseenMessages(n) {
-    if (!n) return;
-    _unseen += n;
-    renderNewPill();
-}
-function renderNewPill() {
-    const pill = document.getElementById('mb-new-pill');
-    if (!pill) return;
-    // The live region stays displayed and only its text changes (a region hidden and shown with its text can go unannounced).
-    const btn = pill.querySelector('button');
-    btn.textContent = _unseen > 0 ? `${_unseen} new message${_unseen === 1 ? '' : 's'}, jump to latest` : '';
-    btn.hidden = _unseen <= 0;
-}
-function clearNewPill() { _unseen = 0; renderNewPill(); }
-function jumpToLatest() {
-    const container = document.getElementById('mb-messages');
-    if (!container) return;
-    container.scrollTop = container.scrollHeight;
-    clearNewPill();
-    container.focus({ preventScroll: true });
-}
-
-// Drops the oldest loaded messages beyond BOARD_KEEP, and their rows, once a page more has built up (see BOARD_KEEP).
-function trimBoardWindow(container) {
-    if (isSelectMode() || pendingMessageId || _allMessages.length <= BOARD_KEEP + PAGE_SIZE) return;
-    const drop = _allMessages.length - BOARD_KEEP;
-    const firstKept = _allMessages[drop].id;
-    // The message a search or Save for Later jump just landed on is kept: the jump's smooth scroll may not have left the bottom yet when a poll comes.
-    const target = container.querySelector(':scope .chat-search-target');
-    if (target && Number(target.dataset.messageId) < firstKept) return;
-    _allMessages = _allMessages.slice(drop);
-    _loadedOffset += drop;
-    for (const row of container.querySelectorAll(ROW)) {
-        if (row.classList.contains('mb-queue-run')) {
-            const lines = [...row.querySelectorAll('.mb-queue-line')].map(l => Number(l.dataset.messageId));
-            if (lines[lines.length - 1] < firstKept) { row.remove(); continue; }
-            if (lines[0] < firstKept) { // a run across the cut: drawn again from its first kept line
-                const run = groupTaskQueueRuns(_allMessages.slice(0, lines.filter(id => id >= firstKept).length), true)[0];
-                const tmp = document.createElement('template');
-                tmp.innerHTML = renderBoardItem(run, null);
-                row.replaceWith(tmp.content);
-            }
-            break;
-        }
-        if (rowFirstId(row) < firstKept) { row.remove(); continue; }
-        // The first message shown starts its group: there is no row above it now.
-        row.classList.replace('mb-message-grouped', 'mb-message-first');
-        break;
-    }
-}
-
-// The quiet line above the rows ("Loading earlier messages\u2026", "Start of the board"), after a poll or a load changed it: its text changes in place, and it goes in or out only when it has something to say.
-function updateBoardHeader(container) {
-    const tmp = document.createElement('template');
-    tmp.innerHTML = boardHeaderHtml();
-    const fresh = tmp.content.querySelector('.mb-earlier-line');
-    const line = container.querySelector(':scope > .mb-earlier-line');
-    if (line && !fresh) line.remove();
-    else if (line) { if (line.outerHTML !== fresh.outerHTML) line.replaceWith(fresh); }
-    else if (fresh) container.prepend(fresh);
-}
-
-/** "Loading earlier messages\u2026" over the top of the box while a page is out: it takes no room, so the rows do not move when it comes and goes. */
-function setEarlierLoading(on) {
-    const el = document.getElementById('mb-earlier-loading');
-    if (el && el.hidden === on) el.hidden = !on;
-    if (on) sayEarlier('Loading earlier messages\u2026');
-}
-
-/** What the screen reader hears when earlier messages are added (a status, not a focus move). */
-function sayEarlier(text) {
-    const el = document.getElementById('mb-earlier-status');
-    if (el && el.textContent !== text) el.textContent = text;
-}
-
-// The time of a message today, the date and time of an older one: the date said nothing on a board that is read the day it is written (#5991).
-function formatTime(iso) {
-    try {
-        const d = new Date(iso);
-        if (d.toDateString() === new Date().toDateString()) return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-        return d.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
-    } catch {
-        return iso;
-    }
-}
-
-// ── Subscribers ──────────────────────────────────────────────────────────
-
-
-
-
-// The team's names for the composer's @ picker (the job title, else the id): refreshed with the members list.
-let mentionNames = [];
-function attachMentionList() {
-    importOnce('./mention_picker.js').then(m => m.attachMentionPicker(document.getElementById('mb-post-input'), () => mentionNames)).catch(() => {}); // the box works without the list
-}
-async function loadBoardSubscribers(project) {
-    try {
-        const subs = await fetchSubscribers(project);
-        mentionNames = [...new Set(subs.filter(s => !isOperatorId(s.subscriber_id)).map(s => s.job_title || s.subscriber_id).filter(n => typeof n === 'string' && n))];
-        setBoardMembers([...new Set(subs.map(s => s.job_title || s.subscriber_id).filter(n => typeof n === 'string' && n))].sort().slice(0, 50)); // the From field's names
-        // @mentions of these members are highlighted; the bodies on screen are marked in place
-        if (setBoardMentionNames(subs.flatMap(s => [s.job_title, s.subscriber_id]))) { highlightMentionsIn(document.getElementById('mb-messages')); retagMentions(document.getElementById('mb-messages'), OPERATOR_ID.toLowerCase()); } // in place: no message is redrawn, so a jump's outline and focus stay
-    } catch (e) {
-        console.error('Failed to load subscribers:', e);
-    }
-}
-
-// ── Subscribers sheet (phone width, #3610) ───────────────────────────────
-
-// ── Dashboard subscription ───────────────────────────────────────────────
-
-async function subscribeDashboard(project) {
-    try {
-        if (isCloud()) {
-            const access = await (await importOnce('./server_access.js')).serverAccess(splitKey(project).server);
-            if (!access?.mayInteract) return;
-        }
-        await boardFetch(project, `/subscribe`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ subscriber_id: OPERATOR_ID, job_title: 'Operator' }),
-        });
-    } catch (e) {
-        // Best effort
-    }
-}
-
-// ── Posting ──────────────────────────────────────────────────────────────
-
-export async function postBoardMessage() {
-    if (!currentProject) return;
-    const blocked = blockedReason(splitKey(currentProject).server, 'interact');
-    if (blocked) { showToast(blocked, true); return; }
-    const input = document.getElementById('mb-post-input');
-    const content = input.value.trim();
-    if (!content) return;
-
-    try {
-        const resp = await boardFetch(currentProject, `/messages`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ subscriber_id: OPERATOR_ID, as: 'Operator', content, ...(_replyTo && content.toLowerCase().startsWith(`@${_replyTo.name.toLowerCase()}`) ? { reply_to: _replyTo.id } : {}) }),
-        });
-        if (!resp.ok) {
-            // The draft stays; say why, in the server's words when it gives them (a per-sender rate
-            // limit's "too many messages…; retry in 20s", #3435).
-            const text = await resp.text().catch(() => '');
-            let reason = '';
-            let unknown = false;
-            try { const b = JSON.parse(text); if (b && typeof b.error === 'string') reason = b.error; unknown = isOutcomeUnknown(resp.status, b, resp.url); } catch { /* not JSON */ }
-            console.error('Post failed:', resp.status, text);
-            showToast(unknown ? OUTCOME_UNKNOWN_LINE : reason ? `Not posted: ${reason}` : `Not posted (HTTP ${resp.status}).`, true);
-            return;
-        }
-        input.value = '';
-        _replyTo = null;
-        // Fetch new messages since our last known total
-        await _pollNewMessages();
-    } catch (e) {
-        console.error('Failed to post message:', e);
-    }
-}
-
-// ── Pause / Resume reads ─────────────────────────────────────────────────
-
-async function loadPausedState(project) {
-    try {
-        const resp = await boardFetch(project, `/paused`);
-        const data = await resp.json();
-        isPaused = !!data.paused;
-        updatePauseButton();
-    } catch (e) {
-        isPaused = false;
-        updatePauseButton();
-    }
-}
-
-function updatePauseButton() {
-    // the page's own item is text; the team panel's button is an icon that one function paints (#5491)
-    paintPauseButton(document.getElementById('board-chat-pause-btn'), isPaused);
-    const btn = document.getElementById('mb-pause-btn');
-    if (!btn) return;
-    btn.textContent = isPaused ? 'Resume Board' : 'Pause Board';
-    btn.classList.toggle('mb-action-danger', isPaused);
-}
-
-export async function toggleBoardPause() {
-    if (!currentProject) return;
-    const action = isPaused ? 'resume' : 'pause';
-    try {
-        const resp = await boardFetch(currentProject, `/${action}`, {
-            method: 'POST',
-        });
-        const data = await resp.json();
-        isPaused = !!data.paused;
-        updatePauseButton();
-    } catch (e) {
-        console.error('Failed to toggle pause:', e);
-    }
-}
-
-// ── Delete message ───────────────────────────────────────────────────────
-
-// The × on a message asks first: a deleted message is gone for every reader. The wording names the
-// sender and the start of the text, so a mis-click on the wrong row is easy to spot (#3696).
- function confirmDeleteBoardMessage(messageId) {
-    const m = _allMessages.find(x => x.id === messageId);
-    const text = m ? String(m.content || '').replace(/\s+/g, ' ').trim() : '';
-    const what = m ? `the message from ${m.job_title || 'Unknown'}${text ? ` ("${text.length > 60 ? text.slice(0, 60) + '\u2026' : text}")` : ''}` : `message #${messageId}`;
-    window.showConfirmModal('Delete Message', `Delete ${what}? This cannot be undone.`, () => deleteBoardMessage(messageId));
-}
-
-async function deleteBoardMessage(messageId) {
-    if (!currentProject) return;
-    try {
-        const resp = await boardFetch(currentProject, `/messages/${pathId(messageId)}`, {
-            method: 'DELETE',
-        });
-        if (!resp.ok) {
-            console.error('Delete message failed:', resp.status);
-            return;
-        }
-        // Remove locally and re-render
-        _allMessages = _allMessages.filter(m => m.id !== messageId);
-        _totalMessages = Math.max(0, _totalMessages - 1);
-        _countedTotal = Math.max(0, _countedTotal - 1);
-        renderMessages(_allMessages);
-    } catch (e) {
-        console.error('Failed to delete message:', e);
-    }
-}
+onRowActions('.mb-messages-scroll', { reply: replyToMessage, link: copyMessageLink, task: id => openTask(bs.currentProject, id) });
 
 // ── Delete project ───────────────────────────────────────────────────────
 
@@ -890,7 +220,7 @@ function syncBoardDeleteButton(project) {
     btn.title = blocked || '';
     btn.textContent = blocked ? 'Delete (needs Launch)' : 'Delete';
 }
-document.addEventListener('coral:server-access-loaded', () => syncBoardDeleteButton(currentProject));
+document.addEventListener('coral:server-access-loaded', () => syncBoardDeleteButton(bs.currentProject));
 
 /** The agents running on this board now, by name (the live list: not asleep, not archived). */
 function runningAgentsOn(project) {
@@ -905,10 +235,10 @@ function runningAgentsText(names) {
 }
 
 export function deleteMessageBoardProject() {
-    const blocked = currentProject ? launchBlockedReason(splitKey(currentProject).server) : '';
+    const blocked = bs.currentProject ? launchBlockedReason(splitKey(bs.currentProject).server) : '';
     if (blocked) { showToast(blocked, true); return; }
-    if (!currentProject) return;
-    const project = currentProject;
+    if (!bs.currentProject) return;
+    const project = bs.currentProject;
     // A board with agents running is not deleted (#5043): they would stay live in a group named with the raw board id. Said here, before asking; the server
     // says it again for an agent this page's list does not show yet.
     const running = runningAgentsOn(project);
@@ -932,122 +262,12 @@ export function deleteMessageBoardProject() {
 
 // ── Polling ──────────────────────────────────────────────────────────────
 
-async function _pollNewMessages() {
-    const project = currentProject;
-    // Wait for the initial page (an after_id=0 poll would fetch the oldest
-    // page), and never run two polls at once.
-    if (!project || isPaused || _loadedProject !== project || _pollInFlight) return;
-    _pollInFlight = true;
-    try {
-        // What follows the newest message shown.
-        const last = _allMessages[_allMessages.length - 1];
-        const result = await fetchMessages(project, PAGE_SIZE, { after_id: last ? last.id : 0 });
-        if (currentProject !== project || _loadedProject !== project) return;
-        // With after_id every returned row is new, even if deletes kept the total flat.
-        const fresh = result.messages.filter(m => !last || m.id > last.id);
-        if (fresh.length < PAGE_SIZE) {
-            // The total should be what was counted plus the new ones; less means messages were deleted (a secret taken down,
-            // say), also when one arrived in the same tick. A whole page means more are waiting: counted, checked once caught up.
-            if (result.total !== _countedTotal + fresh.length) _staleRows = true;
-            _countedTotal = result.total;
-        } else {
-            _countedTotal += fresh.length;
-        }
-        const totalChanged = _totalMessages !== result.total;
-        _totalMessages = result.total;
-        const container = document.getElementById('mb-messages');
-        if (_staleRows && !isSelectMode() && !pendingMessageId && (!container || isAtBottom(container))) {
-            // Rows shown may hold a deleted message: the latest page again. Not while you read higher up, select messages
-            // or wait for a search jump; then at a later poll.
-            const page = await fetchMessages(project, PAGE_SIZE);
-            if (currentProject !== project || _loadedProject !== project) return;
-            _allMessages = page.messages;
-            _totalMessages = _countedTotal = page.total;
-            _loadedOffset = page.beforeCount;
-            _staleRows = false;
-            renderMessages(_allMessages);
-            return;
-        }
-        if (fresh.length > 0) {
-            _allMessages = mergeMessages(_allMessages, fresh);
-            for (const p of applyAskUpdates(_allMessages, result.askUpdates)) { const row = container && container.querySelector(`:scope > .mb-message[data-message-id="${Number(p.id)}"]`); if (row) refreshAsk(row, p); } // a Question these answer says so now
-            appendNewMessages(fresh.length);
-        } else if (totalChanged && container && container.querySelector(ROW)) {
-            updateBoardHeader(container);
-        }
-    } catch (e) {
-        // Silent fail on poll
-    } finally {
-        _pollInFlight = false;
-    }
-}
-
 (window.__coral ||= {}).pollBoardNow = _pollNewMessages; // tests: a poll without waiting 10 s
-
-let _pollCount = 0;
-
-function startBoardPoll() {
-    stopBoardPoll();
-    _pollCount = 0;
-    pollTimer = pollEvery(() => {
-        if (currentProject && (platform.isNative || !document.hidden)) {
-            _pollNewMessages();
-            // Refresh subscribers less often (every 30s instead of every 10s)
-            _pollCount++;
-            if (_pollCount % 3 === 0) {
-                loadBoardSubscribers(currentProject);
-            }
-        }
-    }, 10000, { whenHidden: true }); // the native app polls while hidden
-}
-
-function stopBoardPoll() {
-    if (pollTimer) {
-        clearInterval(pollTimer);
-        pollTimer = null;
-    }
-}
-
-// ── Sleep / Wake ─────────────────────────────────────────────────────
-
-async function loadSleepState(project) {
-    try {
-        const resp = await teamFetch(project, n => `/api/sessions/live/team/${encodeURIComponent(n)}/sleep-status`);
-        const data = await resp.json();
-        isSleeping = !!data.sleeping;
-        updateSleepUI();
-    } catch (e) {
-        isSleeping = false;
-        updateSleepUI();
-    }
-}
-
-function updateSleepUI() {
-    const btn = document.getElementById('mb-sleep-btn');
-    if (btn) {
-        btn.textContent = isSleeping ? 'Wake Team' : 'Sleep Team';
-        btn.classList.toggle('btn-warning', isSleeping);
-    }
-    const banner = document.getElementById('mb-sleep-banner');
-    if (banner) {
-        banner.style.display = isSleeping ? '' : 'none';
-    }
-    const input = document.getElementById('mb-post-input');
-    const sendBtn = document.querySelector('#mb-board .btn-primary');
-    if (input) {
-        input.disabled = isSleeping;
-        input.placeholder = isSleeping ? 'Team is sleeping...' : 'Message the team...';
-    }
-    if (sendBtn) {
-        sendBtn.disabled = isSleeping;
-        sendBtn.style.opacity = isSleeping ? '0.4' : '';
-    }
-}
 
 // ── Init ─────────────────────────────────────────────────────────────────
 
 // What the export and select code needs of the open board (board_export.js).
-connectBoard({ project: () => currentProject, messages: () => _allMessages, render: () => renderMessages(_allMessages), formatTime });
+connectBoard({ project: () => bs.currentProject, messages: () => bs._allMessages, render: () => renderMessages(bs._allMessages), formatTime });
 
 export function initMessageBoard() {
     loadBoardProjects();
