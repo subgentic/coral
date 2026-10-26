@@ -7,6 +7,7 @@ import (
 	"path"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -88,8 +89,12 @@ func stubNames(stub string) []string {
 // by the right relative path (a module in a subdirectory climbs out of it).
 func TestBundleStubsReExportFromAppJsByRelativePath(t *testing.T) {
 	b, _ := realBundle(t)
+	lazy := map[string]bool{}
+	for _, m := range b.Lazy {
+		lazy[m] = true // built against app.js directly, not stubs (TestLazy...)
+	}
 	for m, stub := range b.Files {
-		if m == "app.js" || !strings.HasSuffix(m, ".js") {
+		if m == "app.js" || !strings.HasSuffix(m, ".js") || lazy[m] {
 			continue
 		}
 		want := fmt.Sprintf("from '%s'", relativeTo(m, "app.js"))
@@ -205,8 +210,8 @@ func TestBundleOverlay(t *testing.T) {
 	if err != nil || !bytes.Equal(app, b.Files["app.js"]) {
 		t.Fatalf("app.js is not the bundle: %v", err)
 	}
-	orig, _ := fs.ReadFile(static, "security_settings.js")
-	got, err := fs.ReadFile(o, "security_settings.js")
+	orig, _ := fs.ReadFile(static, "theme_init.js") // a classic script: not a module of the family
+	got, err := fs.ReadFile(o, "theme_init.js")
 	if err != nil || !bytes.Equal(got, orig) {
 		t.Errorf("a file the bundle does not replace is not the original: %v", err)
 	}
@@ -292,6 +297,171 @@ func TestImportOnceSpecsAreFoundInAMinifiedTree(t *testing.T) {
 	for m := range want {
 		if !got[m] {
 			t.Errorf("%s is imported with importOnce in the source but not found in the minified tree", m)
+		}
+	}
+}
+
+// The lazy modules (#8670) are built against the bundle's instance: a lazy file imports app.js and nothing else (a startup module's stub would be a request), except a
+// group's member, whose URL is a stub of its group file. None failed to build, and every lazy module of the tree is covered.
+func TestLazyModulesImportOnlyTheBundle(t *testing.T) {
+	b, static := realBundle(t)
+	if len(b.LazySkipped) > 0 {
+		t.Fatalf("lazy modules that did not build (served as the original, with stub requests): %v", b.LazySkipped)
+	}
+	startup := map[string]bool{"app.js": true}
+	for _, m := range b.Modules {
+		startup[m] = true
+	}
+	want := lazyModules(static, startup)
+	if len(want) < 100 {
+		t.Fatalf("only %d lazy modules found: the walk is not reading the tree", len(want))
+	}
+	if strings.Join(b.Lazy, ",") != strings.Join(want, ",") {
+		t.Errorf("the family covers %d lazy modules, the tree has %d: %v", len(b.Lazy), len(want), want)
+	}
+	memberOf := map[string]string{}
+	for _, g := range LazyGroups {
+		for _, m := range g.Members {
+			memberOf[m] = g.Main
+		}
+	}
+	imp := regexp.MustCompile(`(?:\bfrom|\bimport)\s*["'](\.{1,2}/[^"']+)["']`)
+	for _, m := range b.Lazy {
+		data, ok := b.Files[m]
+		if !ok || len(data) == 0 {
+			t.Errorf("lazy module %s has no file", m)
+			continue
+		}
+		wantImport := "./app.js"
+		if main, member := memberOf[m]; member {
+			wantImport = "./" + main
+		}
+		for _, x := range imp.FindAllStringSubmatch(string(data), -1) {
+			if x[1] != wantImport {
+				t.Errorf("%s imports %s: a lazy file imports only %s", m, x[1], wantImport)
+			}
+		}
+		if _, member := memberOf[m]; !member && !bytes.Contains(data, []byte("sourceMappingURL="+m+".map")) {
+			t.Errorf("%s has no source map link", m)
+		}
+	}
+}
+
+// A group's main file holds the members and the main module in dependency order: every member is registered with importOnce (so the main module's own importOnce of it is
+// answered with no request), comes before the modules that await it, and is awaited by something in the group (else it has no business there).
+func TestLazyGroupsAreWholeAndInOrder(t *testing.T) {
+	b, static := realBundle(t)
+	startup := map[string]bool{"app.js": true}
+	for _, m := range b.Modules {
+		startup[m] = true
+	}
+	lazy := map[string]bool{}
+	for _, m := range lazyModules(static, startup) {
+		lazy[m] = true
+	}
+	seen := map[string]bool{}
+	for _, g := range LazyGroups {
+		pos := map[string]int{}
+		for i, m := range g.Members {
+			if !lazy[m] || seen[m] {
+				t.Errorf("group %s: member %s is not a lazy module, or is in two groups", g.Main, m)
+			}
+			seen[m] = true
+			pos[m] = i
+		}
+		if !lazy[g.Main] || seen[g.Main] {
+			t.Errorf("group main %s is not a lazy module, or is a member", g.Main)
+		}
+		awaited := map[string]bool{}
+		for _, who := range append(append([]string{}, g.Members...), g.Main) {
+			data, err := fs.ReadFile(static, who)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, dep := range importOnceCalls(data) {
+				if i, member := pos[dep]; member {
+					awaited[dep] = true
+					if who != g.Main && i >= pos[who] {
+						t.Errorf("group %s: %s awaits %s, which is listed after it", g.Main, who, dep)
+					}
+				}
+			}
+		}
+		for _, m := range g.Members {
+			if !awaited[m] {
+				t.Errorf("group %s: no module of the group awaits %s", g.Main, m)
+			}
+			if !bytes.Contains(b.Files[g.Main], []byte(strconv.Quote(m))) {
+				t.Errorf("group %s: the file does not register %s with importOnce", g.Main, m)
+			}
+			stub := string(b.Files[m])
+			if len(stub) > 4096 || (strings.Contains(stub, "export {") && !strings.Contains(stub, "from './"+g.Main+"'")) {
+				t.Errorf("%s is not a stub of %s: %q", m, g.Main, stub)
+			}
+			if got, want := stubNames(stub), mustExports(t, static, m); strings.Join(got, ",") != strings.Join(want, ",") {
+				t.Errorf("the stub of %s exports %v, the module exports %v", m, got, want)
+			}
+		}
+		for _, name := range mustExports(t, static, g.Main) {
+			if name != "default" && !bytes.Contains(b.Files[g.Main], []byte(name)) {
+				t.Errorf("group %s: the file does not export %s", g.Main, name)
+			}
+		}
+	}
+}
+
+func mustExports(t *testing.T, static fs.FS, m string) []string {
+	t.Helper()
+	ex, err := exportNames(static, m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return ex
+}
+
+// The same tree builds the same bytes, lazy files included (the build id hashes them).
+func TestLazyFilesAreDeterministic(t *testing.T) {
+	b, static := realBundle(t)
+	index, _ := fs.ReadFile(Templates, "templates/index.html")
+	again, err := BuildBundle(static, index)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range b.Lazy {
+		if !bytes.Equal(b.Files[m], again.Files[m]) {
+			t.Errorf("%s differs between two builds of one tree", m)
+		}
+	}
+}
+
+// The release's static tree is minified (MinifyAsset, tools/strip-static): the lazy families build from it too, with every group member registered.
+func TestLazyFamiliesBuildFromAMinifiedTree(t *testing.T) {
+	_, static := realBundle(t)
+	min := fstest.MapFS{}
+	_ = fs.WalkDir(static, ".", func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return nil
+		}
+		data, _ := fs.ReadFile(static, p)
+		if strings.HasSuffix(p, ".js") && !strings.HasPrefix(p, "vendor/") {
+			data = MinifyAsset(p, data)
+		}
+		min[p] = &fstest.MapFile{Data: data}
+		return nil
+	})
+	index, _ := fs.ReadFile(Templates, "templates/index.html")
+	b, err := BuildBundle(min, index)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(b.LazySkipped) > 0 {
+		t.Fatalf("lazy modules that did not build from the minified tree: %v", b.LazySkipped)
+	}
+	for _, g := range LazyGroups {
+		for _, m := range g.Members {
+			if !bytes.Contains(b.Files[g.Main], []byte(strconv.Quote(m))) {
+				t.Errorf("minified tree: group %s does not register %s", g.Main, m)
+			}
 		}
 	}
 }

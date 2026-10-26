@@ -42,6 +42,11 @@ type Bundle struct {
 	Files map[string][]byte
 	// Modules are the startup modules (paths relative to static/) that are inside app.js.
 	Modules []string
+	// Lazy are the lazy modules (paths relative to static/) the family serves built, in Files, with their startup imports pointing at app.js's instance
+	// (#8670): a group's members as stubs of the group file, every other one as its own file. A lazy module that is in neither is served as the original.
+	Lazy []string
+	// LazySkipped are the lazy modules whose build failed, with why: each is served as the original file. Empty on the real tree (a test holds that).
+	LazySkipped map[string]error
 }
 
 // BundleDisabled reports whether CORAL_NO_BUNDLE=1 asks for the original files.
@@ -61,7 +66,7 @@ func StylesheetsInShell(indexHTML []byte) []string {
 // bundleFormat names what the bundled family's bytes depend on beyond the sources and MinifyAsset's options: change it when BuildBundle's output changes
 // for the same tree (its esbuild options, what it registers or adds), so the static build version (MinifyIdentity, #4320) changes with it and a browser
 // holding the old bundle at the same /static/bb/<build>/ URL is not served the new one's stubs by mistake.
-const bundleFormat = "bundle:ws+syntax+idents,self-registered-importonce,startup-lazy:1"
+const bundleFormat = "bundle:ws+syntax+idents,self-registered-importonce,startup-lazy:1,lazy-families:1"
 
 // StartupLazyModules are the modules the dashboard's startup imports with importOnce (not statically), on every normal start: the
 // leftover-tmux check, the received-files limit notice (#4441) and the sign-in and set-password prompts. They are part of the bundle so those imports cost
@@ -217,7 +222,21 @@ func BuildBundle(static fs.FS, indexHTML []byte) (*Bundle, error) {
 		b.Files[m] = []byte(s.String())
 	}
 
-	// 3. The stylesheets, in the shell's order, as one file.
+	// 3. The lazy modules, built against the bundle's instance: no stub requests, and the tab families in one file (bundle_lazy.go).
+	startup := map[string]bool{"app.js": true}
+	for _, m := range names {
+		startup[m] = true
+	}
+	lazyFiles, lazyCovered, lazySkipped, err := buildLazyModules(static, startup, alias, exports)
+	if err != nil {
+		return nil, err
+	}
+	for name, data := range lazyFiles {
+		b.Files[name] = data
+	}
+	b.Lazy, b.LazySkipped = lazyCovered, lazySkipped
+
+	// 4. The stylesheets, in the shell's order, as one file.
 	if links := StylesheetsInShell(indexHTML); len(links) > 0 {
 		var css bytes.Buffer
 		for _, l := range links {
