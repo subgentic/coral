@@ -172,7 +172,7 @@ registerGroupSource('hub-inbox', {
             return { title: 'Tasks', rows, empty: { line: queries.tasks ? 'No task matches the search.' : 'No assigned tasks.' },
                 signature: JSON.stringify([phone, openKey, rows.map(t => [t.project, t.id, t.title, t.priority, t.status, t.board, t.updated_at])]),
                 node: () => TR.taskList(rows, { label: `Tasks, ${rows.length}`, columns: ['state', 'task', 'priority', 'team', 'when'], phone, // only my tasks: no who; the Team column because the group spans teams
-                    ctx: { openTask: t => openTaskPage(t.project, t.id), keyOf: t => `${t.project}#${t.id}`, current: openKey, teamOf: t => t.board || '' } }) };
+                    ctx: { who: false, openTask: t => openTaskPage(t.project, t.id), keyOf: t => `${t.project}#${t.id}`, current: openKey, teamOf: t => t.board || '' } }) };
         }
         if (key === 'saved') return savedTableSpec();
         return null;

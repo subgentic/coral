@@ -5,7 +5,7 @@
  * A task is the board's own record (status, review_requested, assigned_to, worked_by, completed_by, goal_id, priority, created_at, updated_at, board). Everything is built with the DOM and textContent: titles and names are
  * written by agents.
  *   taskList(tasks, { label, columns, phone, ctx })  -> a table, or on a phone the column
- *   ctx: { openTask(task), openGoal(goalId), goalTitleOf(goalId), current: key, keyOf(task), noGoal: 'No goal', teamOf(task) }
+ *   ctx: { openTask(task), openGoal(goalId), goalTitleOf(goalId), current: key, keyOf(task), noGoal: 'No goal', teamOf(task), who: false to leave who out of the column }
  */
 import { whenText } from './when_text.js';
 import { importOnce } from './import_once.js';
@@ -66,7 +66,7 @@ export function taskColumnRow(t, ctx = {}) {
     b.setAttribute('aria-label', `Open task #${t.id}: ${t.title}, ${taskWord(t)}`);
     if (ctx.current === taskKey(t, ctx)) b.setAttribute('aria-current', 'true');
     const line1 = el('span', 'task-col-line1'); line1.append(el('span', 'task-id', `#${t.id}`), el('span', 'task-col-title', t.title));
-    const line2 = el('span', 'task-col-line2'); line2.append(taskChip(t), el('span', 'task-col-who', whoText(t)));
+    const line2 = el('span', 'task-col-line2'); line2.append(taskChip(t)); if (ctx.who !== false) line2.append(el('span', 'task-col-who', whoText(t))); // who: false where every task is the same person's (the Inbox)
     if (String(t.priority || '').toLowerCase() === 'high') line2.append(el('span', 'task-col-priority', 'High'));
     b.append(line1, line2);
     b.addEventListener('click', () => ctx.openTask?.(t));

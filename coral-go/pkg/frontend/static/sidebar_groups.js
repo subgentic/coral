@@ -138,10 +138,12 @@ function drawTable() {
     const back = isPhoneLayout() ? `<button type="button" class="group-back group-table-back" data-on-click="sgroup-list" data-kind="${escapeAttr(open.kind)}">\u2190 ${escapeHtml(TAB_NAME[open.kind] || 'List')}</button>` : '';
     const html = tables.map((x, i) => tableHtml(x, open.kind, open.key, i, i ? '' : back, tables.length > 1)).join('');
     host.dataset.group = open.kind + ':' + open.key; // which table is on screen (saved.js asks for the Inbox's Saved)
-    const drawn = html + (t.node ? `|${t.signature || ''}` : ''); // a table with its own rows says what they are (signature): the same rows are not drawn again
+    const drawn = html + tables.map(x => (x.node ? `|${x.signature || ''}` : '')).join(''); // a table with its own rows says what they are (signature): the same rows are not drawn again
     if (host.dataset.drawn !== drawn) {
         host.innerHTML = html; host.dataset.drawn = drawn; // a redraw of what is there would drop the focus from a row the keyboard is on
-        if (t.node && t.rows.length) host.querySelector('.group-table-node')?.replaceWith(t.node());
+        const slots = host.querySelectorAll('.group-table-node'); // one per table that draws its own rows (and has some), in order
+        let k = 0;
+        for (const x of tables) if (x.node && x.rows.length) slots[k++]?.replaceWith(x.node());
     }
     return true;
 }
