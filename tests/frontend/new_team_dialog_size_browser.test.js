@@ -6,7 +6,7 @@ const { execFileSync } = require('./helpers/child_process.js');
 const fs = require('node:fs');
 const path = require('node:path');
 const { connect } = require('./agent_view_harness');
-const { install: installNT, N, T, openNewTeam, scenarios, stubModels } = require('./helpers/new_team');
+const { install: installNT, M, N, T, openNewTeam, scenarios, stubModels } = require('./helpers/new_team');
 const BASE = require('./test_base').BASE;
 
 const VIEWS = [['1280x800', 1280, 800, false, false], ['390x844', 390, 844, true, false], ['390x844 at 200% text', 390, 844, true, true]];
@@ -62,8 +62,10 @@ const VIEWS = [['1280x800', 1280, 800, false, false], ['390x844', 390, 844, true
                 await ev(`(() => { const b = window.__nt.rows(window.__nt.dlg(${N.team})).find(x => window.__na.name(x).startsWith('Edit ' + ${JSON.stringify(role)} + ': ')); b.click(); return true; })()`);
                 await waitFor(`!!window.__nt.dlg(${N.member})`, 'Edit member opens', 5000); await settle(300);
                 const m0 = await ev(`window.__na.box(window.__nt.panel(window.__nt.dlg(${N.member})))`); same(r0, m0, 'Edit member vs New team');
-                for (const n of N.memberTabs) { await goSection(N.section, n, N.member); same(m0, await ev(`window.__na.box(window.__nt.panel(window.__nt.dlg(${N.member})))`), `Edit member tab ${n}`); }
-                await t.click('button', N.cancel, N.member); await waitFor(`!window.__nt.dlg(${N.member})`, 'closes', 4000); same(r0, await t.rect(), 'New team after Edit member closes');
+                const mem = M(ev, waitFor);
+                for (const n of N.memberTabs) { await mem.section(n); same(m0, await ev(`window.__na.box(window.__nt.panel(window.__nt.dlg(${N.member})))`), `Edit member tab ${n}`); }
+                await mem.toPersona(); same(m0, await ev(`window.__na.box(window.__nt.panel(window.__nt.dlg(${N.member})))`), 'Edit member persona page');
+                await mem.cancel(); same(r0, await t.rect(), 'New team after Edit member closes');
             });
             await ev(`window.hideLaunchModal && window.hideLaunchModal(); document.documentElement.style.fontSize = ''; true`);
         }
