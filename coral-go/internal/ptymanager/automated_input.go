@@ -96,6 +96,7 @@ type ScreenReader interface {
 type typedMemo struct {
 	text  string
 	paste bool
+	at    time.Time // when Coral typed it: a paste placeholder is Coral's own only for a short while after
 }
 
 type inputGate struct {
@@ -130,7 +131,7 @@ func (g *inputGate) lockSession(name string) func() {
 func (g *inputGate) noteTyped(name, text string, paste bool) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	g.lastTyped[name] = typedMemo{text: squeeze(text), paste: paste}
+	g.lastTyped[name] = typedMemo{text: squeeze(text), paste: paste, at: g.now()}
 }
 
 func (g *inputGate) typedFor(name string) (typedMemo, bool) {

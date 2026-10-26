@@ -132,9 +132,10 @@ func (in AutomatedInput) look(ctx context.Context) verdict {
 		return v // a readable screen with no box Coral recognises: the text goes (the harness queues it)
 	}
 	if emptyBox(box, in.styledSuggestionOnly(ctx, agentType, sessionID)) {
+		gate.forgetTyped(in.Name) // the box is empty: whatever Coral typed was taken, and it is not Coral's leftover any more
 		return v
 	}
-	if memo, ok := gate.typedFor(in.Name); ok && ownBox(box, memo) {
+	if memo, ok := gate.typedFor(in.Name); ok && ownBox(box, memo, gate.now()) {
 		v.leftover = true
 		return v
 	}
@@ -167,14 +168,19 @@ func emptyBox(box string, suggestionOnly bool) bool {
 	return strings.TrimSpace(box) == "" || (boxPlaceholder(box) && !strings.Contains(box, pastePlaceholder)) || suggestionOnly
 }
 
+// pasteLeftoverWindow is how long after Coral pasted a long text a paste placeholder in the box is taken to be that text still waiting for its Enter.
+const pasteLeftoverWindow = 3 * time.Minute
+
 // ownBox reports whether the box holds exactly the text Coral typed last (decided by an exact match of the squeezed texts, or by the
 // placeholder an agent shows for a long paste of Coral's): anything else, a person's words added to ours included, is a draft.
-func ownBox(box string, memo typedMemo) bool {
+func ownBox(box string, memo typedMemo, now time.Time) bool {
 	if memo.text == "" {
 		return false
 	}
 	if strings.Contains(box, pastePlaceholder) {
-		return memo.paste && collapsible(memo.text)
+		// A placeholder says only that something was pasted, not what: a person's own paste looks the same. It is Coral's leftover only when Coral pasted a long text a moment ago (a
+		// text that got no Enter is found at the next send); later it is the person's draft, and the Enter is theirs to press.
+		return memo.paste && collapsible(memo.text) && now.Sub(memo.at) <= pasteLeftoverWindow
 	}
 	return squeeze(box) == memo.text
 }

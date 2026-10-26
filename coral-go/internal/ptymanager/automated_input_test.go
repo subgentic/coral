@@ -340,3 +340,46 @@ func TestTheSessionSurveyDoesNotKeepTheBoardFromAnAgent(t *testing.T) {
 	assert.Equal(t, Skipped, deliver(t, a, n, "1"), "a digit would answer the survey")
 	assert.Len(t, a.sent(), 1)
 }
+
+// A person's own pasted draft is not Coral's leftover (Security's #7757 read): a long text shows in the box as a placeholder ("[Pasted text #1 +40 lines]"), and Coral's last text having been a long paste
+// must not make a placeholder of the person's Coral's own, or the nudge would press the Enter of what the person pasted.
+func TestAPersonsOwnPastedDraftIsNotCoralsLeftover(t *testing.T) {
+	n := "claude-t-pasted-draft"
+	defer ForgetSession(n)
+	person := strings.Replace(idleInputBox, "❯ \n", "❯ [Pasted text #1 +40 lines]\n", 1)
+
+	// Coral's last text was a long paste, long ago (an agent's first prompt); the person pastes their own text now
+	gate.noteTyped(n, strings.Repeat("a long first prompt. ", 30), true)
+	gate.backdateTyped(n, 10*time.Minute)
+	a := &fakeAgent{screen: person}
+	assert.Equal(t, Skipped, deliver(t, a, n, "You have 1 unread message"))
+	assert.Zero(t, a.enters, "the person's paste is never submitted by Coral")
+	assert.Empty(t, a.sent())
+	s, _ := SkippedOf(n)
+	assert.Equal(t, SkipDraft, s.Why)
+
+	// a look at an empty box forgets Coral's text: it was taken, and a placeholder that comes later cannot be it
+	gate.noteTyped(n, strings.Repeat("a long first prompt. ", 30), true)
+	b := &fakeAgent{screen: idleInputBox}
+	b.input(n, "", "x", false).look(context.Background())
+	_, kept := gate.typedFor(n)
+	assert.False(t, kept, "an empty box ends Coral's claim on what it typed")
+	b.show(person)
+	assert.Equal(t, Skipped, deliver(t, b, n, "second"))
+	assert.Zero(t, b.enters)
+
+	// Coral's own long paste that did not get its Enter, a moment ago, is still its leftover
+	gate.noteTyped(n, strings.Repeat("a long first prompt. ", 30), true)
+	c := &fakeAgent{screen: person}
+	assert.Equal(t, Skipped, deliver(t, c, n, "x"))
+	assert.Equal(t, 1, c.enters, "Coral's own recent paste gets its Enter")
+}
+
+// backdateTyped makes the last text Coral typed to name d older (a test of the leftover window).
+func (g *inputGate) backdateTyped(name string, d time.Duration) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	m := g.lastTyped[name]
+	m.at = m.at.Add(-d)
+	g.lastTyped[name] = m
+}
