@@ -92,3 +92,26 @@ func TestInputBoxSkipsKeySequences(t *testing.T) {
 		t.Errorf("submissions = %q", got)
 	}
 }
+
+// The menu's opening and closing are told to the run loop, which fires the hook events Coral reads an agent's state from (#8245).
+func TestPromptMenuTellsWhenItOpensAndCloses(t *testing.T) {
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stdout := os.Stdout
+	os.Stdout = w
+	var kinds []string
+	b := &inputBox{trigger: "OPEN_PROMPT_NOW", notify: func(k string) { kinds = append(kinds, k) }}
+	b.feed([]byte("OPEN_PROMPT_NOW"), func(string) {})
+	b.feed([]byte("\r"), func(string) {})
+	b.feed([]byte("again OPEN_PROMPT_NOW"), func(string) {})
+	b.feed([]byte("\x1bz"), func(string) {}) // an Esc a key follows is not the start of a paste marker
+	os.Stdout = stdout
+	w.Close()
+	_, _ = io.ReadAll(r)
+	want := []string{"permission_request", "permission_answered", "permission_request", "permission_dismissed", "permission_request"} // the key after the Esc is typed into a box that still holds the trigger: the menu opens again
+	if strings.Join(kinds, ",") != strings.Join(want, ",") {
+		t.Errorf("the menu told %v, want %v", kinds, want)
+	}
+}
