@@ -143,7 +143,7 @@ export function buildListBar(spec, onChange, hooks = {}) {
     const fields = spec.fields.map(buildField);
     const clearAll = make('button', 'list-bar-clear-all', 'Clear all'); clearAll.type = 'button';
     // spec.doneButton (#7883): a phone's panel has a Done button that shuts it (the filters apply as they are chosen, so there is nothing to confirm); a desktop's panel stays beside the list and has no use for it
-    const done = collapsible && spec.doneButton ? make('button', 'list-bar-done btn btn-primary', 'Done') : null;
+    const done = collapsible && spec.doneButton ? make('button', 'list-bar-done btn', 'Done') : null;
     if (done) done.type = 'button';
     menu.append(...fields.map(x => x.wrap), ...((inline || collapsible) && sort ? [sort.wrap] : []), ...(inline ? [count] : []), clearAll, ...(done ? [done] : []));
     if (inline) { menu.hidden = false; menu.classList.add('list-bar-menu-inline'); clearAll.textContent = 'Clear filters'; }

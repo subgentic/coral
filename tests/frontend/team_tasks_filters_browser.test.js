@@ -48,6 +48,12 @@ const G1 = 'Explore goals with two teams', G2 = 'Plan the release notes';
                 assert.equal(done.shown, mobile, 'Done is a phone\'s button');
                 if (mobile) {
                     assert.ok(done.h >= 44, 'Done is a 44 px target: ' + done.h);
+                    const look = await ev(`(() => { const b = document.querySelector('#tk-menu .list-bar-done'), m = document.getElementById('tk-menu'), n = document.querySelector('${panel} .team-tb-action'); const bg = e => getComputedStyle(e).backgroundColor; return { primary: b.classList.contains('btn-primary'), sameAsNewTask: n ? bg(b) === bg(n) : null, w: Math.round(b.getBoundingClientRect().width), menu: Math.round(m.getBoundingClientRect().width) }; })()`);
+                    assert.equal(look.primary, false, 'Done is a secondary button, not the primary blue that New task is (#7925): ' + JSON.stringify(look));
+                    assert.notEqual(look.sameAsNewTask, true, 'it does not look like New task: ' + JSON.stringify(look));
+                    assert.ok(Math.abs(look.w - look.menu) <= 2, 'and it is as wide as the panel: ' + JSON.stringify(look));
+                    await shot(`tasks-filters-done-${label}`);
+                    if (process.env.CORAL_SCREENSHOT_DIR) { await ev(`document.documentElement.dataset.theme = 'light'; true`); await settle(900); await shot(`tasks-filters-done-light-${label}`); await ev(`delete document.documentElement.dataset.theme; true`); } // the light theme for the review's shot
                     await ev(`document.querySelector('#tk-menu .list-bar-done').click(); true`); await settle(300);
                     assert.equal(await ev(`document.getElementById('tk-menu').hidden`), true, 'Done shuts the panel');
                     assert.equal(await ev(`document.activeElement.id`), 'tk-toggle', 'with the keyboard back on the Filters icon');
