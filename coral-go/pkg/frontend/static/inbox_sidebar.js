@@ -1,3 +1,4 @@
+import { needsInputAttention } from './display_activity_hint.js';
 /* The dashboard's own Inbox on the shared sidebar (#7472), loaded the first time the Inbox tab is shown (inbox_tab.js keeps the badge and the counts, which are always there).
  *
  * Three groups, the hub's /inbox order: Needs you (the agents waiting for input, from the live list the dashboard already holds), Tasks (the open tasks assigned to the Operator) and Saved (the
@@ -49,7 +50,7 @@ const queries = { needs: '', tasks: '', goals: '', saved: '' }; // a chat folder
 let page = null; // { kind: 'task', project, id } | { kind: 'saved', id }: the item on screen, or null
 
 // ── Needs you ────────────────────────────────────────────────────────────
-const waitingSessions = () => (state.liveSessions || []).filter(s => s && s.waiting_for_input);
+const waitingSessions = () => (state.liveSessions || []).filter(needsInputAttention);
 const teamOf = s => s.board_project ? keyLabel(identityKey(sessionServer(s), s.board_project)) : '';
 const needsText = s => [resolveSessionIdentity(s), sessionStateInfo(s).label, askOf(s), teamOf(s)].join(' ').toLowerCase();
 const needsRows = () => waitingSessions().filter(s => !queries.needs || needsText(s).includes(queries.needs));

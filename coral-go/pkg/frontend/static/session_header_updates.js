@@ -1,7 +1,7 @@
 /* Live updates to the open agent's header: its folder, branch, waiting state, goal and status (moved out of render.js, #4996; no behaviour change). */
 import { syncWaitingNotice } from './waiting.js'; // what waits for the open agent, with Send now (#7727)
 import { syncQueuedFromRow, paint as paintQueued } from './held_sends.js';
-import { _shortPath, _gitStateSummary, _repoBranch, deriveSessionState } from './session_state.js';
+import { _shortPath, _gitStateSummary, _repoBranch, presentationSessionState } from './session_state.js';
 import { startupSignedOut } from './signin_line.js';
 import { syncAgentKeys } from './agent_keys.js';
 import { setText, setHidden, setTitle, setHtml, setDisplay, setClassName, setPill } from './dom_write.js';
@@ -77,7 +77,7 @@ export function updateWaitingIndicator(s) {
     const dot = document.getElementById("session-status-dot");
     const banner = document.getElementById("waiting-banner");
     if (dot) {
-        const key = deriveSessionState(s);
+        const key = presentationSessionState(s);
         dot.classList.toggle("waiting", key === 'needs_input' || key === 'check_terminal');
         dot.classList.toggle("stuck", key === 'stuck');
         dot.classList.toggle("working", key === 'working');
@@ -94,7 +94,7 @@ export function updateWaitingIndicator(s) {
         // the question is already on screen.
         // Same resolver as the rows: the banner follows the WINNING state, so a
         // sleeping or stuck agent with a stale waiting flag never shows it.
-        const bannerKey = deriveSessionState(s);
+        const bannerKey = presentationSessionState(s);
         // An overlay pill (#5287): no layout space, shown after a delay so a state that comes and goes at once never flashes it, gone at once.
         let text = "";
         if (bannerKey === 'needs_input') {

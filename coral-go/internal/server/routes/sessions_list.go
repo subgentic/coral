@@ -460,6 +460,10 @@ func (h *SessionsHandler) agentRow(trace *phaseTrace, agent AgentInfo, lv liveIn
 		firstPrompt = h.jsonl.FirstUserPrompt(sid, agent.WorkingDir, agent.AgentType)
 		trace.agentDetail("first_prompt", sid, time.Since(promptStarted))
 	}
+	var displayHint, displayHintAt any
+	if !skipExpensive {
+		displayHint, displayHintAt = h.displayActivityHint(agent.AgentType, agent.TmuxSession, sid, state, d.stateEvents[sid], time.Now())
+	}
 	entry := map[string]any{
 		"name":                  agent.AgentName,
 		"agent_type":            agent.AgentType,
@@ -505,6 +509,7 @@ func (h *SessionsHandler) agentRow(trace *phaseTrace, agent AgentInfo, lv liveIn
 		"first_prompt":          firstPrompt,
 		"enrichment_pending":    skipExpensive && !sleeping,
 	}
+	withDisplayActivityHint(entry, displayHint, displayHintAt)
 	// Always present (false/""/null too): the dashboard merges entries, so
 	// an omitted false would leave the AUTO chip on after it was turned off.
 	for k, v := range autoAcceptFields(agent.AgentType, autoAcceptStates[sid]) {
@@ -602,6 +607,7 @@ func (h *SessionsHandler) sleepingRows(allLive []store.LiveSession, liveSIDs map
 			"sleep_reason":          sleepReason(ls),
 			"first_prompt":          h.sleepingFirstPrompt(ls),
 		}
+		withDisplayActivityHint(entry, nil, nil)
 		// Include prompt, model, and capabilities for sleeping sessions too
 		addContextUsage(entry, nil, 0)
 		if ls.Prompt != nil {
@@ -653,7 +659,7 @@ func (h *SessionsHandler) ResolveSession(w http.ResponseWriter, r *http.Request)
 		if indexed {
 			state = "finished"
 		}
-		writeJSON(w, http.StatusOK, map[string]any{
+		writeJSON(w, http.StatusOK, withDisplayActivityHint(map[string]any{
 			"session_id":        sessionID,
 			"state":             state,
 			"active":            false,
@@ -680,7 +686,7 @@ func (h *SessionsHandler) ResolveSession(w http.ResponseWriter, r *http.Request)
 			"stuck":             false,
 			"not_started":       false,
 			"starting":          false,
-		})
+		}, nil, nil))
 		return
 	}
 
@@ -717,6 +723,7 @@ func (h *SessionsHandler) ResolveSession(w http.ResponseWriter, r *http.Request)
 		staleness, _ := logInfo["staleness_seconds"].(float64)
 		liveState = h.deriveSingleSessionState(r.Context(), sessionID, staleness)
 	}
+	displayHint, displayHintAt := h.singleDisplayActivityHint(r.Context(), ls.AgentType, naming.SessionName(ls.AgentType, sessionID), sessionID, liveState)
 	out := map[string]any{
 		"session_id":        ls.SessionID,
 		"state":             state,
@@ -749,6 +756,7 @@ func (h *SessionsHandler) ResolveSession(w http.ResponseWriter, r *http.Request)
 		"not_started":       false,
 		"starting":          false,
 	}
+	withDisplayActivityHint(out, displayHint, displayHintAt)
 	for k, v := range h.autoAcceptPayload(r.Context(), ls.SessionID) {
 		out[k] = v
 	}

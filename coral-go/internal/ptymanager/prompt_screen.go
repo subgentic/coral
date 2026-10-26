@@ -142,6 +142,22 @@ const codexWorkingLines = 6
 // codexWorkingOnScreen reports whether Codex's screen shows it working (#247): its working line within the few lines just above
 // the lowest input box. Only there: the same words further up are output (a reply quoting them), not the status.
 func codexWorkingOnScreen(screen string) (line string, busy bool) {
+	return codexWorkingMatching(screen, codexWorkingRe)
+}
+
+// CodexDisplayWorkingOnScreen is a presentation hint, never an input gate. An
+// actual prompt always wins, even with a working line above it.
+func CodexDisplayWorkingOnScreen(screen string) bool {
+	if open, _ := PromptOnScreen(screen); open {
+		return false
+	}
+	_, working := codexWorkingMatching(screen, codexDisplayWorkingRe)
+	return working
+}
+
+var codexDisplayWorkingRe = regexp.MustCompile(`(?i)^\s*[•◦]\s+\S.*\(.*\besc to interrupt\)(?:\s*·\s*\d+ background terminals? running(?:\s*·.*)?)?\s*$`)
+
+func codexWorkingMatching(screen string, workingRe *regexp.Regexp) (line string, busy bool) {
 	lines := tailLines(screenText(screen), promptScreenLines)
 	box := -1
 	for i := len(lines) - 1; i >= 0; i-- {
@@ -160,7 +176,7 @@ func codexWorkingOnScreen(screen string) (line string, busy bool) {
 			continue
 		}
 		seen++
-		if codexWorkingRe.MatchString(t) {
+		if workingRe.MatchString(t) {
 			return t, true
 		}
 	}

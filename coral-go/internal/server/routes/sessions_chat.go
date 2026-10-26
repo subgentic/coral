@@ -586,12 +586,13 @@ func (h *SessionsHandler) SessionStatus(w http.ResponseWriter, r *http.Request) 
 	}
 
 	var row struct {
+		AgentType  string  `db:"agent_type"`
 		Status     string  `db:"status"`
 		IsSleeping int     `db:"is_sleeping"`
 		StoppedAt  *string `db:"stopped_at"`
 	}
 	err := h.db.Reader().GetContext(r.Context(), &row,
-		"SELECT status, is_sleeping, stopped_at FROM live_sessions WHERE session_id = ?", sessionID)
+		"SELECT status, is_sleeping, stopped_at, agent_type FROM live_sessions WHERE session_id = ?", sessionID)
 	if err == sql.ErrNoRows {
 		var indexed bool
 		if indexErr := h.db.Reader().GetContext(r.Context(), &indexed,
@@ -635,7 +636,8 @@ func (h *SessionsHandler) SessionStatus(w http.ResponseWriter, r *http.Request) 
 		state = "done"
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
+	displayHint, displayHintAt := h.singleDisplayActivityHint(r.Context(), row.AgentType, naming.SessionName(row.AgentType, sessionID), sessionID, liveState)
+	writeJSON(w, http.StatusOK, withDisplayActivityHint(map[string]any{
 		"session_id":        sessionID,
 		"state":             state,
 		"active":            !finished,
@@ -651,5 +653,5 @@ func (h *SessionsHandler) SessionStatus(w http.ResponseWriter, r *http.Request) 
 		"latest_event":      ptr.NullIfEmpty(latestEvent),
 		"latest_summary":    ptr.NullIfEmpty(latestSummary),
 		"stopped_at":        row.StoppedAt,
-	})
+	}, displayHint, displayHintAt))
 }
