@@ -345,7 +345,7 @@ function savedListSpec(where = '') {
         node: () => DT.dataTable({ label: `Saved, ${rows.length}`, rows, rowKey: f => f.id, state: dock ? dockSavedState : savedState, sortBar: false, rowName: f => f.which,
             open: (f, row) => dock ? openDockSavedSheet(f.id, row.querySelector('.dt-primary')) : openSavedPage(f.id),
             columns: [
-                { key: 'message', label: 'Message', primary: true, width: 'grow', line: 1, cell: f => { const b = DT.primaryButton(f.which); b.dataset.id = f.id; return b; } },
+                { key: 'message', label: 'Message', primary: true, width: 'grow', nowrap: false, line: 1, cell: f => { const b = DT.primaryButton(f.which); b.dataset.id = f.id; return b; } },
                 ...(multi ? [{ key: 'machine', label: 'Computer', line: dock ? 2 : 0, cell: f => f.serverName || '' }] : []),
                 { key: 'saved', label: 'Saved', tone: 'tertiary', align: 'end', line: 1, cell: f => f.saved },
                 { key: 'state', label: 'State', line: 2, cell: f => (f.state ? DT.tag(f.state) : '') },

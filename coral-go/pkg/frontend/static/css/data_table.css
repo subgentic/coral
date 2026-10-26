@@ -331,6 +331,11 @@
 /* Compact task names get a full line when large text leaves too little room
    beside the timestamp. Keep both their words and their hit area inside the row. */
 @container dt (max-width: 20rem) {
+    /* Wrapping primary columns (Saved messages) get two readable lines before
+       their timestamp, rather than one cramped name beside it. */
+    .dt-box.dt-fold-column.dt-folded .dt-table td.dt-line-1.dt-grow.dt-wrap { flex: 1 1 100%; min-width: 8rem; }
+    .dt-box.dt-fold-column.dt-folded td.dt-wrap > .dt-primary { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: normal; overflow-wrap: normal; word-break: normal; }
+
     .dt-box.dt-compact.dt-fold-column.dt-folded .dt-table td.dt-line-1.dt-grow:has(> .dt-title-cell) { flex: 1 1 100%; min-width: 8rem; height: auto; }
     .dt-box.dt-compact.dt-fold-column.dt-folded .dt-title-cell { flex-wrap: wrap; align-items: baseline; row-gap: 0; }
     .dt-box.dt-compact.dt-fold-column.dt-folded .dt-title-cell > .dt-primary { flex: 1 1 100%; min-width: 8rem; max-width: 100%; margin-block: 0; white-space: normal; overflow: visible; overflow-wrap: normal; word-break: normal; text-overflow: clip; }
