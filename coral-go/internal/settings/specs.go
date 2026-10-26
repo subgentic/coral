@@ -27,7 +27,6 @@ const (
 	TerminalDefaultNotice    = "terminal_default_notice"
 	HubMode                  = "hub_mode"
 	HubOperatorDisabled      = "hub_operator_disabled"
-	LegacyHubOperator        = "hub_acts_as_operator"
 	HubRedactTokens          = "hub_redact_tokens"
 	CloudAllowHubAutoAccept  = "cloud_allow_hub_auto_accept"
 	HubRelaunchUpdates       = "hub_relaunch_updates"
@@ -200,7 +199,6 @@ func init() {
 	// Set only with their own routes.
 	register(Spec{Key: TerminalBackend, Kind: KindEnum, Values: []string{"pty", "tmux"}, Class: ClassOwnRoute, Apply: ApplyRestart, Doc: "Terminal backend."})
 	ownRoute(HubOperatorDisabled, KindBool, "false", "The Hub may not act as the Operator.")
-	ownRoute(LegacyHubOperator, KindBool, "false", "Old spelling of the opposite of hub_operator_disabled.")
 	ownRoute(HubMode, KindBool, "false", "Coral is a Coral Hub's server.")
 	optIn(HubMode)
 	register(Spec{Key: IdentityActor, Kind: KindEnum, Values: []string{"log", "enforce"}, Default: "log", Class: ClassOwnRoute, Apply: ApplyLive, Doc: "Whether the actor header is enforced."})
