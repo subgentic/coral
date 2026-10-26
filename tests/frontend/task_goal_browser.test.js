@@ -36,7 +36,7 @@ const BASE = require('./test_base').BASE;
         assert.equal(await ev(`document.querySelector('#agentic-panel-tasks .dt-subtitle').textContent`), 'Goal: Ship the new installer', 'the chip says Goal: to a screen reader (hidden words), then the title (#7313)');
 
         console.log('2. Create Task: the Goal select lists the open goals; the task is made under the chosen one');
-        await ev(`document.querySelector('.btn-create-task').click(); true`);
+        await ev(`document.querySelector('#board-task-bar .btn-create-task').click(); true`);
         await waitFor(`getComputedStyle(document.getElementById('create-task-modal')).display !== 'none' && !document.getElementById('create-task-goal-row').hidden`, 'the dialog with its Goal select', 8000);
         assert.deepEqual(await ev(`[...document.getElementById('create-task-goal').options].map(o => o.textContent)`), ['No goal', 'Fix the flaky suites', 'Ship the new installer']); // newest activity first, as the Goals view lists them
         await ev(`document.getElementById('create-task-title').value = 'Stabilise CI'; document.getElementById('create-task-goal').value = '${g2}'; document.querySelector('#create-task-modal [data-on-click="m-submit-create-task"]').click(); true`);
@@ -65,11 +65,11 @@ const BASE = require('./test_base').BASE;
         assert.equal((await taskOf(t2.json.id)).goal_id, g1, 'Save moved the task to the chosen goal');
         await waitFor(`!document.getElementById('task-edit-goal') && [...document.querySelectorAll('#team-panel-item .goals-facts dd button.team-link')].some(b => b.textContent === 'Ship the new installer')`, 'the page naming the new goal', 8000);
         await ev(`window.exitTeamPage && window.exitTeamPage({ force: true }); window.selectLiveSession('goal-agent', 'claude', 'goal-agent-id', 'local'); true`);
-        await waitFor(`!!document.querySelector('.btn-create-task') && document.querySelector('.btn-create-task').getClientRects().length > 0`, 'the Tasks tab again', 8000);
+        await waitFor(`!!document.querySelector('#board-task-bar .btn-create-task') && document.querySelector('#board-task-bar .btn-create-task').getClientRects().length > 0`, 'the Tasks tab again', 8000);
 
         console.log('5. a board that requires a goal: the empty choice says "Choose a goal" and Create refuses without one');
         assert.equal((await api('PUT', `/api/board/${B}/settings`, { subscriber_id: 'Operator', require_goal: true })).status, 200);
-        await ev(`document.querySelector('.btn-create-task').click(); true`);
+        await ev(`document.querySelector('#board-task-bar .btn-create-task').click(); true`);
         await waitFor(`getComputedStyle(document.getElementById('create-task-modal')).display !== 'none' && !document.getElementById('create-task-goal-row').hidden && document.getElementById('create-task-goal').options[0].textContent === 'Choose a goal'`, 'the required Goal select', 8000);
         await ev(`document.getElementById('create-task-title').value = 'No goal here'; document.querySelector('#create-task-modal [data-on-click="m-submit-create-task"]').click(); true`);
         await waitFor(`/Choose a goal/.test(document.getElementById('create-task-goal-error').textContent) && !document.getElementById('create-task-goal-error').hidden`, 'the refusal beside the select', 6000);
