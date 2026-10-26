@@ -448,3 +448,16 @@
     .viz-line-4 { stroke-dasharray: 6 2; } .viz-line-5 { stroke-dasharray: 1 3; } .viz-line-6 { stroke-dasharray: 16 6; } .viz-line-o { stroke-dasharray: 3 3; }
     .cost-swatch { forced-color-adjust: none; border-color: CanvasText; }
 }
+.cost-card-change { margin-top: 2px; font-size: 0.75rem; line-height: 1.3; color: var(--text-muted); }
+.cost-card-change:empty { display: none; }
+.viz-fill { stroke: var(--bg-primary); stroke-width: 2; stroke-linejoin: round; }
+.viz-legend { list-style: none; margin: 8px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 0 12px; }
+.viz-legend-btn { width: 100%; display: flex; align-items: center; gap: 8px; min-height: 32px; padding: 0 4px; background: none; border: 0; border-radius: var(--radius-md, 6px); color: var(--text-secondary); font: inherit; font-size: 0.8125rem; text-align: left; cursor: pointer; }
+.viz-legend-btn:hover, .viz-legend-btn[aria-pressed="true"] { background: var(--bg-hover); }
+.viz-legend-btn[aria-pressed="true"] { color: var(--text-primary); font-weight: 600; }
+.viz-legend-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.viz-legend-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.viz-legend-value { font-variant-numeric: tabular-nums; color: var(--text-muted); }
+@media (pointer: coarse) { .viz-legend-btn { min-height: var(--control-touch-height, 44px); } }
+@media (forced-colors: active) { .viz-fill { stroke: Canvas; } }
+#cost-summary-cards .cost-card { grid-row: span 4; } /* label, figure, the change against the period before (#7930), sparkline */

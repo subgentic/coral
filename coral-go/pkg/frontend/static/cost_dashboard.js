@@ -317,6 +317,7 @@ export async function _refreshCostDashboard() {
     // Flash live indicator
     _flashLiveIndicator();
     _refreshSeries(); // the chart above the open breakdown view (#7857)
+    _refreshOverview(); // the change against the period before, and cost by team (#7930)
     _refreshCallMetrics(period, hoursAgo); // the calls view follows the range too, with the page's own refresh (#7719)
     showSpend(document.getElementById('cost-spend'), period, document.getElementById('cost-task-time')); // tokens per commit and task time, one team (#7526, #7530): its own read, its own errors
 
@@ -520,7 +521,33 @@ function _swatched(view, cell) {
 const _pick = view => r => { series.setHighlight(view, series.lineKeyOf(view, SERIES_VIEWS[view].key(r))); _drawSeries(view); _rerender(view); };
 const _seriesOpts = view => ({ open: _pick(view), rowName: r => SERIES_VIEWS[view].name(r) });
 
-document.addEventListener('cost-view-change', e => { if (SERIES_VIEWS[e.detail]) _refreshSeries(e.detail); });
+
+// ── The Overview over time (#7930): the change against the period before, and cost by team stacked ──
+const _CHANGE_CARDS = { input_tokens: 'input', output_tokens: 'output', cache_read_tokens: 'cache-read', cache_write_tokens: 'cache-write', num_requests: 'requests', cost_usd: 'cost' };
+
+async function _refreshOverview() {
+    if (_currentView() !== 'overview') return;
+    const host = document.getElementById('cost-series-overview');
+    if (!host) return;
+    const hours = _periodHours(), untilMs = Date.now(), sinceMs = untilMs - hours * 3600000, interval = _periodInterval(), iso = ms => encodeURIComponent(new Date(ms).toISOString());
+    const read = async url => { const resp = await fetch(url, { cache: 'no-store' }); if (!resp.ok) throw new Error('unavailable'); return (await resp.json()).buckets || []; };
+    try {
+        const [now, byTeam, prior] = await Promise.all([
+            read(`/api/token-usage/timeseries?since=${iso(sinceMs)}&interval=1d`),
+            read(`/api/token-usage/timeseries?since=${iso(sinceMs)}&interval=${interval}&group_by=team`),
+            read(`/api/token-usage/timeseries?since=${iso(sinceMs - hours * 3600000)}&until=${iso(sinceMs)}&interval=1d`),
+        ]);
+        const word = series.priorWord(document.getElementById('cost-time-range')?.value || 'day'), cur = series.bucketTotals(now), before = series.bucketTotals(prior);
+        for (const [field, id] of Object.entries(_CHANGE_CARDS)) { const e = document.getElementById(`cost-change-${id}`); if (e) e.textContent = series.changeText(cur[field], before[field], word); }
+        series.setData('overview', { buckets: byTeam, interval, sinceMs, untilMs });
+    } catch {
+        for (const id of Object.values(_CHANGE_CARDS)) { const e = document.getElementById(`cost-change-${id}`); if (e) e.textContent = ''; }
+        series.setData('overview', null, 'The chart is unavailable. The figures above are complete.');
+    }
+    series.drawOverviewPanel(host, { phone: isPhoneLayout() });
+}
+
+document.addEventListener('cost-view-change', e => { if (SERIES_VIEWS[e.detail]) _refreshSeries(e.detail); else if (e.detail === 'overview') _refreshOverview(); });
 let _resizeTimer = null;
 window.addEventListener('resize', () => { clearTimeout(_resizeTimer); _resizeTimer = setTimeout(() => { const v = _currentView(); if (SERIES_VIEWS[v] && document.getElementById(`cost-series-${v}`)?.firstChild) _drawSeries(v); }, 150); });
 
