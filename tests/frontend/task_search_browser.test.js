@@ -99,7 +99,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(`delete document.documentElement.dataset.theme; document.getElementById('agentic-state').style.width = '680px'; true`);
         }
         check('the bar tracks the board count for search announcements (66 tasks)', s.shown && s.count === '66 tasks' && s.chips.length === 0, JSON.stringify([s.shown, s.count, s.chips]));
-        check('the default list is unchanged: open first, then the newest 50 done, Hide done offered', s.statuses.slice(0, 6).every(x => x !== 'Finished') && s.statuses.filter(x => x === 'Finished').length === 50 && s.hide && /Showing 56 of 66/.test(s.more || ''), JSON.stringify([s.statuses.length, s.hide, s.more]));
+        check('the default list is unchanged: open first, then the newest 50 done, Hide done offered', s.statuses.slice(0, 6).every(x => x !== 'Done') && s.statuses.filter(x => x === 'Done').length === 50 && s.hide && /Showing 56 of 66/.test(s.more || ''), JSON.stringify([s.statuses.length, s.hide, s.more]));
 
         // ── A search asks the whole board ──
         await type('alpha');
@@ -124,7 +124,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         // first done page. Clicking twice raced that load and clicked a removed button.
         await settle(`document.querySelectorAll('#board-task-list .board-task-item:not(.board-task-header)').length === 53`, 'automatic first done page');
         s = await snap();
-        check('gamma automatically loads the first 50 done after its three open tasks', s.count === '63 of 66' && s.statuses.slice(0, 3).every(x => x !== 'Finished') && s.statuses.slice(3).every(x => x === 'Finished') && /Showing 53 of 63/.test(s.more || ''), JSON.stringify([s.count, s.statuses.length, s.more]));
+        check('gamma automatically loads the first 50 done after its three open tasks', s.count === '63 of 66' && s.statuses.slice(0, 3).every(x => x !== 'Done') && s.statuses.slice(3).every(x => x === 'Done') && /Showing 53 of 63/.test(s.more || ''), JSON.stringify([s.count, s.statuses.length, s.more]));
         check('automatic paging keeps the same search input, its text and keyboard focus', await ev(`document.getElementById('tk-search') === window.__searchBeforePaging && document.activeElement === window.__searchBeforePaging && window.__searchBeforePaging.value === 'gamma'`));
         await ev(`document.querySelector('#board-task-list .dt-foot').scrollIntoView({ block: 'end' }); true`);
         await settle(`document.querySelectorAll('#board-task-list .board-task-item:not(.board-task-header)').length === 63`, 'every match');
@@ -137,7 +137,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await pick('tk-status', 'done');
         await settle(`document.querySelector('#board-task-bar .list-bar-count').textContent === '60 of 66'`, 'the done filter');
         s = await snap();
-        check('Done: only the done tasks (60 of 66), the first page of 50, Load more offers the rest', s.statuses.length === 50 && s.statuses.every(x => x === 'Finished') && /Showing 50 of 60/.test(s.more || '') && s.chips.join() === 'Status: Done', JSON.stringify([s.count, s.statuses.length, s.more]));
+        check('Done: only the done tasks (60 of 66), the first page of 50, Load more offers the rest', s.statuses.length === 50 && s.statuses.every(x => x === 'Done') && /Showing 50 of 60/.test(s.more || '') && s.chips.join() === 'Status: Done', JSON.stringify([s.count, s.statuses.length, s.more]));
         await ev(`document.querySelector('#board-task-list .dt-more').click(); true`);
         await settle(`document.querySelectorAll('#board-task-list .board-task-item:not(.board-task-header)').length === 60`, 'the next page');
         s = await snap();
