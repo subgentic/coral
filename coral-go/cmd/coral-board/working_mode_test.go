@@ -64,3 +64,28 @@ func TestWorkingModeCLIServerError(t *testing.T) {
 	serverURL = server.URL
 	require.ErrorContains(t, runWorkingMode([]string{"--board", "team", "--create", "review", "--name", "Review", "--instructions", "X"}), "HTTP 409")
 }
+
+// --asks-are-tasks selects the working mode update and sends the switch; the current mode's other fields are kept.
+func TestWorkingModeAsksAreTasksFlag(t *testing.T) {
+	oldURL := serverURL
+	defer func() { serverURL = oldURL }()
+	var methods []string
+	var bodies []map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		methods = append(methods, r.Method)
+		if r.Method != "GET" {
+			var body map[string]any
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+			bodies = append(bodies, body)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"mode":"worktrees","dependency_guidance":true,"custom_instructions":"Keep me","asks_are_tasks":false,"instructions":"generated"}`))
+	}))
+	defer server.Close()
+	serverURL = server.URL
+	require.NoError(t, runWorkingMode([]string{"--board", "team", "--asks-are-tasks"}))
+	require.Equal(t, []string{"GET", "PUT"}, methods, "the flag alone is an update")
+	require.Equal(t, map[string]any{"mode": "worktrees", "dependency_guidance": true, "custom_instructions": "Keep me", "asks_are_tasks": true}, bodies[0])
+	require.NoError(t, runWorkingMode([]string{"--board", "team", "--asks-are-tasks=false"}))
+	require.Equal(t, false, bodies[1]["asks_are_tasks"])
+}

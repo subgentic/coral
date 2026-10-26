@@ -43,6 +43,7 @@ const AGENT_KEYS = ['name', 'prompt', 'icon', 'capabilities', 'agent_type', 'mod
             assert.equal(q.agents.length, 1); for (const k of Object.keys(q.agents[0])) assert.ok(AGENT_KEYS.includes(k), `an unexpected key on an agent: ${k}`);
             assert.equal(q.agents[0].name, 'Orchestrator');
             assert.ok(!('board_server' in q) && !('worktree' in q) && !('base_branch' in q), 'board_server, worktree and base_branch only when used');
+            assert.ok(q.working_mode && q.working_mode.asks_are_tasks === true, 'a new team has Requests for work are tasks on: working_mode.asks_are_tasks is sent true (goal #21)');
             await waitFor(`!window.__nt.dlg(${N.team})`, 'the dialog closes on a launch', 6000);
         });
         await S.run('step 3 working mode and health: the request carries working_mode {mode, dependency_guidance, custom_instructions} and health_monitor true', async () => {
@@ -54,6 +55,13 @@ const AGENT_KEYS = ['name', 'prompt', 'icon', 'capabilities', 'agent_type', 'mod
             const q = (await sent()).launch[0];
             assert.ok(q.working_mode, 'working_mode is in the request'); assert.equal(typeof q.working_mode.mode, 'string'); assert.equal(q.working_mode.dependency_guidance, true); assert.equal(q.working_mode.custom_instructions, 'Keep the diff small.', 'the additional instructions are custom_instructions');
             assert.equal(q.health_monitor, true, 'health_monitor is true');
+        });
+        await S.run('step 3 Workflow: Requests for work are tasks is on for a new team and turning it off leaves it out of the request (#7792)', async () => {
+            await install_stub(200); await fresh(); await t.to(2, { template: /^Blank/ }); await t.click('button', N.addOrch); await settle(250); await t.click('button', N.next); await t.step(3);
+            await tab('Workflow'); assert.ok(await check(/^Requests for work are tasks/i, false), 'the Requests for work are tasks switch, turned off');
+            await t.click('button', N.launch); await waitFor(`window.__qa.launch.length === 1`, 'the launch request', 6000);
+            const q = (await sent()).launch[0];
+            assert.ok(!q.working_mode || !q.working_mode.asks_are_tasks, 'off: the request does not turn it on');
         });
         await S.run('members: a member changed in Edit member is sent with its agent_type, model and thinking and flags for its mode, the role as name and the prompt', async () => {
             await install_stub(200); await fresh(); await t.to(2, { template: /^Blank/ }); await t.click('button', N.addOrch); await settle(250);

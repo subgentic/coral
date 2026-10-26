@@ -2,8 +2,10 @@ package board
 
 import (
 	"context"
+	"fmt"
 	"github.com/stretchr/testify/require"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -63,4 +65,51 @@ func TestNoneModeAddsNoInstructions(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, DefaultTaskWorkflowInstructions, task.Workflow.Instructions)
 	require.Equal(t, "none", task.Workflow.TeamMode.Mode)
+}
+
+// "Requests for work are tasks" (goal #21): the setting is saved and read back, the rule is in the instructions a task is claimed with while it is on, and nowhere while it is off.
+func TestAsksAreTasksRuleInClaimedInstructions(t *testing.T) {
+	ctx := context.Background()
+	s, err := NewStoreWithKey(filepath.Join(t.TempDir(), "board.db"), "")
+	require.NoError(t, err)
+	defer s.Close()
+
+	n := 0
+	var firstID int64
+	claim := func(team, title string) string {
+		n++
+		task, err := s.CreateTask(ctx, team, title, "", "medium", "lead")
+		require.NoError(t, err)
+		claimed, err := s.ClaimTask(ctx, team, fmt.Sprintf("dev%d", n), task.ID) // one agent per claim: an agent holds one task at a time
+		require.NoError(t, err)
+		if team == "team" && firstID == 0 {
+			firstID = task.ID
+		}
+		return claimed.Workflow.Instructions
+	}
+
+	// A team that never set it keeps today's instructions.
+	require.NotContains(t, claim("fresh", "Plain"), AsksAreTasksRule)
+
+	saved, err := s.SetWorkingMode(ctx, "team", WorkingMode{Mode: "worktrees", AsksAreTasks: true, CustomInstructions: "Run make check."})
+	require.NoError(t, err)
+	require.True(t, saved.AsksAreTasks)
+	require.Contains(t, saved.Instructions, AsksAreTasksRule)
+	read, err := s.GetWorkingMode(ctx, "team")
+	require.NoError(t, err)
+	require.True(t, read.AsksAreTasks, "the switch is read back")
+	on := claim("team", "With the rule")
+	require.Contains(t, on, AsksAreTasksRule, "on: the claimed task carries the rule")
+	require.Contains(t, on, "isolated Git worktree", "and the mode's own text")
+	require.Less(t, strings.Index(on, AsksAreTasksRule), strings.Index(on, "Run make check."), "the rule sits before the team's own text")
+
+	_, err = s.SetWorkingMode(ctx, "team", WorkingMode{Mode: "worktrees", AsksAreTasks: false})
+	require.NoError(t, err)
+	read, err = s.GetWorkingMode(ctx, "team")
+	require.NoError(t, err)
+	require.False(t, read.AsksAreTasks)
+	require.NotContains(t, claim("team", "Without the rule"), AsksAreTasksRule, "off: the next claim does not carry it")
+	kept, err := s.getTaskByID(ctx, "team", firstID)
+	require.NoError(t, err)
+	require.Contains(t, kept.Workflow.Instructions, AsksAreTasksRule, "a task already claimed keeps what it was claimed with")
 }

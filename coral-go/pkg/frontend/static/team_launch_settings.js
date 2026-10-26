@@ -9,6 +9,7 @@ const { healthPanelHTML, readHealth, healthProblem, wireHealthForm, HEALTH_DEFAU
 const { requireGoalSentence } = await importOnce('./task_goals.js');
 const { initSectionDialog } = await importOnce('./section_dialog.js');
 
+const ASKS_ARE_TASKS_HINT = 'When an agent needs another agent to do something, it creates a task. Plain posts are for questions and status.';
 const WORKFLOW_HINT = 'Guidance the agents get on how to share the folder. It does not create worktrees.';
 
 function workflowHTML() {
@@ -16,6 +17,8 @@ function workflowHTML() {
         <select id="team-wm-mode" name="mode" aria-describedby="team-wm-hint"><option value="none">None</option><option value="shared_checkout">Shared checkout</option><option value="worktrees">Worktrees</option></select>
         <p class="settings-hint" id="team-wm-hint">${escapeHtml(WORKFLOW_HINT)}</p>
         ${switchRow({ label: 'Include dependent-queue guidance', name: 'dependency_guidance', attrs: ' id="team-wm-dep"', labelClass: 'check-hit' })}
+        ${switchRow({ label: 'Requests for work are tasks', name: 'asks_are_tasks', checked: true, attrs: ' id="team-wm-asks"', labelClass: 'check-hit', describedBy: ['team-wm-asks-hint'] })}
+        <p class="settings-hint" id="team-wm-asks-hint">${escapeHtml(ASKS_ARE_TASKS_HINT)}</p>
         ${switchRow({ label: 'Require a goal', name: 'require_goal', attrs: ' id="team-wm-goal"', labelClass: 'check-hit', describedBy: ['team-wm-goal-hint'] })}
         <p class="settings-hint" id="team-wm-goal-hint">${escapeHtml(requireGoalSentence)}</p>`;
 }
@@ -70,9 +73,9 @@ export function mountTeamLaunchSettings() {
 export function readTeamLaunchSettings() {
     const root = document.getElementById('team-settings-panes');
     const val = n => root.querySelector(`[name="${n}"]`);
-    const wm = { mode: val('mode')?.value || 'none', dependency_guidance: !!val('dependency_guidance')?.checked, custom_instructions: (document.getElementById('team-custom-instructions')?.value || '').trim() };
+    const wm = { mode: val('mode')?.value || 'none', dependency_guidance: !!val('dependency_guidance')?.checked, asks_are_tasks: !!val('asks_are_tasks')?.checked, custom_instructions: (document.getElementById('team-custom-instructions')?.value || '').trim() };
     const out = { working_mode: null, health_monitor: undefined, board: null, problem: null };
-    if (wm.mode !== 'none' || wm.dependency_guidance || wm.custom_instructions) out.working_mode = wm;
+    if (wm.mode !== 'none' || wm.dependency_guidance || wm.asks_are_tasks || wm.custom_instructions) out.working_mode = wm; // a new team has Requests for work are tasks on: it is sent unless the person turned it off
     const board = {};
     if (val('require_goal')?.checked) board.require_goal = true;
     const form = healthForm();
