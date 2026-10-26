@@ -14,7 +14,7 @@ import { whenText } from './when_text.js';
 export const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const button = (cls, text, onClick) => { const b = el('button', cls, text); b.type = 'button'; if (onClick) b.addEventListener('click', onClick); return b; };
 
-export const tableState = () => ({ sort: null, selected: new Set(), anchor: null, ctx: undefined, select: false, confirming: -1 });
+export const tableState = () => ({ sort: null, selected: new Set(), rowCache: new Map(), anchor: null, ctx: undefined, select: false, confirming: -1 });
 
 // ── cell types ────────────────────────────────────────────────────────────
 /** The row's one real button: its text names the row. */
@@ -77,13 +77,16 @@ export function dataTable(cfg) {
     const st = cfg.state || tableState();
     const columns = cfg.columns, sel = cfg.selectable || null, ctx = cfg.ctx || {};
     const foldKind = cfg.fold || 'column', foldAt = cfg.foldAt || 40;
-    if (sel && sel.contextKey !== undefined && st.ctx !== String(sel.contextKey)) { st.selected.clear(); st.anchor = null; st.ctx = String(sel.contextKey); }
+    if (sel && sel.contextKey !== undefined && st.ctx !== String(sel.contextKey)) { st.selected.clear(); st.rowCache?.clear(); st.confirming = -1; st.choices = null; st.anchor = null; st.ctx = String(sel.contextKey); }
     const box = el('div', `dt-box${cfg.bare ? ' dt-bare' : ''} ${foldKind === 'labeled' ? 'dt-fold-labeled' : foldKind === 'always' ? 'dt-fold-column' : foldKind === 'none' ? 'dt-fold-none' : 'dt-fold-column'}`);
     const bar = el('div', 'dt-bar'); bar.hidden = true;
     const selectButton = button('btn btn-small dt-select-toggle', 'Select', () => { st.select = !st.select; syncSelectMode(); });
     selectButton.setAttribute('aria-pressed', 'false'); selectButton.hidden = !sel;
     let rows = cfg.rows.slice();
     const keyOf = (r) => String(cfg.rowKey(r));
+    const eligible = r => !sel?.canSelect || sel.canSelect(r);
+    st.rowCache ||= new Map();
+    for (const r of rows) { if (eligible(r)) st.rowCache.set(keyOf(r), r); else { st.selected.delete(keyOf(r)); st.rowCache.delete(keyOf(r)); } }
     const nameOf = (r) => (cfg.rowName ? cfg.rowName(r) : keyOf(r));
 
     const sortBar = el('div', 'dt-sortbar');
@@ -104,7 +107,7 @@ export function dataTable(cfg) {
     function drawHead() {
         thead.replaceChildren();
         const tr = el('tr'); tr.setAttribute('role', 'row');
-        if (sel) { const th = el('th', 'dt-check'); th.setAttribute('role', 'columnheader'); const all = el('input'); all.type = 'checkbox'; all.className = 'dt-check-all'; all.setAttribute('aria-label', 'Select all rows on this page'); all.addEventListener('change', () => { for (const r of rows) (all.checked ? st.selected.add(keyOf(r)) : st.selected.delete(keyOf(r))); st.anchor = null; syncSelection(); }); th.append(all); tr.append(th); }
+        if (sel) { const th = el('th', 'dt-check'); th.setAttribute('role', 'columnheader'); const all = el('input'); all.type = 'checkbox'; all.className = 'dt-check-all'; all.setAttribute('aria-label', 'Select all rows on this page'); all.addEventListener('change', () => { for (const r of rows.filter(eligible)) (all.checked ? st.selected.add(keyOf(r)) : st.selected.delete(keyOf(r))); st.anchor = null; syncSelection(); }); th.append(all); tr.append(th); }
         for (const c of columns) {
             const th = el('th', `dt-th${c.numeric || c.align === 'end' ? ' dt-end' : ''}`); th.scope = 'col'; th.setAttribute('role', 'columnheader'); th.dataset.key = c.key;
             if (c.width && /rem$/.test(c.width)) th.style.width = c.width;
@@ -164,10 +167,11 @@ export function dataTable(cfg) {
             const k = keyOf(r), tr = el('tr', 'dt-row'); tr.setAttribute('role', 'row'); tr.dataset.key = k;
             if (sel) {
                 const td = el('td', 'dt-check'); td.setAttribute('role', 'cell');
-                const cb = el('input'); cb.type = 'checkbox'; cb.setAttribute('aria-label', `Select ${nameOf(r)}`); cb.dataset.idx = String(i);
+                const cb = el('input'); cb.type = 'checkbox'; cb.setAttribute('aria-label', `Select ${nameOf(r)}`); cb.dataset.idx = String(i); cb.disabled = !eligible(r); if (cb.disabled) cb.hidden = true;
                 cb.addEventListener('click', (e) => {
+                    if (!eligible(r)) return;
                     const on = cb.checked;
-                    if (e.shiftKey && st.anchor != null && st.anchor !== i) { const [a, b] = st.anchor < i ? [st.anchor, i] : [i, st.anchor]; for (let j = a; j <= b; j++) (on ? st.selected.add(keyOf(list[j])) : st.selected.delete(keyOf(list[j]))); }
+                    if (e.shiftKey && st.anchor != null && st.anchor !== i) { const [a, b] = st.anchor < i ? [st.anchor, i] : [i, st.anchor]; for (let j = a; j <= b; j++) if (eligible(list[j])) (on ? st.selected.add(keyOf(list[j])) : st.selected.delete(keyOf(list[j]))); }
                     else (on ? st.selected.add(k) : st.selected.delete(k));
                     st.anchor = i; syncSelection();
                 });
@@ -193,7 +197,7 @@ export function dataTable(cfg) {
         const present = new Set(rows.map(keyOf));
         for (const tr of tbody.children) { const on = st.selected.has(tr.dataset.key); tr.classList.toggle('dt-selected', on); tr.setAttribute('aria-selected', String(on)); const cb = tr.querySelector('.dt-check input'); if (cb) cb.checked = on; }
         const all = thead.querySelector('.dt-check-all');
-        if (all) { const n = rows.filter(r => st.selected.has(keyOf(r))).length; all.checked = n > 0 && n === rows.length; all.indeterminate = n > 0 && n < rows.length; }
+        if (all) { const available = rows.filter(eligible), n = available.filter(r => st.selected.has(keyOf(r))).length; all.disabled = !available.length; all.checked = n > 0 && n === available.length; all.indeterminate = n > 0 && n < available.length; }
         drawBar();
         if (!quiet && sel.onChange) sel.onChange(new Set(st.selected));
         void present;
@@ -205,21 +209,28 @@ export function dataTable(cfg) {
         if (!n) { st.confirming = -1; st.choices = null; return; }
         bar.append(el('span', 'dt-bar-count', `${n} selected`));
         const actions = sel.actions || [];
-        const chosen = () => rows.filter(r => st.selected.has(keyOf(r)));
+        const chosen = () => [...st.selected].map(k => st.rowCache.get(k)).filter(Boolean);
         actions.forEach((a, i) => {
             if (st.confirming >= 0) return; // while one asks, the others wait
-            bar.append(button(`btn btn-small dt-bar-action${a.danger ? ' dt-danger' : ''}`, a.label, async () => {
-                if (a.choose) { st.choices = await a.choose.options(); st.confirming = i; drawBar(); bar.querySelector('.dt-bar-choice')?.focus(); return; } // an action that needs a value (a person, a priority) asks for it here
+            const action = button(`btn btn-small dt-bar-action${a.danger ? ' dt-danger' : ''}`, a.label, async () => {
+                if (a.choose) { st.choices = await a.choose.options(); st.confirming = i; drawBar(); bar.querySelector(a.danger ? '.dt-bar-keep' : '.dt-bar-choice')?.focus(); return; } // an action that needs a value (a person, a priority) asks for it here
                 if (a.danger) { st.confirming = i; drawBar(); bar.querySelector('.dt-bar-keep')?.focus(); return; }
                 a.run(chosen(), new Set(st.selected));
-            }));
+            });
+            action.disabled = !!a.disabled?.(chosen()); bar.append(action);
         });
         if (st.confirming >= 0) {
             const a = actions[st.confirming];
             if (a.choose) {
                 const pick = el('select', 'dt-bar-choice'); pick.setAttribute('aria-label', a.choose.label);
                 for (const o of st.choices || []) { const op = el('option', null, o.label); op.value = o.value; pick.append(op); }
-                bar.append(el('span', 'dt-bar-confirm', `${a.label}:`), pick, button('btn btn-small dt-bar-keep', 'Keep', () => { st.confirming = -1; st.choices = null; drawBar(); }), button('btn btn-small dt-bar-apply', 'Apply', () => { const v = pick.value; st.confirming = -1; st.choices = null; a.run(chosen(), new Set(st.selected), v); }));
+                const text = a.choose.text ? el('input', 'dt-bar-text') : null;
+                if (text) { text.type = 'text'; text.setAttribute('aria-label', a.choose.text.label); text.placeholder = a.choose.text.label; text.maxLength = a.choose.text.maxLength || 300; text.required = true; }
+                const apply = button(`btn btn-small dt-bar-apply${a.danger ? ' dt-danger' : ''}`, a.danger ? a.label : 'Apply', () => { if (text && !text.value.trim()) { text.reportValidity(); return; } const v = pick.value; st.confirming = -1; st.choices = null; a.run(chosen(), new Set(st.selected), v, text?.value.trim()); });
+                if (text) { apply.disabled = true; text.addEventListener('input', () => { apply.disabled = !text.value.trim(); }); }
+                const ask = typeof a.confirm === 'function' ? a.confirm(n) : a.confirm || `${a.label}:`;
+                bar.append(el('span', 'dt-bar-confirm', ask), pick); if (text) bar.append(text);
+                bar.append(button('btn btn-small dt-bar-keep', 'Keep', () => { st.confirming = -1; st.choices = null; drawBar(); }), apply);
             } else {
                 const ask = el('span', 'dt-bar-confirm', typeof a.confirm === 'function' ? a.confirm(n) : (a.confirm || `${a.label}?`)); ask.setAttribute('role', 'alert');
                 bar.append(ask, button('btn btn-small dt-bar-keep', 'Keep', () => { st.confirming = -1; drawBar(); }), button('btn btn-small dt-danger', a.label, () => { st.confirming = -1; a.run(chosen(), new Set(st.selected)); }));

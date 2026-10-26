@@ -9,6 +9,8 @@ import { browserLocal } from './safe_storage.js';
 import { renderArtifact } from './artifact_preview.js';
 import { renderMarkdownStrict, highlightCodeIn, escapeHtml, showToast } from './utils.js';
 const DT = await importOnce('./data_table.js');
+const Toolbar = await importOnce('./team_toolbar.js');
+let artifactState = DT.tableState();
 const { el } = DT; // lazy modules load the others they need through importOnce, so a failed load is retried
 const { openDetailPane, closeDetailPane, detailKey } = await importOnce('./detail_pane.js');
 const { buildBar } = await importOnce('./team_artifact_bar.js');
@@ -219,6 +221,40 @@ function scrollBox(node) {
     return null;
 }
 let drawnRows = 0; // the rows of the last drawing: the first new row is the one after them
+function artifactBulkActions() {
+    const finish = (key, ok, failed, verb) => {
+        if (key === model.key) { for (const k of ok) artifactState.selected.delete(k); draw(); root?.querySelector('.list-bar-search')?.focus({ preventScroll: true }); }
+        showToast(`${verb} ${ok.length} artifact${ok.length === 1 ? '' : 's'}${failed ? `; ${failed} failed and remain selected` : ''}`, !!failed);
+    };
+    return [
+        { label: 'Download', run: async rows => {
+            if (model.bulkBusy) return; model.bulkBusy = true;
+            const key = model.key, items = rows.map(item => ({ item, link: linkOf(item) })), ok = []; let failed = 0;
+            try { const dl = await importOnce('./artifact_download.js');
+                for (const { item, link } of items) { try {
+                    if (!link?.preview) throw new Error('Unavailable');
+                    if (isCloud()) await dl.downloadArtifact(link.url, readableName(item));
+                    else { const a = document.createElement('a'); a.href = link.url; a.download = dl.sanitizeDownloadName(readableName(item)); document.body.append(a); a.click(); a.remove(); }
+                    ok.push(itemKey(item));
+                } catch { failed++; } }
+            } catch { failed = items.length; } finally { model.bulkBusy = false; finish(key, ok, failed, 'Downloaded'); }
+        } },
+        ...(local() ? [{ label: 'Delete', danger: true, disabled: rows => rows.some(item => !managedHex(item) || !linkOf(item)?.preview),
+            confirm: n => `Delete ${n} artifacts? Their links will become unavailable. This cannot be undone.`, run: async rows => {
+                if (model.bulkBusy || !local() || rows.some(item => !managedHex(item) || !linkOf(item)?.preview)) return;
+                model.bulkBusy = true; const key = model.key, origin = server(), ok = []; let failed = 0;
+                for (const item of rows) { const hex = managedHex(item); try {
+                    const r = await fetch(`/api/artifacts/${hex}`, { method: 'DELETE' });
+                    if (!r.ok && r.status !== 404) throw new Error('Delete failed');
+                    ok.push(itemKey(item)); deletions?.postMessage({ hex, server: origin });
+                    if (key === model.key) { model.items = model.items.filter(it => managedHex(it) !== hex); if (detailKey() === hex) closeDetailPane(); }
+                } catch { failed++; } }
+                model.bulkBusy = false; finish(key, ok, failed, 'Deleted');
+                if (key === model.key) loadArtifacts({ keep: true });
+            } }] : []),
+    ];
+}
+
 function draw() {
     const body = root && root.querySelector('.team-artifacts-body'); if (!body) return;
     const rowsBefore = drawnRows;
@@ -234,9 +270,13 @@ function draw() {
     status.setAttribute('role', model.error ? 'alert' : 'status');
     body.append(status);
     if (model.error) body.append(btn('btn btn-small team-artifacts-retry', 'Retry', () => loadArtifacts({ append: model.items.length > 0 && !!model.cursor, keep: true })));
-    if (model.items.length) {
-        body.append(DT.dataTable({
-            label: `Artifacts, ${model.items.length}`, rows: model.items, rowKey: itemKey, current: detailKey(), sortBar: false,
+    const toolbarRow = bar.node.querySelector('.list-bar-search-row');
+    toolbarRow?.querySelector('.dt-select-toggle')?.remove();
+    Toolbar.mountSelection(toolbarRow, null);
+    if (model.items.length || artifactState.selected.size) {
+        const table = DT.dataTable({
+            label: `Artifacts, ${model.items.length}`, rows: model.items, rowKey: itemKey, current: detailKey(), sortBar: false, state: artifactState, rowName: readableName,
+            selectable: model.scope ? null : { contextKey: model.key, canSelect: item => !!linkOf(item)?.preview, actions: artifactBulkActions(), onChange: keys => Toolbar.mountSelection(toolbarRow, keys.size ? table.bar : null) },
             open: (item, tr) => openArtifact(item, tr.querySelector('.dt-primary')),
             columns: [
                 { key: 'name', label: 'Name', primary: true, width: 'grow', line: 1,
@@ -254,7 +294,9 @@ function draw() {
             ],
             footer: { text: `Showing ${model.items.length} of ${model.counts?.matched ?? model.items.length}${model.truncated ? '+' : ''}`,
                 more: model.hasMore ? { label: 'Load more', busy: model.loadingMore, run: () => { if (!model.loadingMore) loadArtifacts({ append: true }); } } : null },
-        }).el);
+        });
+        body.append(table.el); Toolbar.mountSelection(toolbarRow, artifactState.selected.size ? table.bar : null);
+        if (!model.scope && matchMedia('(max-width: 760px)').matches) toolbarRow?.append(table.selectButton);
     }
     if (model.truncated) body.append(el('p', 'goals-note', 'Some older artifacts are not included in this list.'));
     bar.names([...new Set(model.items.flatMap(i => [i.produced_by, i.sent_by]).filter(n => typeof n === 'string' && n))].sort().slice(0, 50)); // the names on screen, offered in the Uploaded by field
@@ -322,6 +364,7 @@ export function showArtifacts(host, project, h = {}, scope = null) {
     const key = scope ? `${project}|${scope.session}` : project;
     const sameKey = key === model.key;
     if (!sameKey) {
+        artifactState = DT.tableState();
         model.controller?.abort();
         Object.assign(model, { project, scope, key, loaded: false, items: [], hasMore: false, cursor: '', counts: null, truncated: false, loading: false, error: '', loadingMore: false, filters: scope && scope.standalone ? { ...EMPTY } : loadFilters(scope ? `${project}::agent::${scope.session}` : project, browserLocal), kept: new Set() });
         bar = null;

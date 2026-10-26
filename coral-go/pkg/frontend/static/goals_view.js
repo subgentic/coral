@@ -4,7 +4,7 @@
  * Lazy: message_board.js imports it when the Goals face is chosen. */
 import { state } from './state.js';
 import { boardFetch, keyLabel, splitKey, LOCAL_SERVER } from './server_base.js';
-import { setRowCurrent, OPERATOR_ID } from './utils.js';
+import { setRowCurrent, OPERATOR_ID, showToast } from './utils.js';
 import { browserLocal } from './safe_storage.js';
 import { onGoalsSeq } from './goals_feed.js';
 import { pollEvery } from './overload.js';
@@ -304,16 +304,32 @@ function drawPage() {
     root.classList.toggle('goals-open', !!model.openId && !!goalById(model.openId));
 }
 
+function goalBulkActions() {
+    return [{ label: 'Close goals', danger: true,
+        choose: { label: 'Close as', options: () => [{ value: 'done', label: 'Done' }, { value: 'dropped', label: 'Dropped' }], text: { label: 'Reason for closing', maxLength: 300 } },
+        confirm: n => `Close ${n} goals? Any open tasks stay open.`, run: async (rows, keys, as, reason) => {
+            if (model.bulkBusy || !reason) return; model.bulkBusy = true;
+            const project = model.project, tableState = goalsTableState; let done = 0, failed = 0;
+            for (const g of rows) { try {
+                const r = await boardFetch(project, `/goals/${g.id}/close`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: OPERATOR_ID, state: as, reason }) });
+                if (!r.ok) throw new Error('Close failed'); tableState.selected.delete(String(g.id)); done++;
+            } catch { failed++; } }
+            model.bulkBusy = false; showToast(`Closed ${done} goals${failed ? `; ${failed} failed and remain selected` : ''}`, !!failed);
+            if (project === model.project) { await loadGoals(); root?.querySelector('#goals-search')?.focus({ preventScroll: true }); }
+        } }];
+}
+
 function drawTableRaw(col) {
     col.replaceChildren();
     const counts = W.filterCounts(model.goals);
     // The one toolbar line (#7717): the search field, the state pills (one compact select when they do not fit) and New goal at the right.
-    col.append(Toolbar.build({
+    const toolbar = Toolbar.build({
         id: 'goals-search', label: 'Search goals', placeholder: 'Search goals', value: model.goalSearch,
         onSearch: text => { model.goalSearch = text; drawList(); },
         pills: { label: 'Show goals that are', current: model.filter, items: W.FILTERS.map(f => ({ key: f, label: W.filterLabel(f), count: counts[f] })), onPick: f => { model.filter = f; say(W.filterAnnouncement(f, counts[f])); drawList(); } },
         action: btn('btn btn-primary goals-new', 'New goal', () => openCreate()),
-    }));
+    });
+    col.append(toolbar);
     if (model.requireGoal) col.append(Object.assign(el('p', 'goals-note goals-require'), { textContent: W.requireGoalNote }));
     if (state.hubConnected || window.__goalsHub) col.append(el('p', 'goals-note', W.otherBoardsNote));
     if (model.failed) {
@@ -324,7 +340,7 @@ function drawTableRaw(col) {
     if (model.loading) { col.append(el('p', 'goals-note', 'Loading goals…')); return; }
     if (!model.goals.length) { if (!model.failed) { const e = el('div', 'goals-empty'); e.append(el('p', null, W.noGoalsText)); col.append(e); } return; }
     const shown = visible();
-    if (!shown.length) {
+    if (!shown.length && !goalsTableState.selected.size) {
         const fe = W.filteredEmpty(model.filter, model.goals.length);
         const e = el('div', 'goals-empty'); e.append(el('p', null, fe.text), btn('btn', fe.action, () => { model.filter = 'all'; say(W.filterAnnouncement('all', model.goals.length)); drawList(); }));
         col.append(e);
@@ -334,12 +350,15 @@ function drawTableRaw(col) {
     const sortValue = g => sort.key === 'goal' ? g.title : sort.key === 'state' ? W.stateWord(g) : sort.key === 'progress' ? (totalOf(g.rollup) ? doneOf(g.rollup) / totalOf(g.rollup) : 0) : g.updatedAt;
     if (sort) shown.sort((a, b) => { const x = sortValue(a), y = sortValue(b); return (sort.dir === 'desc' ? -1 : 1) * (typeof x === 'number' ? x - y : String(x).localeCompare(String(y), undefined, { numeric: true })); });
     const rows = shown.concat(model.noGoalOpen > 0 && model.filter === 'all' ? [{ id: 'no-goal', title: W.noGoalRowText(model.noGoalOpen), noGoal: true }] : []);
-    col.append(DT.dataTable({
-        label: `Goals, ${shown.length}`, rows, rowKey: g => g.id, state: goalsTableState,
+    const table = DT.dataTable({
+        label: `Goals, ${shown.length}`, rows, rowKey: g => g.id, state: goalsTableState, rowName: g => g.title,
+        selectable: { contextKey: model.project, canSelect: g => !g.noGoal && W.isOpenGoal(g), actions: goalBulkActions(), onChange: keys => Toolbar.mountSelection(toolbar, keys.size ? table.bar : null) },
         onSort: () => drawList(), // keep the no-goal navigation row last in either direction
         open: g => g.noGoal ? window.openTeamPage?.(model.project, { tab: 'tasks', noGoal: true }) : openGoal(g.id, true),
         columns: GC.goalColumns({ progressLabel: 'Tasks' }, ['goal', 'state', 'progress', 'updated']),
-    }).el);
+    });
+    col.append(table.el); Toolbar.mountSelection(toolbar, goalsTableState.selected.size ? table.bar : null);
+    if (PHONE.matches) toolbar.querySelector('.goals-new')?.before(table.selectButton);
 }
 
 function backButton(text, onClick) {

@@ -18,7 +18,7 @@ const GOAL = 'Explore goals with two teams';
     const { settle } = require('./helpers/wait').bind(ev);
     const S = scenarios();
     const click = async (sel, rx, what) => { assert.ok(await ev(`(() => { const e = window.__tp.find(${JSON.stringify(sel)}, ${rx}); if (!e) return false; e.click(); return true; })()`), `no visible ${what || sel} named ${rx}`); await settle(350); };
-    const headers = () => ev(`(() => { const m = window.__tp.page(); const t = m && [...m.querySelectorAll('table, [role=table], [role=grid]')].find(x => x.getClientRects().length); return t ? [...t.querySelectorAll('th, [role=columnheader]')].map(h => window.__na.text(h)) : null; })()`);
+    const headers = () => ev(`(() => { const m = window.__tp.page(); const t = m && [...m.querySelectorAll('table, [role=table], [role=grid]')].find(x => x.getClientRects().length); return t ? [...t.querySelectorAll('th:not(.dt-check), [role=columnheader]:not(.dt-check)')].map(h => window.__na.text(h)) : null; })()`);
     const rowsOf = () => ev(`(() => { const m = window.__tp.page(); const t = m && [...m.querySelectorAll('table, [role=table], [role=grid]')].find(x => x.getClientRects().length); return t ? [...t.querySelectorAll('tbody tr, [role=row]')].filter(r => !r.querySelector('th, [role=columnheader]')).map(r => window.__na.text(r)) : null; })()`);
     const h2 = () => ev(`(() => { const e = [...window.__tp.page().querySelectorAll('h2')].find(window.__na.vis); return e ? window.__na.text(e) : ''; })()`);
     const activeName = () => ev(`(() => { const e = document.activeElement; return e ? window.__na.text(e) : ''; })()`);

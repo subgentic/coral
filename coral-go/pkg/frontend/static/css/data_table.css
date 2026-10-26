@@ -28,6 +28,7 @@
     --table-control-border: var(--control-border);
     --table-control-radius: var(--radius-md);
     --table-control-bg: var(--bg-primary);
+    --table-control-h: 32px;
     --table-control-pad-y: 4px;
     --table-control-pad-x: 8px;
     --table-track-border-w: 1px;
@@ -140,3 +141,6 @@
 @media (forced-colors: active) {
     .dt-progress-meter { border: var(--table-track-border-w) solid var(--table-progress-edge); }
 }
+
+.dt-bar-choice, .dt-bar-text { min-width: 0; max-width: 100%; min-height: var(--table-control-h); padding: var(--table-control-pad-y) var(--table-control-pad-x); border: var(--table-track-border-w) solid var(--table-control-border); border-radius: var(--table-control-radius); color: var(--table-primary-color); background: var(--table-control-bg); font: inherit; font-size: var(--table-secondary-size); }
+@media (max-width: 760px) { .dt-bar-choice, .dt-bar-text, .dt-select-toggle { min-height: var(--table-touch); } }
