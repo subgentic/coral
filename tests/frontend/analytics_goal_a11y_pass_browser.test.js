@@ -1,0 +1,57 @@
+// The 170 accessibility pass on the Analytics page and the goal page (task 7721): what a walk of both found and this holds:
+//   - a phone's Analytics view has its way back on the title's line at normal text and over the title only when the title would not fit beside it (at 200% text it wrapped to a word a line);
+//   - an agent's name in a By agent row is a 44 px target on a phone;
+//   - the goal page's column handle is drawn in forced colors (Windows High Contrast drops backgrounds, and its hover, drag and focus line was one) when it has the keyboard.
+// (The names, the sort state, the keyboard order, the contrast in both themes and the targets of the rest were walked and are right; analytics_a11y, the censuses and goal_side_column hold them.)
+// Drives Chrome over CDP through agent_view_harness.js against the isolated dev server, with the census data world for Analytics and a seeded team for the goal page.
+const assert = require('node:assert/strict');
+const { connect } = require('./agent_view_harness');
+const { DATA_WORLD } = require('./helpers/census_world');
+const { install: installTP, seed, openTeam, goTab, scenarios } = require('./helpers/team_page');
+const BASE = require('./test_base').BASE;
+const { removeBoards } = require('./helpers/board_cleanup');
+
+const TEAM = `qa-a11y-pass-${Date.now() % 100000}`;
+
+(async () => {
+    const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const { settle } = require('./helpers/wait').bind(ev);
+    const S = scenarios();
+    const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
+    try {
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: DATA_WORLD });
+        await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await ev(`window.switchNavTab('tokens'); true`); await settle(1500);
+        const view = async key => { await ev(`(() => { const b = document.querySelector('#cost-nav-list .row-btn[data-view="${key}"]'); if (b) b.click(); return !!b; })()`); await settle(900); };
+        await S.run('a phone: an agent name in a By agent row is a 44 px target', async () => {
+            await view('agent');
+            const links = await ev(`[...document.querySelectorAll('#cost-dashboard-view .cost-agent-link')].filter(e => e.getClientRects().length).map(e => { const b = e.getBoundingClientRect(); return [e.textContent.trim(), Math.round(b.height)]; })`);
+            assert.ok(links.length >= 2, 'the By agent table has agent links: ' + JSON.stringify(links)); for (const [n, h] of links) assert.ok(h >= 44, `${n} is ${h} px high`);
+        });
+        await S.run('a phone: the way back is on the title\'s line at normal text (no row spent) and over it at 200% text, where the title would be a word a line', async () => {
+            await view('provider');
+            const geo = () => ev(`(() => { const b = document.querySelector('.cost-phone-back').getBoundingClientRect(), t = document.getElementById('cost-view-title').getBoundingClientRect(); return { backTop: Math.round(b.top), backBottom: Math.round(b.bottom), titleTop: Math.round(t.top), titleWidth: Math.round(t.width) }; })()`);
+            const normal = await geo(); await shot('analytics-100-back');
+            assert.ok(normal.titleTop < normal.backBottom, 'at normal text the title is beside the way back, not under it: ' + JSON.stringify(normal));
+            await ev(`document.documentElement.style.fontSize = '32px'; true`); await settle(700);
+            const big = await geo(); await shot('analytics-200-back'); await ev(`document.documentElement.style.fontSize = ''; true`);
+            assert.ok(big.backBottom <= big.titleTop + 1, 'at 200% the title is under the way back: ' + JSON.stringify(big)); assert.ok(big.titleWidth > 200, 'and has the width of the screen, not a word a line: ' + JSON.stringify(big));
+        });
+        await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false }); await Emulation.setTouchEmulationEnabled({ enabled: false });
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installTP(ev);
+        await seed(ev, TEAM); await openTeam(ev, waitFor, TEAM).catch(() => {}); await goTab(ev, settle, 'Goals'); await settle(800);
+        await ev(`(() => { const b = [...document.querySelectorAll('[role=tabpanel]:not([hidden]) button')].find(x => /Explore goals/.test(x.textContent)); if (b) b.click(); return !!b; })()`);
+        await waitFor(`!!document.querySelector('.goal-side-grip')`, 'the goal page', 8000);
+        await S.run("the goal page's column handle is drawn in forced colors when it has the keyboard, and not drawn when it has not", async () => {
+            await Emulation.setEmulatedMedia({ features: [{ name: 'forced-colors', value: 'active' }] }); await settle(400);
+            await ev(`(() => { const st = document.createElement('style'); st.textContent = '*, *::before, *::after { transition: none !important; }'; document.head.append(st); return true; })()`); // the line's own fade would be measured half way
+            const line = () => ev(`(() => { const c = getComputedStyle(document.querySelector('.goal-side-grip'), '::before').backgroundColor; return c; })()`);
+            await ev(`document.activeElement && document.activeElement.blur(); true`); await settle(300);
+            const idle = await line(); await ev(`document.querySelector('.goal-side-grip').focus({ focusVisible: true }); true`); await settle(300);
+            const focused = await line(), highlight = await ev(`(() => { const t = document.createElement('i'); t.style.background = 'Highlight'; document.body.append(t); const c = getComputedStyle(t).backgroundColor; t.remove(); return c; })()`); await shot('goal-grip-forced-colors');
+            assert.equal(idle, 'rgba(0, 0, 0, 0)', 'nothing is drawn while it has no keyboard: ' + idle); assert.equal(focused, highlight, `drawn in Highlight when focused: ${focused} against ${highlight}`);
+        });
+    } finally { await Emulation.setEmulatedMedia({ features: [] }).catch(() => {}); await removeBoards(ev, [TEAM]); await client.close(); }
+    S.finish();
+})().catch(e => { console.error(e); process.exitCode = 1; });

@@ -22,6 +22,9 @@
     .settings-tab[aria-selected="true"] { border-left: 4px solid Highlight; padding-left: calc(.7rem - 4px); }
     .team-settings-tabs [role="tab"][aria-selected="true"] { border: 2px solid Highlight; padding: 6px 8px; font-weight: 600; }
 
+    /* The goal page's column handle: its line is a background, which forced colors drop; hover, drag and keyboard focus draw it in Highlight (the same states as the accent line). */
+    .goal-side-grip:hover::before, .goal-side-grip.dragging::before, .goal-side-grip:focus-visible::before { background: Highlight; }
+
     /* What an agent is doing: a shape for each state, since a colour is not available. Working a filled circle, needs input a filled diamond, stuck a filled
        square, idle a hollow ring; ready for input has no dot and sleeping is the moon glyph, as before. */
     .session-dot { box-sizing: border-box; border: 1.5px solid CanvasText; }

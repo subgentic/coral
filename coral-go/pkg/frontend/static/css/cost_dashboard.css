@@ -604,6 +604,9 @@
     #cost-dashboard-view:not([data-phone-item]) .cost-page { display: none; }
     #cost-dashboard-view[data-phone-item] #mobile-analytics-list { display: none; }
     #cost-dashboard-view .cost-phone-back { display: inline-flex; align-items: center; min-height: var(--control-touch-height, 44px); }
+    #cost-dashboard-view .cost-header-left { flex-wrap: wrap; row-gap: 0; } /* the way back stays on the title's line (a row saved) and goes over it only when the title would not have 10 rem beside it: at 200% text it wrapped to a word a line */
+    #cost-dashboard-view .cost-title-block { flex: 1 1 10rem; min-width: 10rem; }
+    #cost-dashboard-view .cost-agent-link { display: inline-block; max-width: 100%; min-height: var(--control-touch-height, 44px); line-height: var(--control-touch-height, 44px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; } /* an agent's name in a table row is a 44 px target */
     #mobile-analytics-list .sidebar-hide-btn { display: none; } /* the page is the whole screen: there is no column to hide */
     #mobile-analytics-list .sidebar-header { padding: 12px; }
     .cost-page { padding: 12px; }
