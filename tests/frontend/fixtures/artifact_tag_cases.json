@@ -1,0 +1,39 @@
+{
+  "comment": "One table of artifact-tag cases, read by the server's test (coral-go/internal/board/artifact_tags_fixture_test.go) and by the dashboard's (artifact_tag_rules): 'tags' is a word as typed and what it is stored as, '' for one refused; 'sets' is the server's whole-set rule only. Change a rule in both places and here (#8673).",
+  "max_len": 24,
+  "max_tags": 5,
+  "tags": [
+    {"input": "for review", "want": "for review"},
+    {"input": "  For   Review ", "want": "for review"},
+    {"input": "a\tb\nc", "want": "a b c"},
+    {"input": "a\u00a0b", "want": "a b"},
+    {"input": "INTERNAL", "want": "internal"},
+    {"input": "q4-report", "want": "q4-report"},
+    {"input": "\u00e9vidence", "want": "\u00e9vidence"},
+    {"input": "xxxxxxxxxxxxxxxxxxxxxxxx", "want": "xxxxxxxxxxxxxxxxxxxxxxxx", "note": "24 characters"},
+    {"input": "xxxxxxxxxxxxxxxxxxxxxxxxx", "want": "", "note": "25 characters"},
+    {"input": "\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0", "want": "\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0", "note": "24 astral letters count 24, not 48"},
+    {"input": "\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0\ud835\udcd0", "want": "", "note": "25 astral letters"},
+    {"input": "\u0663", "want": "\u0663", "note": "a decimal digit of another script"},
+    {"input": "a\u00b2", "want": "", "note": "superscript two is not a decimal digit"},
+    {"input": "\u00bd", "want": "", "note": "one half is not a decimal digit"},
+    {"input": "", "want": ""},
+    {"input": "   ", "want": ""},
+    {"input": "a,b", "want": ""},
+    {"input": "a/b", "want": ""},
+    {"input": "tag!", "want": ""},
+    {"input": "a_b", "want": ""},
+    {"input": "<x>", "want": ""},
+    {"input": "a\u0000b", "want": ""},
+    {"input": "\ud83d\udcce", "want": "", "note": "an emoji is not a letter"}
+  ],
+  "sets": [
+    {"tags": [], "want": []},
+    {"tags": ["a", "a", " A "], "want": ["a"], "note": "repeats once, in the order given"},
+    {"tags": ["b", "a"], "want": ["b", "a"]},
+    {"tags": ["a", "b", "c", "d", "e"], "want": ["a", "b", "c", "d", "e"], "note": "five"},
+    {"tags": ["a", "b", "c", "d", "e", "f"], "want": null, "note": "six different: refused"},
+    {"tags": ["a", "b", "c", "d", "e", "A", "B"], "want": ["a", "b", "c", "d", "e"], "note": "repeats do not count twice"},
+    {"tags": ["a", "tag!"], "want": null, "note": "one bad tag refuses the set"}
+  ]
+}
