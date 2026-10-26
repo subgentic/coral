@@ -3469,7 +3469,6 @@ button.terminal-gone-header { margin: 0 4px 0 0; font-size: 0.6875rem; line-heig
 .tb-label { font-weight: 600; color: var(--text-primary); font-size: var(--fs-md); }
 .tb-now { margin-left: auto; font-size: var(--fs-sm); padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-secondary); background: var(--bg-tertiary); }
 .tb-now b { color: var(--text-primary); }
-.tb-sub { font-size: var(--fs-base); color: var(--text-muted); margin: 0 0 var(--space-md); }
 #settings-modal label.tb-opt { display: flex; flex-direction: row; gap: var(--space-md); align-items: flex-start; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-md) var(--space-lg); margin-bottom: var(--space-md); cursor: pointer; }
 #settings-modal label.tb-opt:has(input:checked) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
 #settings-modal .tb-opt input { flex: none; width: 16px; height: 16px; min-height: 0; margin: 3px 0 0; }

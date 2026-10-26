@@ -44,7 +44,7 @@ const base = { enabled: true, relaunch_available: true, installed: '1.4.141', st
     const norm = (raw) => ev(`import(${S} + 'update_api.js').then(m => m.normalizeStatus(${JSON.stringify(raw)}))`);
     const pane = () => ev(`(() => { const q = s => document.querySelector('#update-pane-body ' + s);
         const w = q('.update-waiting');
-        return { group: !!q('.update-channel'), checked: (document.querySelector('input[name=update-channel]:checked') || {}).value || '', waiting: !!w, cards: w ? [...w.querySelectorAll('.update-status b')].map(b => b.textContent) : [], autoNote: (q('.update-channel-auto') || {}).hidden, pwn: !!window.__pwn, imgs: document.querySelectorAll('#update-pane-body img').length }; })()`);
+        return { group: !!q('#update-channel'), checked: (document.querySelector('input[name=update-channel]:checked') || {}).value || '', waiting: !!w, cards: w ? [...w.querySelectorAll('.update-status b')].map(b => b.textContent) : [], autoNote: (q('.update-channel-auto') || {}).hidden, pwn: !!window.__pwn, imgs: document.querySelectorAll('#update-pane-body img').length }; })()`);
     const apply = async () => { await ev(`window.applySettings(); true`); await settle(500); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
