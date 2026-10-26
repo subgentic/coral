@@ -8,7 +8,7 @@
 .sv-shell { flex: 1; min-height: 0; }
 .sv .settings-panes > .settings-pane { max-width: 860px; }
 .sv .settings-pane-sub:empty { display: none; }
-.sv-body { flex: 1; min-height: 0; overflow: auto; }
+.sv-body { flex: 1; min-height: 0; overflow: auto; overflow-x: hidden; } /* a row that ends exactly at the edge (a fraction of a pixel over) must not draw a sideways scrollbar track under the rows */
 
 /* a row: the label and its help at the left, the control at the right (settings mode); label above, control full width (form mode) */
 .sv-row { display: grid; gap: 4px var(--sv-row-gap); align-items: start; padding: var(--sv-row-pad-y) 0; border-top: 1px solid var(--sv-row-divider); }
