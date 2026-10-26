@@ -68,22 +68,22 @@ const GROUPS = {
 
         console.log('3. A short explanation is a visible hint line; a long one is behind its Learn more, which opens it in place (#7405: no (i))');
         await ev(`document.getElementById('settings-tab-cleanup').click(); true`);
-        const info = await ev(`(() => { const b = document.querySelector('#settings-pane-cleanup .settings-learn'); const t = document.getElementById(b.getAttribute('aria-controls').split(' ')[0]); return { name: b.getAttribute('aria-label'), exp: b.getAttribute('aria-expanded'), clamped: t.classList.contains('settings-hint-clamp'), text: t.textContent.length, vis: t.getClientRects().length, infoBtn: document.querySelectorAll('#settings-pane-cleanup .settings-info-btn').length }; })()`);
-        assert.equal(info.exp, 'false'); assert.equal(info.clamped, true); assert.equal(info.vis, 0, 'a long hint is not on the page until its Learn more opens it'); assert.ok(info.text > 40, 'the explanation is there'); assert.equal(info.infoBtn, 0, 'no (i)');
+        const info = await ev(`(() => { const b = document.querySelector('#settings-pane-cleanup .sv-learn'); const t = document.getElementById(b.getAttribute('aria-controls').split(' ')[0]); return { name: b.getAttribute('aria-label'), exp: b.getAttribute('aria-expanded'), hidden: t.hidden, text: t.textContent.length, vis: t.getClientRects().length, infoBtn: document.querySelectorAll('#settings-pane-cleanup .settings-info-btn').length }; })()`);
+        assert.equal(info.exp, 'false'); assert.equal(info.hidden, true); assert.equal(info.vis, 0, 'a long hint is not on the page until its Learn more opens it'); assert.ok(info.text > 40, 'the explanation is there'); assert.equal(info.infoBtn, 0, 'no (i)');
         assert.match(info.name, /^Learn more about /, 'the link is named after its setting: ' + info.name);
-        await ev(`document.querySelector('#settings-pane-cleanup .settings-learn').click(); true`);
-        const opened = await ev(`(() => { const b = document.querySelector('#settings-pane-cleanup .settings-learn'); const t = document.getElementById(b.getAttribute('aria-controls').split(' ')[0]); return { exp: b.getAttribute('aria-expanded'), open: !t.classList.contains('settings-hint-clamp') && t.getClientRects().length > 0 }; })()`);
+        await ev(`document.querySelector('#settings-pane-cleanup .sv-learn').click(); true`);
+        const opened = await ev(`(() => { const b = document.querySelector('#settings-pane-cleanup .sv-learn'); const t = document.getElementById(b.getAttribute('aria-controls').split(' ')[0]); return { exp: b.getAttribute('aria-expanded'), open: !t.hidden && t.getClientRects().length > 0 }; })()`);
         assert.deepEqual(opened, { exp: 'true', open: true });
-        await ev(`document.querySelector('#settings-pane-cleanup .settings-learn').click(); true`);
-        assert.equal(await ev(`document.querySelector('#settings-pane-cleanup .settings-learn').getAttribute('aria-expanded')`), 'false', 'a second tap closes it');
+        await ev(`document.querySelector('#settings-pane-cleanup .sv-learn').click(); true`);
+        assert.equal(await ev(`document.querySelector('#settings-pane-cleanup .sv-learn').getAttribute('aria-expanded')`), 'false', 'a second tap closes it');
         const loose = await ev(`[...document.querySelectorAll('#settings-modal dt .toggle-desc:not(.settings-hint-line), #settings-modal [data-info]')].filter(e => !/^Now:/.test(e.textContent.trim())).map(e => (e.closest('.settings-row') || {}).id + ' ' + e.className + ' ' + e.textContent.slice(0, 30))`); // (a status line, "Now: Codex will ask", is not an explanation)
         assert.deepEqual(loose, [], 'every explanation is a hint line under its label, none half-built');
-        const unnamed = await ev(`[...document.querySelectorAll('#settings-modal .settings-learn')].filter(b => !b.getAttribute('aria-label')).length`);
+        const unnamed = await ev(`[...document.querySelectorAll('#settings-modal .settings-learn, #settings-modal .sv-learn')].filter(b => !b.getAttribute('aria-label')).length`);
         assert.equal(unnamed, 0, 'every Learn more is named after its setting');
         console.log('   ✓ hint lines and Learn more');
 
         console.log('4. Wide: the list is on the left, no selector; rows are label and control side by side');
-        const wide = await ev(`(() => { const r = e => e.getBoundingClientRect(); const m = r(document.querySelector('#settings-modal .settings-modal-content')); const nav = r(document.getElementById('settings-tabs')); const row = document.querySelector('#settings-pane-cleanup .settings-row'); const dt = r(row.querySelector('dt')), dd = r(row.querySelector('dd'));
+        const wide = await ev(`(() => { const r = e => e.getBoundingClientRect(); const m = r(document.querySelector('#settings-modal .settings-modal-content')); const nav = r(document.getElementById('settings-tabs')); const row = document.querySelector('#settings-pane-cleanup .sv-row'); const dt = r(row.querySelector('.sv-text')), dd = r(row.querySelector('.sv-control'));
             return { w: Math.round(m.width), tabs: nav.width > 0, pick: document.querySelector('#settings-modal .settings-group-pick').getClientRects().length, sideBySide: dd.left > dt.right - 2 && Math.abs(dd.top - dt.top) < 40, over: document.documentElement.scrollWidth - document.documentElement.clientWidth }; })()`);
         assert.ok(wide.w >= 950, 'the dialog is wide (the one dialog size rule: 960 at most): ' + wide.w); assert.equal(wide.tabs, true); assert.equal(wide.pick, 0); assert.equal(wide.sideBySide, true); assert.equal(wide.over, 0);
         console.log(`   ✓ ${wide.w} px dialog`);

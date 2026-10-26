@@ -44,10 +44,6 @@
 /* round 2 (UI/UX's #7405 notes) */
 [data-quiet-focus] :focus-visible { outline: 0 !important; box-shadow: none !important; } /* a dialog opened by a pointer: no ring on what the script focused (quiet_focus.js; the ring comes with the first key) */
 #settings-modal .settings-pane-title { margin-bottom: 8px; }
-#settings-modal .settings-row-details { grid-column: 1 / -1; }
-/* the cleanup rows: labelled fields in a row on their own line, not a sentence */
-#settings-modal .settings-controls-row { align-items: flex-end; gap: 12px 20px; }
-#settings-modal .settings-controls-row .settings-inline { display: flex; flex-direction: column; align-items: flex-start; flex-wrap: nowrap; gap: 4px; font: var(--dlg-label); }
 /* Wake agents after a restart: a switch row of its own under the backend cards */
 #settings-modal .tb-autowake.settings-row-switch { margin: 12px 0 0; padding: 12px 0 0; border-top: 1px solid var(--border-subtle); display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
 #settings-modal .tb-autowake[hidden] { display: none; }
@@ -59,4 +55,3 @@
 #settings-modal .tb-autowake-on input[type="checkbox"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 #settings-modal .tb-autowake-on input[type="checkbox"]:disabled { opacity: .5; cursor: not-allowed; }
 @media (prefers-reduced-motion: reduce) { #settings-modal .tb-autowake-on input[type="checkbox"]::before { transition: none; } }
-#settings-modal .settings-field-unit { font: var(--dlg-control); color: var(--text-secondary); }

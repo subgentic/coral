@@ -40,7 +40,7 @@ const GIB = 1024 ** 3;
         console.log('1. The row: the total, the limit, a labelled field');
         await ev(`window.showSettingsModal('cleanup'); true`);
         await waitFor(`/ GiB| B/.test((document.getElementById('settings-received-size') || {}).textContent || '')`, 'the received line', 8000);
-        const row = await ev(`(() => { const i = document.getElementById('settings-received-max'); const d = document.getElementById(i.getAttribute('aria-describedby').split(' ')[0]); const l = document.querySelector('label[for=settings-received-max]');
+        const row = await ev(`(() => { const i = document.getElementById('settings-received-max'); const d = document.getElementById('settings-received-size'); if (!i.getAttribute('aria-describedby').split(' ').includes(d.id)) throw new Error('the field is not described by its line'); const l = document.querySelector('label[for=settings-received-max]');
             return { value: i.value, loaded: i.dataset.loaded, text: d.textContent, label: l && l.textContent.trim(), type: i.type, min: i.min }; })()`);
         assert.equal(row.value, '2'); assert.equal(row.loaded, '1'); assert.equal(row.label, 'Received files limit'); assert.equal(row.type, 'number'); assert.equal(row.min, '0');
         assert.match(row.text, /^1\.7 GiB of 2\.0 GiB \(85% full\)\. Delete received files in Team Artifacts to make room, or raise the limit\.$/, 'from 80% on: how full, and what to do');
@@ -124,7 +124,7 @@ const GIB = 1024 ** 3;
         const un = await ev(`(() => { const b = document.getElementById('settings-received-unlisted-delete'); const region = document.getElementById('settings-received-size');
             return { text: region.textContent, role: region.getAttribute('role'), described: document.getElementById('settings-received-max').getAttribute('aria-describedby'), button: b.textContent, disabled: b.disabled, buttonInRegion: region.contains(b) }; })()`);
         assert.match(un.text, /Not listed on any board: 3 files, 3 MiB\. Another Coral sent them but the message that names them never came\. They count toward the limit\.$/);
-        assert.equal(un.role, 'status'); assert.equal(un.described, 'settings-received-size settings-received-max-unit', 'one status region, described by the field (then its unit, GiB)'); assert.equal(un.buttonInRegion, false, 'the button is outside the announced text');
+        assert.equal(un.role, 'status'); assert.ok(un.described.split(' ').includes('settings-received-size'), 'one status region, described by the field: ' + un.described); assert.equal(un.buttonInRegion, false, 'the button is outside the announced text');
         assert.equal(un.button, 'Delete 3 unlisted files (3 MiB)', 'it names what it deletes'); assert.equal(un.disabled, false);
         await waitFor(`/ GiB| B/.test(document.getElementById('settings-received-size').textContent) && document.getElementById('settings-received-max').dataset.loaded === '1'`, 'the dialog to finish loading', 8000);
         await sleep(400); // sleep-ok: the rest of the dialog finishes laying out

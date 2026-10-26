@@ -748,80 +748,30 @@
                     </section>
                     <section class="settings-pane" id="settings-pane-cleanup" data-group="cleanup" data-icon="inventory_2" data-title="Storage and cleanup" role="tabpanel" aria-labelledby="settings-tab-cleanup" tabindex="-1" hidden>
                         <h4 class="settings-pane-title">Storage and cleanup</h4>
-                        <dl class="info-grid settings-grid">
-                <div class="settings-row">
-                <dt class="toggle-dt">
-                    <label for="settings-artifact-store-max">Artifact store limit</label>
-                    <span class="toggle-desc">The most space stored artifacts may take. Above it, agents' new uploads are refused until you delete some (Team Artifacts &gt; Delete). 0 means no limit. Saved task and session diffs aren't counted.</span>
-                </dt>
-                <dd>
-                    <span class="settings-unit-field"><input type="number" id="settings-artifact-store-max" min="0" step="1" inputmode="numeric" aria-describedby="settings-artifact-store-size settings-artifact-store-max-unit"><span class="settings-field-unit" id="settings-artifact-store-max-unit">GiB</span></span>
-                    <div id="settings-artifact-store-size" class="settings-hint" role="status">Loading…</div>
-                </dd>
-                <details class="disclosure settings-storage-breakdown settings-row-details"><summary>By age and board</summary><div id="settings-storage-detail" class="settings-hint"></div></details>
-                </div>
-                <div class="settings-row">
-                <dt class="toggle-dt">
-                    <label for="settings-received-max">Received files limit</label>
-                    <span class="toggle-desc">The most space files sent to this computer by other teams and Corals may take. Above it, new received files are refused; nothing is deleted, and your agents' own uploads are not affected. The default is 2; 0 means no limit.</span>
-                </dt>
-                <dd>
-                    <span class="settings-unit-field"><input type="number" id="settings-received-max" min="0" step="1" inputmode="numeric" aria-describedby="settings-received-size settings-received-max-unit"><span class="settings-field-unit" id="settings-received-max-unit">GiB</span></span>
-                    <div id="settings-received-size" class="settings-hint" role="status">Loading…</div>
-                    <div id="settings-received-unlisted" class="settings-hint" hidden>
-                        <button class="btn btn-small" type="button" id="settings-received-unlisted-delete">Delete unlisted files</button>
-                    </div>
-                </dd>
-                </div>
-                <div class="settings-row settings-row-wide">
-                <dt class="toggle-dt">
-                    <label for="settings-prune-days">Free space</label>
-                    <span class="toggle-desc">Shrink rewrites saved diffs of finished tasks without secrets, dot-files, binaries and big files (the code changes stay). Prune deletes saved diffs of finished tasks and stopped sessions, and artifacts nothing links, older than the days you choose. Kept artifacts and anything still linked are never touched. Each shows what it would do first. "Prune every hour" does the same by itself: after you turn it on, nothing is removed until you review what it would do, or 24 hours later; each run frees at most 2 GiB.</span>
-                </dt>
-                <dd>
-                    <div class="settings-controls-row">
-                    <label class="settings-inline">Older than <span class="settings-unit-field"><input type="number" id="settings-prune-days" aria-label="Older than, in days" min="1" max="3650" step="1" value="14" inputmode="numeric"> <span class="settings-field-unit">days</span></span></label>
-                    <label class="settings-inline">What to prune
-                    <select id="settings-prune-kind" aria-label="What to prune">
-                        <option value="diffs">Saved diffs</option>
-                        <option value="objects">Unlinked artifacts</option>
-                        <option value="all">Both</option>
-                    </select></label>
-                    <button class="btn" type="button" id="settings-storage-shrink">Shrink…</button>
-                    <button class="btn btn-danger" type="button" id="settings-storage-prune">Prune…</button>
-                    </div>
-                    <div id="settings-storage-result" class="settings-hint" role="status"></div>
-                    <div class="settings-retention-switch">
-                        <label for="settings-retention-enabled">Prune every hour</label>
-                        <label class="check-hit"><input type="checkbox" id="settings-retention-enabled" aria-describedby="settings-retention-status"></label>
-                    </div>
-                    <div id="settings-retention-status" class="settings-hint" role="status"></div>
-                    <button class="btn btn-small" type="button" id="settings-retention-review" hidden>Review and start…</button>
-                </dd>
-                </div>
-                <div class="settings-row">
-                <dt class="toggle-dt">
-                    <label for="settings-terminal-logs-delete">Terminal logs</label>
-                    <span class="toggle-desc">Each agent's terminal output is kept in the logs folder of Coral's data folder, and stays after the agent is killed. You can delete the logs of agents that have ended; the log of a live, sleeping or archived agent is never touched.</span>
-                </dt>
-                <dd>
-                    <div id="settings-terminal-logs-status" class="settings-hint" role="status">Loading…</div>
-                    <button class="btn btn-small btn-danger" type="button" id="settings-terminal-logs-delete" hidden>Delete terminal logs of ended agents</button>
-                </dd>
-                </div>
-                <div class="settings-row" id="settings-worktrees-row">
-                <dt class="toggle-dt">
-                    <span id="wt-title">Kept worktrees</span>
-                    <span class="toggle-desc" id="wt-desc">Git worktrees Coral made for teams and jobs and kept when they stopped, because they still hold your work. Remove one when you no longer need it: Coral never forces a removal, so unsaved changes or unmerged commits keep it.</span>
-                </dt>
-                <dd>
-                    <div id="wt-status" class="settings-hint" role="status"></div>
-                    <p id="wt-empty" class="settings-hint" hidden></p>
-                    <ul id="wt-list" class="wt-list" aria-labelledby="wt-title" aria-describedby="wt-desc"></ul>
-                    <p id="wt-hub-note" class="settings-hint" hidden>Remove is on this computer's own dashboard: through Coral Hub the list is for reading.</p>
-                </dd>
-                </div>
-                        </dl>
+                        <div id="settings-cleanup-rows"></div>
+                        <div id="settings-cleanup-live" hidden>
+                            <div id="settings-artifact-store-size" class="settings-hint" role="status">Loading&hellip;</div>
+                            <details id="settings-storage-breakdown" class="disclosure settings-storage-breakdown"><summary>By age and board</summary><div id="settings-storage-detail" class="settings-hint"></div></details>
+                            <div id="settings-received-size" class="settings-hint" role="status">Loading&hellip;</div>
+                            <div id="settings-received-unlisted" class="settings-hint" hidden>
+                                <button class="btn btn-small" type="button" id="settings-received-unlisted-delete">Delete unlisted files</button>
+                            </div>
+                            <div id="settings-storage-actions">
+                                <button class="btn" type="button" id="settings-storage-shrink">Shrink&hellip;</button>
+                                <button class="btn btn-danger" type="button" id="settings-storage-prune">Prune&hellip;</button>
+                                <div id="settings-storage-result" class="settings-hint" role="status"></div>
+                            </div>
+                            <div id="settings-retention-status" class="settings-hint" role="status"></div>
+                            <button class="btn btn-small" type="button" id="settings-retention-review" hidden>Review and start&hellip;</button>
+                            <div id="settings-terminal-logs-status" class="settings-hint" role="status">Loading&hellip;</div>
+                            <button class="btn btn-small btn-danger" type="button" id="settings-terminal-logs-delete" hidden>Delete terminal logs of ended agents</button>
+                            <div id="settings-worktrees-live">
+                                <div id="wt-status" class="settings-hint" role="status"></div>
+                                <p id="wt-empty" class="settings-hint" hidden></p>
+                                <ul id="wt-list" class="wt-list" aria-labelledby="wt-title"></ul>
+                                <p id="wt-hub-note" class="settings-hint" hidden>Remove is on this computer's own dashboard: through Coral Hub the list is for reading.</p>
+                            </div>
+                        </div>
                     </section>
                     <section class="settings-pane" id="settings-pane-network" data-group="network" data-icon="hub" data-title="Network and Hub" role="tabpanel" aria-labelledby="settings-tab-network" tabindex="-1" hidden>
                         <h4 class="settings-pane-title">Network and Hub</h4>

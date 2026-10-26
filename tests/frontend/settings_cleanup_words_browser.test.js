@@ -27,7 +27,7 @@ const BASE = require('./test_base').BASE;
             assert.match(await ev(`document.getElementById('settings-retention-status').textContent.trim()`), /7 days/, `${tag}: it says the days`);
             // each control says what it is where a person can see it
             for (const id of ['settings-prune-days', 'settings-prune-kind', 'settings-retention-enabled']) {
-                const labelled = await ev(`(() => { const c = document.getElementById('${id}'); return [...c.labels].filter(l => l.getClientRects().length && l.textContent.trim()).map(l => l.textContent.trim().replace(/\\s+/g, ' ')); })()`);
+                const labelled = await ev(`(() => { const c = document.getElementById('${id}'); return [...c.labels, ...(c.getAttribute('aria-labelledby') || '').split(' ').map(i => document.getElementById(i)).filter(Boolean)].filter(l => l.getClientRects().length && l.textContent.trim()).map(l => l.textContent.trim().replace(/\\s+/g, ' ')); })()`);
                 assert.ok(labelled.length > 0, `${tag}: #${id} has a visible label: ` + JSON.stringify(labelled));
                 if (id === 'settings-prune-days') assert.ok(labelled.some(t => /older than/i.test(t)), `${tag}: the days say "Older than": ` + JSON.stringify(labelled));
                 if (id.endsWith('-kind')) assert.ok(labelled.some(t => /what to prune/i.test(t)), `${tag}: #${id} is labelled "What to prune": ` + JSON.stringify(labelled));

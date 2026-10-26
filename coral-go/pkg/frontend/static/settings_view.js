@@ -18,6 +18,7 @@
  *   }
  *   field = { key, type: 'text'|'textarea'|'number'|'select'|'toggle'|'multiselect'|'radio'|'secret'|'path'|'custom', label, help?: string | { text, more },
  *             id?, default?, required?, placeholder?, rows?, min?, max?, step?, unit?, options?: [{ value, label, help? }] | async () => [...], validate?(value, values) => '' | 'message',
+ *             live?: [element ids or { id, wide }] (page elements a module fills, moved under the help, or under the whole row; the control is described by them),
  *             visibleWhen?(values), disabledWhen?(values) => bool | 'reason', readOnly?, apply?: 'now', action?: { label, run(view), danger?, confirm? }, wide?, compact?, render?(slot, ctl) => { get, invalid?(on) (mark the control's own input), focus?, set, onChange? } }
  *
  * The controller: values() set(key, v) dirty() isDirty() changes() error(key, message) clearErrors() validate({ focus }) save() cancel() showGroup(id) reload() destroy().
@@ -133,14 +134,26 @@ export function mountSettingsView(host, spec) {
         return { node: input, input, get, set: v => { input.value = v === undefined || v === null ? '' : String(v); }, focus: () => input.focus(), disable: on => { input.disabled = on; } };
     }
 
+    /** The Learn more of a help text: a button that opens the long part in place (named after what it is about, for the screen reader: "Learn more about working modes"). */
+    function learnMore(help, field, id) {
+        const more = node('div', 'sv-more'); more.id = `${id}-m`; more.hidden = true; more.append(...paragraphs(help.more));
+        const btn = node('button', 'sv-learn', 'Learn more'); btn.type = 'button'; btn.setAttribute('aria-expanded', 'false'); btn.setAttribute('aria-controls', more.id);
+        const named = () => btn.setAttribute('aria-label', `${btn.textContent} about ${help.about || field.label}`); named(); // help.about, else the field's label
+        btn.addEventListener('click', () => { more.hidden = !more.hidden; btn.setAttribute('aria-expanded', String(!more.hidden)); btn.textContent = more.hidden ? 'Learn more' : 'Show less'; named(); });
+        return { btn, more };
+    }
+
     function buildRow(field, group) {
         const id = `${uid}-${fields.size}`;
         const t = field.type || 'text';
         const row = node('div', `sv-row sv-row-${t}${field.wide ? ' sv-row-wide' : ''}${field.compact ? ' sv-row-compact' : ''}`);
         row.dataset.key = field.key;
         if (t === 'heading' || t === 'notice') { // a row that holds no value: a sub-heading with its line, or text the caller draws (a note with a link)
-            const help = typeof field.help === 'string' ? field.help : '';
-            if (t === 'heading') { const h = node('h5', 'sv-heading', field.label); if (field.id) h.id = field.id; row.append(h); if (help) row.append(node('p', 'sv-help', help)); }
+            const help = typeof field.help === 'string' ? { text: field.help } : field.help || null; // a heading's line may have its Learn more too
+            if (t === 'heading') {
+                const h = node('h5', 'sv-heading', field.label); if (field.id) h.id = field.id; row.append(h);
+                if (help && (help.text || help.more)) { const p = node('p', 'sv-help', help.text || ''); row.append(p); if (help.more) { const { btn, more } = learnMore(help, field, id); p.append(help.text ? ' ' : '', btn); row.append(more); } }
+            }
             else { const slot = node('div', 'sv-notice'); if (field.render) field.render(slot, { field, host: root }); row.append(slot); }
             return { field, group, row, ctl: { node: row, get: () => undefined, set: () => {}, disable: () => {}, focus: () => {} }, errorEl: node('p', 'sv-error'), helpEl: null, actionEl: null, id, label: null };
         }
@@ -161,16 +174,21 @@ export function mountSettingsView(host, spec) {
             helpEl = node(helpBits.length ? 'p' : 'span', helpBits.length ? 'sv-help' : 'sv-help sv-help-inline'); helpEl.id = `${id}-h`; // no sentence: the Learn more follows the label on its line
             helpEl.append(node('span', `sv-help-text${field.helpTextClass ? ' ' + field.helpTextClass : ''}`, helpBits.join(' '))); // helpTextClass: a class the caller's own code finds the sentence by
             if (help && help.more) {
-                const more = node('div', 'sv-more'); more.id = `${id}-m`; more.hidden = true; more.append(...paragraphs(help.more));
-                const btn = node('button', 'sv-learn', 'Learn more'); btn.type = 'button'; btn.setAttribute('aria-expanded', 'false'); btn.setAttribute('aria-controls', more.id);
-                const named = () => btn.setAttribute('aria-label', `${btn.textContent} about ${help.about || field.label}`); named(); // help.about, else the field's label: what it is about, for the screen reader ("Learn more about working modes"); a page of them is not seven "Learn more"
-                btn.addEventListener('click', () => { more.hidden = !more.hidden; btn.setAttribute('aria-expanded', String(!more.hidden)); btn.textContent = more.hidden ? 'Learn more' : 'Show less'; named(); });
+                const { btn, more } = learnMore(help, field, id);
                 helpEl.append(' ', btn); text.append(helpEl, more);
             } else text.append(helpEl);
         }
         const target = ctl.input || ctl.node;
         if (target && target.setAttribute) for (const [k, v] of Object.entries(field.attrs || {})) target.setAttribute(k, v); // attributes of the caller's: an aria attribute
-        if (helpEl && target && target.setAttribute) target.setAttribute('aria-describedby', helpEl.id);
+        const liveIds = []; // field.live: elements of the page that a module of its own fills (a status line, a disclosure) are moved under the help, and describe the control
+        const wideLive = [];
+        for (const item of field.live || []) { // an id, or { id, wide: true } for a part that takes the row's whole width (under both columns)
+            const lid = typeof item === 'string' ? item : item.id, e = document.getElementById(lid); if (!e) continue;
+            if (typeof item === 'object' && item.wide) { e.classList.add('sv-live-wide'); wideLive.push(e); } else text.append(e);
+            liveIds.push(lid);
+        }
+        const describedBy = [helpEl && helpEl.id, ...liveIds].filter(Boolean);
+        if (describedBy.length && target && target.setAttribute) target.setAttribute('aria-describedby', describedBy.join(' '));
         const control = node('div', 'sv-control');
         control.append(ctl.node);
         if (field.unit) {
@@ -200,7 +218,7 @@ export function mountSettingsView(host, spec) {
             control.append(actionEl);
         }
         const errorEl = node('p', 'sv-error'); errorEl.id = `${id}-e`; errorEl.hidden = true; errorEl.setAttribute('role', 'alert');
-        row.append(text, control, errorEl);
+        row.append(text, control, errorEl, ...wideLive);
         if (field.setup && target) field.setup(target); // the caller's own touch on the control, once the row is whole (a data-on-* action it names with setAttribute, which the action census reads)
         const rec = { field, group, row, ctl, errorEl, helpEl, actionEl, id, label };
         const onEdit = () => touched(field.key);
