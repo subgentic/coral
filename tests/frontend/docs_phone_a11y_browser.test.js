@@ -49,6 +49,17 @@ const BASE = require('./test_base').BASE;
             }
             assert.deepEqual(bad, [], 'topics with a heading level skipped');
         });
+        await S.run('390 px: a topic opened by a tap leaves its title with no focus ring (the heading takes the focus, :focus-visible does not match), and one opened from the keyboard keeps it', async () => {
+            await open(390, 844, true);
+            const tap = async sel => { const pt = await ev(`(() => { const b = [...document.querySelectorAll(${JSON.stringify(sel)})].find(e => e.getClientRects().length); const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`); await client.Input.dispatchTouchEvent({ type: 'touchStart', touchPoints: [pt] }); await client.Input.dispatchTouchEvent({ type: 'touchEnd', touchPoints: [] }); };
+            const state = () => ev(`(() => { const h = document.querySelector('#docs-content h1'), a = document.activeElement; return { onTitle: a === h, focusVisible: !!a && a.matches(':focus-visible'), outline: h ? getComputedStyle(h).outlineStyle : null }; })()`);
+            await tap('#mobile-docs-list [data-doc], #mobile-docs-list .group-table-link, #mobile-docs-list .row-btn'); await waitFor(`!!document.querySelector('#docs-content h1') && document.activeElement === document.querySelector('#docs-content h1')`, 'the title to have the focus after the tap', 8000);
+            const tapped = await state(); assert.deepEqual(tapped, { onTitle: true, focusVisible: false, outline: 'none' }, 'after a tap: ' + JSON.stringify(tapped));
+            await ev(`document.activeElement.blur(); true`);
+            await client.Input.dispatchKeyEvent({ type: 'rawKeyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
+            await ev(`window.selectDoc(${JSON.stringify(names[2])}); true`); await waitFor(`document.activeElement === document.querySelector('#docs-content h1')`, 'the title to have the focus after the keyboard', 8000);
+            const keyed = await state(); assert.deepEqual([keyed.onTitle, keyed.focusVisible, keyed.outline !== 'none'], [true, true, true], 'after the keyboard: ' + JSON.stringify(keyed));
+        });
         const wideNames = await open(1280, 800, false);
         await S.run('1280 px: the way back is the toolbar\'s, hidden, and the topic title is alone in its row', async () => {
             await select(wideNames[0]);
