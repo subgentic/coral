@@ -33,6 +33,7 @@ type ChatLocator struct {
 type ChatSearchResult struct {
 	SessionID     string          `json:"session_id"`
 	Type          string          `json:"type"`
+	Archived      bool            `json:"archived"`
 	SourceType    string          `json:"source_type"`
 	Score         float64         `json:"score"`
 	LastTimestamp string          `json:"last_timestamp,omitempty"`
@@ -42,6 +43,8 @@ type ChatSearchResult struct {
 // SearchChats searches indexed agent transcripts and board messages. The
 // history index is used to bound transcript reads; unavailable files are
 // reported honestly through status rather than triggering an unbounded scan.
+// type=group searches every board, including archived ones, matching Group chats.
+// Other search scopes keep archived boards hidden.
 // GET /api/sessions/history/search?q=...&type=all&page=1&page_size=20
 func (h *HistoryHandler) SearchChats(w http.ResponseWriter, r *http.Request) {
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
@@ -131,7 +134,7 @@ func (h *HistoryHandler) SearchChats(w http.ResponseWriter, r *http.Request) {
 				}
 				byProject := map[string]*ChatSearchResult{}
 				for _, m := range msgs {
-					if flags[m.Project].Archived {
+					if flags[m.Project].Archived && chatType != "group" {
 						continue
 					}
 					content := cleanWhitespace(m.Content)
@@ -143,7 +146,7 @@ func (h *HistoryHandler) SearchChats(w http.ResponseWriter, r *http.Request) {
 					offsets = utf16Offsets(excerpt, offsets)
 					res := byProject[m.Project]
 					if res == nil {
-						res = &ChatSearchResult{SessionID: "board:" + m.Project, Type: "group", SourceType: "board", Score: 1, LastTimestamp: m.CreatedAt}
+						res = &ChatSearchResult{SessionID: "board:" + m.Project, Type: "group", Archived: flags[m.Project].Archived, SourceType: "board", Score: 1, LastTimestamp: m.CreatedAt}
 						byProject[m.Project] = res
 					}
 					res.Hits = append(res.Hits, ChatSearchHit{MessageID: m.ID, Role: "board", Timestamp: m.CreatedAt, Excerpt: excerpt, MatchOffsets: offsets, Locator: ChatLocator{Project: m.Project, MessageID: m.ID}})
