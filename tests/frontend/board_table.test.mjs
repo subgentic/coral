@@ -1,7 +1,10 @@
 // The board table's pure parts (#7921): a message's snippet, the tasks and members it names, the day lines.
 import assert from 'node:assert/strict';
-import { snippetOf, taskRefs, tagsOf, dayLabel, sameDay, rowParts, toggleRow, isRowOpen } from '../../coral-go/pkg/frontend/static/board_table.js';
-import { setBoardMentionNames } from '../../coral-go/pkg/frontend/static/board_message_text.js';
+import { installDom, importUi } from './helpers/jsdom_env.mjs';
+
+installDom();
+const { snippetOf, taskRefs, tagsOf, dayLabel, sameDay, rowParts, toggleRow, isRowOpen } = await importUi('board_table');
+const { setBoardMentionNames } = await importUi('board_message_text');
 
 setBoardMentionNames(['Backend Dev', 'QA Engineer']);
 
