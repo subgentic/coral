@@ -173,9 +173,9 @@ const STUB = `(() => {
             // Jobs: the table, the job's page and its pinned bar
             await openTab('jobs');
             await waitFor(`document.getElementById('group-table-view').checkVisibility() && document.querySelector('#group-table-title').textContent === 'Active'`, at + 'Jobs opens on Active as a table', 8000);
-            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view table')[0].querySelectorAll('th')].map(h => h.textContent)`), ['Job', 'Schedule', 'Last run', 'Next'], at + 'the jobs table columns (of the first table: the page lists every group, #7722)');
+            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view table')[0].querySelectorAll('th')].map(h => h.querySelector('.dt-sort > span').textContent)`), ['Job', 'Schedule', 'Last run', 'Next'], at + 'the jobs table columns (of the first table: the page lists every group, #7722)');
             assert.deepEqual(await ev(`(${ON_SCALE})(document.getElementById('group-table-view'), [11, 12, 13, 14, 17, 20])`), [], at + 'every text of the jobs table is on the scale');
-            await ev(`document.querySelector('#group-table-view .group-table-link').click(); true`);
+            await ev(`document.querySelector('#group-table-view .dt-primary').click(); true`);
             await waitFor(`!!document.querySelector('#scheduler-detail .item-bar') && document.querySelector('#scheduler-detail .group-back').checkVisibility()`, at + "the job's page", 8000);
             assert.equal(await ev(`document.querySelector('#scheduler-detail .group-back').textContent`), '\u2190 Active', at + 'the job page has its way back');
             assert.deepEqual(await ev(`(() => { const t = getComputedStyle(document.querySelector('#scheduler-detail .sched-header h2')); return [t.fontSize, t.fontWeight]; })()`), ['17px', '700'], at + "the job's name is 17/700");
@@ -228,7 +228,8 @@ const STUB = `(() => {
                     assert.deepEqual(au.fails.map(f => `${f.sel} ${f.what} ${f.ratio}`), [], how + `${what}: contrast`);
                 }
                 assert.equal(await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1 && document.getElementById('group-table-view').getBoundingClientRect().right <= innerWidth + 1`), true, how + 'the table is inside the screen');
-                await ev(`document.querySelector('#group-table-view .group-table-link').click(); true`);
+                await shot(`jobs-table-${theme}${zoom ? '-200' : ''}`);
+                await ev(`document.querySelector('#group-table-view .dt-primary').click(); true`);
                 await waitFor(`!!document.querySelector('#scheduler-detail .item-bar')`, how + "the job's page", 8000);
                 const au2 = await auditRegion(ev, ['#scheduler-detail']);
                 assert.deepEqual(au2.fails.map(f => `${f.sel} ${f.what} ${f.ratio}`), [], how + "the job's page: contrast");

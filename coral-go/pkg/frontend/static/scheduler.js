@@ -13,6 +13,9 @@ import { cronWords, atWords, awayWords, whenWords, resultWords, reasonWords, las
 import { updateJobsSectionCount } from './live_jobs.js';
 import { limitSeconds, limitParts } from './time_limit.js';
 import { registerGroupSource, groupHeaderHtml, isGroupFolded, syncPaneGroupToggle, refreshGroupTable, backLinkHtml, foldWayBack } from './sidebar_groups.js';
+import * as DT from './data_table.js';
+
+const jobTableStates = new Map();
 
 let scheduledJobs = [];
 let selectedJobId = null;
@@ -73,16 +76,37 @@ export function filterJobs(value) { jobsQuery = String(value || '').trim().toLow
 const JOB_GROUPS = [{ key: 'active', label: 'Active', has: job => job.enabled }, { key: 'paused', label: 'Paused', has: job => !job.enabled }];
 const jobGroups = () => JOB_GROUPS.map(g => ({ ...g, jobs: scheduledJobs.filter(matchesQuery).filter(g.has) })).filter(g => g.jobs.length);
 
-function jobTableRow(job) {
-    return { title: job.name, action: 'job-select', data: { 'job-id': Number(job.id) }, cells: [cronWords(job.cron_expr) + (job.timezone ? ` (${job.timezone})` : ''), job.last_run ? lastWords(job.last_run) : '', job.enabled && job.next_fire_at ? awayWords(job.next_fire_at) : ''] };
-}
+const scheduleOf = job => cronWords(job.cron_expr) + (job.timezone ? ` (${job.timezone})` : '');
+const nextOf = job => !job.enabled ? 'Paused' : job.next_fire_at ? awayWords(job.next_fire_at) : 'Not scheduled';
 
 registerGroupSource('jobs', {
     landing: true, // the page it opens on lists every group the sidebar has (#7722)
     keys: () => jobGroups().map(g => g.key),
     redraw: () => renderJobsSidebar(),
     toolbar: () => ({ search: { id: 'jobs-search', label: 'Search jobs' }, action: { name: 'job-new', label: 'New job' } }), // the create action on the page's toolbar line (#7723)
-    table: key => { const g = jobGroups().find(x => x.key === key); return g ? { title: g.label, columns: ['Job', 'Schedule', 'Last run', 'Next'], rows: g.jobs.map(jobTableRow) } : null; },
+    table: key => {
+        const g = jobGroups().find(x => x.key === key);
+        if (!g) return null;
+        if (!jobTableStates.has(key)) jobTableStates.set(key, DT.tableState());
+        return { title: g.label, rows: g.jobs,
+            signature: JSON.stringify(g.jobs.map(job => [job, lastWords(job.last_run), nextOf(job)])),
+            node: () => DT.dataTable({
+                label: `${g.label} jobs, ${g.jobs.length}`, rows: g.jobs, layout: 'fixed',
+                rowKey: job => job.id, rowName: job => job.name, state: jobTableStates.get(key),
+                open: job => selectScheduledJob(Number(job.id)),
+                columns: [
+                    { key: 'job', label: 'Job', field: 'name', primary: true, width: 'grow', line: 1, sort: true, cell: job => DT.primaryButton(job.name) },
+                    { key: 'schedule', label: 'Schedule', width: '12rem', line: 2, sort: true, sortValue: scheduleOf, cell: scheduleOf },
+                    { key: 'last-run', label: 'Last run', width: '9rem', line: 2, tone: 'tertiary', sort: 'date', sortValue: job => job.last_run?.started_at, cell: job => lastWords(job.last_run) },
+                    { key: 'next', label: 'Next', width: '7rem', line: 1, tone: 'tertiary', sort: 'date', sortValue: job => job.enabled ? job.next_fire_at : '', cell: job => {
+                        const cell = DT.el('span', 'dt-time', nextOf(job));
+                        if (job.enabled && job.next_fire_at) cell.title = `Next run ${atWords(job.next_fire_at)} your time`;
+                        return cell;
+                    } },
+                ],
+            }).el,
+        };
+    },
     isEmpty: () => document.getElementById('scheduler-view')?.style.display === 'block' && !!document.querySelector('#scheduler-detail > .sched-empty-hint') && document.body.getAttribute('data-nav-tab') === 'jobs',
     showList: () => window.switchNavTab?.('jobs'),
     empty: () => window.switchNavTab?.('jobs'),
