@@ -49,6 +49,9 @@ const modelRow = (provider, label) => ({ key: `default_model_${provider}`, type:
     attrs: { list: `settings-models-${provider}`, autocomplete: 'off', 'aria-label': `${label} default model` }, setup: el => { el.classList.add('settings-mono-input'); const dl = document.createElement('datalist'); dl.id = `settings-models-${provider}`; el.after(dl); } });
 const hintOnly = more => ({ text: '', more });
 
+// One CLI path row: the path (mono, spell check off) with the verify result cli_dialogs.js writes under it.
+const cliPath = (type, label) => ({ key: `cli_path_${type}`, type: 'path', id: `settings-cli-path-${type}`, label: `${label} CLI path`, placeholder: type, live: [`cli-result-${type}`], setup: el => el.classList.add('settings-mono-input') });
+
 const AGENTS_FIELDS = host => [
     { key: 'agents_defaults', type: 'heading', id: 'settings-agents-defaults', label: 'Defaults' },
     { key: 'permission_mode', type: 'select', id: 'settings-permission-mode', labelId: 'settings-permission-mode-label', label: 'Default permission mode', options: PERMISSION_OPTIONS,
@@ -71,8 +74,11 @@ const AGENTS_FIELDS = host => [
     { key: 'board_health_monitor', type: 'toggle', id: 'settings-board-health-monitor', label: 'Team health checks', help: 'Applies to every team; each team still turns its own check on in Team settings. Takes effect after Coral restarts.' },
     { key: 'agents_tools', type: 'heading', id: 'settings-agents-tools', label: 'Tools' },
     { key: 'codex_trust_hooks', type: 'toggle', id: 'settings-codex-trust-hooks', label: "Trust Coral's hooks in Codex", help: hintOnly("Codex asks you to review new hooks before it runs them, because a trusted hook runs outside its sandbox. When this is on and only an administrator can change Coral's tools folder (an installed Coral), Coral trusts its own hooks for each Codex agent it launches, so the agent starts without that question; your own hooks and a repository's still ask. Off, Codex asks every time. Applies to Codex agents launched after the change, and can only be changed on this computer.") },
-    live('settings-cli-paths-dl'),
     live('settings-prompts-live'),
+    // the CLI paths: a closed disclosure of four path fields, each with its verify result under it, and Verify All (#8460); the dialog opens it when the default agent's CLI is missing (openCliPathsWhenMissing)
+    { key: 'cli_paths', type: 'heading', id: 'settings-cli-paths', label: 'CLI paths (empty uses PATH)', fold: true },
+    cliPath('claude', 'Claude'), cliPath('codex', 'Codex'), cliPath('agy', 'Antigravity'), cliPath('pi', 'Pi'),
+    live('verify-all-btn'),
 ];
 
 export const CLEANUP_FIELDS = [

@@ -88,6 +88,13 @@
 .sv-bar-buttons { display: flex; align-items: center; gap: 8px; flex: none; }
 .sv-fold { margin: 4px 0 0; }
 .sv-fold > summary { color: var(--text-primary); font-weight: 600; } /* a form's optional part: closed, its rows inside */
+/* the line reads as a control, not a caption: one "▸" marker (a flex summary draws no native one), 32 px high (44 on a coarse pointer, touch.css), the CLI paths' fold (#7041, #8460) */
+.sv-fold > summary { display: flex; align-items: center; gap: 6px; min-height: 32px; list-style: none; font-size: var(--fs-md); }
+.sv-fold > summary::-webkit-details-marker { display: none; }
+.sv-fold > summary::before { content: '▸'; font-size: 0.75rem; flex: none; }
+.sv-fold[open] > summary::before { transform: rotate(90deg); }
+.sv-fold[open] > summary { margin-bottom: 8px; }
+@media (pointer: coarse) { .sv-fold > summary { min-height: var(--control-touch-height, 44px); } }
 .sv-form-bar { flex: 1 1 auto; border-top: 0; padding: 0; background: none; } /* a form's bar sits in the dialog's own footer (spec.form.barHost): that footer has the rule and the padding */
 .sv-bar .btn:disabled { opacity: .5; cursor: not-allowed; } /* nothing changed: both are off, the status says why */
 

@@ -2,12 +2,12 @@
   "settings-row": {
     "css": 37,
     "js": 5,
-    "html": 6
+    "html": 5
   },
   "settings-cli-row": {
-    "css": 2,
+    "css": 0,
     "js": 0,
-    "html": 4
+    "html": 0
   },
   "tb-row": {
     "css": 1,
@@ -104,7 +104,6 @@
     "launch-server-row",
     "net-group-head",
     "net-level-row",
-    "settings-cli-row",
     "settings-cloud-connect-row",
     "settings-cloud-head",
     "settings-cloud-owner-row",

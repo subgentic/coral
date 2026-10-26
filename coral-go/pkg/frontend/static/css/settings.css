@@ -15,7 +15,7 @@
 #settings-modal .settings-tab { font: 400 0.875rem/1.35 var(--font-sans); }
 #settings-modal .settings-tab[aria-selected="true"] { font-weight: 600; }
 #settings-modal .settings-tab, #settings-modal .settings-tab[aria-selected="true"] { transition: none; }
-#settings-modal :is(dt, dt label, .toggle-dt label, .settings-cli-label, .tb-label, label.tb-opt, .tb-opt strong, summary) { font: var(--dlg-label); }
+#settings-modal :is(dt, dt label, .toggle-dt label, .tb-label, label.tb-opt, .tb-opt strong, summary) { font: var(--dlg-label); }
 #settings-modal :is(input, select, textarea, .tb-opt, .tb-autowake label) { font: var(--dlg-control); }
 #settings-modal .btn, #settings-modal :is(.pw-toggle, .tb-learn) { font: var(--dlg-button); }
 #settings-modal :is(.settings-hint, .toggle-desc, .tb-now, .tb-now b, .machine-health-note, .machine-health-status, .tb-note, .tb-d) { font: var(--dlg-hint); }
