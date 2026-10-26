@@ -1,11 +1,12 @@
 /* Coral's side of the shared Inbox (#5754): the adapter that gives inbox_panel.js its tasks, task text, reply and saved-message read from this Coral's own routes, and the one mounted panel
  * (the Inbox tab's "Tasks for you" and the "Read the whole message" control of a Saved for later item). The component itself is inbox_panel.js; Coral Hub mounts the same file with its own adapter. */
+import { state } from './state.js';
 import { importOnce } from './import_once.js';
 import { makeLinkPolicy } from './safe_markdown.js';
 import { openTask, taskHref } from './task_navigation.js';
 import { onAccountForgotten } from './local_store.js';
 import { loadSafeMarkdown } from './vendor_loader.js';
-import { keyLabel, pathId, serverFetch, boardFetch } from './server_base.js';
+import { keyLabel, pathId, serverFetch, boardFetch, identityKey, noteBoardLabels } from './server_base.js';
 import { setInboxCount } from './inbox_tab.js'; // the count on the Tasks tab
 const { mountInbox, clearInboxDrafts, INBOX_CONTRACT } = await importOnce('./inbox_panel.js'); // the component (shared with the hub); this file is the one that is Coral's
 
@@ -18,6 +19,22 @@ async function json(resp) {
     if (!resp.ok) throw new Error((data && typeof data.error === 'string' && data.error) || `HTTP ${resp.status}`);
     return data;
 }
+
+/** The local Inbox spans the same online registered machines as Saved and Board history.
+ * IDs are only unique on their source machine; qualify the team before any row is opened. */
+async function inboxRows(path, field) {
+    const servers = ['local', ...new Set(state.hub ? (state.servers || []).filter(s => s.id && s.id !== 'local' && s.status === 'online').map(s => s.id) : [])];
+    const results = await Promise.allSettled(servers.map(async server => {
+        const data = await json(await serverFetch(server, path));
+        const rows = Array.isArray(data[field]) ? data[field] : [];
+        noteBoardLabels(rows, 'board_id', server);
+        return rows.map(row => ({ ...row, board_id: identityKey(server, row.board_id) }));
+    }));
+    return results.flatMap(result => result.status === 'fulfilled' ? result.value : []);
+}
+
+/** Open goals from this Coral and its registered machines, preserving team identity. */
+export function listInboxGoals() { return inboxRows('/api/goals?limit=100', 'goals'); }
 
 const ARTIFACT_LINK_RE = /coral:\/\/artifacts\/([0-9a-f]{64})(?![0-9a-f])/g;
 const ARTIFACT_LOOKUPS_MAX = 20;
@@ -39,8 +56,8 @@ export const coralInboxAdapter = {
     async listTasks() {
         const q = new URLSearchParams({ assigned_to: 'Operator', fields: FIELDS, sort: 'updated_at', order: 'desc', limit: '100' });
         for (const s of OPEN_STATUSES) q.append('status', s);
-        const d = await json(await fetch(`/api/board/tasks?${q}`));
-        return (d.tasks || []).map(t => ({ id: t.id, project: t.board_id, board: t.board_label || keyLabel(t.board_id), title: t.title, priority: t.priority, status: t.status,
+        const rows = await inboxRows(`/api/board/tasks?${q}`, 'tasks');
+        return rows.map(t => ({ id: t.id, project: t.board_id, board: t.board_label || keyLabel(t.board_id), title: t.title, priority: t.priority, status: t.status,
             created_by: t.created_by, created_at: t.created_at, updated_at: t.updated_at, revision: t.revision, artifact_count: t.artifact_count,
             goal: t.goal_id && t.goal_title ? { id: Number(t.goal_id), title: String(t.goal_title) } : null })); // the goal it serves, when the route sends one (#7302)
     },
