@@ -10,7 +10,7 @@ import (
 
 func displayWorkingFixture(t *testing.T, name string) string {
 	t.Helper()
-	b, err := os.ReadFile(filepath.Join("testdata", "screens", "codex", "0.163.0-display", name))
+	b, err := os.ReadFile(filepath.Join("testdata", "display_activity_hint", "codex-0.163.0", name))
 	require.NoError(t, err)
 	return string(b)
 }
