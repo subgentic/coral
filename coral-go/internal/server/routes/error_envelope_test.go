@@ -60,7 +60,7 @@ var (
 	rawEnvelopeLiteral = regexp.MustCompile(`writeJSON\(w, http\.Status[A-Za-z]+, map\[string\](?:string|any|interface\{\})\{"error": [^{}]*?(?:, "code": [^{}]*?)?\}\)`)
 	rawBodyDecoder     = regexp.MustCompile(`json\.NewDecoder\((?:r\.Body|io\.LimitReader\(r\.Body|http\.MaxBytesReader\(w, r\.Body)`)
 	// files that decode a request body with options, and how many such decoders each has
-	decoderWithOptions = map[string]int{"artifact_comments.go": 1, "cloud.go": 1}
+	decoderWithOptions = map[string]int{"artifact_comments.go": 1, "cloud_link.go": 1}
 )
 
 func TestRoutesUseTheEnvelopeAndBodyHelpers(t *testing.T) {
