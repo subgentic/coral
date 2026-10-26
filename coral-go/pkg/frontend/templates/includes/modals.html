@@ -117,7 +117,7 @@
                                 </div>
                             </details>
                         </div>
-                        <p class="settings-hint">A persona fills the name and the prompt below, and may set the provider, model and permissions on the next step.</p>
+                        <p class="settings-hint" id="launch-persona-hint">A persona fills the name and the prompt below, and may set the provider, model and permissions on the next step.</p>
                         <div id="agent-name-host"></div>
                     </div>
                     <div id="launch-agent-provider" class="launch-agent-provider">
@@ -485,7 +485,7 @@
             <div class="modal-actions modal-footer">
                 <button class="btn" id="restart-cancel" data-on-click="m-hide-restart-modal">Cancel</button>
                 <button class="btn" id="restart-back" data-on-click="m-dialog-step" data-arg="back" hidden>Back</button>
-                <button class="btn" id="restart-next" data-on-click="m-dialog-step" data-arg="next">Next</button>
+                <button class="btn btn-primary" id="restart-next" data-on-click="m-dialog-step" data-arg="next">Next</button>
                 <button class="btn btn-warning" id="restart-go" data-on-click="m-confirm-restart">Restart</button>
                 <p id="restart-stage-live" class="sr-only" role="status"></p>
             </div>

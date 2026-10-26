@@ -4055,9 +4055,12 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .launch-cli-slot:empty { display: none; }
 .launch-cli-slot { margin: 10px 26px 0; font-size: 0.8125rem; line-height: 1.5; color: var(--text-secondary); }
 .launch-cli-slot .acf-cli-warning { margin: 0 !important; } /* the form gave it a margin inline */
+.acf-cli-warning { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; font-size: var(--fs-md); font-weight: 500; } /* a row like any other: the status as its label (13/500), the button at the right, a link or note under it */
+.acf-cli-warning > span { flex: 1 1 12rem; }
+.acf-cli-warning > p { flex: 0 0 100%; margin: 0; font-weight: 400; }
 .launch-cli-slot .acf-cli-warning code { color: var(--text-primary); overflow-wrap: anywhere; }
 .launch-cli-slot .acf-cli-warning .cli-install-link a { color: var(--link-text); }
-.launch-cli-slot .acf-cli-warning .btn { margin: 8px 0 0; }
+.launch-cli-slot .acf-cli-warning .btn { margin: 0 0 0 auto; }
 /* The dialog says it once: the app-wide banner steps aside while the dialog has the line (#6046). */
 body:has(#launch-modal[style*="flex"] :is(#launch-tmux-slot, #team-tmux-slot)[data-blocks-launch]) #tmux-missing-banner { display: none; }
 #launch-tmux-slot code, #team-tmux-slot code { color: var(--text-primary); overflow-wrap: anywhere; }
@@ -4257,7 +4260,7 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .launch-wizard .acf-top-row .acf-model-wrap { margin: 0; }
 .launch-wizard .acf-thinking-wrap { display: block; margin: 0; }
 .launch-wizard .acf-thinking-wrap[hidden] { display: none; }
-.launch-wizard .acf-thinking-label { display: block; margin-bottom: 4px; font-size: .875rem; font-weight: 600; }
+.launch-wizard .acf-thinking-label, .launch-wizard .acf-model-wrap { display: block; margin-bottom: 4px; font-size: var(--fs-md); font-weight: 500; } /* Model and Thinking: the form label style, 13/500 (UI/UX on Restart) */
 #launch-agent-pick .launch-agent-opt { margin: 0; flex: 0 0 auto; }
 .launch-agent-pick { width: max-content; max-width: 100%; }
 .launch-persona-row .agent-preset-selector { border: 0; padding: 0; margin: 0; }
@@ -4271,7 +4274,7 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 /* Restart on the same shell (#7391): the provider line has a slot of its own so the tabs do not move when it appears. */
 .restart-wizard-content > .modal-actions #restart-cancel { margin-right: auto; }
 .restart-wizard-content > .modal-actions { display: flex; align-items: center; gap: 8px; }
-.acf-restart-name { margin: 0 0 16px; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-secondary); color: var(--text-primary); overflow-wrap: anywhere; }
+.acf-restart-name { margin: 0 0 16px; padding: 0; font-size: .875rem; color: var(--text-primary); overflow-wrap: anywhere; }
 .acf-provider-label { display: block; margin: 0 0 14px; }
 .acf-provider-head { display: block; font-size: .875rem; font-weight: 600; margin-bottom: 4px; }
 .acf-provider-fixed { margin: 0 0 14px; }

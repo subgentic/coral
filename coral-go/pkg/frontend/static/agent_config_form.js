@@ -307,7 +307,7 @@ function acfTopHtml(uid, { agentTypeVal, modelVal }) {
                     <option value="terminal"${agentTypeVal === 'terminal' ? ' selected' : ''}>Terminal</option>
                 </select>
             </label>
-            <label class="acf-model-wrap">Model <span style="color:var(--text-muted);font-weight:normal">(optional)</span>
+            <label class="acf-model-wrap">Model <span class="launch-optional">optional</span>
                 ${modelPickerHtml()}
                 <input type="text" class="acf-model" list="acf-models-${uid}" placeholder="Leave blank to use default" autocomplete="off" value="${escapeAttr(modelVal)}">
                 <datalist id="acf-models-${escapeAttr(uid)}"></datalist>
@@ -364,7 +364,7 @@ function drawAcfForm(container, uid, opts, f) {
         <details class="team-advanced acf-flags-details">
             <summary>Flags</summary>
             <div class="team-advanced-body">
-                <label>Flags <span style="color:var(--text-muted);font-weight:normal">(optional)</span>:
+                <label>Flags <span class="launch-optional">optional</span>
                     ${flagsInput}
                 </label>
             </div>
@@ -385,7 +385,7 @@ function drawSectionedAcf(container, uid, opts, { f: { showPreset, showName, pro
             `<div class="acf-persona-page" data-adopt="persona"><div class="launch-prompt-field"><span class="launch-field-head" id="${escapeAttr(uid)}-prompt-label">Behavior prompt</span><textarea class="acf-prompt" aria-labelledby="${escapeAttr(uid)}-prompt-label" rows="8" placeholder="Describe the agent's role and behavior...">${escapeHtml(promptVal)}</textarea></div></div>`,
             pane('agent', 'Agent', 'smart_toy', '', topHTML),
             pane('permissions', 'Permissions', 'lock', '', `${autoPermissionsHTML}${toolsHTML}`),
-            pane('advanced', 'Advanced', 'tune', '', `<label>Flags <span style="color:var(--text-muted);font-weight:normal">(optional)</span>:${flagsInput}</label>`),
+            pane('advanced', 'Advanced', 'tune', '', `<label>Flags <span class="launch-optional">optional</span>${flagsInput}</label>`),
         ].join('');
     } else if (opts.restart) {
         // Restart (#7391): New Agent's steps without the first, the agent being fixed. Step 1 is the persona page (the name, read-only, and the prompt); step 2 is the tabs Model (with Thinking), Permissions, Advanced. The Provider is said in a line; its select stays, hidden, for the form's reads.
@@ -395,7 +395,7 @@ function drawSectionedAcf(container, uid, opts, { f: { showPreset, showName, pro
             `<div class="acf-persona-page"><p class="launch-field-head"><span>Name</span></p><p class="acf-restart-name"></p><div class="launch-prompt-field"><span class="launch-field-head" id="${escapeAttr(uid)}-prompt-label">Behavior prompt</span><textarea class="acf-prompt" aria-labelledby="${escapeAttr(uid)}-prompt-label" rows="8" placeholder="Describe the agent's role and behavior...">${escapeHtml(promptVal)}</textarea></div></div>`,
             pane('agent', 'Model', 'smart_toy', '', `<p class="settings-hint acf-provider-fixed"></p>${agentHTML}`),
             pane('permissions', 'Permissions', 'lock', '', `${autoPermissionsHTML}${toolsHTML}`),
-            pane('advanced', 'Advanced', 'tune', '', `<label>Flags <span style="color:var(--text-muted);font-weight:normal">(optional)</span>:${flagsInput}</label>`),
+            pane('advanced', 'Advanced', 'tune', '', `<label>Flags <span class="launch-optional">optional</span>${flagsInput}</label>`),
         ].join('');
     } else {
         // The team member and Add-agent-to-board dialogs (#7391): the same panes as New Agent's step 3, and one Persona pane (the persona, the name, the prompt) where New Agent has a page.
@@ -405,7 +405,7 @@ function drawSectionedAcf(container, uid, opts, { f: { showPreset, showName, pro
             pane('persona', 'Persona', 'badge', '', `${(showPreset || showName) ? `${presetHTML}${nameHTML}` : ''}${promptHTML}`),
             pane('agent', 'Agent', 'smart_toy', '', topHTML.replace('<label>Agent Type:', '<label class="acf-provider-label"><span class="acf-provider-head">Provider</span>')),
             pane('permissions', 'Permissions', 'lock', '', `${autoPermissionsHTML}${toolsHTML}`),
-            pane('advanced', 'Advanced', 'tune', '', `<label>Flags <span style="color:var(--text-muted);font-weight:normal">(optional)</span>:${flagsInput}</label>`),
+            pane('advanced', 'Advanced', 'tune', '', `<label>Flags <span class="launch-optional">optional</span>${flagsInput}</label>`),
         ].join('');
         container.dataset.acfPersonaPane = '1';
     }

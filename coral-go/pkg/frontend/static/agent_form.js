@@ -22,6 +22,8 @@ export function agentStatus(text) {
 /** Word the name field for what the dialog is doing: a new agent's optional name, or a team member's role (Add member and Edit member save a role, so it is Required). */
 export function setAgentNameMode(member) {
     _nameView?.clearErrors();
+    const hint = document.getElementById('launch-persona-hint'); // the line above says what the persona fills: the name, or the role of a member
+    if (hint) hint.textContent = `A persona fills the ${member ? 'role' : 'name'} and the prompt below, and may set the provider, model and permissions on the next step.`;
     _nameView?.retext('name', member
         ? { label: 'Role', help: 'The role this member has on the team.', required: true, optional: false, requiredMessage: 'A member needs a role' }
         : { label: 'Name', help: 'Choose a persona above and its name goes here, or type your own.', required: false, optional: true });
