@@ -225,19 +225,6 @@ const (
 	AgentTaskReviewPending = 6
 )
 
-// SetAgentTaskDetails stores a task's details and priority (empty = unchanged).
-func (s *TaskStore) SetAgentTaskDetails(ctx context.Context, taskID int64, body, priority string) error {
-	updates := board.TaskUpdate{}
-	if body != "" {
-		updates.Body = &body
-	}
-	if priority != "" {
-		updates.Priority = &priority
-	}
-	_, err := s.UpdateAgentTaskWorkflow(ctx, taskID, updates)
-	return err
-}
-
 // CurrentAgentTask returns the agent's task in progress, or nil.
 func (s *TaskStore) CurrentAgentTask(ctx context.Context, agentName string, sessionID *string) (*AgentTask, error) {
 	filter, filterArgs := sessionFilter(sessionID)

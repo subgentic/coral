@@ -140,11 +140,6 @@ func (s *Store) SetBoardSetting(ctx context.Context, project, key, value string)
 	return err
 }
 
-// BoardSetting is one board setting's raw value, "" when unset.
-func (s *Store) BoardSetting(ctx context.Context, project, key string) (string, error) {
-	return s.boardSettingValue(ctx, project, key)
-}
-
 // boardSettingValue is one board setting's raw value, "" when unset.
 func (s *Store) boardSettingValue(ctx context.Context, project, key string) (string, error) {
 	var v []string
