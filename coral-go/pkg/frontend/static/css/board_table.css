@@ -94,3 +94,5 @@
 @media (max-width: 767px), (pointer: coarse) { .board-chat-scope .mb-view-btn { min-height: var(--control-touch-height, 44px); } }
 .board-chat-scope-note { margin: 0; font-size: 0.75rem; font-weight: 400; color: var(--text-secondary); }
 .board-chat-empty .board-scope-link { background: none; border: 0; padding: 0; font: inherit; color: var(--accent); text-decoration: underline; cursor: pointer; }
+.board-chat-search { padding: 0 10px; }
+.mb-search-link { background: none; border: 0; padding: 0 0.25rem; font: inherit; font-size: 0.75rem; color: var(--accent); text-decoration: underline; cursor: pointer; }
