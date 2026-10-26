@@ -386,7 +386,7 @@ func (s *Store) HasActiveTaskForAssignee(ctx context.Context, project, assignee 
 	var count int
 	err := s.reader().GetContext(ctx, &count,
 		`SELECT COUNT(1) FROM board_tasks
-		 WHERE board_id = ? AND assigned_to = ? AND status = 'in_progress' AND id != ?`,
+		 WHERE board_id = ? AND assigned_to = ? AND `+holdsSlotSQL+` AND id != ?`, // a parked task is set aside: its assignee is not busy with it (#7819)
 		project, assignee, excludeTaskID)
 	if err != nil {
 		return false, err
@@ -403,7 +403,7 @@ func (s *Store) FindIdleSubscriber(ctx context.Context, project string, skip fun
 		`SELECT * FROM board_subscribers
 		 WHERE project = ? AND is_active = 1 AND session_name != ''
 		 AND subscriber_id NOT IN (
-		     SELECT assigned_to FROM board_tasks WHERE board_id = ? AND status = 'in_progress' AND assigned_to IS NOT NULL
+		     SELECT assigned_to FROM board_tasks WHERE board_id = ? AND `+holdsSlotSQL+` AND assigned_to IS NOT NULL
 		 )
 		 ORDER BY RANDOM()`, project, project)
 	if err != nil {
@@ -458,6 +458,10 @@ func (s *Store) NextPendingTaskForSubscriber(ctx context.Context, project, subsc
 	return nil
 }
 
+// holdsSlotSQL is true for a task that is its owner's one active task: in progress and not parked. A parked task is set aside on purpose (#4175 step 3), so its owner may claim another (#7819); it
+// keeps its status and owner, and unparking it gives the slot back (UnparkTask).
+const holdsSlotSQL = `status = 'in_progress' AND NOT ` + parkedSQL
+
 // ClaimTask finds and atomically claims the best pending task for the subscriber.
 // It first looks for tasks assigned to the subscriber, then unassigned tasks.
 // Tasks are ordered by priority (critical > high > medium > low), then by ID.
@@ -469,7 +473,7 @@ func (s *Store) ClaimTask(ctx context.Context, project, subscriberID string, req
 
 	var activeCount int
 	if err := s.db.GetContext(ctx, &activeCount,
-		`SELECT COUNT(*) FROM board_tasks WHERE board_id = ? AND assigned_to = ? AND status = 'in_progress'`,
+		`SELECT COUNT(*) FROM board_tasks WHERE board_id = ? AND assigned_to = ? AND `+holdsSlotSQL,
 		project, subscriberID); err == nil && activeCount > 0 {
 		return nil, fmt.Errorf("complete your current task before claiming a new one")
 	}
@@ -521,7 +525,7 @@ func (s *Store) ClaimTask(ctx context.Context, project, subscriberID string, req
 			`UPDATE board_tasks SET status = 'in_progress', assigned_to = ?, claimed_at = ?, last_activity_at = ?
 			 WHERE id = ? AND board_id = ? AND status = 'pending'
 			   AND (assigned_to = ? OR assigned_to IS NULL OR assigned_to = '')
-			   AND NOT EXISTS (SELECT 1 FROM board_tasks WHERE board_id = ? AND assigned_to = ? AND status = 'in_progress')`,
+			   AND NOT EXISTS (SELECT 1 FROM board_tasks WHERE board_id = ? AND assigned_to = ? AND `+holdsSlotSQL+`)`,
 			subscriberID, now, now, taskID, project, subscriberID, project, subscriberID)
 		if err != nil {
 			tx.Rollback()
@@ -530,7 +534,7 @@ func (s *Store) ClaimTask(ctx context.Context, project, subscriberID string, req
 		n, _ := result.RowsAffected()
 		if n == 0 {
 			var hasActive int
-			tx.GetContext(ctx, &hasActive, `SELECT COUNT(*) FROM board_tasks WHERE board_id = ? AND assigned_to = ? AND status = 'in_progress'`, project, subscriberID)
+			tx.GetContext(ctx, &hasActive, `SELECT COUNT(*) FROM board_tasks WHERE board_id = ? AND assigned_to = ? AND `+holdsSlotSQL, project, subscriberID)
 			tx.Rollback()
 			if hasActive > 0 {
 				return nil, fmt.Errorf("complete your current task before claiming a new one")
@@ -584,7 +588,7 @@ func (s *Store) TouchActiveTask(ctx context.Context, project, subscriberID strin
 		return nil
 	}
 	_, err := s.db.ExecContext(ctx, `UPDATE board_tasks SET last_activity_at = ?
-		WHERE board_id = ? AND assigned_to = ? AND status = 'in_progress'`, nowUTC(), project, subscriberID)
+		WHERE board_id = ? AND assigned_to = ? AND `+holdsSlotSQL, nowUTC(), project, subscriberID)
 	return err
 }
 

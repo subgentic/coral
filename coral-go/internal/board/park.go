@@ -54,14 +54,27 @@ func (s *Store) ParkTask(ctx context.Context, project string, id int64, reason s
 	return s.GetTask(ctx, project, id)
 }
 
-// UnparkTask clears a task's parking.
+// UnparkTask clears a task's parking. A task in progress takes its owner's active-task slot back (#7819); when the owner has claimed another task meanwhile and holds the slot, the unparked task
+// goes back to pending (the owner is kept) instead, so a member never has two tasks in progress: it is claimed next, after the one in hand.
 func (s *Store) UnparkTask(ctx context.Context, project string, id int64) (*Task, error) {
-	res, err := s.db.ExecContext(ctx, `UPDATE board_tasks SET parked_reason = NULL, parked_until = NULL WHERE board_id = ? AND id = ?`, project, id)
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	res, err := tx.ExecContext(ctx, `UPDATE board_tasks SET parked_reason = NULL, parked_until = NULL WHERE board_id = ? AND id = ?`, project, id)
 	if err != nil {
 		return nil, err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
 		return nil, sql.ErrNoRows
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE board_tasks SET status = 'pending' WHERE board_id = ? AND id = ? AND status = 'in_progress' AND assigned_to IS NOT NULL AND assigned_to != ''
+		AND EXISTS (SELECT 1 FROM board_tasks o WHERE o.board_id = board_tasks.board_id AND o.assigned_to = board_tasks.assigned_to AND o.id != board_tasks.id AND o.`+holdsSlotSQL+`)`, project, id); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
 	}
 	return s.GetTask(ctx, project, id)
 }
