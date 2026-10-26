@@ -9,7 +9,7 @@ assert.deepEqual(day, { hoursAgo: 24, since: '2026-10-25T12:00:00.000Z', sincePa
 assert.deepEqual(costRange('hour', NOW), { hoursAgo: 1, since: '2026-10-26T11:00:00.000Z', sinceParam: '?since=2026-10-26T11%3A00%3A00.000Z', interval: '5m', tsParams: '?since=2026-10-26T11%3A00%3A00.000Z&interval=5m' });
 assert.equal(costRange('week', NOW).hoursAgo, 168); assert.equal(costRange('week', NOW).interval, '1h');
 assert.equal(costRange('month', NOW).hoursAgo, 720); assert.equal(costRange('month', NOW).interval, '1d');
-assert.deepEqual(costRange('all', NOW), { hoursAgo: 24, since: '2026-10-25T12:00:00.000Z', sinceParam: '?since=2026-10-25T12%3A00%3A00.000Z', interval: '1d', tsParams: '?since=2026-10-25T12%3A00%3A00.000Z&interval=1d' }, 'all: 0 hours falls to the 24 hour default, as it did inline');
+assert.deepEqual(costRange('all', NOW), day, 'there is no all-time period (the page offers four): a name it does not know is the day, as before (#8366 dropped the dead entry)');
 assert.deepEqual(costRange('nonsense', NOW), day, 'an unknown period is the day');
 
 // each table's rows

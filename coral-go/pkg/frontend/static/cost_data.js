@@ -5,16 +5,16 @@ import { modelDisplayName } from './model_names.js';
 const THINKING_NAMES = { low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Extra high', max: 'Max' };
 function thinkingLevelName(level) { return level ? (THINKING_NAMES[level] || level) : 'Not reported'; }
 
-/** What a period (hour, day, week, month, all) asks for: its hours, the `since` stamp from `nowMs`, the query strings for the summary and the time series, and the series' interval. */
+/** What a period (hour, day, week, month) asks for: its hours, the `since` stamp from `nowMs`, the query strings for the summary and the time series, and the series' interval. */
 export function costRange(period, nowMs) {
     // Map period to a 'since' timestamp for the unified token-usage API
-    const sinceMap = { 'hour': 1, 'day': 24, 'week': 168, 'month': 720, 'all': 0 };
+    const sinceMap = { 'hour': 1, 'day': 24, 'week': 168, 'month': 720 };
     const hoursAgo = sinceMap[period] || 24;
     const since = hoursAgo > 0 ? new Date(nowMs - hoursAgo * 3600000).toISOString() : '';
     const sinceParam = since ? `?since=${encodeURIComponent(since)}` : '';
 
     // Choose time-series interval based on period
-    const intervalMap = { 'hour': '5m', 'day': '1h', 'week': '1h', 'month': '1d', 'all': '1d' };
+    const intervalMap = { 'hour': '5m', 'day': '1h', 'week': '1h', 'month': '1d' };
     const interval = intervalMap[period] || '1h';
     const tsParams = since
         ? `?since=${encodeURIComponent(since)}&interval=${interval}`

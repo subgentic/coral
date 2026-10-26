@@ -75,6 +75,12 @@ const { H1, H2, H3, STUB } = require('./helpers/artifact_versions_stub');
             await ev(`document.querySelector('#artifact-viewer .ac-card[data-id="1"] .ac-resolve').click(); true`);
             await waitFor(`window.__posts.length === 1`, `${at}: Resolve is sent`, 4000);
             assert.match(await ev(`window.__posts[0]`), new RegExp(`/api/artifacts/${H2}/comments/1/resolve$`), `${at}: to the version the comment was written on, not the one on show`);
+            // a reply to a carried comment is written on the version the comment was written on, too (#8366: nothing pinned it; the mutation "reply to the version on show" survived)
+            await ev(`document.querySelector('#artifact-viewer .ac-card[data-id="1"] .ac-replybox').click(); true`);
+            await waitFor(`!!document.querySelector('#artifact-viewer .ac-input')`, `${at}: the reply box opens`, 4000);
+            await ev(`(() => { const t = document.querySelector('#artifact-viewer .ac-input'); t.value = 'A reply to the carried comment'; t.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('#artifact-viewer .ac-send').click(); return true; })()`);
+            await waitFor(`window.__posts.length === 2`, `${at}: the reply is sent`, 4000);
+            assert.match(await ev(`window.__posts[1]`), new RegExp(`/api/artifacts/${H2}/comments$`), `${at}: the reply goes to the version the comment was written on, not the one on show`);
             await shot(`versions-comments-${w}`);
 
             console.log(`${at}: Compare: Changes, Side by side, back`);

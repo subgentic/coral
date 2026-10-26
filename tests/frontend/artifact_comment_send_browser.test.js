@@ -75,6 +75,10 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
             console.log(`${tag}: the action`);
             await open('ask-team');
             check(`${tag}: an open thread of the owner shows "Send to agent"; a reply and a resolved thread do not`, (await ev(`!!${sendBtn(1)}`)) && !(await ev(`!!${sendBtn(3)}`)) && !(await ev(`!!document.querySelector('.ac-card[data-id="1"] .ac-reply .ac-ask-open')`)));
+            // the resolved thread is not drawn until "Show resolved": the check above passed for want of a card (#8366: removing the resolved test from canAsk survived)
+            await ev(`document.querySelector('.ac-showresolved').click(); true`);
+            check(`${tag}: with the resolved threads shown, the resolved one is on the page and has no "Send to agent"`, (await ev(`!!document.querySelector('.ac-card[data-id="3"]')`)) && !(await ev(`!!${sendBtn(3)}`)));
+            await ev(`document.querySelector('.ac-showresolved').click(); true`);
             check(`${tag}: the agent's reply is a reply in the thread, labelled agent`, await ev(`!!document.querySelector('.ac-card[data-id="1"] .ac-reply .ac-kind') && document.querySelector('.ac-card[data-id="1"] .ac-reply .ac-kind').textContent === 'agent'`));
 
             console.log(`${tag}: the picker`);
