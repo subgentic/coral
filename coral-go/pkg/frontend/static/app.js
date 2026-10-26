@@ -710,11 +710,9 @@ function registerRouteHandlers() {
             }
             return;
         }
-        // The list: its filters are the URL's (startup already read them).
-        if (!opts.startup) {
-            setHistoryPage(deserializeFromUrl().page);
-            syncFilterDomToState();
-        }
+        // The list: its filters are the URL's (startup already read them). The search box and the filter controls show them on a start too: a local Coral no longer reads the chat list at start (#8195), so nothing else fills them.
+        if (!opts.startup) setHistoryPage(deserializeFromUrl().page);
+        syncFilterDomToState();
         if (state.currentSession && state.currentSession.type === 'history') state.currentSession = null; // Back closed the chat
         switchNavTab('history', { fromHistory: true });
     });
