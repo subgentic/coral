@@ -64,7 +64,7 @@ func (h *SessionsHandler) agentMayReachWaiting(w http.ResponseWriter, r *http.Re
 		errForbidden(w, "An agent can't use this for an agent of another team: an Orchestrator may use it for the agents of its own team")
 		return false
 	}
-	if h.bs == nil {
+	if h.bs == nil || owner == nil {
 		return deny()
 	}
 	caller, err := h.bs.GetSubscriptionBySessionName(r.Context(), owner.SessionName)

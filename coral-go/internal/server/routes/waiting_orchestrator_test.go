@@ -28,6 +28,7 @@ type waitingTeamEnv struct {
 	srv     *httptest.Server
 	mock    *mockSessionTerminal
 	handler *SessionsHandler
+	ss      *store.SessionStore
 	term    *screenTerminal
 	tokens  map[string]string // by member
 	sids    map[string]string
@@ -51,7 +52,7 @@ func newWaitingTeamEnv(t *testing.T) *waitingTeamEnv {
 	ss := store.NewSessionStore(db)
 	stubCLIPaths(t, ss)
 
-	e := &waitingTeamEnv{t: t, mock: mock, handler: h, tokens: map[string]string{}, sids: map[string]string{}, names: map[string]string{}, boardOf: map[string]string{}}
+	e := &waitingTeamEnv{t: t, mock: mock, handler: h, ss: ss, tokens: map[string]string{}, sids: map[string]string{}, names: map[string]string{}, boardOf: map[string]string{}}
 	members := []struct{ who, title, board, sid string }{
 		{"Lead", "Orchestrator", "alpha", "aaaaaaaa-0000-4000-8000-000000000001"},
 		{"Worker", "Backend", "alpha", "aaaaaaaa-0000-4000-8000-000000000002"},
@@ -182,6 +183,9 @@ func TestTheWaitingHandlersRefuseANonOrchestratorAgentOnTheirOwn(t *testing.T) {
 	r := chi.NewRouter()
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			if req.Header.Get("X-Test-Nil") != "" { // an agent's request whose verified session is nil
+				req = req.WithContext(context.WithValue(req.Context(), verifiedSessionKey{}, (*store.SessionTokenOwner)(nil)))
+			}
 			if who := req.Header.Get("X-Test-Who"); who != "" {
 				req = req.WithContext(context.WithValue(req.Context(), verifiedSessionKey{}, &store.SessionTokenOwner{SessionID: e.sids[who], SessionName: e.names[who]}))
 			}
@@ -206,6 +210,40 @@ func TestTheWaitingHandlersRefuseANonOrchestratorAgentOnTheirOwn(t *testing.T) {
 	assert.Equal(t, http.StatusForbidden, get("Lead", "OtherWorker"), "an orchestrator, another team's member")
 	assert.Equal(t, http.StatusOK, get("Lead", "Worker"), "an orchestrator, its own member")
 	assert.Equal(t, http.StatusOK, get("", "Worker"), "no agent's token (the Operator's dashboard and command line) is not asked")
+
+	// a caller and a target that are live sessions on no board at all: a refusal, not the Recoverer's 500 (#8582)
+	for i, who := range []string{"GhostA", "GhostB"} {
+		sid := "cccccccc-0000-4000-8000-00000000000" + string(rune('1'+i))
+		require.NoError(t, e.ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentName: who, AgentType: "claude", WorkingDir: t.TempDir()}))
+		e.sids[who], e.names[who] = sid, naming.SessionName("claude", sid)
+		e.mock.addSession(e.names[who], "/tmp/"+who)
+	}
+	assert.Equal(t, http.StatusForbidden, get("GhostA", "GhostB"), "an unsubscribed caller, an unsubscribed target (look)")
+	post := func(who, target string) int {
+		req, _ := http.NewRequestWithContext(ctx, http.MethodPost, srv.URL+"/api/sessions/live/"+e.names[target]+"/waiting/send", strings.NewReader(`{"agent_type":"claude","session_id":"`+e.sids[target]+`"}`))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Test-Who", who)
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		resp.Body.Close()
+		return resp.StatusCode
+	}
+	assert.Equal(t, http.StatusForbidden, post("GhostA", "GhostB"), "an unsubscribed caller, an unsubscribed target (send)")
+	assert.Equal(t, http.StatusForbidden, post("Lead", "GhostB"), "an orchestrator, a target on no board")
+	assert.Equal(t, http.StatusForbidden, post("GhostA", "Worker"), "an unsubscribed caller, a member")
+	// a nil verified session: a refusal, not a panic
+	for _, method := range []string{http.MethodGet, http.MethodPost} {
+		url := srv.URL + "/api/sessions/live/" + e.names["Worker"] + "/waiting"
+		if method == http.MethodPost {
+			url += "/send"
+		}
+		req, _ := http.NewRequestWithContext(ctx, method, url+"?agent_type=claude&session_id="+e.sids["Worker"], strings.NewReader(`{"agent_type":"claude","session_id":"`+e.sids["Worker"]+`"}`))
+		req.Header.Set("X-Test-Nil", "1")
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err, method+": the handler panicked")
+		resp.Body.Close()
+		assert.Equal(t, http.StatusForbidden, resp.StatusCode, method)
+	}
 }
 
 // Every route an Orchestrator may use is an operator-only route (so every other agent is refused by the same table), and is not served through the Hub's tunnel.
