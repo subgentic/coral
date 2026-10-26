@@ -1,7 +1,6 @@
 package main
 
 import (
-	"os"
 	"os/exec"
 
 	"github.com/subgentic/coral/internal/windowmark"
@@ -32,8 +31,6 @@ func otherTrayPID(dataDir string, self int, restarting bool, readPID func(string
 func handOver(pid int, ask func(pid int) error) bool {
 	return ask(pid) == nil
 }
-
-var selfPID = os.Getpid
 
 // trackWindow records that the native window process is open (windowmark) and, when it exits, clears the record if it was the person who closed it: isCurrent says the tray has
 // not let go of the process itself (killCoralApp does, before it ends the window for an update or Quit, and then the record stays so the relaunch opens the window again).
