@@ -5,7 +5,7 @@ import { openTask } from './task_navigation.js';
  * Lazy: message_board.js imports it when the Goals face is chosen. */
 import { state } from './state.js';
 import { boardFetch, keyLabel, splitKey, LOCAL_SERVER } from './server_base.js';
-import { setRowCurrent, OPERATOR_ID, showToast } from './utils.js';
+import { OPERATOR_ID, showToast } from './utils.js';
 import { browserLocal } from './safe_storage.js';
 import { onGoalsSeq } from './goals_feed.js';
 import { pollEvery } from './overload.js';
@@ -119,20 +119,6 @@ const taskTotal = (goal, t) => Math.max(t.rows.length, goal ? goal.rollup.done +
 const goalById = (id) => model.goals.find(g => g.id === id);
 const visible = () => model.goals.filter(g => W.keepsGoal(model.filter, g) && (!model.goalSearch.trim() || String(g.title || '').toLowerCase().includes(model.goalSearch.trim().toLowerCase())));
 
-/** The live agent on this computer that is a task's assignee, or null (the button then says it is not running here). */
-function agentFor(task) {
-    const live = state.liveSessions || [];
-    if (task.sessionId) { const bySession = live.find(s => s && s.session_id === task.sessionId); if (bySession) return bySession; }
-    const name = task.assignee;
-    if (!name) return null;
-    return live.find(s => s && (s.board_project === model.project || !s.board_project) && (s.display_name === name || s.name === name)) || null;
-}
-
-function openAgent(session) {
-    window.switchNavTab?.('agents');
-    window.selectLiveSession?.(session.name, session.agent_type, session.session_id, session.server);
-}
-
 // ── drawing ──────────────────────────────────────────────────────────────
 
 function stateChip(goal) {
@@ -148,145 +134,8 @@ function rollupBar(rollup) {
     return bar;
 }
 
-function goalCard(goal) {
-    const li = el('li', 'goal-item');
-    const b = el('button', 'row-btn goal-card'); b.type = 'button'; b.dataset.goalId = String(goal.id);
-    const top = el('span', 'goal-card-top');
-    top.append(el('span', 'goal-card-title', goal.title || `Goal ${goal.id}`), stateChip(goal));
-    b.append(top);
-    const meta = W.driverLine(goal.driver, whenText(goal.updatedAt));
-    if (meta) b.append(el('span', 'goal-card-meta', meta));
-    b.append(rollupBar(goal.rollup), el('span', 'goal-card-sentence', W.readyToClose(goal) ? W.readySentence(W.rollupSentence(goal.rollup)) : W.rollupSentence(goal.rollup)));
-    b.addEventListener('click', () => openGoal(goal.id, true));
-    li.append(b);
-    setRowCurrent(li, goal.id === model.openId);
-    return li;
-}
-
-function drawListRaw() {
-    const col = root.querySelector('.goals-list-col'); if (!col) return;
-    col.replaceChildren();
-    const counts = W.filterCounts(model.goals);
-    const chips = el('div', 'goals-chips'); chips.setAttribute('role', 'group'); chips.setAttribute('aria-label', 'Show goals that are');
-    for (const f of W.FILTERS) {
-        const c = btn('goals-chip', `${W.filterLabel(f)} ${counts[f]}`, () => { model.filter = f; say(W.filterAnnouncement(f, counts[f])); drawList(); });
-        c.setAttribute('aria-pressed', String(model.filter === f)); c.dataset.filter = f;
-        if (!counts[f] && f !== 'all') c.classList.add('goals-chip-zero'); // still pressable, quieter than the chips that have goals
-        chips.append(c);
-    }
-    root.querySelector('.goals-chips-host')?.replaceChildren(chips); // the filter row spans the page, above both columns (#7404)
-    if (model.failed) {
-        const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert');
-        f.append(el('span', null, `${model.failed}${model.goals.length ? ` (${W.asOfText(model.asOf)})` : ''}`), btn('btn btn-small', 'Try again', loadGoals));
-        col.append(f);
-    }
-    if (model.loading) { col.append(el('p', 'goals-note', 'Loading goals…')); return; }
-    if (!model.goals.length) {
-        if (!model.failed) {
-            const e = el('div', 'goals-empty');
-            e.append(el('p', null, W.noGoalsText)); // the header's New goal is the one button; no command line for a person (#7224)
-            col.append(e);
-        }
-        return;
-    }
-    const shown = visible();
-    if (!shown.length) {
-        const fe = W.filteredEmpty(model.filter, model.goals.length);
-        const e = el('div', 'goals-empty'); e.append(el('p', null, fe.text), btn('btn', fe.action, () => { model.filter = 'all'; say(W.filterAnnouncement('all', model.goals.length)); drawList(); }));
-        col.append(e);
-        return;
-    }
-    const ul = el('ul', 'goals-ul'); ul.setAttribute('aria-label', `Goals, ${shown.length}`);
-    for (const g of shown) ul.append(goalCard(g));
-    col.append(ul);
-}
-
-/** The board detail uses the shared task title and table sizing, including its narrow layout. */
-function detailTasks(g, rows) {
-    const byId = new Map(rows.map(t => [t.id, t]));
-    const tweak = columns => {
-        const taskCell = columns[0].cell;
-        columns[0].cell = t => { const cell = taskCell(t); cell.querySelector('.dt-primary').classList.add('goal-open-task'); return cell; };
-        columns.splice(1, 0, { key: 'who', label: 'Assigned to', line: 2, cell: t => {
-            const task = byId.get(t.id), text = [task.assignee, task.statusLine].filter(Boolean).join(' · ');
-            return text ? DT.el('span', 'dt-secondary', text) : '';
-        } });
-        columns.push({ key: 'agent', label: 'Agent', line: 2, cell: t => {
-            const task = byId.get(t.id), session = W.taskStateWord(task.state) !== 'Done' && agentFor(task);
-            if (!session) return '';
-            const action = btn('btn btn-small dt-action goal-open-agent', 'Open the agent', () => openAgent(session));
-            action.setAttribute('aria-label', `Open the agent for task #${t.id}`); return action;
-        } });
-    };
-    return TV.tasksTable('goal-page', rows.map(taskOf), { label: `Tasks of ${g.title}`, tweak, sortBar: false, rowName: undefined,
-        open: t => openTask(model.project, t.id) }).el;
-}
-
 /** Focus goes to the detail as a whole when a goal opens (its name is read: the goal's title), not to a heading that cannot be typed in: no ring is drawn round words (#7404). */
 function focusDetail() { root?.querySelector(layout === 'page' ? '#goals-detail-title' : '.goals-detail-col')?.focus({ preventScroll: true }); }
-
-function drawDetailRaw() {
-    const col = root.querySelector('.goals-detail-col'); if (!col) return;
-    col.replaceChildren();
-    const g = goalById(model.openId);
-    if (!g) { col.classList.add('goals-detail-none'); col.removeAttribute('aria-labelledby'); col.setAttribute('aria-label', 'Goal detail'); return; }
-    col.classList.remove('goals-detail-none');
-    col.removeAttribute('aria-label'); col.setAttribute('aria-labelledby', 'goals-detail-title'); // an open goal's region is named by its title
-    const back = btn('goals-back', '\u2190 Goals', () => closeGoal());
-    col.append(back);
-    const h = el('h3', 'goals-detail-title', g.title); h.id = 'goals-detail-title';
-    const line = el('div', 'goals-detail-line'); line.append(stateChip(g)); const meta = W.driverLine(g.driver, whenText(g.updatedAt)); if (meta) line.append(el('span', 'goal-card-meta', meta));
-    let act = null;
-    if (W.isOpenGoal(g)) { act = btn('btn btn-small goals-close', 'Close goal', () => openClose(g)); act.setAttribute('aria-label', `Close goal: ${g.title}`); } // the dialog's own button is plain "Close goal": the two have different names (the visible words start both)
-    else if (W.isClosedGoal(g)) { act = btn('btn btn-small goals-reopen', 'Reopen', () => reopenGoal(g)); act.setAttribute('aria-label', `Reopen: ${g.title}`); }
-    const titleRow = el('div', 'goals-detail-head'), titleText = el('div', 'goals-detail-head-text');
-    titleText.append(h, line); titleRow.append(titleText); if (act) titleRow.append(act); // Close goal sits at the right of the title row
-    col.append(titleRow);
-    if (g.outcome || g.doneWhen) { // side by side when the detail is wide enough (css), stacked when not
-        const two = el('div', 'goals-two');
-        if (g.outcome) { const d = el('div'); d.append(el('h4', 'goals-sub', 'Outcome'), el('p', 'goals-text', g.outcome)); two.append(d); }
-        if (g.doneWhen) { const d = el('div'); d.append(el('h4', 'goals-sub', 'Done when'), el('p', 'goals-text', g.doneWhen)); two.append(d); }
-        col.append(two);
-    }
-    // "9 tasks: 5 done, ..." (#7878): the count is a link to the team Tasks tab with this goal chosen (its address /team/<name>/tasks?goal=<id>, #7782)
-    const sentence = el('p', 'goal-card-sentence'), said = /^(\d+ tasks?)(: .*)$/.exec(W.rollupSentence(g.rollup));
-    if (said) {
-        const link = btn('goals-tasks-link', said[1], () => window.openTeamPage?.(model.project, { tab: 'tasks', query: `goal=${g.id}` }));
-        link.setAttribute('aria-label', `${said[1]}: show them in the Tasks tab`);
-        sentence.append(link, document.createTextNode(said[2]));
-    } else sentence.textContent = W.rollupSentence(g.rollup);
-    col.append(rollupBar(g.rollup), sentence);
-    const openLeft = g.rollup.active + g.rollup.blocked + g.rollup.queued;
-    if ((g.state === 'done' || g.state === 'dropped') && openLeft) col.append(el('p', 'goals-note goals-closed-open', W.closedWithOpenText(openLeft)));
-    if (W.readyToClose(g) && !isNotYet(g)) { col.append(allDoneStrip(g)); announceAllDone(g); }
-    const tasks = model.tasks.get(g.id);
-    if (!(tasks && tasks.rows && !tasks.rows.length)) col.append(el('h4', 'goals-sub', 'Tasks')); // a goal with no tasks says "No tasks yet" once, under its title (#7224)
-    if (!tasks) col.append(el('p', 'goals-note', 'Loading tasks…'));
-    else if (tasks.failed !== undefined) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, W.failedText(tasks.failed).replace('Goals', 'Tasks')), btn('btn btn-small', 'Try again', () => loadTasks(g.id))); col.append(f); }
-    else if (!tasks.rows.length) { /* said by the rollup sentence above */ }
-    else {
-        const live = tasks.rows.filter(t => W.taskStateWord(t.state) !== 'Done'), idle = live.filter(t => W.taskStateWord(t.state) === 'Queued' && !t.assignee); // nobody has taken these: a task whose agent runs on another computer is not one of them (UI/UX's review of #7404)
-        if (idle.length) col.append(el('p', 'goals-note goals-nobody', W.nobodyWorkingText(idle.length, live.length)));
-        col.append(detailTasks(g, tasks.rows.slice(0, tasks.shown)));
-        const total = taskTotal(g, tasks), left = Math.max(tasks.rows.length - tasks.shown, 0) || (tasks.cursor ? Math.max(total - tasks.shown, 1) : 0);
-        if (left) col.append(btn('btn goals-more', W.showMoreText(left, PAGE), () => showMoreTasks(g.id)));
-        if (tasks.moreFailed) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, tasks.moreFailed)); col.append(f); }
-        if (left || tasks.shown < total) col.append(el('p', 'goals-note', !left && !tasks.cursor ? W.tasksCappedText(Math.min(tasks.shown, tasks.rows.length), total) : W.tasksShownText(Math.min(tasks.shown, tasks.rows.length), total)));
-    }
-}
-
-function drawHead() {
-    const head = root.querySelector('.goals-head'); if (!head) return;
-    head.replaceChildren();
-    const left = el('div', 'goals-head-text');
-    const h = el('h2', 'goals-title', 'Goals'); h.tabIndex = -1;
-    left.append(h, el('p', 'goals-subtitle', W.goalsSubtitle), el('p', 'goals-sub-line', `This board only · ${W.goalCountLine(model.goals.length)}`));
-    if (state.hubConnected || window.__goalsHub) left.append(el('p', 'goals-note', W.otherBoardsNote));
-    head.append(left, btn('btn btn-primary goals-new', 'New goal', () => openCreate()));
-    if (model.noGoalOpen > 0) left.append(el('p', 'goals-note goals-no-goal', W.noGoalTasksText(model.noGoalOpen))); // hidden while the route does not give the number
-    if (model.requireGoal) head.after(Object.assign(el('p', 'goals-note goals-require'), { textContent: W.requireGoalNote }));
-    else root.querySelector('.goals-require')?.remove();
-}
 
 /** Redraw a column and give the keyboard its place back: the control that had focus (a chip by its filter, a card by its goal, anything else by its class and words) is found again in the new draw; when it is gone ("Show all" and "Try again" go when they work) focus goes to the pressed chip, never to the page. */
 function keepFocus(col, redraw) {
@@ -299,8 +148,8 @@ function keepFocus(col, redraw) {
     (same || col.querySelector('.goals-chip[aria-pressed="true"]') || (col.classList.contains('goals-detail-col') ? col : col.querySelector('#goals-detail-title')))?.focus({ preventScroll: true }); // gone because it worked: the pressed chip in the list, the goal's heading in the detail
 }
 
-const drawList = () => (layout === 'page' ? drawPage() : keepFocus(root, drawListRaw)); // the chips are above the list column: the keyboard is looked for in both
-const drawDetail = () => (layout === 'page' ? drawPage() : keepFocus(root && root.querySelector('.goals-detail-col'), drawDetailRaw));
+const drawList = () => drawPage(); // the chips are above the list column: the keyboard is looked for in both
+const drawDetail = () => drawPage();
 
 // ── the team page's Goals tab (#7453): a table of the goals; a goal's own page with its tasks as a table ────────────────
 
@@ -525,9 +374,7 @@ function drawGoalPageRaw(col) {
 
 function draw() {
     if (!root) return;
-    if (layout === 'page') { drawPage(); return; }
-    drawHead(); drawList(); drawDetail();
-    root.classList.toggle('goals-open', !!model.openId && !!goalById(model.openId));
+    drawPage();
 }
 
 /** Open a goal (focus moves to its heading when asked: a person chose it) and read its tasks. */
@@ -685,26 +532,14 @@ function openClose(g, preset) {
 /** Show the board's goals in `host` (the page's #mb-goals) and read them. */
 export function showGoals(host, project, opts = {}) {
     if (project !== model.project) { goalsTableState = DT.tableState(); Object.assign(model, { project, sig: '', goals: [], requireGoal: false, noGoalOpen: null, filter: 'all', openId: 0, tasks: new Map(), failed: '', asOf: '', loading: false, taskSearch: '', screen: 'goal' }); }
-    layout = opts.page ? 'page' : 'cards';
-    hooks = opts.page ? (opts.hooks || {}) : {};
-    const kind = opts.page ? 'page' : 'cards';
-    if (host.dataset.built !== kind) {
-        host.dataset.built = kind;
-        if (kind === 'page') { // the team page's Goals tab (#7453): the status line for a screen reader, and one body that is the table or a goal's page
-            const page = el('div', 'goals-page goals-table-page');
-            const status = el('div', 'goals-status sr-only'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
-            page.append(status, el('div', 'goals-body'));
-            host.replaceChildren(page);
-        } else {
-        const page = el('div', 'goals-page');
+    layout = 'page';
+    hooks = opts.hooks || {};
+    if (host.dataset.built !== 'page') { // the team page's Goals tab (#7453): the status line for a screen reader, and one body that is the table or a goal's page
+        host.dataset.built = 'page';
+        const page = el('div', 'goals-page goals-table-page');
         const status = el('div', 'goals-status sr-only'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
-        const cols = el('div', 'goals-cols');
-        const listCol = el('section', 'goals-list-col'), detailCol = el('section', 'goals-detail-col');
-        listCol.setAttribute('aria-label', 'Goals'); detailCol.setAttribute('aria-label', 'Goal detail'); detailCol.id = 'goals-detail'; detailCol.tabIndex = -1; // the detail takes the focus when a goal opens
-        cols.append(listCol, detailCol);
-        page.append(el('div', 'goals-head'), status, el('div', 'goals-chips-host'), cols);
+        page.append(status, el('div', 'goals-body'));
         host.replaceChildren(page);
-        }
     }
     root = host.querySelector('.goals-page');
     host.hidden = false;

@@ -48,7 +48,7 @@ const HEX = 'c'.repeat(64);
         await l2;
         await coralReady();
         const POST = '#team-page-view .mb-message-body'; // /board/<team> opens the team page (#8129)
-        await until(`document.querySelectorAll('${POST} a').length >= 3 && !!document.querySelector('#mb-subscribers-sheet-list .subscriber-history-link, .subscriber-history-link')`, 'the post and the subscriber');
+        await until(`document.querySelectorAll('${POST} a').length >= 3`, 'the post');
 
         const themes = async theme => {
             await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'settings_core.js'); m.clearCustomThemeVars(); m.applyTheme('${theme}'); return true; })()`);
@@ -57,21 +57,18 @@ const HEX = 'c'.repeat(64);
                 const accent = getComputedStyle(document.documentElement).getPropertyValue('--link-text').trim(); // the light theme's link text is darker than its accent (#5273)
                 const h = accent.replace('#', ''); const want = 'rgb(' + [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16)).join(', ') + ')';
                 const links = [...document.querySelectorAll('${POST} a')].map(a => ({ text: a.textContent, color: getComputedStyle(a).color }));
-                const sub = document.querySelector('#mb-subscribers-sheet-list .subscriber-history-link');
-                return { want, links, sub: sub && { tag: sub.tagName, href: sub.getAttribute('href'), color: getComputedStyle(sub).color } };
+                return { want, links };
             })()`);
         };
         for (const theme of ['dark', 'light']) {
             const t = await themes(theme);
             check(`${theme}: every link in the post has the theme's link colour`, t.links.length >= 3 && t.links.every(l => l.color === t.want), JSON.stringify(t));
-            check(`${theme}: the subscriber's name too`, !!t.sub && t.sub.color === t.want, JSON.stringify(t.sub));
             if (shots) {
                 fs.mkdirSync(shots, { recursive: true });
                 await Emulation.setDeviceMetricsOverride({ width: 1280, height: 720, deviceScaleFactor: 2, mobile: false });
                 await ev(`new Promise(r => setTimeout(() => r(true), 250))`); // sleep-ok: layout after the resize
                 const clip = await ev(`(() => { const a = document.querySelector('${POST}').closest('.mb-message') || document.querySelector('${POST}');
-                    const s = document.querySelector('#mb-subscribers-sheet-list .subscriber-history-link').closest('li') || document.querySelector('#mb-subscribers-sheet-list .subscriber-history-link');
-                    const r1 = a.getBoundingClientRect(), r2 = s.getBoundingClientRect();
+                    const r1 = a.getBoundingClientRect(), r2 = r1;
                     const x = Math.max(0, Math.min(r1.left, r2.left) - 8), y = Math.max(0, Math.min(r1.top, r2.top) - 8);
                     return { x, y, width: Math.min(innerWidth - x, Math.max(r1.right, r2.right) - x + 8), height: Math.max(r1.bottom, r2.bottom) - y + 8, scale: 1 }; })()`);
                 const shot = await Page.captureScreenshot({ format: 'png', clip });
@@ -79,9 +76,6 @@ const HEX = 'c'.repeat(64);
                 await Emulation.setDeviceMetricsOverride(VIEW); // back to the test's window
             }
         }
-
-        const sub = await ev(`(() => { const b = document.querySelector('#mb-subscribers-sheet-list .subscriber-history-link'); return { tag: b.tagName, type: b.getAttribute('type'), href: b.getAttribute('href') }; })()`);
-        check("the subscriber's name is a button, with no javascript: href", sub.tag === 'BUTTON' && sub.type === 'button' && sub.href === null, JSON.stringify(sub));
 
         const hover = await ev(`(() => { const a = document.querySelector('${POST} a'); const st = document.createElement('style');
             return getComputedStyle(a).textDecorationLine; })()`);

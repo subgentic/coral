@@ -215,7 +215,6 @@
 1	message_board.js	checkbox
 1	message_board.js	externalMessageBadge(m)
 1	message_board.js	hubUserBadge(m)
-1	message_board.js	icon
 1	message_board.js	messageAttachmentAttrs(m)
 1	message_board.js	messageAttachmentsHtml(m)
 1	message_board.js	messageTimeHtml(m.created_at)

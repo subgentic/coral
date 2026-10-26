@@ -45,17 +45,6 @@ export function taskStatusWord(status, review) {
 /** The class that colours a state's dot (the goal chips' classes, shared). */
 export const statusClass = (w) => `goal-state-task-${({ 'In progress': 'active', 'In review': 'active' }[w] || w).toLowerCase()}`;
 
-/** "9 tasks: 5 done, 2 active, 1 blocked, 1 queued"; "1 task: 1 done"; "No tasks yet". Zero counts are left out. `rollup` is {done, active, blocked, queued}. */
-export function rollupSentence(rollup) {
-    const r = rollup || {};
-    const parts = [['done', r.done], ['active', r.active], ['blocked', r.blocked], ['queued', r.queued]].map(([w, n]) => [w, Math.max(0, Number(n) || 0)]);
-    const total = parts.reduce((a, [, n]) => a + n, 0);
-    if (!total) return 'No tasks yet';
-    return `${plural(total, 'task', 'tasks')}: ${parts.filter(([, n]) => n).map(([w, n]) => `${n} ${w}`).join(', ')}`;
-}
-
-/** The header's count line: "5 goals"; "1 goal"; "No goals yet". */
-export const goalCountLine = (total) => total ? plural(total, 'goal', 'goals') : 'No goals yet';
 
 /** What the page's status region says once after a chip is pressed: "Showing all 5 goals", "Showing 1 blocked goal", "No dropped goals". */
 export function filterAnnouncement(which, count) {
@@ -76,10 +65,8 @@ export const tasksShownText = (shown, total) => `Showing ${shown} of ${total} ta
 /** The goal page's count of the tasks made as follow-ups of another task that are still open (#7816, the server's follow_ups_open). */
 export const followUpsOpenText = (n) => (n === 1 ? '1 follow-up open' : `${n} follow-ups open`);
 /** Under the list when the route sent fewer tasks than the goal's rollup counts (its cap): honest about it, and where the rest are. */
-export const tasksCappedText = (shown, total) => `Showing ${shown} of ${total} tasks. The rest are on the Tasks panel.`;
 
 /** One line over a goal's open tasks when no agent on this computer works on some of them (said once, not on every row): "Nobody is working on these yet", or "Nobody is working on 2 of these yet". */
-export const nobodyWorkingText = (idle, open) => (idle >= open ? 'Nobody is working on these yet' : `Nobody is working on ${idle} of these yet`);
 
 /** The failed read: "Goals could not be read: <reason>", and the line that marks a list kept on screen from before: "as of 14:32". */
 export const failedText = (reason) => { const r = String(reason || '').trim(); return r ? `Goals could not be read: ${r}` : 'Goals could not be read'; };
@@ -95,8 +82,6 @@ export function driverLine(driver, when) {
 const ERRORS = { goal_title_required: 'A goal needs a title.', goal_text_too_long: 'That is too long: shorten it and try again.', goal_driver_unknown: 'That driver is not on this board.', goal_bad_state: 'That state is not one a goal can have.', goal_not_found: 'That goal is no longer on this board.', goal_closed: 'That goal is closed.', goal_already_closed: 'That goal is already closed.', goal_blocked_on_required: 'A blocked goal says who it waits for.', goal_required: 'This board needs a goal on every task.', local_only: 'This can only be done on this computer.' };
 export const errorWords = (code, sentence) => ERRORS[code] || String(sentence || '').trim() || 'try again';
 
-/** The one line under the Goals heading, and the help under the New goal dialog's Driver. */
-export const goalsSubtitle = 'What the team is working toward. Tasks serve a goal.';
 export const driverHelp = 'Driver: the agent who looks after it';
 
 /** A goal that is Closed with tasks still open, said on its page (the close answers with the count, and does not touch them). */
@@ -125,8 +110,6 @@ export function filterCounts(goals) {
 }
 
 
-/** The line under the Goals page's heading when open tasks serve no goal (#7253). */
-export const noGoalTasksText = (n) => `${n} ${n === 1 ? 'task serves' : 'tasks serve'} no goal`;
 /** The same fact as the Goals table's last row (#7717): it is a row of the table, which opens the team's Tasks. */
 export const noGoalRowText = (n) => `${n} ${n === 1 ? 'task has' : 'tasks have'} no goal`;
 
@@ -161,7 +144,6 @@ export const allDoneAsk = (doneWhen) => `${doneWhen ? `Done when: ${doneWhen}. `
 export const notYetHint = 'Not yet hides this until a task is added.';
 export const notYetSaid = 'Hidden until a task is added.';
 /** A closed-ready goal's card sentence: the rollup's, and a quiet "ready to close?". */
-export const readySentence = (sentence) => `${sentence} · ready to close?`;
 export const closeReasonHint = '300 characters at most.';
 /** Said once, politely, when the all-done strip first appears for a goal. */
 export const allDoneSaid = (n, title) => `All ${n} ${n === 1 ? 'task' : 'tasks'} of ${title} ${n === 1 ? 'is' : 'are'} done`;

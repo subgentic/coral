@@ -116,21 +116,7 @@ const { removeBoards, removeTeams } = require('./helpers/board_cleanup');
         // The shared confirm dialog is untouched by all that: it still has its message and its Yes (#3701).
         check('after Export, the shared confirm dialog still has its message and Yes button', await ev(`!!document.getElementById('confirm-modal-message') && !!document.getElementById('confirm-modal-yes') && !!document.getElementById('confirm-modal-title')`));
 
-        // ── Subscribers sheet ──────────────────────────────────────────────
-        const sheetOpen = () => ev(`getComputedStyle(document.getElementById('mb-subscribers-sheet')).display !== 'none'`);
-        await ev(`document.querySelector('[data-on-click="mb-subscribers"]').click(); true`);
-        await until(`getComputedStyle(document.getElementById('mb-subscribers-sheet')).display !== 'none'`, 'the sheet');
-        const opened = await sheetOpen();
-        await ev(`document.querySelector('#mb-subscribers-sheet .modal-content, #mb-subscribers-sheet > div').click(); true`);
-        const insideKept = await sheetOpen();
-        await ev(`document.getElementById('mb-subscribers-sheet').dispatchEvent(new MouseEvent('click', { bubbles: true })); true`);
-        const backdropClosed = !(await sheetOpen());
-        await ev(`document.querySelector('[data-on-click="mb-subscribers"]').click(); true`);
-        await until(`getComputedStyle(document.getElementById('mb-subscribers-sheet')).display !== 'none'`, 'the sheet again');
-        await ev(`document.querySelector('[data-on-click="mb-subscribers-close"]').click(); true`);
-        check('Subscribers opens the sheet; a click inside keeps it; its backdrop and Close close it', opened && insideKept && backdropClosed && !(await sheetOpen()), `${opened}/${insideKept}/${backdropClosed}`);
-        const hist = await ev(`(() => { const l = document.querySelector('[data-on-click="mb-subscriber-history"]'); return l ? { s: l.dataset.session, n: l.dataset.name } : null; })()`);
-        check('a subscriber\'s history link carries its session as data, not code', !!hist && hist.s === agent.session_name, JSON.stringify(hist));
+        // The Members sheet and a subscriber's history link are gone (#8129): the members are the team page's Agents tab.
 
         // ── Pause, delete a message, delete the board (refused) ────────────
         const pauseText = () => ev(`document.getElementById('mb-pause-btn').textContent.trim()`);
@@ -177,7 +163,7 @@ const { removeBoards, removeTeams } = require('./helpers/board_cleanup');
         const still = await boardListed();
         check('with nothing running, deleting the board asks first; without a Yes it stays', (await ev(`window.__confirmModal`)) === 'Delete Board' && still, JSON.stringify({ modal: await ev(`window.__confirmModal`), still }));
 
-        const inline = await ev(`[...document.querySelectorAll('#messageboard-view *, #mb-subscribers-sheet *')].flatMap(el => [...el.attributes].filter(a => /^on/i.test(a.name)).map(a => el.tagName + '.' + el.className + ' ' + a.name))`);
+        const inline = await ev(`[...document.querySelectorAll('#messageboard-view *, #team-page-view *')].flatMap(el => [...el.attributes].filter(a => /^on/i.test(a.name)).map(a => el.tagName + '.' + el.className + ' ' + a.name))`);
         check('no inline handler left in the board view or its sheet', inline.length === 0, JSON.stringify(inline.slice(0, 5)));
     } catch (e) {
         check('the test ran', false, e.stack || String(e));

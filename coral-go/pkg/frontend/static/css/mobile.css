@@ -548,7 +548,6 @@
         max-width: 100%;
     }
     #messageboard-view .mb-header-end { display: inline-flex; align-items: center; gap: 4px; flex: none; } /* Members (#7988) */
-    #messageboard-view .mb-subscribers-list .subscriber-history-link, #mb-subscribers-sheet .subscriber-history-link { min-height: var(--control-touch-height, 44px); display: inline-flex; align-items: center; } /* a name is a touch target (#6566) */
 
     /* Message board full-screen on mobile */
     #messageboard-view {
