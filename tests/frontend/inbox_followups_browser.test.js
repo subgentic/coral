@@ -63,9 +63,9 @@ const AGENTS = (waiting) => waiting ? [
                     assert.deepEqual(r, { ph: 'Search', name }, group);
                 }
             });
-            if (!mobile) await step('opening a group by its header starts at its heading', async () => {
+            if (!mobile) await step('opening a group by its header starts at the page search box', async () => {
                 await ev(`document.querySelector('${pane} .view-list-item[data-key="tasks"]').click(); true`); await settle(400);
-                assert.equal((await active()).id, 'group-table-title');
+                assert.equal((await active()).id, 'inbox-tk-search', "the page's own search box has the focus (#8603: the first control of the toolbar), not the heading");
             });
             const click = async (what, sel) => { const ok = await ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return false; e.click(); return true; })()`); assert.ok(ok, `${what}: no ${sel}`); };
             const escape = () => ev(`(document.activeElement || document.body).dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); true`);
