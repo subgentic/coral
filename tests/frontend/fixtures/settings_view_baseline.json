@@ -34,11 +34,6 @@
     "js": 0,
     "html": 1
   },
-  "pw-input-row": {
-    "css": 1,
-    "js": 1,
-    "html": 0
-  },
   "net-group-head": {
     "css": 6,
     "js": 2,
@@ -97,7 +92,7 @@
   "launch-field-*": {
     "css": 3,
     "js": 6,
-    "html": 7
+    "html": 6
   },
   "__families": [
     "health-form",
