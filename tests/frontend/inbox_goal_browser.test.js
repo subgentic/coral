@@ -46,7 +46,7 @@ const BASE = require('./test_base').BASE;
         await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2`, 'two tasks', 10000);
         const links = [];
         for (const title of ['Pick the icon', 'Sign the installer']) { // the one with a goal last: its page stays open for the look below
-            await ev(`[...document.querySelectorAll('#group-table-view .group-table-link')].find(b => b.textContent === ${JSON.stringify(title)}).click(); true`);
+            await ev(`[...document.querySelectorAll('#group-table-view .team-row-btn')].find(b => b.textContent === ${JSON.stringify(title)}).click(); true`);
             await waitFor(`!!document.querySelector('#inbox-page .ibx-reply-label')`, `${title} opened`, 8000);
             links.push(await ev(`({ t: document.querySelector('#inbox-page .ibx-task-title').textContent, g: (document.querySelector('#inbox-page .ibx-goal') || {}).textContent || '' })`));
             if (title === 'Sign the installer') break;

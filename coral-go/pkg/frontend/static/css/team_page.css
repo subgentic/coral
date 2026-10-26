@@ -109,7 +109,6 @@
 .team-row-cell { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; }
 .team-link { background: none; border: 0; padding: 0; color: var(--link-text, var(--accent)); font: inherit; text-align: left; cursor: pointer; }
 .team-link:hover { text-decoration: underline; }
-.team-muted { color: var(--text-secondary); }
 
 /* a goal's page and a task's page: facts side by side, tasks as a table, the actions pinned at the bottom */
 .goals-facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 16px; margin: 0; font-size: 0.875rem; max-width: 70ch; }
@@ -305,13 +304,6 @@
 .goal-side-search::placeholder { color: var(--text-secondary); opacity: 1; }
 .goal-side-list { border-top: 1px solid var(--border); }
 .goal-side-group { margin: 0; padding: 10px 12px 4px; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); }
-.goal-side-ul { list-style: none; margin: 0; padding: 0; }
-.goal-side-row { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; width: 100%; text-align: left; padding: 8px 12px; background: none; border: 0; border-radius: 0; color: var(--text-primary); font: inherit; cursor: pointer; }
-.goal-side-row:hover, .goal-side-row[aria-current="true"] { background: var(--bg-hover); }
-.goal-side-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.goal-side-title { font-size: 0.8125rem; font-weight: 600; overflow-wrap: anywhere; }
-.goal-side-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 0.75rem; color: var(--text-secondary); }
-.goal-side-who { overflow-wrap: anywhere; }
 .goal-side .goals-note, .goal-side .goals-failed, .goal-side .goals-more { margin: 10px 12px; }
 .goals-table-page .goal-side-back, .goal-tasks-open { display: none; }
 .goal-main > .goals-table-page { padding: 0; } /* the task page in the main pane sits where the goal's details sat */
@@ -326,7 +318,6 @@
     .goal-side { position: static; max-height: none; border: 0; background: none; align-self: stretch; } /* the list screen is the page's whole width */
     .goals-table-page .goal-side-back { display: inline-flex; margin: 0 0 8px; }
     .goal-tasks-open { display: inline-flex; align-self: flex-start; min-height: 44px; margin-top: 12px; }
-    .goal-side-row { min-height: 44px; padding: 10px 12px; }
     .goal-side-search { min-height: 44px; }
 }
 

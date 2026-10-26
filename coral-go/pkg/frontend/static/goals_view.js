@@ -15,6 +15,7 @@ import { foldWayBack } from './way_back.js';
 const { teamTable, rowButton, stateChip: tableStateChip } = await importOnce('./team_table.js'); // lazy: its failure is retried
 const Toolbar = await importOnce('./team_toolbar.js'); // the one toolbar of the team tabs (#7717)
 const { attachDockResize, DOCK_MIN_WIDTH, dockMaxWidth } = await importOnce('./dock_resize.js');
+const TR = await importOnce('./task_row.js'); // the one task row (#7737): the goal's column draws its rows with it
 
 const PAGE = 50; // a goal's tasks are drawn this many at a time
 import * as W from './goal_words.js';
@@ -354,7 +355,6 @@ function backButton(text, onClick) {
 
 const whoOf = (t) => t.workedBy || (isDone(t) && t.raw && t.raw.completed_by) || t.assignee; // who did the work: the author of a reviewed task, not the orchestrator it was handed to
 const isDone = (t) => W.taskStateWord(t.state) === 'Done';
-const whoText = (t) => { const w = whoOf(t); return isDone(t) ? (w ? `Done by ${w}` : 'Done') : (w || 'Nobody yet'); };
 
 /** The rollup and the rows are read separately: while they disagree (the rollup is fresh, the rows are the last read) the page says it is updating, so two moments are never drawn as one (UI/UX, #7513). */
 function rowsAgree(g) {
@@ -422,7 +422,7 @@ function drawGoalSide(side, g) {
         for (const [name, rows] of groups) {
             if (!rows.length) continue;
             const head = el('h3', 'goal-side-group', `${name} ${rows.length}`);
-            const ul = el('ul', 'goal-side-ul'); ul.setAttribute('aria-label', `${name} tasks of ${g.title}`);
+            const ul = el('ul', 'task-col-list'); ul.setAttribute('aria-label', `${name} tasks of ${g.title}`);
             for (const t of rows) ul.append(sideRow(g, t));
             list.append(head, ul);
         }
@@ -434,17 +434,11 @@ function drawGoalSide(side, g) {
     search.addEventListener('input', () => { model.taskSearch = search.value; fill(); });
 }
 
+/** A row of the column: the one task row (task_row.js) built from the goal's row and its raw record. */
 function sideRow(g, t) {
-    const li = el('li', 'goal-side-item');
-    const b = el('button', 'goal-side-row'); b.type = 'button'; b.dataset.taskId = String(t.id);
-    b.setAttribute('aria-label', `Open task #${t.id}: ${t.title}`);
-    if (model.taskId === t.id) b.setAttribute('aria-current', 'true');
-    const word = W.taskStatusWord(t.state, t.raw && t.raw.review_requested);
-    const meta = el('span', 'goal-side-meta'); meta.append(tableStateChip(word, W.statusClass(word)), el('span', 'goal-side-who', whoText(t)));
-    b.append(el('span', 'goal-side-title', `#${t.id} ${t.title}`), meta);
-    b.addEventListener('click', () => openGoalTask(g, t));
-    li.append(b);
-    return li;
+    const raw = t.raw || {};
+    const task = { ...raw, id: t.id, title: t.title, status: raw.status || t.state, worked_by: t.workedBy || raw.worked_by, assigned_to: raw.assigned_to ?? t.assignee };
+    return TR.taskColumnRow(task, { current: model.taskId === t.id ? TR.taskKey(task) : '', openTask: () => openGoalTask(g, t) });
 }
 
 function openGoalTask(g, t) {
@@ -457,7 +451,7 @@ function closeGoalTask() {
     const id = model.taskId;
     model.taskId = 0; model.screen = PHONE.matches ? 'column' : 'goal';
     drawPage();
-    (root.querySelector(`.goal-side-row[data-task-id="${id}"]`) || root.querySelector('#goals-detail-title'))?.focus({ preventScroll: true });
+    (root.querySelector(`.task-col-btn[data-task-id="${id}"]`) || root.querySelector('#goals-detail-title'))?.focus({ preventScroll: true });
 }
 
 /** The picked task, as the task page (#7644), in the main pane; the column beside it stays. */

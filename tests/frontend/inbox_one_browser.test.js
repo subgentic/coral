@@ -1,6 +1,6 @@
 // The dashboard's own Inbox on the shared sidebar (#7472, part 2 of one sidebar, UI/UX's audit c2596330 and its answers on the board): three groups (Needs you, Tasks, Saved) with counts, Needs you and Tasks listing
 // their rows and Saved its header; one search box that names the group on screen and searches it, Display options (Saved's Filters and Sort) for Saved only; a group's name opens a table at 20/700 with its count
-// (Needs you: Item, Team, When, and Folder, Asks and Goal columns when a row has one; Tasks: Task, Priority, State, Team; Saved: Message, Saved, State, Action, with Open and Done as chips with counts and one Done or Reopen
+// (Needs you: Item, Team, When, and Folder, Asks and Goal columns when a row has one; Tasks: the one task row, State, Task, Priority, Team, Updated; Saved: Message, Saved, State, Action, with Open and Done as chips with counts and one Done or Reopen
 // button per row); a task's page mounts the shared component for the one task (its text and reply box, no second heading) under a "← Tasks" link and a 17/700 title; a saved message's page has its own link
 // back, a bar pinned at the foot (More with Remove, Open as the primary; the whole message is in the page, #7660); one empty line per group; both themes and 200% text; a phone's list is the page and an item the screen after
 // it. Drives Chrome over CDP through agent_view_harness.js with the tasks, the saved list and the waiting agents stubbed.
@@ -121,15 +121,17 @@ const AGENTS = (waiting) => waiting ? [
             await ev(`document.querySelector('${pane} .sgroup-header[data-group-name="hub-inbox:tasks"]').click(); true`);
             await waitFor(`document.querySelector('#group-table-title').textContent === 'Tasks'`, at + 'Tasks opens its table', 8000);
             assert.equal(await ev(`document.querySelector('${pane} .sidebar-search-input').getAttribute('aria-label')`), 'Search tasks', at + 'the search is named for Tasks now');
-            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view th')].map(h => h.textContent)`), ['Task', 'Priority', 'State', 'Team'], at + 'Task, Priority, State, Team');
-            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(r => [...r.children].map(c => c.textContent.trim()).join('|'))`),
-                ['Review the release plan|High|Open|team-a', 'Write the release notes|Medium|In progress|team-a', 'Check the installer|Low|Blocked|team-b'], at + 'rows by priority, in words');
+            // the one task row (#7737): a table on a desktop (State, Task, Priority, Team, Updated), the two-line column on a phone; one word set for the state (the Inbox's "Open" is Queued)
+            const wide = await ev(`!!document.querySelector('#group-table-view .task-table')`);
+            if (wide) assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view th')].map(h => h.textContent)`), ['State', 'Task', 'Priority', 'Team', 'Updated'], at + 'State, Task, Priority, Team, Updated');
+            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view .task-table tbody tr, #group-table-view .task-col-row')].map(r => r.matches('tr') ? [r.querySelector('.team-row-btn').textContent, r.querySelector('.task-priority').textContent, r.querySelector('.goal-chip').textContent, r.querySelector('.task-team').textContent].join('|') : [r.querySelector('.task-col-title').textContent, r.querySelector('.task-col-priority') ? 'High' : '', r.querySelector('.goal-chip').textContent, ''].join('|'))`),
+                wide ? ['Review the release plan|High|Queued|team-a', 'Write the release notes|Medium|In progress|team-a', 'Check the installer|Low|Blocked|team-b'] : ['Review the release plan|High|Queued|', 'Write the release notes||In progress|', 'Check the installer||Blocked|'], at + 'rows by priority, in words');
             assert.deepEqual(await ev(`(${ON_SCALE})(document.getElementById('group-table-view'), ${SCALE})`), [], at + 'every text of the tasks table is on the scale');
-            await ev(`document.querySelector('#group-table-view .group-table-link').click(); true`);
+            await ev(`document.querySelector('#group-table-view .team-row-btn, #group-table-view .task-col-btn').click(); true`);
             await waitFor(`!!document.querySelector('#inbox-page .ibx-reply-input') && document.getElementById('inbox-page').checkVisibility()`, at + "the task's page", 10000);
             assert.equal(await ev(`document.querySelector('#inbox-page > .group-back').textContent`), '← Tasks', at + 'back names the group');
             assert.deepEqual(await ev(`(() => { const t = getComputedStyle(document.querySelector('#inbox-page .wf-item-title')); return [document.querySelector('#inbox-page .wf-item-title').textContent, t.fontSize, t.fontWeight]; })()`), ['Review the release plan', '17px', '700'], at + 'the title is 17/700');
-            assert.match(await ev(`document.querySelector('#inbox-page .item-meta').textContent`), /^From Orchestrator · team-a · High priority · Open/, at + 'one facts line');
+            assert.match(await ev(`document.querySelector('#inbox-page .item-meta').textContent`), /^From Orchestrator · team-a · High priority · Queued/, at + 'one facts line');
             assert.match(await ev(`document.querySelector('#inbox-page .ibx-panel').textContent`), /Please check the plan/, at + "the component shows the task's own text");
             assert.equal(await ev(`getComputedStyle(document.querySelector('#inbox-page .ibx-task-head')).display`), 'none', at + "and not a second heading");
             assert.equal(await ev(`document.querySelectorAll('#inbox-page .ibx-task').length`), 1, at + 'one task is mounted');
@@ -215,7 +217,7 @@ const AGENTS = (waiting) => waiting ? [
                 await waitFor(`document.querySelector('#group-table-title').textContent === 'Tasks'`, how + 'the tasks table', 8000);
                 const au = await auditRegion(ev, ['.sidebar', '#group-table-view']);
                 assert.deepEqual(au.fails.map(f => `${f.sel} ${f.what} ${f.ratio}`), [], how + 'the sidebar and the table: contrast');
-                await ev(`document.querySelector('#group-table-view .group-table-link').click(); true`);
+                await ev(`document.querySelector('#group-table-view .team-row-btn, #group-table-view .task-col-btn').click(); true`);
                 await waitFor(`!!document.querySelector('#inbox-page .ibx-reply-input')`, how + 'a task', 8000);
                 const au2 = await auditRegion(ev, ['#inbox-page']);
                 assert.deepEqual(au2.fails.map(f => `${f.sel} ${f.what} ${f.ratio}`), [], how + "a task's page: contrast");
