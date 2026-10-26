@@ -5,8 +5,6 @@ import { OPERATOR_ID, isOperatorId, escapeHtml, escapeAttr, showView, getAgentCo
 import { registerActions, withId, textOf } from './actions.js';
 import { scrollBehavior } from './motion.js';
 import { emptyState, setHidden } from './dom_write.js';
-import { browserLocal } from './safe_storage.js';
-import { trackBoardGoals } from './goals_badge.js'; // the Goals switch's count and "waiting" (#7252)
 import { state } from './state.js';
 import { resolveBoardArtifacts } from './board_artifacts.js';
 import { messageAttachmentAttrs, messageAttachmentsHtml } from './board_attachments.js';
@@ -22,7 +20,6 @@ import './goal_words.js';
 import { OUTCOME_UNKNOWN_LINE, isOutcomeUnknown } from './outcome_unknown.js';
 import { launchBlockedReason, blockedReason } from './hub_access.js';
 import { pollEvery, afterPause, isBusyStatus, busyRetryingText, machineOf } from './overload.js';
-import { note } from './nav.js';
 import { keyRoute, build } from './routes.js';
 import { attachDialogFocus } from './dialog_focus.js';
 import { mountBoardSearch, highlightBoard, setBoardMembers, resetBoardSearch } from './board_search.js';
@@ -95,66 +92,11 @@ onBoardLabelsChanged(() => {
 
 // ── View switching ───────────────────────────────────────────────────────
 
+/** A board's page is its team page's Messages tab (#8061): every link to a board (a chat, a message, a saved message, a list's row) opens it there, at /team/<team>/messages, and a message anchors where it is. */
 export function selectBoardProject(project, messageId = null) {
-    setMoreOpen(false);
-    currentProject = project;
-    state.boardPageProject = project; // the board on screen: an artifact opened here asks its comments of this board
-    clearNewPill();
-    state.currentBoardServer = splitKey(project).server;
-    pendingMessageId = messageId != null ? String(messageId) : null;
-    note(keyRoute('board', project)); // the board's page (#3532)
-
-    // Hide other views, show messageboard
-    showView("messageboard-view");
-
-    // Show board panel
-    document.getElementById('mb-project-list').style.display = 'none';
-    const board = document.getElementById('mb-board');
-    board.style.display = 'flex';
-    hideBoardSubscribers();
-    document.getElementById('messageboard-view').classList.add('mb-has-board');
-    const backBtn = document.getElementById('mb-back-btn');
-    if (backBtn) backBtn.style.display = '';
-    document.getElementById('mb-pause-btn').style.display = '';
-    document.getElementById('mb-export-btn').style.display = '';
-    document.getElementById('mb-select-btn').style.display = '';
-    const sleepBtn = document.getElementById('mb-sleep-btn');
-    if (sleepBtn) sleepBtn.style.display = '';
-    document.getElementById('mb-delete-btn').style.display = '';
-    syncBoardDeleteButton(project);
-
-    const badge = document.getElementById('messageboard-project-badge');
-    badge.textContent = keyLabel(project);
-    badge.style.display = '';
-    document.querySelector('#messageboard-view .mb-view-header')?.classList.add('mb-has-board');
-    initGrowingTextarea(document.getElementById('mb-post-input'));
-    attachMentionList();
-    // A board opened before its label is known (a /board/<id> page, a board with no agents)
-    // asks for it; the header follows when it, or any list, brings it (#3536).
-    if (!hasBoardLabel(project)) {
-        boardFetch(project, '').then(r => (r.ok ? r.json() : null)).then(d => {
-            if (d && typeof d.board_label === 'string') noteBoardLabel(splitKey(project).server, splitKey(project).name, d.board_label);
-        }).catch(() => {});
-    }
-    const computer = (state.servers || []).find(s => s.id === state.currentBoardServer);
-    document.getElementById('messageboard-title').textContent = isCloud() && computer ? `Board on ${computer.label || computer.id}` : 'Message Board';
-    mountBoardSearch(document.getElementById('mb-tools'), project, SEARCH_HOOKS);
-    applyView(document.getElementById('mb-messages'), 'chat'); // the board's own page keeps the chat; the table is the team page's Board tab
-    document.querySelector('#mb-tools > .mb-table-tools')?.remove();
-
-    // Ensure dashboard is subscribed as a reader
-    subscribeDashboard(project);
-
-    // Load paused and sleep state
-    loadPausedState(project);
-    loadSleepState(project);
-
-    loadBoardMessages(project);
-    loadBoardSubscribers(project);
-    loadBoardProjects();
-    startBoardPoll();
-    setHidden(document.getElementById('mb-team-page-btn'), false);
-    applyBoardFace(project);
+    if (!project) return;
+    window.switchNavTab?.('agents', { fromHistory: true }); // the team page lives under Agents; it writes its own address
+    importOnce('./team_page.js').then(m => m.openTeamPage(project, { tab: 'messages', item: messageId != null ? Number(messageId) : 0 }));
 }
 
 /** The team page's Messages tab (#7453): the board's own column (#mb-board: the search bar, the messages, the composer) moved into `host`, and the board loaded and polled as on the board page. leaveBoardPage puts the column back and stops the poll. */
@@ -213,27 +155,6 @@ export function leaveBoardPage() {
     _boardHome = null;
 }
 
-// Board | Goals (#7113): the board's two faces. The Goals face is this computer's own (the Hub has its own goals page), so the switch is not drawn through the Hub; the choice is kept for this browser.
-const FACE_KEY = 'coral.board.face';
-let _tracked = ''; // the board whose goals the switch counts
-function applyBoardFace(project) {
-    const sw = document.getElementById('mb-face-switch'), goals = document.getElementById('mb-goals'), board = document.getElementById('mb-board');
-    if (!sw || !goals || !board) return;
-    const has = !!project && !isCloud();
-    sw.hidden = !has;
-    if (_tracked !== (has ? project : '')) { _tracked = has ? project : ''; trackBoardGoals(has ? project : null); }
-    const face = has && browserLocal.get(FACE_KEY) === 'goals' ? 'goals' : 'messages';
-    document.getElementById('mb-face-messages')?.setAttribute('aria-pressed', String(face === 'messages'));
-    document.getElementById('mb-face-goals')?.setAttribute('aria-pressed', String(face === 'goals'));
-    if (face === 'goals') {
-        board.style.display = 'none'; // display-ok: #mb-board is shown and hidden this way everywhere else in this file
-        importOnce('./goals_view.js').then(m => m.showGoals(goals, project)).catch(() => {});
-    } else {
-        goals.hidden = true;
-        if (project) board.style.display = 'flex'; // display-ok: as above
-    }
-}
-
 export function showMessageBoardProjects() {
     document.getElementById('messageboard-title').textContent = 'Message Board';
     setMoreOpen(false);
@@ -250,7 +171,6 @@ export function showMessageBoardProjects() {
     document.getElementById('mb-project-list').style.display = '';
     document.getElementById('mb-board').style.display = 'none';
     setHidden(document.getElementById('mb-team-page-btn'), true);
-    applyBoardFace(null);
     hideBoardSubscribers();
     for (const list of ['mb-subscribers-list', 'mb-subscribers-sheet-list']) { const el = document.getElementById(list); if (el) el.innerHTML = '<li class="mb-project-meta">Open a board to see who is subscribed.</li>'; }
     setMembersCount(0);
@@ -1256,7 +1176,6 @@ document.addEventListener('click', (e) => {
 // before use; a bad one does nothing. Deleting a message never asked first, and still doesn't.
 registerActions({
     'mb-project': el => { const p = textOf(el.dataset.project); if (p) selectBoardProject(p); },
-    'mb-face': el => { browserLocal.set(FACE_KEY, el.dataset.face === 'goals' ? 'goals' : 'messages'); applyBoardFace(currentProject); },
     'mb-team-page': () => { if (currentProject) window.openTeamPage?.(currentProject); }, // the board's page offers its team's page (#7457)
     'mb-more': (el, event) => toggleMoreMenu(event),
     'mb-jump-latest': () => jumpToLatest(),
