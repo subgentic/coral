@@ -14,6 +14,8 @@ let sendStarting = false; // the last answer, kept because the toolbar's buttons
 /** Send's words while the agent starts (and back to its own when it has). */
 export function syncSendStarting(starting = sendStarting) {
     sendStarting = !!starting;
+    const hint = document.getElementById("composer-starting-hint"); // the same words as a quiet line above the box (#8242): a phone never shows Send's title
+    if (hint) hint.hidden = !starting;
     document.querySelectorAll(SEND_BUTTONS).forEach(b => {
         if (starting) {
             if (b.dataset.startingWas === undefined) b.dataset.startingWas = JSON.stringify([b.getAttribute("title"), b.getAttribute("data-tooltip"), b.getAttribute("aria-label")]);

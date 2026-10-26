@@ -36,8 +36,12 @@ const { connect } = require('./agent_view_harness');
             };
             const short = await boxOf('Backend Dev'), long = await boxOf(LONG);
             check(`${tag}: a long name makes the box no taller than a short name's, with the starting words`, /^Starting/.test(long.ph) && long.h <= short.h, JSON.stringify({ short, long }));
+            const hint = await ev(`(() => { const h = document.getElementById('composer-starting-hint'); const r = h && h.getBoundingClientRect(); const i = document.getElementById('command-input').getBoundingClientRect(); return h ? { shown: !h.hidden && !!h.getClientRects().length, text: h.textContent, above: r.bottom <= i.top + 1, inWidth: r.right <= innerWidth + 1 } : null; })()`);
+            check(`${tag}: while the agent starts a quiet line above the box says the message is held`, hint && hint.shown && /held until it is ready/.test(hint.text) && hint.above && hint.inWidth, JSON.stringify(hint));
             if (process.env.SHOT_DIR) require('node:fs').writeFileSync(`${process.env.SHOT_DIR}/composer-${w}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); // a picture for a review, when asked for
             if (mobile) check(`${tag}: the phone's placeholder does not wrap`, long.ws === 'nowrap', JSON.stringify(long));
+            await ev(`(async () => { const st = await import(${S} + 'agent_starting.js'); st.syncSendStarting(false); return true; })()`);
+            check(`${tag}: and the line is gone once the agent is up`, await ev(`document.getElementById('composer-starting-hint').hidden === true`));
         }
     } catch (e) { check('the suite ran', false, String(e && e.stack || e).slice(0, 300)); }
     await client.close();
