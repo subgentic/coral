@@ -12,6 +12,7 @@ const { initSectionDialog } = await importOnce('./section_dialog.js');
 const { segmentSelect } = await importOnce('./segmented.js');
 const { launchFlags } = await importOnce('./launch_flags.js');
 import { escapeHtml, escapeAttr } from './utils.js';
+import { mountSettingsView } from './settings_view.js'; // the persona page's Behavior prompt is a field of it (a startup module)
 
 // ── Permissions Editor ─────────────────────────────────────────────────
 const CAPABILITY_LABELS = {
@@ -213,12 +214,21 @@ export function renderAgentConfigForm(containerId, opts = {}) {
 
     const f = acfStartValues(container, opts);
     drawAcfForm(container, uid, opts, f);
+    mountAcfPrompts(container, f);
     initAcfPermissions(container, uid, f);
     initAcfPresets(containerId, uid, opts, f);
     initAcfModel(container, f);
     placeAcfCliLine(container, opts);
     wireAcfAgentType(container);
     finishAcfControls(container, opts);
+}
+
+/** The Behavior prompt: a field of settings_view (label above; the textarea keeps the class every read of the form uses). */
+function mountAcfPrompts(container, { promptVal }) {
+    for (const host of container.querySelectorAll('.acf-prompt-host')) {
+        const view = mountSettingsView(host, { mode: 'form', fields: [{ key: 'prompt', type: 'textarea', label: 'Behavior prompt', rows: Number(host.dataset.rows) || 8, placeholder: "Describe the agent's role and behavior...", setup: e => e.classList.add('acf-prompt') }] });
+        view.set('prompt', promptVal);
+    }
 }
 
 /** What the form starts from: the launch's value (opts.value) over the Settings defaults, and the permissions summary line. */
@@ -382,7 +392,7 @@ function drawSectionedAcf(container, uid, opts, { f: { showPreset, showName, pro
         // New Agent's three steps (#7391): step 2 is the persona page (the prompt here, the persona and name adopted above it), step 3 is these three panes: the provider group adopted into Agent, the Mode as cards, the tool chips in a closed disclosure.
         const toolsHTML = `<details class="acf-tools-details"><summary>Tool permissions <span class="acf-perms-summary settings-hint"></span></summary>${permEditorHTML(true)}</details>`;
         container.innerHTML = [
-            `<div class="acf-persona-page" data-adopt="persona"><div class="launch-prompt-field"><span class="launch-field-head" id="${escapeAttr(uid)}-prompt-label">Behavior prompt</span><textarea class="acf-prompt" aria-labelledby="${escapeAttr(uid)}-prompt-label" rows="8" placeholder="Describe the agent's role and behavior...">${escapeHtml(promptVal)}</textarea></div></div>`,
+            `<div class="acf-persona-page" data-adopt="persona"><div class="acf-prompt-host" data-rows="8"></div></div>`,
             pane('agent', 'Agent', 'smart_toy', '', topHTML),
             pane('permissions', 'Permissions', 'lock', '', `${autoPermissionsHTML}${toolsHTML}`),
             pane('advanced', 'Advanced', 'tune', '', `<label>Flags <span class="launch-optional">optional</span>${flagsInput}</label>`),
@@ -392,7 +402,7 @@ function drawSectionedAcf(container, uid, opts, { f: { showPreset, showName, pro
         const toolsHTML = `<details class="acf-tools-details"><summary>Tool permissions <span class="acf-perms-summary settings-hint"></span></summary>${permEditorHTML(true)}</details>`;
         const agentHTML = topHTML.replace('<label>Agent Type:', '<label class="acf-provider-label" hidden><span class="acf-provider-head">Provider</span>');
         container.innerHTML = [
-            `<div class="acf-persona-page"><p class="launch-field-head"><span>Name</span></p><p class="acf-restart-name"></p><div class="launch-prompt-field"><span class="launch-field-head" id="${escapeAttr(uid)}-prompt-label">Behavior prompt</span><textarea class="acf-prompt" aria-labelledby="${escapeAttr(uid)}-prompt-label" rows="8" placeholder="Describe the agent's role and behavior...">${escapeHtml(promptVal)}</textarea></div></div>`,
+            `<div class="acf-persona-page"><p class="launch-field-head"><span>Name</span></p><p class="acf-restart-name"></p><div class="acf-prompt-host" data-rows="8"></div></div>`,
             pane('agent', 'Model', 'smart_toy', '', `<p class="settings-hint acf-provider-fixed"></p>${agentHTML}`),
             pane('permissions', 'Permissions', 'lock', '', `${autoPermissionsHTML}${toolsHTML}`),
             pane('advanced', 'Advanced', 'tune', '', `<label>Flags <span class="launch-optional">optional</span>${flagsInput}</label>`),
@@ -400,7 +410,7 @@ function drawSectionedAcf(container, uid, opts, { f: { showPreset, showName, pro
     } else {
         // The team member and Add-agent-to-board dialogs (#7391): the same panes as New Agent's step 3, and one Persona pane (the persona, the name, the prompt) where New Agent has a page.
         const toolsHTML = `<details class="acf-tools-details"><summary>Tool permissions <span class="acf-perms-summary settings-hint"></span></summary>${permEditorHTML(true)}</details>`;
-        const promptHTML = `<div class="launch-prompt-field"><span class="launch-field-head" id="${escapeAttr(uid)}-prompt-label">Behavior prompt</span><textarea class="acf-prompt" aria-labelledby="${escapeAttr(uid)}-prompt-label" rows="10" placeholder="Describe the agent's role and behavior...">${escapeHtml(promptVal)}</textarea></div>`;
+        const promptHTML = `<div class="acf-prompt-host" data-rows="10"></div>`;
         container.innerHTML = [
             pane('persona', 'Persona', 'badge', '', `${(showPreset || showName) ? `${presetHTML}${nameHTML}` : ''}${promptHTML}`),
             pane('agent', 'Agent', 'smart_toy', '', topHTML.replace('<label>Agent Type:', '<label class="acf-provider-label"><span class="acf-provider-head">Provider</span>')),
