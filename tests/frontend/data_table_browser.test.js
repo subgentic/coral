@@ -130,6 +130,57 @@ const BASE = require('./test_base').BASE;
         assert.equal(await ev(`document.querySelectorAll('#dt-host tbody tr.dt-selected').length`), 1, 'in Select mode a tap on the row selects it');
         assert.equal((await ev(`window.__log`)).some(x => /^open/.test(x)), false, 'and does not open it');
         console.log('   ✓');
+        console.log('8. Column widths: drag, keys, fit, kept, reset, no handles when folded (#7949)');
+        await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
+        const KEY = 'coral-dt-widths:Fixture';
+        await ev(`localStorage.removeItem(${JSON.stringify(KEY)}); true`);
+        await mount();
+        const W = key => ev(`Math.round(document.querySelector('#dt-host th[data-key="${key}"]').getBoundingClientRect().width)`);
+        const handle = key => ev(`(() => { const r = document.querySelector('#dt-host th[data-key="${key}"] .dt-resize').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);
+        const mouse = (type, x, y) => client.Input.dispatchMouseEvent({ type, x, y, button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, clickCount: 1 });
+        const drag = async (key, dx) => { const h = await handle(key); await mouse('mouseMoved', h.x, h.y); await mouse('mousePressed', h.x, h.y); for (let i = 1; i <= 4; i++) await mouse('mouseMoved', h.x + Math.round(dx * i / 4), h.y); await mouse('mouseReleased', h.x + dx, h.y); };
+        const heads = await ev(`[...document.querySelectorAll('#dt-host thead th')].map(t => { const h = t.querySelector('.dt-resize'); return h ? [h.getAttribute('role'), h.getAttribute('aria-label'), h.tabIndex, h.getAttribute('aria-orientation')] : null; })`);
+        assert.deepEqual(heads.map(h => h && h[1]), ['Resize Name column', 'Resize Who column', 'Resize Count column', 'Resize Updated column', 'Resize Link column'], 'every header has a named handle');
+        assert.ok(heads.every(h => h && h[0] === 'separator' && h[2] === 0 && h[3] === 'vertical'), 'a focusable vertical separator');
+        const w0 = { name: await W('name'), who: await W('who'), n: await W('n') };
+        await drag('who', 70);
+        const w1 = { name: await W('name'), who: await W('who'), n: await W('n') };
+        assert.ok(Math.abs(w1.who - (w0.who + 70)) <= 3, 'dragging the Who edge 70 px right widens it by 70: ' + JSON.stringify({ w0, w1 }));
+        assert.ok(w1.name < w0.name - 50 && Math.abs(w1.n - w0.n) <= 2, 'the title column gives the room, the others stay: ' + JSON.stringify({ w0, w1 }));
+        assert.equal(await ev(`document.querySelector('#dt-host th[data-key="who"]').getAttribute('aria-sort')`), 'none', 'a drag does not sort');
+        assert.equal(await ev(`document.querySelector('#dt-host th[data-key="who"] .dt-resize').getAttribute('aria-valuenow')`), String(w1.who), 'the separator says its width');
+        await drag('who', -1000);
+        assert.ok((await W('who')) >= 64 && (await W('who')) <= 70, 'a column never gets narrower than its minimum: ' + await W('who'));
+        await drag('who', 120);
+        const kept = await W('who');
+        assert.deepEqual(Object.keys(JSON.parse(await ev(`localStorage.getItem(${JSON.stringify(KEY)})`))).includes('who'), true, 'the width is kept in this browser');
+        await mount();
+        assert.ok(Math.abs((await W('who')) - kept) <= 2, 'a redraw (a new table for the same list) has the kept width: ' + (await W('who')) + ' vs ' + kept);
+        assert.equal(await ev(`!!document.querySelector('#dt-host .dt-reset-widths') && !document.querySelector('#dt-host .dt-widthbar').hidden`), true, 'Reset column widths is there while any width is set');
+        // the keyboard
+        await ev(`document.querySelector('#dt-host th[data-key="n"] .dt-resize').focus(); true`);
+        const before = await W('n');
+        await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 });
+        assert.ok(Math.abs((await W('n')) - (before + 16)) <= 2, 'Right widens by 16 px: ' + before + ' to ' + await W('n'));
+        await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'ArrowLeft', code: 'ArrowLeft', windowsVirtualKeyCode: 37 }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'ArrowLeft', code: 'ArrowLeft', windowsVirtualKeyCode: 37 });
+        assert.ok(Math.abs((await W('n')) - before) <= 2, 'Left narrows it again');
+        assert.equal(await ev(`document.activeElement.classList.contains('dt-resize')`), true, 'the keyboard stays on the handle');
+        // fit to content
+        await drag('who', 200);
+        const wide = await W('who');
+        await ev(`document.querySelector('#dt-host th[data-key="who"] .dt-resize').dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); true`);
+        const fit = await W('who');
+        assert.ok(fit < wide - 40 && fit >= 64, 'a double click fits the column to what is in it: ' + wide + ' to ' + fit);
+        // reset
+        await ev(`document.querySelector('#dt-host .dt-reset-widths').click(); true`);
+        assert.equal(await ev(`localStorage.getItem(${JSON.stringify(KEY)})`), null, 'Reset forgets the widths');
+        assert.ok(Math.abs((await W('who')) - w0.who) <= 3 && !(await ev(`document.querySelector('#dt-host .dt-box').classList.contains('dt-sized')`)), 'and the columns are as they were');
+        assert.equal(await ev(`document.querySelector('#dt-host .dt-widthbar').hidden`), true, 'the reset bar goes');
+        // folded: no handles
+        await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+        await mount(); await waitFor(`document.querySelector('#dt-host .dt-box').classList.contains('dt-folded')`, 'folded');
+        assert.equal(await ev(`[...document.querySelectorAll('#dt-host .dt-resize')].filter(h => h.getClientRects().length).length`), 0, 'no handles in the folded layout');
+        console.log('   ✓');
         console.log('PASS data_table: desktop, sort, sticky head, the fold, empty and footer, selection');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
