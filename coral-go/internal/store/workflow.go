@@ -39,6 +39,9 @@ type WorkflowRunBrief struct {
 	TriggerType string  `json:"trigger_type"`
 	StartedAt   *string `json:"started_at"`
 	FinishedAt  *string `json:"finished_at"`
+	// FailedStep and FailureReason: for a failed last run, as the run says them (routes.runView); the list's "failed: step 2 (build)" line reads them.
+	FailedStep    *FailedStep `json:"failed_step,omitempty"`
+	FailureReason string      `json:"failure_reason,omitempty"`
 }
 
 // WorkflowRun represents a single execution of a workflow.

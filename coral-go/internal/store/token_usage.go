@@ -93,6 +93,8 @@ type AgentUsageSummary struct {
 	LastSeen         string  `db:"last_seen" json:"last_seen"`
 	LaunchedAt       *string `db:"launched_at" json:"launched_at,omitempty"`
 	StoppedAt        *string `db:"stopped_at" json:"stopped_at,omitempty"`
+	// IsLive: the session is running now (it has a live_sessions row that has not stopped); false for one that ended or was never launched here. The Cost page says "(ended)" for a row that is false.
+	IsLive bool `db:"is_live" json:"is_live"`
 }
 
 // sourceDedup is a SQL filter that prefers JSONL records over proxy records
@@ -430,7 +432,8 @@ func (s *TokenUsageStore) GetUsageSummaryByAgentBoard(ctx context.Context, since
 	          MIN(t.min_at) as first_seen,
 	          MAX(t.max_at) as last_seen,
 	          ls.created_at as launched_at,
-	          ls.stopped_at as stopped_at
+	          ls.stopped_at as stopped_at,
+	          (ls.session_id IS NOT NULL AND ls.stopped_at IS NULL) as is_live
 	   FROM ` + rel + ` t
 	   LEFT JOIN live_sessions ls ON ls.session_id = t.session_id
 	   WHERE ` + usageDedup("t.")

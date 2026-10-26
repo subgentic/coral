@@ -425,6 +425,7 @@ func (h *HistoryHandler) listSessionsBefore4713(w http.ResponseWriter, r *http.R
 					"summary":           fmt.Sprintf("%d messages, %d participants", p.MessageCount, p.SubscriberCount),
 					"first_timestamp":   ptr.Value(p.FirstMessageAt),
 					"last_timestamp":    ptr.Value(p.LastMessageAt),
+					"updated_at":        ptr.Value(p.LastMessageAt), // sent since #8014: the one change from before #4713
 					"message_count":     p.MessageCount,
 					"subscriber_count":  p.SubscriberCount,
 					"participant_names": participants,

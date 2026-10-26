@@ -63,6 +63,15 @@ func (h *WorkflowHandler) ListWorkflows(w http.ResponseWriter, r *http.Request) 
 		errInternalServer(w, err.Error())
 		return
 	}
+	for i := range workflows {
+		// A failed last run says which step failed and why, as the run's own page does (a few reads: one per workflow whose last run failed).
+		if lr := workflows[i].LastRun; lr != nil && lr.Status == "failed" {
+			if run, err := h.ws.GetWorkflowRun(r.Context(), lr.ID); err == nil && run != nil {
+				runView(run)
+				lr.FailedStep, lr.FailureReason = run.FailedStep, run.FailureReason
+			}
+		}
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"workflows": emptyIfNil(workflows)})
 }
 

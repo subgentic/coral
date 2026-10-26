@@ -303,6 +303,7 @@ func (h *HistoryHandler) boardHistoryRows(r *http.Request, searchQ, dateFrom, da
 			"summary":           fmt.Sprintf("%d messages, %d participants", p.MessageCount, p.SubscriberCount),
 			"first_timestamp":   ptr.Value(p.FirstMessageAt),
 			"last_timestamp":    ptr.Value(p.LastMessageAt),
+			"updated_at":        ptr.Value(p.LastMessageAt), // the time and day group a group chat row shows
 			"message_count":     p.MessageCount,
 			"subscriber_count":  p.SubscriberCount,
 			"participant_names": participants,

@@ -66,8 +66,12 @@ type TaskListItem struct {
 	Outcome         string   `db:"outcome" json:"outcome,omitempty"`
 	ReviewRequested bool     `db:"review_requested" json:"review_requested,omitempty"`
 	// WorkedBy: who did the work, as Task.WorkedBy says it (the author a review took the task from, else who completed it, else the assignee).
-	WorkedBy  string    `db:"worked_by" json:"worked_by,omitempty"`
-	BlockedBy []TaskDep `db:"-" json:"blocked_by,omitempty"`
+	WorkedBy string `db:"worked_by" json:"worked_by,omitempty"`
+	// UpdatedAt: when the task last changed (updatedAtSQL); the Tasks tab's Updated column.
+	UpdatedAt string `db:"updated_at" json:"updated_at"`
+	// Verification: a finished task's verification state, as Task.Verification says it (loadListVerification); absent for any other task.
+	Verification *Verification `db:"-" json:"verification,omitempty"`
+	BlockedBy    []TaskDep     `db:"-" json:"blocked_by,omitempty"`
 }
 
 // TaskListPage is one page of the task list.
@@ -97,7 +101,8 @@ const taskListColumns = `t.id, t.revision, t.board_id, t.title,
 	COALESCE(json_type(w.data, '$.completion_review') = 'object', 0) AS review_requested,
 	CASE WHEN COALESCE(json_extract(w.data, '$.original_author'), '') != '' THEN json_extract(w.data, '$.original_author')
 	     WHEN t.status = 'completed' AND COALESCE(t.completed_by, '') != '' THEN t.completed_by
-	     ELSE COALESCE(t.assigned_to, '') END AS worked_by
+	     ELSE COALESCE(t.assigned_to, '') END AS worked_by,
+	` + prefixedUpdatedAtSQL + ` AS updated_at
 	FROM board_tasks t LEFT JOIN task_workflows w ON w.task_id = t.id`
 
 // ListTaskPage returns a page of the board's task list. Each page costs O(limit) rows:
@@ -142,6 +147,7 @@ func (s *Store) ListTaskPage(ctx context.Context, project string, q TaskListQuer
 	if err != nil {
 		return nil, err
 	}
+	s.loadListVerification(ctx, page.Tasks)
 	if err := s.loadListBlockedBy(ctx, page.Tasks); err != nil {
 		return nil, err
 	}
@@ -215,6 +221,36 @@ func (s *Store) idTaskPage(ctx context.Context, project, status, cursor string, 
 	}
 	rows = rows[:limit]
 	return rows, encodeTaskCursor(project, kind, "", rows[limit-1].ID), nil
+}
+
+// loadListVerification fills Verification for the finished items, from their workflows (one batched read), the way a full task's is.
+func (s *Store) loadListVerification(ctx context.Context, items []TaskListItem) {
+	var ids []int64
+	for i := range items {
+		if items[i].Status == "completed" {
+			ids = append(ids, items[i].ID)
+		}
+	}
+	if len(ids) == 0 {
+		return
+	}
+	data, err := s.loadWorkflowData(ctx, ids)
+	if err != nil {
+		return
+	}
+	for i := range items {
+		if items[i].Status != "completed" {
+			continue
+		}
+		raw, found := data[items[i].ID]
+		w, err := decodeWorkflow(raw, found)
+		if err != nil {
+			continue
+		}
+		t := &Task{Status: items[i].Status, CompletedBy: items[i].CompletedBy, CompletedAt: items[i].CompletedAt, AssignedTo: items[i].AssignedTo}
+		finishWorkflow(t, w)
+		items[i].Verification = t.Verification
+	}
 }
 
 // loadListBlockedBy fills BlockedBy for list items, with the same batched loader as Task.

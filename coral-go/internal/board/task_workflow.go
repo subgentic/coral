@@ -423,6 +423,8 @@ func finishWorkflow(t *Task, w TaskWorkflow) {
 		}
 	}
 	t.Workflow = w
+	t.Outcome = w.Outcome
+	t.ReviewRequested = w.CompletionReview != nil
 	t.Verification = verificationOf(t)
 	t.WorkedBy = workedBy(t, w)
 }

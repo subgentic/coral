@@ -916,6 +916,7 @@ func (s *Store) GoalTaskPage(ctx context.Context, board string, goalID int64, st
 		page.Tasks = page.Tasks[:limit]
 		page.NextCursor = encodeTaskCursor(board, "g", key, page.Tasks[limit-1].ID)
 	}
+	s.loadListVerification(ctx, page.Tasks)
 	if err := s.loadListBlockedBy(ctx, page.Tasks); err != nil {
 		return nil, err
 	}

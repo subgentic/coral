@@ -30,6 +30,9 @@ var TaskQueryLargeFields = []string{"body", "completion_message"}
 // review rounds own that) nor last_activity_at (the stall timer's).
 const updatedAtSQL = `MAX(created_at, COALESCE(claimed_at, created_at), COALESCE(completed_at, created_at), COALESCE(last_activity_at, created_at), COALESCE(edited_at, created_at))`
 
+// prefixedUpdatedAtSQL is updatedAtSQL for a query that names the task table t (the task list's join with the workflows); a test keeps the two the same.
+const prefixedUpdatedAtSQL = `MAX(t.created_at, COALESCE(t.claimed_at, t.created_at), COALESCE(t.completed_at, t.created_at), COALESCE(t.last_activity_at, t.created_at), COALESCE(t.edited_at, t.created_at))`
+
 // taskQueryColumns maps each field the caller may name to its SQL. board_label and goal_title are not columns: board_label is filled from the boards,
 // goal_title (#7345) from the task's own board's goals (FillGoalTitles), which the page reads through a hidden goal_id column.
 var taskQueryColumns = map[string]string{
@@ -820,7 +823,7 @@ func (s *Store) QueryTaskRowsResult(ctx context.Context, q *TaskQuery) ([]Task, 
 	}
 	var rows []Task
 	err = s.reader().SelectContext(ctx, &rows,
-		`SELECT id, revision, board_id, title, body, status, priority, created_by, assigned_to, completed_by, completion_message, created_at, claimed_at, completed_at, session_id, cost_usd, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, parked_reason, parked_until, remind_at, goal_id FROM board_tasks WHERE id IN (`+placeholders(len(ids))+`)`, ids...)
+		`SELECT id, revision, board_id, title, body, status, priority, created_by, assigned_to, completed_by, completion_message, created_at, claimed_at, completed_at, session_id, cost_usd, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, parked_reason, parked_until, remind_at, goal_id, `+updatedAtSQL+` AS updated_at FROM board_tasks WHERE id IN (`+placeholders(len(ids))+`)`, ids...)
 	if err != nil {
 		return nil, nil, err
 	}

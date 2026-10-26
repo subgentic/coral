@@ -70,6 +70,11 @@ type Task struct {
 	// WorkedBy: who did the task's work, set where the workflow is read (finishWorkflow): the author a reviewed task was handed on from (a reviewed task is assigned to the orchestrator, #3725),
 	// else who completed it, else its assignee. Empty for a task nobody has. The views show it where they say who has a task or who did it.
 	WorkedBy string `db:"-" json:"worked_by,omitempty"`
+	// Outcome and ReviewRequested repeat Workflow.Outcome and whether Workflow.CompletionReview is set, where the workflow is read (finishWorkflow), so a full row says them under the names a task list item has.
+	Outcome         string `db:"-" json:"outcome,omitempty"`
+	ReviewRequested bool   `db:"-" json:"review_requested,omitempty"`
+	// UpdatedAt: when the task last changed (updatedAtSQL), read with the lists that span boards and the board's whole-task list; empty where a task is read otherwise.
+	UpdatedAt string `db:"updated_at" json:"updated_at,omitempty"`
 	// Verification: whether a completed task's "done" is backed by an independent check (#4563); set when the workflow is
 	// attached, for a completed task with outcome success only.
 	Verification *Verification `db:"-" json:"verification,omitempty"`
