@@ -169,7 +169,7 @@ function _syncBoardTab(agentData, srv) {
     const boardTab = document.getElementById('agentic-tab-board');
     if (agentData && agentData.board_project) {
         if (boardTab) boardTab.style.display = '';
-        showBoardChatTab(identityKey(srv, agentData.board_project));
+        showBoardChatTab(identityKey(srv, agentData.board_project), { subscriber: agentData.board_subscriber_id, orchestrator: !!agentData.board_is_orchestrator, name: agentData.display_name || agentData.board_job_title || agentData.board_subscriber_id });
         // Auto-switch to Board tab if no persisted preference
         const savedTab = browserLocal.get('coral-agentic-tab-top');
         if (!savedTab || savedTab === 'board') {
