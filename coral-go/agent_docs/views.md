@@ -1,5 +1,7 @@
 # Views API
 
+> Create custom dashboard tabs with HTML and system prompts.
+
 Custom views allow users to create additional dashboard tabs with custom HTML content and system prompts. Views are stored in the SQLite database.
 
 **Reads are open; writes are dashboard-only.** `POST`, `PUT` and `DELETE` are accepted only from the Coral dashboard in a browser on this computer (loopback peer, localhost `Host`, same-origin fetch, no Coral Hub tunnel, no `Authorization: Bearer`). Anything else, including an agent or script calling with curl, gets `403 {"error": "Custom views can only be changed from the Coral dashboard on this computer"}`. `POST` and `PUT` also need `Content-Type: application/json` (else 400).
