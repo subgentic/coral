@@ -82,7 +82,7 @@ const STUB = `(() => {
     try {
         await Page.enable();
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        for (const view of [{ name: 'desktop', w: 1280, h: 900, phone: false, theme: 'dark' }, { name: 'desktop', w: 1280, h: 900, phone: false, theme: 'light' }, { name: '390px', w: 390, h: 844, phone: true, theme: 'dark' }, { name: '390px', w: 390, h: 844, phone: true, theme: 'light' }]) {
+        for (const view of [{ name: 'desktop', w: 1440, h: 900, phone: false, theme: 'dark' }, { name: 'desktop', w: 1440, h: 900, phone: false, theme: 'light' }, { name: '390px', w: 390, h: 844, phone: true, theme: 'dark' }, { name: '390px', w: 390, h: 844, phone: true, theme: 'light' }]) {
             const tag = `${view.name} ${view.theme}`; console.log(tag);
             await open(view);
             // ═══ an agent on a team: the table, the search bar, scoped to the agent
