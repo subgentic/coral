@@ -158,6 +158,22 @@ const BASE = require('./test_base').BASE;
         const hb = await handle('who'); await mouse('mouseMoved', hb.x, hb.y); await mouse('mousePressed', hb.x, hb.y); await mouse('mouseReleased', hb.x, hb.y);
         assert.equal(await ev(`localStorage.getItem(${JSON.stringify(KEY)})`), null, 'a press with no move keeps nothing');
         assert.equal(await ev(`document.querySelector('#dt-host .dt-widthbar').hidden && !document.querySelector('#dt-host .dt-box').classList.contains('dt-sized')`), true, 'and offers no Reset column widths: nothing changed');
+        // the accessibility tree under the fixture table (what a screen reader reads): the names of every node that is not ignored
+        const axNames = async () => {
+            await client.DOM.enable(); await client.Accessibility.enable();
+            const { root } = await client.DOM.getDocument({ depth: 0 });
+            const { nodeId } = await client.DOM.querySelector({ nodeId: root.nodeId, selector: '#dt-host' });
+            const { node } = await client.DOM.describeNode({ nodeId });
+            const { nodes } = await client.Accessibility.getFullAXTree();
+            const byId = new Map(nodes.map(n => [n.nodeId, n])), out = [];
+            const walk = n => { if (!n.ignored && n.name && n.name.value) out.push(n.name.value); for (const c of n.childIds || []) { const k = byId.get(c); if (k) walk(k); } };
+            const start = nodes.find(n => n.backendDOMNodeId === node.backendNodeId); if (start) walk(start);
+            return out;
+        };
+        assert.equal(await ev(`getComputedStyle(document.querySelector('#dt-host .dt-widthbar')).display`), 'none', 'the bar is display:none, not only out of sight (#8091)');
+        const fresh = await axNames();
+        assert.ok(fresh.length > 5, 'the accessibility tree of the table is read: ' + JSON.stringify(fresh));
+        assert.ok(!fresh.some(n => /Reset column widths/.test(n)), 'a screen reader finds no Reset column widths on a table whose widths are untouched: ' + JSON.stringify(fresh));
         assert.equal(await ev(`document.querySelector('#dt-host th[data-key="who"]').getAttribute('aria-sort')`), 'none', 'and does not sort');
         await drag('who', 70);
         const w1 = { name: await W('name'), who: await W('who'), n: await W('n') };
@@ -173,6 +189,7 @@ const BASE = require('./test_base').BASE;
         await mount();
         assert.ok(Math.abs((await W('who')) - kept) <= 2, 'a redraw (a new table for the same list) has the kept width: ' + (await W('who')) + ' vs ' + kept);
         assert.equal(await ev(`!!document.querySelector('#dt-host .dt-reset-widths') && !document.querySelector('#dt-host .dt-widthbar').hidden`), true, 'Reset column widths is there while any width is set');
+        assert.ok((await axNames()).some(n => /Reset column widths/.test(n)), 'and the accessibility tree has it once a width changed');
         // the keyboard
         await ev(`document.querySelector('#dt-host th[data-key="n"] .dt-resize').focus(); true`);
         const before = await W('n');
