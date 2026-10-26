@@ -7,7 +7,6 @@ const { SCAN } = require('./helpers/phone_scan');
 const { setTheme } = require('./helpers/contrast');
 const BASE = require('./test_base').BASE;
 const S = `(window.__coralStatic || '/static/')`;
-const SHOTS = process.env.CORAL_SCREENSHOT_DIR || '';
 
 const VIEWS = [['1280 px, 200% text', 1280, 800, false, 32], ['390 px', 390, 844, true, 16], ['390 px, 200% text', 390, 844, true, 32]];
 const JOBS = [
@@ -43,6 +42,7 @@ const BROKEN = `(() => { const c = document.createElement('canvas').getContext('
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const { settle } = require('./helpers/wait').bind(ev);
+    const shot = require('./helpers/scene_shots')(Page, 'text200-sidebar');
     const problems = [];
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: STUB });
@@ -77,8 +77,7 @@ const BROKEN = `(() => { const c = document.createElement('canvas').getContext('
                         if (gap !== null && gap < Math.max(8, safe)) problems.push(`${where}: the last row of the page's bar is ${gap} px from the screen's bottom edge (it must clear 8 px and the ${safe} px safe area)`);
                     }
                     if (broken.length) problems.push(`${where}: words broken across lines ${broken.join('; ')}`);
-                    if (SHOTS) { const s = await Page.captureScreenshot({ format: 'png' }); require('fs').writeFileSync(`${SHOTS}/sidebar-${name.replace(/[^a-z0-9]+/gi, '_')}-${label.replace(/[^a-z0-9]+/gi, '_')}-${theme}.png`, Buffer.from(s.data, 'base64')); }
-                } catch (e) { problems.push(`${where}: the probe failed: ${String(e.message).slice(0, 240)}`); }
+                } catch (e) { problems.push(`${where}: the probe failed: ${String(e.message).slice(0, 240)}`); } finally { await shot(`${name}-${label}-${theme}`); }
             }
         }
         for (const p of problems) console.log('[FAIL]', p);
