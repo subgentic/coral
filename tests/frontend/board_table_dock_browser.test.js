@@ -54,7 +54,7 @@ const BASE = require('./test_base').BASE;
         await ev(`document.querySelectorAll('#board-panel-msgs > .mb-message')[1].querySelector('.mb-row-toggle').click(); true`); await settle(250);
         const o = await ev(`(() => { const r = document.querySelectorAll('#board-panel-msgs > .mb-message')[1]; return { exp: r.querySelector('.mb-row-toggle').getAttribute('aria-expanded'), tags: r.querySelector(':scope > .mb-row-tags-open').getClientRects().length > 0, body: r.querySelector('.mb-message-body').getClientRects().length > 0, controls: r.querySelector('.mb-row-toggle').getAttribute('aria-controls') === r.querySelector('.mb-message-body').id, buttons: [...r.querySelectorAll('.mb-row-actions button')].map(b => b.textContent + ':' + Math.round(b.getBoundingClientRect().height)), replies: r.querySelector('.mb-row-replies').textContent }; })()`);
         assert.equal(o.exp, 'true'); assert.ok(o.tags && o.body && o.controls, JSON.stringify(o));
-        assert.deepEqual(o.buttons.map(b => b.split(':')[0]), ['Reply', 'Copy link']); assert.ok(o.buttons.every(b => +b.split(':')[1] >= 44), 'folded buttons are 44 px: ' + o.buttons);
+        assert.deepEqual(o.buttons.map(b => b.split(':')[0]), ['Open task #7757', 'Reply', 'Copy link']); assert.ok(o.buttons.every(b => +b.split(':')[1] >= 44), 'folded buttons are 44 px: ' + o.buttons);
         assert.ok(/Replies \(1\)/.test(o.replies));
         await shot('dock-table-open-default-dark');
 
@@ -70,9 +70,9 @@ const BASE = require('./test_base').BASE;
 
         console.log('Reply fills the box and posts reply_to; Copy link is the message\'s address');
         await ev(`document.querySelectorAll('#board-panel-msgs > .mb-message')[0].querySelector('.mb-row-toggle').click(); true`); await settle(200);
-        await ev(`document.querySelectorAll('#board-panel-msgs > .mb-message')[0].querySelector('.mb-row-actions button').click(); true`); await settle(150);
+        await ev(`document.querySelectorAll('#board-panel-msgs > .mb-message')[0].querySelector('.mb-row-actions').querySelectorAll('button').forEach(b => { if (b.textContent === 'Reply') b.click(); }); true`); await settle(150);
         assert.deepEqual(await ev(`({ v: document.getElementById('board-panel-input').value, f: document.activeElement === document.getElementById('board-panel-input') })`), { v: '@QA Engineer ', f: true });
-        const link = await ev(`(() => { let got = ''; Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async t => { got = t; } } }); document.querySelectorAll('#board-panel-msgs > .mb-message')[0].querySelectorAll('.mb-row-actions button')[1].click(); return new Promise(r => setTimeout(() => r(got), 200)); })()`);
+        const link = await ev(`(() => { let got = ''; Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async t => { got = t; } } }); document.querySelectorAll('#board-panel-msgs > .mb-message')[0].querySelectorAll('.mb-row-actions button').forEach(b => { if (b.textContent === 'Copy link') b.click(); }); return new Promise(r => setTimeout(() => r(got), 200)); })()`);
         const first = await ev(`document.querySelectorAll('#board-panel-msgs > .mb-message')[0].dataset.messageId`);
         assert.ok(link.endsWith(`/team/${B}/messages/${first}`), 'the link: ' + link);
         await ev(`(() => { const i = document.getElementById('board-panel-input'); i.value += 'thanks'; i.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('#agentic-panel-board .btn-send').click(); return true; })()`);

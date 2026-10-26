@@ -181,6 +181,37 @@ export function retagMentions(container, self = 'operator') {
     }
 }
 
+/** A reply answers the Question it names, for the member who wrote it (the server does the same: ask.open loses that member, answered when none is left). The loaded messages are updated in place and the ones that changed
+ * are returned, so a row already on screen can say so without a reload. */
+export function applyAnswers(all, fresh) {
+    const changed = [];
+    for (const r of fresh) {
+        if (!r || !r.reply_to) continue;
+        const p = all.find(x => x.id === r.reply_to);
+        if (!p || !p.ask || !Array.isArray(p.ask.open) || !p.ask.open.length) continue;
+        const who = [r.job_title, r.subscriber_id].filter(Boolean).map(x => String(x).toLowerCase());
+        const open = p.ask.open.filter(n => !who.includes(String(n).toLowerCase()));
+        if (open.length === p.ask.open.length) continue;
+        p.ask = { ...p.ask, open, answered: open.length === 0 };
+        if (!changed.includes(p)) changed.push(p);
+    }
+    return changed;
+}
+
+/** A Question's badge says its new state on a row that is already drawn: the head's marks (and the "+N" pill's name, which lists the rest), the open message's marks and the chat header's badge. */
+export function refreshAsk(row, m) {
+    const head = row.querySelector(':scope > .mb-row-toggle .mb-row-tags');
+    if (head && head.dataset.chips) {
+        const chips = JSON.parse(head.dataset.chips).map(c => (c.k === 'ask' ? { ...c, h: askBadge(m) } : c));
+        head.dataset.chips = JSON.stringify(chips);
+        head.innerHTML = layoutChips(chips);
+        const open = row.querySelector(':scope > .mb-row-tags-open');
+        if (open) open.innerHTML = layoutChips(chips, { all: true });
+    }
+    const old = row.querySelector(':scope > .mb-message-header .mb-ask-badge');
+    if (old) { const t = document.createElement('template'); t.innerHTML = askBadge(m); if (t.content.firstElementChild) old.replaceWith(t.content.firstElementChild); }
+}
+
 /** The replies to an open message, as buttons that go to each one: built from the rows now in the list (a reply is a row of its own, in order, indented). */
 function fillReplies(row) {
     const holder = row.querySelector(':scope > .mb-row-replies');

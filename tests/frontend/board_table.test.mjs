@@ -33,6 +33,17 @@ assert.ok(['Reply to Lead Developer', '@Backend Dev', '@QA Engineer', '#7790', '
 assert.ok(!layoutChips(many.slice(0, 3)).includes('more-tag'), 'three marks fit: no pill');
 assert.ok(layoutChips([many[0], many[1], many[2], many[3]]).includes('>+3</span>') && layoutChips([many[0], many[1], many[2], many[3]]).includes('@Backend Dev'), 'no Question: the first mention, then +N');
 
+const { applyAnswers } = await importUi('board_table');
+{ // a reply answers the Question it names, for the member who wrote it
+    const all = [{ id: 1, content: 'q', ask: { to: ['Backend Dev', 'QA Engineer'], open: ['Backend Dev', 'QA Engineer'], answered: false } }, { id: 2, content: 'plain' }];
+    assert.deepEqual(applyAnswers(all, [{ id: 3, job_title: 'Frontend Dev', reply_to: 1 }, { id: 4, job_title: 'x', reply_to: 2 }, { id: 5, job_title: 'y' }]), [], 'a stranger, a reply to a plain message and a non-reply change nothing');
+    const first = applyAnswers(all, [{ id: 6, job_title: 'backend dev', subscriber_id: 'be-1', reply_to: 1 }]);
+    assert.equal(first.length, 1); assert.deepEqual(all[0].ask, { to: ['Backend Dev', 'QA Engineer'], open: ['QA Engineer'], answered: false }, 'one of two answered: still open for the other');
+    applyAnswers(all, [{ id: 7, job_title: 'QA Engineer', reply_to: 1 }]);
+    assert.deepEqual(all[0].ask.open, []); assert.equal(all[0].ask.answered, true, 'every member asked has answered');
+    assert.deepEqual(applyAnswers(all, [{ id: 8, job_title: 'QA Engineer', reply_to: 1 }]), [], 'an answered Question is not changed again');
+}
+
 const now = new Date(2026, 9, 26, 12, 0, 0);
 assert.equal(dayLabel(new Date(2026, 9, 26, 1, 0).toISOString(), now), 'Today');
 assert.equal(dayLabel(new Date(2026, 9, 25, 23, 59).toISOString(), now), 'Yesterday');

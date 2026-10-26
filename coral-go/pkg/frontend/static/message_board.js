@@ -29,7 +29,7 @@ import { mountBoardSearch, highlightBoard, setBoardMembers, resetBoardSearch } f
 import { PAGE_SIZE, fetchAllBoardMessages, fetchAllHistory, fetchAllLiveChat, fetchMessages, fetchProjects, fetchSubscribers, mergeMessages } from './board_fetch.js';
 import { navigateToAgentSession } from './board_agent_links.js';
 import { initGrowingTextarea } from './growing_textarea.js';
-import { onRowActions, boardView, saveBoardView, rowParts, toggleRow, setAllRows, refreshReplies, retagMentions, revealRow, applyView, mountTableTools, forgetOpenRows, sameDay, dayDividerHtml, watchFold } from './board_table.js'; // the board as a table (#7921)
+import { onRowActions, boardView, saveBoardView, rowParts, toggleRow, setAllRows, refreshReplies, retagMentions, revealRow, applyAnswers, refreshAsk, applyView, mountTableTools, forgetOpenRows, sameDay, dayDividerHtml, watchFold } from './board_table.js'; // the board as a table (#7921)
 export { fetchAllBoardMessages, fetchAllHistory, fetchAllLiveChat } from './board_fetch.js';
 import { connectBoard, isSelectMode, isSelected, resetSelection, toggleMessageSelect, doExportBoard, hideExportBoardModal, selectAllMessages, selectNoneMessages, exportSelectedAsMarkdown, cancelSelectMode } from './board_export.js';
 export { showExportBoardModal, doExportBoard, toggleSelectMode, toggleMessageSelect, selectAllMessages, selectNoneMessages, cancelSelectMode, exportSelectedAsMarkdown } from './board_export.js';
@@ -1112,6 +1112,7 @@ async function _pollNewMessages() {
         }
         if (fresh.length > 0) {
             _allMessages = mergeMessages(_allMessages, fresh);
+            for (const p of applyAnswers(_allMessages, fresh)) { const row = container && container.querySelector(`:scope > .mb-message[data-message-id="${Number(p.id)}"]`); if (row) refreshAsk(row, p); } // a Question these answer says so now
             appendNewMessages(fresh.length);
         } else if (totalChanged && container && container.querySelector(ROW)) {
             updateBoardHeader(container);
