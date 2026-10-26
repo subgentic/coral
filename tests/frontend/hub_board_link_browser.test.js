@@ -30,6 +30,22 @@ const { setupHubWorld, BASE } = require('./helpers/hub_world');
             assert.equal(page.machine, true, 'the computer is named'); assert.equal(page.wide, true, 'no sideways scroll');
             assert.deepEqual(await ev(`window.__cspViolations`), [], 'no CSP violation');
             await shot(`hub-board-${w}`);
+            // #8435: the page can fit while its nested message scroller still overflows.
+            // A full date/time must fit its cell, not merely exist in textContent.
+            await ev(`document.fonts.ready.then(() => true)`);
+            const geometry = await ev(`(() => {
+                const list = document.getElementById('mb-messages');
+                return { scroll: list.scrollWidth, client: list.clientWidth,
+                    times: [...list.querySelectorAll('.mb-row-toggle .message-time')].filter(e => e.checkVisibility()).map(e => {
+                        const range = document.createRange(); range.selectNodeContents(e);
+                        const text = range.getBoundingClientRect(), cell = e.getBoundingClientRect(), row = e.closest('.mb-row-toggle').getBoundingClientRect();
+                        return { value: e.textContent, textLeft: text.left, textRight: text.right, cellLeft: cell.left, cellRight: cell.right, rowRight: row.right, listRight: list.getBoundingClientRect().right };
+                    }) };
+            })()`);
+            assert.equal(geometry.scroll, geometry.client, `${w}: the board's own scroller has no horizontal overflow: ${JSON.stringify(geometry)}`);
+            assert.ok(geometry.times.length >= 3, `${w}: visible message timestamps measured`);
+            for (const t of geometry.times) assert.ok(t.textLeft >= t.cellLeft - 1 && t.textRight <= t.cellRight + 1 && t.textRight <= t.rowRight + 1 && t.textRight <= t.listRight + 1,
+                `${w}: the whole timestamp fits its cell and board: ${JSON.stringify(t)}`);
             console.log('   ✓');
         }
         console.log('PASS hub board link: /board/@m1/<team> opens the team page Messages tab with the board table (Table default, Table | Chat switch), no old page parts');
