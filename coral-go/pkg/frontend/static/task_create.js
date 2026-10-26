@@ -27,7 +27,7 @@ function taskFields() {
         { key: 'body', type: 'textarea', id: 'create-task-body', label: 'Description', rows: 3, placeholder: 'Optional description' },
         { key: 'priority', type: 'select', id: 'create-task-priority', label: 'Priority', default: 'medium', options: PRIORITIES },
         // Board tasks only (hidden for an agent that is not on a board)
-        { key: 'assigned_to', type: 'select', id: 'create-task-assignee', label: 'Assigned To', default: '', options: [{ value: '', label: 'Unassigned' }], visibleWhen: board },
+        { key: 'assigned_to', type: 'select', id: 'create-task-assignee', label: 'Assigned to', default: '', options: [{ value: '', label: 'Unassigned' }], visibleWhen: board },
         { key: 'goal_id', type: 'select', id: 'create-task-goal', label: 'Goal', default: '', options: [], visibleWhen: () => board() && _goalShown, messageAsIs: true,
             validate: v => (board() && _goalShown && _requireGoal && !v ? `${chooseGoalLabel}: this board needs a goal on every task.` : '') },
         { key: 'draft', type: 'toggle', id: 'create-task-draft', label: 'Create as draft', default: false, help: 'Not visible to agents until published.', visibleWhen: board },
@@ -73,7 +73,7 @@ export async function showCreateTaskModal(preset = {}) {
     const heading = document.getElementById('create-task-heading');
     if (heading) heading.textContent = _solo
         ? `New task for ${state.currentSession.display_name || state.currentSession.name}`
-        : 'Create Task';
+        : 'Create task';
     v.refresh();
 
     // Populate assignee dropdown from board subscribers
