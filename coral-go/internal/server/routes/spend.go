@@ -327,6 +327,88 @@ func (h *SpendHandler) readToolCalls(ctx context.Context, ro *spendRoster, fr sp
 	return out, ""
 }
 
+// spendCommitRead is what main's history says about the window and the usual: the summary the reply carries and the commits of each period.
+type spendCommitRead struct {
+	info       spendCommits
+	win, usual []landedcommits.Commit
+}
+
+// readCommits reads the repository the board's agents share (their most common git root), its default branch's history for the usual period and the window, and the merge queue's landed commits in the window.
+// Why there is nothing to say comes back in the words of info.Reason, never as a zero.
+func (h *SpendHandler) readCommits(ctx context.Context, project string, ro *spendRoster, fr spendFrame) *spendCommitRead {
+	var dirs []string
+	for _, id := range ro.order {
+		dirs = append(dirs, ro.accs[id].sess.WorkingDir)
+	}
+	cm := &spendCommitRead{info: spendCommits{QueueLanded: map[string]int{}}}
+	if root := landedcommits.CommonRoot(ctx, dirs); root == "" {
+		cm.info.Reason = "no repository found for this board's agents"
+	} else if branch := landedcommits.DefaultBranch(ctx, root); branch == "" {
+		cm.info.Reason = "the repository has no main branch (origin/HEAD, main or master)"
+		cm.info.Repo = filepath.Base(root)
+	} else {
+		all, capped, err := h.commits.Read(ctx, root, branch, fr.usualStart, fr.end)
+		if err != nil {
+			cm.info.Reason = "the repository's history could not be read"
+		} else {
+			cm.info.Available, cm.info.Repo, cm.info.Branch, cm.info.Capped = true, filepath.Base(root), branch, capped
+			for _, c := range all {
+				if t, perr := time.Parse(time.RFC3339, c.At); perr == nil && !t.Before(fr.start) {
+					cm.win = append(cm.win, c)
+				} else {
+					cm.usual = append(cm.usual, c)
+				}
+			}
+			wn, un := len(cm.win), len(cm.usual)
+			cm.info.Window, cm.info.Usual = &wn, &un
+		}
+	}
+	if landed, err := h.bs.LandedSince(ctx, project, spendStamp(fr.start), 0); err == nil {
+		seen := map[string]bool{}
+		for _, l := range landed {
+			if !seen[l.SHA] {
+				seen[l.SHA] = true
+				cm.info.QueueLanded[l.LandedBy]++
+			}
+		}
+	}
+	return cm
+}
+
+// spendNameKey is how two spellings of a name are one: lower case, without the spaces around it.
+func spendNameKey(s string) string { return strings.ToLower(strings.TrimSpace(s)) }
+
+// attributeCommits finds each commit's agent by its author name: the agent's display name, its role on the board or its folder, whichever comes first; a commit that matches no agent is counted in
+// info.Unattributed. It answers the window's commits per session and every commit (both periods) per hour.
+func attributeCommits(info *spendCommits, cm *spendCommitRead, ro *spendRoster) (map[string]int, map[string]int) {
+	byName := map[string]string{} // lower-case name -> session id
+	for _, id := range ro.order {
+		a := ro.accs[id]
+		for _, n := range []string{displayOf(a.sess), ro.roleOf[naming.SessionName(a.sess.AgentType, id)], a.sess.AgentName} {
+			if k := spendNameKey(n); k != "" {
+				if _, ok := byName[k]; !ok {
+					byName[k] = id
+				}
+			}
+		}
+	}
+	commitsBy := map[string]int{}
+	hourCommits := map[string]int{}
+	for _, c := range cm.win {
+		if id, ok := byName[spendNameKey(c.Author)]; ok {
+			commitsBy[id]++
+		} else {
+			info.Unattributed++
+		}
+	}
+	for _, c := range append(append([]landedcommits.Commit(nil), cm.win...), cm.usual...) {
+		if t, err := time.Parse(time.RFC3339, c.At); err == nil {
+			hourCommits[t.Format("2006-01-02T15")]++
+		}
+	}
+	return commitsBy, hourCommits
+}
+
 // Spend answers GET /api/board/{project}/spend?range=24h|7d.
 func (h *SpendHandler) Spend(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
@@ -370,72 +452,10 @@ func (h *SpendHandler) Spend(w http.ResponseWriter, r *http.Request) {
 	}
 	toolWin, toolUsual, toolBySession, toolByBucket := tools.window, tools.usual, tools.bySession, tools.byHour
 
-	// commits from main's history
-	var dirs []string
-	for _, id := range order {
-		dirs = append(dirs, accs[id].sess.WorkingDir)
-	}
-	commitInfo := spendCommits{QueueLanded: map[string]int{}}
-	var winCommits, usualCommits []landedcommits.Commit
-	if root := landedcommits.CommonRoot(ctx, dirs); root == "" {
-		commitInfo.Reason = "no repository found for this board's agents"
-	} else if branch := landedcommits.DefaultBranch(ctx, root); branch == "" {
-		commitInfo.Reason = "the repository has no main branch (origin/HEAD, main or master)"
-		commitInfo.Repo = filepath.Base(root)
-	} else {
-		all, capped, err := h.commits.Read(ctx, root, branch, usualStart, end)
-		if err != nil {
-			commitInfo.Reason = "the repository's history could not be read"
-		} else {
-			commitInfo.Available, commitInfo.Repo, commitInfo.Branch, commitInfo.Capped = true, filepath.Base(root), branch, capped
-			for _, c := range all {
-				if t, perr := time.Parse(time.RFC3339, c.At); perr == nil && !t.Before(start) {
-					winCommits = append(winCommits, c)
-				} else {
-					usualCommits = append(usualCommits, c)
-				}
-			}
-			wn, un := len(winCommits), len(usualCommits)
-			commitInfo.Window, commitInfo.Usual = &wn, &un
-		}
-	}
-	if landed, err := h.bs.LandedSince(ctx, project, f(start), 0); err == nil {
-		seen := map[string]bool{}
-		for _, l := range landed {
-			if !seen[l.SHA] {
-				seen[l.SHA] = true
-				commitInfo.QueueLanded[l.LandedBy]++
-			}
-		}
-	}
-
-	// which agent each commit's author is
-	nameKey := func(s string) string { return strings.ToLower(strings.TrimSpace(s)) }
-	byName := map[string]string{} // lower-case name -> session id
-	for _, id := range order {
-		a := accs[id]
-		for _, n := range []string{displayOf(a.sess), roleOf[naming.SessionName(a.sess.AgentType, id)], a.sess.AgentName} {
-			if k := nameKey(n); k != "" {
-				if _, ok := byName[k]; !ok {
-					byName[k] = id
-				}
-			}
-		}
-	}
-	commitsBy := map[string]int{}
-	hourCommits := map[string]int{}
-	for _, c := range winCommits {
-		if id, ok := byName[nameKey(c.Author)]; ok {
-			commitsBy[id]++
-		} else {
-			commitInfo.Unattributed++
-		}
-	}
-	for _, c := range append(append([]landedcommits.Commit(nil), winCommits...), usualCommits...) {
-		if t, err := time.Parse(time.RFC3339, c.At); err == nil {
-			hourCommits[t.Format("2006-01-02T15")]++
-		}
-	}
+	cm := h.readCommits(ctx, project, roster, fr)
+	commitInfo := cm.info
+	nameKey := spendNameKey
+	commitsBy, hourCommits := attributeCommits(&commitInfo, cm, roster)
 
 	// task times
 	winTasks, err := h.bs.TasksCompletedBetween(ctx, project, f(start), f(end))
