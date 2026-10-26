@@ -1,0 +1,1 @@
+{"timestamp": "2026-10-26T15:18:04.673Z", "ordinal": 7, "type": "turn_context", "payload": {"approval_policy": "on-request", "approvals_reviewer": "auto_review", "sandbox_policy": {"type": "workspace-write", "network_access": false, "exclude_tmpdir_env_var": false, "exclude_slash_tmp": false}, "turn_id": "8471-turn"}}
