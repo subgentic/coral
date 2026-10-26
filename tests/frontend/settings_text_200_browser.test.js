@@ -1,6 +1,6 @@
 // Settings at 200% text (#8277): every group, at 1280 and at 390 px with the text doubled (root font-size 32px), plus Network and Hub and Updates in hub mode.
 // In each pane no control is clipped by its own container, runs past the dialog's edge, or sits on top of another control; the pane never scrolls sideways.
-// Drives Chrome over CDP through agent_view_harness.js against an isolated dev server; run_cdp_suites.mjs finds it by name. CORAL_SCREENSHOT_DIR keeps a shot of each pane.
+// Drives Chrome over CDP through agent_view_harness.js against an isolated dev server; run_cdp_suites.mjs finds it by name. A shot of each pane goes to CORAL_SCREENSHOT_DIR, else RUNNER_TEMP/out (what the gate uploads).
 const fs = require('node:fs');
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -39,7 +39,9 @@ const SCAN = `(() => {
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
+    // the shots go where the gate uploads from (RUNNER_TEMP/out) when no folder is named, so a run on a runner has its pictures
+    const shotDir = process.env.CORAL_SCREENSHOT_DIR || (process.env.RUNNER_TEMP ? `${process.env.RUNNER_TEMP}/out` : '');
+    const shot = async n => { const d = shotDir; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const findings = [];
     let allGroups = [];
     try {
