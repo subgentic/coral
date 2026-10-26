@@ -514,6 +514,7 @@ var DashboardPagePaths = []string{
 	"/inbox/tasks", "/inbox/tasks/*", "/inbox/boards", "/inbox/boards/*",
 	"/team/*",
 	"/board/*",
+	"/inbox/*", // the Inbox folders (#8652): /inbox/<folder>; a bare /inbox is Coral Hub's own page and is not served here
 	"/workflows", "/workflows/*",
 	"/jobs", "/jobs/*",
 	"/analytics", "/analytics/*",

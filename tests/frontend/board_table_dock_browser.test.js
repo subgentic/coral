@@ -74,7 +74,7 @@ const BASE = require('./test_base').BASE;
         assert.deepEqual(await ev(`({ v: document.getElementById('board-panel-input').value, f: document.activeElement === document.getElementById('board-panel-input') })`), { v: '@QA Engineer ', f: true });
         const link = await ev(`(() => { let got = ''; Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async t => { got = t; } } }); document.querySelectorAll('#board-panel-msgs > .mb-message')[0].querySelectorAll('.mb-row-actions button').forEach(b => { if (b.textContent === 'Copy link') b.click(); }); return new Promise(r => setTimeout(() => r(got), 200)); })()`);
         const first = await ev(`document.querySelectorAll('#board-panel-msgs > .mb-message')[0].dataset.messageId`);
-        assert.ok(link.endsWith(`/team/${B}/messages/${first}`), 'the link: ' + link);
+        assert.ok(link.endsWith(`/team/${B}/board/${first}`), 'the link: ' + link);
         await ev(`(() => { const i = document.getElementById('board-panel-input'); i.value += 'thanks'; i.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('#agentic-panel-board .btn-send').click(); return true; })()`);
         await waitFor(`document.querySelectorAll('#board-panel-msgs > .mb-message').length >= 7`, 'the reply row', 10000);
         const list = await ev(`fetch('/api/board/${B}/messages/all?limit=20').then(r => r.json())`);
