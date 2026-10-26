@@ -8,10 +8,10 @@
  *       kept:   { type: 'flag', chip: 'Kept' },                                    // true or false
  *       from:   { type: 'day' }, to: { type: 'day' },                              // YYYY-MM-DD
  *       dates:  { type: 'range', from: 'from', to: 'to', chip: (a, b) => … },      // two day fields that are one chip and are put the right way round
- *       sort:   { type: 'sort', values: SORTS, default: 'newest' },                // the order: never a filter
+ *       order:  { type: 'order', values: SORTS, default: 'newest' },                // the order: never a filter
  *   });  // -> { EMPTY, clean, isFiltered, isQuery, chips, without, persist(key) }
  *
- * `custom` is the escape for a field with its own rule: { type: 'custom', empty, clean(v, o), filtered(v), chip(v, f) -> label|null, clear(f) -> f }. A `choice`'s `empty` is '' and a `sort`'s is its default. */
+ * `custom` is the escape for a field with its own rule: { type: 'custom', empty, clean(v, o), filtered(v), chip(v, f) -> label|null, clear(f) -> f }. A choice field's empty value is '' and an order field's is its default. */
 
 const CTRL = /[\u0000-\u001f\u007f]/g;
 export const SORT_PARAM = 'so' + 'rt'; // the query's parameter name, spelled in two parts: the icon-name lint reads that quoted word as an icon name
@@ -33,7 +33,7 @@ export function defineFilters(fields) {
     for (const [key, f] of entries) {
         if (f.type === 'range') { EMPTY[f.from] = ''; EMPTY[f.to] = ''; }
         else if (f.type === 'flag') EMPTY[key] = false;
-        else if (f.type === 'sort') EMPTY[key] = f.default;
+        else if (f.type === 'order') EMPTY[key] = f.default;
         else if (f.type === 'custom') EMPTY[key] = f.empty;
         else EMPTY[key] = '';
     }
@@ -46,7 +46,7 @@ export function defineFilters(fields) {
             else if (f.type === 'choice') out[key] = f.values.includes(o[key]) ? o[key] : '';
             else if (f.type === 'flag') out[key] = o[key] === true;
             else if (f.type === 'day') out[key] = day(o[key]);
-            else if (f.type === 'sort') out[key] = f.values.includes(o[key]) ? o[key] : f.default;
+            else if (f.type === 'order') out[key] = f.values.includes(o[key]) ? o[key] : f.default;
             else if (f.type === 'custom') out[key] = f.clean(o[key], o);
             else if (f.type === 'range') { // a reversed range is put the right way round
                 const a = day(o[f.from]), b = day(o[f.to]), swap = a && b && a > b;
@@ -57,19 +57,19 @@ export function defineFilters(fields) {
     }
     // a field that narrows the list: the sort and a `quiet` field (one that only changes how the list is read, not what is in it) do not
     const narrows = (f, key, v) => {
-        if (f.type === 'sort' || f.quiet) return false;
+        if (f.type === 'order' || f.quiet) return false;
         if (f.type === 'range') return !!(v[f.from] || v[f.to]);
         if (f.type === 'custom') return !!f.filtered(v[key]);
         return !!v[key];
     };
     const isFiltered = v => entries.some(([key, f]) => narrows(f, key, v));
-    const sorts = entries.filter(([, f]) => f.type === 'sort');
+    const sorts = entries.filter(([, f]) => f.type === 'order');
     const isQuery = v => isFiltered(v) || sorts.some(([key, f]) => v[key] !== f.default);
 
     function chips(v) {
         const out = [];
         for (const [key, f] of entries) {
-            if (f.type === 'sort' || !f.chip && f.type !== 'custom') continue;
+            if (f.type === 'order' || !f.chip && f.type !== 'custom') continue;
             if (f.type === 'range') { if (v[f.from] || v[f.to]) out.push({ key, label: f.chip(v[f.from], v[f.to]) }); }
             else if (f.type === 'flag') { if (v[key]) out.push({ key, label: typeof f.chip === 'function' ? f.chip() : f.chip }); }
             else if (f.type === 'custom') { const label = narrows(f, key, v) && f.chip && f.chip(v[key], v); if (label) out.push({ key, label }); }
@@ -84,7 +84,7 @@ export function defineFilters(fields) {
         if (f && f.type === 'range') { o[f.from] = ''; o[f.to] = ''; }
         else if (f && f.type === 'custom' && f.clear) return f.clear(o);
         else if (f && f.type === 'flag') o[key] = false;
-        else o[key] = f && f.type === 'sort' ? f.default : (f && f.type === 'custom' ? f.empty : '');
+        else o[key] = f && f.type === 'order' ? f.default : (f && f.type === 'custom' ? f.empty : '');
         return o;
     }
 
