@@ -53,6 +53,7 @@ const RANK = { high: 0, medium: 1, low: 2 };
 const stateOf = t => TC.taskWord(t);
 const inboxTasksState = DT.tableState();
 const needsState = DT.tableState();
+const dockSavedState = DT.tableState();
 const savedState = DT.tableState(); // one word set for a task's state (Queued, In progress, Blocked, In review, Done), here as everywhere
 const taskText = t => [t.title, t.board, t.priority, stateOf(t), t.created_by].join(' ').toLowerCase();
 const taskRows = () => tasks.filter(t => !queries.tasks || taskText(t).includes(queries.tasks)).sort((a, b) => (RANK[a.priority] ?? 3) - (RANK[b.priority] ?? 3));
@@ -100,34 +101,23 @@ export function renderInboxNav(force = false) {
 }
 
 // ── The tables ───────────────────────────────────────────────────────────
-/** The Saved table's spec: the Inbox's group table, and the dock's Saved tab (`where: 'dock-tab'`: no title row, rows that open the message in the Inbox) are this one list drawn twice. */
-function savedTableSpec(where = '') {
-        const v = saved.savedView();
-        const rows = v.shown.map(saved.savedItemFacts);
-        const empty = v.loading ? 'Loading saved items' : v.error ? v.error : v.filtered ? 'No saved messages match this search.' : v.scoped || (v.tab === 'done' ? 'Nothing is marked done.' : 'Nothing is saved for later.'); // the first read says it is loading, not that nothing is saved; a failed one says so
-        const multi = rows.some(f => f.serverName); // on a hub the computer each message is on is a column
-    return { title: 'Saved', stack: true, headless: where === 'dock-tab', columns: multi ? ['Message', 'Computer', 'Saved', 'State', 'Action'] : ['Message', 'Saved', 'State', 'Action'], chipsLabel: 'Show',
-            chips: [{ action: 'inbox-saved-chip', data: { tab: 'open' }, label: 'Open', count: v.totals.open, pressed: v.tab === 'open' }, { action: 'inbox-saved-chip', data: { tab: 'done' }, label: 'Done', count: v.totals.done, pressed: v.tab === 'done' }],
-            empty: { line: empty, hint: v.loading || v.error || v.filtered || v.tab === 'done' ? '' : 'Save a message from a chat or a board with its bookmark.' },
-            note: [v.query ? 'The search covers every saved message, not only these.' : '', ...v.down.map(d => `${d.label || d.id} did not answer, so its saved messages are not shown.`)].filter(Boolean).join(' '),
-            rows: rows.map(f => ({ title: f.which, action: 'inbox-saved-open', data: where ? { id: f.id, where } : { id: f.id },
-                cells: [...(multi ? [f.serverName] : []), f.saved, f.state, f.gone ? '' : { action: 'inbox-saved-done', data: { id: f.id }, label: f.done ? 'Reopen' : 'Done', aria: `${f.done ? 'Reopen, move back to Open' : 'Mark done'}: ${f.which}` }] })) };
-
-}
-
-/** The Saved folder's page: the chips (Open, Done) above, the one table under them. The dock's Saved tab keeps savedTableSpec (its own small table) until the dock's lists move. */
-function savedListSpec() {
+/** Saved uses the same columns in the Inbox and dock; only its opener and table state differ. */
+function savedListSpec(where = '') {
     const v = saved.savedView();
     const rows = v.shown.map(saved.savedItemFacts);
-    const spec = savedTableSpec();
+    const dock = where === 'dock-tab';
     const multi = rows.some(f => f.serverName);
-    return { title: spec.title, chipsLabel: spec.chipsLabel, chips: spec.chips, empty: spec.empty, note: spec.note, rows,
+    const empty = v.loading ? 'Loading saved items' : v.error ? v.error : v.filtered ? 'No saved messages match this search.' : v.scoped || (v.tab === 'done' ? 'Nothing is marked done.' : 'Nothing is saved for later.');
+    return { title: 'Saved', headless: dock, chipsLabel: 'Show',
+        chips: [{ action: 'inbox-saved-chip', data: { tab: 'open' }, label: 'Open', count: v.totals.open, pressed: v.tab === 'open' }, { action: 'inbox-saved-chip', data: { tab: 'done' }, label: 'Done', count: v.totals.done, pressed: v.tab === 'done' }],
+        empty: { line: empty, hint: v.loading || v.error || v.filtered || v.tab === 'done' ? '' : 'Save a message from a chat or a board with its bookmark.' },
+        note: [v.query ? 'The search covers every saved message, not only these.' : '', ...v.down.map(d => `${d.label || d.id} did not answer, so its saved messages are not shown.`)].filter(Boolean).join(' '), rows,
         signature: JSON.stringify([multi, rows.map(f => [f.id, f.which, f.saved, f.state, f.gone, f.done, f.serverName])]),
-        node: () => DT.dataTable({ label: `Saved, ${rows.length}`, rows, rowKey: f => f.id, state: savedState, rowName: f => f.which,
-            open: f => openSavedPage(f.id),
+        node: () => DT.dataTable({ label: `Saved, ${rows.length}`, rows, rowKey: f => f.id, state: dock ? dockSavedState : savedState, sortBar: false, rowName: f => f.which,
+            open: (f, row) => dock ? openDockSavedSheet(f.id, row.querySelector('.dt-primary')) : openSavedPage(f.id),
             columns: [
                 { key: 'message', label: 'Message', primary: true, width: 'grow', line: 1, cell: f => { const b = DT.primaryButton(f.which); b.dataset.id = f.id; return b; } },
-                ...(multi ? [{ key: 'machine', label: 'Computer', line: 0, cell: f => f.serverName || '' }] : []),
+                ...(multi ? [{ key: 'machine', label: 'Computer', line: dock ? 2 : 0, cell: f => f.serverName || '' }] : []),
                 { key: 'saved', label: 'Saved', tone: 'tertiary', align: 'end', line: 1, cell: f => f.saved },
                 { key: 'state', label: 'State', line: 2, cell: f => (f.state ? DT.tag(f.state) : '') },
                 { key: 'action', label: 'Action', line: 2, cell: f => {
@@ -165,7 +155,7 @@ async function openDockSavedSheet(id, opener) {
         },
         onClose: () => {
             dockSheetId = '';
-            if (!opener.isConnected) $('saved-table')?.querySelector('.group-chip, .group-table-link')?.focus({ preventScroll: true }); // the row went (removed, or the table was drawn again)
+            if (!opener.isConnected) $('saved-table')?.querySelector('.group-chip, .dt-primary')?.focus({ preventScroll: true }); // the row went (removed, or the table was drawn again)
         },
     });
 }
@@ -173,13 +163,20 @@ async function openDockSavedSheet(id, opener) {
 /** The dock's Saved tab (#saved-table, saved.js render): the same table for the page's scope, drawn into the dock; the keyboard stays on the control it was on when it is still there. */
 export function drawDockSaved(host) {
     const held = host.contains(document.activeElement) ? document.activeElement : null;
-    const was = held && { cls: held.className, id: held.dataset.id || held.closest('tr')?.querySelector('.group-table-link')?.dataset.id || '', tab: held.dataset.tab || '' };
-    const html = tableMarkup(savedTableSpec('dock-tab'));
-    if (host.dataset.drawn !== html) { host.innerHTML = html; host.dataset.drawn = html; }
+    const was = held && { cls: held.className, id: held.dataset.id || held.closest('tr')?.dataset.key || '', tab: held.dataset.tab || '' };
+    const spec = savedListSpec('dock-tab'), html = tableMarkup(spec), signature = html + spec.signature;
+    if (host.dataset.drawn !== signature) {
+        const folded = !!host.querySelector('.dt-box.dt-folded');
+        host.innerHTML = html;
+        const slot = host.querySelector('.group-table-node');
+        if (slot) { const table = spec.node(); table.classList.toggle('dt-folded', folded); slot.replaceWith(table); }
+        host.dataset.drawn = signature;
+    }
     if (dockSheetId && !saved.savedView().shown.some(i => saved.savedItemFacts(i).id === dockSheetId)) importOnce('./detail_pane.js').then(m => m.closeDetailPane()); // another agent's Saved is on screen, or the message left the list: its sheet goes
     if (!was) return;
-    const same = [...host.querySelectorAll('.group-table-link, .group-table-cell-btn, .group-chip')].find(e => e.className === was.cls && (e.dataset.id || e.closest('tr')?.querySelector('.group-table-link')?.dataset.id || '') === was.id && (e.dataset.tab || '') === was.tab);
-    (same || host.querySelector('.group-chip, .group-table-link'))?.focus({ preventScroll: true }); // a row that went (Done, Reopen) leaves the focus on the table's first control, not on the page
+    const same = [...host.querySelectorAll('.dt-primary, .dt-quiet, .group-chip')].find(e => e.className === was.cls && (e.dataset.id || e.closest('tr')?.dataset.key || '') === was.id && (e.dataset.tab || '') === was.tab);
+    (same || host.querySelector('.group-chip, .dt-primary'))?.focus({ preventScroll: true }); // a removed row leaves focus on the first control
+
 }
 
 registerGroupSource('hub-inbox', {

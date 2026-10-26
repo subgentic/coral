@@ -333,7 +333,7 @@ export async function openSaved({ toggle = false } = {}) {
     tab = 'open';
     wire();
     await showSaved();
-    ($('saved-table').querySelector('.group-chip, .group-table-link') || $('saved-close')).focus();
+    ($('saved-table').querySelector('.group-chip, .dt-primary') || $('saved-close')).focus();
 }
 
 // ── The Inbox's Saved group (#7472) ──────────────────────────────────
