@@ -1,3 +1,4 @@
+import { hasWorkingDisplayHint } from './display_activity_hint.js';
 /* Moved out of live_chat.js as it was (#3837): no behaviour change. */
 import { deriveSessionState } from './render.js';
 import { escapeHtml, escapeAttr, renderMarkdown } from './utils.js';
@@ -47,6 +48,7 @@ function needsInputInfo(session) {
     const pt = pendingToolBySession.get(session.session_id) || null;
     const screen = promptOptionsBySession.get(session.session_id) || null;
     if (pt && BLOCKING_TOOLS[pt.tool_name]) return { kind: BLOCKING_TOOLS[pt.tool_name], tool: pt, screen };
+    if (hasWorkingDisplayHint(row) && !(screen && screen.options.length)) return null;
     if (row.waiting_for_input && row.waiting_kind !== "login") return { kind: "permission", tool: pt, screen, summary: String(row.waiting_summary || "").replace(/^Notification:\s*/, "") };
     if (readsPromptsFromScreen(session) && screen && screen.options.length) return { kind: pt ? "permission" : "prompt", tool: pt, screen };
     if (key === "check_terminal") {
@@ -363,6 +365,10 @@ registerActions({
         if (again) { again.disabled = false; again.textContent = "Check again"; }
     },
 });
+
+export function refreshNeedsInputCard() {
+    if (_lastCard) syncNeedsInputCard(_lastCard.container, _lastCard.session);
+}
 
 export function syncNeedsInputCard(container, session) {
     _lastCard = { container, session };
