@@ -22,7 +22,7 @@ import { setHidden } from './dom_write.js';
 import { onViewShown } from './view_switch.js';
 import { importOnce } from './import_once.js';
 import { onInboxHooks, setInboxCount, askOf } from './inbox_tab.js';
-const { coralInboxAdapter, savedExpandFor } = await importOnce('./inbox_coral.js');
+const { coralInboxAdapter, savedExpandFor, listInboxGoals } = await importOnce('./inbox_coral.js');
 const saved = await importOnce('./saved.js');
 const DT = await importOnce('./data_table.js'); // the one table (#7743): the Tasks group's page is its Tasks columns
 const TF = await importOnce('./task_filters.js');
@@ -202,9 +202,7 @@ function inboxGoalsToolbar() {
 }
 async function refreshGoals() {
     try {
-        const r = await fetch('/api/goals?limit=100');
-        const d = r.ok ? await r.json() : { goals: [] };
-        goals = Array.isArray(d.goals) ? d.goals : [];
+        goals = await listInboxGoals();
     } catch { goals = []; }
     renderInboxNav(true);
 }
