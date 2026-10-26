@@ -12,11 +12,21 @@ const NAME = 'Production build server for the release candidate integration and 
     const shot = async name => { const d=process.env.CORAL_SCREENSHOT_DIR || (process.env.RUNNER_TEMP ? `${process.env.RUNNER_TEMP}/out/shots-8144` : ''); if (!d) return; fs.mkdirSync(d,{recursive:true}); fs.writeFileSync(`${d}/${name}.png`,Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64')); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD});
+        // Supply a consistent hub from the first health/live reads, including later refreshes.
+        await Page.addScriptToEvaluateOnNewDocument({source:`(() => {
+            const real=window.fetch, servers=[{id:'build-west',label:${JSON.stringify(NAME)},status:'online',url:'https://build.example.com',agents:4}];
+            const J=o=>Promise.resolve(new Response(JSON.stringify(o),{headers:{'Content-Type':'application/json'}}));
+            window.fetch=(u,o)=>{const p=new URL(String(u),location.origin).pathname;
+                if(p==='/api/health')return J({status:'ok',hub:true});
+                if(p==='/api/sessions/live')return J({sessions:[],servers});
+                if(p==='/api/servers')return J(servers);
+                return real(u,o);};
+        })()`});
         for (const width of [1280,390]) {
             await Emulation.setDeviceMetricsOverride({width,height:900,deviceScaleFactor:1,mobile:width===390});
             await Emulation.setTouchEmulationEnabled({enabled:width===390});
             await Page.navigate({url:BASE+'/'}); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(()=>true)`);
+            await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
             await ev(`(async()=>{ const real=window.fetch; const J=o=>Promise.resolve(new Response(JSON.stringify(o),{headers:{'Content-Type':'application/json'}}));
                 const run={id:1,status:'failed',error_msg:${JSON.stringify(REASON)},started_at:'2026-10-25T12:00:00Z',finished_at:'2026-10-25T12:01:00Z'};
                 const job={id:1,name:'Release packaging',job_type:'prompt',agent_type:'claude',enabled:1,cron_expr:'0 2 * * *',timezone:'UTC',repo_path:'/work/repo',prompt:'Build the release',max_duration_s:3600,last_run:run};
@@ -35,7 +45,7 @@ const NAME = 'Production build server for the release candidate integration and 
                 assert.equal(reason.size,'12px'); assert.equal(reason.weight,'400'); assert.equal(reason.clamp,'2'); assert.equal(reason.normal,'normal'); assert.ok(reason.below && reason.over<=1,JSON.stringify(reason));
                 await shot(`jobs-long-reason-${width}-${theme}`);
                 await ev(`window.switchNavTab('servers'); true`);
-                await waitFor(`!!document.querySelector('#servers-table-slot .dt-name-text')`, 'long server name');
+                await waitFor(`!!document.querySelector('#servers-table-slot .dt-name-text')`, 'long server name', 10000, `({tab:document.querySelector('.nav-tab.active')?.id,body:document.querySelector('#servers-tab-body')?.textContent,servers:window.__qaState?.servers})`);
                 const name=await ev(`(()=>{const n=document.querySelector('#servers-table-slot .dt-name-text'),b=n.closest('button'),s=getComputedStyle(n),td=n.closest('td');return {text:n.textContent,title:td.title,buttonTitle:b.title,accessible:b.getAttribute('aria-label'),space:s.whiteSpace,clamp:s.webkitLineClamp,folded:!!n.closest('.dt-folded'),height:b.getBoundingClientRect().height,clipped:n.scrollWidth>n.clientWidth,over:document.documentElement.scrollWidth-innerWidth};})()`);
                 assert.equal(name.text,NAME); assert.equal(name.title,NAME); assert.equal(name.buttonTitle,NAME); assert.equal(name.accessible,'Open '+NAME); assert.ok(name.over<=1,JSON.stringify(name));
                 if(width===390){assert.equal(name.folded,true);assert.equal(name.space,'normal');assert.equal(name.clamp,'2');assert.ok(name.height>=44);}
