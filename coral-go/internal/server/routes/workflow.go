@@ -826,32 +826,13 @@ func stepWarnings(steps []json.RawMessage) []string {
 			continue
 		}
 		for _, loc := range contentTemplate.FindAllStringIndex(step.Command, -1) {
-			if quoteAt(step.Command, loc[0]) != 0 {
+			if background.ShellQuoteAt(step.Command, loc[0]) != 0 {
 				out = append(out, fmt.Sprintf("step %d (%s): %s is inside quotes; it is already inserted as one quoted shell word, so remove the quotes around it (or use \"$CORAL_PREV_STDOUT\")",
 					i, step.Name, step.Command[loc[0]:loc[1]]))
 			}
 		}
 	}
 	return out
-}
-
-// quoteAt is the POSIX quote open at byte i of cmd: '\”, '"' or 0.
-func quoteAt(cmd string, i int) byte {
-	var q byte
-	for j := 0; j < i && j < len(cmd); j++ {
-		c := cmd[j]
-		switch {
-		case q == 0 && c == '\\':
-			j++
-		case q == '"' && c == '\\':
-			j++
-		case q == 0 && (c == '\'' || c == '"'):
-			q = c
-		case q != 0 && c == q:
-			q = 0
-		}
-	}
-	return q
 }
 
 // withWarnings adds "warnings" to a JSON object answer when there are any.

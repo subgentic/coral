@@ -611,20 +611,10 @@ func TestHubOperatorSetting(t *testing.T) {
 	assert.Equal(t, "hub-user-1234abcd", got.Recent[0].HubUser)
 	assert.NotContains(t, tunneled("GET", "").Body.String(), "recent_actions")
 
-	// v1.4.18's opt-in is dropped at startup.
-	require.NoError(t, ss.SetSetting(context.Background(), legacyHubOperatorSetting, "true"))
-	DropLegacyHubOperatorSetting(context.Background(), ss)
-	settings, _ := ss.GetSettings(context.Background())
-	_, still := settings[legacyHubOperatorSetting]
-	assert.False(t, still)
-	assert.Equal(t, "true", settings[HubOperatorDisabledSetting], "the opt-out is untouched")
-
 	server, _ := setupSystemTestServer(t)
-	for _, k := range []string{HubOperatorDisabledSetting, legacyHubOperatorSetting} {
-		code, msg := putSettingsJSON(t, server.URL, map[string]any{k: "false"})
-		assert.Equal(t, http.StatusBadRequest, code, k)
-		assert.Contains(t, msg, "/api/system/hub-operator", k)
-	}
+	code, msg := putSettingsJSON(t, server.URL, map[string]any{HubOperatorDisabledSetting: "false"})
+	assert.Equal(t, http.StatusBadRequest, code)
+	assert.Contains(t, msg, "/api/system/hub-operator")
 }
 
 func mustRecent(t *testing.T, handler *BoardHandler, ctx context.Context) []board.HubOperatorAction {
