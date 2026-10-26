@@ -130,13 +130,13 @@ const MODULES = ['workflows.js', 'cost_dashboard.js', 'docs.js', 'theme_config.j
         await ev(`window.hideThemeConfigurator(); true`);
         console.log('   ✓ Docs + theme editor: toast, then ?retry=1 → works');
 
-        // Since #3645 a control names an action; the Jobs view's workflow and run links are the real ones
-        // that call into the workflows panel before it has loaded (scheduler.js loads up front).
+        // Since #3645 a control names an action; the Jobs view's workflow link and the run table's row button (wf-run-open, #7902: the run is no longer a data-on-click link of its own)
+        // are the real ones that call into the workflows panel before it has loaded (scheduler.js loads up front).
         console.log('5. Actions into a not-yet-loaded panel work on the first click');
         await fresh();
         await ev(`(() => {
             const host = document.createElement('div'); host.id = 'qa-inline';
-            host.innerHTML = '<a href="#" id="qa-wf" data-on-click="job-workflow" data-workflow-id="7">wf</a> <button id="qa-run" data-on-click="job-run" data-run-id="9">run</button>';
+            host.innerHTML = '<a href="#" id="qa-wf" data-on-click="job-workflow" data-workflow-id="7">wf</a> <button id="qa-run" data-on-click="wf-run-open" data-run-id="9">run</button>';
             document.body.appendChild(host); return true;
         })()`);
         await ev(`document.getElementById('qa-wf').click(); true`);
