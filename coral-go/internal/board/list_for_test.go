@@ -3,14 +3,21 @@ package board
 import (
 	"context"
 	"fmt"
+	"runtime"
+	"runtime/debug"
+	"sort"
+	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// What an agent's dock lists of its board is what its read would deliver (#8484): ListMessagesFor and a peek take the same selection (selectRead), so for every member, role and
-// receive mode, over a board long enough to need several batches, the list from the start is exactly the peek's set, and its pages are slices of it.
+// What an agent's dock lists of its board is what its read would deliver plus its own posts (#8484): ReadSetIDs and a peek take the same selection (selectRead), so for every member, role and
+// receive mode, over a board long enough to need several batches, the list from the start is exactly the peek's set joined with the member's own posts (once, a post that tags its author
+// included), and its pages are slices of it.
 func TestTheDocksListIsWhatReadDelivers(t *testing.T) {
 	ctx := context.Background()
 	s := testStore(t)
@@ -30,6 +37,8 @@ func TestTheDocksListIsWhatReadDelivers(t *testing.T) {
 			post("Poster", "the Worker queue is long, no tag")
 			post("Worker", "@Worker a note to myself")
 			post("Poster", "@Quiet only you "+fmt.Sprint(i))
+			post("Muted", "a post by the muted member "+fmt.Sprint(i))
+			post("Quiet", "@Worker a question from Quiet "+fmt.Sprint(i))
 		}
 	}
 	_, err := s.PostSystemMessage(ctx, "team", "Coral Task Queue", "@Worker [Task #1] assigned to you", nil)
@@ -46,11 +55,32 @@ func TestTheDocksListIsWhatReadDelivers(t *testing.T) {
 		t.Run(who, func(t *testing.T) {
 			peek, err := s.PeekMessages(ctx, "team", who, 5000)
 			require.NoError(t, err)
-			want := ids(peek)
+			// the read set joined with the member's own posts: each message once, in id order
+			set := map[int64]bool{}
+			for _, id := range ids(peek) {
+				set[id] = true
+			}
+			board, err := s.ListMessages(ctx, "team", 5000, 0, 0)
+			require.NoError(t, err)
+			ownCount := 0
+			for _, m := range board {
+				if m.SubscriberID == who {
+					set[m.ID] = true
+					ownCount++
+				}
+			}
+			want := make([]int64, 0, len(set))
+			for id := range set {
+				want = append(want, id)
+			}
+			sort.Slice(want, func(i, j int) bool { return want[i] < want[j] })
+			if who == "Worker" || who == "Muted" {
+				require.Positive(t, ownCount, "the member has posts of its own")
+			}
 
 			all, page, err := s.ListMessagesFor(ctx, "team", who, ForPage{Limit: 5000})
 			require.NoError(t, err)
-			assert.Equal(t, want, ids(all), "the list from the start is exactly what a read would deliver")
+			assert.Equal(t, want, ids(all), "the list from the start is what a read would deliver plus the member's own posts, each once")
 			assert.Equal(t, len(want), page.Scanned, "and its total is that set")
 			assert.Zero(t, page.Remaining)
 			if who == "Worker" {
@@ -79,13 +109,73 @@ func TestTheDocksListIsWhatReadDelivers(t *testing.T) {
 		})
 	}
 
-	// listing leaves the read position alone, and the real read still returns the same set
+	// listing leaves the read position alone: after a real read advanced the cursor, the list still shows the whole selection (the real read's set, and the member's own posts)
 	before, err := s.ReadMessages(ctx, "team", "Quiet", 5000)
 	require.NoError(t, err)
 	listed, _, err := s.ListMessagesFor(ctx, "team", "Quiet", ForPage{Limit: 5000})
 	require.NoError(t, err)
-	assert.Equal(t, ids(before), ids(listed), "after a real read advanced the cursor, the list still shows the whole selection")
+	listedSet := map[int64]bool{}
+	for _, id := range ids(listed) {
+		listedSet[id] = true
+	}
+	for _, id := range ids(before) {
+		assert.True(t, listedSet[id], "what the real read delivered is in the list")
+	}
 	again, err := s.ReadMessages(ctx, "team", "Quiet", 5000)
 	require.NoError(t, err)
 	assert.Empty(t, again, "the read position had moved only for the read")
+}
+
+// The dock's list costs ids, not text (#8484, Security's review): a board of thousands of long messages answers a page of 50 without holding their bodies. The peak heap while it runs is
+// sampled with the collector kept busy; the whole board's text is a bound it must stay well under (a list that held every selected message would pass through all of it).
+func TestTheDocksListDoesNotHoldTheBoardsText(t *testing.T) {
+	if testing.Short() {
+		t.Skip("allocation bound")
+	}
+	ctx := context.Background()
+	s := testStore(t)
+	for name, spec := range map[string][2]string{"Worker": {"Backend", "all"}, "Lead": {"Orchestrator", "all"}, "Poster": {"Developer", "all"}} {
+		_, err := s.Subscribe(ctx, "big", name, spec[0], "claude-"+name, nil, spec[1])
+		require.NoError(t, err)
+	}
+	filler := strings.Repeat("a long line of the board's text, ", 120) // about 4 KB
+	const n = 3000
+	for i := 0; i < n; i++ {
+		_, err := s.PostMessage(ctx, "big", "Poster", fmt.Sprintf("@Worker %d %s", i, filler), nil)
+		require.NoError(t, err)
+	}
+	textBytes := uint64(n * (len(filler) + 12)) // what holding every selected message would need
+
+	defer debug.SetGCPercent(debug.SetGCPercent(5))
+	for _, who := range []string{"Worker", "Lead"} { // the member's tagged rule and the orchestrator's every-message rule
+		runtime.GC()
+		var base runtime.MemStats
+		runtime.ReadMemStats(&base)
+		var peak atomic.Uint64
+		stop := make(chan struct{})
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			var m runtime.MemStats
+			for {
+				runtime.ReadMemStats(&m)
+				if m.HeapAlloc > peak.Load() {
+					peak.Store(m.HeapAlloc)
+				}
+				select {
+				case <-stop:
+					return
+				case <-time.After(300 * time.Microsecond):
+				}
+			}
+		}()
+		msgs, page, err := s.ListMessagesFor(ctx, "big", who, ForPage{Limit: 50})
+		close(stop)
+		<-done
+		require.NoError(t, err)
+		require.Len(t, msgs, 50)
+		require.Equal(t, n, page.Scanned, who)
+		grown := peak.Load() - min(peak.Load(), base.HeapAlloc)
+		assert.Less(t, grown, textBytes/2, "%s: the peak heap while listing (%d bytes) stays well under the board's text (%d bytes)", who, grown, textBytes)
+	}
 }

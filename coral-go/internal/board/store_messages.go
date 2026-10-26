@@ -6,8 +6,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"sort"
 	"strings"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/subgentic/coral/internal/clitext"
 )
 
@@ -245,63 +247,120 @@ type ForPage struct {
 	Remaining int // those older than the page
 }
 
-// ListMessagesFor lists what subscriberID's read would deliver, taken from the whole board with no cursor and no side effects (#8484): what an agent's dock shows of its board. It is the
-// same selection as read (selectRead), so the two cannot differ: a test pins the list to a peek. Not subscribed, or a receive mode of "none": nothing, as read.
-func (s *Store) ListMessagesFor(ctx context.Context, project, subscriberID string, page ForPage) ([]Message, ForPage, error) {
-	rule := s.subscriberReadRule(ctx, project, subscriberID, false)
-	if rule == nil || rule.none {
-		return nil, page, nil
+// selectReadIDs is selectRead's ids: the same selection (the tagged rule reads a batch of candidates' text to apply it, and lets it go), kept as ids only.
+func (s *Store) selectReadIDs(ctx context.Context, project string, rule *readRule, afterID int64, limit int) (ids []int64, scanned int64, more bool, err error) {
+	if !rule.tagged { // every message from others: no text is needed to choose them
+		err = s.reader().SelectContext(ctx, &ids, "SELECT id FROM board_messages WHERE project = ? AND id > ? AND subscriber_id != ? ORDER BY id ASC LIMIT ?", project, afterID, rule.subscriberID, limit)
+		if n := len(ids); n > 0 {
+			scanned = ids[n-1]
+		}
+		return ids, scanned, len(ids) >= limit, err
 	}
-	const batch = 500
-	var all []Message
-	from := int64(0)
-	for i := 0; i < 400; i++ { // a bound on a board of many thousands of selected messages
-		got, scanned, more, err := s.selectRead(ctx, project, rule, from, batch)
-		if err != nil {
-			return nil, page, err
+	msgs, scanned, more, err := s.selectRead(ctx, project, rule, afterID, limit)
+	ids = make([]int64, len(msgs))
+	for i, m := range msgs {
+		ids[i] = m.ID
+	}
+	return ids, scanned, more, err
+}
+
+// ReadSetIDs is what the agent's dock lists for it (#8484), as ids in order: what subscriberID's read would deliver from the whole board (selectRead, the one rule: a member's tags and @all,
+// an orchestrator's everything from others; a receive mode of "none" delivers nothing), plus the member's own posts so its side of a thread is there; a post that also tags its author is
+// there once. Not subscribed: nothing. The ids only are kept, so a board of many thousands of messages costs eight bytes a message, not their text.
+func (s *Store) ReadSetIDs(ctx context.Context, project, subscriberID string) ([]int64, error) {
+	rule := s.subscriberReadRule(ctx, project, subscriberID, false)
+	if rule == nil {
+		return nil, nil
+	}
+	var read []int64
+	if !rule.none {
+		const batch = 500
+		from := int64(0)
+		for i := 0; i < 400; i++ { // a bound on a board of many thousands of selected messages
+			got, scanned, more, err := s.selectReadIDs(ctx, project, rule, from, batch)
+			if err != nil {
+				return nil, err
+			}
+			read = append(read, got...)
+			if !more || scanned <= from {
+				break
+			}
+			from = scanned
 		}
-		all = append(all, got...)
-		if !more || scanned <= from {
-			break
+	}
+	var own []int64
+	if err := s.reader().SelectContext(ctx, &own, "SELECT id FROM board_messages WHERE project = ? AND subscriber_id = ? ORDER BY id ASC", project, subscriberID); err != nil {
+		return nil, err
+	}
+	// both lists are in id order: merge them, a message in both once
+	out := make([]int64, 0, len(read)+len(own))
+	i, j := 0, 0
+	for i < len(read) || j < len(own) {
+		switch {
+		case j >= len(own) || (i < len(read) && read[i] < own[j]):
+			out = append(out, read[i])
+			i++
+		case i >= len(read) || own[j] < read[i]:
+			out = append(out, own[j])
+			j++
+		default:
+			out = append(out, read[i])
+			i++
+			j++
 		}
-		from = scanned
+	}
+	return out, nil
+}
+
+// ListMessagesFor lists the dock's view of a board for subscriberID (ReadSetIDs), no cursor and no side effects, paged like the dashboard's list; only the page's messages are read in full.
+func (s *Store) ListMessagesFor(ctx context.Context, project, subscriberID string, page ForPage) ([]Message, ForPage, error) {
+	all, err := s.ReadSetIDs(ctx, project, subscriberID)
+	if err != nil {
+		return nil, page, err
 	}
 	page.Scanned = len(all)
-	var out []Message
+	var picked []int64
 	switch {
 	case page.HasAfter:
-		for _, m := range all {
-			if m.ID > page.AfterID {
-				out = append(out, m)
-				if len(out) >= page.Limit {
+		for _, id := range all {
+			if id > page.AfterID {
+				picked = append(picked, id)
+				if len(picked) >= page.Limit {
 					break
 				}
 			}
 		}
 	default:
-		for _, m := range all {
-			if page.BeforeID == 0 || m.ID < page.BeforeID {
-				out = append(out, m)
+		for _, id := range all {
+			if page.BeforeID == 0 || id < page.BeforeID {
+				picked = append(picked, id)
 			}
 		}
-		if len(out) > page.Limit {
-			out = out[len(out)-page.Limit:]
+		if len(picked) > page.Limit {
+			picked = picked[len(picked)-page.Limit:]
 		}
 	}
 	anchor := page.BeforeID
 	switch {
-	case len(out) > 0:
-		anchor = out[0].ID
+	case len(picked) > 0:
+		anchor = picked[0]
 	case page.HasAfter:
 		anchor = page.AfterID + 1
 	}
 	page.Remaining = 0
-	for _, m := range all {
-		if anchor > 0 && m.ID < anchor {
-			page.Remaining++
-		}
+	if anchor > 0 {
+		page.Remaining = sort.Search(len(all), func(i int) bool { return all[i] >= anchor }) // the ids older than the page
 	}
-	msgs, err := s.withAsks(ctx, project, out, nil)
+	if len(picked) == 0 {
+		return nil, page, nil
+	}
+	query, args, err := sqlx.In(listMessagesSelect+" WHERE m.project = ? AND m.id IN (?) ORDER BY m.id ASC", project, picked)
+	if err != nil {
+		return nil, page, err
+	}
+	var msgs []Message
+	err = s.reader().SelectContext(ctx, &msgs, s.reader().Rebind(query), args...)
+	msgs, err = s.withAsks(ctx, project, msgs, err)
 	return msgs, page, err
 }
 
