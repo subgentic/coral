@@ -260,6 +260,7 @@ var operatorOnlyRoutes = map[string]string{
 	"GET /api/system/identity-report":                    "read the identity report (every session's calls and mismatches)",
 	"GET /api/board/tasks":                               "list the tasks of every board",
 	"GET /api/goals":                                     "list the goals of every board",
+	"GET /api/team-artifacts":                            "list the artifacts of every team",
 	"GET /api/teams/detail/{name}/knowledge":             "read a team's knowledge",
 	"GET /api/teams/detail/{name}/knowledge/{agentName}": "read an agent's knowledge",
 	"POST /api/teams/detail/{name}/resurrect":            "bring a team back",

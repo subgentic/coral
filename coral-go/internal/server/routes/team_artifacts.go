@@ -72,6 +72,9 @@ type teamArtifact struct {
 	// AlsoReceivedFrom: other <server>/<board> that sent the same bytes later (#4449).
 	AlsoReceivedFrom []string `json:"also_received_from,omitempty"`
 	SentBy           string   `json:"sent_by,omitempty"`
+	// BoardID and Team name the team a row belongs to in the cross-team list (GET /api/team-artifacts); a team's own list leaves them out.
+	BoardID string `json:"board_id,omitempty"`
+	Team    string `json:"team,omitempty"`
 
 	index      int
 	managed    string // 64-hex Coral object id for coral-managed artifacts
@@ -147,32 +150,11 @@ func (h *BoardHandler) ListTeamArtifacts(w http.ResponseWriter, r *http.Request)
 		errBadRequest(w, "session_id must be at most 128 characters without control characters")
 		return
 	}
-	subscribers, err := h.bs.TeamSubscriberSessions(r.Context(), project)
+	items, scanTruncated, err := h.projectArtifactItems(r, project, sessionFilter)
 	if err != nil {
 		errInternalServer(w, "could not list artifacts")
 		return
 	}
-	tasks, scanTruncated, err := h.bs.ListTeamArtifactTasksQuery(r.Context(), board.TeamArtifactQuery{
-		Project: project, Limit: board.MaxTeamArtifactTaskScan, SessionID: sessionFilter, Subscribers: subscribers,
-	})
-	if err != nil {
-		errInternalServer(w, "could not list artifacts")
-		return
-	}
-	items := collectTeamArtifacts(project, tasks, subscribers, sessionFilter)
-	if sessionFilter != "" {
-		// Only a session of this board: the filter used to list ANY session's uploads under
-		// this board's name (#3601, weak site W27).
-		if _, onBoard := teamUploadSessions(tasks, subscribers)[sessionFilter]; onBoard {
-			items = h.uploads.merge(items, h.coralDir, map[string]string{sessionFilter: ""})
-		}
-	} else {
-		items = h.uploads.merge(items, h.coralDir, teamUploadSessions(tasks, subscribers))
-		items = h.mergeCrossTeamRows(items, project)
-	}
-	h.linkUploadTasks(r.Context(), project, items)
-	h.attachArtifactTags(r.Context(), project, items)
-	items = filterReadable(r, h.coralDir, items) // an agent's list holds only what the one read check lets it read, so the totals and the cursor count nothing else (#5577)
 	if tq != nil {
 		h.queryTeamArtifacts(w, r, project, items, scanTruncated, limit, offset, sessionFilter, tq)
 		return
@@ -208,6 +190,36 @@ func (h *BoardHandler) ListTeamArtifacts(w http.ResponseWriter, r *http.Request)
 		resp["session_id"] = sessionFilter
 	}
 	writeJSON(w, http.StatusOK, resp)
+}
+
+// projectArtifactItems is a team's artifact list as the team route builds it, before any query: the task results, the uploads of its agents, the cross-team rows and the upload task links, cut to what the caller may read.
+// sessionFilter keeps one session's uploads (only a session of this board).
+func (h *BoardHandler) projectArtifactItems(r *http.Request, project, sessionFilter string) ([]teamArtifact, bool, error) {
+	subscribers, err := h.bs.TeamSubscriberSessions(r.Context(), project)
+	if err != nil {
+		return nil, false, err
+	}
+	tasks, scanTruncated, err := h.bs.ListTeamArtifactTasksQuery(r.Context(), board.TeamArtifactQuery{
+		Project: project, Limit: board.MaxTeamArtifactTaskScan, SessionID: sessionFilter, Subscribers: subscribers,
+	})
+	if err != nil {
+		return nil, false, err
+	}
+	items := collectTeamArtifacts(project, tasks, subscribers, sessionFilter)
+	if sessionFilter != "" {
+		// Only a session of this board: the filter used to list ANY session's uploads under
+		// this board's name (#3601, weak site W27).
+		if _, onBoard := teamUploadSessions(tasks, subscribers)[sessionFilter]; onBoard {
+			items = h.uploads.merge(items, h.coralDir, map[string]string{sessionFilter: ""})
+		}
+	} else {
+		items = h.uploads.merge(items, h.coralDir, teamUploadSessions(tasks, subscribers))
+		items = h.mergeCrossTeamRows(items, project)
+	}
+	h.linkUploadTasks(r.Context(), project, items)
+	h.attachArtifactTags(r.Context(), project, items)
+	items = filterReadable(r, h.coralDir, items) // an agent's list holds only what the one read check lets it read, so the totals and the cursor count nothing else (#5577)
+	return items, scanTruncated, nil
 }
 
 // collectTeamArtifacts flattens task references into deduplicated items. When

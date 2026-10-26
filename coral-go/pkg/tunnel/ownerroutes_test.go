@@ -28,7 +28,7 @@ func oldIsOwnerRoute(method, p string) bool {
 	}
 	switch method {
 	case http.MethodGet:
-		return p == "/api/settings/prompt-inspection" || boardSettings.MatchString(p) || p == "/api/session-artifacts" || artifactRead.MatchString(p) || teamArtifacts.MatchString(p)
+		return p == "/api/settings/prompt-inspection" || boardSettings.MatchString(p) || p == "/api/session-artifacts" || p == "/api/team-artifacts" || artifactRead.MatchString(p) || teamArtifacts.MatchString(p)
 	case http.MethodPut:
 		return boardSettings.MatchString(p)
 	case http.MethodDelete:
@@ -60,7 +60,7 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 	hex := strings.Repeat("a", 64)
 	paths := []string{
 		"/api/artifacts", "/api/artifacts/" + hex, "/api/artifacts/" + hex + "/meta", "/api/artifacts/" + hex + "/comments", "/api/artifacts/" + hex + "/readers", "/api/artifacts/" + hex[:63], "/api/artifacts/" + strings.ToUpper(hex),
-		"/api/artifacts/" + hex + "/keep", "/api/artifacts/" + hex + "/x", "/api/session-artifacts", "/api/board/team/artifacts", "/api/board/team/artifacts/x", "/api/board/a/b/artifacts",
+		"/api/artifacts/" + hex + "/keep", "/api/artifacts/" + hex + "/x", "/api/session-artifacts", "/api/team-artifacts", "/api/board/team/artifacts", "/api/board/team/artifacts/x", "/api/board/a/b/artifacts",
 		"/api/board/team/tasks/12/artifact-content", "/api/board/team/settings", "/api/board//settings", "/api/board/a/b/settings", "/api/board/team/settings/x", "/api/board/team/status",
 		"/api/board/team/cross-team/enable", "/api/board/team/cross-team/disable", "/api/board/team/cross-team/files/enable", "/api/board/team/cross-team/files/disable",
 		"/api/hub-auto-accept", "/api/hub-auto-accept/enable", "/api/hub-auto-accept/x",
