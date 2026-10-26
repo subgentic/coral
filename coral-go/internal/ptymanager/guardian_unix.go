@@ -204,9 +204,6 @@ const (
 	guardianLives      = 10 * time.Second // a guardian that ran at least this long is not a crash loop: the delay starts again
 )
 
-// disable is for a test that must not start one.
-func (g *guardianClient) disable() { g.mu.Lock(); g.off = true; g.mu.Unlock() }
-
 // start runs the guardian (g.mu held) and tells it every registered terminal. The environment it gets is only the marker: it needs none of Coral's.
 func (g *guardianClient) start() error {
 	exe, err := os.Executable()

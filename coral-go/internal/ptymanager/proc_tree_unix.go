@@ -251,10 +251,8 @@ func mergeCapped(old, add []member, max int) (merged []member, dropped bool) {
 	return merged, dropped
 }
 
-// stillThere is the members of ms that are still the processes they were.
-func stillThere(ms []member) []member { return stillThereBy(ms, member.current) }
-
-// stillThereBy is stillThere with live deciding: member.current asks the system about each member; a snapshot's has asks nothing.
+// stillThereBy keeps the members that live says are still the same processes.
+// member.current asks the system about each member; a snapshot's has asks nothing.
 func stillThereBy(ms []member, live func(member) bool) []member {
 	out := ms[:0:0]
 	for _, m := range ms {

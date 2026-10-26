@@ -14,7 +14,7 @@ import (
 // A test must not assign a package-level variable of this package (#5266). The gate's retry loop is one goroutine for the whole process and
 // outlives the test that started it, so a test that sets a package variable and puts it back in t.Cleanup races with the loop reading it (a
 // DATA RACE under -race in three of twenty CI runs in five hours: pasteVerifyWait, pasteStuckAfter, the gate's clock). Seams a goroutine
-// may read are atomic pointers set through setWaits, setNow and setSpacer (seams_test.go); a variable that is itself a mutex-guarded struct
+// may read are atomic pointers set through setWaits and setSpacer (seams_test.go); a variable that is itself a mutex-guarded struct
 // is changed under its lock (needsInputFunc and the like have Set functions). This census finds the direct assignments (x = ..., x, y = ...,
 // x++), a name declared in the function (a parameter, :=, var) shadowing the package variable.
 func TestTestsDoNotAssignPackageVariables(t *testing.T) {
@@ -123,7 +123,7 @@ func TestTestsDoNotAssignPackageVariables(t *testing.T) {
 	sort.Strings(found)
 	if len(found) > 0 {
 		t.Fatalf("a test assigns a package-level variable (a goroutine an earlier test left running may read it: a data race under -race, #5266). "+
-			"Make it a field of waits() and use setWaits, or use setNow / setSpacer, or an atomic of its own:\n  %s", strings.Join(found, "\n  "))
+			"Make it a field of waits() and use setWaits, or use setSpacer, or an atomic of its own:\n  %s", strings.Join(found, "\n  "))
 	}
 }
 
