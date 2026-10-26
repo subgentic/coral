@@ -349,64 +349,10 @@ func winStageRisk(st winStage, outside func(string) bool) string {
 		return why
 	}
 
+	if why, done := winNestedRisk(st, name, args, outside); done {
+		return why
+	}
 	switch name {
-	case "powershell", "pwsh", "powershell_ise":
-		if why := winShellWrapper(args, outside); why != "" {
-			return why
-		}
-		if st.sink && !winHasCommandArg(args) {
-			return "it runs what a pipeline feeds its PowerShell" // curl http://e | powershell
-		}
-		return ""
-	case "call":
-		return winVerbRisk(strings.Join(args, " "), outside) // call format C: runs format
-	case "for":
-		for i, a := range args {
-			if strings.EqualFold(a, "do") {
-				return winVerbRisk(strings.Join(args[i+1:], " "), outside)
-			}
-		}
-		return ""
-	case "forfiles":
-		for i, a := range args {
-			if strings.EqualFold(a, "/c") && i+1 < len(args) {
-				return winVerbRisk(args[i+1], outside)
-			}
-		}
-		return ""
-	case "if", "else":
-		// if exist x del C:\x: the command is somewhere after the condition, so every tail of the stage is judged.
-		for j := 0; j < len(args); j++ {
-			if strings.Contains(args[j], "==") || winCompareOps[strings.ToLower(args[j])] {
-				continue // a comparison ("%A%"=="1", a equ b), not the command
-			}
-			if why := winStageRisk(winStage{words: args[j:]}, outside); why != "" {
-				return why
-			}
-		}
-		return ""
-	case "cmd":
-		if st.sink && !winHasCmdCommand(args) {
-			return "it runs what a pipeline feeds its cmd"
-		}
-		for i, a := range args {
-			if l := strings.ToLower(a); len(a) > 2 && (strings.HasPrefix(l, "/c") || strings.HasPrefix(l, "/k") || strings.HasPrefix(l, "/r")) {
-				// cmd /c"format C:" and cmd /cformat C:: the command text follows the switch with no space.
-				rest := strings.Join(append([]string{a[2:]}, args[i+1:]...), " ")
-				if strings.Contains(rest, "^") {
-					return "its cmd text is written with escapes (^)"
-				}
-				return winVerbRisk(rest, outside)
-			}
-			if strings.EqualFold(a, "/c") || strings.EqualFold(a, "/k") || strings.EqualFold(a, "/r") {
-				rest := strings.Join(args[i+1:], " ")
-				if strings.Contains(rest, "^") {
-					return "its cmd text is written with escapes (^)"
-				}
-				return winVerbRisk(rest, outside)
-			}
-		}
-		return ""
 	case "start":
 		// cmd's start and PowerShell's alias of Start-Process: the program it starts is judged, with -ArgumentList always asking.
 		for i, a := range args {
@@ -477,14 +423,6 @@ func winStageRisk(st winStage, outside func(string) bool) string {
 			}
 		}
 		return "" // piped into iex, the sink is judged
-	case "bash", "sh", "zsh", "dash", "ksh":
-		// Git Bash and the like, by any path (a path with a space in it too): the -c text is judged, as PowerShell's and cmd's own text is.
-		for i, a := range args {
-			if strings.HasPrefix(a, "-") && !strings.HasPrefix(a, "--") && strings.Contains(a, "c") && i+1 < len(args) {
-				return winVerbRisk(strings.Join(args[i+1:], " "), outside)
-			}
-		}
-		return ""
 	case "tar", "bsdtar":
 		for i, a := range args {
 			v := ""
@@ -691,6 +629,78 @@ func winStageRisk(st winStage, outside func(string) bool) string {
 		}
 	}
 	return ""
+}
+
+// winNestedRisk judges the commands that run another command: a nested PowerShell, call, for, forfiles, if and else, cmd and the POSIX shells. done says the name was one of them.
+func winNestedRisk(st winStage, name string, args []string, outside func(string) bool) (string, bool) {
+	switch name {
+	case "powershell", "pwsh", "powershell_ise":
+		if why := winShellWrapper(args, outside); why != "" {
+			return why, true
+		}
+		if st.sink && !winHasCommandArg(args) {
+			return "it runs what a pipeline feeds its PowerShell", true // curl http://e | powershell
+		}
+		return "", true
+	case "call":
+		return winVerbRisk(strings.Join(args, " "), outside), true // call format C: runs format
+	case "for":
+		for i, a := range args {
+			if strings.EqualFold(a, "do") {
+				return winVerbRisk(strings.Join(args[i+1:], " "), outside), true
+			}
+		}
+		return "", true
+	case "forfiles":
+		for i, a := range args {
+			if strings.EqualFold(a, "/c") && i+1 < len(args) {
+				return winVerbRisk(args[i+1], outside), true
+			}
+		}
+		return "", true
+	case "if", "else":
+		// if exist x del C:\x: the command is somewhere after the condition, so every tail of the stage is judged.
+		for j := 0; j < len(args); j++ {
+			if strings.Contains(args[j], "==") || winCompareOps[strings.ToLower(args[j])] {
+				continue // a comparison ("%A%"=="1", a equ b), not the command
+			}
+			if why := winStageRisk(winStage{words: args[j:]}, outside); why != "" {
+				return why, true
+			}
+		}
+		return "", true
+	case "cmd":
+		if st.sink && !winHasCmdCommand(args) {
+			return "it runs what a pipeline feeds its cmd", true
+		}
+		for i, a := range args {
+			if l := strings.ToLower(a); len(a) > 2 && (strings.HasPrefix(l, "/c") || strings.HasPrefix(l, "/k") || strings.HasPrefix(l, "/r")) {
+				// cmd /c"format C:" and cmd /cformat C:: the command text follows the switch with no space.
+				rest := strings.Join(append([]string{a[2:]}, args[i+1:]...), " ")
+				if strings.Contains(rest, "^") {
+					return "its cmd text is written with escapes (^)", true
+				}
+				return winVerbRisk(rest, outside), true
+			}
+			if strings.EqualFold(a, "/c") || strings.EqualFold(a, "/k") || strings.EqualFold(a, "/r") {
+				rest := strings.Join(args[i+1:], " ")
+				if strings.Contains(rest, "^") {
+					return "its cmd text is written with escapes (^)", true
+				}
+				return winVerbRisk(rest, outside), true
+			}
+		}
+		return "", true
+	case "bash", "sh", "zsh", "dash", "ksh":
+		// Git Bash and the like, by any path (a path with a space in it too): the -c text is judged, as PowerShell's and cmd's own text is.
+		for i, a := range args {
+			if strings.HasPrefix(a, "-") && !strings.HasPrefix(a, "--") && strings.Contains(a, "c") && i+1 < len(args) {
+				return winVerbRisk(strings.Join(args[i+1:], " "), outside), true
+			}
+		}
+		return "", true
+	}
+	return "", false
 }
 
 // normalizeWinWords reads the stage's words as the command that will run: the cmd escapes, the echo-off and call prefixes, a command held in a variable, the module qualifier, and the call operator or dot-sourcing. It returns the words to judge, or done with the reason (possibly none) when the stage is already decided.
