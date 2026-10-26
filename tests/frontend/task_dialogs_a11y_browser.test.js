@@ -1,4 +1,4 @@
-// The Create task dialog and the task page for the keyboard, a screen reader and both themes (#5814, #7644): a refusal in the Create dialog is spoken (role=alert) and marks the
+// The Create task dialog and the task page for the keyboard, a screen reader and both themes (#5814, #7644): a refusal in the Create dialog is spoken once (the footer's status line; the field's own error is its description, not an alert, #8431) and marks the
 // title; "+ Add dependency" and a dependency tag's × are buttons (they were links with no href: not reachable by Tab, and the × had no name); the task's page is named by its task and
 // has the focus on its title, its back link gives the focus back to the row; and the real light theme holds 4.5:1 in the Create dialog and on the task page in its three states (the page, Edit, Complete).
 // Focus goes to the title on open and back to what opened the dialog on Escape. Real board over the API. Drives Chrome over CDP against the isolated dev server.
@@ -35,7 +35,7 @@ const BASE = require('./test_base').BASE;
         assert.equal(await ev(`document.getElementById('create-task-title').getAttribute('aria-required')`), 'true');
         await ev(`document.getElementById('create-task-submit').click(); true`);
         const err = await ev(`(() => { const t = document.getElementById('create-task-title'); const e = t.closest('.sv-row').querySelector('.sv-error'); return { text: e.textContent, role: e.getAttribute('role'), shown: getComputedStyle(e).display !== 'none', invalid: t.getAttribute('aria-invalid'), described: (t.getAttribute('aria-describedby') || '').split(' ').includes(e.id), status: document.querySelector('#create-task-footer .sv-status').textContent, focus: document.activeElement.id }; })()`);
-        assert.deepEqual(err, { text: 'Title is required', role: 'alert', shown: true, invalid: 'true', described: true, status: 'Title is required', focus: 'create-task-title' }, 'the refusal is an alert under the title and on the line beside the buttons');
+        assert.deepEqual(err, { text: 'Title is required', role: null, shown: true, invalid: 'true', described: true, status: 'Title is required', focus: 'create-task-title' }, 'the refusal is the title\'s description and the status line beside the buttons says it (no second alert)');
         await shot('create-error-dark');
         await ev(`const t = document.getElementById('create-task-title'); t.value = 'x'; t.dispatchEvent(new Event('input', { bubbles: true })); true`);
         assert.equal(await ev(`document.querySelector('#create-task-flow').open`), false, 'optional workflow fields start folded');

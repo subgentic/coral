@@ -221,7 +221,7 @@ export function mountSettingsView(host, spec) {
             });
             control.append(actionEl);
         }
-        const errorEl = node('p', 'sv-error'); errorEl.id = `${id}-e`; errorEl.hidden = true; errorEl.setAttribute('role', 'alert');
+        const errorEl = node('p', 'sv-error'); errorEl.id = `${id}-e`; errorEl.hidden = true; // not an alert (#8431): the control is aria-describedby it, and the bar's status line (role=status) says the first thing wrong, so a refused form is announced once
         row.append(text, control, errorEl, ...wideLive);
         if (field.setup && target) field.setup(target); // the caller's own touch on the control, once the row is whole (a data-on-* action it names with setAttribute, which the action census reads)
         const rec = { field, group, row, ctl, errorEl, helpEl, descId, actionEl, id, label };
