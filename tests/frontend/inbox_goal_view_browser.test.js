@@ -55,6 +55,15 @@ const BASE = require('./test_base').BASE;
             for (const theme of ['light','dark']) {
                 await ev(`document.documentElement.setAttribute('data-theme',${JSON.stringify(theme)}); true`);
                 assert.ok(await ev('document.documentElement.scrollWidth <= innerWidth + 1'),'no horizontal overflow');
+                const track = await ev(`(() => {
+                    const bar = document.querySelector('#inbox-page .goal-rollup'), s = getComputedStyle(bar);
+                    const luminance = color => color.match(/[\\d.]+/g).slice(0,3).map(Number).map(v => v/255).map(v => v <= .04045 ? v/12.92 : ((v+.055)/1.055)**2.4).reduce((n,v,i) => n+v*[.2126,.7152,.0722][i],0);
+                    const edge = luminance(s.borderTopColor), back = luminance(getComputedStyle(document.body).backgroundColor);
+                    return { width:s.borderTopWidth, style:s.borderTopStyle, contrast:(Math.max(edge,back)+.05)/(Math.min(edge,back)+.05) };
+                })()`);
+                assert.equal(track.width,'1px','the goal track has a visible edge');
+                assert.equal(track.style,'solid');
+                assert.ok(track.contrast >= 3, `${theme} goal track edge contrasts at least 3:1 with the page: ${track.contrast}`);
                 await shot(`inbox-goal-${width}-${theme}`);
             }
             await client.Input.dispatchKeyEvent({type:'keyDown',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
