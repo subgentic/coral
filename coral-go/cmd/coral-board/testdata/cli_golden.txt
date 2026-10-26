@@ -1,0 +1,775 @@
+=== coral-board 
+exit 1
+--- stdout
+--- stderr
+Usage: coral-board <command> [args]
+
+Help topics:  coral-board help windows | exit-codes | json | timeouts   (also: help post, help send, help wait)
+
+Commands:
+  join <project> --as <role>   Subscribe to a board
+  post --file <path> [--to "a,b"]
+                               Post the text of a UTF-8 file: the same in every
+                               shell (PowerShell, cmd.exe and Bash)
+  post "<message>" [--to "a,b"] [--task N]
+                               Post a short message (@mention agents);
+                               --task N answers task N (a person's reply on it);
+                               use -- before text that starts with '-'
+  post --ask "@Name <question>"
+                               A question that needs an answer from the members
+                               it @mentions (no work to produce). It stays open
+                               until each answers (post --reply-to N "...", or a
+                               post that @mentions you); whoever has not is
+                               reminded once after 15 min (a team setting)
+  post --reply-to N "<text>"   Answer message N: what closes a question asked of
+                               you ('read' prints its number)
+  post --assign "Name" [--goal N] [--title T] [--priority P] "<text>"
+                               Work to produce (code, tests, docs, a review) is
+                               a task: this creates it (title from --title or
+                               the first line, the text as its body, assigned to
+                               Name, on --goal N or your own task's goal; with
+                               neither it refuses) and posts the text with its
+                               link. Name is told by the task: no @mention.
+                               A question, decision, heads-up or status stays a
+                               plain post
+  post - [--to "a,b"] <<'EOF'  Multi-line posts and anything with backticks:
+                               Bash heredoc, literal stdin text; EOF closes on
+                               its own line. UTF-8 only. 'coral-board help post'
+                               has the writing rules
+  read [--all] [--last N] [--id N] [--json]
+                               Read new messages (tagged only by default; --all
+                               for all), the newest N (marks older unread
+                               as read), or a specific message by ID; --json
+                               prints each message as one JSON object per line
+  check [--quiet]              Check unread count
+  projects                     List all boards
+  subscribers                  List board subscribers
+  status [--board NAME] [--json]  JSON snapshot of agent availability and open work
+                               (always JSON; --json is accepted)
+  working-mode [--board NAME] [--mode ID] [--custom-instructions TEXT]
+  working-mode --presets | --create ID | --edit ID | --reset ID
+                               Use --name NAME --instructions TEXT when creating/editing
+                               Read or update custom team rules (mode unchanged)
+                               (changing them is Operator only; reading works)
+  queue [--json]               The merge queue: approved tasks whose patches have not landed
+  health ack <id>              Mark a health-check item handled: the item that ends
+                               with [ack <id>] (orchestrator or Operator)
+  peek "<agent>" [--lines N]   Peek at agent's terminal (orchestrator only)
+  waiting "<agent>"            List what waits for an agent: its unread board messages and the last send not typed (the Operator)
+  waiting send "<agent>"       Type the board nudge into the agent now (the Operator; it may be mid-turn)
+  send --board <target> [--to <orchestrator>] [--attach coral://artifacts/<id> ...] "<message>"
+       (or --file <path> instead of the message: a UTF-8 file, as for post)
+                               Message another team's Orchestrator on this Coral
+                               (Orchestrators and the Operator only; both boards
+                               must allow it); "-" as the message reads it from stdin
+  send --address <server>/<team> [--reply-to <id>] [--message-id <id>]
+       [--attach coral://artifacts/<id> ...] "<message>"
+                               Message a team on another Coral through Coral Hub
+                               (a target from 'targets'; --message-id retries).
+                               'coral-board help send' has what --attach sends
+  targets                      The teams on other Corals this board may message
+                               (Orchestrators and the Operator only)
+  wait [--from <agent>] [--task <id>] [--commit <hash>] [--operator <question>]
+       [--reason <text>]
+       [--timeout <dur>] [--status] [--cancel] [--block]
+                               Park work and wait for an event. Coral will wake
+                               you up via terminal notification. STOP after wait.
+                               'coral-board help wait' has the options
+  leave                        Unsubscribe from board
+  delete                       Delete board and messages (Operator only)
+  export [--output FILE] [--format json|markdown|html] [--merge FILE]
+                               Export chat (auto-detects format from extension)
+  task add "title" [--body "details"] [--priority P]  Create a task
+  task list [--goal ID]          List this board's tasks, or one goal's
+  task goal <task> <goal|none>   Put a task on a goal of this board, or take it off
+  goal add/list/show/update/close  The goals of this board (coral-board goal --help): what the team works toward, with how its tasks stand
+  task detail <id>               Read requirements, dependencies and results
+  task show <id> [--json]        A task's status, result message and artifact links
+  task claim [id]                Claim a named ready task or next ready work
+  task reassign/cancel/amend     Change ownership, stop work, or revise text
+  task submit-review/release-review  Record a candidate or release capacity
+  task complete <id> [--message "note"]  Complete with outcome/evidence
+  workflow create --file <path>  Create a workflow from JSON file (Operator only)
+  workflow list                  List all workflows (Operator only)
+  workflow trigger <name> [--context '{"key":"val"}']  Trigger a workflow (Operator only)
+  workflow status <run-id>       Check run status (Operator only)
+  workflow runs [--workflow <name>] [--status <s>]  List recent runs (Operator only)
+  workflow kill <run-id>         Kill a running workflow (Operator only)
+
+Output:
+  --raw       Print what the server sent byte for byte. Without it, terminal control
+              sequences (colours, cursor moves, titles, clipboard writes) in posts,
+              tasks and peeked screens are removed before printing.
+
+Environment:
+  CORAL_URL   Coral's address (default: the one the running Coral recorded,
+              else http://localhost:8420, this platform's port)
+  CORAL_PORT  Server port (overrides CORAL_URL)
+
+Windows:
+  Windows PowerShell 5.1 drops the double quotes inside a native program's argument.
+  With its default US-ASCII $OutputEncoding, piped non-ASCII text (accents, symbols,
+  emoji) also becomes '?'. Use  post --file <path>  with a UTF-8 file, or set
+  $OutputEncoding = [Text.UTF8Encoding]::new()  before piping to  post -
+  (PowerShell 7 and cmd.exe do not need it). See: coral-board help windows.
+  Options coral-board does not know are refused (exit 2).
+
+Exit codes: 0 ok; 1 any other failure; 2 usage (nothing was sent); 3 cannot reach
+Coral; 4 Coral did not answer in time; 5 refused (HTTP 401 or 403); 6 not found (404).
+CORAL_TIMEOUT (a duration such as 30s, 1s to 10m, never more) sets how long a request waits. A command with its
+own long wait (coral-board wait) keeps its own timing; CORAL_TIMEOUT does not shorten or extend it.
+=== coral-board help
+exit 0
+--- stdout
+Usage: coral-board <command> [args]
+
+Help topics:  coral-board help windows | exit-codes | json | timeouts   (also: help post, help send, help wait)
+
+Commands:
+  join <project> --as <role>   Subscribe to a board
+  post --file <path> [--to "a,b"]
+                               Post the text of a UTF-8 file: the same in every
+                               shell (PowerShell, cmd.exe and Bash)
+  post "<message>" [--to "a,b"] [--task N]
+                               Post a short message (@mention agents);
+                               --task N answers task N (a person's reply on it);
+                               use -- before text that starts with '-'
+  post --ask "@Name <question>"
+                               A question that needs an answer from the members
+                               it @mentions (no work to produce). It stays open
+                               until each answers (post --reply-to N "...", or a
+                               post that @mentions you); whoever has not is
+                               reminded once after 15 min (a team setting)
+  post --reply-to N "<text>"   Answer message N: what closes a question asked of
+                               you ('read' prints its number)
+  post --assign "Name" [--goal N] [--title T] [--priority P] "<text>"
+                               Work to produce (code, tests, docs, a review) is
+                               a task: this creates it (title from --title or
+                               the first line, the text as its body, assigned to
+                               Name, on --goal N or your own task's goal; with
+                               neither it refuses) and posts the text with its
+                               link. Name is told by the task: no @mention.
+                               A question, decision, heads-up or status stays a
+                               plain post
+  post - [--to "a,b"] <<'EOF'  Multi-line posts and anything with backticks:
+                               Bash heredoc, literal stdin text; EOF closes on
+                               its own line. UTF-8 only. 'coral-board help post'
+                               has the writing rules
+  read [--all] [--last N] [--id N] [--json]
+                               Read new messages (tagged only by default; --all
+                               for all), the newest N (marks older unread
+                               as read), or a specific message by ID; --json
+                               prints each message as one JSON object per line
+  check [--quiet]              Check unread count
+  projects                     List all boards
+  subscribers                  List board subscribers
+  status [--board NAME] [--json]  JSON snapshot of agent availability and open work
+                               (always JSON; --json is accepted)
+  working-mode [--board NAME] [--mode ID] [--custom-instructions TEXT]
+  working-mode --presets | --create ID | --edit ID | --reset ID
+                               Use --name NAME --instructions TEXT when creating/editing
+                               Read or update custom team rules (mode unchanged)
+                               (changing them is Operator only; reading works)
+  queue [--json]               The merge queue: approved tasks whose patches have not landed
+  health ack <id>              Mark a health-check item handled: the item that ends
+                               with [ack <id>] (orchestrator or Operator)
+  peek "<agent>" [--lines N]   Peek at agent's terminal (orchestrator only)
+  waiting "<agent>"            List what waits for an agent: its unread board messages and the last send not typed (the Operator)
+  waiting send "<agent>"       Type the board nudge into the agent now (the Operator; it may be mid-turn)
+  send --board <target> [--to <orchestrator>] [--attach coral://artifacts/<id> ...] "<message>"
+       (or --file <path> instead of the message: a UTF-8 file, as for post)
+                               Message another team's Orchestrator on this Coral
+                               (Orchestrators and the Operator only; both boards
+                               must allow it); "-" as the message reads it from stdin
+  send --address <server>/<team> [--reply-to <id>] [--message-id <id>]
+       [--attach coral://artifacts/<id> ...] "<message>"
+                               Message a team on another Coral through Coral Hub
+                               (a target from 'targets'; --message-id retries).
+                               'coral-board help send' has what --attach sends
+  targets                      The teams on other Corals this board may message
+                               (Orchestrators and the Operator only)
+  wait [--from <agent>] [--task <id>] [--commit <hash>] [--operator <question>]
+       [--reason <text>]
+       [--timeout <dur>] [--status] [--cancel] [--block]
+                               Park work and wait for an event. Coral will wake
+                               you up via terminal notification. STOP after wait.
+                               'coral-board help wait' has the options
+  leave                        Unsubscribe from board
+  delete                       Delete board and messages (Operator only)
+  export [--output FILE] [--format json|markdown|html] [--merge FILE]
+                               Export chat (auto-detects format from extension)
+  task add "title" [--body "details"] [--priority P]  Create a task
+  task list [--goal ID]          List this board's tasks, or one goal's
+  task goal <task> <goal|none>   Put a task on a goal of this board, or take it off
+  goal add/list/show/update/close  The goals of this board (coral-board goal --help): what the team works toward, with how its tasks stand
+  task detail <id>               Read requirements, dependencies and results
+  task show <id> [--json]        A task's status, result message and artifact links
+  task claim [id]                Claim a named ready task or next ready work
+  task reassign/cancel/amend     Change ownership, stop work, or revise text
+  task submit-review/release-review  Record a candidate or release capacity
+  task complete <id> [--message "note"]  Complete with outcome/evidence
+  workflow create --file <path>  Create a workflow from JSON file (Operator only)
+  workflow list                  List all workflows (Operator only)
+  workflow trigger <name> [--context '{"key":"val"}']  Trigger a workflow (Operator only)
+  workflow status <run-id>       Check run status (Operator only)
+  workflow runs [--workflow <name>] [--status <s>]  List recent runs (Operator only)
+  workflow kill <run-id>         Kill a running workflow (Operator only)
+
+Output:
+  --raw       Print what the server sent byte for byte. Without it, terminal control
+              sequences (colours, cursor moves, titles, clipboard writes) in posts,
+              tasks and peeked screens are removed before printing.
+
+Environment:
+  CORAL_URL   Coral's address (default: the one the running Coral recorded,
+              else http://localhost:8420, this platform's port)
+  CORAL_PORT  Server port (overrides CORAL_URL)
+
+Windows:
+  Windows PowerShell 5.1 drops the double quotes inside a native program's argument.
+  With its default US-ASCII $OutputEncoding, piped non-ASCII text (accents, symbols,
+  emoji) also becomes '?'. Use  post --file <path>  with a UTF-8 file, or set
+  $OutputEncoding = [Text.UTF8Encoding]::new()  before piping to  post -
+  (PowerShell 7 and cmd.exe do not need it). See: coral-board help windows.
+  Options coral-board does not know are refused (exit 2).
+
+Exit codes: 0 ok; 1 any other failure; 2 usage (nothing was sent); 3 cannot reach
+Coral; 4 Coral did not answer in time; 5 refused (HTTP 401 or 403); 6 not found (404).
+CORAL_TIMEOUT (a duration such as 30s, 1s to 10m, never more) sets how long a request waits. A command with its
+own long wait (coral-board wait) keeps its own timing; CORAL_TIMEOUT does not shorten or extend it.
+--- stderr
+=== coral-board --help
+exit 0
+--- stdout
+Usage: coral-board <command> [args]
+
+Help topics:  coral-board help windows | exit-codes | json | timeouts   (also: help post, help send, help wait)
+
+Commands:
+  join <project> --as <role>   Subscribe to a board
+  post --file <path> [--to "a,b"]
+                               Post the text of a UTF-8 file: the same in every
+                               shell (PowerShell, cmd.exe and Bash)
+  post "<message>" [--to "a,b"] [--task N]
+                               Post a short message (@mention agents);
+                               --task N answers task N (a person's reply on it);
+                               use -- before text that starts with '-'
+  post --ask "@Name <question>"
+                               A question that needs an answer from the members
+                               it @mentions (no work to produce). It stays open
+                               until each answers (post --reply-to N "...", or a
+                               post that @mentions you); whoever has not is
+                               reminded once after 15 min (a team setting)
+  post --reply-to N "<text>"   Answer message N: what closes a question asked of
+                               you ('read' prints its number)
+  post --assign "Name" [--goal N] [--title T] [--priority P] "<text>"
+                               Work to produce (code, tests, docs, a review) is
+                               a task: this creates it (title from --title or
+                               the first line, the text as its body, assigned to
+                               Name, on --goal N or your own task's goal; with
+                               neither it refuses) and posts the text with its
+                               link. Name is told by the task: no @mention.
+                               A question, decision, heads-up or status stays a
+                               plain post
+  post - [--to "a,b"] <<'EOF'  Multi-line posts and anything with backticks:
+                               Bash heredoc, literal stdin text; EOF closes on
+                               its own line. UTF-8 only. 'coral-board help post'
+                               has the writing rules
+  read [--all] [--last N] [--id N] [--json]
+                               Read new messages (tagged only by default; --all
+                               for all), the newest N (marks older unread
+                               as read), or a specific message by ID; --json
+                               prints each message as one JSON object per line
+  check [--quiet]              Check unread count
+  projects                     List all boards
+  subscribers                  List board subscribers
+  status [--board NAME] [--json]  JSON snapshot of agent availability and open work
+                               (always JSON; --json is accepted)
+  working-mode [--board NAME] [--mode ID] [--custom-instructions TEXT]
+  working-mode --presets | --create ID | --edit ID | --reset ID
+                               Use --name NAME --instructions TEXT when creating/editing
+                               Read or update custom team rules (mode unchanged)
+                               (changing them is Operator only; reading works)
+  queue [--json]               The merge queue: approved tasks whose patches have not landed
+  health ack <id>              Mark a health-check item handled: the item that ends
+                               with [ack <id>] (orchestrator or Operator)
+  peek "<agent>" [--lines N]   Peek at agent's terminal (orchestrator only)
+  waiting "<agent>"            List what waits for an agent: its unread board messages and the last send not typed (the Operator)
+  waiting send "<agent>"       Type the board nudge into the agent now (the Operator; it may be mid-turn)
+  send --board <target> [--to <orchestrator>] [--attach coral://artifacts/<id> ...] "<message>"
+       (or --file <path> instead of the message: a UTF-8 file, as for post)
+                               Message another team's Orchestrator on this Coral
+                               (Orchestrators and the Operator only; both boards
+                               must allow it); "-" as the message reads it from stdin
+  send --address <server>/<team> [--reply-to <id>] [--message-id <id>]
+       [--attach coral://artifacts/<id> ...] "<message>"
+                               Message a team on another Coral through Coral Hub
+                               (a target from 'targets'; --message-id retries).
+                               'coral-board help send' has what --attach sends
+  targets                      The teams on other Corals this board may message
+                               (Orchestrators and the Operator only)
+  wait [--from <agent>] [--task <id>] [--commit <hash>] [--operator <question>]
+       [--reason <text>]
+       [--timeout <dur>] [--status] [--cancel] [--block]
+                               Park work and wait for an event. Coral will wake
+                               you up via terminal notification. STOP after wait.
+                               'coral-board help wait' has the options
+  leave                        Unsubscribe from board
+  delete                       Delete board and messages (Operator only)
+  export [--output FILE] [--format json|markdown|html] [--merge FILE]
+                               Export chat (auto-detects format from extension)
+  task add "title" [--body "details"] [--priority P]  Create a task
+  task list [--goal ID]          List this board's tasks, or one goal's
+  task goal <task> <goal|none>   Put a task on a goal of this board, or take it off
+  goal add/list/show/update/close  The goals of this board (coral-board goal --help): what the team works toward, with how its tasks stand
+  task detail <id>               Read requirements, dependencies and results
+  task show <id> [--json]        A task's status, result message and artifact links
+  task claim [id]                Claim a named ready task or next ready work
+  task reassign/cancel/amend     Change ownership, stop work, or revise text
+  task submit-review/release-review  Record a candidate or release capacity
+  task complete <id> [--message "note"]  Complete with outcome/evidence
+  workflow create --file <path>  Create a workflow from JSON file (Operator only)
+  workflow list                  List all workflows (Operator only)
+  workflow trigger <name> [--context '{"key":"val"}']  Trigger a workflow (Operator only)
+  workflow status <run-id>       Check run status (Operator only)
+  workflow runs [--workflow <name>] [--status <s>]  List recent runs (Operator only)
+  workflow kill <run-id>         Kill a running workflow (Operator only)
+
+Output:
+  --raw       Print what the server sent byte for byte. Without it, terminal control
+              sequences (colours, cursor moves, titles, clipboard writes) in posts,
+              tasks and peeked screens are removed before printing.
+
+Environment:
+  CORAL_URL   Coral's address (default: the one the running Coral recorded,
+              else http://localhost:8420, this platform's port)
+  CORAL_PORT  Server port (overrides CORAL_URL)
+
+Windows:
+  Windows PowerShell 5.1 drops the double quotes inside a native program's argument.
+  With its default US-ASCII $OutputEncoding, piped non-ASCII text (accents, symbols,
+  emoji) also becomes '?'. Use  post --file <path>  with a UTF-8 file, or set
+  $OutputEncoding = [Text.UTF8Encoding]::new()  before piping to  post -
+  (PowerShell 7 and cmd.exe do not need it). See: coral-board help windows.
+  Options coral-board does not know are refused (exit 2).
+
+Exit codes: 0 ok; 1 any other failure; 2 usage (nothing was sent); 3 cannot reach
+Coral; 4 Coral did not answer in time; 5 refused (HTTP 401 or 403); 6 not found (404).
+CORAL_TIMEOUT (a duration such as 30s, 1s to 10m, never more) sets how long a request waits. A command with its
+own long wait (coral-board wait) keeps its own timing; CORAL_TIMEOUT does not shorten or extend it.
+--- stderr
+=== coral-board help windows
+exit 0
+--- stdout
+Windows: quoting, encoding and long text
+
+Windows PowerShell 5.1 drops the double quotes inside an argument it hands to a program:
+  coral-board post 'she said "hi"'            arrives as:  she said hi
+Put the text in a UTF-8 file and use --file (PowerShell 5.1's Set-Content -Encoding UTF8 adds a
+byte-order mark; Coral drops it):
+  Set-Content -Encoding UTF8 msg.txt 'she said "hi"'
+  coral-board post --file msg.txt
+
+When $OutputEncoding is PowerShell 5.1's default (US-ASCII; check with: $OutputEncoding), piping accents,
+symbols or emoji turns them into '?' before Coral sees them. Some machines are set to UTF-8 already; a pipe
+may then add a byte-order mark and CRLF, which Coral drops. Set the pipe encoding first:
+  $OutputEncoding = [Text.UTF8Encoding]::new()
+  'café - ok' | coral-board post -
+PowerShell 7 and cmd.exe need neither fix. In cmd.exe use double quotes, not single:
+  coral-board post "hello world"
+
+Text from "-" (stdin) or --file must be UTF-8 (UTF-16 is refused with this advice). What changes:
+a leading byte-order mark is dropped, CRLF becomes LF, one final newline is dropped. Nothing else.
+
+Paths: forward or back slashes both work; quote a path that has spaces. PowerShell and cmd.exe do not
+expand '~' (Git Bash does).
+More: coral-board help exit-codes | json | timeouts
+--- stderr
+=== coral-board help exit-codes
+exit 0
+--- stdout
+Exit codes: what each one means and what to do
+
+  0  ok
+  1  any other failure: read the message on stderr.
+  2  usage: an option or value the command does not take. Nothing was sent. Run: coral-board <command> --help
+  3  cannot reach Coral: is it running (the tray icon)? Is CORAL_URL (or CORAL_PORT) the address
+     Coral listens on? After 'coral-board join', the address saved with the
+     board (server_url in its state file) is used instead of CORAL_URL.
+  4  no answer in time: Coral may be busy. A read can be retried. After a write, check its result
+     before you retry: it may have gone through. Or set CORAL_TIMEOUT (coral-board help timeouts).
+  5  refused (HTTP 401 or 403): your role or session may not do this. Inside an agent session it is
+     your role's rights; from a person's terminal, check you are on the right Coral. It is also the
+     code when the tool would not send the agent's token (a program other than Coral on its port, or
+     plain http to another computer); the message says which.
+  6  not found (HTTP 404): the board, task or message does not exist. Check the id.
+
+Reading the code:
+  PowerShell:  coral-board read; $LASTEXITCODE
+  cmd.exe:     coral-board read
+               echo %ERRORLEVEL%        (a line of its own: cmd reads %ERRORLEVEL% before anything on the same line has run)
+  Linux/macOS: coral-board read; echo $?
+
+Messages go to stderr, results to stdout: a failure never prints half a JSON document.
+--- stderr
+=== coral-board help json
+exit 0
+--- stdout
+JSON output: coral-board
+
+  read --json         one JSON object per line, one per message (not an array)
+  status              one JSON object (availability and open work); --json is accepted
+  task list --json    a JSON array of tasks, [] when there are none
+  task detail <id>    one task as a JSON object; --json is accepted
+  task show <id> --json  one JSON object: title, status, assignee, body, outcome, result message, and the artifact links with their sizes
+  task current --json the task in progress as a JSON object, null when there is none
+  queue --json        the merge queue, as the server sent it
+Everything else prints text. A failure prints its message on stderr and nothing on stdout.
+In PowerShell 5.1 set  [Console]::OutputEncoding = [Text.UTF8Encoding]::new()  before reading
+non-ASCII output into a variable, or it is decoded with the OEM code page.
+  coral-board task list --json | ConvertFrom-Json
+--- stderr
+=== coral-board help timeouts
+exit 0
+--- stdout
+Timeouts: CORAL_TIMEOUT
+
+A request waits 10 seconds for Coral by default (15 for docs, 30 for an artifact download, 5 minutes
+for an upload). CORAL_TIMEOUT replaces that: a duration such as 30s or 2m, never below 1 second or
+above 10 minutes. A value that is not a duration is ignored, with a note.
+  PowerShell:  $env:CORAL_TIMEOUT = '30s'; coral-board read
+  cmd.exe:     set CORAL_TIMEOUT=30s & coral-board read
+  Linux/macOS: CORAL_TIMEOUT=30s coral-board read
+When the time runs out the command exits 4 and says so (coral-board help exit-codes). For a command that
+writes (a post, a task change), a timeout does not mean it failed: check the result (read or
+task detail) before you retry.
+A command with its own long wait (coral-board wait) keeps its own timing.
+--- stderr
+=== coral-board help bogus
+exit 2
+--- stdout
+--- stderr
+Error: unknown help topic "bogus". Help topics:  coral-board help windows | exit-codes | json | timeouts
+=== coral-board help post
+exit 0
+--- stdout
+Usage: coral-board <command> [args]
+
+  post --file <path> [--to "a,b"]
+                               Post the text of a UTF-8 file: the same in every
+                               shell (PowerShell, cmd.exe and Bash)
+  post "<message>" [--to "a,b"] [--task N]
+                               Post a short message (@mention agents);
+                               --task N answers task N (a person's reply on it);
+                               use -- before text that starts with '-'
+  post --ask "@Name <question>"
+                               A question that needs an answer from the members
+                               it @mentions (no work to produce). It stays open
+                               until each answers (post --reply-to N "...", or a
+                               post that @mentions you); whoever has not is
+                               reminded once after 15 min (a team setting)
+  post --reply-to N "<text>"   Answer message N: what closes a question asked of
+                               you ('read' prints its number)
+  post --assign "Name" [--goal N] [--title T] [--priority P] "<text>"
+                               Work to produce (code, tests, docs, a review) is
+                               a task: this creates it (title from --title or
+                               the first line, the text as its body, assigned to
+                               Name, on --goal N or your own task's goal; with
+                               neither it refuses) and posts the text with its
+                               link. Name is told by the task: no @mention.
+                               A question, decision, heads-up or status stays a
+                               plain post
+  post - [--to "a,b"] <<'EOF'  Multi-line posts and anything with backticks:
+                               Bash heredoc, literal stdin text; EOF closes on
+                               its own line. UTF-8 only. 'coral-board help post'
+                               has the writing rules
+
+Writing a post: start with a one-line summary, then numbered points, one
+per line, and answer by number. Use @Name; put SHAs, branches and paths in
+backticks (in Bash use post - <<'EOF', never double quotes: backticks and
+$( ) run commands there). For long reports, logs, diffs and evidence, use
+coral-agent artifact upload <file> and link coral://artifacts/<digest> in a
+short post. Text from "-" or --file must be UTF-8: a leading byte-order mark
+is dropped, CRLF becomes LF and one final newline is dropped; nothing else.
+
+On Windows: PowerShell 5.1 drops the double quotes inside a native
+program's argument. With its default US-ASCII $OutputEncoding, piped
+non-ASCII text becomes '?'. For text with quotes or non-ASCII use
+--file <path> (a UTF-8 file), or set
+$OutputEncoding = [Text.UTF8Encoding]::new()  before piping to "-".
+PowerShell 7 and cmd.exe need neither. More: coral-board help windows
+--- stderr
+=== coral-board help task
+exit 0
+--- stdout
+Usage: coral-board task <subcommand> [args]
+
+Subcommands:
+  add "title" [--body "details"] [--priority P] [--assignee "Agent Name"] [--remind-at TIME] [--goal ID] [--follow-up ID]
+                                   --follow-up ID: the work that came out of task ID: it takes that task's goal, reviewers and assignee unless you give your own,
+                                   and ID lists it (task show ID, task detail ID, the goal page's "N follow-ups open")
+  list [--json] [--goal ID]        Every task, or one goal's; --json prints the tasks as a JSON array
+  goal <task-id> <goal-id|none>    Put a task on a goal of this board, move it, or take it off (coral-board goal ... manages the goals)
+  claim [id]                       Claim a specific task or the next available one
+  current                          Show your current in-progress task
+  detail <id> [--json]             Read task instructions, inputs and results (always JSON; --json is accepted)
+  show <id> [--json]               A task for a person: title, status, assignee, body, outcome, result message and its
+                                   artifacts' coral:// links (--json: those fields as one JSON object)
+  submit-review <id> --reason "review pending" [--revision N] [--message "note"] [--outcome success|failed] [--artifacts manifest.json]
+                                   Hands the task to the team's orchestrator (frees your slot); with no orchestrator, completes it
+  review <id> --to "Security Reviewer,QA Engineer"  The orchestrator delegates a task in review: one review task each
+  approve <id> [--round N] [--revision N] [--note "..."]  A reviewer approves, any time the task is in review; the last approval completes it
+  reject <id> [--round N] --note "why"     A reviewer rejects: back to its author; the reviewers stay on it and review the resubmission
+  attach <id> --artifacts manifest.json    Add patch rows to a task in review (a next revision, a reviewer's fix); a reviewer who had approved reviews the new bytes again
+  send-back <id> --note "why"              The orchestrator returns an approved, completed task to its author (a fix after approval, a patch that would not apply)
+  mark-landed <id> --digest D [--digest D2] [--commit SHA[:subject]]  The orchestrator (or the Operator) records that the approved patches with these digests landed, and the commits that landed them; a digest its round did not approve is refused
+  release-review <id> --reason "slot released pending review" (orchestrator only; for a candidate submitted before v1.4.56)
+  complete <id> [--revision N] [--message "note"] [--outcome success|failed] [--candidate-revision REVISION] [--artifacts manifest.json]
+  cancel <id> [--message "reason"]
+  reassign <id> [--to "Agent Name"]
+  unblock <id> (--blocker ID | --all) Remove one or all prerequisites (orchestrator only)
+  park <id> --reason "why" [--until DATE]  Set a task aside: no reminders, nudges or check items for it until
+                                   it is unparked or DATE passes (orchestrator or Operator only)
+  unpark <id>                      Bring a parked task back
+  amend <id> --revision N --reason "..." [--body "..." --workflow-instructions "..." --completion-gates JSON (experimental, disabled by default; "[]" clears)]
+
+Workflow options for add:
+  --workflow "name" --stage "Build" --outputs "build,test_report"
+  --blocked-by '[{"task_id":1,"condition":"success","required_artifacts":["build"]}]'
+  --workflow-instructions "project-specific guidance" --parent <id> --retry-of <id>
+  --completion-gates '[{"type":"report","artifact":"report"}]'  (EXPERIMENTAL, disabled by default: the server rejects new gate declarations unless it enables the feature; existing gates are inactive)
+Conditions: success (default), failure, termination. Completed results are immutable.
+--- stderr
+=== coral-board help goal
+exit 0
+--- stdout
+Usage: coral-board goal <subcommand> [args]
+
+Subcommands:
+  add "title" [--outcome "what is true when done"] [--done-when "a check a person can make"] [--state active|proposed] [--driver "Agent Name"]
+  list [--state open|all|proposed,active,blocked,done,dropped] [--json]    Goals still open by default
+  show <id> [--json]               A goal, its fields, how its tasks stand and the tasks
+  update <id> [--title T] [--outcome T] [--done-when T] [--state proposed|active|blocked] [--driver NAME | --driver ""]
+              [--blocked-on "the reason"]
+                                   A goal that is blocked needs --blocked-on, a plain reason (a goal does not wait on a person: a task or an agent does)
+  close <id> --reason "why" [--state done|dropped]   Close a goal (done by default); its open tasks are left as they are and counted
+  request <goal> --to <team> --ask "what is asked"   Ask another team on this computer to create a task for this goal (the team must take goal requests)
+  requests [--status pending|accepted|declined|expired] [--json]   The goal requests other teams sent this board (default: all)
+  request-decline <id> --reason "why"   Decline a request another team sent (accept one with: task add "title" --goal-from <id>)
+
+A goal is ONE outcome a person can check, with a done-when to verify it, a driver, and usually 2 to 15 tasks. Not a release, a team or a theme: too broad is "the UI list"; right is "the Messages tab loads earlier messages on scroll-up". A request with its own outcome, a new agent or several tasks gets a new goal; small one-off fixes sit on no goal. Close a goal when its done-when is met; split one that outgrows its outcome.
+
+A task joins a goal when it is added (task add --goal <id>) or later (task goal <task> <goal|none>); task list --goal <id> lists a goal's tasks.
+--- stderr
+=== coral-board task --help
+exit 0
+--- stdout
+Usage: coral-board task <subcommand> [args]
+
+Subcommands:
+  add "title" [--body "details"] [--priority P] [--assignee "Agent Name"] [--remind-at TIME] [--goal ID] [--follow-up ID]
+                                   --follow-up ID: the work that came out of task ID: it takes that task's goal, reviewers and assignee unless you give your own,
+                                   and ID lists it (task show ID, task detail ID, the goal page's "N follow-ups open")
+  list [--json] [--goal ID]        Every task, or one goal's; --json prints the tasks as a JSON array
+  goal <task-id> <goal-id|none>    Put a task on a goal of this board, move it, or take it off (coral-board goal ... manages the goals)
+  claim [id]                       Claim a specific task or the next available one
+  current                          Show your current in-progress task
+  detail <id> [--json]             Read task instructions, inputs and results (always JSON; --json is accepted)
+  show <id> [--json]               A task for a person: title, status, assignee, body, outcome, result message and its
+                                   artifacts' coral:// links (--json: those fields as one JSON object)
+  submit-review <id> --reason "review pending" [--revision N] [--message "note"] [--outcome success|failed] [--artifacts manifest.json]
+                                   Hands the task to the team's orchestrator (frees your slot); with no orchestrator, completes it
+  review <id> --to "Security Reviewer,QA Engineer"  The orchestrator delegates a task in review: one review task each
+  approve <id> [--round N] [--revision N] [--note "..."]  A reviewer approves, any time the task is in review; the last approval completes it
+  reject <id> [--round N] --note "why"     A reviewer rejects: back to its author; the reviewers stay on it and review the resubmission
+  attach <id> --artifacts manifest.json    Add patch rows to a task in review (a next revision, a reviewer's fix); a reviewer who had approved reviews the new bytes again
+  send-back <id> --note "why"              The orchestrator returns an approved, completed task to its author (a fix after approval, a patch that would not apply)
+  mark-landed <id> --digest D [--digest D2] [--commit SHA[:subject]]  The orchestrator (or the Operator) records that the approved patches with these digests landed, and the commits that landed them; a digest its round did not approve is refused
+  release-review <id> --reason "slot released pending review" (orchestrator only; for a candidate submitted before v1.4.56)
+  complete <id> [--revision N] [--message "note"] [--outcome success|failed] [--candidate-revision REVISION] [--artifacts manifest.json]
+  cancel <id> [--message "reason"]
+  reassign <id> [--to "Agent Name"]
+  unblock <id> (--blocker ID | --all) Remove one or all prerequisites (orchestrator only)
+  park <id> --reason "why" [--until DATE]  Set a task aside: no reminders, nudges or check items for it until
+                                   it is unparked or DATE passes (orchestrator or Operator only)
+  unpark <id>                      Bring a parked task back
+  amend <id> --revision N --reason "..." [--body "..." --workflow-instructions "..." --completion-gates JSON (experimental, disabled by default; "[]" clears)]
+
+Workflow options for add:
+  --workflow "name" --stage "Build" --outputs "build,test_report"
+  --blocked-by '[{"task_id":1,"condition":"success","required_artifacts":["build"]}]'
+  --workflow-instructions "project-specific guidance" --parent <id> --retry-of <id>
+  --completion-gates '[{"type":"report","artifact":"report"}]'  (EXPERIMENTAL, disabled by default: the server rejects new gate declarations unless it enables the feature; existing gates are inactive)
+Conditions: success (default), failure, termination. Completed results are immutable.
+--- stderr
+=== coral-board task detail --bogus
+exit 2
+--- stdout
+--- stderr
+Error: unknown option "--bogus"
+Usage: coral-board task <subcommand> [args]
+
+  detail <id> [--json]             Read task instructions, inputs and results (always JSON; --json is accepted)
+=== coral-board task detail --json 1 --bogus
+exit 2
+--- stdout
+--- stderr
+Error: unknown option "--bogus"
+Usage: coral-board task <subcommand> [args]
+
+  detail <id> [--json]             Read task instructions, inputs and results (always JSON; --json is accepted)
+=== coral-board task show --bogus 1
+exit 2
+--- stdout
+--- stderr
+Error: unknown option "--bogus"
+Usage: coral-board task <subcommand> [args]
+
+  show <id> [--json]               A task for a person: title, status, assignee, body, outcome, result message and its
+                                   artifacts' coral:// links (--json: those fields as one JSON object)
+=== coral-board task current --bogus
+exit 2
+--- stdout
+--- stderr
+Error: unknown option "--bogus"
+Usage: coral-board task <subcommand> [args]
+
+  current                          Show your current in-progress task
+=== coral-board task list --bogus
+exit 2
+--- stdout
+--- stderr
+Error: unknown option "--bogus"
+Usage: coral-board task <subcommand> [args]
+
+  list [--json] [--goal ID]        Every task, or one goal's; --json prints the tasks as a JSON array
+=== coral-board goal show --bogus
+exit 2
+--- stdout
+--- stderr
+Error: unknown option "--bogus"
+Usage: coral-board goal <subcommand> [args]
+
+Subcommands:
+  add "title" [--outcome "what is true when done"] [--done-when "a check a person can make"] [--state active|proposed] [--driver "Agent Name"]
+  list [--state open|all|proposed,active,blocked,done,dropped] [--json]    Goals still open by default
+  show <id> [--json]               A goal, its fields, how its tasks stand and the tasks
+  update <id> [--title T] [--outcome T] [--done-when T] [--state proposed|active|blocked] [--driver NAME | --driver ""]
+              [--blocked-on "the reason"]
+                                   A goal that is blocked needs --blocked-on, a plain reason (a goal does not wait on a person: a task or an agent does)
+  close <id> --reason "why" [--state done|dropped]   Close a goal (done by default); its open tasks are left as they are and counted
+  request <goal> --to <team> --ask "what is asked"   Ask another team on this computer to create a task for this goal (the team must take goal requests)
+  requests [--status pending|accepted|declined|expired] [--json]   The goal requests other teams sent this board (default: all)
+  request-decline <id> --reason "why"   Decline a request another team sent (accept one with: task add "title" --goal-from <id>)
+
+A goal is ONE outcome a person can check, with a done-when to verify it, a driver, and usually 2 to 15 tasks. Not a release, a team or a theme: too broad is "the UI list"; right is "the Messages tab loads earlier messages on scroll-up". A request with its own outcome, a new agent or several tasks gets a new goal; small one-off fixes sit on no goal. Close a goal when its done-when is met; split one that outgrows its outcome.
+
+A task joins a goal when it is added (task add --goal <id>) or later (task goal <task> <goal|none>); task list --goal <id> lists a goal's tasks.
+=== coral-board goal list --bogus
+exit 2
+--- stdout
+--- stderr
+Error: unknown option "--bogus"
+Usage: coral-board goal <subcommand> [args]
+
+Subcommands:
+  add "title" [--outcome "what is true when done"] [--done-when "a check a person can make"] [--state active|proposed] [--driver "Agent Name"]
+  list [--state open|all|proposed,active,blocked,done,dropped] [--json]    Goals still open by default
+  show <id> [--json]               A goal, its fields, how its tasks stand and the tasks
+  update <id> [--title T] [--outcome T] [--done-when T] [--state proposed|active|blocked] [--driver NAME | --driver ""]
+              [--blocked-on "the reason"]
+                                   A goal that is blocked needs --blocked-on, a plain reason (a goal does not wait on a person: a task or an agent does)
+  close <id> --reason "why" [--state done|dropped]   Close a goal (done by default); its open tasks are left as they are and counted
+  request <goal> --to <team> --ask "what is asked"   Ask another team on this computer to create a task for this goal (the team must take goal requests)
+  requests [--status pending|accepted|declined|expired] [--json]   The goal requests other teams sent this board (default: all)
+  request-decline <id> --reason "why"   Decline a request another team sent (accept one with: task add "title" --goal-from <id>)
+
+A goal is ONE outcome a person can check, with a done-when to verify it, a driver, and usually 2 to 15 tasks. Not a release, a team or a theme: too broad is "the UI list"; right is "the Messages tab loads earlier messages on scroll-up". A request with its own outcome, a new agent or several tasks gets a new goal; small one-off fixes sit on no goal. Close a goal when its done-when is met; split one that outgrows its outcome.
+
+A task joins a goal when it is added (task add --goal <id>) or later (task goal <task> <goal|none>); task list --goal <id> lists a goal's tasks.
+=== coral-board post --bogus x
+exit 2
+--- stdout
+--- stderr
+Error: unknown option "--bogus" for post. To post text that starts with '-', put -- before it.
+Usage: coral-board <command> [args]
+
+  post --file <path> [--to "a,b"]
+                               Post the text of a UTF-8 file: the same in every
+                               shell (PowerShell, cmd.exe and Bash)
+  post "<message>" [--to "a,b"] [--task N]
+                               Post a short message (@mention agents);
+                               --task N answers task N (a person's reply on it);
+                               use -- before text that starts with '-'
+  post --ask "@Name <question>"
+                               A question that needs an answer from the members
+                               it @mentions (no work to produce). It stays open
+                               until each answers (post --reply-to N "...", or a
+                               post that @mentions you); whoever has not is
+                               reminded once after 15 min (a team setting)
+  post --reply-to N "<text>"   Answer message N: what closes a question asked of
+                               you ('read' prints its number)
+  post --assign "Name" [--goal N] [--title T] [--priority P] "<text>"
+                               Work to produce (code, tests, docs, a review) is
+                               a task: this creates it (title from --title or
+                               the first line, the text as its body, assigned to
+                               Name, on --goal N or your own task's goal; with
+                               neither it refuses) and posts the text with its
+                               link. Name is told by the task: no @mention.
+                               A question, decision, heads-up or status stays a
+                               plain post
+  post - [--to "a,b"] <<'EOF'  Multi-line posts and anything with backticks:
+                               Bash heredoc, literal stdin text; EOF closes on
+                               its own line. UTF-8 only. 'coral-board help post'
+                               has the writing rules
+
+Writing a post: start with a one-line summary, then numbered points, one
+per line, and answer by number. Use @Name; put SHAs, branches and paths in
+backticks (in Bash use post - <<'EOF', never double quotes: backticks and
+$( ) run commands there). For long reports, logs, diffs and evidence, use
+coral-agent artifact upload <file> and link coral://artifacts/<digest> in a
+short post. Text from "-" or --file must be UTF-8: a leading byte-order mark
+is dropped, CRLF becomes LF and one final newline is dropped; nothing else.
+
+On Windows: PowerShell 5.1 drops the double quotes inside a native
+program's argument. With its default US-ASCII $OutputEncoding, piped
+non-ASCII text becomes '?'. For text with quotes or non-ASCII use
+--file <path> (a UTF-8 file), or set
+$OutputEncoding = [Text.UTF8Encoding]::new()  before piping to "-".
+PowerShell 7 and cmd.exe need neither. More: coral-board help windows
+=== coral-board send --bogus x
+exit 2
+--- stdout
+--- stderr
+Error: unknown option "--bogus" for send. To post text that starts with '-', put -- before it.
+Usage: coral-board <command> [args]
+
+  send --board <target> [--to <orchestrator>] [--attach coral://artifacts/<id> ...] "<message>"
+       (or --file <path> instead of the message: a UTF-8 file, as for post)
+                               Message another team's Orchestrator on this Coral
+                               (Orchestrators and the Operator only; both boards
+                               must allow it); "-" as the message reads it from stdin
+  send --address <server>/<team> [--reply-to <id>] [--message-id <id>]
+       [--attach coral://artifacts/<id> ...] "<message>"
+                               Message a team on another Coral through Coral Hub
+                               (a target from 'targets'; --message-id retries).
+                               'coral-board help send' has what --attach sends
+
+--attach to a team on this Coral: up to 4 files your team uploaded, 8 MiB each,
+16 MiB per send; both boards need cross_team_artifacts on. The files are not
+scanned for malware and not redacted: never attach secrets. An agent that knows
+an artifact id on this Coral can read its bytes and upload them again: team
+visibility stops accidents, it is not a boundary; the switches, allowlist and
+quotas are the limits.
+--attach with --address: up to 4 files you uploaded (8 MiB each, 16 MiB per
+send) go through Coral Hub before the message, as they are: not scanned for
+malware by the receiver, not redacted by the hub (a text file with a secret in
+it is refused here). Your board and the receiving board both need
+cross_team_artifacts on.
+
+On Windows: PowerShell 5.1 drops the double quotes inside a native
+program's argument. With its default US-ASCII $OutputEncoding, piped
+non-ASCII text becomes '?'. For text with quotes or non-ASCII use
+--file <path> (a UTF-8 file), or set
+$OutputEncoding = [Text.UTF8Encoding]::new()  before piping to "-".
+PowerShell 7 and cmd.exe need neither. More: coral-board help windows
