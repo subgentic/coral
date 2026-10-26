@@ -35,7 +35,7 @@ function fitPlaceholder(input) {
     if (scale < 1) input.style.setProperty("--ph-scale", String(scale));
     const pad = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) + parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth);
     const probe = document.createElement("div");
-    probe.style.cssText = `position:absolute;visibility:hidden;white-space:pre-wrap;overflow-wrap:break-word;box-sizing:content-box;width:${input.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)}px;font:${cs.font};line-height:${cs.lineHeight};letter-spacing:${cs.letterSpacing};font-size:calc(${cs.fontSize} * ${scale})`;
+    probe.style.cssText = `position:absolute;visibility:hidden;white-space:nowrap;overflow-wrap:normal;box-sizing:content-box;width:${input.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)}px;font:${cs.font};line-height:${cs.lineHeight};letter-spacing:${cs.letterSpacing};font-size:calc(${cs.fontSize} * ${scale})`;
     probe.textContent = input.placeholder;
     document.body.appendChild(probe);
     const need = Math.min(probe.getBoundingClientRect().height + pad, window.innerHeight * 0.4);
