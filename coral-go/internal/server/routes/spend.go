@@ -409,6 +409,32 @@ func attributeCommits(info *spendCommits, cm *spendCommitRead, ro *spendRoster) 
 	return commitsBy, hourCommits
 }
 
+// spendTaskRead is the board's completed tasks in the window and in the usual period, the window's by completer (spendNameKey) and every one by hour ("2006-01-02T15").
+type spendTaskRead struct {
+	win, usual []board.TaskTime
+	byAgent    map[string][]board.TaskTime
+	byHour     map[string]int
+}
+
+func (h *SpendHandler) readTaskTimes(ctx context.Context, project string, fr spendFrame) (*spendTaskRead, string) {
+	win, err := h.bs.TasksCompletedBetween(ctx, project, spendStamp(fr.start), spendStamp(fr.end))
+	usual, err2 := h.bs.TasksCompletedBetween(ctx, project, spendStamp(fr.usualStart), spendStamp(fr.start))
+	if err != nil || err2 != nil {
+		return nil, "could not read task times"
+	}
+	tr := &spendTaskRead{win: win, usual: usual, byAgent: map[string][]board.TaskTime{}, byHour: map[string]int{}}
+	for _, tt := range win {
+		k := spendNameKey(tt.CompletedBy)
+		tr.byAgent[k] = append(tr.byAgent[k], tt)
+	}
+	for _, tt := range append(append([]board.TaskTime(nil), win...), usual...) {
+		if t, perr := time.Parse(time.RFC3339, tt.CompletedAt); perr == nil {
+			tr.byHour[t.Format("2006-01-02T15")]++
+		}
+	}
+	return tr, ""
+}
+
 // Spend answers GET /api/board/{project}/spend?range=24h|7d.
 func (h *SpendHandler) Spend(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
@@ -426,7 +452,7 @@ func (h *SpendHandler) Spend(w http.ResponseWriter, r *http.Request) {
 
 	now := h.clock()
 	fr := newSpendFrame(rng, now)
-	start, end, usualStart, hours, hourly := fr.start, fr.end, fr.usualStart, fr.hours, fr.hourly
+	start, end, hours, hourly := fr.start, fr.end, fr.hours, fr.hourly
 	ctx := r.Context()
 	f := spendStamp
 
@@ -457,23 +483,12 @@ func (h *SpendHandler) Spend(w http.ResponseWriter, r *http.Request) {
 	nameKey := spendNameKey
 	commitsBy, hourCommits := attributeCommits(&commitInfo, cm, roster)
 
-	// task times
-	winTasks, err := h.bs.TasksCompletedBetween(ctx, project, f(start), f(end))
-	usualTasks, err2 := h.bs.TasksCompletedBetween(ctx, project, f(usualStart), f(start))
-	if err != nil || err2 != nil {
-		errInternalServer(w, "could not read task times")
+	tasks, fail := h.readTaskTimes(ctx, project, fr)
+	if fail != "" {
+		errInternalServer(w, fail)
 		return
 	}
-	tasksByAgent := map[string][]board.TaskTime{}
-	tasksByBucket := map[string]int{}
-	for _, tt := range winTasks {
-		tasksByAgent[nameKey(tt.CompletedBy)] = append(tasksByAgent[nameKey(tt.CompletedBy)], tt)
-	}
-	for _, tt := range append(append([]board.TaskTime(nil), winTasks...), usualTasks...) {
-		if t, perr := time.Parse(time.RFC3339, tt.CompletedAt); perr == nil {
-			tasksByBucket[t.Format("2006-01-02T15")]++
-		}
-	}
+	winTasks, usualTasks, tasksByAgent, tasksByBucket := tasks.win, tasks.usual, tasks.byAgent, tasks.byHour
 
 	// the agents
 	total := int64(0)
