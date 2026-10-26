@@ -34,12 +34,36 @@ const FILES_FIELDS = [
 // A live part of a group (filled by its own module, shown or hidden by it): moved from where the template holds it into its place among the rows.
 const live = id => ({ key: `live_${id}`, type: 'notice', render: slot => { const el = document.getElementById(id); if (el) slot.append(el); } });
 const px = n => ({ value: String(n), label: `${n}px` });
+// The terminal backend and waking the agents (#3634, #3636): rows of this pane that terminal_backend.js fills and shows once it has read the status (never through Coral Hub).
+// Settings > Terminal backend: tmux keeps agents running across Coral restarts but any agent can reach other agents' terminals through its socket; pty isolates agents, which end when Coral restarts.
+const OS_NOTE = {
+    mac: "macOS: with pty, other programs normally cannot reach Coral's terminals; with tmux they can, through the socket. Neither backend separates Coral from programs running with your full user rights; for that, run agents under a separate account.",
+    linux: "Linux: with pty, a program running as you can still reach Coral's terminals through /proc today, so pty protects agents from tmux-style access, not from every program running as you.",
+};
+const osNote = () => (`${navigator.userAgentData?.platform || navigator.platform || ''}`.toLowerCase().includes('linux') ? OS_NOTE.linux : OS_NOTE.mac);
+export const TERMINAL_BACKEND_IDS = ['tb-choice', 'tb-fixed', 'tb-now', 'tb-pending', 'tb-autowake-on', 'tb-autowake-cap']; // the ids of the rows that start hidden
+const TERMINAL_BACKEND_FIELDS = [
+    { key: 'terminal-backend', type: 'radio', id: 'tb-choice', wide: true, label: 'Terminal backend',
+        help: { text: '', about: 'the terminal backends', more: [
+            "tmux: Agents keep running when Coral restarts, upgrades or crashes, and Coral picks them up again afterwards. Coral keeps its terminals in a tmux server whose socket sits in your Coral data folder. Any agent, and any other program running as you, can find that socket and read or type into other agents' terminals. Choose this if you restart or upgrade Coral often.",
+            'pty: Coral holds each terminal itself, so there is no shared socket for an agent to use against another agent. The price: agents end whenever Coral restarts, upgrades or crashes (Coral puts them to sleep first when it stops cleanly, and marks them asleep at the next start after a crash). When Coral starts again it wakes them one at a time (not if Coral has restarted several times in a row; up to the number set below; more after you confirm; you can turn this off), and they resume their conversation, but a tool that was running is not continued.',
+            osNote()].join('\n\n') },
+        options: [{ value: 'tmux', id: 'tb-opt-tmux', label: 'tmux', help: "Agents keep running when you quit Coral, and can reach each other's terminals." }, { value: 'pty', id: 'tb-opt-pty', label: 'pty (default)', help: 'Agents stop when you quit Coral and wake next time.' }] },
+    { key: 'tb_fixed', type: 'custom', id: 'tb-fixed', label: 'Terminal backend', render: slot => slot.append("Agents run in Coral's own terminals (pty), the only backend here. They stop when Coral quits and wake next time."),
+        help: { text: '', more: 'This Coral runs agents in its own terminals (pty), the only backend here (no tmux on this system). Agents end when Coral restarts or upgrades; when it starts again Coral wakes them (up to the number set below; more after you confirm; you can turn this off), and they resume their conversation.' } },
+    { key: 'tb_now', type: 'custom', id: 'tb-now', label: 'Running now', render: () => {} },
+    { key: 'tb_pending', type: 'notice', render: slot => { const p = document.createElement('p'); p.id = 'tb-pending'; p.className = 'sv-help'; p.setAttribute('role', 'status'); slot.append(p); } }, // always in the page, only its text changes: a status that appears with its words is often not read
+    { key: 'auto_wake_after_restart', type: 'toggle', id: 'tb-autowake-on', label: 'Wake agents after a restart',
+        help: { text: 'Resumes what was running when Coral stopped.', more: 'Coral wakes them one at a time when it starts, and they resume their conversation with the permissions they ran with, including an agent that bypassed permissions. More than the number below: Coral asks first. Agents you put to sleep stay asleep.' } },
+    { key: 'auto_wake_cap', type: 'number', id: 'tb-autowake-cap', label: 'Wake up to', unit: 'agents without asking', min: 1, max: 50, step: 1, default: 8, attrs: { inputmode: 'numeric' } },
+];
 const TERMINAL_FIELDS = [
     { key: 'terminal_font_size', type: 'select', id: 'settings-terminal-font-size', labelId: 'settings-terminal-font-size-label', label: 'Terminal font size', default: '13', options: [10, 11, 12, 13, 14, 16, 18].map(px) },
     { key: 'terminal_scrollback', type: 'select', id: 'settings-terminal-scrollback', labelId: 'settings-terminal-scrollback-label', label: 'Terminal scrollback', default: '20000',
         options: [{ value: '1000', label: '1,000 lines' }, { value: '5000', label: '5,000 lines' }, { value: '10000', label: '10,000 lines' }, { value: '20000', label: '20,000 lines' }, { value: '50000', label: '50,000 lines' }, { value: '100000', label: 'Unlimited (100k)' }] },
     { key: 'fit_pane_width', type: 'toggle', id: 'settings-fit-pane-width', label: 'Fit pane width', help: { text: '', more: 'With the tmux backend, the terminal takes the size of this browser window.' } },
-    live('settings-terminal-backend'), live('tb-autowake'), live('settings-tools-folder-dl'), live('settings-engine-more'),
+    ...TERMINAL_BACKEND_FIELDS,
+    live('settings-tools-folder-dl'), live('settings-engine-more'),
 ];
 
 const PERMISSION_OPTIONS = [{ value: '', label: 'Not set (Auto)' }, { value: 'default', label: 'Default' }, { value: 'plan', label: 'Plan' }, { value: 'acceptEdits', label: 'Accept edits' }, { value: 'auto', label: 'Auto' }, { value: 'bypassPermissions', label: 'Bypass permissions' }, { value: 'dontAsk', label: "Don't ask" }];
@@ -140,5 +164,6 @@ export function drawSettingsGroups(modal, mount) {
     for (const [hostId, fields] of [['settings-general-rows', GENERAL_FIELDS], ['settings-notifications-rows', NOTIFICATIONS_FIELDS], ['settings-files-rows', FILES_FIELDS], ['settings-terminal-rows', TERMINAL_FIELDS], ['settings-agents-rows', AGENTS_FIELDS], ['settings-cleanup-rows', CLEANUP_FIELDS], ['settings-security-rows', SECURITY_FIELDS], ['settings-network-rows', NETWORK_FIELDS]]) {
         const host = modal.querySelector(`#${hostId}`);
         if (host && !host.firstChild) mount(host, { mode: 'settings', saveBar: false, fields: typeof fields === 'function' ? fields(host) : fields });
+        if (hostId === 'settings-terminal-rows') for (const id of TERMINAL_BACKEND_IDS) host.querySelector(`#${id}`)?.closest('.sv-row')?.setAttribute('hidden', ''); // until terminal_backend.js has read the status
     }
 }

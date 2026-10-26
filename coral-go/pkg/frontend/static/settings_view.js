@@ -114,7 +114,7 @@ export function mountSettingsView(host, spec) {
             const apply = () => { const w = Array.isArray(want) ? want.map(String) : [String(want ?? '')]; for (const i of inputs) i.checked = w.includes(i.value); };
             const draw = list => {
                 inputs.length = 0;
-                box.replaceChildren(...list.map((o, i) => { const lab = node('label', 'sv-choice'); const inp = node('input'); inp.type = t === 'radio' ? 'radio' : 'checkbox'; inp.name = field.key; inp.value = String(o.value); inp.id = o.id || `${id}-c${i}`; inputs.push(inp); lab.append(inp, node('span', 'sv-choice-text', o.label)); if (o.help) lab.append(node('span', 'sv-choice-help', o.help)); return lab; }));
+                box.replaceChildren(...list.map((o, i) => { const lab = node('label', 'sv-choice'); const inp = node('input'); inp.type = t === 'radio' ? 'radio' : 'checkbox'; inp.name = field.key; inp.value = String(o.value); inp.id = o.id || `${id}-c${i}`; inputs.push(inp); const txt = node('span', 'sv-choice-text', o.label); txt.id = `${inp.id}-t`; inp.setAttribute('aria-labelledby', txt.id); lab.append(inp, txt); if (o.help) { const h = node('span', 'sv-choice-help', o.help); h.id = `${inp.id}-h`; inp.setAttribute('aria-describedby', h.id); lab.append(h); } return lab; }));
                 apply();
             };
             draw(optionsOf(field, draw));

@@ -10,14 +10,14 @@
     "html": 0
   },
   "tb-row": {
-    "css": 1,
+    "css": 0,
     "js": 1,
-    "html": 1
+    "html": 0
   },
   "settings-row-switch": {
-    "css": 1,
+    "css": 0,
     "js": 0,
-    "html": 1
+    "html": 0
   },
   "settings-unit-field": {
     "css": 0,
@@ -100,9 +100,6 @@
     "settings-cloud-switch-row",
     "settings-cloud-usercode-row",
     "settings-hint-line",
-    "settings-row",
-    "tb-head",
-    "tb-line",
-    "tb-row"
+    "settings-row"
   ]
 }

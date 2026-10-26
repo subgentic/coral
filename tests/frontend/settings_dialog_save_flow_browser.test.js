@@ -54,7 +54,7 @@ const BASE = require('./test_base').BASE;
         });
         await run('a Save that leaves the dialog open (the wake choice is refused) takes the form as its new start: no unsaved note once only the refused value is put back', async () => {
             await ev(`window.__puts.length = 0; window.__mode = 'ok'; window.ST.settings = {}; true`); await open('terminal'); // sparse settings: the form at open differs from them by the defaults a first Save also writes (#7041)
-            await waitFor(`!document.getElementById('tb-autowake').hidden`, 'the wake row, shown on a pty Coral', 8000);
+            await waitFor(`!document.getElementById('tb-autowake-on').closest('.sv-row').hidden`, 'the wake row, shown on a pty Coral', 8000);
             await type('settings-working-dir', '/work/stays-open'); await type('tb-autowake-cap', '99'); // a cap over 50: the settings save, the wake choice is refused and the dialog stays open
             await save(); await waitFor(`window.__toasts.some(t => /Wake up to/.test(t))`, 'the refusal of the wake choice', 8000);
             assert.equal(await shown(), 'flex', 'the dialog stays open'); assert.equal((await puts())[0].default_working_dir, '/work/stays-open', 'and the working directory was saved');

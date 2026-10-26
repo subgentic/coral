@@ -23,7 +23,7 @@ const WITH_WARNING_BUDGET = 88; // 60 (+1 for the render engine's disclosure mov
         await waitFor(`!!document.getElementById('settings-tab-network')`, 'the Settings dialog', 8000);
         await waitFor(`document.querySelectorAll('#settings-modal .settings-hint-line').length > 5`, 'the hint lines', 8000);
         await ev(`document.getElementById('settings-tab-terminal').click(); true`);
-        await waitFor(`(() => { const p = document.querySelector('#settings-modal .settings-pane:not([hidden])'); return !!p && p.dataset.group === 'terminal' && !document.getElementById('settings-terminal-backend').hidden; })()`, 'the Terminal group, loaded', 8000);
+        await waitFor(`(() => { const p = document.querySelector('#settings-modal .settings-pane:not([hidden])'); return !!p && p.dataset.group === 'terminal' && !document.getElementById('tb-fixed').closest('.sv-row').hidden; })()`, 'the Terminal group, loaded', 8000);
         await ev(`(() => { const r = document.getElementById('settings-tools-folder-row'); if (r) r.hidden = true; return true; })()`); // the normal state has no warning row: a Windows runner shows it for real (its tools folder is a temp folder), and the 64-word state with it is checked on its own
         const seen = await ev(`(() => { const pane = document.querySelector('#settings-modal .settings-pane:not([hidden])'); const out = [];
             const shown = e => { for (let p = e; p; p = p.parentElement) { const s = getComputedStyle(p); if (s.display === 'none' || s.visibility === 'hidden' || p.hidden) return false; } return true; };
@@ -43,14 +43,14 @@ const WITH_WARNING_BUDGET = 88; // 60 (+1 for the render engine's disclosure mov
         assert.ok(withRow.some(t => /agent tools folder can be changed without administrator rights/.test(t)), 'the tools folder line shows: ' + JSON.stringify(withRow));
         assert.ok(wordsWithRow <= WITH_WARNING_BUDGET, `Terminal shows ${wordsWithRow} words with the tools folder warning too, budget ${WITH_WARNING_BUDGET}: ${JSON.stringify(withRow)}`);
         await ev(`document.getElementById('settings-tools-folder-row').hidden = true; true`);
-        const note = await ev(`(() => { const p = document.getElementById('tb-fixed'), b = document.getElementById('tb-learn-fixed'), d = document.getElementById('tb-d-fixed'); const vis = e => e.getClientRects().length > 0;
+        const note = await ev(`(() => { const p = document.getElementById('tb-fixed'), b = p.closest('.sv-row').querySelector('.sv-learn'), d = document.getElementById(b.getAttribute('aria-controls')); const vis = e => e.getClientRects().length > 0;
             return { noteShown: vis(p), note: p.textContent.trim(), learnShown: vis(b), expanded: b.getAttribute('aria-expanded'), controls: b.getAttribute('aria-controls'), detailHidden: d.hidden, detail: d.textContent.trim() }; })()`);
         assert.ok(note.noteShown && note.learnShown, JSON.stringify(note));
         assert.match(note.note, /pty/); assert.match(note.note, /wake next time/);
-        assert.equal(note.expanded, 'false'); assert.equal(note.controls, 'tb-d-fixed'); assert.equal(note.detailHidden, true);
+        assert.equal(note.expanded, 'false'); assert.ok(note.controls); assert.equal(note.detailHidden, true);
         assert.match(note.detail, /no tmux on this system/); assert.match(note.detail, /resume their conversation/);
-        await ev(`document.getElementById('tb-learn-fixed').click(); true`);
-        const open = await ev(`({ expanded: document.getElementById('tb-learn-fixed').getAttribute('aria-expanded'), hidden: document.getElementById('tb-d-fixed').hidden, label: document.getElementById('tb-learn-fixed').textContent.trim() })`);
+        await ev(`document.getElementById('tb-fixed').closest('.sv-row').querySelector('.sv-learn').click(); true`);
+        const open = await ev(`(() => { const b = document.getElementById('tb-fixed').closest('.sv-row').querySelector('.sv-learn'); return { expanded: b.getAttribute('aria-expanded'), hidden: document.getElementById(b.getAttribute('aria-controls')).hidden, label: b.textContent.trim() }; })()`);
         assert.deepEqual(open, { expanded: 'true', hidden: false, label: 'Show less' });
         console.log('PASS Settings > Terminal on a pty-only system: a short line, the rest behind Learn more, within the word budget');
     } finally { await client.close(); }
