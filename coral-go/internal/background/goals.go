@@ -386,16 +386,8 @@ func (g *GoalGenerator) RequestGoal(sessionID string) {
 }
 
 func (g *GoalGenerator) pollOnce(ctx context.Context) {
-	g.pruneMetrics(ctx)
-	g.mu.Lock()
-	g.lastPoll = g.now()
-	g.mu.Unlock()
-	settings, serr := g.sessionStore.GetSettingsForCLI(ctx)
-	if serr != nil { // without the settings the goal CLI would be the one on PATH, not the configured one (#4350): skip this poll
-		g.logger.Error("failed to read settings for the goal poll", "error", serr)
-		return
-	}
-	if GoalsDisabled(settings) {
+	settings, ok := g.beginPoll(ctx)
+	if !ok {
 		return
 	}
 	sessions, err := g.sessionStore.GetAllLiveSessions(ctx)
@@ -404,6 +396,52 @@ func (g *GoalGenerator) pollOnce(ctx context.Context) {
 		return
 	}
 
+	due, live := g.markDueSessions(sessions)
+	g.forgetEndedSessions(live)
+
+	if len(due) == 0 {
+		return
+	}
+	bin := g.resolveCLI(settings)
+	if bin == "" {
+		g.noteMissingCLI(ctx, due)
+		return
+	}
+	g.mu.Lock()
+	g.noCLI = false
+	g.mu.Unlock()
+
+	// A signed-out Claude is never started (#5469): its sign-in flow would hold the login. The goals wait (no attempt recorded, no failure counted) and are due again on a
+	// later tick; agentsignin asks the CLI only now and then and says once per wait that jobs are skipped.
+	if err := agentsignin.Require(ctx, at.Claude, bin); err != nil {
+		g.releaseInFlight(due)
+		return
+	}
+
+	g.launchGenerations(ctx, bin, due)
+}
+
+// beginPoll starts a poll: it prunes the metrics, notes the time, and reads the settings. It reports false when this poll has nothing to do: the settings could not be read (without them the
+// goal CLI would be the one on PATH, not the configured one, #4350) or the generator is off.
+func (g *GoalGenerator) beginPoll(ctx context.Context) (map[string]string, bool) {
+	g.pruneMetrics(ctx)
+	g.mu.Lock()
+	g.lastPoll = g.now()
+	g.mu.Unlock()
+	settings, serr := g.sessionStore.GetSettingsForCLI(ctx)
+	if serr != nil {
+		g.logger.Error("failed to read settings for the goal poll", "error", serr)
+		return nil, false
+	}
+	if GoalsDisabled(settings) {
+		return nil, false
+	}
+	return settings, true
+}
+
+// markDueSessions gives each live session its state, finds the ones whose transcript calls for a new goal (marking them in flight, with the trigger) and reports which sessions are live.
+// Terminals, sleeping sessions and sessions without a transcript yet are passed over.
+func (g *GoalGenerator) markDueSessions(sessions []store.LiveSession) ([]store.LiveSession, map[string]bool) {
 	live := make(map[string]bool, len(sessions))
 	var due []store.LiveSession
 	for i := range sessions {
@@ -440,61 +478,59 @@ func (g *GoalGenerator) pollOnce(ctx context.Context) {
 		}
 		g.mu.Unlock()
 	}
+	return due, live
+}
 
+// forgetEndedSessions drops the state (and the read transcript) of every session that is no longer live.
+func (g *GoalGenerator) forgetEndedSessions(live map[string]bool) {
 	g.mu.Lock()
+	defer g.mu.Unlock()
 	for id := range g.states {
 		if !live[id] {
 			delete(g.states, id)
 			g.reader.ClearSession(id)
 		}
 	}
-	g.mu.Unlock()
+}
 
-	if len(due) == 0 {
-		return
-	}
-	bin := g.resolveCLI(settings)
-	if bin == "" {
-		g.mu.Lock()
-		first := !g.noCLI
-		if first {
-			g.logger.Warn("claude CLI not found; agent goals fall back to the first prompt")
-			g.noCLI = true
-		}
-		var trigger string
-		for _, ls := range due {
-			st := g.states[ls.SessionID]
-			st.inFlight = false
-			if trigger == "" {
-				trigger = st.trigger
-			}
-		}
-		g.mu.Unlock()
-		if first {
-			// Once per outage, not once per tick.
-			ls := due[0]
-			g.record(ctx, &store.GoalGeneration{SessionID: ls.SessionID, AgentName: ls.AgentName, AgentType: ls.AgentType,
-				Trigger: trigger, Outcome: store.GoalOutcomeNoCLI, Error: "claude CLI not found"})
-		}
-		return
-	}
+// noteMissingCLI is what a poll does with due sessions when there is no claude CLI: they are released, and the outage is recorded once (as the first due session's no_cli attempt), not once per tick.
+func (g *GoalGenerator) noteMissingCLI(ctx context.Context, due []store.LiveSession) {
 	g.mu.Lock()
-	g.noCLI = false
-	g.mu.Unlock()
-
-	// A signed-out Claude is never started (#5469): its sign-in flow would hold the login. The goals wait (no attempt recorded, no failure counted) and are due again on a
-	// later tick; agentsignin asks the CLI only now and then and says once per wait that jobs are skipped.
-	if err := agentsignin.Require(ctx, at.Claude, bin); err != nil {
-		g.mu.Lock()
-		for _, ls := range due {
-			if st := g.states[ls.SessionID]; st != nil {
-				st.inFlight = false
-			}
-		}
-		g.mu.Unlock()
-		return
+	first := !g.noCLI
+	if first {
+		g.logger.Warn("claude CLI not found; agent goals fall back to the first prompt")
+		g.noCLI = true
 	}
+	var trigger string
+	for _, ls := range due {
+		st := g.states[ls.SessionID]
+		st.inFlight = false
+		if trigger == "" {
+			trigger = st.trigger
+		}
+	}
+	g.mu.Unlock()
+	if first {
+		// Once per outage, not once per tick.
+		ls := due[0]
+		g.record(ctx, &store.GoalGeneration{SessionID: ls.SessionID, AgentName: ls.AgentName, AgentType: ls.AgentType,
+			Trigger: trigger, Outcome: store.GoalOutcomeNoCLI, Error: "claude CLI not found"})
+	}
+}
 
+// releaseInFlight clears the in-flight mark of the due sessions, so they are due again on a later tick.
+func (g *GoalGenerator) releaseInFlight(due []store.LiveSession) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	for _, ls := range due {
+		if st := g.states[ls.SessionID]; st != nil {
+			st.inFlight = false
+		}
+	}
+}
+
+// launchGenerations starts one generation per due session, at most goalConcurrency at a time.
+func (g *GoalGenerator) launchGenerations(ctx context.Context, bin string, due []store.LiveSession) {
 	for _, ls := range due {
 		ls := ls
 		g.wg.Add(1)
@@ -530,30 +566,7 @@ func (g *GoalGenerator) generate(ctx context.Context, bin string, ls *store.Live
 		SessionID: ls.SessionID, AgentName: ls.AgentName, AgentType: ls.AgentType,
 		Trigger: trigger, TranscriptBytes: size,
 	}
-	defer func() {
-		g.mu.Lock()
-		defer g.mu.Unlock()
-		st := g.states[ls.SessionID]
-		if st == nil {
-			return
-		}
-		st.inFlight = false
-		st.size = size
-		switch {
-		case attempt.Outcome == "":
-			// Not attempted: no transcript to read, no answer yet, or the same requests.
-			if st.generatedAt.IsZero() && !goalAt.IsZero() {
-				st.generatedAt = goalAt // after a restart: the stored goal's time counts
-			}
-		case store.IsGoalFailure(attempt.Outcome):
-			st.failedAt = g.now()
-			st.failures++
-		default:
-			st.generatedAt = g.now()
-			st.failedAt = time.Time{}
-			st.failures = 0
-		}
-	}()
+	defer g.settleGeneration(ls.SessionID, attempt, &size, &goalAt)
 
 	current, source, currentBasis, currentAt := g.latestGoal(ctx, ls.SessionID)
 	if source == GoalSourceUser {
@@ -569,16 +582,9 @@ func (g *GoalGenerator) generate(ctx context.Context, bin string, ls *store.Live
 		tr = st
 	}
 	g.mu.Unlock()
-	transcript := &tr.transcript
-	if size < transcript.offset {
-		*transcript = goalTranscript{} // truncated or replaced: start over
-	}
-	if transcript.read(ctx, path, ls.AgentType) != nil {
+	in, ok := g.readGoalInput(ctx, ls, path, size, tr)
+	if !ok {
 		return
-	}
-	in := transcript.input()
-	if in.Request == "" {
-		in.Request = truncateRunes(userRequestText(g.reader.FirstUserPrompt(ls.SessionID, ls.WorkingDir, ls.AgentType)), 1500)
 	}
 	if !in.HasAssistant {
 		size = 0 // nothing to describe yet; retry once the agent answers
@@ -593,29 +599,9 @@ func (g *GoalGenerator) generate(ctx context.Context, bin string, ls *store.Live
 		return
 	}
 
-	prompt := buildGoalPrompt(in, current)
-	cctx, cancel := context.WithTimeout(ctx, goalCLITimeout)
-	defer cancel()
-	start := time.Now()
-	res, err := g.runCLI(cctx, bin, prompt)
-	attempt.DurationMs = time.Since(start).Milliseconds()
-	attempt.CostUSD = res.CostUSD
-	attempt.InputTokens, attempt.OutputTokens = res.InputTokens, res.OutputTokens
-	attempt.CacheReadTokens, attempt.CacheWriteTokens = res.CacheReadTokens, res.CacheWriteTokens
+	goal, ok := g.askForGoal(ctx, bin, buildGoalPrompt(in, current), ls, attempt)
 	defer g.record(ctx, attempt)
-	if err != nil {
-		attempt.Outcome = store.GoalOutcomeFailed
-		if errors.Is(cctx.Err(), context.DeadlineExceeded) {
-			attempt.Outcome = store.GoalOutcomeTimeout
-		}
-		attempt.Error = truncateRunes(err.Error(), 500)
-		g.logger.Warn("goal generation failed", "session_id", ls.SessionID, "outcome", attempt.Outcome, "error", err)
-		return
-	}
-	goal := cleanGoal(res.Text)
-	if goal == "" {
-		attempt.Outcome = store.GoalOutcomeBadOutput
-		attempt.Error = truncateRunes("unusable reply: "+strings.TrimSpace(res.Text), 500)
+	if !ok {
 		return
 	}
 	attempt.Goal = goal
@@ -624,6 +610,85 @@ func (g *GoalGenerator) generate(ctx context.Context, bin string, ls *store.Live
 		attempt.Outcome = store.GoalOutcomeUnchanged
 		return
 	}
+	g.storeGoal(ctx, ls, goal, basis, attempt)
+}
+
+// settleGeneration is what a generation leaves in the session's state when it ends, by how the attempt ended: it is no longer in flight and it saw size bytes of the transcript; an attempt
+// that was not made (no transcript to read, no answer yet, the same requests) keeps the stored goal's time (after a restart it counts); a failure is counted and backs the session off; any other
+// outcome starts the interval again and clears the failures.
+func (g *GoalGenerator) settleGeneration(sessionID string, attempt *store.GoalGeneration, size *int64, goalAt *time.Time) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	st := g.states[sessionID]
+	if st == nil {
+		return
+	}
+	st.inFlight = false
+	st.size = *size
+	switch {
+	case attempt.Outcome == "":
+		// Not attempted: no transcript to read, no answer yet, or the same requests.
+		if st.generatedAt.IsZero() && !goalAt.IsZero() {
+			st.generatedAt = *goalAt // after a restart: the stored goal's time counts
+		}
+	case store.IsGoalFailure(attempt.Outcome):
+		st.failedAt = g.now()
+		st.failures++
+	default:
+		st.generatedAt = g.now()
+		st.failedAt = time.Time{}
+		st.failures = 0
+	}
+}
+
+// readGoalInput reads what is new in the session's transcript (from the start when it was replaced by a shorter one) and returns what the model is told about it. The first prompt stands in
+// for a request the tail does not have. It reports false when the transcript cannot be read.
+func (g *GoalGenerator) readGoalInput(ctx context.Context, ls *store.LiveSession, path string, size int64, tr *goalState) (goalInput, bool) {
+	transcript := &tr.transcript
+	if size < transcript.offset {
+		*transcript = goalTranscript{} // truncated or replaced: start over
+	}
+	if transcript.read(ctx, path, ls.AgentType) != nil {
+		return goalInput{}, false
+	}
+	in := transcript.input()
+	if in.Request == "" {
+		in.Request = truncateRunes(userRequestText(g.reader.FirstUserPrompt(ls.SessionID, ls.WorkingDir, ls.AgentType)), 1500)
+	}
+	return in, true
+}
+
+// askForGoal runs the CLI for one prompt and fills the attempt's cost columns, its outcome and its error. It returns the goal and true, or false when the attempt failed, timed out or
+// answered with nothing usable.
+func (g *GoalGenerator) askForGoal(ctx context.Context, bin, prompt string, ls *store.LiveSession, attempt *store.GoalGeneration) (string, bool) {
+	cctx, cancel := context.WithTimeout(ctx, goalCLITimeout)
+	defer cancel()
+	start := time.Now()
+	res, err := g.runCLI(cctx, bin, prompt)
+	attempt.DurationMs = time.Since(start).Milliseconds()
+	attempt.CostUSD = res.CostUSD
+	attempt.InputTokens, attempt.OutputTokens = res.InputTokens, res.OutputTokens
+	attempt.CacheReadTokens, attempt.CacheWriteTokens = res.CacheReadTokens, res.CacheWriteTokens
+	if err != nil {
+		attempt.Outcome = store.GoalOutcomeFailed
+		if errors.Is(cctx.Err(), context.DeadlineExceeded) {
+			attempt.Outcome = store.GoalOutcomeTimeout
+		}
+		attempt.Error = truncateRunes(err.Error(), 500)
+		g.logger.Warn("goal generation failed", "session_id", ls.SessionID, "outcome", attempt.Outcome, "error", err)
+		return "", false
+	}
+	goal := cleanGoal(res.Text)
+	if goal == "" {
+		attempt.Outcome = store.GoalOutcomeBadOutput
+		attempt.Error = truncateRunes("unusable reply: "+strings.TrimSpace(res.Text), 500)
+		return "", false
+	}
+	return goal, true
+}
+
+// storeGoal writes a new goal as the session's automatic goal event, with the basis it was made from, and marks the attempt stored (failed, with the reason, when the store refuses it).
+func (g *GoalGenerator) storeGoal(ctx context.Context, ls *store.LiveSession, goal, basis string, attempt *store.GoalGeneration) {
 	attempt.Outcome = store.GoalOutcomeStored
 	detail := fmt.Sprintf(`{"source":%q,"basis":%q}`, GoalSourceAuto, basis)
 	sid := ls.SessionID
