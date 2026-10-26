@@ -221,13 +221,14 @@ func TestQA7355MoreThanFiftyIsAGap(t *testing.T) {
 	c.first()
 	c.drain(1500 * time.Millisecond)
 	e.burst(g.ID, 70, 0)
-	evs, gaps, _ := c.drain(3 * time.Second)
+	evs, gaps, raw := c.drain(3 * time.Second)
 	t.Logf("70 changes: %d events, %d gap frames", len(evs), gaps)
-	assert.GreaterOrEqual(t, gaps, 1, "more than a frame can hold says gap")
-	assert.LessOrEqual(t, len(evs), 50)
-	more, gaps2, _ := c.drain(3 * time.Second)
-	assert.Empty(t, more, "nothing repeated on later ticks")
-	assert.Zero(t, gaps2, "no gap repeated on later ticks")
+	// The frames that carried goal events are in every message: under -race on a slow machine this test saw 57 events (#8483), and which frame held the extra seven is what the failure has to say.
+	assert.GreaterOrEqual(t, gaps, 1, "more than a frame can hold says gap; frames: %v", raw)
+	assert.LessOrEqual(t, len(evs), 50, "one frame holds at most 50 events; frames: %v", raw)
+	more, gaps2, raw2 := c.drain(3 * time.Second)
+	assert.Empty(t, more, "nothing repeated on later ticks; frames: %v", raw2)
+	assert.Zero(t, gaps2, "no gap repeated on later ticks; frames: %v", raw2)
 }
 
 // 3: a connection that is behind a pruned window is told it missed some.
