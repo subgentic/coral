@@ -234,7 +234,8 @@
     "Median execution duration: 840.0s (P90: 840.0s across 1 completed tasks)",
     "Coordination lag candidate: 1 ready task(s) assigned to currently idle subscribers remain unclaimed.",
     "Notification churn observed in 1 incident(s): reminders dispatched for tasks already claimed or in rapid (\u003c2m) succession.",
-    "Active duration observation: 2 task(s) in progress exceed threshold (candidate status, not proof of inactivity)."
+    "Active duration observation: 2 task(s) in progress exceed threshold (candidate status, not proof of inactivity).",
+    "Review-held slots: 1 task(s) hold a slot while a completion review is pending (longest: task #2, 2600s, reviewer QA)."
   ],
   "recommendations": [
     "Dispatch targeted nudges with explicit claim IDs (coral-board task claim \u003cID\u003e) for the 1 unclaimed task(s) assigned to idle subscribers.",

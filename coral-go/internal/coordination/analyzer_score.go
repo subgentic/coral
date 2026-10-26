@@ -179,6 +179,21 @@ func generateKeyFindings(f ObservableFacts, h HeuristicSignals) []string {
 			len(h.DuplicateScopeCandidates)))
 	}
 
+	if len(f.ReviewHeldSlots) > 0 {
+		longest := f.ReviewHeldSlots[0]
+		for _, rh := range f.ReviewHeldSlots[1:] {
+			if rh.DurationSec > longest.DurationSec {
+				longest = rh
+			}
+		}
+		findings = append(findings, fmt.Sprintf("Review-held slots: %d task(s) hold a slot while a completion review is pending (longest: task #%d, %.0fs, reviewer %s).",
+			len(f.ReviewHeldSlots), longest.TaskID, longest.DurationSec, longest.ReviewerRole))
+	}
+	if len(h.RepetitiveHandoffLoops) > 0 {
+		findings = append(findings, fmt.Sprintf("Repetitive handoff loops: %d rapid back-and-forth exchange(s) between the same two agents; the first: %s.",
+			len(h.RepetitiveHandoffLoops), h.RepetitiveHandoffLoops[0].Summary))
+	}
+
 	return findings
 }
 

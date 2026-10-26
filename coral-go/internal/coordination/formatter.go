@@ -135,6 +135,16 @@ func FormatMarkdown(r Report) string {
 		b.WriteString("\n")
 	}
 
+	if len(r.ObservableFacts.ReviewHeldSlots) > 0 {
+		b.WriteString("### E. Review-Held Slots\n\n")
+		b.WriteString("| Task ID | Title | Assignee | Reviewer Role | Held For |\n")
+		b.WriteString("| :---: | :--- | :--- | :--- | :---: |\n")
+		for _, rh := range r.ObservableFacts.ReviewHeldSlots {
+			b.WriteString(fmt.Sprintf("| #%d | %s | %s | %s | %.0fs |\n", rh.TaskID, rh.Title, rh.Assignee, rh.ReviewerRole, rh.DurationSec))
+		}
+		b.WriteString("\n")
+	}
+
 	// Heuristic Signals
 	b.WriteString("## 3. Heuristic Signals & Inefficiency Candidates\n\n")
 	b.WriteString("> [!NOTE]\n")
@@ -213,6 +223,18 @@ func FormatMarkdown(r Report) string {
 		b.WriteString("| :---: | :--- | :--- | :--- |\n")
 		for _, rec := range r.HeuristicSignals.ManualRecoveryEvents {
 			b.WriteString(fmt.Sprintf("| %s | `%s` | %s | %s |\n", taskRef(rec.TaskID), rec.EventType, rec.Actor, truncate(rec.Reason, 80)))
+		}
+		b.WriteString("\n")
+	}
+
+	// Repetitive handoffs
+	if len(r.HeuristicSignals.RepetitiveHandoffLoops) > 0 {
+		b.WriteString("### F. Repetitive Handoff Loops\n\n")
+		b.WriteString("| Agents | Messages | Time Span | Window (UTC) |\n")
+		b.WriteString("| :--- | :---: | :---: | :--- |\n")
+		for _, loop := range r.HeuristicSignals.RepetitiveHandoffLoops {
+			b.WriteString(fmt.Sprintf("| %s | %d | %.0fs | %s – %s |\n", strings.Join(loop.Agents, " & "), loop.MessageCount, loop.TimeSpanSec,
+				loop.FirstTime.UTC().Format("15:04:05"), loop.LastTime.UTC().Format("15:04:05")))
 		}
 		b.WriteString("\n")
 	}
