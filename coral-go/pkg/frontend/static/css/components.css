@@ -2573,6 +2573,7 @@
     cursor: pointer;
     font-size: 1.125rem;
     padding: 0 8px 0 0;
+    min-width: 24px; min-height: 24px; /* its own box, not only the invisible hit area around it (#8451, WCAG 2.2 AA 2.5.8) */
     vertical-align: middle;
     transition: color 0.15s;
 }

@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const NA = require('./helpers/new_agent');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -28,6 +29,12 @@ const BASE = require('./test_base').BASE;
                 return out; })()`);
             assert.deepEqual(miss, [], 'each small control has a 24 px target: ' + JSON.stringify(miss));
         }
+        // the Back button as the real dialog draws it (#8451, WCAG 2.2 AA 2.5.8): its own box is at least 24 px, not only the invisible hit area around it
+        await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await NA.install(ev); await NA.openNewAgent(ev, waitFor);
+        const back = await ev(`(() => { const b = [...document.querySelectorAll('[role=dialog] .launch-back-btn')].find(window.__na.vis); if (!b) return null; const r = b.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })()`);
+        assert.ok(back && back[0] >= 24 && back[1] >= 24, 'the Back button of New agent is ' + JSON.stringify(back) + ' px: its own box is at least 24 by 24');
         console.log('   ✓');
     } finally { await Emulation.clearDeviceMetricsOverride().catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
