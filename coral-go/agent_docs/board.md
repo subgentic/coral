@@ -817,8 +817,8 @@ orchestrator on two things:
   reported as escalated. Activity resets it.
 
 The texts are fixed and hold only a task number and minutes, never a task title or anything an
-agent wrote; they are typed like any automated input (held while the agent is in a turn or a
-prompt is open, never answering one). An agent with no hook events is never nudged. Each run
+agent wrote; they are typed like any automated input (at once, in a turn too; nothing is typed, and nothing kept,
+while a prompt or menu is open on the agent's screen or its input box holds a draft, and never an answer to a prompt). An agent with no hook events is never nudged. Each run
 posts one line per rule from "Coral Task Queue" ("[Coral health] claim nudge sent to: ...",
 "status asked of: ...", "escalated to the orchestrator: ..."); those lines are not agent
 activity and not a mention. Limits, kept by the server: 3 automatic actions per agent per hour

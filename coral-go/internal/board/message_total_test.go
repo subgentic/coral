@@ -170,7 +170,7 @@ func TestUnreadStatesSkipOnlyEmptySearches(t *testing.T) {
 	}
 	// The cases the skip must not touch really differ from an empty state.
 	require.NotZero(t, states["tmux-lead"].LatestID)
-	require.Zero(t, states["tmux-grp"].Count)
+	require.Equal(t, 1, states["tmux-grp"].Count, "a group-mode member is counted what its plain read returns: the one message that tags it (#7757)")
 	require.NotZero(t, states["tmux-grp"].LatestID)
 	require.NotZero(t, states["tmux-w1"].LatestID)
 	require.Zero(t, states["tmux-w2"].LatestID)

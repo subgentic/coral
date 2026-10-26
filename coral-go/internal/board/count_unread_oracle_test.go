@@ -309,8 +309,9 @@ func countUnreadBefore4599(s *Store, ctx context.Context, sessionNames []string,
 		JobTitle     string `db:"job_title"`
 		LastReadID   int64  `db:"last_read_id"`
 		ReceiveMode  string `db:"receive_mode"`
+		CanPeek      int    `db:"can_peek"`
 	}
-	query := "SELECT project, subscriber_id, session_name, job_title, last_read_id, receive_mode FROM board_subscribers WHERE is_active = 1"
+	query := "SELECT project, subscriber_id, session_name, job_title, last_read_id, receive_mode, can_peek FROM board_subscribers WHERE is_active = 1"
 	var args []any
 	if sessionNames != nil {
 		var err error
@@ -381,6 +382,7 @@ func countUnreadBefore4599(s *Store, ctx context.Context, sessionNames []string,
 		if rm == "" {
 			rm = "mentions"
 		}
+		rm = readSelectionMode(sub.SubscriberID, sub.JobTitle, sub.CanPeek, rm) // what a plain read returns (#7757): the selection changed on purpose, the oracle checks the optimised path against the old walk
 		info := &subInfo{SubscriberID: sub.SubscriberID, SessionName: sub.SessionName, JobTitle: sub.JobTitle, LastReadID: sub.LastReadID, ReceiveMode: rm,
 			key: sidebarUnreadKey{sub.Project, sub.SubscriberID, sub.SessionName}}
 		info.start, info.count = s.unreadCounts.sidebarUnreadStart(info.key, sub.LastReadID, sub.JobTitle, rm, epoch)

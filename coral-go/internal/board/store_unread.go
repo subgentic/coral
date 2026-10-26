@@ -6,7 +6,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/jmoiron/sqlx"
@@ -62,45 +61,20 @@ func (s *Store) CheckUnread(ctx context.Context, project, subscriberID string) (
 		return count, err
 	}
 
-	if receiveMode == "mentions" || receiveMode == "all" { // "all" here is a member whose read returns what tags it
-		terms := mentionTerms(subscriberID, sub.JobTitle)
-		// Convert terms to SQL LIKE patterns (% wildcard matches any substring)
-		whereClauses := make([]string, len(terms))
-		args := []any{subscriberID}
-		for i, t := range terms {
-			whereClauses[i] = "content LIKE ? COLLATE NOCASE"
-			args = append(args, "%"+t+"%")
-		}
-		filter := "subscriber_id != ?" + systemFilter + " AND (" + strings.Join(whereClauses, " OR ") + ")"
-		// The same count from the mention index when it can answer (#4483): the sender filter alone in SQL
-		// plus the index's candidates; countMentionsUnread falls back to filter (the OR of LIKE) otherwise.
-		return s.countMentionsUnread(ctx, project, subscriberID, sub.JobTitle, sub.LastReadID, filter, args,
-			&mentionIndexCount{terms: terms, senderArgs: []any{subscriberID}})
+	// Every other member, a group mode included (a plain read does not filter on groups), is counted the messages that tag it.
+	terms := mentionTerms(subscriberID, sub.JobTitle)
+	// Convert terms to SQL LIKE patterns (% wildcard matches any substring)
+	whereClauses := make([]string, len(terms))
+	args := []any{subscriberID}
+	for i, t := range terms {
+		whereClauses[i] = "content LIKE ? COLLATE NOCASE"
+		args = append(args, "%"+t+"%")
 	}
-
-	// Group-based mode: count messages from group members only
-	var memberIDs []string
-	err = s.reader().SelectContext(ctx, &memberIDs,
-		"SELECT subscriber_id FROM board_groups WHERE project = ? AND group_id = ?",
-		project, receiveMode)
-	if err != nil || len(memberIDs) == 0 {
-		return 0, nil
-	}
-
-	placeholders := make([]string, len(memberIDs))
-	args := []interface{}{project, sub.LastReadID, subscriberID}
-	for i, id := range memberIDs {
-		placeholders[i] = "?"
-		args = append(args, id)
-	}
-
-	var count int
-	query := fmt.Sprintf(
-		`SELECT COUNT(*) FROM board_messages
-		 WHERE project = ? AND id > ? AND subscriber_id != ?`+systemFilter+` AND subscriber_id IN (%s)`,
-		strings.Join(placeholders, ","))
-	err = s.reader().GetContext(ctx, &count, query, args...)
-	return count, err
+	filter := "subscriber_id != ?" + systemFilter + " AND (" + strings.Join(whereClauses, " OR ") + ")"
+	// The same count from the mention index when it can answer (#4483): the sender filter alone in SQL
+	// plus the index's candidates; countMentionsUnread falls back to filter (the OR of LIKE) otherwise.
+	return s.countMentionsUnread(ctx, project, subscriberID, sub.JobTitle, sub.LastReadID, filter, args,
+		&mentionIndexCount{terms: terms, senderArgs: []any{subscriberID}})
 }
 
 // LatestUnreadMessageID returns the newest message eligible for a subscriber's
@@ -265,12 +239,13 @@ type unreadSubscriber struct {
 	JobTitle     string `db:"job_title"`
 	LastReadID   int64  `db:"last_read_id"`
 	ReceiveMode  string `db:"receive_mode"`
+	CanPeek      int    `db:"can_peek"`
 }
 
 // activeUnreadSubscribers is every active subscription, or (sessionNames not nil) those of these sessions.
 func (s *Store) activeUnreadSubscribers(ctx context.Context, sessionNames []string) ([]unreadSubscriber, error) {
 	var subs []unreadSubscriber
-	query := "SELECT project, subscriber_id, session_name, job_title, last_read_id, receive_mode FROM board_subscribers WHERE is_active = 1"
+	query := "SELECT project, subscriber_id, session_name, job_title, last_read_id, receive_mode, can_peek FROM board_subscribers WHERE is_active = 1"
 	var args []any
 	if sessionNames != nil {
 		var err error
@@ -320,6 +295,16 @@ func (s *Store) groupMembers(ctx context.Context, subs []unreadSubscriber) (map[
 	return groupsByKey, nil
 }
 
+// readSelectionMode is the mode a member is COUNTED in (#7757, the operator: a number is shown, and a nudge sent, only for what the member's next plain read returns): an orchestrator in mode
+// all is counted every message (its read returns every one); every other member, whatever its receive mode says, is counted the messages that tag it (what ReadMessages returns for it), so
+// a member in mode all or in a group mode is counted as one in mode mentions. "none" is not counted at all (the callers skip it).
+func readSelectionMode(subscriberID, jobTitle string, canPeek int, mode string) string {
+	if mode == "all" && isOrchestrator(subscriberID, jobTitle, canPeek) {
+		return "all"
+	}
+	return "mentions"
+}
+
 // unreadCount is one subscription being counted: where its count resumes (start) and what it holds so far.
 type unreadCount struct {
 	SubscriberID string
@@ -347,6 +332,7 @@ func (s *Store) unreadCountStarts(subs []unreadSubscriber, epoch uint64) (map[st
 		if rm == "" {
 			rm = "mentions"
 		}
+		rm = readSelectionMode(sub.SubscriberID, sub.JobTitle, sub.CanPeek, rm)
 		info := &unreadCount{SubscriberID: sub.SubscriberID, SessionName: sub.SessionName, JobTitle: sub.JobTitle, LastReadID: sub.LastReadID, ReceiveMode: rm,
 			key: sidebarUnreadKey{sub.Project, sub.SubscriberID, sub.SessionName}}
 		info.start, info.count = s.unreadCounts.sidebarUnreadStart(info.key, sub.LastReadID, sub.JobTitle, rm, epoch)

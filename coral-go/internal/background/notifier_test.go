@@ -657,7 +657,7 @@ func TestBoardNotifier_SeedsOnlyRunningAgents(t *testing.T) {
 		_, err := bs.Subscribe(ctx, "proj", s.id, s.id, s.session, nil, "all")
 		require.NoError(t, err)
 	}
-	_, err := bs.PostMessage(ctx, "proj", "Lead", "unread for both", nil)
+	_, err := bs.PostMessage(ctx, "proj", "Lead", "@all unread for both", nil)
 	require.NoError(t, err)
 	notifier := NewBoardNotifier(bs, &mockRuntime{}, 10*time.Second)
 	notifier.SetDiscoverFn(func(_ context.Context) ([]AgentInfo, error) {

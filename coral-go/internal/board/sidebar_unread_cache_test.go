@@ -21,8 +21,9 @@ func uncachedSidebarUnread(t *testing.T, s *Store, sessionNames []string) map[st
 		JobTitle     string `db:"job_title"`
 		LastReadID   int64  `db:"last_read_id"`
 		ReceiveMode  string `db:"receive_mode"`
+		CanPeek      int    `db:"can_peek"`
 	}
-	require.NoError(t, s.db.Select(&subs, "SELECT project, subscriber_id, session_name, job_title, last_read_id, receive_mode FROM board_subscribers WHERE is_active = 1"))
+	require.NoError(t, s.db.Select(&subs, "SELECT project, subscriber_id, session_name, job_title, last_read_id, receive_mode, can_peek FROM board_subscribers WHERE is_active = 1"))
 	want := map[string]bool{}
 	for _, n := range sessionNames {
 		want[n] = true
@@ -50,6 +51,7 @@ func uncachedSidebarUnread(t *testing.T, s *Store, sessionNames []string) map[st
 		if mode == "" {
 			mode = "mentions"
 		}
+		mode = readSelectionMode(sub.SubscriberID, sub.JobTitle, sub.CanPeek, mode) // what a plain read returns (#7757)
 		var msgs []struct {
 			Sender  string `db:"subscriber_id"`
 			Content string `db:"content"`

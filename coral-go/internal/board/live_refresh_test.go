@@ -55,5 +55,5 @@ func TestLiveRefreshUnreadModesAndCursors(t *testing.T) {
 	names := []string{"tmux-all-reader", "tmux-mentions-reader", "tmux-group-reader", "tmux-none-reader"}
 	counts, err := s.GetUnreadCountsForSessions(ctx, names)
 	require.NoError(t, err)
-	require.Equal(t, map[string]int{"tmux-all-reader": 1, "tmux-mentions-reader": 1, "tmux-group-reader": 2, "tmux-none-reader": 0}, counts)
+	require.Equal(t, map[string]int{"tmux-all-reader": 0, "tmux-mentions-reader": 1, "tmux-group-reader": 0, "tmux-none-reader": 0}, counts, "a member is counted what its plain read returns (#7757): the messages that tag it, whatever its mode")
 }
