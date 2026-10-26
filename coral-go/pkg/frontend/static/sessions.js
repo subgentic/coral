@@ -401,6 +401,26 @@ import { describeChat } from './history_list.js';
 import { setBackLink } from './sidebar_groups.js';
 
 /** `entry` is the chat's row when the caller has it (an Inbox folder's list): the page's title and meta come from it even when the cached list does not hold the chat. */
+/** The opened chat's Star and Archive (a phone has no hover, so its way to them is here; the folder's rows show theirs on hover): for a chat of this computer's list. */
+export function drawChatFlags(entry) {
+    const w = document.getElementById('history-flags');
+    if (!w) return;
+    w.hidden = !entry || isCloud();
+    if (w.hidden) return;
+    const star = document.getElementById('history-star'), arch = document.getElementById('history-archive');
+    const starLabel = entry.starred ? 'Remove the star' : 'Star', archLabel = entry.archived ? 'Unarchive' : 'Archive';
+    star.classList.toggle('dt-flag-on', !!entry.starred); star.setAttribute('aria-pressed', String(!!entry.starred)); star.title = starLabel; star.setAttribute('aria-label', starLabel);
+    arch.title = archLabel; arch.setAttribute('aria-label', archLabel); arch.firstElementChild.textContent = entry.archived ? 'unarchive' : 'archive';
+}
+export async function toggleChatFlag(flag) {
+    const cur = state.currentSession;
+    if (!cur || cur.type !== 'history' || (flag !== 'starred' && flag !== 'archived')) return;
+    const entry = state.historySessionsList.find(x => x.session_id === cur.name);
+    if (!entry) return;
+    const m = await importOnce('./mailbox_chats.js');
+    if (await m.setChatFlag(cur.name, flag, !entry[flag])) { entry[flag] = !entry[flag]; drawChatFlags(entry); }
+}
+
 export async function selectHistorySession(sessionId, locator = null, entry = null) {
     const source = historyServer();
     const route = normalize(historyRoute(sessionId));
@@ -434,6 +454,7 @@ export async function selectHistorySession(sessionId, locator = null, entry = nu
     document.getElementById("history-session-title").textContent = historyLabel(openedEntry); // the chat's title; its id is behind Details (#6200)
     const described = describeChat(openedEntry); // the way back to its group's table, and who, when and how long under the title (#7443)
     setBackLink('history-back', isCloud() ? 'history' : 'hub-inbox', isCloud() ? described.group : (state.inboxFolder || { key: 'chats', label: 'All chats' })); // a local Coral's chat goes back to the Inbox folder it came from
+    drawChatFlags(openedEntry);
     const metaEl = document.getElementById('history-session-meta');
     if (metaEl) { metaEl.textContent = described.meta; metaEl.hidden = !described.meta; }
     document.getElementById("history-session-id").textContent = sessionId;
