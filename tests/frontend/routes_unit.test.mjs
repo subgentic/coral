@@ -31,6 +31,7 @@ rt('/team/a%2Fb', { view: 'team', server: null, id: 'a/b', sub: null });
 for (const tab of ['goals', 'messages', 'tasks', 'agents', 'artifacts', 'knowledge', 'settings']) rt(`/team/qa/${tab}`, { view: 'team', server: null, id: 'qa', sub: tab });
 rt('/team/@m2/qa/goals/12', { view: 'team', server: 'm2', id: 'qa', sub: 'goals', item: 12 });
 rt('/team/qa/tasks/7', { view: 'team', server: null, id: 'qa', sub: 'tasks', item: 7 });
+rt('/team/qa/messages/104094', { view: 'team', server: null, id: 'qa', sub: 'messages', item: 104094 }); // a message of the Board tab (#7921)
 for (const bad of ['/team/qa/goals/0', '/team/qa/goals/x', '/team/qa/goals/12/y', '/team/qa/settings/3', '/team/qa/agents/3', '/team/qa/files']) assert.equal(parse(bad), null, bad);
 rt('/board/@m2/qa', { view: 'board', server: 'm2', id: 'qa' });
 rt('/workflows', { view: 'workflows' });
@@ -125,7 +126,7 @@ console.log('routes_unit: ok');
     assert.equal(build(keyRoute('board', '@odd')), '/board/%40odd');
     assert.equal(build(keyRoute('team', 'a/b')), '/team/a%2Fb');
     assert.equal(build(keyRoute('team', 'qa', 'goals', 5)), '/team/qa/goals/5');
-    assert.equal(build(keyRoute('team', 'qa', 'settings', 5)), '/team/qa/settings', 'only goals and tasks have item pages');
+    assert.equal(build(keyRoute('team', 'qa', 'settings', 5)), '/team/qa/settings', 'only goals, tasks and messages have an item');
     for (const k of ['qa', '@m2/qa', '@odd', 'a/b', '@m2/@x', '@x!/y']) {
         assert.equal(routeKey(normalize(keyRoute('board', k))), k, k);
         assert.equal(routeKey(normalize(keyRoute('team', k))), k, k);
