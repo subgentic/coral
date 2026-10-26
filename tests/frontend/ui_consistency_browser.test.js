@@ -113,7 +113,7 @@ const fixtures = async () => {
         } else if(name==='workflows'){mods.workflows.showWorkflowsTab();await new Promise(r=>setTimeout(r,30));await mods.workflows.selectWorkflow(1)}
         else if(name==='docs'){await mods.docs.showDocsTab();await mods.docs.selectDoc('README')}
         else if(name==='analytics'){await mods.cost_dashboard.showCostDashboard();(await import((window.__coralStatic||'/static/')+'analytics_views.js')).selectView('overview');mods.cost_dashboard.stopCostDashboard()} // a phone's list is the page: the view is the screen after it (#7473)
-        else if(name==='board')mods.message_board.selectBoardProject('coral-task-workflows');
+        else if(name==='board'){localStorage.setItem('coral.board.view','chat');mods.message_board.selectBoardProject('coral-task-workflows');for(let i=0;i<80&&!document.querySelector('#team-page-view .mb-message-body');i++)await new Promise(r=>setTimeout(r,100));} // the board is the team page's Messages tab (#8129), drawn as chat rows here
         else if(name==='scheduler'){mods.scheduler.initScheduler();await new Promise(r=>setTimeout(r,30));await mods.scheduler.selectScheduledJob(1)}
     };
 };

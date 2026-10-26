@@ -52,22 +52,14 @@ const BASE = require('./test_base').BASE;
         assert.equal(await ev(`['agentic-tab-subscribers', 'agentic-tab-team-view', 'agentic-tab-team-settings', 'agentic-tab-team-artifacts', 'agentic-tab-knowledge', 'agentic-panel-team-view', 'agentic-panel-knowledge'].some(id => !!document.getElementById(id))`), false, 'the team\'s tabs and panels are not in the page at all');
         assert.equal(d.active, 'files');
 
-        console.log('2. A board\'s page: no side panel, no button for one, its Members are the sheet, and a link to its team\'s page');
+        console.log('2. A board\'s page is its team page (#8129): no side panel, no button for one');
         await ev(`window.selectBoardProject(${JSON.stringify(BOARD)}); true`);
-        await waitFor(`document.querySelectorAll('#mb-messages .mb-message').length === 1`, 'the board rows', 8000);
+        await waitFor(`getComputedStyle(document.getElementById('team-page-view')).display !== 'none' && document.querySelectorAll('#team-page-view #mb-messages .mb-message, #team-page-view #mb-messages .dt-row').length >= 1`, 'the board on the team page', 8000);
         d = await dock();
         assert.equal(d.page, 'none', JSON.stringify(d));
-        assert.equal(await ev(`getComputedStyle(document.getElementById('agentic-state')).display`), 'none', 'the sidebar is not shown on the board');
+        assert.equal(await ev(`getComputedStyle(document.getElementById('agentic-state')).display`), 'none', 'the sidebar is not shown on the team page');
         assert.equal(await ev(`getComputedStyle(document.getElementById('panel-toggle-btn')).display`), 'none', 'and its button is not either');
-        assert.equal(await ev(`!!document.querySelector('#messageboard-view #mb-subscribers-panel')`), false);
-        assert.equal(await ev(`getComputedStyle(document.getElementById('mb-subscribers-btn')).display !== 'none'`), true, 'Members is the sheet\'s button, at every width');
-        assert.equal(await ev(`getComputedStyle(document.getElementById('mb-team-page-btn')).display !== 'none' && !document.getElementById('mb-team-page-btn').hidden`), true, 'a link to the team\'s page');
         await shot('dock-board-none');
-        await ev(`document.getElementById('mb-team-page-btn').click(); true`);
-        await waitFor(`document.getElementById('team-page-view') && getComputedStyle(document.getElementById('team-page-view')).display !== 'none'`, 'the team page', 8000);
-        d = await dock();
-        assert.equal(d.page, 'none', 'the team page has no side panel either: ' + JSON.stringify(d));
-        assert.equal(await ev(`getComputedStyle(document.getElementById('agentic-state')).display`), 'none');
 
         console.log('3. A chat open under the Inbox and the other pages: no sidebar at all; Saved for everything is its own page, which the top bar bookmark opens');
         await ev(`switchNavTab('history'); true`);
