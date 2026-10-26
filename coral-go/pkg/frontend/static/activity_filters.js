@@ -33,7 +33,7 @@ const base = defineFilters({
     type: { type: 'choice', values: TYPES, chip: v => `Type: ${TYPE_LABEL[v]}` },
     from: { type: 'day', chip: v => `From ${v}` },
     to: { type: 'day', chip: v => `Until ${v}` },
-    sort: { type: 'sort', values: SORTS, default: 'newest' },
+    sort: { type: 'order', values: SORTS, default: 'newest' },
 });
 const GROUPS_ON = Object.fromEntries(GROUP_KEYS.map(k => [groupField(k), true]));
 export const EMPTY = { ...base.EMPTY, ...GROUPS_ON };
