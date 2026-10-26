@@ -16,7 +16,7 @@ const BASE = require('./test_base').BASE;
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const said = () => ev(`document.getElementById('mb-announce').textContent.trim()`);
     try {
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Emulation.setFocusEmulationEnabled({ enabled: true });
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: "try { localStorage.setItem('coral.board.view', 'chat'); } catch (e) {}" }); // the chat rows: the team page's Board tab is the table by default (#8129) await Emulation.setFocusEmulationEnabled({ enabled: true });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
         for (const [id, t] of [['Boss', 'Orchestrator'], ['dev-1', 'Developer']]) assert.equal(await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: id, job_title: t, session_name: id + '-s' }), 200);
@@ -69,8 +69,8 @@ const BASE = require('./test_base').BASE;
         await ev(`document.getElementById('mb-messages').scrollTop = 1e6; true`);
         for (const theme of ['dark', 'light']) {
             await setTheme(ev, theme);
-            const h = await auditRegion(ev, ['.mb-view-header']);
-            assert.ok(h.checked > 0 && !h.fails.length, `${theme}: the board header (Delete) holds 4.5:1: ` + JSON.stringify(h.fails).slice(0, 400));
+            const h = await auditRegion(ev, ['#team-page-head']); // the board's header is the team page's (#8129)
+            assert.ok(h.checked > 0 && !h.fails.length, `${theme}: the team page header over the board holds 4.5:1: ` + JSON.stringify(h.fails).slice(0, 400));
         }
         // the board's tasks are the Tasks tab of an agent on the board (the board's page has no side panel, #7457)
         await ev(`window.__m.add('a11y-agent', 'A', 1, { sleeping: false, board_project: ${JSON.stringify(B)} }); true`);

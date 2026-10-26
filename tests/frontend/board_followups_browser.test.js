@@ -66,7 +66,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         add(1, { content: 'left aligned ' + 'L'.repeat(90) + 'END7', who: 'Orchestrator' });
         add(1, { content: 'by an unusual sender', who: 'A Sender With A Rather Long Unbroken-Name' + 'N'.repeat(60) });
         { const id = nextId++; model.push({ id, subscriber_id: 'Coral Task Queue', is_system: true, job_title: 'Coral Task Queue', content: `[Task #9 claimed by QA Engineer] ${'T'.repeat(90)}END6`, created_at: new Date(Date.UTC(2026, 9, 17, 8, 0, 0) + id * 1000).toISOString() }); }
-        await Promise.all([Page.enable(), Runtime.enable()]);
+        await Promise.all([Page.enable(), Runtime.enable()]); await Page.addScriptToEvaluateOnNewDocument({ source: "try { localStorage.setItem('coral.board.view', 'chat'); } catch (e) {}" }); // the chat rows: the team page's Board tab is the table by default (#8129)
         await Emulation.setDeviceMetricsOverride({ width: 1400, height: 900, deviceScaleFactor: 1, mobile: false });
         await Fetch.enable({ patterns: [{ urlPattern: `*/api/board/${B}/messages/all*` }] });
         safePaused(client, ({ requestId, request }) => {
