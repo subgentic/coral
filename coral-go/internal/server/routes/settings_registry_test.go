@@ -142,7 +142,7 @@ func TestDashboardSettingKeysAreRegistered(t *testing.T) {
 		require.NoError(t, err)
 		return string(b)
 	}
-	modals := read("settings_dialog.js")
+	modals := read("settings_form.js") // readSettingsForm builds the payload (it moved out of settings_dialog.js, #8383)
 	start := strings.Index(modals, "let payload = {")
 	require.Positive(t, start, "the Settings dialog's payload")
 	end := strings.Index(modals[start:], "};")
