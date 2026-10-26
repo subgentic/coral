@@ -45,13 +45,25 @@ func sortedPIDs(ms []member) []int {
 	return out
 }
 
-// A stand-in tree: a shell with three children. The table scan finds the same processes, parents and start times as
-// the per-pid snapshot did, and the tree computed from it is the same.
+// A controlled shell and its three children stay alive through both snapshots.
+// Only this tree has stable parents: unrelated processes can exit or be
+// reparented between two live-machine looks (#8520).
 func TestProcTableMatchesPerPIDSnapshot(t *testing.T) {
-	cmd := exec.Command("sh", "-c", "sleep 60 & sleep 60 & sh -c 'sleep 60' & wait")
+	cmd := exec.Command("sh", "-c", `
+        sleep 600 & first=$!
+        sleep 600 & second=$!
+        sleep 600 & third=$!
+        trap 'kill "$first" "$second" "$third" 2>/dev/null; wait; exit 0' TERM
+        wait
+    `)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true} // a terminal has a group of its own; the tree never includes Coral's
 	require.NoError(t, cmd.Start())
-	t.Cleanup(func() { _ = cmd.Process.Kill(); _ = cmd.Wait() })
+	t.Cleanup(func() {
+		// Let the shell end and reap its children before it exits; killing only
+		// the shell leaves three sleepers reparented on the test machine.
+		_ = cmd.Process.Signal(syscall.SIGTERM)
+		assert.NoError(t, cmd.Wait(), "fixture shell must reap its children")
+	})
 
 	var snap *procSnap
 	require.Eventually(t, func() bool { // the children exist once the shell has forked them
@@ -68,13 +80,21 @@ func TestProcTableMatchesPerPIDSnapshot(t *testing.T) {
 
 	compared := 0
 	for pid, c := range oldCreated {
-		if nc, ok := snap.started[pid]; ok { // a process that started or ended between the two looks is in one only
-			compared++
-			assert.Equal(t, c, nc, "start time of pid %d", pid)
-			assert.Equal(t, oldParent[pid], snap.parent[pid], "parent of pid %d", pid)
+		if pid != cmd.Process.Pid && snap.parent[pid] != cmd.Process.Pid {
+			continue // no assertion about the rest of a changing machine
 		}
+		nc, ok := snap.started[pid]
+		require.True(t, ok, "fixture pid %d must exist in both snapshots", pid)
+		compared++
+		wantParent := cmd.Process.Pid
+		if pid == cmd.Process.Pid {
+			wantParent = os.Getpid()
+		}
+		assert.Equal(t, c, nc, "start time of fixture pid %d", pid)
+		assert.Equal(t, wantParent, oldParent[pid], "per-pid parent of fixture pid %d", pid)
+		assert.Equal(t, wantParent, snap.parent[pid], "table parent of fixture pid %d", pid)
 	}
-	assert.Greater(t, compared, 10, "most of the table is in both")
+	require.Equal(t, 4, compared, "the shell and ALL three controlled children must be compared")
 
 	created, ok := oldCreated[cmd.Process.Pid]
 	require.True(t, ok)
@@ -84,8 +104,9 @@ func TestProcTableMatchesPerPIDSnapshot(t *testing.T) {
 	assert.False(t, snap.has(member{0x7ffffff0, created}), "a pid that is not there")
 
 	got := snap.tree(root, "")
-	assert.GreaterOrEqual(t, len(got), 4, "the shell and its three children")
+	assert.Len(t, got, 4, "exactly the controlled shell and its three children")
 	for _, m := range got {
+		t.Logf("fixture_member=%d started_ms=%d", m.pid, m.created)
 		assert.Equal(t, oldCreated[m.pid], m.created, "member %d carries the start time the per-pid way gave it", m.pid)
 	}
 	assert.Contains(t, sortedPIDs(got), root.pid)
