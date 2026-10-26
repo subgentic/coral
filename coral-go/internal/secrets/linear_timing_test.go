@@ -38,12 +38,18 @@ const (
 )
 
 // measureLinear times f over mk(small) and mk(large) and says whether it is linear: no more than 9 times as long (a fast small run is floored at 5 ms) in at least one
-// of two measurements, or finished within quick (a run too quick to read a ratio from). The real guards pass tooQuick and smallBase; a test of the guard itself passes 0 and
-// 1 microsecond, so that its verdict never depends on how fast the machine is.
+// of two measurements, or finished within quick (a run too quick to read a ratio from). The real guards pass tooQuick and smallBase.
 func measureLinear(mk func(n int) string, f func(string), small, large int, quick, base time.Duration) (ds, dl time.Duration, ok bool) {
+	return measureLinearUsing(bestOfThree, mk, f, small, large, quick, base)
+}
+
+// measureLinearUsing shares the growth verdict between wall-clock measurements of the
+// real scanners and counted work in the guard's own test. Counting the control's work
+// makes scheduler pauses irrelevant without relaxing the real guard's threshold.
+func measureLinearUsing(measure func(func(string), string) time.Duration, mk func(int) string, f func(string), small, large int, quick, base time.Duration) (ds, dl time.Duration, ok bool) {
 	text, big := mk(small), mk(large)
 	for attempt := 0; attempt < 2; attempt++ {
-		ds, dl = bestOfThree(f, text), bestOfThree(f, big)
+		ds, dl = measure(f, text), measure(f, big)
 		if dl <= quick || float64(dl)/float64(max(ds, base)) < 9.0 {
 			return ds, dl, true
 		}
@@ -60,29 +66,38 @@ func requireLinear(t *testing.T, name string, mk func(n int) string, f func(stri
 	require.Less(t, dl, 10*time.Second, "%s: %v for %d bytes", name, dl, large)
 }
 
-// The guard still guards: a pass that does work for every 50th byte over the whole text (quadratic) is refused, a single pass of the same weight is accepted. The "too
-// quick" shortcut and the 5 ms floor are off (0 and 1 microsecond), so the ratio is always read and the verdict does not depend on how fast the machine is (a quadratic
-// stand-in under the 150 ms shortcut was accepted on a fast runner, 132 gate); the input is small, so the test takes well under a second.
+// The guard still guards: count the work done by real quadratic and linear loops.
+// The same growth verdict must reject 16-fold growth and accept fourfold growth.
+// A scheduler pause cannot change these counts; the real scanner checks above still
+// measure elapsed time. Use one count as one duration unit, with no quick shortcut.
 func TestTheLinearGuardRefusesAQuadraticPassAndAcceptsALinearOne(t *testing.T) {
 	mk := func(n int) string { return strings.Repeat("a", n) }
-	var sink byte
+	var operations time.Duration
+	countWork := func(f func(string), text string) time.Duration {
+		operations = 0
+		f(text)
+		return operations
+	}
 	quadratic := func(text string) {
 		for i := 0; i < len(text); i += 50 {
 			for j := 0; j < len(text); j++ {
-				sink += text[j]
+				operations++
 			}
 		}
 	}
-	linear := func(text string) { // as many additions as the quadratic one makes at 20 KB, but in proportion to the length
-		for rep := 0; rep < 400; rep++ {
+	linear := func(text string) { // the same work at 200 bytes, proportional to text length
+		for rep := 0; rep < 4; rep++ {
 			for j := 0; j < len(text); j++ {
-				sink += text[j]
+				operations++
 			}
 		}
 	}
-	_, _, ok := measureLinear(mk, quadratic, 20_000, 80_000, 0, time.Microsecond)
+	ds, dl, ok := measureLinearUsing(countWork, mk, quadratic, 200, 800, 0, 1)
+	require.Equal(t, time.Duration(800), ds)
+	require.Equal(t, time.Duration(12_800), dl)
 	require.False(t, ok, "a quadratic pass must fail the guard")
-	_, _, ok = measureLinear(mk, linear, 20_000, 80_000, 0, time.Microsecond)
+	ds, dl, ok = measureLinearUsing(countWork, mk, linear, 200, 800, 0, 1)
+	require.Equal(t, time.Duration(800), ds)
+	require.Equal(t, time.Duration(3_200), dl)
 	require.True(t, ok, "a single pass must pass it")
-	_ = sink
 }
