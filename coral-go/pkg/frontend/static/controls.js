@@ -16,11 +16,11 @@ import './agentic_state.js';
 import { addPendingMessage, confirmPendingMessage, removePendingMessage } from './live_chat.js';
 import { serverFetch, currentServer, serverForSession, sessionServer } from './server_base.js';
 import './sleeping_view.js';
-import { hubBlocked, blockedReason } from './hub_access.js';
-import { prepareImage, artifactErrorText, PICKER_ACCEPT, parseUploadReply, uploadStatusFailure, uploadCodeFailure, UPLOAD_UNFINISHED } from './image_attach.js';
+import { hubBlocked } from './hub_access.js';
+import './image_attach.js';
 import { attachmentsLead, sentToastText } from './shared_images.js';
 import './lazy_panels.js';
-import { responseErrorText, responseError } from './server_status.js';
+import { responseError } from './server_status.js';
 import './launch_flags.js';
 import { reportSendError, showComposerError, clearComposerError, awaitSocketAccept, nextInputId, refuseSocketSends } from './terminal_gone.js';
 import { rememberSend, noteHeld } from './held_sends.js';
@@ -31,25 +31,13 @@ import { showWorktreeNotice } from './worktree_notice.js';
 import { killLiveSession, dropKilledRows } from './kill_live.js';
 import { MODES, modeFromFooterText, pressesFor } from './mode_cycle.js';
 import { _getXtermModule, sleepingBlocked } from './control_runtime.js';
+import { activeUploadPromisesBySession, getPendingAttachments, clearAttachments, openImagePicker, removeAttachment } from './image_composer.js';
+export { getPendingAttachments, initImageDrop, uploadAndInsertImage, renderAttachments, removeAttachment } from './image_composer.js';
 export { restartSession, restartStage, hideRestartModal, confirmRestart } from './restart_flow.js';
 /* Quick actions, command sending, mode toggling, and session controls */
 
 
-// Active upload promises scoped by session_id
-const activeUploadPromisesBySession = new Map(); // session_id -> Promise[]
 let _isSending = false;
-
-// Attached image paths scoped by session_id (cleared on send)
-const pendingAttachmentsBySession = new Map(); // session_id -> [{ path, filename, previewUrl }]
-
-export function getPendingAttachments(session = state.currentSession) {
-    const sid = session?.session_id;
-    if (!sid) return [];
-    if (!pendingAttachmentsBySession.has(sid)) {
-        pendingAttachmentsBySession.set(sid, []);
-    }
-    return pendingAttachmentsBySession.get(sid);
-}
 
 /** Send was pressed with nothing to send: focus the box and flash it once (#3770). */
 function nudgeEmptyInput() {
@@ -731,261 +719,6 @@ export async function sendQuickCommand(command) {
 }
 
 // ── Image Drag & Drop ──────────────────────────────────────────────────────
-
-export function initImageDrop() {
-    const commandPane = document.getElementById("command-pane");
-    if (!commandPane) return;
-
-    // Create drop overlay
-    const overlay = document.createElement("div");
-    overlay.id = "drop-overlay";
-    overlay.className = "drop-overlay";
-    overlay.innerHTML = `<div class="drop-overlay-content">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/>
-        </svg>
-        <span>Drop image to attach</span>
-    </div>`;
-    overlay.style.display = "none";
-    commandPane.style.position = "relative";
-    commandPane.appendChild(overlay);
-
-    let dragCounter = 0;
-
-    commandPane.addEventListener("dragenter", (e) => {
-        e.preventDefault();
-        if (!hasImageFiles(e)) return;
-        dragCounter++;
-        overlay.style.display = "flex";
-    });
-
-    commandPane.addEventListener("dragover", (e) => {
-        e.preventDefault();
-        if (hasImageFiles(e)) e.dataTransfer.dropEffect = "copy";
-    });
-
-    commandPane.addEventListener("dragleave", (e) => {
-        e.preventDefault();
-        dragCounter--;
-        if (dragCounter <= 0) {
-            dragCounter = 0;
-            overlay.style.display = "none";
-        }
-    });
-
-    commandPane.addEventListener("drop", async (e) => {
-        e.preventDefault();
-        dragCounter = 0;
-        overlay.style.display = "none";
-
-        const files = [...(e.dataTransfer?.files || [])].filter(f =>
-            f.type.startsWith("image/")
-        );
-        if (files.length === 0) {
-            showToast("No image files found in drop", true);
-            return;
-        }
-
-        for (const file of files) {
-            await uploadAndInsertImage(file);
-        }
-    });
-
-    // Also support paste — listen on document so it works even when textarea isn't focused
-    const pasteHandler = async (e) => {
-        // Only handle when a live session is selected
-        if (!state.currentSession || state.currentSession.type !== "live") return;
-        // Skip if pasting inside other inputs (not the command input)
-        const tag = e.target.tagName;
-        if ((tag === "INPUT" || tag === "TEXTAREA") && e.target.id !== "command-input") return;
-        if (e.target.isContentEditable) return;
-
-        const items = [...(e.clipboardData?.items || [])];
-        const imageItems = items.filter(item => item.type.startsWith("image/"));
-        if (imageItems.length === 0) return;
-
-        // Extract all files synchronously before any async work,
-        // because clipboardData items become invalid after the event.
-        const files = imageItems.map(item => item.getAsFile()).filter(Boolean);
-        if (files.length === 0) return;
-
-        e.preventDefault();
-        for (const file of files) {
-            await uploadAndInsertImage(file);
-        }
-    };
-    document.addEventListener("paste", pasteHandler);
-}
-
-function hasImageFiles(e) {
-    if (e.dataTransfer?.types?.includes("Files")) {
-        // Check items if available
-        const items = e.dataTransfer.items;
-        if (items) {
-            for (const item of items) {
-                if (item.kind === "file" && item.type.startsWith("image/")) return true;
-            }
-        }
-        return true; // Can't check types on dragenter in some browsers, assume images
-    }
-    return false;
-}
-
-/** The Add image button (#6088): opens the file picker (a phone offers Photo Library, Take Photo and Browse). Launch tier through Coral Hub, as the upload route is: a refused account is told why. This runs
- *  straight from the tap, with nothing awaited before the click, or a phone would not open the picker. */
-function openImagePicker() {
-    const session = state.currentSession;
-    if (!session || session.type !== "live") return;
-    if (sleepingBlocked()) return;
-    const why = blockedReason(sessionServer(session), "launch");
-    if (why) { showToast(why, true); return; }
-    const input = document.getElementById("attach-image-input");
-    if (!input) return;
-    if (!input.dataset.bound) { // bound on the first press, not at startup: the startup sequence stays as it was
-        input.dataset.bound = "1";
-        // The files are taken before the input is cleared, so the same photo can be chosen again.
-        input.addEventListener("change", () => {
-            const files = [...input.files];
-            input.value = "";
-            if (files.length) uploadPickedImages(files);
-        });
-    }
-    input.accept = PICKER_ACCEPT;
-    input.click();
-}
-
-/** Pictures chosen in the picker go up one after another, not at once (a phone on a slow connection, and the hub's limit on parallel requests); each is made smaller first when it is a big photo. */
-async function uploadPickedImages(files, session = state.currentSession) {
-    for (const file of files) {
-        const prepared = await prepareImage(file);
-        if (prepared.error) { showToast(prepared.error, true); continue; }
-        await uploadAndInsertImage(prepared.file, session);
-    }
-}
-
-export async function uploadAndInsertImage(file, session = state.currentSession) {
-    const targetSession = session || state.currentSession;
-    const sid = targetSession?.session_id;
-    if (!sid) return false;
-
-    const uploadPromise = (async () => {
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append("session_id", sid); // the agent this image is for: its artifact copy goes on that agent's record (#5284)
-
-        try {
-            // The path is typed into the agent, so the file must land on the agent's own server.
-            const resp = await serverFetch(sessionServer(targetSession), "/api/upload", {
-                method: "POST",
-                body: formData,
-            });
-            // A failed upload says so in a sentence, with Retry where trying again can work (#6088: through Coral Hub an upload can be cut short and answered with an EMPTY 200).
-            const failed = (text, retry) => showToast(text, true, 10000, retry ? { action: { label: "Retry", onClick: () => uploadAndInsertImage(file, targetSession) } } : {});
-            if (!resp.ok) {
-                const said = await resp.clone().json().catch(() => null); // the hub's proxy names the limit it hit in "code" (#6190); it wins over the status
-                const known = uploadCodeFailure(said && said.code) || uploadStatusFailure(resp.status);
-                if (known) failed(known.text, known.retry);
-                else showToast(`Image not uploaded: ${await responseErrorText(resp, sessionServer(targetSession), `HTTP ${resp.status}`)}`, true);
-                return false;
-            }
-            const result = parseUploadReply(await resp.text());
-            if (!result) { failed(UPLOAD_UNFINISHED, true); return false; }
-            if (result.error) {
-                showToast(result.error, true);
-                return false;
-            }
-
-            // Create a local object URL for the thumbnail preview
-            const previewUrl = URL.createObjectURL(file);
-            const list = getPendingAttachments(targetSession);
-            list.push({
-                path: result.path,
-                filename: result.filename,
-                previewUrl,
-                artifact: result.artifact || null, // the image as an artifact (#5284); null with artifact_error saying why
-            });
-            if (state.currentSession?.session_id === sid) {
-                renderAttachments(targetSession);
-                document.getElementById("command-input")?.focus();
-            }
-            // The chip says what was attached (a toast per file covered Send on a phone, #6160): a screen reader is told in a hidden status line; only a copy that could not be shared is a toast, as it is news the chip does not carry.
-            const status = document.getElementById("image-attach-status");
-            if (status) status.textContent = list.length === 1 ? `Attached ${result.filename}` : `${list.length} images attached`;
-            if (result.artifact_error) showToast(`Attached ${result.filename}, not shared: ${artifactErrorText(result)}`, true);
-            return true;
-        } catch (e) {
-            showToast(UPLOAD_UNFINISHED, true, 10000, { action: { label: "Retry", onClick: () => uploadAndInsertImage(file, targetSession) } });
-            console.error("Upload error:", e);
-            return false;
-        }
-    })();
-
-    const activeList = activeUploadPromisesBySession.get(sid) || [];
-    activeList.push(uploadPromise);
-    activeUploadPromisesBySession.set(sid, activeList);
-    if (state.currentSession?.session_id === sid) renderAttachments(targetSession); // "Uploading" shows in the chip row, not as a toast per file (#6160)
-
-    try {
-        return await uploadPromise;
-    } finally {
-        const currentList = activeUploadPromisesBySession.get(sid) || [];
-        const nextList = currentList.filter(p => p !== uploadPromise);
-        if (nextList.length > 0) {
-            activeUploadPromisesBySession.set(sid, nextList);
-        } else {
-            activeUploadPromisesBySession.delete(sid);
-        }
-        if (state.currentSession?.session_id === sid) renderAttachments(targetSession);
-    }
-}
-
-// An attachment is named by its place in the strip ("Image 2"), not by its file's name: the name is a generated id that says nothing; it stays in the tooltip.
-const imageName = (i, n) => (n > 1 ? `Image ${i + 1}` : 'Image');
-
-export function renderAttachments(session = state.currentSession) {
-    const container = document.getElementById("image-attachments");
-    if (!container) return;
-
-    const list = getPendingAttachments(session);
-    const uploading = (activeUploadPromisesBySession.get(session?.session_id) || []).length;
-    if (list.length === 0 && uploading === 0) {
-        container.innerHTML = "";
-        container.style.display = "none";
-        return;
-    }
-
-    container.style.display = "flex";
-    const uploadingText = `Uploading ${uploading === 1 ? "image" : `${uploading} images`}…`;
-    const pending = uploading ? `<div class="image-uploading">${escapeHtml(uploadingText)}</div>` : "";
-    container.innerHTML = list.map((att, i) => `
-        <div class="image-attachment" title="${escapeAttr(att.filename)}">
-            <img src="${escapeAttr(att.previewUrl)}" alt="${escapeAttr(imageName(i, list.length))}" />
-            <button type="button" class="image-attachment-remove" data-on-click="attachment-remove" data-index="${Number(i)}" aria-label="Remove ${escapeAttr(imageName(i, list.length).toLowerCase())}" title="Remove ${escapeAttr(att.filename)}">&times;</button>
-        </div>
-    `).join("") + pending;
-}
-
-export function removeAttachment(index, session = state.currentSession) {
-    const targetSession = session || state.currentSession;
-    const list = getPendingAttachments(targetSession);
-    const removed = list.splice(index, 1);
-    if (removed[0]?.previewUrl) URL.revokeObjectURL(removed[0].previewUrl);
-    renderAttachments(targetSession);
-}
-
-function clearAttachments(session = state.currentSession) {
-    const targetSession = session || state.currentSession;
-    const sid = targetSession?.session_id;
-    if (!sid) return;
-    const list = pendingAttachmentsBySession.get(sid) || [];
-    for (const att of list) {
-        if (att.previewUrl) URL.revokeObjectURL(att.previewUrl);
-    }
-    pendingAttachmentsBySession.set(sid, []);
-    if (state.currentSession?.session_id === sid) {
-        renderAttachments(targetSession);
-    }
-}
 
 /** Moves the highlight between live agents by touching the two rows that change (the one that was active, the one that is now), not by drawing every row again
  *  (#4990: a switch cost a full list render, about 10 ms at 4x and the browser's style and layout for every row). A row's markup depends on the selection in
