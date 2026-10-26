@@ -10,7 +10,7 @@ import { state } from './state.js';
 import { sessionServer, keyLabel, identityKey } from './server_base.js';
 import { escapeHtml as esc, escapeAttr as escAttr, showView } from './utils.js';
 import { registerActions, textOf } from './actions.js';
-import { tableMarkup, registerGroupSource, groupHeaderHtml, isGroupFolded, syncPaneGroupToggle, refreshGroupTable, openGroupTable } from './sidebar_groups.js';
+import { tableMarkup, registerGroupSource, groupHeaderHtml, isGroupFolded, syncPaneGroupToggle, refreshGroupTable, openGroupTable, foldWayBack } from './sidebar_groups.js';
 import { isPhoneLayout } from './phone_layout.js';
 import { browserLocal } from './safe_storage.js';
 import { resolveSessionIdentity, sessionStateInfo } from './session_state.js';
@@ -229,7 +229,7 @@ function openPageShell(kindLabel, groupKey) {
     host.replaceChildren();
     const back = el('button', 'group-back', `\u2190 ${kindLabel}`); // the link back to the group's table (the shared one, sidebar_groups.js)
     back.type = 'button'; back.setAttribute('data-on-click', 'inbox-back'); back.dataset.kind = 'hub-inbox'; back.dataset.group = groupKey; // the way back puts the focus on the row it came from
-    const phoneBack = el('button', 'group-back inbox-phone-back', '← Back to the list');
+    const phoneBack = el('button', 'group-back inbox-phone-back', '\u2190 Inbox');
     phoneBack.type = 'button'; phoneBack.setAttribute('data-on-click', 'inbox-phone-back');
     host.append(back, phoneBack);
     return host;
@@ -294,7 +294,7 @@ function openSavedPage(id) {
 }
 
 /** A page was opened: the keyboard and a screen reader start at its heading, not on the body. */
-function focusTitle(host) { const h = host.querySelector('.wf-item-title'); if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); } }
+function focusTitle(host) { foldWayBack(host, '.inbox-phone-back', '.wf-item-title'); const h = host.querySelector('.wf-item-title'); if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); } }
 
 /** Back from a page: the focus goes to the row it came from (in the table, or in the list on a phone), else to the table's title. */
 function focusCameFrom(was, inList) {

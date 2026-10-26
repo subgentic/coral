@@ -1,0 +1,53 @@
+// One way back on a phone (#7734, UI/UX's reviews of #7721 and #7722): every page that is a screen after a list has its way back drawn the same: a text link (13 px, weight 500, no border, the link
+// colour), named for where it goes ("<- Inbox", "<- Workflows", "<- Jobs", "<- Docs", "<- Analytics"), on the title's line, and over the title only when the title would not fit beside it. 390 px with touch,
+// isolated dev server, the census worlds' inbox, workflows, jobs and analytics, and the real docs. One scene per page; every failure of every page is reported together.
+const assert = require('node:assert/strict');
+const { connect } = require('./agent_view_harness');
+const { DATA_WORLD } = require('./helpers/census_world');
+const { INBOX_WORLD } = require('./helpers/inbox_world');
+const { install: installTP, seed, openTeam, goTab } = require('./helpers/team_page');
+const BASE = require('./test_base').BASE;
+
+const BACKS = '.group-table-back, .inbox-phone-back, .wf-phone-back, .sched-back, .docs-phone-back, .cost-phone-back, .group-back, .goals-back, .mobile-history-back';
+
+(async () => {
+    const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const S = `(window.__coralStatic || '/static/')`;
+    const results = []; const { settle } = require('./helpers/wait').bind(ev); const TEAM = `qa-way-${Date.now() % 100000}`;
+    const scene = async (name, to, view, setup) => {
+        if (process.env.QA_ONLY && !name.includes(process.env.QA_ONLY)) return;
+        try {
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+            await setup();
+            const g = await ev(`(() => { const v = document.querySelector(${JSON.stringify(view)}); if (!v) return { err: 'no view ' + ${JSON.stringify(view)} };
+                const vis = e => e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden' && !e.closest('[hidden]');
+                const all = [...v.querySelectorAll(${JSON.stringify(BACKS)})].filter(vis); const back = all[0]; if (!back) { const any = v.querySelector(${JSON.stringify(BACKS)}); return { err: 'no visible way back', any: any ? any.className + ' ' + getComputedStyle(any).display + ' ' + Math.round(any.getBoundingClientRect().width) + 'x' + Math.round(any.getBoundingClientRect().height) + ' hiddenAnc=' + !!any.closest('[hidden]') : null, phoneItem: v.hasAttribute('data-phone-item'), vw: innerWidth }; }
+                const order = [...v.querySelectorAll('h1, h2, h3')].filter(vis); const title = order.find(h => back.compareDocumentPosition(h) & Node.DOCUMENT_POSITION_FOLLOWING) || order[0];
+                const cs = getComputedStyle(back), b = back.getBoundingClientRect(), t = title && title.getBoundingClientRect();
+                return { text: back.textContent.replace(/\\s+/g, ' ').trim(), font: cs.fontSize + ' ' + cs.fontWeight, border: cs.borderTopWidth === '0px' || cs.borderTopColor === 'rgba(0, 0, 0, 0)' ? 'none' : cs.borderTopWidth + ' ' + cs.borderTopColor, bg: cs.backgroundColor, color: cs.color,
+                    backs: all.map(e => e.textContent.replace(/\\s+/g, ' ').trim()), beside: !!t && t.top < b.bottom - 1 && t.left >= b.right - 2, title: title ? title.textContent.replace(/\\s+/g, ' ').trim().slice(0, 24) : null, cls: back.className, disp: title ? getComputedStyle(title).display + '/' + getComputedStyle(back).display + '/' + getComputedStyle(back.parentElement).display + ' b=' + Math.round(b.left) + ',' + Math.round(b.top) + ',' + Math.round(b.right) + ' t=' + Math.round(t.left) + ',' + Math.round(t.top) + ',' + Math.round(t.width) : null, titleEl: title ? title.tagName + '.' + title.className + (back.nextElementSibling === title ? ' (next sibling)' : ' (next is ' + (back.nextElementSibling ? back.nextElementSibling.tagName + '.' + back.nextElementSibling.className : 'none') + ')') + ' parent=' + title.parentElement.tagName + '.' + title.parentElement.className.slice(0, 30) + ' backParent=' + back.parentElement.className.slice(0, 30) : null }; })()`);
+            results.push({ name, to, ...g });
+        } catch (e) { const d = await ev(`(() => { const v = document.querySelector(${JSON.stringify(view)}); return { tab: document.body.dataset.navTab, vis: v ? v.getClientRects().length : null, disp: v ? getComputedStyle(v).display : null, item: v ? v.hasAttribute('data-phone-item') : null, dv: v ? v.dataset.view : null, url: location.pathname }; })()`).catch(() => null); results.push({ name, to, err: String(e.message).slice(0, 160), d }); }
+    };
+    try {
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: DATA_WORLD });
+        await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
+        const inbox = async tab => { await ev(INBOX_WORLD); await ev(`localStorage.removeItem('coral.inbox.tab'); window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab(${JSON.stringify(tab)})).then(() => true)`); await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length >= 3`, 'the inbox table', 10000); };
+        await scene('Inbox: a group table', 'Inbox', '#group-table-view', () => inbox('tasks'));
+        await scene('Inbox: a task page', 'Inbox', '#inbox-page', async () => { await inbox('tasks'); await ev(`document.querySelector('#group-table-view .group-table-link').click(); true`); await waitFor(`!!document.querySelector('#inbox-page .ibx-reply-input')`, 'the task page', 10000); });
+        await scene('Workflows: a workflow', 'Workflows', '#wf-detail-container', async () => { await ev(`window.switchNavTab('workflows'); true`); await waitFor(`!!document.querySelector('#wf-nav-list [data-on-click="wf-select"]')`, 'the list', 10000); await ev(`document.querySelector('#wf-nav-list [data-on-click="wf-select"]').click(); true`); await waitFor(`document.querySelectorAll('#wf-detail-container .wf-phone-back').length > 0`, 'the workflow', 10000); });
+        await scene('Workflows: a run', 'Nightly build', '#wf-run-detail-container', async () => { await ev(`window.switchNavTab('workflows'); true`); await waitFor(`typeof window.selectWorkflowRun === 'function'`, 'workflows', 10000); await ev(`window.selectWorkflowRun(31); true`); await waitFor(`!!document.querySelector('#wf-run-detail-container .wf-run-title')`, 'the run', 10000); });
+        await scene('Jobs: a job', 'Jobs', '#scheduler-view', async () => { await ev(`window.switchNavTab('jobs'); true`); await waitFor(`!!document.querySelector('#mobile-jobs-list [data-on-click="job-select"]')`, 'the list', 10000); await ev(`document.querySelector('#mobile-jobs-list [data-on-click="job-select"]').click(); true`); await waitFor(`!!document.querySelector('#scheduler-detail .sched-back')`, 'the job', 10000); });
+        await scene('Docs: a topic', 'Docs', '#docs-view', async () => { await ev(`window.switchNavTab('docs'); true`); await waitFor(`document.querySelectorAll('#docs-nav-list [data-doc]').length >= 3`, 'the topics', 15000); await ev(`window.selectDoc(document.querySelector('#docs-nav-list [data-doc]').dataset.doc); true`); await waitFor(`document.querySelectorAll('#docs-content h1, #docs-content h2').length >= 1`, 'the topic', 10000); });
+        await scene('Analytics: a view', 'Analytics', '#cost-dashboard-view', async () => { await ev(`window.switchNavTab('tokens'); true`); await waitFor(`!!document.getElementById('cost-nav-list')`, 'the analytics list', 10000); for (let i = 0; i < 6; i++) { await ev(`import(${S} + 'analytics_views.js').then(m => { m.selectView('provider'); return true; })`); await settle(500); if (await ev(`document.getElementById('cost-dashboard-view').hasAttribute('data-phone-item')`)) break; } await waitFor(`document.getElementById('cost-dashboard-view').hasAttribute('data-phone-item') && document.getElementById('cost-dashboard-view').getClientRects().length > 0`, 'the view', 5000); await settle(300); });
+        await scene('Chats: a chat', 'Chats', '#history-session-view', async () => { await ev(`window.switchNavTab('history'); true`); await waitFor(`!!document.querySelector('#history-sessions-list [data-on-click="history-open"]')`, 'the chats', 10000); await ev(`document.querySelector('#history-sessions-list [data-on-click="history-open"]').click(); true`); await waitFor(`document.getElementById('history-messages').textContent.includes('Hi there')`, 'the chat', 10000); });
+        const team = async tab => { await installTP(ev); await seed(ev, TEAM); await ev(`window.syncMobileAgentList && window.syncMobileAgentList(); true`); await openTeam(ev, waitFor, TEAM); await goTab(ev, settle, tab); await settle(400); };
+        await scene('Team: a task page', 'Tasks', 'body', async () => { await team('Tasks'); await ev(`document.querySelector('#team-panel-tasks .team-row-btn, #team-panel-tasks tbody button').click(); true`); await waitFor(`!!document.querySelector('#team-panel-item #team-task-title')`, 'the task page', 10000); });
+        await scene('Team: a goal page', 'Goals', 'body', async () => { await team('Goals'); await ev(`document.querySelector('#team-panel-goals .team-row-btn, #team-panel-goals tbody button').click(); true`); await waitFor(`!!document.querySelector('.goals-page .goals-back, #team-panel-item .goals-back, .goal-page .goals-back')`, 'the goal page', 10000); });
+        const want = r => `\u2190 ${r.to}`;
+        const bad = results.filter(r => r.err || (r.backs && r.backs.length !== 1) || r.text !== want(r) || r.font !== '13px 500' || r.border !== 'none' || r.bg !== 'rgba(0, 0, 0, 0)' || (!r.beside && !r.name.startsWith('Docs')));
+        const colours = new Set(results.filter(r => !r.err).map(r => r.color));
+        assert.ok(bad.length === 0 && colours.size === 1, `every phone way back is one text link named for where it goes, beside the title: ${bad.length} of ${results.length} differ (colours: ${[...colours].join(' | ')}):\n` + results.map(r => JSON.stringify(r)).join('\n'));
+        console.log('PASS every phone way back is the same');
+    } finally { await client.close(); }
+})().catch(e => { console.error(e); process.exitCode = 1; });

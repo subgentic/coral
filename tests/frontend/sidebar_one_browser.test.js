@@ -90,7 +90,7 @@ const STUB = `(() => {
                 await ev(`document.querySelector('${pane('jobs')} li.sched-row .row-btn').click(); true`);
                 await waitFor(`!!document.querySelector('#scheduler-detail .item-bar') && document.querySelector('#scheduler-detail').getClientRects().length > 0`, at + "the job's page is a screen of its own", 8000);
                 assert.equal(await ev(`document.getElementById('mobile-jobs-list').getClientRects().length`), 0, at + 'and the list is not under it');
-                assert.equal(await ev(`document.querySelector('#scheduler-detail .sched-back').textContent.trim()`), '\u2190 Back to the list', at + 'with the way back');
+                assert.equal(await ev(`document.querySelector('#scheduler-detail .sched-back').textContent.trim()`), '\u2190 Jobs', at + 'with the way back');
                 await shot(`sidebar-one-job-${w}`);
                 await ev(`document.querySelector('#scheduler-detail .sched-back').click(); true`);
                 await waitFor(`document.getElementById('mobile-jobs-list').getClientRects().length > 0 && document.getElementById('scheduler-detail').getClientRects().length === 0`, at + 'back is the list', 4000);

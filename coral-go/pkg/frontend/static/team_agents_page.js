@@ -3,6 +3,7 @@
  * in a polite status. An agent that already has a repeating reminder has Edit reminder and Remove reminder on its page. Everything drawn is built with the DOM and textContent: names, reasons and task titles are written by agents.
  * Lazy: team_page.js imports it. */
 import { importOnce } from './import_once.js';
+import { foldWayBack } from './way_back.js';
 import { state } from './state.js';
 import { boardFetch, inTeam } from './server_base.js';
 import { pollEvery } from './overload.js';
@@ -228,6 +229,7 @@ export function renderAgentPage(host, agent, ctx) {
         bar.append(btn('btn', 'Edit reminder', () => remindAgent(model.team, id, agent, () => load())), btn('btn', 'Remove reminder', async () => { if (await stopAgentReminder(model.team, id, () => load())) ctx.onBack(); }));
     }
     page.append(bar);
+    foldWayBack(page, '.goals-back', '.goals-detail-title');
     host.append(page);
     h.focus({ preventScroll: true });
 }

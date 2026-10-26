@@ -89,7 +89,7 @@ const AGENTS = (waiting) => waiting ? [
                 await ev(`document.querySelector('${pane} .row-btn[data-on-click="inbox-task-open"]').click(); true`);
                 await waitFor(`document.getElementById('inbox-page').getClientRects().length > 0 && !!document.querySelector('#inbox-page .ibx-reply-input')`, at + 'the task as a screen of its own', 10000);
                 assert.equal(await ev(`document.getElementById('mobile-inbox-list').getClientRects().length`), 0, at + 'and the list is not under it');
-                assert.equal(await ev(`document.querySelector('#inbox-page .inbox-phone-back').textContent.trim()`), '← Back to the list', at + 'with the way back');
+                assert.equal(await ev(`document.querySelector('#inbox-page .inbox-phone-back').textContent.trim()`), '\u2190 Inbox', at + 'with the way back');
                 assert.equal(await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1`), true, at + 'no sideways scroll on a task');
                 await shot(`inbox-one-task-${w}`);
                 await ev(`document.querySelector('#inbox-page .inbox-phone-back').click(); true`);

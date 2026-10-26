@@ -596,6 +596,7 @@
     #workflows-view[data-phone-item] #mobile-workflows-list { display: none; }
     #workflows-view[data-phone-empty]:not([data-phone-item]) .wf-page { display: flex; }
     #workflows-view .wf-phone-back { display: inline-flex; align-items: center; min-height: var(--control-touch-height, 44px); }
+    #workflows-view #wf-run-detail-container .wf-phone-back { display: none; } /* a run's way back is its workflow, named; the list is one more step (#7734) */
     #wf-back-btn { display: none; } /* a phone has its own back, to the list */
     #mobile-workflows-list .sidebar-hide-btn { display: none; } /* the page is the whole screen: there is no column to hide */
     #mobile-workflows-list .sidebar-header { padding: 12px; }

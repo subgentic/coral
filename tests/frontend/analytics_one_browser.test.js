@@ -79,7 +79,7 @@ const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve
                 await choose('By model');
                 await waitFor(`document.getElementById('cost-page').getClientRects().length > 0`, at + 'the view as a screen', 6000);
                 assert.equal(await ev(`document.getElementById('mobile-analytics-list').getClientRects().length`), 0, at + 'and the list is not under it');
-                assert.equal(await ev(`document.querySelector('.cost-phone-back').textContent.trim()`), '← Back to the list', at + 'with the way back');
+                assert.equal(await ev(`document.querySelector('.cost-phone-back').textContent.trim()`), '\u2190 Analytics', at + 'with the way back');
                 assert.equal(await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1`), true, at + 'no sideways scroll on the view');
                 await shot(`analytics-one-view-${w}`);
                 const pr = await ev(`(() => { const s = document.getElementById('cost-time-range'), r = s.getBoundingClientRect(), b = document.querySelector('.cost-header-actions [data-on-click="cost-refresh"]').getBoundingClientRect(); return { count: document.querySelectorAll('#cost-time-range').length, shown: r.width > 0, beside: Math.abs((r.top + r.bottom) / 2 - (b.top + b.bottom) / 2) < 8 && r.right <= b.left + 1, inView: r.top >= 0 && r.bottom <= innerHeight && r.right <= innerWidth && scrollY === 0, h: Math.round(r.height), side: document.documentElement.scrollWidth - document.documentElement.clientWidth }; })()`);

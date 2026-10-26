@@ -15,10 +15,13 @@ import { setHidden, setTitle, setAttr, setData } from './dom_write.js';
 import { isPhoneLayout } from './phone_layout.js';
 
 const sources = new Map();
+const TAB_NAME = { 'hub-inbox': 'Inbox', history: 'Chats', workflows: 'Workflows', jobs: 'Jobs', docs: 'Docs' }; // what a phone's way back from a table is named for (#7734)
 const LANDING = '*'; // the key of the page that lists every group (a source with landing: true)
 const KEY = kind => `coral-sidebar-groups-${kind}`;
 
 export function registerGroupSource(kind, source) { sources.set(kind, source); }
+
+export { foldWayBack } from './way_back.js';
 
 function folded(kind) {
     try { const v = JSON.parse(browserLocal.get(KEY(kind)) || '[]'); return Array.isArray(v) ? v : []; } catch { return []; }
@@ -131,7 +134,7 @@ function drawTable() {
     const tables = !src ? [] : open.key === LANDING ? src.keys().map(k => src.table(k)).filter(Boolean).map((x, i) => (i ? { ...x, extra: undefined } : x)) : [src.table(open.key)].filter(Boolean);
     if (!host || !tables.length) return false;
     // a phone's way back to the list is in the table's own title row, not a row of its own above it (#7722)
-    const back = isPhoneLayout() ? `<button type="button" class="btn btn-small group-table-back" data-on-click="sgroup-list" data-kind="${escapeAttr(open.kind)}">Back to the list</button>` : '';
+    const back = isPhoneLayout() ? `<button type="button" class="group-back group-table-back" data-on-click="sgroup-list" data-kind="${escapeAttr(open.kind)}">\u2190 ${escapeHtml(TAB_NAME[open.kind] || 'List')}</button>` : '';
     const html = tables.map((x, i) => tableHtml(x, open.kind, open.key, i, i ? '' : back, tables.length > 1)).join('');
     host.dataset.group = open.kind + ':' + open.key; // which table is on screen (saved.js asks for the Inbox's Saved)
     if (host.dataset.drawn !== html) { host.innerHTML = html; host.dataset.drawn = html; } // a redraw of what is there would drop the focus from a row the keyboard is on

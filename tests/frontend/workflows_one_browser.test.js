@@ -85,7 +85,7 @@ const STUB = `(() => { const real = window.fetch; const J = b => Promise.resolve
                 await ev(`document.querySelector('${pane('workflows')} li .row-btn').click(); true`);
                 await waitFor(`document.getElementById('wf-page').getClientRects().length > 0 && !!document.querySelector('#wf-detail .item-bar')`, at + 'the workflow as a screen', 8000);
                 assert.equal(await ev(`document.getElementById('mobile-workflows-list').getClientRects().length`), 0, at + 'and the list is not under it');
-                assert.equal(await ev(`document.querySelector('#wf-detail .wf-phone-back').textContent.trim()`), '← Back to the list', at + 'with the way back');
+                assert.equal(await ev(`document.querySelector('#wf-detail .wf-phone-back').textContent.trim()`), '\u2190 Workflows', at + 'with the way back');
                 assert.equal(await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1`), true, at + 'no sideways scroll on the workflow');
                 // the pinned bar is at the foot of the screen and covers none of the page's own content, however long the page is
                 const geo = await ev(`(() => { const bar = document.querySelector('#wf-detail .item-bar').getBoundingClientRect(); const under = [...document.querySelectorAll('#wf-detail h3, #wf-detail tbody tr, #wf-detail .wf-facts-line')].filter(e => { const r = e.getBoundingClientRect(); return r.height > 0 && r.top < bar.bottom - 1 && r.bottom > bar.top + 1; }).map(e => e.tagName + ':' + e.textContent.trim().slice(0, 16)); return { vh: innerHeight, bar: [Math.round(bar.top), Math.round(bar.bottom)], under, scrollY: Math.round(scrollY) }; })()`);

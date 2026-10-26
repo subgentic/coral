@@ -11,6 +11,7 @@ import { goalTitle, refreshGoalTitles, noGoalLabel } from './task_goals.js';
 import { taskStatusWord, statusClass } from './goal_words.js';
 import { state } from './state.js';
 import { showToast } from './utils.js';
+import { foldWayBack } from './way_back.js';
 const { buildTaskBar } = await importOnce('./task_bar.js'); // the old tab's search, filters and sort on the shared list bar (lazy: its failure is retried)
 const TF = await importOnce('./task_filters.js');
 const { renderSafe } = await importOnce('./safe_markdown.js'); // the Inbox's renderer (DOM-built, no markup from text): a task reads the same on both pages
@@ -316,7 +317,8 @@ export function renderTaskPage(host, task, ctx, mode = 'view') {
     let focus = h;
     if (mode === 'edit') {
         const loading = el('p', 'goals-note', 'Loading the task’s form…'); page.append(loading, bar);
-        host.append(page);
+        foldWayBack(page, '.goals-back', '.goals-detail-title');
+    host.append(page);
         bar.append(btn('btn', 'Cancel', () => acts.redraw(task, 'view')));
         importOnce('./team_task_actions.js').then(async (A) => {
             const form = await A.editForm(task, acts);
@@ -352,6 +354,7 @@ export function renderTaskPage(host, task, ctx, mode = 'view') {
         importOnce('./team_task_actions.js').then(A => { for (const b of A.taskButtons(task, acts)) bar.append(b); const danger = bar.querySelector('.btn-danger'); if (danger) bar.prepend(danger); }); // the bar's one order (#7684): a danger button first, alone at the left edge, the primary last
         page.append(bar);
     }
+    foldWayBack(page, '.goals-back', '.goals-detail-title');
     host.append(page);
     if (focus) focus.focus({ preventScroll: true });
 }

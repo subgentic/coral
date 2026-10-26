@@ -11,7 +11,7 @@ import { formatDuration as fmtDuration } from './format.js';
 import { runFailureHtml, runFailureTag } from './run_failure.js';
 import { whenWords, resultWords, limitWords, stepWords, runDot } from './job_words.js'; // the Jobs pages' words: one set for both
 import { limitSeconds, limitParts } from './time_limit.js';
-import { registerGroupSource, groupHeaderHtml, isGroupFolded, syncPaneGroupToggle, refreshGroupTable, openFirstGroupTable, backLinkHtml } from './sidebar_groups.js';
+import { registerGroupSource, groupHeaderHtml, isGroupFolded, syncPaneGroupToggle, refreshGroupTable, openFirstGroupTable, backLinkHtml, foldWayBack } from './sidebar_groups.js';
 import { onViewShown } from './view_switch.js';
 import { isPhoneLayout } from './phone_layout.js';
 
@@ -356,7 +356,7 @@ function renderWorkflowDetail(wf, runs) {
     const facts = [`Folder ${wf.repo_path || 'not set'}`, `Time limit ${limitWords(wf.max_duration_s || 3600)}`, wf.created_at ? `Created ${formatTime(wf.created_at)}` : '', wf.enabled ? '' : 'Disabled'].filter(Boolean).join(' \u00b7 ');
     container.innerHTML = `
         ${backLinkHtml('workflows', group.key, group.label, 'wf-back-btn')}
-        <button type="button" class="group-back wf-phone-back" data-on-click="wf-phone-back">&larr; Back to the list</button>
+        <button type="button" class="group-back wf-phone-back" data-on-click="wf-phone-back">&larr; Workflows</button>
         <h2 class="wf-item-title" id="wf-title">${esc(wf.name)}</h2>
         <p class="item-meta wf-facts-line">${esc(facts)}</p>
         ${wf.description ? `<p class="wf-desc">${esc(wf.description)}</p>` : ''}
@@ -385,6 +385,7 @@ function renderWorkflowDetail(wf, runs) {
             </button>
         </div>
     `;
+    foldWayBack(container, '.wf-phone-back', '#wf-title');
 }
 
 // ── Run detail ─────────────────────────────────────────────────────────
@@ -562,7 +563,7 @@ function renderRunDetail(run) {
         : '';
     container.innerHTML = `
         ${backHtml}
-        <button type="button" class="group-back wf-phone-back" data-on-click="wf-phone-back">&larr; Back to the list</button>
+        <button type="button" class="group-back wf-phone-back" data-on-click="wf-phone-back">&larr; Workflows</button>
         <h2 class="wf-item-title wf-run-title">Run #${run.id}</h2>
         ${startedNote && startedNote.runId === Number(run.id) ? `<p class="item-meta wf-started-line">${esc(startedNote.text)}</p>` : ''}
         <div class="wf-run-meta">
@@ -577,6 +578,7 @@ function renderRunDetail(run) {
         <div class="wf-run-steps wf-timeline">${stepsHtml}</div>
         ${killBtn || retriggerBtn ? `<div class="item-bar wf-run-actions">${killBtn}${retriggerBtn}</div>` : ''}
     `;
+    foldWayBack(container, '#wf-run-back', '.wf-run-title');
     for (const b of container.querySelectorAll('.wf-run-step-output-toggle')) {
         const id = b.getAttribute('aria-controls');
         if (!wasOpen.has(id)) continue;

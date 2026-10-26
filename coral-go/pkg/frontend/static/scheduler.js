@@ -12,7 +12,7 @@ import { runFailure, runFailureTag } from './run_failure.js';
 import { cronWords, atWords, awayWords, whenWords, resultWords, reasonWords, lastWords, limitWords, exitNote, resultLine, runDot } from './job_words.js';
 import { updateJobsSectionCount } from './live_jobs.js';
 import { limitSeconds, limitParts } from './time_limit.js';
-import { registerGroupSource, groupHeaderHtml, isGroupFolded, syncPaneGroupToggle, refreshGroupTable, backLinkHtml } from './sidebar_groups.js';
+import { registerGroupSource, groupHeaderHtml, isGroupFolded, syncPaneGroupToggle, refreshGroupTable, backLinkHtml, foldWayBack } from './sidebar_groups.js';
 
 let scheduledJobs = [];
 let selectedJobId = null;
@@ -230,7 +230,7 @@ function renderJobDetail(job, runs) {
         : '';
     container.innerHTML = `
         ${backLinkHtml('jobs', group.key, group.label)}
-        <button type="button" class="sched-back" data-on-click="job-back">&larr; Back to the list</button>
+        <button type="button" class="sched-back" data-on-click="job-back">&larr; Jobs</button>
         ${failBanner}
         <div class="sched-header">
             <h2>${escapeHtml(job.name)}</h2>
@@ -264,6 +264,7 @@ function renderJobDetail(job, runs) {
             <button class="btn btn-small btn-primary" data-on-click="job-toggle" data-job-id="${Number(job.id)}">${job.enabled ? 'Pause' : 'Enable'}</button>
         </div>
     `;
+    foldWayBack(container, '.sched-back', '.sched-header');
 }
 
 const AGENT_NAMES = { claude: 'Claude', codex: 'Codex', agy: 'Antigravity', antigravity: 'Antigravity', gemini: 'Antigravity', pi: 'Pi' };

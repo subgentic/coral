@@ -58,7 +58,7 @@ const BASE = require('./test_base').BASE;
                 await ev(`document.querySelector('${pane('docs')} li .row-btn').click(); true`);
                 await waitFor(`document.getElementById('docs-page').getClientRects().length > 0 && !!document.querySelector('#docs-content h1')`, at + 'the topic as a screen', 10000);
                 assert.equal(await ev(`document.getElementById('mobile-docs-list').getClientRects().length`), 0, at + 'and the list is not under it');
-                assert.equal(await ev(`document.getElementById('docs-phone-back').textContent.trim()`), '← Back to the list', at + 'with the way back');
+                assert.equal(await ev(`document.getElementById('docs-phone-back').textContent.trim()`), '\u2190 Docs', at + 'with the way back');
                 assert.equal(await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1`), true, at + 'no sideways scroll on a topic');
                 await shot(`docs-one-topic-${w}`);
                 await ev(`document.getElementById('docs-phone-back').click(); true`);

@@ -11,6 +11,7 @@ import { pollEvery } from './overload.js';
 import { whenText } from './when_text.js';
 import { toGoalList, mergeGoalLists, toTaskPage, toDrivers, createBody, errorOf, LIST_PATH } from './goals_adapter.js';
 import { importOnce } from './import_once.js';
+import { foldWayBack } from './way_back.js';
 const { teamTable, rowButton, stateChip: tableStateChip } = await importOnce('./team_table.js'); // lazy: its failure is retried
 const { attachDockResize, DOCK_MIN_WIDTH, dockMaxWidth } = await importOnce('./dock_resize.js');
 
@@ -225,7 +226,7 @@ function drawDetailRaw() {
     if (!g) { col.classList.add('goals-detail-none'); col.removeAttribute('aria-labelledby'); col.setAttribute('aria-label', 'Goal detail'); return; }
     col.classList.remove('goals-detail-none');
     col.removeAttribute('aria-label'); col.setAttribute('aria-labelledby', 'goals-detail-title'); // an open goal's region is named by its title
-    const back = btn('goals-back', '‹ Goals', () => closeGoal());
+    const back = btn('goals-back', '\u2190 Goals', () => closeGoal());
     col.append(back);
     const h = el('h3', 'goals-detail-title', g.title); h.id = 'goals-detail-title';
     const line = el('div', 'goals-detail-line'); line.append(stateChip(g)); const meta = W.driverLine(g.driver, whenText(g.updatedAt)); if (meta) line.append(el('span', 'goal-card-meta', meta));
@@ -365,6 +366,7 @@ function rowsAgree(g) {
 function drawGoalMain(main, g) {
     main.append(backButton('Goals', () => closeGoal()));
     const h = el('h2', 'goals-detail-title', g.title); h.tabIndex = -1; h.id = 'goals-detail-title'; main.append(h);
+    foldWayBack(main, '.goals-back', '.goals-detail-title');
     const line = el('div', 'goals-detail-line'); line.append(stateChip(g));
     const meta = W.driverLine(g.driver, whenText(g.updatedAt)); if (meta) line.append(el('span', 'goal-card-meta', meta));
     main.append(line);
