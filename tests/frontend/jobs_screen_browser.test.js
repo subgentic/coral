@@ -4,6 +4,8 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { setTheme } = require('./helpers/contrast');
+const SHOT_DIR = process.env.CORAL_SCREENSHOT_DIR || path.join(process.env.RUNNER_TEMP || require('node:os').tmpdir(), 'out', 'shots');
 const { connect } = require('./agent_view_harness');
 const { assertPinnedBar } = require('./helpers/pinned_bar');
 const BASE = require('./test_base').BASE;
@@ -11,7 +13,7 @@ const S = `(window.__coralStatic || '/static/')`;
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; await new Promise(r => setTimeout(r, 400)); /* sleep-ok: a screenshot waits out transitions */ fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(path.join(d, name + '.png'), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
+    const shot = async name => { const d = SHOT_DIR; await new Promise(r => setTimeout(r, 400)); /* sleep-ok: a screenshot waits out transitions */ fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(path.join(d, name + '.png'), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const STUB = `(() => {
         const real = window.fetch; const json = (o, status) => Promise.resolve(new Response(JSON.stringify(o), { status: status || 200, headers: { 'Content-Type': 'application/json' } }));
         const ago = h => new Date(Date.now() - h * 3600000).toISOString(), inn = h => new Date(Date.now() + h * 3600000).toISOString();
@@ -103,7 +105,8 @@ const S = `(window.__coralStatic || '/static/')`;
             await ev(`document.querySelector('#scheduler-detail .sched-settings > summary').click(); true`);
             assert.match(await text('#scheduler-detail .sched-settings'), /Time limit\s*1 hour/);
             assert.match(await text('#scheduler-detail .sched-settings'), /Folder\s*\/work\/project/);
-            assert.deepEqual(await ev(`[...document.querySelectorAll('#scheduler-detail .sched-runs-table th')].map(t => t.textContent.trim())`), ['Started', 'Result', 'Duration']);
+            assert.deepEqual(await ev(`[...document.querySelectorAll('#scheduler-detail .sched-runs-table th')].map(t => t.textContent.trim())`), ['Started', 'Result', 'Duration', 'Conversation']);
+            assert.equal(await ev(`document.querySelector('#scheduler-detail .sched-runs-table th:last-child .sr-only')?.textContent`), 'Conversation', 'the optional conversation column has a screen-reader heading');
             assert.equal(await ev(`document.querySelectorAll('#scheduler-detail .dt-table').length`), 1, 'job history uses the shared table');
             assert.match(await ev(`document.querySelector('#scheduler-detail .sched-runs-table tbody tr').textContent.replace(/\\s+/g, ' ')`), /Failed: step 2 \(Test\) exited with 3/);
             assert.match(await ev(`document.querySelectorAll('#scheduler-detail .sched-runs-table tbody tr')[1].textContent.replace(/\\s+/g, ' ')`), /Passed/);
@@ -136,6 +139,11 @@ const S = `(window.__coralStatic || '/static/')`;
                 await ev(`document.documentElement.style.fontSize = ''; true`);
             }
             await shot(`jobs-page-${w}`);
+            await ev(`document.querySelector('#scheduler-detail .sched-settings').open = false; document.querySelector('#scheduler-detail .sched-runs-table').scrollIntoView({ block: 'center' }); true`);
+            for (const theme of ['dark', 'light']) {
+                await setTheme(ev, theme);
+                await shot(`jobs-history-${w}-${theme}`);
+            }
         }
         console.log('jobs_screen: ok');
     } finally { await client.close(); }
