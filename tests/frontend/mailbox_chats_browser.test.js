@@ -9,12 +9,12 @@ const BASE = require('./test_base').BASE;
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const stub = () => ev(`(() => { const R = window.fetch; window.__asked = []; window.__flags = [];
         const day = 86400000, now = Date.now();
-        const sessions = Array.from({ length: 120 }, (_, i) => ({ session_id: 'chat-' + String(i).padStart(3, '0'), type: i === 3 ? 'group' : 'agent', title: i === 3 ? 'release-crew' : 'Chat title ' + i, summary: 'The snippet of chat ' + i, agent_name: ['Backend Dev', 'QA Engineer', 'Frontend Dev'][i % 3], display_name: ['Backend Dev', 'QA Engineer', 'Frontend Dev'][i % 3],
+        const sessions = Array.from({ length: 120 }, (_, i) => ({ session_id: 'chat-' + String(i).padStart(3, '0'), type: i === 3 ? 'group' : 'agent', title: i === 3 ? 'release-crew' : 'Chat title ' + i, summary: i === 3 ? 'release-crew - 1 messages, 0 participants' : 'The snippet of chat ' + i, agent_name: ['Backend Dev', 'QA Engineer', 'Frontend Dev'][i % 3], display_name: ['Backend Dev', 'QA Engineer', 'Frontend Dev'][i % 3],
             last_timestamp: new Date(now - Math.floor(i / 12) * day - i * 60000).toISOString(), duration_sec: 600 + i * 30, source_type: i % 4 === 0 ? 'codex' : 'claude', starred: false, archived: false, active: i === 1, tags: [] }));
         const json = (b, status = 200) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { 'content-type': 'application/json' } }));
         window.fetch = (u, o = {}) => { const url = new URL(String(u && u.url || u), location.origin);
             if (url.pathname === '/api/sessions/history/counts') return json({ all: 120, group: 1, notes: 9, active: 1, starred: 0, archived: 3, by_agent_type: { claude: 90, codex: 30 }, tags: [{ id: 7, name: 'release', color: '#e5534b', count: 4 }] });
-            if (url.pathname === '/api/sessions/history') { window.__asked.push(Object.fromEntries(url.searchParams)); const p = Number(url.searchParams.get('page') || 1), n = Number(url.searchParams.get('page_size') || 50); return json({ sessions: sessions.slice((p - 1) * n, p * n), total: 120, page: p, page_size: n }); }
+            if (url.pathname === '/api/sessions/history') { window.__asked.push(Object.fromEntries(url.searchParams)); const p = Number(url.searchParams.get('page') || 1), n = Number(url.searchParams.get('page_size') || 50); const ty = url.searchParams.get('type'), list = ty === 'group' ? sessions.filter(x => x.type === 'group') : ty === 'agent' ? sessions.filter(x => x.type !== 'group') : sessions; return json({ sessions: list.slice((p - 1) * n, p * n), total: list.length, page: p, page_size: n }); }
             if (/^\\/api\\/sessions\\/history\\/[^/]+\\/flags$/.test(url.pathname) && String(o.method).toUpperCase() === 'PATCH') { window.__flags.push([decodeURIComponent(url.pathname.split('/')[4]), JSON.parse(o.body)]); return json({ ok: true }); }
             return R(u, o); }; return true; })()`);
     const open = async (w, h, mobile) => {
@@ -32,18 +32,18 @@ const BASE = require('./test_base').BASE;
         const f = await ev(`(() => ({ items: [...document.querySelectorAll('.view-list-item')].map(b => [b.dataset.key, (b.querySelector('.view-list-count') || {}).textContent || '']), titles: [...document.querySelectorAll('.view-list-title')].map(t => t.textContent), dot: !!document.querySelector('.view-list-item[data-key="chats-tag-7"] .view-list-dot') }))()`);
         assert.deepEqual(f.titles, ['Needs attention', 'Chats', 'By CLI', 'Tags'], 'the sections');
         const k = Object.fromEntries(f.items);
-        assert.deepEqual([k['chats'], k['chats-group'], k['chats-notes'], k['chats-starred'], k['chats-active'], k['chats-archived'], k['chats-cli-claude'], k['chats-cli-codex'], k['chats-tag-7']], ['120', '1', '9', '0', '1', '3', '90', '30', '4'], 'counts from the one grouped read ' + JSON.stringify(f.items));
+        assert.deepEqual([k['chats'], k['chats-group'], k['chats-notes'], k['chats-starred'], k['chats-active'], k['chats-archived'], k['chats-cli-claude'], k['chats-cli-codex'], k['chats-tag-7']], ['119', '1', '9', '0', '1', '3', '90', '30', '4'], 'counts from the one grouped read (All chats is the agents\' chats: all less the groups) ' + JSON.stringify(f.items));
         assert.ok(f.dot, 'a tag has its colour dot');
         const t = await ev(`(() => { const rows = [...document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)')]; const r = rows[0]; return { n: rows.length, groups: [...document.querySelectorAll('#group-table-view .dt-group th')].map(x => x.textContent), agent: r.querySelector('.dt-primary').textContent, title: r.querySelector('.dt-chat-title').textContent, snippet: r.querySelector('.dt-chat-snippet').textContent, h: Math.round(r.getBoundingClientRect().height), person: !!r.querySelector('.dt-avatar'), group: !!rows[3].querySelector('.dt-tag') && rows[3].querySelector('.dt-tag').textContent }; })()`);
-        assert.equal(t.n, 50, 'the first page is 50 chats'); assert.equal(t.agent, 'Backend Dev'); assert.equal(t.title, 'Chat title 0'); assert.match(t.snippet, /The snippet of chat 0/); assert.ok(t.person && t.h <= 40, 'a one-line row ' + JSON.stringify(t) + await ev(`JSON.stringify([...document.querySelector('#group-table-view .dt-table tbody tr:not(.dt-group)').children].map(c => [c.className, Math.round(c.getBoundingClientRect().height)]))`)); assert.equal(t.group, 'Group', 'a group chat says Group');
+        assert.equal(t.n, 50, 'the first page is 50 chats'); assert.equal(t.agent, 'Backend Dev'); assert.equal(t.title, 'Chat title 0'); assert.match(t.snippet, /The snippet of chat 0/); assert.ok(t.person && t.h <= 40, 'a one-line row ' + JSON.stringify(t) + await ev(`JSON.stringify([...document.querySelector('#group-table-view .dt-table tbody tr:not(.dt-group)').children].map(c => [c.className, Math.round(c.getBoundingClientRect().height)]))`)); assert.equal(t.group, false, 'All chats is the agents\' chats: no group chat in it');
         assert.ok(t.groups.length >= 3 && t.groups[0] === 'Today' && t.groups[1] === 'Yesterday', 'day dividers ' + JSON.stringify(t.groups));
-        assert.equal((await ev(`window.__asked[0]`)).type, 'all', 'All chats asks for every type');
+        assert.equal((await ev(`window.__asked[0]`)).type, 'agent', 'All chats asks for the agents\' chats only');
         console.log('   ✓');
 
         console.log('2. The list reads further as its footer scrolls into view');
         await ev(`document.querySelector('#group-table-view .dt-foot').scrollIntoView({ block: 'center' }); true`);
         await waitFor(`document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)').length >= 100`, 'the second page', 10000);
-        assert.equal((await ev(`window.__asked`)).filter(a => a.type === 'all').map(a => a.page).join(), '1,2', 'one read per page');
+        assert.equal((await ev(`window.__asked`)).filter(a => a.type === 'agent' && !a.starred).map(a => a.page).join(), '1,2', 'one read per page');
         console.log('   ✓');
 
         console.log('3. Star and Archive call the flags route');
@@ -71,6 +71,10 @@ const BASE = require('./test_base').BASE;
             await ev(`window.__asked.length = 0; document.querySelector('.view-list-item[data-key="${key}"]').click(); true`);
             await waitFor(`window.__asked.some(a => Object.entries(${JSON.stringify(want)}).every(([k, v]) => a[k] === v))`, `${key} asks for its own filter ` + JSON.stringify(want)); // a read of the folder before it may still be arriving
         }
+        // the boards' chats live in Group chats: the name once, "1 message"
+        await ev(`document.querySelector('.view-list-item[data-key="chats-group"]').click(); true`);
+        await waitFor(`document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)').length === 1 && !!document.querySelector('#group-table-view .dt-tag')`, 'the Group chats folder: the one board');
+        assert.deepEqual(await ev(`(() => { const r = document.querySelector('#group-table-view .dt-table tbody tr:not(.dt-group)'); return [r.querySelector('.dt-primary').textContent, !!r.querySelector('.dt-chat-title'), r.querySelector('.dt-chat-snippet').textContent.trim(), r.querySelector('.dt-tag').textContent]; })()`), ['release-crew', false, '1 message, 0 participants', 'Group'], 'a group chat says its name once (the agent column\'s), and one message is "1 message"');
         console.log('   ✓');
 
         console.log('5. Phone: two-line rows, the folders as one select');
