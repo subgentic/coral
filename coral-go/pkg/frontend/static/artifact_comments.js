@@ -4,9 +4,11 @@ import { plural } from './format.js';
  * it refuses shows the server's one-line reason. Where a comment sits is artifact_anchor.js; the routes are artifact_comments_api.js. */
 import { isPhoneLayout, PHONE_QUERY } from './phone_layout.js';
 import { importOnce } from './import_once.js';
-const { buildAnchor, locateQuote, indexText } = await importOnce('./artifact_anchor.js');
+const { buildAnchor } = await importOnce('./artifact_anchor.js');
 const api = await importOnce('./artifact_comments_api.js');
 const { createAsk } = await importOnce('./artifact_comment_ask.js');
+const { createComposer } = await importOnce('./artifact_comment_composer.js');
+const { createHighlights } = await importOnce('./artifact_comment_highlights.js');
 import { showToast } from './utils.js';
 import { scrollBehavior } from './motion.js';
 import { pushOverlay, popOverlay } from './overlay_history.js';
@@ -24,7 +26,6 @@ export function commentBoard(opts) {
     return key ? boardKeyName(key) : undefined;
 }
 
-const BODY_MAX = 8192; // the server's cap on a comment (bytes; most text is one byte a character)
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const btn = (cls, text, label) => { const b = el('button', 'btn ' + cls, text); b.type = 'button'; if (label) b.setAttribute('aria-label', label); return b; };
 const KIND = { owner: 'owner', hub: 'Coral Hub', agent: 'agent' };
@@ -118,57 +119,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         render(); paint();
     }
 
-    // ── highlights: the quote found again in what is drawn
-    const textNodes = () => { const out = []; const w = document.createTreeWalker(body, NodeFilter.SHOW_TEXT); for (let n = w.nextNode(); n; n = w.nextNode()) out.push(n); return out; };
-    // The index of the drawn text, kept while the text nodes are the ones it was made from (a megabyte takes a while to index, #5255); drawn again when any node was replaced, added, removed or changed in length.
-    let docIx = null;
-    function docIndex() {
-        const nodes = textNodes();
-        if (docIx && docIx.nodes.length === nodes.length && nodes.every((n, i) => n === docIx.nodes[i] && n.nodeValue.length === docIx.lens[i])) return docIx.ix;
-        docIx = { nodes, lens: nodes.map(n => n.nodeValue.length), ix: indexText(nodes) };
-        return docIx.ix;
-    }
-    // Where each comment's quote sits now. Needed when the comments or the document change, not when a comment is made current.
-    function locate() {
-        st.ranges.clear(); st.orphan.clear();
-        if (!st.data || dialog.classList.contains('av-comparing')) return;
-        const ix = docIndex();
-        for (const { c } of threads()) {
-            if (c.deleted || !c.anchor || c.anchor.whole || groupOf(c) !== 'main') continue;
-            const hit = locateQuote(ix.text, c.anchor);
-            if (!hit) { st.orphan.add(c.id); continue; }
-            const first = ix.at(hit.start), last = ix.at(hit.end - 1);
-            const r = document.createRange();
-            r.setStart(first.node, first.offset);
-            r.setEnd(last.node, last.offset + 1);
-            st.ranges.set(c.id, r);
-        }
-    }
-    function highlight() {
-        const hl = window.CSS && CSS.highlights;
-        if (hl) { hl.delete('ac-comment'); hl.delete('ac-active'); }
-        if (!st.data || !hl || typeof Highlight !== 'function' || dialog.classList.contains('av-comparing')) return; // while two versions are compared the drawn text is the diff, not the version the comments are on
-        const open = [];
-        for (const { c } of threads()) { const r = st.ranges.get(c.id); if (r && !c.resolved) open.push(r); }
-        if (open.length) hl.set('ac-comment', new Highlight(...open));
-        const a = st.ranges.get(st.active);
-        if (a) hl.set('ac-active', new Highlight(a));
-    }
-    // The thread the pointer is on (card or text): its text is lit a little, the card too.
-    function hover(id) {
-        const hl = window.CSS && CSS.highlights;
-        panel.querySelectorAll('.ac-card.ac-hover').forEach(n => n.classList.remove('ac-hover'));
-        if (hl) hl.delete('ac-hover');
-        if (id == null) return;
-        panel.querySelector(`.ac-card[data-id="${id}"]`)?.classList.add('ac-hover');
-        const r = st.ranges.get(id);
-        if (hl && r && typeof Highlight === 'function') hl.set('ac-hover', new Highlight(r));
-    }
-    function paint(relocate = true) {
-        if (relocate) locate();
-        highlight();
-        render();
-    }
+    const { locate, hover, paint, forget } = createHighlights({ st, dialog, body, panel, threads, groupOf, render });
 
     // ── the panel
     // What has focus in the panel, so a redraw (every action redraws it) puts it back on the same control, or, when that control is gone (a posted comment's composer), on the current card.
@@ -322,35 +273,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         finally { st.busy = false; }
     }
 
-    // the editor of an existing comment, in place of its text
-    function editing(c) {
-        if (!st.composing || st.composing.editId !== c.id) return null;
-        return composer(c);
-    }
-    function composer(editOf) {
-        const cm = st.composing;
-        const box = el('form', 'ac-composer'); box.noValidate = true;
-        if (cm.anchor) { const a = cm.anchor; const q = el('blockquote', 'ac-quote', a.whole ? 'The whole document' : a.quote); box.append(q); }
-        const ta = el('textarea', 'ac-input'); ta.rows = 3; ta.maxLength = BODY_MAX; ta.value = editOf ? editOf.body : (cm.draft || '');
-        ta.setAttribute('aria-label', editOf ? 'Edit your comment' : cm.parentId != null ? 'Your reply' : 'Your comment'); ta.placeholder = cm.parentId != null ? 'Write a reply…' : 'Add a comment…';
-        const count = el('span', 'ac-counter', `${ta.value.length} / ${BODY_MAX}`);
-        ta.addEventListener('input', () => { count.textContent = `${ta.value.length} / ${BODY_MAX}`; cm.draft = ta.value; });
-        const cancel = btn('ac-cancel', 'Cancel'); cancel.addEventListener('click', () => { st.composing = null; st.error = ''; render(); });
-        const send = btn('btn-primary ac-send', editOf ? 'Save' : cm.parentId != null ? 'Reply' : 'Comment'); send.type = 'submit';
-        const err = el('p', 'ac-error', st.error); err.setAttribute('role', 'alert'); err.hidden = !st.error;
-        const row = el('div', 'ac-composer-row'); row.append(count, cancel, send);
-        box.append(ta, err, row);
-        box.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const text = ta.value.trim();
-            if (!text) { st.error = 'Write something first.'; err.textContent = st.error; err.hidden = false; return; }
-            send.disabled = true;
-            if (editOf) run(() => api.editComment(ownHex(editOf), st.server, editOf.id, text), 'Comment saved');
-            else run(async () => { const c = await api.createComment(cm.hex || st.hex, st.server, { body: text, anchor: cm.anchor, parentId: cm.parentId, board: st.board }); st.active = c.id; st.scrollCard = true; }, cm.parentId != null ? 'Reply posted' : 'Comment posted');
-        });
-        ta.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); cancel.click(); } else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) box.requestSubmit(); });
-        return box;
-    }
+    const { composer, editing } = createComposer({ st, render, run, ownHex });
 
     // ── a comment's text from its card, and the next or previous comment from the document, by keyboard
     function jumpTo(id) {
@@ -472,9 +395,9 @@ export function attachComments(dialog, body, host, opts = {}) {
         sheetOpen: () => isOpen(), setSheet: (open) => setSheet(open),
         /** A new artifact is on show. */
         // The computer whose artifact it is: the caller's, else the one on show (the rule renderArtifact reads the content by); a bare /api/ route is the hub's own and 404s there (#6245).
-        open(hex, server, board, series = false) { st.series = !!series; region(false); { const hl = window.CSS && CSS.highlights; if (hl) { hl.delete('ac-comment'); hl.delete('ac-active'); } } docIx = null; st.hex = hex; st.server = server || contextServer(); st.board = board; st.data = null; st.active = null; st.composing = null; st.error = ''; st.text = false; st.gone = false; st.filter = 'open'; st.visibilitySet = false; render(); setSheet(false); },
+        open(hex, server, board, series = false) { st.series = !!series; region(false); { const hl = window.CSS && CSS.highlights; if (hl) { hl.delete('ac-comment'); hl.delete('ac-active'); } } forget(); st.hex = hex; st.server = server || contextServer(); st.board = board; st.data = null; st.active = null; st.composing = null; st.error = ''; st.text = false; st.gone = false; st.filter = 'open'; st.visibilitySet = false; render(); setSheet(false); },
         /** The document was drawn: `text` says whether it is text the comments apply to. */
         docRendered(source, text) { st.source = source || ''; st.text = !!text; if (!st.text) { render(); return; } region(true); refresh(); },
-        close() { hover(null); setSheet(false); region(false); docIx = null; st.ranges.clear(); st.hex = null; st.data = null; clearTimeout(selTimer); selBtn.hidden = true; const hl = window.CSS && CSS.highlights; if (hl) { hl.delete('ac-comment'); hl.delete('ac-active'); } render(); },
+        close() { hover(null); setSheet(false); region(false); forget(); st.ranges.clear(); st.hex = null; st.data = null; clearTimeout(selTimer); selBtn.hidden = true; const hl = window.CSS && CSS.highlights; if (hl) { hl.delete('ac-comment'); hl.delete('ac-active'); } render(); },
     };
 }
