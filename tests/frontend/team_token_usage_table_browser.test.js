@@ -4,10 +4,12 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 
-const USAGE = { totals: { total_tokens: 99, cost_usd: 12.5, execution_time_sec: 0 }, by_agent: [
-    { session_id: 's1', agent_name: 'Frontend Dev', input_tokens: 15491800000, output_tokens: 2500000, cache_read_tokens: 1234, cache_write_tokens: 999950, cost_usd: 9.5 },
-    { session_id: 's2', agent_name: 'Backend Dev', input_tokens: 5000, output_tokens: 700, cache_read_tokens: 0, cache_write_tokens: 0, cost_usd: 3 },
-    { session_id: 's3', agent_name: 'QA Engineer', input_tokens: 900, output_tokens: 90, cache_read_tokens: 10, cache_write_tokens: 0, cost_usd: 0.12 }] };
+// the unified usage API's real shape (#7987: the dialog read a by_agent this route never sends, so on a real server it said "No token usage recorded"): one record per session, so one agent in two sessions is one row
+const USAGE = { totals: { total_tokens: 99, cost_usd: 12.5, execution_time_sec: 0 }, records: [
+    { session_id: 's1', agent_name: 'Frontend Dev', input_tokens: 15000000000, output_tokens: 2000000, cache_read_tokens: 1000, cache_write_tokens: 900000, cost_usd: 6, num_turns: 40 },
+    { session_id: 's1b', agent_name: 'Frontend Dev', input_tokens: 491800000, output_tokens: 500000, cache_read_tokens: 234, cache_write_tokens: 99950, cost_usd: 3.5, num_turns: 9 },
+    { session_id: 's2', agent_name: 'Backend Dev', input_tokens: 5000, output_tokens: 700, cache_read_tokens: 0, cache_write_tokens: 0, cost_usd: 3, num_turns: 4 },
+    { session_id: 's3', agent_name: 'QA Engineer', input_tokens: 900, output_tokens: 90, cache_read_tokens: 10, cache_write_tokens: 0, cost_usd: 0.12, num_turns: 2 }] };
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
