@@ -1069,12 +1069,6 @@
         margin-bottom: 6px;
     }
 
-    .settings-cli-row {
-        flex-wrap: wrap;
-        align-items: flex-start;
-    }
-
-    .settings-cli-label,
     .cli-verify-result {
         width: auto;
         min-width: 0;
@@ -2041,44 +2035,6 @@
 .settings-copy-btn {
     flex-shrink: 0;
     margin: 0;
-}
-
-.settings-cli-paths {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    width: 100%;
-}
-
-.settings-cli-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-    width: 100%;
-    margin: 0;
-}
-
-.settings-cli-label {
-    width: 56px;
-    flex-shrink: 0;
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--text-secondary);
-}
-
-.settings-cli-paths .settings-input {
-    flex: 1;
-    font-size: 0.75rem;
-    font-family: var(--font-mono);
-    margin-top: 0;
-}
-
-.settings-cli-actions {
-    display: flex;
-    justify-content: flex-start;
-    margin-top: 2px;
 }
 
 .settings-hint {
@@ -4028,13 +3984,6 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 /* Settings' footer: the note that something is not saved yet, on the left (UI audit #5589, finding 27); and the CLI paths behind one line. */
 .settings-unsaved { margin-right: auto; align-self: center; font-size: var(--fs-base); color: var(--text-secondary); }
 .settings-unsaved[hidden] { display: none; }
-.settings-cli-details > summary { cursor: pointer; font-weight: 600; font-size: var(--fs-md); min-height: 32px; display: flex; align-items: center; }
-.settings-cli-details[open] > summary { margin-bottom: 8px; }
-.settings-cli-details > summary { gap: 6px; }
-.settings-cli-details > summary { list-style: none; }
-.settings-cli-details > summary::-webkit-details-marker { display: none; }
-.settings-cli-details > summary::before { content: '▸'; font-size: 0.75rem; flex: none; } /* a flex summary draws no marker of its own, and the line read as a caption (#7041) */
-.settings-cli-details[open] > summary::before { transform: rotate(90deg); }
 
 
 /* The missing-CLI line of the New Agent dialog sits under the folder, outside More options (#5835): nothing shows while it has nothing to say. */

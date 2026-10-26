@@ -66,9 +66,9 @@ const BASE = require('./test_base').BASE;
 
             console.log(`4. (${w}) Agents: the CLI paths are behind one line; an icon, not an emoji`);
             await open('agents');
-            const ag = await ev(`(() => { const d = document.querySelector('.settings-cli-details'); const vis = e => e.checkVisibility({ checkVisibilityCSS: true }); const btn = document.querySelector('.settings-prompts-btn'); return { open: d.open, summary: d.querySelector('summary').textContent, pathsShown: vis(document.getElementById('settings-cli-path-claude')), icon: !!btn.querySelector('.material-icons'), emoji: /\\u270f/i.test(btn.textContent) }; })()`);
-            assert.deepEqual(ag, { open: false, summary: 'Set paths (empty uses PATH)', pathsShown: false, icon: true, emoji: false });
-            await ev(`document.querySelector('.settings-cli-details > summary').click(); true`);
+            const ag = await ev(`(() => { const d = document.querySelector('#settings-cli-paths'); const vis = e => e.checkVisibility({ checkVisibilityCSS: true }); const btn = document.querySelector('.settings-prompts-btn'); return { open: d.open, summary: d.querySelector('summary').textContent, pathsShown: vis(document.getElementById('settings-cli-path-claude')), icon: !!btn.querySelector('.material-icons'), emoji: /\\u270f/i.test(btn.textContent) }; })()`);
+            assert.deepEqual(ag, { open: false, summary: 'CLI paths (empty uses PATH)', pathsShown: false, icon: true, emoji: false });
+            await ev(`document.querySelector('#settings-cli-paths > summary').click(); true`);
             assert.equal(await ev(`document.getElementById('settings-cli-path-claude').checkVisibility({ checkVisibilityCSS: true })`), true, 'the paths open');
             await shot('agents-cli', w);
             await ev(`window.hideSettingsModal(); true`);

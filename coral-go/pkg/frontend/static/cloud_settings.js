@@ -50,6 +50,7 @@ export function applyCloudSettingsDialog() {
         const ids = Array.from(row.querySelectorAll('[id]')).map(c => c.id);
         if (!ids.some(id => SHOWN_CONTROLS.has(id))) row.hidden = true;
     }
+    for (const fold of modal.querySelectorAll('details.sv-fold')) if (!fold.querySelector('.sv-row:not([hidden])')) fold.hidden = true; // a fold (the CLI paths) whose rows are all machine ones leaves with them (#8460)
     const about = document.getElementById('about-section');
     if (about) about.hidden = true;
     const note = document.createElement('p');
