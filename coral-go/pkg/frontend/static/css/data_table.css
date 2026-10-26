@@ -195,6 +195,7 @@
 .dt-box.dt-folded .dt-row:has(.dt-subtitle) td { height: auto; }
 .dt-box.dt-folded .dt-primary { display: block; min-height: var(--table-touch); min-width: var(--table-touch); line-height: 1.3; } /* a block, not a flex box: text-overflow does nothing on a flex box, so a long name was cut off mid-letter instead of ending in an ellipsis (#8149); the line height and the minimum width keep it a 44 px target, also for a short name such as "#31" (the run table's row button was 43 px wide, #8171) */
 
+
 .dt-primary:focus-visible { outline: var(--table-focus-w) solid var(--table-focus-color); outline-offset: calc(-1 * var(--table-focus-w)); }
 
 @media (forced-colors: active) {
@@ -326,3 +327,11 @@
 
 /* Names and identifiers keep their literal glyphs (digit+x is not multiplication). */
 .dt-primary, .dt-id, .dt-table [data-key="team"] { font-feature-settings: "calt" 0; }
+
+/* Compact task names get a full line when large text leaves too little room
+   beside the timestamp. Keep both their words and their hit area inside the row. */
+@container dt (max-width: 20rem) {
+    .dt-box.dt-compact.dt-fold-column.dt-folded .dt-table td.dt-line-1.dt-grow:has(> .dt-title-cell) { flex: 1 1 100%; min-width: 8rem; height: auto; }
+    .dt-box.dt-compact.dt-fold-column.dt-folded .dt-title-cell { flex-wrap: wrap; align-items: baseline; row-gap: 0; }
+    .dt-box.dt-compact.dt-fold-column.dt-folded .dt-title-cell > .dt-primary { flex: 1 1 100%; min-width: 8rem; max-width: 100%; margin-block: 0; white-space: normal; overflow: visible; overflow-wrap: normal; word-break: normal; text-overflow: clip; }
+}
