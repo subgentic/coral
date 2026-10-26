@@ -460,7 +460,7 @@
     width: 100%;
 }
 
-.spend-grid {
+.cost-chart-grid {
     stroke: var(--border);
     stroke-width: 0.5;
 }
@@ -479,10 +479,6 @@
 
 .spend-dot {
     fill: var(--accent);
-}
-
-.spend-bar {
-    fill: rgba(var(--accent-rgb), 0.15);
 }
 
 .spend-label {

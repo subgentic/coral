@@ -210,7 +210,6 @@
 1	cost_dashboard.js	arrow
 1	cost_dashboard.js	b.num_agents || 0
 2	cost_dashboard.js	barWidth
-1	cost_dashboard.js	bars
 1	cost_dashboard.js	checked
 1	cost_dashboard.js	color
 1	cost_dashboard.js	duration
