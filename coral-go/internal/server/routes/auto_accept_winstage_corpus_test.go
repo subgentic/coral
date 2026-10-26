@@ -17,6 +17,7 @@ import (
 func winStageCorpus() []string {
 	var c []string
 	c = append(c, winStageHand...)
+	c = append(c, winStageTargeted...)
 	// Generated: each verb template against inside, outside, rooted, drive, variable, home, UNC and unreadable paths.
 	paths := []string{`a.txt`, `.\sub\a.txt`, `sub/a.txt`, `..\x`, `C:\x`, `/etc/x`, `~\x`, `$env:TEMP\x`, `%TEMP%\x`, `\\srv\sh\x`, `"C:\Program Files\x"`, `'..\y'`, `HKLM:\Software\x`}
 	verbs := []string{
