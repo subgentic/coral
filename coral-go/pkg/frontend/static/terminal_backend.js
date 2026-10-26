@@ -13,23 +13,15 @@ import { isSignedOut, pollEvery } from './overload.js';
 import { showConfirmModal } from './render.js';
 import { state } from './state.js';
 import { browserSession } from './safe_storage.js';
+import { TERMINAL_BACKEND_IDS } from './settings_fields.js';
 
 let _status = null; // GET /api/system/terminal-backend
 let _autoWakeShown = null; // the auto-wake values as the dialog opened (#3636)
+const show = (id, on) => { const r = document.getElementById(id)?.closest('.sv-row'); if (r) r.hidden = !on; };
 // The pty choice says its agents wake next time only while Wake agents after a restart is on (it follows the box as it is ticked).
 function syncPtyWakes() {
-    const w = $('tb-pty-wakes'), box = $('tb-autowake-on');
-    if (w && box) w.hidden = !box.checked;
-}
-
-const OS_NOTE = {
-    mac: "macOS: with pty, other programs normally cannot reach Coral's terminals; with tmux they can, through the socket. Neither backend separates Coral from programs running with your full user rights; for that, run agents under a separate account.",
-    linux: "Linux: with pty, a program running as you can still reach Coral's terminals through /proc today, so pty protects agents from tmux-style access, not from every program running as you.",
-};
-
-function osNote() {
-    const p = `${navigator.userAgentData?.platform || navigator.platform || ''}`.toLowerCase();
-    return p.includes('linux') ? OS_NOTE.linux : OS_NOTE.mac;
+    const help = document.getElementById('tb-opt-pty')?.closest('label')?.querySelector('.sv-choice-help'), box = document.getElementById('tb-autowake-on');
+    if (help && box) help.textContent = box.checked ? 'Agents stop when you quit Coral and wake next time.' : 'Agents stop when you quit Coral.';
 }
 
 const $ = id => document.getElementById(id);
@@ -66,63 +58,36 @@ function renderPending() {
     }
 }
 
-/** Fill the Settings row (called as the dialog opens). */
+/** Fill the Settings rows (called as the dialog opens). */
 export async function loadTerminalBackendRow() {
-    const row = $('settings-terminal-backend');
-    if (!row) return;
-    if (isCloud()) { row.hidden = true; return; }
+    const hideAll = () => { for (const id of TERMINAL_BACKEND_IDS) show(id, false); };
+    if (!$('tb-choice')) return;
+    if (isCloud()) { hideAll(); return; }
     try {
         _status = await fetchStatus();
     } catch {
-        row.hidden = true;
+        hideAll();
         return;
     }
-    row.hidden = false;
-    $('tb-now').innerHTML = '';
-    $('tb-now').append('Running now: ', Object.assign(document.createElement('b'), { textContent: _status.running }));
-    $('tb-choice').hidden = !_status.choice;
-    $('tb-fixed').hidden = !!_status.choice;
-    $('tb-learn-fixed').hidden = !!_status.choice; // the one-line note's detail, behind Learn more (its target stays closed)
+    const pty = _status.running === 'pty';
+    $('tb-now').textContent = _status.running;
+    show('tb-now', true); show('tb-choice', !!_status.choice); show('tb-pending', !!_status.choice); show('tb-fixed', !_status.choice);
     // Waking the agents that were running when Coral stopped (#3636): a pty Coral only.
-    const aw = $('tb-autowake');
-    if (aw) {
-        aw.hidden = _status.running !== 'pty';
-        const st = state.settings || {};
-        const on = String(st.auto_wake_after_restart ?? 'true') !== 'false';
-        const cap = Number.parseInt(st.auto_wake_cap, 10);
-        $('tb-autowake-on').checked = on;
-        syncPtyWakes();
-        $('tb-autowake-cap').value = cap >= 1 && cap <= 50 ? cap : 8;
-        _autoWakeShown = aw.hidden ? null : { on, cap: Number($('tb-autowake-cap').value) };
-        const box = $('tb-autowake-on');
-        if (!box._tbWakes) { box._tbWakes = true; box.addEventListener('change', syncPtyWakes); }
-    }
-    // Every Learn more in the row opens its text (also the auto-wake one, which a system with no choice shows without the backend options).
-    // Each is named by what it explains (data-about), starting with its visible words, so the several in the row do not read as one button (#6152).
-    const nameLearn = b => b.setAttribute('aria-label', `${b.textContent}${b.textContent === 'Learn more' ? ' about ' : ': '}${b.dataset.about || ''}`.trim());
-    for (const b of document.querySelectorAll('#settings-terminal-backend .tb-learn')) {
-        if (b._tbWired) continue;
-        b._tbWired = true;
-        nameLearn(b);
-        b.addEventListener('click', () => {
-            const targets = b.getAttribute('aria-controls').split(/\s+/).map(id => document.getElementById(id)).filter(Boolean); // the card's one Learn more opens both backends' texts
-            if (!targets.length) return;
-            const open = targets[0].hidden;
-            for (const t of targets) t.hidden = !open;
-            b.setAttribute('aria-expanded', String(open));
-            b.textContent = open ? 'Show less' : 'Learn more';
-            nameLearn(b);
-        });
-    }
+    const st = state.settings || {};
+    const on = String(st.auto_wake_after_restart ?? 'true') !== 'false';
+    const cap = Number.parseInt(st.auto_wake_cap, 10);
+    $('tb-autowake-on').checked = on;
+    $('tb-autowake-cap').value = cap >= 1 && cap <= 50 ? cap : 8;
+    show('tb-autowake-on', pty); show('tb-autowake-cap', pty);
+    _autoWakeShown = pty ? { on, cap: Number($('tb-autowake-cap').value) } : null;
+    syncPtyWakes();
+    const box = $('tb-autowake-on');
+    if (!box._tbWakes) { box._tbWakes = true; box.addEventListener('change', syncPtyWakes); }
     if (_status.choice) {
         const next = nextBackend(_status);
         for (const r of document.querySelectorAll('input[name="terminal-backend"]')) {
             r.checked = r.value === next;
             if (!r._tbWired) { r._tbWired = true; r.addEventListener('change', renderPending); }
-        }
-        // The operating system's security note is the end of each backend's own Learn more, not a third control under both (UI/UX's #5985 note): said once there, whole.
-        for (const d of document.querySelectorAll('#settings-terminal-backend .tb-opt .tb-d')) {
-            if (!d.querySelector('.tb-d-os')) d.append(' ', Object.assign(document.createElement('span'), { className: 'tb-d-os', textContent: osNote() }));
         }
         renderPending();
     }

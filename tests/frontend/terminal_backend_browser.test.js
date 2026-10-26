@@ -53,12 +53,12 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         };
         return true; })()`);
     const settingsOpen = () => ev(`!!document.getElementById('settings-modal') && getComputedStyle(document.getElementById('settings-modal')).display !== 'none'`);
-    const row = () => ev(`(() => { const r = document.getElementById('settings-terminal-backend');
-        return { hidden: r.hidden, now: document.getElementById('tb-now').textContent, choice: !document.getElementById('tb-choice').hidden,
-            fixed: !document.getElementById('tb-fixed').hidden, checked: (document.querySelector('input[name="terminal-backend"]:checked') || {}).value || null,
+    const row = () => ev(`(() => { const vis = id => { const r = document.getElementById(id)?.closest('.sv-row'); return !!r && !r.hidden; };
+        return { hidden: !vis('tb-now'), now: 'Running now: ' + document.getElementById('tb-now').textContent, choice: vis('tb-choice'),
+            fixed: vis('tb-fixed'), checked: (document.querySelector('input[name="terminal-backend"]:checked') || {}).value || null,
             pending: document.getElementById('tb-pending').textContent, pendingHiddenAttr: document.getElementById('tb-pending').hasAttribute('hidden'),
-            texts: [...document.querySelectorAll('#settings-terminal-backend .tb-opt > span')].map(x => [...x.querySelectorAll(':scope > .tb-t, :scope > .tb-line')].map(y => y.textContent.trim().replace(/\\s+/g, ' ')).join(' | ')), // #7405: a card is its name and one line
-            ptyText: (document.querySelector('#tb-opt-pty + span .tb-d') || {}).textContent || '' }; })()`);
+            texts: [...document.querySelectorAll('#tb-choice label.sv-choice')].map(l => [...l.querySelectorAll(':scope > .sv-choice-text, :scope > .sv-choice-help')].map(y => y.textContent.trim().replace(/\\s+/g, ' ')).join(' | ')), // #7405: a card is its name and one line
+            ptyText: (document.getElementById('tb-choice').closest('.sv-row').querySelector('.sv-more') || {}).textContent || '' }; })()`);
     const pick = v => ev(`(() => { const r = document.getElementById('tb-opt-${v}'); r.checked = true; r.dispatchEvent(new Event('change')); return true; })()`);
     const confirmState = () => ev(`({ shown: getComputedStyle(document.getElementById('confirm-modal')).display !== 'none', title: document.getElementById('confirm-modal-title').textContent,
         msg: document.getElementById('confirm-modal-message').textContent, yes: document.getElementById('confirm-modal-yes').textContent })`);
@@ -75,7 +75,7 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         // Verify the native Windows row before the cross-platform stand-in cases.
         if (process.platform === 'win32') {
             await ev(`window.showSettingsModal(); true`);
-            await until(`document.getElementById('settings-terminal-backend')?.hidden === false`, 'the native Windows backend row');
+            await until(`document.getElementById('tb-now')?.closest('.sv-row')?.hidden === false`, 'the native Windows backend row');
             const native = await row();
             check('Windows runs pty with no backend choice', !native.hidden && native.now === 'Running now: pty' && !native.choice && native.fixed, JSON.stringify(native));
             await ev(`window.hideSettingsModal(); true`);
@@ -83,15 +83,15 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
 
         // ── The row for an install that chose tmux (this server itself runs the pty default) ─────────
         await ev(`window.__tbFake = { status: () => ({ saved: 'tmux', running: 'tmux', next: 'tmux', forced: false, choice: true, restart_required: false, can_restart: false, running_agents: 0, leftover_tmux_agents: 0 }) }; window.showSettingsModal(); true`);
-        await until(`document.getElementById('settings-terminal-backend')?.hidden === false`, 'the backend row');
+        await until(`document.getElementById('tb-now')?.closest('.sv-row')?.hidden === false`, 'the backend row');
         let r = await row();
         check('Settings shows the backend row: running tmux, tmux picked, both options', !r.hidden && r.now === 'Running now: tmux' && r.choice && !r.fixed && r.checked === 'tmux'
             && r.texts[0] === "tmux | Agents keep running when you quit Coral, and can reach each other's terminals." && r.texts[1] === 'pty (default) | Agents stop when you quit Coral and wake next time.', JSON.stringify(r));
         { // the pty title says its agents wake next time only while Wake agents after a restart is on (#6263); a pty Coral with the choice, where the wake box is shown
             await ev(`window.__tbFake = { status: () => ({ saved: 'pty', running: 'pty', next: 'pty', forced: false, choice: true, restart_required: false, can_restart: false, running_agents: 0, leftover_tmux_agents: 0 }) };
                 import((window.__coralStatic || '/static/') + 'terminal_backend.js').then(m => m.loadTerminalBackendRow()).then(() => true)`);
-            await until(`document.getElementById('settings-terminal-backend')?.hidden === false && !document.getElementById('tb-autowake').hidden`, 'the wake box');
-            const wakes = () => ev(`(() => { const words = n => n.nodeType === 3 ? n.nodeValue : (n.hidden ? '' : [...n.childNodes].map(words).join('')); return words(document.querySelectorAll('#settings-terminal-backend .tb-opt > span')[1].querySelector(':scope > .tb-line')).replace(/\\s+/g, ' ').trim(); })()`); // the words not under a hidden element (innerText is the whole text while the pane is not drawn)
+            await until(`document.getElementById('tb-now')?.closest('.sv-row')?.hidden === false && !document.getElementById('tb-autowake-on').closest('.sv-row').hidden`, 'the wake box');
+            const wakes = () => ev(`(() => { const words = n => n.nodeType === 3 ? n.nodeValue : (n.hidden ? '' : [...n.childNodes].map(words).join('')); return words(document.querySelectorAll('#tb-choice label.sv-choice')[1].querySelector(':scope > .sv-choice-help')).replace(/\\s+/g, ' ').trim(); })()`); // the words not under a hidden element (innerText is the whole text while the pane is not drawn)
             const tick = on => ev(`(() => { const b = document.getElementById('tb-autowake-on'); b.checked = ${on}; b.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
             await tick(true);
             check('with Wake agents after a restart on, the pty title says they wake next time', (await wakes()) === 'Agents stop when you quit Coral and wake next time.', await wakes());
@@ -101,7 +101,7 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
             // back to the tmux install the checks below run on
             await ev(`window.__tbFake = { status: () => ({ saved: 'tmux', running: 'tmux', next: 'tmux', forced: false, choice: true, restart_required: false, can_restart: false, running_agents: 0, leftover_tmux_agents: 0 }) };
                 import((window.__coralStatic || '/static/') + 'terminal_backend.js').then(m => m.loadTerminalBackendRow()).then(() => true)`);
-            await until(`document.getElementById('tb-now').textContent === 'Running now: tmux'`, 'the tmux row again');
+            await until(`document.getElementById('tb-now').textContent === 'tmux'`, 'the tmux row again');
         }
         check("the pty text has Security's crash wording", /puts them to sleep first when it stops cleanly, and marks them asleep at the next start after a crash/.test(r.ptyText), r.ptyText);
         check('nothing pending to start with', r.pending === '', r.pending);
@@ -112,7 +112,7 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         // ── Apply, then Cancel: nothing saved, Settings stays open ──────────
         await ev(`window.__tbFake = { status: () => ({ saved: 'tmux', running: 'tmux', next: 'tmux', forced: false, choice: true, restart_required: false, can_restart: true, running_agents: 2, leftover_tmux_agents: 0 }) }; true`);
         await ev(`window.showSettingsModal(); true`);
-        await until(`document.getElementById('tb-now').textContent === 'Running now: tmux'`, 'the row again');
+        await until(`document.getElementById('tb-now').textContent === 'tmux'`, 'the row again');
         await pick('pty');
         await ev(`window.__tbCalls.length = 0; window.applySettings(); true`);
         await until(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'the confirm');
@@ -141,7 +141,7 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
 
         // ── Where Coral can restart itself: the restart follows the save ────
         await ev(`window.__tbFake.put = true; window.showSettingsModal(); true`);
-        await until(`document.getElementById('tb-now').textContent === 'Running now: tmux'`, 'the row once more');
+        await until(`document.getElementById('tb-now').textContent === 'tmux'`, 'the row once more');
         await pick('pty');
         await ev(`window.__tbCalls.length = 0; window.applySettings(); true`);
         await until(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'the confirm once more');
@@ -154,7 +154,7 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
 
         // ── No choice here: pty fixed ──────────────────────────────────────
         await ev(`window.__tbFake = { status: { saved: '', running: 'pty', forced: false, choice: false, restart_required: false, can_restart: false, running_agents: 0, leftover_tmux_agents: 0 } }; window.showSettingsModal(); true`);
-        await until(`document.getElementById('tb-now').textContent === 'Running now: pty'`, 'the fixed row');
+        await until(`document.getElementById('tb-now').textContent === 'pty'`, 'the fixed row');
         r = await row();
         check('with no choice (Windows, no tmux) the row shows pty as fixed, no radios', !r.hidden && !r.choice && r.fixed && r.now === 'Running now: pty', JSON.stringify(r));
         await ev(`window.hideSettingsModal(); true`);

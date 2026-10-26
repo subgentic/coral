@@ -10,7 +10,7 @@ const BASE = require('./test_base').BASE;
 const GROUPS = {
     general: ['settings-theme', 'settings-agent-type', 'settings-group-by-team', 'settings-show-summary', 'settings-show-scrollbars', 'settings-check-updates'], // Render engine moved to Terminal, About to Network and Hub (#7040)
     agents: ['settings-permission-mode', 'settings-working-dir', 'settings-cli-path-claude', 'settings-default-model-claude', 'settings-auto-resume', 'settings-auto-goals', 'settings-agent-low-priority', 'settings-board-auto-attach', 'settings-board-health-monitor'],
-    terminal: ['settings-terminal-font-size', 'settings-terminal-scrollback', 'settings-fit-pane-width', 'settings-terminal-backend', 'settings-renderer-select'],
+    terminal: ['settings-terminal-font-size', 'settings-terminal-scrollback', 'settings-fit-pane-width', 'tb-choice', 'settings-renderer-select'],
     notifications: ['settings-notify-needs-input', 'settings-desktop-notify'],
     files: ['settings-file-search-mode', 'settings-file-search-limit', 'settings-git-diff-mode', 'settings-git-poll-interval'],
     cleanup: ['settings-artifact-store-max', 'settings-received-max', 'settings-prune-days', 'settings-retention-enabled', 'settings-terminal-logs-delete'],
@@ -107,8 +107,8 @@ const GROUPS = {
         await open('general');
         // A hub page never loads the machine-only rows that fill themselves (browser sign-in, terminal backend); this local page did. They fill from fetches that answer when they answer (loadSecurityRow
         // shows its row after /api/system/auth-status): wait for each to have filled, THEN hide it, or a slow fill (a throttled CPU) shows the row again after the hiding and its tab joins the list (#5602).
-        for (const row of ['settings-security', 'settings-terminal-backend']) await waitFor(`!document.getElementById('${row}').hidden`, `the ${row} row has filled`, 10000).catch(() => {}); // a row that never fills (nothing to show here) is hidden already
-        await ev(`document.getElementById('settings-security').hidden = true; document.getElementById('settings-terminal-backend').hidden = true; true`);
+        for (const row of ['settings-security', 'tb-choice']) await waitFor(`!(document.getElementById('${row}').closest('.sv-row') || document.getElementById('${row}')).hidden`, `the ${row} row has filled`, 10000).catch(() => {}); // a row that never fills (nothing to show here) is hidden already
+        await ev(`document.getElementById('settings-security').hidden = true; document.getElementById('tb-choice').closest('.sv-row').hidden = true; true`);
         await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'cloud_settings.js'); m.applyCloudSettingsDialog(); return true; })()`);
         const listed = await ev(`[...document.querySelectorAll('#settings-tabs [role=tab]')].filter(t => !t.hidden).map(t => t.id.replace('settings-tab-', ''))`);
         assert.deepEqual(listed, ['general', 'agents', 'terminal', 'notifications', 'files'], 'groups with no hub setting leave the list: ' + listed);

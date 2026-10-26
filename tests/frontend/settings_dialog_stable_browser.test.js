@@ -88,7 +88,7 @@ const SCALE = new Set(['16/700', '17/700', '14/600', '14/400', '13/500', '13/400
             return { free: { labelled: !!document.querySelector('label[for="settings-prune-days"]') && !!document.querySelector('label[for="settings-prune-kind"]'), stacked: kind.top >= days.bottom - 2, buttonsUnder: shrink.top >= kind.bottom - 2, oneRow: Math.abs(shrink.top - prune.top) < 6 }, breakdownWide: det.width > pane.width * 0.6 }; })()`);
         assert.deepEqual(st, { free: { labelled: true, stacked: true, buttonsUnder: true, oneRow: true }, breakdownWide: true }, 'Free space is two labelled fields and then Shrink and Prune on one row; By age and board has the full width');
         await ev(`document.getElementById('settings-tab-terminal').click(); true`); await ev(framesJs(3));
-        const wake = await ev(`(() => { const w = document.getElementById('tb-autowake-on'); return w ? { switchLook: getComputedStyle(w).appearance === 'none', outsideCard: !w.closest('#settings-terminal-backend') } : null; })()`);
+        const wake = await ev(`(() => { const w = document.getElementById('tb-autowake-on'); return w ? { switchLook: getComputedStyle(w).appearance === 'none', outsideCard: !w.closest('#tb-choice') } : null; })()`);
         if (wake) assert.deepEqual(wake, { switchLook: true, outsideCard: true }, 'Wake agents after a restart is a switch, outside the backend card');
 
         // the phone (the tab list becomes a Section selector) and 200% text on a desktop: the dialog is one rectangle on every section there too

@@ -10,15 +10,13 @@
 #settings-modal :is(button, input, select, textarea, code, kbd, samp, summary, pre) { font-family: var(--font-sans); }
 #settings-modal .modal-header h3 { font: var(--dlg-title); }
 #settings-modal .settings-pane-title { font: var(--dlg-pane); }
-#settings-modal .tb-t { font: var(--dlg-section); }
-#settings-modal .tb-default { font-weight: 400; }
 #settings-modal .settings-tab { font: 400 0.875rem/1.35 var(--font-sans); }
 #settings-modal .settings-tab[aria-selected="true"] { font-weight: 600; }
 #settings-modal .settings-tab, #settings-modal .settings-tab[aria-selected="true"] { transition: none; }
-#settings-modal :is(dt, dt label, .toggle-dt label, .tb-label, label.tb-opt, .tb-opt strong, summary) { font: var(--dlg-label); }
-#settings-modal :is(input, select, textarea, .tb-opt, .tb-autowake label) { font: var(--dlg-control); }
+#settings-modal :is(dt, dt label, .toggle-dt label, .tb-label, summary) { font: var(--dlg-label); }
+#settings-modal :is(input, select, textarea) { font: var(--dlg-control); }
 #settings-modal .btn, #settings-modal :is(.pw-toggle, .tb-learn) { font: var(--dlg-button); }
-#settings-modal :is(.settings-hint, .toggle-desc, .tb-now, .tb-now b, .machine-health-note, .machine-health-status, .tb-note, .tb-d) { font: var(--dlg-hint); }
+#settings-modal :is(.settings-hint, .toggle-desc, .tb-now, .tb-now b, .machine-health-note, .machine-health-status, .tb-note) { font: var(--dlg-hint); }
 #settings-modal .badge { font: var(--dlg-badge); }
 
 /* footer: Cancel at the left, Save at the right, as in New agent and New team (the note between them) */
@@ -38,21 +36,7 @@
 @media (max-width: 767px), (pointer: coarse) { #settings-modal .settings-cloud-head > .settings-learn { min-height: 0; display: inline; position: relative; } #settings-modal .settings-cloud-head > .settings-learn::after { content: ''; position: absolute; left: -8px; right: -8px; top: 50%; height: var(--control-touch-height, 44px); transform: translateY(-50%); } } /* beside the sentence the 44 px target is invisible, so a Learn more that wraps under it makes no gap (as .sv-learn) */
 /* a phone: the dialog is the screen on every section (the tab list is the Section selector) */
 @media (max-width: 767px) { #settings-modal .modal-content.settings-modal-content { width: 100vw; max-width: none; height: 100dvh; max-height: none; min-height: 0; border-radius: 0; margin: 0; } }
-/* Terminal backend: two cards, a name and one line each (as Mode in New agent) */
-#settings-modal .tb-line { font: var(--dlg-hint); color: var(--text-secondary); }
-#settings-modal .tb-opt > span { gap: 2px; }
 
 /* round 2 (UI/UX's #7405 notes) */
 [data-quiet-focus] :focus-visible { outline: 0 !important; box-shadow: none !important; } /* a dialog opened by a pointer: no ring on what the script focused (quiet_focus.js; the ring comes with the first key) */
 #settings-modal .settings-pane-title { margin-bottom: 8px; }
-/* Wake agents after a restart: a switch row of its own under the backend cards */
-#settings-modal .tb-autowake.settings-row-switch { margin: 12px 0 0; padding: 12px 0 0; border-top: 1px solid var(--border-subtle); display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
-#settings-modal .tb-autowake[hidden] { display: none; }
-#settings-modal .tb-autowake-on { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; font: var(--dlg-label); } /* the switch at the far end of its row, like every other (#7636) */
-#settings-modal .tb-autowake-on input[type="checkbox"] { appearance: none; -webkit-appearance: none; position: relative; width: 2.5rem; height: 1.4rem; margin: 0; flex: none; border-radius: 1rem; border: 1px solid var(--control-border); background: var(--bg-hover); cursor: pointer; }
-#settings-modal .tb-autowake-on input[type="checkbox"]::before { content: ""; position: absolute; top: 2px; left: 2px; width: calc(1.4rem - 8px); height: calc(1.4rem - 8px); border-radius: 50%; background: var(--text-secondary); transition: transform .12s; }
-#settings-modal .tb-autowake-on input[type="checkbox"]:checked { background: var(--accent-dim); border-color: var(--accent-dim); }
-#settings-modal .tb-autowake-on input[type="checkbox"]:checked::before { background: var(--text-on-accent); transform: translateX(1.1rem); }
-#settings-modal .tb-autowake-on input[type="checkbox"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-#settings-modal .tb-autowake-on input[type="checkbox"]:disabled { opacity: .5; cursor: not-allowed; }
-@media (prefers-reduced-motion: reduce) { #settings-modal .tb-autowake-on input[type="checkbox"]::before { transition: none; } }

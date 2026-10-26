@@ -8,7 +8,7 @@ const { connect } = require('./agent_view_harness');
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const { settle } = require('./helpers/wait').bind(ev);
     const probe = () => ev(`(() => {
-        const learns = [...document.querySelectorAll('.sv-learn, .tb-learn, #tb-autowake > button')].filter(b => b.getClientRects().length);
+        const learns = [...document.querySelectorAll('.sv-learn')].filter(b => b.getClientRects().length);
         const bad = []; let considered = 0, takenByOwn = 0;
         for (const b of learns) {
             const root = b.closest('#settings-modal') || b.closest('#team-panel-settings') || document; // what is behind a dialog is not the hit area's neighbour
@@ -42,7 +42,7 @@ const { connect } = require('./agent_view_harness');
             for (const id of tabs) {
                 await ev(`document.getElementById(${JSON.stringify(id)}).click(); true`); await settle(300);
                 // every Learn more opened too: its words are longer lines, with the Show less in them
-                await ev(`document.querySelectorAll('.sv-learn, .tb-learn').forEach(b => { if (b.getClientRects().length && b.getAttribute('aria-expanded') === 'false') b.click(); }); true`); await settle(200);
+                await ev(`document.querySelectorAll('.sv-learn').forEach(b => { if (b.getClientRects().length && b.getAttribute('aria-expanded') === 'false') b.click(); }); true`); await settle(200);
                 const p = await probe(); seen += p.learns; considered += p.considered;
                 for (const m of p.bad) out.push(`${label} ${id}: ${m}`);
             }

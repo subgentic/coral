@@ -25,24 +25,26 @@ const BASE = require('./test_base').BASE;
             if (process.platform !== 'win32') {
                 console.log(`1. (${w}) Terminal: one title each, the whole explanation under Learn more`);
                 await open('terminal');
-                await waitFor(`!document.getElementById('settings-terminal-backend').hidden && !document.getElementById('tb-choice').hidden`, 'the backend row', 10000);
-                const tb = await ev(`(() => { const vis = e => e.checkVisibility({ checkVisibilityCSS: true }); return [...document.querySelectorAll('#settings-terminal-backend .tb-opt')].map(l => ({ short: l.querySelector('.tb-t').textContent.trim(), shortLen: l.querySelector('.tb-t').textContent.trim().length, fullShown: vis(l.querySelector('.tb-d')), full: l.querySelector('.tb-d').textContent.length })); })()`);
+                await waitFor(`!document.getElementById('tb-choice').closest('.sv-row').hidden`, 'the backend row', 10000);
+                const RADIO_ROW = `document.getElementById('tb-choice').closest('.sv-row')`;
+                const tb = await ev(`(() => [...document.querySelectorAll('#tb-choice label.sv-choice')].map(l => ({ short: l.querySelector('.sv-choice-text').textContent.trim(), line: l.querySelector('.sv-choice-help').textContent.trim() })))()`);
                 assert.equal(tb.length, 2);
-                for (const t of tb) { assert.ok(t.shortLen < 140 && !t.fullShown && t.full > 300, JSON.stringify(t)); }
+                for (const t of tb) { assert.ok(t.line.length < 140, JSON.stringify(t)); }
                 assert.equal(tb[0].short, 'tmux'); assert.equal(tb[1].short, 'pty (default)'); // the card is its name and one line, no line repeats it (#6263, #7405)
-                assert.match(await ev(`document.getElementById('tb-d-tmux').textContent`), /any other program running as you, can find that socket/, 'the access warning moved into Learn more, whole');
-                const os = await ev(`[...document.querySelectorAll('#settings-terminal-backend .tb-opt .tb-d')].map(d => ({ os: (d.querySelector('.tb-d-os') || {}).textContent || '', shown: d.checkVisibility({ checkVisibilityCSS: true }) }))`);
-                assert.ok(os.length === 2 && os.every(o => !o.shown && o.os.length > 100), 'the operating system note ends each backend\'s Learn more, closed at first, said once: ' + JSON.stringify(os));
-                assert.equal(await ev(`document.querySelectorAll('#settings-terminal-backend .tb-learn:not([hidden])').length`), 1, 'the backend card has one Learn more (#7636)');
-                assert.equal(await ev(`document.querySelectorAll('#settings-terminal-backend .tb-opt .tb-learn').length`), 0);
-                const wake = await ev(`(() => { const a = document.getElementById('tb-autowake'); if (!a || a.hidden) return null; const c = document.getElementById('tb-autowake-on').getBoundingClientRect(), r = a.getBoundingClientRect(); return { fromEdge: Math.round(r.right - c.right), first: document.querySelector('#tb-autowake label').firstElementChild.tagName }; })()`);
+                const more = await ev(`(() => { const m = ${RADIO_ROW}.querySelector('.sv-more'); return { text: m.textContent, shown: m.checkVisibility({ checkVisibilityCSS: true }) }; })()`);
+                assert.match(more.text, /any other program running as you, can find that socket/, 'the access warning is in Learn more, whole');
+                assert.ok(!more.shown && more.text.length > 600, 'Learn more is closed at first and holds the whole explanation');
+                assert.equal((more.text.match(/macOS: with pty|Linux: with pty/g) || []).length, 1, "the operating system's note ends the explanation, said once");
+                assert.equal(await ev(`${RADIO_ROW}.querySelectorAll('.sv-learn').length`), 1, 'the backend card has one Learn more (#7636)');
+                assert.equal(await ev(`document.querySelectorAll('#tb-choice label .sv-learn').length`), 0);
+                const wake = await ev(`(() => { const a = document.getElementById('tb-autowake-on').closest('.sv-row'); if (a.hidden) return null; const c = document.getElementById('tb-autowake-on').getBoundingClientRect(), r = a.getBoundingClientRect(); return { fromEdge: Math.round(r.right - c.right), first: a.firstElementChild.tagName === 'DIV' && /Wake agents/.test(a.firstElementChild.textContent) ? 'SPAN' : a.firstElementChild.tagName }; })()`);
                 if (wake) assert.ok(wake.fromEdge < 12 && wake.first === 'SPAN', 'Wake agents after a restart: the label first, its switch at the far end like every other row (#7636): ' + JSON.stringify(wake));
                 await shot('terminal-short', w);
-                await ev(`document.querySelector('#tb-opt-pty').checked = false; document.querySelector('#tb-learn-backends').click(); true`);
-                const opened = await ev(`(() => { const d = document.getElementById('tb-d-pty'); return { shown: d.checkVisibility({ checkVisibilityCSS: true }), text: d.textContent, label: document.querySelector('#tb-learn-backends').textContent, expanded: document.querySelector('#tb-learn-backends').getAttribute('aria-expanded'), radioChanged: document.getElementById('tb-opt-pty').checked }; })()`);
+                await ev(`document.querySelector('#tb-opt-pty').checked = false; ${RADIO_ROW}.querySelector('.sv-learn').click(); true`);
+                const opened = await ev(`(() => { const b = ${RADIO_ROW}.querySelector('.sv-learn'), d = ${RADIO_ROW}.querySelector('.sv-more'); return { shown: d.checkVisibility({ checkVisibilityCSS: true }), text: d.textContent, label: b.textContent, expanded: b.getAttribute('aria-expanded'), radioChanged: document.getElementById('tb-opt-pty').checked }; })()`);
                 assert.ok(opened.shown && opened.label === 'Show less' && opened.expanded === 'true' && /puts them to sleep first when it stops cleanly/.test(opened.text), JSON.stringify(opened).slice(0, 200));
-                const learnName = await ev(`document.querySelector('#tb-learn-backends').getAttribute('aria-label')`);
-                assert.equal(learnName, 'Show less: the terminal backends', 'an open Learn more is named by its visible words and what it explains: ' + learnName);
+                const learnName = await ev(`${RADIO_ROW}.querySelector('.sv-learn').getAttribute('aria-label')`);
+                assert.equal(learnName, 'Show less about the terminal backends', 'an open Learn more is named by its visible words and what it explains: ' + learnName);
                 assert.equal(opened.radioChanged, false, 'Learn more does not choose the backend');
                 await shot('terminal-learn', w);
                 await ev(`window.hideSettingsModal(); true`);

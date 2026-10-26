@@ -75,12 +75,12 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
 
         // ── Settings, on a pty Coral ───────────────────────────────────────
         await ev(`window.showSettingsModal(); true`);
-        await until(`document.getElementById('tb-autowake')?.hidden === false`, 'the auto-wake part');
+        await until(`document.getElementById('tb-autowake-on')?.closest('.sv-row')?.hidden === false`, 'the auto-wake part');
         const row = await ev(`({ on: document.getElementById('tb-autowake-on').checked, cap: document.getElementById('tb-autowake-cap').value,
-            text: document.getElementById('tb-autowake').textContent.replace(/\\s+/g, ' ') })`);
+            text: document.getElementById('tb-autowake-on').closest('.sv-row').textContent.replace(/\\s+/g, ' ') })`);
         await ev(`document.getElementById('settings-tab-terminal').click(); true`);
-        await until(`document.getElementById('tb-autowake').getClientRects().length > 0`, 'the Terminal tab open');
-        const edge = await ev(`(() => { const a = document.getElementById('tb-autowake'), c = document.getElementById('tb-autowake-on').getBoundingClientRect(); return { fromEdge: Math.round(a.getBoundingClientRect().right - c.right), first: document.querySelector('#tb-autowake .tb-autowake-on').firstElementChild.tagName }; })()`);
+        await until(`document.getElementById('tb-autowake-on').getClientRects().length > 0`, 'the Terminal tab open');
+        const edge = await ev(`(() => { const a = document.getElementById('tb-autowake-on').closest('.sv-row'), c = document.getElementById('tb-autowake-on').getBoundingClientRect(); return { fromEdge: Math.round(a.getBoundingClientRect().right - c.right), first: a.firstElementChild.tagName === 'DIV' && /Wake agents/.test(a.firstElementChild.textContent) ? 'SPAN' : a.firstElementChild.tagName }; })()`);
         check('Wake agents after a restart: the label first, its switch at the far end like every other row (#7636)', edge.fromEdge < 12 && edge.first === 'SPAN', JSON.stringify(edge));
         check('on pty, Settings shows the wake setting, on, cap 8, and says bypass-permission agents resume as they ran',
             row.on && row.cap === '8' && /Wake agents after a restart/.test(row.text) && /running when Coral stopped/.test(row.text) && /bypassed permissions/.test(row.text), JSON.stringify(row));
