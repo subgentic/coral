@@ -30,9 +30,9 @@
     "html": 0
   },
   "settings-api-key-row": {
-    "css": 3,
+    "css": 0,
     "js": 0,
-    "html": 1
+    "html": 0
   },
   "net-group-head": {
     "css": 6,
@@ -104,7 +104,6 @@
     "launch-server-row",
     "net-group-head",
     "net-level-row",
-    "settings-api-key-row",
     "settings-cli-row",
     "settings-cloud-connect-row",
     "settings-cloud-head",
