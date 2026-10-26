@@ -3435,7 +3435,7 @@
       "id": "saved/listener/saved_marks.js:295:resize",
       "tab": "saved",
       "kind": "listener",
-      "what": "resize handler: window.addEventListener('resize', fitSavedButton);",
+      "what": "resize handler: window.addEventListener('resize', fitSavedBar);",
       "source": "static/saved_marks.js:295",
       "status": "moved",
       "newHome": "the Save for later bookmark of a message: saved_marks.js is shared and the Messages tab (message_board.js) and the agent chat use it",

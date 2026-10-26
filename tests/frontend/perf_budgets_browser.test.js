@@ -37,7 +37,7 @@ const { framesJs } = require('./helpers/wait');
         // Typing makes no page-wide lookup (#6887): the budget used to be one per key (32), which a per-key lookup in the Stop/Keys state used up entirely (#6802: 32 + the Saved count refresh = 33 failed the 164 gate).
         // The one lookup a typing run may hold is not a key's: the Saved count's paint (saved_marks.js refreshSavedCount, 50 ms after a coral:route-changed or coral:saved-changed event, not a timer), so it is left out of the
         // per-key count, which is exactly 0, and counted on its own (a stuck refresh loop would still show).
-        const SAVED = '#saved-btn .saved-count, .saved-menu-item .saved-count';
+        const SAVED = '#saved-btn .saved-count';
         const perKey = walkers.filter(x => x !== SAVED);
         assert.equal(perKey.length, 0, `typing makes no page-wide lookup per keystroke (32 keys): ${perKey.length}: ${[...new Set(perKey)].join(' | ')}`);
         assert.ok(walkers.length - perKey.length <= 3, `the Saved count paints at most 3 times in a typing run (a stuck refresh loop would show): ${walkers.length - perKey.length}`);
