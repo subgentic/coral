@@ -1008,6 +1008,13 @@ func fieldDelta(prev, curr map[string]any) map[string]any {
 			out[k] = v
 		}
 	}
+	// Display evidence is a per-payload lease: do not retain an omitted hint
+	// through a field diff, or reissue its old read timestamp as current (#7974).
+	for _, k := range []string{"display_activity_hint", "display_activity_hint_at"} {
+		if v, ok := curr[k]; ok {
+			out[k] = v
+		}
+	}
 	for k, v := range curr {
 		if old, ok := prev[k]; !ok || !sameJSON(old, v) {
 			out[k] = v

@@ -111,6 +111,7 @@ type SessionsHandler struct {
 	loginScreens loginScreens
 	// startupScreens: whether an agent that has sent no event yet waits on a prompt its CLI drew at launch (#4543).
 	startupScreens loginScreens
+	displayScreens displayScreenCache // presentation-only Codex activity evidence (#7974)
 	// screens: captures the read-only pollers (the agent poll) share for a moment (#3887)
 	screens screenSnaps
 	// hooksRev is the hook set each session's agent loaded at its launch, from its events

@@ -3,7 +3,7 @@
 import { buildListBar } from './list_bar.js';
 import { STATES, STATE_LABEL, SORTS, SORT_LABEL, EMPTY, makeModel, comparator } from './agent_list_filters.js';
 import { getAgentFilter, getListFilters, setListFilters, setListComparator } from './agent_filter.js';
-import { deriveSessionState, resolveSessionIdentity } from './session_state.js';
+import { presentationSessionState, resolveSessionIdentity } from './session_state.js';
 import { sessionServer, sessionTeamKey, keyLabel, LOCAL_SERVER } from './server_base.js';
 import { serverLabel } from './launch_server.js';
 import { state } from './state.js';
@@ -40,7 +40,7 @@ function onChange(f) {
 
 /** What the filters read off an agent. */
 export const FILTER_CTX = {
-    stateKey: s => deriveSessionState(s),
+    stateKey: s => presentationSessionState(s),
     boardOf: s => sessionTeamKey(s) || '',
     machineOf: s => sessionServer(s),
 };
