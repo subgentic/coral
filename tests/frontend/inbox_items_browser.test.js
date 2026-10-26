@@ -8,7 +8,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const board = 'inbox-items-' + Date.now().toString(36), title = 'Read this task in the Inbox';
+    const board = 'inbox-items-2f0x-' + Date.now().toString(36), title = 'Read this task in the Inbox';
     const failures = [];
     const api = (method, url, body) => ev(`fetch(${JSON.stringify(url)}, {method:${JSON.stringify(method)},headers:{'Content-Type':'application/json'},body:${JSON.stringify(JSON.stringify(body))}}).then(async r=>({status:r.status,body:await r.json()}))`);
     const load = async url => {
@@ -54,11 +54,19 @@ const BASE = require('./test_base').BASE;
                     const url=`/inbox/${kind}/${board}${isTask?'/'+id:''}`;
                     await load('/'); await folder(key);
                     if (isTask) await ev(`import((window.__coralStatic||'/static/')+'inbox_sidebar.js').then(m=>m.filterInbox('Read this task'))`);
+                    if (!isTask) {
+                        await waitFor(`!!(${row(text)})`, 'literal board name');
+                        assert.equal(await ev(`getComputedStyle(${row(text)}).fontFeatureSettings`), '"calt" 0', 'board names preserve digit+x on the list');
+                    }
                     await open(text); await checkInbox(url); // failing-first: currently jumps to /team
                     const content=isTask?'#inbox-page .team-task-page':'#inbox-page #mb-board';
                     await waitFor(`document.querySelector(${JSON.stringify(content)})?.textContent.includes(${JSON.stringify(isTask?title:'Read this board in the Inbox')})`, 'shared item content');
                     // Check the mounted page, not the shell shown while its task read is pending.
                     assert.ok(await ev(`document.querySelector('#inbox-page .goals-back')?.getClientRects().length>0`),'Back is visible at this width');
+                    if (!isTask) {
+                        assert.equal(await ev(`getComputedStyle(document.querySelector('#inbox-page .inbox-board-head h2')).fontFeatureSettings`), '"calt" 0', 'the board heading preserves digit+x');
+                        assert.equal(await ev(`document.querySelector('#inbox-page .inbox-board-head h2').textContent`), board);
+                    }
                     if (!isTask) assert.ok(await ev(`(() => { const title=document.querySelector('#inbox-page .inbox-board-head h2').getBoundingClientRect(), search=document.querySelector('#inbox-page #mb-tools').getBoundingClientRect(); return search.top-title.bottom>=12; })()`),'Board title has at least 12 px before search');
                     if (width===390) assert.equal(await ev(`document.querySelector('#inbox-page select[aria-label="Inbox views"]').value`),key);
                     for (const theme of ['light','dark']) {
