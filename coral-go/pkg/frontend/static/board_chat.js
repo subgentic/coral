@@ -15,6 +15,7 @@ import { paintPauseButton as _paintPauseButton } from './board_pause_button.js';
 import { applyAskUpdates, onRowActions, boardView, saveBoardView, rowParts, applyView, mountTableTools, forgetOpenRows, refreshReplies, retagMentions, watchFold, dayLineBefore } from './board_table.js'; // the Board as a table (#7922): the team page's module at dock width
 import { messageTimeHtml } from './message_time.js';
 import { keyRoute, build } from './routes.js';
+import { browserLocal } from './safe_storage.js';
 
 // ── Board (right-panel tab) ──────────────────────────────────────
 let _boardChatTimer = null;
@@ -41,6 +42,15 @@ const _BOARD_CHAT_KEEP = 300;
 let _boardChatSelectMode = false;
 let _boardChatSelectedIds = new Set();
 
+// An agent's dock shows what that agent would read (#8484): the messages its read delivers (its @mentions, @all and the rest of the server's one rule), asked of the board with for_subscriber.
+// "Whole board" shows everything; the choice is kept per browser, as Table | Chat is. The Orchestrator's dock, and an agent with no member id, has no switch and shows the whole board.
+const SCOPE_KEY = 'coral.board.scope';
+let _boardChatScope = '';      // the member whose read the list is (empty: the whole board)
+let _boardChatReader = null;   // { id, name } the dock's agent as a board member, or null when its dock shows the whole board
+let _boardChatBoardTotal = 0;  // the whole board's count, beside the reader's own
+const scopePref = () => (browserLocal.get(SCOPE_KEY) === 'all' ? 'all' : 'agent');
+const scopeQuery = () => (_boardChatScope ? `&for_subscriber=${encodeURIComponent(_boardChatScope)}` : '');
+
 // What a rebuild used to reset and a kept panel must reset itself on a switch: select mode, an open @-mention list, the title.
 function _resetBoardPanelForSwitch(panel, boardName) {
     if (_boardChatSelectMode) {
@@ -58,8 +68,10 @@ function _resetBoardPanelForSwitch(panel, boardName) {
     if (title && title.textContent !== label) title.textContent = label;
 }
 
-export function showBoardChatTab(boardName) {
+export function showBoardChatTab(boardName, agent = null) {
     _activeBoardChat = boardName;
+    _boardChatReader = agent && agent.subscriber && !agent.orchestrator ? { id: String(agent.subscriber), name: agent.name || String(agent.subscriber) } : null;
+    const scope = _boardChatReader && scopePref() === 'agent' ? _boardChatReader.id : '';
     ++_boardChatGen;
     const panel = document.getElementById('agentic-panel-board');
     if (!panel) return;
@@ -74,7 +86,7 @@ export function showBoardChatTab(boardName) {
     } else {
         // The same board again (another agent of its team): the messages element, with its rendered messages, is carried over into
         // the rebuilt panel, so the render below keeps those nodes instead of building them again (#3881).
-        const carried = _boardChatLoaded && _boardChatBoard === boardName ? document.getElementById('board-panel-msgs') : null;
+        const carried = _boardChatLoaded && _boardChatBoard === boardName && _boardChatScope === scope ? document.getElementById('board-panel-msgs') : null;
         if (carried) carried.remove();
 
         // Populate the board tab content (visibility managed by switchAgenticTab)
@@ -117,10 +129,12 @@ export function showBoardChatTab(boardName) {
     panel.dataset.board = boardName;
     }
 
-    // A new board starts afresh; the same board shows what it had at once, and the poll fetches
+    // A new board, or another reader of it, starts afresh; the same board shows what it had at once, and the poll fetches
     // only what came since.
-    if (_boardChatBoard !== boardName) {
+    if (_boardChatBoard !== boardName || _boardChatScope !== scope) {
         _boardChatBoard = boardName;
+        _boardChatScope = scope;
+        _boardChatBoardTotal = 0;
         forgetOpenRows(); // no row stays open across teams
         _boardChatReplyTo = null;
         _boardChatLoaded = false;
@@ -130,6 +144,7 @@ export function showBoardChatTab(boardName) {
     }
     _boardChatSelectMode = false;
     _boardChatSelectedIds.clear();
+    _syncScopeBar(panel, agent);
     if (_boardChatLoaded) _renderBoardPanelMessages(document.getElementById('board-panel-msgs'), true);
 
     _loadBoardPanelChat(boardName);
@@ -174,7 +189,7 @@ async function _loadBoardPanelChat(boardName, { full = false } = {}) {
         if (loaded) {
             const last = _boardChatMessages[_boardChatMessages.length - 1];
             const afterId = last ? last.id : 0;
-            const resp = await boardFetch(boardName, `/messages/all?limit=${_BOARD_CHAT_PAGE}&after_id=${encodeURIComponent(afterId)}&format=dashboard`);
+            const resp = await boardFetch(boardName, `/messages/all?limit=${_BOARD_CHAT_PAGE}&after_id=${encodeURIComponent(afterId)}&format=dashboard${scopeQuery()}`);
             if (!resp.ok) return;
             const data = await resp.json();
             if (stale()) return;
@@ -188,6 +203,7 @@ async function _loadBoardPanelChat(boardName, { full = false } = {}) {
                 _boardChatMessages = [...byId.values()].sort((a, b) => a.id - b.id);
                 applyAskUpdates(_boardChatMessages, data.ask_updates); // a Question these answer says so in the render below (the server's word, #8200)
                 _boardChatTotal = expected;
+                if (data.board_total !== undefined) _boardChatBoardTotal = Number(data.board_total) || 0;
                 const el = document.getElementById('board-panel-msgs');
                 _trimBoardChatWindow(el);
                 if (el) _renderBoardPanelMessages(el, false);
@@ -197,7 +213,7 @@ async function _loadBoardPanelChat(boardName, { full = false } = {}) {
         }
 
         // The latest page (offset=0: no OFFSET scan).
-        const resp = await boardFetch(boardName, `/messages/all?limit=${_BOARD_CHAT_PAGE}&offset=0&format=dashboard`);
+        const resp = await boardFetch(boardName, `/messages/all?limit=${_BOARD_CHAT_PAGE}&offset=0&format=dashboard${scopeQuery()}`);
         if (!resp.ok) return; // a refusal is not an empty board
         const data = await resp.json();
         if (stale()) return;
@@ -208,6 +224,7 @@ async function _loadBoardPanelChat(boardName, { full = false } = {}) {
         _boardChatBoard = boardName;
         _boardChatMessages = messages;
         _boardChatTotal = total;
+        _boardChatBoardTotal = Number(data.board_total) || 0;
         _boardChatOffset = Number(data.before_count) || 0;
         _boardChatLoaded = true;
 
@@ -267,7 +284,7 @@ async function _loadEarlierBoardChat() {
     _boardChatEarlierBusy = true;
     _setBoardChatLoading(true);
     try {
-        const resp = await boardFetch(boardName, `/messages/all?limit=${_BOARD_CHAT_PAGE}&before_id=${encodeURIComponent(_boardChatMessages[0].id)}&format=dashboard`);
+        const resp = await boardFetch(boardName, `/messages/all?limit=${_BOARD_CHAT_PAGE}&before_id=${encodeURIComponent(_boardChatMessages[0].id)}&format=dashboard${scopeQuery()}`);
         if (!resp.ok) return;
         const data = await resp.json();
         // The panel may have switched boards or reloaded while this was in flight.
@@ -309,8 +326,15 @@ function _renderBoardPanelMessages(msgsEl, scrollToBottom) {
     if (!msgsEl) return;
     const messages = _boardChatMessages;
     if (!messages.length && _boardChatOffset <= 0) {
-        msgsEl.innerHTML = `<div class="board-chat-empty">${escapeHtml(_emptyBoardLine())}</div>`;
+        if (_boardChatScope && _boardChatReader) { // nothing for this agent yet: say so, and the way to the whole board
+            const line = document.createElement('div'); line.className = 'board-chat-empty';
+            const more = document.createElement('button'); more.type = 'button'; more.className = 'board-scope-link'; more.textContent = 'Show the whole board';
+            more.addEventListener('click', () => _setBoardChatScopePref('all'));
+            line.append(`Nothing for ${_boardChatReader.name} yet. `, more);
+            msgsEl.replaceChildren(line);
+        } else msgsEl.innerHTML = `<div class="board-chat-empty">${escapeHtml(_emptyBoardLine())}</div>`;
         msgsEl.dataset.rendered = '1';
+        _syncScopeNote();
         return;
     }
     const wasAtBottom = scrollToBottom || msgsEl.scrollTop >= msgsEl.scrollHeight - msgsEl.clientHeight - 20;
@@ -361,6 +385,7 @@ function _renderBoardPanelMessages(msgsEl, scrollToBottom) {
     resolveBoardArtifacts(msgsEl, _activeBoardChat ? splitKey(_activeBoardChat).server : undefined);
     if (wasAtBottom) msgsEl.scrollTop = msgsEl.scrollHeight;
     msgsEl.dataset.rendered = '1';
+    _syncScopeNote();
     _fillBoardChatTop(msgsEl);
     // Update select bar if in select mode
     if (_boardChatSelectMode) _updateBoardChatSelectBar();
@@ -489,6 +514,45 @@ function mountDockTableSwitch(panel) {
         if (box) { applyView(box, v); if (bottom) box.scrollTop = box.scrollHeight; }
     } });
     head.insertBefore(head.querySelector(':scope > .mb-table-tools'), head.querySelector('#board-chat-pause-btn'));
+}
+
+/** The dock's choice between what this agent reads and the whole board, kept per browser; the list is asked for again. */
+function _setBoardChatScopePref(pref) {
+    browserLocal.set(SCOPE_KEY, pref === 'all' ? 'all' : 'agent');
+    if (_activeBoardChat) showBoardChatTab(_activeBoardChat, _boardChatAgentArg);
+}
+let _boardChatAgentArg = null;
+
+/** The scope row under the dock's head: the "For this agent | Whole board" switch and, while the list is filtered, one quiet line saying what it is. Not drawn for the Orchestrator or an agent with no member id. */
+function _syncScopeBar(panel, agent) {
+    _boardChatAgentArg = agent;
+    let bar = panel.querySelector(':scope > .board-chat-scope');
+    if (!_boardChatReader) { bar?.remove(); return; }
+    if (!bar) {
+        bar = document.createElement('div'); bar.className = 'board-chat-scope';
+        const sw = document.createElement('div'); sw.className = 'mb-view-switch'; sw.setAttribute('role', 'group'); sw.setAttribute('aria-label', 'Show on the board');
+        for (const [key, label] of [['agent', 'For this agent'], ['all', 'Whole board']]) {
+            const b = document.createElement('button'); b.type = 'button'; b.className = 'mb-view-btn'; b.dataset.scope = key; b.textContent = label;
+            b.addEventListener('click', () => _setBoardChatScopePref(key));
+            sw.append(b);
+        }
+        const note = document.createElement('p'); note.className = 'board-chat-scope-note'; note.id = 'board-chat-scope-note';
+        bar.append(sw, note);
+        panel.querySelector('.board-chat-header').after(bar);
+    }
+    for (const b of bar.querySelectorAll('.mb-view-btn')) b.setAttribute('aria-pressed', String((b.dataset.scope === 'agent') === !!_boardChatScope));
+    _syncScopeNote();
+}
+
+/** "Showing what Ada reads: its mentions, @all and its replies. 12 of 184 messages": only while the list is filtered. */
+function _syncScopeNote() {
+    const note = document.getElementById('board-chat-scope-note');
+    if (!note) return;
+    const text = _boardChatScope && _boardChatReader
+        ? `Showing what ${_boardChatReader.name} reads: its mentions, @all and its replies.${_boardChatLoaded && _boardChatBoardTotal ? ` ${_boardChatTotal}\u00a0of\u00a0${_boardChatBoardTotal}\u00a0messages` : ''}`
+        : '';
+    if (note.textContent !== text) note.textContent = text;
+    note.hidden = !text;
 }
 
 /** Reply in the dock: "@Sender " at the start of the box's text and the focus in it. */
