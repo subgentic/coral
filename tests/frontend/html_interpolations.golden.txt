@@ -106,13 +106,7 @@
 1	controls.js	macroButtons
 1	controls.js	modeButtons
 1	controls.js	navButtons
-6	cost_dashboard.js	H
-5	cost_dashboard.js	PAD
-1	cost_dashboard.js	PAD + 4
-3	cost_dashboard.js	PAD + plotH
-2	cost_dashboard.js	PAD + plotH + 16
-1	cost_dashboard.js	PAD + plotH + 4
-2	cost_dashboard.js	PAD + plotW
+4	cost_dashboard.js	H
 4	cost_dashboard.js	PAD.left
 4	cost_dashboard.js	PAD.left + plotW
 1	cost_dashboard.js	PAD.left + plotW / 2
@@ -122,17 +116,16 @@
 1	cost_dashboard.js	PAD.top + plotH + 4
 2	cost_dashboard.js	PAD.top + plotH / 2
 1	cost_dashboard.js	PAD.top + plotH / 2 + 4
-6	cost_dashboard.js	W
-2	cost_dashboard.js	_formatCost(maxCost)
+4	cost_dashboard.js	W
+1	cost_dashboard.js	_formatCost(maxCost)
 1	cost_dashboard.js	_formatCost(midCost)
-2	cost_dashboard.js	areaPoints.join(' ')
+1	cost_dashboard.js	areaPoints.join(' ')
 1	cost_dashboard.js	checked
 1	cost_dashboard.js	color
 1	cost_dashboard.js	formatBucketLabel(buckets[0].bucket)
 1	cost_dashboard.js	formatBucketLabel(buckets[Math.floor(n / 2)].bucket)
 1	cost_dashboard.js	formatBucketLabel(buckets[n - 1].bucket)
-1	cost_dashboard.js	maxTurn
-3	cost_dashboard.js	points.join(' ')
+2	cost_dashboard.js	points.join(' ')
 1	cost_dashboard.js	points[points.length - 1].split(',')[0]
 1	cost_dashboard.js	points[points.length - 1].split(',')[1]
 1	editions.js	ASK_MODES.map(([value, name, text]) => `<label class="editions-ask-opt"><input type="radio" name="editions-mod

@@ -173,17 +173,35 @@ export const lineKeyOf = (view, key) => { const st = state[view]; return st && a
 export const highlighted = view => (state[view] ? state[view].hi : '');
 export function setHighlight(view, key, redraw) { const st = seriesState(view); st.hi = st.hi === key ? '' : key; if (redraw) redraw(); }
 export const wordFor = interval => STEP_WORD[interval] || STEP_WORD['1h'];
-/** The keys checked in the table (the table's own selection, mapped to keys by the caller). */
-export function setSelected(view, keys) { const st = seriesState(view); st.selected = new Set(keys); if (st.hi && st.hi !== OTHER && st.selected.size && !st.selected.has(st.hi)) st.hi = ''; }
-
+/** Whether a row has a line of its own now (not folded into Other, not left out). */
+export const hasLine = (view, key) => { const st = state[view]; return !!st && st.data != null && assignLines(st.ranked, st.selected).lines.some(l => l.key === key); };
+/** A row's swatch is the switch of its line. In the default view (the top 7 and Other) a row with a line is left out, and a row in Other is shown alone; once rows are chosen each swatch adds or removes its row, and the last
+ *  one removed brings the default back. */
+export function toggleLine(view, key) {
+    const st = seriesState(view), asg = assignLines(st.ranked, st.selected);
+    let next;
+    if (!st.selected.size) next = asg.lines.some(l => l.key === key) ? new Set(asg.lines.map(l => l.key).filter(k => k !== key)) : new Set([key]);
+    else { next = new Set(st.selected); if (next.has(key)) next.delete(key); else next.add(key); }
+    const def = asg.active ? assignLines(st.ranked, null).lines.map(l => l.key) : asg.lines.map(l => l.key);
+    if (next.size === def.length && def.every(k => next.has(k))) next = new Set(); // the top 7 chosen again is the default (and brings Other back)
+    st.selected = next;
+    if (st.hi && st.hi !== OTHER && st.selected.size && !st.selected.has(st.hi)) st.hi = '';
+}
+/** Back to the top 7 and Other. */
+export function resetLines(view) { seriesState(view).selected = new Set(); }
 /** Sets what the view has read (null while it loads or after an error) and keeps the colours' order. */
 export function setData(view, data, error) { const st = seriesState(view); st.data = data; st.error = error || ''; st.ranked = data ? rankKeys(data.buckets) : []; }
 
-function seg(label, items, isOn, onToggle) {
+function seg(label, items, isOn, onToggle, multi) {
     const wrap = el('div', 'viz-ctl'); wrap.append(el('span', 'viz-ctl-label', label));
-    const g = el('div', 'viz-seg'); g.setAttribute('role', 'group'); g.setAttribute('aria-label', label);
+    const g = el('div', multi ? 'viz-seg viz-multi' : 'viz-seg'); g.setAttribute('role', 'group'); g.setAttribute('aria-label', label);
     for (const [k, t] of items) { const b = el('button', null, t); b.type = 'button'; b.setAttribute('aria-pressed', String(isOn(k))); b.addEventListener('click', () => onToggle(k)); g.append(b); }
-    wrap.append(g); return wrap;
+    wrap.append(g); watchMore(g); return wrap;
+}
+/** A scrolling row says there is more beyond its edge: data-more (end, start, both) is what the stylesheet fades. */
+function watchMore(g) {
+    const mark = () => { const start = g.scrollLeft > 1, end = g.scrollLeft + g.clientWidth < g.scrollWidth - 1, v = start && end ? 'both' : start ? 'start' : end ? 'end' : ''; if (v) g.setAttribute('data-more', v); else g.removeAttribute('data-more'); };
+    g.addEventListener('scroll', mark, { passive: true }); requestAnimationFrame(mark);
 }
 const joinWords = list => (list.length < 2 ? list.join('') : `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}`);
 
@@ -201,7 +219,7 @@ export function drawPanel(host, view, { tableTotal, redraw, phone }) {
     const again = () => { drawPanel(host, view, { tableTotal, redraw, phone }); redraw?.(); };
     const picked = METRICS.filter(x => st.metrics.includes(x.key));
     const tools = el('div', 'viz-tools');
-    tools.append(seg('Metrics', METRICS.map(x => [x.key, x.label]), k => st.metrics.includes(k), k => { st.metrics = st.metrics.includes(k) ? (st.metrics.length > 1 ? st.metrics.filter(x => x !== k) : st.metrics) : [...st.metrics, k]; again(); }),
+    tools.append(seg('Metrics', METRICS.map(x => [x.key, x.label]), k => st.metrics.includes(k), k => { st.metrics = st.metrics.includes(k) ? (st.metrics.length > 1 ? st.metrics.filter(x => x !== k) : st.metrics) : [...st.metrics, k]; again(); }, true),
         seg('Show', [['cum', 'Running total'], ['int', wordFor(interval).replace(/^each/, 'Each')]], k => (k === 'cum') === st.cumulative, k => { st.cumulative = k === 'cum'; again(); }));
     const asg = assignLines(st.ranked, st.selected), when = st.cumulative ? 'running total' : wordFor(interval);
     const oneRowMany = picked.length > 1 && asg.lines.length === 1 && !asg.folded.length;
@@ -211,8 +229,10 @@ export function drawPanel(host, view, { tableTotal, redraw, phone }) {
     const rowsOf = st.selected.size ? shownKeys : null;
     const card = (title, hint) => { const c = el('div', 'viz-card'); c.append(el('h4', 'viz-title', title)); if (hint) c.append(el('p', 'viz-hint', hint)); const chart = el('div', 'viz-chart'); c.append(chart); host.append(c); return chart; };
     const checks = [];
+    const addReset = (after, n) => { const p = el('p', 'viz-hint'); p.append(document.createTextNode(`Showing ${n} of ${st.ranked.length} rows. `)); const b = el('button', 'viz-linkbtn', `Show the top ${TOP}`); b.type = 'button'; b.addEventListener('click', () => { resetLines(view); again(); }); p.append(b); after.after(p); };
     const byRows = (m, title) => { // a line per shown row, for one metric
-        const lines = buildSeries(buckets, asg, times, m.key, st.cumulative), chart = card(title, asg.active ? `Showing the ${shownKeys.length} checked ${shownKeys.length === 1 ? 'row' : 'rows'}. Clear the checks above the table to see the top 7.` : '');
+        const lines = buildSeries(buckets, asg, times, m.key, st.cumulative), chart = card(title, '');
+        if (asg.active) addReset(chart.parentElement.querySelector('.viz-title'), shownKeys.length);
         drawChart(chart, { times, lines, metric: m.key, interval, hi: st.hi, phone });
         checks.push([m, lines.reduce((a, l) => a + l.total, 0)]);
     };
@@ -220,6 +240,7 @@ export function drawPanel(host, view, { tableTotal, redraw, phone }) {
     else if (asg.lines.length === 1 && !asg.folded.length) { // one row, several metrics: the metrics are the lines, a chart for each unit
         for (const group of metricUnits(picked)) {
             const lines = buildMetricLines(buckets, [asg.lines[0].key], times, group, st.cumulative), chart = card(`${asg.lines[0].key}: ${joinWords(group.map(g => g.label))}, ${when}`);
+            if (asg.active) addReset(chart.parentElement.querySelector('.viz-title'), shownKeys.length);
             drawChart(chart, { times, lines, metric: group[0].key, interval, hi: '', phone, log: !!st.log && group.length > 1 });
             if (lines.length > 1) { // the metrics are the lines: a key (the table names rows, not metrics), each metric with what it adds up to
                 const ul = el('ul', 'viz-legend viz-legend-plain');

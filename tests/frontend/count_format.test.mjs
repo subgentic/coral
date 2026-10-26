@@ -10,6 +10,7 @@ const cases = [
 for (const [n, want] of cases) assert.equal(formatTokens(n), want, `formatTokens(${n})`);
 assert.equal(compactCount(1500, 'k'), '1.5k');
 assert.equal(compactCount(15491800000, 'k'), '15.5B', 'only the thousands have a lower-case letter');
+assert.equal(formatTokens(999.9999999999997), '1.0K', 'a float that is nearly a thousand is a thousand'); assert.equal(formatTokens(100.00000000000003), '100'); assert.equal(formatTokens(12.34), '12.3'); assert.equal(formatTokens(0.04), '0');
 assert.equal(formatTokens(NaN), 'NaN', 'a value that is not a number is not made up');
 assert.equal(_formatTokenCount(null), '0');
 assert.equal(_formatTokenCount(950), '950');
