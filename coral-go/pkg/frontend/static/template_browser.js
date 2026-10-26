@@ -3,6 +3,8 @@
 import { escapeHtml, escapeAttr, showToast } from './utils.js';
 import { registerActions } from './actions.js';
 import { registerDialog, closeDialog } from './modal_chrome.js';
+import { importOnce } from './import_once.js';
+const { categoriesOf, templatesOf, categoryName, filterCategories, filterTemplates, templateName, displayName, previewParts } = await importOnce('./template_browser_data.js');
 
 let _categoriesCache = {};
 
@@ -85,7 +87,7 @@ export async function showTemplateBrowser(type, onSelect) {
 
     // Load categories
     const rawData = await fetchCategories(type);
-    const categories = rawData.categories || rawData.commands || rawData || [];
+    const categories = categoriesOf(rawData);
     if (!categories.length) {
         catPanel.innerHTML = '<div class="template-browser-empty">No categories found</div>';
         return;
@@ -95,14 +97,10 @@ export async function showTemplateBrowser(type, onSelect) {
     let activeCategory = null;
 
     function renderCategories(filter) {
-        const q = (filter || '').toLowerCase();
-        const filtered = categories.filter(c => {
-            const name = c.name || c;
-            return !q || name.toLowerCase().includes(q);
-        });
+        const filtered = filterCategories(categories, filter);
         catPanel.innerHTML = filtered.map(c => {
-            const name = c.name || c;
-            const display = name.replace(/-/g, ' ');
+            const name = categoryName(c);
+            const display = displayName(name);
             const active = activeCategory === name ? ' active' : '';
             return `<button class="template-cat-btn${active}" data-cat="${escapeAttr(name)}">${escapeHtml(display)}</button>`;
         }).join('') || '<div class="template-browser-empty">No matches</div>';
@@ -119,23 +117,19 @@ export async function showTemplateBrowser(type, onSelect) {
         previewPanel.innerHTML = '<div class="template-browser-empty">Select a template to preview</div>';
 
         const rawTemplates = await fetchTemplatesInCategory(type, catName);
-        const templates = rawTemplates.agents || rawTemplates.commands || rawTemplates || [];
+        const templates = templatesOf(rawTemplates);
         renderTemplateList(templates);
     }
 
     function renderTemplateList(templates, filter) {
-        const q = (filter || '').toLowerCase();
-        const filtered = templates.filter(t => {
-            const name = t.name || t.filename || '';
-            return !q || name.toLowerCase().includes(q);
-        });
+        const filtered = filterTemplates(templates, filter);
         if (!filtered.length) {
             listPanel.innerHTML = '<div class="template-browser-empty">No templates found</div>';
             return;
         }
         listPanel.innerHTML = filtered.map(t => {
-            const name = t.name || (t.filename || '').replace(/\.md$/, '');
-            const display = name.replace(/-/g, ' ');
+            const name = templateName(t);
+            const display = displayName(name);
             return `<button class="template-item-btn" data-cat="${escapeAttr(activeCategory)}" data-name="${escapeAttr(name)}">${escapeHtml(display)}</button>`;
         }).join('');
 
@@ -155,20 +149,10 @@ export async function showTemplateBrowser(type, onSelect) {
             return;
         }
 
-        const displayName = (template.name || name).replace(/-/g, ' ');
-        const desc = template.description || '';
-        const body = template.body || '';
-        const truncBody = body.length > 500 ? body.substring(0, 500) + '...' : body;
-        const meta = [];
-        if (template.model) meta.push(`Model: ${template.model}`);
-        if (template.tools) meta.push(`Tools: ${template.tools}`);
-        if (template.allowed_tools) meta.push(`Tools: ${template.allowed_tools}`);
-        if (template.argument_hint) meta.push(`Args: ${template.argument_hint}`);
-
-        const btnLabel = type === 'agents' ? 'Use Template' : 'Add as Macro';
+        const { displayName: shownName, desc, body: truncBody, meta, btnLabel } = previewParts(template, name, type);
 
         previewPanel.innerHTML = `
-            <div class="template-preview-name">${escapeHtml(displayName)}</div>
+            <div class="template-preview-name">${escapeHtml(shownName)}</div>
             ${desc ? `<div class="template-preview-desc">${escapeHtml(desc)}</div>` : ''}
             ${meta.length ? `<div class="template-preview-meta">${meta.map(m => escapeHtml(m)).join(' &middot; ')}</div>` : ''}
             <div class="template-preview-body"><pre>${escapeHtml(truncBody)}</pre></div>
