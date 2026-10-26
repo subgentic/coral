@@ -53,7 +53,7 @@ const agenticSt = { ...base, channel: 'agentic', approved: { version: '1.4.142',
     };
     const pane = () => ev(`(() => { const q = s => document.querySelector('#update-pane-body ' + s); const all = s => [...document.querySelectorAll('#update-pane-body ' + s)];
         const w = q('.update-waiting');
-        return { group: !!q('.update-channel'), radios: all('input[name=update-channel]').map(r => ({ v: r.value, checked: r.checked })), hubLine: (q('.update-channel .tb-sub') || {}).textContent || '', calm: all('.update-channel > .update-calm').filter(e => !e.hidden).map(e => e.textContent),
+        return { group: !!q('#update-channel'), radios: all('input[name=update-channel]').map(r => ({ v: r.value, checked: r.checked })), hubLine: (q('#update-channel.update-fact') || {}).textContent || '', calm: all('.update-calm:not(.update-privacy)').filter(e => !e.hidden).map(e => e.textContent),
             waiting: !!w, open: w ? w.open : null, summary: w ? w.querySelector('summary').textContent : '', cards: w ? [...w.querySelectorAll('.update-status')].map(c => ({ title: c.querySelector('b').textContent, sub: c.querySelector('.update-status-text p').textContent, tag: (c.querySelector('code') || {}).textContent || '', href: c.querySelector('a').getAttribute('href'), target: c.querySelector('a').target, rel: c.querySelector('a').rel, label: c.querySelector('a').getAttribute('aria-label'), dot: c.dataset.k, notes: (c.querySelector('.update-notes pre') || {}).textContent || null, notesImgs: c.querySelectorAll('.update-notes img, .update-notes b').length })) : [],
             pwn: !!window.__pwn }; })()`);
     const click = sel => ev(`document.querySelector(${JSON.stringify(sel)}).click(); true`);
@@ -91,7 +91,7 @@ const agenticSt = { ...base, channel: 'agentic', approved: { version: '1.4.142',
             p = await pane();
             check(`${tag}: the notes are plain text: markup in them is shown as text, never drawn (${p.notesImgs} elements, pwn ${p.pwn})`, p.cards[0].notes === NOTES && p.cards[0].notesImgs === 0 && !p.pwn && p.cards[1].notes === null);
             await shot(`channel-agentic-waiting-${view.name}-${view.theme}`);
-            const g = await ev(`(() => { const pane = document.getElementById('update-pane-body'); const t = [...pane.querySelectorAll('.update-waiting > summary, .update-notes > summary, .update-act, label.tb-opt')].filter(e => e.getClientRects().length).map(e => Math.round(e.getBoundingClientRect().height)); return { over: Math.max(0, pane.scrollWidth - pane.clientWidth), docOver: Math.max(0, document.documentElement.scrollWidth - innerWidth), minTarget: Math.min(...t) }; })()`);
+            const g = await ev(`(() => { const pane = document.getElementById('update-pane-body'); const t = [...pane.querySelectorAll('.update-waiting > summary, .update-notes > summary, .update-act, label.sv-choice')].filter(e => e.getClientRects().length).map(e => Math.round(e.getBoundingClientRect().height)); return { over: Math.max(0, pane.scrollWidth - pane.clientWidth), docOver: Math.max(0, document.documentElement.scrollWidth - innerWidth), minTarget: Math.min(...t) }; })()`);
             check(`${tag}: nothing wider than the pane or the page (${g.over}, ${g.docOver})`, g.over <= 0 && g.docOver <= 0);
             if (view.phone) check(`${tag}: every control is 44 px or more (${g.minTarget})`, g.minTarget >= 44);
             const au = await auditRegion(ev, ['#update-pane-body'], { focus: ['.update-waiting > summary', '.update-act', '#uc-approved'] });
@@ -120,7 +120,7 @@ const agenticSt = { ...base, channel: 'agentic', approved: { version: '1.4.142',
             // 4. the Hub: a line of text, no radios, no waiting list, even when the server sent one
             await load(view, agenticSt, { hub: true });
             p = await pane();
-            check(`${tag}: through the Hub: "${p.hubLine}", no radios, no waiting list`, p.group && p.hubLine === 'Channel: Agentic (set on this computer)' && p.radios.length === 0 && !p.waiting);
+            check(`${tag}: through the Hub: "${p.hubLine}", no radios, no waiting list`, p.group && p.hubLine === 'Agentic (set on this computer)' && p.radios.length === 0 && !p.waiting);
             await shot(`channel-hub-${view.name}-${view.theme}`);
         }
         // 5. the toast, once (desktop dark)

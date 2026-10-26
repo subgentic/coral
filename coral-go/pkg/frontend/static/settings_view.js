@@ -17,7 +17,7 @@
  *     words: { none, dirty, saved, failed, busy },  onApply(key, value) for apply: 'now' fields
  *   }
  *   field = { key, type: 'text'|'textarea'|'number'|'select'|'toggle'|'multiselect'|'radio'|'secret'|'path'|'custom', label, help?: string | { text, more },
- *             id?, default?, required?, placeholder?, rows?, min?, max?, step?, unit?, options?: [{ value, label, help? }] | async () => [...], validate?(value, values) => '' | 'message',
+ *             id?, default?, required?, placeholder?, rows?, min?, max?, step?, unit?, options?: [{ value, label, help?, id? }] | async () => [...], validate?(value, values) => '' | 'message',
  *             live?: [element ids or { id, wide?, describes?: false }] (page elements a module fills, moved under the help, or under the whole row; the control is described by them),
  *             visibleWhen?(values), disabledWhen?(values) => bool | 'reason', readOnly?, apply?: 'now', action?: { label, run(view), danger?, confirm? }, wide?, compact?, render?(slot, ctl) => { get, invalid?(on) (mark the control's own input), focus?, set, onChange? } }
  *
@@ -114,7 +114,7 @@ export function mountSettingsView(host, spec) {
             const apply = () => { const w = Array.isArray(want) ? want.map(String) : [String(want ?? '')]; for (const i of inputs) i.checked = w.includes(i.value); };
             const draw = list => {
                 inputs.length = 0;
-                box.replaceChildren(...list.map((o, i) => { const lab = node('label', 'sv-choice'); const inp = node('input'); inp.type = t === 'radio' ? 'radio' : 'checkbox'; inp.name = field.key; inp.value = String(o.value); inp.id = `${id}-c${i}`; inputs.push(inp); lab.append(inp, node('span', 'sv-choice-text', o.label)); if (o.help) lab.append(node('span', 'sv-choice-help', o.help)); return lab; }));
+                box.replaceChildren(...list.map((o, i) => { const lab = node('label', 'sv-choice'); const inp = node('input'); inp.type = t === 'radio' ? 'radio' : 'checkbox'; inp.name = field.key; inp.value = String(o.value); inp.id = o.id || `${id}-c${i}`; inputs.push(inp); lab.append(inp, node('span', 'sv-choice-text', o.label)); if (o.help) lab.append(node('span', 'sv-choice-help', o.help)); return lab; }));
                 apply();
             };
             draw(optionsOf(field, draw));
