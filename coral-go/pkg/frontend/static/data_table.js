@@ -1,10 +1,12 @@
 /* The one table (#7743): every list or table surface passes what to show, the component owns how it looks and behaves. The operator's rule: a styling change is one token or one rule, so every size and colour here
  * is a --table-* token (css/data_table.css) and no surface styles a row, a cell or a header.
  *
- *   dataTable({ label, columns, rows, rowKey, groupBy(row) -> { key, label }, open, current, state, onSort, layout, fold, foldAt, sortBar, bare, empty, footer, selectable, rowName }) -> { el, bar, selectButton, selection(), clear(), state }
+ *   dataTable({ label, columns, rows, rowKey, groupBy(row) -> { key, label }, open, current, state, onSort, layout, fold, foldAt, sortBar, bare, empty, footer, selectable, rowName, detail, decorate, decorateHead }) -> { el, bar, selectButton, selection(), clear(), state }
  *   selectable = { contextKey, onChange(keys), actions: [{ label, run(rows, keys, value), danger, confirm, choose: { label, options() -> [{ value, label }] } }] }: a danger action confirms in the bar, a choose action asks for its value there.
  *   Column = { key, label, field | cell(row, ctx), primary, tone: 'primary'|'secondary'|'tertiary', width: 'grow'|'content'|'<n>rem', nowrap, align: 'start'|'end', numeric,
  *              sort: true|'number'|'date'|fn(a, b), sortValue(row), line: 0|1|2, when(row), subtitle(row), hideLabel }
+ *   detail = { id(row), open(row) -> bool, render(row) -> Node }: a second full-width row under each row (hidden while open(row) is false); the surface's own toggle in a cell opens it (Coral Hub's Servers: health, what applies).
+ *   decorate(row, tr, detailTr) and decorateHead(th, column): called each time the rows (or the header) are drawn, for the hooks a surface keeps on them.
  *   cell types: chip(word, cls), avatar(name), personButton(name, label), tag(text), timeCell(stamp), link(text, run), primaryButton(text, label)
  *   state: tableState(), kept by the caller across redraws: the sort, and the selection (a set of row keys, kept while the rows are filtered or paged, cleared when selectable.contextKey changes).
  * Folded (the table's own box narrower than foldAt rem, 40 by default; also at 200% text): fold 'column' is the two-line row (line 1 and line 2 cells), fold 'labeled' is the name, then "label value" lines
@@ -128,6 +130,7 @@ export function dataTable(cfg) {
                 b.append(el('span', null, c.label), el('span', 'dt-arrow', on ? (st.sort.dir === 'desc' ? '↓' : '↑') : '↕')); b.lastChild.setAttribute('aria-hidden', 'true');
                 th.append(b);
             } else th.append(el('span', c.hideLabel ? 'sr-only' : 'dt-head-text', c.label)); // hideLabel: a column that is only an action has no head text on screen, its name is for a reader
+            if (cfg.decorateHead) cfg.decorateHead(th, c);
             tr.append(th);
         }
         thead.append(tr);
@@ -169,6 +172,17 @@ export function dataTable(cfg) {
         return td;
     }
 
+    // detail (#7903): one more full-width row under each row, hidden until the surface says it is open; the toggle that opens it is a button in one of the row's cells (aria-expanded, aria-controls: the detail's id)
+    function detailRow(r, k, cols) {
+        const d = cfg.detail, tr = el('tr', 'dt-detail'); tr.setAttribute('role', 'row'); tr.dataset.detailFor = k;
+        const id = d.id && d.id(r); if (id) tr.id = id;
+        tr.hidden = !(d.open && d.open(r));
+        const td = el('td', 'dt-detail-cell'); td.setAttribute('role', 'cell'); td.colSpan = cols;
+        td.append(d.render(r));
+        tr.append(td);
+        return tr;
+    }
+
     function drawBody() {
         tbody.replaceChildren();
         const list = sortedRows();
@@ -203,6 +217,9 @@ export function dataTable(cfg) {
             }
             if (cfg.current != null && cfg.current === k) tr.setAttribute('aria-current', 'true');
             tbody.append(tr);
+            const dr = cfg.detail ? detailRow(r, k, cols) : null;
+            if (dr) tbody.append(dr);
+            if (cfg.decorate) cfg.decorate(r, tr, dr); // the surface's own hooks on a row it owns (an id, a class a deep link reads, a key handler): called again whenever the rows are drawn again, a sort included
         });
         syncSelection(true);
     }
@@ -210,7 +227,7 @@ export function dataTable(cfg) {
     function syncSelection(quiet) {
         if (!sel) return;
         const present = new Set(rows.map(keyOf));
-        for (const tr of tbody.children) { const on = st.selected.has(tr.dataset.key); tr.classList.toggle('dt-selected', on); tr.setAttribute('aria-selected', String(on)); const cb = tr.querySelector('.dt-check input'); if (cb) cb.checked = on; }
+        for (const tr of tbody.querySelectorAll(':scope > .dt-row')) { const on = st.selected.has(tr.dataset.key); tr.classList.toggle('dt-selected', on); tr.setAttribute('aria-selected', String(on)); const cb = tr.querySelector('.dt-check input'); if (cb) cb.checked = on; }
         const all = thead.querySelector('.dt-check-all');
         if (all) { const available = rows.filter(eligible), n = available.filter(r => st.selected.has(keyOf(r))).length; all.disabled = !available.length; all.checked = n > 0 && n === available.length; all.indeterminate = n > 0 && n < available.length; }
         drawBar();

@@ -124,6 +124,23 @@ const BASE = require('./test_base').BASE;
         assert.equal(await ev(`document.querySelectorAll('#dt-host tbody tr.dt-selected').length`), 1, 'in Select mode a tap on the row selects it');
         assert.equal((await ev(`window.__log`)).some(x => /^open/.test(x)), false, 'and does not open it');
         console.log('   ✓');
+        console.log('7. A row\'s detail, and the hooks a surface keeps on its rows (#7903)');
+        await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
+        await ev(`(async () => { const DT = await import(${MOD} + 'data_table.js'); window.__open = new Set(['b']); const host = document.getElementById('dt-host'); host.replaceChildren(DT.dataTable({ label: 'With detail', columns: [{ key: 'name', label: 'Name', primary: true, field: 'name', sort: true }], rows: [{ name: 'a' }, { name: 'b' }], rowKey: r => r.name,
+            detail: { id: r => 'd-' + r.name, open: r => window.__open.has(r.name), render: r => { const p = document.createElement('p'); p.textContent = 'about ' + r.name; return p; } },
+            decorate: (r, tr, d) => { tr.id = 'row-' + r.name; tr.classList.add('hooked'); if (d) d.classList.add('hooked-detail'); }, decorateHead: (th, c) => th.classList.add('head-' + c.key) }).el); return true; })()`);
+        const det = () => ev(`({ rows: document.querySelectorAll('#dt-host tbody tr.dt-row').length, details: [...document.querySelectorAll('#dt-host tbody tr.dt-detail')].map(d => ({ id: d.id, hidden: d.hidden, shown: d.getClientRects().length > 0, text: d.textContent, span: d.firstElementChild.colSpan, after: d.previousElementSibling.id })),
+            hooks: [...document.querySelectorAll('#dt-host tr.hooked')].map(t => t.id), hookedDetails: document.querySelectorAll('#dt-host tr.hooked-detail').length, head: !!document.querySelector('#dt-host th.head-name') })`);
+        let dd = await det();
+        assert.equal(dd.rows, 2); assert.deepEqual(dd.details.map(x => [x.id, x.hidden, x.shown, x.after]), [['d-a', true, false, 'row-a'], ['d-b', false, true, 'row-b']], 'a detail row follows its row, hidden until the surface says open: ' + JSON.stringify(dd));
+        assert.equal(dd.details[1].text, 'about b'); assert.equal(dd.details[1].span, 1, 'one cell across the table');
+        assert.deepEqual(dd.hooks, ['row-a', 'row-b']); assert.equal(dd.hookedDetails, 2); assert.equal(dd.head, true, 'decorate and decorateHead reach the rows and the header');
+        await ev(`document.querySelector('#dt-host .dt-sort').click(); document.querySelector('#dt-host .dt-sort').click(); true`);
+        dd = await det();
+        assert.deepEqual(dd.hooks, ['row-b', 'row-a'], 'a sort draws the rows again and the hooks come with them (descending now): ' + JSON.stringify(dd));
+        assert.equal(dd.hookedDetails, 2); assert.equal(dd.head, true, 'and the header\'s');
+        assert.deepEqual(dd.details.map(x => [x.id, x.after]), [['d-b', 'row-b'], ['d-a', 'row-a']], 'each detail still follows its own row');
+        console.log('   ✓');
         console.log('PASS data_table: desktop, sort, sticky head, the fold, empty and footer, selection');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
