@@ -139,13 +139,6 @@
 .detail-foot .btn { min-height: 36px; }
 .detail-foot .btn-danger { color: var(--error-text); border-color: var(--error); background: transparent; margin-right: auto; } /* one danger button, at the left edge: error-colour text with a 1 px error-colour edge, no fill, the size of the other buttons (UI/UX) */
 .team-table-scroll { overflow-x: auto; max-width: 100%; container: teamtable / inline-size; }
-.team-row-phone-status { display: none; }
-/* The Agents table at a narrow width in rem (a phone at 200% text is 11 rem wide, at 100% 20: the page's rem is 18 px): Status folds under the name, as Doing and Provider do, and Remind stays on the screen (UI/UX 170 consistency pass 2, item 5). */
-@container teamtable (max-width: 18rem) {
-    .team-table-agents th:nth-child(2), .team-table-agents td:nth-child(2) { display: none; }
-    .team-table-agents tbody td:nth-child(1) { min-width: 0; }
-    .team-row-phone-status { display: block; margin-top: 4px; }
-}
 .detail-foot a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 #team-panel-messages { padding: 16px 24px 0; } /* the same top as the other tabs (a tab's body starts 16 px under the strip, 12 on a phone), and the search row's left edge where theirs is (the messages themselves stay on the tables' edge) */
 .team-panel .list-bar-bar { padding: 0 0 8px; } /* a tab's search starts on the page edge where its chips and table do, not 12 px in (UI/UX 170 consistency, item 3) */
@@ -173,8 +166,6 @@
     .team-task-artifact-name { min-height: 44px; display: inline-flex; align-items: center; } /* a task's artifact is a 44 px target on a phone (#7739) */
     .team-table th:nth-child(n+3), .team-table td:nth-child(n+3) { display: none; } /* the name cell carries its second line: who and which goal fold into it (the phone's table is Name and State) */
     .team-row-phone { display: block; }
-    .team-table-agents th:nth-child(5), .team-table-agents td:nth-child(5) { display: table-cell; } /* the Agents table keeps Remind on a phone: Agent, Status, Remind */
-    .team-table-agents td:nth-child(5) { vertical-align: middle; }
     .detail-pane { position: fixed; inset: 0; z-index: 30; width: auto; border-left: 0; }
     .detail-close { width: 44px; height: 44px; }
     .detail-grip { display: none; }
@@ -186,9 +177,7 @@
 
 /* The Agents tab (stage 3): a quiet line and Refresh, status chips with counts on one line (they scroll sideways when too many), Remind as a quiet button in its row */
 .team-state-bad { --goal-hue: var(--error); }
-.team-table .team-remind { white-space: nowrap; margin: -5px 0; } /* in its cell, left-aligned with the column header and on the name's line: the .btn-small side margin and its height are taken out of the row */
 .team-agent-tasks { margin: 0; padding-left: 18px; }
-@media (max-width: 767px), (pointer: coarse) { .team-remind { min-height: var(--control-touch-height, 44px); } .team-table .team-remind { margin: -12px 0; } }
 /* The Settings tab (stage 3): one page of four sections, rows with the label and hint at the left and the control at the right, and a bar pinned under it (the status line, Cancel at the left, Save settings at the right). */
 .team-settings-page { flex: 1; min-height: 0; display: flex; flex-direction: column; container-type: inline-size; }
 .ts-label { overflow-wrap: break-word; }
@@ -209,8 +198,6 @@
 @media (max-width: 760px) {
     .ts-row { grid-template-columns: minmax(0, 1fr); }
     .ts-row-switch { grid-template-columns: minmax(0, 1fr) auto; align-items: center; } /* a switch stays at the right of its words on a phone, as on a desktop */
-    .team-table-agents th, .team-table-agents td { padding-left: 8px; padding-right: 8px; }
-    .team-table-agents td:nth-child(1) { min-width: 8.5rem; overflow-wrap: break-word; }
     .ts-control { justify-content: flex-start; }
     .team-settings-page select, .team-settings-page input:not([type="checkbox"]), .team-settings-page .btn { min-height: var(--control-touch-height, 44px); } /* every control of the page is a touch target (the prompt role list too) */
 }

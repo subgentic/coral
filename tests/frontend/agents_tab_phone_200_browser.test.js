@@ -13,20 +13,20 @@ const TEAM = `qa-agents200-${Date.now() % 100000}`;
     const { settle } = require('./helpers/wait').bind(ev);
     const S = scenarios();
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
-    const table = () => ev(`(() => { const box = document.querySelector('[role=tabpanel]:not([hidden]) .team-table-scroll'); const rows = [...box.querySelectorAll('tbody tr')];
+    const table = () => ev(`(() => { const box = document.querySelector('[role=tabpanel]:not([hidden]) .dt-box'); const rows = [...box.querySelectorAll('tbody tr')];
         const shown = e => !!e && e.getClientRects().length > 0;
         const remind = rows.map(r => r.querySelector('.team-remind')).filter(Boolean).map(b => { const q = b.getBoundingClientRect(); return q.right <= innerWidth + 0.5 && q.left >= 0; });
-        return { sideways: box.scrollWidth > box.clientWidth + 1, statusColumn: shown(box.querySelector('thead th:nth-child(2)')), foldedStatus: rows.map(r => shown(r.querySelector('.team-row-phone-status')) && shown(r.querySelector('.team-row-phone-status .goal-chip'))), remind, rows: rows.length }; })()`);
+        return { sideways: box.scrollWidth > box.clientWidth + 1, statusColumn: shown(box.querySelector('thead th:nth-child(2)')), foldedStatus: rows.map(r => shown(r.querySelector('[data-key=status]')) && shown(r.querySelector('[data-key=status] .goal-chip'))), remind, rows: rows.length }; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installTP(ev);
         await seed(ev, TEAM); await ev(`window.syncMobileAgentList && window.syncMobileAgentList(); true`);
         await openTeam(ev, waitFor, TEAM).catch(() => {});
-        await goTab(ev, settle, 'Agents'); await waitFor(`document.querySelectorAll('[role=tabpanel]:not([hidden]) .team-table-scroll tbody tr').length >= 2`, 'the agents', 10000);
-        await S.run('390 px, 100% text: the Status column is there and nothing folds', async () => {
+        await goTab(ev, settle, 'Agents'); await waitFor(`document.querySelectorAll('[role=tabpanel]:not([hidden]) .dt-box tbody tr').length >= 2`, 'the agents', 10000);
+        await S.run('390 px, 100% text: shared folded rows keep Status and Remind visible', async () => {
             const t = await table(); await shot('agents-100');
-            assert.deepEqual([t.sideways, t.statusColumn, t.foldedStatus.some(Boolean)], [false, true, false], JSON.stringify(t)); assert.ok(t.remind.length && t.remind.every(Boolean), 'Remind is on the screen: ' + JSON.stringify(t));
+            assert.deepEqual([t.sideways, t.statusColumn, t.foldedStatus.some(Boolean)], [false, false, true], JSON.stringify(t)); assert.ok(t.remind.length && t.remind.every(Boolean), 'Remind is on the screen: ' + JSON.stringify(t));
         });
         await S.run('390 px, 200% text: Status is under the name, Remind is on the screen, no sideways scroll', async () => {
             await ev(`document.documentElement.style.fontSize = '32px'; true`); await settle(500);

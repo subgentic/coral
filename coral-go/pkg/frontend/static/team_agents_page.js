@@ -11,7 +11,10 @@ import { OPERATOR_ID } from './utils.js';
 import { refreshTeamAvailability, remindAgent, stopAgentReminder } from './team_availability.js';
 const { openRemindDialog, REPEATS } = await importOnce('./team_remind_dialog.js');
 const Toolbar = await importOnce('./team_toolbar.js'); // the one toolbar of the team tabs (#7717)
-const { teamTable, rowButton, rowFocusTarget, stateChip, el } = await importOnce('./team_table.js'); // lazy modules load the others they need through importOnce, so a failed load is retried
+const { rowFocusTarget, stateChip, el } = await importOnce('./team_table.js'); // lazy modules load the others they need through importOnce, so a failed load is retried
+
+const DT = await importOnce('./data_table.js');
+let agentsTableState = DT.tableState();
 
 const WORD = { available: 'Free', busy: 'Busy', task_idle: 'Task assigned, idle', queued: 'Queued', waiting: 'Waiting', needs_input: 'Needs input', sleeping: 'Sleeping', offline: 'Offline', unknown: 'No signal yet', unavailable: 'Unavailable' };
 // The chips: the statuses people look for first; any other status that has agents gets its own chip after them.
@@ -88,7 +91,7 @@ async function sendReminder(agent, { message, seconds }) {
 const askRemind = (agent, opener) => openRemindDialog(agent.name, { opener, onSend: (v) => sendReminder(agent, v) });
 
 function remindButton(agent) {
-    const b = btn('btn btn-small team-remind', 'Remind');
+    const b = btn('btn btn-small dt-action team-remind', 'Remind');
     b.setAttribute('aria-label', `Remind ${agent.name}`); // one button per row, each named for whose
     b.addEventListener('click', (e) => { e.stopPropagation(); askRemind(agent, b); });
     return b;
@@ -127,7 +130,7 @@ function drawChips(host) {
 function draw() {
     const body = root && root.querySelector('.team-agents-body'); if (!body) return;
     const a = document.activeElement;
-    const held = a && body.contains(a) ? (a.closest('tr[data-key]')?.dataset.key && a.classList.contains('team-row-btn') ? `row:${a.closest('tr').dataset.key}` : a.dataset.filter ? `chip:${a.dataset.filter}` : '') : '';
+    const held = a && body.contains(a) ? (a.closest('tr[data-key]')?.dataset.key && a.classList.contains('dt-primary') ? `row:${a.closest('tr').dataset.key}` : a.dataset.filter ? `chip:${a.dataset.filter}` : '') : '';
     body.replaceChildren();
     if (model.failed) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, model.failed), btn('btn btn-small', 'Try again', () => load())); body.append(f); }
     if (model.loading) { body.append(el('p', 'goals-note', 'Checking agents…')); return; }
@@ -136,19 +139,18 @@ function draw() {
     if (!data.agents.length) { body.append(el('div', 'goals-empty', 'No agents on this board yet.')); return; }
     drawChips(body);
     const rows = visibleAgents();
-    body.append(teamTable({
-        label: `Agents, ${rows.length}`, columns: ['Agent', 'Status', 'Doing', 'Provider', 'Remind'],
-        className: 'team-table-agents', rows: rows.map(ag => {
-            const key = ag.subscriber_id || ag.session_id || ag.name;
-            const b = rowButton(ag.name);
-            const first = el('div', 'team-row-cell'); const folded = el('span', 'team-row-phone-status'); folded.append(stateChip(statusWord(ag), CLASS[ag.availability]));
-            first.append(b, el('span', 'team-row-phone', [doingOf(ag), providerOf(ag)].filter(Boolean).join(' · ')), folded); // a phone's table folds what it does and its provider under the name, and at a narrow width (200% text) its status too
-            return {
-                key, open: (tr) => hooks.openAgent?.(ag, tr.querySelector('.team-row-btn')),
-                cells: [first, stateChip(statusWord(ag), CLASS[ag.availability]), doingOf(ag), providerOf(ag), canRemind(ag) && ag.agent_type !== 'terminal' ? remindButton(ag) : ''],
-            };
-        }),
-    }));
+    body.append(DT.dataTable({
+        label: `Agents, ${rows.length}`, rows, rowKey: ag => ag.subscriber_id || ag.session_id || ag.name, state: agentsTableState,
+        open: (ag, tr) => hooks.openAgent?.(ag, tr.querySelector('.dt-primary')),
+        columns: [
+            { key: 'agent', label: 'Agent', primary: true, width: 'grow', line: 1, field: 'name', sort: true,
+                cell: ag => { const b = DT.primaryButton('', ag.name); b.append(DT.avatar(ag.name)); return b; } },
+            { key: 'status', label: 'Status', line: 2, sort: true, sortValue: statusWord, cell: ag => DT.chip(statusWord(ag), CLASS[ag.availability]) },
+            { key: 'doing', label: 'Doing', line: 2, sort: true, sortValue: doingOf, cell: doingOf },
+            { key: 'provider', label: 'Provider', line: 2, tone: 'tertiary', sort: true, sortValue: providerOf, cell: providerOf },
+            { key: 'remind', label: 'Remind', line: 1, cell: ag => canRemind(ag) && ag.agent_type !== 'terminal' ? remindButton(ag) : '' },
+        ],
+    }).el);
     if (held) { const sel = held.startsWith('row:') ? rowFocusTarget(body, held.slice(4)) : body.querySelector(`.goals-chip[data-filter="${CSS.escape(held.slice(5))}"]`); sel?.focus({ preventScroll: true }); }
 }
 
@@ -168,7 +170,7 @@ function watch() {
 
 /** Show the team's agents in `host`. hooks: onCount(n), openAgent(agent, opener). */
 export function showAgents(host, team, h = {}) {
-    if (team !== model.team) Object.assign(model, { team, data: null, filter: 'all', failed: '', loading: false });
+    if (team !== model.team) { agentsTableState = DT.tableState(); Object.assign(model, { team, data: null, filter: 'all', search: '', failed: '', loading: false }); }
     hooks = h;
     if (!host.dataset.built) {
         host.dataset.built = '1';

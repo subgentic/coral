@@ -113,3 +113,6 @@
 .dt-progress-meter::-webkit-progress-bar { background: var(--table-progress-track); }
 .dt-progress-meter::-webkit-progress-value { background: var(--table-progress-fill); }
 .dt-progress-meter::-moz-progress-bar { background: var(--table-progress-fill); }
+
+.dt-table .dt-action { margin: 0; white-space: nowrap; }
+.dt-box.dt-folded .dt-action { min-height: var(--table-touch); }
