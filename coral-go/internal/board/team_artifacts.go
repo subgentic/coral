@@ -29,6 +29,9 @@ type TeamArtifactTask struct {
 	AssignedTo  string
 	CompletedBy string
 	SessionID   string
+	// GoalID and GoalTitle: the goal of this board the task works toward (#8579), nil and empty for none.
+	GoalID    *int64
+	GoalTitle string
 }
 
 // TeamSubscriberSessions maps each of the project's subscriber ids to the Coral
@@ -161,11 +164,14 @@ func (s *Store) ListTeamArtifactTasksQuery(ctx context.Context, q TeamArtifactQu
 		AssignedTo  *string `db:"assigned_to"`
 		CompletedBy *string `db:"completed_by"`
 		SessionID   *string `db:"session_id"`
+		GoalID      *int64  `db:"goal_id"`
+		GoalTitle   string  `db:"goal_title"`
 		Data        string  `db:"data"`
 	}
 	// Prefilter in SQL so tasks without any artifacts are not decoded.
-	query := `SELECT t.id, t.title, t.created_at, t.completed_at, t.assigned_to, t.completed_by, t.session_id, w.data
+	query := `SELECT t.id, t.title, t.created_at, t.completed_at, t.assigned_to, t.completed_by, t.session_id, t.goal_id, COALESCE(g.title, '') AS goal_title, w.data
 		FROM board_tasks t JOIN task_workflows w ON w.task_id = t.id
+		LEFT JOIN board_goals g ON g.board_id = t.board_id AND g.id = t.goal_id
 		WHERE t.board_id = ? AND w.data LIKE '%"artifacts":[%'`
 	args := []any{project}
 	if q.SessionID != "" {
@@ -215,6 +221,7 @@ func (s *Store) ListTeamArtifactTasksQuery(ctx context.Context, q TeamArtifactQu
 		if row.SessionID != nil {
 			t.SessionID = *row.SessionID
 		}
+		t.GoalID, t.GoalTitle = row.GoalID, row.GoalTitle
 		tasks = append(tasks, t)
 	}
 	return tasks, truncated, nil
