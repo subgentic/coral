@@ -17,6 +17,7 @@ import os
 import re
 import sys
 import time
+import urllib.error
 import urllib.request
 
 API = "https://api.github.com"
@@ -165,6 +166,29 @@ def github_get(repo):
         with urllib.request.urlopen(req, timeout=30) as resp:
             return json.load(resp)
     return get
+
+
+def github_zip(repo):
+    """The bytes of an artifact's zip. The API answers with a redirect to a signed storage URL: it is followed without the token (urllib would send the
+    Authorization header on to the storage host), and the body is capped."""
+    token = os.environ.get("GITHUB_TOKEN", "")
+
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, *a, **k):
+            return None
+
+    def get_zip(artifact_id):
+        req = urllib.request.Request(f"{API}/repos/{repo}/actions/artifacts/{int(artifact_id)}/zip", headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"})
+        try:
+            urllib.request.build_opener(NoRedirect).open(req, timeout=30)
+        except urllib.error.HTTPError as e:
+            loc = e.headers.get("Location", "") if e.code in (301, 302, 303, 307, 308) else ""
+            if not loc.startswith("https://"):
+                return b""
+            with urllib.request.urlopen(urllib.request.Request(loc), timeout=30) as resp:
+                return resp.read(1 << 20)
+        return b""
+    return get_zip
 
 
 def pr_files(get, number):

@@ -245,12 +245,27 @@ jobs:
               o.write("suites=" + ",".join(again[:3]) + "\n")
           if len(again) > 3: lines.append(f"{len(again) - 3} more suite(s) to repeat by hand: " + ", ".join(again[3:]))
           print("\n".join(lines))
+          # What release_provenance.py reads when the notes commit accepts a known red suite (#8643): this run's own facts, by name of run and attempt.
+          # parts_reported counts the parts that wrote results.json: a part killed before its end uploads run.log only and is not reported
+          os.makedirs('cdp-summary', exist_ok=True)
+          with open('cdp-summary/cdp-summary.json', 'w') as o:
+              json.dump({'head_sha': os.environ['GITHUB_SHA'], 'event': os.environ['GITHUB_EVENT_NAME'], 'run_id': int(os.environ['GITHUB_RUN_ID']),
+                         'run_attempt': int(os.environ['GITHUB_RUN_ATTEMPT']), 'parts_reported': sum(os.path.exists(os.path.join(d, 'results.json')) for d in dirs), 'suites_run': len(rows), 'failed': failed,
+                         'flaky': flaky, 'ends': len(ends), 'stripped': os.environ['STRIPPED_RESULT'], 'parts': os.environ['PARTS_RESULT']}, o)
           with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as s:
               s.write("## cdp-gate\n\n" + "\n\n".join(lines) + "\n")
           raise SystemExit(0 if green else 1)
           PY
           echo "parts: $PARTS_RESULT"
           [ "$PARTS_RESULT" = success ]
+      - name: upload the summary
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: cdp-summary-a${{ github.run_attempt }}
+          path: cdp-summary/cdp-summary.json
+          if-no-files-found: ignore
+          retention-days: 30
 
   repeat:
     # Manual only (workflow_dispatch with suites): the chosen suites, each run inputs.runs times on one shard with

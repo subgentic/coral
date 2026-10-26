@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """Tests of release_provenance.py (#5550) against a stand-in GitHub API: no network."""
+import io
+import json
 import os
 import sys
 import unittest
+import zipfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import release_provenance as p  # noqa: E402
@@ -16,6 +19,7 @@ CFG = {
     "events": ["push", "pull_request", "workflow_dispatch"],
     "always_events": ["push", "workflow_dispatch"],
     "workflow_files": {n: f".github/workflows/{n}.yml" for n in ("go-tests", "go-race", "cdp-gate")},
+    "cdp_parts": 9,
 }
 TAGGED = "b" * 40  # the notes commit that is tagged
 GATED = "a" * 40  # its parent: the code the gates ran on
@@ -27,9 +31,11 @@ def run(name, sha, conclusion="success", status="completed", event="push", branc
             "path": f".github/workflows/{name}.yml@refs/heads/{branch}"}
 
 
-def api(commits, compare, runs):
-    """commits: sha -> {files, parents}; compare: sha -> status; runs: list of run dicts"""
+def api(commits, compare, runs, artifacts=None):
+    """commits: sha -> {files, parents}; compare: sha -> status; runs: list of run dicts; artifacts: run id -> list of artifact dicts"""
     def get(path):
+        if path.startswith("/actions/runs/") and "/artifacts" in path:
+            return {"artifacts": (artifacts or {}).get(int(path.split("/")[3]), [])}
         if path.startswith("/commits/"):
             c = commits[path.split("/")[2]]
             return {"files": [{"filename": f} for f in c["files"]], "parents": [{"sha": s} for s in c["parents"]], "commit": {"message": c.get("message", "")}}
@@ -42,9 +48,9 @@ def api(commits, compare, runs):
     return get
 
 
-def go(commits, compare, runs, actor="the-pusher"):
+def go(commits, compare, runs, actor="the-pusher", artifacts=None, zips=None):
     lines = []
-    rc = p.provenance(CFG, api(commits, compare, runs), REPO, TAGGED, actor, out=lines.append)
+    rc = p.provenance(CFG, api(commits, compare, runs, artifacts), REPO, TAGGED, actor, out=lines.append, get_zip=(lambda i: zips[i]) if zips is not None else None)
     return rc, "\n".join(lines)
 
 
@@ -180,6 +186,186 @@ class T(unittest.TestCase):
             self.assertEqual(rc, 1, out)
             self.assertIn("| trailer | refused | a Gated-commit line is not in the exact form", out)
             self.assertIn(bad[:12], out)
+
+    # ---- a known red (#8643): the notes commit's "Accepted-red" trailer ----
+    RED = "strict: board_table_seeded.test.mjs"
+
+    def summary(self, **kw):
+        d = {"head_sha": GATED, "event": "push", "run_id": 3, "run_attempt": 1, "parts_reported": 9, "suites_run": 240, "failed": [self.RED], "flaky": [], "ends": 0,
+             "stripped": "success", "parts": "failure"}
+        d.update(kw)
+        return d
+
+    def zipped(self, d, name="cdp-summary.json"):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as z:
+            z.writestr(name, json.dumps(d) if not isinstance(d, (bytes, str)) else d)
+        return buf.getvalue()
+
+    def waive(self, names=None, summary=None, runs=None, message=None, artifact=None, zipbytes=None, nogz=False):
+        """Run the release with a red cdp-gate and an Accepted-red trailer; returns (rc, out)."""
+        names = [self.RED] if names is None else names
+        msg = message if message is not None else f"release notes: v2.0.1\n\nGated-commit: {GATED}\nAccepted-red: {', '.join(names)}\n"
+        commits = {TAGGED: {"files": ["RELEASE_NOTES.md"], "parents": [GATED], "message": msg}}
+        runs = runs if runs is not None else [run("go-tests", GATED), run("go-race", GATED, rid=2), run("cdp-gate", GATED, conclusion="failure", rid=3)]
+        art = artifact if artifact is not None else {"id": 77, "name": "cdp-summary-a1", "expired": False, "workflow_run": {"id": 3, "head_sha": GATED}}
+        blob = zipbytes if zipbytes is not None else self.zipped(summary if summary is not None else self.summary())
+        return go(commits, {TAGGED: "identical"}, runs, artifacts={3: [art]}, zips=None if nogz else {77: blob})
+
+    def test_a_named_red_suite_that_is_really_the_only_red_one_is_accepted_and_recorded(self):
+        rc, out = self.waive()
+        self.assertEqual(rc, 0, out)
+        self.assertIn(f"| cdp-gate | accepted red | {self.RED}: run 3 attempt 1, 240 suites ran,", out)
+        self.assertIn(f"provenance: GATES GREEN except accepted red: {self.RED}", out)
+        self.assertIn(f"gated commit: {GATED}", out)
+        # two named, both red
+        two = [self.RED, "x_browser.test.mjs"]
+        rc, out = self.waive(names=two, summary=self.summary(failed=two))
+        self.assertEqual(rc, 0, out)
+
+    def test_without_the_trailer_a_red_cdp_gate_still_fails(self):
+        rc, out = self.waive(message=f"release notes: v2.0.1\n\nGated-commit: {GATED}\n")
+        self.assertEqual(rc, 1, out)
+        self.assertIn("| cdp-gate | failure | run 3 |", out)
+        self.assertNotIn("accepted red", out)
+
+    def test_a_second_red_suite_that_is_not_named_is_refused(self):
+        rc, out = self.waive(summary=self.summary(failed=[self.RED, "other.test.mjs"]))
+        self.assertEqual(rc, 1, out)
+        self.assertIn("Accepted-red refused", out)
+        self.assertNotIn("other.test.mjs", out)  # a name that was not accepted is never printed
+
+    def test_a_named_suite_that_did_not_fail_or_does_not_exist_is_refused(self):
+        rc, out = self.waive(names=["fine.test.mjs"], summary=self.summary(failed=[self.RED]))
+        self.assertEqual(rc, 1, out)
+        rc, out = self.waive(summary=self.summary(failed=[]))  # a later green rerun: nothing is red, the waiver is refused
+        self.assertEqual(rc, 1, out)
+
+    def test_go_tests_and_go_race_are_never_excused(self):
+        for gate in ("go-tests", "go-race"):
+            runs = [run("go-tests", GATED), run("go-race", GATED, rid=2), run("cdp-gate", GATED, conclusion="failure", rid=3)]
+            runs = [run(gate, GATED, conclusion="failure", rid=5 if r["name"] == gate else r["id"]) if r["name"] == gate else r for r in runs]
+            rc, out = self.waive(runs=runs)
+            self.assertEqual(rc, 1, (gate, out))
+            self.assertIn(f"| {gate} | failure |", out)
+            rc, out = self.waive(names=[gate], summary=self.summary(failed=[gate]), runs=runs)
+            self.assertEqual(rc, 1, (gate, out))
+
+    def test_a_red_for_more_than_suites_is_not_excusable(self):
+        for bad in ({"parts_reported": 8}, {"parts": "cancelled"}, {"parts": "success"}, {"parts": None}, {"flaky": ["f.test.mjs"]}, {"ends": 1}, {"stripped": "failure"}, {"suites_run": 0}):
+            rc, out = self.waive(summary=self.summary(**bad))
+            self.assertEqual(rc, 1, (bad, out))
+
+    def test_a_summary_of_another_run_or_commit_or_attempt_or_event_is_refused(self):
+        for bad in ({"head_sha": "c" * 40}, {"run_id": 4}, {"run_attempt": 2}, {"event": "workflow_dispatch"}, {"failed": "x"}, {"ends": "0"}):
+            rc, out = self.waive(summary=self.summary(**bad))
+            self.assertEqual(rc, 1, (bad, out))
+
+    def test_the_artifact_must_be_this_runs_own_of_that_attempt(self):
+        base = {"id": 77, "name": "cdp-summary-a1", "expired": False, "workflow_run": {"id": 3, "head_sha": GATED}}
+        for bad in (dict(base, name="cdp-summary"), dict(base, name="cdp-summary-a2"), dict(base, expired=True), dict(base, workflow_run={"id": 9, "head_sha": GATED}),
+                    dict(base, workflow_run={"id": 3, "head_sha": "c" * 40})):
+            rc, out = self.waive(artifact=bad)
+            self.assertEqual(rc, 1, (bad, out))
+        rc, out = self.waive(nogz=True)  # no way to read the artifact
+        self.assertEqual(rc, 1, out)
+
+    def test_a_summary_that_is_not_a_one_file_zip_of_a_json_object_is_refused(self):
+        two = io.BytesIO()
+        with zipfile.ZipFile(two, "w") as z:
+            z.writestr("cdp-summary.json", json.dumps(self.summary()))
+            z.writestr("extra.txt", "x")
+        for blob in (two.getvalue(), b"", b"not a zip", self.zipped(self.summary(), name="other.json"), self.zipped("[1]"), self.zipped("{not json"),
+                     self.zipped(json.dumps(self.summary(pad="x" * 70000)))):
+            rc, out = self.waive(zipbytes=blob)
+            self.assertEqual(rc, 1, (blob[:20], out))
+
+    def test_a_cancelled_cdp_gate_run_does_not_carry_a_waiver(self):
+        runs = [run("go-tests", GATED), run("go-race", GATED, rid=2), run("cdp-gate", GATED, conclusion="cancelled", rid=3)]
+        rc, out = self.waive(runs=runs)
+        self.assertEqual(rc, 1, out)
+        self.assertNotIn("accepted red", out)
+
+    def test_a_dispatched_cdp_gate_run_does_not_carry_a_waiver(self):
+        runs = [run("go-tests", GATED), run("go-race", GATED, rid=2), run("cdp-gate", GATED, conclusion="failure", rid=3, event="workflow_dispatch")]
+        rc, out = self.waive(runs=runs)  # the summary says push, the run is a dispatch: the run decides
+        self.assertEqual(rc, 1, out)
+
+    def test_a_malformed_or_unplaced_trailer_is_refused_and_never_printed_raw(self):
+        hostile = "x\n::error::injected"
+        for names_line in ("Accepted-red:strict_x.test.mjs", "Accepted-red: ", "accepted-red: x.test.mjs", "Accepted-red: A.test.mjs", "Accepted-red: a, a", "Accepted-red: a, b, c, d",
+                           "Accepted-red: a::b", "Accepted-red: a,b", "Accepted-red: go-tests ; rm"):
+            rc, out = self.waive(message=f"release notes\n\nGated-commit: {GATED}\n{names_line}\n")
+            self.assertEqual(rc, 1, (names_line, out))
+            self.assertIn("| trailer | refused |", out)
+        rc, out = self.waive(message=f"release notes\n\nGated-commit: {GATED}\nAccepted-red: a.test.mjs\nAccepted-red: b.test.mjs\n")
+        self.assertEqual(rc, 1, out)
+        rc, out = self.waive(message=f"release notes\n\nGated-commit: {GATED}\nAccepted-red: {hostile}\n")
+        self.assertEqual(rc, 1, out)
+        self.assertNotIn("::error::", out)
+        rc, out = self.waive(message=f"release notes\n\nGated-commit: {GATED}\nAccepted-red: a|b`c<d>$(x)\n")  # a character a table row or a command would use
+        self.assertEqual(rc, 1, out)
+        for c in "|`<>$()":
+            self.assertNotIn(c, out.split("| trailer | refused |")[1].split("\n")[0].rstrip(" |"), c)
+        rc, out = self.waive(message=f"release notes\n\nGated-commit: {GATED}\nAccepted-red: {self.RED}\nAccepted-red: {self.RED}\n")
+        self.assertEqual(rc, 1, out)
+        self.assertIn("more than one Accepted-red line", out)
+        # without Gated-commit the waiver has no commit to be for
+        rc, out = self.waive(message=f"release notes\n\nAccepted-red: {self.RED}\n")
+        self.assertEqual(rc, 1, out)
+        self.assertIn("needs the Gated-commit trailer", out)
+
+    def test_the_summary_step_counts_the_parts_that_wrote_results_and_a_killed_part_is_not_excused(self):
+        """The workflow's own inline summary script, run on a temp parts/ tree: nine part directories, one of them (killed by its timeout) holding run.log only."""
+        import re
+        import subprocess
+        import tempfile
+        here = os.path.dirname(os.path.abspath(__file__))
+        wf = open(os.path.join(here, "..", "..", ".github", "workflows", "cdp-gate.yml")).read()
+        start = wf.index("python3 - <<'PY'\n", wf.index("\n  summary:")) + len("python3 - <<'PY'\n")
+        code = "\n".join(l[10:] for l in wf[start:wf.index("          PY\n", start)].splitlines())
+
+        def run_step(missing):
+            with tempfile.TemporaryDirectory(prefix="cdp-sum-") as d:
+                for n in range(1, 10):
+                    pd = os.path.join(d, "parts", f"cdp-{n}-a1")
+                    os.makedirs(pd)
+                    open(os.path.join(pd, "run.log"), "w").write("log\n")
+                    if n != missing:
+                        rows = [{"test": f"s{n}.test.mjs", "status": "pass"}] + ([{"test": self.RED, "status": "fail"}] if n == 1 else [])
+                        open(os.path.join(pd, "results.json"), "w").write(json.dumps(rows))
+                env = dict(os.environ, PARTS_RESULT="failure", STRIPPED_RESULT="success", GITHUB_OUTPUT=os.path.join(d, "out"), GITHUB_STEP_SUMMARY=os.path.join(d, "sum"),
+                           GITHUB_SHA=GATED, GITHUB_EVENT_NAME="push", GITHUB_RUN_ID="3", GITHUB_RUN_ATTEMPT="1")
+                subprocess.run([sys.executable, "-I", "-c", code], cwd=d, env=env, capture_output=True, check=False)
+                return json.load(open(os.path.join(d, "cdp-summary", "cdp-summary.json")))
+
+        whole = run_step(missing=None)
+        self.assertEqual((whole["parts_reported"], whole["failed"], whole["suites_run"]), (9, [self.RED], 10))
+        rc, out = self.waive(summary=whole)
+        self.assertEqual(rc, 0, out)
+        killed = run_step(missing=5)
+        self.assertEqual(killed["parts_reported"], 8, "the part with run.log only is not reported")
+        rc, out = self.waive(summary=killed)
+        self.assertEqual(rc, 1, out)
+        self.assertIn("8 parts reported, 9 expected", out)
+
+    def test_only_cdp_gate_can_carry_a_waiver(self):
+        """A red go-tests with a valid-looking summary of its own run and a matching trailer is still refused: the waiver is judged for cdp-gate alone."""
+        runs = [run("go-tests", GATED, conclusion="failure", rid=5), run("go-race", GATED, rid=2), run("cdp-gate", GATED, rid=3)]
+        art = {"id": 78, "name": "cdp-summary-a1", "expired": False, "workflow_run": {"id": 5, "head_sha": GATED}}
+        msg = f"release notes: v2.0.1\n\nGated-commit: {GATED}\nAccepted-red: {self.RED}\n"
+        commits = {TAGGED: {"files": ["RELEASE_NOTES.md"], "parents": [GATED], "message": msg}}
+        rc, out = go(commits, {TAGGED: "identical"}, runs, artifacts={5: [art]}, zips={78: self.zipped(self.summary(run_id=5))})
+        self.assertEqual(rc, 1, out)
+        self.assertIn("| go-tests | failure | run 5 |", out)
+        self.assertNotIn("accepted red", out)
+
+    def test_the_live_gate_json_keeps_the_three_heavy_gates_and_the_part_count(self):
+        import gate_check
+        cfg = gate_check.load_config(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".github", "gate.json"))
+        for n in ("go-tests", "go-race", "cdp-gate"):
+            self.assertIn(n, cfg["always"], "dropping a heavy gate from gate.json needs the owner: the known-red input is the way to accept a red suite (#8643)")
+        self.assertEqual(cfg.get("cdp_parts"), 9, "the cdp-gate matrix has nine parts")
 
     def test_main_rejects_a_bad_argument_before_any_request(self):
         for argv in (["x"], ["x", "a/b", "c" * 40], ["x", "a/b", "c" * 40, "bad actor;rm"], ["x", "a b", "c" * 40, "ok"], ["x", "a/b", "zz", "ok"]):
